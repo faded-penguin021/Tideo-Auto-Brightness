@@ -33,10 +33,11 @@ object Routes {
 fun AppNavGraph(navController: NavHostController, viewModel: SettingsViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val graphState by viewModel.graphState.collectAsStateWithLifecycle()
+    val healthState by viewModel.healthState.collectAsStateWithLifecycle()
 
     NavHost(navController = navController, startDestination = Routes.Dashboard) {
         composable(Routes.Dashboard) {
-            DashboardScreen(navController = navController, state = state, onToggle = viewModel::setEnabled)
+            DashboardScreen(navController = navController, state = state, healthState = healthState, onToggle = viewModel::setEnabled)
         }
         composable(Routes.BrightnessSettings) {
             BrightnessSettingsScreen(state = state, onUpdate = viewModel::updateBrightness)

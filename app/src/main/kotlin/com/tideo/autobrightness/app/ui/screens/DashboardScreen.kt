@@ -11,17 +11,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.navigation.Routes
+import com.tideo.autobrightness.app.state.ServiceHealthUiState
 import com.tideo.autobrightness.app.state.SettingsState
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun DashboardScreen(
     navController: NavHostController,
     state: SettingsState,
+    healthState: ServiceHealthUiState,
     onToggle: (Boolean) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Auto Brightness")
         Switch(checked = state.enabled, onCheckedChange = onToggle)
+        Text("Last sensor sample: ${healthState.lastSensorTimestampMs.toHumanTime()}")
+        Text("Last brightness apply: ${healthState.lastApplyTimestampMs.toHumanTime()}")
+        Text("Degraded mode: ${if (healthState.degradedMode) "Yes" else "No"}")
+        healthState.degradedReason?.let { Text("Reason: $it") }
+
         Button(onClick = { navController.navigate(Routes.BrightnessSettings) }) { Text("Brightness Settings") }
         Button(onClick = { navController.navigate(Routes.Dimming) }) { Text("Dimming") }
         Button(onClick = { navController.navigate(Routes.Reactivity) }) { Text("Reactivity") }
@@ -34,4 +44,11 @@ fun DashboardScreen(
         Button(onClick = { navController.navigate(Routes.GraphTaper) }) { Text("Taper Graph") }
         Button(onClick = { navController.navigate(Routes.GraphPowerDraw) }) { Text("Power Draw Graph") }
     }
+}
+
+private fun Long?.toHumanTime(): String {
+    if (this == null) return "Never"
+    return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(
+        Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDateTime(),
+    )
 }
