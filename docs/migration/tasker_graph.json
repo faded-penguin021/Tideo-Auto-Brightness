@@ -1,0 +1,5465 @@
+{
+  "source_xml": "Advanced_Auto_Brightness_V3.3.prj_4.xml",
+  "profile_trigger_map": [
+    {
+      "id": "753",
+      "name": "Hibernate (Display Off)",
+      "entry_mid0": "585",
+      "entry_task": "Reset Brightness and State",
+      "triggers": [
+        {
+          "context_kind": "Event",
+          "code": "210",
+          "android_trigger_type": "Display Off event"
+        }
+      ]
+    },
+    {
+      "id": "754",
+      "name": "Throttle Reinitialization",
+      "entry_mid0": "566",
+      "entry_task": "Reset Throttle",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "123",
+          "android_trigger_type": "Variable value state"
+        },
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Throttle",
+              "op": "3",
+              "rhs": "%AAB_DefaultThrottle"
+            },
+            {
+              "lhs": "%LastAAB",
+              "op": "12",
+              "rhs": null
+            }
+          ]
+        },
+        {
+          "context_kind": "Event",
+          "code": "2095",
+          "android_trigger_type": "Tick/delayed timer event",
+          "args": [
+            {
+              "tag": "Str",
+              "value": "10000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "755",
+      "name": "Allow Override",
+      "entry_mid0": "567",
+      "entry_task": "Manual Override",
+      "triggers": [
+        {
+          "context_kind": "Event",
+          "code": "2075",
+          "android_trigger_type": "System setting changed event",
+          "args": [
+            {
+              "tag": "Str",
+              "value": "screen_brightness"
+            }
+          ]
+        },
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AutoBrightRunning",
+              "op": "2",
+              "rhs": "0"
+            },
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "1",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_Initializing",
+              "op": "1",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_DetectOverrides",
+              "op": "1",
+              "rhs": "Off"
+            }
+          ]
+        },
+        {
+          "context_kind": "State",
+          "code": "123",
+          "android_trigger_type": "Variable value state"
+        }
+      ]
+    },
+    {
+      "id": "756",
+      "name": "Repost Paused Notification",
+      "entry_mid0": "567",
+      "entry_task": "Manual Override",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Service",
+              "op": "1",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_ResumeTapped",
+              "op": "1",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%SCREEN",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "2",
+              "rhs": "true"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "757",
+      "name": "Repost Foreground Notification",
+      "entry_mid0": "584",
+      "entry_task": "_ForegroundNotification",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%SCREEN",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "1",
+              "rhs": "true"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "758",
+      "name": "Dynamic Scale Engine",
+      "entry_mid0": "90",
+      "entry_task": "Dynamic Scale V13 (Java) App Version",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_MorningStart",
+              "op": "6",
+              "rhs": "%TIMES % 86400"
+            },
+            {
+              "lhs": "%AAB_MorningEnd",
+              "op": "7",
+              "rhs": "%TIMES % 86400"
+            },
+            {
+              "lhs": "%AAB_EveningStart",
+              "op": "6",
+              "rhs": "%TIMES % 86400 - 86400"
+            },
+            {
+              "lhs": "%AAB_EveningEnd",
+              "op": "7",
+              "rhs": "%TIMES % 86400 - 86400"
+            },
+            {
+              "lhs": "%AAB_SunLastDate",
+              "op": "3",
+              "rhs": "%DATE"
+            },
+            {
+              "lhs": "%AAB_ScalingUse",
+              "op": "2",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_MorningStart",
+              "op": "6",
+              "rhs": "%TIMES % 86400 + 86400"
+            },
+            {
+              "lhs": "%AAB_MorningEnd",
+              "op": "7",
+              "rhs": "%TIMES % 86400 + 86400"
+            },
+            {
+              "lhs": "%AAB_MorningStart",
+              "op": "6",
+              "rhs": "%TIMES % 86400 - 86400"
+            },
+            {
+              "lhs": "%AAB_MorningEnd",
+              "op": "7",
+              "rhs": "%TIMES % 86400 - 86400"
+            },
+            {
+              "lhs": "%AAB_EveningStart",
+              "op": "6",
+              "rhs": "%TIMES % 86400"
+            },
+            {
+              "lhs": "%AAB_EveningEnd",
+              "op": "7",
+              "rhs": "%TIMES % 86400"
+            },
+            {
+              "lhs": "%AAB_EveningStart",
+              "op": "6",
+              "rhs": "%TIMES % 86400 + 86400"
+            },
+            {
+              "lhs": "%AAB_EveningEnd",
+              "op": "7",
+              "rhs": "%TIMES % 86400 + 86400"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "759",
+      "name": "Proximity Detection",
+      "entry_mid0": "545",
+      "entry_task": "Detect Proximity",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "125",
+          "android_trigger_type": "Proximity sensor state"
+        },
+        {
+          "context_kind": "State",
+          "code": "123",
+          "android_trigger_type": "Variable value state"
+        }
+      ]
+    },
+    {
+      "id": "760",
+      "name": "Monitor Ambient Light",
+      "entry_mid0": "554",
+      "entry_task": "Process Sensor Event (Java)",
+      "triggers": [
+        {
+          "context_kind": "Event",
+          "code": "2088",
+          "android_trigger_type": "Periodic timer event",
+          "conditions": [
+            {
+              "lhs": "%AAB_TrustUnreliable",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_TrustUnreliable",
+              "op": "2",
+              "rhs": "Off"
+            },
+            {
+              "lhs": "%as_accuracy",
+              "op": "7",
+              "rhs": "1"
+            },
+            {
+              "lhs": "%as_values1",
+              "op": "6",
+              "rhs": "%AAB_ThreshAbsLow"
+            },
+            {
+              "lhs": "%as_values1",
+              "op": "7",
+              "rhs": "%AAB_ThreshAbsHigh"
+            },
+            {
+              "lhs": "%AAB_MainLoop",
+              "op": "3",
+              "rhs": "On"
+            }
+          ],
+          "args": [
+            {
+              "tag": "Str",
+              "value": "5"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "761",
+      "name": "Initialize (Display On)",
+      "entry_mid0": "618",
+      "entry_task": "Set Initial Brightness (Java) V3",
+      "triggers": [
+        {
+          "context_kind": "Event",
+          "code": "208",
+          "android_trigger_type": "Display On event"
+        }
+      ]
+    },
+    {
+      "id": "762",
+      "name": "Context: App Changed",
+      "entry_mid0": "43",
+      "entry_task": "_EvaluateContexts V2",
+      "triggers": [
+        {
+          "context_kind": "Event",
+          "code": "2078",
+          "android_trigger_type": "App changed event"
+        },
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_ContextOverride",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_ContextCache",
+              "op": "2",
+              "rhs": "*.*"
+            }
+          ]
+        },
+        {
+          "context_kind": "State",
+          "code": "123",
+          "android_trigger_type": "Variable value state"
+        }
+      ]
+    },
+    {
+      "id": "763",
+      "name": "Context: Battery Changed",
+      "entry_mid0": "43",
+      "entry_task": "_EvaluateContexts V2",
+      "triggers": [
+        {
+          "context_kind": "Event",
+          "code": "203",
+          "android_trigger_type": "Battery Changed event"
+        },
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_ContextCache",
+              "op": "2",
+              "rhs": "*[BATT]*"
+            },
+            {
+              "lhs": "%AAB_ContextOverride",
+              "op": "3",
+              "rhs": "true"
+            }
+          ]
+        },
+        {
+          "context_kind": "State",
+          "code": "123",
+          "android_trigger_type": "Variable value state"
+        }
+      ]
+    },
+    {
+      "id": "764",
+      "name": "Context: Time Changed",
+      "entry_mid0": "43",
+      "entry_task": "_EvaluateContexts V2",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_NextContextTime",
+              "op": "12",
+              "rhs": null
+            },
+            {
+              "lhs": "%AAB_ContextOverride",
+              "op": "3",
+              "rhs": "true"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "765",
+      "name": "Context: Location Listener",
+      "entry_mid0": "630",
+      "entry_task": "_ContextLocnListener V4",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_ContextOverride",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_ContextCache",
+              "op": "2",
+              "rhs": "*[LOC]*"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "766",
+      "name": "Context: Location Refresher",
+      "entry_mid0": "631",
+      "entry_task": "_ContextF5NetLoc V8",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_ContextCache",
+              "op": "2",
+              "rhs": "*[LOC]*"
+            },
+            {
+              "lhs": "%AAB_ContextOverride",
+              "op": "3",
+              "rhs": "true"
+            }
+          ]
+        },
+        {
+          "context_kind": "State",
+          "code": "123",
+          "android_trigger_type": "Variable value state"
+        }
+      ]
+    },
+    {
+      "id": "767",
+      "name": "Context: Location Changed",
+      "entry_mid0": "43",
+      "entry_task": "_EvaluateContexts V2",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_ContextCache",
+              "op": "2",
+              "rhs": "*[LOC]*"
+            },
+            {
+              "lhs": "%AAB_ContextOverride",
+              "op": "3",
+              "rhs": "true"
+            }
+          ]
+        },
+        {
+          "context_kind": "State",
+          "code": "123",
+          "android_trigger_type": "Variable value state"
+        },
+        {
+          "context_kind": "Event",
+          "code": "3050",
+          "android_trigger_type": "Variable set event",
+          "args": [
+            {
+              "tag": "Str",
+              "value": "%AAB_NetLocation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "768",
+      "name": "Context: WiFi (Dis)connected",
+      "entry_mid0": "43",
+      "entry_task": "_EvaluateContexts V2",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "160",
+          "android_trigger_type": "WiFi connection state"
+        },
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_Manual_Override",
+              "op": "3",
+              "rhs": "true"
+            },
+            {
+              "lhs": "%AAB_Service",
+              "op": "2",
+              "rhs": "On"
+            },
+            {
+              "lhs": "%AAB_ContextCache",
+              "op": "2",
+              "rhs": "*[WIFI]*"
+            },
+            {
+              "lhs": "%AAB_ContextOverride",
+              "op": "3",
+              "rhs": "true"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "769",
+      "name": "Panic (Reset)",
+      "entry_mid0": "528",
+      "entry_task": "_PanicButton",
+      "triggers": [
+        {
+          "context_kind": "Event",
+          "code": "2083",
+          "android_trigger_type": "Device boot event"
+        },
+        {
+          "context_kind": "State",
+          "code": "120",
+          "android_trigger_type": "Display state"
+        },
+        {
+          "context_kind": "State",
+          "code": "123",
+          "android_trigger_type": "Variable value state"
+        }
+      ]
+    },
+    {
+      "id": "8",
+      "name": "Context: Reset Serialized Cache",
+      "entry_mid0": "26",
+      "entry_task": "_ResetContextCacheDaily",
+      "triggers": [
+        {
+          "context_kind": "State",
+          "code": "165",
+          "android_trigger_type": "Expression/variable condition state",
+          "conditions": [
+            {
+              "lhs": "%AAB_ContextCache",
+              "op": "12",
+              "rhs": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "task_dependency_edges": [
+    {
+      "from_task_id": "105",
+      "from_task": "_GetWifiNoLocation V3",
+      "to_task": "_PrivilegeDetection V5 (Java)",
+      "to_task_id": "378",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "384",
+      "from_task": "unnamed_384",
+      "to_task": "_SaveButtonGeneral",
+      "to_task_id": "582",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "386",
+      "from_task": "unnamed_386",
+      "to_task": "_SaveButtonGeneral",
+      "to_task_id": "582",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "391",
+      "from_task": "unnamed_391",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "396",
+      "from_task": "unnamed_396",
+      "to_task": "Initialize AAB Defaults",
+      "to_task_id": "570",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "396",
+      "from_task": "unnamed_396",
+      "to_task": "Advanced Auto Brightness",
+      "to_task_id": "580",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "397",
+      "from_task": "unnamed_397",
+      "to_task": "_QSToggleAABService V2",
+      "to_task_id": "551",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "402",
+      "from_task": "unnamed_402",
+      "to_task": "_QSToggleAABService V2",
+      "to_task_id": "551",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "403",
+      "from_task": "unnamed_403",
+      "to_task": "_SaveButtonMisc",
+      "to_task_id": "564",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "406",
+      "from_task": "unnamed_406",
+      "to_task": "_SaveButtonReactivity",
+      "to_task_id": "577",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "41",
+      "from_task": "_SuggestCurveParameters V23 (Hybrid)",
+      "to_task": "Advanced Auto Brightness",
+      "to_task_id": "580",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "411",
+      "from_task": "unnamed_411",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "411",
+      "from_task": "unnamed_411",
+      "to_task": "_LoadedReactivityToggle",
+      "to_task_id": "560",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "411",
+      "from_task": "unnamed_411",
+      "to_task": "_LoadedOverrideToggle",
+      "to_task_id": "641",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "412",
+      "from_task": "unnamed_412",
+      "to_task": "Advanced Auto Brightness",
+      "to_task_id": "580",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "412",
+      "from_task": "unnamed_412",
+      "to_task": "Advanced Auto Brightness",
+      "to_task_id": "580",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "417",
+      "from_task": "unnamed_417",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "43",
+      "from_task": "_EvaluateContexts V2",
+      "to_task": "_ProfileManager",
+      "to_task_id": "637",
+      "via": "Perform Task",
+      "action_index": 11
+    },
+    {
+      "from_task_id": "43",
+      "from_task": "_EvaluateContexts V2",
+      "to_task": "Set Initial Brightness (Java) V3",
+      "to_task_id": "618",
+      "via": "Perform Task",
+      "action_index": 14
+    },
+    {
+      "from_task_id": "43",
+      "from_task": "_EvaluateContexts V2",
+      "to_task": "_GetWifiForContext",
+      "to_task_id": "633",
+      "via": "Perform Task",
+      "action_index": 24
+    },
+    {
+      "from_task_id": "43",
+      "from_task": "_EvaluateContexts V2",
+      "to_task": "_GetWifiNoLocation V3",
+      "to_task_id": "105",
+      "via": "Perform Task",
+      "action_index": 26
+    },
+    {
+      "from_task_id": "462",
+      "from_task": "unnamed_462",
+      "to_task": "_MenuScene",
+      "to_task_id": "562",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "466",
+      "from_task": "unnamed_466",
+      "to_task": "_SaveButtonDimming",
+      "to_task_id": "588",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "466",
+      "from_task": "unnamed_466",
+      "to_task": "_DimmingApplyToggle",
+      "to_task_id": "589",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "473",
+      "from_task": "unnamed_473",
+      "to_task": "_GenerateReactivityGraph (Java)",
+      "to_task_id": "703",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "473",
+      "from_task": "unnamed_473",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "481",
+      "from_task": "unnamed_481",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "490",
+      "from_task": "unnamed_490",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "492",
+      "from_task": "unnamed_492",
+      "to_task": "_PrivilegeDetection V5 (Java)",
+      "to_task_id": "378",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "500",
+      "from_task": "unnamed_500",
+      "to_task": "Initialize AAB Defaults",
+      "to_task_id": "570",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "500",
+      "from_task": "unnamed_500",
+      "to_task": "_SuperDimmingScene",
+      "to_task_id": "586",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "509",
+      "from_task": "unnamed_509",
+      "to_task": "_DimmingUIToggle",
+      "to_task_id": "638",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "509",
+      "from_task": "unnamed_509",
+      "to_task": "_DimmingApplyToggle",
+      "to_task_id": "589",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "511",
+      "from_task": "unnamed_511",
+      "to_task": "_DimmingUIToggle",
+      "to_task_id": "638",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "511",
+      "from_task": "unnamed_511",
+      "to_task": "_DimmingApplyToggle",
+      "to_task_id": "589",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "513",
+      "from_task": "unnamed_513",
+      "to_task": "_GenerateDimmingCurveGraph (Java)",
+      "to_task_id": "556",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "513",
+      "from_task": "unnamed_513",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "515",
+      "from_task": "unnamed_515",
+      "to_task": "_SaveButtonDimming",
+      "to_task_id": "588",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "516",
+      "from_task": "unnamed_516",
+      "to_task": "_LoadedDimmingToggle",
+      "to_task_id": "587",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "517",
+      "from_task": "unnamed_517",
+      "to_task": "Dynamic Scale V13 (Java) App Version",
+      "to_task_id": "90",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "517",
+      "from_task": "unnamed_517",
+      "to_task": "_GenerateCircadianDimmingGraph (Java)",
+      "to_task_id": "705",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "517",
+      "from_task": "unnamed_517",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 8
+    },
+    {
+      "from_task_id": "520",
+      "from_task": "unnamed_520",
+      "to_task": "_SaveButtonDimming",
+      "to_task_id": "588",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "521",
+      "from_task": "unnamed_521",
+      "to_task": "_LoadedDimmingToggle",
+      "to_task_id": "587",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "524",
+      "from_task": "_CalibratePowerDraw",
+      "to_task": "_ChartJsChunks",
+      "to_task_id": "581",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "524",
+      "from_task": "_CalibratePowerDraw",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "524",
+      "from_task": "_CalibratePowerDraw",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "524",
+      "from_task": "_CalibratePowerDraw",
+      "to_task": "_QSToggleAABService V2",
+      "to_task_id": "551",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "524",
+      "from_task": "_CalibratePowerDraw",
+      "to_task": "_QSToggleAABService V2",
+      "to_task_id": "551",
+      "via": "Perform Task",
+      "action_index": 9
+    },
+    {
+      "from_task_id": "525",
+      "from_task": "unnamed_525",
+      "to_task": "_OverrideToggle",
+      "to_task_id": "640",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "526",
+      "from_task": "unnamed_526",
+      "to_task": "_OverrideToggle",
+      "to_task_id": "640",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "527",
+      "from_task": "unnamed_527",
+      "to_task": "_SuperDimmingLongTap",
+      "to_task_id": "644",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "528",
+      "from_task": "_PanicButton",
+      "to_task": "_QSToggleAABService V2",
+      "to_task_id": "551",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "528",
+      "from_task": "_PanicButton",
+      "to_task": "Disable Super Dimming (Unprivileged)",
+      "to_task_id": "654",
+      "via": "Perform Task",
+      "action_index": 10
+    },
+    {
+      "from_task_id": "528",
+      "from_task": "_PanicButton",
+      "to_task": "Disable Super Dimming (Privileged)",
+      "to_task_id": "645",
+      "via": "Perform Task",
+      "action_index": 11
+    },
+    {
+      "from_task_id": "533",
+      "from_task": "unnamed_533",
+      "to_task": "_PWMToggle",
+      "to_task_id": "648",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "533",
+      "from_task": "unnamed_533",
+      "to_task": "_LoadedPWMToggle",
+      "to_task_id": "649",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "534",
+      "from_task": "unnamed_534",
+      "to_task": "_PWMToggle",
+      "to_task_id": "648",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "534",
+      "from_task": "unnamed_534",
+      "to_task": "_LoadedPWMToggle",
+      "to_task_id": "649",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "537",
+      "from_task": "unnamed_537",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "538",
+      "from_task": "unnamed_538",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "540",
+      "from_task": "_ExperimentScene",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 9
+    },
+    {
+      "from_task_id": "540",
+      "from_task": "_ExperimentScene",
+      "to_task": "_LoadedExperimentTogglesV2",
+      "to_task_id": "558",
+      "via": "Perform Task",
+      "action_index": 15
+    },
+    {
+      "from_task_id": "541",
+      "from_task": "_SaveButtonExperiment",
+      "to_task": "Dynamic Scale V13 (Java) App Version",
+      "to_task_id": "90",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "544",
+      "from_task": "Evaluate Light Change (Java) V2",
+      "to_task": "Map Lux to Brightness (Java) V2",
+      "to_task_id": "661",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "544",
+      "from_task": "Evaluate Light Change (Java) V2",
+      "to_task": "Set Thresholds (Java)",
+      "to_task_id": "546",
+      "via": "Perform Task",
+      "action_index": 13
+    },
+    {
+      "from_task_id": "544",
+      "from_task": "Evaluate Light Change (Java) V2",
+      "to_task": "Lux Smoothing (Java)",
+      "to_task_id": "535",
+      "via": "Perform Task",
+      "action_index": 18
+    },
+    {
+      "from_task_id": "544",
+      "from_task": "Evaluate Light Change (Java) V2",
+      "to_task": "Map Lux to Brightness (Java) V2",
+      "to_task_id": "661",
+      "via": "Perform Task",
+      "action_index": 27
+    },
+    {
+      "from_task_id": "544",
+      "from_task": "Evaluate Light Change (Java) V2",
+      "to_task": "Set Thresholds (Java)",
+      "to_task_id": "546",
+      "via": "Perform Task",
+      "action_index": 29
+    },
+    {
+      "from_task_id": "549",
+      "from_task": "_GenerateCircadianGraph V8 (Java)",
+      "to_task": "_ChartJsChunks",
+      "to_task_id": "581",
+      "via": "Perform Task",
+      "action_index": 12
+    },
+    {
+      "from_task_id": "551",
+      "from_task": "_QSToggleAABService V2",
+      "to_task": "_MainSwitchUI V2",
+      "to_task_id": "553",
+      "via": "Perform Task",
+      "action_index": 12
+    },
+    {
+      "from_task_id": "551",
+      "from_task": "_QSToggleAABService V2",
+      "to_task": "Dimming Decider",
+      "to_task_id": "578",
+      "via": "Perform Task",
+      "action_index": 16
+    },
+    {
+      "from_task_id": "551",
+      "from_task": "_QSToggleAABService V2",
+      "to_task": "Reset Brightness and State",
+      "to_task_id": "585",
+      "via": "Perform Task",
+      "action_index": 17
+    },
+    {
+      "from_task_id": "551",
+      "from_task": "_QSToggleAABService V2",
+      "to_task": "_MainSwitchUI V2",
+      "to_task_id": "553",
+      "via": "Perform Task",
+      "action_index": 21
+    },
+    {
+      "from_task_id": "551",
+      "from_task": "_QSToggleAABService V2",
+      "to_task": "Set Initial Brightness (Java) V3",
+      "to_task_id": "618",
+      "via": "Perform Task",
+      "action_index": 24
+    },
+    {
+      "from_task_id": "551",
+      "from_task": "_QSToggleAABService V2",
+      "to_task": "_ForegroundNotification",
+      "to_task_id": "584",
+      "via": "Perform Task",
+      "action_index": 41
+    },
+    {
+      "from_task_id": "551",
+      "from_task": "_QSToggleAABService V2",
+      "to_task": "Dimming Decider",
+      "to_task_id": "578",
+      "via": "Perform Task",
+      "action_index": 42
+    },
+    {
+      "from_task_id": "554",
+      "from_task": "Process Sensor Event (Java)",
+      "to_task": "Evaluate Light Change (Java) V2",
+      "to_task_id": "544",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "556",
+      "from_task": "_GenerateDimmingCurveGraph (Java)",
+      "to_task": "_ChartJsChunks",
+      "to_task_id": "581",
+      "via": "Perform Task",
+      "action_index": 12
+    },
+    {
+      "from_task_id": "557",
+      "from_task": "_GenerateAlphaGraph (Java)",
+      "to_task": "_ChartJsChunks",
+      "to_task_id": "581",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "562",
+      "from_task": "_MenuScene",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "563",
+      "from_task": "_AskPermissionsV7",
+      "to_task": "Advanced Auto Brightness",
+      "to_task_id": "580",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "564",
+      "from_task": "_SaveButtonMisc",
+      "to_task": "Set Initial Brightness (Java) V3",
+      "to_task_id": "618",
+      "via": "Perform Task",
+      "action_index": 10
+    },
+    {
+      "from_task_id": "565",
+      "from_task": "_MiscScene",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "565",
+      "from_task": "_MiscScene",
+      "to_task": "_LoadedMiscAuto",
+      "to_task_id": "576",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "567",
+      "from_task": "Manual Override",
+      "to_task": "Process Overrides",
+      "to_task_id": "561",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "567",
+      "from_task": "Manual Override",
+      "to_task": "_QSToggleAABService V2",
+      "to_task_id": "551",
+      "via": "Perform Task",
+      "action_index": 14
+    },
+    {
+      "from_task_id": "569",
+      "from_task": "Resume After Override",
+      "to_task": "Set Initial Brightness (Java) V3",
+      "to_task_id": "618",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "569",
+      "from_task": "Resume After Override",
+      "to_task": "_QSToggleAABService V2",
+      "to_task_id": "551",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "575",
+      "from_task": "_ReactivityScene",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "575",
+      "from_task": "_ReactivityScene",
+      "to_task": "_LoadedReactivityToggle",
+      "to_task_id": "560",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "575",
+      "from_task": "_ReactivityScene",
+      "to_task": "_LoadedOverrideToggle",
+      "to_task_id": "641",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "577",
+      "from_task": "_SaveButtonReactivity",
+      "to_task": "Set Initial Brightness (Java) V3",
+      "to_task_id": "618",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "578",
+      "from_task": "Dimming Decider",
+      "to_task": "Calculate Super Dimming (Unprivileged) V3",
+      "to_task_id": "647",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "578",
+      "from_task": "Dimming Decider",
+      "to_task": "_ShowColorFilter",
+      "to_task_id": "579",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "578",
+      "from_task": "Dimming Decider",
+      "to_task": "Disable Super Dimming (Unprivileged)",
+      "to_task_id": "654",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "578",
+      "from_task": "Dimming Decider",
+      "to_task": "Calculate Super Dimming (Privileged) V4",
+      "to_task_id": "646",
+      "via": "Perform Task",
+      "action_index": 11
+    },
+    {
+      "from_task_id": "578",
+      "from_task": "Dimming Decider",
+      "to_task": "Disable Super Dimming (Privileged)",
+      "to_task_id": "645",
+      "via": "Perform Task",
+      "action_index": 13
+    },
+    {
+      "from_task_id": "580",
+      "from_task": "Advanced Auto Brightness",
+      "to_task": "Initialize AAB Defaults",
+      "to_task_id": "570",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "580",
+      "from_task": "Advanced Auto Brightness",
+      "to_task": "_AskPermissionsV7",
+      "to_task_id": "563",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "580",
+      "from_task": "Advanced Auto Brightness",
+      "to_task": "_SetSuggestedVariables",
+      "to_task_id": "655",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "580",
+      "from_task": "Advanced Auto Brightness",
+      "to_task": "_ColorSuggestionsScene",
+      "to_task_id": "652",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "580",
+      "from_task": "Advanced Auto Brightness",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 8
+    },
+    {
+      "from_task_id": "580",
+      "from_task": "Advanced Auto Brightness",
+      "to_task": "_LoadedMainToggle",
+      "to_task_id": "547",
+      "via": "Perform Task",
+      "action_index": 14
+    },
+    {
+      "from_task_id": "580",
+      "from_task": "Advanced Auto Brightness",
+      "to_task": "_Updates",
+      "to_task_id": "706",
+      "via": "Perform Task",
+      "action_index": 19
+    },
+    {
+      "from_task_id": "580",
+      "from_task": "Advanced Auto Brightness",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 22
+    },
+    {
+      "from_task_id": "582",
+      "from_task": "_SaveButtonGeneral",
+      "to_task": "Set Initial Brightness (Java) V3",
+      "to_task_id": "618",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "582",
+      "from_task": "_SaveButtonGeneral",
+      "to_task": "_ValidateBrightnessParams",
+      "to_task_id": "707",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "585",
+      "from_task": "Reset Brightness and State",
+      "to_task": "Disable Super Dimming (Privileged)",
+      "to_task_id": "645",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "585",
+      "from_task": "Reset Brightness and State",
+      "to_task": "_ContextResume",
+      "to_task_id": "626",
+      "via": "Perform Task",
+      "action_index": 9
+    },
+    {
+      "from_task_id": "586",
+      "from_task": "_SuperDimmingScene",
+      "to_task": "_LoadedPWMToggle",
+      "to_task_id": "649",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "586",
+      "from_task": "_SuperDimmingScene",
+      "to_task": "_PrivilegeDetection V5 (Java)",
+      "to_task_id": "378",
+      "via": "Perform Task",
+      "action_index": 8
+    },
+    {
+      "from_task_id": "586",
+      "from_task": "_SuperDimmingScene",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 10
+    },
+    {
+      "from_task_id": "586",
+      "from_task": "_SuperDimmingScene",
+      "to_task": "_LoadedDimmingToggle",
+      "to_task_id": "587",
+      "via": "Perform Task",
+      "action_index": 11
+    },
+    {
+      "from_task_id": "588",
+      "from_task": "_SaveButtonDimming",
+      "to_task": "_DimmingApplyToggle",
+      "to_task_id": "589",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "589",
+      "from_task": "_DimmingApplyToggle",
+      "to_task": "Dynamic Scale V13 (Java) App Version",
+      "to_task_id": "90",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "589",
+      "from_task": "_DimmingApplyToggle",
+      "to_task": "Disable Super Dimming (Privileged)",
+      "to_task_id": "645",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "589",
+      "from_task": "_DimmingApplyToggle",
+      "to_task": "Set Initial Brightness (Java) V3",
+      "to_task_id": "618",
+      "via": "Perform Task",
+      "action_index": 9
+    },
+    {
+      "from_task_id": "589",
+      "from_task": "_DimmingApplyToggle",
+      "to_task": "Dimming Decider",
+      "to_task_id": "578",
+      "via": "Perform Task",
+      "action_index": 13
+    },
+    {
+      "from_task_id": "591",
+      "from_task": "unnamed_591",
+      "to_task": "_LoadedDimmingToggle",
+      "to_task_id": "587",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "601",
+      "from_task": "_KeyEventBackMenu",
+      "to_task": "Advanced Auto Brightness",
+      "to_task_id": "580",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "601",
+      "from_task": "_KeyEventBackMenu",
+      "to_task": "_ShowProfileScene",
+      "to_task_id": "622",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "601",
+      "from_task": "_KeyEventBackMenu",
+      "to_task": "_ReactivityScene",
+      "to_task_id": "575",
+      "via": "Perform Task",
+      "action_index": 8
+    },
+    {
+      "from_task_id": "601",
+      "from_task": "_KeyEventBackMenu",
+      "to_task": "_MiscScene",
+      "to_task_id": "565",
+      "via": "Perform Task",
+      "action_index": 10
+    },
+    {
+      "from_task_id": "601",
+      "from_task": "_KeyEventBackMenu",
+      "to_task": "_ExperimentScene",
+      "to_task_id": "540",
+      "via": "Perform Task",
+      "action_index": 12
+    },
+    {
+      "from_task_id": "601",
+      "from_task": "_KeyEventBackMenu",
+      "to_task": "_SuperDimmingScene",
+      "to_task_id": "586",
+      "via": "Perform Task",
+      "action_index": 14
+    },
+    {
+      "from_task_id": "603",
+      "from_task": "unnamed_603",
+      "to_task": "_LoadedExperimentTogglesV2",
+      "to_task_id": "558",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "606",
+      "from_task": "unnamed_606",
+      "to_task": "_KeyEventBackMenu",
+      "to_task_id": "601",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "613",
+      "from_task": "unnamed_613",
+      "to_task": "_UpdateBrightnessFormulae",
+      "to_task_id": "659",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "613",
+      "from_task": "unnamed_613",
+      "to_task": "_UpdateStaticSceneElements",
+      "to_task_id": "571",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "613",
+      "from_task": "unnamed_613",
+      "to_task": "_RedInvalidFormulae",
+      "to_task_id": "583",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "614",
+      "from_task": "unnamed_614",
+      "to_task": "_UpdateBrightnessFormulae",
+      "to_task_id": "659",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "614",
+      "from_task": "unnamed_614",
+      "to_task": "_UpdateStaticSceneElements",
+      "to_task_id": "571",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "614",
+      "from_task": "unnamed_614",
+      "to_task": "_RedInvalidFormulae",
+      "to_task_id": "583",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "615",
+      "from_task": "unnamed_615",
+      "to_task": "_UpdateBrightnessFormulae",
+      "to_task_id": "659",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "615",
+      "from_task": "unnamed_615",
+      "to_task": "_UpdateStaticSceneElements",
+      "to_task_id": "571",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "615",
+      "from_task": "unnamed_615",
+      "to_task": "_RedInvalidFormulae",
+      "to_task_id": "583",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "616",
+      "from_task": "unnamed_616",
+      "to_task": "_UpdateBrightnessFormulae",
+      "to_task_id": "659",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "616",
+      "from_task": "unnamed_616",
+      "to_task": "_UpdateStaticSceneElements",
+      "to_task_id": "571",
+      "via": "Perform Task",
+      "action_index": 8
+    },
+    {
+      "from_task_id": "616",
+      "from_task": "unnamed_616",
+      "to_task": "_RedInvalidFormulae",
+      "to_task_id": "583",
+      "via": "Perform Task",
+      "action_index": 9
+    },
+    {
+      "from_task_id": "617",
+      "from_task": "unnamed_617",
+      "to_task": "_UpdateBrightnessFormulae",
+      "to_task_id": "659",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "617",
+      "from_task": "unnamed_617",
+      "to_task": "_UpdateStaticSceneElements",
+      "to_task_id": "571",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "617",
+      "from_task": "unnamed_617",
+      "to_task": "_RedInvalidFormulae",
+      "to_task_id": "583",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "618",
+      "from_task": "Set Initial Brightness (Java) V3",
+      "to_task": "Initialize AAB Defaults",
+      "to_task_id": "570",
+      "via": "Perform Task",
+      "action_index": 12
+    },
+    {
+      "from_task_id": "618",
+      "from_task": "Set Initial Brightness (Java) V3",
+      "to_task": "Map Lux to Brightness (Java) V2",
+      "to_task_id": "661",
+      "via": "Perform Task",
+      "action_index": 13
+    },
+    {
+      "from_task_id": "618",
+      "from_task": "Set Initial Brightness (Java) V3",
+      "to_task": "Dynamic Scale V13 (Java) App Version",
+      "to_task_id": "90",
+      "via": "Perform Task",
+      "action_index": 20
+    },
+    {
+      "from_task_id": "618",
+      "from_task": "Set Initial Brightness (Java) V3",
+      "to_task": "Dimming Decider",
+      "to_task_id": "578",
+      "via": "Perform Task",
+      "action_index": 24
+    },
+    {
+      "from_task_id": "618",
+      "from_task": "Set Initial Brightness (Java) V3",
+      "to_task": "_ContextF5NetLoc V8",
+      "to_task_id": "631",
+      "via": "Perform Task",
+      "action_index": 32
+    },
+    {
+      "from_task_id": "618",
+      "from_task": "Set Initial Brightness (Java) V3",
+      "to_task": "_EvaluateContexts V2",
+      "to_task_id": "43",
+      "via": "Perform Task",
+      "action_index": 39
+    },
+    {
+      "from_task_id": "621",
+      "from_task": "unnamed_621",
+      "to_task": "Advanced Auto Brightness",
+      "to_task_id": "580",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "621",
+      "from_task": "unnamed_621",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "621",
+      "from_task": "unnamed_621",
+      "to_task": "_LoadedMainToggle",
+      "to_task_id": "547",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "623",
+      "from_task": "_ContextManager",
+      "to_task": "_EvaluateContexts V2",
+      "to_task_id": "43",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "626",
+      "from_task": "_ContextResume",
+      "to_task": "_QSToggleAABService V2",
+      "to_task_id": "551",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "626",
+      "from_task": "_ContextResume",
+      "to_task": "_EvaluateContexts V2",
+      "to_task_id": "43",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "628",
+      "from_task": "_ContextLocModeRead",
+      "to_task": "_LocModeChanger",
+      "to_task_id": "559",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "630",
+      "from_task": "_ContextLocnListener V4",
+      "to_task": "_ContextLocModeRead",
+      "to_task_id": "628",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "630",
+      "from_task": "_ContextLocnListener V4",
+      "to_task": "_LocModeChanger",
+      "to_task_id": "559",
+      "via": "Perform Task",
+      "action_index": 9
+    },
+    {
+      "from_task_id": "631",
+      "from_task": "_ContextF5NetLoc V8",
+      "to_task": "_ContextLocnListener V4",
+      "to_task_id": "630",
+      "via": "Perform Task",
+      "action_index": 32
+    },
+    {
+      "from_task_id": "633",
+      "from_task": "_GetWifiForContext",
+      "to_task": "_GetWifiNoLocation V3",
+      "to_task_id": "105",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "637",
+      "from_task": "_ProfileManager",
+      "to_task": "Set Initial Brightness (Java) V3",
+      "to_task_id": "618",
+      "via": "Perform Task",
+      "action_index": 29
+    },
+    {
+      "from_task_id": "637",
+      "from_task": "_ProfileManager",
+      "to_task": "_CreateDefaultProfiles",
+      "to_task_id": "592",
+      "via": "Perform Task",
+      "action_index": 35
+    },
+    {
+      "from_task_id": "638",
+      "from_task": "_DimmingUIToggle",
+      "to_task": "_SuperDimmingScene",
+      "to_task_id": "586",
+      "via": "Perform Task",
+      "action_index": 18
+    },
+    {
+      "from_task_id": "639",
+      "from_task": "ARGB To Hex",
+      "to_task": "_ShowColorFilter",
+      "to_task_id": "579",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "646",
+      "from_task": "Calculate Super Dimming (Privileged) V4",
+      "to_task": "Apply Dimming (Privileged)",
+      "to_task_id": "650",
+      "via": "Perform Task",
+      "action_index": 9
+    },
+    {
+      "from_task_id": "647",
+      "from_task": "Calculate Super Dimming (Unprivileged) V3",
+      "to_task": "Apply Dimming (Unprivileged)",
+      "to_task_id": "653",
+      "via": "Perform Task",
+      "action_index": 8
+    },
+    {
+      "from_task_id": "647",
+      "from_task": "Calculate Super Dimming (Unprivileged) V3",
+      "to_task": "ARGB To Hex",
+      "to_task_id": "639",
+      "via": "Perform Task",
+      "action_index": 19
+    },
+    {
+      "from_task_id": "648",
+      "from_task": "_PWMToggle",
+      "to_task": "_SuperDimmingScene",
+      "to_task_id": "586",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "650",
+      "from_task": "Apply Dimming (Privileged)",
+      "to_task": "Disable Super Dimming (Privileged)",
+      "to_task_id": "645",
+      "via": "Perform Task",
+      "action_index": 30
+    },
+    {
+      "from_task_id": "651",
+      "from_task": "unnamed_651",
+      "to_task": "_SuggestCurveParameters V23 (Hybrid)",
+      "to_task_id": "41",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "657",
+      "from_task": "_GenerateCompressionGraph (Java)",
+      "to_task": "_ChartJsChunks",
+      "to_task_id": "581",
+      "via": "Perform Task",
+      "action_index": 12
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Dynamic Range Compressed Scale (Java) V2",
+      "to_task_id": "548",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Software Dimming V2",
+      "to_task_id": "700",
+      "via": "Perform Task",
+      "action_index": 16
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Calculate Animation (Java) V2",
+      "to_task_id": "543",
+      "via": "Perform Task",
+      "action_index": 17
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Smooth DC-Like Brightness Transition V5 (Java)",
+      "to_task_id": "698",
+      "via": "Perform Task",
+      "action_index": 18
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Disable Super Dimming (Privileged)",
+      "to_task_id": "645",
+      "via": "Perform Task",
+      "action_index": 22
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Disable Super Dimming (Unprivileged)",
+      "to_task_id": "654",
+      "via": "Perform Task",
+      "action_index": 25
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Dimming Decider",
+      "to_task_id": "578",
+      "via": "Perform Task",
+      "action_index": 39
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Calculate Animation (Java) V2",
+      "to_task_id": "543",
+      "via": "Perform Task",
+      "action_index": 44
+    },
+    {
+      "from_task_id": "661",
+      "from_task": "Map Lux to Brightness (Java) V2",
+      "to_task": "Smooth Brightness Transition V5 (Java)",
+      "to_task_id": "696",
+      "via": "Perform Task",
+      "action_index": 47
+    },
+    {
+      "from_task_id": "663",
+      "from_task": "_GenerateGraph (Java)",
+      "to_task": "_ChartJsChunks",
+      "to_task_id": "581",
+      "via": "Perform Task",
+      "action_index": 12
+    },
+    {
+      "from_task_id": "665",
+      "from_task": "unnamed_665",
+      "to_task": "_SaveButtonExperiment",
+      "to_task_id": "541",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "666",
+      "from_task": "unnamed_666",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "667",
+      "from_task": "unnamed_667",
+      "to_task": "_ExitButton",
+      "to_task_id": "656",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "669",
+      "from_task": "unnamed_669",
+      "to_task": "_SaveButtonExperiment",
+      "to_task_id": "541",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "671",
+      "from_task": "unnamed_671",
+      "to_task": "_LoadedExperimentTogglesV2",
+      "to_task_id": "558",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "674",
+      "from_task": "unnamed_674",
+      "to_task": "Dynamic Scale V13 (Java) App Version",
+      "to_task_id": "90",
+      "via": "Perform Task",
+      "action_index": 5
+    },
+    {
+      "from_task_id": "674",
+      "from_task": "unnamed_674",
+      "to_task": "_GenerateCircadianGraph V8 (Java)",
+      "to_task_id": "549",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "674",
+      "from_task": "unnamed_674",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 8
+    },
+    {
+      "from_task_id": "675",
+      "from_task": "unnamed_675",
+      "to_task": "Initialize AAB Defaults",
+      "to_task_id": "570",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "675",
+      "from_task": "unnamed_675",
+      "to_task": "_ExperimentScene",
+      "to_task_id": "540",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "676",
+      "from_task": "unnamed_676",
+      "to_task": "_ExperimentUIToggle",
+      "to_task_id": "542",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "677",
+      "from_task": "unnamed_677",
+      "to_task": "_ExperimentUIToggle",
+      "to_task_id": "542",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "679",
+      "from_task": "unnamed_679",
+      "to_task": "_SaveButtonExperiment",
+      "to_task_id": "541",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "680",
+      "from_task": "unnamed_680",
+      "to_task": "_LoadedExperimentTogglesV2",
+      "to_task_id": "558",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "685",
+      "from_task": "unnamed_685",
+      "to_task": "_MenuScene",
+      "to_task_id": "562",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "686",
+      "from_task": "unnamed_686",
+      "to_task": "_GenerateCompressionGraph (Java)",
+      "to_task_id": "657",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "686",
+      "from_task": "unnamed_686",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 3
+    },
+    {
+      "from_task_id": "693",
+      "from_task": "unnamed_693",
+      "to_task": "_NotifyToggle",
+      "to_task_id": "692",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "695",
+      "from_task": "unnamed_695",
+      "to_task": "_NotifyToggle",
+      "to_task_id": "692",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "697",
+      "from_task": "unnamed_697",
+      "to_task": "_QSExperimentUIToggle",
+      "to_task_id": "552",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "699",
+      "from_task": "unnamed_699",
+      "to_task": "_QSExperimentUIToggle",
+      "to_task_id": "552",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "703",
+      "from_task": "_GenerateReactivityGraph (Java)",
+      "to_task": "_ChartJsChunks",
+      "to_task_id": "581",
+      "via": "Perform Task",
+      "action_index": 4
+    },
+    {
+      "from_task_id": "705",
+      "from_task": "_GenerateCircadianDimmingGraph (Java)",
+      "to_task": "_ChartJsChunks",
+      "to_task_id": "581",
+      "via": "Perform Task",
+      "action_index": 10
+    },
+    {
+      "from_task_id": "706",
+      "from_task": "_Updates",
+      "to_task": "_ProfileManager",
+      "to_task_id": "637",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "706",
+      "from_task": "_Updates",
+      "to_task": "_CreateLogo",
+      "to_task_id": "619",
+      "via": "Perform Task",
+      "action_index": 26
+    },
+    {
+      "from_task_id": "710",
+      "from_task": "unnamed_710",
+      "to_task": "_SaveButtonReactivity",
+      "to_task_id": "577",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "717",
+      "from_task": "unnamed_717",
+      "to_task": "_MenuScene",
+      "to_task_id": "562",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "718",
+      "from_task": "unnamed_718",
+      "to_task": "_MenuScene",
+      "to_task_id": "562",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "724",
+      "from_task": "unnamed_724",
+      "to_task": "_UpdateBrightnessFormulae",
+      "to_task_id": "659",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "724",
+      "from_task": "unnamed_724",
+      "to_task": "_UpdateStaticSceneElements",
+      "to_task_id": "571",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "724",
+      "from_task": "unnamed_724",
+      "to_task": "_RedInvalidFormulae",
+      "to_task_id": "583",
+      "via": "Perform Task",
+      "action_index": 11
+    },
+    {
+      "from_task_id": "724",
+      "from_task": "unnamed_724",
+      "to_task": "_GenerateGraph (Java)",
+      "to_task_id": "663",
+      "via": "Perform Task",
+      "action_index": 16
+    },
+    {
+      "from_task_id": "724",
+      "from_task": "unnamed_724",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 18
+    },
+    {
+      "from_task_id": "731",
+      "from_task": "unnamed_731",
+      "to_task": "_ReactivityToggle",
+      "to_task_id": "555",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "733",
+      "from_task": "unnamed_733",
+      "to_task": "_ReactivityToggle",
+      "to_task_id": "555",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "735",
+      "from_task": "unnamed_735",
+      "to_task": "Initialize AAB Defaults",
+      "to_task_id": "570",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "735",
+      "from_task": "unnamed_735",
+      "to_task": "_ReactivityScene",
+      "to_task_id": "575",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "738",
+      "from_task": "unnamed_738",
+      "to_task": "Initialize AAB Defaults",
+      "to_task_id": "570",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "738",
+      "from_task": "unnamed_738",
+      "to_task": "_MiscScene",
+      "to_task_id": "565",
+      "via": "Perform Task",
+      "action_index": 6
+    },
+    {
+      "from_task_id": "743",
+      "from_task": "unnamed_743",
+      "to_task": "_GenerateAlphaGraph (Java)",
+      "to_task_id": "557",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "743",
+      "from_task": "unnamed_743",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "746",
+      "from_task": "unnamed_746",
+      "to_task": "_SaveButtonMisc",
+      "to_task_id": "564",
+      "via": "Perform Task",
+      "action_index": 0
+    },
+    {
+      "from_task_id": "748",
+      "from_task": "unnamed_748",
+      "to_task": "_AdaptiveBrightnessSceneSize V4",
+      "to_task_id": "620",
+      "via": "Perform Task",
+      "action_index": 1
+    },
+    {
+      "from_task_id": "748",
+      "from_task": "unnamed_748",
+      "to_task": "_LoadedMiscAuto",
+      "to_task_id": "576",
+      "via": "Perform Task",
+      "action_index": 2
+    },
+    {
+      "from_task_id": "752",
+      "from_task": "unnamed_752",
+      "to_task": "_RedInvalidFormulae",
+      "to_task_id": "583",
+      "via": "Perform Task",
+      "action_index": 7
+    },
+    {
+      "from_task_id": "90",
+      "from_task": "Dynamic Scale V13 (Java) App Version",
+      "to_task": "Evaluate Light Change (Java) V2",
+      "to_task_id": "544",
+      "via": "Perform Task",
+      "action_index": 81
+    }
+  ],
+  "variables": [
+    {
+      "variable": "%AAB_AnimSteps",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "20",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Calculate Animation (Java) V2",
+        "Initialize AAB Defaults",
+        "Reset Brightness and State",
+        "Reset Throttle",
+        "Set Initial Brightness (Java) V3",
+        "_MiscScene",
+        "_SaveButtonMisc",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_ChartJs",
+      "type": "variable-ref",
+      "owner": "_ChartJsChunks",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_ChartJsChunks"
+      ],
+      "readers": [
+        "_CalibratePowerDraw",
+        "_ChartJsChunks",
+        "_GenerateAlphaGraph (Java)",
+        "_GenerateCircadianDimmingGraph (Java)",
+        "_GenerateCircadianGraph V8 (Java)",
+        "_GenerateCompressionGraph (Java)",
+        "_GenerateDimmingCurveGraph (Java)",
+        "_GenerateGraph (Java)",
+        "_GenerateReactivityGraph (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_ContextJSONCache",
+      "type": "unknown",
+      "owner": "_ResetContextCacheDaily",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "_ResetContextCacheDaily"
+      ]
+    },
+    {
+      "variable": "%AAB_ContextLocMode",
+      "type": "integer",
+      "owner": "_ContextLocModeRead",
+      "lifetime": "global_tasker_variable",
+      "default": "-1",
+      "writers": [
+        "_ContextLocModeRead"
+      ],
+      "readers": [
+        "_ContextLocModeRead"
+      ]
+    },
+    {
+      "variable": "%AAB_ContextOverride",
+      "type": "boolean/enum",
+      "owner": "_ContextResume",
+      "lifetime": "global_tasker_variable",
+      "default": "false",
+      "writers": [
+        "_ContextResume",
+        "_ProfileManager"
+      ],
+      "readers": [
+        "_ContextResume",
+        "_ProfileManager"
+      ]
+    },
+    {
+      "variable": "%AAB_CurrentActiveProfile",
+      "type": "variable-ref",
+      "owner": "_EvaluateContexts V2",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_EvaluateContexts V2",
+        "_ProfileManager"
+      ],
+      "readers": [
+        "_EvaluateContexts V2",
+        "_ProfileManager"
+      ]
+    },
+    {
+      "variable": "%AAB_CurrentBright",
+      "type": "variable-ref",
+      "owner": "Map Lux to Brightness (Java) V2",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Map Lux to Brightness (Java) V2"
+      ],
+      "readers": [
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Map Lux to Brightness (Java) V2",
+        "Smooth Brightness Transition V5 (Java)",
+        "Smooth DC-Like Brightness Transition V5 (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_CycleStart",
+      "type": "variable-ref",
+      "owner": "Set Initial Brightness (Java) V3",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Set Initial Brightness (Java) V3"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Set Initial Brightness (Java) V3",
+        "Smooth Brightness Transition V5 (Java)",
+        "Smooth DC-Like Brightness Transition V5 (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_CycleTime",
+      "type": "unknown",
+      "owner": "Smooth Brightness Transition V5 (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Smooth Brightness Transition V5 (Java)",
+        "Smooth DC-Like Brightness Transition V5 (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_CycleTotal",
+      "type": "variable-ref",
+      "owner": "Evaluate Light Change (Java) V2",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Evaluate Light Change (Java) V2"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2"
+      ]
+    },
+    {
+      "variable": "%AAB_Date",
+      "type": "variable-ref",
+      "owner": "_ExperimentSetDate",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_ExperimentSetDate"
+      ],
+      "readers": [
+        "_ExperimentClearDate",
+        "_ExperimentSetDate"
+      ]
+    },
+    {
+      "variable": "%AAB_Debug",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "0",
+      "writers": [
+        "Initialize AAB Defaults",
+        "_SetDebugLevel"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_SetDebugLevel"
+      ]
+    },
+    {
+      "variable": "%AAB_DefaultThrottle",
+      "type": "variable-ref",
+      "owner": "Reset Throttle",
+      "lifetime": "global_tasker_variable",
+      "default": "1000",
+      "writers": [
+        "Reset Throttle"
+      ],
+      "readers": [
+        "Reset Throttle",
+        "Set Initial Brightness (Java) V3",
+        "_SaveButtonMisc"
+      ]
+    },
+    {
+      "variable": "%AAB_DeltaFactor",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "1.8",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "Lux Smoothing (Java)",
+        "_MiscScene",
+        "_ReactivityScene",
+        "_SaveButtonMisc",
+        "unnamed_710",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_DetectOverrides",
+      "type": "boolean/enum",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "Off",
+      "writers": [
+        "Initialize AAB Defaults",
+        "_LoadedOverrideToggle",
+        "_OverrideToggle"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_LoadedOverrideToggle",
+        "_OverrideToggle"
+      ]
+    },
+    {
+      "variable": "%AAB_DimDynamic",
+      "type": "unknown",
+      "owner": "Calculate Super Dimming (Privileged) V4",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3"
+      ]
+    },
+    {
+      "variable": "%AAB_DimSpread",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "100",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_SaveButtonDimming",
+        "_SuperDimmingScene",
+        "unnamed_500",
+        "unnamed_505"
+      ]
+    },
+    {
+      "variable": "%AAB_DimmingCurrent",
+      "type": "variable-ref",
+      "owner": "Apply Dimming (Privileged)",
+      "lifetime": "global_tasker_variable",
+      "default": "0",
+      "writers": [
+        "Apply Dimming (Privileged)",
+        "Apply Dimming (Unprivileged)",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Dimming Decider",
+        "Disable Super Dimming (Unprivileged)",
+        "Map Lux to Brightness (Java) V2"
+      ],
+      "readers": [
+        "Apply Dimming (Privileged)",
+        "Apply Dimming (Unprivileged)",
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Dimming Decider",
+        "Disable Super Dimming (Unprivileged)",
+        "Map Lux to Brightness (Java) V2"
+      ]
+    },
+    {
+      "variable": "%AAB_DimmingDS",
+      "type": "integer",
+      "owner": "Apply Dimming (Privileged)",
+      "lifetime": "global_tasker_variable",
+      "default": "0",
+      "writers": [
+        "Apply Dimming (Privileged)",
+        "Apply Dimming (Unprivileged)",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Dimming Decider",
+        "Disable Super Dimming (Unprivileged)",
+        "Map Lux to Brightness (Java) V2"
+      ],
+      "readers": [
+        "Apply Dimming (Privileged)",
+        "Apply Dimming (Unprivileged)",
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Dimming Decider",
+        "Disable Super Dimming (Unprivileged)",
+        "Map Lux to Brightness (Java) V2",
+        "Smooth DC-Like Brightness Transition V5 (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_DimmingEnabled",
+      "type": "boolean/enum",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "false",
+      "writers": [
+        "Initialize AAB Defaults",
+        "_DimmingUIToggle",
+        "_PWMToggle"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_DimmingUIToggle",
+        "_PWMToggle"
+      ]
+    },
+    {
+      "variable": "%AAB_DimmingExponent",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "2.5",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Initialize AAB Defaults",
+        "_SaveButtonDimming",
+        "_SuperDimmingScene",
+        "unnamed_500"
+      ]
+    },
+    {
+      "variable": "%AAB_DimmingStatus",
+      "type": "integer",
+      "owner": "ARGB To Hex",
+      "lifetime": "global_tasker_variable",
+      "default": "0",
+      "writers": [
+        "ARGB To Hex",
+        "Apply Dimming (Privileged)",
+        "Apply Dimming (Unprivileged)",
+        "Disable Super Dimming (Privileged)",
+        "Disable Super Dimming (Unprivileged)",
+        "Manual Override",
+        "Map Lux to Brightness (Java) V2",
+        "Reset Brightness and State",
+        "_DimmingApplyToggle",
+        "_ShowColorFilter"
+      ],
+      "readers": [
+        "ARGB To Hex",
+        "Apply Dimming (Privileged)",
+        "Apply Dimming (Unprivileged)",
+        "Disable Super Dimming (Privileged)",
+        "Disable Super Dimming (Unprivileged)",
+        "Manual Override",
+        "Map Lux to Brightness (Java) V2",
+        "Reset Brightness and State",
+        "_DimmingApplyToggle",
+        "_ShowColorFilter"
+      ]
+    },
+    {
+      "variable": "%AAB_DimmingStrength",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "25",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Initialize AAB Defaults",
+        "_SaveButtonDimming",
+        "_SuperDimmingScene",
+        "unnamed_500",
+        "unnamed_505"
+      ]
+    },
+    {
+      "variable": "%AAB_DimmingStrengthCurr",
+      "type": "variable-ref",
+      "owner": "Apply Dimming (Privileged)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Apply Dimming (Privileged)",
+        "Calculate Super Dimming (Unprivileged) V3"
+      ],
+      "readers": [
+        "Apply Dimming (Privileged)",
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3"
+      ]
+    },
+    {
+      "variable": "%AAB_DimmingThreshold",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "15",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Initialize AAB Defaults",
+        "Smooth DC-Like Brightness Transition V5 (Java)",
+        "Software Dimming V2",
+        "_DimmingUIToggle",
+        "_PWMToggle",
+        "_SaveButtonDimming",
+        "_SuperDimmingScene",
+        "unnamed_500"
+      ]
+    },
+    {
+      "variable": "%AAB_EveningDuration",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_EveningEnd",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_EveningStart",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_Form1A",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "5",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_SaveButtonGeneral",
+        "unnamed_396"
+      ]
+    },
+    {
+      "variable": "%AAB_Form2A",
+      "type": "variable-ref",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_SaveButtonGeneral",
+        "_SaveButtonMisc",
+        "unnamed_396"
+      ]
+    },
+    {
+      "variable": "%AAB_Form2B",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "8.8",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_SaveButtonGeneral",
+        "_SaveButtonMisc",
+        "unnamed_396"
+      ]
+    },
+    {
+      "variable": "%AAB_Form2C",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "18",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_RedInvalidFormulae",
+        "_SaveButtonGeneral",
+        "_SaveButtonMisc",
+        "unnamed_396"
+      ]
+    },
+    {
+      "variable": "%AAB_Form2D",
+      "type": "variable-ref",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Initialize AAB Defaults",
+        "_SaveButtonGeneral"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_SaveButtonGeneral",
+        "unnamed_396"
+      ]
+    },
+    {
+      "variable": "%AAB_Form3A",
+      "type": "string",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Initialize AAB Defaults",
+        "_SaveButtonMisc"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_SaveButtonGeneral",
+        "_SaveButtonMisc",
+        "unnamed_396"
+      ]
+    },
+    {
+      "variable": "%AAB_HTML_Graph",
+      "type": "variable-ref",
+      "owner": "_GenerateGraph (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_GenerateGraph (Java)"
+      ],
+      "readers": [
+        "_DeleteOverridePoint",
+        "_GenerateGraph (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_HTML_Graph2",
+      "type": "variable-ref",
+      "owner": "_GenerateReactivityGraph (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_GenerateReactivityGraph (Java)"
+      ],
+      "readers": [
+        "_GenerateReactivityGraph (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_HTML_Graph3",
+      "type": "variable-ref",
+      "owner": "_GenerateAlphaGraph (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_GenerateAlphaGraph (Java)"
+      ],
+      "readers": [
+        "_GenerateAlphaGraph (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_HTML_Graph4",
+      "type": "variable-ref",
+      "owner": "_GenerateCircadianGraph V8 (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_GenerateCircadianGraph V8 (Java)"
+      ],
+      "readers": [
+        "_GenerateCircadianGraph V8 (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_HTML_Graph5",
+      "type": "variable-ref",
+      "owner": "_GenerateCompressionGraph (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_GenerateCompressionGraph (Java)"
+      ],
+      "readers": [
+        "_GenerateCompressionGraph (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_HTML_Graph6",
+      "type": "variable-ref",
+      "owner": "_GenerateDimmingCurveGraph (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_GenerateDimmingCurveGraph (Java)"
+      ],
+      "readers": [
+        "_GenerateDimmingCurveGraph (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_HTML_Graph7",
+      "type": "variable-ref",
+      "owner": "_GenerateCircadianDimmingGraph (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_GenerateCircadianDimmingGraph (Java)"
+      ],
+      "readers": [
+        "_GenerateCircadianDimmingGraph (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_HTML_Graph8",
+      "type": "variable-ref",
+      "owner": "_CalibratePowerDraw",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_CalibratePowerDraw"
+      ],
+      "readers": [
+        "_CalibratePowerDraw"
+      ]
+    },
+    {
+      "variable": "%AAB_HexOverlay",
+      "type": "string",
+      "owner": "ARGB To Hex",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "ARGB To Hex"
+      ],
+      "readers": [
+        "ARGB To Hex",
+        "Disable Super Dimming (Unprivileged)"
+      ]
+    },
+    {
+      "variable": "%AAB_Initializing",
+      "type": "boolean/enum",
+      "owner": "Set Initial Brightness (Java) V3",
+      "lifetime": "global_tasker_variable",
+      "default": "true",
+      "writers": [
+        "Set Initial Brightness (Java) V3"
+      ],
+      "readers": [
+        "Set Initial Brightness (Java) V3"
+      ]
+    },
+    {
+      "variable": "%AAB_JavaDialogResponse",
+      "type": "unknown",
+      "owner": "_DeleteOverridePoint",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "_DeleteOverridePoint"
+      ]
+    },
+    {
+      "variable": "%AAB_LastAnimation",
+      "type": "unknown",
+      "owner": "Smooth Brightness Transition V5 (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Smooth Brightness Transition V5 (Java)",
+        "Smooth DC-Like Brightness Transition V5 (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_LastRawLux",
+      "type": "variable-ref",
+      "owner": "Set Initial Brightness (Java) V3",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Set Initial Brightness (Java) V3"
+      ],
+      "readers": [
+        "Process Sensor Event (Java)",
+        "Set Initial Brightness (Java) V3",
+        "Set Thresholds (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_LastSensorAccuracy",
+      "type": "variable-ref",
+      "owner": "Set Initial Brightness (Java) V3",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Set Initial Brightness (Java) V3"
+      ],
+      "readers": [
+        "Set Initial Brightness (Java) V3"
+      ]
+    },
+    {
+      "variable": "%AAB_Latitude",
+      "type": "variable-ref",
+      "owner": "_ExperimentSetDate",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_ExperimentSetDate"
+      ],
+      "readers": [
+        "_ExperimentClearDate",
+        "_ExperimentSetDate"
+      ]
+    },
+    {
+      "variable": "%AAB_LocnBackOff",
+      "type": "unknown",
+      "owner": "_ContextF5NetLoc V8",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "_ContextF5NetLoc V8"
+      ]
+    },
+    {
+      "variable": "%AAB_LocnLog",
+      "type": "unknown",
+      "owner": "_ContextLocnListener V4",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "_ContextLocnListener V4"
+      ]
+    },
+    {
+      "variable": "%AAB_Longitude",
+      "type": "variable-ref",
+      "owner": "_ExperimentSetDate",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_ExperimentSetDate"
+      ],
+      "readers": [
+        "_ExperimentClearDate",
+        "_ExperimentSetDate"
+      ]
+    },
+    {
+      "variable": "%AAB_MainLoop",
+      "type": "integer",
+      "owner": "Evaluate Light Change (Java) V2",
+      "lifetime": "global_tasker_variable",
+      "default": "0",
+      "writers": [
+        "Evaluate Light Change (Java) V2",
+        "Process Sensor Event (Java)"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Process Sensor Event (Java)",
+        "Reset Brightness and State"
+      ]
+    },
+    {
+      "variable": "%AAB_Manual_Override",
+      "type": "boolean/enum",
+      "owner": "Manual Override",
+      "lifetime": "global_tasker_variable",
+      "default": "true",
+      "writers": [
+        "Manual Override",
+        "_PanicButton"
+      ],
+      "readers": [
+        "Manual Override",
+        "Set Initial Brightness (Java) V3",
+        "_ContextResume",
+        "_PanicButton"
+      ]
+    },
+    {
+      "variable": "%AAB_MaxBright",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "255",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Dynamic Range Compressed Scale (Java) V2",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_GenerateCompressionGraph (Java)",
+        "_GenerateGraph (Java)",
+        "_MiscScene",
+        "_SaveButtonMisc",
+        "_SetSuggestedVariables",
+        "_UpdateBrightnessFormulae",
+        "_ValidateBrightnessParams",
+        "unnamed_610",
+        "unnamed_687",
+        "unnamed_689",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_MaxWait",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "65",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Calculate Animation (Java) V2",
+        "Initialize AAB Defaults",
+        "Reset Throttle",
+        "Set Initial Brightness (Java) V3",
+        "_MiscScene",
+        "_SaveButtonMisc",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_MinBright",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "10",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Calculate Super Dimming (Privileged) V4",
+        "Calculate Super Dimming (Unprivileged) V3",
+        "Dynamic Range Compressed Scale (Java) V2",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_GenerateCompressionGraph (Java)",
+        "_GenerateDimmingCurveGraph (Java)",
+        "_GenerateGraph (Java)",
+        "_MiscScene",
+        "_SaveButtonDimming",
+        "_SaveButtonMisc",
+        "_SuperDimmingScene",
+        "unnamed_506",
+        "unnamed_513",
+        "unnamed_610",
+        "unnamed_687",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_MinThrottle",
+      "type": "unknown",
+      "owner": "_MiscScene",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "_MiscScene",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_MinWait",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "25",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Calculate Animation (Java) V2",
+        "Initialize AAB Defaults",
+        "Reset Brightness and State",
+        "_MiscScene",
+        "_SaveButtonMisc",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_MorningDuration",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_MorningEnd",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_MorningStart",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_NetLocation",
+      "type": "unknown",
+      "owner": "Reset Brightness and State",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Reset Brightness and State",
+        "_EvaluateContexts V2"
+      ]
+    },
+    {
+      "variable": "%AAB_NotifyUse",
+      "type": "boolean/enum",
+      "owner": "_NotifyToggle",
+      "lifetime": "global_tasker_variable",
+      "default": "true",
+      "writers": [
+        "_NotifyToggle",
+        "_Updates"
+      ],
+      "readers": [
+        "_NotifyToggle",
+        "_Updates"
+      ]
+    },
+    {
+      "variable": "%AAB_NowSS",
+      "type": "variable-ref",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_Offset",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "0",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Dynamic Range Compressed Scale (Java) V2",
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_MiscScene",
+        "_SaveButtonMisc",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_Overrides",
+      "type": "unknown",
+      "owner": "Process Overrides",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Process Overrides",
+        "_DeleteOverridePoint",
+        "_GenerateGraph (Java)",
+        "unnamed_724"
+      ]
+    },
+    {
+      "variable": "%AAB_PWMExp",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "0.8",
+      "writers": [
+        "Initialize AAB Defaults",
+        "_Updates"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "Software Dimming V2",
+        "_SaveButtonDimming",
+        "_SuperDimmingScene",
+        "_Updates"
+      ]
+    },
+    {
+      "variable": "%AAB_PWMSensitive",
+      "type": "boolean/enum",
+      "owner": "_DimmingUIToggle",
+      "lifetime": "global_tasker_variable",
+      "default": "false",
+      "writers": [
+        "_DimmingUIToggle",
+        "_PWMToggle",
+        "_Updates"
+      ],
+      "readers": [
+        "_DimmingUIToggle",
+        "_PWMToggle",
+        "_Updates"
+      ]
+    },
+    {
+      "variable": "%AAB_Package",
+      "type": "unknown",
+      "owner": "_LearnWriteSecure",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "_LearnWriteSecure"
+      ]
+    },
+    {
+      "variable": "%AAB_PermGranted",
+      "type": "unknown",
+      "owner": "_AskPermissionsV7",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "_AskPermissionsV7",
+        "_Updates"
+      ]
+    },
+    {
+      "variable": "%AAB_PolarState",
+      "type": "boolean/enum",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": "true",
+      "writers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_PrevBright",
+      "type": "variable-ref",
+      "owner": "Smooth DC-Like Brightness Transition V5 (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Smooth DC-Like Brightness Transition V5 (Java)"
+      ],
+      "readers": [
+        "Map Lux to Brightness (Java) V2",
+        "Reset Brightness and State",
+        "Smooth DC-Like Brightness Transition V5 (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_Privilege",
+      "type": "string",
+      "owner": "_PrivilegeDetection V5 (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": "None",
+      "writers": [
+        "_PrivilegeDetection V5 (Java)"
+      ],
+      "readers": [
+        "_PrivilegeDetection V5 (Java)",
+        "_SuperDimmingLongTap",
+        "unnamed_492"
+      ]
+    },
+    {
+      "variable": "%AAB_ProfileUser",
+      "type": "variable-ref",
+      "owner": "_ProfileManager",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_ProfileManager"
+      ],
+      "readers": [
+        "_ProfileManager"
+      ]
+    },
+    {
+      "variable": "%AAB_Proximity",
+      "type": "string",
+      "owner": "Detect Proximity",
+      "lifetime": "global_tasker_variable",
+      "default": "near",
+      "writers": [
+        "Detect Proximity"
+      ],
+      "readers": [
+        "Detect Proximity"
+      ]
+    },
+    {
+      "variable": "%AAB_QSUse",
+      "type": "boolean/enum",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "false",
+      "writers": [
+        "Initialize AAB Defaults",
+        "_QSExperimentUIToggle"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_QSExperimentUIToggle"
+      ]
+    },
+    {
+      "variable": "%AAB_ResumeTapped",
+      "type": "boolean/enum",
+      "owner": "Manual Override",
+      "lifetime": "global_tasker_variable",
+      "default": "Off",
+      "writers": [
+        "Manual Override",
+        "Resume After Override"
+      ],
+      "readers": [
+        "Manual Override",
+        "Resume After Override"
+      ]
+    },
+    {
+      "variable": "%AAB_Scale",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "1",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "Map Lux to Brightness (Java) V2",
+        "_MiscScene",
+        "_SaveButtonMisc",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_ScaleDynamic",
+      "type": "unknown",
+      "owner": "Dynamic Range Compressed Scale (Java) V2",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Range Compressed Scale (Java) V2",
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_ScaleDynamicCompress",
+      "type": "unknown",
+      "owner": "Process Overrides",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Process Overrides"
+      ]
+    },
+    {
+      "variable": "%AAB_ScaleSpread",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "15",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_ExperimentScene",
+        "_SaveButtonExperiment",
+        "unnamed_675"
+      ]
+    },
+    {
+      "variable": "%AAB_ScaleSteepness",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "6",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_ExperimentScene",
+        "_SaveButtonExperiment",
+        "unnamed_675"
+      ]
+    },
+    {
+      "variable": "%AAB_ScaleTaperMidpoint",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "190",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Dynamic Range Compressed Scale (Java) V2",
+        "Initialize AAB Defaults",
+        "_ExperimentScene",
+        "_SaveButtonExperiment",
+        "unnamed_675"
+      ]
+    },
+    {
+      "variable": "%AAB_ScaleTaperSteepness",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "0.075",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Dynamic Range Compressed Scale (Java) V2",
+        "Initialize AAB Defaults",
+        "_ExperimentScene",
+        "_SaveButtonExperiment",
+        "unnamed_675"
+      ]
+    },
+    {
+      "variable": "%AAB_ScaleTransitionFactor",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "0.1",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version",
+        "Initialize AAB Defaults",
+        "_ExperimentScene",
+        "_SaveButtonExperiment",
+        "unnamed_675"
+      ]
+    },
+    {
+      "variable": "%AAB_ScalingUse",
+      "type": "boolean/enum",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "false",
+      "writers": [
+        "Initialize AAB Defaults",
+        "_ExperimentUIToggle"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_ExperimentUIToggle"
+      ]
+    },
+    {
+      "variable": "%AAB_Scenebg",
+      "type": "string",
+      "owner": "Advanced Auto Brightness",
+      "lifetime": "global_tasker_variable",
+      "default": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover\">\n    <title>AAB Background</title>\n    <style>\n        * {\n            -webkit-tap-highlight-color: transparent;\n            box-sizing: border-box;\n        }\n\n        body {\n            margin: 0;\n            background-color: #333333;\n            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;\n            height: 100vh;\n            width: 100vw;\n            overflow: hidden;\n        }\n\n        .banner {\n            background-color: #007C63;\n            color: #FFFFFF;\n            padding: clamp(20px, 7vw, 35px) 4vw;\n            \n            box-shadow: 0 4px 8px rgba(0,0,0,0.3);\n            display: flex;\n            align-items: center;\n            justify-content: flex-start;\n            max-height: 20vh;\n            overflow: hidden;\n        }\n        \n        .banner h1 {\n            margin: 0 0 0 5vw;\n            font-weight: 500;\n            line-height: 1;\n            white-space: nowrap;\n            font-size: clamp(16px, 5.5vw, 32px);\n        }\n\n        .placeholder {\n            width: clamp(24px, 7vw, 36px);\n            height: clamp(20px, 6vw, 30px);\n            \n            flex-shrink: 0;\n        }\n    </style>\n</head>\n<body>\n\n    <div class=\"banner\">\n        <div class=\"placeholder\"></div>\n        <h1>Advanced Auto Brightness</h1>\n    </div>\n</body>\n</html>",
+      "writers": [
+        "Advanced Auto Brightness"
+      ],
+      "readers": [
+        "Advanced Auto Brightness"
+      ]
+    },
+    {
+      "variable": "%AAB_Service",
+      "type": "boolean/enum",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "On",
+      "writers": [
+        "Initialize AAB Defaults",
+        "Resume After Override",
+        "_ContextResume",
+        "_PanicButton",
+        "_QSToggleAABService V2"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "Resume After Override",
+        "_ContextResume",
+        "_PanicButton",
+        "_QSToggleAABService V2"
+      ]
+    },
+    {
+      "variable": "%AAB_SettingsBGone",
+      "type": "string",
+      "owner": "_Updates",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_Updates"
+      ],
+      "readers": [
+        "_Updates"
+      ]
+    },
+    {
+      "variable": "%AAB_SettingsBGtwo",
+      "type": "string",
+      "owner": "_Updates",
+      "lifetime": "global_tasker_variable",
+      "default": ");\">\n            <span></span>\n            <span></span>\n            <span></span>\n        </div>\n\n        <h1>Advanced Auto Brightness</h1>\n    </div>\n</body>\n</html>",
+      "writers": [
+        "_Updates"
+      ],
+      "readers": [
+        "_Updates"
+      ]
+    },
+    {
+      "variable": "%AAB_SetupComplete",
+      "type": "integer",
+      "owner": "Advanced Auto Brightness",
+      "lifetime": "global_tasker_variable",
+      "default": "1",
+      "writers": [
+        "Advanced Auto Brightness",
+        "unnamed_396",
+        "unnamed_500",
+        "unnamed_675",
+        "unnamed_735",
+        "unnamed_738"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "unnamed_396",
+        "unnamed_500",
+        "unnamed_675",
+        "unnamed_735",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_SetupTitle",
+      "type": "string",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "Advanced Auto Brightness Setup",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "Set Initial Brightness (Java) V3"
+      ]
+    },
+    {
+      "variable": "%AAB_SunLastDate",
+      "type": "variable-ref",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version",
+        "_ExperimentUIToggle",
+        "_GenerateCircadianDimmingGraph (Java)",
+        "_GenerateCircadianGraph V8 (Java)",
+        "_SaveButtonExperiment",
+        "unnamed_517",
+        "unnamed_674"
+      ]
+    },
+    {
+      "variable": "%AAB_Sundawn",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_Sundusk",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_Sunlightduration",
+      "type": "variable-ref",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_Sunnoon",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_Sunrise",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version",
+        "_GenerateCircadianDimmingGraph (Java)",
+        "_GenerateCircadianGraph V8 (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_Sunset",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_Test",
+      "type": "variable-ref",
+      "owner": "_SuggestCurveParameters V23 (Hybrid)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "_SuggestCurveParameters V23 (Hybrid)"
+      ],
+      "readers": [
+        "_SuggestCurveParameters V23 (Hybrid)"
+      ]
+    },
+    {
+      "variable": "%AAB_ThreshAbsHigh",
+      "type": "unknown",
+      "owner": "Evaluate Light Change (Java) V2",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Evaluate Light Change (Java) V2"
+      ]
+    },
+    {
+      "variable": "%AAB_ThreshAbsLow",
+      "type": "unknown",
+      "owner": "Evaluate Light Change (Java) V2",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Evaluate Light Change (Java) V2"
+      ]
+    },
+    {
+      "variable": "%AAB_ThreshBright",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "0.08",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Initialize AAB Defaults",
+        "_ReactivityScene",
+        "_SaveButtonReactivity",
+        "unnamed_710",
+        "unnamed_735"
+      ]
+    },
+    {
+      "variable": "%AAB_ThreshDark",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "0.3",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Initialize AAB Defaults",
+        "_ReactivityScene",
+        "_SaveButtonReactivity",
+        "unnamed_710",
+        "unnamed_735"
+      ]
+    },
+    {
+      "variable": "%AAB_ThreshDim",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "0.25",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Initialize AAB Defaults",
+        "_ReactivityScene",
+        "_SaveButtonReactivity",
+        "unnamed_710",
+        "unnamed_735"
+      ]
+    },
+    {
+      "variable": "%AAB_ThreshDynamic",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "5",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Initialize AAB Defaults",
+        "Lux Smoothing (Java)"
+      ]
+    },
+    {
+      "variable": "%AAB_ThreshMidpoint",
+      "type": "string",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Initialize AAB Defaults",
+        "_ReactivityScene",
+        "_SaveButtonReactivity",
+        "unnamed_710",
+        "unnamed_712",
+        "unnamed_735"
+      ]
+    },
+    {
+      "variable": "%AAB_ThreshSteepness",
+      "type": "float",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "2.1",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Initialize AAB Defaults",
+        "_ReactivityScene",
+        "_SaveButtonReactivity",
+        "unnamed_710",
+        "unnamed_735"
+      ]
+    },
+    {
+      "variable": "%AAB_Throttle",
+      "type": "variable-ref",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Initialize AAB Defaults",
+        "Reset Brightness and State",
+        "Reset Throttle",
+        "Set Initial Brightness (Java) V3"
+      ],
+      "readers": [
+        "Evaluate Light Change (Java) V2",
+        "Initialize AAB Defaults",
+        "Reset Brightness and State",
+        "Reset Throttle",
+        "Set Initial Brightness (Java) V3",
+        "_MiscScene",
+        "_SaveButtonMisc",
+        "unnamed_738"
+      ]
+    },
+    {
+      "variable": "%AAB_TrustUnreliable",
+      "type": "boolean/enum",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "Off",
+      "writers": [
+        "Initialize AAB Defaults",
+        "_ReactivityToggle"
+      ],
+      "readers": [
+        "Initialize AAB Defaults",
+        "_ReactivityScene",
+        "_ReactivityToggle",
+        "unnamed_710"
+      ]
+    },
+    {
+      "variable": "%AAB_Version",
+      "type": "float",
+      "owner": "_Updates",
+      "lifetime": "global_tasker_variable",
+      "default": "3.3",
+      "writers": [
+        "_Updates"
+      ],
+      "readers": [
+        "_Updates"
+      ]
+    },
+    {
+      "variable": "%AAB_Zone1End",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "35",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "Evaluate Light Change (Java) V2",
+        "Initialize AAB Defaults",
+        "Lux Smoothing (Java)",
+        "_ReactivityScene",
+        "_SaveButtonGeneral",
+        "_SaveButtonMisc",
+        "unnamed_396",
+        "unnamed_710"
+      ]
+    },
+    {
+      "variable": "%AAB_Zone2End",
+      "type": "integer",
+      "owner": "Initialize AAB Defaults",
+      "lifetime": "global_tasker_variable",
+      "default": "10000",
+      "writers": [
+        "Initialize AAB Defaults"
+      ],
+      "readers": [
+        "Advanced Auto Brightness",
+        "Initialize AAB Defaults",
+        "_SaveButtonGeneral",
+        "_SaveButtonMisc",
+        "unnamed_396"
+      ]
+    },
+    {
+      "variable": "%AAB_calc_dawn",
+      "type": "variable-ref",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_calc_dusk",
+      "type": "variable-ref",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_calc_noon",
+      "type": "variable-ref",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_calc_sunrise",
+      "type": "unknown",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%AAB_calc_sunset",
+      "type": "variable-ref",
+      "owner": "Dynamic Scale V13 (Java) App Version",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ],
+      "readers": [
+        "Dynamic Scale V13 (Java) App Version"
+      ]
+    },
+    {
+      "variable": "%app_list_json",
+      "type": "unknown",
+      "owner": "_AppPicker",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "_AppPicker"
+      ]
+    },
+    {
+      "variable": "%as_accuracy",
+      "type": "unknown",
+      "owner": "Process Sensor Event (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Process Sensor Event (Java)",
+        "Set Initial Brightness (Java) V3"
+      ]
+    },
+    {
+      "variable": "%as_values1",
+      "type": "unknown",
+      "owner": "Process Sensor Event (Java)",
+      "lifetime": "global_tasker_variable",
+      "default": null,
+      "writers": [],
+      "readers": [
+        "Process Sensor Event (Java)",
+        "Set Initial Brightness (Java) V3"
+      ]
+    }
+  ],
+  "side_effects": [
+    {
+      "task": "_PrivilegeDetection V5 (Java)",
+      "task_id": "378",
+      "action_index": 0,
+      "category": "brightness_write",
+      "evidence": "import android.content.Context;\nimport android.content.SharedPreferences;\nimport android.content.pm.PackageManager;\nimport java.io.BufferedReader;\nimport java.io.InputStreamReader;"
+    },
+    {
+      "task": "_PrivilegeDetection V5 (Java)",
+      "task_id": "378",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "import android.content.Context;\nimport android.content.SharedPreferences;\nimport android.content.pm.PackageManager;\nimport java.io.BufferedReader;\nimport java.io.InputStreamReader;"
+    },
+    {
+      "task": "_PrivilegeDetection V5 (Java)",
+      "task_id": "378",
+      "action_index": 0,
+      "category": "permission_prompt",
+      "evidence": "import android.content.Context;\nimport android.content.SharedPreferences;\nimport android.content.pm.PackageManager;\nimport java.io.BufferedReader;\nimport java.io.InputStreamReader;"
+    },
+    {
+      "task": "_PrivilegeDetection V5 (Java)",
+      "task_id": "378",
+      "action_index": 7,
+      "category": "brightness_write",
+      "evidence": "Advanced Auto Brightness | Please tap learn in order to learn how to grant Write Secure Settings permissions to this app. | aab_setup_notification"
+    },
+    {
+      "task": "_PrivilegeDetection V5 (Java)",
+      "task_id": "378",
+      "action_index": 7,
+      "category": "notification_update",
+      "evidence": "Advanced Auto Brightness | Please tap learn in order to learn how to grant Write Secure Settings permissions to this app. | aab_setup_notification"
+    },
+    {
+      "task": "_PrivilegeDetection V5 (Java)",
+      "task_id": "378",
+      "action_index": 7,
+      "category": "permission_prompt",
+      "evidence": "Advanced Auto Brightness | Please tap learn in order to learn how to grant Write Secure Settings permissions to this app. | aab_setup_notification"
+    },
+    {
+      "task": "_PrivilegeDetection V5 (Java)",
+      "task_id": "378",
+      "action_index": 9,
+      "category": "overlay_display",
+      "evidence": "\u26a0\ufe0f Unprivileged will draw a semi-transparent overlay and eat your battery. Not recommended! Please check notification for an alternative. | aab_toast | #FF007C63 | 7000"
+    },
+    {
+      "task": "_PrivilegeDetection V5 (Java)",
+      "task_id": "378",
+      "action_index": 9,
+      "category": "notification_update",
+      "evidence": "\u26a0\ufe0f Unprivileged will draw a semi-transparent overlay and eat your battery. Not recommended! Please check notification for an alternative. | aab_toast | #FF007C63 | 7000"
+    },
+    {
+      "task": "unnamed_411",
+      "task_id": "411",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=Override,thresh_dark_label,dark_threshold,zone_1_end_label,zone_1_end_calculated,thresh_dim_label,dim_threshold,thresh_bright_label,bright_threshold,thresh_steepn"
+    },
+    {
+      "task": "unnamed_411",
+      "task_id": "411",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Reactivity Settings | AAB Reactivity Graph"
+    },
+    {
+      "task": "_EvaluateContexts V2",
+      "task_id": "43",
+      "action_index": 3,
+      "category": "file_io",
+      "evidence": "import org.json.JSONArray;\nimport org.json.JSONObject;\nimport java.io.File;\nimport java.util.ArrayList;\nimport java.util.Calendar;\nimport java.util.List;\nimport java.nio.file.Files"
+    },
+    {
+      "task": "unnamed_462",
+      "task_id": "462",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "_MenuScene"
+    },
+    {
+      "task": "unnamed_462",
+      "task_id": "462",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "unnamed_473",
+      "task_id": "473",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=save_button,back_scene | ="
+    },
+    {
+      "task": "unnamed_473",
+      "task_id": "473",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Reactivity Graph"
+    },
+    {
+      "task": "unnamed_500",
+      "task_id": "500",
+      "action_index": 6,
+      "category": "overlay_display",
+      "evidence": "_SuperDimmingScene"
+    },
+    {
+      "task": "unnamed_509",
+      "task_id": "509",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "\u26a0\ufe0f Unprivileged super dimming will use a semi transparent overlay. Battery drain might be excessive! | #FF007C63"
+    },
+    {
+      "task": "unnamed_511",
+      "task_id": "511",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "\u26a0\ufe0f Unprivileged super dimming will use a semi transparent overlay. Battery drain might be excessive! | #FF007C63"
+    },
+    {
+      "task": "unnamed_513",
+      "task_id": "513",
+      "action_index": 5,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=save_button,back_scene | ="
+    },
+    {
+      "task": "unnamed_513",
+      "task_id": "513",
+      "action_index": 6,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Dimming Graph"
+    },
+    {
+      "task": "unnamed_517",
+      "task_id": "517",
+      "action_index": 7,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=save_button,back_scene | ="
+    },
+    {
+      "task": "unnamed_517",
+      "task_id": "517",
+      "action_index": 8,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Circadian Dimming Graph"
+    },
+    {
+      "task": "_CalibratePowerDraw",
+      "task_id": "524",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=back_scene | ="
+    },
+    {
+      "task": "_CalibratePowerDraw",
+      "task_id": "524",
+      "action_index": 4,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Power Draw Graph"
+    },
+    {
+      "task": "unnamed_532",
+      "task_id": "532",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "unnamed_532",
+      "task_id": "532",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "unnamed_532",
+      "task_id": "532",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "_ExperimentScene",
+      "task_id": "540",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=spread_label,scale,save_button,exit_scenes,draw_graph4,undo_button,transition_factor_label,curve_steepness_label,transition,steepness,experimental_label,draw_grap"
+    },
+    {
+      "task": "_ExperimentScene",
+      "task_id": "540",
+      "action_index": 9,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Experiment Settings | AAB Experiment Graph,AAB Taper Graph"
+    },
+    {
+      "task": "unnamed_550",
+      "task_id": "550",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "_QSToggleAABService V2",
+      "task_id": "551",
+      "action_index": 3,
+      "category": "notification_update",
+      "evidence": "Repost Foreground Notification"
+    },
+    {
+      "task": "_QSToggleAABService V2",
+      "task_id": "551",
+      "action_index": 32,
+      "category": "notification_update",
+      "evidence": "Repost Foreground Notification"
+    },
+    {
+      "task": "_QSToggleAABService V2",
+      "task_id": "551",
+      "action_index": 41,
+      "category": "notification_update",
+      "evidence": "_ForegroundNotification"
+    },
+    {
+      "task": "_AskPermissionsV7",
+      "task_id": "563",
+      "action_index": 1,
+      "category": "permission_prompt",
+      "evidence": "%orig_perm | %AAB_PermGranted"
+    },
+    {
+      "task": "_AskPermissionsV7",
+      "task_id": "563",
+      "action_index": 8,
+      "category": "overlay_display",
+      "evidence": "import android.provider.Settings;\n             import android.content.Intent;\n             import android.net.Uri;\n             import android.app.AlertDialog;\n             import "
+    },
+    {
+      "task": "_AskPermissionsV7",
+      "task_id": "563",
+      "action_index": 8,
+      "category": "notification_update",
+      "evidence": "import android.provider.Settings;\n             import android.content.Intent;\n             import android.net.Uri;\n             import android.app.AlertDialog;\n             import "
+    },
+    {
+      "task": "_AskPermissionsV7",
+      "task_id": "563",
+      "action_index": 8,
+      "category": "permission_prompt",
+      "evidence": "import android.provider.Settings;\n             import android.content.Intent;\n             import android.net.Uri;\n             import android.app.AlertDialog;\n             import "
+    },
+    {
+      "task": "_AskPermissionsV7",
+      "task_id": "563",
+      "action_index": 10,
+      "category": "permission_prompt",
+      "evidence": "All permissions granted! | aab_toast | #FF007C63"
+    },
+    {
+      "task": "_MiscScene",
+      "task_id": "565",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=min_bright_label,Minimum Brightness Slider,max_bright_label,Maximum Brightness,scale_label,scale,offset_label,offset,Anim_steps_label,Animation Steps,min_wait_lab"
+    },
+    {
+      "task": "_MiscScene",
+      "task_id": "565",
+      "action_index": 1,
+      "category": "notification_update",
+      "evidence": "%ui_body_elements=min_bright_label,Minimum Brightness Slider,max_bright_label,Maximum Brightness,scale_label,scale,offset_label,offset,Anim_steps_label,Animation Steps,min_wait_lab"
+    },
+    {
+      "task": "_MiscScene",
+      "task_id": "565",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Misc Settings | AAB Alpha Graph"
+    },
+    {
+      "task": "Manual Override",
+      "task_id": "567",
+      "action_index": 9,
+      "category": "notification_update",
+      "evidence": "Manual brightness override detected or Android's auto-brightness enabled. The service is now paused. Tap the notification to continue the service. | #FFFFFFFF | Bottom | aab_toast "
+    },
+    {
+      "task": "Manual Override",
+      "task_id": "567",
+      "action_index": 11,
+      "category": "notification_update",
+      "evidence": "Advanced Auto Brightness Paused | Brightness manually set or Android auto brightness enabled. Expand notification and tap \"tap here to resume.\" | aab_override_notification"
+    },
+    {
+      "task": "Manual Override",
+      "task_id": "567",
+      "action_index": 16,
+      "category": "notification_update",
+      "evidence": "Repost Paused Notification"
+    },
+    {
+      "task": "Manual Override",
+      "task_id": "567",
+      "action_index": 24,
+      "category": "notification_update",
+      "evidence": "Advanced Auto Brightness Paused | Brightness manually set or Android auto brightness enabled. Expand notification and tap \"tap here to resume.\" | aab_override_notification"
+    },
+    {
+      "task": "Initialize AAB Defaults",
+      "task_id": "570",
+      "action_index": 56,
+      "category": "notification_update",
+      "evidence": "Repost Paused Notification"
+    },
+    {
+      "task": "Initialize AAB Defaults",
+      "task_id": "570",
+      "action_index": 60,
+      "category": "notification_update",
+      "evidence": "%AAB_SetupTitle | Defaults initialized. To finish setup, please turn your screen off and back on. | aab_setup_notification"
+    },
+    {
+      "task": "_ReactivityScene",
+      "task_id": "575",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=Override,thresh_dark_label,dark_threshold,zone_1_end_label,zone_1_end_calculated,thresh_dim_label,dim_threshold,thresh_bright_label,bright_threshold,thresh_steepn"
+    },
+    {
+      "task": "_ReactivityScene",
+      "task_id": "575",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Reactivity Settings | AAB Reactivity Graph"
+    },
+    {
+      "task": "_LoadedMiscAuto",
+      "task_id": "576",
+      "action_index": 3,
+      "category": "notification_update",
+      "evidence": "AAB Misc Settings | Notify_on_green"
+    },
+    {
+      "task": "_LoadedMiscAuto",
+      "task_id": "576",
+      "action_index": 8,
+      "category": "notification_update",
+      "evidence": "AAB Misc Settings | Notify_on_green"
+    },
+    {
+      "task": "Advanced Auto Brightness",
+      "task_id": "580",
+      "action_index": 1,
+      "category": "permission_prompt",
+      "evidence": "_AskPermissionsV7"
+    },
+    {
+      "task": "Advanced Auto Brightness",
+      "task_id": "580",
+      "action_index": 6,
+      "category": "overlay_display",
+      "evidence": "_ColorSuggestionsScene"
+    },
+    {
+      "task": "Advanced Auto Brightness",
+      "task_id": "580",
+      "action_index": 7,
+      "category": "overlay_display",
+      "evidence": "%ui_h1_elements=switch_description\n%ui_body_elements=form1a_label,form1a,form2d_label,End_zone_1,form2a_label,Form2a_calculated,form2b_label,form2b,form2c_label,form2c,end_zone_2 l"
+    },
+    {
+      "task": "Advanced Auto Brightness",
+      "task_id": "580",
+      "action_index": 8,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Brightness Settings | AAB Brightness Graph"
+    },
+    {
+      "task": "Advanced Auto Brightness",
+      "task_id": "580",
+      "action_index": 16,
+      "category": "overlay_display",
+      "evidence": "%AAB_Scenebg | <!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no, viewpo"
+    },
+    {
+      "task": "_ChartJsChunks",
+      "task_id": "581",
+      "action_index": 0,
+      "category": "notification_update",
+      "evidence": "%chartjs | /*!\n * Chart.js v4.5.0\n * https://www.chartjs.org\n * (c) 2025 Chart.js Contributors\n * Released under the MIT License\n */\n!function(t,e){\"object\"==typeof exports&&\"undef"
+    },
+    {
+      "task": "_ChartJsChunks",
+      "task_id": "581",
+      "action_index": 2,
+      "category": "notification_update",
+      "evidence": "%chartjs11 | yout(o),s||u(n,(t=>{t.reset()})),this._updateDatasets(t),this.notifyPlugins(\"afterUpdate\",{mode:t}),this._layers.sort(kn(\"z\",\"_idx\"));const{_active:a,_lastEvent:r}=thi"
+    },
+    {
+      "task": "_ChartJsChunks",
+      "task_id": "581",
+      "action_index": 11,
+      "category": "notification_update",
+      "evidence": "%chartjs20 | xt(this.getContext()),s=i.enabled&&e.options.animation&&i.animations,n=new Ts(this.chart,s);return s._cacheable&&(this._cachedAnimations=Object.freeze(n)),n}getContext"
+    },
+    {
+      "task": "_ChartJsChunks",
+      "task_id": "581",
+      "action_index": 16,
+      "category": "notification_update",
+      "evidence": "%chartjs6 | s,s),e=e&&!ms(i.addedNodes,s);e&&i()}));return n.observe(document,{childList:!0,subtree:!0}),n}const _s=new Map;let ys=0;function vs(){const t=window.devicePixelRatio;t"
+    },
+    {
+      "task": "_ChartJsChunks",
+      "task_id": "581",
+      "action_index": 18,
+      "category": "notification_update",
+      "evidence": "%chartjs8 | ),maxDefined:a(e)}}getMinMax(t){let e,{min:i,max:s,minDefined:n,maxDefined:o}=this.getUserBounds();if(n&&o)return{min:i,max:s};const a=this.getMatchingVisibleMetas();fo"
+    },
+    {
+      "task": "_ChartJsChunks",
+      "task_id": "581",
+      "action_index": 19,
+      "category": "notification_update",
+      "evidence": "%chartjs9 | etYAxisLabelAlignment(f);k=t.textAlign,M=t.x}else if(\"right\"===s){const t=this._getYAxisLabelAlignment(f);k=t.textAlign,M=t.x}else if(\"x\"===e){if(\"center\"===s)w=(t.top+"
+    },
+    {
+      "task": "_ChartJsChunks",
+      "task_id": "581",
+      "action_index": 20,
+      "category": "notification_update",
+      "evidence": "%chartjs10 | aults&&a.push(e.defaults),t.createResolver(a,n,[\"\"],{scriptable:!1,indexable:!1,allKeys:!0})}function ln(t,e){const i=ue.datasets[t]||{};return((e.datasets||{})[t]||{}"
+    },
+    {
+      "task": "_ForegroundNotification",
+      "task_id": "584",
+      "action_index": 2,
+      "category": "notification_update",
+      "evidence": "Advanced Auto Brightness | Foreground notification. Please don't dismiss this notification. It's important for maintaining functionality. | aab_setup_notification"
+    },
+    {
+      "task": "_ForegroundNotification",
+      "task_id": "584",
+      "action_index": 4,
+      "category": "notification_update",
+      "evidence": "Advanced Auto Brightness | Foreground notification. Please don't dismiss this notification. It's important for maintaining functionality. | aab_setup_notification"
+    },
+    {
+      "task": "_SuperDimmingScene",
+      "task_id": "586",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=Strength_label,strength,dim_spread_label,spread,Dimming_Exponent_label,steepness,Dimming_Threshold_label,dimming threshold,superdimming_label,Privilege_label,priv"
+    },
+    {
+      "task": "_SuperDimmingScene",
+      "task_id": "586",
+      "action_index": 10,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Superdimming Settings | AAB Circadian Dimming Graph,AAB Dimming Graph"
+    },
+    {
+      "task": "_CreateDefaultProfiles",
+      "task_id": "592",
+      "action_index": 0,
+      "category": "file_io",
+      "evidence": "import org.json.JSONObject;\nimport java.io.File;\nimport java.io.FileWriter;\nimport java.math.BigDecimal;\nimport java.math.RoundingMode;\n\n/*\n * AAB Default Profile Generator\n * Gene"
+    },
+    {
+      "task": "_CreateDefaultProfiles",
+      "task_id": "592",
+      "action_index": 4,
+      "category": "file_io",
+      "evidence": "Download/AAB/configs | *.json | %current_files"
+    },
+    {
+      "task": "_CreateDefaultProfiles",
+      "task_id": "592",
+      "action_index": 6,
+      "category": "file_io",
+      "evidence": "AAB Profile | Profile Dashboard | javascript: files = '%current_files'.split(',') .map(f => f.split('/').pop().replace('.json', '')) .filter(n => n && n !== 'contexts') .sort(); re"
+    },
+    {
+      "task": "unnamed_600",
+      "task_id": "600",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "_KeyEventBackMenu",
+      "task_id": "601",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "_ShowProfileScene"
+    },
+    {
+      "task": "_KeyEventBackMenu",
+      "task_id": "601",
+      "action_index": 8,
+      "category": "overlay_display",
+      "evidence": "_ReactivityScene"
+    },
+    {
+      "task": "_KeyEventBackMenu",
+      "task_id": "601",
+      "action_index": 10,
+      "category": "overlay_display",
+      "evidence": "_MiscScene"
+    },
+    {
+      "task": "_KeyEventBackMenu",
+      "task_id": "601",
+      "action_index": 12,
+      "category": "overlay_display",
+      "evidence": "_ExperimentScene"
+    },
+    {
+      "task": "_KeyEventBackMenu",
+      "task_id": "601",
+      "action_index": 14,
+      "category": "overlay_display",
+      "evidence": "_SuperDimmingScene"
+    },
+    {
+      "task": "unnamed_607",
+      "task_id": "607",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "AAB Superdimming Settings | %scene_status"
+    },
+    {
+      "task": "unnamed_613",
+      "task_id": "613",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "_UpdateStaticSceneElements"
+    },
+    {
+      "task": "unnamed_614",
+      "task_id": "614",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "_UpdateStaticSceneElements"
+    },
+    {
+      "task": "unnamed_615",
+      "task_id": "615",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "_UpdateStaticSceneElements"
+    },
+    {
+      "task": "unnamed_616",
+      "task_id": "616",
+      "action_index": 8,
+      "category": "overlay_display",
+      "evidence": "_UpdateStaticSceneElements"
+    },
+    {
+      "task": "unnamed_617",
+      "task_id": "617",
+      "action_index": 5,
+      "category": "overlay_display",
+      "evidence": "_UpdateStaticSceneElements"
+    },
+    {
+      "task": "_CreateLogo",
+      "task_id": "619",
+      "action_index": 7,
+      "category": "file_io",
+      "evidence": "/storage/emulated/0/Download/AAB/logo.png | %file_exists"
+    },
+    {
+      "task": "unnamed_621",
+      "task_id": "621",
+      "action_index": 5,
+      "category": "overlay_display",
+      "evidence": "%ui_h1_elements=switch_description\n%ui_body_elements=form1a_label,form1a,form2d_label,End_zone_1,form2a_label,Form2a_calculated,form2b_label,form2b,form2c_label,form2c,end_zone_2 l"
+    },
+    {
+      "task": "unnamed_621",
+      "task_id": "621",
+      "action_index": 6,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Brightness Settings | AAB Brightness Graph"
+    },
+    {
+      "task": "_ShowProfileScene",
+      "task_id": "622",
+      "action_index": 0,
+      "category": "file_io",
+      "evidence": "Download/AAB/configs/contexts.json | %aab_contexts_json"
+    },
+    {
+      "task": "_ShowProfileScene",
+      "task_id": "622",
+      "action_index": 1,
+      "category": "file_io",
+      "evidence": "Download/AAB/configs/ | *.json | %files"
+    },
+    {
+      "task": "_ContextManager",
+      "task_id": "623",
+      "action_index": 1,
+      "category": "file_io",
+      "evidence": "Download/AAB/configs/contexts.json | %exists"
+    },
+    {
+      "task": "_ContextManager",
+      "task_id": "623",
+      "action_index": 7,
+      "category": "file_io",
+      "evidence": "Download/AAB/configs/contexts.json | []"
+    },
+    {
+      "task": "_ContextManager",
+      "task_id": "623",
+      "action_index": 9,
+      "category": "file_io",
+      "evidence": "import org.json.JSONArray;\nimport org.json.JSONObject;\nimport java.io.File;\nimport java.io.FileWriter;\nimport java.nio.file.Files;\nimport java.nio.file.Paths;\nimport java.util.Hash"
+    },
+    {
+      "task": "_ContextManager",
+      "task_id": "623",
+      "action_index": 9,
+      "category": "permission_prompt",
+      "evidence": "import org.json.JSONArray;\nimport org.json.JSONObject;\nimport java.io.File;\nimport java.io.FileWriter;\nimport java.nio.file.Files;\nimport java.nio.file.Paths;\nimport java.util.Hash"
+    },
+    {
+      "task": "_AppPicker",
+      "task_id": "625",
+      "action_index": 0,
+      "category": "file_io",
+      "evidence": "import android.content.pm.PackageManager;\nimport android.content.pm.ApplicationInfo;\nimport android.graphics.Bitmap;\nimport android.graphics.Canvas;\nimport android.graphics.drawabl"
+    },
+    {
+      "task": "_ContextResume",
+      "task_id": "626",
+      "action_index": 8,
+      "category": "notification_update",
+      "evidence": "org.json.JSONObject state = new org.json.JSONObject();\n\nString[] keys = {\"AAB_Form1A\", \"AAB_Zone1End\", \"AAB_Form2A\", \"AAB_Form2B\", \"AAB_Form2C\", \"AAB_Zone2End\", \"AAB_Form3A\", \"AAB_"
+    },
+    {
+      "task": "_ContextResume",
+      "task_id": "626",
+      "action_index": 8,
+      "category": "file_io",
+      "evidence": "org.json.JSONObject state = new org.json.JSONObject();\n\nString[] keys = {\"AAB_Form1A\", \"AAB_Zone1End\", \"AAB_Form2A\", \"AAB_Form2B\", \"AAB_Form2C\", \"AAB_Zone2End\", \"AAB_Form3A\", \"AAB_"
+    },
+    {
+      "task": "_ShowDebugScene",
+      "task_id": "634",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "_ShowDebugScene",
+      "task_id": "634",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "_ShowDebugScene",
+      "task_id": "634",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "_DeleteOverridePoint",
+      "task_id": "636",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "/* --- Java Code to Show a Native Overlay Dialog --- */\nimport android.app.AlertDialog;\nimport android.content.DialogInterface;\nimport android.os.Handler;\nimport android.os.Looper;"
+    },
+    {
+      "task": "_ProfileManager",
+      "task_id": "637",
+      "action_index": 5,
+      "category": "file_io",
+      "evidence": "%profile_name | ^.*/|\\.json$"
+    },
+    {
+      "task": "_ProfileManager",
+      "task_id": "637",
+      "action_index": 9,
+      "category": "file_io",
+      "evidence": "import org.json.JSONObject;\nimport java.io.BufferedReader;\nimport java.io.FileReader;\nimport java.io.FileWriter;\nimport java.io.File;\nimport java.math.BigDecimal;\nimport java.math."
+    },
+    {
+      "task": "_DimmingUIToggle",
+      "task_id": "638",
+      "action_index": 18,
+      "category": "overlay_display",
+      "evidence": "_SuperDimmingScene"
+    },
+    {
+      "task": "ARGB To Hex",
+      "task_id": "639",
+      "action_index": 7,
+      "category": "overlay_display",
+      "evidence": "Preview of overlay color for current brightness and/or time of day. | #FF007C63 | aab_debug | %AAB_HexOverlay"
+    },
+    {
+      "task": "ARGB To Hex",
+      "task_id": "639",
+      "action_index": 12,
+      "category": "overlay_display",
+      "evidence": "%AAB_HexOverlay | #%hex_a%append"
+    },
+    {
+      "task": "_LearnWriteSecure",
+      "task_id": "643",
+      "action_index": 4,
+      "category": "permission_prompt",
+      "evidence": "import android.app.Activity;\nimport android.app.AlertDialog;\nimport android.content.DialogInterface;\nimport android.content.Context;\nimport android.content.ClipboardManager;\nimport"
+    },
+    {
+      "task": "_LearnWriteSecure",
+      "task_id": "643",
+      "action_index": 5,
+      "category": "permission_prompt",
+      "evidence": "android.permission.WRITE_SECURE_SETTINGS | Please follow the instructions in the next pop up to grant Write Secure Settings permissions to %AAB_Package. This will enable a more eff"
+    },
+    {
+      "task": "_SuperDimmingLongTap",
+      "task_id": "644",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "Displays your current privilege. \n\u26a0\ufe0f Unprivileged will draw a semi-transparent overlay and eat your battery. Not recommended to enable super dimming! | aab_toast | #FF007C63"
+    },
+    {
+      "task": "_SuperDimmingLongTap",
+      "task_id": "644",
+      "action_index": 14,
+      "category": "brightness_write",
+      "evidence": "Advanced Auto Brightness | Please tap learn in order to learn how to grant Write Secure Settings permissions to this app. | aab_setup_notification"
+    },
+    {
+      "task": "_SuperDimmingLongTap",
+      "task_id": "644",
+      "action_index": 14,
+      "category": "notification_update",
+      "evidence": "Advanced Auto Brightness | Please tap learn in order to learn how to grant Write Secure Settings permissions to this app. | aab_setup_notification"
+    },
+    {
+      "task": "_SuperDimmingLongTap",
+      "task_id": "644",
+      "action_index": 14,
+      "category": "permission_prompt",
+      "evidence": "Advanced Auto Brightness | Please tap learn in order to learn how to grant Write Secure Settings permissions to this app. | aab_setup_notification"
+    },
+    {
+      "task": "_PWMToggle",
+      "task_id": "648",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "System will use an overlay to dim the screen. \n\n\u26a0\ufe0f Might cause increased battery drain! | Bottom | #FF007C63"
+    },
+    {
+      "task": "_PWMToggle",
+      "task_id": "648",
+      "action_index": 6,
+      "category": "overlay_display",
+      "evidence": "_SuperDimmingScene"
+    },
+    {
+      "task": "_PWMToggle",
+      "task_id": "648",
+      "action_index": 15,
+      "category": "overlay_display",
+      "evidence": "System will no longer use an overlay to dim the screen | Bottom | #FF007C63"
+    },
+    {
+      "task": "Disable Super Dimming (Unprivileged)",
+      "task_id": "654",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "%AAB_HexOverlay"
+    },
+    {
+      "task": "_ExitButton",
+      "task_id": "656",
+      "action_index": 18,
+      "category": "overlay_display",
+      "evidence": "AAB Debug Scene"
+    },
+    {
+      "task": "unnamed_674",
+      "task_id": "674",
+      "action_index": 7,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=save_button,back_scene | ="
+    },
+    {
+      "task": "unnamed_674",
+      "task_id": "674",
+      "action_index": 8,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Experiment Graph"
+    },
+    {
+      "task": "unnamed_675",
+      "task_id": "675",
+      "action_index": 6,
+      "category": "overlay_display",
+      "evidence": "_ExperimentScene"
+    },
+    {
+      "task": "unnamed_682",
+      "task_id": "682",
+      "action_index": 0,
+      "category": "notification_update",
+      "evidence": "Use notifications to keep the service alive and show 'paused' notifications. | #FF007C63"
+    },
+    {
+      "task": "unnamed_685",
+      "task_id": "685",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "_MenuScene"
+    },
+    {
+      "task": "unnamed_686",
+      "task_id": "686",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=save_button,back_scene | ="
+    },
+    {
+      "task": "unnamed_686",
+      "task_id": "686",
+      "action_index": 3,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Taper Graph"
+    },
+    {
+      "task": "_NotifyToggle",
+      "task_id": "692",
+      "action_index": 1,
+      "category": "notification_update",
+      "evidence": "%AAB_NotifyUse | true"
+    },
+    {
+      "task": "_NotifyToggle",
+      "task_id": "692",
+      "action_index": 2,
+      "category": "notification_update",
+      "evidence": "%AAB_NotifyUse | false"
+    },
+    {
+      "task": "_NotifyToggle",
+      "task_id": "692",
+      "action_index": 3,
+      "category": "notification_update",
+      "evidence": "AAB Misc Settings | Notify_on_green"
+    },
+    {
+      "task": "_NotifyToggle",
+      "task_id": "692",
+      "action_index": 4,
+      "category": "notification_update",
+      "evidence": "Notifications disabled!<br>\n\u26a0\ufe0f Service <i>might</i> be stopped via aggressive battery management. | Bottom | #FF007C63"
+    },
+    {
+      "task": "_NotifyToggle",
+      "task_id": "692",
+      "action_index": 9,
+      "category": "notification_update",
+      "evidence": "%AAB_NotifyUse | true"
+    },
+    {
+      "task": "_NotifyToggle",
+      "task_id": "692",
+      "action_index": 10,
+      "category": "notification_update",
+      "evidence": "AAB Misc Settings | Notify_on_green"
+    },
+    {
+      "task": "_NotifyToggle",
+      "task_id": "692",
+      "action_index": 11,
+      "category": "notification_update",
+      "evidence": "Notifications enabled! | Bottom | #FF007C63"
+    },
+    {
+      "task": "unnamed_693",
+      "task_id": "693",
+      "action_index": 0,
+      "category": "notification_update",
+      "evidence": "_NotifyToggle"
+    },
+    {
+      "task": "unnamed_695",
+      "task_id": "695",
+      "action_index": 0,
+      "category": "notification_update",
+      "evidence": "_NotifyToggle"
+    },
+    {
+      "task": "Smooth Brightness Transition V5 (Java)",
+      "task_id": "696",
+      "action_index": 3,
+      "category": "brightness_write",
+      "evidence": "import android.provider.Settings;\nimport android.content.ContentResolver;\n\n/* --- Safe Initialization Phase --- */\n\n/* 1. Get Content Resolver */\ncResolver = context.getContentReso"
+    },
+    {
+      "task": "Smooth DC-Like Brightness Transition V5 (Java)",
+      "task_id": "698",
+      "action_index": 8,
+      "category": "brightness_write",
+      "evidence": "import java.util.HashMap;\nimport android.provider.Settings;\nimport android.content.ContentResolver;\n\n/* --- Start Timer --- */\nengineStartTime = System.currentTimeMillis();\n\n/* ---"
+    },
+    {
+      "task": "Smooth DC-Like Brightness Transition V5 (Java)",
+      "task_id": "698",
+      "action_index": 8,
+      "category": "overlay_display",
+      "evidence": "import java.util.HashMap;\nimport android.provider.Settings;\nimport android.content.ContentResolver;\n\n/* --- Start Timer --- */\nengineStartTime = System.currentTimeMillis();\n\n/* ---"
+    },
+    {
+      "task": "_Updates",
+      "task_id": "706",
+      "action_index": 1,
+      "category": "notification_update",
+      "evidence": "%AAB_NotifyUse | true"
+    },
+    {
+      "task": "_Updates",
+      "task_id": "706",
+      "action_index": 4,
+      "category": "file_io",
+      "evidence": "Download/AAB/configs/Back-up_v3-2_%parseddate.json | %exists"
+    },
+    {
+      "task": "_Updates",
+      "task_id": "706",
+      "action_index": 8,
+      "category": "file_io",
+      "evidence": "Download/AAB/configs/contexts.json | %exists"
+    },
+    {
+      "task": "_Updates",
+      "task_id": "706",
+      "action_index": 11,
+      "category": "file_io",
+      "evidence": "Download/AAB/configs/contexts.json | []"
+    },
+    {
+      "task": "_Updates",
+      "task_id": "706",
+      "action_index": 14,
+      "category": "overlay_display",
+      "evidence": "%AAB_SettingsBGone | <!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no, "
+    },
+    {
+      "task": "_Updates",
+      "task_id": "706",
+      "action_index": 19,
+      "category": "permission_prompt",
+      "evidence": "%AAB_PermGranted"
+    },
+    {
+      "task": "unnamed_717",
+      "task_id": "717",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "_MenuScene"
+    },
+    {
+      "task": "unnamed_718",
+      "task_id": "718",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "_MenuScene"
+    },
+    {
+      "task": "unnamed_724",
+      "task_id": "724",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "_UpdateStaticSceneElements"
+    },
+    {
+      "task": "unnamed_724",
+      "task_id": "724",
+      "action_index": 17,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=save_button,back_scene_graph,suggest_graph | ="
+    },
+    {
+      "task": "unnamed_724",
+      "task_id": "724",
+      "action_index": 18,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Brightness Graph"
+    },
+    {
+      "task": "unnamed_735",
+      "task_id": "735",
+      "action_index": 7,
+      "category": "overlay_display",
+      "evidence": "_ReactivityScene"
+    },
+    {
+      "task": "unnamed_738",
+      "task_id": "738",
+      "action_index": 6,
+      "category": "overlay_display",
+      "evidence": "_MiscScene"
+    },
+    {
+      "task": "unnamed_743",
+      "task_id": "743",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=save_button,back_scene | ="
+    },
+    {
+      "task": "unnamed_743",
+      "task_id": "743",
+      "action_index": 2,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Alpha Graph"
+    },
+    {
+      "task": "unnamed_748",
+      "task_id": "748",
+      "action_index": 0,
+      "category": "overlay_display",
+      "evidence": "%ui_body_elements=min_bright_label,Minimum Brightness Slider,max_bright_label,Maximum Brightness,scale_label,scale,offset_label,offset,Anim_steps_label,Animation Steps,min_wait_lab"
+    },
+    {
+      "task": "unnamed_748",
+      "task_id": "748",
+      "action_index": 0,
+      "category": "notification_update",
+      "evidence": "%ui_body_elements=min_bright_label,Minimum Brightness Slider,max_bright_label,Maximum Brightness,scale_label,scale,offset_label,offset,Anim_steps_label,Animation Steps,min_wait_lab"
+    },
+    {
+      "task": "unnamed_748",
+      "task_id": "748",
+      "action_index": 1,
+      "category": "overlay_display",
+      "evidence": "_AdaptiveBrightnessSceneSize V4 | AAB Misc Settings | AAB Alpha Graph"
+    },
+    {
+      "task": "Dynamic Scale V13 (Java) App Version",
+      "task_id": "90",
+      "action_index": 2,
+      "category": "permission_prompt",
+      "evidence": "android.permission.ACCESS_BACKGROUND_LOCATION | The dynamic scale engine requires location access in order to properly acquire times for solar events in your location."
+    },
+    {
+      "task": "Dynamic Scale V13 (Java) App Version",
+      "task_id": "90",
+      "action_index": 41,
+      "category": "notification_update",
+      "evidence": "Advanced Auto Brightness | Failed to retrieve Sun data today. Will use yesterday's data. Toggle 'use circadian scaling' to retry. | aab_privilege_notification"
+    },
+    {
+      "task": "Dynamic Scale V13 (Java) App Version",
+      "task_id": "90",
+      "action_index": 45,
+      "category": "permission_prompt",
+      "evidence": "CheckMissingPermissions(android.permission.WRITE_SECURE_SETTINGS)"
+    }
+  ],
+  "behavioral_acceptance_criteria": {
+    "manual_override": [
+      "When screen_brightness changes externally and override detection is enabled, AAB transitions into manual override mode.",
+      "While manual override is active, automatic brightness writes are suppressed until reset conditions clear."
+    ],
+    "context_adaptation": [
+      "Context events (app change, battery change, location/WiFi changes) trigger the shared context recomputation task.",
+      "Recomputed context feeds subsequent brightness scaling decisions without requiring screen restart."
+    ],
+    "dimming": [
+      "Display-off hibernate profile triggers dimming/teardown task chain.",
+      "Proximity and ambient light monitor profiles can lower target brightness under dark or near-object conditions."
+    ],
+    "circadian_scaling": [
+      "Dynamic Scale Engine profile evaluates time- and state-based conditions before applying scale factors.",
+      "Scaling should be monotonic with configured nighttime constraints to avoid abrupt jumps."
+    ],
+    "foreground_notification_behavior": [
+      "Foreground notification is reposted when service is active and notification gating conditions are true.",
+      "Paused notification variant is posted when manual/initialization gating indicates suspended automation."
+    ]
+  }
+}
