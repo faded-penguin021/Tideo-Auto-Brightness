@@ -1,0 +1,204 @@
+package com.tideo.autobrightness.domain.brightness
+
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.log10
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.round
+import kotlin.math.sqrt
+import kotlin.math.tanh
+
+class BrightnessEngine {
+    fun evaluate(input: BrightnessPolicyInput): BrightnessPolicyOutput {
+        input.overrides.manualBrightness?.let { manual ->
+            return BrightnessPolicyOutput(
+                targetBrightness = manual.coerceIn(input.curve.minBrightness, input.curve.maxBrightness),
+                transitionDurationMs = 0,
+                animationSteps = 1,
+                animationWaitMs = 0,
+                luxAlpha = 1.0,
+                dimmingAlpha = 0.0,
+                smoothedLux = input.lux,
+                dynamicThreshold = 0.0,
+                thresholdLow = input.lux,
+                thresholdHigh = input.lux,
+                scaleDynamic = 1.0,
+            )
+        }
+
+        val prev = input.previous
+        val prevSmoothedLux = prev?.smoothedLux ?: input.lux
+
+        val dynamicThreshold = dynamicThreshold(input.lux, prevSmoothedLux, input.thresholds)
+        val absThresholds = absoluteThresholds(prev?.lastRawLux ?: input.lux, dynamicThreshold)
+
+        val shouldUpdate = prev == null || input.lux <= absThresholds.first || input.lux >= absThresholds.second
+        val (smoothedLux, luxAlpha) = if (shouldUpdate) {
+            smoothLux(
+                rawLux = input.lux,
+                previousSmoothedLux = prevSmoothedLux,
+                thresholdDynamicPercent = dynamicThreshold * 100.0,
+                deltaFactor = input.thresholds.deltaFactor,
+                zone1End = input.thresholds.zone1End,
+            )
+        } else {
+            prevSmoothedLux to 0.0
+        }
+
+        val mappedBrightness = mapLuxToBrightness(smoothedLux, input.curve)
+        val scaleDynamic = if (input.dynamicScaling.enabled) {
+            computeDynamicScale(input.time, input.dynamicScaling, input.context)
+        } else {
+            input.overrides.baseScaleOverride ?: 1.0
+        }
+
+        val scaledBrightness = compressedDynamicScale(mappedBrightness, scaleDynamic, input.curve)
+        val targetBrightness = round(scaledBrightness).toInt().coerceIn(input.curve.minBrightness, input.curve.maxBrightness)
+
+        val (steps, wait, throttle) = calculateAnimation(
+            alpha = luxAlpha,
+            animation = input.animation,
+            cycleTimeMs = prev?.cycleTimeMs,
+        )
+
+        val dimmingAlpha = dimmingAlpha(targetBrightness, input.curve.minBrightness)
+
+        return BrightnessPolicyOutput(
+            targetBrightness = targetBrightness,
+            transitionDurationMs = throttle,
+            animationSteps = steps,
+            animationWaitMs = wait,
+            luxAlpha = luxAlpha,
+            dimmingAlpha = dimmingAlpha,
+            smoothedLux = smoothedLux,
+            dynamicThreshold = dynamicThreshold,
+            thresholdLow = absThresholds.first,
+            thresholdHigh = absThresholds.second,
+            scaleDynamic = scaleDynamic,
+        )
+    }
+
+    fun smoothLux(
+        rawLux: Double,
+        previousSmoothedLux: Double,
+        thresholdDynamicPercent: Double,
+        deltaFactor: Double,
+        zone1End: Double,
+    ): Pair<Double, Double> {
+        val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
+        val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
+        val luxAlpha = round3((1.0 - exp(-deltaFactor * effectiveDelta)).coerceIn(0.0, 1.0))
+        val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
+        val rounded = if (smoothed < zone1End) roundN(smoothed, 2) else round(smoothed)
+        return rounded to luxAlpha
+    }
+
+    fun dynamicThreshold(rawLux: Double, smoothedLux: Double, cfg: ThresholdConfig): Double {
+        val logLux = log10(smoothedLux + 1.0)
+        val exponent = -cfg.threshSteepness * (logLux - cfg.threshMidpoint)
+        val threshSig = round3(cfg.threshDim + (cfg.threshBright - cfg.threshDim) / (1.0 + exp(exponent)))
+        val threshLow = round3(cfg.threshDark - ((cfg.threshDark - cfg.threshDim) / cfg.zone1End) * smoothedLux)
+        return if (smoothedLux < cfg.zone1End) threshLow else threshSig
+    }
+
+    fun absoluteThresholds(lastRawLux: Double, dynamicThreshold: Double): Pair<Double, Double> {
+        val dynamicPercent = dynamicThreshold * 100.0
+        val low = lastRawLux * (1.0 - (dynamicPercent / 100.0))
+        val high = lastRawLux * (1.0 + (dynamicPercent / 100.0))
+        return low to high
+    }
+
+    fun mapLuxToBrightness(smoothedLux: Double, cfg: BrightnessCurveConfig): Double {
+        val mapped = when {
+            smoothedLux < cfg.zone1End -> cfg.form1A * sqrt(smoothedLux)
+            smoothedLux < cfg.zone2End -> cfg.form2A + cfg.form2B * (
+                (smoothedLux - cfg.form2C).coerceAtLeast(0.0).pow(0.33) -
+                    (cfg.zone1End - cfg.form2C).coerceAtLeast(0.0).pow(0.33)
+                )
+            else -> cfg.maxBrightness - (cfg.form3A / smoothedLux) * cfg.maxBrightness
+        }
+        return mapped.coerceIn(cfg.minBrightness.toDouble(), cfg.maxBrightness.toDouble())
+    }
+
+    fun compressedDynamicScale(mappedBrightness: Double, scaleDynamic: Double, cfg: BrightnessCurveConfig): Double {
+        if (mappedBrightness == 0.0) return cfg.minBrightness.toDouble()
+        val exponent = round3(-cfg.taperSteepness * (mappedBrightness - cfg.taperMidpoint))
+        val compressionFactor = round3(1.0 / (1.0 + exp(exponent)))
+        val taperEffect = round3(1.0 - compressionFactor)
+        val taperedScale = round3(1.0 + (scaleDynamic - 1.0) * taperEffect)
+        val dynamicCap = round3(cfg.maxBrightness / mappedBrightness)
+        val dynamicFloor = round3(2.0 - dynamicCap)
+
+        val effectiveScale = if (scaleDynamic > 1.0) {
+            min(taperedScale, dynamicCap)
+        } else {
+            max(taperedScale, dynamicFloor)
+        }
+
+        return roundN(mappedBrightness * round3(effectiveScale) + cfg.offset, 1)
+    }
+
+    fun computeDynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): Double {
+        val progress = if (context.isPolarDayNight) {
+            if (time.sunlightDurationMinutes > 1380.0) 1.0 else 0.0
+        } else {
+            rampProgress(time)
+        }
+        val xFactor = (progress - 0.5) * scaling.steepness
+        val tanhMax = tanh(scaling.steepness / 2.0)
+        val modifier = if (abs(tanhMax) > 0.000001) tanh(xFactor) / tanhMax else 0.0
+        return round3(1.0 + (scaling.spreadPercent / 100.0) * modifier)
+    }
+
+    fun calculateAnimation(alpha: Double, animation: AnimationConfig, cycleTimeMs: Double?): Triple<Int, Long, Long> {
+        val clamped = alpha.coerceIn(0.0, 1.0)
+        val loops = round(1.0 + clamped * (animation.maxSteps - 1.0)).toInt().coerceAtLeast(1)
+        val rawWait = (1.0 - clamped) * (animation.maxWaitMs - animation.minWaitMs) + animation.minWaitMs
+        val wait = round(rawWait).toLong().coerceAtLeast(0)
+        var throttle = round(loops * wait + 10.0).toLong()
+        if (cycleTimeMs != null && cycleTimeMs <= 2000.0) {
+            throttle += round(cycleTimeMs).toLong()
+        }
+        return Triple(loops, wait, throttle)
+    }
+
+    private fun rampProgress(time: TimeContext): Double {
+        val now = time.secondsOfDay
+        val next = now + 86400.0
+        val prev = now - 86400.0
+
+        fun inRange(t: Double, start: Double, end: Double): Boolean = t >= start && t < end
+
+        val morningDuration = (time.morningEnd - time.morningStart).coerceAtLeast(1.0)
+        val eveningDuration = (time.eveningEnd - time.eveningStart).coerceAtLeast(1.0)
+
+        return when {
+            inRange(now, time.morningStart, time.morningEnd) -> (now - time.morningStart) / morningDuration
+            inRange(next, time.morningStart, time.morningEnd) -> (next - time.morningStart) / morningDuration
+            inRange(prev, time.morningStart, time.morningEnd) -> (prev - time.morningStart) / morningDuration
+            inRange(now, time.eveningStart, time.eveningEnd) -> 1.0 - ((now - time.eveningStart) / eveningDuration)
+            inRange(next, time.eveningStart, time.eveningEnd) -> 1.0 - ((next - time.eveningStart) / eveningDuration)
+            inRange(prev, time.eveningStart, time.eveningEnd) -> 1.0 - ((prev - time.eveningStart) / eveningDuration)
+            else -> {
+                val isDay = (now >= time.morningEnd && now <= time.eveningStart) ||
+                    (next >= time.morningEnd && next <= time.eveningStart) ||
+                    (prev >= time.morningEnd && prev <= time.eveningStart)
+                if (isDay) 1.0 else 0.0
+            }
+        }.coerceIn(0.0, 1.0)
+    }
+
+    private fun round3(value: Double): Double = roundN(value, 3)
+
+    private fun roundN(value: Double, digits: Int): Double {
+        val factor = 10.0.pow(digits)
+        return round(value * factor) / factor
+    }
+
+    private fun dimmingAlpha(targetBrightness: Int, minBrightness: Int): Double {
+        val span = (255 - minBrightness).coerceAtLeast(1)
+        return (1.0 - ((targetBrightness - minBrightness).toDouble() / span)).coerceIn(0.0, 1.0)
+    }
+}
