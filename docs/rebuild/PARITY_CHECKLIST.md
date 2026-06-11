@@ -20,15 +20,15 @@ filled by S1/S2 during extraction.
 | prof759 Proximity Detection → task545 | L300 | | pending |
 | prof760 Monitor Ambient Light → task554 (incl. ConditionList gate) | L318 | | pending |
 | prof761 Initialize (Display On) → task618 | L386 | | pending |
-| prof762 Context: App Changed → task43 | L398 | | pending |
-| prof763 Context: Battery Changed → task43 | L456 | | pending |
-| prof764 Context: Time Changed → task43 | L500 | | pending |
-| prof765 Context: Location Listener → task630 | L541 | | pending |
-| prof766 Context: Location Refresher → task631 | L579 | | pending |
-| prof767 Context: Location Changed → task43 | L628 | | pending |
-| prof768 Context: WiFi (Dis)connected → task43 | L676 | | pending |
+| prof762 Context: App Changed → task43 | L398 | extraction/contexts_spec.md (S2) | pending |
+| prof763 Context: Battery Changed → task43 | L456 | extraction/contexts_spec.md (S2) | pending |
+| prof764 Context: Time Changed → task43 | L500 | extraction/contexts_spec.md (S2) | pending |
+| prof765 Context: Location Listener → task630 | L541 | extraction/contexts_spec.md (S2) | pending |
+| prof766 Context: Location Refresher → task631 | L579 | extraction/contexts_spec.md (S2) | pending |
+| prof767 Context: Location Changed → task43 | L628 | extraction/contexts_spec.md (S2) | pending |
+| prof768 Context: WiFi (Dis)connected → task43 | L676 | extraction/contexts_spec.md (S2) | pending |
 | prof769 Panic (Reset) → task528 | L722 | | pending |
-| prof8 Context: Reset Serialized Cache → task26 | L744 | | pending |
+| prof8 Context: Reset Serialized Cache → task26 | L744 | extraction/contexts_spec.md (S2) | pending |
 
 ## Pipeline & feature task clusters (~25)
 
@@ -51,42 +51,44 @@ filled by S1/S2 during extraction.
 | Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | | pending |
 | Panic reset: 528 | | | pending |
 | Init/defaults: 570 Initialize AAB Defaults | | | pending |
-| Circadian dynamic scale: 90 (+ polar handling) | | | pending |
-| Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | | pending |
-| Privilege detection/grant: 378, 643, 563 | | | pending |
-| QS tile: 551, 552 | | | pending |
-| Foreground notification: 584, 692 | | | pending |
-| Curve suggestion wizard: 38, 655 | | | pending |
-| Formula validation: 583, 707 | | | pending |
-| Power draw calibration: 524 | | | pending |
-| Profiles/import/export/defaults: 592, 637, 622 | | | pending |
-| Debug tooling: 634, 635 | | | pending |
-| Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | | pending |
+| Circadian dynamic scale: 90 (+ polar handling) | | S2 extracted → tasks/task090_dynamic_scale.md | pending |
+| Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S2 extracted → contexts_spec.md | pending |
+| Privilege detection/grant: 378, 643, 563 | | S2 extracted → features_spec.md | pending |
+| QS tile: 551, 552 | | S2 extracted → features_spec.md | pending |
+| Foreground notification: 584, 692 | | S2 extracted → features_spec.md | pending |
+| Curve suggestion wizard: 38, 655 | | S2 extracted → tasks/task038_curve_wizard.md + task655 | pending |
+| Formula validation: 583, 707 | | S2 extracted → features_spec.md | pending |
+| Power draw calibration: 524 | | S2 extracted → features_spec.md | pending |
+| Profiles/import/export/defaults: 592, 637, 622 | | S2 extracted → features_spec.md | pending |
+| Debug tooling: 634, 635 | | S2 extracted → features_spec.md | pending |
+| Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | S2 extracted → screen_map.md (scene dispositions) | pending |
 
 ## Scenes (20) → M3 screens (~9, per S2 screen_map.md)
 
+> S2 extracted all 20 scenes → `extraction/scenes/*.md` (450-element tables) + `screen_map.md` (full disposition matrix). 'Ported to' = target M3 screen; Status `pending` until rendered (S11–S13).
+
 | Scene | XML | Ported to | Status |
 |---|---|---|---|
-| AAB Menu | L4462 | | pending |
-| AAB Brightness Settings | L1415 | | pending |
-| AAB Reactivity Settings | L6739 | | pending |
-| AAB Superdimming Settings | L7533 | | pending |
-| AAB Misc Settings | L4718 | | pending |
-| AAB Experiment Settings | L3334 | | pending |
-| AAB Profile | L5724 | | pending |
-| AAB Debug Scene | L2583 | | pending |
-| AAB Color Filter | L2552 | | pending |
-| AAB Brightness Graph | L1202 | | pending |
-| AAB Alpha Graph | L1038 | | pending |
-| AAB Reactivity Graph | L6563 | | pending |
-| AAB Dimming Graph | L3006 | | pending |
-| AAB Circadian Dimming Graph | L2388 | | pending |
-| AAB Taper Graph | L8387 | | pending |
-| AAB Power Draw Graph | L5611 | | pending |
-| AAB Experiment Graph | L3170 | | pending |
-| AAB About | L799 | | pending |
-| AAB User Guide | L8551 | | pending |
-| AAB Chart.Js License | L2194 | | pending |
+| AAB Menu | L4462 | Dashboard (M3 nav) | pending (S2 extracted) |
+| AAB Brightness Settings | L1415 | Curve & Brightness | pending (S2 extracted) |
+| AAB Reactivity Settings | L6739 | Reactivity | pending (S2 extracted) |
+| AAB Superdimming Settings | L7533 | Animation & Dimming | pending (S2 extracted) |
+| AAB Misc Settings | L4718 | Dashboard/Tools | pending (S2 extracted) |
+| AAB Experiment Settings | L3334 | Dynamic Scale | pending (S2 extracted) |
+| AAB Profile | L5724 | Profiles & Import/Export | pending (S2 extracted) |
+| AAB Debug Scene | L2583 | Tools | pending (S2 extracted) |
+| AAB Color Filter | L2552 | Animation & Dimming | pending (S2 extracted) |
+| AAB Brightness Graph | L1202 | Curve & Brightness (BrightnessCurveChart) | pending (S2 extracted) |
+| AAB Alpha Graph | L1038 | Reactivity (alpha overlay) | pending (S2 extracted) |
+| AAB Reactivity Graph | L6563 | Reactivity (ReactivityChart) | pending (S2 extracted) |
+| AAB Dimming Graph | L3006 | Animation & Dimming (DimmingChart) | pending (S2 extracted) |
+| AAB Circadian Dimming Graph | L2388 | Dynamic Scale (CircadianChart) | pending (S2 extracted) |
+| AAB Taper Graph | L8387 | Dynamic Scale (TaperChart) | pending (S2 extracted) |
+| AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | pending (S2 extracted) |
+| AAB Experiment Graph | L3170 | Dynamic Scale (ExperimentChart) | pending (S2 extracted) |
+| AAB About | L799 | About+Guide+Onboarding | pending (S2 extracted) |
+| AAB User Guide | L8551 | About+Guide+Onboarding | pending (S2 extracted) |
+| AAB Chart.Js License | L2194 | dropped(Chart.js removed) | pending (S2 extracted) |
 
 ## Java blocks (40, anchors verified — see XML_RECIPES.md R7 for the full line↔task table)
 
