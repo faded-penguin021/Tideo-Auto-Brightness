@@ -19,10 +19,11 @@ Condition `<op>`: 2 `=` · 3 `!=` · 6 `<` · 7 `>` · 12 isSet · 13 isNotSet.
 ### task551 `_QSToggleAABService V2` (L17325-17718, code-0 driven)
 Master service ON/OFF toggle. Triggered by the QS tile tap and by resume/context callers.
 
-**Branch decision (act0):** `IF %AAB_Service = On  OR caller1 !~ *Resume After Override*  OR caller1 = *_ContextResume*`
-→ treat as **turn OFF**; else **turn ON**. (And2/Or2 grouping flagged unresolved in INDEX.md #1; literal
-sequence is `bool0=And, bool1=Or`. Effect: if service already On, or caller is a resume/contextresume, go to
-the OFF path. The Off path is the `act1..act25` block; the On path is `act27..act47`.)
+**Branch decision (act0):** conditions `%AAB_Service = On` **And** `caller1 !~ *Resume After Override*`
+**Or** `caller1 = *_ContextResume*`; per the validated D-021 rule (plain `And` binds tighter than `Or`):
+`(%AAB_Service=On AND caller1 !~ *Resume After Override*) OR caller1 ~ *_ContextResume*` → **turn OFF**;
+else **turn ON**. (Resolves the D-018 leftover; sanity-check the ContextResume leg at runtime in S9.
+The Off path is the `act1..act25` block; the On path is `act27..act47`.)
 
 **OFF path (act1-act25):**
 - `%AAB_Service = Off` (act1).
@@ -129,26 +130,43 @@ INITIAL_SETTLE_MS=6000.
 ## 4. Debug levels + log surface
 
 ### task635 `_SetDebugLevel` (L28955-28978)
-One action: `IF %par1 isSet → %AAB_Debug = %par1`. So `%AAB_Debug` is the debug verbosity level, set
-from a UI selector (`<select id=debug-selector>`, value bound to int `%AAB_Debug`, L2868-2876).
+One action: `IF %par1 isSet → %AAB_Debug = %par1`. So `%AAB_Debug` is the debug *category* selector
+value — 10 named categories, NOT a verbosity level (owner-corrected S3.5, D-023; see table below) —
+set from a UI selector (`<select id=debug-selector>`, options L2772-2783, JS binding L2868-2876).
 
 ### task634 `_ShowDebugScene` (L28895-28954)
 Shows scene "AAB Debug Scene" (code 47, fullscreen overlay 100×100%). If `%err` isSet AND
 `%AAB_Package = *com.tideo.aab*`, hide+re-show (refresh) the scene. (Self-debug guard for the dev build.)
 
-### `%AAB_Debug` level semantics
-- **Default 0** (off). Selector-driven integer; default `'3000'`-style fallbacks elsewhere are unrelated.
-- Conditions across the project gate on it almost exclusively with **op 2 (`=`)**, i.e. **discrete
-  named levels, not a `≥` threshold**. Observed equality targets: **1, 2, 3, 4, 5, 6, 7, 8, 9**
-  (one `op 3 !=1` at L16386 — "any debug on"). Histogram of distinct rhs values:
-  1×2, 2×2, 3×1, 4×1, 5×4, 6×1, 7×7, 8×1, 9×1.
-- Level **8** is the verbose context-evaluation log gate (e.g. task623 `isDebug=AAB_Debug.equals("8")`
-  writes `%eval_log` "Veto: …" diagnostics, L12183; task637 "System restored missing Default.json").
-- Level **7** is the most-used (pipeline-math logging). Levels gate `code 548` toasts tagged
-  `aab_debug` and `%eval_log`/`%err` surfaces.
+### `%AAB_Debug` level semantics — 10 named categories (authoritative; owner-verified S3.5, D-023)
 
-> Rebuild note: model `%AAB_Debug` as an enum/int 0–9 where each level *selectively* unlocks a category
-> of diagnostic logging (equality-matched), NOT a monotonic severity threshold. Default 0.
+The Debug scene's selector (XML L2773–2782) names every level. They are **distinct info categories,
+shown mostly as toasts — NOT verbosity tiers**:
+
+| Level | Label (verbatim from the selector) |
+|---|---|
+| 0 | Off |
+| 1 | Skip Animations |
+| 2 | Animation Details |
+| 3 | Light Eval Thresholds |
+| 4 | Dynamic Scale Calcs |
+| 5 | Super Dimming Info |
+| 6 | Overlay Preview |
+| 7 | Graph Metrics |
+| 8 | Context Automation |
+| 9 | Context Location |
+
+- **Default 0** (off). Selector-driven integer; default `'3000'`-style fallbacks elsewhere are unrelated.
+- Conditions across the project gate on it almost exclusively with **op 2 (`=`)** — consistent with the
+  discrete categories above (one `op 3 !=1` at L16386 — "any debug on"). Histogram of equality targets:
+  1×2, 2×2, 3×1, 4×1, 5×4, 6×1, 7×7, 8×1, 9×1.
+- Level 8 "Context Automation" gates the context-evaluation log (task623 `isDebug=AAB_Debug.equals("8")`
+  writes `%eval_log` "Veto: …" diagnostics, L12183; task637 "System restored missing Default.json").
+  ⚠️ S1's *inferred* glosses were wrong here — 7 is **Graph Metrics**, not "pipeline-math logging".
+- Levels gate `code 548` toasts tagged `aab_debug` and `%eval_log`/`%err` surfaces.
+
+> Rebuild note: model `%AAB_Debug` as an enum 0–9 with the labels above (equality-matched category
+> selector, NOT a monotonic severity threshold). Default 0. S12 UI = dropdown with these exact labels.
 
 ---
 
@@ -286,6 +304,12 @@ Detection order (first hit wins → `hasPrivilegeFound`):
 5. **Fallback** → `"None"` + toast "⚠️ Unprivileged will draw a semi-transparent overlay and eat your
    battery. Not recommended!"
 
+> **Sanctioned deviation (owner, S3.5 → D-024):** step 4 reads the **Tasker pref `adbwp`** for the ADB
+> port — a Tasker-host artifact with no business in a standalone app. The rebuild must NOT read Tasker
+> prefs (and drops ADB-WiFi probing altogether): elevated-tier truth is
+> `checkPermission(WRITE_SECURE_SETTINGS)`; ADB / Shizuku / root remain *grant channels* only (matches
+> the S7 PrivilegeManager + S11 onboarding design and D-016).
+
 If caller `~ *anon*` and final privilege ≠ None, toasts "Current privilege: <x>."
 
 > Tier mapping to CLAUDE.md model: `Root` / `Write Secure` / `Shizuku` / `ADB WiFi` are all the
@@ -302,6 +326,11 @@ WRITE_SECURE_SETTINGS → returns immediately. Otherwise builds:
 NOT grant; it instructs the user to run ADB. (Shizuku is the grant channel elsewhere, not here.)
 
 ### task563 `_AskPermissionsV7` (Java L19678-20042) — the BASIC/runtime permission wizard
+
+> **Sanctioned deviation (owner, S3.5 → D-024):** the 8 capability gates below and their order are the
+> parity contract; the dialog-polling *flow* is not. S11 replaces it with modern Compose onboarding
+> (ActivityResultContracts + lifecycle re-checks), as its RUNBOOK brief already specifies.
+
 Sets `%AAB_Package = context.getPackageName()`. Polling loop that walks the user through 8 sequential
 permission "steps", each with a Grant dialog + the matching Settings intent, re-checking each pass:
 1. **Write Settings** (`Settings.System.canWrite`) — the BASIC tier gate.

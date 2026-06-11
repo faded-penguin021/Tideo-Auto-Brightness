@@ -14,8 +14,8 @@ rects and `PropertiesElement` scene-chrome are dropped (replaced by the M3 Scaff
 | **Dashboard** | Menu (nav), Misc Settings (global toggles, service switch) | — |
 | **Curve & Brightness** | Brightness Settings, Brightness Graph | BrightnessCurveChart |
 | **Reactivity** | Reactivity Settings, Reactivity Graph, Alpha Graph | ReactivityChart |
-| **Animation & Dimming** | Superdimming Settings, Dimming Graph, Color Filter | DimmingChart |
-| **Dynamic Scale** | Experiment Settings, Experiment Graph, Circadian Dimming Graph, Taper Graph | ExperimentChart, CircadianChart, TaperChart |
+| **Animation & Dimming** | Superdimming Settings, Dimming Graph, Circadian Dimming Graph, Color Filter | DimmingChart, CircadianChart |
+| **Dynamic Scale** | Experiment Settings, Experiment Graph, Taper Graph | ExperimentChart, TaperChart |
 | **Contexts** | (rules surfaced from contexts_spec — no dedicated Tasker scene; editor lives in AAB Profile) | — |
 | **Tools** | Debug Scene, Power Draw Graph, (wizard from Brightness Graph 'Suggest', calibration from task524) | PowerDrawChart |
 | **Profiles & Import/Export** | AAB Profile (profile manager + context-rule editor) | — |
@@ -452,22 +452,30 @@ Every Chart.js WebElement maps to a named Compose-Canvas chart (built S12/S13). 
 | background#5 | Rect | dropped(decorative/background rect) |
 | props | Properties | merged-into Dynamic Scale |
 
-### AAB Circadian Dimming Graph  ·  `circadian_dimming_graph`  ·  XML L2388–2551  ·  12 elements  → Dynamic Scale
+### AAB Circadian Dimming Graph  ·  `circadian_dimming_graph`  ·  XML L2388–2551  ·  12 elements  → Animation & Dimming
+
+> **S3.5 (owner, D-026): re-homed Dynamic Scale → Animation & Dimming.** In Tasker this graph is opened
+> from **Superdimming Settings** (`draw_graph4` button, handler task517: warning toast if
+> `%aab_scaletransitionfactor>0.5`, clears `%AAB_SunLastDate`, runs task90 + task705, hides Superdimming
+> Settings), and the button is shown only when circadian scaling (`%AAB_ScalingUse`) is enabled — keep
+> that conditional visibility. This also resolves the contradiction with `_disp_group4.md`, which already
+> said Animation & Dimming. (Distinct from the Experiment Graph / task549 / Graph4 — that one stays in
+> Dynamic Scale.)
 
 | Element | Type | Disposition |
 |---|---|---|
-| elements0 | Web | merged-into Dynamic Scale |
-| elements1 | Web | merged-into Dynamic Scale |
+| elements0 | Web | merged-into Animation & Dimming |
+| elements1 | Web | merged-into Animation & Dimming |
 | background#1 | Rect | dropped(decorative/background rect) |
-| elements2 | Text | merged-into Dynamic Scale |
+| elements2 | Text | merged-into Animation & Dimming |
 | background#2 | Rect | dropped(decorative/background rect) |
-| elements3 | Text | merged-into Dynamic Scale |
+| elements3 | Text | merged-into Animation & Dimming |
 | background#3 | Rect | dropped(decorative/background rect) |
-| elements4 | Text | merged-into Dynamic Scale |
+| elements4 | Text | merged-into Animation & Dimming |
 | background#4 | Rect | dropped(decorative/background rect) |
-| elements5 | Text | merged-into Dynamic Scale |
+| elements5 | Text | merged-into Animation & Dimming |
 | background#5 | Rect | dropped(decorative/background rect) |
-| props | Properties | merged-into Dynamic Scale |
+| props | Properties | merged-into Animation & Dimming |
 
 ### AAB Taper Graph  ·  `taper_graph`  ·  XML L8387–8550  ·  12 elements  → Dynamic Scale
 

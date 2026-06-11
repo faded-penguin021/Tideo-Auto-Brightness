@@ -514,7 +514,9 @@ resolver test matrix matches spec table 1:1; pushed.
 Parallel window C (with S10 — disjoint packages; rebase before push).
 
 **Objective:** Compose M3 navigation shell (screen set per `screen_map.md`), privilege
-onboarding via ActivityResultContracts, live Dashboard.
+onboarding via ActivityResultContracts, live Dashboard. Onboarding parity contract = task563's
+8 gates + order (features_spec); the polling-dialog flow itself is a sanctioned deviation
+(D-024) — do not port it, and never read Tasker prefs (`adbwp`) in privilege detection.
 
 **Inputs:** `screen_map.md`, existing `app/.../ui/*` + `navigation/*` + `state/
 SettingsViewModel.kt`, `PrivilegeManager`, `ServiceHealthStore`, pipeline state flows.
@@ -548,9 +550,12 @@ Robolectric compose smoke test: launch → Dashboard renders, each route navigat
 **Objective:** Every parameter/tool/profile screen with Tasker-faithful validation, plus the
 reusable Compose-Canvas chart engine with the brightness-curve chart as template instance.
 
-**Inputs:** `screen_map.md` + `extraction/scenes/*` (element dispositions), S8
-`SettingsValidator`, S6 `CurveSuggestionEngine`, existing `LineGraph.kt` (extend or replace —
-your call, record it), `extraction/features_spec.md` (calibration/debug).
+**Inputs:** `screen_map.md` + `extraction/scenes/*` (element dispositions) +
+`extraction/tasks/anonymous_handlers.md` (S3.5/D-026: **168 anonymous scene-handler tasks —
+every row owned by your screens must end up ported or dropped(reason); includes the 34
+`keyTask` rows = per-scene back-key behavior**), S8 `SettingsValidator`, S6
+`CurveSuggestionEngine`, existing `LineGraph.kt` (extend or replace — your call, record it),
+`extraction/features_spec.md` (calibration/debug — debug selector uses the 10 verbatim labels, D-023).
 
 **Deliverables:** screens per screen_map: Curve & Brightness (min/max/offset/scale, zone ends,
 form params + LIVE derived form2A/form3A readout), Reactivity (thresholds incl. midpoint/
@@ -581,7 +586,7 @@ scene rows flipped for covered scenes; pushed. → **HUMAN GATE 2.**
 ## S13 — Chart replication + static screens
 
 **Model:** Haiku / high · **Size:** medium · **Preconditions:** S12 DONE (template exists),
-S6 DONE (chart math), S2 scene docs.
+S6 DONE (chart math), S2 scene docs + `extraction/tasks/anonymous_handlers.md` (S3.5).
 
 **Objective:** Replicate the remaining charts from the template and port static content
 screens. Pure pattern work.

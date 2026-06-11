@@ -20,7 +20,7 @@ ROUND_HALF_UP)`, string-formatted returns (`a + "," + b`), int truncation. See p
 | State (paused, screen on) | prof756 | task567 | repost paused notif |
 | Time periodic | prof757 | task584 | repost running notif |
 | Time windows (dawn/dusk) | prof758 | task90 | dynamic scale recompute |
-| Proximity | prof759 (pri 4) | task545 | pause near-face |
+| Proximity | prof759 (pri 4) | task545 | set %AAB_Proximity near/far → LuxAlpha damp ×0.1 (no pause) |
 | Throttle drift | prof754 | task566 | throttle reinit |
 | Panic event | prof769 (pri 15) | task528 | emergency reset |
 
@@ -95,6 +95,10 @@ Exponential smoothing with hysteresis:
 ### 1e. task548 Dynamic Range Compressed Scale (`java/task548_1`)
 Applies `%AAB_ScaleDynamic`/`%AAB_ScaleDynamicCompress` compression to `mapped` brightness when dynamic
 scaling is active (circadian multiplier from task90). Returns compressed brightness. Math in Java file.
+**Why it exists (owner, S3.5):** it compresses the circadian *multiplier* toward the top of the
+brightness range — without it a high base (e.g. 240) with a >1 multiplier (e.g. 1.15) pins at 255 for
+too long, and a sub-1 multiplier (e.g. 0.85) could never reach 255 no matter how bright the ambient
+light. Rationale only — behavior is ported from the Java unchanged.
 
 ### 1f. task543 Calculate Animation (`java/task543_1`) → returns `"%loops,%wait"`
 Computes step count `loops` and per-step `wait` (ms) for the transition, from `lux_alpha` and the
@@ -185,7 +189,7 @@ These guarantee C0 continuity across the 3 zones. Identical expressions appear i
 | `%AAB_Sun*` / `%AAB_calc_*` / `%AAB_Polar*` / `%AAB_*Duration` | solar times & polar state | task90 (S2/S6) |
 | `%AAB_MorningStart/End`, `%AAB_EveningStart/End` | dawn/dusk ramp windows | task90; prof758 gate |
 | `%AAB_Initializing` | true during initial-brightness write | task618; gates prof755 |
-| `%AAB_Proximity` | near/far | prof759 / task545 |
+| `%AAB_Proximity` | near/far | prof759 / task545 "Detect Proximity"; damps LuxAlpha ×0.1 in 544 |
 | `%AAB_Privilege` / `%AAB_SecondaryPrivilege` | detected tier | task378/643 (S2/S7) |
 | `%AAB_ActiveContext` / `%AAB_ContextCache` / `%AAB_NextContextTime` | context-engine state | task43/623 (S2/S10) |
 | `%AutoBrightRunning`, `%as_values1`, `%as_accuracy`, `%TRUN` | Tasker built-ins / sensor array | system |

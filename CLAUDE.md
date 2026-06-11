@@ -4,7 +4,7 @@ You are one session in a multi-session rebuild program. The program converts the
 `Advanced_Auto_Brightness_V3.3.prj_9.xml` (repo root, 1.6 MB — **NEVER read it wholesale; use
 `docs/rebuild/XML_RECIPES.md`**) into a modern Kotlin/Compose Android app with feature parity.
 A previous AI conversion attempt was audited: parts are salvaged (see ledger below), the rest is
-rebuilt segment by segment. Work happens on branch **`claude/modest-bohr-5ybl2i`** only.
+rebuilt segment by segment. Work happens on **your session's assigned `claude/*` branch** (see Git rules).
 
 ## Session protocol (follow in order, every session)
 
@@ -17,7 +17,7 @@ rebuilt segment by segment. Work happens on branch **`claude/modest-bohr-5ybl2i`
 5. Run your segment's acceptance commands until green.
 6. Update `docs/rebuild/STATE.md` (append your segment-log row, update "Current state" and
    "Next up", add any deviations/discoveries) and flip your PARITY_CHECKLIST.md rows.
-7. Commit with message prefix `[Sx] ` and push: `git push -u origin claude/modest-bohr-5ybl2i`.
+7. Commit with message prefix `[Sx] ` and push: `git push -u origin <your-session-branch>`.
 
 **Never leave the branch red.** If acceptance cannot go green: revert source changes (or move
 them to side branch `claude/blocked-Sx`), still commit+push the STATE.md update with
@@ -83,6 +83,15 @@ dimming. Shizuku is used only in the grant flow, never as a runtime binder depen
   `R.mipmap.ic_launcher` but no `res/` exists.
 - Environment: no KVM → no emulator. Verification = compile + JVM/Robolectric tests; on-device
   behavior is checked by the human at Gates 1–3 (see RUNBOOK).
+- S3.5 owner-review corrections (trust these; details in extraction docs + STATE.md D-020…D-026):
+  ConditionList semantics = plain And/Or bind tighter (And > Or), And2/Or2 join those groups
+  left-to-right; ⚠️ ConditionList children are ALPHABETICAL in the XML — re-sort numerically
+  (this scrambled S1's prof758 transcription). Action 590 = Variable Split, 105 = Set Clipboard.
+  %AAB_Debug = 10 named toast categories (Debug-scene selector labels), not verbosity.
+  %AAB_Test = curve-wizard diagnostics report → clipboard (user-facing — surface it). prof759/
+  task545 sets %AAB_Proximity near/far → damps LuxAlpha ×0.1, never pauses. prof769 panic =
+  upside-down + shake. 168/276 tasks are anonymous scene handlers → see
+  extraction/tasks/anonymous_handlers.md. Never read Tasker prefs (adbwp) in the rebuild.
 
 ## Coding conventions
 
@@ -98,8 +107,12 @@ dimming. Shizuku is used only in the grant flow, never as a runtime binder depen
 
 ## Git rules
 
-- Branch `claude/modest-bohr-5ybl2i` only. Never force-push. Never push to main.
-- Commit prefix `[Sx] `. Push with `git push -u origin claude/modest-bohr-5ybl2i`
+- Each cloud session gets its OWN `claude/<codename>` branch, named in the session directive.
+  This is **by design** (D-020): the owner merges each segment to `main` via PR after stage
+  completion, and new sessions start from fresh main. Develop and push ONLY on your session's
+  assigned branch. Do NOT log, explain, or try to reconcile branch-name differences between
+  sessions — that question is settled. Never force-push. Never push to main.
+- Commit prefix `[Sx] `. Push with `git push -u origin <your-session-branch>`
   (retry up to 4× with backoff 2s/4s/8s/16s on network errors only).
-- If parallel segments raced you (push rejected): `git pull --rebase origin
-  claude/modest-bohr-5ybl2i` — STATE.md conflicts are append-both-sides, trivial to merge.
+- Parallel segments (S6∥S7∥S8) land on separate session branches; the owner's stage merges
+  absorb STATE.md append-both-sides conflicts.

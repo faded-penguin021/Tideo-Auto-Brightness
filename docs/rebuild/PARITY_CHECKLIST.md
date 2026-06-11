@@ -62,6 +62,7 @@ filled by S1/S2 during extraction.
 | Profiles/import/export/defaults: 592, 637, 622 | | S2 extracted → features_spec.md | pending |
 | Debug tooling: 634, 635 | | S2 extracted → features_spec.md | pending |
 | Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | S2 extracted → screen_map.md (scene dispositions) | pending |
+| **Anonymous scene-handler tasks (168 unnamed**, incl. 34 `keyTask` back-key handlers) | various | S3.5 census → extraction/tasks/anonymous_handlers.md | pending (S12/S13: every row ported or dropped(reason)) |
 
 ## Scenes (20) → M3 screens (~9, per S2 screen_map.md)
 
@@ -82,7 +83,7 @@ filled by S1/S2 during extraction.
 | AAB Alpha Graph | L1038 | Reactivity (alpha overlay) | pending (S2 extracted) |
 | AAB Reactivity Graph | L6563 | Reactivity (ReactivityChart) | pending (S2 extracted) |
 | AAB Dimming Graph | L3006 | Animation & Dimming (DimmingChart) | pending (S2 extracted) |
-| AAB Circadian Dimming Graph | L2388 | Dynamic Scale (CircadianChart) | pending (S2 extracted) |
+| AAB Circadian Dimming Graph | L2388 | Animation & Dimming (CircadianChart; re-homed S3.5/D-026, visible only when %AAB_ScalingUse on) | pending (S2 extracted) |
 | AAB Taper Graph | L8387 | Dynamic Scale (TaperChart) | pending (S2 extracted) |
 | AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | pending (S2 extracted) |
 | AAB Experiment Graph | L3170 | Dynamic Scale (ExperimentChart) | pending (S2 extracted) |
