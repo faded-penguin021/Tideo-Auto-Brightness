@@ -9,7 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.tideo.autobrightness.app.AppModule
-import com.tideo.autobrightness.app.R
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.settings.SettingsStore
 import com.tideo.autobrightness.app.storage.serviceHealthDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -82,7 +82,7 @@ class AmbientMonitoringService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Auto Brightness active")
             .setContentText("Monitoring ambient changes")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_brightness)
             .setOngoing(true)
             .build()
     }

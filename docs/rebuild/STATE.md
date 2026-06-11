@@ -11,25 +11,23 @@ next session does not know it.
 | S0 scaffolding | 2026-06-11 | Fable (planning session) | DONE | (this commit) | CLAUDE.md, RUNBOOK, recipes, checklist, SDK script, hook authored. No source/gradle changes. |
 | S1 extraction A | 2026-06-11 | Opus/high | DONE | (this commit) | 40 Java blocks decoded; 28 task docs; profiles.md (753–761,769); pipeline_spec.md; defaults_audit.md (125 vars); INDEX.md. Docs-only. Java "Extracted" checklist cells flipped. |
 | S2 extraction B | 2026-06-11 | Opus/medium | DONE | (this commit) | task090_dynamic_scale.md (+solar answer), task038_curve_wizard.md, contexts_spec.md, features_spec.md, 20 scene docs + 4 _disp fragments, screen_map.md (450-element matrix → 9 M3 screens). Docs-only. Scene/context-profile/non-pipeline-cluster checklist cells annotated "S2 extracted". |
+| S3 toolchain | 2026-06-11 | Sonnet/medium | DONE | (see push) | Gradle 8.14.3 wrapper; D-007 fixed (pluginManagement); libs.versions.toml (Kotlin 2.0.21, AGP 8.7.3, compose-bom 2024.12.01); :platform → com.android.library; :data retired (git rm); res/ created; manifest updated (specialUse FGS + all permissions); lint-baseline.xml frozen. Pre-existing compile bugs fixed (D-019). :app:assembleDebug ✅ :platform:test ✅ :app:lintDebug ✅; :domain:test 4/5 pass (1 pre-existing parity failure — rapidLuxSpike, D-019, S4/S5 fix). |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 + S2 DONE. `docs/rebuild/extraction/` now holds the verbatim ground truth for BOTH the core
-pipeline (S1) and the non-pipeline features/UI (S2). S2 added: `tasks/task090_dynamic_scale.md`,
-`tasks/task038_curve_wizard.md`, `contexts_spec.md`, `features_spec.md`, `scenes/*.md` (20 scenes,
-exhaustive element tables) + `scenes/_disp_group{1-4}.md` fragments, and `docs/rebuild/screen_map.md`
-(THE 450-element → 9-M3-screen consolidation matrix). Later UI/feature segments read these, not the XML.
-Build still does not CONFIGURE (D-007; S3). Repo also has the Tasker XML, audited Codex conversion,
-and docs/migration/.
+S1 + S2 + S3 DONE. Build is now GREEN: `./gradlew :app:assembleDebug :platform:test :app:lintDebug`
+all pass. APK at `app/build/outputs/apk/debug/app-debug.apk` (28 MB). Gradle 8.14.3 wrapper
+committed; version catalog at `gradle/libs.versions.toml`; :platform is now an Android library;
+:data retired. One pre-existing domain test failure remains (`rapidLuxSpike_isSmoothedByTaskerFormula`
+— engine parity bug per D-019, not a new regression). S4 is now unblocked.
 
 ## Next up
 
-- S3 (Sonnet, medium) — toolchain modernization + first green build. No preconditions besides S0.
-  This is the only remaining parallel-window-A segment; it gates ALL builds.
-- After S3: S4 (reference impl + golden vectors), needs S1+S3.
-- S1 ∥ S2 ∥ S3 were parallel-safe; S2 now DONE (disjoint from S1/S3, no rebase needed).
+- S4 (Opus/medium) — Tasker reference implementation + golden vectors. Preconditions: S1 DONE ✅, S3 DONE ✅.
+- S5 (Sonnet/high) after S4.
+- S6 ∥ S7 ∥ S8 (parallel window B) after S5.
 
 ## Deviations & discoveries ledger
 
@@ -111,7 +109,22 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   NOT 1:1 with scene names (Experiment Graph uses task549/HTML_Graph4; Taper Graph uses task657/HTML_Graph5).
   Unresolved carried from features extraction: And2/Or2 grouping in task551 OFF-path branch (validate in S9).
 
-Append new entries as D-008, D-009, … with which segments they affect.
+- D-019: S3 revealed three pre-existing Codex compile bugs (no prior baseline was runnable due to D-007):
+  (a) `BrightnessCurveConfig` was missing `zone1End: Double = 35.0` field used by `mapLuxToBrightness` —
+  added with same default as `ThresholdConfig.zone1End`; S4/S5 must keep both fields in sync or unify.
+  (b) `AmbientMonitoringService.kt` imported `com.tideo.autobrightness.app.R` but namespace is
+  `com.tideo.autobrightness` → corrected to `com.tideo.autobrightness.R`.
+  (c) `ProfileImportExportManager.kt` called `AabProfilePayload(settings.validate())` positionally but
+  constructor is `(schemaVersion: Int, settings: AabSettings)` → fixed to named arg `(settings = …)`.
+  Additionally: `Theme.Material3.DayNight.NoActionBar` requires com.google.android.material (not in SDK
+  alone) → used `android:Theme.Material.Light.NoActionBar` (SDK built-in) as XML parent for Compose app.
+  Domain test `rapidLuxSpike_isSmoothedByTaskerFormula` fails: lux spike 20→800 gives luxAlpha=1.0
+  (no smoothing), but test expects <1.0. Root cause: effectiveDelta ≈ 36.87 → exp(−66) ≈ 0 → alpha=1.
+  This is a pre-existing engine parity bug per D-010; S4 will characterize it via reference impl; S5 fixes.
+  Final version matrix: Kotlin 2.0.21, AGP 8.7.3, Compose BOM 2024.12.01, Gradle 8.14.3, minSdk 31,
+  compileSdk/targetSdk 35. (Affects S4: note the domain compile fix; S5: fix engine parity.)
+
+Append new entries as D-020, D-021, … with which segments they affect.
 
 ## Blockers
 
