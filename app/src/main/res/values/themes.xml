@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose handles all M3 theming; this XML theme just satisfies the manifest ref. -->
+    <style name="Theme.TideoAutoBrightness" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

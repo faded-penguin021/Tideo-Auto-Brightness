@@ -45,6 +45,7 @@ data class BrightnessCurveConfig(
     val form2A: Double = 29.58,
     val form2B: Double = 8.8,
     val form2C: Double = 18.0,
+    val zone1End: Double = 35.0,
     val zone2End: Double = 10_000.0,
     val form3A: Double = 2513.0,
     val minBrightness: Int = 10,

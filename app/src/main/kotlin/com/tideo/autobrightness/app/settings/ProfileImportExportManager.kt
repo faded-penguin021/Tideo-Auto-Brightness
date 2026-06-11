@@ -15,14 +15,14 @@ class ProfileImportExportManager(
     suspend fun exportToAppPrivate(profileName: String, settings: AabSettings): String {
         val fileName = sanitizeFileName(profileName)
         context.openFileOutput(fileName, Context.MODE_PRIVATE).use { output ->
-            output.write(json.encodeToString(AabProfilePayload.serializer(), AabProfilePayload(settings.validate())).encodeToByteArray())
+            output.write(json.encodeToString(AabProfilePayload.serializer(), AabProfilePayload(settings = settings.validate())).encodeToByteArray())
         }
         return fileName
     }
 
     suspend fun exportToDocument(uri: Uri, settings: AabSettings, resolver: ContentResolver = context.contentResolver) {
         resolver.openOutputStream(uri)?.use { output ->
-            output.write(json.encodeToString(AabProfilePayload.serializer(), AabProfilePayload(settings.validate())).encodeToByteArray())
+            output.write(json.encodeToString(AabProfilePayload.serializer(), AabProfilePayload(settings = settings.validate())).encodeToByteArray())
         } ?: throw FileNotFoundException("Unable to open output stream for uri=$uri")
     }
 
