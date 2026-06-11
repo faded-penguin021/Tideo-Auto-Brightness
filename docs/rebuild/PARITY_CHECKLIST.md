@@ -1,0 +1,125 @@
+# PARITY_CHECKLIST — every Tasker artifact, tracked to disposition
+
+Statuses: `pending` → `ported` (with target) / `dropped(reason)` → `device-verified` (human, Gates).
+Segments flip rows they own; S14 enforces zero `pending`; the human flips to `device-verified`.
+XML anchors: profiles/scenes verified line numbers (see XML_RECIPES.md R4/R5/R7); task anchors
+filled by S1/S2 during extraction.
+
+## Profiles (18)
+
+| Profile | XML | Ported to | Status |
+|---|---|---|---|
+| prof753 Hibernate (Display Off) → task585 | L3 | | pending |
+| prof754 Throttle Reinitialization → task566 | L16 | | pending |
+| prof755 Allow Override → task567 | L56 | | pending |
+| prof756 Repost Paused Notification → task567 | L111 | | pending |
+| prof757 Repost Foreground Notification → task584 | L156 | | pending |
+| prof758 Dynamic Scale Engine → task90 | L195 | | pending |
+| prof759 Proximity Detection → task545 | L300 | | pending |
+| prof760 Monitor Ambient Light → task554 (incl. ConditionList gate) | L318 | | pending |
+| prof761 Initialize (Display On) → task618 | L386 | | pending |
+| prof762 Context: App Changed → task43 | L398 | | pending |
+| prof763 Context: Battery Changed → task43 | L456 | | pending |
+| prof764 Context: Time Changed → task43 | L500 | | pending |
+| prof765 Context: Location Listener → task630 | L541 | | pending |
+| prof766 Context: Location Refresher → task631 | L579 | | pending |
+| prof767 Context: Location Changed → task43 | L628 | | pending |
+| prof768 Context: WiFi (Dis)connected → task43 | L676 | | pending |
+| prof769 Panic (Reset) → task528 | L722 | | pending |
+| prof8 Context: Reset Serialized Cache → task26 | L744 | | pending |
+
+## Pipeline & feature task clusters (~25)
+
+| Cluster (tasks) | XML | Ported to | Status |
+|---|---|---|---|
+| Sensor ingest: 554 Process Sensor Event | | | pending |
+| Light-change eval + thresholds: 544, 546 | | | pending |
+| Lux smoothing: 535 | | | pending |
+| Lux→brightness mapping: 661 (+663 Java cross-check) | | | pending |
+| Compressed dynamic scale: 548 | | | pending |
+| Continuity coefficients: 659 _UpdateBrightnessFormulae | | | pending |
+| Animation calc: 543 | | | pending |
+| Brightness transitions: 696, 698 | | | pending |
+| Software/super dimming: 700, 645, 646, 647, 650, 653, 654, 644 | | | pending |
+| Initial brightness on wake: 618 | | | pending |
+| Hibernate/reset: 585 | | | pending |
+| Throttle reset: 566 | | | pending |
+| Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | | pending |
+| Panic reset: 528 | | | pending |
+| Init/defaults: 570 Initialize AAB Defaults | | | pending |
+| Circadian dynamic scale: 90 (+ polar handling) | | | pending |
+| Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | | pending |
+| Privilege detection/grant: 378, 643, 563 | | | pending |
+| QS tile: 551, 552 | | | pending |
+| Foreground notification: 584, 692 | | | pending |
+| Curve suggestion wizard: 38, 655 | | | pending |
+| Formula validation: 583, 707 | | | pending |
+| Power draw calibration: 524 | | | pending |
+| Profiles/import/export/defaults: 592, 637, 622 | | | pending |
+| Debug tooling: 634, 635 | | | pending |
+| Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | | pending |
+
+## Scenes (20) → M3 screens (~9, per S2 screen_map.md)
+
+| Scene | XML | Ported to | Status |
+|---|---|---|---|
+| AAB Menu | L4462 | | pending |
+| AAB Brightness Settings | L1415 | | pending |
+| AAB Reactivity Settings | L6739 | | pending |
+| AAB Superdimming Settings | L7533 | | pending |
+| AAB Misc Settings | L4718 | | pending |
+| AAB Experiment Settings | L3334 | | pending |
+| AAB Profile | L5724 | | pending |
+| AAB Debug Scene | L2583 | | pending |
+| AAB Color Filter | L2552 | | pending |
+| AAB Brightness Graph | L1202 | | pending |
+| AAB Alpha Graph | L1038 | | pending |
+| AAB Reactivity Graph | L6563 | | pending |
+| AAB Dimming Graph | L3006 | | pending |
+| AAB Circadian Dimming Graph | L2388 | | pending |
+| AAB Taper Graph | L8387 | | pending |
+| AAB Power Draw Graph | L5611 | | pending |
+| AAB Experiment Graph | L3170 | | pending |
+| AAB About | L799 | | pending |
+| AAB User Guide | L8551 | | pending |
+| AAB Chart.Js License | L2194 | | pending |
+
+## Java blocks (40, anchors verified — see XML_RECIPES.md R7 for the full line↔task table)
+
+| Block (task · line) | Extracted (S1/S2) | Reference impl (S4/S6) | Production port | Status |
+|---|---|---|---|---|
+| task105 L8906 · _GetWifiNoLocation | | | | pending |
+| task378 L9468 · _PrivilegeDetection | | | | pending |
+| task38 L9921 · _SuggestCurveParameters | | | | pending |
+| task43 L12091 · _EvaluateContexts | | | | pending |
+| task524 L14246 · _CalibratePowerDraw | | | | pending |
+| task535 L15204 · Lux Smoothing | | | | pending |
+| task543 L15878 · Calculate Animation | | | | pending |
+| task544 L16062 · Evaluate Light Change | | | | pending |
+| task546 L16481 · Set Thresholds | | | | pending |
+| task548 L16630 · DR Compressed Scale | | | | pending |
+| task549 L17138 · _GenerateCircadianGraph | | | | pending |
+| task554 L18132 · Process Sensor Event | | | | pending |
+| task556 L18359 · _GenerateDimmingCurveGraph | | | | pending |
+| task557 L18959 · _GenerateAlphaGraph | | | | pending |
+| task563 L19677 · _AskPermissionsV7 | | | | pending |
+| task592 L24132 · _CreateDefaultProfiles | | | | pending |
+| task618 L25826+L26096 · Set Initial Brightness (×2) | | | | pending |
+| task620 L26400 · _AdaptiveBrightnessSceneSize | | | | pending |
+| task623 L26926 · _ContextManager | | | | pending |
+| task625 L27185 · _AppPicker | | | | pending |
+| task626 L27355 · _ContextResume | | | | pending |
+| task630 L27585+L27817 · _ContextLocnListener (×2) | | | | pending |
+| task631 L27939+L28432 · _ContextF5NetLoc (×2) | | | | pending |
+| task633 L28827 · _GetWifiForContext | | | | pending |
+| task636 L28993 · _DeleteOverridePoint | | | | pending |
+| task637 L29303 · _ProfileManager | | | | pending |
+| task643 L30505 · _LearnWriteSecure | | | | pending |
+| task655 L32591 · _SetSuggestedVariables | | | | pending |
+| task657 L32986 · _GenerateCompressionGraph | | | | pending |
+| task663 L33944+L34370 · _GenerateGraph (×2) | | | | pending |
+| task696 L35733 · Smooth Brightness Transition | | | | pending |
+| task698 L36043 · Smooth DC-Like Transition | | | | pending |
+| task703 L36847 · _GenerateReactivityGraph | | | | pending |
+| task705 L37517 · _GenerateCircadianDimmingGraph | | | | pending |
+| task90 L40429+L41085 · Dynamic Scale V13 (×2) | | | | pending |
