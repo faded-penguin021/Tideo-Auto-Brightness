@@ -50,7 +50,7 @@
 | elements23 | abs_and_rel_super_dimming_effect | TextElement | displays `%AAB_DimmingCurrent`, `%AAB_DimmingDS`, `%AAB_CurrentBright` | — | longclick=514 | Live readout: current super-dimming strength (rel/abs) + brightness; longtap action |
 | elements1 | rectangle_10 | RectElement | — | — | — | Decorative card bg for circadian/graph row (y=2034) |
 | elements9 | draw_graph4_drop_shadow | TextElement | static "Draw Circadian Graph" | — | — | Drop-shadow layer behind "Draw Circadian Graph" |
-| elements10 | draw_graph4 | TextElement | static "Draw Circadian Graph" | — | click=517 | Button: open circadian graph (`_CalibratePowerDraw`/graph) |
+| elements10 | draw_graph4 | TextElement | static "Draw Circadian Graph" | — | click=517 | Button: opens **AAB Circadian Dimming Graph** — task517 warns if `%aab_scaletransitionfactor>0.5`, clears `%AAB_SunLastDate`, runs task90 + task705 `_GenerateCircadianDimmingGraph`, resizes (task620), hides this scene. Shown only when `%AAB_ScalingUse` is enabled (owner). S3.5 fix — the earlier `_CalibratePowerDraw` gloss was wrong (D-026) |
 | elements20 | draw_graph5_drop_shadow | TextElement | static "Draw Dimming Graph" | — | — | Drop-shadow layer behind "Draw Dimming Graph" |
 | elements21 | draw_graph5 | TextElement | static "Draw Dimming Graph" | — | click=513 | Button: open dimming graph |
 | elements5 | rectangle_9 | RectElement | — | — | — | Decorative card bg for bottom button bar (y=1234) |

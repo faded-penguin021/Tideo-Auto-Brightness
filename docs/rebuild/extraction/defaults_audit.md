@@ -14,6 +14,24 @@ Source of truth: **task570 _Initialize AAB Defaults_** (`extraction/tasks/task57
 
 **Settings present in census but MISSING from `AabSettings.kt`:** `AAB_AnimSteps`, `AAB_ContextOverride` (per-profile override flag), `AAB_SetupTitle` (UI string), plus DERIVED `AAB_ThreshMidpoint`. → S8 schema-v2 work.
 
+## Non-`%AAB_` globals (S3.5 addendum, owner-prompted — D-025)
+
+Tasker namespacing: a variable is **global iff its name contains a capital letter anywhere**
+(`%sHeep` = `%Sheep` = `%SHEEP` = global). The S1 census scanned only `%AAB_*` and missed the
+pipeline's four bare globals (all RUNTIME, no defaults; already specced in `pipeline_spec.md`
+§state-vars — this fixes the audit's scope, not the pipeline spec):
+
+| Variable | XML hits | Meaning |
+|---|---|---|
+| `%SmoothedLux` | 15 | EMA-smoothed lux (task544/535; cleared by task585) |
+| `%AutoBrightRunning` | 13 | 1 while the pipeline is writing brightness (echo suppression) |
+| `%LastAAB` | 10 | TIMEMS of last accepted tick (throttle gate) |
+| `%LuxAlpha` | 9 | last smoothing alpha → animation pacing (prox-damped ×0.1) |
+
+(Scan: `grep -oE '%[A-Za-z][A-Za-z0-9_]*' | grep [A-Z]`, minus `%AAB_*` and ALL-CAPS Tasker
+built-ins; the two remaining one-off hits are HTML/Java false positives. Future audits must
+include this scan.)
+
 ## Full table
 
 | Variable | Default (task570 unless noted) | Class | In AabSettings.kt? | Meaning |
@@ -76,7 +94,7 @@ Source of truth: **task570 _Initialize AAB Defaults_** (`extraction/tasks/task57
 | `%AAB_MainLoop` | — | RUNTIME | NO | On/Off main-loop gate flag (prof760 gate) |
 | `%AAB_Manual_Override` | — | RUNTIME | NO | true when user manually overrode brightness (pause) |
 | `%AAB_MaxBright` | 255 | SETTING | yes | User setting (see task570) |
-| `%AAB_MaxSteps` | — | RUNTIME | NO | Referenced but NEVER assigned a default in task570 — legacy/unused (see D-004 resolution) |
+| `%AAB_MaxSteps` | — | LEGACY | NO | Never assigned a default; owner-confirmed (S3.5, D-025): abandoned predecessor of `AAB_AnimSteps` — do not port (see D-004 resolution) |
 | `%AAB_MaxWait` | 65 | SETTING | yes | User setting (see task570) |
 | `%AAB_MinBright` | 10 | SETTING | yes | User setting (see task570) |
 | `%AAB_MinThrottle` | — | RUNTIME | NO | Referenced lower bound for throttle — not defaulted in 570 (runtime/legacy) |
@@ -124,7 +142,7 @@ Source of truth: **task570 _Initialize AAB Defaults_** (`extraction/tasks/task57
 | `%AAB_Sunnoon` | — | RUNTIME | NO | Solar noon |
 | `%AAB_Sunrise` | — | RUNTIME | NO | Sunrise time |
 | `%AAB_Sunset` | — | RUNTIME | NO | Sunset time |
-| `%AAB_Test` | — | RUNTIME | NO | Debug/test scratch var |
+| `%AAB_Test` | — | RUNTIME | NO | **Curve-wizard diagnostics report** (R²/nRMSE/bias log built by task38 `setVariable("AAB_Test", logBuffer)` L10510/L10867), **copied to clipboard** via the project's only Set Clipboard action (code 105, L9864) and documented to users in the guide (L8715). Key explainability output — surface it in the rebuilt wizard UI (S6/S12; owner-corrected S3.5, D-025) |
 | `%AAB_ThreshAbsHigh` | — | RUNTIME | NO | Absolute upper lux gate (prof760) — set by task546 Set Thresholds, NOT task570 |
 | `%AAB_ThreshAbsLow` | — | RUNTIME | NO | Absolute lower lux gate (prof760) — set by task546 Set Thresholds, NOT task570 |
 | `%AAB_ThreshBright` | 0.08 | SETTING | yes | User setting (see task570) |

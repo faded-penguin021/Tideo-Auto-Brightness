@@ -8,7 +8,8 @@ Extraction notes:
 - `<mid0>` = enter task, `<mid1>` = exit task, `<pri>` = profile priority.
 - A profile **fires its enter task only when its context is active AND its `<ConditionList sr="if">` gate passes**. These gates are load-bearing pipeline logic (D-003).
 - Condition op codes (empirically derived, project-wide histogram): `2 ==` · `3 !=` · `6 <` · `7 >` · `9 >=` · `0 ~(matches)` · `1 !~` · `12 isSet` · `13 isNotSet`.
-- ⚠️ **Tasker `And2`/`Or2` booleans denote a tighter-binding sub-group** (a second precedence level). Exact grouping for the multi-clause gates (prof760, prof758) is given as a *best-effort reading* and flagged in `INDEX.md` "unresolved" for S4/S9 runtime validation.
+- **ConditionList boolean semantics (owner-verified 2026-06-11, D-021):** plain `And`/`Or` bind *tighter* and form inner sub-expressions (with conventional `And` > `Or` precedence); `And2`/`Or2` are the *outer* joins between those sub-expressions, evaluated left-to-right. Validated against prof760 (owner confirmed the staged semantics) and prof758 (rule yields the only design-sensible reading). Resolves INDEX.md unresolved #1 / D-009.
+- ⚠️ **ConditionList children are stored ALPHABETICALLY in the XML** (`bool10` sorts before `bool2`, `c10` before `c2`) — re-sort numerically before transcribing. S1's prof758 bool sequence was scrambled by this (fixed below; D-021, recipe R4 updated).
 
 | Profile | Line | Enter | Exit | Pri | Context (code) |
 |---|---|---|---|---|---|
@@ -21,7 +22,7 @@ Extraction notes:
 | prof759 Proximity Detection | L300 | task545 | task545 | 4 | State **Proximity** (125, arg0=1) |
 | prof760 Monitor Ambient Light | L318 | task554 | — | 7 | Event **Light Sensor** (2088, type=5, 1000 ms) |
 | prof761 Initialize (Display On) | L386 | task618 | — | 7 | Event **Display On** (208) |
-| prof769 Panic (Reset) | L722 | task528 | — | 15 | Event (2083, panic trigger) |
+| prof769 Panic (Reset) | L722 | task528 | — | 15 | Event 2083 (shake/sig-motion) + State 120/3 (upside down) + State 123/1 |
 
 ---
 
@@ -40,12 +41,12 @@ Extraction notes:
   | c4 | `%as_values1 > %AAB_ThreshAbsHigh` | And2 |
   | c5 | `%AAB_MainLoop != On` | — |
 
-- **Best-effort reading** (And2/Or2 bind tighter than And/Or):
+- **Confirmed reading** (owner-verified 2026-06-11, D-021 — plain And/Or = inner groups, And2/Or2 = outer joins left-to-right):
   `((TrustUnreliable=On) OR (TrustUnreliable=Off AND as_accuracy>1)) AND ((as_values1 < ThreshAbsLow) OR (as_values1 > ThreshAbsHigh)) AND (MainLoop != On)`
-  - **Accuracy-trust gate:** either the user trusts unreliable readings, or the reading must be accuracy>1 (Medium/High). Low-accuracy readings are dropped unless `TrustUnreliable=On`.
-  - **Absolute-threshold dead-band:** the profile only re-fires when lux has moved **outside** the absolute band `[ThreshAbsLow, ThreshAbsHigh]` — this is a hysteresis/anti-jitter gate. `ThreshAbsLow/High` are set by **task546 _Set Thresholds_**, not task570.
-  - **Main-loop flag:** `MainLoop != On` — fires when the main loop is not already marked running (re-entrancy guard). ⚠️ Verify polarity in S9.
-- ⚠️ The exact And2/Or2 grouping is **flagged unresolved** (INDEX). The reading above matches design intent; S4/S9 must confirm against runtime behavior.
+  Three staged gates, evaluated in order:
+  1. **Accuracy-trust gate:** either the user trusts unreliable readings, or the reading must be accuracy>1 (Medium/High). Low-accuracy readings are dropped unless `TrustUnreliable=On`.
+  2. **Absolute-threshold dead-band:** the profile only re-fires when lux has moved **outside** the absolute band `[ThreshAbsLow, ThreshAbsHigh]` — this is a hysteresis/anti-jitter gate. `ThreshAbsLow/High` are set by **task546 _Set Thresholds_**, not task570.
+  3. **Main-loop mutex:** `MainLoop != On` — owner-confirmed polarity: re-entrancy/mutex guard, skip while the main loop is already running.
 
 ## prof753 "Hibernate (Display Off)" → task585
 - **Context:** Event **Display Off** (code 210). No gate. **Pri 3.**
@@ -77,18 +78,20 @@ Extraction notes:
 - Periodically reposts the foreground/running notification (task584) while active and not overridden.
 
 ## prof758 "Dynamic Scale Engine" → task90
-- **Context:** Time/periodic (code 165).
-- **Gate** (conditions c0..c13, bool sequence `[And, Or, And, Or, And2, And, Or, And, Or, And, Or, And, Or]` — multi-window time test):
-  - `%AAB_MorningStart < %TIMES % 86400` / `%AAB_MorningEnd > %TIMES % 86400` (within morning ramp window, with ±86400 wrap variants)
-  - `%AAB_EveningStart < … - 86400` / `%AAB_EveningEnd > …` (evening ramp window, with wrap variants)
-  - `%AAB_SunLastDate != %DATE` (recompute once per day)
-  - `%AAB_ScalingUse = true` (dynamic scaling enabled)
-- i.e. fires task90 (Dynamic Scale V13) when scaling is enabled AND now is inside a dawn/dusk ramp window (with day-wrap handling) OR the sun-times are stale for today. ⚠️ Exact And2 grouping flagged unresolved; window math owned by S2 (task090 doc) + S6.
+- **Context:** Time (con0, repeat every 2 min) + State (con1, code 165) carrying the gate.
+- **Gate** (c0..c13; bool sequence corrected in S3.5 — S1's `[…And2 in 5th position…]` was an artifact of the XML's ALPHABETICAL child ordering (D-021). Numerically re-sorted it is twelve plain joins, then one final `And2`: `[And, Or, And, Or, And, Or, And, Or, And, Or, And, Or, And2]`):
+  - c0∧c1: `MorningStart < %TIMES%86400 < MorningEnd` · c2∧c3: same window at `+86400` · c4∧c5: same at `−86400` (day-wrap variants)
+  - c6∧c7: `EveningStart < %TIMES%86400 < EveningEnd` · c8∧c9: at `+86400` · c10∧c11: at `−86400`
+  - c12: `%AAB_SunLastDate != %DATE` (sun data stale for today) · c13: `%AAB_ScalingUse = true`
+- **Reading (validated D-021 rule):**
+  `((c0∧c1) ∨ (c2∧c3) ∨ (c4∧c5) ∨ (c6∧c7) ∨ (c8∧c9) ∨ (c10∧c11) ∨ c12) AND (ScalingUse = true)`
+  — fires task90 (Dynamic Scale V13) when circadian scaling is enabled AND (now is inside a dawn/dusk ramp window, with ±1-day wrap variants, OR sun times need recomputing today). Window math owned by S2 (task090 doc) + S6.
 
 ## prof759 "Proximity Detection" → task545 (enter & exit)
 - **Context:** State **Proximity** (code 125, arg0=1). **Pri 4.**
-- Both enter and exit run task545 (proximity handling — e.g. pause/ignore sensor while phone is to ear/in pocket). task545 is not in S1's transcription list; S2/S9 should note it.
+- Enter and exit both run **task545 "Detect Proximity"** (XML L16424; transcribed S3.5 → `tasks/task545_detect-proximity.md`): `If %caller1 ~ *enter* → %AAB_Proximity = near; Else-If %caller1 ~ *exit* → %AAB_Proximity = far`.
+- **It does NOT pause the pipeline** (owner-verified, D-022): `near` only *damps* smoothing — task544 act28–29 sets `LuxAlpha = lux_results2 × 0.1`, so brightness reacts an order of magnitude slower while the phone is at the ear / in a pocket.
 
 ## prof769 "Panic (Reset)" → task528
-- **Context:** Event (code 2083, panic trigger — likely a Tasker shortcut/long-press hook; two arg0 entries). **Pri 15** (highest — beats everything).
-- Fires task528 (Panic Button) → restore sane brightness, clear all runtime state, disengage dimming. Emergency escape hatch (Gate-1 / S9 notification panic-reset action).
+- **Contexts (all must hold; XML L722–743, verified S3.5/D-022):** Event **2083** (significant-motion/shake trigger, no args) **+** State **120 arg0=3** (Orientation: *upside down*) **+** State **123 arg0=1** (same state family as prof754; label inferred — display-active). **Pri 15** (highest — beats everything).
+- Owner-verified semantics: emergency escape hatch when the screen is black due to misconfiguration — **flip the phone upside down and shake**. task528 (Panic Button) sets brightness to max, disables the event listeners/profiles, and sets `%AAB_Service = Off` (full stop). (Gate-1 / S9 notification panic-reset action.)

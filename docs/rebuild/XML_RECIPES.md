@@ -12,7 +12,7 @@ X=Advanced_Auto_Brightness_V3.3.prj_9.xml
 
 ```bash
 grep -c '<Profile sr=' $X    # => 18
-grep -c '<Task sr=' $X       # => 276   (Task elements; ~159 carry <nme> names)
+grep -c '<Task sr=' $X       # => 276   (Task elements; 108 carry <nme> names — S3.5 verified; the old "~159" counted ALL <nme> in the file incl. profiles/scenes)
 grep -c '<Scene sr=' $X      # => 20
 grep -c '<Action sr=' $X     # => 2274
 grep -c '<code>474</code>' $X  # => 40  (embedded Java blocks — see R7)
@@ -35,7 +35,8 @@ grep -A6 '<Task sr=' $X | grep -E '<(id|nme)>'
 ```
 
 Emits `<id>` and (when present) `<nme>` pairs in file order. Unnamed Task elements are
-anonymous (scene-embedded/click handlers); the named ~159 are the real inventory.
+anonymous scene handlers (168 of them — see R11 + `extraction/tasks/anonymous_handlers.md`);
+the 108 named tasks are the by-name inventory (S3.5-corrected count; was misstated as ~159).
 
 ## R4 — Profiles. ⚠️ Profiles carry a `ve="2"` attribute — do NOT close the pattern with `>`
 
@@ -52,6 +53,12 @@ prof769 L722, prof8 L744. (All 18 live in lines 3–798, before the scenes.)
 Inside a profile: `<id>`, `<nme>`, `<mid0>` = enter task id, `<mid1>` = exit task id,
 `<pri>` = priority, then context children (`<Event sr="con0">`, `<State ...>`, `<App ...>`,
 `<Time ...>`, `<Day ...>`) each with a `<code>` (context type) and args.
+
+**⚠️ ConditionList children are stored ALPHABETICALLY, not numerically** (`bool10`/`bool11`/`bool12`
+sort before `bool2`; `c10` before `c2`). Re-sort by numeric index before reading a gate, or the boolean
+sequence comes out scrambled — this mis-transcribed prof758 in S1 (fixed S3.5, D-021). Boolean
+semantics (owner-validated, D-021): plain `And`/`Or` bind tighter (inner groups, `And` > `Or`);
+`And2`/`Or2` join those groups left-to-right.
 
 **⚠️ Profile-level `<ConditionList sr="if">` blocks are load-bearing pipeline logic.**
 Example: prof760 "Monitor Ambient Light" (Event code 2088 = Sensor, type 5 = light, arg2=1000ms)
@@ -205,3 +212,16 @@ git show 9d36d36^:Advanced_Auto_Brightness_V3.3.prj_4.xml | grep -c '<Task sr='
 
 prj_9 ≈ prj_4: only `_SuggestCurveParameters` bumped V23→V24 (task id 41→38). Codex-era
 docs in docs/migration/ were derived from prj_4 and are therefore NOT stale, just shallow.
+
+## R11 — Anonymous (unnamed) tasks → scene handlers (S3.5)
+
+168 of 276 tasks have no `<nme>` — all are scene-element handlers (`<clickTask>`, `<checkchangeTask>`,
+`<valueselectedTask>`, `<keyTask>`, …) referenced by id from `<Scene>` blocks. Census + wiring +
+action summaries: `extraction/tasks/anonymous_handlers.md`. Find the callers of task N:
+
+```bash
+grep -n ">N</" $X | grep -v "<id>"     # e.g. <clickTask>517</clickTask>
+```
+
+Extract the body with R2. Named tasks are never wired by id from scenes (they are invoked by name via
+Perform Task / scene-HTML `performTask('Name', pri)`).

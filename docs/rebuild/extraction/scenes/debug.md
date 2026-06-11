@@ -25,7 +25,8 @@ Active Rule, Loaded Profile, Last Update, Last Animation.
 ### JS → Tasker calls embedded in the WebElement HTML
 - `performTask('_CalibratePowerDraw', 10)` — "Screen Power Measurement" calibration tool
   (steps brightness, measures mA, generates Power Curve). Experimental diagnostic.
-- `performTask('_SetDebugLevel', 10, val)` — set debug verbosity level.
+- `performTask('_SetDebugLevel', 10, val)` — set the debug *category* (10 named levels from the
+  selector options at XML L2773–2782, e.g. "7 - Graph Metrics" — see features_spec §4, D-023).
 
 ## Disposition
 

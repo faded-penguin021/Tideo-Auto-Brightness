@@ -47,12 +47,13 @@ task535 → `%output` and task548 → `%dr_results`.)
 | 355 | Array Push (value at index) | `%AAB_Overrides` push (task561 act6/9) |
 | 356 | Array element delete | `%AAB_Overrides` delete at index (task561 act14) |
 | 389 | Multiple Variables Set | newline-separated `name=value` block (task544 act2/14/27) |
+| 105 | Set Clipboard (S3.5, owner-corrected) | single use: `%AAB_Test` → clipboard (L9864, curve-wizard report — D-025) |
 | 474 | Java Code | arg0 = source (entity-encoded), arg1 = optional output var |
 | 523 / 779 | Notify / Notify Cancel(by title) | task567 act19 notify; task567/569 cancel |
 | 547 | Variable Set | arg0=name, arg1=value; arg2=Recurse, **arg3=DoMaths**, arg4=Append |
 | 548 | Flash | arg0=text |
 | 549 | Variable Clear | arg0=name |
-| 590 | Array Push (split by sep) | `%lux_results` split on `,` (task544 act26) |
+| 590 | **Variable Split** (S3.5, owner-corrected — was mislabeled "Array Push") | arg0=var, arg1=separator (`,`), arg2=delete-base; e.g. `%lux_results` split (task544 act26); 9 uses |
 | 598 | Variable Search/Replace | R7 (NOT Java — see D-001) |
 | 810 | Set Display Brightness | arg0=brightness (task661 act45) |
 
@@ -64,16 +65,19 @@ Condition `<op>` codes (project-wide histogram): `0 ~` · `1 !~` · `2 =` · `3 
 
 ## Unresolved (recorded, NOT guessed)
 
-1. **Tasker `And2`/`Or2` boolean grouping** in multi-clause profile gates (prof760 accuracy/abs/main-loop;
-   prof758 dawn/dusk windows). The literal condition+bool sequences are captured verbatim in
-   `profiles.md`; the parenthesized reading is best-effort (And2/Or2 = tighter binding). **S4/S9 must
-   confirm the exact grouping against runtime behavior** before relying on the polarity of
-   `%AAB_MainLoop != On` and the abs-dead-band OR.
-2. **`%AAB_MaxSteps`** appears in the 125-var census but is **never assigned a default** (task570/592/637).
-   Treat as legacy/unused; do not invent a value. S8 to decide (recompute from `AnimSteps` if a cap is needed).
-3. **Context subtype codes 165 (State vs Time), 123, 2083** — best-guess given (periodic/state/panic);
-   exact Tasker context subtype IDs not cross-referenced to an external table. Effect is unambiguous from
-   the gate + enter task; only the raw code label is uncertain.
+1. **RESOLVED (S3.5, owner-verified → D-021).** `And2`/`Or2` grouping: plain `And`/`Or` bind tighter
+   (inner groups, `And` > `Or`); `And2`/`Or2` join those groups left-to-right. prof760's reading
+   confirmed by the owner (incl. the `%AAB_MainLoop != On` mutex polarity); prof758 re-derived in
+   `profiles.md` — whose bool sequence was also FIXED there (⚠️ ConditionList children are stored
+   ALPHABETICALLY in the XML; re-sort numerically — see R4). task551 act0 reading updated in
+   `features_spec.md`. Residual: Gate-1 runtime sanity check only.
+2. **RESOLVED (S3.5, owner-confirmed → D-025).** `%AAB_MaxSteps` is legacy — the abandoned predecessor
+   of `AAB_AnimSteps`. Do not port; do not invent a default.
+3. **Context subtype codes 165 (State vs Time), 123** — best-guess given (periodic/state); exact Tasker
+   context subtype IDs not cross-referenced to an external table. Effect is unambiguous from the gate +
+   enter task; only the raw code label is uncertain. **2083 resolved (S3.5, owner):** prof769's trigger
+   is the significant-motion/shake event; its companion State 120 arg0=3 = Orientation "upside down"
+   (123 arg0=1 label still inferred).
 4. **Action codes 49, 135, 300, 355, 356** — meanings inferred from in-place evidence (hide-scene, goto,
    loop anchor, array push, array delete), not from a canonical Tasker code table. High confidence but
    flagged. **389 = Multiple Variables Set** is confident.

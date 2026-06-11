@@ -12,6 +12,7 @@ next session does not know it.
 | S1 extraction A | 2026-06-11 | Opus/high | DONE | (this commit) | 40 Java blocks decoded; 28 task docs; profiles.md (753–761,769); pipeline_spec.md; defaults_audit.md (125 vars); INDEX.md. Docs-only. Java "Extracted" checklist cells flipped. |
 | S2 extraction B | 2026-06-11 | Opus/medium | DONE | (this commit) | task090_dynamic_scale.md (+solar answer), task038_curve_wizard.md, contexts_spec.md, features_spec.md, 20 scene docs + 4 _disp fragments, screen_map.md (450-element matrix → 9 M3 screens). Docs-only. Scene/context-profile/non-pipeline-cluster checklist cells annotated "S2 extracted". |
 | S3 toolchain | 2026-06-11 | Sonnet/medium | DONE | (see push) | Gradle 8.14.3 wrapper; D-007 fixed (pluginManagement); libs.versions.toml (Kotlin 2.0.21, AGP 8.7.3, compose-bom 2024.12.01); :platform → com.android.library; :data retired (git rm); res/ created; manifest updated (specialUse FGS + all permissions); lint-baseline.xml frozen. Pre-existing compile bugs fixed (D-019). :app:assembleDebug ✅ :platform:test ✅ :app:lintDebug ✅; :domain:test 4/5 pass (1 pre-existing parity failure — rapidLuxSpike, D-019, S4/S5 fix). |
+| S3.5 errata (owner review) | 2026-06-11 | Fable | DONE | (this commit) | Owner-review corrections folded into extraction docs + CLAUDE.md (D-020…D-026): branch policy settled; And2/Or2 rule validated + alphabetical-XML-ordering trap found (prof758 bool sequence fixed); prof759/769 semantics corrected; debug = 10 named categories; 590=Variable Split, 105=Set Clipboard; %AAB_Test = wizard report→clipboard; non-AAB globals censused; Circadian Dimming Graph re-homed; 168-anonymous-task census added (tasks/anonymous_handlers.md) + task545 doc. Docs-only — build untouched. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
@@ -22,6 +23,8 @@ all pass. APK at `app/build/outputs/apk/debug/app-debug.apk` (28 MB). Gradle 8.1
 committed; version catalog at `gradle/libs.versions.toml`; :platform is now an Android library;
 :data retired. One pre-existing domain test failure remains (`rapidLuxSpike_isSmoothedByTaskerFormula`
 — engine parity bug per D-019, not a new regression). S4 is now unblocked.
+S3.5 (owner-review errata) applied on top: extraction docs corrected per D-020…D-026 — read those
+entries before trusting any pre-S3.5 reading of profile gates, debug levels, or action codes 590/105.
 
 ## Next up
 
@@ -124,7 +127,45 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Final version matrix: Kotlin 2.0.21, AGP 8.7.3, Compose BOM 2024.12.01, Gradle 8.14.3, minSdk 31,
   compileSdk/targetSdk 35. (Affects S4: note the domain compile fix; S5: fix engine parity.)
 
-Append new entries as D-020, D-021, … with which segments they affect.
+- D-020: BRANCH POLICY RESOLVED (closes D-011, D-012). Per-session `claude/*` branches are BY DESIGN:
+  the owner merges each segment to main via PR after stage completion; sessions start from fresh main.
+  CLAUDE.md rewritten accordingly. Future sessions: do NOT log or reconcile branch-name differences.
+- D-021: ConditionList semantics VALIDATED (owner-confirmed prof760 staging incl. `%AAB_MainLoop != On`
+  mutex polarity; cross-checked on prof758): plain `And`/`Or` bind tighter (inner groups, `And` > `Or`);
+  `And2`/`Or2` join those groups left-to-right. Resolves D-009 + INDEX unresolved #1; S9 runtime
+  validation downgraded to a Gate-1 sanity check. DISCOVERY: ConditionList children are stored
+  ALPHABETICALLY in the XML (`bool10` < `bool2`) — S1's prof758 bool sequence was scrambled by this;
+  fixed in profiles.md; recipe R4 updated. task551 act0 reading resolved (D-018 leftover).
+  (Affects S4 gate vectors, S9.)
+- D-022: prof769 contexts verified (XML L722–743): Event 2083 (significant-motion/shake) + State 120
+  arg0=3 (orientation upside-down) + State 123 arg0=1 — panic = flip + shake → max brightness, listeners
+  off, `%AAB_Service=Off`. prof759/task545 "Detect Proximity" (L16424, new doc
+  tasks/task545_detect-proximity.md) sets `%AAB_Proximity` near/far; damps LuxAlpha ×0.1 in task544 —
+  it never pauses the pipeline. (Affects S9.)
+- D-023: `%AAB_Debug` = 10 named info categories from the Debug-scene selector (XML L2773–2782): Off /
+  Skip Animations / Animation Details / Light Eval Thresholds / Dynamic Scale Calcs / Super Dimming
+  Info / Overlay Preview / Graph Metrics / Context Automation / Context Location. S1's inferred glosses
+  for 7/8/9 were wrong; features_spec corrected. (Affects S12 debug UI.)
+- D-024: SANCTIONED DEVIATIONS (owner): (a) privilege detection must NOT read Tasker pref `adbwp`
+  (drop ADB-WiFi probing; elevated truth = checkPermission(WRITE_SECURE_SETTINGS); ADB/Shizuku/root are
+  grant channels only — matches existing S7/S11 design); (b) task563's polling-dialog onboarding flow is
+  NOT the parity contract — only its 8 gates + order are; S11 keeps its ActivityResultContracts design.
+  (Affects S7, S11.)
+- D-025: `%AAB_Test` = curve-wizard diagnostics report (R²/nRMSE/bias; task38 logBuffer), copied to
+  clipboard via the single code-105 action (L9864), documented to users (guide L8715) — surface in the
+  rebuilt wizard UI (S6/S12). INDEX action codes fixed: 590 = Variable Split (was mislabeled "Array
+  Push"), 105 = Set Clipboard. defaults_audit: added the 4 non-AAB capital-letter globals
+  (%SmoothedLux 15× / %AutoBrightRunning 13× / %LastAAB 10× / %LuxAlpha 9×); `%AAB_MaxSteps`
+  owner-confirmed legacy (abandoned predecessor of AnimSteps — do not port). (Affects S4, S6, S8, S12.)
+- D-026: ANONYMOUS TASKS: 168 of 276 tasks are unnamed scene-element handlers; ALL are wired from
+  scenes (none dead); 34 are `keyTask` = per-scene back/hardware-key behavior that S2 dropped as scene
+  chrome. Census: extraction/tasks/anonymous_handlers.md — S12/S13 precondition (every row ported or
+  dropped(reason)). Circadian Dimming Graph re-homed Dynamic Scale → Animation & Dimming (owner; opened
+  from Superdimming Settings via task517, button visible only when `%AAB_ScalingUse` on; screen_map +
+  superdimming_settings gloss fixed — old `_CalibratePowerDraw` gloss was wrong; _disp_group4 already
+  agreed). (Affects S12, S13.)
+
+Append new entries as D-027, D-028, … with which segments they affect.
 
 ## Blockers
 
