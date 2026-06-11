@@ -10,24 +10,26 @@ next session does not know it.
 |---|---|---|---|---|---|
 | S0 scaffolding | 2026-06-11 | Fable (planning session) | DONE | (this commit) | CLAUDE.md, RUNBOOK, recipes, checklist, SDK script, hook authored. No source/gradle changes. |
 | S1 extraction A | 2026-06-11 | Opus/high | DONE | (this commit) | 40 Java blocks decoded; 28 task docs; profiles.md (753–761,769); pipeline_spec.md; defaults_audit.md (125 vars); INDEX.md. Docs-only. Java "Extracted" checklist cells flipped. |
+| S2 extraction B | 2026-06-11 | Opus/medium | DONE | (this commit) | task090_dynamic_scale.md (+solar answer), task038_curve_wizard.md, contexts_spec.md, features_spec.md, 20 scene docs + 4 _disp fragments, screen_map.md (450-element matrix → 9 M3 screens). Docs-only. Scene/context-profile/non-pipeline-cluster checklist cells annotated "S2 extracted". |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 DONE. `docs/rebuild/extraction/` now holds the verbatim ground truth for the core pipeline:
-40 decoded Java blocks (`java/`), 28 action-by-action task transcriptions (`tasks/`), `profiles.md`
-(pipeline profiles + gates), `pipeline_spec.md` (end-to-end flow + state-var table), `defaults_audit.md`
-(all 125 vars classified), `INDEX.md` (inventory + action-code legend + unresolved + 3 spot-checks).
-Later pipeline segments should read these, not the XML. Build still does not CONFIGURE (D-007; S3).
-Repo also has the Tasker XML, audited Codex conversion (salvage/discard per ledger), and docs/migration/.
+S1 + S2 DONE. `docs/rebuild/extraction/` now holds the verbatim ground truth for BOTH the core
+pipeline (S1) and the non-pipeline features/UI (S2). S2 added: `tasks/task090_dynamic_scale.md`,
+`tasks/task038_curve_wizard.md`, `contexts_spec.md`, `features_spec.md`, `scenes/*.md` (20 scenes,
+exhaustive element tables) + `scenes/_disp_group{1-4}.md` fragments, and `docs/rebuild/screen_map.md`
+(THE 450-element → 9-M3-screen consolidation matrix). Later UI/feature segments read these, not the XML.
+Build still does not CONFIGURE (D-007; S3). Repo also has the Tasker XML, audited Codex conversion,
+and docs/migration/.
 
 ## Next up
 
-- S2 (Opus, medium) — extraction B: features/contexts/scenes. No preconditions besides S0.
-  S1 deliberately left S2's surface untouched (contexts 762–768/8, task90/38/43, scenes, screen_map).
 - S3 (Sonnet, medium) — toolchain modernization + first green build. No preconditions besides S0.
-- S1 ∥ S2 ∥ S3 are parallel-safe (disjoint files; rebase before push if raced).
+  This is the only remaining parallel-window-A segment; it gates ALL builds.
+- After S3: S4 (reference impl + golden vectors), needs S1+S3.
+- S1 ∥ S2 ∥ S3 were parallel-safe; S2 now DONE (disjoint from S1/S3, no rebase needed).
 
 ## Deviations & discoveries ledger
 
@@ -67,6 +69,47 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   session's checked-out branch and push target is `claude/practical-mayer-kaopcf` (per session directive).
   S1 committed/pushed to `claude/practical-mayer-kaopcf`. Future sessions: confirm the intended branch;
   if the canonical branch is modest-bohr, these S1 docs may need to be merged/cherry-picked over.
+
+- D-012: BRANCH DISCREPANCY continues. This S2 session ran on `claude/dreamy-brahmagupta-eqd4nu`
+  (per session directive), not `claude/modest-bohr-5ybl2i` (CLAUDE.md) nor `claude/practical-mayer-kaopcf`
+  (S1, D-011). Three branches now carry program docs. A future session MUST reconcile/merge these onto
+  one canonical branch before code segments (S3+) build on them.
+- D-013: SOLAR SOURCE RESOLVED (task90). Dynamic Scale COMPUTES sunrise/sunset/dawn/dusk/solar-noon
+  ITSELF via inline NOAA solar equations (declination `0.39782*sin(L)`, `H=acos(cosH)`) from
+  lat/lon/date — it does NOT consume Tasker `%SUNRISE`/`%SUNSET`. Polar: `cosH` out of [-1,1] →
+  `AAB_SunStatus="polar"`, `ss_sunlight_duration=1440` (midnight sun, `-2.0` marker) else `0`. Normal:
+  `durationMins=(set-rise)/60`, `+1440` if negative. **S6 must port a NOAA solar calculator**, not call
+  any platform sunrise API; golden-test vs NOAA tables incl. polar. (Affects S6.)
+- D-014: CONTEXT PRECEDENCE is NOT profile `<pri>` (prof762–768 are all pri 0). Real precedence = the
+  per-rule integer `priority` inside `contexts.json`, resolved in task43 PASS 3: highest priority wins,
+  ties → specificity (# matched trigger dimensions), final ties → array order. An override swaps the
+  ENTIRE active profile via `_ProfileManager LOAD_FILE` (39-key snapshot) + re-runs Set Initial
+  Brightness — NOT a scale-only/min-max-only modifier. Two caches: `%AAB_ContextCache`
+  =`[BATT][LOC][WIFI],pkg,pkg,` (token gate + app set) and `%AAB_ContextJSONCache` (full JSON RAM copy);
+  disk truth = `Download/AAB/configs/contexts.json`. Daily reset prof8→task26 fires 03:00, clears ONLY
+  the JSON RAM cache (code 549), forcing disk reload. task43 has per-caller cooldowns
+  (Resume 0 / Batt 30s / Loc 8s / Wifi 8s / Time 1s / else 500ms) + signal veto gates. (Affects S10; corrects feature spec §1.)
+- D-015: FORMULA VALIDATION = 5 rules. task583 `_RedInvalidFormulae` (3 advisory, marks scene field red,
+  no abort): `form2A<0`, `form3A<0`, `form2C>zone1End`. task707 `_ValidateBrightnessParams` (2 safety):
+  predicts brightness at 1000 lux via the zone formula that 1000 lux falls in; if `<25` → warning toast +
+  `%is_safe=no`; `%AAB_MaxBright` defaults 255 when unset. (Affects S8 `validate()`, S12 red-invalid UI.)
+- D-016: PRIVILEGE DETECTION (task378) is a first-hit probe: Root(`su -c id`→uid0) → WriteSecure
+  (`checkPermission`) → Shizuku(`getShizukuService`) → ADB-WiFi(TCP 127.0.0.1:5555) → None. ALL positive
+  results map to ELEVATED; None = unprivileged overlay. BASIC (WRITE_SETTINGS) is a SEPARATE gate in
+  task563 step 1. `%AAB_Privilege` cached unless caller forces re-detect; `%AAB_PermGranted="3"`=all 8
+  runtime perms granted. task643 only TEACHES the `pm grant WRITE_SECURE_SETTINGS` adb command (clipboard
+  dialog), never grants. (Affects S7 PrivilegeManager, S11 onboarding.)
+- D-017: `%AAB_AnimSteps` HAS a user-facing slider (Misc Settings, range 0–100) and `%AAB_ScaleTaperMidpoint`
+  a slider (Experiment Settings, 130–240) — confirms both are real settings (reinforces D-008: add AnimSteps
+  to AabSettings). All numeric inputs in settings scenes are `EditTextElement` (no SliderElement in
+  brightness/reactivity/superdimming); toggles render as overlaid Switch PAIRS (on+off overlay) → collapse
+  to one M3 toggle. (Affects S8 schema, S12 UI.)
+- D-018: Scene element census = exactly **450** raw `<*Element sr=>` (224 Rect/129 Text/28 Web/22 EditText/
+  20 Properties/16 Switch/6 Slider/5 Button); ~264 are functional, the rest are nested `background` rects.
+  `screen_map.md` dispositions all 450 (functional → target screen; background rects + PropertiesElement
+  scene-chrome → dropped). 8 of 28 WebElements are Chart.js charts → named Compose charts; generators are
+  NOT 1:1 with scene names (Experiment Graph uses task549/HTML_Graph4; Taper Graph uses task657/HTML_Graph5).
+  Unresolved carried from features extraction: And2/Or2 grouping in task551 OFF-path branch (validate in S9).
 
 Append new entries as D-008, D-009, … with which segments they affect.
 
