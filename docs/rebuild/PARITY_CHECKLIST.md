@@ -7,6 +7,8 @@ filled by S1/S2 during extraction.
 
 ## Profiles (18)
 
+> S1 extracted profiles 753–761, 769 → `extraction/profiles.md` (context+gate+enter/exit+pri). Profiles 762–768, 8 are S2. Status stays `pending` until ported to Kotlin (S9+).
+
 | Profile | XML | Ported to | Status |
 |---|---|---|---|
 | prof753 Hibernate (Display Off) → task585 | L3 | | pending |
@@ -29,6 +31,8 @@ filled by S1/S2 during extraction.
 | prof8 Context: Reset Serialized Cache → task26 | L744 | | pending |
 
 ## Pipeline & feature task clusters (~25)
+
+> S1 transcribed the core-pipeline tasks (554, 544, 535, 546, 661, 548, 659, 543, 696, 698, 700, 618, 585, 566, 567, 569, 561, 528, 570, 645–654, 644, 551, 584) → `extraction/tasks/*.md` + `pipeline_spec.md` + `defaults_audit.md`. Status stays `pending` until ported (S4–S9). Non-pipeline clusters (90, 43/contexts, 38/655, 524, 592/637/622, debug, misc UI) are S2.
 
 | Cluster (tasks) | XML | Ported to | Status |
 |---|---|---|---|
@@ -88,38 +92,38 @@ filled by S1/S2 during extraction.
 
 | Block (task · line) | Extracted (S1/S2) | Reference impl (S4/S6) | Production port | Status |
 |---|---|---|---|---|
-| task105 L8906 · _GetWifiNoLocation | | | | pending |
-| task378 L9468 · _PrivilegeDetection | | | | pending |
-| task38 L9921 · _SuggestCurveParameters | | | | pending |
-| task43 L12091 · _EvaluateContexts | | | | pending |
-| task524 L14246 · _CalibratePowerDraw | | | | pending |
-| task535 L15204 · Lux Smoothing | | | | pending |
-| task543 L15878 · Calculate Animation | | | | pending |
-| task544 L16062 · Evaluate Light Change | | | | pending |
-| task546 L16481 · Set Thresholds | | | | pending |
-| task548 L16630 · DR Compressed Scale | | | | pending |
-| task549 L17138 · _GenerateCircadianGraph | | | | pending |
-| task554 L18132 · Process Sensor Event | | | | pending |
-| task556 L18359 · _GenerateDimmingCurveGraph | | | | pending |
-| task557 L18959 · _GenerateAlphaGraph | | | | pending |
-| task563 L19677 · _AskPermissionsV7 | | | | pending |
-| task592 L24132 · _CreateDefaultProfiles | | | | pending |
-| task618 L25826+L26096 · Set Initial Brightness (×2) | | | | pending |
-| task620 L26400 · _AdaptiveBrightnessSceneSize | | | | pending |
-| task623 L26926 · _ContextManager | | | | pending |
-| task625 L27185 · _AppPicker | | | | pending |
-| task626 L27355 · _ContextResume | | | | pending |
-| task630 L27585+L27817 · _ContextLocnListener (×2) | | | | pending |
-| task631 L27939+L28432 · _ContextF5NetLoc (×2) | | | | pending |
-| task633 L28827 · _GetWifiForContext | | | | pending |
-| task636 L28993 · _DeleteOverridePoint | | | | pending |
-| task637 L29303 · _ProfileManager | | | | pending |
-| task643 L30505 · _LearnWriteSecure | | | | pending |
-| task655 L32591 · _SetSuggestedVariables | | | | pending |
-| task657 L32986 · _GenerateCompressionGraph | | | | pending |
-| task663 L33944+L34370 · _GenerateGraph (×2) | | | | pending |
-| task696 L35733 · Smooth Brightness Transition | | | | pending |
-| task698 L36043 · Smooth DC-Like Transition | | | | pending |
-| task703 L36847 · _GenerateReactivityGraph | | | | pending |
-| task705 L37517 · _GenerateCircadianDimmingGraph | | | | pending |
-| task90 L40429+L41085 · Dynamic Scale V13 (×2) | | | | pending |
+| task105 L8906 · _GetWifiNoLocation | ✓ S1 | | | pending |
+| task378 L9468 · _PrivilegeDetection | ✓ S1 | | | pending |
+| task38 L9921 · _SuggestCurveParameters | ✓ S1 | | | pending |
+| task43 L12091 · _EvaluateContexts | ✓ S1 | | | pending |
+| task524 L14246 · _CalibratePowerDraw | ✓ S1 | | | pending |
+| task535 L15204 · Lux Smoothing | ✓ S1 | | | pending |
+| task543 L15878 · Calculate Animation | ✓ S1 | | | pending |
+| task544 L16062 · Evaluate Light Change | ✓ S1 | | | pending |
+| task546 L16481 · Set Thresholds | ✓ S1 | | | pending |
+| task548 L16630 · DR Compressed Scale | ✓ S1 | | | pending |
+| task549 L17138 · _GenerateCircadianGraph | ✓ S1 | | | pending |
+| task554 L18132 · Process Sensor Event | ✓ S1 | | | pending |
+| task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | | pending |
+| task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | | pending |
+| task563 L19677 · _AskPermissionsV7 | ✓ S1 | | | pending |
+| task592 L24132 · _CreateDefaultProfiles | ✓ S1 | | | pending |
+| task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | | | pending |
+| task620 L26400 · _AdaptiveBrightnessSceneSize | ✓ S1 | | | pending |
+| task623 L26926 · _ContextManager | ✓ S1 | | | pending |
+| task625 L27185 · _AppPicker | ✓ S1 | | | pending |
+| task626 L27355 · _ContextResume | ✓ S1 | | | pending |
+| task630 L27585+L27817 · _ContextLocnListener (×2) | ✓ S1 | | | pending |
+| task631 L27939+L28432 · _ContextF5NetLoc (×2) | ✓ S1 | | | pending |
+| task633 L28827 · _GetWifiForContext | ✓ S1 | | | pending |
+| task636 L28993 · _DeleteOverridePoint | ✓ S1 | | | pending |
+| task637 L29303 · _ProfileManager | ✓ S1 | | | pending |
+| task643 L30505 · _LearnWriteSecure | ✓ S1 | | | pending |
+| task655 L32591 · _SetSuggestedVariables | ✓ S1 | | | pending |
+| task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
+| task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | | | pending |
+| task696 L35733 · Smooth Brightness Transition | ✓ S1 | | | pending |
+| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | | | pending |
+| task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
+| task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |
+| task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | | | pending |
