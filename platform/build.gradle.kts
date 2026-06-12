@@ -31,6 +31,7 @@ android {
 dependencies {
     implementation(project(":domain"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.shizuku.api)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.robolectric)

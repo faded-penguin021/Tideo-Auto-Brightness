@@ -59,5 +59,14 @@
                 <action android:name="android.intent.action.SCREEN_OFF" />
             </intent-filter>
         </receiver>
+
+        <!-- Shizuku: one-time WRITE_SECURE_SETTINGS grant channel (not a runtime binder dep). -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="com.tideo.autobrightness.shizuku"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     </application>
 </manifest>
