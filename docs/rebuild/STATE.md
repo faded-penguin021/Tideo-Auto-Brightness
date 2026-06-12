@@ -17,22 +17,20 @@ next session does not know it.
 | S4 reference impl + golden vectors | 2026-06-12 | Opus/medium | DONE | (see push) | `TaskerReference.kt` (12 Java-faithful blocks: 554/535/544/546/548/659/661/543/696/698/618 + Math.round/BigDecimal helpers); `GoldenVectorGenerator.kt` (regen via `-DregenGolden=1`); 8 committed golden CSVs (smoothing 16512, taper 1148, animation 927, mapping/threshold 688, formulae 540, transition 680, dimming 510 rows). `CorePipelineParityTest.kt` asserts current engine vs vectors @1e-9; 661-vs-663 cross-validation PASSES (Form2D≡Zone1End). 7 gaps found (D-028) → `parity_gaps.md`, 7 `@Ignore("S5: gap-NN")`. `:domain:test` GREEN. Added a `tasks.withType<Test>` regen-property passthrough to `domain/build.gradle.kts`. |
 | S5 domain engine parity | 2026-06-12 | Sonnet/high | DONE | (see push) | All 7 parity gaps closed; 0 @Ignore remain. R1 fix: `roundN` now uses `Math.round` (gap-04/05/06); `smoothLux` final rounding uses BigDecimal HALF_UP (gap-01 R1); `absoluteThresholds` uses BigDecimal HALF_UP (gap-02 R1). R2 fixes: removed `coerceIn` from `luxAlpha` (gap-01), added `par1<0.2` special-case to `absoluteThresholds` + added `currentLux` param (gap-02), removed clamp+`coerceAtLeast` from `mapLuxToBrightness` (gap-03). gap-07: test fixture fixed. New files: `BrightnessFormulae.kt`, `SoftwareDimming.kt`, `OverrideRules.kt`, `InitialBrightness.kt`. Defaults corrected (AnimationConfig 20/25/65ms; ThresholdConfig.threshMidpoint 4.0). Follow-on (F1–F5, D-030): task700/646/647 oracle functions + superdimming.csv (2016 rows) + CorePipelineParityTest parity tests; OverrideRules.recordOverridePoint scalingUse param + newest-first order fix; OverrideRulesTest.kt + InitialBrightnessTest.kt added; parity_gaps.md + checklist updated. `:domain:test :app:assembleDebug` GREEN. |
 | S6 circadian solar + curve wizard | 2026-06-12 | Sonnet/high | DONE | (see push) | `SolarTimes.kt` (NOAA solar calculator + buildScheduleWindows — SolarCalculator.compute/buildScheduleWindows); `DynamicScaleEngine.kt` (tanh ramp + progress, absorbs computeDynamicScale+rampProgress from BrightnessEngine — BigDecimal HALF_UP parity fix D-031); `CurveSuggestionEngine.kt` (AAB Curve Fitting Engine V43.8 — full ~600-line port of task38 + applyToLiveCurve from task655). BrightnessEngine now delegates computeDynamicScale to DynamicScaleEngine (rampProgress removed). TaskerReference.kt extended with solarTimes/buildScheduleWindows/dynamicScale wrappers. GoldenVectorGenerator gains writeCircadian (576 rows) + writeWizard (12 rows). New parity tests: CircadianParityTest.kt (solar times + schedule windows + dynamic scale + 4 polar assertions) + WizardParityTest.kt (12 scenarios). Total: 50 tests, 0 @Ignore. `:domain:test` GREEN. |
+| S8 settings schema v2 + validator | 2026-06-12 | Sonnet/medium | DONE | (see push) | `AabSettings` v2 (animSteps, thresholdMidpoint, contextOverride, setupTitle added; scale Int→Float; throttleDefaultMs 1000→1310; debugLevel range 0..9; CURRENT_SCHEMA_VERSION=2); `AabSettingsSerializer` migration v1→v2; `AabSettingsMapper` completed (toThresholdConfig/toAnimationConfig/toBrightnessCurveConfig/toDynamicScalingConfig + validate fixes); `TaskerLegacyProfileSerializer` updated (new fields + scale Float); `DefaultProfiles.kt` (5 profiles from task592); `SettingsValidator.kt` (5 rules: task583×3 advisory + task707×2 safety); `ContextOverrideRules.kt` (ContextRule/ContextTriggers/BatteryTrigger/LocationTrigger/ContextOverrideConfig + Tasker JSON interop); 20 new unit tests (migration×6, legacy round-trip×5, validator×9). `:app:testDebugUnitTest` ✅ `:app:assembleDebug` ✅ `:app:lintDebug` ✅ `:domain:test` ✅ |
 | S7 platform adapters + privilege | 2026-06-12 | Sonnet/medium | DONE | (see push) | `sensor/LightSensorSource.kt` (TYPE_LIGHT callbackFlow); `brightness/ScreenBrightnessController.kt` (read/write 0–255, OEM range norm via config_screenBrightnessSettingMaximum, suppress-echo hook); `brightness/SecureDimmingController.kt` (reduce_bright_colors via Settings.Secure, ELEVATED-gated); `privilege/PrivilegeManager.kt` (Tier NONE/BASIC/ELEVATED; BASIC=canWrite, ELEVATED=checkPermission; tierFlow; root+Shizuku grant helpers); `privilege/ShizukuGrantGateway.kt` (binder check + permission request stub — exec TODO S11, D-032); `observe/BrightnessObserver.kt` (ContentObserver callbackFlow, null-Handler for synchronous dispatch, self-write filter via suppress-echo); `context/{BatteryStateReader,LocationReader,ForegroundAppMonitor,WifiInfoReader}.kt`. ShizukuProvider added to manifest; shizuku-api added to platform + app deps; shizuku-provider added to app deps. SystemAdapters.kt marked @Deprecated("S9b removes"). Robolectric tests: 19 total (brightness write/read/mode-force, tier-gating, observer dispatch+self-write-filter, LightSensorSource cancel). `:platform:test` GREEN (19 tests); `:app:assembleDebug` GREEN. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 through S7 DONE. Build is GREEN: `:platform:test` 19 tests; `:app:assembleDebug` ✅.
-Platform adapters are complete: LightSensorSource, ScreenBrightnessController (suppress-echo),
-SecureDimmingController, PrivilegeManager (NONE/BASIC/ELEVATED + tierFlow + root/Shizuku helpers),
-BrightnessObserver, and all four context readers. ShizukuGrantGateway stub lands binder check +
-permission request; `pm grant` exec deferred to S11. S8 is the last segment in parallel window B.
+S1 through S8 DONE. Build is GREEN: `:platform:test` 19 tests; `:app:testDebugUnitTest` 20 new tests (+ pre-existing); `:app:assembleDebug` ✅ `:app:lintDebug` ✅.
+Settings schema v2 complete: AabSettings gains animSteps/thresholdMidpoint/contextOverride/setupTitle; scale changed to Float; throttle default corrected to 1310. Mapper extended with all 4 domain config conversion functions. SettingsValidator implements all 5 Tasker validation rules (task583×3 advisory + task707×2 safety). DefaultProfiles has all 5 built-in profiles from task592. ContextOverrideRules data model is ready for S10 engine wiring. Parallel window B complete.
 
 ## Next up
 
-- S8: Settings schema v2, persistence, import/export (preconditions S1 ✅, S2 ✅, S5 ✅)
-- Then S9a → S9b (split per D-027) → Gate 1.
+- S9a: Runtime pipeline core (preconditions S5 ✅, S6 ✅, S7 ✅, S8 ✅)
+- Then S9b → Gate 1.
 
 ## Deviations & discoveries ledger
 
@@ -255,7 +253,20 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   binder dependency, D-024). The stub is clearly commented TODO(S11) in ShizukuGrantGateway.kt.
   (Affects S11.)
 
-Append new entries as D-033, D-034, … with which segments they affect.
+- D-033: S8 SCHEMA CORRECTIONS. (a) `scale` field changed from `Int` to `Float` to accommodate
+  task592 profile values 0.8 (Battery Saver) and 1.15 (Outdoors). JSON migration is transparent
+  (JSON integer `1` decodes as `Float 1.0f`). AabSettingsContract updated to range 0.1..10.0.
+  (b) `throttleDefaultMs` default corrected from 1000 to 1310 (= task570 AnimSteps*MaxWait+10 =
+  20*65+10; the old value was never audited). (c) `debugLevel` contract range corrected to 0..9
+  (was 0..5; there are 10 categories per D-023). (d) AabSettingsContract `%AAB_DefaultThrottle`
+  renamed to `%AAB_Throttle` (matching the actual Tasker variable; legacy import handles both).
+  (e) `DefaultProfiles.Default` animation values (50/5/30/1510) differ from task570 init values
+  (20/25/65/1310) — they come from task592's `getBaseProfile()`, which is the authored initial
+  profile, not the settings defaults. The `AabSettings()` constructor still uses task570 values.
+  (f) `thresholdMidpoint` in DefaultProfiles.Default is 3.0 (from task592), not 4.0 (task570).
+  Both values are correct in their respective contexts. (Affects S9a mapper usage, S12 UI.)
+
+Append new entries as D-034, D-035, … with which segments they affect.
 
 ## Blockers
 
