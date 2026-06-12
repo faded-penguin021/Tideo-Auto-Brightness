@@ -36,16 +36,16 @@ filled by S1/S2 during extraction.
 
 | Cluster (tasks) | XML | Ported to | Status |
 |---|---|---|---|
-| Sensor ingest: 554 Process Sensor Event | | | pending |
-| Light-change eval + thresholds: 544, 546 | | | pending |
-| Lux smoothing: 535 | | | pending |
-| Lux→brightness mapping: 661 (+663 Java cross-check) | | | pending |
-| Compressed dynamic scale: 548 | | | pending |
-| Continuity coefficients: 659 _UpdateBrightnessFormulae | | | pending |
-| Animation calc: 543 | | | pending |
-| Brightness transitions: 696, 698 | | | pending |
+| Sensor ingest: 554 Process Sensor Event | | TaskerReference (S4) | reference (S5 ports) |
+| Light-change eval + thresholds: 544, 546 | | TaskerReference + threshold.csv (S4) | reference (S5 ports) |
+| Lux smoothing: 535 | | TaskerReference + smoothing.csv (S4) | reference (S5 ports) |
+| Lux→brightness mapping: 661 (+663 Java cross-check) | | TaskerReference + mapping.csv; 661vs663 cross-validated (S4) | reference (S5 ports) |
+| Compressed dynamic scale: 548 | | TaskerReference + taper.csv (S4) | reference (S5 ports) |
+| Continuity coefficients: 659 _UpdateBrightnessFormulae | | TaskerReference + formulae.csv (S4) | reference (S5 ports) |
+| Animation calc: 543 | | TaskerReference + animation.csv (S4) | reference (S5 ports) |
+| Brightness transitions: 696, 698 | | TaskerReference + transition.csv/dimming.csv (S4) | reference (S5 ports) |
 | Software/super dimming: 700, 645, 646, 647, 650, 653, 654, 644 | | | pending |
-| Initial brightness on wake: 618 | | | pending |
+| Initial brightness on wake: 618 | | TaskerReference (S4) | reference (S5 ports) |
 | Hibernate/reset: 585 | | | pending |
 | Throttle reset: 566 | | | pending |
 | Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | | pending |
@@ -100,18 +100,18 @@ filled by S1/S2 during extraction.
 | task38 L9921 · _SuggestCurveParameters | ✓ S1 | | | pending |
 | task43 L12091 · _EvaluateContexts | ✓ S1 | | | pending |
 | task524 L14246 · _CalibratePowerDraw | ✓ S1 | | | pending |
-| task535 L15204 · Lux Smoothing | ✓ S1 | | | pending |
-| task543 L15878 · Calculate Animation | ✓ S1 | | | pending |
-| task544 L16062 · Evaluate Light Change | ✓ S1 | | | pending |
-| task546 L16481 · Set Thresholds | ✓ S1 | | | pending |
-| task548 L16630 · DR Compressed Scale | ✓ S1 | | | pending |
+| task535 L15204 · Lux Smoothing | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task543 L15878 · Calculate Animation | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task546 L16481 · Set Thresholds | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task548 L16630 · DR Compressed Scale | ✓ S1 | ✓ S4 | | reference (S5 ports) |
 | task549 L17138 · _GenerateCircadianGraph | ✓ S1 | | | pending |
-| task554 L18132 · Process Sensor Event | ✓ S1 | | | pending |
+| task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | | reference (S5 ports) |
 | task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | | pending |
 | task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | | pending |
 | task563 L19677 · _AskPermissionsV7 | ✓ S1 | | | pending |
 | task592 L24132 · _CreateDefaultProfiles | ✓ S1 | | | pending |
-| task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | | | pending |
+| task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | ✓ S4 | | reference (S5 ports) |
 | task620 L26400 · _AdaptiveBrightnessSceneSize | ✓ S1 | | | pending |
 | task623 L26926 · _ContextManager | ✓ S1 | | | pending |
 | task625 L27185 · _AppPicker | ✓ S1 | | | pending |
@@ -124,9 +124,9 @@ filled by S1/S2 during extraction.
 | task643 L30505 · _LearnWriteSecure | ✓ S1 | | | pending |
 | task655 L32591 · _SetSuggestedVariables | ✓ S1 | | | pending |
 | task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
-| task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | | | pending |
-| task696 L35733 · Smooth Brightness Transition | ✓ S1 | | | pending |
-| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | | | pending |
+| task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | | reference (S5 ports) |
 | task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
 | task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |
 | task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | | | pending |

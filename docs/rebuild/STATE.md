@@ -14,6 +14,7 @@ next session does not know it.
 | S3 toolchain | 2026-06-11 | Sonnet/medium | DONE | (see push) | Gradle 8.14.3 wrapper; D-007 fixed (pluginManagement); libs.versions.toml (Kotlin 2.0.21, AGP 8.7.3, compose-bom 2024.12.01); :platform → com.android.library; :data retired (git rm); res/ created; manifest updated (specialUse FGS + all permissions); lint-baseline.xml frozen. Pre-existing compile bugs fixed (D-019). :app:assembleDebug ✅ :platform:test ✅ :app:lintDebug ✅; :domain:test 4/5 pass (1 pre-existing parity failure — rapidLuxSpike, D-019, S4/S5 fix). |
 | S3.5 errata (owner review) | 2026-06-11 | Fable | DONE | (this commit) | Owner-review corrections folded into extraction docs + CLAUDE.md (D-020…D-026): branch policy settled; And2/Or2 rule validated + alphabetical-XML-ordering trap found (prof758 bool sequence fixed); prof759/769 semantics corrected; debug = 10 named categories; 590=Variable Split, 105=Set Clipboard; %AAB_Test = wizard report→clipboard; non-AAB globals censused; Circadian Dimming Graph re-homed; 168-anonymous-task census added (tasks/anonymous_handlers.md) + task545 doc. Docs-only — build untouched. |
 | S3.6 plan hardening (LLM peer review) | 2026-06-12 | Fable | DONE | (this commit) | 6 of 8 review findings adopted, 2 adopted-with-correction (D-027): S9→S9a+S9b split (Gate 1 after S9b; S10/S11 preconds updated); binding runtime concurrency model (drop-not-queue, MainLoop=mutex); S8 preconds += S2; S4 code-547 expression transcription protocol; hardcoded profile gates + truth-table test; S12 step-0 handler triage; S11 theme-workaround revisit. RUNBOOK + CLAUDE.md updated. Docs-only — build untouched. |
+| S4 reference impl + golden vectors | 2026-06-12 | Opus/medium | DONE | (see push) | `TaskerReference.kt` (12 Java-faithful blocks: 554/535/544/546/548/659/661/543/696/698/618 + Math.round/BigDecimal helpers); `GoldenVectorGenerator.kt` (regen via `-DregenGolden=1`); 8 committed golden CSVs (smoothing 16512, taper 1148, animation 927, mapping/threshold 688, formulae 540, transition 680, dimming 510 rows). `CorePipelineParityTest.kt` asserts current engine vs vectors @1e-9; 661-vs-663 cross-validation PASSES (Form2D≡Zone1End). 7 gaps found (D-028) → `parity_gaps.md`, 7 `@Ignore("S5: gap-NN")`. `:domain:test` GREEN. Added a `tasks.withType<Test>` regen-property passthrough to `domain/build.gradle.kts`. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
@@ -28,12 +29,16 @@ S3.5 (owner-review errata) applied on top: extraction docs corrected per D-020�
 entries before trusting any pre-S3.5 reading of profile gates, debug levels, or action codes 590/105.
 S3.6 (peer-review plan hardening) applied: RUNBOOK restructured per D-027 — S9 is now S9a+S9b,
 runtime concurrency model is binding, S4/S8/S11/S12 briefs amended. No code changes.
+S4 DONE: the Tasker reference oracle + golden vectors + parity harness exist. `:domain:test` is
+GREEN with exactly 7 documented `@Ignore("S5: gap-NN")` (see `parity_gaps.md`, D-028). The engine's
+divergences from Tasker are now CHARACTERIZED, not guessed — S5 closes them against immutable vectors.
 
 ## Next up
 
-- S4 (Opus/medium) — Tasker reference implementation + golden vectors. Preconditions: S1 DONE ✅, S3 DONE ✅.
-  Note the new code-547 expression transcription protocol in the brief (D-027b).
-- S5 (Sonnet/high) after S4.
+- S5 (Sonnet/high) — domain engine parity completion. Preconditions: S4 DONE ✅. Close gap-01…gap-07
+  (see `parity_gaps.md`): the two systemic causes are R1 rounding-ties (`kotlin.math.round` →
+  Java `Math.round`/BigDecimal) and R2 engine-added clamps/structure (D-010a/b). Remove all 7
+  `@Ignore`s; do NOT edit `TaskerReference.kt` or the golden CSVs (immutable oracle).
 - S6 ∥ S7 ∥ S8 (parallel window B) after S5. (S8 preconditions now formally include S2 — already DONE ✅.)
 - Then S9a → S9b (split per D-027) → Gate 1.
 
@@ -196,7 +201,26 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   and (b)'s 661-vs-663 cross-validation is the actual safeguard). (Affects S4, S8, S9a, S9b,
   S10, S11, S12.)
 
-Append new entries as D-028, D-029, … with which segments they affect.
+- D-028: S4 PARITY GAPS CHARACTERIZED (full detail in `parity_gaps.md`). The Tasker reference
+  oracle + 8 golden CSVs are committed and immutable. The current `BrightnessEngine` diverges from
+  Tasker in 7 enumerated gaps, all from two systemic causes: **R1** rounding-tie semantics — engine
+  uses `kotlin.math.round` (ties-to-even) where Tasker uses Java `Math.round` (ties-toward-+∞) and
+  `BigDecimal(double).setScale(n,HALF_UP)`; **R2** clamps/structure the engine added that Tasker
+  lacks (luxAlpha `coerceIn`, mapped-brightness clamp inside the mapping vs after scaling, threshold
+  `<0.2`/`<10` special-cases, `^0.33` `coerceAtLeast`). gap-01 smoothing(535), gap-02 absThresholds(546),
+  gap-03 mapping(661), gap-04 animation(543), gap-05 dynamicThreshold(544), gap-06 taper(548),
+  gap-07 the `rapidLuxSpike` CONTRACT test (its `luxAlpha<1.0` expectation is WRONG — a spike of
+  20→800 lux legitimately yields alpha=1.0 in BOTH engine and reference; resolves the D-019 hanging
+  failure: not an engine bug, a bad fixture). 661-vs-663 cross-validation PASSES (Form2D≡Zone1End per
+  D-008/D-025) — no XML re-derivation needed. CONFIRMS D-010(a)(b) at row granularity. (Affects S5:
+  close all 7; never edit the reference/vectors to make tests pass.)
+- D-029: minor build addition — `domain/build.gradle.kts` gained a `tasks.withType<Test>` stanza that
+  forwards the `regenGolden` system property to the test JVM (Gradle does not forward `-D` to forked
+  test JVMs by default). Sanctioned by S4's "(if needed) a test-resources stanza" allowance; no
+  production/behavior impact. Golden regen command: `./gradlew :domain:test -DregenGolden=1
+  --tests "*GoldenVectorGeneratorTest*"`.
+
+Append new entries as D-030, D-031, … with which segments they affect.
 
 ## Blockers
 
