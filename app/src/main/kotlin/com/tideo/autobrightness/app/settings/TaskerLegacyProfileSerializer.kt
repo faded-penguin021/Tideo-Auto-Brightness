@@ -20,7 +20,7 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_MinBright"]?.toIntOrNull()?.let { settings = settings.copy(minBrightness = it) }
         map["%AAB_MaxBright"]?.toIntOrNull()?.let { settings = settings.copy(maxBrightness = it) }
         map["%AAB_Offset"]?.toIntOrNull()?.let { settings = settings.copy(offset = it) }
-        map["%AAB_Scale"]?.toIntOrNull()?.let { settings = settings.copy(scale = it) }
+        map["%AAB_Scale"]?.toFloatOrNull()?.let { settings = settings.copy(scale = it) }
         map["%AAB_Zone1End"]?.toIntOrNull()?.let { settings = settings.copy(zone1End = it) }
         map["%AAB_Zone2End"]?.toIntOrNull()?.let { settings = settings.copy(zone2End = it) }
         map["%AAB_Form1A"]?.toIntOrNull()?.let { settings = settings.copy(form1A = it) }
@@ -33,7 +33,8 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_DimSpread"]?.toIntOrNull()?.let { settings = settings.copy(dimSpread = it) }
         map["%AAB_PWMSensitive"]?.let { settings = settings.copy(pwmSensitive = it.asBoolean(settings.pwmSensitive)) }
         map["%AAB_PWMExp"]?.toFloatOrNull()?.let { settings = settings.copy(pwmExponent = it) }
-        map["%AAB_DefaultThrottle"]?.toLongOrNull()?.let { settings = settings.copy(throttleDefaultMs = it) }
+        // Tasker uses %AAB_Throttle; legacy exports may also use %AAB_DefaultThrottle (old naming)
+        (map["%AAB_Throttle"] ?: map["%AAB_DefaultThrottle"])?.toLongOrNull()?.let { settings = settings.copy(throttleDefaultMs = it) }
         map["%AAB_MinWait"]?.toIntOrNull()?.let { settings = settings.copy(minWaitMs = it) }
         map["%AAB_MaxWait"]?.toIntOrNull()?.let { settings = settings.copy(maxWaitMs = it) }
         map["%AAB_DeltaFactor"]?.toFloatOrNull()?.let { settings = settings.copy(deltaFactor = it) }
@@ -52,6 +53,10 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_QSUse"]?.let { settings = settings.copy(quickSettingsEnabled = it.asBoolean(settings.quickSettingsEnabled)) }
         map["%AAB_NotifyUse"]?.let { settings = settings.copy(notificationsEnabled = it.asBoolean(settings.notificationsEnabled)) }
         map["%AAB_Debug"]?.toIntOrNull()?.let { settings = settings.copy(debugLevel = it) }
+        map["%AAB_AnimSteps"]?.toIntOrNull()?.let { settings = settings.copy(animSteps = it) }
+        map["%AAB_ThreshMidpoint"]?.toDoubleOrNull()?.let { settings = settings.copy(thresholdMidpoint = it) }
+        map["%AAB_ContextOverride"]?.let { settings = settings.copy(contextOverride = it.asBoolean(settings.contextOverride)) }
+        map["%AAB_SetupTitle"]?.let { settings = settings.copy(setupTitle = it) }
 
         return settings.validate()
     }

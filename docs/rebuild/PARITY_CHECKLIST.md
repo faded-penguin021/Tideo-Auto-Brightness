@@ -57,9 +57,9 @@ filled by S1/S2 during extraction.
 | QS tile: 551, 552 | | S2 extracted → features_spec.md | pending |
 | Foreground notification: 584, 692 | | S2 extracted → features_spec.md | pending |
 | Curve suggestion wizard: 38, 655 | | CurveSuggestionEngine.kt (S6 domain, golden-tested wizard.csv 12 rows, WizardParityTest); applyToLiveCurve = task655 | ported |
-| Formula validation: 583, 707 | | S2 extracted → features_spec.md | pending |
+| Formula validation: 583, 707 | | S2 extracted → features_spec.md; SettingsValidator.kt (S8 — 5 rules: form2A<0, form3A<0, form2C>zone1End advisory + predicted-brightness@1000lux<25 safety) | ported |
 | Power draw calibration: 524 | | S2 extracted → features_spec.md | pending |
-| Profiles/import/export/defaults: 592, 637, 622 | | S2 extracted → features_spec.md | pending |
+| Profiles/import/export/defaults: 592, 637, 622 | | S2 extracted → features_spec.md; DefaultProfiles.kt (S8 — 5 built-in profiles from task592); AabSettings v2 + migration + TaskerLegacyProfileSerializer updated (S8); ContextOverrideRules.kt storage model (S8); wiring to disk S10/S12 | ported (schema+defaults; disk wiring S10/S12) |
 | Debug tooling: 634, 635 | | S2 extracted → features_spec.md | pending |
 | Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | S2 extracted → screen_map.md (scene dispositions) | pending |
 | **Anonymous scene-handler tasks (168 unnamed**, incl. 34 `keyTask` back-key handlers) | various | S3.5 census → extraction/tasks/anonymous_handlers.md | pending (S12/S13: every row ported or dropped(reason)) |
