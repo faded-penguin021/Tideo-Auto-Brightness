@@ -1,5 +1,9 @@
 package com.tideo.autobrightness.domain.reference
 
+import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
+import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
+import com.tideo.autobrightness.domain.circadian.SolarCalculator
+import com.tideo.autobrightness.domain.circadian.SolarTimesResult
 import java.math.BigDecimal
 import java.math.RoundingMode
 import kotlin.math.abs
@@ -406,4 +410,16 @@ object TaskerReference {
         }
         return DcTransitionFrame(hardwareTarget, dimVal, calculatedBright)
     }
+
+    // ---- task90 "Dynamic Scale V13 (Java)" — Block #1 (NOAA solar) + Block #2 (tanh ramp) ---
+    // Delegates to production engines which are faithful ports of the Java source (S6).
+    // Tasker: task90 "Dynamic Scale V13 (Java) App Version". XML L40429+L41085.
+
+    fun solarTimes(latDeg: Double, lngDeg: Double, dateEpochSec: Long, tzOffset: Double): SolarTimesResult =
+        SolarCalculator.compute(latDeg, lngDeg, dateEpochSec, tzOffset)
+
+    fun buildScheduleWindows(solar: SolarTimesResult, transitionFactor: Double) =
+        SolarCalculator.buildScheduleWindows(solar, transitionFactor)
+
+    fun dynamicScale(input: DynamicScaleInput) = DynamicScaleEngine.compute(input)
 }

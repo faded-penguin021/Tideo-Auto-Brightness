@@ -1,5 +1,10 @@
 package com.tideo.autobrightness.domain.reference
 
+import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
+import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
+import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
+import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
+import com.tideo.autobrightness.domain.wizard.OverridePoint
 import java.io.File
 import kotlin.math.ln
 import kotlin.test.Test
@@ -224,6 +229,123 @@ object GoldenVectorGenerator {
         File(dir, "superdimming.csv").writeText(rows.toString())
     }
 
+    // ---- Circadian (S6) ------------------------------------------------------------------
+
+    private data class Location(val name: String, val lat: Double, val lng: Double)
+    private data class DateCase(val label: String, val epochSec: Long)
+
+    fun writeCircadian(dir: File) {
+        val locations = listOf(
+            Location("london", 51.5, -0.1),
+            Location("singapore", 1.3, 103.8),
+            Location("sydney", -33.9, 151.2),
+            Location("fairbanks", 64.8, -147.7),
+        )
+        val dates = listOf(
+            DateCase("equinox_mar", 1742428800L),   // 2025-03-20 00:00 UTC
+            DateCase("solstice_jun", 1750464000L),  // 2025-06-21 00:00 UTC
+            DateCase("solstice_dec", 1766275200L),  // 2025-12-21 00:00 UTC
+        )
+        val transitionFactors = listOf(0.05, 0.15, 0.30)
+        // 16 evenly-spaced times across the day
+        val timesOfDay = (0 until 16).map { i -> i * 5400.0 }
+        val tzOffset = 0.0
+        val steepness = 4.0
+        val scaleSpreadPercent = 15.0
+        val dimSpreadPercent = 100.0
+
+        val header = "loc,lat,lng,date,dateEpoch,tzOffset,sunStatus," +
+            "riseEpochSec,setEpochSec,dawnEpochSec,duskEpochSec,noonEpochSec,sunlightMins," +
+            "transitionFactor,dawnSecOfDay,sunriseSecOfDay,noonSecOfDay,sunsetSecOfDay,duskSecOfDay," +
+            "morningStart,morningEnd,morningDuration,eveningStart,eveningEnd,eveningDuration," +
+            "nowSecOfDay,isPolar,steepness,scaleSpreadPercent,dimSpreadPercent," +
+            "progress,modifier,dimDynamic,scaleDynamic"
+        val rows = StringBuilder("$header\n")
+
+        for (loc in locations) {
+            for (date in dates) {
+                val solar = TaskerReference.solarTimes(loc.lat, loc.lng, date.epochSec, tzOffset)
+                for (tf in transitionFactors) {
+                    val win = TaskerReference.buildScheduleWindows(solar, tf)
+                    val isPolar = solar.sunStatus == "polar"
+                    for (now in timesOfDay) {
+                        val dsInput = DynamicScaleInput(
+                            nowSecOfDay = now,
+                            morningStart = win.morningStart,
+                            morningEnd = win.morningEnd,
+                            eveningStart = win.eveningStart,
+                            eveningEnd = win.eveningEnd,
+                            sunlightDurationMinutes = solar.sunlightDurationMinutes.toDouble(),
+                            isPolar = isPolar,
+                            steepness = steepness,
+                            scaleSpreadPercent = scaleSpreadPercent,
+                            dimSpreadPercent = dimSpreadPercent,
+                        )
+                        val ds = TaskerReference.dynamicScale(dsInput)
+                        rows.append("${loc.name},${fmt(loc.lat)},${fmt(loc.lng)},${date.label},${date.epochSec},${fmt(tzOffset)},${solar.sunStatus},")
+                        rows.append("${solar.riseEpochSec},${solar.setEpochSec},${solar.dawnEpochSec},${solar.duskEpochSec},${solar.noonEpochSec},${solar.sunlightDurationMinutes},")
+                        rows.append("${fmt(tf)},${fmt(win.dawnSecOfDay)},${fmt(win.sunriseSecOfDay)},${fmt(win.noonSecOfDay)},${fmt(win.sunsetSecOfDay)},${fmt(win.duskSecOfDay)},")
+                        rows.append("${fmt(win.morningStart)},${fmt(win.morningEnd)},${fmt(win.morningDuration)},${fmt(win.eveningStart)},${fmt(win.eveningEnd)},${fmt(win.eveningDuration)},")
+                        rows.append("${fmt(now)},$isPolar,${fmt(steepness)},${fmt(scaleSpreadPercent)},${fmt(dimSpreadPercent)},")
+                        rows.append("${fmt(ds.progress)},${fmt(ds.modifier)},${fmt(ds.dimDynamic)},${fmt(ds.scaleDynamic)}\n")
+                    }
+                }
+            }
+        }
+        File(dir, "circadian.csv").writeText(rows.toString())
+    }
+
+    // ---- Wizard (S6) ---------------------------------------------------------------------
+
+    /** A fixed set of override points defining a test scenario for CurveSuggestionEngine. */
+    data class WizardTestCase(
+        val name: String,
+        val overrides: List<OverridePoint>,
+        val tau: Double,
+        val curveVariant: Variant = Variant("default"),
+    )
+
+    val wizardTestCases: List<WizardTestCase> = listOf(
+        WizardTestCase("t1_default_tau4", sparsePts, 4.0),
+        WizardTestCase("t1_default_tau1", sparsePts, 1.0),
+        WizardTestCase("t1_default_tau8", sparsePts, 8.0),
+        WizardTestCase("t2_dense_tau4", densePts, 4.0),
+        WizardTestCase("t2_dense_tau1", densePts, 1.0),
+        WizardTestCase("t2_dense_tau8", densePts, 8.0),
+        WizardTestCase("t3_allzones_tau4", allZonesPts, 4.0),
+        WizardTestCase("t3_allzones_tau2", allZonesPts, 2.0),
+        WizardTestCase("t4_darkHeavy_tau4", darkHeavyPts, 4.0),
+        WizardTestCase("t4_darkHeavy_tau2", darkHeavyPts, 2.0),
+        WizardTestCase("t1_variantZoneShift_tau4", sparsePts, 4.0, Variant("zoneShift", zone1End = 50.0, zone2End = 8_000.0, form2c = 12.0)),
+        WizardTestCase("t3_variantZoneShift_tau4", allZonesPts, 4.0, Variant("zoneShift", zone1End = 50.0, zone2End = 8_000.0, form2c = 12.0)),
+    )
+
+    fun writeWizard(dir: File) {
+        val header = "testCase,tau,isNull,zone1End,zone2End,form1a,form2a,form2b,form2c,form2d,form3a"
+        val rows = StringBuilder("$header\n")
+        for (tc in wizardTestCases) {
+            val cfg = BrightnessCurveConfig(
+                form1A = tc.curveVariant.form1a,
+                form2A = tc.curveVariant.form2a,
+                form2B = tc.curveVariant.form2b,
+                form2C = tc.curveVariant.form2c,
+                zone1End = tc.curveVariant.zone1End,
+                zone2End = tc.curveVariant.zone2End,
+                form3A = tc.curveVariant.form3a,
+                minBrightness = tc.curveVariant.minBright.toInt(),
+                maxBrightness = tc.curveVariant.maxBright.toInt(),
+            )
+            val input = CurveSuggestionInput(overrides = tc.overrides, currentCurve = cfg, tau = tc.tau)
+            val result = CurveSuggestionEngine.suggest(input)
+            if (result != null) {
+                rows.append("${tc.name},${fmt(tc.tau)},false,${result.zone1End},${result.zone2End},${result.form1a},${result.form2a},${result.form2b},${result.form2c},${result.form2d},${result.form3a}\n")
+            } else {
+                rows.append("${tc.name},${fmt(tc.tau)},true,0,0,N/A,N/A,N/A,N/A,0,N/A\n")
+            }
+        }
+        File(dir, "wizard.csv").writeText(rows.toString())
+    }
+
     fun generateAll(dir: File) {
         dir.mkdirs()
         writeMapping(dir)
@@ -235,8 +357,50 @@ object GoldenVectorGenerator {
         writeTransition(dir)
         writeDimming(dir)
         writeSuperdimming(dir)
+        writeCircadian(dir)
+        writeWizard(dir)
     }
 }
+
+// Fixed override-point sets for WizardTestCase. Defined at top level for clarity.
+private val sparsePts = listOf(
+    OverridePoint(0.5, 10.0), OverridePoint(2.0, 13.0), OverridePoint(5.0, 17.0),
+    OverridePoint(15.0, 22.0), OverridePoint(40.0, 35.0), OverridePoint(100.0, 58.0),
+    OverridePoint(300.0, 95.0), OverridePoint(800.0, 140.0), OverridePoint(2000.0, 180.0),
+    OverridePoint(5000.0, 215.0), OverridePoint(10000.0, 235.0), OverridePoint(20000.0, 245.0),
+    OverridePoint(50000.0, 252.0), OverridePoint(80000.0, 254.0), OverridePoint(100000.0, 255.0),
+)
+
+private val densePts = listOf(
+    OverridePoint(0.2, 10.0), OverridePoint(0.5, 10.5), OverridePoint(1.0, 11.0),
+    OverridePoint(2.0, 12.5), OverridePoint(4.0, 15.0), OverridePoint(8.0, 18.5),
+    OverridePoint(15.0, 22.0), OverridePoint(25.0, 27.0), OverridePoint(40.0, 33.0),
+    OverridePoint(70.0, 44.0), OverridePoint(120.0, 60.0), OverridePoint(200.0, 78.0),
+    OverridePoint(350.0, 100.0), OverridePoint(600.0, 125.0), OverridePoint(1000.0, 152.0),
+    OverridePoint(1800.0, 178.0), OverridePoint(3000.0, 198.0), OverridePoint(5000.0, 214.0),
+    OverridePoint(8000.0, 228.0), OverridePoint(12000.0, 238.0), OverridePoint(20000.0, 245.0),
+    OverridePoint(35000.0, 250.0), OverridePoint(60000.0, 253.0), OverridePoint(100000.0, 255.0),
+)
+
+private val allZonesPts = listOf(
+    OverridePoint(0.5, 10.0), OverridePoint(1.0, 11.0), OverridePoint(2.0, 13.0),
+    OverridePoint(5.0, 17.0), OverridePoint(10.0, 21.0), OverridePoint(20.0, 26.0),
+    OverridePoint(35.0, 33.0), OverridePoint(60.0, 45.0), OverridePoint(100.0, 58.0),
+    OverridePoint(200.0, 80.0), OverridePoint(400.0, 105.0), OverridePoint(700.0, 130.0),
+    OverridePoint(1200.0, 158.0), OverridePoint(2000.0, 180.0), OverridePoint(3500.0, 200.0),
+    OverridePoint(5000.0, 215.0), OverridePoint(7000.0, 225.0), OverridePoint(10000.0, 235.0),
+    OverridePoint(15000.0, 242.0), OverridePoint(25000.0, 248.0), OverridePoint(50000.0, 252.0),
+    OverridePoint(80000.0, 254.0), OverridePoint(100000.0, 255.0),
+)
+
+private val darkHeavyPts = listOf(
+    OverridePoint(0.1, 10.0), OverridePoint(0.3, 10.0), OverridePoint(0.7, 10.5),
+    OverridePoint(1.5, 11.5), OverridePoint(3.0, 14.0), OverridePoint(6.0, 17.0),
+    OverridePoint(10.0, 20.0), OverridePoint(18.0, 24.0), OverridePoint(30.0, 30.0),
+    OverridePoint(50.0, 38.0), OverridePoint(100.0, 55.0), OverridePoint(300.0, 90.0),
+    OverridePoint(1000.0, 150.0), OverridePoint(5000.0, 210.0), OverridePoint(30000.0, 248.0),
+    OverridePoint(100000.0, 255.0),
+)
 
 class GoldenVectorGeneratorTest {
     @Test
