@@ -3,13 +3,13 @@ package com.tideo.autobrightness.domain.parity
 import com.tideo.autobrightness.domain.brightness.AnimationConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
+import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.brightness.ThresholdConfig
 import com.tideo.autobrightness.domain.reference.GoldenVectorGenerator
 import com.tideo.autobrightness.domain.reference.TaskerReference
 import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test
-import org.junit.Ignore
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -18,12 +18,10 @@ import kotlin.test.fail
  * Parity harness: asserts the CURRENT production [BrightnessEngine] (and helpers) against the
  * committed golden vectors generated from [TaskerReference] (the Tasker oracle).
  *
- * Numeric tolerance is 1e-9; integer/string outputs are exact. Tests that currently DIVERGE from
- * the oracle are ignored INDIVIDUALLY (one gap id each) with a matching entry in
- * `docs/rebuild/parity_gaps.md` — S5 closes them. Segment: S4 (do NOT fix the engine here).
- *
- * Self-consistency tests (formulae/dimming/transition) have no production counterpart yet; they
- * guard the oracle itself against accidental reference drift.
+ * Numeric tolerance is 1e-9; integer/string outputs are exact. All 7 gaps documented in
+ * docs/rebuild/parity_gaps.md were closed in S5 — no active Ignore annotations remain. The
+ * golden vectors and reference implementation are immutable fixtures (never edit them to
+ * make tests pass; fix production code instead).
  */
 class CorePipelineParityTest {
 
@@ -41,7 +39,6 @@ class CorePipelineParityTest {
     private fun Map<String, String>.d(k: String): Double = getValue(k).toDouble()
 
     // ---- smoothing (task535) -------------------------------------------------------------
-    @Ignore("S5: gap-01")
     @Test
     fun smoothing_matchesEngine() {
         val mismatches = mutableListOf<String>()
@@ -61,7 +58,6 @@ class CorePipelineParityTest {
     }
 
     // ---- dynamic threshold (task544) -----------------------------------------------------
-    @Ignore("S5: gap-05")
     @Test
     fun dynamicThreshold_matchesEngine() {
         for (r in golden("threshold.csv")) {
@@ -79,12 +75,12 @@ class CorePipelineParityTest {
     }
 
     // ---- absolute thresholds (task546) ---------------------------------------------------
-    @Ignore("S5: gap-02")
     @Test
     fun absoluteThresholds_matchesEngine() {
         val mismatches = mutableListOf<String>()
         for (r in golden("threshold.csv")) {
-            val (low, high) = engine.absoluteThresholds(r.d("lastRawLux"), r.d("dynamicThreshold"))
+            // currentLux = par1 (for < 0.2 special-case and < 10 scale selector); lastRawLux separate
+            val (low, high) = engine.absoluteThresholds(r.d("currentLux"), r.d("lastRawLux"), r.d("dynamicThreshold"))
             if (abs(low - r.d("threshAbsLow")) > tol || abs(high - r.d("threshAbsHigh")) > tol) {
                 mismatches += "lux=${r["currentLux"]} engine=($low,$high) ref=(${r["threshAbsLow"]},${r["threshAbsHigh"]})"
             }
@@ -93,7 +89,6 @@ class CorePipelineParityTest {
     }
 
     // ---- lux→brightness mapping (task661) ------------------------------------------------
-    @Ignore("S5: gap-03")
     @Test
     fun mapping_matchesEngine() {
         val mismatches = mutableListOf<String>()
@@ -118,7 +113,6 @@ class CorePipelineParityTest {
     }
 
     // ---- compressed dynamic scale / taper (task548) --------------------------------------
-    @Ignore("S5: gap-06")
     @Test
     fun taper_matchesEngine() {
         for (r in golden("taper.csv")) {
@@ -135,7 +129,6 @@ class CorePipelineParityTest {
     }
 
     // ---- animation (task543) -------------------------------------------------------------
-    @Ignore("S5: gap-04")
     @Test
     fun animation_matchesEngine() {
         for (r in golden("animation.csv")) {
@@ -149,6 +142,18 @@ class CorePipelineParityTest {
             assertEquals(r.getValue("loops").toLong(), steps.toLong(), "alpha=${r["alpha"]} loops")
             assertEquals(r.getValue("wait").toLong(), wait, "alpha=${r["alpha"]} wait")
             assertEquals(r.getValue("throttle").toLong(), throttle, "alpha=${r["alpha"]} throttle")
+        }
+    }
+
+    // ---- continuity coefficients production code (task659) --------------------------------
+    @Test
+    fun formulae_productionMatchesOracle() {
+        for (r in golden("formulae.csv")) {
+            val c = BrightnessFormulae.deriveContinuityCoefficients(
+                r.d("form1a"), r.d("form2b"), r.d("form2c"), r.d("zone1End"), r.d("zone2End"), r.d("maxBright"),
+            )
+            assertEquals(r.d("form2a"), c.form2A, tol, "form2A variant=${r["variant"]}")
+            assertEquals(r.d("form3a"), c.form3A, tol, "form3A variant=${r["variant"]}")
         }
     }
 

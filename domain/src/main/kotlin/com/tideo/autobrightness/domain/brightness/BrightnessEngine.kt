@@ -1,12 +1,13 @@
 package com.tideo.autobrightness.domain.brightness
 
+import java.math.BigDecimal
+import java.math.RoundingMode
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.round
 import kotlin.math.sqrt
 import kotlin.math.tanh
 
@@ -32,7 +33,8 @@ class BrightnessEngine {
         val prevSmoothedLux = prev?.smoothedLux ?: input.lux
 
         val dynamicThreshold = dynamicThreshold(input.lux, prevSmoothedLux, input.thresholds)
-        val absThresholds = absoluteThresholds(prev?.lastRawLux ?: input.lux, dynamicThreshold)
+        // Tasker task546: par1 = current lux (gate + scale selector), lastRawLux = previous raw
+        val absThresholds = absoluteThresholds(input.lux, prev?.lastRawLux ?: input.lux, dynamicThreshold)
 
         val shouldUpdate = prev == null || input.lux <= absThresholds.first || input.lux >= absThresholds.second
         val (smoothedLux, luxAlpha) = if (shouldUpdate) {
@@ -55,7 +57,8 @@ class BrightnessEngine {
         }
 
         val scaledBrightness = compressedDynamicScale(mappedBrightness, scaleDynamic, input.curve)
-        val targetBrightness = round(scaledBrightness).toInt().coerceIn(input.curve.minBrightness, input.curve.maxBrightness)
+        // Tasker task661 act16-21: clamp to [MinBright, MaxBright] AFTER scaling; Math.round (ties toward +∞)
+        val targetBrightness = Math.round(scaledBrightness).toInt().coerceIn(input.curve.minBrightness, input.curve.maxBrightness)
 
         val (steps, wait, throttle) = calculateAnimation(
             alpha = luxAlpha,
@@ -89,9 +92,11 @@ class BrightnessEngine {
     ): Pair<Double, Double> {
         val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
         val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
-        val luxAlpha = round3((1.0 - exp(-deltaFactor * effectiveDelta)).coerceIn(0.0, 1.0))
+        // Tasker task535: lux_alpha is NOT clamped to [0,1] (D-010a, gap-01 R2 fix)
+        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta))
         val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
-        val rounded = if (smoothed < zone1End) roundN(smoothed, 2) else round(smoothed)
+        // Tasker task535: BigDecimal(raw).setScale(2|0, HALF_UP) — exact-binary BigDecimal (gap-01 R1 fix)
+        val rounded = if (smoothed < zone1End) bigScale(smoothed, 2) else bigScale(smoothed, 0)
         return rounded to luxAlpha
     }
 
@@ -103,23 +108,27 @@ class BrightnessEngine {
         return if (smoothedLux < cfg.zone1End) threshLow else threshSig
     }
 
-    fun absoluteThresholds(lastRawLux: Double, dynamicThreshold: Double): Pair<Double, Double> {
+    fun absoluteThresholds(currentLux: Double, lastRawLux: Double, dynamicThreshold: Double): Pair<Double, Double> {
+        // Tasker task546: par1 < 0.2 → ("1","0","0.1") — special-case (gap-02 R2 fix)
+        if (currentLux < 0.2) return 0.0 to 0.1
         val dynamicPercent = dynamicThreshold * 100.0
         val low = lastRawLux * (1.0 - (dynamicPercent / 100.0))
         val high = lastRawLux * (1.0 + (dynamicPercent / 100.0))
-        return low to high
+        // Tasker task546: BigDecimal HALF_UP, 2-dp if par1 < 10, else 0-dp (gap-02 R1 fix)
+        val scale = if (currentLux < 10) 2 else 0
+        return bigScale(low, scale) to bigScale(high, scale)
     }
 
     fun mapLuxToBrightness(smoothedLux: Double, cfg: BrightnessCurveConfig): Double {
-        val mapped = when {
+        // Tasker task661: NO coerceAtLeast on ^0.33 bases, NO clamp to [min,max] here (D-010b, gap-03 R2 fix)
+        return when {
             smoothedLux < cfg.zone1End -> cfg.form1A * sqrt(smoothedLux)
             smoothedLux < cfg.zone2End -> cfg.form2A + cfg.form2B * (
-                (smoothedLux - cfg.form2C).coerceAtLeast(0.0).pow(0.33) -
-                    (cfg.zone1End - cfg.form2C).coerceAtLeast(0.0).pow(0.33)
+                (smoothedLux - cfg.form2C).pow(0.33) -
+                    (cfg.zone1End - cfg.form2C).pow(0.33)
                 )
             else -> cfg.maxBrightness - (cfg.form3A / smoothedLux) * cfg.maxBrightness
         }
-        return mapped.coerceIn(cfg.minBrightness.toDouble(), cfg.maxBrightness.toDouble())
     }
 
     fun compressedDynamicScale(mappedBrightness: Double, scaleDynamic: Double, cfg: BrightnessCurveConfig): Double {
@@ -154,12 +163,13 @@ class BrightnessEngine {
 
     fun calculateAnimation(alpha: Double, animation: AnimationConfig, cycleTimeMs: Double?): Triple<Int, Long, Long> {
         val clamped = alpha.coerceIn(0.0, 1.0)
-        val loops = round(1.0 + clamped * (animation.maxSteps - 1.0)).toInt().coerceAtLeast(1)
+        // Tasker task543: Math.round (ties toward +∞), not kotlin.math.round (gap-04 R1 fix)
+        val loops = Math.round(1.0 + clamped * (animation.maxSteps - 1.0)).toInt().coerceAtLeast(1)
         val rawWait = (1.0 - clamped) * (animation.maxWaitMs - animation.minWaitMs) + animation.minWaitMs
-        val wait = round(rawWait).toLong().coerceAtLeast(0)
-        var throttle = round(loops * wait + 10.0).toLong()
+        val wait = Math.round(rawWait)
+        var throttle = Math.round(loops.toLong() * wait + 10.0)
         if (cycleTimeMs != null && cycleTimeMs <= 2000.0) {
-            throttle += round(cycleTimeMs).toLong()
+            throttle += Math.round(cycleTimeMs)
         }
         return Triple(loops, wait, throttle)
     }
@@ -192,10 +202,15 @@ class BrightnessEngine {
 
     private fun round3(value: Double): Double = roundN(value, 3)
 
+    // Tasker idiom Math.round(v * factor) / factor — ties toward +∞ (not kotlin.math.round which ties-to-even)
     private fun roundN(value: Double, digits: Int): Double {
         val factor = 10.0.pow(digits)
-        return round(value * factor) / factor
+        return Math.round(value * factor).toDouble() / factor
     }
+
+    // Tasker idiom new BigDecimal(v).setScale(scale, ROUND_HALF_UP) — exact-binary double constructor
+    private fun bigScale(v: Double, scale: Int): Double =
+        BigDecimal(v).setScale(scale, RoundingMode.HALF_UP).toDouble()
 
     private fun dimmingAlpha(targetBrightness: Int, minBrightness: Int): Double {
         val span = (255 - minBrightness).coerceAtLeast(1)

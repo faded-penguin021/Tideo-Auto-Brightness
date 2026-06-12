@@ -35,7 +35,8 @@ data class ThresholdConfig(
     val threshDim: Double = 0.25,
     val threshBright: Double = 0.08,
     val threshSteepness: Double = 2.1,
-    val threshMidpoint: Double = 3.0,
+    // Tasker: task570 act39 %AAB_ThreshMidpoint = log10(%AAB_Zone2End) = log10(10000) = 4 (D-004/D-008)
+    val threshMidpoint: Double = 4.0,
     val zone1End: Double = 35.0,
     val deltaFactor: Double = 1.8,
 )
@@ -56,9 +57,10 @@ data class BrightnessCurveConfig(
 )
 
 data class AnimationConfig(
-    val maxSteps: Int = 50,
-    val minWaitMs: Long = 5,
-    val maxWaitMs: Long = 30,
+    // Tasker: task570 act26/27/28: AAB_AnimSteps=20, AAB_MinWait=25ms, AAB_MaxWait=65ms (D-004/D-008)
+    val maxSteps: Int = 20,
+    val minWaitMs: Long = 25,
+    val maxWaitMs: Long = 65,
 )
 
 data class DynamicScalingConfig(
