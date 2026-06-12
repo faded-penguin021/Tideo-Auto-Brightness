@@ -17,21 +17,21 @@ next session does not know it.
 | S4 reference impl + golden vectors | 2026-06-12 | Opus/medium | DONE | (see push) | `TaskerReference.kt` (12 Java-faithful blocks: 554/535/544/546/548/659/661/543/696/698/618 + Math.round/BigDecimal helpers); `GoldenVectorGenerator.kt` (regen via `-DregenGolden=1`); 8 committed golden CSVs (smoothing 16512, taper 1148, animation 927, mapping/threshold 688, formulae 540, transition 680, dimming 510 rows). `CorePipelineParityTest.kt` asserts current engine vs vectors @1e-9; 661-vs-663 cross-validation PASSES (Form2D≡Zone1End). 7 gaps found (D-028) → `parity_gaps.md`, 7 `@Ignore("S5: gap-NN")`. `:domain:test` GREEN. Added a `tasks.withType<Test>` regen-property passthrough to `domain/build.gradle.kts`. |
 | S5 domain engine parity | 2026-06-12 | Sonnet/high | DONE | (see push) | All 7 parity gaps closed; 0 @Ignore remain. R1 fix: `roundN` now uses `Math.round` (gap-04/05/06); `smoothLux` final rounding uses BigDecimal HALF_UP (gap-01 R1); `absoluteThresholds` uses BigDecimal HALF_UP (gap-02 R1). R2 fixes: removed `coerceIn` from `luxAlpha` (gap-01), added `par1<0.2` special-case to `absoluteThresholds` + added `currentLux` param (gap-02), removed clamp+`coerceAtLeast` from `mapLuxToBrightness` (gap-03). gap-07: test fixture fixed. New files: `BrightnessFormulae.kt`, `SoftwareDimming.kt`, `OverrideRules.kt`, `InitialBrightness.kt`. Defaults corrected (AnimationConfig 20/25/65ms; ThresholdConfig.threshMidpoint 4.0). Follow-on (F1–F5, D-030): task700/646/647 oracle functions + superdimming.csv (2016 rows) + CorePipelineParityTest parity tests; OverrideRules.recordOverridePoint scalingUse param + newest-first order fix; OverrideRulesTest.kt + InitialBrightnessTest.kt added; parity_gaps.md + checklist updated. `:domain:test :app:assembleDebug` GREEN. |
 | S6 circadian solar + curve wizard | 2026-06-12 | Sonnet/high | DONE | (see push) | `SolarTimes.kt` (NOAA solar calculator + buildScheduleWindows — SolarCalculator.compute/buildScheduleWindows); `DynamicScaleEngine.kt` (tanh ramp + progress, absorbs computeDynamicScale+rampProgress from BrightnessEngine — BigDecimal HALF_UP parity fix D-031); `CurveSuggestionEngine.kt` (AAB Curve Fitting Engine V43.8 — full ~600-line port of task38 + applyToLiveCurve from task655). BrightnessEngine now delegates computeDynamicScale to DynamicScaleEngine (rampProgress removed). TaskerReference.kt extended with solarTimes/buildScheduleWindows/dynamicScale wrappers. GoldenVectorGenerator gains writeCircadian (576 rows) + writeWizard (12 rows). New parity tests: CircadianParityTest.kt (solar times + schedule windows + dynamic scale + 4 polar assertions) + WizardParityTest.kt (12 scenarios). Total: 50 tests, 0 @Ignore. `:domain:test` GREEN. |
+| S7 platform adapters + privilege | 2026-06-12 | Sonnet/medium | DONE | (see push) | `sensor/LightSensorSource.kt` (TYPE_LIGHT callbackFlow); `brightness/ScreenBrightnessController.kt` (read/write 0–255, OEM range norm via config_screenBrightnessSettingMaximum, suppress-echo hook); `brightness/SecureDimmingController.kt` (reduce_bright_colors via Settings.Secure, ELEVATED-gated); `privilege/PrivilegeManager.kt` (Tier NONE/BASIC/ELEVATED; BASIC=canWrite, ELEVATED=checkPermission; tierFlow; root+Shizuku grant helpers); `privilege/ShizukuGrantGateway.kt` (binder check + permission request stub — exec TODO S11, D-032); `observe/BrightnessObserver.kt` (ContentObserver callbackFlow, null-Handler for synchronous dispatch, self-write filter via suppress-echo); `context/{BatteryStateReader,LocationReader,ForegroundAppMonitor,WifiInfoReader}.kt`. ShizukuProvider added to manifest; shizuku-api added to platform + app deps; shizuku-provider added to app deps. SystemAdapters.kt marked @Deprecated("S9b removes"). Robolectric tests: 19 total (brightness write/read/mode-force, tier-gating, observer dispatch+self-write-filter, LightSensorSource cancel). `:platform:test` GREEN (19 tests); `:app:assembleDebug` GREEN. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 through S6 DONE (incl. S5 follow-on F1–F5 per D-030, S6 per D-031). Build is GREEN:
-`./gradlew :domain:test` passes (50 tests, 0 @Ignore). Domain engine has full circadian and
-wizard math. Golden CSVs: 11 total (9 original + circadian.csv 576 rows + wizard.csv 12 rows).
-S7 and S8 remain from parallel window B.
+S1 through S7 DONE. Build is GREEN: `:platform:test` 19 tests; `:app:assembleDebug` ✅.
+Platform adapters are complete: LightSensorSource, ScreenBrightnessController (suppress-echo),
+SecureDimmingController, PrivilegeManager (NONE/BASIC/ELEVATED + tierFlow + root/Shizuku helpers),
+BrightnessObserver, and all four context readers. ShizukuGrantGateway stub lands binder check +
+permission request; `pm grant` exec deferred to S11. S8 is the last segment in parallel window B.
 
 ## Next up
 
-- S7 ∥ S8 (parallel window B continuation) — all preconditions met (S2 ✅, S5 ✅).
-  - S7: Platform adapters + tiered privilege manager
-  - S8: Settings schema v2, persistence, import/export
+- S8: Settings schema v2, persistence, import/export (preconditions S1 ✅, S2 ✅, S5 ✅)
 - Then S9a → S9b (split per D-027) → Gate 1.
 
 ## Deviations & discoveries ledger
@@ -247,7 +247,15 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   the rounding change. (Affects BrightnessEngine.kt; new CircadianParityTest golden-tests the correct
   BigDecimal behavior.)
 
-Append new entries as D-032, D-033, … with which segments they affect.
+- D-032: S7 SHIZUKU LIMITATION. `ShizukuGrantGateway` lands binder availability check
+  (`Shizuku.pingBinder()`) and permission request (`Shizuku.requestPermission()`), but the
+  actual `pm grant WRITE_SECURE_SETTINGS` exec via `Shizuku.newProcess` or a bound user-service
+  requires a registered user-service component — deferred to S11 as agreed in the S7 brief's
+  failure notes. After any successful grant, the app uses `Settings.Secure` directly (no runtime
+  binder dependency, D-024). The stub is clearly commented TODO(S11) in ShizukuGrantGateway.kt.
+  (Affects S11.)
+
+Append new entries as D-033, D-034, … with which segments they affect.
 
 ## Blockers
 

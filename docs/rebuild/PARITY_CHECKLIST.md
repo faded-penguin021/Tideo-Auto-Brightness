@@ -53,7 +53,7 @@ filled by S1/S2 during extraction.
 | Init/defaults: 570 Initialize AAB Defaults | | | pending |
 | Circadian dynamic scale: 90 (+ polar handling) | | SolarCalculator.kt + DynamicScaleEngine.kt (S6 domain, golden-tested circadian.csv 576 rows, CircadianParityTest + 4 polar assertions); BrightnessEngine delegates computeDynamicScale (D-031) | ported |
 | Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S2 extracted → contexts_spec.md | pending |
-| Privilege detection/grant: 378, 643, 563 | | S2 extracted → features_spec.md | pending |
+| Privilege detection/grant: 378, 643, 563 | | S2 extracted → features_spec.md; platform layer: AndroidPrivilegeManager + ShizukuGrantGateway stub (S7); UI wiring S11 | platform-ported (S7) |
 | QS tile: 551, 552 | | S2 extracted → features_spec.md | pending |
 | Foreground notification: 584, 692 | | S2 extracted → features_spec.md | pending |
 | Curve suggestion wizard: 38, 655 | | CurveSuggestionEngine.kt (S6 domain, golden-tested wizard.csv 12 rows, WizardParityTest); applyToLiveCurve = task655 | ported |
