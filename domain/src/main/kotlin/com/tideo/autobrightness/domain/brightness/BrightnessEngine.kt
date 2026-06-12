@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.domain.brightness
 
+import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
+import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
 import java.math.BigDecimal
 import java.math.RoundingMode
 import kotlin.math.abs
@@ -9,7 +11,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
-import kotlin.math.tanh
 
 class BrightnessEngine {
     fun evaluate(input: BrightnessPolicyInput): BrightnessPolicyOutput {
@@ -149,17 +150,20 @@ class BrightnessEngine {
         return roundN(mappedBrightness * round3(effectiveScale) + cfg.offset, 1)
     }
 
-    fun computeDynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): Double {
-        val progress = if (context.isPolarDayNight) {
-            if (time.sunlightDurationMinutes > 1380.0) 1.0 else 0.0
-        } else {
-            rampProgress(time)
-        }
-        val xFactor = (progress - 0.5) * scaling.steepness
-        val tanhMax = tanh(scaling.steepness / 2.0)
-        val modifier = if (abs(tanhMax) > 0.000001) tanh(xFactor) / tanhMax else 0.0
-        return round3(1.0 + (scaling.spreadPercent / 100.0) * modifier)
-    }
+    fun computeDynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): Double =
+        DynamicScaleEngine.compute(
+            DynamicScaleInput(
+                nowSecOfDay = time.secondsOfDay,
+                morningStart = time.morningStart,
+                morningEnd = time.morningEnd,
+                eveningStart = time.eveningStart,
+                eveningEnd = time.eveningEnd,
+                sunlightDurationMinutes = time.sunlightDurationMinutes,
+                isPolar = context.isPolarDayNight,
+                steepness = scaling.steepness,
+                scaleSpreadPercent = scaling.spreadPercent,
+            )
+        ).scaleDynamic
 
     fun calculateAnimation(alpha: Double, animation: AnimationConfig, cycleTimeMs: Double?): Triple<Int, Long, Long> {
         val clamped = alpha.coerceIn(0.0, 1.0)
@@ -172,32 +176,6 @@ class BrightnessEngine {
             throttle += Math.round(cycleTimeMs)
         }
         return Triple(loops, wait, throttle)
-    }
-
-    private fun rampProgress(time: TimeContext): Double {
-        val now = time.secondsOfDay
-        val next = now + 86400.0
-        val prev = now - 86400.0
-
-        fun inRange(t: Double, start: Double, end: Double): Boolean = t >= start && t < end
-
-        val morningDuration = (time.morningEnd - time.morningStart).coerceAtLeast(1.0)
-        val eveningDuration = (time.eveningEnd - time.eveningStart).coerceAtLeast(1.0)
-
-        return when {
-            inRange(now, time.morningStart, time.morningEnd) -> (now - time.morningStart) / morningDuration
-            inRange(next, time.morningStart, time.morningEnd) -> (next - time.morningStart) / morningDuration
-            inRange(prev, time.morningStart, time.morningEnd) -> (prev - time.morningStart) / morningDuration
-            inRange(now, time.eveningStart, time.eveningEnd) -> 1.0 - ((now - time.eveningStart) / eveningDuration)
-            inRange(next, time.eveningStart, time.eveningEnd) -> 1.0 - ((next - time.eveningStart) / eveningDuration)
-            inRange(prev, time.eveningStart, time.eveningEnd) -> 1.0 - ((prev - time.eveningStart) / eveningDuration)
-            else -> {
-                val isDay = (now >= time.morningEnd && now <= time.eveningStart) ||
-                    (next >= time.morningEnd && next <= time.eveningStart) ||
-                    (prev >= time.morningEnd && prev <= time.eveningStart)
-                if (isDay) 1.0 else 0.0
-            }
-        }.coerceIn(0.0, 1.0)
     }
 
     private fun round3(value: Double): Double = roundN(value, 3)

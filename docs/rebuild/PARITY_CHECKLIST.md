@@ -51,12 +51,12 @@ filled by S1/S2 during extraction.
 | Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic, unit-tested OverrideRulesTest.kt S5); platform wiring + notification S9a | ported (logic) |
 | Panic reset: 528 | | | pending |
 | Init/defaults: 570 Initialize AAB Defaults | | | pending |
-| Circadian dynamic scale: 90 (+ polar handling) | | S2 extracted → tasks/task090_dynamic_scale.md | pending |
+| Circadian dynamic scale: 90 (+ polar handling) | | SolarCalculator.kt + DynamicScaleEngine.kt (S6 domain, golden-tested circadian.csv 576 rows, CircadianParityTest + 4 polar assertions); BrightnessEngine delegates computeDynamicScale (D-031) | ported |
 | Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S2 extracted → contexts_spec.md | pending |
 | Privilege detection/grant: 378, 643, 563 | | S2 extracted → features_spec.md | pending |
 | QS tile: 551, 552 | | S2 extracted → features_spec.md | pending |
 | Foreground notification: 584, 692 | | S2 extracted → features_spec.md | pending |
-| Curve suggestion wizard: 38, 655 | | S2 extracted → tasks/task038_curve_wizard.md + task655 | pending |
+| Curve suggestion wizard: 38, 655 | | CurveSuggestionEngine.kt (S6 domain, golden-tested wizard.csv 12 rows, WizardParityTest); applyToLiveCurve = task655 | ported |
 | Formula validation: 583, 707 | | S2 extracted → features_spec.md | pending |
 | Power draw calibration: 524 | | S2 extracted → features_spec.md | pending |
 | Profiles/import/export/defaults: 592, 637, 622 | | S2 extracted → features_spec.md | pending |
@@ -97,7 +97,7 @@ filled by S1/S2 during extraction.
 |---|---|---|---|---|
 | task105 L8906 · _GetWifiNoLocation | ✓ S1 | | | pending |
 | task378 L9468 · _PrivilegeDetection | ✓ S1 | | | pending |
-| task38 L9921 · _SuggestCurveParameters | ✓ S1 | | | pending |
+| task38 L9921 · _SuggestCurveParameters | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.kt (S6) | ported |
 | task43 L12091 · _EvaluateContexts | ✓ S1 | | | pending |
 | task524 L14246 · _CalibratePowerDraw | ✓ S1 | | | pending |
 | task535 L15204 · Lux Smoothing | ✓ S1 | ✓ S4 | | reference (S5 ports) |
@@ -122,11 +122,11 @@ filled by S1/S2 during extraction.
 | task636 L28993 · _DeleteOverridePoint | ✓ S1 | | | pending |
 | task637 L29303 · _ProfileManager | ✓ S1 | | | pending |
 | task643 L30505 · _LearnWriteSecure | ✓ S1 | | | pending |
-| task655 L32591 · _SetSuggestedVariables | ✓ S1 | | | pending |
+| task655 L32591 · _SetSuggestedVariables | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.applyToLiveCurve (S6) | ported |
 | task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
 | task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 | | reference (S5 ports) |
 | task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | | reference (S5 ports) |
 | task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | | reference (S5 ports) |
 | task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
 | task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |
-| task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | | | pending |
+| task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | ✓ S6 (delegate) | SolarCalculator.kt + DynamicScaleEngine.kt (S6) | ported |
