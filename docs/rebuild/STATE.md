@@ -266,7 +266,38 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (f) `thresholdMidpoint` in DefaultProfiles.Default is 3.0 (from task592), not 4.0 (task570).
   Both values are correct in their respective contexts. (Affects S9a mapper usage, S12 UI.)
 
-Append new entries as D-034, D-035, … with which segments they affect.
+- D-034: S8.5 REVIEW FIXES (S7 surface). (a) **Suppress-echo redesigned**: the S7 token-set
+  scheme (registerExpectedWrite/consume-on-match) had four defects under S9a's N-frame
+  animation: ContentObserver re-reads the CURRENT value so a delayed callback for frame N
+  consumes frame N+1's token (false manual-override pause), CopyOnWriteArraySet collapsed
+  duplicate frame values, no-op writes never notify (orphan tokens), and orphans never expired
+  (stale token could swallow a real user override). Replaced with last-self-write matching:
+  `write()` records the device value; `isSelfWrite(raw)` = equality with the LATEST write, not
+  consumed; `clearSelfWriteMarker()` for pause. This is Tasker-faithful (task567 compares the
+  observed value against %LastAAB). S9a MUST: share one controller instance between writer and
+  observer (per-instance state), and call clearSelfWriteMarker() on pause. (b) OEM
+  normalization: `.toInt()` truncation both directions made write(x)→read() drift −1 on
+  non-255 devices; now Math.round both ways (round-trip identity), clamps on both paths,
+  `deviceMaxOverride` ctor param as test seam. (c) forceManualMode now idempotent (second call
+  no longer overwrites the saved AUTOMATIC mode); savedMode still lost on process death —
+  S9a should persist it if restore-after-crash matters. (d) PrivilegeManager.writeSettingsIntent()
+  added (BASIC grant helper the S7 brief specified). (e) ShizukuGrantGateway: listener now
+  removed on denial too; pre-granted permission honored. (f) ForegroundAppMonitor retains
+  last-known package across polls (trailing 3s window yielded null for apps foregrounded >3s —
+  would have broken S10 app rules); uses ACTIVITY_RESUMED. (g) SecureDimming level clamped
+  0..1000 + success-path/clamp tests; ELEVATED shadow-grant tier test; non-vacuous observer
+  filter test. KNOWN RESIDUAL (S9a): user override landing exactly on the last self-written
+  value is filtered — identical to Tasker %LastAAB behavior, accepted. (Affects S9a, S9b, S10.)
+- D-035: MODEL POLICY from S9a onward — code segments upgraded Sonnet → **Opus** (S9a high;
+  S9b/S10/S11/S12 medium); S13 stays Haiku; S14 already Opus. Owner observed Sonnet sessions
+  compacting (×1) or nearing compaction; in-repo evidence: every Sonnet code segment passed
+  its own acceptance gate yet review later found real defects (S5 → D-030 b: gate polarity +
+  newest-first order; S7 → D-034 a/b). Golden-vector parity caught none of these because they
+  live in glue/platform code outside the vectors — exactly where reviewer attention, not test
+  coverage, is the safety net. Compaction events must now be recorded in segment-log rows.
+  (Affects S9a…S12 session directives.)
+
+Append new entries as D-036, D-037, … with which segments they affect.
 
 ## Blockers
 

@@ -100,18 +100,18 @@ filled by S1/S2 during extraction.
 | task38 L9921 · _SuggestCurveParameters | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.kt (S6) | ported |
 | task43 L12091 · _EvaluateContexts | ✓ S1 | | | pending |
 | task524 L14246 · _CalibratePowerDraw | ✓ S1 | | | pending |
-| task535 L15204 · Lux Smoothing | ✓ S1 | ✓ S4 | | reference (S5 ports) |
-| task543 L15878 · Calculate Animation | ✓ S1 | ✓ S4 | | reference (S5 ports) |
-| task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | | reference (S5 ports) |
-| task546 L16481 · Set Thresholds | ✓ S1 | ✓ S4 | | reference (S5 ports) |
-| task548 L16630 · DR Compressed Scale | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task535 L15204 · Lux Smoothing | ✓ S1 | ✓ S4 | BrightnessEngine.smoothLux (S5) | ported |
+| task543 L15878 · Calculate Animation | ✓ S1 | ✓ S4 | BrightnessEngine.calculateAnimation (S5) | ported |
+| task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | BrightnessEngine.dynamicThreshold (S5) | ported |
+| task546 L16481 · Set Thresholds | ✓ S1 | ✓ S4 | BrightnessEngine.absoluteThresholds (S5) | ported |
+| task548 L16630 · DR Compressed Scale | ✓ S1 | ✓ S4 | BrightnessEngine.compressedDynamicScale (S5) | ported |
 | task549 L17138 · _GenerateCircadianGraph | ✓ S1 | | | pending |
-| task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | BrightnessEngine.kt ingest (S5) | ported |
 | task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | | pending |
 | task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | | pending |
 | task563 L19677 · _AskPermissionsV7 | ✓ S1 | | | pending |
 | task592 L24132 · _CreateDefaultProfiles | ✓ S1 | | | pending |
-| task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | ✓ S4 | InitialBrightness.kt (S5) | ported |
 | task620 L26400 · _AdaptiveBrightnessSceneSize | ✓ S1 | | | pending |
 | task623 L26926 · _ContextManager | ✓ S1 | | | pending |
 | task625 L27185 · _AppPicker | ✓ S1 | | | pending |
@@ -124,9 +124,9 @@ filled by S1/S2 during extraction.
 | task643 L30505 · _LearnWriteSecure | ✓ S1 | | | pending |
 | task655 L32591 · _SetSuggestedVariables | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.applyToLiveCurve (S6) | ported |
 | task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
-| task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 | | reference (S5 ports) |
-| task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | | reference (S5 ports) |
-| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | | reference (S5 ports) |
+| task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 (cross-validation oracle, D-002) | chart render = S13 BrightnessCurveChart | reference (chart S13) |
+| task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | runtime write loop = S9a AnimationRunner | reference (S9a ports) |
+| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime write loop = S9a AnimationRunner | reference (S9a ports) |
 | task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
 | task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |
 | task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | ✓ S6 (delegate) | SolarCalculator.kt + DynamicScaleEngine.kt (S6) | ported |
