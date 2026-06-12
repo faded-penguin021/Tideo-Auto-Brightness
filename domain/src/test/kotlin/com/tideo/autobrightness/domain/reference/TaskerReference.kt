@@ -287,6 +287,90 @@ object TaskerReference {
     fun setInitialBrightness(rawLux: Double): InitialBrightnessResult =
         InitialBrightnessResult(jround(rawLux), Math.round(rawLux * 100.0) / 100.0)
 
+    // ---- task700 "Software Dimming V2" (code-547 DoMaths) -----------------------------------
+    // XML L36474-L36712. par1 = target brightness; all Variable Set / If / Else — no Java block.
+    // Reference for [SoftwareDimming.finalDimLevel].
+
+    /**
+     * Oracle for task700 acts 0-25: compute reduce_bright_colors dim level for a target brightness.
+     *
+     * @param par1              Target brightness (%par1 in task700).
+     * @param isElevated        %AAB_Privilege != None.
+     * @param dimmingThreshold  %AAB_DimmingThreshold.
+     * @param pwmExp            %AAB_PWMExp.
+     */
+    fun finalDimLevel(par1: Double, isElevated: Boolean, dimmingThreshold: Double, pwmExp: Double): Double {
+        // act0-4: max_dim
+        val maxDim = if (isElevated) 99.0 else 252.45
+        // act5-8: safe_thresh = max(DimmingThreshold, 1)
+        var safeThresh = dimmingThreshold
+        if (safeThresh < 1.0) safeThresh = 1.0
+        // act9: dark_floor = 0.95
+        val darkFloor = 0.95
+        // act10: k_factor = (1 - dark_floor) ^ (1 / PWMExp)
+        val kFactor = (1.0 - darkFloor).pow(1.0 / pwmExp)
+        // act11-14: bias = (k_factor * safe_thresh) / (1 - k_factor), floor 10
+        var bias = (kFactor * safeThresh) / (1.0 - kFactor)
+        if (bias < 10.0) bias = 10.0
+        // act15-18: ratio = (par1 + bias) / (safe_thresh + bias), cap 1
+        var ratio = (par1 + bias) / (safeThresh + bias)
+        if (ratio > 1.0) ratio = 1.0
+        // act19: final_dim = max_dim * (1 - ratio ^ PWMExp)
+        var finalDim = maxDim * (1.0 - ratio.pow(pwmExp))
+        // act20-24: safety clamps (should never trigger mathematically; prevent black screens)
+        if (finalDim > maxDim && isElevated) finalDim = 99.0
+        else if (!isElevated && finalDim > maxDim) finalDim = 253.0
+        return finalDim
+    }
+
+    // ---- task646/647 "Calculate Super Dimming" acts 2-16 ------------------------------------
+    // task646 XML L31026-L31289 (privileged), task647 L31290-L31586 (unprivileged).
+    // Both share the same dim_progress → clamped_strength → dim_shell math; the downstream
+    // "Apply Dimming" sub-task (platform privilege call) is out of scope here.
+    // Reference for [SoftwareDimming.dimProgress] / [SoftwareDimming.dimShell].
+
+    data class DimProgressResult(val dimProgress: Double, val dimShell: Double)
+
+    /**
+     * Oracle for task646 acts 2-16 / task647 acts 2-15: compute dim_progress and dim_shell.
+     *
+     * Note: task646/647 only enter this path when target_brightness < dimmingThreshold (act0/1 gate).
+     * There is NO span<=0 guard in the Tasker source (D-030).
+     *
+     * @param targetBrightness   %AAB_CurrentBright (already validated < dimmingThreshold by caller gate).
+     * @param minBright          %AAB_MinBright.
+     * @param dimmingThreshold   %AAB_DimmingThreshold.
+     * @param dimmingExponent    %AAB_DimmingExponent.
+     * @param dimmingStrength    %AAB_DimmingStrength.
+     * @param dimDynamic         %AAB_DimDynamic (only applied when scalingUse=true).
+     * @param scalingUse         %AAB_ScalingUse = true.
+     */
+    fun dimProgressAndShell(
+        targetBrightness: Double,
+        minBright: Double,
+        dimmingThreshold: Double,
+        dimmingExponent: Double,
+        dimmingStrength: Double,
+        dimDynamic: Double,
+        scalingUse: Boolean,
+    ): DimProgressResult {
+        // act3 (task646) / act2 (task647): dim_progress formula (DoMaths, no span guard)
+        var dimProgress = (1.0 - (targetBrightness - minBright) / (dimmingThreshold - minBright)).pow(dimmingExponent)
+        // act4/3: clamp < 0
+        if (dimProgress < 0.0) dimProgress = 0.0
+        // act5/4: clamp > 1
+        if (dimProgress > 1.0) dimProgress = 1.0
+        // act6-10: clamped_strength via ScalingUse branch
+        var clampedStrength = if (scalingUse) dimmingStrength * dimDynamic else dimmingStrength
+        // act11/10: cap 65
+        if (clampedStrength > 65.0) clampedStrength = 65.0
+        // act13/12: floor 0
+        else if (clampedStrength < 0.0) clampedStrength = 0.0
+        // act16/15: dim_shell = clamped_strength * dim_progress
+        val dimShell = clampedStrength * dimProgress
+        return DimProgressResult(dimProgress, dimShell)
+    }
+
     // ---- task696 "Smooth Brightness Transition V5 (Java)" — per-frame pure math ----------
     // Java L35734-L35886. progress = counter/loops; interpolate start→target; round+clamp [0,255].
     fun transitionFrameBrightness(startBrightness: Double, targetBrightness: Double, counter: Int, loops: Int): Int {

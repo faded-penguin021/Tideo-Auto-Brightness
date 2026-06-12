@@ -4,10 +4,14 @@ S4 built the Tasker reference oracle (`domain/src/test/.../reference/TaskerRefer
 committed golden vectors (`domain/src/test/resources/golden/*.csv`). `CorePipelineParityTest`
 asserts the current production `BrightnessEngine` against those vectors at tolerance `1e-9`.
 
-Every row below is a parity test that currently DIVERGES from the oracle, marked
-`@Ignore("S5: gap-NN")` **individually**. S5 closes each gap by fixing production code (never by
-editing the reference or the vectors — those are immutable except for evidence-backed extraction
-corrections, logged in STATE.md). Gap count == `@Ignore` count == 7 (acceptance cross-check).
+**Status (S5 closed all 7 gaps):** 0 `@Ignore` annotations remain in `domain/src/test`. All
+production engine helpers (`smoothLux`, `dynamicThreshold`, `absoluteThresholds`,
+`mapLuxToBrightness`, `compressedDynamicScale`, `calculateAnimation`, `BrightnessFormulae`) pass
+their golden-vector parity tests at 1e-9. `SoftwareDimming` (`finalDimLevel`, `dimShell`) is
+additionally covered by `superdimming.csv` (2016 rows). `OverrideRules` and `InitialBrightness`
+are covered by dedicated unit-test classes. See STATE.md D-030 for residual deviations.
+
+The rows below are preserved as a historical record of each gap's root cause and S5 fix.
 
 ## Root-cause summary
 

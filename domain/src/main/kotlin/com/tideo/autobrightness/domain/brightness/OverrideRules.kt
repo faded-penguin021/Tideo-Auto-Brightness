@@ -76,30 +76,34 @@ object OverrideRules {
     /**
      * Record a manual override point (lux, brightness pair) into the capped override history.
      *
-     * Tasker: task561 "Process Overrides" — maintains %AAB_Overrides array capped at 50 entries;
-     * oldest entry deleted when limit exceeded (acts 12-15 top_of_loop). When dynamic compression
-     * is active, stores the de-compressed base brightness (BRIGHT / ScaleDynamicCompress).
+     * Tasker: task561 "Process Overrides" — maintains %AAB_Overrides array capped at 50 entries.
+     * New entries are inserted at position 1 (code355 Array Push, act6/9 — newest-first ordering).
+     * Oldest entries are deleted from the tail when the array exceeds 50 (acts 12-15 top_of_loop).
+     * When BOTH ScalingUse=true AND ScaleDynamicCompress!=0 (act0 gate), stores the de-compressed
+     * base brightness (BRIGHT / ScaleDynamicCompress, capped at 255 per act3-5).
      *
-     * @param history           Existing override points (lux → brightness).
-     * @param lux               Current smoothed lux.
-     * @param brightness        Observed brightness (raw BRIGHT, or de-compressed when [dynamicCompress] != 0).
-     * @param dynamicCompress   %AAB_ScaleDynamicCompress — non-zero means dynamic scaling is active.
+     * @param history           Existing override points (newest at index 0).
+     * @param lux               Current smoothed lux (%SmoothedLux).
+     * @param brightness        Observed brightness (%BRIGHT).
+     * @param dynamicCompress   %AAB_ScaleDynamicCompress.
+     * @param scalingUse        %AAB_ScalingUse — must be true alongside non-zero compress to de-compress.
      * @param maxEntries        Maximum history size (50 in Tasker).
-     * @return                  Updated override history with the new entry appended; oldest dropped if full.
+     * @return                  Updated override history with the new entry at index 0; oldest dropped if full.
      */
     fun recordOverridePoint(
         history: List<Pair<Double, Double>>,
         lux: Double,
         brightness: Double,
         dynamicCompress: Double,
+        scalingUse: Boolean,
         maxEntries: Int = 50,
     ): List<Pair<Double, Double>> {
-        val idealBase = if (dynamicCompress != 0.0) {
-            (brightness / dynamicCompress).coerceAtMost(255.0)
-        } else {
-            brightness
-        }
-        val updated = history + (lux to idealBase)
-        return if (updated.size > maxEntries) updated.drop(updated.size - maxEntries) else updated
+        // act0: ScalingUse=true AND ScaleDynamicCompress!=0 → de-compress
+        var idealBase = if (scalingUse && dynamicCompress != 0.0) brightness / dynamicCompress else brightness
+        // act3-5: cap at 255
+        if (idealBase > 255.0) idealBase = 255.0
+        // act6/9: Array Push at index 1 → newest-first; acts 12-15: drop oldest from tail
+        val updated = listOf(lux to idealBase) + history
+        return if (updated.size > maxEntries) updated.take(maxEntries) else updated
     }
 }

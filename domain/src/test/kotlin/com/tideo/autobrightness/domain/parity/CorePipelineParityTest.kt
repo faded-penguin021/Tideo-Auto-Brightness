@@ -4,6 +4,7 @@ import com.tideo.autobrightness.domain.brightness.AnimationConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
+import com.tideo.autobrightness.domain.brightness.SoftwareDimming
 import com.tideo.autobrightness.domain.brightness.ThresholdConfig
 import com.tideo.autobrightness.domain.reference.GoldenVectorGenerator
 import com.tideo.autobrightness.domain.reference.TaskerReference
@@ -192,6 +193,42 @@ class CorePipelineParityTest {
         lux < v.zone1End -> v.form1a * Math.sqrt(lux)
         lux < v.zone2End -> v.form2a + v.form2b * (Math.pow(lux - v.form2c, 0.33) - Math.pow(v.zone1End - v.form2c, 0.33))
         else -> v.maxBright - (v.form3a / lux) * v.maxBright
+    }
+
+    // ---- software dimming: finalDimLevel (task700) -----------------------------------------
+    @Test
+    fun softwareDimming_finalDimLevel_matchesOracle() {
+        for (r in golden("superdimming.csv")) {
+            val fd = SoftwareDimming.finalDimLevel(
+                targetBrightness = r.d("targetBrightness"),
+                isElevated = r["isElevated"] == "true",
+                dimmingThreshold = r.d("dimmingThreshold"),
+                pwmExp = r.d("pwmExp"),
+            )
+            assertEquals(r.d("finalDim"), fd, tol, "tb=${r["targetBrightness"]} elev=${r["isElevated"]}")
+        }
+    }
+
+    // ---- super dimming shell (task646/647) -------------------------------------------------
+    @Test
+    fun softwareDimming_dimShell_matchesOracle() {
+        val mismatches = mutableListOf<String>()
+        for (r in golden("superdimming.csv")) {
+            val scalingUse = r["scalingUse"] == "true"
+            val dimDynamic = if (scalingUse) r.d("dimDynamic") else null
+            val shell = SoftwareDimming.dimShell(
+                brightness = r.d("targetBrightness"),
+                minBrightness = r.d("minBright"),
+                dimmingThreshold = r.d("dimmingThreshold"),
+                dimmingExponent = r.d("dimmingExponent"),
+                dimmingStrength = r.d("dimmingStrength"),
+                dimDynamic = dimDynamic,
+            )
+            if (abs(shell - r.d("dimShell")) > tol) {
+                mismatches += "tb=${r["targetBrightness"]} su=${r["scalingUse"]} engine=$shell ref=${r["dimShell"]}"
+            }
+        }
+        if (mismatches.isNotEmpty()) fail("dimShell diverges in ${mismatches.size} rows; e.g. ${mismatches.first()}")
     }
 
     @Test

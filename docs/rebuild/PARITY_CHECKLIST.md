@@ -44,11 +44,11 @@ filled by S1/S2 during extraction.
 | Continuity coefficients: 659 _UpdateBrightnessFormulae | | TaskerReference + formulae.csv (S4) + BrightnessFormulae.kt (S5) | ported |
 | Animation calc: 543 | | TaskerReference + animation.csv (S4) + BrightnessEngine.calculateAnimation (S5) | ported |
 | Brightness transitions: 696, 698 | | TaskerReference + transition.csv/dimming.csv (S4) | reference (S9a ports) |
-| Software/super dimming math: 700, 645, 646, 647 | | SoftwareDimming.kt (S5 math); 650/653/654/644 privilege writes platform (S9b) | ported (math) |
-| Initial brightness on wake: 618 | | TaskerReference (S4) + InitialBrightness.kt (S5) | ported |
+| Software/super dimming math: 700, 645, 646, 647 | | SoftwareDimming.kt (S5 math, golden-tested superdimming.csv 2016 rows, CorePipelineParityTest); 650/653/654/644 privilege writes platform (S9b) | ported (math) |
+| Initial brightness on wake: 618 | | TaskerReference (S4) + InitialBrightness.kt (S5) + InitialBrightnessTest.kt (S5) | ported |
 | Hibernate/reset: 585 | | | pending |
 | Throttle reset: 566 | | | pending |
-| Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic); platform wiring + notification S9a | ported (logic) |
+| Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic, unit-tested OverrideRulesTest.kt S5); platform wiring + notification S9a | ported (logic) |
 | Panic reset: 528 | | | pending |
 | Init/defaults: 570 Initialize AAB Defaults | | | pending |
 | Circadian dynamic scale: 90 (+ polar handling) | | S2 extracted → tasks/task090_dynamic_scale.md | pending |

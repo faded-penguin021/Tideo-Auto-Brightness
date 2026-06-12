@@ -189,6 +189,41 @@ object GoldenVectorGenerator {
         File(dir, "dimming.csv").writeText(rows.toString())
     }
 
+    fun writeSuperdimming(dir: File) {
+        val rows = StringBuilder(
+            "targetBrightness,isElevated,dimmingThreshold,pwmExp,minBright,dimmingExponent," +
+                "dimmingStrength,dimDynamic,scalingUse,finalDim,dimProgress,dimShell\n",
+        )
+        val brightnessGrid = listOf(0.0, 4.0, 10.0, 30.0, 100.0, 200.0, 255.0)
+        val elevatedGrid = listOf(false, true)
+        val thresholdGrid = listOf(5.0, 20.0)
+        val pwmExpGrid = listOf(1.5, 2.0, 3.0)
+        val minBrightGrid = listOf(1.0, 10.0)
+        val dimExpGrid = listOf(1.0, 2.0)
+        val strengthGrid = listOf(10.0, 65.0)
+        val dimDynGrid = listOf(1.0, 2.0)
+        val scalingUseGrid = listOf(false, true)
+        for (tb in brightnessGrid)
+            for (elev in elevatedGrid)
+            for (thresh in thresholdGrid)
+            for (pwm in pwmExpGrid)
+            for (minB in minBrightGrid)
+            for (dimExp in dimExpGrid)
+            for (str in strengthGrid)
+            for (dd in dimDynGrid)
+            for (su in scalingUseGrid) {
+                // Skip invalid config: DimmingThreshold must exceed MinBright (D-030: span<=0 guard)
+                if (thresh <= minB) continue
+                val fd = TaskerReference.finalDimLevel(tb, elev, thresh, pwm)
+                val ds = TaskerReference.dimProgressAndShell(tb, minB, thresh, dimExp, str, dd, su)
+                rows.append(
+                    "${fmt(tb)},$elev,${fmt(thresh)},${fmt(pwm)},${fmt(minB)},${fmt(dimExp)}," +
+                        "${fmt(str)},${fmt(dd)},$su,${fmt(fd)},${fmt(ds.dimProgress)},${fmt(ds.dimShell)}\n",
+                )
+            }
+        File(dir, "superdimming.csv").writeText(rows.toString())
+    }
+
     fun generateAll(dir: File) {
         dir.mkdirs()
         writeMapping(dir)
@@ -199,6 +234,7 @@ object GoldenVectorGenerator {
         writeAnimation(dir)
         writeTransition(dir)
         writeDimming(dir)
+        writeSuperdimming(dir)
     }
 }
 
