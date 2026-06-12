@@ -2,7 +2,9 @@ package com.tideo.autobrightness.platform.privilege
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,8 @@ interface PrivilegeManager {
     fun adbGrantInstruction(): String
     fun tryGrantViaRoot(): Boolean
     fun requestShizukuGrant()
+    /** Intent for the BASIC grant: system "Modify system settings" screen for this app. */
+    fun writeSettingsIntent(): Intent
 }
 
 class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
@@ -40,6 +44,9 @@ class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
     override fun refresh() {
         _tierFlow.value = detectTier()
     }
+
+    override fun writeSettingsIntent(): Intent =
+        Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${context.packageName}"))
 
     override fun adbGrantInstruction(): String =
         "adb shell pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS"

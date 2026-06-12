@@ -25,7 +25,7 @@ class AndroidSecureDimmingController(
         if (privilegeManager.currentTier() < Tier.ELEVATED) {
             return Result.failure(SecurityException("WRITE_SECURE_SETTINGS not granted"))
         }
-        Settings.Secure.putInt(resolver, "reduce_bright_colors_level", level)
+        Settings.Secure.putInt(resolver, "reduce_bright_colors_level", level.coerceIn(0, 1000))
         return Result.success(Unit)
     }
 

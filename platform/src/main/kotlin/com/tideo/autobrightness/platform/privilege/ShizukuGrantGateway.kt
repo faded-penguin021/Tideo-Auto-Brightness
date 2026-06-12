@@ -29,12 +29,26 @@ object ShizukuGrantGateway {
      */
     fun requestGrant(context: Context, onGranted: () -> Unit) {
         if (!isAvailable()) return
+        val alreadyGranted = try {
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        } catch (_: Exception) {
+            false
+        }
+        if (alreadyGranted) {
+            // TODO (S11): exec via Shizuku user-service:
+            // "pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS"
+            onGranted()
+            return
+        }
         val listener = object : Shizuku.OnRequestPermissionResultListener {
             override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
-                if (requestCode == REQUEST_CODE && grantResult == PackageManager.PERMISSION_GRANTED) {
+                if (requestCode != REQUEST_CODE) return
+                // Remove on ANY result for our code — leaving it registered on denial leaks
+                // the listener and re-fires it on unrelated future requests.
+                Shizuku.removeRequestPermissionResultListener(this)
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
                     // TODO (S11): exec via Shizuku user-service:
                     // "pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS"
-                    Shizuku.removeRequestPermissionResultListener(this)
                     onGranted()
                 }
             }
