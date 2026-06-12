@@ -75,7 +75,7 @@ dimming. Shizuku is used only in the grant flow, never as a runtime binder depen
   not stale — but it has zero action-level or scene detail; treat as reference only.
 - Salvage KEEP list: `domain/.../brightness/BrightnessEngine.kt` (+tests),
   `app/.../settings/AabSettings.kt`, `TaskerLegacyProfileSerializer.kt`, SettingsStore/
-  AppDataStores, module split, runtime scaffolding shapes. DISCARD list (deleted by S3/S9):
+  AppDataStores, module split, runtime scaffolding shapes. DISCARD list (deleted by S3/S9b):
   toy `BrightnessPolicyEngine` + `EvaluateAndApplyBrightnessUseCase` + `Ports.kt`, everything
   in `data/`, `platform/SystemAdapters.kt` fakes, `WebViewGraphFallback`,
   `PermissionOnboardingStateMachine`.
@@ -92,6 +92,14 @@ dimming. Shizuku is used only in the grant flow, never as a runtime binder depen
   task545 sets %AAB_Proximity near/far → damps LuxAlpha ×0.1, never pauses. prof769 panic =
   upside-down + shake. 168/276 tasks are anonymous scene handlers → see
   extraction/tasks/anonymous_handlers.md. Never read Tasker prefs (adbwp) in the rebuild.
+- S3.6 peer-review adoptions (D-027): S9 split into S9a (pipeline core + service) and S9b
+  (dimming wiring, tile, boot receiver, legacy rip-out) — Gate 1 after S9b. Runtime concurrency
+  model is BINDING: single pipeline coroutine, one event runs to completion (incl. animation),
+  events arriving mid-cycle are DROPPED not queued (prof760's %AAB_MainLoop clause is Tasker's
+  re-entry mutex, D-021). Profile gates = hardcoded Kotlin booleans with provenance + a
+  truth-table test; no generic ConditionList evaluator. S8 preconditions now include S2.
+  S4 has an explicit code-547 maths transcription protocol (cross-validate task661 vs task663;
+  disagreements → parity_gaps.md, never guess). S12 starts with an anonymous-handler triage.
 
 ## Coding conventions
 

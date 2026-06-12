@@ -12,13 +12,15 @@ Models are Opus / Sonnet / Haiku at reasoning effort low / medium / high. Where 
 
 ```
 S0 ─┬─ S1 ─┬──────────── S4 ── S5 ─┬─ S6 ─────┐
-    ├─ S2 ─┤(S2 feeds S6,S10,S12+) ├─ S7 ─────┼─ S9 ─┬─ S10 ─┬─ S12 ── S13 ── S14
-    └─ S3 ─┴─(gates all builds)────┴─ S8 ─────┘GATE1 └─ S11 ─┘ GATE2          GATE3
+    ├─ S2 ─┤(S2 feeds S6,S8,S10,S12+) S7 ─────┼─ S9a ── S9b ─┬─ S10 ─┬─ S12 ── S13 ── S14
+    └─ S3 ─┴─(gates all builds)────┴─ S8 ─────┘        GATE1 └─ S11 ─┘ GATE2          GATE3
 ```
 
 Parallel windows (disjoint files; if raced, `git pull --rebase` before push):
-**A:** S1 ∥ S2 ∥ S3 · **B:** S6 ∥ S7 ∥ S8 (after S5; S6 also needs S2) · **C:** S10 ∥ S11 (after S9).
-Serial spine: S0 → A → S4 → S5 → B → S9 → C → S12 → S13 → S14.
+**A:** S1 ∥ S2 ∥ S3 · **B:** S6 ∥ S7 ∥ S8 (after S5; S6 and S8 also need S2) ·
+**C:** S10 ∥ S11 (after S9b).
+Serial spine: S0 → A → S4 → S5 → B → S9a → S9b → C → S12 → S13 → S14.
+(S9 was split into S9a/S9b in S3.6 — see D-027.)
 
 ## Global failure protocol
 
@@ -196,10 +198,10 @@ compose BOM, minimal res/ (kills the `R.mipmap.ic_launcher` blocker), correct ma
 9. `:platform` → `com.android.library` (namespace `com.tideo.autobrightness.platform`,
    minSdk 31, compileSdk 35, Robolectric-ready: `testOptions.unitTests
    { isIncludeAndroidResources = true; isReturnDefaultValues = true }`). Keep
-   `SystemAdapters.kt` compiling as-is (deleted in S9, not now).
+   `SystemAdapters.kt` compiling as-is (deleted in S9b, not now).
 10. Retire `:data`: `grep -rn "autobrightness.data" app domain platform` — if (expected) zero
    references: remove from `settings.gradle.kts`, `git rm -r data/`. If referenced: record in
-   STATE.md and defer deletion to S9.
+   STATE.md and defer deletion to S9b.
 11. Lint baseline: `./gradlew :app:lintDebug` → commit `app/lint-baseline.xml`
     (`lint { baseline = file("lint-baseline.xml") }`). Policy: baseline never grows.
 12. STATE.md (record exact final version matrix) + checklist untouched (no parity rows here) +
@@ -252,6 +254,16 @@ continuity math), `pipeline_spec.md`, `defaults_audit.md`;
 
 **Non-goals:** Do NOT fix `BrightnessEngine` (S5's job). No circadian/wizard (S6). No app/
 platform changes. No gradle changes beyond (if needed) a test-resources stanza.
+
+**Expression transcription protocol (code-547 maths — task661 curve math, task659 continuity;
+D-002/D-027):** Java blocks get verbatim decode, but Variable Set maths expressions need their
+own discipline: (a) start from the verbatim expression in the extraction doc; (b) write the
+parse tree you inferred into the function's provenance comment (note operator precedence/
+associativity assumptions explicitly); (c) cross-validate the task661 transcription against
+task663's plot-side Java copy of the same 3-zone formula (CLAUDE.md ledger) by running both
+over the golden lux grid; (d) if 661 and 663 disagree on any row, record both values in
+`parity_gaps.md` and re-derive from the XML via recipes — NEVER pick one by guessing. This is
+the highest-risk transcription in the program: a divergence here is wrong brightness everywhere.
 
 **Steps:** transcribe block-by-block with the original Java in a side comment where subtle;
 sanity-test each reference function against hand-computed values from XML comments/Flash
@@ -380,9 +392,9 @@ as interface + impl + Robolectric/fake test):
   `context/WifiInfoReader.kt` (`ConnectivityManager.registerNetworkCallback` with
   `FLAG_INCLUDE_LOCATION_INFO`, read `transportInfo as WifiInfo` SSID; document
   FINE_LOCATION requirement).
-- Mark `SystemAdapters.kt` classes `@Deprecated("S9 removes")` (toy loop still uses them).
+- Mark `SystemAdapters.kt` classes `@Deprecated("S9b removes")` (toy loop still uses them).
 
-**Non-goals:** No service/runtime rewiring (S9), no UI, no context POLICY (S10 — you build
+**Non-goals:** No service/runtime rewiring (S9a/S9b), no UI, no context POLICY (S10 — you build
 readers only), no deletion of fakes.
 
 **Acceptance:** `./gradlew :platform:test :app:assembleDebug` green. Robolectric coverage:
@@ -398,8 +410,9 @@ sensor source covered by a fake-driven flow test (Robolectric sensors are limite
 
 ## S8 — Settings schema v2, persistence, import/export
 
-**Model:** Sonnet / medium · **Size:** medium · **Preconditions:** S1 DONE, S5 DONE.
-Parallel window B.
+**Model:** Sonnet / medium · **Size:** medium · **Preconditions:** S1 DONE, S2 DONE
+(features_spec.md carries the 583/707 validation rules + 592/637/622 import/export semantics),
+S5 DONE. Parallel window B.
 
 **Objective:** Close every settings-schema gap, version the schema with migration, make
 import/export + default profiles real, expose validation for the UI.
@@ -425,18 +438,33 @@ round-trip + validator tests; pushed.
 
 ---
 
-## S9 — Runtime integration: the real pipeline service (+ legacy rip-out)
+## S9a — Runtime core: the real pipeline service
 
 **Model:** Sonnet / high (Opus / medium if budget allows — cheapest insurance before Gate 1)
-· **Size:** large · **Preconditions:** S5, S6, S7, S8 all DONE.
+· **Size:** large · **Preconditions:** S5, S6, S7, S8 all DONE. (Split from the original S9
+per D-027 so the parity-critical core can land/block independently of features+cleanup.)
 
 **Objective:** Rebuild the runtime as the sensor-event-driven Tasker pipeline with animated
-writes, override detect/resume, hibernate, throttle, panic, boot start, QS tile, actionable
-notification; delete every legacy fake.
+writes, override detect/resume, hibernate, throttle, panic, actionable notification.
 
 **Inputs:** `pipeline_spec.md` (THE spec), extraction docs for 554/544/535/661/548/543/696/
-698/700/618/585/566/567/569/561/528/551/584, all S7 adapters, S8 mapper, existing
-`app/.../runtime/*`.
+698/700/618/585/566/567/569/561/528/584, `extraction/profiles.md` (D-021 grouping), all S7
+adapters, S8 mapper, existing `app/.../runtime/*`.
+
+**Concurrency model (BINDING, D-027):** the pipeline is serialized — a single pipeline
+coroutine processes one event to completion (including its animation frames) before looking at
+the next. Sensor events arriving mid-cycle are **DROPPED, not queued** — this is exactly what
+prof760's `%AAB_MainLoop != On` clause does in Tasker (a re-entry mutex, D-021): the profile
+simply doesn't fire while a cycle runs. Implement as a busy-gate (e.g. `Channel` with
+drop-when-busy `trySend`, or an atomic in-cycle flag); the MainLoop flag maps to it 1:1. All
+runtime state (smoothedLux, lastRawLux, thresholds, cycleTime…) lives in one state holder
+written ONLY from the pipeline coroutine; other coroutines (UI, notification) read via
+StateFlow snapshots. No state writes from observer/animation callbacks — they signal the
+pipeline coroutine instead.
+
+**Profile-gate strategy (D-027):** HARDCODE each profile's ConditionList as a Kotlin boolean
+expression with a provenance comment showing the D-021 parenthesization — do NOT build a
+generic ConditionList evaluator (we port fixed profiles, not a Tasker runtime).
 
 **Deliverables:**
 1. `app/.../runtime/BrightnessPipelineController.kt` — owns Tasker runtime state (smoothedLux,
@@ -453,20 +481,52 @@ notification; delete every legacy fake.
    actions Pause/Resume/Disable + panic-reset (528: restore sane brightness, clear state);
    SCREEN_OFF → hibernate (sensor unregister, state reset per 585), SCREEN_ON → reinit
    (throttle reset 566 + initial brightness 618 via domain `InitialBrightness`).
-5. Super dimming: below threshold engage `SecureDimmingController` (math from domain
-   `SoftwareDimming`) when tier ELEVATED; clean disengage path (645–654 semantics).
-6. `runtime/BrightnessTileService.kt` — `TileService` toggling the service; manifest entry
+5. Gate truth-table unit test (D-027): construct the prof760 AND prof758 condition expressions
+   exactly per D-021 grouping and assert true/false for every branch of each clause — a
+   mis-parenthesized gate silently suppresses sensor events and no other test catches it.
+6. Robolectric/unit tests: service start → foreground notification posted; SCREEN_OFF/ON
+   hibernate/reinit (sensor flow subscription state); observer event → paused state; pipeline
+   controller unit-tested with fake adapters end-to-end (lux sequence → expected write
+   sequence from goldens); mid-cycle event is dropped (concurrency model assertion).
+
+**Non-goals:** Super dimming wiring, QS tile, boot receiver, legacy rip-out (ALL S9b).
+Context-override policy (S10), UI screens (S11/S12), onboarding flow (S11).
+
+**Acceptance:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :domain:test
+:platform:test :app:lintDebug` green (legacy fakes still present — S9b deletes them); pushed.
+
+**Failure notes:** `ForegroundServiceTypeException` on start → re-check manifest property +
+type flag pairing. If blocked, S9b can still NOT proceed (it deletes code S9a's graph replaces)
+— log BLOCKED and recommend escalation.
+
+---
+
+## S9b — Runtime features + legacy rip-out
+
+**Model:** Sonnet / high · **Size:** medium · **Preconditions:** S9a DONE. Same window —
+ideally the immediately following session.
+
+**Objective:** Finish the runtime surface (super dimming, QS tile, boot start) and delete
+every legacy fake, then declare Gate 1.
+
+**Inputs:** extraction docs 645–654/700 (dimming), 551 (tile), `features_spec.md`;
+S9a runtime; `AppModule.kt`.
+
+**Deliverables:**
+1. Super dimming: below threshold engage `SecureDimmingController` (math from domain
+   `SoftwareDimming`) when tier ELEVATED; clean disengage path (645–654 semantics); wired
+   into the S9a pipeline cycle (writes happen from the pipeline coroutine — see S9a
+   concurrency model).
+2. `runtime/BrightnessTileService.kt` — `TileService` toggling the service; manifest entry
    with `android.permission.BIND_QUICK_SETTINGS_TILE` + icon.
-7. `BootCompletedReceiver` — start service if enabled (specialUse FGS is boot-eligible;
+3. `BootCompletedReceiver` — start service if enabled (specialUse FGS is boot-eligible;
    if start fails log + post notification prompting open).
-8. RIP-OUT: delete `domain/BrightnessPolicyEngine.kt`, `domain/EvaluateAndApplyBrightnessUseCase.kt`,
+4. RIP-OUT: delete `domain/BrightnessPolicyEngine.kt`, `domain/EvaluateAndApplyBrightnessUseCase.kt`,
    `domain/Ports.kt`, `platform/SystemAdapters.kt`, `app/ui/graph/WebViewGraphFallback.kt`,
    `app/onboarding/PermissionOnboardingStateMachine.kt`, leftover `data/` references; rewrite
    `AppModule.kt` composing the real graph; keep `ServiceHealthStore` telemetry.
-9. Robolectric tests: service start → foreground notification posted; SCREEN_OFF/ON
-   hibernate/reinit (sensor flow subscription state); observer event → paused state;
-   tile instantiation; pipeline controller unit-tested with fake adapters end-to-end
-   (lux sequence → expected write sequence from goldens).
+5. Robolectric tests: tile instantiation; boot receiver → service start intent; dimming
+   engage/disengage tier-gated.
 
 **Non-goals:** Context-override policy (S10), UI screens (S11/S12), onboarding flow (S11).
 
@@ -475,15 +535,15 @@ notification; delete every legacy fake.
 EvaluateAndApplyBrightnessUseCase" app domain platform` → empty; STATE.md row notes "GATE 1
 READY"; pushed. → **HUMAN GATE 1** (checklist below).
 
-**Failure notes:** `ForegroundServiceTypeException` on start → re-check manifest property +
-type flag pairing; Robolectric TileService gaps → downgrade to instantiation-only test +
-STATE.md note.
+**Failure notes:** Robolectric TileService gaps → downgrade to instantiation-only test +
+STATE.md note. If rip-out breaks compilation in ways out of scope, prefer reverting the
+specific deletion and logging PARTIAL over leaving the branch red.
 
 ---
 
 ## S10 — Context override engine
 
-**Model:** Sonnet / medium · **Size:** medium · **Preconditions:** S2, S7, S9 DONE.
+**Model:** Sonnet / medium · **Size:** medium · **Preconditions:** S2, S7, S9a+S9b DONE.
 Parallel window C (with S11).
 
 **Objective:** Port the context system: per-app / WiFi / battery / time / location overrides
@@ -510,7 +570,7 @@ resolver test matrix matches spec table 1:1; pushed.
 
 ## S11 — UI shell, onboarding/privileges, dashboard
 
-**Model:** Sonnet / medium · **Size:** large · **Preconditions:** S7, S8, S9 DONE.
+**Model:** Sonnet / medium · **Size:** large · **Preconditions:** S7, S8, S9a+S9b DONE.
 Parallel window C (with S10 — disjoint packages; rebase before push).
 
 **Objective:** Compose M3 navigation shell (screen set per `screen_map.md`), privilege
@@ -533,9 +593,13 @@ usage-access step shown only when app rules exist (deep-link `ACTION_USAGE_ACCES
 (pipeline flows), service master switch (start/stop FGS), pause/resume, active context line,
 tier badge → onboarding, service health (last sensor event, degraded flags); M3 dynamic color
 + DayNight; first-run routing → onboarding when tier == NONE.
+Also revisit D-019's XML theme workaround (`android:Theme.Material.Light.NoActionBar`):
+Compose M3 generates its own theming and needs no Material XML parent — evaluate simplifying
+`values/themes.xml` to a minimal/no-op parent (watch the pre-Compose window background +
+status-bar look); record the outcome in STATE.md either way (D-027g).
 
 **Non-goals:** Parameter screens, charts, tools, context CRUD (all S12/S13). Notification
-styling (S9 owns it).
+styling (S9a owns it).
 
 **Acceptance:** `./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest` green;
 Robolectric compose smoke test: launch → Dashboard renders, each route navigates; pushed.
@@ -556,6 +620,16 @@ every row owned by your screens must end up ported or dropped(reason); includes 
 `keyTask` rows = per-scene back-key behavior**), S8 `SettingsValidator`, S6
 `CurveSuggestionEngine`, existing `LineGraph.kt` (extend or replace — your call, record it),
 `extraction/features_spec.md` (calibration/debug — debug selector uses the 10 verbatim labels, D-023).
+
+**Step 0 — handler triage (BEFORE any porting, D-027f):** sweep `anonymous_handlers.md` and
+add a disposition-class column committing each of the 168 rows to one of three buckets:
+(a) **trivial scene-chrome** (background-rect clicks, scene close/back `keyTask` rows) →
+bulk-drop with one shared reason; (b) **settings mutations** (toggle/write a single variable,
+EditText value-selected) → dropped(`absorbed-by-compose-state`) — Compose field state +
+debounced persist already covers them; (c) **complex** (multi-action handlers with branching/
+side effects) → enumerate explicitly; THESE are your 1:1 port list. Commit the triaged file
+before starting screens so a follow-up session can resume from it. S13 owns the chart-scene
+rows — mark them `deferred-S13`, don't port them.
 
 **Deliverables:** screens per screen_map: Curve & Brightness (min/max/offset/scale, zone ends,
 form params + LIVE derived form2A/form3A readout), Reactivity (thresholds incl. midpoint/
@@ -644,7 +718,7 @@ on; lint-baseline shrink pass (delete entries that no longer fire).
 
 ## Human gates (the user + their phone; findings go to STATE.md "Gate findings")
 
-**GATE 1 — core loop (after S9).** Install `app/build/outputs/apk/debug/app-debug.apk`.
+**GATE 1 — core loop (after S9b).** Install `app/build/outputs/apk/debug/app-debug.apk`.
 Grant notifications + WRITE_SETTINGS via onboarding-less path if S11 not done yet (Settings →
 Apps → Special access → Modify system settings). Enable service. Verify: cover light sensor →
 brightness animates DOWN smoothly (no jumps); shine light → animates UP; drag system slider
@@ -684,7 +758,7 @@ style segment scoped to the findings).
 | 1 | Extraction misreading | Opus on S1/S2/S4; verbatim dumps + line provenance; census reconciliation (40/18/20/125); "unresolved" over guessing | S1/S2 |
 | 2 | Rounding/tie divergence (Math.round ties, BigDecimal HALF_UP, string outputs) | Reference keeps Java semantics; explicit tie/boundary golden rows | S4/S5 |
 | 3 | Kotlin 2 / AGP migration friction | Pinned matrix; step-down-one-minor protocol; STATE log | S3 |
-| 4 | FGS specialUse / boot policy (API 34/35) | Manifest property + type flag pairing; Gate-1 reboot test; dataSync abandoned | S3/S9 |
+| 4 | FGS specialUse / boot policy (API 34/35) | Manifest property + type flag pairing; Gate-1 reboot test; dataSync abandoned | S3/S9a/S9b |
 | 5 | OEM brightness range ≠ 255 | config_screenBrightnessSettingMaximum lookup + normalization; Gate-1 sweep | S7 |
 | 6 | Shizuku integration complexity | One-time-grant design (no runtime binder); adb fallback always present; gateway faked in tests | S7/S11 |
 | 7 | Scene-consolidation feature loss | S2 450-element disposition matrix; Gate 2 walkthrough; S14 zero-pending | S2/S12/S14 |

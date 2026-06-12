@@ -13,6 +13,7 @@ next session does not know it.
 | S2 extraction B | 2026-06-11 | Opus/medium | DONE | (this commit) | task090_dynamic_scale.md (+solar answer), task038_curve_wizard.md, contexts_spec.md, features_spec.md, 20 scene docs + 4 _disp fragments, screen_map.md (450-element matrix → 9 M3 screens). Docs-only. Scene/context-profile/non-pipeline-cluster checklist cells annotated "S2 extracted". |
 | S3 toolchain | 2026-06-11 | Sonnet/medium | DONE | (see push) | Gradle 8.14.3 wrapper; D-007 fixed (pluginManagement); libs.versions.toml (Kotlin 2.0.21, AGP 8.7.3, compose-bom 2024.12.01); :platform → com.android.library; :data retired (git rm); res/ created; manifest updated (specialUse FGS + all permissions); lint-baseline.xml frozen. Pre-existing compile bugs fixed (D-019). :app:assembleDebug ✅ :platform:test ✅ :app:lintDebug ✅; :domain:test 4/5 pass (1 pre-existing parity failure — rapidLuxSpike, D-019, S4/S5 fix). |
 | S3.5 errata (owner review) | 2026-06-11 | Fable | DONE | (this commit) | Owner-review corrections folded into extraction docs + CLAUDE.md (D-020…D-026): branch policy settled; And2/Or2 rule validated + alphabetical-XML-ordering trap found (prof758 bool sequence fixed); prof759/769 semantics corrected; debug = 10 named categories; 590=Variable Split, 105=Set Clipboard; %AAB_Test = wizard report→clipboard; non-AAB globals censused; Circadian Dimming Graph re-homed; 168-anonymous-task census added (tasks/anonymous_handlers.md) + task545 doc. Docs-only — build untouched. |
+| S3.6 plan hardening (LLM peer review) | 2026-06-12 | Fable | DONE | (this commit) | 6 of 8 review findings adopted, 2 adopted-with-correction (D-027): S9→S9a+S9b split (Gate 1 after S9b; S10/S11 preconds updated); binding runtime concurrency model (drop-not-queue, MainLoop=mutex); S8 preconds += S2; S4 code-547 expression transcription protocol; hardcoded profile gates + truth-table test; S12 step-0 handler triage; S11 theme-workaround revisit. RUNBOOK + CLAUDE.md updated. Docs-only — build untouched. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
@@ -25,12 +26,16 @@ committed; version catalog at `gradle/libs.versions.toml`; :platform is now an A
 — engine parity bug per D-019, not a new regression). S4 is now unblocked.
 S3.5 (owner-review errata) applied on top: extraction docs corrected per D-020…D-026 — read those
 entries before trusting any pre-S3.5 reading of profile gates, debug levels, or action codes 590/105.
+S3.6 (peer-review plan hardening) applied: RUNBOOK restructured per D-027 — S9 is now S9a+S9b,
+runtime concurrency model is binding, S4/S8/S11/S12 briefs amended. No code changes.
 
 ## Next up
 
 - S4 (Opus/medium) — Tasker reference implementation + golden vectors. Preconditions: S1 DONE ✅, S3 DONE ✅.
+  Note the new code-547 expression transcription protocol in the brief (D-027b).
 - S5 (Sonnet/high) after S4.
-- S6 ∥ S7 ∥ S8 (parallel window B) after S5.
+- S6 ∥ S7 ∥ S8 (parallel window B) after S5. (S8 preconditions now formally include S2 — already DONE ✅.)
+- Then S9a → S9b (split per D-027) → Gate 1.
 
 ## Deviations & discoveries ledger
 
@@ -165,7 +170,33 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   superdimming_settings gloss fixed — old `_CalibratePowerDraw` gloss was wrong; _disp_group4 already
   agreed). (Affects S12, S13.)
 
-Append new entries as D-027, D-028, … with which segments they affect.
+- D-027: S3.6 PLAN HARDENING from external LLM peer review of the S0–S3.5 approach. Adopted:
+  (a) S8 preconditions now include S2 (its inputs always listed S2's features_spec.md; the DAG
+  just never enforced it — no schedule impact, S2 already DONE). (b) S4 brief gains an explicit
+  transcription protocol for code-547 maths expressions (verbatim → parse-tree note in provenance
+  comment → cross-validate task661 vs task663 over the golden lux grid → disagreements recorded
+  in parity_gaps.md, never resolved by guessing). (c) S9 SPLIT: S9a = pipeline controller +
+  AnimationRunner + OverrideMonitor + service rebuild + tests (parity-critical core); S9b =
+  super-dimming wiring + tile + boot receiver + legacy rip-out. Gate 1 moves after S9b (the
+  reviewer proposed gating after S9a, but Gate 1's reboot/tile/dimming checks need S9b
+  deliverables). S10/S11 preconditions → S9a+S9b. (d) BINDING concurrency model (CLAUDE.md +
+  S9a brief): single pipeline coroutine, one event runs to completion incl. animation frames;
+  events arriving mid-cycle are DROPPED, not queued — prof760's `%AAB_MainLoop != On` clause is
+  a re-entry mutex that SUPPRESSES events while a cycle runs. ⚠️ The reviewer claimed "Tasker
+  would queue it" — wrong: the gate drops; a queueing/conflating implementation would process
+  events Tasker never would. (e) Profile gates are HARDCODED Kotlin booleans with provenance
+  comments (no generic ConditionList evaluator) + a dedicated prof758/prof760 truth-table unit
+  test in S9a (per-branch true/false — a mis-parenthesized gate silently suppresses sensor
+  events). (f) S12 step-0 triage of anonymous_handlers.md into trivial-chrome / settings-mutation
+  / complex buckets, committed before screen work. (g) S11 revisits D-019's XML theme workaround
+  (Compose M3 needs no Material XML parent). REJECTED from the review: the Tasker
+  single-threaded/queueing claim (corrected in d — Tasker runs tasks concurrently by default;
+  this project's serialization comes from its own MainLoop mutex); the Tasker expression
+  type-coercion concerns as a distinct risk (expressions are already captured verbatim per S1,
+  and (b)'s 661-vs-663 cross-validation is the actual safeguard). (Affects S4, S8, S9a, S9b,
+  S10, S11, S12.)
+
+Append new entries as D-028, D-029, … with which segments they affect.
 
 ## Blockers
 
