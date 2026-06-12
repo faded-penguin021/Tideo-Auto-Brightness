@@ -3,7 +3,6 @@ package com.tideo.autobrightness.domain.brightness
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.junit.Ignore
 
 class BrightnessEngineContractTest {
     private val engine = BrightnessEngine()
@@ -36,19 +35,29 @@ class BrightnessEngineContractTest {
         assertTrue(output.animationSteps >= 1)
     }
 
-    @Ignore("S5: gap-07")
     @Test
     fun rapidLuxSpike_isSmoothedByTaskerFormula() {
-        val output = engine.evaluate(
+        // Large spike (20→800): effective_delta ≈ 36.9 → luxAlpha=1.0 (snap to raw — correct per oracle, D-028 gap-07)
+        val spikeOutput = engine.evaluate(
             BrightnessPolicyInput(
                 lux = 800.0,
                 time = TimeContext(secondsOfDay = 12 * 3600.0),
                 previous = PreviousState(smoothedLux = 20.0, lastRawLux = 20.0),
             ),
         )
+        assertEquals(1.0, spikeOutput.luxAlpha, 1e-9)
+        assertEquals(800.0, spikeOutput.smoothedLux, 1e-9)
 
-        assertTrue(output.smoothedLux < 800.0)
-        assertTrue(output.luxAlpha < 1.0)
+        // Moderate step just over the dead-band (100→126): effective_delta is small → luxAlpha < 1.0
+        val smoothOutput = engine.evaluate(
+            BrightnessPolicyInput(
+                lux = 126.0,
+                time = TimeContext(secondsOfDay = 12 * 3600.0),
+                previous = PreviousState(smoothedLux = 100.0, lastRawLux = 100.0),
+            ),
+        )
+        assertTrue(smoothOutput.luxAlpha < 1.0)
+        assertTrue(smoothOutput.smoothedLux < 126.0)
     }
 
     @Test

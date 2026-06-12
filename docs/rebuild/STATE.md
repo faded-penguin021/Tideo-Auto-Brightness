@@ -15,31 +15,26 @@ next session does not know it.
 | S3.5 errata (owner review) | 2026-06-11 | Fable | DONE | (this commit) | Owner-review corrections folded into extraction docs + CLAUDE.md (D-020…D-026): branch policy settled; And2/Or2 rule validated + alphabetical-XML-ordering trap found (prof758 bool sequence fixed); prof759/769 semantics corrected; debug = 10 named categories; 590=Variable Split, 105=Set Clipboard; %AAB_Test = wizard report→clipboard; non-AAB globals censused; Circadian Dimming Graph re-homed; 168-anonymous-task census added (tasks/anonymous_handlers.md) + task545 doc. Docs-only — build untouched. |
 | S3.6 plan hardening (LLM peer review) | 2026-06-12 | Fable | DONE | (this commit) | 6 of 8 review findings adopted, 2 adopted-with-correction (D-027): S9→S9a+S9b split (Gate 1 after S9b; S10/S11 preconds updated); binding runtime concurrency model (drop-not-queue, MainLoop=mutex); S8 preconds += S2; S4 code-547 expression transcription protocol; hardcoded profile gates + truth-table test; S12 step-0 handler triage; S11 theme-workaround revisit. RUNBOOK + CLAUDE.md updated. Docs-only — build untouched. |
 | S4 reference impl + golden vectors | 2026-06-12 | Opus/medium | DONE | (see push) | `TaskerReference.kt` (12 Java-faithful blocks: 554/535/544/546/548/659/661/543/696/698/618 + Math.round/BigDecimal helpers); `GoldenVectorGenerator.kt` (regen via `-DregenGolden=1`); 8 committed golden CSVs (smoothing 16512, taper 1148, animation 927, mapping/threshold 688, formulae 540, transition 680, dimming 510 rows). `CorePipelineParityTest.kt` asserts current engine vs vectors @1e-9; 661-vs-663 cross-validation PASSES (Form2D≡Zone1End). 7 gaps found (D-028) → `parity_gaps.md`, 7 `@Ignore("S5: gap-NN")`. `:domain:test` GREEN. Added a `tasks.withType<Test>` regen-property passthrough to `domain/build.gradle.kts`. |
+| S5 domain engine parity | 2026-06-12 | Sonnet/high | DONE | (see push) | All 7 parity gaps closed; 0 @Ignore remain. R1 fix: `roundN` now uses `Math.round` (gap-04/05/06); `smoothLux` final rounding uses BigDecimal HALF_UP (gap-01 R1); `absoluteThresholds` uses BigDecimal HALF_UP (gap-02 R1). R2 fixes: removed `coerceIn` from `luxAlpha` (gap-01), added `par1<0.2` special-case to `absoluteThresholds` + added `currentLux` param (gap-02), removed clamp+`coerceAtLeast` from `mapLuxToBrightness` (gap-03). gap-07: test fixture fixed. New files: `BrightnessFormulae.kt`, `SoftwareDimming.kt`, `OverrideRules.kt`, `InitialBrightness.kt`. Defaults corrected (AnimationConfig 20/25/65ms; ThresholdConfig.threshMidpoint 4.0). Follow-on (F1–F5, D-030): task700/646/647 oracle functions + superdimming.csv (2016 rows) + CorePipelineParityTest parity tests; OverrideRules.recordOverridePoint scalingUse param + newest-first order fix; OverrideRulesTest.kt + InitialBrightnessTest.kt added; parity_gaps.md + checklist updated. `:domain:test :app:assembleDebug` GREEN. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 + S2 + S3 DONE. Build is now GREEN: `./gradlew :app:assembleDebug :platform:test :app:lintDebug`
-all pass. APK at `app/build/outputs/apk/debug/app-debug.apk` (28 MB). Gradle 8.14.3 wrapper
-committed; version catalog at `gradle/libs.versions.toml`; :platform is now an Android library;
-:data retired. One pre-existing domain test failure remains (`rapidLuxSpike_isSmoothedByTaskerFormula`
-— engine parity bug per D-019, not a new regression). S4 is now unblocked.
-S3.5 (owner-review errata) applied on top: extraction docs corrected per D-020…D-026 — read those
-entries before trusting any pre-S3.5 reading of profile gates, debug levels, or action codes 590/105.
-S3.6 (peer-review plan hardening) applied: RUNBOOK restructured per D-027 — S9 is now S9a+S9b,
-runtime concurrency model is binding, S4/S8/S11/S12 briefs amended. No code changes.
-S4 DONE: the Tasker reference oracle + golden vectors + parity harness exist. `:domain:test` is
-GREEN with exactly 7 documented `@Ignore("S5: gap-NN")` (see `parity_gaps.md`, D-028). The engine's
-divergences from Tasker are now CHARACTERIZED, not guessed — S5 closes them against immutable vectors.
+S1 through S5 DONE (incl. S5 follow-on F1–F5 per D-030). Build is GREEN:
+`./gradlew :domain:test :app:assembleDebug :platform:test :app:lintDebug` all pass. Domain engine
+is parity-complete against the Tasker oracle — all 7 gaps closed, 0 @Ignore in domain/src/test.
+Golden CSVs: 9 total (8 original + superdimming.csv 2016 rows). `SoftwareDimming` is now
+golden-tested; `OverrideRules` and `InitialBrightness` have dedicated unit-test classes.
+D-030 ledger covers residual deviations (dimProgress span guard, calculateAnimation coerceAtLeast).
+Parallel window B (S6 ∥ S7 ∥ S8) is now unblocked.
 
 ## Next up
 
-- S5 (Sonnet/high) — domain engine parity completion. Preconditions: S4 DONE ✅. Close gap-01…gap-07
-  (see `parity_gaps.md`): the two systemic causes are R1 rounding-ties (`kotlin.math.round` →
-  Java `Math.round`/BigDecimal) and R2 engine-added clamps/structure (D-010a/b). Remove all 7
-  `@Ignore`s; do NOT edit `TaskerReference.kt` or the golden CSVs (immutable oracle).
-- S6 ∥ S7 ∥ S8 (parallel window B) after S5. (S8 preconditions now formally include S2 — already DONE ✅.)
+- S6 ∥ S7 ∥ S8 (parallel window B) — all preconditions met (S2 ✅, S5 ✅).
+  - S6: Circadian solar engine + curve-wizard math (domain only)
+  - S7: Platform adapters + tiered privilege manager
+  - S8: Settings schema v2, persistence, import/export
 - Then S9a → S9b (split per D-027) → Gate 1.
 
 ## Deviations & discoveries ledger
@@ -220,7 +215,32 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   production/behavior impact. Golden regen command: `./gradlew :domain:test -DregenGolden=1
   --tests "*GoldenVectorGeneratorTest*"`.
 
-Append new entries as D-030, D-031, … with which segments they affect.
+- D-030: S5 follow-on corrections from owner PR review (F1–F5, committed on `claude/youthful-newton-nosjpo`):
+  (a) **S4 oracle gap**: task700/646/647 were never added to `TaskerReference.kt` in S4 — added in S5
+  follow-on as `finalDimLevel()` and `dimProgressAndShell()`. `superdimming.csv` (2016 rows) generated
+  and committed; `CorePipelineParityTest` gains `softwareDimming_finalDimLevel_matchesOracle` and
+  `softwareDimming_dimShell_matchesOracle`. Existing 8 golden CSVs byte-identical after regen.
+  (b) **OverrideRules.recordOverridePoint fix**: task561 act0 gate is `ScalingUse=true AND
+  ScaleDynamicCompress!=0`; the initial S5 port only checked `dynamicCompress!=0` (missing scalingUse).
+  Fixed. Insertion order was also wrong (newest-last vs Tasker's code355 Array Push at index 1 =
+  newest-first); fixed to `listOf(new) + history` + `take(maxEntries)`. New `OverrideRulesTest.kt`
+  covers all gate polarities, suppress-echo, shouldCommitPause, and recordOverridePoint edge cases.
+  (c) **SoftwareDimming.dimProgress span guard (SANCTIONED DEVIATION)**: production code retains
+  `if (span <= 0.0) return 1.0` which has no counterpart in task646/647. Rationale: task646/647
+  only invoke `dim_progress` when `target_brightness < DimmingThreshold` (act1 gate), which
+  implicitly means `DimmingThreshold > MinBright` in any valid configuration. Division-by-zero would
+  be a misconfigured (invalid) settings state. The guard prevents crashes on invalid input and agrees
+  with the oracle on all valid inputs (golden vectors exclude `threshold <= minBright` combinations).
+  This guard is NOT exercised by `superdimming.csv` and does NOT affect parity. S9a/S9b: rely on
+  `SoftwareDimming.finalDimLevel`, `.dimProgress`, `.dimShell` being fully golden-tested/unit-tested.
+  (d) **InitialBrightnessTest.kt** added: sweeps vs `TaskerReference.setInitialBrightness` including
+  tie cases (0.5 → 1, 1.5 → 2, -2.5 → -2) confirming Math.round semantics.
+  (e) **calculateAnimation coerceAtLeast(1)**: the `loops.coerceAtLeast(1)` guard in
+  `BrightnessEngine.calculateAnimation` has no Tasker counterpart and is vector-uncovered (animSteps=0
+  never appears in animation.csv). Retained as crash-prevention for invalid AnimSteps=0; not a parity
+  issue on valid inputs. (Affects S9a for integration tests if animSteps=0 ever occurs at runtime.)
+
+Append new entries as D-031, D-032, … with which segments they affect.
 
 ## Blockers
 
