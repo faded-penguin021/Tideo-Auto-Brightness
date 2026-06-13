@@ -27,11 +27,20 @@ next session does not know it.
 
 | Gate 1 punch-list (findings triage) | 2026-06-13 | Opus/high | DONE | (see push) | Triaged the 6 human Gate-1 findings (D-041). Fixed 3 genuine runtime bugs + 1 sub-bug: **G1-F1** crash — `AndroidScreenBrightnessController.write/forceManualMode/restoreMode` + `AndroidSecureDimmingController` now swallow `SecurityException` (unprivileged install degrades, no process crash); MainActivity requests POST_NOTIFICATIONS at launch; service notification shows a "Grant Modify system settings" hint when `!canWrite`. **G1-F3** Disable/UI desync — SettingsViewModel now collects `settingsDataStore.data` as source of truth so the notification's serviceEnabled=false propagates to the toggle. **G1-F4** panic/resume zombie — task528 panic is a FULL STOP not a pausable state: `controller.emergencyStop()` (restore 255 + drop dimming + cancel jobs) → service persists serviceEnabled=false + stopForeground/stopSelf (removed PipelineEvent.Panic/panicInternal). **G1-F5** sub-bug — AppModule tierProvider now `refresh()`es each cycle so a post-start Shizuku/ADB grant is seen. **G1-F2/F5 deferred to S12 (owner decision):** DetectOverrides + DimmingEnabled default Off (Tasker task570 parity, defaults_audit confirmed) and have no UI until S12 — expected-not-bugs. New test: BrightnessPipelineControllerTest.emergencyStop_restoresMaxBrightnessAndFullStops. Full ladder GREEN (59 app unit tests). No compaction. |
 
+| S10 context override engine | 2026-06-13 | Opus/medium | DONE | (see push) | Context system ported (D-042). Domain: `context/ContextOverrideResolver.kt` (pure task43 PASS3/4 — match+rank precedence priority→specificity→array-order, overnight time ranges w/ yesterday membership, SUNRISE/SUNSET tokens, haversine location gate, nextContextTime HH.MM) + `context/ContextModel.kt` (ContextRuleSpec/ContextSignals/ContextResolution); 21-case 1:1 matrix test. App: `runtime/ContextEngine.kt` (PASS1 per-caller cooldown + PASS2 signal-change veto + %AAB_ContextState, applies override by swapping the ENTIRE profile via mergeProfile = task626 39-key snapshot, fires onContextChanged→task43 act21 re-init); `runtime/AndroidContextSignalSource.kt` (S7 readers + Calendar day/seconds + SolarCalculator local sunrise/sunset); `runtime/AppProfileCatalog.kt` (built-in profiles; S12 extends); `settings/ContextRuleStore.kt` (task623 upsert/delete CRUD over new contextRulesDataStore) + `ContextRulesSerializer.kt` + `ContextRuleMapping.kt` (app→domain spec + signal tokens). Wired: AppModule→createRuntime composes engine+pipeline (settingsProvider=engine.effectiveSettings); BrightnessPipelineController gains ContextChanged event→reapplyProfile; AmbientMonitoringService starts engine, screen on/off→engine, pipeline-tick→time re-eval, notification subText = active context. Tests: ContextOverrideResolverTest(21), ContextEngineTest(5, fakes), ContextRuleStoreTest(5). Full ladder GREEN: `:domain:test :platform:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`. No compaction. |
+
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 through S9b DONE → **GATE 1 READY** (human on-device verification next). Build is GREEN across
+S1 through S9b DONE + **GATE 1 PASSED**; **S10 (context override engine) DONE**. The runtime now
+swaps the entire active brightness profile on app/wifi/battery/time/location context matches: the
+golden-tested domain `ContextOverrideResolver` (task43 PASS3/4 precedence) is driven by the app
+`ContextEngine` (cooldown/veto + S7 readers), which feeds the pipeline its effective settings and
+re-runs Set Initial Brightness on every switch. Context rules persist via `ContextRuleStore`
+(DataStore). S11 (UI shell) is the remaining parallel-window-C segment; rule-editing UI is S12.
+
+(historical) S1 through S9b DONE → GATE 1 READY. Build is GREEN across
 the full ladder: `:domain:test`, `:platform:test`, `:app:testDebugUnitTest`, `:app:assembleDebug`,
 `:app:lintDebug`. The runtime is the real sensor-event-driven Tasker pipeline: BrightnessPipelineController
 owns all runtime state and drives a single serialized cycle (drop-not-queue MainLoop mutex); AnimationRunner
@@ -49,7 +58,7 @@ AppModule is now the real DI root.
   core loop (sensor → animate, slider → pause/resume, screen off/on → reinit, reboot → self-start,
   notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
   Findings → "Gate findings" below.
-- Then parallel window C: **S10** (context override engine) ∥ **S11** (UI shell + onboarding).
+- Parallel window C: **S10** (context override engine) DONE ∥ **S11** (UI shell + onboarding) — S11 next.
 - Carried for S12 (D-040): unprivileged overlay dimming (task698 DC-like / 653/654) is NOT wired
   (S9b did the ELEVATED secure path only); DimDynamic (circadian dim strength, task646 ScalingUse
   branch) passes null pending real solar windows (D-039d); proximity damp (task545) still unwired.
@@ -499,7 +508,40 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   surface the DetectOverrides toggle so this is verifiable at Gate 2.
   (Affects S11, S12, Gate 2.)
 
-Append new entries as D-042, D-043, … with which segments they affect.
+- D-042: S10 CONTEXT-OVERRIDE decisions (sanctioned by the S10 brief + extraction; flagged for S12/S14).
+  (a) **Override = whole-profile swap, NOT scale/min/max.** The S10 brief's parenthetical "(scale/min/
+  max/disable per spec)" predates the S2 correction; contexts_spec §4 (authoritative) + D-014 say
+  `_ProfileManager LOAD_FILE` replaces the entire curve/threshold/anim/dynamic/dimming parameter set.
+  Implemented as `mergeProfile(baseline, profile)` overlaying exactly task626's 39-key snapshot; fields
+  OUTSIDE it (serviceEnabled, contextOverride, debugLevel, setupTitle, schemaVersion, and the
+  snapshot-omitted thresholdDynamic) stay from the baseline so a profile can't disable the service.
+  (b) **DataStore replaces Tasker's dual RAM/disk cache + prof8 daily reset.** `ContextRuleStore`
+  (DataStore<ContextOverrideConfig>) is a single always-fresh source of truth, so contexts_spec §2's
+  `%AAB_ContextCache`/`%AAB_ContextJSONCache` and prof8/task26's 03:00 reset (whose only effect was
+  forcing a stale-RAM→disk reload) are obsolete — prof8 row marked dropped(cache obsolete). Solar
+  times are recomputed fresh each eval (AndroidContextSignalSource), so the daily-reset failsafe has no
+  surviving purpose. The cheap signal-token pre-filter (`%AAB_ContextCache` tokens) IS kept, as
+  `ContextSignalTokens`, driving the PASS2 veto + app-poll gate.
+  (c) **`%AAB_ProfileUser` baseline = the DataStore AabSettings; its NAME defaults "Default".** The
+  rebuild has no stored user-profile-name field (D-038(ii)); no-match always reverts to the baseline
+  settings regardless of name. userProfileName="Default" only feeds the resolver's fallback
+  existence-check + the APP_CHANGED isNonDefault veto. S12 (profile save/load) should track the real
+  active user-profile name + extend AppProfileCatalog with user-saved profiles (currently built-ins
+  only — an unknown rule.profile name resolves null → engine keeps baseline, a safe degrade).
+  (d) **Location is passive-only.** AndroidContextSignalSource uses LocationReader.lastKnownLocation
+  (PASSIVE_PROVIDER); task630/631's persistent LocationListener + adaptive backoff/zombie-listener
+  watchdog + the Variable-Set prof767 trigger machinery are NOT ported (prof766 deferred; prof765
+  partial). LOCATION-caller eval still fires on the WIFI/battery/app signal edges and pipeline ticks.
+  Deferred to S12/S14 if device testing shows passive last-known is too stale.
+  (e) **Time scheduling approximated by pipeline-tick re-eval**, not prof764's exact self-scheduling
+  Time context at `%AAB_NextContextTime`. nextContextTime IS computed (resolver) + exposed as a
+  StateFlow; ContextEngine.onPipelineTick (TIME caller, 1s cooldown) re-evaluates each accepted cycle.
+  Acceptable: time-window membership is checked on every cycle anyway; S12 may add an exact alarm.
+  (f) **PASS1 cooldown lastEvalTime is null until the first eval** (not 0) so a freshly-started engine
+  always evaluates once regardless of clock value (the 0-init would have blocked the seed eval when
+  clock≈0; harmless in prod but a real edge). (Affects S12, S14.)
+
+Append new entries as D-043, D-044, … with which segments they affect.
 
 ## Blockers
 

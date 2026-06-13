@@ -20,15 +20,15 @@ filled by S1/S2 during extraction.
 | prof759 Proximity Detection → task545 | L300 | | pending |
 | prof760 Monitor Ambient Light → task554 (incl. ConditionList gate) | L318 | ProfileGates.monitorAmbientLightGate + truth-table test + BrightnessPipelineController (S9a) | ported |
 | prof761 Initialize (Display On) → task618 | L386 | runtime/BrightnessPipelineController.reinit/setInitialBrightness (S9a) | ported |
-| prof762 Context: App Changed → task43 | L398 | extraction/contexts_spec.md (S2) | pending |
-| prof763 Context: Battery Changed → task43 | L456 | extraction/contexts_spec.md (S2) | pending |
-| prof764 Context: Time Changed → task43 | L500 | extraction/contexts_spec.md (S2) | pending |
-| prof765 Context: Location Listener → task630 | L541 | extraction/contexts_spec.md (S2) | pending |
-| prof766 Context: Location Refresher → task631 | L579 | extraction/contexts_spec.md (S2) | pending |
-| prof767 Context: Location Changed → task43 | L628 | extraction/contexts_spec.md (S2) | pending |
-| prof768 Context: WiFi (Dis)connected → task43 | L676 | extraction/contexts_spec.md (S2) | pending |
+| prof762 Context: App Changed → task43 | L398 | runtime/ContextEngine (S10 — foreground-app poll → APP_CHANGED veto → ContextOverrideResolver); AndroidContextSignalSource | ported (engine; rule UI S12) |
+| prof763 Context: Battery Changed → task43 | L456 | runtime/ContextEngine (S10 — BatteryStateReader flow → BATTERY veto Δ≥5%/plug-flip → resolver) | ported (engine; rule UI S12) |
+| prof764 Context: Time Changed → task43 | L500 | runtime/ContextEngine (S10 — time-window eval on pipeline ticks; nextContextTime computed by resolver) | ported (engine; rule UI S12) |
+| prof765 Context: Location Listener → task630 | L541 | runtime/AndroidContextSignalSource LocationReader (passive last-known); persistent listener/backoff (task630/631) not ported — coarse passive read only (D-042) | partial (passive location; listener S12/S14) |
+| prof766 Context: Location Refresher → task631 | L579 | not ported — adaptive location refresher/zombie-listener watchdog out of S10 scope (D-042) | deferred (S12/S14) |
+| prof767 Context: Location Changed → task43 | L628 | runtime/ContextEngine (S10 — LOCATION caller evaluates when a rule uses [LOC]) | ported (engine; rule UI S12) |
+| prof768 Context: WiFi (Dis)connected → task43 | L676 | runtime/ContextEngine (S10 — WifiInfoReader SSID flow → WIFI veto on SSID change → resolver) | ported (engine; rule UI S12) |
 | prof769 Panic (Reset) → task528 | L722 | runtime/BrightnessPipelineController.panic + notification action (S9a) | ported |
-| prof8 Context: Reset Serialized Cache → task26 | L744 | extraction/contexts_spec.md (S2) | pending |
+| prof8 Context: Reset Serialized Cache → task26 | L744 | N/A — DataStore is the single fresh source of truth; the RAM/disk cache reset failsafe is moot (D-042) | dropped (cache obsolete) |
 
 ## Pipeline & feature task clusters (~25)
 
@@ -52,14 +52,14 @@ filled by S1/S2 during extraction.
 | Panic reset: 528 | | runtime/BrightnessPipelineController.emergencyStop + notification Reset action; Gate-1 G1-F4 fix: panic is a FULL STOP (restore 255 + drop dimming + %AAB_Service=Off + service teardown), not a pausable state (D-041) | ported |
 | Init/defaults: 570 Initialize AAB Defaults | | | pending |
 | Circadian dynamic scale: 90 (+ polar handling) | | SolarCalculator.kt + DynamicScaleEngine.kt (S6 domain, golden-tested circadian.csv 576 rows, CircadianParityTest + 4 polar assertions); BrightnessEngine delegates computeDynamicScale (D-031) | ported |
-| Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S2 extracted → contexts_spec.md | pending |
+| Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S10: ContextOverrideResolver (task43 PASS3/4, 21-case matrix test) + ContextEngine (PASS1 cooldown/PASS2 veto) + ContextRuleStore (task623 upsert/delete CRUD); 624/630/631 location-listener subsystem deferred (D-042) | ported (eval+CRUD; location-listener S12/S14) |
 | Privilege detection/grant: 378, 643, 563 | | S2 extracted → features_spec.md; platform layer: AndroidPrivilegeManager + ShizukuGrantGateway stub (S7); UI wiring S11 | platform-ported (S7) |
 | QS tile: 551, 552 | | S2 extracted → features_spec.md; runtime/BrightnessTileService (S9b — toggles serviceEnabled + start/stop FGS via AutoBrightnessRuntime; manifest QS_TILE entry + BIND_QUICK_SETTINGS_TILE); BrightnessTileServiceTest instantiation smoke | ported (toggle) |
 | Foreground notification: 584, 692 | | S2 extracted → features_spec.md; runtime/AmbientMonitoringService live lux/target notification + Pause/Resume/Reset/Disable actions (S9a) | ported |
 | Curve suggestion wizard: 38, 655 | | CurveSuggestionEngine.kt (S6 domain, golden-tested wizard.csv 12 rows, WizardParityTest); applyToLiveCurve = task655 | ported |
 | Formula validation: 583, 707 | | S2 extracted → features_spec.md; SettingsValidator.kt (S8 — 5 rules: form2A<0, form3A<0, form2C>zone1End advisory + predicted-brightness@1000lux<25 safety) | ported |
 | Power draw calibration: 524 | | S2 extracted → features_spec.md | pending |
-| Profiles/import/export/defaults: 592, 637, 622 | | S2 extracted → features_spec.md; DefaultProfiles.kt (S8 — 5 built-in profiles from task592); AabSettings v2 + migration + TaskerLegacyProfileSerializer updated (S8); ContextOverrideRules.kt storage model (S8); wiring to disk S10/S12 | ported (schema+defaults; disk wiring S10/S12) |
+| Profiles/import/export/defaults: 592, 637, 622 | | S2 extracted → features_spec.md; DefaultProfiles.kt (S8 — 5 built-in profiles from task592); AabSettings v2 + migration + TaskerLegacyProfileSerializer updated (S8); ContextOverrideRules.kt storage model (S8); context-rule disk wiring done S10 (ContextRuleStore/DataStore); profile import/export disk wiring S12 | ported (schema+defaults+context-rule store; profile import/export S12) |
 | Debug tooling: 634, 635 | | S2 extracted → features_spec.md | pending |
 | Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | S2 extracted → screen_map.md (scene dispositions) | pending |
 | **Anonymous scene-handler tasks (168 unnamed**, incl. 34 `keyTask` back-key handlers) | various | S3.5 census → extraction/tasks/anonymous_handlers.md | pending (S12/S13: every row ported or dropped(reason)) |
@@ -98,7 +98,7 @@ filled by S1/S2 during extraction.
 | task105 L8906 · _GetWifiNoLocation | ✓ S1 | | | pending |
 | task378 L9468 · _PrivilegeDetection | ✓ S1 | | | pending |
 | task38 L9921 · _SuggestCurveParameters | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.kt (S6) | ported |
-| task43 L12091 · _EvaluateContexts | ✓ S1 | | | pending |
+| task43 L12091 · _EvaluateContexts | ✓ S1 | | domain/context/ContextOverrideResolver.kt + app/runtime/ContextEngine.kt (S10) | ported |
 | task524 L14246 · _CalibratePowerDraw | ✓ S1 | | | pending |
 | task535 L15204 · Lux Smoothing | ✓ S1 | ✓ S4 | BrightnessEngine.smoothLux (S5) | ported |
 | task543 L15878 · Calculate Animation | ✓ S1 | ✓ S4 | BrightnessEngine.calculateAnimation (S5) | ported |
@@ -113,9 +113,9 @@ filled by S1/S2 during extraction.
 | task592 L24132 · _CreateDefaultProfiles | ✓ S1 | | | pending |
 | task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | ✓ S4 | InitialBrightness.kt (S5) | ported |
 | task620 L26400 · _AdaptiveBrightnessSceneSize | ✓ S1 | | | pending |
-| task623 L26926 · _ContextManager | ✓ S1 | | | pending |
+| task623 L26926 · _ContextManager | ✓ S1 | | app/settings/ContextRuleStore.kt (S10 — upsert/delete CRUD) | ported |
 | task625 L27185 · _AppPicker | ✓ S1 | | | pending |
-| task626 L27355 · _ContextResume | ✓ S1 | | | pending |
+| task626 L27355 · _ContextResume | ✓ S1 | | mergeProfile() 39-key snapshot (S10); RESUME caller (cooldown 0/forced eval) | ported (snapshot+caller) |
 | task630 L27585+L27817 · _ContextLocnListener (×2) | ✓ S1 | | | pending |
 | task631 L27939+L28432 · _ContextF5NetLoc (×2) | ✓ S1 | | | pending |
 | task633 L28827 · _GetWifiForContext | ✓ S1 | | | pending |
