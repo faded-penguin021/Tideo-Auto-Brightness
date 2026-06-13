@@ -21,18 +21,28 @@ next session does not know it.
 | S7 platform adapters + privilege | 2026-06-12 | Sonnet/medium | DONE | (see push) | `sensor/LightSensorSource.kt` (TYPE_LIGHT callbackFlow); `brightness/ScreenBrightnessController.kt` (read/write 0–255, OEM range norm via config_screenBrightnessSettingMaximum, suppress-echo hook); `brightness/SecureDimmingController.kt` (reduce_bright_colors via Settings.Secure, ELEVATED-gated); `privilege/PrivilegeManager.kt` (Tier NONE/BASIC/ELEVATED; BASIC=canWrite, ELEVATED=checkPermission; tierFlow; root+Shizuku grant helpers); `privilege/ShizukuGrantGateway.kt` (binder check + permission request stub — exec TODO S11, D-032); `observe/BrightnessObserver.kt` (ContentObserver callbackFlow, null-Handler for synchronous dispatch, self-write filter via suppress-echo); `context/{BatteryStateReader,LocationReader,ForegroundAppMonitor,WifiInfoReader}.kt`. ShizukuProvider added to manifest; shizuku-api added to platform + app deps; shizuku-provider added to app deps. SystemAdapters.kt marked @Deprecated("S9b removes"). Robolectric tests: 19 total (brightness write/read/mode-force, tier-gating, observer dispatch+self-write-filter, LightSensorSource cancel). `:platform:test` GREEN (19 tests); `:app:assembleDebug` GREEN. |
 
 | S8.5 review (Fable→Opus) | 2026-06-12/13 | Fable+Opus | IN PROGRESS | 3c6a585, cd3fd15, (this) | Sequential reviews (one agent at a time per owner). DONE: full acceptance suite green; S7 review → D-034 (suppress-echo redesign, OEM rounding, +8 tests); D-035 model policy (Opus from S9a); checklist unstale'd; **S4/S5 review → D-036** (2 CRITICAL parity holes fixed: task661 ScalingUse=false/%AAB_Scale branch + %AAB_ScaleDynamicCompress surfacing; new calculated.csv golden + 3 tests; existing 8 CSVs byte-identical); **S6 review → D-037** (port verified faithful; fixed oracle-circularity by adding independent SolarInvariantTest [7 astronomical invariants, all pass] + wizard abort test + dawn/dusk golden assertions); **S8 review → D-038** (CRITICAL: contextOverride default true→false [would lock context switching on fresh install]; fixed 2 vacuous safety-validator tests). All four reviews (S4/S5, S6, S7, S8) COMPLETE. Build green. S9a may proceed (Opus per D-035). |
+| S9a runtime core | 2026-06-13 | Opus/high | DONE | (see push) | Runtime pipeline rebuilt (D-039). New: `runtime/ProfileGates.kt` (hardcoded prof760/758/755 ConditionList booleans, D-021 provenance); `PipelineState.kt` (single runtime-state holder + PipelineEvent sealed type); `AnimationRunner.kt` (task696 per-frame write + read-back override detect, suppress-echo); `OverrideMonitor.kt` (BrightnessObserver→OverrideRules prof755 gate); `BrightnessPipelineController.kt` (single-coroutine pipeline, drop-not-queue MainLoop mutex via AtomicBoolean, sensor→gate→throttle→BrightnessEngine.evaluate→animate, override/pause/resume, hibernate/reinit/panic); `AmbientMonitoringService.kt` REBUILT (ServiceCompat specialUse FGS, live lux/target notification + Pause/Resume/Reset/Disable actions, dynamic SCREEN_ON/OFF receiver→reinit/hibernate). Tests: ProfileGatesTest (prof760+758+755 truth table), AnimationRunnerTest (4), BrightnessPipelineControllerTest (first-run/throttle/mid-cycle-drop/override/resume/hibernate, 5), AmbientMonitoringServiceTest (Robolectric foreground notif + lifecycle, 2). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :domain:test :platform:test :app:lintDebug`. Legacy fakes still present (S9b rips out). No compaction. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 through S8 DONE. Build is GREEN: `:platform:test` 19 tests; `:app:testDebugUnitTest` 20 new tests (+ pre-existing); `:app:assembleDebug` ✅ `:app:lintDebug` ✅.
-Settings schema v2 complete: AabSettings gains animSteps/thresholdMidpoint/contextOverride/setupTitle; scale changed to Float; throttle default corrected to 1310. Mapper extended with all 4 domain config conversion functions. SettingsValidator implements all 5 Tasker validation rules (task583×3 advisory + task707×2 safety). DefaultProfiles has all 5 built-in profiles from task592. ContextOverrideRules data model is ready for S10 engine wiring. Parallel window B complete.
+S1 through S9a DONE. Build is GREEN across the full ladder: `:domain:test`, `:platform:test`,
+`:app:testDebugUnitTest` (incl. 13 new S9a runtime tests), `:app:assembleDebug`, `:app:lintDebug`.
+The runtime is now the real sensor-event-driven Tasker pipeline: BrightnessPipelineController owns
+all runtime state and drives a single serialized cycle (drop-not-queue MainLoop mutex);
+AnimationRunner does per-frame writes with read-back override detection; OverrideMonitor + controller
+implement detect/pause/resume; AmbientMonitoringService is a specialUse FGS with a live notification
+(Pause/Resume/Reset/Disable) and SCREEN_ON/OFF → reinit/hibernate. Profile gates prof760/758/755 are
+hardcoded booleans (ProfileGates) with a truth-table test. **Legacy fakes still present** (AppModule,
+EvaluateAndApplyBrightnessUseCase, BrightnessPolicyEngine, Ports, SystemAdapters) — S9b rips them out.
 
 ## Next up
 
-- S9a: Runtime pipeline core (preconditions S5 ✅, S6 ✅, S7 ✅, S8 ✅)
-- Then S9b → Gate 1.
+- S9b: super-dimming wiring + QS tile + boot start + legacy rip-out → **GATE 1**.
+  Note for S9b (D-039): pass `BrightnessPolicyOutput.scaleDynamicCompress` into the dimming path;
+  wire SecureDimmingController writes from the pipeline coroutine; replace AppModule with the real
+  graph (the controller's adapter set is the template); proximity damp (task545) is still unwired.
 
 ## Deviations & discoveries ledger
 
@@ -388,7 +398,38 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   mapper conversions; 5 DefaultProfiles vs task592; ContextOverrideRules JSON interop. (Affects
   S10, S12, S14.)
 
-Append new entries as D-039, D-040, … with which segments they affect.
+- D-039: S9a RUNTIME CORE design decisions (all sanctioned by the S9a brief; flagged for S9b/S12/S14).
+  (a) **Engine owns the dead-band; controller owns the prof760 gate.** The controller applies the
+  prof760 ConditionList (accuracy-trust + absolute dead-band using the PREVIOUS cycle's stored
+  ThreshAbsLow/High + MainLoop mutex) BEFORE calling the golden-tested BrightnessEngine, which
+  internally recomputes its own absolute band (`shouldUpdate`). When a tick passes the controller
+  gate but the engine treats it as a no-op (luxAlpha→0, same target), the result is a redundant
+  write of the same value — harmless; the controller additionally skips the animation when
+  `target == brightness.read()`. No behavioral divergence from the engine (which is the oracle), only
+  avoided redundant writes. The two gates use the SAME stored band on the common path so they agree.
+  (b) **Fast intra-cycle flags live outside the immutable snapshot.** `autoRunning` and `initializing`
+  flip many times within one cycle and are read by the observer coroutine, so they are `@Volatile`
+  vars in the controller, not fields of the StateFlow `PipelineState` (which holds the durable
+  runtime vars per pipeline_spec §5). Everything durable is written ONLY from the consumer coroutine.
+  (c) **MainLoop mutex = `AtomicBoolean inCycle` + `compareAndSet`.** Sensor ticks that lose the CAS
+  (or whose gate sees `mainLoopOn`) are dropped at the collector, never enqueued (Tasker drop-not-
+  queue, D-021/D-027). Control events (screen/pause/resume/panic/override) go through an UNLIMITED
+  channel and are NOT dropped; one event still runs to completion (incl. animation) before the next.
+  (d) **secondsOfDay is derived from UTC wall-clock** (`(clock()/1000)%86400`) with default ramp
+  windows. Irrelevant in S9a (scalingEnabled defaults false → engine ignores circadian), but S9b/S12
+  MUST supply real LOCAL seconds-of-day + solar windows (SolarCalculator) when wiring circadian.
+  (e) **prof758 gate transcribed + truth-table-tested in ProfileGates, but task90 is NOT scheduled
+  in S9a** — the periodic dynamic-scale recompute (prof758→task90) is S9b/S12. (f) **task696 only**
+  in AnimationRunner; the task698 DC-like dimming write + SecureDimmingController wiring is S9b
+  (pass `output.scaleDynamicCompress` to OverrideRules.recordOverridePoint — already done in the
+  controller's handleOverride). (g) **Proximity damp (task545/prof759) is unwired** — the engine has
+  no proximity concept and S9a's scope is the core loop; revisit if a later segment surfaces it.
+  (h) **task567's CycleTime re-check wait is collapsed**: handleOverride applies OverrideRules
+  .shouldCommitPause immediately rather than waiting %AAB_CycleTime, because the single-cycle model
+  already guarantees no animation is mid-flight when an OverrideDetected event is dequeued. (Affects
+  S9b, S10, S12, S14.)
+
+Append new entries as D-040, D-041, … with which segments they affect.
 
 ## Blockers
 
