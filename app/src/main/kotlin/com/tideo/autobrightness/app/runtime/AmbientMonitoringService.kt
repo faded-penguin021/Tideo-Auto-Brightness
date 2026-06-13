@@ -14,17 +14,14 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.tideo.autobrightness.R
+import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.storage.settingsDataStore
-import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
-import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
-import com.tideo.autobrightness.platform.sensor.AndroidLightSensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -55,16 +52,9 @@ class AmbientMonitoringService : Service() {
         super.onCreate()
         createNotificationChannel()
 
-        // ONE controller instance is shared between writer and observer so the suppress-echo
-        // marker is per-instance (D-034): the observer must see exactly the writer's last value.
-        val brightnessController = AndroidScreenBrightnessController(applicationContext)
-        controller = BrightnessPipelineController(
-            lightSensor = AndroidLightSensorSource(applicationContext),
-            brightness = brightnessController,
-            brightnessObserver = AndroidBrightnessObserver(applicationContext, brightnessController),
-            settingsProvider = { applicationContext.settingsDataStore.data.first() },
-            scope = scope,
-        )
+        // AppModule composes the real graph (S7 adapters + S9a pipeline + S9b super dimming);
+        // writer and observer share one instance for the per-instance suppress-echo marker (D-034).
+        controller = AppModule(applicationContext).createController(scope)
 
         registerReceiver(
             screenReceiver,

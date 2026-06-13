@@ -43,8 +43,8 @@ filled by S1/S2 during extraction.
 | Compressed dynamic scale: 548 | | TaskerReference + taper.csv (S4) + BrightnessEngine.compressedDynamicScale (S5) | ported |
 | Continuity coefficients: 659 _UpdateBrightnessFormulae | | TaskerReference + formulae.csv (S4) + BrightnessFormulae.kt (S5) | ported |
 | Animation calc: 543 | | TaskerReference + animation.csv (S4) + BrightnessEngine.calculateAnimation (S5) | ported |
-| Brightness transitions: 696, 698 | | TaskerReference + transition.csv/dimming.csv (S4); runtime/AnimationRunner per-frame write + read-back override detect (S9a); 698 DC-like dimming write S9b | ported (brightness; 698 dimming S9b) |
-| Software/super dimming math: 700, 645, 646, 647 | | SoftwareDimming.kt (S5 math, golden-tested superdimming.csv 2016 rows, CorePipelineParityTest); 650/653/654/644 privilege writes platform (S9b) | ported (math) |
+| Brightness transitions: 696, 698 | | TaskerReference + transition.csv/dimming.csv (S4); runtime/AnimationRunner per-frame write + read-back override detect (S9a). S9b wires the ELEVATED secure-dimming (reduce_bright_colors) layer; the task698 DC-like *unprivileged overlay* transition (653/654) is deferred to S12 (D-040) | ported (brightness + secure dimming; unprivileged overlay S12) |
+| Software/super dimming math: 700, 645, 646, 647 | | SoftwareDimming.kt (S5 math, golden-tested superdimming.csv 2016 rows, CorePipelineParityTest); runtime/SuperDimmingCoordinator (S9b) engages task646 dimShell → AndroidSecureDimmingController (reduce_bright_colors) when ELEVATED, disengages above threshold (task645); wired into pipeline cycle + pause/override/panic/hibernate; SuperDimmingCoordinatorTest tier-gated | ported (math + secure-dimming wiring) |
 | Initial brightness on wake: 618 | | TaskerReference (S4) + InitialBrightness.kt (S5) + InitialBrightnessTest.kt (S5) | ported |
 | Hibernate/reset: 585 | | runtime/BrightnessPipelineController.hibernate (S9a — sensor unregister + runtime-state clear) | ported |
 | Throttle reset: 566 | | runtime/BrightnessPipelineController.reinit (S9a — throttle = settings default on wake) | ported |
@@ -54,7 +54,7 @@ filled by S1/S2 during extraction.
 | Circadian dynamic scale: 90 (+ polar handling) | | SolarCalculator.kt + DynamicScaleEngine.kt (S6 domain, golden-tested circadian.csv 576 rows, CircadianParityTest + 4 polar assertions); BrightnessEngine delegates computeDynamicScale (D-031) | ported |
 | Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S2 extracted → contexts_spec.md | pending |
 | Privilege detection/grant: 378, 643, 563 | | S2 extracted → features_spec.md; platform layer: AndroidPrivilegeManager + ShizukuGrantGateway stub (S7); UI wiring S11 | platform-ported (S7) |
-| QS tile: 551, 552 | | S2 extracted → features_spec.md | pending |
+| QS tile: 551, 552 | | S2 extracted → features_spec.md; runtime/BrightnessTileService (S9b — toggles serviceEnabled + start/stop FGS via AutoBrightnessRuntime; manifest QS_TILE entry + BIND_QUICK_SETTINGS_TILE); BrightnessTileServiceTest instantiation smoke | ported (toggle) |
 | Foreground notification: 584, 692 | | S2 extracted → features_spec.md; runtime/AmbientMonitoringService live lux/target notification + Pause/Resume/Reset/Disable actions (S9a) | ported |
 | Curve suggestion wizard: 38, 655 | | CurveSuggestionEngine.kt (S6 domain, golden-tested wizard.csv 12 rows, WizardParityTest); applyToLiveCurve = task655 | ported |
 | Formula validation: 583, 707 | | S2 extracted → features_spec.md; SettingsValidator.kt (S8 — 5 rules: form2A<0, form3A<0, form2C>zone1End advisory + predicted-brightness@1000lux<25 safety) | ported |
@@ -126,7 +126,7 @@ filled by S1/S2 during extraction.
 | task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
 | task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 (cross-validation oracle, D-002) | chart render = S13 BrightnessCurveChart | reference (chart S13) |
 | task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner (S9a) | ported |
-| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner brightness path (S9a); DC-like dimming write S9b | ported (brightness; dimming S9b) |
+| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner brightness path (S9a); S9b wires the ELEVATED secure-dimming layer (task646/650/645 via SuperDimmingCoordinator); DC-like unprivileged overlay deferred S12 (D-040) | ported (brightness + secure dimming; overlay S12) |
 | task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
 | task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |
 | task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | ✓ S6 (delegate) | SolarCalculator.kt + DynamicScaleEngine.kt (S6) | ported |

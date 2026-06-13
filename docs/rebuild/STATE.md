@@ -23,26 +23,34 @@ next session does not know it.
 | S8.5 review (Fable→Opus) | 2026-06-12/13 | Fable+Opus | IN PROGRESS | 3c6a585, cd3fd15, (this) | Sequential reviews (one agent at a time per owner). DONE: full acceptance suite green; S7 review → D-034 (suppress-echo redesign, OEM rounding, +8 tests); D-035 model policy (Opus from S9a); checklist unstale'd; **S4/S5 review → D-036** (2 CRITICAL parity holes fixed: task661 ScalingUse=false/%AAB_Scale branch + %AAB_ScaleDynamicCompress surfacing; new calculated.csv golden + 3 tests; existing 8 CSVs byte-identical); **S6 review → D-037** (port verified faithful; fixed oracle-circularity by adding independent SolarInvariantTest [7 astronomical invariants, all pass] + wizard abort test + dawn/dusk golden assertions); **S8 review → D-038** (CRITICAL: contextOverride default true→false [would lock context switching on fresh install]; fixed 2 vacuous safety-validator tests). All four reviews (S4/S5, S6, S7, S8) COMPLETE. Build green. S9a may proceed (Opus per D-035). |
 | S9a runtime core | 2026-06-13 | Opus/high | DONE | (see push) | Runtime pipeline rebuilt (D-039). New: `runtime/ProfileGates.kt` (hardcoded prof760/758/755 ConditionList booleans, D-021 provenance); `PipelineState.kt` (single runtime-state holder + PipelineEvent sealed type); `AnimationRunner.kt` (task696 per-frame write + read-back override detect, suppress-echo); `OverrideMonitor.kt` (BrightnessObserver→OverrideRules prof755 gate); `BrightnessPipelineController.kt` (single-coroutine pipeline, drop-not-queue MainLoop mutex via AtomicBoolean, sensor→gate→throttle→BrightnessEngine.evaluate→animate, override/pause/resume, hibernate/reinit/panic); `AmbientMonitoringService.kt` REBUILT (ServiceCompat specialUse FGS, live lux/target notification + Pause/Resume/Reset/Disable actions, dynamic SCREEN_ON/OFF receiver→reinit/hibernate). Tests: ProfileGatesTest (prof760+758+755 truth table), AnimationRunnerTest (4), BrightnessPipelineControllerTest (first-run/throttle/mid-cycle-drop/override/resume/hibernate, 5), AmbientMonitoringServiceTest (Robolectric foreground notif + lifecycle, 2). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :domain:test :platform:test :app:lintDebug`. Legacy fakes still present (S9b rips out). No compaction. |
 
+| S9b runtime features + legacy rip-out | 2026-06-13 | Opus/medium | DONE | (see push) | Super dimming + QS tile + boot start wired; legacy graph deleted (D-040). New: `runtime/SuperDimmingCoordinator.kt` (DimmingCoordinator iface + NoOp + SuperDimmingCoordinator — engages task646 `SoftwareDimming.dimShell` → `AndroidSecureDimmingController` reduce_bright_colors when tier ELEVATED ∧ dimmingEnabled ∧ target<DimmingThreshold; disengages above threshold/task645); `runtime/BrightnessTileService.kt` (QS tile toggles serviceEnabled + start/stop FGS via AutoBrightnessRuntime). BrightnessPipelineController gains optional `dimming` param: `dimming.apply(target,settings)` from the cycle + setInitialBrightness; `dimming.disengage()` on override/pause/panic/hibernate. AppModule REWRITTEN as real DI root (`createController(scope)` composes S7 adapters + S9a pipeline + S9b dimming, shared brightness instance D-034); AmbientMonitoringService uses it. MaintenanceWorker stripped of the toy use case (health heartbeat + service re-ensure only). RIP-OUT: `git rm` BrightnessPolicyEngine, EvaluateAndApplyBrightnessUseCase, Ports.kt, SystemAdapters.kt, WebViewGraphFallback.kt, PermissionOnboardingStateMachine.kt. Manifest: QS_TILE service (BIND_QUICK_SETTINGS_TILE). Tests: SuperDimmingCoordinatorTest (6, tier-gated engage/disengage), BootCompletedReceiverTest (2, Robolectric service-start intent + non-boot ignore), BrightnessTileServiceTest (instantiation smoke — Robolectric can't bind a tile). Rip-out grep empty. Full ladder GREEN: `:domain:test :platform:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`. No compaction. **GATE 1 READY.** |
+
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 through S9a DONE. Build is GREEN across the full ladder: `:domain:test`, `:platform:test`,
-`:app:testDebugUnitTest` (incl. 13 new S9a runtime tests), `:app:assembleDebug`, `:app:lintDebug`.
-The runtime is now the real sensor-event-driven Tasker pipeline: BrightnessPipelineController owns
-all runtime state and drives a single serialized cycle (drop-not-queue MainLoop mutex);
-AnimationRunner does per-frame writes with read-back override detection; OverrideMonitor + controller
-implement detect/pause/resume; AmbientMonitoringService is a specialUse FGS with a live notification
-(Pause/Resume/Reset/Disable) and SCREEN_ON/OFF → reinit/hibernate. Profile gates prof760/758/755 are
-hardcoded booleans (ProfileGates) with a truth-table test. **Legacy fakes still present** (AppModule,
-EvaluateAndApplyBrightnessUseCase, BrightnessPolicyEngine, Ports, SystemAdapters) — S9b rips them out.
+S1 through S9b DONE → **GATE 1 READY** (human on-device verification next). Build is GREEN across
+the full ladder: `:domain:test`, `:platform:test`, `:app:testDebugUnitTest`, `:app:assembleDebug`,
+`:app:lintDebug`. The runtime is the real sensor-event-driven Tasker pipeline: BrightnessPipelineController
+owns all runtime state and drives a single serialized cycle (drop-not-queue MainLoop mutex); AnimationRunner
+does per-frame writes with read-back override detection; OverrideMonitor + controller implement
+detect/pause/resume; AmbientMonitoringService is a specialUse FGS with a live notification
+(Pause/Resume/Reset/Disable) and SCREEN_ON/OFF → reinit/hibernate; SuperDimmingCoordinator drives the
+ELEVATED secure reduce_bright_colors layer from the cycle; BrightnessTileService toggles the service from
+a QS tile; BootCompletedReceiver self-starts on boot. **Legacy graph fully removed** (BrightnessPolicyEngine,
+EvaluateAndApplyBrightnessUseCase, Ports, SystemAdapters, WebViewGraphFallback, PermissionOnboardingStateMachine);
+AppModule is now the real DI root.
 
 ## Next up
 
-- S9b: super-dimming wiring + QS tile + boot start + legacy rip-out → **GATE 1**.
-  Note for S9b (D-039): pass `BrightnessPolicyOutput.scaleDynamicCompress` into the dimming path;
-  wire SecureDimmingController writes from the pipeline coroutine; replace AppModule with the real
-  graph (the controller's adapter set is the template); proximity damp (task545) is still unwired.
+- **HUMAN GATE 1** (RUNBOOK "Human gates"): install app-debug.apk, grant WRITE_SETTINGS, verify the
+  core loop (sensor → animate, slider → pause/resume, screen off/on → reinit, reboot → self-start,
+  notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
+  Findings → "Gate findings" below.
+- Then parallel window C: **S10** (context override engine) ∥ **S11** (UI shell + onboarding).
+- Carried for S12 (D-040): unprivileged overlay dimming (task698 DC-like / 653/654) is NOT wired
+  (S9b did the ELEVATED secure path only); DimDynamic (circadian dim strength, task646 ScalingUse
+  branch) passes null pending real solar windows (D-039d); proximity damp (task545) still unwired.
 
 ## Deviations & discoveries ledger
 
@@ -429,7 +437,28 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   already guarantees no animation is mid-flight when an OverrideDetected event is dequeued. (Affects
   S9b, S10, S12, S14.)
 
-Append new entries as D-040, D-041, … with which segments they affect.
+- D-040: S9b RUNTIME FEATURES + RIP-OUT decisions (sanctioned by the S9b brief; flagged for S12/S14).
+  (a) **Super dimming = ELEVATED secure path only.** SuperDimmingCoordinator wires the privileged
+  reduce_bright_colors layer (task646 `dimShell` math → AndroidSecureDimmingController, disengage =
+  task645) and runs it from the pipeline coroutine (post-animation in runCycle, plus setInitialBrightness;
+  disengaged on override/pause/panic/hibernate). The task698 **DC-like UNPRIVILEGED overlay** transition
+  (tasks 653/654) is NOT wired — it is a separate non-secure animation path out of S9b's "engage
+  SecureDimmingController" scope; deferred to S12. The brief's deliverable named only SecureDimmingController.
+  (b) **DimDynamic passes null** (task646 act6 ScalingUse branch → DimmingStrength×DimDynamic). DimDynamic
+  is a DynamicScaleEngine output that needs real solar windows; S9a already defers real circadian wiring
+  (D-039d, UTC seconds + default windows) and scalingEnabled defaults false, so the plain-strength else-branch
+  is the correct default-config path. S12 must wire DimDynamic when it wires real local solar windows.
+  (c) **AppModule is now the DI root.** `AppModule(context).createController(scope)` composes the S7 adapters
+  + S9a pipeline + S9b dimming with a shared brightness instance (D-034 suppress-echo); the service delegates
+  to it instead of inlining. createController builds fresh adapters per service lifetime.
+  (d) **MaintenanceWorker no longer evaluates.** The toy EvaluateAndApply loop is gone; the live FGS owns all
+  evaluation. The worker now only re-ensures the service is running (memory-pressure safety net) + writes a
+  health heartbeat. The daily context-cache reset (contexts_spec, prof8/task26) is S10's wiring, not added here.
+  (e) **QS tile** toggles serviceEnabled + start/stop via AutoBrightnessRuntime.onSettingChanged (task551
+  on/off semantics); Robolectric cannot bind a TileService (ServiceController casts the tile binder) so its
+  test is instantiation-only (brief-sanctioned downgrade). (Affects S10, S12.)
+
+Append new entries as D-041, D-042, … with which segments they affect.
 
 ## Blockers
 
@@ -437,7 +466,7 @@ Append new entries as D-040, D-041, … with which segments they affect.
 
 ## Gate findings
 
-### Gate 1 (after S9) — pending
+### Gate 1 (after S9b) — READY (awaiting human on-device run)
 ### Gate 2 (after S12) — pending
 ### Gate 3 (after S14) — pending
 
