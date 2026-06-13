@@ -58,11 +58,11 @@ filled by S1/S2 during extraction.
 | Foreground notification: 584, 692 | | S2 extracted → features_spec.md; runtime/AmbientMonitoringService live lux/target notification + Pause/Resume/Reset/Disable actions (S9a) | ported |
 | Curve suggestion wizard: 38, 655 | | CurveSuggestionEngine.kt (S6 domain, golden-tested wizard.csv 12 rows, WizardParityTest); applyToLiveCurve = task655 | ported |
 | Formula validation: 583, 707 | | S2 extracted → features_spec.md; SettingsValidator.kt (S8 — 5 rules: form2A<0, form3A<0, form2C>zone1End advisory + predicted-brightness@1000lux<25 safety) | ported |
-| Power draw calibration: 524 | | S2 extracted → features_spec.md | pending |
-| Profiles/import/export/defaults: 592, 637, 622 | | S2 extracted → features_spec.md; DefaultProfiles.kt (S8 — 5 built-in profiles from task592); AabSettings v2 + migration + TaskerLegacyProfileSerializer updated (S8); ContextOverrideRules.kt storage model (S8); context-rule disk wiring done S10 (ContextRuleStore/DataStore); profile import/export disk wiring S12 | ported (schema+defaults+context-rule store; profile import/export S12) |
-| Debug tooling: 634, 635 | | S2 extracted → features_spec.md | pending |
+| Power draw calibration: 524 | | S2 extracted → features_spec.md; Tools entry + PowerDrawChart slot (S12); on-device current-sampling measurement deferred (D-044) | partial (UI entry S12; measurement deferred) |
+| Profiles/import/export/defaults: 592, 637, 622 | | DefaultProfiles.kt (S8); AabSettings v2 + migration + TaskerLegacyProfileSerializer (S8); ContextRuleStore (S10); Profiles screen (S12 — apply/reset + CreateDocument/OpenDocument import-export incl. legacy) | ported |
+| Debug tooling: 634, 635 | | Tools screen 10-label debug selector (S12, D-023); in-app log view deferred (D-044) | partial (selector S12; log view deferred) |
 | Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | S2 extracted → screen_map.md (scene dispositions) | pending |
-| **Anonymous scene-handler tasks (168 unnamed**, incl. 34 `keyTask` back-key handlers) | various | S3.5 census → extraction/tasks/anonymous_handlers.md | pending (S12/S13: every row ported or dropped(reason)) |
+| **Anonymous scene-handler tasks (168 unnamed**, incl. 34 `keyTask` back-key handlers) | various | S3.5 census + S12 Step-0 triage (a/b/c buckets) → extraction/tasks/anonymous_handlers.md | ported (S12 — (a)/(b) dropped w/ shared reasons, (c) ported into 7 screens; chart-gen rows deferred-S13) |
 
 ## Scenes (20) → M3 screens (~9, per S2 screen_map.md)
 
@@ -71,22 +71,22 @@ filled by S1/S2 during extraction.
 | Scene | XML | Ported to | Status |
 |---|---|---|---|
 | AAB Menu | L4462 | Dashboard (M3 nav) | ported (S11 — M3 nav shell + live Dashboard; nav to all target screens) |
-| AAB Brightness Settings | L1415 | Curve & Brightness | pending (S2 extracted) |
-| AAB Reactivity Settings | L6739 | Reactivity | pending (S2 extracted) |
-| AAB Superdimming Settings | L7533 | Animation & Dimming | pending (S2 extracted) |
-| AAB Misc Settings | L4718 | Dashboard/Tools | pending (S2 extracted) |
-| AAB Experiment Settings | L3334 | Dynamic Scale | pending (S2 extracted) |
-| AAB Profile | L5724 | Profiles & Import/Export | pending (S2 extracted) |
-| AAB Debug Scene | L2583 | Tools | pending (S2 extracted) |
-| AAB Color Filter | L2552 | Animation & Dimming | pending (S2 extracted) |
-| AAB Brightness Graph | L1202 | Curve & Brightness (BrightnessCurveChart) | pending (S2 extracted) |
-| AAB Alpha Graph | L1038 | Reactivity (alpha overlay) | pending (S2 extracted) |
-| AAB Reactivity Graph | L6563 | Reactivity (ReactivityChart) | pending (S2 extracted) |
-| AAB Dimming Graph | L3006 | Animation & Dimming (DimmingChart) | pending (S2 extracted) |
-| AAB Circadian Dimming Graph | L2388 | Animation & Dimming (CircadianChart; re-homed S3.5/D-026, visible only when %AAB_ScalingUse on) | pending (S2 extracted) |
-| AAB Taper Graph | L8387 | Dynamic Scale (TaperChart) | pending (S2 extracted) |
-| AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | pending (S2 extracted) |
-| AAB Experiment Graph | L3170 | Dynamic Scale (ExperimentChart) | pending (S2 extracted) |
+| AAB Brightness Settings | L1415 | Curve & Brightness | ported (S12 — fields + validator + live form2A/3A + BrightnessCurveChart) |
+| AAB Reactivity Settings | L6739 | Reactivity | ported (S12 — thresholds + DetectOverrides/trust toggles; chart slot S13) |
+| AAB Superdimming Settings | L7533 | Animation & Dimming | ported (S12 — anim + ELEVATED-gated dimming + PWM; chart slot S13) |
+| AAB Misc Settings | L4718 | Dashboard/Tools | ported (S12 — anim/throttle in Animation & Dimming, debug/notify in Tools/Dashboard) |
+| AAB Experiment Settings | L3334 | Dynamic Scale | ported (S12 — scaling/taper fields + warnings; chart slot S13) |
+| AAB Profile | L5724 | Profiles & Import/Export | ported (S12 — built-in profiles + reset + JSON/legacy import-export + context CRUD) |
+| AAB Debug Scene | L2583 | Tools | ported (S12 — 10-label debug selector + wizard + calibration entry) |
+| AAB Color Filter | L2552 | Animation & Dimming | ported (S12 — PWM-sensitive + exponent rows) |
+| AAB Brightness Graph | L1202 | Curve & Brightness (BrightnessCurveChart) | ported (S12 — BrightnessCurveChart = chart template; ChartCanvas engine) |
+| AAB Alpha Graph | L1038 | Reactivity (alpha overlay) | partial (S12 host slot; chart render S13) |
+| AAB Reactivity Graph | L6563 | Reactivity (ReactivityChart) | partial (S12 host slot; chart render S13) |
+| AAB Dimming Graph | L3006 | Animation & Dimming (DimmingChart) | partial (S12 host slot; chart render S13) |
+| AAB Circadian Dimming Graph | L2388 | Animation & Dimming (CircadianChart; re-homed S3.5/D-026, visible only when %AAB_ScalingUse on) | partial (S12 host slot; chart render S13) |
+| AAB Taper Graph | L8387 | Dynamic Scale (TaperChart) | partial (S12 host slot; chart render S13) |
+| AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | partial (S12 host slot; chart + on-device calibration S13/Gate) |
+| AAB Experiment Graph | L3170 | Dynamic Scale (ExperimentChart) | partial (S12 host slot; chart render S13) |
 | AAB About | L799 | About+Guide+Onboarding | partial (S11 — onboarding/privilege stepper done; About content S13) |
 | AAB User Guide | L8551 | About+Guide+Onboarding | partial (S11 — onboarding done; User Guide content S13) |
 | AAB Chart.Js License | L2194 | dropped(Chart.js removed) | pending (S2 extracted) |

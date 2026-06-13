@@ -189,3 +189,60 @@ XML_RECIPES R2 (extract task by id) for the full block.
 | task750 | L39905 | AAB Brightness Settings · elements18·longclick | Flash(Sets the lux level where 'indoor light' ends …) |
 | task751 | L39930 | AAB Brightness Settings · elements19·valueselected | If[%new_val isSet]; Variable Set(%aab_zone2end); End If |
 | task752 | L39959 | AAB Brightness Settings · elements20·valueselected | If[%new_val isSet]; Variable Set(%aab_form2d); Variable Set(%aab_zone1end); End If; If[%aab_zone1end < %aab_form2c]; Variable Set(%aab_form2c); Element Visibility(AAB Brightness Settings); Perform Task(_RedInvalidFormul… |
+
+---
+
+## S12 Step-0 triage (D-027f) — disposition class per row
+
+Added by S12 before any screen work. Every listed row is committed to exactly one bucket:
+**(a) trivial scene-chrome** → bulk-dropped (M3 `Scaffold`/back-nav + per-field `supportingText`
+replace Tasker scene nav and longclick help toasts); **(b) settings-mutation** →
+`dropped(absorbed-by-compose-state)` (a Compose field/toggle bound to `AabSettings` with a
+debounced persist + `SettingsValidator` covers it); **(c) complex** → the explicit 1:1 port list
+below (multi-action / branching / cross-field / side-effecting). Chart *generation* rows keep
+their **logic** in S12 (warnings, guards, apply) but their **render** is `deferred-S13`.
+
+### (a) Trivial scene-chrome — DROPPED (shared reason)
+
+- **`props·key` back-key handlers** (scene show/destroy nav): task550, 568, 590, 591, 593, 594,
+  597, 598, 599, 600, 602, 603, 605, 606, 632 → dropped(M3 nav back). About/Guide/License
+  keys task595, 596, 604 → `deferred-S13` (S13 owns those screens).
+- **Exit/close/scene-nav clicks** (`_ExitButton`, Show/Destroy Scene): task391, 411, 417, 462,
+  481, 490, 516, 521, 532, 537, 538, 666, 667, 671, 680, 748 → dropped(M3 nav). About/Guide
+  task685, 717, 718 → `deferred-S13`.
+- **Longclick help tooltips** (single `Flash(...)`, ± a throwaway var set): task383, 405, 421,
+  465, 493, 505, 506, 510, 514, 519, 527, 529, 536, 658, 662, 670, 672, 678, 682, 684, 687,
+  688, 690, 694, 702, 711, 712, 719, 720, 721, 722, 723, 725, 726, 727, 728, 729, 730, 732,
+  736, 737, 740, 741, 747, 749, 750 → dropped(help text → Compose `supportingText`).
+
+### (b) Settings-mutation — DROPPED(absorbed-by-compose-state)
+
+- **Bound value set** (`Variable Set(%aab_*)` from valueselected, ± single range guard the
+  validator/clamp already enforces): task390, 395, 407, 409, 508, 522, 530, 531, 539, 608, 660,
+  664, 681, 683, 689, 691, 701, 704, 708, 709, 713, 734, 739, 742, 744, 751.
+- **Save buttons** (`_SaveButton*` — Compose persists on valid edit, no explicit Save): task406,
+  466, 515, 520, 669, 679, 710, 746.
+- **Toggle checkchange** (`_*Toggle` named tasks): task397, 402, 525, 526, 533, 534, 676, 677,
+  693, 695, 697, 699, 731, 733.
+- **Reset-to-defaults** (`Initialize AAB Defaults` + scene reload): task396, 500, 675, 735, 738
+  → absorbed by the Profiles "Reset to defaults" action (writes `AabSettings()` / `DefaultProfiles`).
+- **Privilege re-detect** task492 → dropped(covered-by-S11 onboarding tier flow).
+
+### (c) Complex — 1:1 PORT LIST (owned by S12 screens)
+
+| Row(s) | Behavior | Ported into |
+|---|---|---|
+| task384, 386 | `form2a<0` → block apply with warning | Curve & Brightness: `SettingsValidator` form2A error gates the field (red), no separate Save |
+| task752 | set zone1End → derive form2d, clamp form2c≤zone1End, re-run RedInvalid | Curve & Brightness: cross-field clamp in VM + validator |
+| task613, 614, 615, 616, 617 | focuschange → `_UpdateBrightnessFormulae` + `_RedInvalidFormulae` (+ zone2End≥zone1End, form2C≤zone1End guards) | Curve & Brightness: LIVE derived form2A/form3A readout + per-field validator errors |
+| task403, 714, 715, 716 | min/max wait + animSteps cross-field guards; throttle = animSteps·maxWait+10 derivation | Animation & Dimming: derived throttle readout + cross-field validation |
+| task509, 511, 523, 607, 609, 610, 611, 612 | dimming/exponent/threshold/spread/strength focuschange validators + unprivileged-tier warning | Animation & Dimming: field error states + ELEVATED-gated rows with tier hint |
+| task513 | dimming threshold<minBright guard (+ dimming graph gen) | Animation & Dimming: threshold validation; chart render `deferred-S13` |
+| task517, 674 | `scaleTransitionFactor>0.5` "graph may be non-sensical" warning (+ circadian/experiment graph gen) | Dynamic Scale / Animation & Dimming: warning surfaced; chart render `deferred-S13` |
+| task665, 689 | "values not set" / taper midpoint ≤ maxBright guards | Dynamic Scale: field validation |
+| task651, 412, 621, 724 | run `_SuggestCurveParameters`; apply (`%suggest=true`) vs discard; refresh curve | Tools: wizard runner over `CurveSuggestionEngine` + `applyToLiveCurve` |
+| task411, 473, 686, 743 | generate Reactivity/Compression/Alpha graphs (Java) | chart render `deferred-S13` (Reactivity/Dynamic Scale/Tools host slots left by S12) |
+
+**Net:** ~46 (a) + ~58 (b) dropped with shared reasons; ~30 distinct (c) behaviors ported into the
+seven S12 screens; chart-generation/render rows `deferred-S13`. S13 resumes from the
+`deferred-S13` tags here.

@@ -31,11 +31,28 @@ next session does not know it.
 
 | S11 UI shell + onboarding + dashboard | 2026-06-13 | Opus/medium | DONE | (see push) | M3 nav shell over the screen_map target set rebuilt (D-043). New: `navigation/AppRoute.kt` (enum: Dashboard/Onboarding real + 8 S12/S13 placeholders) + rewritten `NavGraph.kt` (first-run routing → Onboarding when tier==NONE) + `ui/screens/PlaceholderScreen.kt`; `ui/theme/Theme.kt` (M3 dynamic color + DayNight); rebuilt `ui/screens/DashboardScreen.kt` (stateless `DashboardContent` + VM wrapper: live lux/smoothed/current→target, master switch, pause/resume, active-context line, tier badge→onboarding, health) driven by `state/DashboardViewModel.kt` + `state/DashboardState.kt` + new `runtime/LiveRuntimeState.kt` (process-wide bridge from the service's pipeline StateFlow to the UI); `ui/onboarding/OnboardingScreen.kt` (stateless `OnboardingContent` + wrapper: POST_NOTIFICATIONS → WRITE_SETTINGS w/ onResume canWrite re-check → optional ELEVATED [adb-copy/Shizuku/root + live tier] → usage-access shown only when app rules exist). **Shizuku grant exec completed (closes D-032):** AIDL `IShizukuUserService` + `ShizukuUserService` (bound user service execs `pm grant WRITE_SECURE_SETTINGS`) wired through `ShizukuGrantGateway.requestGrant`→`PrivilegeManager.requestShizukuGrant(onResult)`; platform `buildFeatures.aidl=true`; NO java reflection (owner caution). Service republishes pipeline state to LiveRuntimeState + resets on teardown. themes.xml simplified to minimal DayNight no-actionbar platform parent (D-027g resolved). RIP-OUT of toy UI: deleted SettingsState/SettingsViewModel + 3 toy screens; SettingsStore/AabSettingsMapper decoupled from the toy SettingsState (readRawSettings().serviceEnabled at 4 call sites). New deps: compose ui-test-junit4/manifest. Tests: `UiShellTest` (3 Robolectric compose). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(72) `:platform:test :domain:test :app:lintDebug`. No compaction. |
 
+| S12 settings/tools/profile screens + chart engine | 2026-06-13 | Opus/medium | DONE | (see push) | The 7 parameter/tool/profile placeholder screens filled + the reusable chart engine landed (D-044). **Step-0 triage** committed first: `anonymous_handlers.md` 168 rows bucketed (a) trivial-chrome / (b) settings-mutation (both bulk-dropped w/ shared reasons) / (c) ~30 complex behaviors → explicit port list. New: `state/SettingsViewModel.kt` (DataStore-as-truth, advisory SettingsValidator errors, reset/applyProfile/replaceAll) + `state/ContextsViewModel.kt` (rule CRUD + installed-app picker); `ui/components/{SettingsControls,SettingsScaffold}.kt` (NumberSettingField w/ red-error supportingText, SwitchSettingRow, DerivedReadout, back-nav scaffold); `ui/graph/ChartCanvas.kt` (generic axes/ticks/log10/multi-series/markers engine — the S13 template base) + `ui/graph/BrightnessCurveChart.kt` (THE template instance) + `ui/screens/ChartPlaceholder.kt` (deferred-S13 slots); screens `CurveBrightnessScreen` (fields + validator + live form2A/3A + curve chart), `ReactivityScreen` (thresholds + **DetectOverrides toggle, G1-F2**), `AnimationDimmingScreen` (anim + derived throttle + **ELEVATED-gated DimmingEnabled, G1-F5** + PWM), `DynamicScaleScreen` (scaling/taper + task517/674/689 warnings), `ContextsScreen` (rule CRUD), `ToolsScreen` (wizard runner + 10-label debug selector + calibration entry), `ProfilesScreen` (apply/reset + Create/OpenDocument import-export incl. legacy). NavGraph wires all 7 (About → S13 placeholder). Tests: `SettingsScreensTest` (5 — validator→UI form2C error, safety banner, DetectOverrides edit, dimming tier-gate, debug label). Acceptance ladder GREEN: `:app:testDebugUnitTest`(77) `:app:assembleDebug :app:lintDebug`. No compaction. **GATE 2 READY.** |
+
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 through S9b DONE + **GATE 1 PASSED**; **S10 (context override engine) DONE**; **S11 (UI shell +
+**S12 (settings & tools screens + chart engine core) DONE but GATE 2 FAILED → merged + salvaged in
+S12.5 (D-045).** Gate 2 found the UI "miles off" the Tasker app (generic Material, no AAB design
+language/preview-Apply model/sliders; findings G2-F1..F18). The branch is merged as-is (domain/runtime/
+chart-engine sound); the UI is rebuilt in S12.5a/b/c. The wiring below still describes what shipped: all seven
+parameter/tool/profile screens are real Compose M3 over the screen_map target set: Curve & Brightness
+(fields + task583/707 validator red-errors + live form2A/form3A + the BrightnessCurveChart template),
+Reactivity (thresholds + the **DetectOverrides** toggle deferred from Gate 1), Animation & Dimming
+(animation + derived throttle + **ELEVATED-gated DimmingEnabled** + PWM — both Gate-1 deferrals now
+verifiable at Gate 2), Dynamic Scale, Contexts (rule CRUD + app picker over the S10 store), Tools
+(curve-wizard runner + 10-label debug selector + calibration entry), Profiles (apply/reset +
+JSON/legacy import-export). The reusable `ChartCanvas` engine + the one `BrightnessCurveChart`
+template instance are the copy-this-pattern base for S13. Deferred to S13/later (D-044): the six
+non-template charts' render, on-device power-draw measurement, in-app debug log, unprivileged overlay
+dimming. Step-0 anonymous-handler triage committed before screen work. Build GREEN.
+
+(historical) S1 through S9b DONE + **GATE 1 PASSED**; **S10 (context override engine) DONE**; **S11 (UI shell +
 onboarding + dashboard) DONE** — parallel window C complete. The app now has a real Compose M3
 navigation shell (dynamic color + DayNight): a live **Dashboard** (lux/brightness readout, master
 switch, pause/resume, active-context line, privilege tier badge, service health) backed by
@@ -66,13 +83,19 @@ AppModule is now the real DI root.
   notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
   Findings → "Gate findings" below.
 - Parallel window C: **S10** (context override engine) DONE ∥ **S11** (UI shell + onboarding) DONE.
-- **S12** (settings & tools screens + chart engine core) is next on the serial spine — preconditions
-  S8, S10, S11 (+ S6 for wizard/chart math) all DONE. S12 fills the 8 placeholder screens
-  (Curve & Brightness, Reactivity, Animation & Dimming, Dynamic Scale, Contexts, Tools, Profiles,
-  About) with real content + `SettingsValidator`-backed fields; surfaces the DetectOverrides /
-  DimmingEnabled toggles deferred from Gate 1 (D-041 F2/F5) so they are verifiable at Gate 2; starts
-  with the anonymous-handler triage (D-027f). Note the S11 ViewModel pattern (DataStore-as-truth +
-  LiveRuntimeState) and the stateless-content/wrapper split (testable under Robolectric compose).
+- **S12.5 — UI salvage (a/b/c)** is the next serial step (NEW; brief in RUNBOOK, D-045). S12 merges
+  to main as-is; S12.5 rebuilds the UI to AAB fidelity (teal+gold design language + nav drawer + hero
+  cards; temporary-preview→Apply model; bounded sliders; Misc-screen regrouping; toasts; context-editor
+  fidelity; the profile-load-disables-overrides bug G2-F8). **Gate 2 is re-tested after S12.5c**, not now.
+- **HUMAN GATE 2** (RUNBOOK "Human gates", after S12.5): full UI walkthrough — every field
+  edits/persists/rejects-invalid-with-red; live form2A/form3A; wizard produces+applies suggestions;
+  Shizuku ELEVATED flow; QS tile; per-app override; charging+time contexts; brightness-chart shape;
+  legacy Tasker import. Findings → "Gate findings". Note the two Gate-1 deferrals are now surfaced:
+  DetectOverrides (Reactivity) and DimmingEnabled (Animation & Dimming, ELEVATED-gated).
+- **S13** (chart replication + static screens) is next on the serial spine — preconditions S12 DONE
+  (template exists), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over read-only
+  `ChartCanvas.kt`) into the six remaining charts and fills their `ChartPlaceholder` host slots
+  (tagged in screen_map + anonymous_handlers `deferred-S13`), plus About/UserGuide content. Haiku/high.
 - Carried for S12 (D-040): unprivileged overlay dimming (task698 DC-like / 653/654) is NOT wired
   (S9b did the ELEVATED secure path only); DimDynamic (circadian dim strength, task646 ScalingUse
   branch) passes null pending real solar windows (D-039d); proximity damp (task545) still unwired.
@@ -598,7 +621,53 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Done button reads "Skip for now" until BASIC is granted. First-run routing: NavGraph starts on
   Onboarding when tier==NONE. (Affects S12, S13, S14.)
 
-Append new entries as D-044, D-045, … with which segments they affect.
+- D-044: S12 SETTINGS/TOOLS SCREENS + CHART ENGINE decisions (sanctioned by the S12 brief; flagged
+  for S13/S14/Gate 2).
+  (a) **Step-0 triage method (D-027f).** Rather than rewrite 168 doc rows inline, an "S12 Step-0
+  triage" section was APPENDED to `anonymous_handlers.md` committing every row to a bucket: (a)
+  trivial scene-chrome (props·key back, _ExitButton/scene-nav, longclick help Flashes) and (b)
+  settings-mutation (Variable Set / valueselected / _SaveButton* / toggle / reset-defaults) are
+  bulk-dropped with one shared reason each (M3 nav + Scaffold back; Compose field state + debounced
+  persist + SettingsValidator); (c) ~30 complex behaviors → an explicit per-row port table mapped to
+  the owning screen. Chart-generation rows tagged `deferred-S13`. Committed before screen work.
+  (b) **DataStore-as-truth, advisory validation (Tasker-faithful).** `SettingsViewModel` persists raw
+  edits immediately (no clamp-on-keystroke); `SettingsValidator` (task583/707) reddens fields/banners
+  but NEVER blocks the write — matching the Tasker scenes (the _RedInvalidFormulae rows are advisory).
+  `validate()` clamping still applies where settings are CONSUMED (DashboardViewModel/runtime), not on
+  the editor write path. Per-field range guards in the brief's scenes (task403/513/689/674…) are
+  rendered as inline error banners; they do not prevent persistence.
+  (c) **Curve-wizard override-point capture NOT wired.** `ToolsScreen`'s wizard runs
+  `CurveSuggestionEngine.suggest` against the currently-recorded override points and applies via
+  `applyToLiveCurve`, but the rebuild has no persistence that captures runtime override points into a
+  UI-readable store yet (OverrideRules records them in pipeline state only). The runner therefore
+  starts from an empty set → task38's <9-points error path → "need ≥ 9" message; apply is fully wired
+  for when points exist. S13/S14: add override-point capture+persistence so the wizard has real input.
+  (d) **Power-draw calibration = entry + chart slot only.** task524's on-device battery-current
+  sampling / brightness-ramp measurement (minutes-long, untestable in this env) is NOT ported; the
+  Tools screen has the entry + a PowerDrawChart `ChartPlaceholder`. Deferred to S13/Gate.
+  (e) **Charts: engine + ONE template.** `ChartCanvas.kt` (generic) + `BrightnessCurveChart.kt`
+  (template) are done; the other six charts are `ChartPlaceholder` host slots for S13 (hard-fence:
+  S13 must not modify ChartCanvas). In-app debug LOG view (task634/635) deferred — only the 10-label
+  selector (D-023) is wired. Unprivileged DC-like overlay dimming (task698/653/654, carried from
+  D-040a) still NOT wired.
+  (f) **Sun-source (location vs manual times) UI not added** on Dynamic Scale — `AabSettings` has no
+  manual-lat/lon/time fields (the runtime computes solar times from passive location, D-042d). Add the
+  fields + UI if Gate 2 shows passive location is insufficient. (Affects S13, S14, Gate 2.)
+
+- D-045: S12 UI verdict + SALVAGE PLAN (owner, Gate 2). S12's screens are functionally wired and
+  green but "miles off" the Tasker app: it built a GENERIC Material settings app, violating CLAUDE.md's
+  prime directive ("port behaviour exactly; modernise the *how*, never the *what*"). The owner chose to
+  **merge S12 anyway** (the domain engine, runtime pipeline, chart engine, validator, DataStore models
+  and the stateless-Content/wrapper + Robolectric-compose patterns are all sound and worth keeping) and
+  to **salvage the UI in S12.5** (split a = design language/app shell, b = preview→Apply interaction
+  model + sliders + grouping, c = feature/behaviour fidelity). S12.5 is a UI-LAYER salvage — it must NOT
+  touch domain/, runtime decision logic, golden vectors, or the ChartCanvas public API. The full defect
+  list is Gate-2 findings G2-F1..F18 (this file). Owner's two binding answers: interaction model =
+  **full temporary-preview → Apply with [committed] values + pipeline re-run**; screen layout = **keep
+  the 9-screen screen_map but fix grouping (re-add a faithful Misc/General screen; min/max/offset/scale +
+  animation belong there)**. (Affects S12.5a/b/c, S13, S14, Gate 2.)
+
+Append new entries as D-046, D-047, … with which segments they affect.
 
 ## Blockers
 
@@ -654,7 +723,73 @@ The tester executed the Gate 1 instructions exactly as provided. The `tideo-auto
 
 **G1-F5: Super Dimming not activating**
 *   **Observation:** After granting `WRITE_SECURE_SETTINGS` (verified via Shizuku authorized applications), reducing ambient light below the dimming threshold does not engage Android's Extra Dim / reduce bright colors feature.
-### Gate 2 (after S12) — pending
+### Gate 2 (after S12) — findings recorded (triage pending decisions)
+
+**Human test 2026-06-13 ~18:15 UTC.** Onboarding incl. Shizuku binding smooth. Many individual
+fields/validators work (see PASSED). But the owner's headline verdict: **"miles off the Tasker
+version — UX is poor, screens restructured, behaviours don't match Tasker; I expected a faithful
+port."** Root cause (self-assessed): S12 built a generic Material settings app, violating CLAUDE.md
+"port behaviour exactly / modernise the how not the what". The interaction MODEL was not ported.
+
+**PASSED:** permissions onboarding + Shizuku; form2C>zone1End red error; form2A/form3A live; safety
+warning @1000lux; min-wait>max-wait error; transition-factor>0.5 warning; taper-midpoint>maxBright
+warning; time-context rule loads its profile (min-bright kicks in); reset-to-defaults; QS tile toggles.
+
+**FINDINGS (G2-Fn):**
+- **G2-F1 (parity, major) — no temporary-preview / Apply model.** Tasker AAB edits TEMP values that
+  drive the graph, then an Apply commits them and shows the committed/active value in `[brackets]`
+  next to each setting. S12 commits every keystroke instantly, no preview, no bracketed active value.
+- **G2-F2 (parity/structure) — field grouping wrong.** min/max/offset/scale + animation settings are
+  on the **Misc** scene in Tasker; S12 scattered them onto Curve & Brightness / Animation & Dimming.
+  (Note: the 20→9 consolidation itself is the owner-approved screen_map/S2 plan; this is a grouping
+  error WITHIN that, vs the extraction.)
+- **G2-F3 (parity/UX) — bounded sliders replaced by unbounded free-text.** Tasker uses bounded
+  sliders for min/max brightness, taper midpoint (130–240), animSteps, etc. (D-017/D-018: 6 sliders).
+  S12 used free-text everywhere → e.g. min-bright range shown as 1..255 with no bound, taper midpoint
+  free text.
+- **G2-F4 (bug) — min brightness doesn't update the curve graph.** BrightnessCurveChart floors at 0,
+  not minBrightness, so the curve floor never moves.
+- **G2-F5 (validation gap) — scale=0.01 gives no "dangerously low curve" warning.** Tasker warns.
+- **G2-F6 (bug) — zone2End < zone1End → form3A shows NaN with no warning.** Need a guard + warning.
+- **G2-F7 (bug) — numeric text entry corrupts.** NumberSettingField re-seeds from the committed value
+  mid-edit: 8.8 → backspace → … → typing 8.8 yields "8.80.0". Want empty/null over a forced 0.
+- **G2-F8 (runtime — CLARIFIED by owner) — manual override detection is reliable; loading a profile
+  DISABLES it.** Owner confirmed overrides work consistently EXCEPT after a profile load, which leaves
+  override detection off. Real bug for S12.5 (the profile-apply path must not clear/disable the
+  DetectOverrides runtime state; likely the reapply/setInitialBrightness path or the
+  effectiveSettings swap dropping detectOverrides). Investigate the ContextEngine/profile merge +
+  controller reapply.
+- **G2-F9 (runtime/dimming) — super dimming does not engage Android Extra Dim even with ELEVATED.**
+  DimmingEnabled now persists (S12) but reduce_bright_colors does not activate. Likely shares the
+  no-re-eval root cause (F16) and/or OEM secure-key differences; needs device investigation.
+- **G2-F10 (parity) — PWM-sensitive and super-dimming are not mutually exclusive.** Tasker disables
+  one when the other is enabled.
+- **G2-F11 (parity + bug) — dim spread editable while circadian/scaling disabled (should be gated);
+  dim-spread label is wrong.**
+- **G2-F12 (parity/UX) — Flash/toast actions only render inline; no toasts anywhere.** Tasker uses
+  toasts for confirmations/warnings/help (longclick). S12 converted all to supportingText/banners.
+- **G2-F13 (parity/UX) — taper midpoint is unbounded free text (should be a 130–240 slider).** (⊂ F3)
+- **G2-F14 (feature gaps) — context rule editor weak:** no "get current SSID" helper; no SUNRISE/SUNSET
+  for from/to (resolver supports the tokens — editor doesn't expose them); foreground-app list is tiny
+  (Android 11+ package-visibility: needs `<queries>`/LAUNCHER or QUERY_ALL_PACKAGES) + no app icons;
+  no usage-access prompt when an app trigger is added.
+- **G2-F15 (gap) — debug selector persists but does nothing.** %AAB_Debug = 10 runtime TOAST categories
+  (D-023); no runtime debug output is wired.
+- **G2-F16 (bug, high value) — settings/profile changes don't re-run the pipeline.** Applying a profile
+  in the dark changes the numbers but not the screen (no new sensor event → drop-not-queue → no
+  re-eval). Time-context switching DOES apply (it fires ContextChanged). Tasker re-runs "Advanced Auto
+  Brightness" on save/apply. Need a settings-change → forced re-eval control event (likely also fixes F9).
+- **G2-F17 (minor) — QS tile:** works; unclear whether it reflects paused state.
+- **G2-F18 (design language — major) — the app does not look or feel like AAB.** The Tasker project
+  has a distinctive **teal + gold** design language, the **project name in a header up top**, a
+  **hamburger / nav-drawer menu** (the AAB Menu scene), and **hero cards** for Profiles and Contexts.
+  S12 shipped default Material 3 (dynamic color), a plain top bar, and a flat list of outlined nav
+  buttons on the Dashboard — generic, not AAB. (Owner's examples are illustrative, NOT exhaustive: the
+  whole visual/interaction identity needs to match the Tasker app.)
+
+**Decision (owner, 2026-06-13 19:00):** MERGE this branch as-is (S12 compiles + tests green; domain/
+runtime/chart-engine are sound) and **salvage the UI in a new S12.5** (see RUNBOOK; split a/b/c).
+Gate 2 stays open and is re-tested after S12.5. **Gate 2 NOT signed off.** D-045 records the plan.
 ### Gate 3 (after S14) — pending
 
 The human records on-device findings here; the next session triages them.

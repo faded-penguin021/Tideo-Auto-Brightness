@@ -609,3 +609,32 @@ Every Chart.js WebElement maps to a named Compose-Canvas chart (built S12/S13). 
   re-implemented as native Compose screens.
 - The 4 Chart.Js License elements are `dropped(Chart.js removed)`; the Menu's HTML nav is replaced
   by M3 navigation. **Zero unmapped elements.**
+
+---
+
+## S12 implementation status (2026-06-13)
+
+The consolidation matrix above is now realized in Compose. Mapping of target screens → files:
+
+- **Curve & Brightness** → `ui/screens/CurveBrightnessScreen.kt` (min/max/offset/scale, zones,
+  form1A/2B/2C + live derived form2A/form3A readout + task583/707 validator errors) + the
+  `BrightnessCurveChart` template on the reusable `ui/graph/ChartCanvas.kt` engine.
+- **Reactivity** → `ReactivityScreen.kt` (thresholds + midpoint/steepness/deltaFactor; DetectOverrides
+  + trust-unreliable toggles — surfaces the Gate-1 D-041 F2 toggle). ReactivityChart slot → S13.
+- **Animation & Dimming** → `AnimationDimmingScreen.kt` (animSteps/min/max wait + derived throttle;
+  ELEVATED-gated dimming rows w/ tier hint + onboarding link — surfaces D-041 F5 DimmingEnabled; PWM).
+  Dimming/Circadian charts → S13.
+- **Dynamic Scale** → `DynamicScaleScreen.kt` (scaling enable/spread/steepness/transition + taper
+  midpoint/steepness; task517/674/689 warnings). Experiment/Taper charts → S13.
+- **Contexts** → `ContextsScreen.kt` (rule list CRUD: app picker, Wi-Fi, time window, charging,
+  profile + priority) over `ContextRuleStore` (S10).
+- **Tools** → `ToolsScreen.kt` (curve-wizard runner over `CurveSuggestionEngine` + applyToLiveCurve;
+  10-label debug selector D-023; power-draw calibration entry + PowerDrawChart slot → S13).
+- **Profiles & Import/Export** → `ProfilesScreen.kt` (built-in profile apply, reset, CreateDocument/
+  OpenDocument JSON + legacy-Tasker import-export via `ProfileImportExportManager`).
+- **About & Guide** → still `PlaceholderScreen` (S13).
+
+Chart engine (`ChartCanvas.kt`) + the one template instance (`BrightnessCurveChart.kt`) are the
+"copy this pattern" base for S13's remaining six charts. Deferred to S13/later (D-044): the six
+non-template charts' render, on-device power-draw measurement, in-app debug log view, and the
+unprivileged DC-like overlay dimming (task698/653/654).
