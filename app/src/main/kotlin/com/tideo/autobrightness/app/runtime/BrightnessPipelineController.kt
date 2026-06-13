@@ -117,6 +117,9 @@ class BrightnessPipelineController(
     fun pause() { events.trySend(PipelineEvent.Pause) }
     fun resume() { events.trySend(PipelineEvent.Resume) }
 
+    /** A context override swapped the active profile: re-apply the initial brightness (task43 act21). */
+    fun onContextChanged() { events.trySend(PipelineEvent.ContextChanged) }
+
     /**
      * prof769/task528 panic: restore a sane brightness, drop super dimming, and FULL STOP
      * (%AAB_Service=Off — task528 act1-2 toggles the service off). This is terminal, not a
@@ -181,7 +184,14 @@ class BrightnessPipelineController(
             PipelineEvent.Pause -> pauseInternal()
             PipelineEvent.Resume -> resumeInternal()
             is PipelineEvent.OverrideDetected -> handleOverride(event.observedBrightness)
+            PipelineEvent.ContextChanged -> reapplyProfile()
         }
+    }
+
+    /** task43 act21: a context profile swap re-runs Set Initial Brightness with the new (effective) settings. */
+    private suspend fun reapplyProfile() {
+        if (_state.value.paused || !_state.value.serviceOn) return
+        setInitialBrightness(settingsProvider().also { cachedSettings = it })
     }
 
     /** task554 → task544 → task535 → task661: ingest a reading and animate to the new brightness. */

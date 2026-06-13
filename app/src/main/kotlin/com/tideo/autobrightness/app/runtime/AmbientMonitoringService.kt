@@ -21,8 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -36,14 +36,15 @@ import kotlinx.coroutines.launch
 class AmbientMonitoringService : Service() {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private lateinit var controller: BrightnessPipelineController
+    private lateinit var contextEngine: ContextEngine
     private var notificationJob: Job? = null
 
     // SCREEN_ON/OFF are runtime-only broadcasts (not deliverable to manifest receivers).
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent?) {
             when (intent?.action) {
-                Intent.ACTION_SCREEN_OFF -> controller.onScreenOff()
-                Intent.ACTION_SCREEN_ON -> controller.onScreenOn()
+                Intent.ACTION_SCREEN_OFF -> { controller.onScreenOff(); contextEngine.onScreenOff() }
+                Intent.ACTION_SCREEN_ON -> { controller.onScreenOn(); contextEngine.onScreenOn() }
             }
         }
     }
@@ -52,9 +53,12 @@ class AmbientMonitoringService : Service() {
         super.onCreate()
         createNotificationChannel()
 
-        // AppModule composes the real graph (S7 adapters + S9a pipeline + S9b super dimming);
-        // writer and observer share one instance for the per-instance suppress-echo marker (D-034).
-        controller = AppModule(applicationContext).createController(scope)
+        // AppModule composes the real graph (S7 adapters + S9a pipeline + S9b super dimming +
+        // S10 context engine); writer and observer share one instance for the suppress-echo
+        // marker (D-034), and the pipeline reads its settings through the context engine.
+        val runtime = AppModule(applicationContext).createRuntime(scope)
+        controller = runtime.controller
+        contextEngine = runtime.contextEngine
 
         registerReceiver(
             screenReceiver,
@@ -93,10 +97,14 @@ class AmbientMonitoringService : Service() {
 
     private fun ensureRunning() {
         controller.start()
+        contextEngine.start(scope)
         if (notificationJob?.isActive == true) return
         notificationJob = scope.launch {
-            controller.state
-                .map { NotificationModel(it.smoothedLux, it.targetBrightness, it.paused, it.serviceOn) }
+            combine(controller.state, contextEngine.activeContext) { state, ctx ->
+                // Each accepted cycle drives time-window re-evaluation (contexts_spec — prof764).
+                contextEngine.onPipelineTick()
+                NotificationModel(state.smoothedLux, state.targetBrightness, state.paused, state.serviceOn, ctx)
+            }
                 .distinctUntilChanged()
                 .collect { model ->
                     if (!model.serviceOn) return@collect
@@ -138,6 +146,7 @@ class AmbientMonitoringService : Service() {
         val targetBrightness: Int? = null,
         val paused: Boolean = false,
         val serviceOn: Boolean = true,
+        val activeContext: String? = null,
     )
 
     private fun buildNotification(model: NotificationModel): Notification {
@@ -156,6 +165,8 @@ class AmbientMonitoringService : Service() {
                 "Lux ${model.smoothedLux.toInt()} → brightness ${model.targetBrightness}"
             else -> "Monitoring ambient light"
         }
+        // Surface the active context override (%AAB_ActiveContext) as a second line when one is on.
+        val contextLine = model.activeContext?.let { "Context: $it" }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
@@ -163,6 +174,7 @@ class AmbientMonitoringService : Service() {
             .setSmallIcon(R.drawable.ic_stat_brightness)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+        contextLine?.let { builder.setSubText(it) }
 
         if (model.paused) {
             builder.addAction(0, "Resume", actionIntent(ACTION_RESUME))
@@ -186,6 +198,7 @@ class AmbientMonitoringService : Service() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenReceiver) }
+        contextEngine.stop()
         controller.stop()
         scope.cancel()
         super.onDestroy()

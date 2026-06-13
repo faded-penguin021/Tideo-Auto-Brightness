@@ -1,0 +1,279 @@
+package com.tideo.autobrightness.app.runtime
+
+import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.ContextRule
+import com.tideo.autobrightness.app.settings.ContextSignalTokens
+import com.tideo.autobrightness.app.settings.toSpec
+import com.tideo.autobrightness.domain.context.ContextOverrideResolver
+import com.tideo.autobrightness.domain.context.ContextResolution
+import com.tideo.autobrightness.domain.context.ContextSignals
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.math.abs
+
+/**
+ * Runtime context-override engine — the Kotlin rebuild of Tasker's 8 watcher profiles (prof762–768
+ * + prof8) + task43 `_EvaluateContexts V2` orchestration (contexts_spec).
+ *
+ * The pure precedence/merge decision is delegated to the golden domain [ContextOverrideResolver];
+ * this class owns the stateful glue the resolver brief leaves out:
+ *  - PASS 1 per-caller cooldown debounce (contexts_spec §4 / task43 L31-57).
+ *  - PASS 2 signal-change veto gates + `%AAB_ContextState` (task43 L183-248).
+ *  - signal acquisition via the S7 readers (battery/wifi/foreground-app/location) + clock/solar.
+ *  - applying the resolved override by swapping the **entire active profile** (contexts_spec §4 —
+ *    NOT a scale/min/max tweak) and re-running Set Initial Brightness ([onProfileChanged]).
+ *
+ * Concurrency: every evaluation runs under [evalMutex] so the veto state and active-profile latch
+ * stay consistent across the battery/wifi/app/time signal sources.
+ */
+class ContextEngine(
+    private val rulesProvider: suspend () -> List<ContextRule>,
+    private val baselineProvider: suspend () -> AabSettings,
+    private val profileCatalog: ProfileCatalog,
+    private val signalSource: ContextSignalSource,
+    private val onProfileChanged: () -> Unit,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val userProfileName: String = "Default",
+) {
+    private val _activeContext = MutableStateFlow<String?>(null)
+    /** `%AAB_ActiveContext` — the winning rule's name, or null when running the user baseline. */
+    val activeContext: StateFlow<String?> = _activeContext.asStateFlow()
+
+    private val _nextContextTime = MutableStateFlow<String?>(null)
+    /** `%AAB_NextContextTime` (HH.MM) — nearest future time endpoint, drives time re-eval scheduling. */
+    val nextContextTime: StateFlow<String?> = _nextContextTime.asStateFlow()
+
+    // Effective settings the pipeline consumes: the active profile merged over the baseline, or the
+    // baseline itself when no override is active. Null until the first evaluation seeds it.
+    private val _effective = MutableStateFlow<AabSettings?>(null)
+
+    private val evalMutex = Mutex()
+
+    // PASS 1: global last-eval clock (task43 %AAB_LastEvalTime). null until the first eval runs, so a
+    // freshly started engine always evaluates once regardless of the cooldown window.
+    private var lastEvalTime: Long? = null
+    // PASS 2: previous signal snapshot (%AAB_ContextState: app#lat#lon#batt#plug#day#wifi).
+    private var lastApp = ""
+    private var lastBatt = -1
+    private var lastPlug = -1
+    private var lastDay = -1
+    private var lastWifi = ""
+    /** The profile currently applied (`%AAB_CurrentActiveProfile`). */
+    private var currentProfileName: String? = null
+
+    // Latest live signal pieces fed by the reader flows; assembled into a full snapshot per eval.
+    @Volatile private var latestApp = ""
+    @Volatile private var latestBatt = 0
+    @Volatile private var latestPlug = false
+    @Volatile private var latestWifi = ""
+
+    private var scope: CoroutineScope? = null
+    private var batteryJob: Job? = null
+    private var wifiJob: Job? = null
+    private var appJob: Job? = null
+    @Volatile private var screenOn = true
+
+    /** Effective settings for the pipeline's settingsProvider: active profile override or baseline. */
+    suspend fun effectiveSettings(): AabSettings = _effective.value ?: baselineProvider()
+
+    fun start(scope: CoroutineScope) {
+        if (this.scope != null) return
+        this.scope = scope
+        batteryJob = scope.launch {
+            signalSource.batteryFlow().collect { snap ->
+                latestBatt = snap.percent
+                latestPlug = snap.plugged
+                evaluate(ContextCaller.BATTERY)
+            }
+        }
+        wifiJob = scope.launch {
+            signalSource.wifiFlow().collect { ssid ->
+                latestWifi = ssid ?: ""
+                evaluate(ContextCaller.WIFI)
+            }
+        }
+        scope.launch {
+            // Seed the effective settings + active profile from a first general evaluation.
+            evaluate(ContextCaller.GENERAL)
+            startAppPollIfNeeded()
+        }
+    }
+
+    fun stop() {
+        batteryJob?.cancel(); batteryJob = null
+        wifiJob?.cancel(); wifiJob = null
+        appJob?.cancel(); appJob = null
+        scope = null
+    }
+
+    /** Screen ON (prof761 reinit): resume foreground-app polling + re-evaluate time windows. */
+    fun onScreenOn() {
+        screenOn = true
+        scope?.launch {
+            startAppPollIfNeeded()
+            evaluate(ContextCaller.TIME)
+        }
+    }
+
+    /** Screen OFF (prof753 hibernate): app polling is pointless with the display off. */
+    fun onScreenOff() {
+        screenOn = false
+        appJob?.cancel(); appJob = null
+    }
+
+    /** Called from the pipeline cycle: re-evaluate time-window rules (contexts_spec — prof764). */
+    fun onPipelineTick() {
+        scope?.launch { evaluate(ContextCaller.TIME) }
+    }
+
+    private suspend fun startAppPollIfNeeded() {
+        if (appJob?.isActive == true) return
+        if (!screenOn) return
+        val tokens = ContextSignalTokens.from(rulesProvider())
+        if (!tokens.usesApps) return // poll only when ≥1 app rule is configured (cost gate)
+        appJob = scope?.launch {
+            signalSource.foregroundAppFlow(APP_POLL_INTERVAL_MS).collect { pkg ->
+                pkg?.let { latestApp = it }
+                evaluate(ContextCaller.APP_CHANGED)
+            }
+        }
+    }
+
+    private suspend fun evaluate(caller: ContextCaller) = evalMutex.withLock {
+        val rules = rulesProvider()
+        val tokens = ContextSignalTokens.from(rules)
+
+        // PASS 1 — per-caller cooldown debounce.
+        val cooldown = caller.cooldownMs
+        val now = clock()
+        val last = lastEvalTime
+        if (cooldown > 0 && last != null && now - last < cooldown) return@withLock
+
+        val signals = signalSource.assemble(latestApp, latestBatt, latestPlug, latestWifi)
+
+        // PASS 2 — veto gates.
+        if (!shouldProceed(caller, signals, tokens)) return@withLock
+        lastEvalTime = now
+        recordState(signals)
+
+        // PASS 3/4 — pure decision.
+        val baseline = baselineProvider()
+        val knownProfiles = profileCatalog.names()
+        val resolution = ContextOverrideResolver.resolve(
+            rules = rules.map { it.toSpec() },
+            signals = signals,
+            overrideActive = baseline.contextOverride,
+            userProfile = userProfileName,
+            profileExists = { knownProfiles.contains(it) },
+        )
+        apply(resolution, baseline)
+    }
+
+    private fun shouldProceed(caller: ContextCaller, signals: ContextSignals, tokens: ContextSignalTokens): Boolean {
+        val midnightRollover = signals.dayOfWeek != lastDay && lastDay != -1
+        if (caller == ContextCaller.RESUME || midnightRollover) return true
+        return when (caller) {
+            ContextCaller.APP_CHANGED -> {
+                val isRuleActive = _activeContext.value != null
+                val isNonDefault = currentProfileName != null && currentProfileName != userProfileName
+                val appInCache = tokens.appPackages.contains(signals.app)
+                (isRuleActive || isNonDefault || appInCache) && signals.app != lastApp
+            }
+            ContextCaller.LOCATION -> tokens.usesLocation
+            ContextCaller.BATTERY ->
+                tokens.usesBattery && (signals.plugged != (lastPlug == 1) || abs(signals.batteryPercent - lastBatt) >= BATTERY_DELTA_THRESHOLD)
+            ContextCaller.WIFI -> tokens.usesWifi && signals.wifi != lastWifi
+            ContextCaller.TIME, ContextCaller.GENERAL, ContextCaller.RESUME -> true
+        }
+    }
+
+    private fun recordState(signals: ContextSignals) {
+        lastApp = signals.app
+        lastBatt = signals.batteryPercent
+        lastPlug = if (signals.plugged) 1 else 0
+        lastDay = signals.dayOfWeek
+        lastWifi = signals.wifi
+    }
+
+    private suspend fun apply(resolution: ContextResolution, baseline: AabSettings) {
+        _nextContextTime.value = resolution.nextContextTime
+
+        // Manual context lock (%AAB_ContextOverride): wake times refresh, profile switch skipped.
+        val target = resolution.targetProfile ?: return
+
+        val changed = target != currentProfileName
+        currentProfileName = target
+        _activeContext.value = resolution.activeContextName
+
+        _effective.value = if (resolution.activeContextName != null) {
+            // A rule won — swap the entire active profile (load-current-file, D-038(ii) simplification).
+            profileCatalog.profile(target)?.let { mergeProfile(baseline, it) } ?: baseline
+        } else {
+            // No match → revert to the user baseline profile.
+            baseline
+        }
+
+        // task43 act21: re-run Set Initial Brightness when the profile actually changed.
+        if (changed) onProfileChanged()
+    }
+
+    private companion object {
+        const val APP_POLL_INTERVAL_MS = 2500L
+        const val BATTERY_DELTA_THRESHOLD = 5
+    }
+}
+
+/** Caller identity drives the PASS 1 cooldown + PASS 2 veto branch (task43 L31-57, L204-240). */
+enum class ContextCaller(val cooldownMs: Long) {
+    RESUME(0L),
+    APP_CHANGED(500L),
+    BATTERY(30_000L),
+    LOCATION(8_000L),
+    WIFI(8_000L),
+    TIME(1_000L),
+    GENERAL(500L),
+}
+
+/** A point-in-time battery reading (decoupled from the platform `BatteryState` so the engine is JVM-testable). */
+data class BatterySignal(val percent: Int, val plugged: Boolean)
+
+/**
+ * Platform signal acquisition for the context engine. The Android impl wires the S7 readers
+ * (battery/wifi/foreground-app/location) and computes day-of-week + local seconds + solar times.
+ */
+interface ContextSignalSource {
+    fun batteryFlow(): Flow<BatterySignal>
+    fun wifiFlow(): Flow<String?>
+    fun foregroundAppFlow(intervalMs: Long): Flow<String?>
+
+    /** Assemble a full snapshot from the latest cached signal pieces + current clock/location/solar. */
+    suspend fun assemble(app: String, batteryPercent: Int, plugged: Boolean, wifi: String): ContextSignals
+}
+
+/** Resolves a profile NAME to its full [AabSettings]. S10 backs this with the built-in profiles. */
+interface ProfileCatalog {
+    suspend fun profile(name: String): AabSettings?
+    suspend fun names(): Set<String>
+}
+
+/**
+ * Overlay a context profile's parameter set onto the baseline. The fields swapped are exactly Tasker
+ * task626 `_ContextResume`'s 39-key snapshot (the LOAD_FILE parameter set); fields outside it
+ * (service enable, manual context lock, debug level, setup title, schema version, and the
+ * snapshot-omitted %AAB_ThreshDynamic) are preserved from the baseline.
+ */
+internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSettings = profile.copy(
+    serviceEnabled = baseline.serviceEnabled,
+    contextOverride = baseline.contextOverride,
+    debugLevel = baseline.debugLevel,
+    setupTitle = baseline.setupTitle,
+    schemaVersion = baseline.schemaVersion,
+    thresholdDynamic = baseline.thresholdDynamic,
+)

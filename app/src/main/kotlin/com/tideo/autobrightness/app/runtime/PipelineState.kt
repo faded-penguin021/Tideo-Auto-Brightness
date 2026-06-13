@@ -55,4 +55,7 @@ sealed interface PipelineEvent {
 
     /** An external brightness write was detected as a manual override (prof755 / task567). */
     data class OverrideDetected(val observedBrightness: Int) : PipelineEvent
+
+    /** A context override swapped the active profile → re-run Set Initial Brightness (task43 act21). */
+    data object ContextChanged : PipelineEvent
 }
