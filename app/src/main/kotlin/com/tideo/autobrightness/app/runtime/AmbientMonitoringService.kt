@@ -76,7 +76,12 @@ class AmbientMonitoringService : Service() {
         when (intent?.action) {
             ACTION_PAUSE -> controller.pause()
             ACTION_RESUME -> controller.resume()
-            ACTION_PANIC -> controller.panic()
+            ACTION_PANIC -> {
+                // task528 panic = full stop (not a pausable state, G1-F4): restore brightness +
+                // drop dimming, then tear the service down like Disable.
+                scope.launch { panicAndStop() }
+                return START_NOT_STICKY
+            }
             ACTION_DISABLE -> {
                 scope.launch { disableAndStop() }
                 return START_NOT_STICKY
@@ -103,6 +108,15 @@ class AmbientMonitoringService : Service() {
 
     private suspend fun disableAndStop() {
         controller.stop()
+        tearDownDisabled()
+    }
+
+    private suspend fun panicAndStop() {
+        controller.emergencyStop() // restore 255 + drop dimming + cancel jobs (task528)
+        tearDownDisabled()
+    }
+
+    private suspend fun tearDownDisabled() {
         // Persist the disable so boot/screen receivers do not restart the loop.
         applicationContext.settingsDataStore.updateData { it.copy(serviceEnabled = false) }
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -127,8 +141,16 @@ class AmbientMonitoringService : Service() {
     )
 
     private fun buildNotification(model: NotificationModel): Notification {
-        val title = if (model.paused) "Auto Brightness paused" else "Auto Brightness active"
+        // Without WRITE_SETTINGS the loop runs but every brightness write is a no-op (G1-F1);
+        // surface why nothing is changing instead of looking silently broken.
+        val canWrite = android.provider.Settings.System.canWrite(this)
+        val title = when {
+            !canWrite -> "Auto Brightness — permission needed"
+            model.paused -> "Auto Brightness paused"
+            else -> "Auto Brightness active"
+        }
         val text = when {
+            !canWrite -> "Grant 'Modify system settings' to control brightness"
             model.paused -> "Manual override active — tap Resume to continue"
             model.smoothedLux != null && model.targetBrightness != null ->
                 "Lux ${model.smoothedLux.toInt()} → brightness ${model.targetBrightness}"

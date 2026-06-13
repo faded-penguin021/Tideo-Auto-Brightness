@@ -5,12 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.runtime.ServiceHealthStore
+import com.tideo.autobrightness.app.settings.AabSettingsMapper
 import com.tideo.autobrightness.app.settings.SettingsStore
+import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.storage.serviceHealthDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -28,8 +32,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val healthState: StateFlow<ServiceHealthUiState> = mutableHealthState.asStateFlow()
 
     init {
+        // Observe the DataStore as the source of truth so external writes (e.g. the notification
+        // "Disable" action flipping serviceEnabled) propagate to the UI toggle (G1-F3). Only the
+        // persisted fields are reconciled; local-only group state (sliders) is preserved.
         viewModelScope.launch {
-            mutableState.value = settingsStore.readSettings()
+            getApplication<Application>().settingsDataStore.data
+                .map { AabSettingsMapper.toUiState(it.validate()) }
+                .distinctUntilChanged()
+                .collect { persisted ->
+                    mutableState.update {
+                        it.copy(
+                            enabled = persisted.enabled,
+                            minBrightness = persisted.minBrightness,
+                            maxBrightness = persisted.maxBrightness,
+                        )
+                    }
+                }
         }
         viewModelScope.launch {
             healthStore.telemetry.collect { telemetry ->

@@ -25,6 +25,8 @@ next session does not know it.
 
 | S9b runtime features + legacy rip-out | 2026-06-13 | Opus/medium | DONE | (see push) | Super dimming + QS tile + boot start wired; legacy graph deleted (D-040). New: `runtime/SuperDimmingCoordinator.kt` (DimmingCoordinator iface + NoOp + SuperDimmingCoordinator — engages task646 `SoftwareDimming.dimShell` → `AndroidSecureDimmingController` reduce_bright_colors when tier ELEVATED ∧ dimmingEnabled ∧ target<DimmingThreshold; disengages above threshold/task645); `runtime/BrightnessTileService.kt` (QS tile toggles serviceEnabled + start/stop FGS via AutoBrightnessRuntime). BrightnessPipelineController gains optional `dimming` param: `dimming.apply(target,settings)` from the cycle + setInitialBrightness; `dimming.disengage()` on override/pause/panic/hibernate. AppModule REWRITTEN as real DI root (`createController(scope)` composes S7 adapters + S9a pipeline + S9b dimming, shared brightness instance D-034); AmbientMonitoringService uses it. MaintenanceWorker stripped of the toy use case (health heartbeat + service re-ensure only). RIP-OUT: `git rm` BrightnessPolicyEngine, EvaluateAndApplyBrightnessUseCase, Ports.kt, SystemAdapters.kt, WebViewGraphFallback.kt, PermissionOnboardingStateMachine.kt. Manifest: QS_TILE service (BIND_QUICK_SETTINGS_TILE). Tests: SuperDimmingCoordinatorTest (6, tier-gated engage/disengage), BootCompletedReceiverTest (2, Robolectric service-start intent + non-boot ignore), BrightnessTileServiceTest (instantiation smoke — Robolectric can't bind a tile). Rip-out grep empty. Full ladder GREEN: `:domain:test :platform:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`. No compaction. **GATE 1 READY.** |
 
+| Gate 1 punch-list (findings triage) | 2026-06-13 | Opus/high | DONE | (see push) | Triaged the 6 human Gate-1 findings (D-041). Fixed 3 genuine runtime bugs + 1 sub-bug: **G1-F1** crash — `AndroidScreenBrightnessController.write/forceManualMode/restoreMode` + `AndroidSecureDimmingController` now swallow `SecurityException` (unprivileged install degrades, no process crash); MainActivity requests POST_NOTIFICATIONS at launch; service notification shows a "Grant Modify system settings" hint when `!canWrite`. **G1-F3** Disable/UI desync — SettingsViewModel now collects `settingsDataStore.data` as source of truth so the notification's serviceEnabled=false propagates to the toggle. **G1-F4** panic/resume zombie — task528 panic is a FULL STOP not a pausable state: `controller.emergencyStop()` (restore 255 + drop dimming + cancel jobs) → service persists serviceEnabled=false + stopForeground/stopSelf (removed PipelineEvent.Panic/panicInternal). **G1-F5** sub-bug — AppModule tierProvider now `refresh()`es each cycle so a post-start Shizuku/ADB grant is seen. **G1-F2/F5 deferred to S12 (owner decision):** DetectOverrides + DimmingEnabled default Off (Tasker task570 parity, defaults_audit confirmed) and have no UI until S12 — expected-not-bugs. New test: BrightnessPipelineControllerTest.emergencyStop_restoresMaxBrightnessAndFullStops. Full ladder GREEN (59 app unit tests). No compaction. |
+
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
@@ -458,7 +460,46 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   on/off semantics); Robolectric cannot bind a TileService (ServiceController casts the tile binder) so its
   test is instantiation-only (brief-sanctioned downgrade). (Affects S10, S12.)
 
-Append new entries as D-041, D-042, … with which segments they affect.
+- D-041: GATE 1 PUNCH-LIST triage of the human on-device findings (G1-F1…F5). Three genuine
+  runtime bugs fixed + one sub-bug; two findings owner-deferred to S12.
+  (a) **G1-F1 (crash on unprivileged launch) — FIXED.** Root cause: `Settings.System.putInt`
+  throws `SecurityException` without WRITE_SETTINGS; it was uncaught in the pipeline coroutine →
+  process crash on the first cycle. Fix: platform writes (`AndroidScreenBrightnessController`
+  write/forceManualMode/restoreMode; `AndroidSecureDimmingController` setLevel/setActivated) now
+  swallow ONLY `SecurityException` (other throwables still propagate) → the loop degrades (no
+  brightness change) instead of crashing. The self-write marker is only set on a successful write.
+  Plus: MainActivity requests POST_NOTIFICATIONS at launch (Android 13+) so the FGS notification is
+  visible; the notification shows "Grant 'Modify system settings'" when `Settings.System.canWrite`
+  is false. NOTE for S11: this is minimal robustness, NOT the onboarding stepper — S11 still owns
+  the full grant UX (WRITE_SETTINGS re-check, ELEVATED step).
+  (b) **G1-F3 (notification Disable ≠ UI toggle) — FIXED.** SettingsViewModel read settings ONCE in
+  init and never observed the DataStore, so the service's `serviceEnabled=false` write (Disable
+  action) never reached the UI (same in-process ViewModel showed stale "On"). Fix: the VM now
+  collects `settingsDataStore.data` → toUiState as the source of truth for enabled/min/max
+  (local-only slider group state preserved). S11/S12: keep this flow when rebuilding the dashboard.
+  (c) **G1-F4 (panic then Resume leaves brightness stuck) — FIXED.** task528 panic is a FULL STOP
+  (act1-2 toggle %AAB_Service Off, act6 brightness 255, act7-8 disable dimming), not a pausable
+  state. The S9a impl set serviceOn=false + cancelled the sensor but left a zombie FGS that Resume
+  could not revive. Fix: `BrightnessPipelineController.emergencyStop()` (synchronous: cancel all
+  jobs + restore 255 + disengage dimming + reset state) and the service's ACTION_PANIC now persists
+  serviceEnabled=false + stopForeground/stopSelf (same teardown as Disable, plus the 255 write).
+  Removed the channel-based `PipelineEvent.Panic`/`panicInternal`. After panic the user re-enables
+  via the toggle/QS tile — coherent with Tasker (%AAB_Service=Off). The notification "Reset" action
+  now performs this full stop.
+  (d) **G1-F5 (super dimming) — DEFERRED to S12 + tier sub-bug FIXED.** Primary cause: %AAB_DimmingEnabled
+  defaults false (task570 parity) and no settings UI persists it yet (S12) — owner chose to defer
+  (verify at Gate 2). Sub-bug fixed now: `AndroidPrivilegeManager` caches the tier at construction,
+  so a WRITE_SECURE_SETTINGS grant made AFTER the service started was invisible; AppModule's
+  tierProvider now calls `refresh()` before each read so the grant is picked up live. S12: wire
+  dimmingEnabled (+ strength/threshold) and DimDynamic (D-040) into the dimming path.
+  (e) **G1-F2 (manual override pause) — DEFERRED to S12.** %AAB_DetectOverrides defaults Off
+  (task570 parity, defaults_audit L55) and has no UI to enable; with it off, both OverrideMonitor
+  and AnimationRunner read-back detection are correctly disabled. Owner chose to defer; the override
+  machinery itself is unit-tested (S5 OverrideRulesTest + S9a controller test) and unchanged. S12:
+  surface the DetectOverrides toggle so this is verifiable at Gate 2.
+  (Affects S11, S12, Gate 2.)
+
+Append new entries as D-042, D-043, … with which segments they affect.
 
 ## Blockers
 
@@ -466,7 +507,20 @@ Append new entries as D-041, D-042, … with which segments they affect.
 
 ## Gate findings
 
-### Gate 1 (after S9b) — READY
+### Gate 1 (after S9b) — TRIAGED (D-041); RE-TEST PENDING
+
+**Triage outcome (Gate-1 punch-list session, 2026-06-13, full detail D-041):**
+- **G1-F1 crash → FIXED** (platform writes swallow SecurityException; POST_NOTIFICATIONS requested
+  at launch; "permission needed" notification hint).
+- **G1-F3 Disable desync → FIXED** (SettingsViewModel observes the DataStore).
+- **G1-F4 panic/resume → FIXED** (panic is now a full stop = task528 %AAB_Service Off).
+- **G1-F5 super dimming → DEFERRED S12** (DimmingEnabled defaults off, no UI yet) + tier-refresh
+  sub-bug FIXED.
+- **G1-F2 override pause → DEFERRED S12** (DetectOverrides defaults off, no UI yet — Tasker parity).
+- **Passed checks (1,2,4,5,6a,6b) unaffected.** Re-test F1/F3/F4 on the next debug APK; F2/F5 verify
+  at Gate 2 once S12 surfaces the DetectOverrides + DimmingEnabled toggles.
+
+#### Original human findings (preserved)
 
 **Test Execution Context:** 
 The tester executed the Gate 1 instructions exactly as provided. The `tideo-auto-brightness-gate1-debug.apk` was installed (bypassing the expected Google Play Protect warning). Permissions were manually granted via Android Settings/App Ops: `POST_NOTIFICATIONS` (after initial crash), `WRITE_SETTINGS` (Modify system settings), and `WRITE_SECURE_SETTINGS` (via ADB/Shizuku, verified in Shizuku authorized apps). 

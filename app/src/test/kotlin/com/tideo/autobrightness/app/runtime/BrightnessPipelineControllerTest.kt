@@ -167,6 +167,33 @@ class BrightnessPipelineControllerTest {
     }
 
     @Test
+    fun emergencyStop_restoresMaxBrightnessAndFullStops() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        controller.start()
+
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+        assertTrue(controller.state.value.serviceOn)
+
+        controller.emergencyStop()
+        advanceUntilIdle()
+
+        // task528: brightness restored to max, service fully off, runtime state cleared.
+        assertEquals(255, brightness.writes.last(), "panic restores max brightness")
+        assertTrue(!controller.state.value.serviceOn, "panic is a full stop (%AAB_Service=Off)")
+        assertNull(controller.state.value.smoothedLux)
+
+        // A further sensor reading must NOT revive the pipeline (sensor unsubscribed).
+        val writesAfter = brightness.writes.size
+        sensor.flow.emit(sample(lux = 5000.0))
+        advanceUntilIdle()
+        assertEquals(writesAfter, brightness.writes.size, "no writes after emergency stop")
+        scope.cancel()
+    }
+
+    @Test
     fun screenOff_hibernatesRuntimeState() = runTest {
         val sensor = FakeSensor()
         val (controller, scope) = newController(sensor, clock = { 1000L })

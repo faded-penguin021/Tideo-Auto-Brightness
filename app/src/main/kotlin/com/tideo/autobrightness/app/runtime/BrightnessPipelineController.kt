@@ -116,7 +116,24 @@ class BrightnessPipelineController(
     fun onScreenOn() { events.trySend(PipelineEvent.ScreenOn) }
     fun pause() { events.trySend(PipelineEvent.Pause) }
     fun resume() { events.trySend(PipelineEvent.Resume) }
-    fun panic() { events.trySend(PipelineEvent.Panic) }
+
+    /**
+     * prof769/task528 panic: restore a sane brightness, drop super dimming, and FULL STOP
+     * (%AAB_Service=Off — task528 act1-2 toggles the service off). This is terminal, not a
+     * pausable state (Gate 1 G1-F4): it is invoked synchronously and tears all jobs down, so the
+     * service can persist serviceEnabled=false and stop right after.
+     */
+    fun emergencyStop() {
+        sensorJob?.cancel(); sensorJob = null
+        overrideJob?.cancel(); overrideJob = null
+        consumerJob?.cancel(); consumerJob = null
+        inCycle.set(false)
+        brightness.forceManualMode()
+        brightness.write(PANIC_BRIGHTNESS) // task528 act6: Set Display Brightness 255
+        brightness.restoreMode()
+        dimming.disengage() // task528 act7/8: Disable Super Dimming
+        _state.value = PipelineState(serviceOn = false)
+    }
 
     private fun startSensor() {
         if (sensorJob?.isActive == true) return
@@ -163,7 +180,6 @@ class BrightnessPipelineController(
             PipelineEvent.ScreenOn -> reinit()
             PipelineEvent.Pause -> pauseInternal()
             PipelineEvent.Resume -> resumeInternal()
-            PipelineEvent.Panic -> panicInternal()
             is PipelineEvent.OverrideDetected -> handleOverride(event.observedBrightness)
         }
     }
@@ -296,19 +312,6 @@ class BrightnessPipelineController(
                 threshAbsHigh = null,
                 cycleTimeMs = null,
             )
-        }
-    }
-
-    /** prof769/task528 panic: restore a sane brightness, clear state, full stop (%AAB_Service=Off). */
-    private fun panicInternal() {
-        brightness.forceManualMode()
-        brightness.write(PANIC_BRIGHTNESS) // task528: restore a sane (max) brightness
-        brightness.restoreMode()
-        dimming.disengage() // task528: clear super dimming on panic
-        sensorJob?.cancel(); sensorJob = null
-        inCycle.set(false)
-        _state.update {
-            PipelineState(serviceOn = false)
         }
     }
 

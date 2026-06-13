@@ -1,8 +1,23 @@
 # Gate 1 debug build
 
 `tideo-auto-brightness-gate1-debug.apk` — debug-signed APK built from this branch
-(`claude/cool-meitner-sv6u5x`) at the S9b commit. This is a throwaway test artifact for the
-Gate 1 on-device check; it can be deleted from the repo once Gate 1 is recorded.
+(`claude/cool-meitner-sv6u5x`). Throwaway test artifact for the Gate 1 on-device check; can be
+deleted from the repo once Gate 1 is signed off.
+
+## Re-test build (after Gate-1 findings triage, D-041)
+
+This build fixes three findings from the first run — please re-verify:
+- **G1-F1:** app no longer crashes on first launch without permissions. It asks for notifications
+  up front and shows a "Grant 'Modify system settings'" hint in the notification until you grant
+  WRITE_SETTINGS; brightness control starts working once granted.
+- **G1-F3:** the notification **Disable** action now also flips the in-app master toggle to Off.
+- **G1-F4:** the notification **Reset** is now a clean full stop (restores max brightness, drops
+  dimming, turns the service Off — re-enable via the toggle or QS tile). There is no broken
+  "Resume after Reset" anymore.
+
+Deferred to the S12 settings UI (not testable yet, verify at Gate 2): **G1-F2** manual-override
+pause (needs the *Detect overrides* setting, defaults Off per Tasker) and **G1-F5** super dimming
+(needs the *Dimming enabled* setting, defaults Off per Tasker).
 
 ## Install (phone-only)
 

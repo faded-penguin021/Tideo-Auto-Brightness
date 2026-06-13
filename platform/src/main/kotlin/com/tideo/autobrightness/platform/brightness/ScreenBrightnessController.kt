@@ -71,26 +71,38 @@ class AndroidScreenBrightnessController(
 
     override fun write(level: Int) {
         val device = toDevice(level)
-        lastSelfWriteDevice = device
-        Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, device)
+        // Settings.System.putInt throws SecurityException without WRITE_SETTINGS. Swallow only that
+        // so an unprivileged install degrades (no brightness change) instead of crashing the pipeline
+        // coroutine / process (Gate 1 G1-F1). The marker is only updated on a successful write.
+        when (val error = runCatching {
+            Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, device)
+        }.exceptionOrNull()) {
+            null -> lastSelfWriteDevice = device
+            is SecurityException -> Unit
+            else -> throw error
+        }
     }
 
     override fun forceManualMode() {
-        if (savedMode == null) {
-            savedMode = Settings.System.getInt(
+        runCatching {
+            if (savedMode == null) {
+                savedMode = Settings.System.getInt(
+                    resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+                )
+            }
+            Settings.System.putInt(
                 resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
                 Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
             )
-        }
-        Settings.System.putInt(
-            resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
-            Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-        )
+        }.exceptionOrNull()?.let { if (it !is SecurityException) throw it }
     }
 
     override fun restoreMode() {
         savedMode?.let {
-            Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, it)
+            runCatching {
+                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, it)
+            }.exceptionOrNull()?.let { e -> if (e !is SecurityException) throw e }
         }
         savedMode = null
     }

@@ -53,9 +53,6 @@ sealed interface PipelineEvent {
     /** User tapped Resume (task569). */
     data object Resume : PipelineEvent
 
-    /** Panic reset (prof769 / task528). */
-    data object Panic : PipelineEvent
-
     /** An external brightness write was detected as a manual override (prof755 / task567). */
     data class OverrideDetected(val observedBrightness: Int) : PipelineEvent
 }

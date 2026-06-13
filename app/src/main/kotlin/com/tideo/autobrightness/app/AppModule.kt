@@ -38,7 +38,10 @@ class AppModule(context: Context) {
             scope = scope,
             dimming = SuperDimmingCoordinator(
                 secureDimming = AndroidSecureDimmingController(appContext, privilegeManager),
-                tierProvider = privilegeManager::currentTier,
+                // Re-detect each cycle so a WRITE_SECURE_SETTINGS grant made AFTER the service
+                // started (Shizuku/ADB) is picked up without a restart (G1-F5). Cheap: one
+                // checkSelfPermission per cycle.
+                tierProvider = { privilegeManager.refresh(); privilegeManager.currentTier() },
             ),
         )
     }
