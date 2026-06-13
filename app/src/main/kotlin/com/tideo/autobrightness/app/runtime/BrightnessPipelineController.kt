@@ -49,6 +49,7 @@ class BrightnessPipelineController(
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
     private val animationRunner: AnimationRunner = AnimationRunner(brightness),
+    private val dimming: DimmingCoordinator = NoOpDimmingCoordinator,
 ) {
     private val engine = BrightnessEngine()
 
@@ -216,6 +217,10 @@ class BrightnessPipelineController(
                     targetBrightness = target,
                 )
             }
+
+            // Super-dimming layer (task646→650/645): engage below DimmingThreshold, else disengage.
+            // Runs from the pipeline coroutine so the secure write is serialized with the cycle.
+            dimming.apply(target, settings)
         } finally {
             autoRunning = false
         }
@@ -253,11 +258,14 @@ class BrightnessPipelineController(
             scalingUse = s.scalingUse,
         )
         brightness.clearSelfWriteMarker()
+        // task567: a manual override disengages any active super dimming.
+        dimming.disengage()
         _state.update { it.copy(paused = true, overrideHistory = history) }
     }
 
     private fun pauseInternal() {
         brightness.clearSelfWriteMarker()
+        dimming.disengage()
         _state.update { it.copy(paused = true) }
     }
 
@@ -278,6 +286,7 @@ class BrightnessPipelineController(
     private fun hibernate() {
         sensorJob?.cancel(); sensorJob = null
         inCycle.set(false)
+        dimming.disengage() // task585: drop super dimming when the display goes off
         _state.update {
             it.copy(
                 smoothedLux = null,
@@ -295,6 +304,7 @@ class BrightnessPipelineController(
         brightness.forceManualMode()
         brightness.write(PANIC_BRIGHTNESS) // task528: restore a sane (max) brightness
         brightness.restoreMode()
+        dimming.disengage() // task528: clear super dimming on panic
         sensorJob?.cancel(); sensorJob = null
         inCycle.set(false)
         _state.update {
@@ -312,6 +322,7 @@ class BrightnessPipelineController(
             val output = engine.evaluate(buildInput(lux, settings, PipelineState()))
             brightness.forceManualMode()
             brightness.write(output.targetBrightness)
+            dimming.apply(output.targetBrightness, settings)
             _state.update {
                 it.copy(
                     lastAppliedBrightness = output.targetBrightness,
