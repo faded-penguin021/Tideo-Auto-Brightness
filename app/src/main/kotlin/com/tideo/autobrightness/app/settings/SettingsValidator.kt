@@ -51,6 +51,24 @@ object SettingsValidator {
             errors += FieldError("form2C", "Zone 2 Offset (${settings.form2C}) must be ≤ zone1End (${settings.zone1End})")
         }
 
+        // G2-F6: zone2End below zone1End makes the zone-2 power term (and derived form3A) NaN; guard
+        // it with an explicit advisory so the user sees the cause instead of a bare "NaN" readout.
+        if (settings.zone2End < settings.zone1End) {
+            errors += FieldError(
+                "zone2End",
+                "Zone 2 end (${settings.zone2End}) must be ≥ zone 1 end (${settings.zone1End}).",
+            )
+        }
+
+        // G2-F5: an extremely low global scale produces a dangerously dim curve (e.g. scale 0.01).
+        // Tasker warns; surface an advisory (the safety bound below uses the unscaled zone formula).
+        if (settings.scale < 0.5f) {
+            errors += FieldError(
+                "scale",
+                "⚠️ Scale (${settings.scale}) is very low — the curve may be too dim to see.",
+            )
+        }
+
         // task707: compute predicted brightness at 1000 lux using the correct zone formula
         // %aab_form2d = zone1End (derived coefficient form2D = zone1End, defaults_audit)
         val safeVal: Double = when {

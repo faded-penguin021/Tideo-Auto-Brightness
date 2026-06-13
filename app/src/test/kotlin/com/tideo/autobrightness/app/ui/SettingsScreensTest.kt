@@ -1,6 +1,10 @@
 package com.tideo.autobrightness.app.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,6 +15,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.ui.screens.AnimationDimmingContent
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
+import com.tideo.autobrightness.app.ui.screens.MiscContent
 import com.tideo.autobrightness.app.ui.screens.ReactivityContent
 import com.tideo.autobrightness.app.ui.screens.ToolsContent
 import com.tideo.autobrightness.platform.privilege.Tier
@@ -22,8 +27,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * S12 acceptance: invalid curve input renders a Tasker-faithful red [SettingsValidator] error in the
- * UI (task583/707), plus smoke coverage that the parameter/tools content composables render and edit.
+ * S12.5b acceptance for the parameter screens: validator red-errors render (task583/707), the
+ * preview→Apply chrome works (committed `[bracket]` + Apply/Discard bar), and the slider-backed
+ * fields are bounded (G2-F3/F13).
  */
 @RunWith(RobolectricTestRunner::class)
 class SettingsScreensTest {
@@ -40,7 +46,7 @@ class SettingsScreensTest {
 
         compose.setContent {
             MaterialTheme {
-                CurveBrightnessContent(invalid, errors, onBack = {}, onUpdate = {})
+                CurveBrightnessContent(invalid, invalid, errors, epoch = 0, dirty = false, {}, {}, {}, {})
             }
         }
 
@@ -50,25 +56,28 @@ class SettingsScreensTest {
 
     @Test
     fun curveBrightness_safetyWarning_rendersBanner() {
-        // task707 safety warning surfaces as a banner on the Curve & Brightness screen.
         val errors = listOf(
             com.tideo.autobrightness.app.settings.FieldError(
                 "safetyBrightness", "⚠️ Safety Warning: Brightness too low at 1000 Lux.",
             ),
         )
-        compose.setContent { MaterialTheme { CurveBrightnessContent(AabSettings(), errors, {}, {}) } }
+        compose.setContent {
+            MaterialTheme {
+                CurveBrightnessContent(AabSettings(), AabSettings(), errors, 0, false, {}, {}, {}, {})
+            }
+        }
         compose.onNodeWithTag("error_safetyBrightness").performScrollTo().assertIsDisplayed()
     }
 
     @Test
-    fun reactivity_detectOverridesToggle_isWiredAndEdits() {
+    fun reactivity_detectOverridesToggle_editsDraft() {
         var captured: AabSettings? = null
         compose.setContent {
             MaterialTheme {
                 ReactivityContent(
-                    AabSettings(detectOverrides = false),
-                    onBack = {},
-                    onUpdate = { transform -> captured = transform(AabSettings(detectOverrides = false)) },
+                    AabSettings(detectOverrides = false), AabSettings(), epoch = 0, dirty = false,
+                    onEdit = { transform -> captured = transform(AabSettings(detectOverrides = false)) },
+                    onApply = {}, onDiscard = {}, onBack = {},
                 )
             }
         }
@@ -81,8 +90,8 @@ class SettingsScreensTest {
         compose.setContent {
             MaterialTheme {
                 AnimationDimmingContent(
-                    AabSettings(), tier = Tier.BASIC,
-                    onBack = {}, onUpdate = {}, onOpenOnboarding = {},
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false, tier = Tier.BASIC,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, onOpenOnboarding = {},
                 )
             }
         }
@@ -91,15 +100,71 @@ class SettingsScreensTest {
     }
 
     @Test
-    fun tools_debugSelector_showsCurrentLabel() {
+    fun misc_debugSelector_showsCurrentLabel() {
         compose.setContent {
             MaterialTheme {
-                ToolsContent(
-                    AabSettings(debugLevel = 3),
-                    onBack = {}, onSetDebugLevel = {}, onRunWizard = { null }, onApplyWizard = {},
+                MiscContent(
+                    AabSettings(debugLevel = 3), AabSettings(debugLevel = 3), emptyList(), 0, false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
                 )
             }
         }
-        compose.onNodeWithText("Debug: Light Eval Thresholds").assertExists()
+        compose.onNodeWithText("Debug: Light Eval Thresholds").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun misc_committedBracket_shownWhenDraftDiffers() {
+        // Draft min = 42, committed (active) min = 10 → the slider shows the committed value [10].
+        compose.setContent {
+            MaterialTheme {
+                MiscContent(
+                    AabSettings(minBrightness = 42), AabSettings(minBrightness = 10), emptyList(), 0, true,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Min brightness: 42 [10]", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun misc_sliders_areBounded() {
+        compose.setContent {
+            MaterialTheme {
+                MiscContent(
+                    AabSettings(minBrightness = 10, maxBrightness = 255), AabSettings(), emptyList(), 0, false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                )
+            }
+        }
+        // misc_settings.md: Min brightness 0–75, Max brightness 150–255. Assert the bounds (the
+        // current value carries float-snap imprecision, so range/steps are the meaningful contract).
+        compose.onNodeWithTag("slider_minBrightness").performScrollTo()
+            .assert(rangeIs(0f..75f, steps = 74))
+        compose.onNodeWithTag("slider_maxBrightness").performScrollTo()
+            .assert(rangeIs(150f..255f, steps = 104))
+    }
+
+    private fun rangeIs(range: ClosedFloatingPointRange<Float>, steps: Int) =
+        SemanticsMatcher("ProgressBarRangeInfo range=$range steps=$steps") { node ->
+            val info = node.config.getOrNull(SemanticsProperties.ProgressBarRangeInfo)
+            info != null && info.range == range && info.steps == steps
+        }
+
+    @Test
+    fun draftBar_applyAndDiscard_invokeCallbacks() {
+        var applied = false
+        var discarded = false
+        compose.setContent {
+            MaterialTheme {
+                MiscContent(
+                    AabSettings(minBrightness = 42), AabSettings(minBrightness = 10), emptyList(), 0, true,
+                    onEdit = {}, onApply = { applied = true }, onDiscard = { discarded = true }, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("apply_settings").performClick()
+        assertTrue(applied, "Apply commits the draft")
+        compose.onNodeWithTag("discard_settings").performClick()
+        assertTrue(discarded, "Discard reverts the draft")
     }
 }

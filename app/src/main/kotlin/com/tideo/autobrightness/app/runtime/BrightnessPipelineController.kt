@@ -121,6 +121,14 @@ class BrightnessPipelineController(
     fun onContextChanged() { events.trySend(PipelineEvent.ContextChanged) }
 
     /**
+     * A settings Apply / profile load committed new parameters: re-run the pipeline immediately so the
+     * change takes effect without waiting for a new sensor reading (G2-F16). This is an UNLIMITED
+     * control event — it is NOT subject to the drop-not-queue sensor mutex — and reuses the same
+     * re-evaluate path as a context swap (re-read effective settings → Set Initial Brightness).
+     */
+    fun reapply() { events.trySend(PipelineEvent.ContextChanged) }
+
+    /**
      * prof769/task528 panic: restore a sane brightness, drop super dimming, and FULL STOP
      * (%AAB_Service=Off — task528 act1-2 toggles the service off). This is terminal, not a
      * pausable state (Gate 1 G1-F4): it is invoked synchronously and tears all jobs down, so the

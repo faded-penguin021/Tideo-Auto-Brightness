@@ -34,10 +34,12 @@ fun BrightnessCurveChart(
     val maxLux = 120_000f
     val samples = 80
 
-    // 1. sample mapLuxToBrightness over a log-spaced lux grid (the "new curve" series)
+    // 1. sample mapLuxToBrightness over a log-spaced lux grid (the "new curve" series). Floor at
+    // minBrightness — the applied brightness is clamped to [min, max], so the curve floor must move
+    // with Min brightness rather than sitting on 0 (G2-F4).
     val curvePoints = logSpaced(minLux, maxLux, samples).map { lux ->
         val b = engine.mapLuxToBrightness(lux.toDouble(), curve)
-            .coerceIn(0.0, curve.maxBrightness.toDouble())
+            .coerceIn(curve.minBrightness.toDouble(), curve.maxBrightness.toDouble())
         Offset(lux, b.toFloat())
     }
 

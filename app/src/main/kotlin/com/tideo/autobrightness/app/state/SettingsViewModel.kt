@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.AppModule
+import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.FieldError
@@ -52,13 +53,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     /** Reset every parameter to the task570 baseline defaults (anonymous-handler reset rows). */
     fun resetDefaults() {
         viewModelScope.launch {
-            app.settingsDataStore.updateData { current ->
+            val updated = app.settingsDataStore.updateData { current ->
                 // Preserve runtime/identity fields; reset only the tunable parameter set.
                 AabSettings(
                     serviceEnabled = current.serviceEnabled,
                     contextOverride = current.contextOverride,
                 )
             }
+            if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
         }
     }
 
@@ -66,17 +68,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun applyProfile(name: String) {
         val profile = DefaultProfiles.all[name] ?: return
         viewModelScope.launch {
-            app.settingsDataStore.updateData { current ->
+            val updated = app.settingsDataStore.updateData { current ->
                 profile.copy(serviceEnabled = current.serviceEnabled)
             }
+            // task592/626 apply re-runs Advanced Auto Brightness so the new curve takes effect
+            // immediately, not at the next sensor tick (G2-F16).
+            if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
         }
     }
 
     fun replaceAll(newSettings: AabSettings) {
         viewModelScope.launch {
-            app.settingsDataStore.updateData { current ->
+            val updated = app.settingsDataStore.updateData { current ->
                 newSettings.copy(serviceEnabled = current.serviceEnabled)
             }
+            if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
         }
     }
 }

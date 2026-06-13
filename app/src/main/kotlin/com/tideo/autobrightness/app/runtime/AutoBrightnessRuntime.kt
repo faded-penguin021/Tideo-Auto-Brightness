@@ -34,6 +34,12 @@ object AutoBrightnessRuntime {
     /** Resume the live pipeline from the UI (mirrors the notification's Resume action). */
     fun resume(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_RESUME)
 
+    /**
+     * Force the live pipeline to re-evaluate now (settings Apply / profile load, G2-F16). A no-op
+     * when the service is not running — the next start picks up the committed settings anyway.
+     */
+    fun reapply(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_REAPPLY)
+
     private fun sendServiceAction(context: Context, action: String) {
         val appContext = context.applicationContext
         val intent = Intent(appContext, AmbientMonitoringService::class.java).setAction(action)
