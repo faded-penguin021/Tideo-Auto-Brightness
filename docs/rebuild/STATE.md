@@ -33,11 +33,23 @@ next session does not know it.
 
 | S12 settings/tools/profile screens + chart engine | 2026-06-13 | Opus/medium | DONE | (see push) | The 7 parameter/tool/profile placeholder screens filled + the reusable chart engine landed (D-044). **Step-0 triage** committed first: `anonymous_handlers.md` 168 rows bucketed (a) trivial-chrome / (b) settings-mutation (both bulk-dropped w/ shared reasons) / (c) ~30 complex behaviors → explicit port list. New: `state/SettingsViewModel.kt` (DataStore-as-truth, advisory SettingsValidator errors, reset/applyProfile/replaceAll) + `state/ContextsViewModel.kt` (rule CRUD + installed-app picker); `ui/components/{SettingsControls,SettingsScaffold}.kt` (NumberSettingField w/ red-error supportingText, SwitchSettingRow, DerivedReadout, back-nav scaffold); `ui/graph/ChartCanvas.kt` (generic axes/ticks/log10/multi-series/markers engine — the S13 template base) + `ui/graph/BrightnessCurveChart.kt` (THE template instance) + `ui/screens/ChartPlaceholder.kt` (deferred-S13 slots); screens `CurveBrightnessScreen` (fields + validator + live form2A/3A + curve chart), `ReactivityScreen` (thresholds + **DetectOverrides toggle, G1-F2**), `AnimationDimmingScreen` (anim + derived throttle + **ELEVATED-gated DimmingEnabled, G1-F5** + PWM), `DynamicScaleScreen` (scaling/taper + task517/674/689 warnings), `ContextsScreen` (rule CRUD), `ToolsScreen` (wizard runner + 10-label debug selector + calibration entry), `ProfilesScreen` (apply/reset + Create/OpenDocument import-export incl. legacy). NavGraph wires all 7 (About → S13 placeholder). Tests: `SettingsScreensTest` (5 — validator→UI form2C error, safety banner, DetectOverrides edit, dimming tier-gate, debug label). Acceptance ladder GREEN: `:app:testDebugUnitTest`(77) `:app:assembleDebug :app:lintDebug`. No compaction. **GATE 2 READY.** |
 
+| S12.5a design language + app shell | 2026-06-13 | Opus/high | DONE | (see push) | UI-layer reskin to AAB identity (D-046, Gate-2 G2-F18). New: `ui/theme/Color.kt` (teal+gold palette, per-value provenance from extraction — about.md L51 + the "on" indicator dots/Flash overlays) + rewritten `ui/theme/Theme.kt` (static AAB dark-first/light `ColorScheme`, dynamic colour now opt-in OFF, DayNight kept); `ui/components/AppShell.kt` (`AabTopBar` branded teal header w/ hamburger + `AabNavDrawer` = Compose rebuild of the AAB Menu scene menu.md/L4462: gold-sun teal banner + grouped destinations Profiles&Contexts / Settings / Info&Help, current-route highlight, Recheck Permissions→Onboarding, Chart.js License dropped). `DashboardScreen` rewritten: flat OutlinedButton nav list (nav_* tags) replaced by the drawer; Profiles + Contexts surfaced as prominent **hero cards** (gold-iconed, clickable). New dep `androidx.compose.material:material-icons-core` (from BOM, no version) — declared in libs.versions.toml + app build.gradle. UiShellTest extended (+2: drawer navigates to every route via OnClick semantics; hero cards navigate). Scope kept to identity+nav — field behaviour/sliders/grouping untouched (those are S12.5b). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(81) `:app:lintDebug :domain:test :platform:test`. No compaction. |
+
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12 (settings & tools screens + chart engine core) DONE but GATE 2 FAILED → merged + salvaged in
+**S12.5a (design language + app shell) DONE.** The app now wears the AAB **teal + gold** identity
+(D-046): a static brand `ColorScheme` (dynamic colour opt-in OFF, DayNight kept), a branded teal top
+header with a hamburger that opens the **AAB-Menu nav drawer** (Compose rebuild of scene menu.md/L4462
+— gold-sun banner + grouped Profiles&Contexts / Settings / Info&Help destinations, current-route
+highlight), and **hero cards** for Profiles + Contexts on the Dashboard (the flat OutlinedButton nav
+list is gone). This is the first of the three UI-salvage sub-segments and addresses **G2-F18**; the
+interaction model (preview→Apply, sliders, Misc/General grouping) is **S12.5b**, and feature/behaviour
+fidelity (context editor, toasts, debug toasts, G2-F8/F9) is **S12.5c**. Scope was strictly the UI
+layer — domain/runtime/chart-engine/validator untouched. Build GREEN across the full ladder.
+
+**(historical) S12 (settings & tools screens + chart engine core) DONE but GATE 2 FAILED → merged + salvaged in
 S12.5 (D-045).** Gate 2 found the UI "miles off" the Tasker app (generic Material, no AAB design
 language/preview-Apply model/sliders; findings G2-F1..F18). The branch is merged as-is (domain/runtime/
 chart-engine sound); the UI is rebuilt in S12.5a/b/c. The wiring below still describes what shipped: all seven
@@ -83,10 +95,13 @@ AppModule is now the real DI root.
   notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
   Findings → "Gate findings" below.
 - Parallel window C: **S10** (context override engine) DONE ∥ **S11** (UI shell + onboarding) DONE.
-- **S12.5 — UI salvage (a/b/c)** is the next serial step (NEW; brief in RUNBOOK, D-045). S12 merges
-  to main as-is; S12.5 rebuilds the UI to AAB fidelity (teal+gold design language + nav drawer + hero
-  cards; temporary-preview→Apply model; bounded sliders; Misc-screen regrouping; toasts; context-editor
-  fidelity; the profile-load-disables-overrides bug G2-F8). **Gate 2 is re-tested after S12.5c**, not now.
+- **S12.5 — UI salvage (a/b/c)** (brief in RUNBOOK, D-045). **S12.5a DONE** (teal+gold design language +
+  AAB-Menu nav drawer + hero cards — D-046). **Next: S12.5b** = temporary-preview→Apply model (draft
+  AabSettings + `[committed]` brackets + pipeline re-run on Apply, G2-F1/F16) + bounded sliders
+  (G2-F3/F13) + faithful Misc/General field regrouping (G2-F2) + validation parity (G2-F5/F6/F10/F11).
+  Then **S12.5c** = context-editor fidelity (G2-F14), toasts (G2-F12), debug→runtime toasts (G2-F15),
+  the profile-load-disables-overrides bug (G2-F8), super-dimming engagement (G2-F9), QS-tile paused
+  state (G2-F17). **Gate 2 is re-tested after S12.5c**, not now.
 - **HUMAN GATE 2** (RUNBOOK "Human gates", after S12.5): full UI walkthrough — every field
   edits/persists/rejects-invalid-with-red; live form2A/form3A; wizard produces+applies suggestions;
   Shizuku ELEVATED flow; QS tile; per-app override; charging+time contexts; brightness-chart shape;
@@ -667,7 +682,34 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   the 9-screen screen_map but fix grouping (re-add a faithful Misc/General screen; min/max/offset/scale +
   animation belong there)**. (Affects S12.5a/b/c, S13, S14, Gate 2.)
 
-Append new entries as D-046, D-047, … with which segments they affect.
+- D-046: S12.5a DESIGN LANGUAGE + APP SHELL (UI-layer salvage; sanctioned by the S12.5a brief;
+  addresses Gate-2 G2-F18). **Palette (teal + gold) is derived from the extraction, not invented:**
+  primary teal `#007C63`, accent `#00A986`, bright link `#00C79E`, gold/strong `#FFC107`, bg `#333333`,
+  card/surface `#383838`, decorative panel `#404040` — provenance per value in `ui/theme/Color.kt`
+  (authority: `extraction/scenes/about.md` L51 "bg #333333, banner #007C63, accent #007C63/#00A986,
+  links #00C79E, strong #FFC107, license box #383838"; reinforced by the `#FF007C63` "on" indicator
+  dots in brightness/reactivity/superdimming settings scenes, the curve-wizard Flash overlays
+  task038/task090, and the power-draw chart series #007C63/#FFC107). The chosen schemes:
+  `AabDarkColorScheme` (dark-first = faithful: charcoal surfaces, teal primary, gold secondary) +
+  derived `AabLightColorScheme`; both in `Theme.kt`. **Dynamic colour is now opt-in OFF** (was S11's
+  default-on Material-You) so the brand identity is stable; DayNight kept.
+  **App shell** = `ui/components/AppShell.kt`: `AabTopBar` (teal CenterAligned header, gold hamburger,
+  title up top) + `AabNavDrawer` (`ModalDrawerSheet`) — the Compose rebuild of the **AAB Menu scene**
+  (menu.md, XML L4462): gold-sun teal banner header + destinations grouped into the menu's three
+  cards (Profiles&Contexts hero / Settings / Info&Help), current route highlighted; Recheck Permissions
+  → Onboarding; Chart.js License entry dropped (screen_map). `DashboardScreen` rewritten so the drawer
+  (opened from the hamburger) replaces S11/S12's flat `OutlinedButton` nav list, and **Profiles +
+  Contexts are hero cards** (gold-iconed, clickable, Contexts shows the active context). **New dep:**
+  `androidx.compose.material:material-icons-core` (resolved from the existing compose BOM, no explicit
+  version) for the drawer/hero icons — declared in `libs.versions.toml` + `app/build.gradle.kts`.
+  SCOPE BOUNDARY: kept the existing 9-route `AppRoute` set and all field behaviour intact — the
+  Misc/General field regrouping + AppRoute changes are S12.5b's job (G2-F2), NOT done here. Other
+  screens keep their own back-nav SettingsScaffold; the drawer is the Dashboard's hub. UiShellTest +2
+  (drawer→every route via OnClick semantics action [NavigationDrawerItem's selectable tap doesn't
+  register under Robolectric gesture injection — use performSemanticsAction]; hero-card navigation).
+  (Affects S12.5b, S12.5c, S13 — S13 static screens inherit this theme/shell.)
+
+Append new entries as D-047, D-048, … with which segments they affect.
 
 ## Blockers
 
@@ -786,6 +828,9 @@ warning; time-context rule loads its profile (min-bright kicks in); reset-to-def
   S12 shipped default Material 3 (dynamic color), a plain top bar, and a flat list of outlined nav
   buttons on the Dashboard — generic, not AAB. (Owner's examples are illustrative, NOT exhaustive: the
   whole visual/interaction identity needs to match the Tasker app.)
+  **→ ADDRESSED by S12.5a (D-046):** teal+gold brand `ColorScheme` (dynamic colour off), branded teal
+  top header with the project name + hamburger, the AAB-Menu `ModalNavigationDrawer` rebuild, and
+  Profiles/Contexts hero cards replacing the flat button list. Re-verify the full look/feel at Gate 2.
 
 **Decision (owner, 2026-06-13 19:00):** MERGE this branch as-is (S12 compiles + tests green; domain/
 runtime/chart-engine are sound) and **salvage the UI in a new S12.5** (see RUNBOOK; split a/b/c).

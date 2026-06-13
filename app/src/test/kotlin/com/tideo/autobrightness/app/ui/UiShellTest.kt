@@ -1,7 +1,9 @@
 package com.tideo.autobrightness.app.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -11,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.state.DashboardUiState
+import com.tideo.autobrightness.app.ui.components.AabNavDrawer
 import com.tideo.autobrightness.app.ui.onboarding.OnboardingContent
 import com.tideo.autobrightness.app.ui.onboarding.OnboardingUiState
 import com.tideo.autobrightness.app.ui.screens.DashboardContent
@@ -62,10 +65,62 @@ class UiShellTest {
         compose.onNodeWithTag("service_switch").performClick()
         assertEquals(true, toggled)
 
-        // Every tunable destination is reachable from the Dashboard.
+        // The Profiles + Contexts hero cards (G2-F18) replace flat nav buttons on the Dashboard.
+        compose.onNodeWithTag("hero_profiles").assertExists()
+        compose.onNodeWithTag("hero_contexts").assertExists()
+
+        // Every tunable destination is reachable from the AAB-Menu drawer.
         AppRoute.dashboardDestinations.forEach {
             compose.onNodeWithTag("nav_${it.route}").assertExists()
         }
+    }
+
+    @Test
+    fun navDrawer_navigatesToEveryDestination() {
+        // The AAB-Menu drawer (rebuild of scene menu.md) is stateless, so drive it directly —
+        // deterministic, no modal open-animation. Confirms every destination + Recheck Permissions.
+        var navigated: AppRoute? = null
+        var recheck = false
+        compose.setContent {
+            MaterialTheme {
+                AabNavDrawer(
+                    current = AppRoute.Dashboard,
+                    onNavigate = { navigated = it },
+                    onRecheckPermissions = { recheck = true },
+                )
+            }
+        }
+
+        // Invoke the OnClick semantics action directly: deterministic in Robolectric (no gesture
+        // injection / display dependency, which NavigationDrawerItem's selectable does not honour here).
+        AppRoute.dashboardDestinations.forEach { route ->
+            compose.onNodeWithTag("nav_${route.route}").performSemanticsAction(SemanticsActions.OnClick)
+            assertEquals(route, navigated)
+        }
+        compose.onNodeWithTag("nav_recheck_permissions").performSemanticsAction(SemanticsActions.OnClick)
+        assertTrue(recheck)
+    }
+
+    @Test
+    fun heroCards_navigateToProfilesAndContexts() {
+        var navigated: AppRoute? = null
+        compose.setContent {
+            MaterialTheme {
+                DashboardContent(
+                    state = DashboardUiState(tier = Tier.BASIC, serviceRunning = true),
+                    onToggleService = {},
+                    onPause = {},
+                    onResume = {},
+                    onOpenOnboarding = {},
+                    onNavigate = { navigated = it },
+                )
+            }
+        }
+
+        compose.onNodeWithTag("hero_profiles").performScrollTo().performClick()
+        assertEquals(AppRoute.Profiles, navigated)
+        compose.onNodeWithTag("hero_contexts").performScrollTo().performClick()
+        assertEquals(AppRoute.Contexts, navigated)
     }
 
     @Test
