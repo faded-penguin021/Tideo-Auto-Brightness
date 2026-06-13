@@ -21,10 +21,30 @@ object AutoBrightnessRuntime {
     fun bootstrap(context: Context) {
         scheduleMaintenance(context)
         CoroutineScope(Dispatchers.Default).launch {
-            val settings = SettingsStore(context.settingsDataStore).readSettings()
-            if (settings.enabled) {
+            val settings = SettingsStore(context.settingsDataStore).readRawSettings()
+            if (settings.serviceEnabled) {
                 startMonitoring(context, "bootstrap")
             }
+        }
+    }
+
+    /** Pause the live pipeline from the UI (mirrors the notification's Pause action). */
+    fun pause(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_PAUSE)
+
+    /** Resume the live pipeline from the UI (mirrors the notification's Resume action). */
+    fun resume(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_RESUME)
+
+    private fun sendServiceAction(context: Context, action: String) {
+        val appContext = context.applicationContext
+        val intent = Intent(appContext, AmbientMonitoringService::class.java).setAction(action)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                appContext.startForegroundService(intent)
+            } else {
+                appContext.startService(intent)
+            }
+        } catch (_: IllegalStateException) {
+            // Service not currently running — pause/resume only apply while it is, so ignore.
         }
     }
 

@@ -13,7 +13,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
         CoroutineScope(Dispatchers.Default).launch {
-            val enabled = SettingsStore(context.settingsDataStore).readSettings().enabled
+            val enabled = SettingsStore(context.settingsDataStore).readRawSettings().serviceEnabled
             AutoBrightnessRuntime.scheduleMaintenance(context)
             if (enabled) {
                 AutoBrightnessRuntime.startMonitoring(context, "boot_completed")

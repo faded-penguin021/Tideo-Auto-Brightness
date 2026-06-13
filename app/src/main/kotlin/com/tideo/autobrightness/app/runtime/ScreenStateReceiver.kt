@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 class ScreenStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         CoroutineScope(Dispatchers.Default).launch {
-            val enabled = SettingsStore(context.settingsDataStore).readSettings().enabled
+            val enabled = SettingsStore(context.settingsDataStore).readRawSettings().serviceEnabled
             if (!enabled) return@launch
 
             when (intent?.action) {

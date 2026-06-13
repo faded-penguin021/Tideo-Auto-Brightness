@@ -11,6 +11,11 @@ android {
         minSdk = 31
     }
 
+    buildFeatures {
+        // AIDL for the Shizuku user-service grant interface (S11 — WRITE_SECURE_SETTINGS exec).
+        aidl = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

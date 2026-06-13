@@ -21,7 +21,13 @@ interface PrivilegeManager {
     fun refresh()
     fun adbGrantInstruction(): String
     fun tryGrantViaRoot(): Boolean
-    fun requestShizukuGrant()
+    /** Whether a Shizuku binder is reachable (so the UI can show/hide the Shizuku path). */
+    fun isShizukuAvailable(): Boolean
+    /**
+     * Runs the Shizuku grant flow (permission request → user-service `pm grant`). [onResult] reports
+     * the outcome for the UI; on success the tier is refreshed before [onResult] fires.
+     */
+    fun requestShizukuGrant(onResult: (ShizukuGrantGateway.Result) -> Unit)
     /** Intent for the BASIC grant: system "Modify system settings" screen for this app. */
     fun writeSettingsIntent(): Intent
 }
@@ -63,9 +69,13 @@ class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
         false
     }
 
-    // Full Shizuku exec (pm grant via user-service) is wired in S11.
-    // This lands the binder-check + permission-request half; ShizukuGrantGateway stubs the exec.
-    override fun requestShizukuGrant() {
-        ShizukuGrantGateway.requestGrant(context) { refresh() }
+    override fun isShizukuAvailable(): Boolean = ShizukuGrantGateway.isAvailable()
+
+    // S11 (D-032 closed): full Shizuku grant via a bound user service that execs `pm grant`.
+    override fun requestShizukuGrant(onResult: (ShizukuGrantGateway.Result) -> Unit) {
+        ShizukuGrantGateway.requestGrant(context) { result ->
+            if (result is ShizukuGrantGateway.Result.Success) refresh()
+            onResult(result)
+        }
     }
 }

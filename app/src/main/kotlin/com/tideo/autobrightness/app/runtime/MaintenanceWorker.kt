@@ -21,8 +21,8 @@ class MaintenanceWorker(
     private val healthStore = ServiceHealthStore(appContext.serviceHealthDataStore)
 
     override suspend fun doWork(): Result {
-        val settings = settingsStore.readSettings()
-        if (!settings.enabled) return Result.success()
+        val settings = settingsStore.readRawSettings()
+        if (!settings.serviceEnabled) return Result.success()
 
         // Re-ensure the foreground service is up; startForegroundService is a no-op if already running.
         AutoBrightnessRuntime.startMonitoring(applicationContext, "maintenance_reinit")

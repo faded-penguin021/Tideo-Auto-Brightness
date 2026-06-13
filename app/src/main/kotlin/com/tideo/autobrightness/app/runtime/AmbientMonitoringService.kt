@@ -103,6 +103,8 @@ class AmbientMonitoringService : Service() {
             combine(controller.state, contextEngine.activeContext) { state, ctx ->
                 // Each accepted cycle drives time-window re-evaluation (contexts_spec — prof764).
                 contextEngine.onPipelineTick()
+                // Republish the live snapshot so the in-app Dashboard can render it (S11).
+                LiveRuntimeState.publish(state, ctx)
                 NotificationModel(state.smoothedLux, state.targetBrightness, state.paused, state.serviceOn, ctx)
             }
                 .distinctUntilChanged()
@@ -127,6 +129,7 @@ class AmbientMonitoringService : Service() {
     private suspend fun tearDownDisabled() {
         // Persist the disable so boot/screen receivers do not restart the loop.
         applicationContext.settingsDataStore.updateData { it.copy(serviceEnabled = false) }
+        LiveRuntimeState.reset()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -200,6 +203,7 @@ class AmbientMonitoringService : Service() {
         runCatching { unregisterReceiver(screenReceiver) }
         contextEngine.stop()
         controller.stop()
+        LiveRuntimeState.reset()
         scope.cancel()
         super.onDestroy()
     }
