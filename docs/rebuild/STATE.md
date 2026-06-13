@@ -466,7 +466,36 @@ Append new entries as D-041, D-042, … with which segments they affect.
 
 ## Gate findings
 
-### Gate 1 (after S9b) — READY (awaiting human on-device run)
+### Gate 1 (after S9b) — READY
+
+**Test Execution Context:** 
+The tester executed the Gate 1 instructions exactly as provided. The `tideo-auto-brightness-gate1-debug.apk` was installed (bypassing the expected Google Play Protect warning). Permissions were manually granted via Android Settings/App Ops: `POST_NOTIFICATIONS` (after initial crash), `WRITE_SETTINGS` (Modify system settings), and `WRITE_SECURE_SETTINGS` (via ADB/Shizuku, verified in Shizuku authorized apps). 
+
+## Passed Checks
+
+*   **Step 1 (Service & Notification):** Service enabled successfully. Notification appeared showing live `Lux X --> Brightness Y` updates.
+*   **Step 2 (Smooth Animation):** Covering the light sensor resulted in brightness animating down smoothly. Moving into bright light resulted in brightness animating up smoothly.
+*   **Step 4 (Screen Off / On Re-init):** Display cycled off in the dark, then on in the light. Brightness instantly snapped to the correct target value (instant set on wake is correct/acceptable behavior).
+*   **Step 5 (Reboot Self-Start):** Rebooting the device successfully triggers the service to start automatically. `BootCompletedReceiver` is functioning correctly.
+*   **Step 6a (Pause Action):** Notification "Pause" action successfully stops brightness changes and triggers manual override state.
+*   **Step 6b (Reset Action):** Notification "Reset" action successfully triggers panic behavior, setting brightness to maximum (correct Tasker parity for Task528).
+
+## Failed / Anomalous Checks
+
+**G1-F1: App crashes on first launch (missing permissions)**
+*   **Observation:** App instantly crashes on launch before any notification permission prompt appears. Crash is resolved only by manually granting permissions via Android Settings/App Ops.
+
+**G1-F2: Manual override detection failing (System slider grab does not pause pipeline)**
+*   **Observation:** Dragging the *Android system brightness slider* mid-animation locks the UI slider in place, but the Tideo app continues to overwrite brightness as lighting conditions change. No "Paused" notification appears.
+
+**G1-F3: State desync between Notification 'Disable' and App UI**
+*   **Observation:** Tapping "Disable" in the notification successfully stops the service and removes the notification. However, opening the app afterwards shows the main service toggle as "On".
+
+**G1-F4: Pipeline fails to resume after Panic Reset**
+*   **Observation:** Selecting "Reset" sets brightness to 100% (correct). However, selecting "Resume" afterward updates the notification to "Monitoring ambient light", while the brightness remains locked at 100% and does not react to lighting changes.
+
+**G1-F5: Super Dimming not activating**
+*   **Observation:** After granting `WRITE_SECURE_SETTINGS` (verified via Shizuku authorized applications), reducing ambient light below the dimming threshold does not engage Android's Extra Dim / reduce bright colors feature.
 ### Gate 2 (after S12) — pending
 ### Gate 3 (after S14) — pending
 
