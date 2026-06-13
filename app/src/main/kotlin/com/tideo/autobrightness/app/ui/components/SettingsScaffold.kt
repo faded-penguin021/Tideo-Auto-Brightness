@@ -1,0 +1,63 @@
+package com.tideo.autobrightness.app.ui.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+/**
+ * Shared M3 scaffold for every S12 parameter/tool screen: a top app bar with a back arrow (this is
+ * the Compose-native replacement for the dropped `props·key` back-key handlers and `_ExitButton`
+ * scene-nav rows, anonymous_handlers triage bucket (a)) over a scrolling content column.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScaffold(
+    title: String,
+    onBack: () -> Unit,
+    content: @Composable (PaddingValues) -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+                navigationIcon = {
+                    TextButton(onClick = onBack, modifier = Modifier.testTag("back_button")) {
+                        Text("‹ Back")
+                    }
+                },
+            )
+        },
+        content = content,
+    )
+}
+
+/** Convenience: a scrolling column inside [SettingsScaffold] with consistent padding/spacing. */
+@Composable
+fun SettingsColumn(
+    padding: PaddingValues,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        content()
+    }
+}

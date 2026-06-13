@@ -8,14 +8,21 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.ui.onboarding.OnboardingScreen
+import com.tideo.autobrightness.app.ui.screens.AnimationDimmingScreen
+import com.tideo.autobrightness.app.ui.screens.ContextsScreen
+import com.tideo.autobrightness.app.ui.screens.CurveBrightnessScreen
 import com.tideo.autobrightness.app.ui.screens.DashboardScreen
+import com.tideo.autobrightness.app.ui.screens.DynamicScaleScreen
 import com.tideo.autobrightness.app.ui.screens.PlaceholderScreen
+import com.tideo.autobrightness.app.ui.screens.ProfilesScreen
+import com.tideo.autobrightness.app.ui.screens.ReactivityScreen
+import com.tideo.autobrightness.app.ui.screens.ToolsScreen
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /**
- * The navigation shell over the [AppRoute] target screen set. S11 wires Dashboard + Onboarding for
- * real; the S12/S13-owned destinations resolve to a labelled [PlaceholderScreen] so navigation works
- * end-to-end. First-run routing sends the user to Onboarding when no write privilege exists yet.
+ * The navigation shell over the [AppRoute] target screen set. S11 wired Dashboard + Onboarding; S12
+ * fills the parameter/tool/profile destinations with real screens. About & Guide remains a labelled
+ * [PlaceholderScreen] until S13. First-run routing sends the user to Onboarding when tier == NONE.
  */
 @Composable
 fun AppNavGraph(
@@ -25,9 +32,15 @@ fun AppNavGraph(
     NavHost(navController = navController, startDestination = startDestination) {
         composable(AppRoute.Dashboard.route) { DashboardScreen(navController) }
         composable(AppRoute.Onboarding.route) { OnboardingScreen(navController) }
-        AppRoute.dashboardDestinations.forEach { route ->
-            composable(route.route) { PlaceholderScreen(route.label, route.owner) }
-        }
+        composable(AppRoute.CurveBrightness.route) { CurveBrightnessScreen(navController) }
+        composable(AppRoute.Reactivity.route) { ReactivityScreen(navController) }
+        composable(AppRoute.AnimationDimming.route) { AnimationDimmingScreen(navController) }
+        composable(AppRoute.DynamicScale.route) { DynamicScaleScreen(navController) }
+        composable(AppRoute.Contexts.route) { ContextsScreen(navController) }
+        composable(AppRoute.Tools.route) { ToolsScreen(navController) }
+        composable(AppRoute.Profiles.route) { ProfilesScreen(navController) }
+        // S13-owned:
+        composable(AppRoute.About.route) { PlaceholderScreen(AppRoute.About.label, AppRoute.About.owner) }
     }
 }
 
