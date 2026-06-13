@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Compose handles all M3 theming; this XML theme just satisfies the manifest ref. -->
-    <style name="Theme.TideoAutoBrightness" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      Compose Material 3 (TideoTheme) generates all in-app theming, so this XML theme exists only to
+      satisfy the manifest android:theme and paint the brief pre-Compose launch window (D-027g). It
+      is reduced to a minimal DayNight, no-action-bar platform parent — no Material XML parent, no
+      colors — so the launch window follows the system light/dark setting.
+    -->
+    <style name="Theme.TideoAutoBrightness" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>

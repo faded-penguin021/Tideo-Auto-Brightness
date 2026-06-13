@@ -29,16 +29,23 @@ next session does not know it.
 
 | S10 context override engine | 2026-06-13 | Opus/medium | DONE | (see push) | Context system ported (D-042). Domain: `context/ContextOverrideResolver.kt` (pure task43 PASS3/4 — match+rank precedence priority→specificity→array-order, overnight time ranges w/ yesterday membership, SUNRISE/SUNSET tokens, haversine location gate, nextContextTime HH.MM) + `context/ContextModel.kt` (ContextRuleSpec/ContextSignals/ContextResolution); 21-case 1:1 matrix test. App: `runtime/ContextEngine.kt` (PASS1 per-caller cooldown + PASS2 signal-change veto + %AAB_ContextState, applies override by swapping the ENTIRE profile via mergeProfile = task626 39-key snapshot, fires onContextChanged→task43 act21 re-init); `runtime/AndroidContextSignalSource.kt` (S7 readers + Calendar day/seconds + SolarCalculator local sunrise/sunset); `runtime/AppProfileCatalog.kt` (built-in profiles; S12 extends); `settings/ContextRuleStore.kt` (task623 upsert/delete CRUD over new contextRulesDataStore) + `ContextRulesSerializer.kt` + `ContextRuleMapping.kt` (app→domain spec + signal tokens). Wired: AppModule→createRuntime composes engine+pipeline (settingsProvider=engine.effectiveSettings); BrightnessPipelineController gains ContextChanged event→reapplyProfile; AmbientMonitoringService starts engine, screen on/off→engine, pipeline-tick→time re-eval, notification subText = active context. Tests: ContextOverrideResolverTest(21), ContextEngineTest(5, fakes), ContextRuleStoreTest(5). Full ladder GREEN: `:domain:test :platform:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`. No compaction. |
 
+| S11 UI shell + onboarding + dashboard | 2026-06-13 | Opus/medium | DONE | (see push) | M3 nav shell over the screen_map target set rebuilt (D-043). New: `navigation/AppRoute.kt` (enum: Dashboard/Onboarding real + 8 S12/S13 placeholders) + rewritten `NavGraph.kt` (first-run routing → Onboarding when tier==NONE) + `ui/screens/PlaceholderScreen.kt`; `ui/theme/Theme.kt` (M3 dynamic color + DayNight); rebuilt `ui/screens/DashboardScreen.kt` (stateless `DashboardContent` + VM wrapper: live lux/smoothed/current→target, master switch, pause/resume, active-context line, tier badge→onboarding, health) driven by `state/DashboardViewModel.kt` + `state/DashboardState.kt` + new `runtime/LiveRuntimeState.kt` (process-wide bridge from the service's pipeline StateFlow to the UI); `ui/onboarding/OnboardingScreen.kt` (stateless `OnboardingContent` + wrapper: POST_NOTIFICATIONS → WRITE_SETTINGS w/ onResume canWrite re-check → optional ELEVATED [adb-copy/Shizuku/root + live tier] → usage-access shown only when app rules exist). **Shizuku grant exec completed (closes D-032):** AIDL `IShizukuUserService` + `ShizukuUserService` (bound user service execs `pm grant WRITE_SECURE_SETTINGS`) wired through `ShizukuGrantGateway.requestGrant`→`PrivilegeManager.requestShizukuGrant(onResult)`; platform `buildFeatures.aidl=true`; NO java reflection (owner caution). Service republishes pipeline state to LiveRuntimeState + resets on teardown. themes.xml simplified to minimal DayNight no-actionbar platform parent (D-027g resolved). RIP-OUT of toy UI: deleted SettingsState/SettingsViewModel + 3 toy screens; SettingsStore/AabSettingsMapper decoupled from the toy SettingsState (readRawSettings().serviceEnabled at 4 call sites). New deps: compose ui-test-junit4/manifest. Tests: `UiShellTest` (3 Robolectric compose). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(72) `:platform:test :domain:test :app:lintDebug`. No compaction. |
+
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-S1 through S9b DONE + **GATE 1 PASSED**; **S10 (context override engine) DONE**. The runtime now
-swaps the entire active brightness profile on app/wifi/battery/time/location context matches: the
-golden-tested domain `ContextOverrideResolver` (task43 PASS3/4 precedence) is driven by the app
-`ContextEngine` (cooldown/veto + S7 readers), which feeds the pipeline its effective settings and
-re-runs Set Initial Brightness on every switch. Context rules persist via `ContextRuleStore`
-(DataStore). S11 (UI shell) is the remaining parallel-window-C segment; rule-editing UI is S12.
+S1 through S9b DONE + **GATE 1 PASSED**; **S10 (context override engine) DONE**; **S11 (UI shell +
+onboarding + dashboard) DONE** — parallel window C complete. The app now has a real Compose M3
+navigation shell (dynamic color + DayNight): a live **Dashboard** (lux/brightness readout, master
+switch, pause/resume, active-context line, privilege tier badge, service health) backed by
+`DashboardViewModel` over the DataStore (source of truth, G1-F3 pattern) + a process-wide
+`LiveRuntimeState` bridge the service republishes its pipeline StateFlow into; and an **Onboarding**
+stepper implementing task563's 8 gates/order via ActivityResultContracts (notifications →
+WRITE_SETTINGS → optional ELEVATED → usage-access). The Shizuku WRITE_SECURE_SETTINGS grant is now
+fully wired through a bound user service (AIDL, closes D-032 — no reflection). Parameter/tool/profile
+screens (S12) and About/Guide + charts (S13) are labelled placeholders that navigation resolves to.
+Build is GREEN across the full ladder.
 
 (historical) S1 through S9b DONE → GATE 1 READY. Build is GREEN across
 the full ladder: `:domain:test`, `:platform:test`, `:app:testDebugUnitTest`, `:app:assembleDebug`,
@@ -58,7 +65,14 @@ AppModule is now the real DI root.
   core loop (sensor → animate, slider → pause/resume, screen off/on → reinit, reboot → self-start,
   notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
   Findings → "Gate findings" below.
-- Parallel window C: **S10** (context override engine) DONE ∥ **S11** (UI shell + onboarding) — S11 next.
+- Parallel window C: **S10** (context override engine) DONE ∥ **S11** (UI shell + onboarding) DONE.
+- **S12** (settings & tools screens + chart engine core) is next on the serial spine — preconditions
+  S8, S10, S11 (+ S6 for wizard/chart math) all DONE. S12 fills the 8 placeholder screens
+  (Curve & Brightness, Reactivity, Animation & Dimming, Dynamic Scale, Contexts, Tools, Profiles,
+  About) with real content + `SettingsValidator`-backed fields; surfaces the DetectOverrides /
+  DimmingEnabled toggles deferred from Gate 1 (D-041 F2/F5) so they are verifiable at Gate 2; starts
+  with the anonymous-handler triage (D-027f). Note the S11 ViewModel pattern (DataStore-as-truth +
+  LiveRuntimeState) and the stateless-content/wrapper split (testable under Robolectric compose).
 - Carried for S12 (D-040): unprivileged overlay dimming (task698 DC-like / 653/654) is NOT wired
   (S9b did the ELEVATED secure path only); DimDynamic (circadian dim strength, task646 ScalingUse
   branch) passes null pending real solar windows (D-039d); proximity damp (task545) still unwired.
@@ -541,7 +555,50 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   always evaluates once regardless of clock value (the 0-init would have blocked the seed eval when
   clock≈0; harmless in prod but a real edge). (Affects S12, S14.)
 
-Append new entries as D-043, D-044, … with which segments they affect.
+- D-043: S11 UI-SHELL decisions (sanctioned by the S11 brief; flagged for S12/S13/S14).
+  (a) **Shizuku grant exec closed via a bound user service, NOT reflection (D-032 closed).** The
+  owner reported `Shizuku.newProcess`-style reflection being fragile in Tasker-factory apps, so the
+  documented user-service pattern was implemented: AIDL `IShizukuUserService` (`destroy()=16777114`,
+  `grantWriteSecureSettings(pkg)`), `ShizukuUserService` runs `pm grant ...WRITE_SECURE_SETTINGS` in
+  the Shizuku-spawned shell/root process (the same channel the adb instruction uses — WRITE_SECURE_
+  SETTINGS is signature|privileged, not a runtime perm, so `grantRuntimePermission` does NOT apply),
+  bound via `Shizuku.bindUserService`/`UserServiceArgs`. Enabled `buildFeatures.aidl=true` in
+  `platform`. UNVERIFIABLE in this environment (no binder/device) — verify at Gate 2. The binder call
+  runs off the callback thread; result surfaces to the onboarding UI via
+  `PrivilegeManager.requestShizukuGrant(onResult: (ShizukuGrantGateway.Result)->Unit)` (signature
+  changed from the S7 stub's `()`/`{refresh()}`).
+  (b) **Live pipeline → UI via a process-wide `LiveRuntimeState` singleton.** The pipeline controller
+  lives inside the service; the Dashboard (same process, different component) reads a republished
+  `StateFlow<PipelineState>` + activeContext + serviceRunning. The service publishes from its single
+  pipeline-collector coroutine (one writer, D-027 concurrency model intact) and `reset()`s on
+  disable/destroy so the UI never shows stale "live" data. Not a binding to the service; a snapshot
+  mirror. S12/S14: if a second observer of pipeline state is added, keep the single-writer rule.
+  (c) **DataStore is the UI source of truth** (G1-F3 pattern carried forward): `DashboardViewModel`
+  derives serviceEnabled from `settingsDataStore` (so the notification Disable propagates) and the
+  tier from `PrivilegeManager.tierFlow()` (call `refreshTier()` on resume — the manager only updates
+  on `refresh()`). `setEnabled` persists serviceEnabled BEFORE start/stop so boot/screen/maintenance
+  receivers agree.
+  (d) **Toy UI ripped out.** Deleted the Codex-era `SettingsState`/`SettingsViewModel` + the 3 toy
+  screens (BrightnessSettings/SettingsGroup/Graph) and decoupled `SettingsStore`/`AabSettingsMapper`
+  from `SettingsState` (removed `readSettings()/writeSettings()/toUiState()/fromUiState()`; the 4
+  receiver/worker call sites now use `readRawSettings().serviceEnabled`). `LineGraph.kt` KEPT (S12
+  may extend/replace it per its brief). The validated `AabSettings` is the single settings model.
+  (e) **Screens are split stateless-`Content` + stateful wrapper** so `DashboardContent`/
+  `OnboardingContent` render under a Robolectric compose smoke test (`UiShellTest`, 3 tests:
+  Dashboard render+toggle, full `AppRoute`-table navigation, Onboarding steps+done). Added test deps
+  `compose ui-test-junit4` (testImplementation) + `ui-test-manifest` (debugImplementation). S12/S13:
+  follow this split for testability.
+  (f) **D-027g RESOLVED.** `values/themes.xml` reduced to a minimal `@android:Theme.DeviceDefault.
+  DayNight` no-actionbar parent (no Material XML parent, no colors) — Compose `TideoTheme`
+  (dynamic color + DayNight) owns all in-app theming. The XML theme could NOT be removed entirely:
+  the manifest `android:theme` + the pre-Compose launch window still require one.
+  (g) **Onboarding flow = task563's 8 gates/order only** (D-024): notifications → WRITE_SETTINGS
+  (BASIC, onResume `canWrite` re-check) → optional ELEVATED (skippable; adb-copy/Shizuku/root) →
+  usage-access (rendered only when ≥1 context rule targets apps). No Tasker prefs (adbwp) read. The
+  Done button reads "Skip for now" until BASIC is granted. First-run routing: NavGraph starts on
+  Onboarding when tier==NONE. (Affects S12, S13, S14.)
+
+Append new entries as D-044, D-045, … with which segments they affect.
 
 ## Blockers
 

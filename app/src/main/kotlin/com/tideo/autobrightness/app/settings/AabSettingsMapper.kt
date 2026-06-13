@@ -1,31 +1,10 @@
 package com.tideo.autobrightness.app.settings
 
-import com.tideo.autobrightness.app.state.SettingsState
 import com.tideo.autobrightness.domain.brightness.AnimationConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
 import com.tideo.autobrightness.domain.brightness.ThresholdConfig
-
-object AabSettingsMapper {
-    fun toUiState(settings: AabSettings): SettingsState {
-        return SettingsState(
-            enabled = settings.serviceEnabled,
-            minBrightness = (settings.minBrightness / 255f).coerceIn(0f, 1f),
-            maxBrightness = (settings.maxBrightness / 255f).coerceIn(0f, 1f),
-        )
-    }
-
-    fun fromUiState(uiState: SettingsState, current: AabSettings): AabSettings {
-        val min = (uiState.minBrightness.coerceIn(0f, 1f) * 255).toInt().coerceIn(1, 255)
-        val max = (uiState.maxBrightness.coerceIn(0f, 1f) * 255).toInt().coerceIn(min, 255)
-        return current.copy(
-            serviceEnabled = uiState.enabled,
-            minBrightness = min,
-            maxBrightness = max,
-        )
-    }
-}
 
 // Domain config mappings — used by S9a pipeline controller to build BrightnessPolicyInput.
 
