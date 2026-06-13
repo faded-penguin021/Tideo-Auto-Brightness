@@ -507,18 +507,23 @@ Append new entries as D-042, D-043, … with which segments they affect.
 
 ## Gate findings
 
-### Gate 1 (after S9b) — TRIAGED (D-041); RE-TEST PENDING
+### Gate 1 (after S9b) — PASSED (core loop; F2/F5 → Gate 2)
+
+**Human re-test 2026-06-13 11:15 UTC:** owner confirmed **G1-F1, G1-F3, G1-F4 fixed and behaving
+per the README** on-device. Combined with the originally-passing checks (1,2,4,5,6a,6b), the
+Gate-1 core loop is signed off. The two remaining findings are owner-deferred (not failures):
+F2 (manual-override pause) and F5 (super dimming) need the S12 settings UI to enable their
+toggles (DetectOverrides / DimmingEnabled both default Off, Tasker parity) → **verify at Gate 2**.
 
 **Triage outcome (Gate-1 punch-list session, 2026-06-13, full detail D-041):**
-- **G1-F1 crash → FIXED** (platform writes swallow SecurityException; POST_NOTIFICATIONS requested
-  at launch; "permission needed" notification hint).
-- **G1-F3 Disable desync → FIXED** (SettingsViewModel observes the DataStore).
-- **G1-F4 panic/resume → FIXED** (panic is now a full stop = task528 %AAB_Service Off).
+- **G1-F1 crash → FIXED + CONFIRMED** (platform writes swallow SecurityException; POST_NOTIFICATIONS
+  requested at launch; "permission needed" notification hint).
+- **G1-F3 Disable desync → FIXED + CONFIRMED** (SettingsViewModel observes the DataStore).
+- **G1-F4 panic/resume → FIXED + CONFIRMED** (panic is now a full stop = task528 %AAB_Service Off).
 - **G1-F5 super dimming → DEFERRED S12** (DimmingEnabled defaults off, no UI yet) + tier-refresh
   sub-bug FIXED.
 - **G1-F2 override pause → DEFERRED S12** (DetectOverrides defaults off, no UI yet — Tasker parity).
-- **Passed checks (1,2,4,5,6a,6b) unaffected.** Re-test F1/F3/F4 on the next debug APK; F2/F5 verify
-  at Gate 2 once S12 surfaces the DetectOverrides + DimmingEnabled toggles.
+- Throwaway `dist/` re-test APK removed after sign-off (it lives in branch history only).
 
 #### Original human findings (preserved)
 
