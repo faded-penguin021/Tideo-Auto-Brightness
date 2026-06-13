@@ -5,8 +5,17 @@ with: *"Execute segment Sx of docs/rebuild/RUNBOOK.md"* (nothing else is require
 routes the session through the protocol). Segments must check their **preconditions** against
 `STATE.md` and refuse to start if unmet (log a BLOCKED row instead).
 
-Models are Opus / Sonnet / Haiku at reasoning effort low / medium / high. Where a brief says
-"Opus if budget allows", Sonnet-high is acceptable.
+Models are Opus / Sonnet / Haiku at reasoning effort low / medium / high.
+
+**Model policy since S8.5 (D-035):** S9a onward, code segments run on **Opus**, not Sonnet.
+Rationale: every Sonnet code segment passed its own acceptance gate yet left correctness
+issues that only review caught (S5 → D-030 gate-polarity + insertion-order bugs; S7 → D-034
+suppress-echo race + OEM rounding drift), and the owner observed Sonnet sessions hitting or
+nearing context compaction, which degrades exactly the long-tail care these briefs need.
+S13 stays Haiku (fenced template replication). **Compaction rule (all models):** if a session
+compacts, record it in its STATE.md segment-log row (e.g. "Sonnet/high, compacted ×1") so
+quality can be correlated; prefer delegating bulk file reading to subagents over reading
+into the main context.
 
 ## Execution DAG
 
@@ -440,7 +449,7 @@ round-trip + validator tests; pushed.
 
 ## S9a — Runtime core: the real pipeline service
 
-**Model:** Sonnet / high (Opus / medium if budget allows — cheapest insurance before Gate 1)
+**Model:** Opus / high (upgraded from Sonnet per D-035 — parity-critical core before Gate 1)
 · **Size:** large · **Preconditions:** S5, S6, S7, S8 all DONE. (Split from the original S9
 per D-027 so the parity-critical core can land/block independently of features+cleanup.)
 
@@ -503,8 +512,8 @@ type flag pairing. If blocked, S9b can still NOT proceed (it deletes code S9a's 
 
 ## S9b — Runtime features + legacy rip-out
 
-**Model:** Sonnet / high · **Size:** medium · **Preconditions:** S9a DONE. Same window —
-ideally the immediately following session.
+**Model:** Opus / medium (upgraded from Sonnet per D-035) · **Size:** medium ·
+**Preconditions:** S9a DONE. Same window — ideally the immediately following session.
 
 **Objective:** Finish the runtime surface (super dimming, QS tile, boot start) and delete
 every legacy fake, then declare Gate 1.
@@ -543,8 +552,8 @@ specific deletion and logging PARTIAL over leaving the branch red.
 
 ## S10 — Context override engine
 
-**Model:** Sonnet / medium · **Size:** medium · **Preconditions:** S2, S7, S9a+S9b DONE.
-Parallel window C (with S11).
+**Model:** Opus / medium (upgraded from Sonnet per D-035) · **Size:** medium ·
+**Preconditions:** S2, S7, S9a+S9b DONE. Parallel window C (with S11).
 
 **Objective:** Port the context system: per-app / WiFi / battery / time / location overrides
 with serialized cache + daily reset and Tasker-priority-faithful precedence.
@@ -570,8 +579,9 @@ resolver test matrix matches spec table 1:1; pushed.
 
 ## S11 — UI shell, onboarding/privileges, dashboard
 
-**Model:** Sonnet / medium · **Size:** large · **Preconditions:** S7, S8, S9a+S9b DONE.
-Parallel window C (with S10 — disjoint packages; rebase before push).
+**Model:** Opus / medium (upgraded from Sonnet per D-035) · **Size:** large ·
+**Preconditions:** S7, S8, S9a+S9b DONE. Parallel window C (with S10 — disjoint packages;
+rebase before push).
 
 **Objective:** Compose M3 navigation shell (screen set per `screen_map.md`), privilege
 onboarding via ActivityResultContracts, live Dashboard. Onboarding parity contract = task563's
@@ -608,8 +618,8 @@ Robolectric compose smoke test: launch → Dashboard renders, each route navigat
 
 ## S12 — Settings & tools screens + chart engine core
 
-**Model:** Sonnet / medium · **Size:** large · **Preconditions:** S8, S10, S11 DONE
-(S6 for wizard/chart math).
+**Model:** Opus / medium (upgraded from Sonnet per D-035) · **Size:** large ·
+**Preconditions:** S8, S10, S11 DONE (S6 for wizard/chart math).
 
 **Objective:** Every parameter/tool/profile screen with Tasker-faithful validation, plus the
 reusable Compose-Canvas chart engine with the brightness-curve chart as template instance.

@@ -12,6 +12,10 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+// Tasker task548 result: the final calculated brightness (round1) + the effective compressed
+// scale (%AAB_ScaleDynamicCompress), which task561/OverrideRules consumes.
+data class CompressedScaleResult(val calculatedBrightness: Double, val effectiveScale: Double)
+
 class BrightnessEngine {
     fun evaluate(input: BrightnessPolicyInput): BrightnessPolicyOutput {
         input.overrides.manualBrightness?.let { manual ->
@@ -27,6 +31,7 @@ class BrightnessEngine {
                 thresholdLow = input.lux,
                 thresholdHigh = input.lux,
                 scaleDynamic = 1.0,
+                scaleDynamicCompress = 1.0,
             )
         }
 
@@ -57,9 +62,18 @@ class BrightnessEngine {
             input.overrides.baseScaleOverride ?: 1.0
         }
 
-        val scaledBrightness = compressedDynamicScale(mappedBrightness, scaleDynamic, input.curve)
+        // Tasker task661 act10-14: ScalingUse → task548 taper; else linear mapped*Scale+Offset.
+        val scaleResult = if (input.curve.scalingUse) {
+            compressedDynamicScale(mappedBrightness, scaleDynamic, input.curve)
+        } else {
+            CompressedScaleResult(
+                calculatedBrightness = mappedBrightness * input.curve.scale + input.curve.offset,
+                effectiveScale = scaleDynamic,
+            )
+        }
         // Tasker task661 act16-21: clamp to [MinBright, MaxBright] AFTER scaling; Math.round (ties toward +∞)
-        val targetBrightness = Math.round(scaledBrightness).toInt().coerceIn(input.curve.minBrightness, input.curve.maxBrightness)
+        val targetBrightness = Math.round(scaleResult.calculatedBrightness).toInt()
+            .coerceIn(input.curve.minBrightness, input.curve.maxBrightness)
 
         val (steps, wait, throttle) = calculateAnimation(
             alpha = luxAlpha,
@@ -81,6 +95,7 @@ class BrightnessEngine {
             thresholdLow = absThresholds.first,
             thresholdHigh = absThresholds.second,
             scaleDynamic = scaleDynamic,
+            scaleDynamicCompress = scaleResult.effectiveScale,
         )
     }
 
@@ -132,8 +147,8 @@ class BrightnessEngine {
         }
     }
 
-    fun compressedDynamicScale(mappedBrightness: Double, scaleDynamic: Double, cfg: BrightnessCurveConfig): Double {
-        if (mappedBrightness == 0.0) return cfg.minBrightness.toDouble()
+    fun compressedDynamicScale(mappedBrightness: Double, scaleDynamic: Double, cfg: BrightnessCurveConfig): CompressedScaleResult {
+        if (mappedBrightness == 0.0) return CompressedScaleResult(cfg.minBrightness.toDouble(), scaleDynamic)
         val exponent = round3(-cfg.taperSteepness * (mappedBrightness - cfg.taperMidpoint))
         val compressionFactor = round3(1.0 / (1.0 + exp(exponent)))
         val taperEffect = round3(1.0 - compressionFactor)
@@ -141,13 +156,24 @@ class BrightnessEngine {
         val dynamicCap = round3(cfg.maxBrightness / mappedBrightness)
         val dynamicFloor = round3(2.0 - dynamicCap)
 
-        val effectiveScale = if (scaleDynamic > 1.0) {
-            min(taperedScale, dynamicCap)
-        } else {
-            max(taperedScale, dynamicFloor)
-        }
+        val effectiveScale = round3(
+            if (scaleDynamic > 1.0) min(taperedScale, dynamicCap) else max(taperedScale, dynamicFloor),
+        )
 
-        return roundN(mappedBrightness * round3(effectiveScale) + cfg.offset, 1)
+        return CompressedScaleResult(roundN(mappedBrightness * effectiveScale + cfg.offset, 1), effectiveScale)
+    }
+
+    // Tasker task661 act10-21: map → (ScalingUse ? task548 taper : mapped*Scale+Offset) → clamp
+    // to [MinBright, MaxBright] as doubles (the int round happens at the platform write). This is
+    // the unit the golden vector `calculated.csv` pins; evaluate() reuses the same branch.
+    fun calculatedBrightness(lux: Double, cfg: BrightnessCurveConfig, scaleDynamic: Double): Double {
+        val mapped = mapLuxToBrightness(lux, cfg)
+        val calc = if (cfg.scalingUse) {
+            compressedDynamicScale(mapped, scaleDynamic, cfg).calculatedBrightness
+        } else {
+            mapped * cfg.scale + cfg.offset
+        }
+        return calc.coerceIn(cfg.minBrightness.toDouble(), cfg.maxBrightness.toDouble())
     }
 
     fun computeDynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): Double =

@@ -49,8 +49,11 @@ data class AabSettings(
     val notificationsEnabled: Boolean = true,
     // Tasker: %AAB_Debug; 10 named categories 0–9 (D-023)
     val debugLevel: Int = 0,
-    // Tasker: %AAB_ContextOverride; per-profile flag (D-008)
-    val contextOverride: Boolean = true,
+    // Tasker: %AAB_ContextOverride — runtime "manual context lock" latch. When true, ALL context
+    // watchers are suppressed (contexts_spec §1.1 gate fires only when ContextOverride != true).
+    // The baseline/fresh-install default MUST be false or context switching never works (D-038).
+    // A saved override-profile stores true here; the baseline AabSettings does not.
+    val contextOverride: Boolean = false,
     // Tasker: %AAB_SetupTitle; onboarding dialog title (D-008)
     val setupTitle: String = "Advanced Auto Brightness Setup",
 )
@@ -116,6 +119,6 @@ object AabSettingsContract {
         AabSettingRule("%AAB_QSUse", "quickSettingsEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_NotifyUse", "notificationsEnabled", AabValueType.Boolean, "true", "must be true|false"),
         AabSettingRule("%AAB_Debug", "debugLevel", AabValueType.Int, "0", "range 0..9"),
-        AabSettingRule("%AAB_ContextOverride", "contextOverride", AabValueType.Boolean, "true", "must be true|false"),
+        AabSettingRule("%AAB_ContextOverride", "contextOverride", AabValueType.Boolean, "false", "must be true|false"),
     )
 }

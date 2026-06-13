@@ -1,8 +1,10 @@
 package com.tideo.autobrightness.platform.privilege
 
+import android.Manifest
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Before
+import org.robolectric.Shadows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -46,5 +48,21 @@ class PrivilegeManagerTest {
         val instruction = manager.adbGrantInstruction()
         assertTrue(instruction.contains(context.packageName))
         assertTrue(instruction.contains("WRITE_SECURE_SETTINGS"))
+    }
+
+    @Test
+    fun grantedWriteSecureSettings_detectsElevated() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        Shadows.shadowOf(app).grantPermissions(Manifest.permission.WRITE_SECURE_SETTINGS)
+        manager.refresh()
+        assertTrue(manager.currentTier() == Tier.ELEVATED)
+        assertTrue(manager.tierFlow().value == Tier.ELEVATED)
+    }
+
+    @Test
+    fun writeSettingsIntent_targetsManageWriteSettingsForThisPackage() {
+        val intent = manager.writeSettingsIntent()
+        assertTrue(intent.action == android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS)
+        assertTrue(intent.data.toString().contains(context.packageName))
     }
 }

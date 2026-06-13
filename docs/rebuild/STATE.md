@@ -20,6 +20,8 @@ next session does not know it.
 | S8 settings schema v2 + validator | 2026-06-12 | Sonnet/medium | DONE | (see push) | `AabSettings` v2 (animSteps, thresholdMidpoint, contextOverride, setupTitle added; scale Int→Float; throttleDefaultMs 1000→1310; debugLevel range 0..9; CURRENT_SCHEMA_VERSION=2); `AabSettingsSerializer` migration v1→v2; `AabSettingsMapper` completed (toThresholdConfig/toAnimationConfig/toBrightnessCurveConfig/toDynamicScalingConfig + validate fixes); `TaskerLegacyProfileSerializer` updated (new fields + scale Float); `DefaultProfiles.kt` (5 profiles from task592); `SettingsValidator.kt` (5 rules: task583×3 advisory + task707×2 safety); `ContextOverrideRules.kt` (ContextRule/ContextTriggers/BatteryTrigger/LocationTrigger/ContextOverrideConfig + Tasker JSON interop); 20 new unit tests (migration×6, legacy round-trip×5, validator×9). `:app:testDebugUnitTest` ✅ `:app:assembleDebug` ✅ `:app:lintDebug` ✅ `:domain:test` ✅ |
 | S7 platform adapters + privilege | 2026-06-12 | Sonnet/medium | DONE | (see push) | `sensor/LightSensorSource.kt` (TYPE_LIGHT callbackFlow); `brightness/ScreenBrightnessController.kt` (read/write 0–255, OEM range norm via config_screenBrightnessSettingMaximum, suppress-echo hook); `brightness/SecureDimmingController.kt` (reduce_bright_colors via Settings.Secure, ELEVATED-gated); `privilege/PrivilegeManager.kt` (Tier NONE/BASIC/ELEVATED; BASIC=canWrite, ELEVATED=checkPermission; tierFlow; root+Shizuku grant helpers); `privilege/ShizukuGrantGateway.kt` (binder check + permission request stub — exec TODO S11, D-032); `observe/BrightnessObserver.kt` (ContentObserver callbackFlow, null-Handler for synchronous dispatch, self-write filter via suppress-echo); `context/{BatteryStateReader,LocationReader,ForegroundAppMonitor,WifiInfoReader}.kt`. ShizukuProvider added to manifest; shizuku-api added to platform + app deps; shizuku-provider added to app deps. SystemAdapters.kt marked @Deprecated("S9b removes"). Robolectric tests: 19 total (brightness write/read/mode-force, tier-gating, observer dispatch+self-write-filter, LightSensorSource cancel). `:platform:test` GREEN (19 tests); `:app:assembleDebug` GREEN. |
 
+| S8.5 review (Fable→Opus) | 2026-06-12/13 | Fable+Opus | IN PROGRESS | 3c6a585, cd3fd15, (this) | Sequential reviews (one agent at a time per owner). DONE: full acceptance suite green; S7 review → D-034 (suppress-echo redesign, OEM rounding, +8 tests); D-035 model policy (Opus from S9a); checklist unstale'd; **S4/S5 review → D-036** (2 CRITICAL parity holes fixed: task661 ScalingUse=false/%AAB_Scale branch + %AAB_ScaleDynamicCompress surfacing; new calculated.csv golden + 3 tests; existing 8 CSVs byte-identical); **S6 review → D-037** (port verified faithful; fixed oracle-circularity by adding independent SolarInvariantTest [7 astronomical invariants, all pass] + wizard abort test + dawn/dusk golden assertions); **S8 review → D-038** (CRITICAL: contextOverride default true→false [would lock context switching on fresh install]; fixed 2 vacuous safety-validator tests). All four reviews (S4/S5, S6, S7, S8) COMPLETE. Build green. S9a may proceed (Opus per D-035). |
+
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
@@ -266,7 +268,127 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (f) `thresholdMidpoint` in DefaultProfiles.Default is 3.0 (from task592), not 4.0 (task570).
   Both values are correct in their respective contexts. (Affects S9a mapper usage, S12 UI.)
 
-Append new entries as D-034, D-035, … with which segments they affect.
+- D-034: S8.5 REVIEW FIXES (S7 surface). (a) **Suppress-echo redesigned**: the S7 token-set
+  scheme (registerExpectedWrite/consume-on-match) had four defects under S9a's N-frame
+  animation: ContentObserver re-reads the CURRENT value so a delayed callback for frame N
+  consumes frame N+1's token (false manual-override pause), CopyOnWriteArraySet collapsed
+  duplicate frame values, no-op writes never notify (orphan tokens), and orphans never expired
+  (stale token could swallow a real user override). Replaced with last-self-write matching:
+  `write()` records the device value; `isSelfWrite(raw)` = equality with the LATEST write, not
+  consumed; `clearSelfWriteMarker()` for pause. This is Tasker-faithful (task567 compares the
+  observed value against %LastAAB). S9a MUST: share one controller instance between writer and
+  observer (per-instance state), and call clearSelfWriteMarker() on pause. (b) OEM
+  normalization: `.toInt()` truncation both directions made write(x)→read() drift −1 on
+  non-255 devices; now Math.round both ways (round-trip identity), clamps on both paths,
+  `deviceMaxOverride` ctor param as test seam. (c) forceManualMode now idempotent (second call
+  no longer overwrites the saved AUTOMATIC mode); savedMode still lost on process death —
+  S9a should persist it if restore-after-crash matters. (d) PrivilegeManager.writeSettingsIntent()
+  added (BASIC grant helper the S7 brief specified). (e) ShizukuGrantGateway: listener now
+  removed on denial too; pre-granted permission honored. (f) ForegroundAppMonitor retains
+  last-known package across polls (trailing 3s window yielded null for apps foregrounded >3s —
+  would have broken S10 app rules); uses ACTIVITY_RESUMED. (g) SecureDimming level clamped
+  0..1000 + success-path/clamp tests; ELEVATED shadow-grant tier test; non-vacuous observer
+  filter test. KNOWN RESIDUAL (S9a): user override landing exactly on the last self-written
+  value is filtered — identical to Tasker %LastAAB behavior, accepted. (Affects S9a, S9b, S10.)
+- D-035: MODEL POLICY from S9a onward — code segments upgraded Sonnet → **Opus** (S9a high;
+  S9b/S10/S11/S12 medium); S13 stays Haiku; S14 already Opus. Owner observed Sonnet sessions
+  compacting (×1) or nearing compaction; in-repo evidence: every Sonnet code segment passed
+  its own acceptance gate yet review later found real defects (S5 → D-030 b: gate polarity +
+  newest-first order; S7 → D-034 a/b). Golden-vector parity caught none of these because they
+  live in glue/platform code outside the vectors — exactly where reviewer attention, not test
+  coverage, is the safety net. Compaction events must now be recorded in segment-log rows.
+  (Affects S9a…S12 session directives.)
+
+- D-036: S8.5 REVIEW FIXES (S4/S5 domain). Two CRITICAL parity holes found (both invisible to
+  the prior golden vectors because no CSV exercised the path) and fixed against the EXISTING
+  reference oracle (no oracle/vector edits — the 8 prior CSVs are byte-identical after regen):
+  (a) **task661 ScalingUse=false branch + %AAB_Scale were missing.** `BrightnessEngine.evaluate`
+  unconditionally ran the task548 taper; task661 act10-14 is `If ScalingUse → taper; Else →
+  mapped*%AAB_Scale+%AAB_Offset`. The engine had no `scale`/`scalingUse` field, so a real config
+  (ScalingUse off, Scale≠1.0) produced wrong brightness. Added `scalingUse:Boolean=true` +
+  `scale:Double=1.0` to `BrightnessCurveConfig`, added the linear branch + a public
+  `calculatedBrightness(lux,cfg,scaleDynamic)` (mirrors the oracle's act10-21, clamps as doubles),
+  wired the mapper (`scalingUse←scalingEnabled`, `scale←settings.scale`). New golden
+  `calculated.csv` (2752 rows: 4 variants × lux grid × {ScalingUse T/F} × scaleDynamic grid) +
+  `calculated_matchesEngine` parity test. (b) **%AAB_ScaleDynamicCompress (effectiveScale) was
+  computed then discarded.** `compressedDynamicScale` now returns `CompressedScaleResult`
+  (calculatedBrightness + effectiveScale); `BrightnessPolicyOutput` gains `scaleDynamicCompress`.
+  S9a MUST pass `output.scaleDynamicCompress` as the `dynamicCompress` arg to
+  `OverrideRules.recordOverridePoint` (task561 gate: scalingUse=true AND compress≠0). Also fixed:
+  taper test now asserts effectiveScale (was unasserted); added direct
+  `softwareDimming_dimProgress_matchesOracle` (was only indirectly tested via dimShell); exact
+  `form2A`/`form3A` defaults (were 29.58/2513.0 ≈; now 29.58039891549808/2513.1533352729266 —
+  unused at runtime since the mapper derives them, but no longer a latent trap). `:domain:test`
+  + `:app:testDebugUnitTest` GREEN.
+  ACCEPTED (not bugs): `dynamicThreshold(rawLux,…)`'s rawLux is dead — task544 uses par1 only for
+  the `relative_change` log var; the threshold uses %SmoothedLux only, so the out-of-sync
+  currentLux≠smoothedLux case provably cannot diverge (left in for Tasker-signature fidelity).
+  FLAGGED for S9a/S14 (Finding 7, not resolved): task546 stores %AAB_ThreshDynamic as a
+  BigDecimal-formatted percentage STRING that task535 re-parses; production passes
+  `dynamicThreshold*100` unrounded. The 16512-row smoothing golden is self-consistent, but
+  verify whether task546's string-rounding shifts the smoothing input on-device.
+  OPEN QUESTION for S9a: the mapper now drives BOTH `curve.scalingUse` and `dynamicScaling.enabled`
+  from the single `scalingEnabled` setting — confirm against profiles/contexts extraction whether
+  Tasker can run circadian (task90) independently of %AAB_ScalingUse. (Affects S9a, S9b, S14.)
+
+- D-037: S8.5 REVIEW (S6 circadian + wizard). Math verified faithful to task90 Java blocks
+  line-by-line (NOAA constants, tanh ramp, polar sentinels, schedule windows) and task38/task655
+  (fitting constants, R²/penalties, form output) — no parity bug in the port. BUT one
+  methodological hole fixed: **the circadian/wizard "reference" delegates to production**
+  (`TaskerReference.solarTimes/buildScheduleWindows/dynamicScale` → SolarCalculator/
+  DynamicScaleEngine, TaskerReference.kt:418-424), so `circadian.csv`/`wizard.csv` are generated
+  FROM production and CircadianParityTest/WizardParityTest are regression-LOCKS, not independent
+  oracles — and S6 never did the NOAA-table cross-check its brief required. FIX: added
+  `SolarInvariantTest.kt` (7 assertions on astronomical invariants that hold regardless of
+  implementation — equator-equinox ≈12h, dawn<rise<noon<set<dusk twilight ordering, eastward
+  longitude advances sunrise [lng sign], N-hemisphere long-June/short-Dec + S reversed [LAT sign],
+  high-arctic midnight-sun/polar-night [polar branch]); ALL PASS → the port is now independently
+  confirmed correct, not merely self-consistent. Also: assert dawn/dusk epochs in
+  circadian_solarTimes_matchesGolden (were unchecked); added wizard abort-path test (<9 points →
+  null; no golden case exercised it). ACCEPTED/non-bugs: (a) DynamicScaleEngine derives
+  morning/evening duration from window endpoints rather than Tasker's independent
+  %AAB_MorningDuration vars — equivalent because act76 defines duration ≡ end−start; if S9a/S12
+  ever exposes duration as a standalone setting, add explicit fields. (b) applyToLiveCurve form3a
+  floor 0.0 matches task655 (the 0.001 floor is task38's post-blend safeguard, correctly only in
+  suggest()). (c) BrightnessEngine.computeDynamicScale hardcodes dimSpreadPercent=0.0 — harmless
+  (it returns only scaleDynamic, which depends on scaleSpread; dimDynamic is discarded there).
+  S9b IMPACT: when wiring the dimming path, call DynamicScaleEngine.compute with the real
+  %AAB_DimSpread and consume dimDynamic — do NOT route it through BrightnessEngine.computeDynamicScale.
+  (Affects S9a, S9b, S12, S14.)
+
+- D-038: S8.5 REVIEW (S8 settings/validator/contexts). One CRITICAL default fixed + two
+  safety-validator test-vacuity fixes; model verified otherwise correct.
+  (a) **CRITICAL — `contextOverride` defaulted `true`.** `%AAB_ContextOverride` is the runtime
+  "manual context lock" latch: the watcher gate (contexts_spec §1.1) fires ONLY when
+  `ContextOverride != true`, and PASS 4 skips the profile switch when it is true. Defaulting the
+  baseline AabSettings to `true` would permanently suppress ALL context switching on every fresh
+  install and after v1→v2 migration — S10's context system would never fire. Fixed default →
+  `false` (+ AabSettingsContract rule + serializer comment + migration-test assertion). The
+  defaults_audit "true (per-profile, task637)" describes the value stored INSIDE a saved
+  override-profile file, not the baseline — the conflation that caused the bug. Legacy round-trip
+  test unaffected (its fixture sets %AAB_ContextOverride=true explicitly, testing the import map).
+  (b) **Validator tests were vacuous on the safety path** (task707): the test labelled "zone1
+  formula" actually drove the zone-2 branch (zone-1 selection at line 57-60 was never executed by
+  any test), and the "zone3" test did `filterNot { form3A|safetyBrightness|form2A }.size == 0`,
+  which passes even with zero errors. Fixed: relabelled the zone-2 test, added a real zone-1
+  selection test, rewrote the zone-3 test to assert the safety error actually fires (zone2End=999
+  → form3A≈987 → safe_val≈3.3 < 25). The validator LOGIC is correct (zone select
+  zone1End>1000→z1 / zone2End>1000→z2 / else z3; formulas match features_spec §5, form2D≡zone1End).
+  DOCUMENTED (not fixed): (i) validator's `(1000-form2C).pow(0.33)` is NaN-safe only while form2C
+  is range-clamped (1..50); S12 must run AabSettings.validate() (which clamps) before/with
+  SettingsValidator, or add a guard — flagged for S12. (ii) `ContextRule.profile` stores a
+  FILENAME (Tasker interop), not the 39-key snapshot, and the model carries no baseline for the
+  "no winner → revert to %AAB_ProfileUser" path — acceptable per the S8 brief (storage model
+  only), but S10 MUST hold the user-baseline profile reference externally and treat profile
+  application as load-current-file (a sanctioned simplification vs Tasker's snapshot-at-creation).
+  (iii) specificity counts timeRange and days as independent dims; spec wording "time, +1 if days"
+  is ambiguous — S10 must confirm against task43 before finalizing the precedence tie-break.
+  VERIFIED CLEAN: all 38 SETTING defaults vs task570/defaults_audit; %AAB_MaxSteps absent;
+  migration (ignoreUnknownKeys + non-trivial v1 fixture, scale Int→Float transparent); the 4
+  mapper conversions; 5 DefaultProfiles vs task592; ContextOverrideRules JSON interop. (Affects
+  S10, S12, S14.)
+
+Append new entries as D-039, D-040, … with which segments they affect.
 
 ## Blockers
 

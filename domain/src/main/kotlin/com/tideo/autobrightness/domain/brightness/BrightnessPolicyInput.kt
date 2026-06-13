@@ -43,17 +43,23 @@ data class ThresholdConfig(
 
 data class BrightnessCurveConfig(
     val form1A: Double = 5.0,
-    val form2A: Double = 29.58,
+    // Derived continuity defaults (task659) for the default settings; the mapper recomputes
+    // them via BrightnessFormulae.deriveContinuityCoefficients. Exact = 5*sqrt(35), etc.
+    val form2A: Double = 29.58039891549808,
     val form2B: Double = 8.8,
     val form2C: Double = 18.0,
     val zone1End: Double = 35.0,
     val zone2End: Double = 10_000.0,
-    val form3A: Double = 2513.0,
+    val form3A: Double = 2513.1533352729266,
     val minBrightness: Int = 10,
     val maxBrightness: Int = 255,
     val offset: Double = 0.0,
     val taperMidpoint: Double = 190.0,
     val taperSteepness: Double = 0.075,
+    // Tasker task661 act10/14: %AAB_ScalingUse gates the taper (task548) vs. the linear
+    // `mapped * %AAB_Scale + %AAB_Offset` branch. %AAB_Scale is the static base multiplier.
+    val scalingUse: Boolean = true,
+    val scale: Double = 1.0,
 )
 
 data class AnimationConfig(

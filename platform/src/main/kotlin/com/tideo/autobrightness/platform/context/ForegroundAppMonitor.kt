@@ -36,8 +36,13 @@ class AndroidForegroundAppMonitor(private val context: Context) : ForegroundAppM
 
     override fun foregroundPackage(intervalMs: Long): Flow<String?> = flow {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        // The trailing window only sees apps that RESUMED inside it; an app sitting in the
+        // foreground longer than the window would otherwise read as null. Retain the last
+        // known package between polls (null only until the first resume event is seen).
+        var lastKnown: String? = null
         while (true) {
-            emit(queryForeground(usm))
+            queryForeground(usm)?.let { lastKnown = it }
+            emit(lastKnown)
             delay(intervalMs)
         }
     }
@@ -49,7 +54,7 @@ class AndroidForegroundAppMonitor(private val context: Context) : ForegroundAppM
         var last: String? = null
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                 last = event.packageName
             }
         }

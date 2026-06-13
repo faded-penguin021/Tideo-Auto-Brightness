@@ -145,6 +145,33 @@ object GoldenVectorGenerator {
         File(dir, "taper.csv").writeText(rows.toString())
     }
 
+    // task661 act10-21 full calculated_brightness path, BOTH branches (ScalingUse true/false).
+    // The taper-only CSV never exercised the linear `mapped*Scale+Offset` branch (S8.5/D-036).
+    fun writeCalculated(dir: File) {
+        val rows = StringBuilder(
+            "variant,lux,scalingUse,scaleDynamic,form1a,form2a,form2b,form2c,zone1End,zone2End," +
+                "form3a,minBright,maxBright,offset,scale,taperMidpoint,taperSteepness,calculatedBrightness\n",
+        )
+        val scaleDynamicGrid = listOf(0.8, 1.0, 1.4)
+        for (v in variants) for (lux in luxGrid()) for (su in listOf(true, false)) {
+            // The linear branch ignores scaleDynamic, so one row suffices there.
+            val sdValues = if (su) scaleDynamicGrid else listOf(1.0)
+            for (sd in sdValues) {
+                val calc = TaskerReference.calculatedBrightness(
+                    lux, v.form1a, v.form2a, v.form2b, v.form2c, v.form2d, v.zone1End, v.zone2End,
+                    v.form3a, v.minBright, v.maxBright, v.offset, v.scale, su, sd, v.taperMidpoint, v.taperSteepness,
+                )
+                rows.append(
+                    "${v.name},${fmt(lux)},$su,${fmt(sd)},${fmt(v.form1a)},${fmt(v.form2a)}," +
+                        "${fmt(v.form2b)},${fmt(v.form2c)},${fmt(v.zone1End)},${fmt(v.zone2End)}," +
+                        "${fmt(v.form3a)},${fmt(v.minBright)},${fmt(v.maxBright)},${fmt(v.offset)}," +
+                        "${fmt(v.scale)},${fmt(v.taperMidpoint)},${fmt(v.taperSteepness)},${fmt(calc)}\n",
+                )
+            }
+        }
+        File(dir, "calculated.csv").writeText(rows.toString())
+    }
+
     fun writeAnimation(dir: File) {
         val rows = StringBuilder("variant,alpha,animSteps,minWait,maxWait,cycleTime,loops,wait,throttle\n")
         val alphaGrid = (0..100).map { it / 100.0 } + listOf(-0.3, 1.3)
@@ -353,6 +380,7 @@ object GoldenVectorGenerator {
         writeSmoothing(dir)
         writeThreshold(dir)
         writeTaper(dir)
+        writeCalculated(dir)
         writeAnimation(dir)
         writeTransition(dir)
         writeDimming(dir)

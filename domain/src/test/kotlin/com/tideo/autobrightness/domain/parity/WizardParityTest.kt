@@ -4,9 +4,11 @@ import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.reference.GoldenVectorGenerator
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
+import com.tideo.autobrightness.domain.wizard.OverridePoint
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -72,5 +74,20 @@ class WizardParityTest {
             if (result.form3a != row["form3a"]) mismatches += "$tag form3a engine=${result.form3a} ref=${row["form3a"]}"
         }
         if (mismatches.isNotEmpty()) fail("wizard diverges in ${mismatches.size} cases:\n${mismatches.joinToString("\n")}")
+    }
+
+    /**
+     * Independent abort-path check (S8.5/D-037): task38 returns the "error" path (null) when the
+     * override set has fewer than 9 points after ghost injection. No golden case exercises this;
+     * 2 real points + ≤5 ghosts < 9 → null. This assertion does not depend on a production-derived
+     * golden, so it is genuine ground truth for the abort contract.
+     */
+    @Test
+    fun wizard_abortsBelowMinimumDataPoints() {
+        val input = CurveSuggestionInput(
+            overrides = listOf(OverridePoint(10.0, 20.0), OverridePoint(1000.0, 150.0)),
+            currentCurve = BrightnessCurveConfig(),
+        )
+        assertNull(CurveSuggestionEngine.suggest(input), "fewer than 9 points must abort to null")
     }
 }

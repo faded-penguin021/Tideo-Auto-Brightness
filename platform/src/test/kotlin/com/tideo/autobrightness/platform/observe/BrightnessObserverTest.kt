@@ -49,19 +49,24 @@ class BrightnessObserverTest {
     }
 
     @Test
-    fun selfWrite_isFiltered() = runTest(UnconfinedTestDispatcher()) {
+    fun selfWrite_isFiltered_externalChangeStillEmitted() = runTest(UnconfinedTestDispatcher()) {
         val received = mutableListOf<Int>()
         val job = launch(UnconfinedTestDispatcher()) {
             observer.externalChanges().collect { received.add(it) }
         }
+        val uri = Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS)
 
-        // Mark the current value (150) as a self-write before notifying.
-        controller.registerExpectedWrite(150)
-        context.contentResolver.notifyChange(
-            Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS), null
-        )
+        // Self-write: controller.write records the marker; the notify must be filtered.
+        controller.write(150)
+        context.contentResolver.notifyChange(uri, null)
+
+        // External write to a different value: must be emitted. This guards against the
+        // filter test passing vacuously when the observer never fires at all.
+        Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 42)
+        context.contentResolver.notifyChange(uri, null)
 
         job.cancel()
         assertTrue(received.none { it == 150 }, "Self-write (150) should have been filtered out")
+        assertTrue(received.contains(42), "External change (42) should have been emitted")
     }
 }

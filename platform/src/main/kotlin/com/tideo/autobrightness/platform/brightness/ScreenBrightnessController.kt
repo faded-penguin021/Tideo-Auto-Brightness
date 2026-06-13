@@ -4,7 +4,6 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.res.Resources
 import android.provider.Settings
-import java.util.concurrent.CopyOnWriteArraySet
 
 // Tasker: task696/698 write Settings.System.SCREEN_BRIGHTNESS; task554 reads it back.
 // OEM normalization: domain always 0–255 (Tasker parity); device range may differ.
@@ -13,37 +12,57 @@ interface ScreenBrightnessController {
     fun write(level: Int)
     fun forceManualMode()
     fun restoreMode()
-    /** Mark a domain-scale value as a pending self-write so BrightnessObserver can filter it. */
-    fun registerExpectedWrite(domainLevel: Int)
-    fun clearExpectedWrites()
-    /** True and removes one occurrence if the raw device-scale value is a registered self-write. */
+    /**
+     * True if the raw device-scale value equals the most recent [write] from this process.
+     * Tasker: task567 compares the observed brightness against %LastAAB (the last value the
+     * pipeline wrote) — equality means self-write, mismatch means manual override. Matching
+     * the LATEST write (rather than consuming per-write tokens) is required because
+     * ContentObserver.onChange re-reads the CURRENT setting: during an N-frame animation a
+     * delayed callback for frame N observes frame N+1's value.
+     */
     fun isSelfWrite(rawDeviceValue: Int): Boolean
+    /** Forget the self-write marker (e.g. when auto-control pauses and the user owns the slider). */
+    fun clearSelfWriteMarker()
 }
 
-class AndroidScreenBrightnessController(private val context: Context) : ScreenBrightnessController {
+class AndroidScreenBrightnessController(
+    private val context: Context,
+    deviceMaxOverride: Int? = null,
+) : ScreenBrightnessController {
     private val resolver: ContentResolver get() = context.contentResolver
 
     // config_screenBrightnessSettingMaximum is an internal integer resource on AOSP/OEM ROMs.
     // Returns 0 if absent → fallback to 255 (standard scale, Tasker parity).
     private val deviceMax: Int by lazy {
-        val id = Resources.getSystem().getIdentifier(
-            "config_screenBrightnessSettingMaximum", "integer", "android"
-        )
-        if (id != 0) Resources.getSystem().getInteger(id).takeIf { it > 0 } ?: 255 else 255
+        deviceMaxOverride ?: run {
+            val id = Resources.getSystem().getIdentifier(
+                "config_screenBrightnessSettingMaximum", "integer", "android"
+            )
+            if (id != 0) Resources.getSystem().getInteger(id).takeIf { it > 0 } ?: 255 else 255
+        }
     }
 
-    private var savedMode: Int = Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+    // Null until forceManualMode saves the user's mode; null again after restoreMode.
+    // Guarding on null keeps repeated forceManualMode calls from overwriting the saved
+    // AUTOMATIC mode with MANUAL.
+    private var savedMode: Int? = null
 
-    // Stored as device-scale to match what ContentObserver delivers.
-    private val expectedWrites = CopyOnWriteArraySet<Int>()
+    @Volatile
+    private var lastSelfWriteDevice: Int? = null
 
-    private fun toDevice(domainLevel: Int): Int =
-        if (deviceMax == 255) domainLevel
-        else ((domainLevel.toDouble() / 255.0) * deviceMax).toInt().coerceIn(0, deviceMax)
+    // Math.round both directions so the round-trip write(x) → read() is identity for all
+    // 0–255 on any deviceMax ≥ 255 (truncation drifted by −1 per conversion).
+    private fun toDevice(domainLevel: Int): Int {
+        val clamped = domainLevel.coerceIn(0, 255)
+        return if (deviceMax == 255) clamped
+        else Math.round(clamped.toDouble() / 255.0 * deviceMax).toInt()
+    }
 
-    private fun toDomain(deviceLevel: Int): Int =
-        if (deviceMax == 255) deviceLevel
-        else ((deviceLevel.toDouble() / deviceMax.toDouble()) * 255).toInt().coerceIn(0, 255)
+    private fun toDomain(deviceLevel: Int): Int {
+        val clamped = deviceLevel.coerceIn(0, deviceMax)
+        return if (deviceMax == 255) clamped
+        else Math.round(clamped.toDouble() / deviceMax * 255.0).toInt()
+    }
 
     override fun read(): Int {
         val raw = Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, 128)
@@ -51,14 +70,18 @@ class AndroidScreenBrightnessController(private val context: Context) : ScreenBr
     }
 
     override fun write(level: Int) {
-        Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, toDevice(level))
+        val device = toDevice(level)
+        lastSelfWriteDevice = device
+        Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, device)
     }
 
     override fun forceManualMode() {
-        savedMode = Settings.System.getInt(
-            resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
-            Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-        )
+        if (savedMode == null) {
+            savedMode = Settings.System.getInt(
+                resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
+                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+            )
+        }
         Settings.System.putInt(
             resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
             Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
@@ -66,16 +89,15 @@ class AndroidScreenBrightnessController(private val context: Context) : ScreenBr
     }
 
     override fun restoreMode() {
-        Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, savedMode)
+        savedMode?.let {
+            Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, it)
+        }
+        savedMode = null
     }
 
-    override fun registerExpectedWrite(domainLevel: Int) {
-        expectedWrites.add(toDevice(domainLevel))
-    }
+    override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastSelfWriteDevice
 
-    override fun clearExpectedWrites() {
-        expectedWrites.clear()
+    override fun clearSelfWriteMarker() {
+        lastSelfWriteDevice = null
     }
-
-    override fun isSelfWrite(rawDeviceValue: Int): Boolean = expectedWrites.remove(rawDeviceValue)
 }
