@@ -11,15 +11,15 @@ filled by S1/S2 during extraction.
 
 | Profile | XML | Ported to | Status |
 |---|---|---|---|
-| prof753 Hibernate (Display Off) → task585 | L3 | | pending |
-| prof754 Throttle Reinitialization → task566 | L16 | | pending |
-| prof755 Allow Override → task567 | L56 | | pending |
-| prof756 Repost Paused Notification → task567 | L111 | | pending |
-| prof757 Repost Foreground Notification → task584 | L156 | | pending |
-| prof758 Dynamic Scale Engine → task90 | L195 | | pending |
+| prof753 Hibernate (Display Off) → task585 | L3 | runtime/BrightnessPipelineController.hibernate (S9a) | ported |
+| prof754 Throttle Reinitialization → task566 | L16 | runtime/BrightnessPipelineController.reinit (S9a) | ported |
+| prof755 Allow Override → task567 | L56 | runtime/OverrideMonitor + ProfileGates.allowOverrideGate (S9a) | ported |
+| prof756 Repost Paused Notification → task567 | L111 | runtime/AmbientMonitoringService paused notification (S9a) | ported |
+| prof757 Repost Foreground Notification → task584 | L156 | runtime/AmbientMonitoringService live notification (S9a) | ported |
+| prof758 Dynamic Scale Engine → task90 | L195 | gate transcribed: ProfileGates.dynamicScaleGate + truth-table test (S9a); task90 scheduling S9b/S12 | partial (gate S9a) |
 | prof759 Proximity Detection → task545 | L300 | | pending |
-| prof760 Monitor Ambient Light → task554 (incl. ConditionList gate) | L318 | | pending |
-| prof761 Initialize (Display On) → task618 | L386 | | pending |
+| prof760 Monitor Ambient Light → task554 (incl. ConditionList gate) | L318 | ProfileGates.monitorAmbientLightGate + truth-table test + BrightnessPipelineController (S9a) | ported |
+| prof761 Initialize (Display On) → task618 | L386 | runtime/BrightnessPipelineController.reinit/setInitialBrightness (S9a) | ported |
 | prof762 Context: App Changed → task43 | L398 | extraction/contexts_spec.md (S2) | pending |
 | prof763 Context: Battery Changed → task43 | L456 | extraction/contexts_spec.md (S2) | pending |
 | prof764 Context: Time Changed → task43 | L500 | extraction/contexts_spec.md (S2) | pending |
@@ -27,7 +27,7 @@ filled by S1/S2 during extraction.
 | prof766 Context: Location Refresher → task631 | L579 | extraction/contexts_spec.md (S2) | pending |
 | prof767 Context: Location Changed → task43 | L628 | extraction/contexts_spec.md (S2) | pending |
 | prof768 Context: WiFi (Dis)connected → task43 | L676 | extraction/contexts_spec.md (S2) | pending |
-| prof769 Panic (Reset) → task528 | L722 | | pending |
+| prof769 Panic (Reset) → task528 | L722 | runtime/BrightnessPipelineController.panic + notification action (S9a) | ported |
 | prof8 Context: Reset Serialized Cache → task26 | L744 | extraction/contexts_spec.md (S2) | pending |
 
 ## Pipeline & feature task clusters (~25)
@@ -43,19 +43,19 @@ filled by S1/S2 during extraction.
 | Compressed dynamic scale: 548 | | TaskerReference + taper.csv (S4) + BrightnessEngine.compressedDynamicScale (S5) | ported |
 | Continuity coefficients: 659 _UpdateBrightnessFormulae | | TaskerReference + formulae.csv (S4) + BrightnessFormulae.kt (S5) | ported |
 | Animation calc: 543 | | TaskerReference + animation.csv (S4) + BrightnessEngine.calculateAnimation (S5) | ported |
-| Brightness transitions: 696, 698 | | TaskerReference + transition.csv/dimming.csv (S4) | reference (S9a ports) |
+| Brightness transitions: 696, 698 | | TaskerReference + transition.csv/dimming.csv (S4); runtime/AnimationRunner per-frame write + read-back override detect (S9a); 698 DC-like dimming write S9b | ported (brightness; 698 dimming S9b) |
 | Software/super dimming math: 700, 645, 646, 647 | | SoftwareDimming.kt (S5 math, golden-tested superdimming.csv 2016 rows, CorePipelineParityTest); 650/653/654/644 privilege writes platform (S9b) | ported (math) |
 | Initial brightness on wake: 618 | | TaskerReference (S4) + InitialBrightness.kt (S5) + InitialBrightnessTest.kt (S5) | ported |
-| Hibernate/reset: 585 | | | pending |
-| Throttle reset: 566 | | | pending |
-| Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic, unit-tested OverrideRulesTest.kt S5); platform wiring + notification S9a | ported (logic) |
-| Panic reset: 528 | | | pending |
+| Hibernate/reset: 585 | | runtime/BrightnessPipelineController.hibernate (S9a — sensor unregister + runtime-state clear) | ported |
+| Throttle reset: 566 | | runtime/BrightnessPipelineController.reinit (S9a — throttle = settings default on wake) | ported |
+| Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic, OverrideRulesTest.kt S5); runtime wiring: OverrideMonitor + controller pause/resume + recordOverridePoint (S9a). 640/641/636 override-array CRUD UI = S12 | ported (detect/pause/resume) |
+| Panic reset: 528 | | runtime/BrightnessPipelineController.panic + notification Reset action (S9a) | ported |
 | Init/defaults: 570 Initialize AAB Defaults | | | pending |
 | Circadian dynamic scale: 90 (+ polar handling) | | SolarCalculator.kt + DynamicScaleEngine.kt (S6 domain, golden-tested circadian.csv 576 rows, CircadianParityTest + 4 polar assertions); BrightnessEngine delegates computeDynamicScale (D-031) | ported |
 | Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S2 extracted → contexts_spec.md | pending |
 | Privilege detection/grant: 378, 643, 563 | | S2 extracted → features_spec.md; platform layer: AndroidPrivilegeManager + ShizukuGrantGateway stub (S7); UI wiring S11 | platform-ported (S7) |
 | QS tile: 551, 552 | | S2 extracted → features_spec.md | pending |
-| Foreground notification: 584, 692 | | S2 extracted → features_spec.md | pending |
+| Foreground notification: 584, 692 | | S2 extracted → features_spec.md; runtime/AmbientMonitoringService live lux/target notification + Pause/Resume/Reset/Disable actions (S9a) | ported |
 | Curve suggestion wizard: 38, 655 | | CurveSuggestionEngine.kt (S6 domain, golden-tested wizard.csv 12 rows, WizardParityTest); applyToLiveCurve = task655 | ported |
 | Formula validation: 583, 707 | | S2 extracted → features_spec.md; SettingsValidator.kt (S8 — 5 rules: form2A<0, form3A<0, form2C>zone1End advisory + predicted-brightness@1000lux<25 safety) | ported |
 | Power draw calibration: 524 | | S2 extracted → features_spec.md | pending |
@@ -125,8 +125,8 @@ filled by S1/S2 during extraction.
 | task655 L32591 · _SetSuggestedVariables | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.applyToLiveCurve (S6) | ported |
 | task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
 | task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 (cross-validation oracle, D-002) | chart render = S13 BrightnessCurveChart | reference (chart S13) |
-| task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | runtime write loop = S9a AnimationRunner | reference (S9a ports) |
-| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime write loop = S9a AnimationRunner | reference (S9a ports) |
+| task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner (S9a) | ported |
+| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner brightness path (S9a); DC-like dimming write S9b | ported (brightness; dimming S9b) |
 | task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
 | task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |
 | task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | ✓ S6 (delegate) | SolarCalculator.kt + DynamicScaleEngine.kt (S6) | ported |
