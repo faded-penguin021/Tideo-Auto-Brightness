@@ -114,6 +114,7 @@ fun AabNavDrawer(
             drawerItem(AppRoute.Reactivity, Icons.Filled.Refresh, current, onNavigate)
             drawerItem(AppRoute.AnimationDimming, Icons.Filled.PlayArrow, current, onNavigate)
             drawerItem(AppRoute.DynamicScale, Icons.Filled.DateRange, current, onNavigate)
+            drawerItem(AppRoute.Misc, Icons.Filled.Settings, current, onNavigate)
 
             DrawerSectionLabel("Info & Help")
             drawerItem(AppRoute.Tools, Icons.Filled.Build, current, onNavigate)

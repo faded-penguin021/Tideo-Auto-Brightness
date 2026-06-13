@@ -80,6 +80,12 @@ class AmbientMonitoringService : Service() {
         when (intent?.action) {
             ACTION_PAUSE -> controller.pause()
             ACTION_RESUME -> controller.resume()
+            ACTION_REAPPLY -> {
+                // Settings Apply / profile load: re-run the pipeline now (G2-F16). ensureRunning()
+                // first so an Apply made while the service is up (but this start re-delivers) is safe.
+                ensureRunning()
+                controller.reapply()
+            }
             ACTION_PANIC -> {
                 // task528 panic = full stop (not a pausable state, G1-F4): restore brightness +
                 // drop dimming, then tear the service down like Disable.
@@ -216,6 +222,7 @@ class AmbientMonitoringService : Service() {
         const val ACTION_RESUME = "com.tideo.autobrightness.runtime.action.RESUME"
         const val ACTION_DISABLE = "com.tideo.autobrightness.runtime.action.DISABLE"
         const val ACTION_PANIC = "com.tideo.autobrightness.runtime.action.PANIC"
+        const val ACTION_REAPPLY = "com.tideo.autobrightness.runtime.action.REAPPLY"
         const val EXTRA_REASON = "reason"
         private const val CHANNEL_ID = "ambient_monitoring"
         private const val NOTIFICATION_ID = 1001

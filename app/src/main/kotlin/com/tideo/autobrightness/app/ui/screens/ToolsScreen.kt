@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -21,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -32,20 +29,13 @@ import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionResult
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 
-/** %AAB_Debug 10 named categories, verbatim (D-023). Index == debugLevel. */
-val DEBUG_LABELS = listOf(
-    "Off", "Skip Animations", "Animation Details", "Light Eval Thresholds", "Dynamic Scale Calcs",
-    "Super Dimming Info", "Overlay Preview", "Graph Metrics", "Context Automation", "Context Location",
-)
-
-/** Tools: curve wizard, debug-level selector, power-draw calibration (Tasker Debug Scene + wizard). */
+/** Tools: curve wizard + power-draw calibration (Tasker Debug Scene + wizard). The debug-category
+ * selector moved to the Misc screen (G2-F2). */
 @Composable
 fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewModel()) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     ToolsContent(
-        settings = settings,
         onBack = { navController.popBackStack() },
-        onSetDebugLevel = { level -> vm.update { it.copy(debugLevel = level) } },
         onRunWizard = { overrides ->
             CurveSuggestionEngine.suggest(
                 CurveSuggestionInput(overrides, settings.toBrightnessCurveConfig()),
@@ -68,18 +58,13 @@ fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewMo
 
 @Composable
 fun ToolsContent(
-    settings: AabSettings,
     onBack: () -> Unit,
-    onSetDebugLevel: (Int) -> Unit,
     onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
 ) {
     SettingsScaffold("Tools", onBack) { padding ->
         SettingsColumn(padding) {
             WizardCard(onRunWizard, onApplyWizard)
-
-            SectionHeader("Debug")
-            DebugLevelSelector(settings.debugLevel, onSetDebugLevel)
 
             SectionHeader("Power-draw calibration")
             Text(
@@ -130,22 +115,6 @@ private fun WizardCard(
                     modifier = Modifier.testTag("apply_wizard"),
                 ) { Text("Apply suggestion") }
             }
-        }
-    }
-}
-
-@Composable
-private fun DebugLevelSelector(current: Int, onSelect: (Int) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().testTag("debug_selector")) {
-        Text("Debug: ${DEBUG_LABELS.getOrElse(current) { "Off" }}")
-    }
-    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-        DEBUG_LABELS.forEachIndexed { level, label ->
-            DropdownMenuItem(
-                text = { Text(label) },
-                onClick = { onSelect(level); expanded = false },
-            )
         }
     }
 }

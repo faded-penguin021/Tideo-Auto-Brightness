@@ -34,20 +34,37 @@ next session does not know it.
 | S12 settings/tools/profile screens + chart engine | 2026-06-13 | Opus/medium | DONE | (see push) | The 7 parameter/tool/profile placeholder screens filled + the reusable chart engine landed (D-044). **Step-0 triage** committed first: `anonymous_handlers.md` 168 rows bucketed (a) trivial-chrome / (b) settings-mutation (both bulk-dropped w/ shared reasons) / (c) ~30 complex behaviors → explicit port list. New: `state/SettingsViewModel.kt` (DataStore-as-truth, advisory SettingsValidator errors, reset/applyProfile/replaceAll) + `state/ContextsViewModel.kt` (rule CRUD + installed-app picker); `ui/components/{SettingsControls,SettingsScaffold}.kt` (NumberSettingField w/ red-error supportingText, SwitchSettingRow, DerivedReadout, back-nav scaffold); `ui/graph/ChartCanvas.kt` (generic axes/ticks/log10/multi-series/markers engine — the S13 template base) + `ui/graph/BrightnessCurveChart.kt` (THE template instance) + `ui/screens/ChartPlaceholder.kt` (deferred-S13 slots); screens `CurveBrightnessScreen` (fields + validator + live form2A/3A + curve chart), `ReactivityScreen` (thresholds + **DetectOverrides toggle, G1-F2**), `AnimationDimmingScreen` (anim + derived throttle + **ELEVATED-gated DimmingEnabled, G1-F5** + PWM), `DynamicScaleScreen` (scaling/taper + task517/674/689 warnings), `ContextsScreen` (rule CRUD), `ToolsScreen` (wizard runner + 10-label debug selector + calibration entry), `ProfilesScreen` (apply/reset + Create/OpenDocument import-export incl. legacy). NavGraph wires all 7 (About → S13 placeholder). Tests: `SettingsScreensTest` (5 — validator→UI form2C error, safety banner, DetectOverrides edit, dimming tier-gate, debug label). Acceptance ladder GREEN: `:app:testDebugUnitTest`(77) `:app:assembleDebug :app:lintDebug`. No compaction. **GATE 2 READY.** |
 
 | S12.5a design language + app shell | 2026-06-13 | Opus/high | DONE | (see push) | UI-layer reskin to AAB identity (D-046, Gate-2 G2-F18). New: `ui/theme/Color.kt` (teal+gold palette, per-value provenance from extraction — about.md L51 + the "on" indicator dots/Flash overlays) + rewritten `ui/theme/Theme.kt` (static AAB dark-first/light `ColorScheme`, dynamic colour now opt-in OFF, DayNight kept); `ui/components/AppShell.kt` (`AabTopBar` branded teal header w/ hamburger + `AabNavDrawer` = Compose rebuild of the AAB Menu scene menu.md/L4462: gold-sun teal banner + grouped destinations Profiles&Contexts / Settings / Info&Help, current-route highlight, Recheck Permissions→Onboarding, Chart.js License dropped). `DashboardScreen` rewritten: flat OutlinedButton nav list (nav_* tags) replaced by the drawer; Profiles + Contexts surfaced as prominent **hero cards** (gold-iconed, clickable). New dep `androidx.compose.material:material-icons-core` (from BOM, no version) — declared in libs.versions.toml + app build.gradle. UiShellTest extended (+2: drawer navigates to every route via OnClick semantics; hero cards navigate). Scope kept to identity+nav — field behaviour/sliders/grouping untouched (those are S12.5b). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(81) `:app:lintDebug :domain:test :platform:test`. No compaction. |
+| S12.5b interaction model (preview→Apply, sliders, grouping) | 2026-06-13 | Opus/high | DONE | (see push) | Ported AAB's temporary-preview→Apply editing model + bounded sliders + faithful Misc grouping + validation parity (D-047; addresses G2-F1/F2/F3/F4/F5/F6/F7/F10/F11/F13/F16). New `state/DraftSettingsViewModel.kt` (per-screen NavBackStackEntry-scoped draft: edit→draft only, **Apply** commits draft→DataStore + forces re-eval, **Discard**/dirty-back reverts; `epoch`-seeded fields fix mid-edit corruption G2-F7; advisory errors on the draft). `SettingsControls.kt`: seed-once `NumberSettingField` w/ committed `[bracket]` + empty-allowed (G2-F1/F7), new bounded `IntSliderSettingField` (G2-F3/F13), `DraftApplyBar` + `DraftSettingsScaffold` (Apply/Discard + dirty-back confirm). **6 sliders w/ exact Tasker ranges** (misc_settings.md / experiment_settings.md): MinBright 0–75, MaxBright 150–255, AnimSteps 0–100, MinWait 1–99, MaxWait 2–100, TaperMidpoint 130–240. New **Misc** screen (`AppRoute.Misc`, drawer Settings group, NavGraph wired) holds min/max sliders + offset/scale + anim sliders + derived throttle + notifications + the 10-label debug selector (moved off Tools) — the G2-F2 regrouping; Curve & Brightness now only the curve-zone coefficients, Animation & Dimming only super-dimming+PWM (mutually exclusive, G2-F10) + circadian-gated dim spread (G2-F11). Forced re-eval path: `AutoBrightnessRuntime.reapply`→service `ACTION_REAPPLY`→`controller.reapply()` (UNLIMITED ContextChanged event), gated on serviceEnabled; SettingsViewModel applyProfile/reset/replaceAll reapply too (G2-F16). Validator: +zone2End<zone1End NaN guard (G2-F6) + dangerously-low-scale (G2-F5); BrightnessCurveChart floors at minBrightness (G2-F4). Tests: `DraftSettingsViewModelTest`(3, real DataStore — edit/dirty/discard, apply commits, serviceEnabled preserved) + `SettingsScreensTest` rewritten (8: validator errors, draft bracket, slider ranges asserted, Apply/Discard wiring, debug label on Misc). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(85) `:app:lintDebug :domain:test :platform:test`. No compaction. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.5a (design language + app shell) DONE.** The app now wears the AAB **teal + gold** identity
-(D-046): a static brand `ColorScheme` (dynamic colour opt-in OFF, DayNight kept), a branded teal top
-header with a hamburger that opens the **AAB-Menu nav drawer** (Compose rebuild of scene menu.md/L4462
-— gold-sun banner + grouped Profiles&Contexts / Settings / Info&Help destinations, current-route
-highlight), and **hero cards** for Profiles + Contexts on the Dashboard (the flat OutlinedButton nav
-list is gone). This is the first of the three UI-salvage sub-segments and addresses **G2-F18**; the
-interaction model (preview→Apply, sliders, Misc/General grouping) is **S12.5b**, and feature/behaviour
-fidelity (context editor, toasts, debug toasts, G2-F8/F9) is **S12.5c**. Scope was strictly the UI
-layer — domain/runtime/chart-engine/validator untouched. Build GREEN across the full ladder.
+**S12.5b (interaction model: preview→Apply, sliders, grouping) DONE.** The parameter screens now port
+AAB's actual editing model (D-047): each is backed by a per-screen, NavBackStackEntry-scoped
+**`DraftSettingsViewModel`** — edits mutate a **draft** only, the graph previews the draft live, and an
+**Apply** button commits draft→DataStore **and forces an immediate pipeline re-evaluate** (an UNLIMITED
+`ACTION_REAPPLY`→`controller.reapply()` control event, gated on serviceEnabled). Back/Discard reverts
+to committed (dirty-back is confirmed); each numeric field shows the committed/active value in
+`[brackets]` when the draft differs, and is **seed-once-per-epoch** to fix the mid-edit text corruption
+(G2-F1/F7). Six settings now render as **bounded M3 sliders** with the exact Tasker ranges (MinBright
+0–75, MaxBright 150–255, AnimSteps 0–100, MinWait 1–99, MaxWait 2–100, TaperMidpoint 130–240; G2-F3/F13).
+A dedicated **Misc** screen is re-added (G2-F2): brightness range + animation + notifications + debug
+live there, Curve & Brightness keeps only the curve-zone coefficients, Animation & Dimming only super
+dimming + PWM (now **mutually exclusive**, G2-F10) with a **circadian-gated** dim-spread field (G2-F11).
+Validation parity: zone2End<zone1End NaN guard (G2-F6), dangerously-low-scale advisory (G2-F5), the
+curve chart floors at minBrightness (G2-F4). profile-load / reset / import also force a re-eval (G2-F16).
+Scope stayed in the UI/settings/runtime-control layer — **domain/, golden vectors, ChartCanvas public
+API untouched**. The remaining Gate-2 gaps (context editor G2-F14, toasts G2-F12, debug→runtime toasts
+G2-F15, profile-load-disables-overrides G2-F8, super-dimming engagement G2-F9, QS paused state G2-F17)
+are **S12.5c**. Build GREEN across the full ladder.
+
+**(historical) S12.5a (design language + app shell) DONE.** The app wears the AAB **teal + gold**
+identity (D-046): a static brand `ColorScheme` (dynamic colour opt-in OFF, DayNight kept), a branded
+teal top header with a hamburger that opens the **AAB-Menu nav drawer** (Compose rebuild of scene
+menu.md/L4462 — gold-sun banner + grouped destinations, current-route highlight), and **hero cards**
+for Profiles + Contexts on the Dashboard (the flat OutlinedButton nav list is gone). Addresses
+**G2-F18**. Scope was strictly the UI layer — domain/runtime/chart-engine/validator untouched.
 
 **(historical) S12 (settings & tools screens + chart engine core) DONE but GATE 2 FAILED → merged + salvaged in
 S12.5 (D-045).** Gate 2 found the UI "miles off" the Tasker app (generic Material, no AAB design
@@ -96,12 +113,17 @@ AppModule is now the real DI root.
   Findings → "Gate findings" below.
 - Parallel window C: **S10** (context override engine) DONE ∥ **S11** (UI shell + onboarding) DONE.
 - **S12.5 — UI salvage (a/b/c)** (brief in RUNBOOK, D-045). **S12.5a DONE** (teal+gold design language +
-  AAB-Menu nav drawer + hero cards — D-046). **Next: S12.5b** = temporary-preview→Apply model (draft
-  AabSettings + `[committed]` brackets + pipeline re-run on Apply, G2-F1/F16) + bounded sliders
-  (G2-F3/F13) + faithful Misc/General field regrouping (G2-F2) + validation parity (G2-F5/F6/F10/F11).
-  Then **S12.5c** = context-editor fidelity (G2-F14), toasts (G2-F12), debug→runtime toasts (G2-F15),
+  AAB-Menu nav drawer + hero cards — D-046). **S12.5b DONE** (preview→Apply draft model + `[committed]`
+  brackets + pipeline re-run + bounded sliders + Misc regrouping + validation parity — D-047).
+  **Next: S12.5c** = context-editor fidelity (G2-F14), toasts (G2-F12), debug→runtime toasts (G2-F15),
   the profile-load-disables-overrides bug (G2-F8), super-dimming engagement (G2-F9), QS-tile paused
-  state (G2-F17). **Gate 2 is re-tested after S12.5c**, not now.
+  state (G2-F17). **Gate 2 is re-tested after S12.5c**, not now. S12.5c notes from S12.5b: the
+  `controller.reapply()` plumbing (ACTION_REAPPLY → ContextChanged event) is the hook F9 can reuse; the
+  Misc/Curve/Animation draft VMs share the whole-AabSettings draft, so a context override mutating the
+  curve WHILE the user edits a settings screen would, on Apply, revert the override's curve fields to the
+  seeded values (bounded edge — only the runtime/identity fields are re-synced mid-edit; revisit if it
+  matters). DetectOverrides (Reactivity) + DimmingEnabled (Animation & Dimming) toggles are surfaced;
+  F8 is about the profile-load reapply path dropping detectOverrides at runtime, not the UI.
 - **HUMAN GATE 2** (RUNBOOK "Human gates", after S12.5): full UI walkthrough — every field
   edits/persists/rejects-invalid-with-red; live form2A/form3A; wizard produces+applies suggestions;
   Shizuku ELEVATED flow; QS tile; per-app override; charging+time contexts; brightness-chart shape;
@@ -709,7 +731,53 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   register under Robolectric gesture injection — use performSemanticsAction]; hero-card navigation).
   (Affects S12.5b, S12.5c, S13 — S13 static screens inherit this theme/shell.)
 
-Append new entries as D-047, D-048, … with which segments they affect.
+- D-047: S12.5b INTERACTION MODEL + GROUPING + VALIDATION (UI/settings/runtime-control salvage;
+  sanctioned by the S12.5b brief; addresses Gate-2 G2-F1/F2/F3/F4/F5/F6/F7/F10/F11/F13/F16).
+  (a) **Temporary-preview → Apply (G2-F1).** New `state/DraftSettingsViewModel.kt` backs the 5
+  parameter screens; each resolves its OWN instance via `viewModel()` so the draft is
+  NavBackStackEntry-scoped (per-screen, not shared). `edit{}` mutates the draft only; `apply()`
+  commits draft→DataStore (preserving the runtime/identity fields serviceEnabled/contextOverride) +
+  forces a re-eval; `discard()`/leaving the screen reverts. `dirty` = draft≠committed. The init
+  collector seeds the draft once from the first committed snapshot, then re-syncs ONLY
+  serviceEnabled/contextOverride/schemaVersion/setupTitle on later emissions so `dirty` reflects only
+  this screen's edits. KNOWN BOUNDED EDGE (flagged S12.5c): the draft is the whole `AabSettings`, so a
+  context override that mutates curve fields WHILE a settings screen is open would, on Apply, write the
+  seeded (pre-override) curve values back — only runtime/identity fields are re-synced mid-edit.
+  (b) **Seed-once fields + brackets (G2-F1/F7).** `NumberSettingField` is re-seeded by an `epoch`
+  counter (bumped on seed/discard), NOT by the incoming value, killing the "8.8→8.80.0" mid-edit
+  corruption; an empty field is allowed (no forced 0). It shows the committed value in `[brackets]`
+  when the draft differs (Tasker `_UpdateStaticSceneElements`).
+  (c) **Bounded sliders (G2-F3/F13).** New `IntSliderSettingField`; the definitive **6 sliders** +
+  ranges from the extraction (misc_settings.md elements4/6/20/22/23 + experiment_settings.md
+  elements26): MinBright **0–75**, MaxBright **150–255**, AnimSteps **0–100**, MinWait **1–99**,
+  MaxWait **2–100**, TaperMidpoint **130–240**. Everything else stays EditText.
+  (d) **Misc/General regrouping (G2-F2).** New `AppRoute.Misc` (+ NavGraph + drawer Settings group +
+  screen_map.md). The Misc scene's fields live there: min/max sliders, offset/scale text, anim
+  sliders + derived throttle (+ min>max-wait warning), notifications toggle, the 10-label debug
+  selector (moved OFF Tools). Curve & Brightness now = curve-zone coefficients + live form2A/3A + draft
+  preview chart only; Animation & Dimming = super dimming + PWM only (animation moved out). This is a
+  grouping correction WITHIN the owner-approved 20→consolidation (9→10 target screens).
+  (e) **Forced re-eval on Apply / profile load (G2-F16).** `BrightnessPipelineController.reapply()`
+  (reuses the `ContextChanged`→reapplyProfile→setInitialBrightness path, an UNLIMITED control event,
+  never the drop-not-queue sensor mutex) ← `AmbientMonitoringService.ACTION_REAPPLY` ←
+  `AutoBrightnessRuntime.reapply(context)`. `DraftSettingsViewModel.apply()` and
+  `SettingsViewModel.applyProfile/resetDefaults/replaceAll` call it, **gated on serviceEnabled** (no
+  spinning up a disabled service). The wizard-apply path still commits via SettingsViewModel.update
+  (instant, no forced reapply — rare, a later tick applies); recorded, not a regression.
+  (f) **Mutual exclusivity + gating (G2-F10/F11).** Enabling super dimming clears PWM-sensitive and
+  vice-versa (superdimming_settings.md two-toggle pair). The dim-spread field is the CIRCADIAN
+  dim-strength spread (task646 DimDynamic) → gated on `scalingEnabled` (∧ ELEVATED) + relabelled.
+  (g) **Validation parity (G2-F4/F5/F6).** SettingsValidator gains zone2End<zone1End (the inverted
+  range that NaN'd form3A — guarded + the derived readout renders "—" on NaN) and a
+  dangerously-low-scale advisory (scale<0.5). `BrightnessCurveChart` floors the previewed curve at
+  `minBrightness` so the Min slider moves the curve floor.
+  HARD FENCE HONOURED: domain/, golden vectors, and the `ChartCanvas` public API untouched. Tests:
+  `DraftSettingsViewModelTest` (real DataStore, Robolectric — edit/dirty/discard, apply commits,
+  serviceEnabled preserved) + `SettingsScreensTest` rewritten (validator errors, `[bracket]`, slider
+  ranges asserted via ProgressBarRangeInfo, Apply/Discard wiring, Misc debug label).
+  (Affects S12.5c, S13, Gate 2.)
+
+Append new entries as D-048, D-049, … with which segments they affect.
 
 ## Blockers
 
@@ -781,20 +849,24 @@ warning; time-context rule loads its profile (min-bright kicks in); reset-to-def
 - **G2-F1 (parity, major) — no temporary-preview / Apply model.** Tasker AAB edits TEMP values that
   drive the graph, then an Apply commits them and shows the committed/active value in `[brackets]`
   next to each setting. S12 commits every keystroke instantly, no preview, no bracketed active value.
+  **→ ADDRESSED by S12.5b (D-047a/b):** per-screen `DraftSettingsViewModel` (draft→Apply, `[bracket]`).
 - **G2-F2 (parity/structure) — field grouping wrong.** min/max/offset/scale + animation settings are
   on the **Misc** scene in Tasker; S12 scattered them onto Curve & Brightness / Animation & Dimming.
   (Note: the 20→9 consolidation itself is the owner-approved screen_map/S2 plan; this is a grouping
-  error WITHIN that, vs the extraction.)
+  error WITHIN that, vs the extraction.) **→ ADDRESSED by S12.5b (D-047d):** re-added Misc screen.
 - **G2-F3 (parity/UX) — bounded sliders replaced by unbounded free-text.** Tasker uses bounded
   sliders for min/max brightness, taper midpoint (130–240), animSteps, etc. (D-017/D-018: 6 sliders).
   S12 used free-text everywhere → e.g. min-bright range shown as 1..255 with no bound, taper midpoint
-  free text.
+  free text. **→ ADDRESSED by S12.5b (D-047c):** 6 `IntSliderSettingField`s with the exact ranges.
 - **G2-F4 (bug) — min brightness doesn't update the curve graph.** BrightnessCurveChart floors at 0,
-  not minBrightness, so the curve floor never moves.
+  not minBrightness, so the curve floor never moves. **→ ADDRESSED by S12.5b (D-047g):** floors at min.
 - **G2-F5 (validation gap) — scale=0.01 gives no "dangerously low curve" warning.** Tasker warns.
+  **→ ADDRESSED by S12.5b (D-047g):** advisory `scale<0.5` rule.
 - **G2-F6 (bug) — zone2End < zone1End → form3A shows NaN with no warning.** Need a guard + warning.
+  **→ ADDRESSED by S12.5b (D-047g):** validator rule + NaN-guarded readout.
 - **G2-F7 (bug) — numeric text entry corrupts.** NumberSettingField re-seeds from the committed value
   mid-edit: 8.8 → backspace → … → typing 8.8 yields "8.80.0". Want empty/null over a forced 0.
+  **→ ADDRESSED by S12.5b (D-047b):** epoch-seeded field, empty allowed.
 - **G2-F8 (runtime — CLARIFIED by owner) — manual override detection is reliable; loading a profile
   DISABLES it.** Owner confirmed overrides work consistently EXCEPT after a profile load, which leaves
   override detection off. Real bug for S12.5 (the profile-apply path must not clear/disable the
@@ -805,12 +877,13 @@ warning; time-context rule loads its profile (min-bright kicks in); reset-to-def
   DimmingEnabled now persists (S12) but reduce_bright_colors does not activate. Likely shares the
   no-re-eval root cause (F16) and/or OEM secure-key differences; needs device investigation.
 - **G2-F10 (parity) — PWM-sensitive and super-dimming are not mutually exclusive.** Tasker disables
-  one when the other is enabled.
+  one when the other is enabled. **→ ADDRESSED by S12.5b (D-047f):** each toggle clears the other.
 - **G2-F11 (parity + bug) — dim spread editable while circadian/scaling disabled (should be gated);
-  dim-spread label is wrong.**
+  dim-spread label is wrong.** **→ ADDRESSED by S12.5b (D-047f):** gated on `scalingEnabled`, relabelled.
 - **G2-F12 (parity/UX) — Flash/toast actions only render inline; no toasts anywhere.** Tasker uses
   toasts for confirmations/warnings/help (longclick). S12 converted all to supportingText/banners.
 - **G2-F13 (parity/UX) — taper midpoint is unbounded free text (should be a 130–240 slider).** (⊂ F3)
+  **→ ADDRESSED by S12.5b (D-047c):** taper-midpoint slider 130–240 on Dynamic Scale.
 - **G2-F14 (feature gaps) — context rule editor weak:** no "get current SSID" helper; no SUNRISE/SUNSET
   for from/to (resolver supports the tokens — editor doesn't expose them); foreground-app list is tiny
   (Android 11+ package-visibility: needs `<queries>`/LAUNCHER or QUERY_ALL_PACKAGES) + no app icons;
@@ -821,6 +894,8 @@ warning; time-context rule loads its profile (min-bright kicks in); reset-to-def
   in the dark changes the numbers but not the screen (no new sensor event → drop-not-queue → no
   re-eval). Time-context switching DOES apply (it fires ContextChanged). Tasker re-runs "Advanced Auto
   Brightness" on save/apply. Need a settings-change → forced re-eval control event (likely also fixes F9).
+  **→ ADDRESSED by S12.5b (D-047e):** `ACTION_REAPPLY`→`controller.reapply()` on Apply/profile-load
+  (F9 still needs the device check in S12.5c).
 - **G2-F17 (minor) — QS tile:** works; unclear whether it reflects paused state.
 - **G2-F18 (design language — major) — the app does not look or feel like AAB.** The Tasker project
   has a distinctive **teal + gold** design language, the **project name in a header up top**, a

@@ -9,15 +9,23 @@ rects and `PropertiesElement` scene-chrome are dropped (replaced by the M3 Scaff
 
 ## Target M3 screen set
 
+> **S12.5b update (G2-F2):** the S2 plan folded Misc-scene fields into other screens; Gate 2 judged
+> that grouping wrong vs Tasker. A dedicated **Misc** screen is re-added — it owns the Misc scene's
+> brightness range (min/max/offset/scale), animation (steps/min/max wait + derived throttle),
+> notifications and the debug selector. Curve & Brightness keeps only the curve-zone coefficients;
+> Animation & Dimming keeps only super-dimming + PWM. The 9→**10** target screens still honour the
+> owner-approved 20→consolidation; this is a grouping correction within it, not a new scene.
+
 | Screen | Source scenes | Charts |
 |---|---|---|
-| **Dashboard** | Menu (nav), Misc Settings (global toggles, service switch) | — |
-| **Curve & Brightness** | Brightness Settings, Brightness Graph | BrightnessCurveChart |
+| **Dashboard** | Menu (nav), Misc Settings (service switch) | — |
+| **Curve & Brightness** | Brightness Settings (curve coefficients), Brightness Graph | BrightnessCurveChart |
 | **Reactivity** | Reactivity Settings, Reactivity Graph, Alpha Graph | ReactivityChart |
-| **Animation & Dimming** | Superdimming Settings, Dimming Graph, Circadian Dimming Graph, Color Filter | DimmingChart, CircadianChart |
+| **Animation & Dimming** | Superdimming Settings, Color Filter, Dimming/Circadian Graphs | DimmingChart, CircadianChart |
 | **Dynamic Scale** | Experiment Settings, Experiment Graph, Taper Graph | ExperimentChart, TaperChart |
+| **Misc** | Misc Settings (min/max/offset/scale, anim steps + waits + throttle, notifications, debug) | — |
 | **Contexts** | (rules surfaced from contexts_spec — no dedicated Tasker scene; editor lives in AAB Profile) | — |
-| **Tools** | Debug Scene, Power Draw Graph, (wizard from Brightness Graph 'Suggest', calibration from task524) | PowerDrawChart |
+| **Tools** | Debug Scene (wizard), Power Draw Graph, (wizard from Brightness Graph 'Suggest', calibration from task524) | PowerDrawChart |
 | **Profiles & Import/Export** | AAB Profile (profile manager + context-rule editor) | — |
 | **About+Guide+Onboarding** | AAB About, AAB User Guide, privilege onboarding | — |
 | _(dropped)_ | AAB Chart.Js License (Chart.js removed) | — |

@@ -1,14 +1,25 @@
 package com.tideo.autobrightness.app.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +31,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /** A bold section label between groups of fields. */
 @Composable
@@ -32,13 +44,21 @@ fun SectionHeader(text: String) {
     )
 }
 
+private fun formatNumber(value: Number, isInt: Boolean): String =
+    if (isInt) value.toInt().toString() else value.toFloat().toString()
+
+private fun sameNumber(a: Number, b: Number, isInt: Boolean): Boolean =
+    if (isInt) a.toInt() == b.toInt() else a.toFloat() == b.toFloat()
+
 /**
- * Outlined numeric field with Tasker-faithful red-error state. The text is local state so typing is
- * never fought; every parse-able edit is committed via [onCommit]. [error] (from SettingsValidator)
- * renders red; otherwise [helper] (the ported longclick tooltip text) shows as supporting text.
+ * Outlined numeric field for the draft-edit model (S12.5b). The text is seeded **once per draft
+ * epoch** ([epoch]) rather than re-keyed on the incoming [value]: re-seeding on every emission of a
+ * committed value corrupted input mid-keystroke ("8.8" → backspace → "8.80.0", G2-F7). An empty
+ * field is allowed and simply leaves the draft unchanged (no forced 0).
  *
- * Replaces the EditTextElement + valueselected/focuschange handler rows (anonymous_handlers triage
- * buckets (a) help-text + (b) settings-mutation).
+ * When the draft [value] differs from the [committed]/active value, the committed value is shown in
+ * `[brackets]` next to the label — Tasker's `_UpdateStaticSceneElements` behaviour (G2-F1).
+ * [error] (from SettingsValidator) renders red; otherwise [helper] shows as supporting text.
  */
 @Composable
 fun NumberSettingField(
@@ -46,21 +66,24 @@ fun NumberSettingField(
     value: Number,
     onCommit: (Double) -> Unit,
     modifier: Modifier = Modifier,
+    epoch: Int = 0,
+    committed: Number? = null,
     error: String? = null,
     helper: String? = null,
     enabled: Boolean = true,
     isInt: Boolean = true,
     testTag: String = label,
 ) {
-    val displayed = if (isInt) value.toInt().toString() else value.toFloat().toString()
-    var text by remember(displayed) { mutableStateOf(displayed) }
+    var text by remember(epoch) { mutableStateOf(formatNumber(value, isInt)) }
+    val bracket = committed?.takeIf { !sameNumber(it, value, isInt) }
+        ?.let { " [${formatNumber(it, isInt)}]" } ?: ""
     OutlinedTextField(
         value = text,
         onValueChange = { raw ->
             text = raw
             raw.trim().replace(',', '.').toDoubleOrNull()?.let(onCommit)
         },
-        label = { Text(label) },
+        label = { Text(label + bracket) },
         enabled = enabled,
         isError = error != null,
         singleLine = true,
@@ -73,6 +96,48 @@ fun NumberSettingField(
         ),
         modifier = modifier.fillMaxWidth().testTag(testTag),
     )
+}
+
+/**
+ * A bounded M3 [Slider] for an integer setting (S12.5b, G2-F3/F13). The Tasker Misc/Experiment scenes
+ * render these six values as sliders with hard ranges (per the extraction scene docs) — free-text was wrong.
+ * The committed/active value is shown in `[brackets]` when the draft differs.
+ */
+@Composable
+fun IntSliderSettingField(
+    label: String,
+    value: Int,
+    range: IntRange,
+    onCommit: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    committed: Int? = null,
+    helper: String? = null,
+    enabled: Boolean = true,
+    testTag: String = label,
+) {
+    val bracket = committed?.takeIf { it != value }?.let { " [$it]" } ?: ""
+    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(
+            "$label: $value$bracket",
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Slider(
+            value = value.coerceIn(range).toFloat(),
+            onValueChange = { onCommit(it.roundToInt().coerceIn(range.first, range.last)) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            steps = (range.last - range.first - 1).coerceAtLeast(0),
+            enabled = enabled,
+            modifier = modifier.fillMaxWidth().testTag(testTag),
+        )
+        if (helper != null) {
+            Text(
+                helper,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /** A labelled M3 switch row (collapses Tasker's overlaid on/off Switch pairs into one — D-017). */
@@ -119,5 +184,81 @@ fun DerivedReadout(label: String, value: String, testTag: String = label) {
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** The Apply / Discard control bar (Tasker scenes' Apply + Reset buttons), enabled only when dirty. */
+@Composable
+fun DraftApplyBar(dirty: Boolean, onApply: () -> Unit, onDiscard: () -> Unit) {
+    Surface(tonalElevation = 3.dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = onDiscard,
+                enabled = dirty,
+                modifier = Modifier.weight(1f).testTag("discard_settings"),
+            ) { Text("Discard") }
+            Button(
+                onClick = onApply,
+                enabled = dirty,
+                modifier = Modifier.weight(1f).testTag("apply_settings"),
+            ) { Text(if (dirty) "Apply" else "Applied") }
+        }
+    }
+}
+
+/**
+ * Scaffold for the draft-edit parameter screens (S12.5b): a back arrow that confirms before
+ * discarding unsaved edits, and a sticky [DraftApplyBar] at the bottom (Apply/Discard). Leaving the
+ * screen throws the draft away (the per-screen VM is NavBackStackEntry-scoped), so a dirty back is
+ * confirmed first to match Tasker's preview→Apply expectation.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DraftSettingsScaffold(
+    title: String,
+    dirty: Boolean,
+    onApply: () -> Unit,
+    onDiscard: () -> Unit,
+    onNavigateBack: () -> Unit,
+    content: @Composable (PaddingValues) -> Unit,
+) {
+    var showConfirm by remember { mutableStateOf(false) }
+    val attemptBack: () -> Unit = { if (dirty) showConfirm = true else onNavigateBack() }
+    BackHandler(enabled = true) { attemptBack() }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+                navigationIcon = {
+                    TextButton(onClick = attemptBack, modifier = Modifier.testTag("back_button")) {
+                        Text("‹ Back")
+                    }
+                },
+            )
+        },
+        bottomBar = { DraftApplyBar(dirty, onApply, onDiscard) },
+        content = content,
+    )
+
+    if (showConfirm) {
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            title = { Text("Discard changes?") },
+            text = { Text("You have unsaved changes on this screen. Discard them and leave?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { showConfirm = false; onDiscard(); onNavigateBack() },
+                    modifier = Modifier.testTag("confirm_discard"),
+                ) { Text("Discard") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) { Text("Keep editing") }
+            },
+        )
     }
 }

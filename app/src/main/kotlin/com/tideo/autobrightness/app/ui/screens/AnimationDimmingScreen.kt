@@ -14,58 +14,50 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.settings.AabSettings
-import com.tideo.autobrightness.app.state.SettingsViewModel
-import com.tideo.autobrightness.app.ui.components.DerivedReadout
+import com.tideo.autobrightness.app.state.DraftSettingsViewModel
+import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
-import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.platform.privilege.Tier
 
-/** Animation & Dimming (Tasker AAB Superdimming Settings + Misc anim fields + Color Filter). */
+/**
+ * Animation & Dimming (Tasker AAB Superdimming Settings + Color Filter). The animation fields moved
+ * to Misc (G2-F2); this screen owns super dimming (ELEVATED) and PWM/software dimming. Draft → Apply
+ * (S12.5b). Super dimming and PWM are **mutually exclusive** (G2-F10); the circadian dim-spread field
+ * is gated on circadian scaling (G2-F11).
+ */
 @Composable
-fun AnimationDimmingScreen(navController: NavHostController, vm: SettingsViewModel = viewModel()) {
-    val settings by vm.settings.collectAsStateWithLifecycle()
+fun AnimationDimmingScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
+    val draft by vm.draft.collectAsStateWithLifecycle()
+    val committed by vm.committed.collectAsStateWithLifecycle()
+    val dirty by vm.dirty.collectAsStateWithLifecycle()
+    val epoch by vm.epoch.collectAsStateWithLifecycle()
     val tier by vm.tier.collectAsStateWithLifecycle()
     AnimationDimmingContent(
-        settings, tier,
+        draft, committed, epoch, dirty, tier,
+        onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
-        onUpdate = vm::update,
         onOpenOnboarding = { navController.navigate(AppRoute.Onboarding.route) },
     )
 }
 
 @Composable
 fun AnimationDimmingContent(
-    settings: AabSettings,
+    draft: AabSettings,
+    committed: AabSettings,
+    epoch: Int,
+    dirty: Boolean,
     tier: Tier,
+    onEdit: ((AabSettings) -> AabSettings) -> Unit,
+    onApply: () -> Unit,
+    onDiscard: () -> Unit,
     onBack: () -> Unit,
-    onUpdate: ((AabSettings) -> AabSettings) -> Unit,
     onOpenOnboarding: () -> Unit,
 ) {
-    SettingsScaffold("Animation & Dimming", onBack) { padding ->
+    DraftSettingsScaffold("Animation & Dimming", dirty, onApply, onDiscard, onBack) { padding ->
         SettingsColumn(padding) {
-            SectionHeader("Animation")
-            NumberSettingField(
-                "Animation steps", settings.animSteps, { onUpdate { s -> s.copy(animSteps = it.toInt()) } },
-                helper = "Number of steps in a brightness change animation (0–100).", testTag = "field_animSteps",
-            )
-            NumberSettingField(
-                "Min wait (ms)", settings.minWaitMs, { onUpdate { s -> s.copy(minWaitMs = it.toInt()) } },
-                helper = "Shortest delay between animation frames.", testTag = "field_minWaitMs",
-            )
-            NumberSettingField(
-                "Max wait (ms)", settings.maxWaitMs, { onUpdate { s -> s.copy(maxWaitMs = it.toInt()) } },
-                helper = "Longest delay between animation frames.", testTag = "field_maxWaitMs",
-            )
-            // task714 throttle derivation: AnimSteps*MaxWait+10 (floored at 1001 in Tasker; we surface raw).
-            val derivedThrottle = settings.animSteps * settings.maxWaitMs + 10
-            DerivedReadout("Throttle (derived)", "$derivedThrottle ms", testTag = "derived_throttle")
-            if (settings.minWaitMs > settings.maxWaitMs) {
-                ErrorBanner("Minimum wait cannot exceed maximum wait.", "error_waits")
-            }
-
             SectionHeader("Super dimming")
             if (tier != Tier.ELEVATED) {
                 Text(
@@ -79,46 +71,57 @@ fun AnimationDimmingContent(
                 }
             }
             val dimEnabled = tier == Tier.ELEVATED
-            // task509/511 _DimmingUIToggle — surfaces the DimmingEnabled toggle deferred from Gate 1
-            // (D-041 F5). Gated to ELEVATED (the secure reduce_bright_colors path, D-040a).
+            // task509/511 _DimmingUIToggle — ELEVATED-gated (secure reduce_bright_colors path, D-040a).
+            // Mutually exclusive with PWM/software dimming (G2-F10): enabling super dimming disables PWM.
             SwitchSettingRow(
-                "Enable super dimming", settings.dimmingEnabled,
-                { onUpdate { s -> s.copy(dimmingEnabled = it) } },
+                "Enable super dimming", draft.dimmingEnabled,
+                { on -> onEdit { s -> s.copy(dimmingEnabled = on, pwmSensitive = if (on) false else s.pwmSensitive) } },
                 enabled = dimEnabled,
                 helper = "Extra dimming below the threshold (Android Extra Dim).",
                 testTag = "switch_dimmingEnabled",
             )
             NumberSettingField(
-                "Dimming strength", settings.dimmingStrength, { onUpdate { s -> s.copy(dimmingStrength = it.toInt()) } },
-                enabled = dimEnabled, helper = "Maximum super-dimming strength (0–100).", testTag = "field_dimmingStrength",
+                "Dimming strength", draft.dimmingStrength, { onEdit { s -> s.copy(dimmingStrength = it.toInt()) } },
+                epoch = epoch, committed = committed.dimmingStrength, enabled = dimEnabled,
+                helper = "Maximum super-dimming strength (0–100).", testTag = "field_dimmingStrength",
             )
             NumberSettingField(
-                "Dimming exponent", settings.dimmingExponent, { onUpdate { s -> s.copy(dimmingExponent = it.toFloat()) } },
-                isInt = false, enabled = dimEnabled, helper = "How gradually dimming kicks in.", testTag = "field_dimmingExponent",
+                "Dimming exponent", draft.dimmingExponent, { onEdit { s -> s.copy(dimmingExponent = it.toFloat()) } },
+                epoch = epoch, committed = committed.dimmingExponent, isInt = false, enabled = dimEnabled,
+                helper = "How gradually dimming kicks in.", testTag = "field_dimmingExponent",
             )
             NumberSettingField(
-                "Dimming threshold", settings.dimmingThreshold, { onUpdate { s -> s.copy(dimmingThreshold = it.toInt()) } },
-                enabled = dimEnabled, helper = "Screen brightness below which dimming engages.", testTag = "field_dimmingThreshold",
+                "Dimming threshold", draft.dimmingThreshold, { onEdit { s -> s.copy(dimmingThreshold = it.toInt()) } },
+                epoch = epoch, committed = committed.dimmingThreshold, enabled = dimEnabled,
+                helper = "Screen brightness below which dimming engages.", testTag = "field_dimmingThreshold",
             )
             // task513/610: threshold must not sit below minimum brightness.
-            if (settings.dimmingThreshold < settings.minBrightness) {
+            if (draft.dimmingThreshold < draft.minBrightness) {
                 ErrorBanner("Dimming threshold is below minimum brightness.", "error_dimmingThreshold")
             }
+            // G2-F11: dim spread is the CIRCADIAN dim-strength spread (task646 DimDynamic) — it only
+            // does anything when circadian scaling is on, so gate the field on it + correct the label.
             NumberSettingField(
-                "Dim spread", settings.dimSpread, { onUpdate { s -> s.copy(dimSpread = it.toInt()) } },
-                enabled = dimEnabled, helper = "How wide the dim shifts over the brightness range.", testTag = "field_dimSpread",
+                "Circadian dim spread", draft.dimSpread, { onEdit { s -> s.copy(dimSpread = it.toInt()) } },
+                epoch = epoch, committed = committed.dimSpread,
+                enabled = dimEnabled && draft.scalingEnabled,
+                helper = "How much the dimming strength shifts across the day (needs circadian scaling).",
+                testTag = "field_dimSpread",
             )
 
             SectionHeader("PWM (flicker) handling")
+            // Software dimming / PWM-sensitive — no ELEVATED needed (superdimming_settings.md note);
+            // mutually exclusive with super dimming (G2-F10).
             SwitchSettingRow(
-                "PWM-sensitive mode", settings.pwmSensitive,
-                { onUpdate { s -> s.copy(pwmSensitive = it) } },
-                helper = "Gamma-like compression for flicker-sensitive eyes.",
+                "Use software dimming (PWM-sensitive)", draft.pwmSensitive,
+                { on -> onEdit { s -> s.copy(pwmSensitive = on, dimmingEnabled = if (on) false else s.dimmingEnabled) } },
+                helper = "Gamma-like compression for flicker-sensitive eyes (disables super dimming).",
                 testTag = "switch_pwmSensitive",
             )
             NumberSettingField(
-                "PWM exponent", settings.pwmExponent, { onUpdate { s -> s.copy(pwmExponent = it.toFloat()) } },
-                isInt = false, helper = "Shape of the PWM compression curve.", testTag = "field_pwmExponent",
+                "PWM exponent", draft.pwmExponent, { onEdit { s -> s.copy(pwmExponent = it.toFloat()) } },
+                epoch = epoch, committed = committed.pwmExponent, isInt = false,
+                helper = "Shape of the PWM compression curve.", testTag = "field_pwmExponent",
             )
 
             // Circadian dimming chart (re-homed here per D-026) is render-deferred to S13.

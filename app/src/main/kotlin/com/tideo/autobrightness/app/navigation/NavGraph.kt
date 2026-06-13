@@ -13,6 +13,7 @@ import com.tideo.autobrightness.app.ui.screens.ContextsScreen
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessScreen
 import com.tideo.autobrightness.app.ui.screens.DashboardScreen
 import com.tideo.autobrightness.app.ui.screens.DynamicScaleScreen
+import com.tideo.autobrightness.app.ui.screens.MiscScreen
 import com.tideo.autobrightness.app.ui.screens.PlaceholderScreen
 import com.tideo.autobrightness.app.ui.screens.ProfilesScreen
 import com.tideo.autobrightness.app.ui.screens.ReactivityScreen
@@ -36,6 +37,7 @@ fun AppNavGraph(
         composable(AppRoute.Reactivity.route) { ReactivityScreen(navController) }
         composable(AppRoute.AnimationDimming.route) { AnimationDimmingScreen(navController) }
         composable(AppRoute.DynamicScale.route) { DynamicScaleScreen(navController) }
+        composable(AppRoute.Misc.route) { MiscScreen(navController) }
         composable(AppRoute.Contexts.route) { ContextsScreen(navController) }
         composable(AppRoute.Tools.route) { ToolsScreen(navController) }
         composable(AppRoute.Profiles.route) { ProfilesScreen(navController) }

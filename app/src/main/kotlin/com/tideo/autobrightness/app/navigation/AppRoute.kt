@@ -13,6 +13,10 @@ enum class AppRoute(val route: String, val label: String, val owner: String) {
     Reactivity("reactivity", "Reactivity", "S12"),
     AnimationDimming("animation_dimming", "Animation & Dimming", "S12"),
     DynamicScale("dynamic_scale", "Dynamic Scale", "S12"),
+    // S12.5b re-adds the Misc/General screen (G2-F2): the Tasker "Misc" scene's brightness range
+    // (min/max/offset/scale), animation (steps + min/max wait + throttle), notifications and debug
+    // fields live here — they were wrongly scattered onto other screens in S12.
+    Misc("misc", "Misc", "S12.5b"),
     Contexts("contexts", "Contexts", "S12"),
     Tools("tools", "Tools", "S12"),
     Profiles("profiles", "Profiles & Import/Export", "S12"),
@@ -21,7 +25,7 @@ enum class AppRoute(val route: String, val label: String, val owner: String) {
     companion object {
         /** Destinations surfaced as navigation entries on the Dashboard (everything the user tunes). */
         val dashboardDestinations: List<AppRoute> = listOf(
-            CurveBrightness, Reactivity, AnimationDimming, DynamicScale,
+            CurveBrightness, Reactivity, AnimationDimming, DynamicScale, Misc,
             Contexts, Tools, Profiles, About,
         )
     }
