@@ -37,7 +37,10 @@ Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12 (settings & tools screens + chart engine core) DONE — GATE 2 READY.** All seven
+**S12 (settings & tools screens + chart engine core) DONE but GATE 2 FAILED → merged + salvaged in
+S12.5 (D-045).** Gate 2 found the UI "miles off" the Tasker app (generic Material, no AAB design
+language/preview-Apply model/sliders; findings G2-F1..F18). The branch is merged as-is (domain/runtime/
+chart-engine sound); the UI is rebuilt in S12.5a/b/c. The wiring below still describes what shipped: all seven
 parameter/tool/profile screens are real Compose M3 over the screen_map target set: Curve & Brightness
 (fields + task583/707 validator red-errors + live form2A/form3A + the BrightnessCurveChart template),
 Reactivity (thresholds + the **DetectOverrides** toggle deferred from Gate 1), Animation & Dimming
@@ -80,7 +83,11 @@ AppModule is now the real DI root.
   notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
   Findings → "Gate findings" below.
 - Parallel window C: **S10** (context override engine) DONE ∥ **S11** (UI shell + onboarding) DONE.
-- **HUMAN GATE 2** (RUNBOOK "Human gates", after S12): full UI walkthrough — every field
+- **S12.5 — UI salvage (a/b/c)** is the next serial step (NEW; brief in RUNBOOK, D-045). S12 merges
+  to main as-is; S12.5 rebuilds the UI to AAB fidelity (teal+gold design language + nav drawer + hero
+  cards; temporary-preview→Apply model; bounded sliders; Misc-screen regrouping; toasts; context-editor
+  fidelity; the profile-load-disables-overrides bug G2-F8). **Gate 2 is re-tested after S12.5c**, not now.
+- **HUMAN GATE 2** (RUNBOOK "Human gates", after S12.5): full UI walkthrough — every field
   edits/persists/rejects-invalid-with-red; live form2A/form3A; wizard produces+applies suggestions;
   Shizuku ELEVATED flow; QS tile; per-app override; charging+time contexts; brightness-chart shape;
   legacy Tasker import. Findings → "Gate findings". Note the two Gate-1 deferrals are now surfaced:
@@ -647,7 +654,20 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   manual-lat/lon/time fields (the runtime computes solar times from passive location, D-042d). Add the
   fields + UI if Gate 2 shows passive location is insufficient. (Affects S13, S14, Gate 2.)
 
-Append new entries as D-045, D-046, … with which segments they affect.
+- D-045: S12 UI verdict + SALVAGE PLAN (owner, Gate 2). S12's screens are functionally wired and
+  green but "miles off" the Tasker app: it built a GENERIC Material settings app, violating CLAUDE.md's
+  prime directive ("port behaviour exactly; modernise the *how*, never the *what*"). The owner chose to
+  **merge S12 anyway** (the domain engine, runtime pipeline, chart engine, validator, DataStore models
+  and the stateless-Content/wrapper + Robolectric-compose patterns are all sound and worth keeping) and
+  to **salvage the UI in S12.5** (split a = design language/app shell, b = preview→Apply interaction
+  model + sliders + grouping, c = feature/behaviour fidelity). S12.5 is a UI-LAYER salvage — it must NOT
+  touch domain/, runtime decision logic, golden vectors, or the ChartCanvas public API. The full defect
+  list is Gate-2 findings G2-F1..F18 (this file). Owner's two binding answers: interaction model =
+  **full temporary-preview → Apply with [committed] values + pipeline re-run**; screen layout = **keep
+  the 9-screen screen_map but fix grouping (re-add a faithful Misc/General screen; min/max/offset/scale +
+  animation belong there)**. (Affects S12.5a/b/c, S13, S14, Gate 2.)
+
+Append new entries as D-046, D-047, … with which segments they affect.
 
 ## Blockers
 
@@ -733,8 +753,12 @@ warning; time-context rule loads its profile (min-bright kicks in); reset-to-def
 - **G2-F6 (bug) — zone2End < zone1End → form3A shows NaN with no warning.** Need a guard + warning.
 - **G2-F7 (bug) — numeric text entry corrupts.** NumberSettingField re-seeds from the committed value
   mid-edit: 8.8 → backspace → … → typing 8.8 yields "8.80.0". Want empty/null over a forced 0.
-- **G2-F8 (runtime, likely S9a) — manual override detection worked once, then unreliable.** Toggle now
-  exists (S12); the detection itself is flaky. Possibly the self-write marker / OverrideMonitor.
+- **G2-F8 (runtime — CLARIFIED by owner) — manual override detection is reliable; loading a profile
+  DISABLES it.** Owner confirmed overrides work consistently EXCEPT after a profile load, which leaves
+  override detection off. Real bug for S12.5 (the profile-apply path must not clear/disable the
+  DetectOverrides runtime state; likely the reapply/setInitialBrightness path or the
+  effectiveSettings swap dropping detectOverrides). Investigate the ContextEngine/profile merge +
+  controller reapply.
 - **G2-F9 (runtime/dimming) — super dimming does not engage Android Extra Dim even with ELEVATED.**
   DimmingEnabled now persists (S12) but reduce_bright_colors does not activate. Likely shares the
   no-re-eval root cause (F16) and/or OEM secure-key differences; needs device investigation.
@@ -756,11 +780,16 @@ warning; time-context rule loads its profile (min-bright kicks in); reset-to-def
   re-eval). Time-context switching DOES apply (it fires ContextChanged). Tasker re-runs "Advanced Auto
   Brightness" on save/apply. Need a settings-change → forced re-eval control event (likely also fixes F9).
 - **G2-F17 (minor) — QS tile:** works; unclear whether it reflects paused state.
+- **G2-F18 (design language — major) — the app does not look or feel like AAB.** The Tasker project
+  has a distinctive **teal + gold** design language, the **project name in a header up top**, a
+  **hamburger / nav-drawer menu** (the AAB Menu scene), and **hero cards** for Profiles and Contexts.
+  S12 shipped default Material 3 (dynamic color), a plain top bar, and a flat list of outlined nav
+  buttons on the Dashboard — generic, not AAB. (Owner's examples are illustrative, NOT exhaustive: the
+  whole visual/interaction identity needs to match the Tasker app.)
 
-**Triage / next:** awaiting owner decisions on (1) screen layout/grouping and (2) the preview→Apply
-interaction model + sliders + toasts, recorded as D-045 once chosen. Unambiguous bugs (F4/F6/F7/F16 +
-F14 package-visibility/usage-access + F10/F11 gating + F5 warning) will be fixed regardless. F8/F9 need
-device re-verification after F16. **Gate 2 NOT signed off.**
+**Decision (owner, 2026-06-13 19:00):** MERGE this branch as-is (S12 compiles + tests green; domain/
+runtime/chart-engine are sound) and **salvage the UI in a new S12.5** (see RUNBOOK; split a/b/c).
+Gate 2 stays open and is re-tested after S12.5. **Gate 2 NOT signed off.** D-045 records the plan.
 ### Gate 3 (after S14) — pending
 
 The human records on-device findings here; the next session triages them.
