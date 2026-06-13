@@ -49,7 +49,7 @@ filled by S1/S2 during extraction.
 | Hibernate/reset: 585 | | runtime/BrightnessPipelineController.hibernate (S9a — sensor unregister + runtime-state clear) | ported |
 | Throttle reset: 566 | | runtime/BrightnessPipelineController.reinit (S9a — throttle = settings default on wake) | ported |
 | Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic, OverrideRulesTest.kt S5); runtime wiring: OverrideMonitor + controller pause/resume + recordOverridePoint (S9a). 640/641/636 override-array CRUD UI = S12 | ported (detect/pause/resume) |
-| Panic reset: 528 | | runtime/BrightnessPipelineController.panic + notification Reset action (S9a) | ported |
+| Panic reset: 528 | | runtime/BrightnessPipelineController.emergencyStop + notification Reset action; Gate-1 G1-F4 fix: panic is a FULL STOP (restore 255 + drop dimming + %AAB_Service=Off + service teardown), not a pausable state (D-041) | ported |
 | Init/defaults: 570 Initialize AAB Defaults | | | pending |
 | Circadian dynamic scale: 90 (+ polar handling) | | SolarCalculator.kt + DynamicScaleEngine.kt (S6 domain, golden-tested circadian.csv 576 rows, CircadianParityTest + 4 polar assertions); BrightnessEngine delegates computeDynamicScale (D-031) | ported |
 | Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S2 extracted → contexts_spec.md | pending |

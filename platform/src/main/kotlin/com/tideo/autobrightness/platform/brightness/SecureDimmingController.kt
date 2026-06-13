@@ -25,15 +25,18 @@ class AndroidSecureDimmingController(
         if (privilegeManager.currentTier() < Tier.ELEVATED) {
             return Result.failure(SecurityException("WRITE_SECURE_SETTINGS not granted"))
         }
-        Settings.Secure.putInt(resolver, "reduce_bright_colors_level", level.coerceIn(0, 1000))
-        return Result.success(Unit)
+        // Defensive: a revoked/stale grant can still throw SecurityException at write time.
+        return runCatching {
+            Settings.Secure.putInt(resolver, "reduce_bright_colors_level", level.coerceIn(0, 1000))
+        }
     }
 
     override fun setActivated(on: Boolean): Result<Unit> {
         if (privilegeManager.currentTier() < Tier.ELEVATED) {
             return Result.failure(SecurityException("WRITE_SECURE_SETTINGS not granted"))
         }
-        Settings.Secure.putInt(resolver, "reduce_bright_colors_activated", if (on) 1 else 0)
-        return Result.success(Unit)
+        return runCatching {
+            Settings.Secure.putInt(resolver, "reduce_bright_colors_activated", if (on) 1 else 0)
+        }
     }
 }
