@@ -20,7 +20,7 @@ next session does not know it.
 | S8 settings schema v2 + validator | 2026-06-12 | Sonnet/medium | DONE | (see push) | `AabSettings` v2 (animSteps, thresholdMidpoint, contextOverride, setupTitle added; scale Int→Float; throttleDefaultMs 1000→1310; debugLevel range 0..9; CURRENT_SCHEMA_VERSION=2); `AabSettingsSerializer` migration v1→v2; `AabSettingsMapper` completed (toThresholdConfig/toAnimationConfig/toBrightnessCurveConfig/toDynamicScalingConfig + validate fixes); `TaskerLegacyProfileSerializer` updated (new fields + scale Float); `DefaultProfiles.kt` (5 profiles from task592); `SettingsValidator.kt` (5 rules: task583×3 advisory + task707×2 safety); `ContextOverrideRules.kt` (ContextRule/ContextTriggers/BatteryTrigger/LocationTrigger/ContextOverrideConfig + Tasker JSON interop); 20 new unit tests (migration×6, legacy round-trip×5, validator×9). `:app:testDebugUnitTest` ✅ `:app:assembleDebug` ✅ `:app:lintDebug` ✅ `:domain:test` ✅ |
 | S7 platform adapters + privilege | 2026-06-12 | Sonnet/medium | DONE | (see push) | `sensor/LightSensorSource.kt` (TYPE_LIGHT callbackFlow); `brightness/ScreenBrightnessController.kt` (read/write 0–255, OEM range norm via config_screenBrightnessSettingMaximum, suppress-echo hook); `brightness/SecureDimmingController.kt` (reduce_bright_colors via Settings.Secure, ELEVATED-gated); `privilege/PrivilegeManager.kt` (Tier NONE/BASIC/ELEVATED; BASIC=canWrite, ELEVATED=checkPermission; tierFlow; root+Shizuku grant helpers); `privilege/ShizukuGrantGateway.kt` (binder check + permission request stub — exec TODO S11, D-032); `observe/BrightnessObserver.kt` (ContentObserver callbackFlow, null-Handler for synchronous dispatch, self-write filter via suppress-echo); `context/{BatteryStateReader,LocationReader,ForegroundAppMonitor,WifiInfoReader}.kt`. ShizukuProvider added to manifest; shizuku-api added to platform + app deps; shizuku-provider added to app deps. SystemAdapters.kt marked @Deprecated("S9b removes"). Robolectric tests: 19 total (brightness write/read/mode-force, tier-gating, observer dispatch+self-write-filter, LightSensorSource cancel). `:platform:test` GREEN (19 tests); `:app:assembleDebug` GREEN. |
 
-| S8.5 review (Fable→Opus) | 2026-06-12/13 | Fable+Opus | IN PROGRESS | 3c6a585, cd3fd15, (this) | Sequential reviews (one agent at a time per owner). DONE: full acceptance suite green; S7 review → D-034 (suppress-echo redesign, OEM rounding, +8 tests); D-035 model policy (Opus from S9a); checklist unstale'd; **S4/S5 review → D-036** (2 CRITICAL parity holes fixed: task661 ScalingUse=false/%AAB_Scale branch + %AAB_ScaleDynamicCompress surfacing; new calculated.csv golden + 3 tests; existing 8 CSVs byte-identical). NOT DONE: S6, S8 deep reviews (rerun ONE AT A TIME). Resume at S6 before S9a. |
+| S8.5 review (Fable→Opus) | 2026-06-12/13 | Fable+Opus | IN PROGRESS | 3c6a585, cd3fd15, (this) | Sequential reviews (one agent at a time per owner). DONE: full acceptance suite green; S7 review → D-034 (suppress-echo redesign, OEM rounding, +8 tests); D-035 model policy (Opus from S9a); checklist unstale'd; **S4/S5 review → D-036** (2 CRITICAL parity holes fixed: task661 ScalingUse=false/%AAB_Scale branch + %AAB_ScaleDynamicCompress surfacing; new calculated.csv golden + 3 tests; existing 8 CSVs byte-identical); **S6 review → D-037** (port verified faithful; fixed oracle-circularity by adding independent SolarInvariantTest [7 astronomical invariants, all pass] + wizard abort test + dawn/dusk golden assertions). NOT DONE: S8 deep review (rerun, one agent). Resume at S8 before S9a. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
@@ -331,7 +331,32 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   from the single `scalingEnabled` setting — confirm against profiles/contexts extraction whether
   Tasker can run circadian (task90) independently of %AAB_ScalingUse. (Affects S9a, S9b, S14.)
 
-Append new entries as D-037, D-038, … with which segments they affect.
+- D-037: S8.5 REVIEW (S6 circadian + wizard). Math verified faithful to task90 Java blocks
+  line-by-line (NOAA constants, tanh ramp, polar sentinels, schedule windows) and task38/task655
+  (fitting constants, R²/penalties, form output) — no parity bug in the port. BUT one
+  methodological hole fixed: **the circadian/wizard "reference" delegates to production**
+  (`TaskerReference.solarTimes/buildScheduleWindows/dynamicScale` → SolarCalculator/
+  DynamicScaleEngine, TaskerReference.kt:418-424), so `circadian.csv`/`wizard.csv` are generated
+  FROM production and CircadianParityTest/WizardParityTest are regression-LOCKS, not independent
+  oracles — and S6 never did the NOAA-table cross-check its brief required. FIX: added
+  `SolarInvariantTest.kt` (7 assertions on astronomical invariants that hold regardless of
+  implementation — equator-equinox ≈12h, dawn<rise<noon<set<dusk twilight ordering, eastward
+  longitude advances sunrise [lng sign], N-hemisphere long-June/short-Dec + S reversed [LAT sign],
+  high-arctic midnight-sun/polar-night [polar branch]); ALL PASS → the port is now independently
+  confirmed correct, not merely self-consistent. Also: assert dawn/dusk epochs in
+  circadian_solarTimes_matchesGolden (were unchecked); added wizard abort-path test (<9 points →
+  null; no golden case exercised it). ACCEPTED/non-bugs: (a) DynamicScaleEngine derives
+  morning/evening duration from window endpoints rather than Tasker's independent
+  %AAB_MorningDuration vars — equivalent because act76 defines duration ≡ end−start; if S9a/S12
+  ever exposes duration as a standalone setting, add explicit fields. (b) applyToLiveCurve form3a
+  floor 0.0 matches task655 (the 0.001 floor is task38's post-blend safeguard, correctly only in
+  suggest()). (c) BrightnessEngine.computeDynamicScale hardcodes dimSpreadPercent=0.0 — harmless
+  (it returns only scaleDynamic, which depends on scaleSpread; dimDynamic is discarded there).
+  S9b IMPACT: when wiring the dimming path, call DynamicScaleEngine.compute with the real
+  %AAB_DimSpread and consume dimDynamic — do NOT route it through BrightnessEngine.computeDynamicScale.
+  (Affects S9a, S9b, S12, S14.)
+
+Append new entries as D-038, D-039, … with which segments they affect.
 
 ## Blockers
 

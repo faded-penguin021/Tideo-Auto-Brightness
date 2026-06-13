@@ -54,6 +54,10 @@ class CircadianParityTest {
                 mismatches += "$tag riseEpoch engine=${solar.riseEpochSec} ref=${r["riseEpochSec"]}"
             if (abs(solar.setEpochSec - r.l("setEpochSec")) > 0)
                 mismatches += "$tag setEpoch engine=${solar.setEpochSec} ref=${r["setEpochSec"]}"
+            if (abs(solar.dawnEpochSec - r.l("dawnEpochSec")) > 0)
+                mismatches += "$tag dawnEpoch engine=${solar.dawnEpochSec} ref=${r["dawnEpochSec"]}"
+            if (abs(solar.duskEpochSec - r.l("duskEpochSec")) > 0)
+                mismatches += "$tag duskEpoch engine=${solar.duskEpochSec} ref=${r["duskEpochSec"]}"
             if (abs(solar.noonEpochSec - r.l("noonEpochSec")) > 0)
                 mismatches += "$tag noonEpoch engine=${solar.noonEpochSec} ref=${r["noonEpochSec"]}"
             if (abs(solar.sunlightDurationMinutes - r.l("sunlightMins")) > 0)
