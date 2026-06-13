@@ -42,9 +42,14 @@ Every Chart.js WebElement maps to a named Compose-Canvas chart (built S12/S13). 
 
 ### AAB Menu  ·  `menu`  ·  XML L4462–4717  ·  3 elements  → (nav hub)
 
+**S12.5a:** rebuilt as the `AabNavDrawer` (`ModalNavigationDrawer`, `ui/components/AppShell.kt`) opened
+from the branded `AabTopBar` hamburger — the menu's three HTML "cards" become drawer groups
+(Profiles&Contexts hero / Settings / Info&Help); Recheck Permissions → Onboarding; the Chart.js License
+entry is dropped (D-046). Profiles + Contexts also surface as hero cards on the Dashboard.
+
 | Element | Type | Disposition |
 |---|---|---|
-| elements0 | Web | dropped(nav replaced by M3 navigation) |
+| elements0 | Web | dropped-HTML; **nav rebuilt as `AabNavDrawer` (S12.5a)** |
 | background#1 | Rect | dropped(decorative/background rect) |
 | props | Properties | dropped(nav replaced by M3 navigation) |
 

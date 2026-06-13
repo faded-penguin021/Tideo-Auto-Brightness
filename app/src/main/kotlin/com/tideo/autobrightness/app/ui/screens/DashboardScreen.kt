@@ -8,23 +8,31 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -33,7 +41,11 @@ import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.state.DashboardUiState
 import com.tideo.autobrightness.app.state.DashboardViewModel
 import com.tideo.autobrightness.app.state.ServiceHealthUiState
+import com.tideo.autobrightness.app.ui.components.AabNavDrawer
+import com.tideo.autobrightness.app.ui.components.AabTopBar
+import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.platform.privilege.Tier
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -52,7 +64,13 @@ fun DashboardScreen(navController: NavHostController, viewModel: DashboardViewMo
     )
 }
 
-/** Stateless, fully driven by [state] + callbacks so it can render under a Robolectric compose test. */
+/**
+ * Stateless, fully driven by [state] + callbacks so it can render under a Robolectric compose test.
+ *
+ * S12.5a: the flat `OutlinedButton` nav list is replaced by the AAB-Menu drawer ([AabNavDrawer]) +
+ * a branded top bar ([AabTopBar]); Profiles and Contexts are surfaced as prominent hero cards
+ * (Gate-2 G2-F18). Field behaviour is unchanged (that is S12.5b).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardContent(
@@ -63,27 +81,58 @@ fun DashboardContent(
     onOpenOnboarding: () -> Unit,
     onNavigate: (AppRoute) -> Unit,
 ) {
-    Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text("Tideo Auto Brightness") }) },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            TierBadge(tier = state.tier, onClick = onOpenOnboarding)
-            ServiceSwitchCard(state.serviceEnabled, onToggleService)
-            LiveReadoutCard(state, onPause, onResume)
-            state.activeContext?.let { ContextCard(it) }
-            HealthCard(state.health)
-            HorizontalDivider()
-            AppRoute.dashboardDestinations.forEach { route ->
-                OutlinedButton(
-                    onClick = { onNavigate(route) },
-                    modifier = Modifier.fillMaxWidth().testTag("nav_${route.route}"),
-                ) { Text(route.label) }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AabNavDrawer(
+                current = AppRoute.Dashboard,
+                onNavigate = { route ->
+                    scope.launch { drawerState.close() }
+                    onNavigate(route)
+                },
+                onRecheckPermissions = {
+                    scope.launch { drawerState.close() }
+                    onOpenOnboarding()
+                },
+            )
+        },
+    ) {
+        Scaffold(
+            topBar = {
+                AabTopBar(
+                    title = "Tideo Auto Brightness",
+                    onOpenMenu = { scope.launch { drawerState.open() } },
+                )
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TierBadge(tier = state.tier, onClick = onOpenOnboarding)
+                ServiceSwitchCard(state.serviceEnabled, onToggleService)
+                LiveReadoutCard(state, onPause, onResume)
+                HeroCard(
+                    icon = Icons.Filled.Person,
+                    title = "Profiles",
+                    subtitle = "Save, load & import brightness profiles",
+                    testTag = "hero_profiles",
+                    onClick = { onNavigate(AppRoute.Profiles) },
+                )
+                HeroCard(
+                    icon = Icons.Filled.Place,
+                    title = "Contexts",
+                    subtitle = state.activeContext?.let { "Active: $it" }
+                        ?: "No context override active",
+                    testTag = "hero_contexts",
+                    onClick = { onNavigate(AppRoute.Contexts) },
+                )
+                HealthCard(state.health)
             }
         }
     }
@@ -153,12 +202,32 @@ private fun LiveReadoutCard(state: DashboardUiState, onPause: () -> Unit, onResu
     }
 }
 
+/** Prominent summary card (the AAB Menu "hero" cards for Profiles / Contexts). */
 @Composable
-private fun ContextCard(activeContext: String) {
-    Card {
-        Column(Modifier.padding(16.dp)) {
-            Text("Active context", style = MaterialTheme.typography.labelMedium)
-            Text(activeContext, style = MaterialTheme.typography.titleMedium)
+private fun HeroCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).testTag(testTag),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Icon(icon, contentDescription = null, tint = AabGold)
+            Column {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }
