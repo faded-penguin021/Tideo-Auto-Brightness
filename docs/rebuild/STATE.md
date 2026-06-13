@@ -20,7 +20,7 @@ next session does not know it.
 | S8 settings schema v2 + validator | 2026-06-12 | Sonnet/medium | DONE | (see push) | `AabSettings` v2 (animSteps, thresholdMidpoint, contextOverride, setupTitle added; scale Int→Float; throttleDefaultMs 1000→1310; debugLevel range 0..9; CURRENT_SCHEMA_VERSION=2); `AabSettingsSerializer` migration v1→v2; `AabSettingsMapper` completed (toThresholdConfig/toAnimationConfig/toBrightnessCurveConfig/toDynamicScalingConfig + validate fixes); `TaskerLegacyProfileSerializer` updated (new fields + scale Float); `DefaultProfiles.kt` (5 profiles from task592); `SettingsValidator.kt` (5 rules: task583×3 advisory + task707×2 safety); `ContextOverrideRules.kt` (ContextRule/ContextTriggers/BatteryTrigger/LocationTrigger/ContextOverrideConfig + Tasker JSON interop); 20 new unit tests (migration×6, legacy round-trip×5, validator×9). `:app:testDebugUnitTest` ✅ `:app:assembleDebug` ✅ `:app:lintDebug` ✅ `:domain:test` ✅ |
 | S7 platform adapters + privilege | 2026-06-12 | Sonnet/medium | DONE | (see push) | `sensor/LightSensorSource.kt` (TYPE_LIGHT callbackFlow); `brightness/ScreenBrightnessController.kt` (read/write 0–255, OEM range norm via config_screenBrightnessSettingMaximum, suppress-echo hook); `brightness/SecureDimmingController.kt` (reduce_bright_colors via Settings.Secure, ELEVATED-gated); `privilege/PrivilegeManager.kt` (Tier NONE/BASIC/ELEVATED; BASIC=canWrite, ELEVATED=checkPermission; tierFlow; root+Shizuku grant helpers); `privilege/ShizukuGrantGateway.kt` (binder check + permission request stub — exec TODO S11, D-032); `observe/BrightnessObserver.kt` (ContentObserver callbackFlow, null-Handler for synchronous dispatch, self-write filter via suppress-echo); `context/{BatteryStateReader,LocationReader,ForegroundAppMonitor,WifiInfoReader}.kt`. ShizukuProvider added to manifest; shizuku-api added to platform + app deps; shizuku-provider added to app deps. SystemAdapters.kt marked @Deprecated("S9b removes"). Robolectric tests: 19 total (brightness write/read/mode-force, tier-gating, observer dispatch+self-write-filter, LightSensorSource cancel). `:platform:test` GREEN (19 tests); `:app:assembleDebug` GREEN. |
 
-| S8.5 review (Fable/high) | 2026-06-12 | Fable | PARTIAL | 3c6a585, cd3fd15 | Usage-limit cut. DONE: full acceptance suite green; S7 deep review → D-034 fixes (suppress-echo redesign, OEM rounding, grant intent, FG-app retention, Shizuku leak, +8 tests) committed+pushed; PARITY_CHECKLIST Java-block rows unstale'd; D-035 model policy (Opus from S9a). NOT DONE: S4/S5, S6, S8 deep reviews (agents stopped at usage limit — rerun ONE AT A TIME, sequentially, never parallel; prompts can be reconstructed from RUNBOOK briefs + ledger). Resume here before S9a. |
+| S8.5 review (Fable→Opus) | 2026-06-12/13 | Fable+Opus | IN PROGRESS | 3c6a585, cd3fd15, (this) | Sequential reviews (one agent at a time per owner). DONE: full acceptance suite green; S7 review → D-034 (suppress-echo redesign, OEM rounding, +8 tests); D-035 model policy (Opus from S9a); checklist unstale'd; **S4/S5 review → D-036** (2 CRITICAL parity holes fixed: task661 ScalingUse=false/%AAB_Scale branch + %AAB_ScaleDynamicCompress surfacing; new calculated.csv golden + 3 tests; existing 8 CSVs byte-identical). NOT DONE: S6, S8 deep reviews (rerun ONE AT A TIME). Resume at S6 before S9a. |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
@@ -299,7 +299,39 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   coverage, is the safety net. Compaction events must now be recorded in segment-log rows.
   (Affects S9a…S12 session directives.)
 
-Append new entries as D-036, D-037, … with which segments they affect.
+- D-036: S8.5 REVIEW FIXES (S4/S5 domain). Two CRITICAL parity holes found (both invisible to
+  the prior golden vectors because no CSV exercised the path) and fixed against the EXISTING
+  reference oracle (no oracle/vector edits — the 8 prior CSVs are byte-identical after regen):
+  (a) **task661 ScalingUse=false branch + %AAB_Scale were missing.** `BrightnessEngine.evaluate`
+  unconditionally ran the task548 taper; task661 act10-14 is `If ScalingUse → taper; Else →
+  mapped*%AAB_Scale+%AAB_Offset`. The engine had no `scale`/`scalingUse` field, so a real config
+  (ScalingUse off, Scale≠1.0) produced wrong brightness. Added `scalingUse:Boolean=true` +
+  `scale:Double=1.0` to `BrightnessCurveConfig`, added the linear branch + a public
+  `calculatedBrightness(lux,cfg,scaleDynamic)` (mirrors the oracle's act10-21, clamps as doubles),
+  wired the mapper (`scalingUse←scalingEnabled`, `scale←settings.scale`). New golden
+  `calculated.csv` (2752 rows: 4 variants × lux grid × {ScalingUse T/F} × scaleDynamic grid) +
+  `calculated_matchesEngine` parity test. (b) **%AAB_ScaleDynamicCompress (effectiveScale) was
+  computed then discarded.** `compressedDynamicScale` now returns `CompressedScaleResult`
+  (calculatedBrightness + effectiveScale); `BrightnessPolicyOutput` gains `scaleDynamicCompress`.
+  S9a MUST pass `output.scaleDynamicCompress` as the `dynamicCompress` arg to
+  `OverrideRules.recordOverridePoint` (task561 gate: scalingUse=true AND compress≠0). Also fixed:
+  taper test now asserts effectiveScale (was unasserted); added direct
+  `softwareDimming_dimProgress_matchesOracle` (was only indirectly tested via dimShell); exact
+  `form2A`/`form3A` defaults (were 29.58/2513.0 ≈; now 29.58039891549808/2513.1533352729266 —
+  unused at runtime since the mapper derives them, but no longer a latent trap). `:domain:test`
+  + `:app:testDebugUnitTest` GREEN.
+  ACCEPTED (not bugs): `dynamicThreshold(rawLux,…)`'s rawLux is dead — task544 uses par1 only for
+  the `relative_change` log var; the threshold uses %SmoothedLux only, so the out-of-sync
+  currentLux≠smoothedLux case provably cannot diverge (left in for Tasker-signature fidelity).
+  FLAGGED for S9a/S14 (Finding 7, not resolved): task546 stores %AAB_ThreshDynamic as a
+  BigDecimal-formatted percentage STRING that task535 re-parses; production passes
+  `dynamicThreshold*100` unrounded. The 16512-row smoothing golden is self-consistent, but
+  verify whether task546's string-rounding shifts the smoothing input on-device.
+  OPEN QUESTION for S9a: the mapper now drives BOTH `curve.scalingUse` and `dynamicScaling.enabled`
+  from the single `scalingEnabled` setting — confirm against profiles/contexts extraction whether
+  Tasker can run circadian (task90) independently of %AAB_ScalingUse. (Affects S9a, S9b, S14.)
+
+Append new entries as D-037, D-038, … with which segments they affect.
 
 ## Blockers
 

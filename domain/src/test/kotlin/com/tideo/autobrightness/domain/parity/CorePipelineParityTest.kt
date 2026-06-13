@@ -124,9 +124,31 @@ class CorePipelineParityTest {
                 taperMidpoint = r.d("taperMidpoint"),
                 taperSteepness = r.d("taperSteepness"),
             )
-            val calc = engine.compressedDynamicScale(r.d("mapped"), r.d("scaleDynamic"), cfg)
-            assertEquals(r.d("calculatedBrightness"), calc, tol, "mapped=${r["mapped"]} scale=${r["scaleDynamic"]}")
+            val res = engine.compressedDynamicScale(r.d("mapped"), r.d("scaleDynamic"), cfg)
+            assertEquals(r.d("calculatedBrightness"), res.calculatedBrightness, tol, "mapped=${r["mapped"]} scale=${r["scaleDynamic"]}")
+            assertEquals(r.d("effectiveScale"), res.effectiveScale, tol, "effScale mapped=${r["mapped"]} scale=${r["scaleDynamic"]}")
         }
+    }
+
+    // ---- calculated_brightness, both branches (task661 act10-21) --------------------------
+    @Test
+    fun calculated_matchesEngine() {
+        val mismatches = mutableListOf<String>()
+        for (r in golden("calculated.csv")) {
+            val cfg = BrightnessCurveConfig(
+                form1A = r.d("form1a"), form2A = r.d("form2a"), form2B = r.d("form2b"),
+                form2C = r.d("form2c"), zone1End = r.d("zone1End"), zone2End = r.d("zone2End"),
+                form3A = r.d("form3a"), minBrightness = r.d("minBright").toInt(),
+                maxBrightness = r.d("maxBright").toInt(), offset = r.d("offset"),
+                taperMidpoint = r.d("taperMidpoint"), taperSteepness = r.d("taperSteepness"),
+                scalingUse = r["scalingUse"] == "true", scale = r.d("scale"),
+            )
+            val calc = engine.calculatedBrightness(r.d("lux"), cfg, r.d("scaleDynamic"))
+            if (abs(calc - r.d("calculatedBrightness")) > tol) {
+                mismatches += "variant=${r["variant"]} lux=${r["lux"]} su=${r["scalingUse"]} engine=$calc ref=${r["calculatedBrightness"]}"
+            }
+        }
+        if (mismatches.isNotEmpty()) fail("calculated diverges in ${mismatches.size} rows; e.g. ${mismatches.first()}")
     }
 
     // ---- animation (task543) -------------------------------------------------------------
@@ -206,6 +228,20 @@ class CorePipelineParityTest {
                 pwmExp = r.d("pwmExp"),
             )
             assertEquals(r.d("finalDim"), fd, tol, "tb=${r["targetBrightness"]} elev=${r["isElevated"]}")
+        }
+    }
+
+    // ---- super dimming progress (task646/647) — asserted directly, not just via dimShell ---
+    @Test
+    fun softwareDimming_dimProgress_matchesOracle() {
+        for (r in golden("superdimming.csv")) {
+            val p = SoftwareDimming.dimProgress(
+                brightness = r.d("targetBrightness"),
+                minBrightness = r.d("minBright"),
+                dimmingThreshold = r.d("dimmingThreshold"),
+                dimmingExponent = r.d("dimmingExponent"),
+            )
+            assertEquals(r.d("dimProgress"), p, tol, "tb=${r["targetBrightness"]} thr=${r["dimmingThreshold"]}")
         }
     }
 

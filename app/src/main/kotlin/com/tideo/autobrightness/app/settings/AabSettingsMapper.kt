@@ -68,11 +68,13 @@ fun AabSettings.toBrightnessCurveConfig(): BrightnessCurveConfig {
         offset = offset.toDouble(),
         taperMidpoint = scaleTaperMidpoint.toDouble(),
         taperSteepness = scaleTaperSteepness.toDouble(),
+        // Tasker task661 act10/14 (D-036): %AAB_ScalingUse picks taper vs. linear; %AAB_Scale is
+        // the static multiplier used by the linear branch (mapped*Scale+Offset).
+        scalingUse = scalingEnabled,
+        scale = scale.toDouble(),
     )
 }
 
-// Note: %AAB_Scale (base multiplier) maps to BrightnessOverrides.baseScaleOverride in the pipeline,
-// not to DynamicScalingConfig. S9a constructs BrightnessOverrides directly from settings.scale.
 fun AabSettings.toDynamicScalingConfig(): DynamicScalingConfig = DynamicScalingConfig(
     enabled = scalingEnabled,
     spreadPercent = scaleSpread.toDouble(),
