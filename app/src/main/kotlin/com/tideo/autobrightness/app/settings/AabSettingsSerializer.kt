@@ -24,7 +24,7 @@ object AabSettingsSerializer : Serializer<AabSettings> {
         output.write(json.encodeToString(AabSettings.serializer(), t).encodeToByteArray())
     }
 
-    // v1→v2: added animSteps(20), thresholdMidpoint(4.0), contextOverride(true), setupTitle;
+    // v1→v2: added animSteps(20), thresholdMidpoint(4.0), contextOverride(false), setupTitle;
     // scale type Int→Float (transparent — JSON integers decode as Float without loss).
     // New fields absent from v1 JSON get Kotlin default values automatically via ignoreUnknownKeys.
     internal fun migrate(settings: AabSettings): AabSettings {

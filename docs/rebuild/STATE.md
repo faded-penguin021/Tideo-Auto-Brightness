@@ -20,7 +20,7 @@ next session does not know it.
 | S8 settings schema v2 + validator | 2026-06-12 | Sonnet/medium | DONE | (see push) | `AabSettings` v2 (animSteps, thresholdMidpoint, contextOverride, setupTitle added; scale Int→Float; throttleDefaultMs 1000→1310; debugLevel range 0..9; CURRENT_SCHEMA_VERSION=2); `AabSettingsSerializer` migration v1→v2; `AabSettingsMapper` completed (toThresholdConfig/toAnimationConfig/toBrightnessCurveConfig/toDynamicScalingConfig + validate fixes); `TaskerLegacyProfileSerializer` updated (new fields + scale Float); `DefaultProfiles.kt` (5 profiles from task592); `SettingsValidator.kt` (5 rules: task583×3 advisory + task707×2 safety); `ContextOverrideRules.kt` (ContextRule/ContextTriggers/BatteryTrigger/LocationTrigger/ContextOverrideConfig + Tasker JSON interop); 20 new unit tests (migration×6, legacy round-trip×5, validator×9). `:app:testDebugUnitTest` ✅ `:app:assembleDebug` ✅ `:app:lintDebug` ✅ `:domain:test` ✅ |
 | S7 platform adapters + privilege | 2026-06-12 | Sonnet/medium | DONE | (see push) | `sensor/LightSensorSource.kt` (TYPE_LIGHT callbackFlow); `brightness/ScreenBrightnessController.kt` (read/write 0–255, OEM range norm via config_screenBrightnessSettingMaximum, suppress-echo hook); `brightness/SecureDimmingController.kt` (reduce_bright_colors via Settings.Secure, ELEVATED-gated); `privilege/PrivilegeManager.kt` (Tier NONE/BASIC/ELEVATED; BASIC=canWrite, ELEVATED=checkPermission; tierFlow; root+Shizuku grant helpers); `privilege/ShizukuGrantGateway.kt` (binder check + permission request stub — exec TODO S11, D-032); `observe/BrightnessObserver.kt` (ContentObserver callbackFlow, null-Handler for synchronous dispatch, self-write filter via suppress-echo); `context/{BatteryStateReader,LocationReader,ForegroundAppMonitor,WifiInfoReader}.kt`. ShizukuProvider added to manifest; shizuku-api added to platform + app deps; shizuku-provider added to app deps. SystemAdapters.kt marked @Deprecated("S9b removes"). Robolectric tests: 19 total (brightness write/read/mode-force, tier-gating, observer dispatch+self-write-filter, LightSensorSource cancel). `:platform:test` GREEN (19 tests); `:app:assembleDebug` GREEN. |
 
-| S8.5 review (Fable→Opus) | 2026-06-12/13 | Fable+Opus | IN PROGRESS | 3c6a585, cd3fd15, (this) | Sequential reviews (one agent at a time per owner). DONE: full acceptance suite green; S7 review → D-034 (suppress-echo redesign, OEM rounding, +8 tests); D-035 model policy (Opus from S9a); checklist unstale'd; **S4/S5 review → D-036** (2 CRITICAL parity holes fixed: task661 ScalingUse=false/%AAB_Scale branch + %AAB_ScaleDynamicCompress surfacing; new calculated.csv golden + 3 tests; existing 8 CSVs byte-identical); **S6 review → D-037** (port verified faithful; fixed oracle-circularity by adding independent SolarInvariantTest [7 astronomical invariants, all pass] + wizard abort test + dawn/dusk golden assertions). NOT DONE: S8 deep review (rerun, one agent). Resume at S8 before S9a. |
+| S8.5 review (Fable→Opus) | 2026-06-12/13 | Fable+Opus | IN PROGRESS | 3c6a585, cd3fd15, (this) | Sequential reviews (one agent at a time per owner). DONE: full acceptance suite green; S7 review → D-034 (suppress-echo redesign, OEM rounding, +8 tests); D-035 model policy (Opus from S9a); checklist unstale'd; **S4/S5 review → D-036** (2 CRITICAL parity holes fixed: task661 ScalingUse=false/%AAB_Scale branch + %AAB_ScaleDynamicCompress surfacing; new calculated.csv golden + 3 tests; existing 8 CSVs byte-identical); **S6 review → D-037** (port verified faithful; fixed oracle-circularity by adding independent SolarInvariantTest [7 astronomical invariants, all pass] + wizard abort test + dawn/dusk golden assertions); **S8 review → D-038** (CRITICAL: contextOverride default true→false [would lock context switching on fresh install]; fixed 2 vacuous safety-validator tests). All four reviews (S4/S5, S6, S7, S8) COMPLETE. Build green. S9a may proceed (Opus per D-035). |
 
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
@@ -356,7 +356,39 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   %AAB_DimSpread and consume dimDynamic — do NOT route it through BrightnessEngine.computeDynamicScale.
   (Affects S9a, S9b, S12, S14.)
 
-Append new entries as D-038, D-039, … with which segments they affect.
+- D-038: S8.5 REVIEW (S8 settings/validator/contexts). One CRITICAL default fixed + two
+  safety-validator test-vacuity fixes; model verified otherwise correct.
+  (a) **CRITICAL — `contextOverride` defaulted `true`.** `%AAB_ContextOverride` is the runtime
+  "manual context lock" latch: the watcher gate (contexts_spec §1.1) fires ONLY when
+  `ContextOverride != true`, and PASS 4 skips the profile switch when it is true. Defaulting the
+  baseline AabSettings to `true` would permanently suppress ALL context switching on every fresh
+  install and after v1→v2 migration — S10's context system would never fire. Fixed default →
+  `false` (+ AabSettingsContract rule + serializer comment + migration-test assertion). The
+  defaults_audit "true (per-profile, task637)" describes the value stored INSIDE a saved
+  override-profile file, not the baseline — the conflation that caused the bug. Legacy round-trip
+  test unaffected (its fixture sets %AAB_ContextOverride=true explicitly, testing the import map).
+  (b) **Validator tests were vacuous on the safety path** (task707): the test labelled "zone1
+  formula" actually drove the zone-2 branch (zone-1 selection at line 57-60 was never executed by
+  any test), and the "zone3" test did `filterNot { form3A|safetyBrightness|form2A }.size == 0`,
+  which passes even with zero errors. Fixed: relabelled the zone-2 test, added a real zone-1
+  selection test, rewrote the zone-3 test to assert the safety error actually fires (zone2End=999
+  → form3A≈987 → safe_val≈3.3 < 25). The validator LOGIC is correct (zone select
+  zone1End>1000→z1 / zone2End>1000→z2 / else z3; formulas match features_spec §5, form2D≡zone1End).
+  DOCUMENTED (not fixed): (i) validator's `(1000-form2C).pow(0.33)` is NaN-safe only while form2C
+  is range-clamped (1..50); S12 must run AabSettings.validate() (which clamps) before/with
+  SettingsValidator, or add a guard — flagged for S12. (ii) `ContextRule.profile` stores a
+  FILENAME (Tasker interop), not the 39-key snapshot, and the model carries no baseline for the
+  "no winner → revert to %AAB_ProfileUser" path — acceptable per the S8 brief (storage model
+  only), but S10 MUST hold the user-baseline profile reference externally and treat profile
+  application as load-current-file (a sanctioned simplification vs Tasker's snapshot-at-creation).
+  (iii) specificity counts timeRange and days as independent dims; spec wording "time, +1 if days"
+  is ambiguous — S10 must confirm against task43 before finalizing the precedence tie-break.
+  VERIFIED CLEAN: all 38 SETTING defaults vs task570/defaults_audit; %AAB_MaxSteps absent;
+  migration (ignoreUnknownKeys + non-trivial v1 fixture, scale Int→Float transparent); the 4
+  mapper conversions; 5 DefaultProfiles vs task592; ContextOverrideRules JSON interop. (Affects
+  S10, S12, S14.)
+
+Append new entries as D-039, D-040, … with which segments they affect.
 
 ## Blockers
 

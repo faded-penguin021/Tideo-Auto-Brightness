@@ -44,20 +44,9 @@ class SettingsValidatorTest {
     }
 
     @Test
-    fun `predicted brightness below 25 at 1000 lux triggers safety error (zone1 formula)`() {
-        // zone1End=2000 > 1000 → zone1 formula: form1A * sqrt(1000)
-        // form1A=0 → safe_val=0 < 25 → safety error
-        // Note: form1A has a lower valid range of 1, but validate() coerces after validation
-        // So we test with a value that genuinely produces low brightness without violating form1A range
-        // form1A=1: safe_val = 1 * sqrt(1000) ≈ 31.6 → valid (>25)
-        // form1A=1, zone1End=1 so 1000>zone1End → zone2 path
-        // Easiest: keep zone1End large enough, reduce form1A below sqrt threshold
-        // 1 * sqrt(1000) = 31.6 → still > 25
-        // Let's try: zone1End=2000, form1A=1 → safe_val=31.6 → valid
-        // For zone1 < 25 we'd need form1A * sqrt(1000) < 25 → form1A < 0.79 → but min valid is 1
-        // So zone1 path with valid form1A can't trigger the error. Try zone2:
-        // Make zone1End=10 (< 1000), zone2End=2000 (>1000): zone2 formula applies
-        // Use very small form2B to get a tiny zone2 value
+    fun `predicted brightness below 25 at 1000 lux triggers safety error (zone2 formula)`() {
+        // zone1End=10 (<1000), zone2End=2000 (>1000) → 1000 falls in ZONE 2.
+        // form2A = 1*sqrt(10) ≈ 3.162; safe_val = 3.162 + 0.1*((995)^0.33 - (5)^0.33) ≈ 3.99 < 25.
         val s = AabSettings(
             zone1End = 10,
             zone2End = 2000,
@@ -67,15 +56,31 @@ class SettingsValidatorTest {
             maxBrightness = 255,
         )
         val errors = SettingsValidator.validate(s)
-        // Compute expected value manually for assertion
-        // form2A = form1A * sqrt(zone1End) = 1 * sqrt(10) ≈ 3.162
-        // safe_val = form2A + form2B * ((1000-form2C)^0.33 - (zone1End-form2C)^0.33)
-        //          = 3.162 + 0.1 * ((995)^0.33 - (5)^0.33)
-        //          ≈ 3.162 + 0.1 * (9.97 - 1.71) ≈ 3.162 + 0.826 ≈ 3.99
-        // 3.99 < 25 → safety error expected
         assertTrue(
             errors.any { it.field == "safetyBrightness" },
             "Expected safetyBrightness error for very dim zone-2 config; got: $errors",
+        )
+    }
+
+    @Test
+    fun `zone1 formula is selected when zone1End above 1000 and is safe with valid form1A`() {
+        // zone1End=2000 > 1000 → 1000 falls in ZONE 1: form1A*sqrt(1000). Exercises the
+        // zone-1 selection branch (otherwise never hit by any test). With the minimum valid
+        // form1A=1, safe_val = sqrt(1000) ≈ 31.6 > 25, so zone-1 configs are always safe at
+        // 1000 lux — a regression that mis-selected zone 2/3 here (form2B tiny → ~0) would
+        // wrongly raise a safety error, which this asserts does NOT happen.
+        val s = AabSettings(
+            zone1End = 2000,
+            zone2End = 10_000,
+            form1A = 1,
+            form2B = 0.1f,
+            form2C = 5,
+            maxBrightness = 255,
+        )
+        val errors = SettingsValidator.validate(s)
+        assertTrue(
+            errors.none { it.field == "safetyBrightness" },
+            "Zone-1 selection (zone1End>1000) with valid form1A must be safe at 1000 lux; got: $errors",
         )
     }
 
@@ -89,22 +94,25 @@ class SettingsValidatorTest {
     }
 
     @Test
-    fun `zone3 path activates when zone2End below 1000`() {
-        // zone1End=5, zone2End=500 → both < 1000 → zone3 formula
-        // zone3: MaxBright - (form3A/1000)*MaxBright
-        // With high form3A the result can be negative → safety error
+    fun `zone3 formula is selected when zone2End below 1000 and fires safety error when too dim`() {
+        // zone1End=5, zone2End=999 → both ≤ 1000 → 1000 falls in ZONE 3:
+        //   safe_val = MaxBright - (form3A/1000)*MaxBright.
+        // form3A ≈ 999*(255-(2.236+0.1*((997)^0.33-(3)^0.33)))/255 ≈ 987 → safe_val ≈ 3.3 < 25.
+        // Previously this test filtered out the very fields it should check, so it passed even
+        // with zero errors (vacuous). Now assert the safety error is actually present.
         val s = AabSettings(
             zone1End = 5,
-            zone2End = 500,
+            zone2End = 999,
             form1A = 1,
             form2B = 0.1f,
             form2C = 2,
             maxBrightness = 255,
         )
         val errors = SettingsValidator.validate(s)
-        // form3A likely very large (zone2end * (maxbright - ...) / maxbright) → zone3 safe_val may be negative
-        // Either way, method must not crash
-        assertEquals(errors.filterNot { it.field == "form3A" || it.field == "safetyBrightness" || it.field == "form2A" }.size, 0)
+        assertTrue(
+            errors.any { it.field == "safetyBrightness" },
+            "Zone-3 selection with a very dim curve must raise a safety error; got: $errors",
+        )
     }
 
     @Test

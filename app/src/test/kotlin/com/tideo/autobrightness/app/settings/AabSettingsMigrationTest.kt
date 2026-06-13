@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.settings
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AabSettingsMigrationTest {
@@ -32,7 +33,7 @@ class AabSettingsMigrationTest {
         // New v2 fields absent from v1 JSON take Kotlin default values
         assertEquals(20, settings.animSteps, "animSteps should default to 20 (task570)")
         assertEquals(4.0, settings.thresholdMidpoint, "thresholdMidpoint should default to 4.0 (log10(10000))")
-        assertTrue(settings.contextOverride, "contextOverride should default to true")
+        assertFalse(settings.contextOverride, "contextOverride must default to false — the runtime context-lock latch starts unlatched (D-038)")
         assertEquals("Advanced Auto Brightness Setup", settings.setupTitle)
     }
 
