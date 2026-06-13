@@ -703,7 +703,64 @@ The tester executed the Gate 1 instructions exactly as provided. The `tideo-auto
 
 **G1-F5: Super Dimming not activating**
 *   **Observation:** After granting `WRITE_SECURE_SETTINGS` (verified via Shizuku authorized applications), reducing ambient light below the dimming threshold does not engage Android's Extra Dim / reduce bright colors feature.
-### Gate 2 (after S12) — pending
+### Gate 2 (after S12) — findings recorded (triage pending decisions)
+
+**Human test 2026-06-13 ~18:15 UTC.** Onboarding incl. Shizuku binding smooth. Many individual
+fields/validators work (see PASSED). But the owner's headline verdict: **"miles off the Tasker
+version — UX is poor, screens restructured, behaviours don't match Tasker; I expected a faithful
+port."** Root cause (self-assessed): S12 built a generic Material settings app, violating CLAUDE.md
+"port behaviour exactly / modernise the how not the what". The interaction MODEL was not ported.
+
+**PASSED:** permissions onboarding + Shizuku; form2C>zone1End red error; form2A/form3A live; safety
+warning @1000lux; min-wait>max-wait error; transition-factor>0.5 warning; taper-midpoint>maxBright
+warning; time-context rule loads its profile (min-bright kicks in); reset-to-defaults; QS tile toggles.
+
+**FINDINGS (G2-Fn):**
+- **G2-F1 (parity, major) — no temporary-preview / Apply model.** Tasker AAB edits TEMP values that
+  drive the graph, then an Apply commits them and shows the committed/active value in `[brackets]`
+  next to each setting. S12 commits every keystroke instantly, no preview, no bracketed active value.
+- **G2-F2 (parity/structure) — field grouping wrong.** min/max/offset/scale + animation settings are
+  on the **Misc** scene in Tasker; S12 scattered them onto Curve & Brightness / Animation & Dimming.
+  (Note: the 20→9 consolidation itself is the owner-approved screen_map/S2 plan; this is a grouping
+  error WITHIN that, vs the extraction.)
+- **G2-F3 (parity/UX) — bounded sliders replaced by unbounded free-text.** Tasker uses bounded
+  sliders for min/max brightness, taper midpoint (130–240), animSteps, etc. (D-017/D-018: 6 sliders).
+  S12 used free-text everywhere → e.g. min-bright range shown as 1..255 with no bound, taper midpoint
+  free text.
+- **G2-F4 (bug) — min brightness doesn't update the curve graph.** BrightnessCurveChart floors at 0,
+  not minBrightness, so the curve floor never moves.
+- **G2-F5 (validation gap) — scale=0.01 gives no "dangerously low curve" warning.** Tasker warns.
+- **G2-F6 (bug) — zone2End < zone1End → form3A shows NaN with no warning.** Need a guard + warning.
+- **G2-F7 (bug) — numeric text entry corrupts.** NumberSettingField re-seeds from the committed value
+  mid-edit: 8.8 → backspace → … → typing 8.8 yields "8.80.0". Want empty/null over a forced 0.
+- **G2-F8 (runtime, likely S9a) — manual override detection worked once, then unreliable.** Toggle now
+  exists (S12); the detection itself is flaky. Possibly the self-write marker / OverrideMonitor.
+- **G2-F9 (runtime/dimming) — super dimming does not engage Android Extra Dim even with ELEVATED.**
+  DimmingEnabled now persists (S12) but reduce_bright_colors does not activate. Likely shares the
+  no-re-eval root cause (F16) and/or OEM secure-key differences; needs device investigation.
+- **G2-F10 (parity) — PWM-sensitive and super-dimming are not mutually exclusive.** Tasker disables
+  one when the other is enabled.
+- **G2-F11 (parity + bug) — dim spread editable while circadian/scaling disabled (should be gated);
+  dim-spread label is wrong.**
+- **G2-F12 (parity/UX) — Flash/toast actions only render inline; no toasts anywhere.** Tasker uses
+  toasts for confirmations/warnings/help (longclick). S12 converted all to supportingText/banners.
+- **G2-F13 (parity/UX) — taper midpoint is unbounded free text (should be a 130–240 slider).** (⊂ F3)
+- **G2-F14 (feature gaps) — context rule editor weak:** no "get current SSID" helper; no SUNRISE/SUNSET
+  for from/to (resolver supports the tokens — editor doesn't expose them); foreground-app list is tiny
+  (Android 11+ package-visibility: needs `<queries>`/LAUNCHER or QUERY_ALL_PACKAGES) + no app icons;
+  no usage-access prompt when an app trigger is added.
+- **G2-F15 (gap) — debug selector persists but does nothing.** %AAB_Debug = 10 runtime TOAST categories
+  (D-023); no runtime debug output is wired.
+- **G2-F16 (bug, high value) — settings/profile changes don't re-run the pipeline.** Applying a profile
+  in the dark changes the numbers but not the screen (no new sensor event → drop-not-queue → no
+  re-eval). Time-context switching DOES apply (it fires ContextChanged). Tasker re-runs "Advanced Auto
+  Brightness" on save/apply. Need a settings-change → forced re-eval control event (likely also fixes F9).
+- **G2-F17 (minor) — QS tile:** works; unclear whether it reflects paused state.
+
+**Triage / next:** awaiting owner decisions on (1) screen layout/grouping and (2) the preview→Apply
+interaction model + sliders + toasts, recorded as D-045 once chosen. Unambiguous bugs (F4/F6/F7/F16 +
+F14 package-visibility/usage-access + F10/F11 gating + F5 warning) will be fixed regardless. F8/F9 need
+device re-verification after F16. **Gate 2 NOT signed off.**
 ### Gate 3 (after S14) — pending
 
 The human records on-device findings here; the next session triages them.
