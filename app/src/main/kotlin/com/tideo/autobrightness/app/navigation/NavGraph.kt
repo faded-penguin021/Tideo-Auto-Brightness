@@ -8,22 +8,24 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.ui.onboarding.OnboardingScreen
-import com.tideo.autobrightness.app.ui.screens.AnimationDimmingScreen
+import com.tideo.autobrightness.app.ui.screens.CircadianScreen
 import com.tideo.autobrightness.app.ui.screens.ContextsScreen
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessScreen
 import com.tideo.autobrightness.app.ui.screens.DashboardScreen
-import com.tideo.autobrightness.app.ui.screens.DynamicScaleScreen
+import com.tideo.autobrightness.app.ui.screens.MenuScreen
 import com.tideo.autobrightness.app.ui.screens.MiscScreen
 import com.tideo.autobrightness.app.ui.screens.PlaceholderScreen
 import com.tideo.autobrightness.app.ui.screens.ProfilesScreen
 import com.tideo.autobrightness.app.ui.screens.ReactivityScreen
+import com.tideo.autobrightness.app.ui.screens.SuperDimmingScreen
 import com.tideo.autobrightness.app.ui.screens.ToolsScreen
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /**
- * The navigation shell over the [AppRoute] target screen set. S11 wired Dashboard + Onboarding; S12
- * fills the parameter/tool/profile destinations with real screens. About & Guide remains a labelled
- * [PlaceholderScreen] until S13. First-run routing sends the user to Onboarding when tier == NONE.
+ * The navigation shell over the [AppRoute] target screen set. S12.6a makes [AppRoute.Menu] the home
+ * hub and the start destination after onboarding; every other screen is reached from it and returns
+ * to it (see [navigateTopLevel]). First-run routing sends the user to Onboarding when tier == NONE.
+ * About & Guide remains a labelled [PlaceholderScreen] until S13.
  */
 @Composable
 fun AppNavGraph(
@@ -31,12 +33,13 @@ fun AppNavGraph(
     startDestination: String = rememberStartDestination(),
 ) {
     NavHost(navController = navController, startDestination = startDestination) {
+        composable(AppRoute.Menu.route) { MenuScreen(navController) }
         composable(AppRoute.Dashboard.route) { DashboardScreen(navController) }
         composable(AppRoute.Onboarding.route) { OnboardingScreen(navController) }
         composable(AppRoute.CurveBrightness.route) { CurveBrightnessScreen(navController) }
         composable(AppRoute.Reactivity.route) { ReactivityScreen(navController) }
-        composable(AppRoute.AnimationDimming.route) { AnimationDimmingScreen(navController) }
-        composable(AppRoute.DynamicScale.route) { DynamicScaleScreen(navController) }
+        composable(AppRoute.SuperDimming.route) { SuperDimmingScreen(navController) }
+        composable(AppRoute.Circadian.route) { CircadianScreen(navController) }
         composable(AppRoute.Misc.route) { MiscScreen(navController) }
         composable(AppRoute.Contexts.route) { ContextsScreen(navController) }
         composable(AppRoute.Tools.route) { ToolsScreen(navController) }
@@ -46,12 +49,25 @@ fun AppNavGraph(
     }
 }
 
-/** Start on Onboarding when tier == NONE (no brightness-write access), else the Dashboard. */
+/**
+ * Navigate to a top-level destination from the Menu hub (or the Dashboard's quick links), always
+ * rooting the back stack at [AppRoute.Menu] so a back press from any settings/tool screen returns to
+ * the Menu, never the Dashboard (S12.6a owner decision 1, G2R-F1). `launchSingleTop` avoids stacking
+ * duplicates when re-selecting the current destination.
+ */
+fun NavHostController.navigateTopLevel(route: AppRoute) {
+    navigate(route.route) {
+        popUpTo(AppRoute.Menu.route) { inclusive = false }
+        launchSingleTop = true
+    }
+}
+
+/** Start on Onboarding when tier == NONE (no brightness-write access), else the Menu hub. */
 @Composable
 private fun rememberStartDestination(): String {
     val context = LocalContext.current
     return remember {
         val tier = AppModule(context.applicationContext).privilegeManager.currentTier()
-        if (tier == Tier.NONE) AppRoute.Onboarding.route else AppRoute.Dashboard.route
+        if (tier == Tier.NONE) AppRoute.Onboarding.route else AppRoute.Menu.route
     }
 }

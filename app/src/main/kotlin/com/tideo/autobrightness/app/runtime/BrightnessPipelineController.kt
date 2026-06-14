@@ -159,6 +159,12 @@ class BrightnessPipelineController(
      * and enqueue a [PipelineEvent.SensorTick]; everything else is dropped here (never queued).
      */
     private fun onSensorSample(lux: Double, accuracy: Int) {
+        // Record every delivered sample so the UI can show a live "last sample" age (G2R-F5), even
+        // for readings the prof760 dead-band/throttle gates later drop. This is the one PipelineState
+        // field written from the sensor collector rather than the consumer; it is a monotonic
+        // timestamp and MutableStateFlow.update is atomic (CAS retry), so it cannot corrupt or be
+        // lost against the consumer's snapshot writes.
+        _state.update { it.copy(lastSampleMs = clock()) }
         val settings = cachedSettings ?: return
         if (!settings.serviceEnabled) return
         val s = _state.value

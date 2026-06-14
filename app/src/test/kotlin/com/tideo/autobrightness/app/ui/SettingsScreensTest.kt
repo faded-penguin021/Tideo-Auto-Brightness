@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performScrollTo
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.state.AppEntry
-import com.tideo.autobrightness.app.ui.screens.AnimationDimmingContent
+import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
 import com.tideo.autobrightness.app.ui.screens.ContextsContent
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
 import com.tideo.autobrightness.app.ui.screens.MiscContent
@@ -88,10 +88,10 @@ class SettingsScreensTest {
     }
 
     @Test
-    fun animationDimming_dimmingRowsDisabledWithoutElevated() {
+    fun superDimming_dimmingRowsDisabledWithoutElevated() {
         compose.setContent {
             MaterialTheme {
-                AnimationDimmingContent(
+                SuperDimmingContent(
                     AabSettings(), AabSettings(), epoch = 0, dirty = false, tier = Tier.BASIC,
                     onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, onOpenOnboarding = {},
                 )

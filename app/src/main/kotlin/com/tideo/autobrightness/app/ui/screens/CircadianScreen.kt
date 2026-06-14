@@ -14,14 +14,17 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 
-/** Dynamic Scale (Tasker AAB Experiment Settings + Experiment/Taper graphs). Draft → Apply (S12.5b). */
+/**
+ * Circadian (Tasker AAB Experiment Settings + Experiment/Taper graphs). Renamed from "Dynamic Scale"
+ * in S12.6a (G2R-F4) to match the Tasker name for the day/night curve scaling. Draft → Apply (S12.5b).
+ */
 @Composable
-fun DynamicScaleScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
+fun CircadianScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
     val draft by vm.draft.collectAsStateWithLifecycle()
     val committed by vm.committed.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
-    DynamicScaleContent(
+    CircadianContent(
         draft, committed, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
@@ -29,7 +32,7 @@ fun DynamicScaleScreen(navController: NavHostController, vm: DraftSettingsViewMo
 }
 
 @Composable
-fun DynamicScaleContent(
+fun CircadianContent(
     draft: AabSettings,
     committed: AabSettings,
     epoch: Int,
@@ -39,7 +42,7 @@ fun DynamicScaleContent(
     onDiscard: () -> Unit,
     onBack: () -> Unit,
 ) {
-    DraftSettingsScaffold("Dynamic Scale", dirty, onApply, onDiscard, onBack) { padding ->
+    DraftSettingsScaffold("Circadian", dirty, onApply, onDiscard, onBack) { padding ->
         SettingsColumn(padding) {
             ChartPlaceholder("ExperimentChart / TaperChart", "dynamic_scale_chart")
 

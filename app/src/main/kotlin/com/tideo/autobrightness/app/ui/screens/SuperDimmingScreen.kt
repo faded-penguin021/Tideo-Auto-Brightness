@@ -23,19 +23,19 @@ import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /**
- * Animation & Dimming (Tasker AAB Superdimming Settings + Color Filter). The animation fields moved
- * to Misc (G2-F2); this screen owns super dimming (ELEVATED) and PWM/software dimming. Draft → Apply
- * (S12.5b). Super dimming and PWM are **mutually exclusive** (G2-F10); the circadian dim-spread field
- * is gated on circadian scaling (G2-F11).
+ * Super Dimming (Tasker AAB Superdimming Settings + Color Filter). Renamed from "Animation & Dimming"
+ * in S12.6a (G2R-F3) — its content is super dimming (ELEVATED) + PWM/software dimming after the
+ * animation fields moved to Misc (G2-F2). Draft → Apply (S12.5b). Super dimming and PWM are
+ * **mutually exclusive** (G2-F10); the circadian dim-spread field is gated on circadian scaling (G2-F11).
  */
 @Composable
-fun AnimationDimmingScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
+fun SuperDimmingScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
     val draft by vm.draft.collectAsStateWithLifecycle()
     val committed by vm.committed.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val tier by vm.tier.collectAsStateWithLifecycle()
-    AnimationDimmingContent(
+    SuperDimmingContent(
         draft, committed, epoch, dirty, tier,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
@@ -44,7 +44,7 @@ fun AnimationDimmingScreen(navController: NavHostController, vm: DraftSettingsVi
 }
 
 @Composable
-fun AnimationDimmingContent(
+fun SuperDimmingContent(
     draft: AabSettings,
     committed: AabSettings,
     epoch: Int,
@@ -56,7 +56,7 @@ fun AnimationDimmingContent(
     onBack: () -> Unit,
     onOpenOnboarding: () -> Unit,
 ) {
-    DraftSettingsScaffold("Animation & Dimming", dirty, onApply, onDiscard, onBack) { padding ->
+    DraftSettingsScaffold("Super Dimming", dirty, onApply, onDiscard, onBack) { padding ->
         SettingsColumn(padding) {
             SectionHeader("Super dimming")
             if (tier != Tier.ELEVATED) {

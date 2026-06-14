@@ -18,6 +18,8 @@ data class DashboardUiState(
     val currentBrightness: Int? = null,
     val targetBrightness: Int? = null,
     val activeContext: String? = null,
+    /** TIMEMS of the last sensor sample the pipeline saw (live), for the "Xs ago" readout (G2R-F5). */
+    val lastSampleMs: Long? = null,
     val health: ServiceHealthUiState = ServiceHealthUiState(),
 )
 

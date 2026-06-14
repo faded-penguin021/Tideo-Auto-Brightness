@@ -42,6 +42,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val current: Int?,
         val target: Int?,
         val context: String?,
+        val lastSampleMs: Long?,
     )
 
     private val liveFlow = combine(
@@ -49,7 +50,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         LiveRuntimeState.activeContext,
         LiveRuntimeState.serviceRunning,
     ) { p, ctx, running ->
-        Live(running, p.paused, p.lastRawLux, p.smoothedLux, p.lastAppliedBrightness, p.targetBrightness, ctx)
+        Live(running, p.paused, p.lastRawLux, p.smoothedLux, p.lastAppliedBrightness, p.targetBrightness, ctx, p.lastSampleMs)
     }
 
     private val healthFlow = healthStore.telemetry.map {
@@ -77,6 +78,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             currentBrightness = live.current,
             targetBrightness = live.target,
             activeContext = live.context,
+            lastSampleMs = live.lastSampleMs,
             health = health,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())

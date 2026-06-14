@@ -926,12 +926,21 @@ overlay + wizard have real input.
 4. **Curve chart overlays recorded override points** (G2R-F14): `BrightnessCurveChart` plots the recorded
    points as markers; the fitted/suggested curve shows only when ≥ 9 points exist (task38 threshold) — use
    the existing `ChartCanvas` marker API (do not modify ChartCanvas).
+5. **Fix manual-override FALSE POSITIVES on rapid light changes** (G2R-F26, added 2026-06-14; full
+   code-grounded analysis in STATE.md **D-049**). A fast lux swing pauses the pipeline as if the user moved
+   the slider. Primary suspect: `BrightnessPipelineController.handleOverride` commits the pause immediately,
+   omitting Tasker task567 act8's **cycle-time settle wait + re-read** ("before the new brightness has taken
+   hold"). Add that settle/re-check; then harden the single-latest self-write marker
+   (`ScreenBrightnessController.isSelfWrite`) and the OEM-range round-trip drift in `AnimationRunner`'s
+   read-back (compare in device space / with tolerance — see D-049 #2/#4). Add a regression test: a rapid
+   from→to with interleaved self-writes must NOT emit `OverrideDetected`, but a genuine external write after
+   settling MUST. Stay within the single-pipeline-coroutine model (D-027).
 
 **Non-goals:** the curve-fitting math (S6, golden), ChartCanvas internals. **HARD FENCE: domain/ untouched.**
 
 **Acceptance:** `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug :domain:test :platform:test`
 green; regression tests for the reapply-uses-fresh-settings + min-brightness paths + override-point
-persistence; STATE.md/checklist updated; pushed.
+persistence + the rapid-light-change override false-positive (G2R-F26/D-049); STATE.md/checklist updated; pushed.
 
 ---
 

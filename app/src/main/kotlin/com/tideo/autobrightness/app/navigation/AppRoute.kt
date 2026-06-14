@@ -1,18 +1,23 @@
 package com.tideo.autobrightness.app.navigation
 
 /**
- * The target Material 3 screen set from `docs/rebuild/screen_map.md`. S11 builds Dashboard and
- * Onboarding for real; the parameter/tool/profile screens are owned by S12 and the About/Guide
- * content by S13, so they resolve to a labelled placeholder until then ([owner] tags which segment
- * fills each in). Keeping the full route table here means navigation resolves end-to-end now.
+ * The target Material 3 screen set from `docs/rebuild/screen_map.md`.
+ *
+ * S12.6a (G2R-F1/F2/F3/F4): the **AAB Menu is now a real home screen** ([Menu]) — the app hub that
+ * the user returns to from every settings/tool screen (not the Dashboard). The Dashboard is a
+ * separate live-status destination reached from the Menu. Two screens are renamed to match Tasker:
+ * `Animation & Dimming` → **Super Dimming** and `Dynamic Scale` → **Circadian**.
  */
 enum class AppRoute(val route: String, val label: String, val owner: String) {
+    Menu("menu", "Menu", "S12.6a"),
     Dashboard("dashboard", "Dashboard", "S11"),
     Onboarding("onboarding", "Setup & Permissions", "S11"),
     CurveBrightness("curve_brightness", "Curve & Brightness", "S12"),
     Reactivity("reactivity", "Reactivity", "S12"),
-    AnimationDimming("animation_dimming", "Animation & Dimming", "S12"),
-    DynamicScale("dynamic_scale", "Dynamic Scale", "S12"),
+    // S12.6a rename (G2R-F3): the screen owns super dimming + PWM after S12.5b, so its name follows.
+    SuperDimming("super_dimming", "Super Dimming", "S12.6a"),
+    // S12.6a rename (G2R-F4): "Dynamic Scale" → "Circadian" (the Tasker name for the day/night curve).
+    Circadian("circadian", "Circadian", "S12.6a"),
     // S12.5b re-adds the Misc/General screen (G2-F2): the Tasker "Misc" scene's brightness range
     // (min/max/offset/scale), animation (steps + min/max wait + throttle), notifications and debug
     // fields live here — they were wrongly scattered onto other screens in S12.
@@ -23,10 +28,22 @@ enum class AppRoute(val route: String, val label: String, val owner: String) {
     About("about", "About & Guide", "S13");
 
     companion object {
-        /** Destinations surfaced as navigation entries on the Dashboard (everything the user tunes). */
-        val dashboardDestinations: List<AppRoute> = listOf(
-            CurveBrightness, Reactivity, AnimationDimming, DynamicScale, Misc,
-            Contexts, Tools, Profiles, About,
+        /** Profiles + Contexts — surfaced as the Menu's prominent hero cards (moved off the Dashboard). */
+        val heroDestinations: List<AppRoute> = listOf(Profiles, Contexts)
+
+        /** The tunable parameter screens — the Menu "Settings" group. */
+        val settingsDestinations: List<AppRoute> = listOf(
+            CurveBrightness, Reactivity, SuperDimming, Circadian, Misc,
         )
+
+        /** Tools + reference content — the Menu "Info & Help" group. */
+        val infoDestinations: List<AppRoute> = listOf(Tools, About)
+
+        /**
+         * Every destination surfaced as a plain navigation ROW in the Menu (the hero cards render
+         * separately). Drives the menu list + the navigation smoke tests.
+         */
+        val menuNavDestinations: List<AppRoute> =
+            listOf(Dashboard) + settingsDestinations + infoDestinations
     }
 }

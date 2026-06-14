@@ -37,11 +37,23 @@ next session does not know it.
 | S12.5b interaction model (preview→Apply, sliders, grouping) | 2026-06-13 | Opus/high | DONE | (see push) | Ported AAB's temporary-preview→Apply editing model + bounded sliders + faithful Misc grouping + validation parity (D-047; addresses G2-F1/F2/F3/F4/F5/F6/F7/F10/F11/F13/F16). New `state/DraftSettingsViewModel.kt` (per-screen NavBackStackEntry-scoped draft: edit→draft only, **Apply** commits draft→DataStore + forces re-eval, **Discard**/dirty-back reverts; `epoch`-seeded fields fix mid-edit corruption G2-F7; advisory errors on the draft). `SettingsControls.kt`: seed-once `NumberSettingField` w/ committed `[bracket]` + empty-allowed (G2-F1/F7), new bounded `IntSliderSettingField` (G2-F3/F13), `DraftApplyBar` + `DraftSettingsScaffold` (Apply/Discard + dirty-back confirm). **6 sliders w/ exact Tasker ranges** (misc_settings.md / experiment_settings.md): MinBright 0–75, MaxBright 150–255, AnimSteps 0–100, MinWait 1–99, MaxWait 2–100, TaperMidpoint 130–240. New **Misc** screen (`AppRoute.Misc`, drawer Settings group, NavGraph wired) holds min/max sliders + offset/scale + anim sliders + derived throttle + notifications + the 10-label debug selector (moved off Tools) — the G2-F2 regrouping; Curve & Brightness now only the curve-zone coefficients, Animation & Dimming only super-dimming+PWM (mutually exclusive, G2-F10) + circadian-gated dim spread (G2-F11). Forced re-eval path: `AutoBrightnessRuntime.reapply`→service `ACTION_REAPPLY`→`controller.reapply()` (UNLIMITED ContextChanged event), gated on serviceEnabled; SettingsViewModel applyProfile/reset/replaceAll reapply too (G2-F16). Validator: +zone2End<zone1End NaN guard (G2-F6) + dangerously-low-scale (G2-F5); BrightnessCurveChart floors at minBrightness (G2-F4). Tests: `DraftSettingsViewModelTest`(3, real DataStore — edit/dirty/discard, apply commits, serviceEnabled preserved) + `SettingsScreensTest` rewritten (8: validator errors, draft bracket, slider ranges asserted, Apply/Discard wiring, debug label on Misc). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(85) `:app:lintDebug :domain:test :platform:test`. No compaction. |
 | S12.5c feature & behaviour fidelity | 2026-06-14 | Opus/high | DONE | (see push) | Closed the remaining Gate-2 behaviour gaps (D-048). **G2-F8** profile-load-disables-overrides FIXED: `detectOverrides` is a global preference, not a task626 snapshot key → preserved in `mergeProfile` + `SettingsViewModel.applyProfile/replaceAll`. **G2-F12** toasts restored via `ui/components/Toaster.kt` (`rememberToaster`): Apply (shared `DraftApplyBar`), profile apply/reset/import-export, context save/delete, wizard apply/copy. **G2-F14** context-rule editor fidelity: manifest `<queries>` LAUNCHER block + app icons (`AppEntry.icon`, core-ktx `toBitmap`), "use current Wi-Fi" (`WifiInfoReader.currentSsid()`), SUNRISE/SUNSET time tokens, usage-access prompt+deep-link when an app trigger is set. **G2-F15** runtime debug toasts: new `runtime/RuntimeDebug.kt` (`DebugCategory`×9/`DebugSink`/NoOp) + `ToastDebugSink` wired into the pipeline (LIGHT_EVAL/ANIMATION_DETAILS/DYNAMIC_SCALE/GRAPH_METRICS + SKIP_ANIMATIONS behaviour), SuperDimmingCoordinator (SUPER_DIMMING), ContextEngine (CONTEXT_AUTOMATION/LOCATION), gated on the live debugLevel; `%AAB_Test` wizard report → clipboard in Tools. **G2-F9** super-dimming: engagement logic verified + now driven by the S12.5b reapply; added a SUPER_DIMMING debug toast (engage / why-not) + precise AOSP-secure-key/OEM-variance note for the device gate (no logic bug found). **G2-F17** QS tile subtitle = Off/Active/Paused/Starting from LiveRuntimeState. New tests: RuntimeDebugTest(3), ContextEngineTest.mergeProfile_preservesDetectOverrides, SettingsScreensTest +2 (context editor SUNRISE/SSID + usage-access prompt). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(91) `:app:lintDebug :domain:test :platform:test`. Lint baseline unchanged. No compaction. **GATE 2 RE-TEST READY.** |
 
+| S12.6a IA & naming | 2026-06-14 | Opus/high | DONE | (see push) | Menu-as-home reshape + two renames + Dashboard last-sample fix (G2R-F1…F5). **AAB Menu promoted to a real home hub** (`AppRoute.Menu` + `ui/screens/MenuScreen.kt`): gold-sun teal banner (rebranded "Tideo Auto Brightness", not "Advanced"), Profiles/Contexts **hero cards moved off the Dashboard**, Settings/Info&Help nav groups; it is the start destination after onboarding (tier!=NONE→Menu) and the back-target from every settings/tool screen via new `NavHostController.navigateTopLevel` (popUpTo(menu)). The S12.5a `AabNavDrawer` retired; `AabTopBar` gained an optional back arrow (AutoMirrored). Dashboard slimmed to live-status (tier badge, master switch, live readout, health) + back→Menu. **Renames:** `AnimationDimming`→`SuperDimming` (route `super_dimming`, title "Super Dimming", G2R-F3); `DynamicScale`→`Circadian` (route `circadian`, title "Circadian", G2R-F4) — files `AnimationDimmingScreen.kt`→`SuperDimmingScreen.kt`, `DynamicScaleScreen.kt`→`CircadianScreen.kt` (composables + content fns + NavGraph + tests). **Last-sample fix (G2R-F5):** `PipelineState.lastSampleMs` recorded for every delivered sample in `onSensorSample` (atomic StateFlow.update), surfaced via LiveRuntimeState→DashboardUiState, rendered as relative "Xs ago" (replaces the never-written health-store source). Domain/golden/ChartCanvas untouched. Tests: `UiShellTest` rewritten (Menu hero+nav, renames resolve, start-on-Menu + back-from-settings→Menu, last-sample renders); `SettingsScreensTest` SuperDimming rename. Ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug`. No compaction. |
+
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.5 UI salvage DONE + GATE-2 RE-TEST done → S12.6 planned (next work).** The owner re-tested the
+**S12.6a (IA & naming) DONE → S12.6b/c/d/e remain (parallel window).** The AAB Menu is now the app's
+home hub (start destination + back-target); the Profiles/Contexts hero cards live there (off the
+Dashboard), which is slimmed to a live-status screen reached from the Menu. `Animation & Dimming` is
+renamed **Super Dimming** and `Dynamic Scale` **Circadian** (routes, titles, files, tests). The
+Dashboard "Last sensor sample: never" bug is fixed (G2R-F5): the pipeline now records every sample's
+time in `PipelineState.lastSampleMs` and the Dashboard renders it as a live "Xs ago". The banner is
+rebranded "Tideo Auto Brightness" (owner note — was "Advanced"). Ladder GREEN
+(`:app:assembleDebug :app:testDebugUnitTest :app:lintDebug`). **Next: S12.6b/c/d/e (now unblocked — the
+nav/testTag reshape they depend on is landed), then HUMAN GATE 2 re-test after S12.6e.**
+
+**(historical) S12.5 UI salvage DONE + GATE-2 RE-TEST done → S12.6 planned (next work).** The owner re-tested the
 S12.5c build on-device (2026-06-14): two S12.5 fixes re-confirmed (min-bright graph, QS tile) but a
 second, larger batch of parity/behaviour gaps surfaced — **25 findings G2R-F1…F25** (see "Gate 2
 RE-TEST" below), structured and routed into a new **S12.6** (a–e, all Opus/high; RUNBOOK). Four binding
@@ -151,13 +163,17 @@ AppModule is now the real DI root.
   signed off.
 - **S12.6 — Gate-2 re-test salvage (a–e, all Opus/high)** is the NEXT work (brief in RUNBOOK). Owner
   decisions are binding (menu-as-home; block-Apply-on-critical-errors; all-profiles-editable+factory-
-  restore; SAF folder grant for legacy import). **S12.6a FIRST** (menu-as-home reshape + Super Dimming /
-  Circadian renames + Dashboard last-sample fix — touches all nav/testTags), then **S12.6b** (Live Debug
-  scene + per-screen diagnostic cards + global debug selector + teal toasts), **S12.6c** (reapply-uses-
-  fresh-settings + min-bright runtime bug + override-point capture + curve overlay), **S12.6d** (profile
-  save/overwrite/factory-restore + SAF legacy import + per-screen reset + Apply-gate), **S12.6e** (label/
-  long-press-help audit + context Wi-Fi/location + usage-access flow + load toasts). b/c/d/e are a
-  parallel window after a. Domain/ + golden vectors + ChartCanvas API stay fenced.
+  restore; SAF folder grant for legacy import). **S12.6a DONE** (menu-as-home reshape + Super Dimming /
+  Circadian renames + Dashboard last-sample fix — landed the nav/testTag reshape b/c/d/e depend on),
+  then **S12.6b** (Live Debug scene + per-screen diagnostic cards + global debug selector + teal toasts),
+  **S12.6c** (reapply-uses-fresh-settings + min-bright runtime bug + override-point capture + curve
+  overlay + **override false-positives on rapid light changes, G2R-F26/D-049**), **S12.6d** (profile
+  save/overwrite/factory-restore + SAF legacy import + per-screen reset +
+  Apply-gate), **S12.6e** (label/long-press-help audit + context Wi-Fi/location + usage-access flow +
+  load toasts). b/c/d/e are a parallel window now that a is merged. Domain/ + golden vectors +
+  ChartCanvas API stay fenced. **NOTE for b/c/d/e:** the AAB Menu is now the home `AppRoute.Menu`;
+  use `navigateTopLevel` for any new top-level destination so back still returns to the Menu; the
+  global debug selector S12.6b moves OFF Misc belongs on the new Live Debug screen reached from the Menu.
 - **HUMAN GATE 2 — RE-TEST AGAIN** after S12.6e. Re-verify all G2R-Fn + the original Gate-2 set.
 - **S13** (chart replication + static screens) follows S12.6 on the serial spine — preconditions S12.6
   DONE (faithful screens + menu IA), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over
@@ -859,7 +875,41 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (D-044c) — the wizard still runs against an empty recorded set; S13/S14 should add runtime capture.
   (Affects S13, S14, Gate 2.)
 
-Append new entries as D-048, D-049, … with which segments they affect.
+- D-049: OVERRIDE-DETECTION FALSE POSITIVES ON RAPID LIGHT CHANGES (owner-reported 2026-06-14, G2R-F26).
+  **DEFERRED to S12.6c — not yet fixed.** Symptom: a fast lux swing makes the pipeline pause as a "manual
+  override" although nothing external wrote the brightness. Code-grounded analysis (S12.6a investigated,
+  did not change source — HARD FENCE: this is `app/runtime` + `platform` glue, NOT domain/):
+
+  Two override-detect paths exist, both suspect, and a Tasker settle step is MISSING:
+  1. **Missing cycle-time settle wait + re-read in `BrightnessPipelineController.handleOverride`.** Its own
+     comment says it "mirrors the prof755 gate after the cycle-time wait" (task567 act8), but it commits
+     the pause IMMEDIATELY via `OverrideRules.shouldCommitPause` with **no delay and no second read**.
+     Tasker task567 waits `%AAB_CycleTime` and RE-CHECKS that the brightness is still off-target before
+     pausing — exactly the owner's "before the new brightness has taken hold". This is the strongest
+     candidate: add the settle wait (≈ `cycleTimeMs`, fallback to throttle) + re-read; only pause if the
+     observed value is still not our last self-write after settling.
+  2. **Single-latest self-write marker is too weak under rapid multi-frame writes.**
+     `ScreenBrightnessController.isSelfWrite` matches ONLY `lastSelfWriteDevice` (the most recent write).
+     A fast animation writes f1..fN quickly; the system `ContentObserver` can coalesce/reorder/delay
+     callbacks, and `read()` re-reads the CURRENT value. Between back-to-back cycles a delayed callback can
+     observe a value that is no longer the latest marker → leaks to `OverrideMonitor` as external. Consider
+     a short-lived set OR a "self-write generation + grace window" (suppress any change within ~N ms of our
+     last write) instead of a single equality.
+  3. **`autoRunning` gate hole.** `runCycle` clears `autoRunning` in its `finally` the instant `animate()`
+     returns, but the final frame's `ContentObserver` callback can arrive a few ms later when
+     `autoRunning=false`, so the gate then relies solely on the (weak, see #2) marker. A post-write settle
+     window (#1/#2) closes this too.
+  4. **OEM range round-trip drift in `AnimationRunner` read-back.** `controller.read()` is
+     `toDomain(toDevice(x))`, which is NOT identity when `config_screenBrightnessSettingMaximum != 255`
+     (e.g. deviceMax 100/1023/2047/4095), so `observed != lastWritten` can fire `OVERRIDDEN` on EVERY
+     multi-frame animation on those devices — device-dependent, which may explain why it's intermittent.
+     Compare in DEVICE space (raw values) or with a ±1 tolerance, not domain space.
+  RECOMMENDED for the next model (S12.6c): start with #1 (the missing settle wait/re-read — most faithful
+  to Tasker and matches the owner's intuition), then harden #2/#4. Add a regression test: a rapid
+  from→to with an interleaved self-write sequence must NOT yield `OverrideDetected`; and a real external
+  write after settling MUST. Keep it inside the single-pipeline-coroutine model (D-027). (Affects S12.6c.)
+
+Append new entries as D-049, D-050, … with which segments they affect.
 
 ## Blockers
 
@@ -1049,6 +1099,11 @@ snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
 - **G2R-F13** **Manual override points are not recorded** (the wizard's input; D-044c capture still unwired).
 - **G2R-F14** The brightness curve used to **overlay all recorded override points**; the fitted curve only
   appeared with **> 8 points**. Restore the point overlay + fit-only-when-≥9 behaviour.
+- **G2R-F26** (owner-reported 2026-06-14, post-S12.6a; NOT in the original re-test batch) **Manual-override
+  FALSE POSITIVES on rapid light changes** — a fast lux swing makes the pipeline pause as if the user
+  grabbed the slider, when nothing external wrote. Owner's read: a mutex issue, or new light readings are
+  allowed before the new brightness has "taken hold". **Deferred to S12.6c** (do NOT touch domain/; this is
+  controller/animation/observer glue). Code-grounded root-cause analysis + recommended fix in **D-049**.
 
 *Profiles & persistence (→ S12.6d):*
 - **G2R-F15** **Cannot save a custom profile**, and want to be able to **overwrite existing profiles** too
