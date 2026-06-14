@@ -186,8 +186,10 @@ AppModule is now the real DI root.
   capture/persistence G2R-F13 + curve overlay G2R-F14 + override false-positives G2R-F26/D-049 +
   PWM-sensitive hardware-floor clamp G2R-F27/D-050 — D-051). Remaining: **S12.6d** (profile
   save/overwrite/factory-restore + SAF legacy import + per-screen reset +
-  Apply-gate), **S12.6e** (label/long-press-help audit + context Wi-Fi/location + usage-access flow +
-  load toasts). b/c/d/e are a parallel window now that a is merged. Domain/ + golden vectors +
+  Apply-gate + **manual-load context-lock/Resume G2R-F30**), **S12.6e** (label/long-press-help audit +
+  context Wi-Fi/location [**G2R-F22 root cause found, see findings**] + **time-picker modal G2R-F28** +
+  usage-access flow + load toasts). A Live Debug refinement (**G2R-F29** Performance & Timings parity)
+  is carried too. b/c/d/e are a parallel window now that a is merged. Domain/ + golden vectors +
   ChartCanvas API stay fenced. **NOTE for b/c/d/e:** the AAB Menu is now the home `AppRoute.Menu`;
   use `navigateTopLevel` for any new top-level destination so back still returns to the Menu; the
   global debug selector S12.6b moves OFF Misc belongs on the new Live Debug screen reached from the Menu.
@@ -1231,6 +1233,36 @@ snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
   instruction on how to fix it (surface that instruction/flow here).
 - **G2R-F24** The setup/permissions screen should show **usage access as optional by default**.
 - **G2R-F25** There is **no toast when a rule/profile is loaded**.
+
+#### Additional owner findings during S12.6c testing (2026-06-14) — triaged to future sub-segments
+These five were reported while S12.6c was in flight. S12.6c investigated/triaged them but did NOT
+implement them: each belongs to a future S12.6 sub-segment (owner-confirmed rule — "if it was supposed
+to be addressed already, fix now; otherwise leave for future stages"; none are S12.6c scope). Routed:
+- **G2R-F22 (S12.6e) — Wi-Fi "use current SSID" reports "Not connected" — ROOT CAUSE FOUND (S12.6c
+  investigation).** `AndroidWifiInfoReader.currentSsid()` uses the SYNCHRONOUS
+  `ConnectivityManager.getNetworkCapabilities(activeNetwork)`, whose `transportInfo` WifiInfo SSID is
+  REDACTED to `<unknown ssid>` on API 29+ (our minSdk 31) — only a `NetworkCallback` registered with
+  `FLAG_INCLUDE_LOCATION_INFO` (as `ssidFlow()` already does) returns the real SSID, and only with
+  FINE_LOCATION granted AND location services ON. **S12.6e fix:** make `currentSsid()` a `suspend` that
+  reads the SSID via a one-shot `registerNetworkCallback(..., FLAG_INCLUDE_LOCATION_INFO)` with a short
+  timeout; surface targeted messages for not-on-Wi-Fi vs needs-FINE_LOCATION vs location-services-off
+  (don't conflate all three as "Not connected"). Also G2R-F22's **live location** half (LocationTrigger
+  lat/lon/radius editor + "use current location" via the existing `AndroidLocationReader`) is still
+  unimplemented — the rule editor exposes no location fields at all.
+- **G2R-F28 (S12.6e, NEW) — context-rule time inputs are free-text "HH:MM"; should open the system
+  TimePicker modal.** The From/To fields in `ContextsScreen.RuleEditor` are `OutlinedTextField`s; replace
+  with a tap→Material3 `TimePicker` dialog (keep the SUNRISE/SUNSET token buttons).
+- **G2R-F29 (S12.6b refinement, NEW) — Live Debug "Performance & Timings" lacks full Tasker parity.** The
+  Tasker debug scene (debug.md L19-23) surfaces `%LuxAlpha`, `%AAB_CycleTotal`, Reactivity Cooldown
+  (throttle), Last Animation (steps×wait) and Last Update under Performance/Automation; the rebuilt card
+  shows only cycle time + last sample. A future Live Debug pass should add luxAlpha / animation
+  (steps×wait) / throttle / last-update to `PipelineState` (runtime holder, NOT the domain engine API)
+  and render them.
+- **G2R-F30 (S12.6d, NEW) — manually loading a profile does not pause context automation or offer a
+  Resume.** In Tasker a manual profile load latches `%AAB_ContextOverride=true` (the manual context lock,
+  D-014/D-038a) so watchers stop overriding the user's choice; the rebuild's `applyProfile` does not set
+  it and the UI shows no "context automation paused / Resume" affordance. S12.6d (profiles) should set
+  the lock on manual apply + surface a resume control that clears `contextOverride` (+ re-evaluates).
 
 ### Gate 3 (after S14) — pending
 
