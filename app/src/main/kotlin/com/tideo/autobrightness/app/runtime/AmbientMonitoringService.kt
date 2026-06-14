@@ -6,11 +6,16 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.service.quicksettings.TileService
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.tideo.autobrightness.R
@@ -39,6 +44,11 @@ class AmbientMonitoringService : Service() {
     private lateinit var controller: BrightnessPipelineController
     private lateinit var contextEngine: ContextEngine
     private var notificationJob: Job? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // Rising-edge latch so the high-priority override alert + toast fire ONCE per override, not on
+    // every notification refresh while it stays paused (G2R-F35).
+    private var alertedOverride = false
 
     // SCREEN_ON/OFF are runtime-only broadcasts (not deliverable to manifest receivers).
     private val screenReceiver = object : BroadcastReceiver() {
@@ -123,13 +133,27 @@ class AmbientMonitoringService : Service() {
                 // manual-load override lock (%AAB_ContextOverride) is surfaced separately from the
                 // active context rule (F46) so the Menu can distinguish them.
                 LiveRuntimeState.publish(state, ctx, manualOverride)
-                NotificationModel(state.smoothedLux, state.targetBrightness, state.paused, state.serviceOn, ctx)
+                NotificationModel(
+                    state.smoothedLux,
+                    state.targetBrightness,
+                    state.paused,
+                    state.serviceOn,
+                    ctx,
+                    state.pausedByOverride,
+                )
             }
                 .distinctUntilChanged()
                 .collect { model ->
                     if (!model.serviceOn) return@collect
                     getSystemService(NotificationManager::class.java)
                         .notify(NOTIFICATION_ID, buildNotification(model))
+                    // QS tile live refresh (G2R-F63): ping the tile so Off→Starting→Active/Paused
+                    // renders without the panel being closed+reopened. The tile re-reads the live
+                    // LiveRuntimeState/DataStore in onStartListening.
+                    requestTileRefresh()
+                    // High-priority override alert + toast, once on the rising edge (G2R-F35).
+                    if (model.pausedByOverride && !alertedOverride) notifyManualOverride()
+                    alertedOverride = model.pausedByOverride
                 }
         }
     }
@@ -154,12 +178,54 @@ class AmbientMonitoringService : Service() {
 
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Ambient monitoring",
-            NotificationManager.IMPORTANCE_LOW,
+        manager.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "Ambient monitoring", NotificationManager.IMPORTANCE_LOW),
         )
-        manager.createNotificationChannel(channel)
+        // Separate HIGH-importance, vibrating channel for the manual-override alert (G2R-F35). The
+        // ongoing FGS notification stays on the silent LOW channel; an override heads-up + buzz is a
+        // distinct one-shot, mirroring Tasker's Notify+vibrate on a detected manual override.
+        manager.createNotificationChannel(
+            NotificationChannel(
+                OVERRIDE_CHANNEL_ID,
+                "Manual override",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 200, 100, 200)
+            },
+        )
+    }
+
+    /**
+     * Post the high-priority manual-override notification (heads-up + vibration) and flash a toast
+     * (G2R-F35). Fired once on the override rising edge; the ongoing notification separately reflects
+     * the paused state with the Resume action (G2R-F40).
+     */
+    internal fun notifyManualOverride() {
+        val alert = NotificationCompat.Builder(this, OVERRIDE_CHANNEL_ID)
+            .setContentTitle("Manual override detected")
+            .setContentText("Auto Brightness paused — tap Resume to continue")
+            .setSmallIcon(R.drawable.ic_stat_brightness)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVibrate(longArrayOf(0, 200, 100, 200))
+            .setAutoCancel(true)
+            .addAction(0, "Resume", actionIntent(ACTION_RESUME))
+            .build()
+        getSystemService(NotificationManager::class.java).notify(OVERRIDE_NOTIFICATION_ID, alert)
+        mainHandler.post {
+            Toast.makeText(this, "Manual override — auto brightness paused", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Ask the OS to refresh our QS tile (G2R-F63); no-op if the tile isn't added. */
+    private fun requestTileRefresh() {
+        runCatching {
+            TileService.requestListeningState(
+                applicationContext,
+                ComponentName(applicationContext, BrightnessTileService::class.java),
+            )
+        }
     }
 
     private data class NotificationModel(
@@ -168,6 +234,7 @@ class AmbientMonitoringService : Service() {
         val paused: Boolean = false,
         val serviceOn: Boolean = true,
         val activeContext: String? = null,
+        val pausedByOverride: Boolean = false,
     )
 
     private fun buildNotification(model: NotificationModel): Notification {
@@ -237,6 +304,8 @@ class AmbientMonitoringService : Service() {
         const val ACTION_REAPPLY = "com.tideo.autobrightness.runtime.action.REAPPLY"
         const val EXTRA_REASON = "reason"
         private const val CHANNEL_ID = "ambient_monitoring"
+        private const val OVERRIDE_CHANNEL_ID = "manual_override"
         private const val NOTIFICATION_ID = 1001
+        private const val OVERRIDE_NOTIFICATION_ID = 1002
     }
 }

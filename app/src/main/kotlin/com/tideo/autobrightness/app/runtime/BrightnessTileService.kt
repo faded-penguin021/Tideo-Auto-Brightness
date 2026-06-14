@@ -5,26 +5,50 @@ import android.service.quicksettings.TileService
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
  * Quick Settings tile mirroring Tasker's _QSToggleAABService V2 (task551): tapping the tile toggles
  * the auto-brightness service on/off, persisting `serviceEnabled` and starting/stopping the
  * foreground service (S9a [AmbientMonitoringService]). The tile label/state reflects the persisted
- * enable flag.
+ * enable flag and the live pipeline state.
  */
 class BrightnessTileService : TileService() {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+    // Active only between onStartListening/onStopListening: pushes live state changes to the tile so
+    // Off→Starting→Active/Paused renders while the panel is open (G2R-F63). The service also pings us
+    // via TileService.requestListeningState so the OS re-runs onStartListening on each state change.
+    private var listeningJob: Job? = null
+
     override fun onStartListening() {
         super.onStartListening()
-        scope.launch {
-            val enabled = applicationContext.settingsDataStore.data.first().serviceEnabled
-            renderTile(enabled)
+        listeningJob?.cancel()
+        listeningJob = scope.launch {
+            val enabledFlow = applicationContext.settingsDataStore.data
+                .map { it.serviceEnabled }
+                .distinctUntilChanged()
+            combine(
+                enabledFlow,
+                LiveRuntimeState.serviceRunning,
+                LiveRuntimeState.pipeline.map { it.paused }.distinctUntilChanged(),
+            ) { enabled, running, paused -> Triple(enabled, running, paused) }
+                .distinctUntilChanged()
+                .collect { (enabled, running, paused) -> renderTile(enabled, running, paused) }
         }
+    }
+
+    override fun onStopListening() {
+        listeningJob?.cancel()
+        listeningJob = null
+        super.onStopListening()
     }
 
     override fun onClick() {
@@ -35,25 +59,15 @@ class BrightnessTileService : TileService() {
                 it.copy(serviceEnabled = !it.serviceEnabled)
             }.serviceEnabled
             AutoBrightnessRuntime.onSettingChanged(applicationContext, newEnabled)
-            renderTile(newEnabled)
+            renderTile(newEnabled, LiveRuntimeState.serviceRunning.value, LiveRuntimeState.pipeline.value.paused)
         }
     }
 
-    private fun renderTile(enabled: Boolean) {
-        // Reflect the live paused/running state, not just the persisted enable flag (G2-F17). The
-        // service republishes its pipeline snapshot into LiveRuntimeState (D-043b); read it here so
-        // the tile shows "Paused" when a manual override is latched.
-        val running = LiveRuntimeState.serviceRunning.value
-        val paused = LiveRuntimeState.pipeline.value.paused
+    private fun renderTile(enabled: Boolean, running: Boolean, paused: Boolean) {
         qsTile?.apply {
             state = if (enabled) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-            label = "Auto Brightness"
-            subtitle = when {
-                !enabled -> "Off"
-                running && paused -> "Paused"
-                running -> "Active"
-                else -> "Starting…"
-            }
+            label = TILE_LABEL
+            subtitle = tileSubtitle(enabled, running, paused)
             updateTile()
         }
     }
@@ -61,5 +75,20 @@ class BrightnessTileService : TileService() {
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
+    }
+
+    companion object {
+        const val TILE_LABEL = "Auto Brightness"
+
+        /**
+         * Pure (enabled, running, paused) → subtitle mapping (G2-F17/G2R-F63). Extracted so the live
+         * state mapping is unit-testable without binding a real QS tile (Robolectric cannot).
+         */
+        fun tileSubtitle(enabled: Boolean, running: Boolean, paused: Boolean): String = when {
+            !enabled -> "Off"
+            running && paused -> "Paused"
+            running -> "Active"
+            else -> "Starting…"
+        }
     }
 }

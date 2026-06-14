@@ -12,6 +12,10 @@ data class PipelineState(
     val serviceOn: Boolean = false,
     /** true == paused by a manual override (%AAB_Manual_Override). */
     val paused: Boolean = false,
+    /** true when [paused] was latched by a DETECTED manual brightness override (prof755/task567) as
+     *  opposed to a user-initiated Pause. Drives the high-priority override notification + toast
+     *  (G2R-F35) so the service can alert only on a genuine override, not on every pause. */
+    val pausedByOverride: Boolean = false,
     /** %SmoothedLux — EMA-smoothed lux; null until the first reading seeds it. */
     val smoothedLux: Double? = null,
     /** %AAB_LastRawLux — last raw lux (round3). */

@@ -296,7 +296,12 @@ class BrightnessPipelineController(
 
             // Super-dimming layer (task646→650/645): engage below DimmingThreshold, else disengage.
             // Runs from the pipeline coroutine so the secure write is serialized with the cycle.
-            dimming.apply(target, settings)
+            // F65: feed the UN-FLOORED engine target (%AAB_CurrentBright in task646 act1/act2), NOT the
+            // PWM-floored hardware value — when pwmSensitive raises `target` UP to dimmingThreshold the
+            // floored value is never < threshold, so the secure reduce_bright_colors layer would never
+            // engage and "Extra Dim" never applied. The two layers cooperate: the hardware sits at the
+            // PWM floor while the secure layer darkens visually below it (task661/698 floor ⟂ task650).
+            dimming.apply(output.targetBrightness, settings)
         } finally {
             autoRunning = false
         }
@@ -356,7 +361,9 @@ class BrightnessPipelineController(
         brightness.clearSelfWriteMarker()
         // task567: a manual override disengages any active super dimming.
         dimming.disengage()
-        _state.update { it.copy(paused = true, overrideHistory = history) }
+        // pausedByOverride flags this as a DETECTED override (not a user Pause) so the service raises
+        // the high-priority notification + toast (G2R-F35).
+        _state.update { it.copy(paused = true, pausedByOverride = true, overrideHistory = history) }
         // Persist the captured training point (newest first) so the wizard + curve overlay have real
         // input across restarts (G2R-F13; closes D-044c).
         history.firstOrNull()?.let { (lux, bright) -> overrideSink.record(lux, bright) }
@@ -365,12 +372,13 @@ class BrightnessPipelineController(
     private fun pauseInternal() {
         brightness.clearSelfWriteMarker()
         dimming.disengage()
-        _state.update { it.copy(paused = true) }
+        // A user-initiated Pause is NOT an override (pausedByOverride stays false → no alert, G2R-F35).
+        _state.update { it.copy(paused = true, pausedByOverride = false) }
     }
 
     /** task569 Resume After Override: re-establish the initial brightness and clear the pause latch. */
     private suspend fun resumeInternal() {
-        _state.update { it.copy(paused = false) }
+        _state.update { it.copy(paused = false, pausedByOverride = false) }
         setInitialBrightness(settingsProvider().also { cachedSettings = it })
     }
 
@@ -409,7 +417,8 @@ class BrightnessPipelineController(
             val target = applyPwmFloor(output.targetBrightness, settings)
             brightness.forceManualMode()
             brightness.write(target)
-            dimming.apply(target, settings)
+            // F65: dimming decides off the un-floored engine target, not the PWM-floored write (above).
+            dimming.apply(output.targetBrightness, settings)
             // F64: arm the post-init settle window so the ContentObserver echo of THIS self-write
             // (and any AUTO→MANUAL mode-flip recompute) — delivered after `initializing` clears below
             // — is not flagged as a manual override on start/reinit/resume/context swap.
