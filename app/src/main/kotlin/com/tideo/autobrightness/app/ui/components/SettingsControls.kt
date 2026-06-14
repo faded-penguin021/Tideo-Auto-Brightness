@@ -190,26 +190,45 @@ fun DerivedReadout(label: String, value: String, testTag: String = label) {
 /**
  * The Apply / Discard control bar (Tasker scenes' Apply + Reset buttons), enabled only when dirty.
  * Apply confirms with a toast (Tasker Flashes "Applied", G2-F12).
+ *
+ * When [criticalError] is set the Apply button is DISABLED even while dirty (G2R-F18 / D-052): a
+ * critical curve error (form2A<0, form3A<0, form2C>zone1End) must not be appliable. This is a
+ * sanctioned deviation from Tasker's advisory-only model (owner-decision 2); a hint row explains it.
  */
 @Composable
-fun DraftApplyBar(dirty: Boolean, onApply: () -> Unit, onDiscard: () -> Unit) {
+fun DraftApplyBar(
+    dirty: Boolean,
+    onApply: () -> Unit,
+    onDiscard: () -> Unit,
+    criticalError: Boolean = false,
+) {
     val toast = rememberToaster()
     Surface(tonalElevation = 3.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedButton(
-                onClick = onDiscard,
-                enabled = dirty,
-                modifier = Modifier.weight(1f).testTag("discard_settings"),
-            ) { Text("Discard") }
-            Button(
-                onClick = { onApply(); toast("Settings applied") },
-                enabled = dirty,
-                modifier = Modifier.weight(1f).testTag("apply_settings"),
-            ) { Text(if (dirty) "Apply" else "Applied") }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            if (criticalError) {
+                Text(
+                    "Fix the highlighted curve error before applying.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 6.dp).testTag("apply_blocked_hint"),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(
+                    onClick = onDiscard,
+                    enabled = dirty,
+                    modifier = Modifier.weight(1f).testTag("discard_settings"),
+                ) { Text("Discard") }
+                Button(
+                    onClick = { onApply(); toast("Settings applied") },
+                    enabled = dirty && !criticalError,
+                    modifier = Modifier.weight(1f).testTag("apply_settings"),
+                ) { Text(if (dirty) "Apply" else "Applied") }
+            }
         }
     }
 }
@@ -228,6 +247,8 @@ fun DraftSettingsScaffold(
     onApply: () -> Unit,
     onDiscard: () -> Unit,
     onNavigateBack: () -> Unit,
+    criticalError: Boolean = false,
+    onReset: (() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     var showConfirm by remember { mutableStateOf(false) }
@@ -243,9 +264,18 @@ fun DraftSettingsScaffold(
                         Text("‹ Back")
                     }
                 },
+                actions = {
+                    // Per-screen reset to the task570 baseline (G2R-F17): edits the draft, so the user
+                    // sees the defaults previewed and commits them with Apply.
+                    if (onReset != null) {
+                        TextButton(onClick = onReset, modifier = Modifier.testTag("reset_screen")) {
+                            Text("Reset")
+                        }
+                    }
+                },
             )
         },
-        bottomBar = { DraftApplyBar(dirty, onApply, onDiscard) },
+        bottomBar = { DraftApplyBar(dirty, onApply, onDiscard, criticalError) },
         content = content,
     )
 

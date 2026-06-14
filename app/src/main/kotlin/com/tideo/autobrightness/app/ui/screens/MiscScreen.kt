@@ -15,6 +15,7 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
+import com.tideo.autobrightness.app.ui.components.rememberToaster
 
 /**
  * Misc / General (Tasker "AAB Misc Settings" scene). Re-adds the field grouping Tasker actually uses
@@ -30,10 +31,26 @@ fun MiscScreen(navController: NavHostController, vm: DraftSettingsViewModel = vi
     val errors by vm.errors.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
+    val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
+    val toast = rememberToaster()
     MiscContent(
         draft, committed, errors, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
+        criticalError = criticalError,
+        // G2R-F17: reset only the Misc brightness-range/animation/notification fields to defaults.
+        onReset = {
+            vm.edit { s ->
+                val d = AabSettings()
+                s.copy(
+                    minBrightness = d.minBrightness, maxBrightness = d.maxBrightness, offset = d.offset,
+                    scale = d.scale, animSteps = d.animSteps, minWaitMs = d.minWaitMs,
+                    maxWaitMs = d.maxWaitMs, throttleDefaultMs = d.throttleDefaultMs,
+                    notificationsEnabled = d.notificationsEnabled,
+                )
+            }
+            toast("Reset to defaults")
+        },
     )
 }
 
@@ -48,8 +65,10 @@ fun MiscContent(
     onApply: () -> Unit,
     onDiscard: () -> Unit,
     onBack: () -> Unit,
+    criticalError: Boolean = false,
+    onReset: (() -> Unit)? = null,
 ) {
-    DraftSettingsScaffold("Misc", dirty, onApply, onDiscard, onBack) { padding ->
+    DraftSettingsScaffold("Misc", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             SectionHeader("Brightness range")
             // Tasker Misc sliders: Min 0–75, Max 150–255 (misc_settings.md elements4/6).

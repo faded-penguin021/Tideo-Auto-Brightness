@@ -44,12 +44,26 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val errors by vm.errors.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
+    val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
     val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
+    val toast = com.tideo.autobrightness.app.ui.components.rememberToaster()
     CurveBrightnessContent(
         draft, committed, errors, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         overridePoints = overridePoints,
+        criticalError = criticalError,
+        // G2R-F17: reset only the curve-zone coefficients to the task570 baseline (defaults).
+        onReset = {
+            vm.edit { s ->
+                val d = AabSettings()
+                s.copy(
+                    form1A = d.form1A, zone1End = d.zone1End, form2B = d.form2B,
+                    form2C = d.form2C, zone2End = d.zone2End,
+                )
+            }
+            toast("Reset to defaults")
+        },
     )
 }
 
@@ -68,8 +82,10 @@ fun CurveBrightnessContent(
     onDiscard: () -> Unit,
     onBack: () -> Unit,
     overridePoints: List<OverridePoint> = emptyList(),
+    criticalError: Boolean = false,
+    onReset: (() -> Unit)? = null,
 ) {
-    DraftSettingsScaffold("Curve & Brightness", dirty, onApply, onDiscard, onBack) { padding ->
+    DraftSettingsScaffold("Curve & Brightness", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             val curveConfig = draft.toBrightnessCurveConfig()
             val overlay = remember(overridePoints) {

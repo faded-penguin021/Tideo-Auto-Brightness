@@ -10,6 +10,8 @@ import com.tideo.autobrightness.app.settings.ContextOverrideConfig
 import com.tideo.autobrightness.app.settings.ContextRulesSerializer
 import com.tideo.autobrightness.app.settings.OverridePoints
 import com.tideo.autobrightness.app.settings.OverridePointsSerializer
+import com.tideo.autobrightness.app.settings.SavedProfiles
+import com.tideo.autobrightness.app.settings.SavedProfilesSerializer
 
 val Context.settingsDataStore: DataStore<AabSettings> by dataStore(
     fileName = "aab_settings.json",
@@ -28,4 +30,12 @@ val Context.contextRulesDataStore: DataStore<ContextOverrideConfig> by dataStore
 val Context.overridePointsDataStore: DataStore<OverridePoints> by dataStore(
     fileName = "aab_override_points.json",
     serializer = OverridePointsSerializer,
+)
+
+// User-editable named profiles (S12.6d, G2R-F15): the five DefaultProfiles seeded once, then
+// overwritable, plus any "Save current as…" entries. AppProfileCatalog reads this so context rules
+// can target user profiles too (closes the D-042c unknown-profile gap).
+val Context.userProfilesDataStore: DataStore<SavedProfiles> by dataStore(
+    fileName = "aab_user_profiles.json",
+    serializer = SavedProfilesSerializer,
 )

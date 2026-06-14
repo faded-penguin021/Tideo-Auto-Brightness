@@ -97,6 +97,16 @@ class ContextEngine(
      */
     suspend fun reevaluate() = evalMutex.withLock {
         val baseline = baselineProvider()
+        // Manual context lock (%AAB_ContextOverride): a manual profile load latches it (G2R-F30,
+        // D-014/D-038a). When set, the user's choice IS the baseline and all watcher overrides are
+        // suppressed (the resolver already skips switching) — so drop any still-active context and run
+        // the bare baseline. A "Resume" clears the latch and lets the next eval re-resolve contexts.
+        if (baseline.contextOverride) {
+            _activeContext.value = null
+            currentProfileName = userProfileName
+            _effective.value = baseline
+            return@withLock
+        }
         val active = currentProfileName
         _effective.value = if (_activeContext.value != null && active != null) {
             profileCatalog.profile(active)?.let { mergeProfile(baseline, it) } ?: baseline

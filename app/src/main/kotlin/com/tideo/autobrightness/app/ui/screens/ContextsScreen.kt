@@ -53,6 +53,7 @@ import java.util.UUID
 @Composable
 fun ContextsScreen(navController: NavHostController, vm: ContextsViewModel = viewModel()) {
     val rules by vm.rules.collectAsStateWithLifecycle()
+    val profileNames by vm.profileNames.collectAsStateWithLifecycle()
     var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
     androidx.compose.runtime.LaunchedEffect(Unit) { apps = runCatching { vm.installedApps() }.getOrDefault(emptyList()) }
     val toast = rememberToaster()
@@ -60,7 +61,7 @@ fun ContextsScreen(navController: NavHostController, vm: ContextsViewModel = vie
     val scope = rememberCoroutineScope()
     ContextsContent(
         rules = rules,
-        profileNames = vm.profileNames,
+        profileNames = profileNames.ifEmpty { listOf("Default") },
         apps = apps,
         onBack = { navController.popBackStack() },
         onSave = { toast("Rule saved"); vm.save(it) },
@@ -174,6 +175,9 @@ private fun RuleEditor(
     var startTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(0) ?: "") }
     var endTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(1) ?: "") }
     var charging by remember { mutableStateOf(rule.triggers.battery?.onPower == true) }
+    // Battery percentage window (G2R-F31, owner-reported): 0/100 means "any level" → omit the bound.
+    var battMin by remember { mutableStateOf(rule.triggers.battery?.min?.takeIf { it > 0 }?.toString() ?: "") }
+    var battMax by remember { mutableStateOf(rule.triggers.battery?.max?.takeIf { it < 100 }?.toString() ?: "") }
     val selectedApps = remember { mutableStateOf(rule.triggers.apps?.toSet() ?: emptySet()) }
     var profileMenu by remember { mutableStateOf(false) }
 
@@ -223,6 +227,21 @@ private fun RuleEditor(
         }
     }
     SwitchSettingRow("Only while charging", charging, { charging = it }, testTag = "rule_charging")
+
+    // Battery percentage window (G2R-F31). Either bound may be left blank for "any".
+    Text("Battery percentage:", style = MaterialTheme.typography.labelMedium)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = battMin, onValueChange = { battMin = it.filter(Char::isDigit) },
+            label = { Text("From %") }, singleLine = true,
+            modifier = Modifier.weight(1f).testTag("rule_batt_min"),
+        )
+        OutlinedTextField(
+            value = battMax, onValueChange = { battMax = it.filter(Char::isDigit) },
+            label = { Text("To %") }, singleLine = true,
+            modifier = Modifier.weight(1f).testTag("rule_batt_max"),
+        )
+    }
 
     if (apps.isNotEmpty()) {
         Text("Foreground apps:", style = MaterialTheme.typography.labelMedium)
@@ -274,10 +293,21 @@ private fun RuleEditor(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
         Button(
             onClick = {
+                val minPct = battMin.trim().toIntOrNull()?.coerceIn(0, 100)
+                val maxPct = battMax.trim().toIntOrNull()?.coerceIn(0, 100)
+                val hasBattery = charging || minPct != null || maxPct != null
                 val triggers = ContextTriggers(
                     apps = selectedApps.value.takeIf { it.isNotEmpty() }?.toList(),
                     wifi = wifi.split(",").map { it.trim() }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() },
-                    battery = if (charging) BatteryTrigger(onPower = true) else null,
+                    battery = if (hasBattery) {
+                        BatteryTrigger(
+                            min = minPct ?: 0,
+                            max = maxPct ?: 100,
+                            onPower = if (charging) true else null,
+                        )
+                    } else {
+                        null
+                    },
                     timeRange = if (startTime.isNotBlank() && endTime.isNotBlank()) listOf(startTime.trim(), endTime.trim()) else null,
                 )
                 // Prompt for usage access on save if the rule targets apps and it is not granted.

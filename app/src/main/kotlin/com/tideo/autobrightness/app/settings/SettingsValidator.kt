@@ -4,11 +4,22 @@ import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+/** Severity of a [FieldError]. CRITICAL errors block Apply (S12.6d, G2R-F18); ADVISORY only warn. */
+enum class Severity { CRITICAL, ADVISORY }
+
 /**
  * Validation error for a specific field.
  * Used by S12 UI to render red-invalid state on curve-settings fields.
+ *
+ * [severity] distinguishes the three task583 form-coefficient errors (form2A<0, form3A<0,
+ * form2C>zone1End) which S12.6d gates Apply on (CRITICAL, owner-decision 2 / D-052 — a sanctioned
+ * deviation from Tasker's advisory-only model) from the ADVISORY safety/range warnings that only warn.
  */
-data class FieldError(val field: String, val message: String)
+data class FieldError(
+    val field: String,
+    val message: String,
+    val severity: Severity = Severity.ADVISORY,
+)
 
 /**
  * Tasker-faithful validation of brightness-curve parameters.
@@ -36,19 +47,19 @@ object SettingsValidator {
             maxBrightness = maxBright,
         )
 
-        // task583 rule 1: form2A < 0 → advisory red field
+        // task583 rule 1: form2A < 0 → CRITICAL (blocks Apply, G2R-F18/D-052)
         if (coeffs.form2A < 0.0) {
-            errors += FieldError("form2A", "%.3f (automatic) — form2A < 0, adjust form1A or zone1End".format(coeffs.form2A))
+            errors += FieldError("form2A", "%.3f (automatic) — form2A < 0, adjust form1A or zone1End".format(coeffs.form2A), Severity.CRITICAL)
         }
 
-        // task583 rule 2: form3A < 0 → advisory red field
+        // task583 rule 2: form3A < 0 → CRITICAL (blocks Apply, G2R-F18/D-052)
         if (coeffs.form3A < 0.0) {
-            errors += FieldError("form3A", "%.0f (auto) — form3A < 0, adjust curve parameters".format(coeffs.form3A))
+            errors += FieldError("form3A", "%.0f (auto) — form3A < 0, adjust curve parameters".format(coeffs.form3A), Severity.CRITICAL)
         }
 
-        // task583 rule 3: form2C > zone1End → advisory red Zone 2 Offset label
+        // task583 rule 3: form2C > zone1End → CRITICAL (blocks Apply, G2R-F18/D-052)
         if (settings.form2C > settings.zone1End) {
-            errors += FieldError("form2C", "Zone 2 Offset (${settings.form2C}) must be ≤ zone1End (${settings.zone1End})")
+            errors += FieldError("form2C", "Zone 2 Offset (${settings.form2C}) must be ≤ zone1End (${settings.zone1End})", Severity.CRITICAL)
         }
 
         // G2-F6: zone2End below zone1End makes the zone-2 power term (and derived form3A) NaN; guard

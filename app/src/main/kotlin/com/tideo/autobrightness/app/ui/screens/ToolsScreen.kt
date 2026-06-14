@@ -119,19 +119,30 @@ private fun WizardCard(
 
             result?.let { r ->
                 r.qualityLines.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                // The full Tasker-style %AAB_Test diagnostics report (zone boundaries, curve params,
+                // per-zone R²/nRMSE/bias, fit stability) — the engine already produces it verbatim, so
+                // surface ALL of it, not just the 4-line summary (owner finding: report too terse).
+                Card(Modifier.fillMaxWidth().testTag("wizard_report")) {
+                    Text(
+                        r.diagnosticsLog.trim(),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = { onApplyWizard(r); toast("Suggestion applied") },
                         modifier = Modifier.testTag("apply_wizard"),
                     ) { Text("Apply suggestion") }
-                    // %AAB_Test diagnostics → clipboard (D-025, G2-F15): the wizard's R²/nRMSE/bias report.
+                    // %AAB_Test diagnostics → clipboard (D-025, G2-F15): copy the FULL verbose report.
                     OutlinedButton(
                         onClick = {
-                            clipboard.setText(AnnotatedString(r.qualityLines.joinToString("\n")))
-                            toast("Diagnostics copied to clipboard")
+                            clipboard.setText(AnnotatedString(r.diagnosticsLog.trim()))
+                            toast("Full report copied to clipboard")
                         },
                         modifier = Modifier.testTag("copy_diagnostics"),
-                    ) { Text("Copy report") }
+                    ) { Text("Copy full report") }
                 }
             }
         }

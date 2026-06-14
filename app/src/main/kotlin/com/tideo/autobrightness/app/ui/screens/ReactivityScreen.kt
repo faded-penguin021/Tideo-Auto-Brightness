@@ -13,6 +13,7 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
+import com.tideo.autobrightness.app.ui.components.rememberToaster
 
 /** Reactivity (Tasker AAB Reactivity Settings + Reactivity/Alpha graphs). Draft → Apply (S12.5b). */
 @Composable
@@ -21,10 +22,26 @@ fun ReactivityScreen(navController: NavHostController, vm: DraftSettingsViewMode
     val committed by vm.committed.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
+    val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
+    val toast = rememberToaster()
     ReactivityContent(
         draft, committed, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
+        criticalError = criticalError,
+        // G2R-F17: reset only this screen's reactivity fields to the task570 baseline (defaults).
+        onReset = {
+            vm.edit { s ->
+                val d = AabSettings()
+                s.copy(
+                    thresholdDark = d.thresholdDark, thresholdDim = d.thresholdDim,
+                    thresholdBright = d.thresholdBright, thresholdSteepness = d.thresholdSteepness,
+                    thresholdMidpoint = d.thresholdMidpoint, thresholdDynamic = d.thresholdDynamic,
+                    deltaFactor = d.deltaFactor, trustUnreliableSensor = d.trustUnreliableSensor,
+                )
+            }
+            toast("Reset to defaults")
+        },
     )
 }
 
@@ -38,8 +55,10 @@ fun ReactivityContent(
     onApply: () -> Unit,
     onDiscard: () -> Unit,
     onBack: () -> Unit,
+    criticalError: Boolean = false,
+    onReset: (() -> Unit)? = null,
 ) {
-    DraftSettingsScaffold("Reactivity", dirty, onApply, onDiscard, onBack) { padding ->
+    DraftSettingsScaffold("Reactivity", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             ChartPlaceholder("ReactivityChart", "reactivity_chart")
 

@@ -8,7 +8,9 @@ import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.FieldError
+import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
+import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.wizard.OverridePoint
@@ -16,6 +18,7 @@ import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -33,9 +36,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val app = application
     private val appModule = AppModule(application)
     private val privilegeManager: PrivilegeManager = appModule.privilegeManager
+    private val userProfiles: UserProfileStore = appModule.userProfileStore
+
+    init {
+        // Seed the five built-in profiles once so the Profiles screen + context catalog see them.
+        viewModelScope.launch { userProfiles.ensureSeeded() }
+    }
 
     /** Recorded manual-override training points (newest first) feeding the curve wizard (G2R-F13). */
     val overridePoints: StateFlow<List<OverridePoint>> = appModule.overridePointStore.points()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** User-editable saved profiles (built-ins seeded first), for the Profiles screen (G2R-F15). */
+    val profiles: StateFlow<List<SavedProfile>> = userProfiles.profilesFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val settings: StateFlow<AabSettings> = app.settingsDataStore.data
@@ -76,19 +89,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Apply a built-in named profile (task592 set). The live service-enabled flag plus the GLOBAL
-     * preferences `detectOverrides` and `debugLevel` are preserved: neither is part of the task626
-     * profile snapshot, so loading a profile must not turn manual-override detection off (G2-F8) nor
-     * change the selected debug category (G2R-F9).
+     * Apply a saved named profile (the [UserProfileStore] set; built-ins are seeded into it). The live
+     * service-enabled flag plus the GLOBAL preferences `detectOverrides` and `debugLevel` are preserved:
+     * neither is part of the task626 profile snapshot, so loading a profile must not turn manual-override
+     * detection off (G2-F8) nor change the selected debug category (G2R-F9).
+     *
+     * A manual profile load also latches the **manual context lock** `%AAB_ContextOverride=true`
+     * (G2R-F30, D-014/D-038a) so the context watchers stop overriding the user's deliberate choice; the
+     * Profiles screen surfaces a "Resume" affordance ([resumeContextAutomation]) to clear it.
      */
     fun applyProfile(name: String) {
-        val profile = DefaultProfiles.all[name] ?: return
         viewModelScope.launch {
+            val profile = userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return@launch
             val updated = app.settingsDataStore.updateData { current ->
                 profile.copy(
                     serviceEnabled = current.serviceEnabled,
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
+                    contextOverride = true, // latch the manual context lock (G2R-F30)
                 )
             }
             // task592/626 apply re-runs Advanced Auto Brightness so the new curve takes effect
@@ -101,13 +119,45 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val updated = app.settingsDataStore.updateData { current ->
                 // Preserve the live service flag + the global DetectOverrides (G2-F8) and debugLevel
-                // (G2R-F9) preferences — neither belongs to an imported profile's parameter set.
+                // (G2R-F9) preferences — neither belongs to an imported profile's parameter set. An
+                // import is also a manual load → latch the context lock (G2R-F30).
                 newSettings.copy(
                     serviceEnabled = current.serviceEnabled,
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
+                    contextOverride = true,
                 )
             }
+            if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
+        }
+    }
+
+    /** Save the current settings as a named profile (create or overwrite, G2R-F15). */
+    fun saveCurrentAs(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            userProfiles.save(trimmed, app.settingsDataStore.data.first())
+        }
+    }
+
+    /** Delete a saved profile (built-ins can be removed; [restoreFactoryProfiles] re-seeds them). */
+    fun deleteProfile(name: String) {
+        viewModelScope.launch { userProfiles.delete(name) }
+    }
+
+    /** Re-seed the five built-in profiles from [DefaultProfiles] (G2R-F15, owner-decision 3). */
+    fun restoreFactoryProfiles() {
+        viewModelScope.launch { userProfiles.restoreFactory() }
+    }
+
+    /**
+     * Clear the manual context lock latched by [applyProfile] and re-evaluate so the context watchers
+     * resume overriding (G2R-F30). Mirrors Tasker clearing %AAB_ContextOverride.
+     */
+    fun resumeContextAutomation() {
+        viewModelScope.launch {
+            val updated = app.settingsDataStore.updateData { it.copy(contextOverride = false) }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
         }
     }

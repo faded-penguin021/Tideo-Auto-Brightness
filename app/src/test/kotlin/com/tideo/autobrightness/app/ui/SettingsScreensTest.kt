@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -229,6 +230,101 @@ class SettingsScreensTest {
         }
         compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
         compose.onNodeWithTag("usage_access_prompt").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun curveBrightness_criticalError_disablesApply() {
+        // G2R-F18/D-052: a CRITICAL curve error (form3A<0) must disable Apply even while dirty.
+        val invalid = AabSettings(form1A = -1)
+        val errors = SettingsValidator.validate(invalid)
+        assertTrue(errors.any { it.severity == com.tideo.autobrightness.app.settings.Severity.CRITICAL })
+
+        compose.setContent {
+            MaterialTheme {
+                CurveBrightnessContent(
+                    invalid, AabSettings(), errors, epoch = 0, dirty = true,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                    criticalError = true,
+                )
+            }
+        }
+        compose.onNodeWithTag("apply_settings").assertIsNotEnabled()
+        compose.onNodeWithTag("apply_blocked_hint").assertExists()
+    }
+
+    @Test
+    fun reactivity_resetButton_rendersWhenProvided() {
+        // G2R-F17: each settings screen exposes a per-screen reset action.
+        var reset = false
+        compose.setContent {
+            MaterialTheme {
+                ReactivityContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                    onReset = { reset = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("reset_screen").performClick()
+        assertTrue(reset, "tapping Reset invokes the per-screen reset")
+    }
+
+    @Test
+    fun profiles_savedProfiles_render_withManageActions() {
+        // G2R-F15: saved profiles list with apply/overwrite/delete + save-as/restore actions.
+        val profiles = listOf(
+            com.tideo.autobrightness.app.settings.SavedProfile("Default", AabSettings(), builtIn = true),
+            com.tideo.autobrightness.app.settings.SavedProfile("Mine", AabSettings()),
+        )
+        compose.setContent {
+            MaterialTheme {
+                com.tideo.autobrightness.app.ui.screens.ProfilesContent(
+                    profiles = profiles, legacyEntries = emptyList(), contextLocked = false, status = null,
+                    onBack = {}, onApplyProfile = {}, onOverwriteProfile = {}, onDeleteProfile = {},
+                    onSaveCurrentAs = {}, onRestoreFactory = {}, onResumeContext = {}, onReset = {},
+                    onExport = {}, onImport = {}, onChooseLegacyFolder = {}, onLoadLegacy = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("apply_profile_Mine").performScrollTo().assertExists()
+        compose.onNodeWithTag("overwrite_profile_Default").performScrollTo().assertExists()
+        compose.onNodeWithTag("save_profile_as").performScrollTo().assertExists()
+        compose.onNodeWithTag("restore_factory").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun profiles_contextLockBanner_offersResume() {
+        // G2R-F30: a manual profile load latches the context lock; the Profiles screen offers Resume.
+        var resumed = false
+        compose.setContent {
+            MaterialTheme {
+                com.tideo.autobrightness.app.ui.screens.ProfilesContent(
+                    profiles = emptyList(), legacyEntries = emptyList(), contextLocked = true, status = null,
+                    onBack = {}, onApplyProfile = {}, onOverwriteProfile = {}, onDeleteProfile = {},
+                    onSaveCurrentAs = {}, onRestoreFactory = {}, onResumeContext = { resumed = true }, onReset = {},
+                    onExport = {}, onImport = {}, onChooseLegacyFolder = {}, onLoadLegacy = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("context_lock_banner").assertExists()
+        compose.onNodeWithTag("resume_context").performScrollTo().performClick()
+        assertTrue(resumed, "Resume clears the manual context lock")
+    }
+
+    @Test
+    fun contextEditor_exposesBatteryPercentageFields() {
+        // Owner finding (G2R-F31): the rule editor must offer a battery percentage from/to window.
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    onBack = {}, onSave = {}, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("rule_batt_min").performScrollTo().assertExists()
+        compose.onNodeWithTag("rule_batt_max").performScrollTo().assertExists()
     }
 
     @Test

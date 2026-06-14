@@ -131,4 +131,21 @@ class SettingsValidatorTest {
         val errors = SettingsValidator.validate(s)
         assertTrue(errors.all { it.message.isNotEmpty() }, "All errors should have non-empty messages")
     }
+
+    @Test
+    fun `the three form errors are CRITICAL and the rest are advisory`() {
+        // S12.6d/G2R-F18/D-052: form2A/form3A/form2C are CRITICAL (block Apply); safety/range warn only.
+        val critical = SettingsValidator.validate(AabSettings(form1A = -1, form2C = 50, zone1End = 35))
+        assertTrue(
+            critical.filter { it.field in setOf("form2A", "form3A", "form2C") }
+                .all { it.severity == Severity.CRITICAL },
+            "form-coefficient errors must be CRITICAL; got: $critical",
+        )
+
+        // A dim-but-valid curve (no form errors) only raises an ADVISORY safety warning.
+        val advisory = SettingsValidator.validate(
+            AabSettings(zone1End = 10, zone2End = 2000, form1A = 1, form2B = 0.1f, form2C = 5),
+        )
+        assertTrue(advisory.isNotEmpty() && advisory.none { it.severity == Severity.CRITICAL })
+    }
 }

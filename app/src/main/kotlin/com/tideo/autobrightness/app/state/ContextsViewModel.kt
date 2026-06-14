@@ -10,12 +10,13 @@ import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextRuleStore
-import com.tideo.autobrightness.app.settings.DefaultProfiles
+import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.platform.context.AndroidForegroundAppMonitor
 import com.tideo.autobrightness.platform.context.AndroidWifiInfoReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -26,15 +27,19 @@ data class AppEntry(val packageName: String, val label: String, val icon: ImageB
 /** Drives the Contexts screen: rule CRUD over [ContextRuleStore] + the installed-app picker. */
 class ContextsViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
-    private val store: ContextRuleStore = AppModule(application).contextRuleStore
+    private val appModule = AppModule(application)
+    private val store: ContextRuleStore = appModule.contextRuleStore
+    private val userProfiles: UserProfileStore = appModule.userProfileStore
     private val wifi = AndroidWifiInfoReader(application)
     private val foregroundApp = AndroidForegroundAppMonitor(application)
 
     val rules: StateFlow<List<ContextRule>> = store.rulesFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Built-in profile names a rule can switch to (extended with user profiles in a later pass). */
-    val profileNames: List<String> = DefaultProfiles.all.keys.toList()
+    /** Saved profile names a rule can switch to (built-ins + user profiles, G2R-F15/D-042c). */
+    val profileNames: StateFlow<List<String>> = userProfiles.profilesFlow()
+        .map { profiles -> profiles.map { it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun save(rule: ContextRule) = viewModelScope.launch { store.save(rule) }
     fun delete(id: String) = viewModelScope.launch { store.delete(id) }

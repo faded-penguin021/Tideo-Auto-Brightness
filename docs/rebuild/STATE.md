@@ -41,19 +41,23 @@ next session does not know it.
 
 | S12.6b glass-box diagnostics + Live Debug scene | 2026-06-14 | Opus/high | DONE | (see push) | The runtime "glass box" surfaced (G2R-F6…F10). New: **Live Debug Info** scene (`AppRoute.LiveDebug`, in the Menu Info&Help group + `navigateTopLevel` back→Menu) = `LiveDebugScreen`/`LiveDebugContent` over `LiveDebugViewModel` (combines LiveRuntimeState pipeline/context/running + DataStore min/max/debugLevel) — live `%AAB_*` readout grouped per debug.md HTML cards (Core Metrics / Circadian & Scale / System Status / Performance & Timings), gold `#FFC107` values via new `ui/components/DiagnosticCard.kt` (`DiagnosticCard`/`DiagnosticLine`/`goldValue`). **Per-screen DiagnosticCards** (G2R-F7/F8): `ReactivityDiagnosticCard` (threshold + dead zone) + `CircadianDiagnosticCard` (uncompressed vs true scale + min/max) embedded on those screens; stateless `*Content(state)` builders for tests. To feed them, `PipelineState` gains `threshDynamic` (%AAB_ThreshDynamic) + `scaleDynamic` (%AAB_ScaleDynamic uncompressed), populated in `runCycle` from existing `BrightnessPolicyOutput.dynamicThreshold`/`scaleDynamic` (no domain API change). **Debug selector → global + relocated** (G2R-F9): moved off Misc to Live Debug (`LiveDebugViewModel.setDebugLevel` writes DataStore directly); `debugLevel` now preserved across `SettingsViewModel.applyProfile/replaceAll/resetDefaults` + `DraftSettingsViewModel.apply`/re-sync (already in `mergeProfile`) — `DEBUG_LABELS`/`DebugLevelSelector` moved MiscScreen→LiveDebugScreen. **Teal debug toasts** (G2R-F10): `ToastDebugSink` builds a teal-rounded custom TextView (via `makeText`+`setView` so ShadowToast still records text). Tests: SettingsScreensTest (Live Debug + Reactivity/Circadian diagnostic cards render seeded PipelineState; selector relocation) + new `SettingsViewModelTest` (debugLevel survives profile apply + reset) + ContextEngineTest `mergeProfile_preservesDebugLevel`. Full ladder GREEN: `:app:testDebugUnitTest`(102) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **NEW FINDING recorded (verified, deferred to S12.6c): G2R-F27/D-050 — PWM-sensitive mode never locks the hardware brightness floor (`pwmSensitive` unread by the runtime).** |
 | S12.6c pipeline behaviour correctness | 2026-06-14 | Opus/high | DONE | (see push) | Fixed the runtime bugs the re-test found + wired override-point capture (D-051; G2R-F11/F12/F13/F14/F26/F27). **G2R-F11/F12** (Apply/profile-load + min-brightness ignored until a light change): root = the pipeline's `settingsProvider`=`ContextEngine.effectiveSettings()` served the STALE cached `_effective` snapshot. Added `ContextEngine.reevaluate()` (re-reads the FRESH baseline + re-merges the active profile, no watcher re-resolution) and the service's `ACTION_REAPPLY` now calls it BEFORE `controller.reapply()` → manual edits take effect immediately (min-bright no longer "stuck at 10"). **G2R-F13** override-point capture (closes D-044c): new `OverridePointStore` (DataStore, newest-first cap 50) + `OverridePointSink`; `handleOverride` persists the de-compressed point; `SettingsViewModel`/`DraftSettingsViewModel` expose `overridePoints`; Tools wizard reads the recorded set. **G2R-F14** `BrightnessCurveChart` overlays the recorded points as dots + shows the fitted/suggested curve only at ≥9 points (ChartCanvas unchanged). **G2R-F26/D-049** override false-positives: `handleOverride` now does the task567 act8 settle (wait %AAB_CycleTime → re-read → only pause if still ≠ our last applied) + the AnimationRunner read-back is now device-exact (`ScreenBrightnessController.isOnScreenSelfWrite`, kills OEM round-trip drift, D-049 #4). **G2R-F27/D-050** PWM-sensitive hardware floor: `applyPwmFloor` clamps the hardware write up to `dimmingThreshold` when `pwmSensitive && target<threshold` (task698 step3) in runCycle + setInitialBrightness. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas API untouched.** New tests: controller minBrightness/PWM-floor/override-false-positive (3), ContextEngine reevaluate-fresh-baseline, OverridePointStore (3). Full ladder GREEN: `:platform:test :app:testDebugUnitTest`(104) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
+| S12.6d profiles + legacy import + reset + Apply-gate | 2026-06-14 | Opus/high | DONE | (see push) | Real user-profile management + legacy import + validation gate (D-052; G2R-F15/F16/F17/F18/F30 + owner findings F31/F32). **G2R-F15** user-editable profiles: new `UserProfileStore` (DataStore `SavedProfiles`: built-ins seeded once, Save-current-as, overwrite-in-place [keeps built-in flag], delete, **Restore factory profiles**); `AppProfileCatalog` converted object→class reading the store (built-in fallback) so context rules target user profiles too (closes D-042c); `SettingsViewModel` gains saveCurrentAs/deleteProfile/restoreFactoryProfiles/profiles flow; ContextsViewModel.profileNames now a StateFlow off the store. **G2R-F16** legacy SAF import: `LegacyConfigImporter` (OpenDocumentTree grant→takePersistableUriPermission, list `*.json` via DocumentsContract — no MANAGE_EXTERNAL_STORAGE/no new dep) wired into the rewritten ProfilesScreen (link-folder + per-file Load) alongside the single-file picker. **G2R-F17** per-screen reset: `DraftSettingsScaffold` gains an `onReset` TopAppBar action; each of the 5 draft screens resets only its own fields to the task570 baseline + toast. **G2R-F18/D-052** block-Apply: `FieldError` gains `Severity`; the 3 task583 form errors (form2A/3A<0, form2C>zone1End) are CRITICAL; `DraftSettingsViewModel.hasCriticalError` disables `DraftApplyBar` Apply (+ hint) while one stands — sanctioned deviation from Tasker's advisory model. **G2R-F30** manual-load context lock: applyProfile/replaceAll latch `contextOverride=true`; `ContextEngine.reevaluate()` honours the lock (drops active context, runs the manual baseline); Profiles screen shows a Resume banner → `resumeContextAutomation()` clears it + reapplies. **Owner findings during S12.6d:** **G2R-F31** battery % from/to added to the context rule editor (BatteryTrigger min/max; resolver already supported it); **G2R-F32** curve-wizard report was too terse — Tools now shows + copies the FULL `diagnosticsLog` (the engine already produced it; app-layer only). **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: UserProfileStoreTest(5), SettingsValidator severity(1), SettingsScreens criticalError-gate/reset/profiles/context-lock/battery(5), ContextEngine reevaluate-lock(1). Full ladder GREEN: `:app:testDebugUnitTest`(116) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.6a + S12.6b + S12.6c DONE → S12.6d/e remain.** S12.6c (pipeline behaviour correctness, D-051)
-fixed the runtime bugs the re-test found: Apply/profile-load + min-brightness now take effect immediately
-(reevaluate-fresh-baseline before reapply, G2R-F11/F12); manual override points are captured + persisted
-(OverridePointStore) and overlaid on the curve with a ≥9-point fitted curve (G2R-F13/F14); rapid-light
-override false-positives are fixed (task567 settle-wait re-read + device-exact AnimationRunner read-back,
-G2R-F26/D-049); PWM-sensitive now floors the hardware brightness at the dimming threshold
-(G2R-F27/D-050). domain/, golden vectors and ChartCanvas stayed fenced. Ladder GREEN
-(`:app:testDebugUnitTest`=104, `:platform:test :domain:test :app:assembleDebug :app:lintDebug`).
-**Next: S12.6d/e, then HUMAN GATE 2 re-test after S12.6e.**
+**S12.6a + S12.6b + S12.6c + S12.6d DONE → S12.6e remains.** S12.6d (profiles + legacy import + reset +
+Apply-gate, D-052) landed real user-profile management: `UserProfileStore` (built-ins seeded once,
+Save-current-as, overwrite, **Restore factory profiles**, G2R-F15) read by `AppProfileCatalog` so context
+rules can target user profiles (closes D-042c); **SAF folder grant** legacy import from
+`Download/AAB/configs` via `LegacyConfigImporter` (no MANAGE_EXTERNAL_STORAGE, G2R-F16); per-screen reset
+on every draft screen (G2R-F17); **block-Apply on CRITICAL validation errors** (form2A/3A<0,
+form2C>zone1End now `Severity.CRITICAL` → Apply disabled, G2R-F18/**D-052** sanctioned deviation);
+manual-load **context lock + Resume** (G2R-F30). Two owner findings reported mid-segment were also fixed
+(app-layer only): **G2R-F31** battery % from/to in the context rule editor, **G2R-F32** curve-wizard report
+now shows/copies the full verbose `diagnosticsLog`. domain/, golden vectors and ChartCanvas stayed fenced.
+Ladder GREEN (`:app:testDebugUnitTest`=116, `:platform:test :domain:test :app:assembleDebug :app:lintDebug`).
+**Next: S12.6e, then HUMAN GATE 2 re-test after S12.6e.**
 
 **(historical) S12.6a (IA & naming) + S12.6b (glass-box diagnostics) DONE → S12.6c/d/e remain (parallel window).**
 The AAB Menu is the home hub; Super Dimming / Circadian renames + Dashboard last-sample fix landed in
@@ -184,13 +188,14 @@ AppModule is now the real DI root.
   **S12.6b DONE** (Live Debug scene + per-screen diagnostic cards + global debug selector + teal toasts).
   **S12.6c DONE** (reapply-uses-fresh-settings + min-bright runtime fix G2R-F11/F12 + override-point
   capture/persistence G2R-F13 + curve overlay G2R-F14 + override false-positives G2R-F26/D-049 +
-  PWM-sensitive hardware-floor clamp G2R-F27/D-050 — D-051). Remaining: **S12.6d** (profile
-  save/overwrite/factory-restore + SAF legacy import + per-screen reset +
-  Apply-gate + **manual-load context-lock/Resume G2R-F30**), **S12.6e** (label/long-press-help audit +
-  context Wi-Fi/location [**G2R-F22 root cause found, see findings**] + **time-picker modal G2R-F28** +
-  usage-access flow + load toasts). A Live Debug refinement (**G2R-F29** Performance & Timings parity)
-  is carried too. b/c/d/e are a parallel window now that a is merged. Domain/ + golden vectors +
-  ChartCanvas API stay fenced. **NOTE for b/c/d/e:** the AAB Menu is now the home `AppRoute.Menu`;
+  PWM-sensitive hardware-floor clamp G2R-F27/D-050 — D-051). **S12.6d DONE** (user-editable profiles +
+  overwrite + factory-restore G2R-F15 + SAF legacy import G2R-F16 + per-screen reset G2R-F17 +
+  block-Apply-on-critical-error G2R-F18/D-052 + manual-load context-lock/Resume G2R-F30; plus owner
+  findings G2R-F31 battery % editor + G2R-F32 verbose wizard report). Remaining: **S12.6e**
+  (label/long-press-help audit + context Wi-Fi/location [**G2R-F22 root cause found, see findings**] +
+  **time-picker modal G2R-F28** + usage-access flow + load toasts). A Live Debug refinement
+  (**G2R-F29** Performance & Timings parity) is carried too. e is the last parallel-window sub-segment.
+  Domain/ + golden vectors + ChartCanvas API stay fenced. **NOTE for e:** the AAB Menu is the home `AppRoute.Menu`;
   use `navigateTopLevel` for any new top-level destination so back still returns to the Menu; the
   global debug selector S12.6b moves OFF Misc belongs on the new Live Debug screen reached from the Menu.
 - **HUMAN GATE 2 — RE-TEST AGAIN** after S12.6e. Re-verify all G2R-Fn + the original Gate-2 set.
@@ -1004,7 +1009,15 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (D-040); the hardware floor is independent. Regression test asserts the applied value == threshold.
   (Affects S12.6d/e, S13, Gate 2.)
 
-Append new entries as D-052, D-053, … with which segments they affect.
+- D-052: S12.6d BLOCK-APPLY ON CRITICAL VALIDATION ERRORS (owner-decision 2, G2R-F18). A SANCTIONED
+  deviation from CLAUDE.md's "Tasker semantics win" rule: Tasker's task583 `_RedInvalidFormulae` is
+  advisory-only (it reddens the field but still applies). The owner overrode this for the rebuild — the
+  three form-coefficient errors (form2A<0, form3A<0, form2C>zone1End) now carry `Severity.CRITICAL` and
+  DISABLE the draft-screen Apply button while present (with a hint). All other rules (the task707
+  safety@1000lux warning, wait-order, low-scale, zone2End<zone1End) stay ADVISORY and only warn. This is
+  the ONLY place Tasker's advisory model is overridden; do not generalise it. (Affects S12.6d/e, Gate 2.)
+
+Append new entries as D-053, D-054, … with which segments they affect.
 
 ## Blockers
 
@@ -1212,12 +1225,30 @@ snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
 
 *Profiles & persistence (→ S12.6d):*
 - **G2R-F15** **Cannot save a custom profile**, and want to be able to **overwrite existing profiles** too
-  (as the Tasker project allows). [decision: scope of overwrite — see S12.6 open questions]
+  (as the Tasker project allows).
+  **→ FIXED by S12.6d:** `UserProfileStore` — built-ins seeded once, Save-current-as, overwrite-in-place,
+  delete, Restore factory profiles; `AppProfileCatalog` reads it so context rules target user profiles.
 - **G2R-F16** **Cannot load a legacy profile** from `Download/AAB/configs` — the app doesn't see that
   directory (only `Download/AAB` + my own folders), likely a scoped-storage / Tasker-ownership conflict.
+  **→ FIXED by S12.6d:** SAF folder grant (`OpenDocumentTree`→persisted permission) + `LegacyConfigImporter`
+  lists/loads `*.json` via DocumentsContract; no MANAGE_EXTERNAL_STORAGE. Single-file picker kept as fallback.
 - **G2R-F17** Settings screens have **no reset-to-defaults button**.
-- **G2R-F18** **Invalid settings are appliable** (e.g. form3A negative). [decision: block vs Tasker's
-  advisory model — see S12.6 open questions]
+  **→ FIXED by S12.6d:** `DraftSettingsScaffold` Reset action on all 5 draft screens (resets only that
+  screen's fields to the task570 baseline + toast; user Applies to commit).
+- **G2R-F18** **Invalid settings are appliable** (e.g. form3A negative). [owner-decision 2: block.]
+  **→ FIXED by S12.6d (D-052):** the 3 task583 form errors are `Severity.CRITICAL`; `DraftApplyBar` Apply
+  is disabled (with a hint) while one stands. Advisory rules still only warn.
+- **G2R-F30** (NEW, S12.6d) manual profile load did not pause context automation / offer Resume.
+  **→ FIXED by S12.6d:** applyProfile/replaceAll latch `contextOverride=true`; `ContextEngine.reevaluate()`
+  honours the lock; Profiles screen Resume banner → `resumeContextAutomation()`.
+- **G2R-F31** (owner-reported during S12.6d) the context rule editor has **no battery percentage from/to**.
+  **→ FIXED by S12.6d:** battery % min/max fields added to the rule editor (BatteryTrigger min/max — the
+  domain resolver already evaluated them; this was a pure UI gap).
+- **G2R-F32** (owner-reported during S12.6d) the **curve-fitting report is far less verbose than Tasker's**.
+  **→ FIXED by S12.6d (app-layer only, domain fenced):** the engine already produced the full Tasker-style
+  `%AAB_Test` report in `CurveSuggestionResult.diagnosticsLog` — the Tools screen showed only the 4-line
+  summary. It now renders + copies the FULL diagnosticsLog (zone boundaries, curve params, per-zone
+  R²/nRMSE/bias, fit stability).
 
 *Labels, tooltips, context editor & onboarding (→ S12.6e):*
 - **G2R-F19** Some **labels don't match their meaning** (e.g. *delta factor*). Tasker's long-press shows an
