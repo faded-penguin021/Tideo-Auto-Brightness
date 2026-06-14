@@ -35,12 +35,29 @@ next session does not know it.
 | S12.6e labels/help audit + context editor + onboarding | 2026-06-14 | Opus/high | DONE | (this push) | Last S12.6 sub-segment (D-053; G2R-F19…F25 + F28/F29). **Label + verbatim long-press-help audit** (G2R-F19/F20/F21): new `TaskerHelp.kt` holds the 30 verbatim Flash help strings (decoded from the reactivity/brightness/misc/superdimming scene `longclick` tasks via XML_RECIPES R2); `NumberSettingField`/`IntSliderSettingField`/`SwitchSettingRow` gained a `help=` param surfaced via an "ⓘ" reveal (Tasker longtap → tap, `helptext_<tag>`); every control on Reactivity/Curve/Misc/SuperDimming relabelled to the Tasker scene labels + the verbatim help wired. **WIRING AUDIT (G2R-F20): the owner-flagged "delta factor" was MIS-LABELLED/MIS-HELPED, not mis-wired** — `%AAB_DeltaFactor` IS the sensor-smoothing alpha factor (`luxAlpha=1-exp(-deltaFactor·effectiveDelta)`, BrightnessEngine); relabelled "Smoothing Δ" + verbatim help. No other binding bug found; all field→`%AAB_*` bindings cross-checked vs AabSettingsContract. **Context Wi-Fi/location (G2R-F22):** `WifiInfoReader.currentSsid()` is now a `suspend` returning a typed `SsidResult` (one-shot `NetworkCallback` w/ `FLAG_INCLUDE_LOCATION_INFO`+2s timeout; targeted NotOnWifi/NeedsLocationPermission/LocationServicesOff/Unknown messages — fixes the API-29+ `<unknown ssid>` redaction); rule editor gained lat/lon/radius fields + "Use current location" (AndroidLocationReader). **Time picker (G2R-F28):** From/To open the M3 `TimePicker` modal (SUNRISE/SUNSET tokens kept). **Usage access (G2R-F23/F24):** onboarding always shows the usage step, labelled "(optional)" by default / "(needed for per-app rules)" once an app rule exists; the rule-editor grant prompt was already present. **Toast on load (G2R-F25):** new `ContextLoadSink`/`ToastContextLoadSink` → unconditional teal-less toast when a runtime context rule loads its profile; Profiles-screen apply already toasted. **Live Debug Performance & Timings (G2R-F29):** `PipelineState` gains `luxAlpha`/`animationSteps`/`animationWaitMs`/`throttleMs`/`lastUpdateMs` (populated in runCycle from existing engine output, no domain change) → Live Debug card now shows LuxAlpha / cycle / reactivity-cooldown / last-animation (steps×wait) / last-update. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: SettingsScreens +5 (delta-factor verbatim help reveal, time-picker modal, use-current-SSID fills field, location fields, Live Debug timings) + ContextEngine contextLoad-fires-sink (1). Full ladder GREEN (`:app:testDebugUnitTest`=122 `:app:assembleDebug :app:lintDebug :domain:test :platform:test`). No compaction. **GATE 2 RE-TEST (again) READY.** |
 | S12.6d profiles + legacy import + reset + Apply-gate | 2026-06-14 | Opus/high | DONE | (see push) | Real user-profile management + legacy import + validation gate (D-052; G2R-F15/F16/F17/F18/F30 + owner findings F31/F32). **G2R-F15** user-editable profiles: new `UserProfileStore` (DataStore `SavedProfiles`: built-ins seeded once, Save-current-as, overwrite-in-place [keeps built-in flag], delete, **Restore factory profiles**); `AppProfileCatalog` converted object→class reading the store (built-in fallback) so context rules target user profiles too (closes D-042c); `SettingsViewModel` gains saveCurrentAs/deleteProfile/restoreFactoryProfiles/profiles flow; ContextsViewModel.profileNames now a StateFlow off the store. **G2R-F16** legacy SAF import: `LegacyConfigImporter` (OpenDocumentTree grant→takePersistableUriPermission, list `*.json` via DocumentsContract — no MANAGE_EXTERNAL_STORAGE/no new dep) wired into the rewritten ProfilesScreen (link-folder + per-file Load) alongside the single-file picker. **G2R-F17** per-screen reset: `DraftSettingsScaffold` gains an `onReset` TopAppBar action; each of the 5 draft screens resets only its own fields to the task570 baseline + toast. **G2R-F18/D-052** block-Apply: `FieldError` gains `Severity`; the 3 task583 form errors (form2A/3A<0, form2C>zone1End) are CRITICAL; `DraftSettingsViewModel.hasCriticalError` disables `DraftApplyBar` Apply (+ hint) while one stands — sanctioned deviation from Tasker's advisory model. **G2R-F30** manual-load context lock: applyProfile/replaceAll latch `contextOverride=true`; `ContextEngine.reevaluate()` honours the lock (drops active context, runs the manual baseline); Profiles screen shows a Resume banner → `resumeContextAutomation()` clears it + reapplies. **Owner findings during S12.6d:** **G2R-F31** battery % from/to added to the context rule editor (BatteryTrigger min/max; resolver already supported it); **G2R-F32** curve-wizard report was too terse — Tools now shows + copies the FULL `diagnosticsLog` (the engine already produced it; app-layer only). **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: UserProfileStoreTest(5), SettingsValidator severity(1), SettingsScreens criticalError-gate/reset/profiles/context-lock/battery(5), ContextEngine reevaluate-lock(1). Full ladder GREEN: `:app:testDebugUnitTest`(116) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 | S12.7b runtime feedback surfaces | 2026-06-14 | Opus/high | DONE | (this push) | Notification/QS-tile/super-dimming surfaces fixed (D-055; G2R-F35/F40/F63/F65). **F65 (the real bug):** super dimming never engaged with PWM-sensitive on because `runCycle`/`setInitialBrightness` fed the **PWM-floored** target (raised UP to `dimmingThreshold`) to `dimming.apply`, so `target < dimmingThreshold` was never true → Extra Dim off. Now pass the **un-floored `output.targetBrightness`** (= task646 act1/act2 `%AAB_CurrentBright`); the hardware sits at the PWM floor while the secure `reduce_bright_colors` layer darkens below it (the two layers cooperate; coordinator value `dim_shell` was already correct per task650 act8). **F35:** new `pausedByOverride` PipelineState flag (set in `handleOverride`, cleared by user Pause/Resume) → service posts a **high-priority vibrating override notification** (new `manual_override` IMPORTANCE_HIGH channel + Resume action) **+ toast**, once on the rising edge. **F40:** ongoing FGS notification already toggled Pause↔Resume on `paused`; verified + test. **F63:** `BrightnessTileService` now **live-collects** (serviceEnabled ⊕ LiveRuntimeState running/paused) in `onStartListening`→`updateTile` on every change (cancel in `onStopListening`), and the service calls `TileService.requestListeningState` on each state publish so Off→Starting→Active/Paused renders without reopening the panel; subtitle mapping extracted to a pure `tileSubtitle()`. Tests: controller +2 (un-floored dimming target / pausedByOverride latch), AmbientMonitoringService +1 (high-pri notif + Resume + toast), BrightnessTileService +1 (subtitle mapping). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(132) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
+| S12.7c context system: location lifecycle, ordering, legacy targets, days | 2026-06-14 | Opus/high | DONE | (this push) | Context-system parity batch (D-056; G2R-F42/F43/F44/F45/F47/F67/F68). **F45 smart location listener:** `LocationReader.locationUpdates()` (continuous `requestLocationUpdates` NETWORK+GPS, seeds best last-known, filters (0,0) null-island reads) replaces the on-demand passive read that died on backgrounding + read `0.0,0.0`; hosted in the FGS scope; `ContextEngine.startLocationListenerIfNeeded()` gated on `tokens.usesLocation` (Tasker's `[LOC]`-in-ContextCache cost gate — owner-confirmed) + a ≥100 m haversine debounce before firing the LOCATION eval (kills the near-constant/input-blocking toasts); `assemble()` now takes engine-fed lat/lon (new `LocationSignal`). **F42** `currentLocation()` → typed `LocationResult` (NeedsPermission/Unavailable/Available) with a call-time permission recheck + fresh `getCurrentLocation` fix (no longer falsely "not granted" post-grant). **F43** rule list `byPriority()` (highest first, name tie-break) not creation order. **F44** legacy load registers the profile into `UserProfileStore` (file name) → selectable as a rule target without a re-save (`SettingsViewModel.saveImportedProfile`). **F67** day-of-week `FilterChip` picker → `ContextTriggers.days` (resolver/overnight-wrap already supported, domain fenced). **F68** SUNRISE/SUNSET tokens show today's resolved time in theme gold ("Sunrise (06:42)", `ContextsViewModel.solarTimes()`). **F47** Context Automation debug toast enriched: trigger · context · profile · rule (priority). Tests: ContextEngine +2 (location ≥100 m debounce, enriched F47 toast), AppProfileCatalog +1 (legacy target visible), ContextRuleStore +1 (byPriority), SettingsScreens +2 (day picker saves DAY_OF_WEEK, sunrise resolved-time). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(138) `:platform:test :domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.7a manual-override engine correctness | 2026-06-14 | Opus/high | DONE | (this push) | Ported the REAL task567/task696 override logic (D-054; G2R-F34/F64/F46). **F34:** `AnimationRunner` replaced the exact-match `isOnScreenSelfWrite()` (false-fired on OEM round-trip drift) with task696's band+debounce — band `[minTarget-2, maxTarget+2]` spanning the sweep, override only after **2 consecutive** out-of-band reads (every-frame, since the every-5th was a Tasker IPC optimization). **F64:** `OverrideMonitor` gained a settle-suppression gate; `setInitialBrightness` arms a 1500ms window after each initial self-write so the start/reinit/resume/QS-on observer echo (incl. the AUTO→MANUAL mode-flip recompute) is not flagged as an override; the S12.6c idle-path settle-wait kept. **F46:** manual profile load = override (`LiveRuntimeState.manualOverride` published from `%AAB_ContextOverride` via the service) shown in the Menu; a context rule active is no longer labelled an override (Menu Contexts card relabelled). Tests: AnimationRunner +3 (self-writes complete / opposing-write overridden / single-transient debounced), controller +1 (init-echo suppressed then real-write pauses post-window), UiShell +2 (Menu label semantics). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(128) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.7b DONE (2026-06-14) → S12.7 c–h remain.** S12.7b fixed the runtime feedback surfaces (D-055):
+**S12.7c DONE (2026-06-14) → S12.7 d–h remain.** S12.7c closed the context-system parity batch (D-056;
+G2R-F42/F43/F44/F45/F47/F67/F68). The headline is **F45's smart location listener**: a continuous
+`requestLocationUpdates` flow (`LocationReader.locationUpdates`, NETWORK+GPS, last-known seed, (0,0)
+null-island filter) hosted in the FGS scope replaces the on-demand passive read that died on backgrounding
+and reported `loc 0.0,0.0`; the `ContextEngine` collects it **gated on `tokens.usesLocation`** (Tasker's
+`[LOC]`-in-`%AAB_ContextCache` cost gate, owner-confirmed) with a **≥100 m haversine debounce** before
+firing a LOCATION eval (kills the near-constant input-blocking toasts). Also: typed
+`currentLocation()`→`LocationResult` with a call-time permission recheck + fresh fix (F42); priority-ordered
+rule list (F43); legacy-imported profiles auto-registered as rule targets (F44); a day-of-week chip picker
+wired to the already-supported `ContextTriggers.days`/overnight-wrap resolver (F67, domain fenced);
+SUNRISE/SUNSET tokens showing today's resolved time in gold (F68); and the enriched Context Automation
+debug toast (trigger·context·profile·rule+priority, F47). domain/ + golden vectors stayed fenced. Ladder
+GREEN (`:app:testDebugUnitTest`=138). **Next: S12.7 d–h (d–h largely disjoint; rebase before push), then
+owner re-tests Gate 2 again after S12.7h.** Resolves the long-standing context deviation (d) "location is
+passive-only".
+
+**(historical) S12.7b DONE (2026-06-14) → S12.7 c–h remain.** S12.7b fixed the runtime feedback surfaces (D-055):
 the **F65 super-dimming Extra-Dim bug** (root cause: the pipeline fed `dimming.apply` the PWM-FLOORED
 target, so the `target < dimmingThreshold` engage gate was never true — now feeds the un-floored engine
 target, task646 `%AAB_CurrentBright`, so the secure `reduce_bright_colors` layer darkens below the floor);
@@ -734,11 +751,12 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   existence-check + the APP_CHANGED isNonDefault veto. S12 (profile save/load) should track the real
   active user-profile name + extend AppProfileCatalog with user-saved profiles (currently built-ins
   only — an unknown rule.profile name resolves null → engine keeps baseline, a safe degrade).
-  (d) **Location is passive-only.** AndroidContextSignalSource uses LocationReader.lastKnownLocation
-  (PASSIVE_PROVIDER); task630/631's persistent LocationListener + adaptive backoff/zombie-listener
-  watchdog + the Variable-Set prof767 trigger machinery are NOT ported (prof766 deferred; prof765
-  partial). LOCATION-caller eval still fires on the WIFI/battery/app signal edges and pipeline ticks.
-  Deferred to S12/S14 if device testing shows passive last-known is too stale.
+  (d) **Location is passive-only.** ✅ RESOLVED S12.7c (D-056). AndroidContextSignalSource used
+  LocationReader.lastKnownLocation (PASSIVE_PROVIDER); now `LocationReader.locationUpdates()` runs a
+  persistent NETWORK+GPS `requestLocationUpdates` listener in the FGS scope, gated on the `[LOC]`
+  ContextCache token (so it never runs without a location rule) with a ≥100 m debounce — Tasker's
+  task630/631 "super smart location listener" equivalent. prof766/767 Variable-Set trigger machinery is
+  still not ported verbatim, but the LOCATION caller now has real continuous fixes (not stale last-known).
   (e) **Time scheduling approximated by pipeline-tick re-eval**, not prof764's exact self-scheduling
   Time context at `%AAB_NextContextTime`. nextContextTime IS computed (resolver) + exposed as a
   StateFlow; ContextEngine.onPipelineTick (TIME caller, 1s cooldown) re-evaluates each accepted cycle.
@@ -1115,7 +1133,33 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   **Fence honoured: domain/ + golden vectors untouched** (band logic is app-layer; `OverrideRules` unchanged).
   (Affects S12.7a; S12.7b reuses the override→notification path; S12.7c/h depend on the F46 lock semantics.)
 
-Append new entries as D-055, D-056, … with which segments they affect.
+- D-056: **S12.7c context-system parity** (G2R-F42/F43/F44/F45/F47/F67/F68; UI/app/platform-glue only,
+  domain/ + golden vectors fenced). **F45 smart location listener** (the headline): the old on-demand
+  `LocationReader.lastKnownLocation(PASSIVE_PROVIDER)` read died on backgrounding and reported `loc 0.0,0.0`;
+  replaced by `LocationReader.locationUpdates()` — a continuous `requestLocationUpdates` flow over NETWORK +
+  GPS, seeded with the best non-null-island last-known fix, filtering exact `(0.0,0.0)` reads. Hosted in the
+  FGS scope so it survives backgrounding. `ContextEngine.startLocationListenerIfNeeded()` collects it ONLY
+  when a rule uses location (`tokens.usesLocation` = Tasker's `[LOC]`-in-`%AAB_ContextCache` cost gate —
+  owner-confirmed mid-segment) and applies a **≥100 m haversine debounce** before firing the LOCATION eval
+  (kills the near-constant, input-blocking context-location toasts). `ContextSignalSource.assemble()` now
+  takes engine-fed `lat`/`lon` (new `LocationSignal`); `AndroidContextSignalSource` still falls back to
+  last-known for the SOLAR computation when no fix yet. **F42** `currentLocation()` → typed `LocationResult`
+  (NeedsPermission / Unavailable / Available) after a **call-time** permission recheck + a fresh
+  `getCurrentLocation` fix (fixes the false "not granted" post-grant). **F43** `List<ContextRule>.byPriority()`
+  (highest priority first, case-insensitive name tie-break) feeds `ContextsViewModel.rules`. **F44** loading
+  a legacy config now `SettingsViewModel.saveImportedProfile`s it (under its file name) into `UserProfileStore`,
+  which `AppProfileCatalog` (the rule editor's source) reads → selectable as a rule target with no manual
+  re-save (extends D-042c). **F67** a 7-`FilterChip` day picker wired to `ContextTriggers.days` (all/none =
+  every day); the resolver's overnight-wrap (post-midnight tail = previous day's membership) is unchanged and
+  verified (domain fenced). **F68** `ContextsViewModel.solarTimes()` computes today's rise/set for the
+  last-known location; SUNRISE/SUNSET tokens render "Sunrise (06:42)" in `AabGold`. **F47** the
+  CONTEXT_AUTOMATION debug toast on each auto-load now reads "trigger … · context … · profile … · rule X
+  (priority N)". Resolves the long-standing context deviation (d) "location is passive-only". Tests:
+  ContextEngine +2, AppProfileCatalog +1, ContextRuleStore +1 (byPriority), SettingsScreens +2.
+  (Affects S12.7c; S12.7d builds the Location-permission Setup step + SSID order on this listener; S12.7h's
+  Circadian Date/Lat/Lon reuses `solarTimes()`/the location helper.)
+
+Append new entries as D-057, D-058, … with which segments they affect.
 
 ## Blockers
 
@@ -1484,30 +1528,38 @@ at the end).
   (see F33/F41-perm).
 
 *Context system:*
-- **G2R-F42** Context-rule "use current location" **wrongly reports Location permission not granted** (even
+- **G2R-F42** ✅ RESOLVED S12.7c (D-056). Context-rule "use current location" **wrongly reports Location permission not granted** (even
   when it is) — likely a stale/sync permission check; recheck on use (cf. the permission-propagation delay
-  the owner saw in F44).
-- **G2R-F43** The **context-rule list is ordered by creation time** (oldest first); it should be ordered by
-  **priority (highest first)** to match the resolution model (D-014).
-- **G2R-F44** Context-rule creation only offers **built-in profiles**; **imported legacy profiles** (loaded
+  the owner saw in F44). → `currentLocation()` now returns a typed `LocationResult` after a call-time
+  permission recheck + a fresh `getCurrentLocation` fix; the editor shows a targeted message per outcome.
+- **G2R-F43** ✅ RESOLVED S12.7c (D-056). The **context-rule list is ordered by creation time** (oldest first); it should be ordered by
+  **priority (highest first)** to match the resolution model (D-014). → `List<ContextRule>.byPriority()`
+  (highest first, case-insensitive name tie-break) in `ContextsViewModel.rules`.
+- **G2R-F44** ✅ RESOLVED S12.7c (D-056). Context-rule creation only offers **built-in profiles**; **imported legacy profiles** (loaded
   from `Download/AAB/configs`) are NOT selectable as a rule target — only after re-saving them as a new
   profile. The legacy import must register into the profile catalog the rule editor reads (extends D-042c).
-- **G2R-F45** **Context location matching + listener lifecycle.** Test setup (lat 55.83, lon 4.99, 2000 m,
+  → loading a legacy config now `saveImportedProfile`s it (file name) into `UserProfileStore`, which
+  `AppProfileCatalog` (the rule editor's source) reads — selectable immediately, no manual re-save.
+- **G2R-F45** ✅ RESOLVED S12.7c (D-056). **Context location matching + listener lifecycle.** Test setup (lat 55.83, lon 4.99, 2000 m,
   highest priority) initially read "active rule: none"; debug toasts showed **`loc 0.0,0.0`** even with
   Location enabled. It later started working (permission-propagation delay), BUT the **location listener
   dies the instant the app is backgrounded** → reverts to no-rule. Needs a proper **foreground/zombie-
   guarded location listener** (Tasker's "super smart location listener"), and the **0.0,0.0** read is a
   bug. Also the context-location debug toasts are **not debounced to ≥100 m** changes and are near-constant,
-  **blocking text input**.
+  **blocking text input**. → `LocationReader.locationUpdates()` continuous `requestLocationUpdates`
+  (NETWORK+GPS, best-last-known seed, (0,0) null-island filter) hosted in the FGS scope (survives
+  backgrounding); `ContextEngine` collects it gated on `tokens.usesLocation` (the `[LOC]` cost gate,
+  owner-confirmed) with a ≥100 m haversine debounce before firing the LOCATION eval.
 - **G2R-F46 (semantics)** ✅ RESOLVED S12.7a (D-054). **"Manual profile load = override" misunderstanding.** After a manual profile
   load the Menu says **no context override active** — but a manual load IS the override (it should latch +
   display it, smoother Resume). Conversely, **a context rule being active is NOT an "override"** and must
   not be labelled one. Fix the override/lock semantics + the Menu/label wording (refines G2R-F30/D-038a).
 
 *Debug / toasts:*
-- **G2R-F47** **Context-automation debug toasts are missing.** Tasker flashed these constantly: on app
+- **G2R-F47** ✅ RESOLVED S12.7c (D-056). **Context-automation debug toasts are missing.** Tasker flashed these constantly: on app
   switch, on auto-loading a profile — showing **context trigger, context, profile, and rule (with
-  priority)**. Surface them under the Context Automation debug category.
+  priority)**. Surface them under the Context Automation debug category. → the CONTEXT_AUTOMATION toast on
+  each auto-load now reads "trigger … · context … · profile … · rule X (priority N)".
 - **G2R-F48** **Dynamic Scale debug** fires on **every light change**; it should fire **every 2 minutes
   into a dawn/dusk transition** only.
 - **G2R-F49** **Overlay Preview debug** (privilege≈none fallback) should **toast the colour of the
@@ -1564,11 +1616,14 @@ at the end).
   coordinator's `target < dimmingThreshold` gate was never true. Now feeds the **un-floored engine target**
   (task646 `%AAB_CurrentBright`); the hardware floors while the secure layer darkens below it.
 - **G2R-F66** Graphs need a **legend** for the (now-confirmed) dashed gold reference line + the live curve.
-- **G2R-F67** Context rules also need **day-of-week selection** (Tasker `<Day>` rules) with **smart
+- **G2R-F67** ✅ RESOLVED S12.7c (D-056). Context rules also need **day-of-week selection** (Tasker `<Day>` rules) with **smart
   midnight wrapping**. The domain `ContextTriggers.days` + resolver already exist (D-014); the rule editor
-  exposes no day picker.
-- **G2R-F68** The rule editor's **Sunrise/Sunset tokens should also display the resolved current
-  time-of-day** for today, in theme **gold** (Tasker shows e.g. "SUNRISE (06:42)").
+  exposes no day picker. → added a 7-`FilterChip` day picker wired to `ContextTriggers.days` (all/none =
+  every day); the resolver's overnight-wrap (post-midnight tail = previous day's membership) is unchanged
+  (domain fenced) and verified.
+- **G2R-F68** ✅ RESOLVED S12.7c (D-056). The rule editor's **Sunrise/Sunset tokens should also display the resolved current
+  time-of-day** for today, in theme **gold** (Tasker shows e.g. "SUNRISE (06:42)"). → `solarTimes()`
+  computes today's rise/set for the last-known location; the tokens render "Sunrise (06:42)" in `AabGold`.
 - **G2R-F69 (owner, 2026-06-14 20:33 — DEFERRED to S12.7g)** On the **Curve & Brightness** screen the
   **dashed gold reference line moves as you edit the field values** — it should be a FIXED reference (the
   default / last-loaded curve) so edits are visible *against* it. The live curve should track the draft;

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -392,6 +393,42 @@ class SettingsScreensTest {
         compose.onNodeWithTag("use_current_location").performScrollTo().assertExists()
         compose.onNodeWithTag("rule_lat").performScrollTo().assertExists()
         compose.onNodeWithTag("rule_radius").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun contextEditor_dayPicker_savesSelectedDays_G2RF67() {
+        // G2R-F67: the rule editor exposes a day-of-week picker; the selection is persisted as
+        // Calendar.DAY_OF_WEEK values (Monday = 2).
+        var saved: com.tideo.autobrightness.app.settings.ContextRule? = null
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    onBack = {}, onSave = { saved = it }, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("day_2").performScrollTo().performClick()
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        assertEquals(listOf(2), saved?.triggers?.days, "Monday must be saved as DAY_OF_WEEK 2")
+    }
+
+    @Test
+    fun contextEditor_sunriseToken_showsResolvedTime_G2RF68() {
+        // G2R-F68: when today's solar times are known, the SUNRISE token shows the resolved time.
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    solarLabel = "06:42" to "18:30",
+                    onBack = {}, onSave = {}, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("start_sunrise").performScrollTo()
+            .assertTextContains("Sunrise (06:42)", substring = true)
     }
 
     @Test

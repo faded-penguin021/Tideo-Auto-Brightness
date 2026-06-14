@@ -141,6 +141,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /**
+     * Register an imported/legacy profile into the saved-profile catalog (G2R-F44). The
+     * [AppProfileCatalog] reads [UserProfileStore], so registering here makes the profile selectable
+     * as a context-rule target without the user having to manually "Save current as…" first. Distinct
+     * from [replaceAll], which applies a profile to the live settings; the Profiles screen does both
+     * when loading a legacy config.
+     */
+    fun saveImportedProfile(name: String, settings: AabSettings) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch { userProfiles.save(trimmed, settings) }
+    }
+
     /** Delete a saved profile (built-ins can be removed; [restoreFactoryProfiles] re-seeds them). */
     fun deleteProfile(name: String) {
         viewModelScope.launch { userProfiles.delete(name) }

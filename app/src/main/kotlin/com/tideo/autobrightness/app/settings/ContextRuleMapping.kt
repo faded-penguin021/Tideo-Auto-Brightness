@@ -24,6 +24,13 @@ fun ContextRule.toSpec(): ContextRuleSpec = ContextRuleSpec(
 )
 
 /**
+ * Order rules for display by priority (highest first), matching the resolution precedence (G2R-F43,
+ * D-014). Ties keep a stable, case-insensitive name order so the list doesn't reshuffle on edits.
+ */
+fun List<ContextRule>.byPriority(): List<ContextRule> =
+    sortedWith(compareByDescending<ContextRule> { it.priority }.thenBy { it.name.lowercase() })
+
+/**
  * The cheap signal-token pre-filter (`%AAB_ContextCache`, contexts_spec §2.1): which signal types
  * any configured rule uses. Drives the watcher gates so we only run the full evaluator when a
  * relevant signal type is actually in play.

@@ -122,7 +122,13 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
         onLoadLegacy = { entry ->
             scope.launch {
                 status = runCatching {
-                    vm.replaceAll(manager.importFromDocument(entry.uri)); "Loaded ${entry.name}"
+                    val imported = manager.importFromDocument(entry.uri)
+                    // G2R-F44: register the legacy profile under its file name so it's selectable as a
+                    // context-rule target without a manual re-save, then apply it to the live settings.
+                    val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
+                    vm.saveImportedProfile(profileName, imported)
+                    vm.replaceAll(imported)
+                    "Loaded ${entry.name}"
                 }.getOrElse { "Load failed: ${it.message}" }
                 status?.let(toast)
             }
