@@ -16,6 +16,13 @@ rects and `PropertiesElement` scene-chrome are dropped (replaced by the M3 Scaff
 > Animation & Dimming keeps only super-dimming + PWM. The 9→**10** target screens still honour the
 > owner-approved 20→consolidation; this is a grouping correction within it, not a new scene.
 
+> **S12.5c update (feature/behaviour fidelity, no new screens):** Contexts gains a faithful rule
+> editor (`<queries>` launcher app list with icons, "use current Wi-Fi" helper, SUNRISE/SUNSET time
+> tokens, usage-access prompt when an app trigger is set); Tools surfaces the `%AAB_Test` wizard
+> diagnostics → clipboard (D-025); the Misc debug selector now drives runtime debug **toasts** for the
+> 10 `%AAB_Debug` categories (D-023); confirmations/warnings toast across screens (G2-F12); the QS
+> tile shows the live paused/running state (G2-F17). Behaviour-only — the screen set is unchanged.
+
 | Screen | Source scenes | Charts |
 |---|---|---|
 | **Dashboard** | Menu (nav), Misc Settings (service switch) | — |

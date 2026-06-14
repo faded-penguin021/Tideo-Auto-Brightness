@@ -187,9 +187,13 @@ fun DerivedReadout(label: String, value: String, testTag: String = label) {
     }
 }
 
-/** The Apply / Discard control bar (Tasker scenes' Apply + Reset buttons), enabled only when dirty. */
+/**
+ * The Apply / Discard control bar (Tasker scenes' Apply + Reset buttons), enabled only when dirty.
+ * Apply confirms with a toast (Tasker Flashes "Applied", G2-F12).
+ */
 @Composable
 fun DraftApplyBar(dirty: Boolean, onApply: () -> Unit, onDiscard: () -> Unit) {
+    val toast = rememberToaster()
     Surface(tonalElevation = 3.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -202,7 +206,7 @@ fun DraftApplyBar(dirty: Boolean, onApply: () -> Unit, onDiscard: () -> Unit) {
                 modifier = Modifier.weight(1f).testTag("discard_settings"),
             ) { Text("Discard") }
             Button(
-                onClick = onApply,
+                onClick = { onApply(); toast("Settings applied") },
                 enabled = dirty,
                 modifier = Modifier.weight(1f).testTag("apply_settings"),
             ) { Text(if (dirty) "Apply" else "Applied") }

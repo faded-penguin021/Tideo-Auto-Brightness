@@ -5,7 +5,9 @@ import com.tideo.autobrightness.app.runtime.AndroidContextSignalSource
 import com.tideo.autobrightness.app.runtime.AppProfileCatalog
 import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
 import com.tideo.autobrightness.app.runtime.ContextEngine
+import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
+import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.storage.contextRulesDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -39,6 +41,9 @@ class AppModule(context: Context) {
      */
     fun createRuntime(scope: CoroutineScope): RuntimeGraph {
         val brightness = AndroidScreenBrightnessController(appContext)
+        // Runtime debug Flashes (the 10 %AAB_Debug categories, D-023/G2-F15) shown only when the
+        // matching debugLevel is selected; shared by the pipeline, dimming + context engine.
+        val debugSink: DebugSink = ToastDebugSink(appContext)
 
         lateinit var controller: BrightnessPipelineController
         val contextEngine = ContextEngine(
@@ -47,6 +52,7 @@ class AppModule(context: Context) {
             profileCatalog = AppProfileCatalog,
             signalSource = AndroidContextSignalSource(appContext),
             onProfileChanged = { controller.onContextChanged() },
+            debugSink = debugSink,
         )
 
         controller = BrightnessPipelineController(
@@ -61,7 +67,9 @@ class AppModule(context: Context) {
                 // Re-detect each cycle so a WRITE_SECURE_SETTINGS grant made AFTER the service
                 // started (Shizuku/ADB) is picked up without a restart (G1-F5).
                 tierProvider = { privilegeManager.refresh(); privilegeManager.currentTier() },
+                debugSink = debugSink,
             ),
+            debugSink = debugSink,
         )
 
         return RuntimeGraph(controller, contextEngine)

@@ -14,9 +14,20 @@ import kotlinx.coroutines.flow.callbackFlow
 // Requires ACCESS_FINE_LOCATION at runtime on API 29+ to obtain SSID.
 interface WifiInfoReader {
     fun ssidFlow(): Flow<String?>
+
+    /** One-shot read of the currently-connected SSID (for the rule editor's "use current SSID"). */
+    fun currentSsid(): String?
 }
 
 class AndroidWifiInfoReader(private val context: Context) : WifiInfoReader {
+    override fun currentSsid(): String? {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return null
+        if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return null
+        val raw = (caps.transportInfo as? WifiInfo)?.ssid
+        return raw?.removeSurrounding("\"")?.takeIf { it.isNotEmpty() && it != "<unknown ssid>" }
+    }
+
     override fun ssidFlow(): Flow<String?> = callbackFlow {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val request = NetworkRequest.Builder()

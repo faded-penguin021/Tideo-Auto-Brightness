@@ -13,7 +13,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.SettingsValidator
+import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.ui.screens.AnimationDimmingContent
+import com.tideo.autobrightness.app.ui.screens.ContextsContent
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
 import com.tideo.autobrightness.app.ui.screens.MiscContent
 import com.tideo.autobrightness.app.ui.screens.ReactivityContent
@@ -149,6 +151,47 @@ class SettingsScreensTest {
             val info = node.config.getOrNull(SemanticsProperties.ProgressBarRangeInfo)
             info != null && info.range == range && info.steps == steps
         }
+
+    @Test
+    fun contextEditor_exposesSunriseTokensAndCurrentSsidHelper() {
+        // G2-F14: the rule editor must offer the SUNRISE/SUNSET tokens + a "use current SSID" helper.
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(),
+                    profileNames = listOf("Default"),
+                    apps = emptyList(),
+                    onBack = {}, onSave = {}, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("use_current_ssid").performScrollTo().assertExists()
+        compose.onNodeWithTag("start_sunrise").performScrollTo().assertExists()
+        compose.onNodeWithTag("end_sunset").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun contextEditor_promptsForUsageAccess_whenAppRuleLacksGrant() {
+        // G2-F14: editing a rule that targets an app while usage access is missing surfaces the prompt.
+        val appRule = com.tideo.autobrightness.app.settings.ContextRule(
+            id = "r1", name = "Cinema", profile = "Default",
+            triggers = com.tideo.autobrightness.app.settings.ContextTriggers(apps = listOf("com.example")),
+        )
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = listOf(appRule),
+                    profileNames = listOf("Default"),
+                    apps = listOf(AppEntry("com.example", "Example")),
+                    onBack = {}, onSave = {}, onDelete = {},
+                    hasUsageAccess = { false },
+                )
+            }
+        }
+        compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
+        compose.onNodeWithTag("usage_access_prompt").performScrollTo().assertExists()
+    }
 
     @Test
     fun draftBar_applyAndDiscard_invokeCallbacks() {

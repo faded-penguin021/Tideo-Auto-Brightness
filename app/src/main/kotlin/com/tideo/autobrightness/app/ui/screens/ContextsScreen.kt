@@ -1,15 +1,19 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -22,9 +26,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,6 +45,8 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
+import com.tideo.autobrightness.app.ui.components.rememberToaster
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 /** Contexts (per-app / Wi-Fi / time / charging override rules — Tasker AAB Profile + contexts.json). */
@@ -47,13 +55,28 @@ fun ContextsScreen(navController: NavHostController, vm: ContextsViewModel = vie
     val rules by vm.rules.collectAsStateWithLifecycle()
     var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
     androidx.compose.runtime.LaunchedEffect(Unit) { apps = runCatching { vm.installedApps() }.getOrDefault(emptyList()) }
+    val toast = rememberToaster()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     ContextsContent(
         rules = rules,
         profileNames = vm.profileNames,
         apps = apps,
         onBack = { navController.popBackStack() },
-        onSave = vm::save,
-        onDelete = { vm.delete(it) },
+        onSave = { toast("Rule saved"); vm.save(it) },
+        onDelete = { vm.delete(it); toast("Rule deleted") },
+        onUseCurrentSsid = { onResult ->
+            scope.launch {
+                val ssid = vm.currentSsid()
+                if (ssid == null) toast("Not connected to Wi-Fi")
+                onResult(ssid)
+            }
+        },
+        hasUsageAccess = vm::hasUsageAccess,
+        onRequestUsageAccess = {
+            toast("Grant usage access so per-app rules can detect the foreground app")
+            runCatching { context.startActivity(vm.usageAccessIntent()) }
+        },
     )
 }
 
@@ -65,6 +88,9 @@ fun ContextsContent(
     onBack: () -> Unit,
     onSave: (ContextRule) -> Unit,
     onDelete: (String) -> Unit,
+    onUseCurrentSsid: ((String?) -> Unit) -> Unit = {},
+    hasUsageAccess: () -> Boolean = { true },
+    onRequestUsageAccess: () -> Unit = {},
 ) {
     var editing by remember { mutableStateOf<ContextRule?>(null) }
 
@@ -95,6 +121,9 @@ fun ContextsContent(
                     apps = apps,
                     onCancel = { editing = null },
                     onSave = { onSave(it); editing = null },
+                    onUseCurrentSsid = onUseCurrentSsid,
+                    hasUsageAccess = hasUsageAccess,
+                    onRequestUsageAccess = onRequestUsageAccess,
                 )
             }
         }
@@ -134,6 +163,9 @@ private fun RuleEditor(
     apps: List<AppEntry>,
     onCancel: () -> Unit,
     onSave: (ContextRule) -> Unit,
+    onUseCurrentSsid: ((String?) -> Unit) -> Unit,
+    hasUsageAccess: () -> Boolean,
+    onRequestUsageAccess: () -> Unit,
 ) {
     var name by remember { mutableStateOf(rule.name) }
     var profile by remember { mutableStateOf(rule.profile) }
@@ -169,20 +201,49 @@ private fun RuleEditor(
         value = wifi, onValueChange = { wifi = it }, label = { Text("Wi-Fi SSIDs (comma-separated)") },
         modifier = Modifier.fillMaxWidth().testTag("rule_wifi"),
     )
+    TextButton(
+        onClick = { onUseCurrentSsid { ssid -> if (ssid != null) wifi = ssid } },
+        modifier = Modifier.testTag("use_current_ssid"),
+    ) { Text("Use current Wi-Fi") }
+
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = startTime, onValueChange = { startTime = it }, label = { Text("From (HH:MM)") },
-            singleLine = true, modifier = Modifier.weight(1f).testTag("rule_start"),
-        )
-        OutlinedTextField(
-            value = endTime, onValueChange = { endTime = it }, label = { Text("To (HH:MM)") },
-            singleLine = true, modifier = Modifier.weight(1f).testTag("rule_end"),
-        )
+        Column(Modifier.weight(1f)) {
+            OutlinedTextField(
+                value = startTime, onValueChange = { startTime = it }, label = { Text("From (HH:MM)") },
+                singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_start"),
+            )
+            TimeTokenRow("start") { startTime = it }
+        }
+        Column(Modifier.weight(1f)) {
+            OutlinedTextField(
+                value = endTime, onValueChange = { endTime = it }, label = { Text("To (HH:MM)") },
+                singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_end"),
+            )
+            TimeTokenRow("end") { endTime = it }
+        }
     }
     SwitchSettingRow("Only while charging", charging, { charging = it }, testTag = "rule_charging")
 
     if (apps.isNotEmpty()) {
         Text("Foreground apps:", style = MaterialTheme.typography.labelMedium)
+        // Per-app rules need usage access to read the foreground app (G2-F14): prompt when one is set.
+        if (selectedApps.value.isNotEmpty() && !hasUsageAccess()) {
+            Card(
+                Modifier.fillMaxWidth().testTag("usage_access_prompt"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "Usage access is required to detect the foreground app.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    OutlinedButton(onClick = onRequestUsageAccess, modifier = Modifier.testTag("grant_usage_access")) {
+                        Text("Grant usage access")
+                    }
+                }
+            }
+        }
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
             items(apps, key = { it.packageName }) { entry ->
                 Row(
@@ -195,8 +256,16 @@ private fun RuleEditor(
                             selectedApps.value = if (checked) selectedApps.value + entry.packageName
                             else selectedApps.value - entry.packageName
                         },
+                        modifier = Modifier.testTag("app_check_${entry.packageName}"),
                     )
-                    Text(entry.label, style = MaterialTheme.typography.bodyMedium)
+                    Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                        entry.icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(28.dp)) }
+                    }
+                    Text(
+                        entry.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
                 }
             }
         }
@@ -211,6 +280,8 @@ private fun RuleEditor(
                     battery = if (charging) BatteryTrigger(onPower = true) else null,
                     timeRange = if (startTime.isNotBlank() && endTime.isNotBlank()) listOf(startTime.trim(), endTime.trim()) else null,
                 )
+                // Prompt for usage access on save if the rule targets apps and it is not granted.
+                if (triggers.apps != null && !hasUsageAccess()) onRequestUsageAccess()
                 onSave(
                     rule.copy(
                         name = name,
@@ -223,5 +294,14 @@ private fun RuleEditor(
             modifier = Modifier.testTag("save_rule"),
         ) { Text("Save rule") }
         TextButton(onClick = onCancel, modifier = Modifier.testTag("cancel_rule")) { Text("Cancel") }
+    }
+}
+
+/** SUNRISE/SUNSET quick-insert tokens for a time field (the resolver accepts them, G2-F14). */
+@Composable
+private fun TimeTokenRow(which: String, onPick: (String) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton(onClick = { onPick("SUNRISE") }, modifier = Modifier.testTag("${which}_sunrise")) { Text("Sunrise") }
+        TextButton(onClick = { onPick("SUNSET") }, modifier = Modifier.testTag("${which}_sunset")) { Text("Sunset") }
     }
 }

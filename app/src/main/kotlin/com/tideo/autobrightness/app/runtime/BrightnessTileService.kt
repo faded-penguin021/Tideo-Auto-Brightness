@@ -40,9 +40,20 @@ class BrightnessTileService : TileService() {
     }
 
     private fun renderTile(enabled: Boolean) {
+        // Reflect the live paused/running state, not just the persisted enable flag (G2-F17). The
+        // service republishes its pipeline snapshot into LiveRuntimeState (D-043b); read it here so
+        // the tile shows "Paused" when a manual override is latched.
+        val running = LiveRuntimeState.serviceRunning.value
+        val paused = LiveRuntimeState.pipeline.value.paused
         qsTile?.apply {
             state = if (enabled) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
             label = "Auto Brightness"
+            subtitle = when {
+                !enabled -> "Off"
+                running && paused -> "Paused"
+                running -> "Active"
+                else -> "Starting…"
+            }
             updateTile()
         }
     }
