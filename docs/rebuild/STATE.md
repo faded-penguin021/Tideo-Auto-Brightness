@@ -1569,6 +1569,12 @@ at the end).
   exposes no day picker.
 - **G2R-F68** The rule editor's **Sunrise/Sunset tokens should also display the resolved current
   time-of-day** for today, in theme **gold** (Tasker shows e.g. "SUNRISE (06:42)").
+- **G2R-F69 (owner, 2026-06-14 20:33 — DEFERRED to S12.7g)** On the **Curve & Brightness** screen the
+  **dashed gold reference line moves as you edit the field values** — it should be a FIXED reference (the
+  default / last-loaded curve) so edits are visible *against* it. The live curve should track the draft;
+  the reference must NOT. Likely `BrightnessCurveChart` is sampling the reference series from the draft
+  settings instead of a snapshot of the committed/default curve. (Chart sub-segment — S12.7g, where
+  `ChartCanvas`/curve view work is sanctioned.)
 - **OWNER ANSWERS to S12.6e open questions:** (F34) **yes — transcribe the real task567 override logic**
   from the XML, don't approximate. (F41) provide **guidance on granting `DUMP` and/or using Shizuku** for
   the no-Location SSID path. (F50) **yes, use an AccessibilityService** for global toasts — distribution is

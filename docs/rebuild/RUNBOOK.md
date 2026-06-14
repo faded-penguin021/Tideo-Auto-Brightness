@@ -1176,9 +1176,13 @@ engine features); coordinate with S13 (which copies this template). domain/ + go
    chart** against the recorded points + reference, so the impact is visible (not Tools-only).
 5. **Tap-to-delete override points** (F36): points are larger tap targets; tapping shows the lux/brightness
    pair and confirms deletion (writes back to `OverridePointStore`).
+6. **Fixed reference line** (F69): the dashed gold reference line on the Curve & Brightness chart currently
+   **moves as the user edits field values** — it must be a FIXED snapshot of the committed/default curve so
+   draft edits show *against* it. Sample the reference series from a committed/default settings snapshot, not
+   the live draft; the live curve tracks the draft.
 
 **Acceptance:** ladder green; tests for the log-x/tick mapping, the legend, and override-point deletion;
-STATE.md flips F36/F55/F62/F66; screen_map/checklist updated. **S13 scope note:** after this, S13 = the
+STATE.md flips F36/F55/F62/F66/F69; screen_map/checklist updated. **S13 scope note:** after this, S13 = the
 remaining charts (copying this richer template) + About/User Guide static screens.
 
 ---
