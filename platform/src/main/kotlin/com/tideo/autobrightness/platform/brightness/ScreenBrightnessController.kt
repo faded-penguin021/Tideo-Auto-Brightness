@@ -21,6 +21,15 @@ interface ScreenBrightnessController {
      * delayed callback for frame N observes frame N+1's value.
      */
     fun isSelfWrite(rawDeviceValue: Int): Boolean
+    /**
+     * True if the value CURRENTLY on screen is our most recent self-write. Compares in DEVICE space
+     * (the raw setting value vs the last written device value), so it is immune to the
+     * domain↔device round-trip drift that [read] incurs when `config_screenBrightnessSettingMaximum
+     * != 255` (D-049 #4): `read()` is `toDomain(toDevice(x))`, which is NOT identity on such OEM
+     * ranges, so an animation read-back comparing domain values would spuriously fire OVERRIDDEN on
+     * every multi-frame transition. The animation runner uses this instead of a domain comparison.
+     */
+    fun isOnScreenSelfWrite(): Boolean
     /** Forget the self-write marker (e.g. when auto-control pauses and the user owns the slider). */
     fun clearSelfWriteMarker()
 }
@@ -108,6 +117,11 @@ class AndroidScreenBrightnessController(
     }
 
     override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastSelfWriteDevice
+
+    override fun isOnScreenSelfWrite(): Boolean {
+        val raw = Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, -1)
+        return raw >= 0 && raw == lastSelfWriteDevice
+    }
 
     override fun clearSelfWriteMarker() {
         lastSelfWriteDevice = null

@@ -29,6 +29,8 @@ fun BrightnessCurveChart(
     modifier: Modifier = Modifier,
     currentLux: Double? = null,
     currentBrightness: Int? = null,
+    overridePoints: List<Offset> = emptyList(),
+    fittedCurve: BrightnessCurveConfig? = null,
 ) {
     val minLux = 1f
     val maxLux = 120_000f
@@ -49,9 +51,24 @@ fun BrightnessCurveChart(
         Offset(lux, b.toFloat())
     }
 
+    // task38/task663: the suggested (fitted) curve, shown only when ≥ 9 override points exist — the
+    // caller passes a non-null fittedCurve only then (G2R-F14).
+    val fittedPoints = fittedCurve?.let { fc ->
+        logSpaced(minLux, maxLux, samples).map { lux ->
+            val b = engine.mapLuxToBrightness(lux.toDouble(), fc)
+                .coerceIn(fc.minBrightness.toDouble(), fc.maxBrightness.toDouble())
+            Offset(lux, b.toFloat())
+        }
+    }
+
     val series = buildList {
         add(ChartSeries("Curve", curvePoints, MaterialTheme.colorScheme.primary))
         if (curve.scalingUse) add(ChartSeries("Taper", taperPoints, MaterialTheme.colorScheme.tertiary, strokeWidthPx = 2f))
+        fittedPoints?.let { add(ChartSeries("Suggested", it, MaterialTheme.colorScheme.secondary, strokeWidthPx = 2f)) }
+        // Recorded override points (task561 %AAB_Overrides) overlaid as scatter dots: each is a
+        // single-point series, which ChartCanvas renders as a dot (G2R-F14; ChartCanvas unchanged).
+        val pointColor = MaterialTheme.colorScheme.error
+        overridePoints.forEach { add(ChartSeries("override", listOf(it), pointColor)) }
     }
 
     val markers = buildList {

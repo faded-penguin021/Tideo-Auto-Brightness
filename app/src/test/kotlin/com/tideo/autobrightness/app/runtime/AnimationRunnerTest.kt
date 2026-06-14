@@ -12,12 +12,14 @@ class AnimationRunnerTest {
         val writes = mutableListOf<Int>()
         var current = 0
         var overrideRead: Int? = null
+        private var lastWrite: Int? = null
         override fun read(): Int = overrideRead ?: current
-        override fun write(level: Int) { current = level; writes += level }
+        override fun write(level: Int) { current = level; lastWrite = level; writes += level }
         override fun forceManualMode() = Unit
         override fun restoreMode() = Unit
-        override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == current
-        override fun clearSelfWriteMarker() = Unit
+        override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
+        override fun isOnScreenSelfWrite(): Boolean = read() == lastWrite
+        override fun clearSelfWriteMarker() { lastWrite = null }
     }
 
     @Test

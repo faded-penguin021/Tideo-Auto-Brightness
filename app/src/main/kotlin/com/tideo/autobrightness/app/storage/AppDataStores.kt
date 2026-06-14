@@ -8,6 +8,8 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.AabSettingsSerializer
 import com.tideo.autobrightness.app.settings.ContextOverrideConfig
 import com.tideo.autobrightness.app.settings.ContextRulesSerializer
+import com.tideo.autobrightness.app.settings.OverridePoints
+import com.tideo.autobrightness.app.settings.OverridePointsSerializer
 
 val Context.settingsDataStore: DataStore<AabSettings> by dataStore(
     fileName = "aab_settings.json",
@@ -19,4 +21,11 @@ val Context.serviceHealthDataStore by preferencesDataStore(name = "service_healt
 val Context.contextRulesDataStore: DataStore<ContextOverrideConfig> by dataStore(
     fileName = "aab_context_rules.json",
     serializer = ContextRulesSerializer,
+)
+
+// Recorded manual-override training points (%AAB_Overrides): captured at runtime by the pipeline so
+// the curve wizard + curve overlay have real input (G2R-F13/F14; closes the D-044c capture gap).
+val Context.overridePointsDataStore: DataStore<OverridePoints> by dataStore(
+    fileName = "aab_override_points.json",
+    serializer = OverridePointsSerializer,
 )

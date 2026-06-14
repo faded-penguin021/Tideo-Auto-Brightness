@@ -84,6 +84,27 @@ class ContextEngine(
     /** Effective settings for the pipeline's settingsProvider: active profile override or baseline. */
     suspend fun effectiveSettings(): AabSettings = _effective.value ?: baselineProvider()
 
+    /**
+     * Re-derive the effective settings from the FRESH baseline now (settings Apply / profile load,
+     * G2R-F11/F12). [effectiveSettings] otherwise returns the cached `_effective` snapshot from the
+     * last context evaluation, so a manual DataStore edit (e.g. raising %AAB_MinBright) would not take
+     * effect until the next watcher eval — leaving the runtime on stale settings ("stuck at 10").
+     *
+     * This keeps the currently-resolved active context/profile (it does NOT re-run the watcher
+     * resolution, so it can't spuriously switch contexts) but re-reads the baseline and re-merges, so
+     * a global/baseline edit flows through immediately while any active override stays in effect.
+     * The service calls this before [BrightnessPipelineController.reapply].
+     */
+    suspend fun reevaluate() = evalMutex.withLock {
+        val baseline = baselineProvider()
+        val active = currentProfileName
+        _effective.value = if (_activeContext.value != null && active != null) {
+            profileCatalog.profile(active)?.let { mergeProfile(baseline, it) } ?: baseline
+        } else {
+            baseline
+        }
+    }
+
     fun start(scope: CoroutineScope) {
         if (this.scope != null) return
         this.scope = scope

@@ -48,7 +48,7 @@ filled by S1/S2 during extraction.
 | Initial brightness on wake: 618 | | TaskerReference (S4) + InitialBrightness.kt (S5) + InitialBrightnessTest.kt (S5) | ported |
 | Hibernate/reset: 585 | | runtime/BrightnessPipelineController.hibernate (S9a — sensor unregister + runtime-state clear) | ported |
 | Throttle reset: 566 | | runtime/BrightnessPipelineController.reinit (S9a — throttle = settings default on wake) | ported |
-| Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic, OverrideRulesTest.kt S5); runtime wiring: OverrideMonitor + controller pause/resume + recordOverridePoint (S9a). 640/641/636 override-array CRUD UI = S12 | ported (detect/pause/resume) |
+| Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic, OverrideRulesTest.kt S5); runtime wiring: OverrideMonitor + controller pause/resume + recordOverridePoint (S9a); S12.6c added the task567 act8 settle-wait re-read (no rapid-light false-pause, G2R-F26/D-049) + device-exact AnimationRunner read-back, and **captures+persists** the points to `OverridePointStore` (G2R-F13, closes D-044c). 640/641/636 override-array CRUD UI = S12.6d | ported (detect/pause/resume + capture/persist) |
 | Panic reset: 528 | | runtime/BrightnessPipelineController.emergencyStop + notification Reset action; Gate-1 G1-F4 fix: panic is a FULL STOP (restore 255 + drop dimming + %AAB_Service=Off + service teardown), not a pausable state (D-041) | ported |
 | Init/defaults: 570 Initialize AAB Defaults | | | pending |
 | Circadian dynamic scale: 90 (+ polar handling) | | SolarCalculator.kt + DynamicScaleEngine.kt (S6 domain, golden-tested circadian.csv 576 rows, CircadianParityTest + 4 polar assertions); BrightnessEngine delegates computeDynamicScale (D-031) | ported |
@@ -126,7 +126,7 @@ filled by S1/S2 during extraction.
 | task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
 | task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 (cross-validation oracle, D-002) | chart render = S13 BrightnessCurveChart | reference (chart S13) |
 | task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner (S9a) | ported |
-| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner brightness path (S9a); S9b wires the ELEVATED secure-dimming layer (task646/650/645 via SuperDimmingCoordinator); DC-like unprivileged overlay deferred S12 (D-040) | ported (brightness + secure dimming; overlay S12) |
+| task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner brightness path (S9a); S9b wires the ELEVATED secure-dimming layer (task646/650/645 via SuperDimmingCoordinator); S12.6c adds the **PWM-sensitive hardware floor** (step 3: clamp hardware up to dimmingThreshold, G2R-F27/D-050); DC-like unprivileged overlay still deferred (D-040) | ported (brightness + secure dimming + PWM hardware floor; overlay deferred) |
 | task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
 | task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |
 | task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | ✓ S6 (delegate) | SolarCalculator.kt + DynamicScaleEngine.kt (S6) | ported |

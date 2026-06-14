@@ -84,7 +84,13 @@ class AmbientMonitoringService : Service() {
                 // Settings Apply / profile load: re-run the pipeline now (G2-F16). ensureRunning()
                 // first so an Apply made while the service is up (but this start re-delivers) is safe.
                 ensureRunning()
-                controller.reapply()
+                // Refresh the effective settings from the FRESH baseline BEFORE re-applying, so a
+                // manual DataStore edit (e.g. min-brightness) takes effect immediately rather than
+                // using the stale context snapshot (G2R-F11/F12).
+                scope.launch {
+                    contextEngine.reevaluate()
+                    controller.reapply()
+                }
             }
             ACTION_PANIC -> {
                 // task528 panic = full stop (not a pausable state, G1-F4): restore brightness +

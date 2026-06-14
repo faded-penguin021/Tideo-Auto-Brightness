@@ -167,6 +167,32 @@ class ContextEngineTest {
     }
 
     @Test
+    fun reevaluate_picksUpFreshBaseline_withoutWatcherEval_G2RF11() = runTest {
+        // G2R-F11/F12: a manual settings Apply edits the DataStore baseline but fires no context
+        // signal. effectiveSettings() otherwise serves the cached snapshot (stale "stuck at 10");
+        // reevaluate() must re-read the fresh baseline so the change takes effect immediately.
+        var base = baseline.copy(minBrightness = 10)
+        val src = FakeSignalSource(app = "com.other.app") // no rule matches → baseline path
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { listOf(videoStreamingRule) },
+            baselineProvider = { base },
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { 0L },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+        assertEquals(10, engine.effectiveSettings().minBrightness)
+
+        base = base.copy(minBrightness = 90)
+        engine.reevaluate()
+        assertEquals(90, engine.effectiveSettings().minBrightness, "reevaluate re-reads the fresh baseline")
+        scope.cancel()
+    }
+
+    @Test
     fun mergeProfile_preservesDetectOverrides_G2F8() {
         // detectOverrides is a global reactivity preference, NOT a task626 snapshot key: a context
         // profile swap must keep the user's manual-override detection setting (G2-F8).

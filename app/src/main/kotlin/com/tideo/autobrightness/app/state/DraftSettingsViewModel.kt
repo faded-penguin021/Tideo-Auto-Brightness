@@ -9,6 +9,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.storage.settingsDataStore
+import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +37,12 @@ import kotlinx.coroutines.launch
  */
 class DraftSettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
-    private val privilegeManager: PrivilegeManager = AppModule(application).privilegeManager
+    private val appModule = AppModule(application)
+    private val privilegeManager: PrivilegeManager = appModule.privilegeManager
+
+    /** Recorded manual-override points (newest first) overlaid on the curve preview (G2R-F14). */
+    val overridePoints: StateFlow<List<OverridePoint>> = appModule.overridePointStore.points()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** The committed/active settings (DataStore source of truth) shown in `[brackets]`. */
     val committed: StateFlow<AabSettings> = app.settingsDataStore.data

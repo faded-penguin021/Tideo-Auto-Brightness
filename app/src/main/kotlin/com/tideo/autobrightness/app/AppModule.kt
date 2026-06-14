@@ -9,7 +9,9 @@ import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.settings.ContextRuleStore
+import com.tideo.autobrightness.app.settings.OverridePointStore
 import com.tideo.autobrightness.app.storage.contextRulesDataStore
+import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
@@ -33,6 +35,10 @@ class AppModule(context: Context) {
 
     /** Persistence + CRUD for context rules (exposed for the S12 rule-editing UI). */
     val contextRuleStore: ContextRuleStore = ContextRuleStore(appContext.contextRulesDataStore)
+
+    /** Recorded manual-override training points — captured by the pipeline, read by the wizard +
+     *  curve overlay (G2R-F13/F14). */
+    val overridePointStore: OverridePointStore = OverridePointStore(appContext.overridePointsDataStore)
 
     /**
      * Build a fresh runtime graph for a service lifetime. The brightness writer and observer SHARE
@@ -70,6 +76,8 @@ class AppModule(context: Context) {
                 debugSink = debugSink,
             ),
             debugSink = debugSink,
+            // Persist captured override points so the wizard + curve overlay have real input (G2R-F13).
+            overrideSink = { lux, brightness -> overridePointStore.record(lux, brightness) },
         )
 
         return RuntimeGraph(controller, contextEngine)

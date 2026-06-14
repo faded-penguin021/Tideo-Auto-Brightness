@@ -11,6 +11,7 @@ import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
+import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,7 +31,12 @@ import kotlinx.coroutines.launch
  */
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
-    private val privilegeManager: PrivilegeManager = AppModule(application).privilegeManager
+    private val appModule = AppModule(application)
+    private val privilegeManager: PrivilegeManager = appModule.privilegeManager
+
+    /** Recorded manual-override training points (newest first) feeding the curve wizard (G2R-F13). */
+    val overridePoints: StateFlow<List<OverridePoint>> = appModule.overridePointStore.points()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val settings: StateFlow<AabSettings> = app.settingsDataStore.data
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AabSettings())
