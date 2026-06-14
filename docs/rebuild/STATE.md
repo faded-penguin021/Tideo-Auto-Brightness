@@ -167,7 +167,8 @@ AppModule is now the real DI root.
   Circadian renames + Dashboard last-sample fix — landed the nav/testTag reshape b/c/d/e depend on),
   then **S12.6b** (Live Debug scene + per-screen diagnostic cards + global debug selector + teal toasts),
   **S12.6c** (reapply-uses-fresh-settings + min-bright runtime bug + override-point capture + curve
-  overlay), **S12.6d** (profile save/overwrite/factory-restore + SAF legacy import + per-screen reset +
+  overlay + **override false-positives on rapid light changes, G2R-F26/D-049**), **S12.6d** (profile
+  save/overwrite/factory-restore + SAF legacy import + per-screen reset +
   Apply-gate), **S12.6e** (label/long-press-help audit + context Wi-Fi/location + usage-access flow +
   load toasts). b/c/d/e are a parallel window now that a is merged. Domain/ + golden vectors +
   ChartCanvas API stay fenced. **NOTE for b/c/d/e:** the AAB Menu is now the home `AppRoute.Menu`;
@@ -874,7 +875,41 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (D-044c) — the wizard still runs against an empty recorded set; S13/S14 should add runtime capture.
   (Affects S13, S14, Gate 2.)
 
-Append new entries as D-048, D-049, … with which segments they affect.
+- D-049: OVERRIDE-DETECTION FALSE POSITIVES ON RAPID LIGHT CHANGES (owner-reported 2026-06-14, G2R-F26).
+  **DEFERRED to S12.6c — not yet fixed.** Symptom: a fast lux swing makes the pipeline pause as a "manual
+  override" although nothing external wrote the brightness. Code-grounded analysis (S12.6a investigated,
+  did not change source — HARD FENCE: this is `app/runtime` + `platform` glue, NOT domain/):
+
+  Two override-detect paths exist, both suspect, and a Tasker settle step is MISSING:
+  1. **Missing cycle-time settle wait + re-read in `BrightnessPipelineController.handleOverride`.** Its own
+     comment says it "mirrors the prof755 gate after the cycle-time wait" (task567 act8), but it commits
+     the pause IMMEDIATELY via `OverrideRules.shouldCommitPause` with **no delay and no second read**.
+     Tasker task567 waits `%AAB_CycleTime` and RE-CHECKS that the brightness is still off-target before
+     pausing — exactly the owner's "before the new brightness has taken hold". This is the strongest
+     candidate: add the settle wait (≈ `cycleTimeMs`, fallback to throttle) + re-read; only pause if the
+     observed value is still not our last self-write after settling.
+  2. **Single-latest self-write marker is too weak under rapid multi-frame writes.**
+     `ScreenBrightnessController.isSelfWrite` matches ONLY `lastSelfWriteDevice` (the most recent write).
+     A fast animation writes f1..fN quickly; the system `ContentObserver` can coalesce/reorder/delay
+     callbacks, and `read()` re-reads the CURRENT value. Between back-to-back cycles a delayed callback can
+     observe a value that is no longer the latest marker → leaks to `OverrideMonitor` as external. Consider
+     a short-lived set OR a "self-write generation + grace window" (suppress any change within ~N ms of our
+     last write) instead of a single equality.
+  3. **`autoRunning` gate hole.** `runCycle` clears `autoRunning` in its `finally` the instant `animate()`
+     returns, but the final frame's `ContentObserver` callback can arrive a few ms later when
+     `autoRunning=false`, so the gate then relies solely on the (weak, see #2) marker. A post-write settle
+     window (#1/#2) closes this too.
+  4. **OEM range round-trip drift in `AnimationRunner` read-back.** `controller.read()` is
+     `toDomain(toDevice(x))`, which is NOT identity when `config_screenBrightnessSettingMaximum != 255`
+     (e.g. deviceMax 100/1023/2047/4095), so `observed != lastWritten` can fire `OVERRIDDEN` on EVERY
+     multi-frame animation on those devices — device-dependent, which may explain why it's intermittent.
+     Compare in DEVICE space (raw values) or with a ±1 tolerance, not domain space.
+  RECOMMENDED for the next model (S12.6c): start with #1 (the missing settle wait/re-read — most faithful
+  to Tasker and matches the owner's intuition), then harden #2/#4. Add a regression test: a rapid
+  from→to with an interleaved self-write sequence must NOT yield `OverrideDetected`; and a real external
+  write after settling MUST. Keep it inside the single-pipeline-coroutine model (D-027). (Affects S12.6c.)
+
+Append new entries as D-049, D-050, … with which segments they affect.
 
 ## Blockers
 
@@ -1064,6 +1099,11 @@ snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
 - **G2R-F13** **Manual override points are not recorded** (the wizard's input; D-044c capture still unwired).
 - **G2R-F14** The brightness curve used to **overlay all recorded override points**; the fitted curve only
   appeared with **> 8 points**. Restore the point overlay + fit-only-when-≥9 behaviour.
+- **G2R-F26** (owner-reported 2026-06-14, post-S12.6a; NOT in the original re-test batch) **Manual-override
+  FALSE POSITIVES on rapid light changes** — a fast lux swing makes the pipeline pause as if the user
+  grabbed the slider, when nothing external wrote. Owner's read: a mutex issue, or new light readings are
+  allowed before the new brightness has "taken hold". **Deferred to S12.6c** (do NOT touch domain/; this is
+  controller/animation/observer glue). Code-grounded root-cause analysis + recommended fix in **D-049**.
 
 *Profiles & persistence (→ S12.6d):*
 - **G2R-F15** **Cannot save a custom profile**, and want to be able to **overwrite existing profiles** too
