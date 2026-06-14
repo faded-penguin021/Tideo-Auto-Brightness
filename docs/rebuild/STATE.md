@@ -38,16 +38,17 @@ Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**ALL of S12.6 (a–e) DONE; GATE 2 RE-RE-TESTED (2026-06-14) → 30 new findings G2R-F33…F62 → S12.6f is the
-next work.** The owner re-tested the S12.6e dist/ APK on-device: "definitely going in the right direction"
-but a further batch of parity/behaviour gaps remains (see "Gate 2 RE-RE-TEST" below) — manual-override
-false-positives (need anim mutex + target-vs-actual delta check), no Resume on the notification, Wi-Fi SSID
-should use the Shizuku/dump `_GetWifiNoLocation V3` path (not Location), context location listener dies on
-background + 0.0,0.0 reads, "manual load = override" semantics, missing per-screen live readouts + graph
-reference lines + axis labels, debug-toast behaviour (foreground-only, stacking, not-instant-off,
-context-automation toasts missing), and several label/wiring polish items. **Gate 2 stays NOT signed off**;
-findings route to **S12.6f** (owner/RUNBOOK to slice). The dist/ APK + README stay committed for the owner
-(delete before merge). **Next: plan + execute S12.6f, then re-test Gate 2 again.**
+**ALL of S12.6 (a–e) DONE; GATE 2 RE-RE-TESTED (2026-06-14) → 36 new findings G2R-F33…F68 → S12.7 (a–h) is
+the next work (planned in RUNBOOK, all Opus/high).** The owner re-tested the S12.6e dist/ APK on-device:
+"definitely going in the right direction" but a further batch of parity/behaviour gaps remains (see "Gate 2
+RE-RE-TEST" below) — manual-override false-positives + spurious instant-override-on-start race (need the real
+task567 logic: anim mutex + target-vs-actual delta), no Resume on the notification, QS tile not live, super
+dimming doesn't Extra-Dim, Wi-Fi SSID should use the Shizuku/dump `_GetWifiNoLocation V3` path (not
+Location), context location listener dies on background + 0.0,0.0 reads + needs day-of-week rules,
+"manual load = override" semantics, missing per-screen live readouts, global/Accessibility toasts +
+toast-cancel + instant-off, and several label/wiring polish items + the polished load/save/rule modals.
+**Gate 2 stays NOT signed off.** The dist/ APK + README were **removed** (owner about to merge S12.6).
+**Next: execute S12.7 a–h, then re-test Gate 2 again.**
 
 **(historical) ALL of S12.6 (a–e) DONE → HUMAN GATE 2 RE-TEST (again) is next.** S12.6e (D-053) closed the last batch:
 the **label + verbatim long-press-help audit** (G2R-F19/F20/F21) — `TaskerHelp.kt` carries the 30 decoded
@@ -215,20 +216,26 @@ AppModule is now the real DI root.
   context Wi-Fi `SsidResult`/live-location G2R-F22 + time-picker modal G2R-F28 + usage-access-optional
   G2R-F24 + runtime context-load toast G2R-F25 + Live Debug Performance & Timings parity G2R-F29 —
   D-053). **ALL S12.6 sub-segments complete.** Domain/ + golden vectors + ChartCanvas API stayed fenced.
-- **GATE 2 RE-RE-TEST DONE (2026-06-14) → 30 findings G2R-F33…F62** (see "Gate 2 RE-RE-TEST"). Gate 2
+- **GATE 2 RE-RE-TEST DONE (2026-06-14) → 36 findings G2R-F33…F68** (see "Gate 2 RE-RE-TEST"). Gate 2
   still NOT signed off.
-- **S12.6f — Gate-2 re-re-test salvage** is the NEXT work (RUNBOOK to plan/slice). Themes: manual-override
-  detection (anim mutex + target-vs-actual delta, F34) + override notification/vibration (F35) + tap-to-
-  delete points (F36); Wi-Fi via `_GetWifiNoLocation V3` Shizuku/dump path (F41) + Location grant in Setup
-  + restricted-settings flow (F33); context location listener lifecycle + 0.0,0.0 + ordering + legacy-
-  profile targets + override semantics (F42–F46); debug-toast behaviour (foreground/global, stacking,
-  instant-off, context-automation + dynamic-scale timing, F47–F52); per-screen live readouts + label/%/
-  var-substitution + Misc auto-scale + form2A/3A labels (F56–F61); first-boot nav to Menu (F57). **S13
-  candidates** (charts): reference dashed gold line (F37), axis labels + interactive scrub + log-x (F55),
-  curve-fitting on the curve view (F62). **Owner-decision/large design ports:** the full Profile/Contexts
-  settings-list-with-gold-changed-values HTML (F38), Circadian Date/Lat/Lon element (F39). A global-toast
-  surface (F50) likely needs Accessibility — owner sign-off.
-- **HUMAN GATE 2 — RE-TEST (4th) AGAIN** after S12.6f. Re-verify all G2R-Fn + the original Gate-2 set.
+- **S12.7 — Gate-2 re-re-test salvage (a–h, all Opus/high)** is the NEXT work (brief in RUNBOOK). Split:
+  **a** manual-override engine (transcribe task567: anim mutex + target-vs-actual delta) + instant-override
+  race + override semantics (F34/F64/F46); **b** runtime feedback surfaces — override notification+vibration
+  +toast, notification Resume, QS tile live refresh, super-dimming Extra-Dim fix (F35/F40/F63/F65); **c**
+  context system — location listener lifecycle/0.0,0.0/debounce, use-current-location perm recheck, priority
+  ordering, legacy-profile rule targets, context-automation debug toasts, day-of-week rules+midnight wrap,
+  sunrise/sunset gold value (F42/F43/F44/F45/F47/F67/F68); **d** permissions & Wi-Fi & first-boot nav —
+  restricted-settings guidance, Location grant in Setup, `_GetWifiNoLocation V3` Shizuku/dump SSID path +
+  grant guidance, first-boot→Menu (F33/F41/F57); **e** debug/toast infra — Accessibility global toasts,
+  cancel-previous, instant debug-off, dynamic-scale timing, overlay-preview colour toast (F48/F49/F50/F51/
+  F52); **f** per-screen live readouts + labels — readout blocks, reactivity %, var-substitution+info-gate,
+  Misc auto-scale, form2A/3A labels (F56/F58/F59/F60/F61); **g** charts & curve view (may lift the
+  ChartCanvas fence) — axis labels + interactive scrub + log-x, curve-fitting on the curve view, reference-
+  line legend (F55/F62/F66 [+F36 tap-to-delete points]); **h** rich editors / scene fidelity — polished
+  load/save/create/edit-rule modals + full settings list w/ gold changed-vs-default (F38), Circadian
+  Date/Lat/Lon element (F39). domain/ + golden vectors stay fenced except S12.7g (charts) which may extend
+  ChartCanvas.
+- **HUMAN GATE 2 — RE-TEST (4th) AGAIN** after S12.7. Re-verify all G2R-Fn + the original Gate-2 set.
 - **S13** (chart replication + static screens) follows S12.6 on the serial spine — preconditions S12.6
   DONE (faithful screens + menu IA), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over
   read-only `ChartCanvas.kt`) into the six remaining charts and fills their `ChartPlaceholder` host slots
@@ -1369,12 +1376,12 @@ to be addressed already, fix now; otherwise leave for future stages"; none are S
   it and the UI shows no "context automation paused / Resume" affordance. S12.6d (profiles) should set
   the lock on manual apply + surface a resume control that clears `contextOverride` (+ re-evaluates).
 
-### Gate 2 RE-RE-TEST (after S12.6e) — findings recorded → S12.6f (Gate 2 still NOT signed off)
+### Gate 2 RE-RE-TEST (after S12.6e) — findings recorded → S12.7 (Gate 2 still NOT signed off)
 
-**Owner on-device re-re-test 2026-06-14 ~18:45 UTC** (S12.6e build, dist/ APK). "Definitely going in the
-right direction." A further batch of parity/behaviour gaps remains → **G2R-F33…F62**, recorded verbatim
+**Owner on-device re-re-test 2026-06-14 ~18:45 + 19:24 UTC** (S12.6e build, dist/ APK). "Definitely going in
+the right direction." A further batch of parity/behaviour gaps remains → **G2R-F33…F68**, recorded verbatim
 (structured below; owner's technical hints preserved — they are parity-critical). **Gate 2 stays NOT signed
-off**; these route to a new **S12.6f** (owner/RUNBOOK to slice into sub-segments). Several are S13 chart
+off**; these route to a new **S12.7** (a–h, all Opus/high; brief in RUNBOOK). Several are S13 chart
 work or large HTML-scene design ports — flagged inline. The owner did NOT follow the dist/README test
 order, so the README's S12.6a–d re-confirmation items are still UNVERIFIED this round (see "untested" note
 at the end).
@@ -1488,6 +1495,37 @@ at the end).
   dynamic scale** when circadian scaling is enabled (mirrors the Tasker scale_dynamic auto field).
 - **G2R-F61** Under **Curve & Brightness, form2A / form3A look like placeholders** — label them **"Zone 2
   alignment" / "Zone 3 alignment"** (they are the derived continuity hinge points).
+
+*Re-re-test clarifications + additional findings (owner, 2026-06-14 19:24) + owner answers to the open questions:*
+- **CONFIRMED WORKING (retractions / no action):** boot self-start; screen off→on reinit; block-Apply gate;
+  per-screen reset; override-point persistence; PWM-sensitive **hardware-floor** lock. **G2R-F37 RETRACTED**
+  — the dashed **gold reference line IS present** on the graphs; it only needs a **legend** now (→ G2R-F66).
+- **G2R-F63** **QS tile state is not live** — Off→Starting "hangs" until the QS panel is closed+reopened;
+  state transitions only render when not being watched. Needs `TileService.requestListeningState` /
+  `Tile.updateTile` on every state change (and a refresh on `onStartListening`).
+- **G2R-F64** **Spurious "instant override" on service start / display-on (race).** QS Off→On sometimes
+  lands in *override* instead of resuming; a display off→on cycle sometimes leaves it *paused*. Both point
+  to a manual-override being detected at start/reinit (the observer firing on our own initial write).
+  Confirmed in the Dashboard; hard to reproduce once cleared. Likely a race in OverrideMonitor vs the
+  initial `setInitialBrightness` write — gate override detection until the first self-write settles.
+  (Tightly related to G2R-F34; fix together.)
+- **G2R-F65** **Super dimming does not Extra-Dim.** With PWM-sensitive on, the hardware floor locks to the
+  setpoint correctly, BUT the **secure `reduce_bright_colors` (Extra Dim) layer never actually dims** below
+  it. The ELEVATED super-dimming engage path is not taking effect on-device (separate from the PWM floor).
+- **G2R-F66** Graphs need a **legend** for the (now-confirmed) dashed gold reference line + the live curve.
+- **G2R-F67** Context rules also need **day-of-week selection** (Tasker `<Day>` rules) with **smart
+  midnight wrapping**. The domain `ContextTriggers.days` + resolver already exist (D-014); the rule editor
+  exposes no day picker.
+- **G2R-F68** The rule editor's **Sunrise/Sunset tokens should also display the resolved current
+  time-of-day** for today, in theme **gold** (Tasker shows e.g. "SUNRISE (06:42)").
+- **OWNER ANSWERS to S12.6e open questions:** (F34) **yes — transcribe the real task567 override logic**
+  from the XML, don't approximate. (F41) provide **guidance on granting `DUMP` and/or using Shizuku** for
+  the no-Location SSID path. (F50) **yes, use an AccessibilityService** for global toasts — distribution is
+  **F-Droid/GitHub, not Play Store**, so the sensitive permission is acceptable. (F38/F39) the "modals" =
+  the **load / save / create-rule / edit-rule** dialogs — they feel **more polished** in Tasker's WebViews
+  than the current M3; raise the fidelity (full settings list w/ gold changed-vs-default values; smoother
+  context resume). (F46) **confirmed** — manual profile load = an override (latch + Menu shows it + Resume
+  clears); a context rule being active is NOT an override.
 
 ### Gate 3 (after S14) — pending
 
