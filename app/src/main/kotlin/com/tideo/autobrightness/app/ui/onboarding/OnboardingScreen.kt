@@ -200,16 +200,23 @@ fun OnboardingContent(
                 testTag = "step_write_settings",
             )
             ElevatedStepCard(state, onCopyAdb, onRequestShizuku, onTryRoot)
-            if (state.needsUsageAccess) {
-                StepCard(
-                    title = "4. Usage access (per-app contexts)",
-                    body = "Required to detect the foreground app for your per-app context rules.",
-                    done = state.usageAccessGranted,
-                    actionLabel = "Open usage access",
-                    onAction = onRequestUsageAccess,
-                    testTag = "step_usage_access",
-                )
-            }
+            // G2R-F24: usage access is OPTIONAL by default (per D-024/task563) — always shown so it is
+            // discoverable, but only flagged as needed once a per-app context rule exists.
+            StepCard(
+                title = if (state.needsUsageAccess) "4. Usage access (needed for per-app rules)"
+                else "4. Usage access (optional)",
+                body = if (state.needsUsageAccess) {
+                    "One of your context rules targets specific apps. Grant usage access so the " +
+                        "service can detect the foreground app."
+                } else {
+                    "Only needed if you later add a context rule that switches profiles per app. " +
+                        "You can skip this for now and grant it from the Contexts screen later."
+                },
+                done = state.usageAccessGranted,
+                actionLabel = "Open usage access",
+                onAction = onRequestUsageAccess,
+                testTag = "step_usage_access",
+            )
             Button(
                 onClick = onDone,
                 modifier = Modifier.fillMaxWidth().testTag("onboarding_done"),

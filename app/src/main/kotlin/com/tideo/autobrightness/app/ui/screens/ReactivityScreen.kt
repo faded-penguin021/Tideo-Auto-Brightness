@@ -65,55 +65,61 @@ fun ReactivityContent(
             // Live glass-box readout: current dynamic threshold + sensor dead zone (G2R-F7).
             ReactivityDiagnosticCard()
 
+            // Labels + verbatim long-press help re-derived from extraction/scenes/reactivity_settings.md
+            // (S12.6e, G2R-F19/F20/F21). The threshold fields are %aab_thresh*pc reactivity levels.
             SectionHeader("Smoothing thresholds")
             NumberSettingField(
-                "Threshold dark", draft.thresholdDark, { onEdit { s -> s.copy(thresholdDark = it.toFloat()) } },
+                "Dark threshold", draft.thresholdDark, { onEdit { s -> s.copy(thresholdDark = it.toFloat()) } },
                 epoch = epoch, committed = committed.thresholdDark, isInt = false,
-                helper = "Reactivity in complete darkness.", testTag = "field_thresholdDark",
+                help = TaskerHelp.THRESH_DARK, testTag = "field_thresholdDark",
             )
             NumberSettingField(
-                "Threshold dim", draft.thresholdDim, { onEdit { s -> s.copy(thresholdDim = it.toFloat()) } },
+                "Dim threshold", draft.thresholdDim, { onEdit { s -> s.copy(thresholdDim = it.toFloat()) } },
                 epoch = epoch, committed = committed.thresholdDim, isInt = false,
-                helper = "Baseline reactivity for most situations.", testTag = "field_thresholdDim",
+                help = TaskerHelp.THRESH_DIM, testTag = "field_thresholdDim",
             )
             NumberSettingField(
-                "Threshold bright", draft.thresholdBright, { onEdit { s -> s.copy(thresholdBright = it.toFloat()) } },
+                "Bright threshold", draft.thresholdBright, { onEdit { s -> s.copy(thresholdBright = it.toFloat()) } },
                 epoch = epoch, committed = committed.thresholdBright, isInt = false,
-                helper = "Reactivity in bright outdoor light.", testTag = "field_thresholdBright",
+                help = TaskerHelp.THRESH_BRIGHT, testTag = "field_thresholdBright",
             )
             NumberSettingField(
-                "Threshold steepness", draft.thresholdSteepness, { onEdit { s -> s.copy(thresholdSteepness = it.toFloat()) } },
+                "Curve slope", draft.thresholdSteepness, { onEdit { s -> s.copy(thresholdSteepness = it.toFloat()) } },
                 epoch = epoch, committed = committed.thresholdSteepness, isInt = false,
-                helper = "How quickly reactivity changes across light levels.", testTag = "field_thresholdSteepness",
+                help = TaskerHelp.CURVE_SLOPE, testTag = "field_thresholdSteepness",
             )
             NumberSettingField(
-                "Threshold midpoint (log lux)", draft.thresholdMidpoint, { onEdit { s -> s.copy(thresholdMidpoint = it) } },
+                "Curve mid (log lux)", draft.thresholdMidpoint, { onEdit { s -> s.copy(thresholdMidpoint = it) } },
                 epoch = epoch, committed = committed.thresholdMidpoint, isInt = false,
-                helper = "Log-lux level where the system switches behavior.", testTag = "field_thresholdMidpoint",
+                help = TaskerHelp.CURVE_MID, testTag = "field_thresholdMidpoint",
             )
             NumberSettingField(
                 "Dynamic threshold", draft.thresholdDynamic, { onEdit { s -> s.copy(thresholdDynamic = it.toInt()) } },
                 epoch = epoch, committed = committed.thresholdDynamic,
-                helper = "Adaptive dead-band scaling.", testTag = "field_thresholdDynamic",
+                helper = "Adaptive dead-band scaling (%AAB_ThreshDynamic).", testTag = "field_thresholdDynamic",
             )
+            // G2R-F19/F20: "Delta factor" was mislabelled with a wrong help ("brightness only changes
+            // once lux exceeds this"). It is the SENSOR-SMOOTHING factor (%AAB_DeltaFactor, Misc scene
+            // "Smoothing Δ"): luxAlpha = 1 - exp(-deltaFactor·effectiveDelta) in BrightnessEngine — the
+            // binding was already correct, only the label/help were wrong. Fixed to the verbatim help.
             NumberSettingField(
-                "Delta factor", draft.deltaFactor, { onEdit { s -> s.copy(deltaFactor = it.toFloat()) } },
+                "Smoothing Δ", draft.deltaFactor, { onEdit { s -> s.copy(deltaFactor = it.toFloat()) } },
                 epoch = epoch, committed = committed.deltaFactor, isInt = false,
-                helper = "Brightness only changes once the lux change exceeds this.", testTag = "field_deltaFactor",
+                help = TaskerHelp.DELTA_FACTOR, testTag = "field_deltaFactor",
             )
 
             SectionHeader("Override & trust")
             // task525/526 _OverrideToggle — DetectOverrides (Gate-1 G1-F2 deferral, surfaced in S12).
             SwitchSettingRow(
-                "Detect manual overrides", draft.detectOverrides,
+                "Use override detection", draft.detectOverrides,
                 { onEdit { s -> s.copy(detectOverrides = it) } },
-                helper = "Pause when you change brightness manually; resume automatically.",
+                help = TaskerHelp.DETECT_OVERRIDES,
                 testTag = "switch_detectOverrides",
             )
             SwitchSettingRow(
-                "Trust unreliable sensor", draft.trustUnreliableSensor,
+                "Trust low-accuracy sensor", draft.trustUnreliableSensor,
                 { onEdit { s -> s.copy(trustUnreliableSensor = it) } },
-                helper = "Enable only if auto-brightness seems unresponsive on your device.",
+                help = TaskerHelp.TRUST_UNRELIABLE,
                 testTag = "switch_trustUnreliableSensor",
             )
         }

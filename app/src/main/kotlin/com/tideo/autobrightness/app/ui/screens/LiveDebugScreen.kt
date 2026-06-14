@@ -96,9 +96,14 @@ fun LiveDebugContent(
                 Metric("Active rule", state.activeContext ?: "None", "debug_active_rule")
             }
 
-            // Performance & Timings (debug.md group 5): last cycle duration + last sample age.
+            // Performance & Timings (debug.md L19-23): luxAlpha, cycle total, reactivity cooldown
+            // (throttle), last animation (steps×wait) and last update — full Tasker parity (G2R-F29).
             DiagnosticCard("Performance & Timings", "debug_performance") {
+                Metric("Smoothing α (LuxAlpha)", fmt(p.luxAlpha, 3), "debug_lux_alpha")
                 Metric("Cycle time (ms)", fmt(p.cycleTimeMs, 0), "debug_cycle_time")
+                Metric("Reactivity cooldown (ms)", p.throttleMs?.toString() ?: "—", "debug_throttle")
+                Metric("Last animation", animationLabel(p.animationSteps, p.animationWaitMs), "debug_last_animation")
+                Metric("Last update", lastSampleLabel(p.lastUpdateMs), "debug_last_update")
                 Metric("Last sample", lastSampleLabel(p.lastSampleMs), "debug_last_sample")
             }
 
@@ -115,6 +120,10 @@ private fun Metric(label: String, value: String, testTag: String) {
         goldValue(value)
     }
 }
+
+/** "steps×waitms" for the Live Debug "Last Animation" row, or "—" when no animation has run. */
+private fun animationLabel(steps: Int?, waitMs: Long?): String =
+    if (steps != null && waitMs != null) "${steps}×${waitMs}ms" else "—"
 
 private fun lastSampleLabel(ms: Long?, now: Long = System.currentTimeMillis()): String {
     if (ms == null) return "never"

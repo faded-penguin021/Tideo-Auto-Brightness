@@ -221,6 +221,27 @@ class ContextEngineTest {
     }
 
     @Test
+    fun contextLoad_firesLoadSink_G2RF25() = runTest {
+        // G2R-F25: a runtime context-rule profile load notifies the load sink (→ user toast),
+        // unconditionally (not gated on the debug selector). Fires only for a named rule win.
+        val loads = mutableListOf<Pair<String, String>>()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { listOf(videoStreamingRule) },
+            baselineProvider = { baseline },
+            profileCatalog = catalog,
+            signalSource = FakeSignalSource(app = "com.netflix.mediaclient"),
+            onProfileChanged = {},
+            clock = { 0L },
+            contextLoadSink = { ctx, prof -> loads += ctx to prof },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+        assertEquals(listOf("Cinema" to "Video Streaming"), loads)
+        scope.cancel()
+    }
+
+    @Test
     fun mergeProfile_preservesDetectOverrides_G2F8() {
         // detectOverrides is a global reactivity preference, NOT a task626 snapshot key: a context
         // profile swap must keep the user's manual-override detection setting (G2-F8).

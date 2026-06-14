@@ -62,3 +62,18 @@ class ToastDebugSink(context: Context) : DebugSink {
         const val AAB_TEAL = 0xFF007C63.toInt()
     }
 }
+
+/**
+ * Android [ContextLoadSink] (S12.6e, G2R-F25): an unconditional user-visible toast when a context rule
+ * loads its profile at runtime (Tasker flashes on a context load). Posts on the main looper since the
+ * engine emits from a background coroutine.
+ */
+class ToastContextLoadSink(context: Context) : ContextLoadSink {
+    private val appContext = context.applicationContext
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    override fun onContextLoaded(contextName: String, profileName: String) {
+        val text = "Context \"$contextName\" → profile \"$profileName\""
+        mainHandler.post { Toast.makeText(appContext, text, Toast.LENGTH_SHORT).show() }
+    }
+}

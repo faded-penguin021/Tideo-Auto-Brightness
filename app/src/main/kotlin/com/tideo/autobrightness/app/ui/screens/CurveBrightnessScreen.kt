@@ -107,31 +107,34 @@ fun CurveBrightnessContent(
                 fittedCurve = fittedCurve,
             )
 
+            // Labels + verbatim long-press help re-derived from extraction/scenes/brightness_settings.md
+            // (S12.6e, G2R-F19/F21). Tasker labels: "Zone 1 Scaling" (form1A), "Zone 2 Scaling" (form2B),
+            // "Zone 2 Offset" (form2C); zone-end fields keep the lux annotation.
             SectionHeader("Curve zones")
             NumberSettingField(
-                "Form 1A", draft.form1A, { onEdit { s -> s.copy(form1A = it.toInt()) } },
+                "Zone 1 scaling (form1A)", draft.form1A, { onEdit { s -> s.copy(form1A = it.toInt()) } },
                 epoch = epoch, committed = committed.form1A,
-                helper = "How quickly brightness rises in dim light.", testTag = "field_form1A",
+                help = TaskerHelp.FORM_1A, testTag = "field_form1A",
             )
             NumberSettingField(
                 "Zone 1 end (lux)", draft.zone1End, { onEdit { s -> s.copy(zone1End = it.toInt()) } },
                 epoch = epoch, committed = committed.zone1End,
-                helper = "Where dim-light zone 1 ends and zone 2 begins.", testTag = "field_zone1End",
+                help = TaskerHelp.ZONE_1_END, testTag = "field_zone1End",
             )
             NumberSettingField(
-                "Form 2B", draft.form2B, { onEdit { s -> s.copy(form2B = it.toFloat()) } },
+                "Zone 2 scaling (form2B)", draft.form2B, { onEdit { s -> s.copy(form2B = it.toFloat()) } },
                 epoch = epoch, committed = committed.form2B, isInt = false,
-                helper = "Boost in medium light.", testTag = "field_form2B",
+                help = TaskerHelp.FORM_2B, testTag = "field_form2B",
             )
             NumberSettingField(
-                "Form 2C (zone 2 offset)", draft.form2C, { onEdit { s -> s.copy(form2C = it.toInt()) } },
+                "Zone 2 offset (form2C)", draft.form2C, { onEdit { s -> s.copy(form2C = it.toInt()) } },
                 epoch = epoch, committed = committed.form2C, error = errors.forField("form2C"),
-                helper = "Midrange offset; must be ≤ zone 1 end.", testTag = "field_form2C",
+                help = TaskerHelp.FORM_2C, testTag = "field_form2C",
             )
             NumberSettingField(
                 "Zone 2 end (lux)", draft.zone2End, { onEdit { s -> s.copy(zone2End = it.toInt()) } },
                 epoch = epoch, committed = committed.zone2End, error = errors.forField("zone2End"),
-                helper = "Where indoor zone 2 ends and bright zone 3 begins.", testTag = "field_zone2End",
+                help = TaskerHelp.ZONE_2_END, testTag = "field_zone2End",
             )
 
             // task659 live-derived continuity coefficients (task613/614/615 _UpdateBrightnessFormulae).

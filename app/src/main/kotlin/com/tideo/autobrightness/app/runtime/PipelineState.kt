@@ -30,6 +30,16 @@ data class PipelineState(
     val threshDynamic: Double? = null,
     /** %AAB_CycleTime — measured duration of the last cycle, feeds task543's throttle. */
     val cycleTimeMs: Double? = null,
+    /** %LuxAlpha — last smoothing alpha (1 - exp(-deltaFactor·effectiveDelta)); Live Debug (G2R-F29). */
+    val luxAlpha: Double? = null,
+    /** Last animation step count (%AAB_AnimSteps used this cycle); Live Debug "Last Animation" (G2R-F29). */
+    val animationSteps: Int? = null,
+    /** Last per-step wait (ms) used this cycle; Live Debug "Last Animation" (G2R-F29). */
+    val animationWaitMs: Long? = null,
+    /** %AAB_Throttle — reactivity cooldown window (ms) in force; Live Debug (G2R-F29). */
+    val throttleMs: Long? = null,
+    /** TIMEMS of the last brightness update this pipeline wrote (%AAB_LastUpdate); Live Debug (G2R-F29). */
+    val lastUpdateMs: Long? = null,
     /** %AAB_ScaleDynamic — last UNCOMPRESSED circadian/base scale (task90 output, pre-taper); null
      *  until the first cycle. Surfaced for the Circadian diagnostic card / Live Debug scene (G2R-F8). */
     val scaleDynamic: Double? = null,

@@ -11,17 +11,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,8 +43,10 @@ import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.settings.BatteryTrigger
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextTriggers
+import com.tideo.autobrightness.app.settings.LocationTrigger
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.ContextsViewModel
+import com.tideo.autobrightness.platform.context.SsidResult
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
@@ -66,11 +72,28 @@ fun ContextsScreen(navController: NavHostController, vm: ContextsViewModel = vie
         onBack = { navController.popBackStack() },
         onSave = { toast("Rule saved"); vm.save(it) },
         onDelete = { vm.delete(it); toast("Rule deleted") },
-        onUseCurrentSsid = { onResult ->
+        onUseCurrentSsid = { setSsid ->
             scope.launch {
-                val ssid = vm.currentSsid()
-                if (ssid == null) toast("Not connected to Wi-Fi")
-                onResult(ssid)
+                // G2R-F22: targeted message per failure mode, not a blanket "Not connected".
+                when (val result = vm.currentSsid()) {
+                    is SsidResult.Connected -> { setSsid(result.ssid); toast("Wi-Fi: ${result.ssid}") }
+                    SsidResult.NotOnWifi -> toast("Not connected to Wi-Fi")
+                    SsidResult.NeedsLocationPermission ->
+                        toast("Reading the Wi-Fi name needs Location permission (grant it in Setup)")
+                    SsidResult.LocationServicesOff ->
+                        toast("Turn on Location services to read the Wi-Fi name")
+                    SsidResult.Unknown -> toast("Could not read the current Wi-Fi name")
+                }
+            }
+        },
+        onUseCurrentLocation = { setLatLon ->
+            // G2R-F22 (live location): fill lat/lon from the last known device location.
+            val loc = vm.currentLocation()
+            if (loc != null) {
+                setLatLon(loc.latitude, loc.longitude)
+                toast("Location: %.4f, %.4f".format(loc.latitude, loc.longitude))
+            } else {
+                toast("No location available (grant Location permission and try again)")
             }
         },
         hasUsageAccess = vm::hasUsageAccess,
@@ -89,7 +112,8 @@ fun ContextsContent(
     onBack: () -> Unit,
     onSave: (ContextRule) -> Unit,
     onDelete: (String) -> Unit,
-    onUseCurrentSsid: ((String?) -> Unit) -> Unit = {},
+    onUseCurrentSsid: ((String) -> Unit) -> Unit = {},
+    onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
     hasUsageAccess: () -> Boolean = { true },
     onRequestUsageAccess: () -> Unit = {},
 ) {
@@ -123,6 +147,7 @@ fun ContextsContent(
                     onCancel = { editing = null },
                     onSave = { onSave(it); editing = null },
                     onUseCurrentSsid = onUseCurrentSsid,
+                    onUseCurrentLocation = onUseCurrentLocation,
                     hasUsageAccess = hasUsageAccess,
                     onRequestUsageAccess = onRequestUsageAccess,
                 )
@@ -164,7 +189,8 @@ private fun RuleEditor(
     apps: List<AppEntry>,
     onCancel: () -> Unit,
     onSave: (ContextRule) -> Unit,
-    onUseCurrentSsid: ((String?) -> Unit) -> Unit,
+    onUseCurrentSsid: ((String) -> Unit) -> Unit,
+    onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit,
     hasUsageAccess: () -> Boolean,
     onRequestUsageAccess: () -> Unit,
 ) {
@@ -175,6 +201,10 @@ private fun RuleEditor(
     var startTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(0) ?: "") }
     var endTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(1) ?: "") }
     var charging by remember { mutableStateOf(rule.triggers.battery?.onPower == true) }
+    // Location window (G2R-F22): lat/lon/radius editor + "use current location".
+    var lat by remember { mutableStateOf(rule.triggers.location?.lat?.toString() ?: "") }
+    var lon by remember { mutableStateOf(rule.triggers.location?.lon?.toString() ?: "") }
+    var radius by remember { mutableStateOf(rule.triggers.location?.radius?.toString() ?: "") }
     // Battery percentage window (G2R-F31, owner-reported): 0/100 means "any level" → omit the bound.
     var battMin by remember { mutableStateOf(rule.triggers.battery?.min?.takeIf { it > 0 }?.toString() ?: "") }
     var battMax by remember { mutableStateOf(rule.triggers.battery?.max?.takeIf { it < 100 }?.toString() ?: "") }
@@ -206,26 +236,45 @@ private fun RuleEditor(
         modifier = Modifier.fillMaxWidth().testTag("rule_wifi"),
     )
     TextButton(
-        onClick = { onUseCurrentSsid { ssid -> if (ssid != null) wifi = ssid } },
+        onClick = { onUseCurrentSsid { ssid -> wifi = ssid } },
         modifier = Modifier.testTag("use_current_ssid"),
     ) { Text("Use current Wi-Fi") }
 
+    // G2R-F28: time inputs open the system TimePicker modal; SUNRISE/SUNSET tokens are kept as
+    // one-tap alternatives (the resolver accepts them, G2-F14).
+    Text("Time window:", style = MaterialTheme.typography.labelMedium)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Column(Modifier.weight(1f)) {
-            OutlinedTextField(
-                value = startTime, onValueChange = { startTime = it }, label = { Text("From (HH:MM)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_start"),
-            )
+            TimeField("From", startTime, "start") { startTime = it }
             TimeTokenRow("start") { startTime = it }
         }
         Column(Modifier.weight(1f)) {
-            OutlinedTextField(
-                value = endTime, onValueChange = { endTime = it }, label = { Text("To (HH:MM)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_end"),
-            )
+            TimeField("To", endTime, "end") { endTime = it }
             TimeTokenRow("end") { endTime = it }
         }
     }
+
+    SectionHeader("Location")
+    OutlinedButton(
+        onClick = { onUseCurrentLocation { la, lo -> lat = "%.5f".format(la); lon = "%.5f".format(lo) } },
+        modifier = Modifier.testTag("use_current_location"),
+    ) { Text("Use current location") }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = lat, onValueChange = { lat = it }, label = { Text("Latitude") },
+            singleLine = true, modifier = Modifier.weight(1f).testTag("rule_lat"),
+        )
+        OutlinedTextField(
+            value = lon, onValueChange = { lon = it }, label = { Text("Longitude") },
+            singleLine = true, modifier = Modifier.weight(1f).testTag("rule_lon"),
+        )
+    }
+    OutlinedTextField(
+        value = radius, onValueChange = { radius = it.filter { c -> c.isDigit() || c == '.' } },
+        label = { Text("Radius (metres)") }, singleLine = true,
+        modifier = Modifier.fillMaxWidth().testTag("rule_radius"),
+    )
+
     SwitchSettingRow("Only while charging", charging, { charging = it }, testTag = "rule_charging")
 
     // Battery percentage window (G2R-F31). Either bound may be left blank for "any".
@@ -296,6 +345,9 @@ private fun RuleEditor(
                 val minPct = battMin.trim().toIntOrNull()?.coerceIn(0, 100)
                 val maxPct = battMax.trim().toIntOrNull()?.coerceIn(0, 100)
                 val hasBattery = charging || minPct != null || maxPct != null
+                val latV = lat.trim().toDoubleOrNull()
+                val lonV = lon.trim().toDoubleOrNull()
+                val radiusV = radius.trim().toDoubleOrNull()
                 val triggers = ContextTriggers(
                     apps = selectedApps.value.takeIf { it.isNotEmpty() }?.toList(),
                     wifi = wifi.split(",").map { it.trim() }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() },
@@ -305,6 +357,11 @@ private fun RuleEditor(
                             max = maxPct ?: 100,
                             onPower = if (charging) true else null,
                         )
+                    } else {
+                        null
+                    },
+                    location = if (latV != null && lonV != null && radiusV != null && radiusV > 0) {
+                        LocationTrigger(lat = latV, lon = lonV, radius = radiusV)
                     } else {
                         null
                     },
@@ -325,6 +382,47 @@ private fun RuleEditor(
         ) { Text("Save rule") }
         TextButton(onClick = onCancel, modifier = Modifier.testTag("cancel_rule")) { Text("Cancel") }
     }
+}
+
+/**
+ * A tappable time field that opens the Material3 [TimePicker] modal (G2R-F28). Shows the current
+ * value (an "HH:MM" time or a SUNRISE/SUNSET token); tapping opens the picker, seeded from the current
+ * "HH:MM" when present. Replaces the previous free-text `OutlinedTextField`.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeField(label: String, value: String, tag: String, onSet: (String) -> Unit) {
+    var showPicker by remember { mutableStateOf(false) }
+    val (initialH, initialM) = remember(value) { parseHhMm(value) ?: (8 to 0) }
+
+    OutlinedButton(
+        onClick = { showPicker = true },
+        modifier = Modifier.fillMaxWidth().testTag("rule_$tag"),
+    ) { Text("$label: ${value.ifBlank { "—" }}") }
+
+    if (showPicker) {
+        val state = rememberTimePickerState(initialHour = initialH, initialMinute = initialM, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = { onSet("%02d:%02d".format(state.hour, state.minute)); showPicker = false },
+                    modifier = Modifier.testTag("${tag}_time_ok"),
+                ) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancel") } },
+            text = { TimePicker(state = state) },
+        )
+    }
+}
+
+/** Parse an "HH:MM" string to (hour, minute), or null for blank/token values (SUNRISE/SUNSET). */
+private fun parseHhMm(value: String): Pair<Int, Int>? {
+    val parts = value.trim().split(":")
+    if (parts.size != 2) return null
+    val h = parts[0].toIntOrNull() ?: return null
+    val m = parts[1].toIntOrNull() ?: return null
+    return if (h in 0..23 && m in 0..59) h to m else null
 }
 
 /** SUNRISE/SUNSET quick-insert tokens for a time field (the resolver accepts them, G2-F14). */

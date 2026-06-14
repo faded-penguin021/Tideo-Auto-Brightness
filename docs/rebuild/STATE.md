@@ -32,12 +32,29 @@ next session does not know it.
 | S12.6a IA & naming | 2026-06-14 | Opus/high | DONE | (see push) | Menu-as-home reshape + two renames + Dashboard last-sample fix (G2R-F1…F5). **AAB Menu promoted to a real home hub** (`AppRoute.Menu` + `ui/screens/MenuScreen.kt`): gold-sun teal banner (rebranded "Tideo Auto Brightness", not "Advanced"), Profiles/Contexts **hero cards moved off the Dashboard**, Settings/Info&Help nav groups; it is the start destination after onboarding (tier!=NONE→Menu) and the back-target from every settings/tool screen via new `NavHostController.navigateTopLevel` (popUpTo(menu)). The S12.5a `AabNavDrawer` retired; `AabTopBar` gained an optional back arrow (AutoMirrored). Dashboard slimmed to live-status (tier badge, master switch, live readout, health) + back→Menu. **Renames:** `AnimationDimming`→`SuperDimming` (route `super_dimming`, title "Super Dimming", G2R-F3); `DynamicScale`→`Circadian` (route `circadian`, title "Circadian", G2R-F4) — files `AnimationDimmingScreen.kt`→`SuperDimmingScreen.kt`, `DynamicScaleScreen.kt`→`CircadianScreen.kt` (composables + content fns + NavGraph + tests). **Last-sample fix (G2R-F5):** `PipelineState.lastSampleMs` recorded for every delivered sample in `onSensorSample` (atomic StateFlow.update), surfaced via LiveRuntimeState→DashboardUiState, rendered as relative "Xs ago" (replaces the never-written health-store source). Domain/golden/ChartCanvas untouched. Tests: `UiShellTest` rewritten (Menu hero+nav, renames resolve, start-on-Menu + back-from-settings→Menu, last-sample renders); `SettingsScreensTest` SuperDimming rename. Ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug`. No compaction. |
 | S12.6b glass-box diagnostics + Live Debug scene | 2026-06-14 | Opus/high | DONE | (see push) | The runtime "glass box" surfaced (G2R-F6…F10). New: **Live Debug Info** scene (`AppRoute.LiveDebug`, in the Menu Info&Help group + `navigateTopLevel` back→Menu) = `LiveDebugScreen`/`LiveDebugContent` over `LiveDebugViewModel` (combines LiveRuntimeState pipeline/context/running + DataStore min/max/debugLevel) — live `%AAB_*` readout grouped per debug.md HTML cards (Core Metrics / Circadian & Scale / System Status / Performance & Timings), gold `#FFC107` values via new `ui/components/DiagnosticCard.kt` (`DiagnosticCard`/`DiagnosticLine`/`goldValue`). **Per-screen DiagnosticCards** (G2R-F7/F8): `ReactivityDiagnosticCard` (threshold + dead zone) + `CircadianDiagnosticCard` (uncompressed vs true scale + min/max) embedded on those screens; stateless `*Content(state)` builders for tests. To feed them, `PipelineState` gains `threshDynamic` (%AAB_ThreshDynamic) + `scaleDynamic` (%AAB_ScaleDynamic uncompressed), populated in `runCycle` from existing `BrightnessPolicyOutput.dynamicThreshold`/`scaleDynamic` (no domain API change). **Debug selector → global + relocated** (G2R-F9): moved off Misc to Live Debug (`LiveDebugViewModel.setDebugLevel` writes DataStore directly); `debugLevel` now preserved across `SettingsViewModel.applyProfile/replaceAll/resetDefaults` + `DraftSettingsViewModel.apply`/re-sync (already in `mergeProfile`) — `DEBUG_LABELS`/`DebugLevelSelector` moved MiscScreen→LiveDebugScreen. **Teal debug toasts** (G2R-F10): `ToastDebugSink` builds a teal-rounded custom TextView (via `makeText`+`setView` so ShadowToast still records text). Tests: SettingsScreensTest (Live Debug + Reactivity/Circadian diagnostic cards render seeded PipelineState; selector relocation) + new `SettingsViewModelTest` (debugLevel survives profile apply + reset) + ContextEngineTest `mergeProfile_preservesDebugLevel`. Full ladder GREEN: `:app:testDebugUnitTest`(102) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **NEW FINDING recorded (verified, deferred to S12.6c): G2R-F27/D-050 — PWM-sensitive mode never locks the hardware brightness floor (`pwmSensitive` unread by the runtime).** |
 | S12.6c pipeline behaviour correctness | 2026-06-14 | Opus/high | DONE | (see push) | Fixed the runtime bugs the re-test found + wired override-point capture (D-051; G2R-F11/F12/F13/F14/F26/F27). **G2R-F11/F12** (Apply/profile-load + min-brightness ignored until a light change): root = the pipeline's `settingsProvider`=`ContextEngine.effectiveSettings()` served the STALE cached `_effective` snapshot. Added `ContextEngine.reevaluate()` (re-reads the FRESH baseline + re-merges the active profile, no watcher re-resolution) and the service's `ACTION_REAPPLY` now calls it BEFORE `controller.reapply()` → manual edits take effect immediately (min-bright no longer "stuck at 10"). **G2R-F13** override-point capture (closes D-044c): new `OverridePointStore` (DataStore, newest-first cap 50) + `OverridePointSink`; `handleOverride` persists the de-compressed point; `SettingsViewModel`/`DraftSettingsViewModel` expose `overridePoints`; Tools wizard reads the recorded set. **G2R-F14** `BrightnessCurveChart` overlays the recorded points as dots + shows the fitted/suggested curve only at ≥9 points (ChartCanvas unchanged). **G2R-F26/D-049** override false-positives: `handleOverride` now does the task567 act8 settle (wait %AAB_CycleTime → re-read → only pause if still ≠ our last applied) + the AnimationRunner read-back is now device-exact (`ScreenBrightnessController.isOnScreenSelfWrite`, kills OEM round-trip drift, D-049 #4). **G2R-F27/D-050** PWM-sensitive hardware floor: `applyPwmFloor` clamps the hardware write up to `dimmingThreshold` when `pwmSensitive && target<threshold` (task698 step3) in runCycle + setInitialBrightness. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas API untouched.** New tests: controller minBrightness/PWM-floor/override-false-positive (3), ContextEngine reevaluate-fresh-baseline, OverridePointStore (3). Full ladder GREEN: `:platform:test :app:testDebugUnitTest`(104) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
+| S12.6e labels/help audit + context editor + onboarding | 2026-06-14 | Opus/high | DONE | (this push) | Last S12.6 sub-segment (D-053; G2R-F19…F25 + F28/F29). **Label + verbatim long-press-help audit** (G2R-F19/F20/F21): new `TaskerHelp.kt` holds the 30 verbatim Flash help strings (decoded from the reactivity/brightness/misc/superdimming scene `longclick` tasks via XML_RECIPES R2); `NumberSettingField`/`IntSliderSettingField`/`SwitchSettingRow` gained a `help=` param surfaced via an "ⓘ" reveal (Tasker longtap → tap, `helptext_<tag>`); every control on Reactivity/Curve/Misc/SuperDimming relabelled to the Tasker scene labels + the verbatim help wired. **WIRING AUDIT (G2R-F20): the owner-flagged "delta factor" was MIS-LABELLED/MIS-HELPED, not mis-wired** — `%AAB_DeltaFactor` IS the sensor-smoothing alpha factor (`luxAlpha=1-exp(-deltaFactor·effectiveDelta)`, BrightnessEngine); relabelled "Smoothing Δ" + verbatim help. No other binding bug found; all field→`%AAB_*` bindings cross-checked vs AabSettingsContract. **Context Wi-Fi/location (G2R-F22):** `WifiInfoReader.currentSsid()` is now a `suspend` returning a typed `SsidResult` (one-shot `NetworkCallback` w/ `FLAG_INCLUDE_LOCATION_INFO`+2s timeout; targeted NotOnWifi/NeedsLocationPermission/LocationServicesOff/Unknown messages — fixes the API-29+ `<unknown ssid>` redaction); rule editor gained lat/lon/radius fields + "Use current location" (AndroidLocationReader). **Time picker (G2R-F28):** From/To open the M3 `TimePicker` modal (SUNRISE/SUNSET tokens kept). **Usage access (G2R-F23/F24):** onboarding always shows the usage step, labelled "(optional)" by default / "(needed for per-app rules)" once an app rule exists; the rule-editor grant prompt was already present. **Toast on load (G2R-F25):** new `ContextLoadSink`/`ToastContextLoadSink` → unconditional teal-less toast when a runtime context rule loads its profile; Profiles-screen apply already toasted. **Live Debug Performance & Timings (G2R-F29):** `PipelineState` gains `luxAlpha`/`animationSteps`/`animationWaitMs`/`throttleMs`/`lastUpdateMs` (populated in runCycle from existing engine output, no domain change) → Live Debug card now shows LuxAlpha / cycle / reactivity-cooldown / last-animation (steps×wait) / last-update. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: SettingsScreens +5 (delta-factor verbatim help reveal, time-picker modal, use-current-SSID fills field, location fields, Live Debug timings) + ContextEngine contextLoad-fires-sink (1). Full ladder GREEN (`:app:testDebugUnitTest`=122 `:app:assembleDebug :app:lintDebug :domain:test :platform:test`). No compaction. **GATE 2 RE-TEST (again) READY.** |
 | S12.6d profiles + legacy import + reset + Apply-gate | 2026-06-14 | Opus/high | DONE | (see push) | Real user-profile management + legacy import + validation gate (D-052; G2R-F15/F16/F17/F18/F30 + owner findings F31/F32). **G2R-F15** user-editable profiles: new `UserProfileStore` (DataStore `SavedProfiles`: built-ins seeded once, Save-current-as, overwrite-in-place [keeps built-in flag], delete, **Restore factory profiles**); `AppProfileCatalog` converted object→class reading the store (built-in fallback) so context rules target user profiles too (closes D-042c); `SettingsViewModel` gains saveCurrentAs/deleteProfile/restoreFactoryProfiles/profiles flow; ContextsViewModel.profileNames now a StateFlow off the store. **G2R-F16** legacy SAF import: `LegacyConfigImporter` (OpenDocumentTree grant→takePersistableUriPermission, list `*.json` via DocumentsContract — no MANAGE_EXTERNAL_STORAGE/no new dep) wired into the rewritten ProfilesScreen (link-folder + per-file Load) alongside the single-file picker. **G2R-F17** per-screen reset: `DraftSettingsScaffold` gains an `onReset` TopAppBar action; each of the 5 draft screens resets only its own fields to the task570 baseline + toast. **G2R-F18/D-052** block-Apply: `FieldError` gains `Severity`; the 3 task583 form errors (form2A/3A<0, form2C>zone1End) are CRITICAL; `DraftSettingsViewModel.hasCriticalError` disables `DraftApplyBar` Apply (+ hint) while one stands — sanctioned deviation from Tasker's advisory model. **G2R-F30** manual-load context lock: applyProfile/replaceAll latch `contextOverride=true`; `ContextEngine.reevaluate()` honours the lock (drops active context, runs the manual baseline); Profiles screen shows a Resume banner → `resumeContextAutomation()` clears it + reapplies. **Owner findings during S12.6d:** **G2R-F31** battery % from/to added to the context rule editor (BatteryTrigger min/max; resolver already supported it); **G2R-F32** curve-wizard report was too terse — Tools now shows + copies the FULL `diagnosticsLog` (the engine already produced it; app-layer only). **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: UserProfileStoreTest(5), SettingsValidator severity(1), SettingsScreens criticalError-gate/reset/profiles/context-lock/battery(5), ContextEngine reevaluate-lock(1). Full ladder GREEN: `:app:testDebugUnitTest`(116) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.6a + S12.6b + S12.6c + S12.6d DONE → S12.6e remains.** S12.6d (profiles + legacy import + reset +
+**ALL of S12.6 (a–e) DONE → HUMAN GATE 2 RE-TEST (again) is next.** S12.6e (D-053) closed the last batch:
+the **label + verbatim long-press-help audit** (G2R-F19/F20/F21) — `TaskerHelp.kt` carries the 30 decoded
+Flash help strings, surfaced via an "ⓘ" reveal on every Reactivity/Curve/Misc/SuperDimming control, with
+the labels re-matched to the Tasker scene labels; the owner-flagged **"delta factor" was a label/help bug,
+NOT a wiring bug** (`%AAB_DeltaFactor` is the sensor-smoothing alpha factor — binding was correct →
+relabelled "Smoothing Δ"). **Context editor:** Wi-Fi SSID now read via a `suspend NetworkCallback` with
+`FLAG_INCLUDE_LOCATION_INFO` returning a typed `SsidResult` (targeted messages, fixes API-29+ redaction,
+G2R-F22), live location lat/lon/radius + "use current location" added, and the time inputs open the M3
+**TimePicker** modal (G2R-F28). **Onboarding** shows usage access as **optional by default** (G2R-F24);
+**runtime context loads toast** via `ContextLoadSink` (G2R-F25). **Live Debug Performance & Timings**
+reached full Tasker parity (luxAlpha / cycle / throttle / last-animation steps×wait / last-update,
+G2R-F29) by surfacing existing engine output into `PipelineState` (no domain change). domain/, golden
+vectors and ChartCanvas stayed fenced. Ladder GREEN (`:app:testDebugUnitTest`=122, `:platform:test
+:domain:test :app:assembleDebug :app:lintDebug`). **Next: HUMAN GATE 2 — re-test AGAIN (all G2R-Fn + the
+original Gate-2 set). Then S13.**
+
+**(historical) S12.6a + S12.6b + S12.6c + S12.6d DONE → S12.6e remains.** S12.6d (profiles + legacy import + reset +
 Apply-gate, D-052) landed real user-profile management: `UserProfileStore` (built-ins seeded once,
 Save-current-as, overwrite, **Restore factory profiles**, G2R-F15) read by `AppProfileCatalog` so context
 rules can target user profiles (closes D-042c); **SAF folder grant** legacy import from
@@ -182,13 +199,11 @@ AppModule is now the real DI root.
   PWM-sensitive hardware-floor clamp G2R-F27/D-050 — D-051). **S12.6d DONE** (user-editable profiles +
   overwrite + factory-restore G2R-F15 + SAF legacy import G2R-F16 + per-screen reset G2R-F17 +
   block-Apply-on-critical-error G2R-F18/D-052 + manual-load context-lock/Resume G2R-F30; plus owner
-  findings G2R-F31 battery % editor + G2R-F32 verbose wizard report). Remaining: **S12.6e**
-  (label/long-press-help audit + context Wi-Fi/location [**G2R-F22 root cause found, see findings**] +
-  **time-picker modal G2R-F28** + usage-access flow + load toasts). A Live Debug refinement
-  (**G2R-F29** Performance & Timings parity) is carried too. e is the last parallel-window sub-segment.
-  Domain/ + golden vectors + ChartCanvas API stay fenced. **NOTE for e:** the AAB Menu is the home `AppRoute.Menu`;
-  use `navigateTopLevel` for any new top-level destination so back still returns to the Menu; the
-  global debug selector S12.6b moves OFF Misc belongs on the new Live Debug screen reached from the Menu.
+  findings G2R-F31 battery % editor + G2R-F32 verbose wizard report). **S12.6e DONE** (label +
+  verbatim long-press-help audit G2R-F19/F20/F21 [delta-factor was a label bug not a wiring bug] +
+  context Wi-Fi `SsidResult`/live-location G2R-F22 + time-picker modal G2R-F28 + usage-access-optional
+  G2R-F24 + runtime context-load toast G2R-F25 + Live Debug Performance & Timings parity G2R-F29 —
+  D-053). **ALL S12.6 sub-segments complete.** Domain/ + golden vectors + ChartCanvas API stayed fenced.
 - **HUMAN GATE 2 — RE-TEST AGAIN** after S12.6e. Re-verify all G2R-Fn + the original Gate-2 set.
 - **S13** (chart replication + static screens) follows S12.6 on the serial spine — preconditions S12.6
   DONE (faithful screens + menu IA), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over
@@ -1007,8 +1022,23 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   DISABLE the draft-screen Apply button while present (with a hint). All other rules (the task707
   safety@1000lux warning, wait-order, low-scale, zone2End<zone1End) stay ADVISORY and only warn. This is
   the ONLY place Tasker's advisory model is overridden; do not generalise it. (Affects S12.6d/e, Gate 2.)
+- D-053: S12.6e LABEL/HELP AUDIT + CONTEXT EDITOR + ONBOARDING (G2R-F19…F25, F28, F29). Findings:
+  (a) the owner-flagged **"delta factor" was a LABEL/HELP bug, not a wiring bug** — `%AAB_DeltaFactor` IS
+  the sensor-smoothing alpha factor in `BrightnessEngine` (`luxAlpha=1-exp(-deltaFactor·effectiveDelta)`);
+  relabelled "Smoothing Δ" + verbatim help. A full field→`%AAB_*` cross-check vs `AabSettingsContract`
+  found **no other binding bug**. (b) The 30 verbatim long-press help strings were decoded from the
+  reactivity/brightness/misc/superdimming scene `longclick` tasks (Flash code 548, XML_RECIPES R2) and
+  live in `TaskerHelp.kt` — the single source of truth; the Experiment-scene (Circadian screen) help
+  tasks were NOT in this batch (carried gap). task510's `%AAB_DimmingEnabled` help text literally says
+  "circadian scaling feature" — ported verbatim; the super-dimming wiring is correct (S12.5c G2-F9).
+  (c) Wi-Fi SSID: the synchronous `getNetworkCapabilities` path is redacted to `<unknown ssid>` on API
+  29+; `currentSsid()` is now `suspend`→`SsidResult` via a one-shot `NetworkCallback`
+  (`FLAG_INCLUDE_LOCATION_INFO`, 2s timeout) — interface change rippled to ContextsViewModel/Screen.
+  (d) `PipelineState` gained 5 timing fields populated from existing engine output (NO domain API change,
+  fence honoured). (Affects S12.6e; Gate 2 re-test; S13 inherits the help-reveal pattern + the
+  Experiment-scene help gap.)
 
-Append new entries as D-053, D-054, … with which segments they affect.
+Append new entries as D-054, D-055, … with which segments they affect.
 
 ## Blockers
 
@@ -1245,16 +1275,39 @@ snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
 - **G2R-F19** Some **labels don't match their meaning** (e.g. *delta factor*). Tasker's long-press shows an
   explanatory toast: *"Controls how much to smooth out sensor readings. Higher values react faster to
   small light changes, but may increase jitter. Lower values are more stable, but might feel sluggish."*
+  **→ FIXED by S12.6e (D-053):** every Reactivity/Curve/Misc/SuperDimming control relabelled to the Tasker
+  scene label + the **verbatim** Flash help (`TaskerHelp.kt`, 30 strings decoded from the `longclick`
+  tasks) surfaced via an "ⓘ" reveal. "Delta factor" → **"Smoothing Δ"** with the exact owner-quoted help.
 - **G2R-F20** The label mismatches lead to a suspicion that the **underlying behaviour/wiring is also
   wrong** — audit each parameter label → variable → runtime use against the extraction.
+  **→ AUDITED, S12.6e (D-053):** the delta-factor case was a **label/help bug, not a wiring bug** —
+  `%AAB_DeltaFactor` IS the sensor-smoothing alpha factor (`luxAlpha=1-exp(-deltaFactor·effectiveDelta)`,
+  BrightnessEngine). All other field→`%AAB_*` bindings cross-checked vs `AabSettingsContract`; **no other
+  binding bug found.** One verbatim oddity recorded: task510's help for `%AAB_DimmingEnabled` ("Use super
+  dimming") describes "circadian scaling feature" — ported verbatim; super-dimming wiring already verified
+  correct (S12.5c G2-F9), so this is Tasker's own help text, not a rebuild bug.
 - **G2R-F21** The long-press explanations are **embedded in the scenes as long-press triggers** — port/fix
   them all (every scene's help longclicks).
+  **→ FIXED by S12.6e (D-053):** ported verbatim as the "ⓘ" reveal text. **Carried gap:** the Experiment
+  Settings scene help tasks (Circadian screen: scaleSpread/steepness/transition/taper) were NOT in this
+  extraction batch — those fields keep their concise S12 helpers; a future pass should decode them too.
 - **G2R-F22** Context rule creation **still cannot get the Wi-Fi SSID** (`_GetWifiNoLocation V3`) nor live
   location.
+  **→ FIXED by S12.6e (D-053):** `WifiInfoReader.currentSsid()` is now `suspend`→`SsidResult` via a
+  one-shot `NetworkCallback(FLAG_INCLUDE_LOCATION_INFO)` (2s timeout) — fixes the synchronous-path
+  `<unknown ssid>` redaction on API 29+ — with targeted messages (NotOnWifi / NeedsLocationPermission /
+  LocationServicesOff / Unknown). Live location: rule editor gained lat/lon/radius fields + "Use current
+  location" (AndroidLocationReader).
 - **G2R-F23** On rule creation, **usage access is greyed out**; the original permission onboarding had an
   instruction on how to fix it (surface that instruction/flow here).
+  **→ ADDRESSED (S12.5c + S12.6e):** the rule editor shows a usage-access prompt + grant deep-link when an
+  app trigger lacks the grant (already in S12.5c); not greyed.
 - **G2R-F24** The setup/permissions screen should show **usage access as optional by default**.
+  **→ FIXED by S12.6e (D-053):** onboarding always shows the usage step, labelled "(optional)" by default
+  and "(needed for per-app rules)" once an app rule exists (per D-024/task563); Done is never blocked.
 - **G2R-F25** There is **no toast when a rule/profile is loaded**.
+  **→ FIXED by S12.6e (D-053):** `ContextLoadSink`/`ToastContextLoadSink` toasts on a runtime context-rule
+  profile load (unconditional); the Profiles screen already toasted on manual apply (S12.5c).
 
 #### Additional owner findings during S12.6c testing (2026-06-14) — triaged to future sub-segments
 These five were reported while S12.6c was in flight. S12.6c investigated/triaged them but did NOT
@@ -1274,12 +1327,18 @@ to be addressed already, fix now; otherwise leave for future stages"; none are S
 - **G2R-F28 (S12.6e, NEW) — context-rule time inputs are free-text "HH:MM"; should open the system
   TimePicker modal.** The From/To fields in `ContextsScreen.RuleEditor` are `OutlinedTextField`s; replace
   with a tap→Material3 `TimePicker` dialog (keep the SUNRISE/SUNSET token buttons).
+  **→ FIXED by S12.6e (D-053):** `TimeField` opens an M3 `TimePicker` `AlertDialog` (seeded from the
+  current HH:MM); the SUNRISE/SUNSET token buttons are kept.
 - **G2R-F29 (S12.6b refinement, NEW) — Live Debug "Performance & Timings" lacks full Tasker parity.** The
   Tasker debug scene (debug.md L19-23) surfaces `%LuxAlpha`, `%AAB_CycleTotal`, Reactivity Cooldown
   (throttle), Last Animation (steps×wait) and Last Update under Performance/Automation; the rebuilt card
   shows only cycle time + last sample. A future Live Debug pass should add luxAlpha / animation
   (steps×wait) / throttle / last-update to `PipelineState` (runtime holder, NOT the domain engine API)
   and render them.
+  **→ FIXED by S12.6e (D-053):** `PipelineState` gained `luxAlpha`/`animationSteps`/`animationWaitMs`/
+  `throttleMs`/`lastUpdateMs` (populated in `runCycle` from the existing `BrightnessPolicyOutput`, no
+  domain change); the Performance & Timings card now renders LuxAlpha / cycle / reactivity-cooldown /
+  last-animation (steps×wait) / last-update / last-sample.
 - **G2R-F30 (S12.6d, NEW) — manually loading a profile does not pause context automation or offer a
   Resume.** In Tasker a manual profile load latches `%AAB_ContextOverride=true` (the manual context lock,
   D-014/D-038a) so watchers stop overriding the user's choice; the rebuild's `applyProfile` does not set

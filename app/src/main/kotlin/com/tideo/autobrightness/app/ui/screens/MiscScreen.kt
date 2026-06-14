@@ -70,30 +70,32 @@ fun MiscContent(
 ) {
     DraftSettingsScaffold("Misc", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
+            // Labels + verbatim long-press help re-derived from extraction/scenes/misc_settings.md
+            // (S12.6e, G2R-F19/F21).
             SectionHeader("Brightness range")
             // Tasker Misc sliders: Min 0–75, Max 150–255 (misc_settings.md elements4/6).
             IntSliderSettingField(
                 "Min brightness", draft.minBrightness, 0..75,
                 { onEdit { s -> s.copy(minBrightness = it) } },
                 committed = committed.minBrightness,
-                helper = "Lowest level the screen will use.", testTag = "slider_minBrightness",
+                help = TaskerHelp.MIN_BRIGHT, testTag = "slider_minBrightness",
             )
             IntSliderSettingField(
                 "Max brightness", draft.maxBrightness, 150..255,
                 { onEdit { s -> s.copy(maxBrightness = it) } },
                 committed = committed.maxBrightness,
-                helper = "Highest level the screen will use.", testTag = "slider_maxBrightness",
+                help = TaskerHelp.MAX_BRIGHT, testTag = "slider_maxBrightness",
             )
             NumberSettingField(
                 "Offset", draft.offset, { onEdit { s -> s.copy(offset = it.toInt()) } },
                 epoch = epoch, committed = committed.offset,
-                helper = "A flat boost or cut applied to the whole curve.", testTag = "field_offset",
+                help = TaskerHelp.OFFSET, testTag = "field_offset",
             )
             NumberSettingField(
                 "Scale", draft.scale, { onEdit { s -> s.copy(scale = it.toFloat()) } },
                 epoch = epoch, committed = committed.scale, isInt = false,
                 error = errors.forField("scale"),
-                helper = "Global multiplier for the entire curve.", testTag = "field_scale",
+                help = TaskerHelp.SCALE, testTag = "field_scale",
             )
 
             SectionHeader("Animation")
@@ -102,19 +104,19 @@ fun MiscContent(
                 "Animation steps", draft.animSteps, 0..100,
                 { onEdit { s -> s.copy(animSteps = it) } },
                 committed = committed.animSteps,
-                helper = "Steps in a brightness-change animation.", testTag = "slider_animSteps",
+                help = TaskerHelp.ANIM_STEPS, testTag = "slider_animSteps",
             )
             IntSliderSettingField(
                 "Min wait (ms)", draft.minWaitMs, 1..99,
                 { onEdit { s -> s.copy(minWaitMs = it) } },
                 committed = committed.minWaitMs,
-                helper = "Shortest delay between animation frames.", testTag = "slider_minWaitMs",
+                help = TaskerHelp.MIN_WAIT, testTag = "slider_minWaitMs",
             )
             IntSliderSettingField(
                 "Max wait (ms)", draft.maxWaitMs, 2..100,
                 { onEdit { s -> s.copy(maxWaitMs = it) } },
                 committed = committed.maxWaitMs,
-                helper = "Longest delay between animation frames.", testTag = "slider_maxWaitMs",
+                help = TaskerHelp.MAX_WAIT, testTag = "slider_maxWaitMs",
             )
             // task714 throttle derivation: AnimSteps*MaxWait+10 (read-only live readout, elements31).
             val derivedThrottle = draft.animSteps * draft.maxWaitMs + 10
@@ -125,9 +127,9 @@ fun MiscContent(
 
             SectionHeader("Notifications")
             SwitchSettingRow(
-                "Show notifications", draft.notificationsEnabled,
+                "Use notifications", draft.notificationsEnabled,
                 { onEdit { s -> s.copy(notificationsEnabled = it) } },
-                helper = "Show the ongoing auto-brightness notification.",
+                help = TaskerHelp.NOTIFY_USE,
                 testTag = "switch_notifications",
             )
         }

@@ -328,6 +328,93 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun reactivity_deltaFactorHelp_rendersVerbatimTaskerText() {
+        // G2R-F19/F21: tapping the "ⓘ" reveals the VERBATIM Tasker long-press help. The delta-factor
+        // help (task740) describes sensor smoothing — the case the owner flagged as mislabelled.
+        compose.setContent {
+            MaterialTheme {
+                ReactivityContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("help_field_deltaFactor").performScrollTo().performClick()
+        compose.onNodeWithText("Controls how much to smooth out sensor readings", substring = true)
+            .assertExists()
+    }
+
+    @Test
+    fun contextEditor_timeField_opensTimePickerModal() {
+        // G2R-F28: the From/To inputs open the Material3 TimePicker modal.
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    onBack = {}, onSave = {}, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("rule_start").performScrollTo().performClick()
+        compose.onNodeWithTag("start_time_ok").assertExists()
+    }
+
+    @Test
+    fun contextEditor_useCurrentSsid_fillsField() {
+        // G2R-F22: "use current Wi-Fi" returns the SSID and fills the field.
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    onBack = {}, onSave = {}, onDelete = {},
+                    onUseCurrentSsid = { setSsid -> setSsid("HomeNet") },
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("use_current_ssid").performScrollTo().performClick()
+        compose.onNodeWithText("HomeNet", substring = true).assertExists()
+    }
+
+    @Test
+    fun contextEditor_exposesLocationFields() {
+        // G2R-F22 (live location): lat/lon/radius editor + "use current location".
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    onBack = {}, onSave = {}, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("use_current_location").performScrollTo().assertExists()
+        compose.onNodeWithTag("rule_lat").performScrollTo().assertExists()
+        compose.onNodeWithTag("rule_radius").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun liveDebug_performanceCard_rendersTimings() {
+        // G2R-F29: Performance & Timings shows luxAlpha + animation (steps×wait) + throttle.
+        val seeded = PipelineState(
+            luxAlpha = 0.42, animationSteps = 20, animationWaitMs = 65L,
+            throttleMs = 1310L, cycleTimeMs = 12.0, lastUpdateMs = System.currentTimeMillis(),
+        )
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(pipeline = seeded, serviceRunning = true),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("debug_lux_alpha").performScrollTo().assertExists()
+        compose.onNodeWithTag("debug_throttle").performScrollTo().assertExists()
+        compose.onNodeWithText("20×65ms", substring = true).assertExists()
+    }
+
+    @Test
     fun draftBar_applyAndDiscard_invokeCallbacks() {
         var applied = false
         var discarded = false

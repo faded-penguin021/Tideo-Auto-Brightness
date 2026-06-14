@@ -278,6 +278,12 @@ class BrightnessPipelineController(
                     scalingUse = settings.scalingEnabled,
                     lastAppliedBrightness = target,
                     targetBrightness = target,
+                    // Live Debug "Performance & Timings" parity (G2R-F29).
+                    luxAlpha = output.luxAlpha,
+                    animationSteps = output.animationSteps,
+                    animationWaitMs = output.animationWaitMs,
+                    throttleMs = settings.throttleDefaultMs,
+                    lastUpdateMs = clock(),
                 )
             }
 
