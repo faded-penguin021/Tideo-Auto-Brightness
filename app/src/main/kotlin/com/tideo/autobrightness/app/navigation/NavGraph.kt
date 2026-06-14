@@ -64,6 +64,19 @@ fun NavHostController.navigateTopLevel(route: AppRoute) {
     }
 }
 
+/**
+ * Finish onboarding (G2R-F57): land on the [AppRoute.Menu] hub — NOT the Dashboard — and drop
+ * Onboarding from the back stack (`popUpTo … inclusive`) so the hardware Back from the Menu exits
+ * the app rather than returning to a half-finished setup. Fixes the "first boot loads a
+ * non-functional Dashboard you can't navigate away from" report.
+ */
+fun NavHostController.completeOnboarding() {
+    navigate(AppRoute.Menu.route) {
+        popUpTo(AppRoute.Onboarding.route) { inclusive = true }
+        launchSingleTop = true
+    }
+}
+
 /** Start on Onboarding when tier == NONE (no brightness-write access), else the Menu hub. */
 @Composable
 private fun rememberStartDestination(): String {

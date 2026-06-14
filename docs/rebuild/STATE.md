@@ -36,12 +36,27 @@ next session does not know it.
 | S12.6d profiles + legacy import + reset + Apply-gate | 2026-06-14 | Opus/high | DONE | (see push) | Real user-profile management + legacy import + validation gate (D-052; G2R-F15/F16/F17/F18/F30 + owner findings F31/F32). **G2R-F15** user-editable profiles: new `UserProfileStore` (DataStore `SavedProfiles`: built-ins seeded once, Save-current-as, overwrite-in-place [keeps built-in flag], delete, **Restore factory profiles**); `AppProfileCatalog` converted object→class reading the store (built-in fallback) so context rules target user profiles too (closes D-042c); `SettingsViewModel` gains saveCurrentAs/deleteProfile/restoreFactoryProfiles/profiles flow; ContextsViewModel.profileNames now a StateFlow off the store. **G2R-F16** legacy SAF import: `LegacyConfigImporter` (OpenDocumentTree grant→takePersistableUriPermission, list `*.json` via DocumentsContract — no MANAGE_EXTERNAL_STORAGE/no new dep) wired into the rewritten ProfilesScreen (link-folder + per-file Load) alongside the single-file picker. **G2R-F17** per-screen reset: `DraftSettingsScaffold` gains an `onReset` TopAppBar action; each of the 5 draft screens resets only its own fields to the task570 baseline + toast. **G2R-F18/D-052** block-Apply: `FieldError` gains `Severity`; the 3 task583 form errors (form2A/3A<0, form2C>zone1End) are CRITICAL; `DraftSettingsViewModel.hasCriticalError` disables `DraftApplyBar` Apply (+ hint) while one stands — sanctioned deviation from Tasker's advisory model. **G2R-F30** manual-load context lock: applyProfile/replaceAll latch `contextOverride=true`; `ContextEngine.reevaluate()` honours the lock (drops active context, runs the manual baseline); Profiles screen shows a Resume banner → `resumeContextAutomation()` clears it + reapplies. **Owner findings during S12.6d:** **G2R-F31** battery % from/to added to the context rule editor (BatteryTrigger min/max; resolver already supported it); **G2R-F32** curve-wizard report was too terse — Tools now shows + copies the FULL `diagnosticsLog` (the engine already produced it; app-layer only). **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: UserProfileStoreTest(5), SettingsValidator severity(1), SettingsScreens criticalError-gate/reset/profiles/context-lock/battery(5), ContextEngine reevaluate-lock(1). Full ladder GREEN: `:app:testDebugUnitTest`(116) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 | S12.7b runtime feedback surfaces | 2026-06-14 | Opus/high | DONE | (this push) | Notification/QS-tile/super-dimming surfaces fixed (D-055; G2R-F35/F40/F63/F65). **F65 (the real bug):** super dimming never engaged with PWM-sensitive on because `runCycle`/`setInitialBrightness` fed the **PWM-floored** target (raised UP to `dimmingThreshold`) to `dimming.apply`, so `target < dimmingThreshold` was never true → Extra Dim off. Now pass the **un-floored `output.targetBrightness`** (= task646 act1/act2 `%AAB_CurrentBright`); the hardware sits at the PWM floor while the secure `reduce_bright_colors` layer darkens below it (the two layers cooperate; coordinator value `dim_shell` was already correct per task650 act8). **F35:** new `pausedByOverride` PipelineState flag (set in `handleOverride`, cleared by user Pause/Resume) → service posts a **high-priority vibrating override notification** (new `manual_override` IMPORTANCE_HIGH channel + Resume action) **+ toast**, once on the rising edge. **F40:** ongoing FGS notification already toggled Pause↔Resume on `paused`; verified + test. **F63:** `BrightnessTileService` now **live-collects** (serviceEnabled ⊕ LiveRuntimeState running/paused) in `onStartListening`→`updateTile` on every change (cancel in `onStopListening`), and the service calls `TileService.requestListeningState` on each state publish so Off→Starting→Active/Paused renders without reopening the panel; subtitle mapping extracted to a pure `tileSubtitle()`. Tests: controller +2 (un-floored dimming target / pausedByOverride latch), AmbientMonitoringService +1 (high-pri notif + Resume + toast), BrightnessTileService +1 (subtitle mapping). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(132) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 | S12.7c context system: location lifecycle, ordering, legacy targets, days | 2026-06-14 | Opus/high | DONE | (this push) | Context-system parity batch (D-056; G2R-F42/F43/F44/F45/F47/F67/F68). **F45 smart location listener:** `LocationReader.locationUpdates()` (continuous `requestLocationUpdates` NETWORK+GPS, seeds best last-known, filters (0,0) null-island reads) replaces the on-demand passive read that died on backgrounding + read `0.0,0.0`; hosted in the FGS scope; `ContextEngine.startLocationListenerIfNeeded()` gated on `tokens.usesLocation` (Tasker's `[LOC]`-in-ContextCache cost gate — owner-confirmed) + a ≥100 m haversine debounce before firing the LOCATION eval (kills the near-constant/input-blocking toasts); `assemble()` now takes engine-fed lat/lon (new `LocationSignal`). **F42** `currentLocation()` → typed `LocationResult` (NeedsPermission/Unavailable/Available) with a call-time permission recheck + fresh `getCurrentLocation` fix (no longer falsely "not granted" post-grant). **F43** rule list `byPriority()` (highest first, name tie-break) not creation order. **F44** legacy load registers the profile into `UserProfileStore` (file name) → selectable as a rule target without a re-save (`SettingsViewModel.saveImportedProfile`). **F67** day-of-week `FilterChip` picker → `ContextTriggers.days` (resolver/overnight-wrap already supported, domain fenced). **F68** SUNRISE/SUNSET tokens show today's resolved time in theme gold ("Sunrise (06:42)", `ContextsViewModel.solarTimes()`). **F47** Context Automation debug toast enriched: trigger · context · profile · rule (priority). Tests: ContextEngine +2 (location ≥100 m debounce, enriched F47 toast), AppProfileCatalog +1 (legacy target visible), ContextRuleStore +1 (byPriority), SettingsScreens +2 (day picker saves DAY_OF_WEEK, sunrise resolved-time). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(138) `:platform:test :domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
+| S12.7d permissions, Wi-Fi acquisition, first-boot nav | 2026-06-14 | Opus/high | DONE | (this push) | Permissions/SSID/nav batch (D-057; G2R-F33/F41/F57). **F41 (SSID):** ported the real `_GetWifiNoLocation V3` order (task105/633) — `AndroidWifiInfoReader.currentSsid` now tries the no-Location strategies FIRST (`WifiSsidStrategies.kt`: `ShizukuWifiSsidStrategy` runs `cmd wifi status` via new `ShizukuShell.exec` + AIDL `exec(String[])` on the existing user service → `DumpsysWifiSsidStrategy` runs in-process `dumpsys wifi`, parsing the `mWifiInfo`/`COMPLETED` line), and only falls back to the Location-gated `NetworkCallback` last; strategies are constructor-injectable so the source-order is unit-tested. **F41 (perm):** Setup gained a Location step (RequestMultiplePermissions FINE+COARSE, labelled optional). **F33:** onboarding shows a `RestrictedSettingsCard` ("Allow restricted settings" + Open-App-info deep-link) when `isLikelySideloaded` (install source not a known store). **F57:** new `NavHostController.completeOnboarding()` lands on `AppRoute.Menu` with `popUpTo(Onboarding, inclusive)` (was Dashboard) → Back from Menu exits cleanly. **Fence: domain/ + golden vectors untouched.** Tests: `WifiSsidStrategyTest` (9 — source order with fakes + cmd/dumpsys parsers + normalize), UiShell +3 (Location step renders, restricted hint when sideloaded, completeOnboarding→Menu drops Onboarding). Full ladder GREEN: `:platform:test :app:testDebugUnitTest`(140) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.7a manual-override engine correctness | 2026-06-14 | Opus/high | DONE | (this push) | Ported the REAL task567/task696 override logic (D-054; G2R-F34/F64/F46). **F34:** `AnimationRunner` replaced the exact-match `isOnScreenSelfWrite()` (false-fired on OEM round-trip drift) with task696's band+debounce — band `[minTarget-2, maxTarget+2]` spanning the sweep, override only after **2 consecutive** out-of-band reads (every-frame, since the every-5th was a Tasker IPC optimization). **F64:** `OverrideMonitor` gained a settle-suppression gate; `setInitialBrightness` arms a 1500ms window after each initial self-write so the start/reinit/resume/QS-on observer echo (incl. the AUTO→MANUAL mode-flip recompute) is not flagged as an override; the S12.6c idle-path settle-wait kept. **F46:** manual profile load = override (`LiveRuntimeState.manualOverride` published from `%AAB_ContextOverride` via the service) shown in the Menu; a context rule active is no longer labelled an override (Menu Contexts card relabelled). Tests: AnimationRunner +3 (self-writes complete / opposing-write overridden / single-transient debounced), controller +1 (init-echo suppressed then real-write pauses post-window), UiShell +2 (Menu label semantics). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(128) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.7c DONE (2026-06-14) → S12.7 d–h remain.** S12.7c closed the context-system parity batch (D-056;
+**S12.7d DONE (2026-06-14) → S12.7 e–h remain.** S12.7d closed the permissions/SSID/first-boot-nav batch
+(D-057; G2R-F33/F41/F57). The headline is **F41's `_GetWifiNoLocation V3` port**: `AndroidWifiInfoReader`
+now reads the connected SSID **without Location** by trying the no-Location strategies first — Shizuku
+`cmd wifi status` (via a new `ShizukuShell.exec` + an `exec(String[])` method added to the existing AIDL
+user service) then in-process `dumpsys wifi` (parsing the `mWifiInfo`/`COMPLETED` line) — and only falling
+back to the Location-gated `NetworkCallback` as a last resort (`WifiSsidStrategies.kt`; strategies are
+constructor-injectable so the source-selection order is unit-tested). Setup also gained the missing
+**Location grant step** (F41-perm, optional) and a **restricted-settings hint card** for sideloaded installs
+(F33, `isLikelySideloaded` → "Allow restricted settings" + Open-App-info). **F57:** finishing onboarding now
+lands on the **Menu hub** (not the dead Dashboard) via `completeOnboarding()` with `popUpTo(Onboarding,
+inclusive)` so Back exits cleanly. domain/ + golden vectors stayed fenced. Ladder GREEN
+(`:app:testDebugUnitTest`=140). **Next: S12.7 e–h (largely disjoint; rebase before push), then owner
+re-tests Gate 2 again after S12.7h.**
+
+**(historical) S12.7c DONE (2026-06-14) → S12.7 d–h remain.** S12.7c closed the context-system parity batch (D-056;
 G2R-F42/F43/F44/F45/F47/F67/F68). The headline is **F45's smart location listener**: a continuous
 `requestLocationUpdates` flow (`LocationReader.locationUpdates`, NETWORK+GPS, last-known seed, (0,0)
 null-island filter) hosted in the FGS scope replaces the on-demand passive read that died on backgrounding
@@ -260,12 +275,12 @@ AppModule is now the real DI root.
   context-rule semantics). **b–h remain.** Split:
   **a** manual-override engine (transcribe task567: anim mutex + target-vs-actual delta) + instant-override
   race + override semantics (F34/F64/F46) — DONE; **b** runtime feedback surfaces — override notification+vibration
-  +toast, notification Resume, QS tile live refresh, super-dimming Extra-Dim fix (F35/F40/F63/F65); **c**
+  +toast, notification Resume, QS tile live refresh, super-dimming Extra-Dim fix (F35/F40/F63/F65) — DONE; **c**
   context system — location listener lifecycle/0.0,0.0/debounce, use-current-location perm recheck, priority
   ordering, legacy-profile rule targets, context-automation debug toasts, day-of-week rules+midnight wrap,
-  sunrise/sunset gold value (F42/F43/F44/F45/F47/F67/F68); **d** permissions & Wi-Fi & first-boot nav —
+  sunrise/sunset gold value (F42/F43/F44/F45/F47/F67/F68) — DONE; **d** permissions & Wi-Fi & first-boot nav —
   restricted-settings guidance, Location grant in Setup, `_GetWifiNoLocation V3` Shizuku/dump SSID path +
-  grant guidance, first-boot→Menu (F33/F41/F57); **e** debug/toast infra — Accessibility global toasts,
+  grant guidance, first-boot→Menu (F33/F41/F57) — DONE (D-057); **e** debug/toast infra — Accessibility global toasts,
   cancel-previous, instant debug-off, dynamic-scale timing, overlay-preview colour toast (F48/F49/F50/F51/
   F52); **f** per-screen live readouts + labels — readout blocks, reactivity %, var-substitution+info-gate,
   Misc auto-scale, form2A/3A labels (F56/F58/F59/F60/F61); **g** charts & curve view (may lift the
@@ -1159,7 +1174,29 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (Affects S12.7c; S12.7d builds the Location-permission Setup step + SSID order on this listener; S12.7h's
   Circadian Date/Lat/Lon reuses `solarTimes()`/the location helper.)
 
-Append new entries as D-057, D-058, … with which segments they affect.
+- D-057: **S12.7d permissions / Wi-Fi acquisition / first-boot nav** (G2R-F33/F41/F57; UI/app/platform-glue
+  only, domain/ + golden vectors fenced). **F41 SSID — the `_GetWifiNoLocation V3` port (headline):**
+  `AndroidWifiInfoReader.currentSsid` now resolves the SSID without Location by trying the no-Location
+  strategies in Tasker's order before the Location fallback. New `platform/context/WifiSsidStrategies.kt`:
+  `WifiSsidStrategy` fun-interface + `ShizukuWifiSsidStrategy` (runs `cmd wifi status` and parses
+  `Wifi is connected to "SSID"`) + `DumpsysWifiSsidStrategy` (in-process `dumpsys wifi`, parses the
+  `mWifiInfo`/`COMPLETED` line) + pure parsers (`parseCmdWifiStatus`/`parseDumpsysWifi`/`normalizeSsid`).
+  Shizuku execution added via new `platform/privilege/ShizukuShell.kt` (binds the existing user service and
+  calls a new AIDL `exec(in String[])` method, implemented in `ShizukuUserService`); user-service version
+  bumped to 2 for the shell bind. `currentSsid` iterates injectable `noLocationStrategies` (default Shizuku →
+  dumpsys), then the renamed-private `locationCallbackSsid()` (the pre-S12.7d `NetworkCallback` path) is the
+  LAST fallback. **F41 perm:** OnboardingScreen gained a Location step (`RequestMultiplePermissions`
+  FINE+COARSE, optional). **F33:** `RestrictedSettingsCard` shown when `isLikelySideloaded(context)`
+  (`getInstallSourceInfo().installingPackageName` not in {com.android.vending, com.google.android.feedback}),
+  with an "Open App info" `ACTION_APPLICATION_DETAILS_SETTINGS` deep-link. **F57:** new
+  `NavHostController.completeOnboarding()` → `AppRoute.Menu` with `popUpTo(Onboarding, inclusive)`;
+  OnboardingScreen onDone uses it (was a direct Dashboard navigate). Tests: `WifiSsidStrategyTest` (9 — fake
+  strategy source-order short-circuit/fallthrough/Location-fallback + cmd/dumpsys parser + normalize),
+  UiShellTest +3 (Location step renders, restricted-settings hint + Open-App-info, completeOnboarding lands
+  on Menu and drops Onboarding from the back stack). (Affects S12.7d; the SSID strategy + Location helper
+  are reused by any future Wi-Fi/location work; S12.7e's permission-aware toasts can lean on the same gates.)
+
+Append new entries as D-058, D-059, … with which segments they affect.
 
 ## Blockers
 
@@ -1477,11 +1514,14 @@ order, so the README's S12.6a–d re-confirmation items are still UNVERIFIED thi
 at the end).
 
 *Onboarding / permissions:*
-- **G2R-F33** First launch asks permissions but does NOT surface/guide the Android **"restricted settings"
-  / greyed-out** fix flow (sideloaded apps must "Allow restricted settings" in App info before certain
-  grants take effect). Onboarding must detect + instruct this.
-- **G2R-F41 (perm half)** There is **no option to grant Location permission in Setup** — needed for the
-  location-based SSID path + context location. (With Location enabled via Android app settings it works.)
+- **G2R-F33** ✅ RESOLVED S12.7d (D-057). First launch asks permissions but does NOT surface/guide the Android
+  **"restricted settings" / greyed-out** fix flow (sideloaded apps must "Allow restricted settings" in App
+  info before certain grants take effect). Onboarding must detect + instruct this. → onboarding shows a
+  `RestrictedSettingsCard` (with an "Open App info" deep-link) when the install source is not a known store
+  (`isLikelySideloaded` via `getInstallSourceInfo`).
+- **G2R-F41 (perm half)** ✅ RESOLVED S12.7d (D-057). There is **no option to grant Location permission in Setup** —
+  needed for the location-based SSID path + context location. → added a Location step (RequestMultiplePermissions
+  FINE+COARSE), labelled optional (the Shizuku/dump SSID path needs no Location).
 
 *Manual override detection & feedback:*
 - **G2R-F34** ✅ RESOLVED S12.7a (D-054). Manual-override **false positives persist** — the app can't tell a
@@ -1519,13 +1559,14 @@ at the end).
   state), parity with Tasker. → ongoing FGS notif toggles Pause↔Resume on `paused`; the F35 override now latches `paused` so Resume actually surfaces.
 
 *Wi-Fi SSID acquisition (extends G2R-F22 — the S12.6e fix was the wrong primary path):*
-- **G2R-F41 (SSID half)** Don't require Location for the SSID. Per **`_GetWifiNoLocation V3`** (task105/633):
-  1) **with Shizuku**, run `cmd wifi status | grep "Wifi is connected to" | cut -d\" -f2`;
-  2) **with WRITE_SECURE_SETTINGS / dump access (no Shizuku)**, run
-  `dumpsys wifi | grep mWifiInfo | grep COMPLETED` and regex the SSID out;
-  3) only fall back to the Location-gated `NetworkCallback` path. The current message "requires location
-  permission, grant it in setup" is both wrong-priority and points to a Setup option that doesn't exist
-  (see F33/F41-perm).
+- **G2R-F41 (SSID half)** ✅ RESOLVED S12.7d (D-057). Don't require Location for the SSID. Per
+  **`_GetWifiNoLocation V3`** (task105/633): 1) **with Shizuku**, run `cmd wifi status | grep "Wifi is
+  connected to" | cut -d\" -f2`; 2) **with WRITE_SECURE_SETTINGS / dump access (no Shizuku)**, run
+  `dumpsys wifi | grep mWifiInfo | grep COMPLETED` and regex the SSID out; 3) only fall back to the
+  Location-gated `NetworkCallback` path. → `AndroidWifiInfoReader.currentSsid` now runs the no-Location
+  strategies first (`WifiSsidStrategies.kt`: `ShizukuWifiSsidStrategy` via `ShizukuShell.exec`/new AIDL
+  `exec` → `DumpsysWifiSsidStrategy` in-process `dumpsys wifi`), Location `NetworkCallback` is the LAST
+  fallback. Strategies are injectable → source-order unit-tested. The Setup option now exists (F41-perm).
 
 *Context system:*
 - **G2R-F42** ✅ RESOLVED S12.7c (D-056). Context-rule "use current location" **wrongly reports Location permission not granted** (even
@@ -1580,9 +1621,10 @@ at the end).
 *Per-screen live readouts & labels (extends G2R-F7/F8):*
 - **G2R-F56** **Reactivity "live reactivity" threshold should be shown as a percentage** (current 0.5 →
   display "50%"). (The bound vars are `%aab_thresh*pc` percentages.)
-- **G2R-F57** **First boot after granting permissions loads a non-functional Dashboard** — can't navigate
-  back to the Menu, and the hardware Back key closes the app. (Onboarding "Done" routes to Dashboard, not
-  Menu — should land on the Menu hub, cf. S12.6a.)
+- **G2R-F57** ✅ RESOLVED S12.7d (D-057). **First boot after granting permissions loads a non-functional Dashboard**
+  — can't navigate back to the Menu, and the hardware Back key closes the app. (Onboarding "Done" routes to
+  Dashboard, not Menu — should land on the Menu hub, cf. S12.6a.) → new `NavHostController.completeOnboarding()`
+  navigates to `AppRoute.Menu` with `popUpTo(Onboarding, inclusive)`; OnboardingScreen's onDone uses it.
 - **G2R-F58** **Every settings screen needs the Tasker live-readout block.** Examples: Curve & Brightness →
   "Current smoothed lux [%SmoothedLux]" + "Current brightness (%AAB_MinBright–%AAB_MaxBright)
   [%AAB_CurrentBright]"; Misc → "Current throttle [%AAB_Throttle] ms" + "Current smoothing α [%LuxAlpha]".

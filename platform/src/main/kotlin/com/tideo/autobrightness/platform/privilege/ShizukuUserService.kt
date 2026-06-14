@@ -30,4 +30,16 @@ class ShizukuUserService : IShizukuUserService.Stub() {
     } catch (t: Throwable) {
         t.message ?: t.javaClass.simpleName
     }
+
+    // S12.7d (G2R-F41): run a command in the privileged process and hand back its stdout. Used by
+    // the no-Location SSID path (`cmd wifi status`), which reads the connected SSID without the
+    // ACCESS_FINE_LOCATION runtime grant + Location services that the framework otherwise demands.
+    override fun exec(command: Array<String>): String = try {
+        val process = Runtime.getRuntime().exec(command)
+        val stdout = process.inputStream.bufferedReader().use { it.readText() }
+        process.waitFor()
+        stdout
+    } catch (_: Throwable) {
+        ""
+    }
 }
