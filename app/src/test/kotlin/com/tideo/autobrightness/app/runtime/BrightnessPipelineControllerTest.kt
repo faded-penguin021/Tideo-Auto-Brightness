@@ -46,6 +46,13 @@ class BrightnessPipelineControllerTest {
         override fun clearSelfWriteMarker() { lastWrite = null }
     }
 
+    private class FakeDimming : DimmingCoordinator {
+        val applied = mutableListOf<Int>()
+        var disengaged = 0
+        override fun apply(targetBrightness: Int, settings: AabSettings) { applied += targetBrightness }
+        override fun disengage() { disengaged++ }
+    }
+
     private fun sample(lux: Double, accuracy: Int = 3) = LightSample(lux.toFloat(), accuracy, 0L)
 
     // trustUnreliable=true keeps the accuracy gate out of the way; detectOverrides=true for the
@@ -311,6 +318,62 @@ class BrightnessPipelineControllerTest {
         observer.flow.emit(applied + 80)
         advanceUntilIdle()
         assertTrue(controller.state.value.paused, "a real external write after the window must pause")
+        scope.cancel()
+    }
+
+    // S12.7b/G2R-F65: with PWM-sensitive on, the HARDWARE write is floored to the dimming threshold,
+    // but super dimming must decide off the UN-FLOORED engine target so reduce_bright_colors actually
+    // engages below the threshold (otherwise floored==threshold and dimming never turns on).
+    @Test
+    fun pwmSensitive_superDimmingSeesUnflooredTarget() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val dimming = FakeDimming()
+        val pwm = settings.copy(
+            minBrightness = 1,
+            pwmSensitive = true,
+            dimmingThreshold = 40,
+            dimmingEnabled = true,
+        )
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = { pwm }, scope = scope, clock = { 1000L }, dimming = dimming,
+        )
+        controller.start()
+        sensor.flow.emit(sample(lux = 1.0)) // maps to ~5, below threshold 40
+        advanceUntilIdle()
+
+        assertEquals(40, brightness.writes.last(), "PWM floor holds the hardware write at threshold")
+        assertTrue(dimming.applied.isNotEmpty(), "dimming should be asked to apply")
+        assertTrue(
+            dimming.applied.last() < pwm.dimmingThreshold,
+            "dimming must see the un-floored target (< threshold) so Extra Dim engages (F65)",
+        )
+        scope.cancel()
+    }
+
+    // S12.7b/G2R-F35: a DETECTED manual override latches pausedByOverride (drives the high-priority
+    // notification + toast); a user-initiated Pause does NOT.
+    @Test
+    fun detectedOverride_setsPausedByOverride_userPauseDoesNot() = runTest {
+        val observer = FakeObserver()
+        val (controller, scope) = newController(observer = observer, clock = { 1000L })
+        controller.start()
+
+        observer.flow.emit(200)
+        advanceUntilIdle()
+        assertTrue(controller.state.value.paused)
+        assertTrue(controller.state.value.pausedByOverride, "a detected override flags pausedByOverride")
+
+        controller.resume()
+        advanceUntilIdle()
+        assertTrue(!controller.state.value.pausedByOverride, "resume clears the override flag")
+
+        controller.pause()
+        advanceUntilIdle()
+        assertTrue(controller.state.value.paused)
+        assertTrue(!controller.state.value.pausedByOverride, "a user Pause is not an override")
         scope.cancel()
     }
 
