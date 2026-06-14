@@ -24,9 +24,13 @@ interface WifiInfoReader {
 
     /**
      * One-shot read of the currently-connected SSID for the rule editor's "use current SSID"
-     * (G2R-F22). Returns a typed [SsidResult] so the UI can give a targeted message instead of a
-     * blanket "Not connected": the synchronous `getNetworkCapabilities` path used previously always
-     * returned `<unknown ssid>` on API 29+ (S12.6c root-cause, D-049-adjacent).
+     * (G2R-F22/F41). Returns a typed [SsidResult] so the UI can give a targeted message instead of a
+     * blanket "Not connected".
+     *
+     * Resolution order follows Tasker's `_GetWifiNoLocation V3` (S12.7d): the no-Location strategies
+     * (Shizuku `cmd wifi status`, then `dumpsys wifi`) are tried FIRST, and only when neither resolves
+     * does it fall back to the Location-gated `NetworkCallback` path — so most users read the SSID
+     * without ever granting ACCESS_FINE_LOCATION.
      */
     suspend fun currentSsid(): SsidResult
 }
@@ -44,8 +48,26 @@ sealed interface SsidResult {
     data object Unknown : SsidResult
 }
 
-class AndroidWifiInfoReader(private val context: Context) : WifiInfoReader {
+class AndroidWifiInfoReader(
+    private val context: Context,
+    // The no-Location strategies, in priority order (S12.7d/G2R-F41). Injectable so the source-
+    // selection order can be unit-tested with fakes without a real Shizuku binder / dumpsys.
+    private val noLocationStrategies: List<WifiSsidStrategy> = listOf(
+        ShizukuWifiSsidStrategy(context),
+        DumpsysWifiSsidStrategy(context),
+    ),
+) : WifiInfoReader {
     override suspend fun currentSsid(): SsidResult {
+        // _GetWifiNoLocation V3 order: try Shizuku → dumpsys first; a hit returns without Location.
+        for (strategy in noLocationStrategies) {
+            val ssid = runCatching { strategy.trySsid() }.getOrNull()
+            if (!ssid.isNullOrEmpty()) return SsidResult.Connected(ssid)
+        }
+        return locationCallbackSsid()
+    }
+
+    // The Location-gated NetworkCallback path — the LAST fallback (was the only path pre-S12.7d).
+    private suspend fun locationCallbackSsid(): SsidResult {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val caps = cm.getNetworkCapabilities(cm.activeNetwork)
         if (caps == null || !caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return SsidResult.NotOnWifi

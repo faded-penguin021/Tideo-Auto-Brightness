@@ -95,7 +95,7 @@ filled by S1/S2 during extraction.
 
 | Block (task · line) | Extracted (S1/S2) | Reference impl (S4/S6) | Production port | Status |
 |---|---|---|---|---|
-| task105 L8906 · _GetWifiNoLocation | ✓ S1 | | platform/WifiInfoReader: SSID via NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) — the modern equivalent of the Tasker no-location-toast trick (S12.6e, G2R-F22) | ported (SSID acquisition) |
+| task105 L8906 · _GetWifiNoLocation | ✓ S1 | | platform/WifiInfoReader: real _GetWifiNoLocation V3 order (S12.7d, G2R-F41) — Shizuku `cmd wifi status` (ShizukuShell.exec) → in-process `dumpsys wifi` → Location NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) last (WifiSsidStrategies.kt) | ported (no-Location SSID order) |
 | task378 L9468 · _PrivilegeDetection | ✓ S1 | | | pending |
 | task38 L9921 · _SuggestCurveParameters | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.kt (S6) | ported |
 | task43 L12091 · _EvaluateContexts | ✓ S1 | | domain/context/ContextOverrideResolver.kt + app/runtime/ContextEngine.kt (S10) | ported |
@@ -109,7 +109,7 @@ filled by S1/S2 during extraction.
 | task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | BrightnessEngine.kt ingest (S5) | ported |
 | task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | | pending |
 | task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | | pending |
-| task563 L19677 · _AskPermissionsV7 | ✓ S1 | | | pending |
+| task563 L19677 · _AskPermissionsV7 | ✓ S1 | | app/ui/onboarding/OnboardingScreen.kt — notifications → WRITE_SETTINGS → Location → ELEVATED → usage; S12.7d adds restricted-settings hint (F33) + Location step (F41) + Menu landing (F57) | ported (onboarding gates) |
 | task592 L24132 · _CreateDefaultProfiles | ✓ S1 | | | pending |
 | task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | ✓ S4 | InitialBrightness.kt (S5) | ported |
 | task620 L26400 · _AdaptiveBrightnessSceneSize | ✓ S1 | | | pending |
@@ -118,7 +118,7 @@ filled by S1/S2 during extraction.
 | task626 L27355 · _ContextResume | ✓ S1 | | mergeProfile() 39-key snapshot (S10); RESUME caller (cooldown 0/forced eval) | ported (snapshot+caller) |
 | task630 L27585+L27817 · _ContextLocnListener (×2) | ✓ S1 | | | pending |
 | task631 L27939+L28432 · _ContextF5NetLoc (×2) | ✓ S1 | | | pending |
-| task633 L28827 · _GetWifiForContext | ✓ S1 | | | pending |
+| task633 L28827 · _GetWifiForContext | ✓ S1 | | platform/WifiInfoReader.currentSsid (S12.7d) — typed SsidResult feeding the rule editor's "use current SSID" via the no-Location order | ported (editor SSID read) |
 | task636 L28993 · _DeleteOverridePoint | ✓ S1 | | | pending |
 | task637 L29303 · _ProfileManager | ✓ S1 | | | pending |
 | task643 L30505 · _LearnWriteSecure | ✓ S1 | | | pending |

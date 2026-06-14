@@ -45,7 +45,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.AppModule
-import com.tideo.autobrightness.app.navigation.AppRoute
+import com.tideo.autobrightness.app.navigation.completeOnboarding
 import com.tideo.autobrightness.platform.privilege.ShizukuGrantGateway
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.flow.first
@@ -58,6 +58,10 @@ data class OnboardingUiState(
     val shizukuAvailable: Boolean = false,
     val needsUsageAccess: Boolean = false,
     val usageAccessGranted: Boolean = false,
+    val locationGranted: Boolean = false,
+    // G2R-F33: sideloaded installs (not from the Play Store) may hit Android's "Restricted setting"
+    // block on the WRITE_SETTINGS / accessibility toggles → show the "Allow restricted settings" hint.
+    val sideloaded: Boolean = false,
     val elevatedMessage: String? = null,
     val adbCommand: String = "",
 )
@@ -82,6 +86,7 @@ fun OnboardingScreen(navController: NavHostController) {
             OnboardingUiState(
                 adbCommand = privilegeManager.adbGrantInstruction(),
                 shizukuAvailable = privilegeManager.isShizukuAvailable(),
+                sideloaded = isLikelySideloaded(context),
             ),
         )
     }
@@ -94,6 +99,7 @@ fun OnboardingScreen(navController: NavHostController) {
             tier = privilegeManager.currentTier(),
             shizukuAvailable = privilegeManager.isShizukuAvailable(),
             usageAccessGranted = hasUsageAccess(context),
+            locationGranted = hasLocationPermission(context),
         )
     }
 
@@ -128,6 +134,14 @@ fun OnboardingScreen(navController: NavHostController) {
         ActivityResultContracts.StartActivityForResult(),
     ) { reprobe() }
 
+    val locationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { reprobe() }
+
+    val appInfoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { reprobe() } // App-info screen returns no result; re-check grants on return (F33).
+
     OnboardingContent(
         state = ui,
         onRequestNotifications = {
@@ -136,6 +150,19 @@ fun OnboardingScreen(navController: NavHostController) {
             }
         },
         onRequestWriteSettings = { settingsLauncher.launch(privilegeManager.writeSettingsIntent()) },
+        onRequestLocation = {
+            locationLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+            )
+        },
+        onOpenAppInfo = {
+            appInfoLauncher.launch(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            )
+        },
         onCopyAdb = { clipboard.setText(AnnotatedString(ui.adbCommand)) },
         onRequestShizuku = {
             ui = ui.copy(elevatedMessage = "Requesting Shizuku grant…")
@@ -152,12 +179,8 @@ fun OnboardingScreen(navController: NavHostController) {
             reprobe()
         },
         onRequestUsageAccess = { usageLauncher.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
-        onDone = {
-            navController.navigate(AppRoute.Dashboard.route) {
-                popUpTo(AppRoute.Onboarding.route) { inclusive = true }
-                launchSingleTop = true
-            }
-        },
+        // G2R-F57: land on the Menu hub (not a dead Dashboard); Back from the Menu exits cleanly.
+        onDone = { navController.completeOnboarding() },
     )
 }
 
@@ -167,6 +190,8 @@ fun OnboardingContent(
     state: OnboardingUiState,
     onRequestNotifications: () -> Unit,
     onRequestWriteSettings: () -> Unit,
+    onRequestLocation: () -> Unit,
+    onOpenAppInfo: () -> Unit,
     onCopyAdb: () -> Unit,
     onRequestShizuku: () -> Unit,
     onTryRoot: () -> Unit,
@@ -183,6 +208,12 @@ fun OnboardingContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // G2R-F33: sideloaded apps may see "Modify system settings" / accessibility toggles greyed
+            // out under Android's restricted-settings block; guide the one-time "Allow restricted
+            // settings" fix up front, before the grant steps that it gates.
+            if (state.sideloaded) {
+                RestrictedSettingsCard(onOpenAppInfo)
+            }
             StepCard(
                 title = "1. Notifications",
                 body = "Allow notifications so the ongoing brightness controls and status are visible.",
@@ -199,12 +230,23 @@ fun OnboardingContent(
                 onAction = onRequestWriteSettings,
                 testTag = "step_write_settings",
             )
+            // G2R-F41 (perm half): Location is needed for the location-based SSID fallback and for
+            // location context rules. Optional — the Shizuku/dump SSID path needs no Location at all.
+            StepCard(
+                title = "3. Location (optional)",
+                body = "Needed only for location-based context rules and as a fallback for reading " +
+                    "the Wi-Fi name. Wi-Fi rules also work without it via Shizuku / ADB.",
+                done = state.locationGranted,
+                actionLabel = "Grant location",
+                onAction = onRequestLocation,
+                testTag = "step_location",
+            )
             ElevatedStepCard(state, onCopyAdb, onRequestShizuku, onTryRoot)
             // G2R-F24: usage access is OPTIONAL by default (per D-024/task563) — always shown so it is
             // discoverable, but only flagged as needed once a per-app context rule exists.
             StepCard(
-                title = if (state.needsUsageAccess) "4. Usage access (needed for per-app rules)"
-                else "4. Usage access (optional)",
+                title = if (state.needsUsageAccess) "5. Usage access (needed for per-app rules)"
+                else "5. Usage access (optional)",
                 body = if (state.needsUsageAccess) {
                     "One of your context rules targets specific apps. Grant usage access so the " +
                         "service can detect the foreground app."
@@ -221,6 +263,25 @@ fun OnboardingContent(
                 onClick = onDone,
                 modifier = Modifier.fillMaxWidth().testTag("onboarding_done"),
             ) { Text(if (state.canWrite) "Done" else "Skip for now") }
+        }
+    }
+}
+
+@Composable
+private fun RestrictedSettingsCard(onOpenAppInfo: () -> Unit) {
+    Card(modifier = Modifier.testTag("restricted_settings_hint")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Heads up: restricted settings", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "This app was installed outside the Play Store, so Android may block the " +
+                    "\"Modify system settings\" toggle below (it appears greyed out or shows " +
+                    "\"Restricted setting\"). If that happens, open App info, tap the ⋮ menu " +
+                    "(top-right), choose \"Allow restricted settings\", then return here.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedButton(onClick = onOpenAppInfo, modifier = Modifier.testTag("open_app_info")) {
+                Text("Open App info")
+            }
         }
     }
 }
@@ -310,3 +371,21 @@ private fun hasUsageAccess(context: Context): Boolean {
     )
     return mode == AppOpsManager.MODE_ALLOWED
 }
+
+private fun hasLocationPermission(context: Context): Boolean =
+    context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+/**
+ * Best-effort detection of a sideloaded install (G2R-F33): an installer that is null or not a known
+ * app store implies the user installed the APK directly, which is when Android's restricted-settings
+ * block applies. Errs toward showing the hint (returns true on any failure) — it is purely advisory.
+ */
+private fun isLikelySideloaded(context: Context): Boolean = try {
+    val installer = context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+    installer == null || installer !in PLAY_STORE_INSTALLERS
+} catch (_: Throwable) {
+    true
+}
+
+private val PLAY_STORE_INSTALLERS = setOf("com.android.vending", "com.google.android.feedback")

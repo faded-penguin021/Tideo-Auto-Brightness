@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tideo.autobrightness.app.navigation.AppRoute
+import com.tideo.autobrightness.app.navigation.completeOnboarding
 import com.tideo.autobrightness.app.navigation.navigateTopLevel
 import com.tideo.autobrightness.app.state.DashboardUiState
 import com.tideo.autobrightness.app.ui.onboarding.OnboardingContent
@@ -191,6 +192,8 @@ class UiShellTest {
                     ),
                     onRequestNotifications = {},
                     onRequestWriteSettings = {},
+                    onRequestLocation = {},
+                    onOpenAppInfo = {},
                     onCopyAdb = {},
                     onRequestShizuku = {},
                     onTryRoot = {},
@@ -202,9 +205,60 @@ class UiShellTest {
 
         compose.onNodeWithTag("step_notifications").assertExists()
         compose.onNodeWithTag("step_write_settings").assertExists()
+        // G2R-F41 (perm half): the Location grant step is part of Setup.
+        compose.onNodeWithTag("step_location").performScrollTo().assertExists()
         compose.onNodeWithTag("step_elevated").assertExists()
         compose.onNodeWithTag("step_usage_access").assertExists()
         compose.onNodeWithTag("onboarding_done").performScrollTo().performClick()
         assertTrue(done)
+    }
+
+    @Test
+    fun onboardingContent_showsRestrictedSettingsHintWhenSideloaded() {
+        // G2R-F33: a sideloaded install surfaces the "Allow restricted settings" guidance; a store
+        // install does not.
+        var appInfoOpened = false
+        compose.setContent {
+            MaterialTheme {
+                OnboardingContent(
+                    state = OnboardingUiState(sideloaded = true),
+                    onRequestNotifications = {},
+                    onRequestWriteSettings = {},
+                    onRequestLocation = {},
+                    onOpenAppInfo = { appInfoOpened = true },
+                    onCopyAdb = {},
+                    onRequestShizuku = {},
+                    onTryRoot = {},
+                    onRequestUsageAccess = {},
+                    onDone = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("restricted_settings_hint").assertExists()
+        compose.onNodeWithTag("open_app_info").performScrollTo().performClick()
+        assertTrue(appInfoOpened)
+    }
+
+    @Test
+    fun completeOnboarding_landsOnMenuAndDropsOnboarding() {
+        // G2R-F57: finishing onboarding routes to the Menu hub, not the Dashboard, and Onboarding is
+        // removed from the back stack so Back from the Menu exits rather than returning to setup.
+        lateinit var nav: androidx.navigation.NavHostController
+        compose.setContent {
+            nav = rememberNavController()
+            NavHost(navController = nav, startDestination = AppRoute.Onboarding.route) {
+                AppRoute.entries.forEach { route ->
+                    composable(route.route) { PlaceholderScreen(route.label, route.owner) }
+                }
+            }
+        }
+
+        compose.runOnUiThread { nav.completeOnboarding() }
+        compose.onNodeWithText(AppRoute.Menu.label).assertExists()
+        assertEquals(AppRoute.Menu.route, nav.currentDestination?.route)
+        // Onboarding is gone from the back stack: a back press has nothing to pop above the Menu.
+        var popped = true
+        compose.runOnUiThread { popped = nav.popBackStack() }
+        assertTrue(!popped)
     }
 }

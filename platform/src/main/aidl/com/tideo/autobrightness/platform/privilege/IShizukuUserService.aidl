@@ -10,4 +10,9 @@ interface IShizukuUserService {
     // Runs `pm grant <packageName> android.permission.WRITE_SECURE_SETTINGS` in the privileged
     // process. Returns an empty string on success, or a non-empty diagnostic on failure.
     String grantWriteSecureSettings(String packageName) = 1;
+
+    // Runs an arbitrary command in the privileged (shell uid 2000 / root) process and returns its
+    // stdout (empty string on failure). Used by the no-Location SSID path (_GetWifiNoLocation V3,
+    // S12.7d/G2R-F41): `cmd wifi status` reads the connected SSID without ACCESS_FINE_LOCATION.
+    String exec(in String[] command) = 2;
 }
