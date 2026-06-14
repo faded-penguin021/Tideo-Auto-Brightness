@@ -26,7 +26,7 @@ filled by S1/S2 during extraction.
 | prof765 Context: Location Listener → task630 | L541 | runtime/AndroidContextSignalSource LocationReader (passive last-known); persistent listener/backoff (task630/631) not ported — coarse passive read only (D-042) | partial (passive location; listener S12/S14) |
 | prof766 Context: Location Refresher → task631 | L579 | not ported — adaptive location refresher/zombie-listener watchdog out of S10 scope (D-042) | deferred (S12/S14) |
 | prof767 Context: Location Changed → task43 | L628 | runtime/ContextEngine (S10 — LOCATION caller evaluates when a rule uses [LOC]) | ported (engine; rule UI S12) |
-| prof768 Context: WiFi (Dis)connected → task43 | L676 | runtime/ContextEngine (S10 — WifiInfoReader SSID flow → WIFI veto on SSID change → resolver) | ported (engine; rule UI S12) |
+| prof768 Context: WiFi (Dis)connected → task43 | L676 | runtime/ContextEngine (S10 — WifiInfoReader SSID flow → WIFI veto on SSID change → resolver) | ported (engine; rule UI S12; S12.6e: `currentSsid()` suspend NetworkCallback w/ FLAG_INCLUDE_LOCATION_INFO fixes API-29+ SSID redaction, G2R-F22) |
 | prof769 Panic (Reset) → task528 | L722 | runtime/BrightnessPipelineController.panic + notification action (S9a) | ported |
 | prof8 Context: Reset Serialized Cache → task26 | L744 | N/A — DataStore is the single fresh source of truth; the RAM/disk cache reset failsafe is moot (D-042) | dropped (cache obsolete) |
 
@@ -71,13 +71,13 @@ filled by S1/S2 during extraction.
 | Scene | XML | Ported to | Status |
 |---|---|---|---|
 | AAB Menu | L4462 | Menu (home hub) | ported (S11 nav shell → S12.6a promoted to a real `Menu` home screen: banner + Profiles/Contexts hero cards + grouped nav; start dest + back-target for all screens) |
-| AAB Brightness Settings | L1415 | Curve & Brightness | ported (S12.5b — curve-zone coefficients + live form2A/3A + draft→Apply preview chart; min/max/offset/scale moved to Misc, G2-F2) |
-| AAB Reactivity Settings | L6739 | Reactivity | ported (S12.5b — thresholds + DetectOverrides/trust; draft→Apply; chart slot S13) |
-| AAB Superdimming Settings | L7533 | Super Dimming (renamed S12.6a/G2R-F3) | ported (S12.5b — ELEVATED-gated super dimming + PWM, mutually-exclusive (G2-F10), dim-spread gated on circadian (G2-F11); anim moved to Misc; chart slot S13) |
-| AAB Misc Settings | L4718 | Misc | ported (S12.5b — dedicated Misc screen, G2-F2: min/max sliders 0–75/150–255, offset/scale text, anim sliders + derived throttle, notifications + debug selector) |
+| AAB Brightness Settings | L1415 | Curve & Brightness | ported (S12.5b — curve-zone coefficients + live form2A/3A + draft→Apply preview chart; min/max/offset/scale moved to Misc, G2-F2; **S12.6e**: Tasker scene labels + verbatim long-press help via ⓘ reveal, G2R-F19/F21) |
+| AAB Reactivity Settings | L6739 | Reactivity | ported (S12.5b — thresholds + DetectOverrides/trust; draft→Apply; chart slot S13; **S12.6e**: Tasker labels + verbatim help; "delta factor"→"Smoothing Δ" was a label bug not a wiring bug, G2R-F19/F20) |
+| AAB Superdimming Settings | L7533 | Super Dimming (renamed S12.6a/G2R-F3) | ported (S12.5b — ELEVATED-gated super dimming + PWM, mutually-exclusive (G2-F10), dim-spread gated on circadian (G2-F11); anim moved to Misc; chart slot S13; **S12.6e**: Tasker labels + verbatim help, G2R-F19/F21) |
+| AAB Misc Settings | L4718 | Misc | ported (S12.5b — dedicated Misc screen, G2-F2: min/max sliders 0–75/150–255, offset/scale text, anim sliders + derived throttle, notifications + debug selector; **S12.6e**: Tasker labels + verbatim help, G2R-F19/F21) |
 | AAB Experiment Settings | L3334 | Circadian (renamed S12.6a/G2R-F4) | ported (S12.5b — scaling/taper + taper-midpoint slider 130–240 (G2-F13) + warnings; chart slot S13) |
-| AAB Profile | L5724 | Profiles & Import/Export | ported (S12 — built-in profiles + reset + JSON/legacy import-export + context CRUD; reapply-on-load S12.5b; context-rule editor fidelity S12.5c — `<queries>` app list w/ icons, use-current-SSID, SUNRISE/SUNSET tokens, usage-access prompt, save/delete toasts; profile-load keeps DetectOverrides G2-F8. **S12.6d**: user-editable saved profiles + overwrite + factory restore, SAF folder legacy import, per-screen reset, manual-load context lock + Resume; **battery % from/to** added to the rule editor, G2R-F31) |
-| AAB Debug Scene | L2583 | LiveDebug | ported (S12.6b — rebuilt as the dedicated **Live Debug Info** scene: glass-box %AAB_* readout grouped per the debug.md HTML cards + the now-global 10-label debug selector, G2R-F6/F9; S12.5c selector drives runtime debug toasts G2-F15; %AAB_Test wizard report→clipboard stays on Tools, which keeps wizard + calibration entry) |
+| AAB Profile | L5724 | Profiles & Import/Export | ported (S12 — built-in profiles + reset + JSON/legacy import-export + context CRUD; reapply-on-load S12.5b; context-rule editor fidelity S12.5c — `<queries>` app list w/ icons, use-current-SSID, SUNRISE/SUNSET tokens, usage-access prompt, save/delete toasts; profile-load keeps DetectOverrides G2-F8. **S12.6d**: user-editable saved profiles + overwrite + factory restore, SAF folder legacy import, per-screen reset, manual-load context lock + Resume; **battery % from/to** added to the rule editor, G2R-F31. **S12.6e**: Wi-Fi SSID via suspend NetworkCallback→`SsidResult` w/ targeted messages, live location lat/lon/radius + "use current location", M3 TimePicker modal (G2R-F22/F28), runtime context-load toast (G2R-F25)) |
+| AAB Debug Scene | L2583 | LiveDebug | ported (S12.6b — rebuilt as the dedicated **Live Debug Info** scene: glass-box %AAB_* readout grouped per the debug.md HTML cards + the now-global 10-label debug selector, G2R-F6/F9; S12.5c selector drives runtime debug toasts G2-F15; %AAB_Test wizard report→clipboard stays on Tools, which keeps wizard + calibration entry; **S12.6e**: Performance & Timings card reaches Tasker parity — luxAlpha/cycle/throttle/last-animation(steps×wait)/last-update, G2R-F29) |
 | AAB Color Filter | L2552 | Super Dimming | ported (S12 — PWM-sensitive + exponent rows) |
 | AAB Brightness Graph | L1202 | Curve & Brightness (BrightnessCurveChart) | ported (S12 — BrightnessCurveChart = chart template; ChartCanvas engine) |
 | AAB Alpha Graph | L1038 | Reactivity (alpha overlay) | partial (S12 host slot; chart render S13) |
@@ -95,7 +95,7 @@ filled by S1/S2 during extraction.
 
 | Block (task · line) | Extracted (S1/S2) | Reference impl (S4/S6) | Production port | Status |
 |---|---|---|---|---|
-| task105 L8906 · _GetWifiNoLocation | ✓ S1 | | | pending |
+| task105 L8906 · _GetWifiNoLocation | ✓ S1 | | platform/WifiInfoReader: SSID via NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) — the modern equivalent of the Tasker no-location-toast trick (S12.6e, G2R-F22) | ported (SSID acquisition) |
 | task378 L9468 · _PrivilegeDetection | ✓ S1 | | | pending |
 | task38 L9921 · _SuggestCurveParameters | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.kt (S6) | ported |
 | task43 L12091 · _EvaluateContexts | ✓ S1 | | domain/context/ContextOverrideResolver.kt + app/runtime/ContextEngine.kt (S10) | ported |

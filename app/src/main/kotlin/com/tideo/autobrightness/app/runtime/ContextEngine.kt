@@ -42,6 +42,7 @@ class ContextEngine(
     private val clock: () -> Long = System::currentTimeMillis,
     private val userProfileName: String = "Default",
     private val debugSink: DebugSink = NoOpDebugSink,
+    private val contextLoadSink: ContextLoadSink = NoOpContextLoadSink,
 ) {
     private val _activeContext = MutableStateFlow<String?>(null)
     /** `%AAB_ActiveContext` — the winning rule's name, or null when running the user baseline. */
@@ -262,6 +263,9 @@ class ContextEngine(
             debugSink.emit(DebugCategory.CONTEXT_AUTOMATION, baseline.debugLevel) {
                 "context ${resolution.activeContextName ?: "(none)"} → profile $target"
             }
+            // G2R-F25: confirm the load to the user (Tasker flashes when a context loads its profile).
+            // Fires only when a named rule actually wins (not when reverting to the user baseline).
+            resolution.activeContextName?.let { contextLoadSink.onContextLoaded(it, target) }
             onProfileChanged()
         }
     }
@@ -297,6 +301,20 @@ interface ContextSignalSource {
 
     /** Assemble a full snapshot from the latest cached signal pieces + current clock/location/solar. */
     suspend fun assemble(app: String, batteryPercent: Int, plugged: Boolean, wifi: String): ContextSignals
+}
+
+/**
+ * Sink for the "context rule loaded its profile" notification (G2R-F25). The Android impl shows a
+ * user-visible toast; kept as a fun interface so the engine stays JVM-testable. Distinct from
+ * [DebugSink], which is gated on the debug-category selector — this fires unconditionally on a load.
+ */
+fun interface ContextLoadSink {
+    fun onContextLoaded(contextName: String, profileName: String)
+}
+
+/** No-op load sink for tests / when no toast surface is wired. */
+object NoOpContextLoadSink : ContextLoadSink {
+    override fun onContextLoaded(contextName: String, profileName: String) = Unit
 }
 
 /** Resolves a profile NAME to its full [AabSettings]. S10 backs this with the built-in profiles. */

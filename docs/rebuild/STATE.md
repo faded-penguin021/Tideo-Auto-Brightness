@@ -32,12 +32,41 @@ next session does not know it.
 | S12.6a IA & naming | 2026-06-14 | Opus/high | DONE | (see push) | Menu-as-home reshape + two renames + Dashboard last-sample fix (G2R-F1…F5). **AAB Menu promoted to a real home hub** (`AppRoute.Menu` + `ui/screens/MenuScreen.kt`): gold-sun teal banner (rebranded "Tideo Auto Brightness", not "Advanced"), Profiles/Contexts **hero cards moved off the Dashboard**, Settings/Info&Help nav groups; it is the start destination after onboarding (tier!=NONE→Menu) and the back-target from every settings/tool screen via new `NavHostController.navigateTopLevel` (popUpTo(menu)). The S12.5a `AabNavDrawer` retired; `AabTopBar` gained an optional back arrow (AutoMirrored). Dashboard slimmed to live-status (tier badge, master switch, live readout, health) + back→Menu. **Renames:** `AnimationDimming`→`SuperDimming` (route `super_dimming`, title "Super Dimming", G2R-F3); `DynamicScale`→`Circadian` (route `circadian`, title "Circadian", G2R-F4) — files `AnimationDimmingScreen.kt`→`SuperDimmingScreen.kt`, `DynamicScaleScreen.kt`→`CircadianScreen.kt` (composables + content fns + NavGraph + tests). **Last-sample fix (G2R-F5):** `PipelineState.lastSampleMs` recorded for every delivered sample in `onSensorSample` (atomic StateFlow.update), surfaced via LiveRuntimeState→DashboardUiState, rendered as relative "Xs ago" (replaces the never-written health-store source). Domain/golden/ChartCanvas untouched. Tests: `UiShellTest` rewritten (Menu hero+nav, renames resolve, start-on-Menu + back-from-settings→Menu, last-sample renders); `SettingsScreensTest` SuperDimming rename. Ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug`. No compaction. |
 | S12.6b glass-box diagnostics + Live Debug scene | 2026-06-14 | Opus/high | DONE | (see push) | The runtime "glass box" surfaced (G2R-F6…F10). New: **Live Debug Info** scene (`AppRoute.LiveDebug`, in the Menu Info&Help group + `navigateTopLevel` back→Menu) = `LiveDebugScreen`/`LiveDebugContent` over `LiveDebugViewModel` (combines LiveRuntimeState pipeline/context/running + DataStore min/max/debugLevel) — live `%AAB_*` readout grouped per debug.md HTML cards (Core Metrics / Circadian & Scale / System Status / Performance & Timings), gold `#FFC107` values via new `ui/components/DiagnosticCard.kt` (`DiagnosticCard`/`DiagnosticLine`/`goldValue`). **Per-screen DiagnosticCards** (G2R-F7/F8): `ReactivityDiagnosticCard` (threshold + dead zone) + `CircadianDiagnosticCard` (uncompressed vs true scale + min/max) embedded on those screens; stateless `*Content(state)` builders for tests. To feed them, `PipelineState` gains `threshDynamic` (%AAB_ThreshDynamic) + `scaleDynamic` (%AAB_ScaleDynamic uncompressed), populated in `runCycle` from existing `BrightnessPolicyOutput.dynamicThreshold`/`scaleDynamic` (no domain API change). **Debug selector → global + relocated** (G2R-F9): moved off Misc to Live Debug (`LiveDebugViewModel.setDebugLevel` writes DataStore directly); `debugLevel` now preserved across `SettingsViewModel.applyProfile/replaceAll/resetDefaults` + `DraftSettingsViewModel.apply`/re-sync (already in `mergeProfile`) — `DEBUG_LABELS`/`DebugLevelSelector` moved MiscScreen→LiveDebugScreen. **Teal debug toasts** (G2R-F10): `ToastDebugSink` builds a teal-rounded custom TextView (via `makeText`+`setView` so ShadowToast still records text). Tests: SettingsScreensTest (Live Debug + Reactivity/Circadian diagnostic cards render seeded PipelineState; selector relocation) + new `SettingsViewModelTest` (debugLevel survives profile apply + reset) + ContextEngineTest `mergeProfile_preservesDebugLevel`. Full ladder GREEN: `:app:testDebugUnitTest`(102) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **NEW FINDING recorded (verified, deferred to S12.6c): G2R-F27/D-050 — PWM-sensitive mode never locks the hardware brightness floor (`pwmSensitive` unread by the runtime).** |
 | S12.6c pipeline behaviour correctness | 2026-06-14 | Opus/high | DONE | (see push) | Fixed the runtime bugs the re-test found + wired override-point capture (D-051; G2R-F11/F12/F13/F14/F26/F27). **G2R-F11/F12** (Apply/profile-load + min-brightness ignored until a light change): root = the pipeline's `settingsProvider`=`ContextEngine.effectiveSettings()` served the STALE cached `_effective` snapshot. Added `ContextEngine.reevaluate()` (re-reads the FRESH baseline + re-merges the active profile, no watcher re-resolution) and the service's `ACTION_REAPPLY` now calls it BEFORE `controller.reapply()` → manual edits take effect immediately (min-bright no longer "stuck at 10"). **G2R-F13** override-point capture (closes D-044c): new `OverridePointStore` (DataStore, newest-first cap 50) + `OverridePointSink`; `handleOverride` persists the de-compressed point; `SettingsViewModel`/`DraftSettingsViewModel` expose `overridePoints`; Tools wizard reads the recorded set. **G2R-F14** `BrightnessCurveChart` overlays the recorded points as dots + shows the fitted/suggested curve only at ≥9 points (ChartCanvas unchanged). **G2R-F26/D-049** override false-positives: `handleOverride` now does the task567 act8 settle (wait %AAB_CycleTime → re-read → only pause if still ≠ our last applied) + the AnimationRunner read-back is now device-exact (`ScreenBrightnessController.isOnScreenSelfWrite`, kills OEM round-trip drift, D-049 #4). **G2R-F27/D-050** PWM-sensitive hardware floor: `applyPwmFloor` clamps the hardware write up to `dimmingThreshold` when `pwmSensitive && target<threshold` (task698 step3) in runCycle + setInitialBrightness. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas API untouched.** New tests: controller minBrightness/PWM-floor/override-false-positive (3), ContextEngine reevaluate-fresh-baseline, OverridePointStore (3). Full ladder GREEN: `:platform:test :app:testDebugUnitTest`(104) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
+| S12.6e labels/help audit + context editor + onboarding | 2026-06-14 | Opus/high | DONE | (this push) | Last S12.6 sub-segment (D-053; G2R-F19…F25 + F28/F29). **Label + verbatim long-press-help audit** (G2R-F19/F20/F21): new `TaskerHelp.kt` holds the 30 verbatim Flash help strings (decoded from the reactivity/brightness/misc/superdimming scene `longclick` tasks via XML_RECIPES R2); `NumberSettingField`/`IntSliderSettingField`/`SwitchSettingRow` gained a `help=` param surfaced via an "ⓘ" reveal (Tasker longtap → tap, `helptext_<tag>`); every control on Reactivity/Curve/Misc/SuperDimming relabelled to the Tasker scene labels + the verbatim help wired. **WIRING AUDIT (G2R-F20): the owner-flagged "delta factor" was MIS-LABELLED/MIS-HELPED, not mis-wired** — `%AAB_DeltaFactor` IS the sensor-smoothing alpha factor (`luxAlpha=1-exp(-deltaFactor·effectiveDelta)`, BrightnessEngine); relabelled "Smoothing Δ" + verbatim help. No other binding bug found; all field→`%AAB_*` bindings cross-checked vs AabSettingsContract. **Context Wi-Fi/location (G2R-F22):** `WifiInfoReader.currentSsid()` is now a `suspend` returning a typed `SsidResult` (one-shot `NetworkCallback` w/ `FLAG_INCLUDE_LOCATION_INFO`+2s timeout; targeted NotOnWifi/NeedsLocationPermission/LocationServicesOff/Unknown messages — fixes the API-29+ `<unknown ssid>` redaction); rule editor gained lat/lon/radius fields + "Use current location" (AndroidLocationReader). **Time picker (G2R-F28):** From/To open the M3 `TimePicker` modal (SUNRISE/SUNSET tokens kept). **Usage access (G2R-F23/F24):** onboarding always shows the usage step, labelled "(optional)" by default / "(needed for per-app rules)" once an app rule exists; the rule-editor grant prompt was already present. **Toast on load (G2R-F25):** new `ContextLoadSink`/`ToastContextLoadSink` → unconditional teal-less toast when a runtime context rule loads its profile; Profiles-screen apply already toasted. **Live Debug Performance & Timings (G2R-F29):** `PipelineState` gains `luxAlpha`/`animationSteps`/`animationWaitMs`/`throttleMs`/`lastUpdateMs` (populated in runCycle from existing engine output, no domain change) → Live Debug card now shows LuxAlpha / cycle / reactivity-cooldown / last-animation (steps×wait) / last-update. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: SettingsScreens +5 (delta-factor verbatim help reveal, time-picker modal, use-current-SSID fills field, location fields, Live Debug timings) + ContextEngine contextLoad-fires-sink (1). Full ladder GREEN (`:app:testDebugUnitTest`=122 `:app:assembleDebug :app:lintDebug :domain:test :platform:test`). No compaction. **GATE 2 RE-TEST (again) READY.** |
 | S12.6d profiles + legacy import + reset + Apply-gate | 2026-06-14 | Opus/high | DONE | (see push) | Real user-profile management + legacy import + validation gate (D-052; G2R-F15/F16/F17/F18/F30 + owner findings F31/F32). **G2R-F15** user-editable profiles: new `UserProfileStore` (DataStore `SavedProfiles`: built-ins seeded once, Save-current-as, overwrite-in-place [keeps built-in flag], delete, **Restore factory profiles**); `AppProfileCatalog` converted object→class reading the store (built-in fallback) so context rules target user profiles too (closes D-042c); `SettingsViewModel` gains saveCurrentAs/deleteProfile/restoreFactoryProfiles/profiles flow; ContextsViewModel.profileNames now a StateFlow off the store. **G2R-F16** legacy SAF import: `LegacyConfigImporter` (OpenDocumentTree grant→takePersistableUriPermission, list `*.json` via DocumentsContract — no MANAGE_EXTERNAL_STORAGE/no new dep) wired into the rewritten ProfilesScreen (link-folder + per-file Load) alongside the single-file picker. **G2R-F17** per-screen reset: `DraftSettingsScaffold` gains an `onReset` TopAppBar action; each of the 5 draft screens resets only its own fields to the task570 baseline + toast. **G2R-F18/D-052** block-Apply: `FieldError` gains `Severity`; the 3 task583 form errors (form2A/3A<0, form2C>zone1End) are CRITICAL; `DraftSettingsViewModel.hasCriticalError` disables `DraftApplyBar` Apply (+ hint) while one stands — sanctioned deviation from Tasker's advisory model. **G2R-F30** manual-load context lock: applyProfile/replaceAll latch `contextOverride=true`; `ContextEngine.reevaluate()` honours the lock (drops active context, runs the manual baseline); Profiles screen shows a Resume banner → `resumeContextAutomation()` clears it + reapplies. **Owner findings during S12.6d:** **G2R-F31** battery % from/to added to the context rule editor (BatteryTrigger min/max; resolver already supported it); **G2R-F32** curve-wizard report was too terse — Tools now shows + copies the FULL `diagnosticsLog` (the engine already produced it; app-layer only). **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: UserProfileStoreTest(5), SettingsValidator severity(1), SettingsScreens criticalError-gate/reset/profiles/context-lock/battery(5), ContextEngine reevaluate-lock(1). Full ladder GREEN: `:app:testDebugUnitTest`(116) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.6a + S12.6b + S12.6c + S12.6d DONE → S12.6e remains.** S12.6d (profiles + legacy import + reset +
+**ALL of S12.6 (a–e) DONE; GATE 2 RE-RE-TESTED (2026-06-14) → 36 new findings G2R-F33…F68 → S12.7 (a–h) is
+the next work (planned in RUNBOOK, all Opus/high).** The owner re-tested the S12.6e dist/ APK on-device:
+"definitely going in the right direction" but a further batch of parity/behaviour gaps remains (see "Gate 2
+RE-RE-TEST" below) — manual-override false-positives + spurious instant-override-on-start race (need the real
+task567 logic: anim mutex + target-vs-actual delta), no Resume on the notification, QS tile not live, super
+dimming doesn't Extra-Dim, Wi-Fi SSID should use the Shizuku/dump `_GetWifiNoLocation V3` path (not
+Location), context location listener dies on background + 0.0,0.0 reads + needs day-of-week rules,
+"manual load = override" semantics, missing per-screen live readouts, global/Accessibility toasts +
+toast-cancel + instant-off, and several label/wiring polish items + the polished load/save/rule modals.
+**Gate 2 stays NOT signed off.** The dist/ APK + README were **removed** (owner about to merge S12.6).
+**Next: execute S12.7 a–h, then re-test Gate 2 again.**
+
+**(historical) ALL of S12.6 (a–e) DONE → HUMAN GATE 2 RE-TEST (again) is next.** S12.6e (D-053) closed the last batch:
+the **label + verbatim long-press-help audit** (G2R-F19/F20/F21) — `TaskerHelp.kt` carries the 30 decoded
+Flash help strings, surfaced via an "ⓘ" reveal on every Reactivity/Curve/Misc/SuperDimming control, with
+the labels re-matched to the Tasker scene labels; the owner-flagged **"delta factor" was a label/help bug,
+NOT a wiring bug** (`%AAB_DeltaFactor` is the sensor-smoothing alpha factor — binding was correct →
+relabelled "Smoothing Δ"). **Context editor:** Wi-Fi SSID now read via a `suspend NetworkCallback` with
+`FLAG_INCLUDE_LOCATION_INFO` returning a typed `SsidResult` (targeted messages, fixes API-29+ redaction,
+G2R-F22), live location lat/lon/radius + "use current location" added, and the time inputs open the M3
+**TimePicker** modal (G2R-F28). **Onboarding** shows usage access as **optional by default** (G2R-F24);
+**runtime context loads toast** via `ContextLoadSink` (G2R-F25). **Live Debug Performance & Timings**
+reached full Tasker parity (luxAlpha / cycle / throttle / last-animation steps×wait / last-update,
+G2R-F29) by surfacing existing engine output into `PipelineState` (no domain change). domain/, golden
+vectors and ChartCanvas stayed fenced. Ladder GREEN (`:app:testDebugUnitTest`=122, `:platform:test
+:domain:test :app:assembleDebug :app:lintDebug`). **Next: HUMAN GATE 2 — re-test AGAIN (all G2R-Fn + the
+original Gate-2 set). Then S13.**
+
+**(historical) S12.6a + S12.6b + S12.6c + S12.6d DONE → S12.6e remains.** S12.6d (profiles + legacy import + reset +
 Apply-gate, D-052) landed real user-profile management: `UserProfileStore` (built-ins seeded once,
 Save-current-as, overwrite, **Restore factory profiles**, G2R-F15) read by `AppProfileCatalog` so context
 rules can target user profiles (closes D-042c); **SAF folder grant** legacy import from
@@ -182,14 +211,31 @@ AppModule is now the real DI root.
   PWM-sensitive hardware-floor clamp G2R-F27/D-050 — D-051). **S12.6d DONE** (user-editable profiles +
   overwrite + factory-restore G2R-F15 + SAF legacy import G2R-F16 + per-screen reset G2R-F17 +
   block-Apply-on-critical-error G2R-F18/D-052 + manual-load context-lock/Resume G2R-F30; plus owner
-  findings G2R-F31 battery % editor + G2R-F32 verbose wizard report). Remaining: **S12.6e**
-  (label/long-press-help audit + context Wi-Fi/location [**G2R-F22 root cause found, see findings**] +
-  **time-picker modal G2R-F28** + usage-access flow + load toasts). A Live Debug refinement
-  (**G2R-F29** Performance & Timings parity) is carried too. e is the last parallel-window sub-segment.
-  Domain/ + golden vectors + ChartCanvas API stay fenced. **NOTE for e:** the AAB Menu is the home `AppRoute.Menu`;
-  use `navigateTopLevel` for any new top-level destination so back still returns to the Menu; the
-  global debug selector S12.6b moves OFF Misc belongs on the new Live Debug screen reached from the Menu.
-- **HUMAN GATE 2 — RE-TEST AGAIN** after S12.6e. Re-verify all G2R-Fn + the original Gate-2 set.
+  findings G2R-F31 battery % editor + G2R-F32 verbose wizard report). **S12.6e DONE** (label +
+  verbatim long-press-help audit G2R-F19/F20/F21 [delta-factor was a label bug not a wiring bug] +
+  context Wi-Fi `SsidResult`/live-location G2R-F22 + time-picker modal G2R-F28 + usage-access-optional
+  G2R-F24 + runtime context-load toast G2R-F25 + Live Debug Performance & Timings parity G2R-F29 —
+  D-053). **ALL S12.6 sub-segments complete.** Domain/ + golden vectors + ChartCanvas API stayed fenced.
+- **GATE 2 RE-RE-TEST DONE (2026-06-14) → 36 findings G2R-F33…F68** (see "Gate 2 RE-RE-TEST"). Gate 2
+  still NOT signed off.
+- **S12.7 — Gate-2 re-re-test salvage (a–h, all Opus/high)** is the NEXT work (brief in RUNBOOK). Split:
+  **a** manual-override engine (transcribe task567: anim mutex + target-vs-actual delta) + instant-override
+  race + override semantics (F34/F64/F46); **b** runtime feedback surfaces — override notification+vibration
+  +toast, notification Resume, QS tile live refresh, super-dimming Extra-Dim fix (F35/F40/F63/F65); **c**
+  context system — location listener lifecycle/0.0,0.0/debounce, use-current-location perm recheck, priority
+  ordering, legacy-profile rule targets, context-automation debug toasts, day-of-week rules+midnight wrap,
+  sunrise/sunset gold value (F42/F43/F44/F45/F47/F67/F68); **d** permissions & Wi-Fi & first-boot nav —
+  restricted-settings guidance, Location grant in Setup, `_GetWifiNoLocation V3` Shizuku/dump SSID path +
+  grant guidance, first-boot→Menu (F33/F41/F57); **e** debug/toast infra — Accessibility global toasts,
+  cancel-previous, instant debug-off, dynamic-scale timing, overlay-preview colour toast (F48/F49/F50/F51/
+  F52); **f** per-screen live readouts + labels — readout blocks, reactivity %, var-substitution+info-gate,
+  Misc auto-scale, form2A/3A labels (F56/F58/F59/F60/F61); **g** charts & curve view (may lift the
+  ChartCanvas fence) — axis labels + interactive scrub + log-x, curve-fitting on the curve view, reference-
+  line legend (F55/F62/F66 [+F36 tap-to-delete points]); **h** rich editors / scene fidelity — polished
+  load/save/create/edit-rule modals + full settings list w/ gold changed-vs-default (F38), Circadian
+  Date/Lat/Lon element (F39). domain/ + golden vectors stay fenced except S12.7g (charts) which may extend
+  ChartCanvas.
+- **HUMAN GATE 2 — RE-TEST (4th) AGAIN** after S12.7. Re-verify all G2R-Fn + the original Gate-2 set.
 - **S13** (chart replication + static screens) follows S12.6 on the serial spine — preconditions S12.6
   DONE (faithful screens + menu IA), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over
   read-only `ChartCanvas.kt`) into the six remaining charts and fills their `ChartPlaceholder` host slots
@@ -1007,8 +1053,23 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   DISABLE the draft-screen Apply button while present (with a hint). All other rules (the task707
   safety@1000lux warning, wait-order, low-scale, zone2End<zone1End) stay ADVISORY and only warn. This is
   the ONLY place Tasker's advisory model is overridden; do not generalise it. (Affects S12.6d/e, Gate 2.)
+- D-053: S12.6e LABEL/HELP AUDIT + CONTEXT EDITOR + ONBOARDING (G2R-F19…F25, F28, F29). Findings:
+  (a) the owner-flagged **"delta factor" was a LABEL/HELP bug, not a wiring bug** — `%AAB_DeltaFactor` IS
+  the sensor-smoothing alpha factor in `BrightnessEngine` (`luxAlpha=1-exp(-deltaFactor·effectiveDelta)`);
+  relabelled "Smoothing Δ" + verbatim help. A full field→`%AAB_*` cross-check vs `AabSettingsContract`
+  found **no other binding bug**. (b) The 30 verbatim long-press help strings were decoded from the
+  reactivity/brightness/misc/superdimming scene `longclick` tasks (Flash code 548, XML_RECIPES R2) and
+  live in `TaskerHelp.kt` — the single source of truth; the Experiment-scene (Circadian screen) help
+  tasks were NOT in this batch (carried gap). task510's `%AAB_DimmingEnabled` help text literally says
+  "circadian scaling feature" — ported verbatim; the super-dimming wiring is correct (S12.5c G2-F9).
+  (c) Wi-Fi SSID: the synchronous `getNetworkCapabilities` path is redacted to `<unknown ssid>` on API
+  29+; `currentSsid()` is now `suspend`→`SsidResult` via a one-shot `NetworkCallback`
+  (`FLAG_INCLUDE_LOCATION_INFO`, 2s timeout) — interface change rippled to ContextsViewModel/Screen.
+  (d) `PipelineState` gained 5 timing fields populated from existing engine output (NO domain API change,
+  fence honoured). (Affects S12.6e; Gate 2 re-test; S13 inherits the help-reveal pattern + the
+  Experiment-scene help gap.)
 
-Append new entries as D-053, D-054, … with which segments they affect.
+Append new entries as D-054, D-055, … with which segments they affect.
 
 ## Blockers
 
@@ -1245,16 +1306,39 @@ snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
 - **G2R-F19** Some **labels don't match their meaning** (e.g. *delta factor*). Tasker's long-press shows an
   explanatory toast: *"Controls how much to smooth out sensor readings. Higher values react faster to
   small light changes, but may increase jitter. Lower values are more stable, but might feel sluggish."*
+  **→ FIXED by S12.6e (D-053):** every Reactivity/Curve/Misc/SuperDimming control relabelled to the Tasker
+  scene label + the **verbatim** Flash help (`TaskerHelp.kt`, 30 strings decoded from the `longclick`
+  tasks) surfaced via an "ⓘ" reveal. "Delta factor" → **"Smoothing Δ"** with the exact owner-quoted help.
 - **G2R-F20** The label mismatches lead to a suspicion that the **underlying behaviour/wiring is also
   wrong** — audit each parameter label → variable → runtime use against the extraction.
+  **→ AUDITED, S12.6e (D-053):** the delta-factor case was a **label/help bug, not a wiring bug** —
+  `%AAB_DeltaFactor` IS the sensor-smoothing alpha factor (`luxAlpha=1-exp(-deltaFactor·effectiveDelta)`,
+  BrightnessEngine). All other field→`%AAB_*` bindings cross-checked vs `AabSettingsContract`; **no other
+  binding bug found.** One verbatim oddity recorded: task510's help for `%AAB_DimmingEnabled` ("Use super
+  dimming") describes "circadian scaling feature" — ported verbatim; super-dimming wiring already verified
+  correct (S12.5c G2-F9), so this is Tasker's own help text, not a rebuild bug.
 - **G2R-F21** The long-press explanations are **embedded in the scenes as long-press triggers** — port/fix
   them all (every scene's help longclicks).
+  **→ FIXED by S12.6e (D-053):** ported verbatim as the "ⓘ" reveal text. **Carried gap:** the Experiment
+  Settings scene help tasks (Circadian screen: scaleSpread/steepness/transition/taper) were NOT in this
+  extraction batch — those fields keep their concise S12 helpers; a future pass should decode them too.
 - **G2R-F22** Context rule creation **still cannot get the Wi-Fi SSID** (`_GetWifiNoLocation V3`) nor live
   location.
+  **→ FIXED by S12.6e (D-053):** `WifiInfoReader.currentSsid()` is now `suspend`→`SsidResult` via a
+  one-shot `NetworkCallback(FLAG_INCLUDE_LOCATION_INFO)` (2s timeout) — fixes the synchronous-path
+  `<unknown ssid>` redaction on API 29+ — with targeted messages (NotOnWifi / NeedsLocationPermission /
+  LocationServicesOff / Unknown). Live location: rule editor gained lat/lon/radius fields + "Use current
+  location" (AndroidLocationReader).
 - **G2R-F23** On rule creation, **usage access is greyed out**; the original permission onboarding had an
   instruction on how to fix it (surface that instruction/flow here).
+  **→ ADDRESSED (S12.5c + S12.6e):** the rule editor shows a usage-access prompt + grant deep-link when an
+  app trigger lacks the grant (already in S12.5c); not greyed.
 - **G2R-F24** The setup/permissions screen should show **usage access as optional by default**.
+  **→ FIXED by S12.6e (D-053):** onboarding always shows the usage step, labelled "(optional)" by default
+  and "(needed for per-app rules)" once an app rule exists (per D-024/task563); Done is never blocked.
 - **G2R-F25** There is **no toast when a rule/profile is loaded**.
+  **→ FIXED by S12.6e (D-053):** `ContextLoadSink`/`ToastContextLoadSink` toasts on a runtime context-rule
+  profile load (unconditional); the Profiles screen already toasted on manual apply (S12.5c).
 
 #### Additional owner findings during S12.6c testing (2026-06-14) — triaged to future sub-segments
 These five were reported while S12.6c was in flight. S12.6c investigated/triaged them but did NOT
@@ -1274,17 +1358,174 @@ to be addressed already, fix now; otherwise leave for future stages"; none are S
 - **G2R-F28 (S12.6e, NEW) — context-rule time inputs are free-text "HH:MM"; should open the system
   TimePicker modal.** The From/To fields in `ContextsScreen.RuleEditor` are `OutlinedTextField`s; replace
   with a tap→Material3 `TimePicker` dialog (keep the SUNRISE/SUNSET token buttons).
+  **→ FIXED by S12.6e (D-053):** `TimeField` opens an M3 `TimePicker` `AlertDialog` (seeded from the
+  current HH:MM); the SUNRISE/SUNSET token buttons are kept.
 - **G2R-F29 (S12.6b refinement, NEW) — Live Debug "Performance & Timings" lacks full Tasker parity.** The
   Tasker debug scene (debug.md L19-23) surfaces `%LuxAlpha`, `%AAB_CycleTotal`, Reactivity Cooldown
   (throttle), Last Animation (steps×wait) and Last Update under Performance/Automation; the rebuilt card
   shows only cycle time + last sample. A future Live Debug pass should add luxAlpha / animation
   (steps×wait) / throttle / last-update to `PipelineState` (runtime holder, NOT the domain engine API)
   and render them.
+  **→ FIXED by S12.6e (D-053):** `PipelineState` gained `luxAlpha`/`animationSteps`/`animationWaitMs`/
+  `throttleMs`/`lastUpdateMs` (populated in `runCycle` from the existing `BrightnessPolicyOutput`, no
+  domain change); the Performance & Timings card now renders LuxAlpha / cycle / reactivity-cooldown /
+  last-animation (steps×wait) / last-update / last-sample.
 - **G2R-F30 (S12.6d, NEW) — manually loading a profile does not pause context automation or offer a
   Resume.** In Tasker a manual profile load latches `%AAB_ContextOverride=true` (the manual context lock,
   D-014/D-038a) so watchers stop overriding the user's choice; the rebuild's `applyProfile` does not set
   it and the UI shows no "context automation paused / Resume" affordance. S12.6d (profiles) should set
   the lock on manual apply + surface a resume control that clears `contextOverride` (+ re-evaluates).
+
+### Gate 2 RE-RE-TEST (after S12.6e) — findings recorded → S12.7 (Gate 2 still NOT signed off)
+
+**Owner on-device re-re-test 2026-06-14 ~18:45 + 19:24 UTC** (S12.6e build, dist/ APK). "Definitely going in
+the right direction." A further batch of parity/behaviour gaps remains → **G2R-F33…F68**, recorded verbatim
+(structured below; owner's technical hints preserved — they are parity-critical). **Gate 2 stays NOT signed
+off**; these route to a new **S12.7** (a–h, all Opus/high; brief in RUNBOOK). Several are S13 chart
+work or large HTML-scene design ports — flagged inline. The owner did NOT follow the dist/README test
+order, so the README's S12.6a–d re-confirmation items are still UNVERIFIED this round (see "untested" note
+at the end).
+
+*Onboarding / permissions:*
+- **G2R-F33** First launch asks permissions but does NOT surface/guide the Android **"restricted settings"
+  / greyed-out** fix flow (sideloaded apps must "Allow restricted settings" in App info before certain
+  grants take effect). Onboarding must detect + instruct this.
+- **G2R-F41 (perm half)** There is **no option to grant Location permission in Setup** — needed for the
+  location-based SSID path + context location. (With Location enabled via Android app settings it works.)
+
+*Manual override detection & feedback:*
+- **G2R-F34** Manual-override **false positives persist** — the app can't tell a true override from a new
+  sensor reading. Owner spec: while an animation is **mid-flight there must be a mutex lock**, plus a
+  **target-vs-actual delta check** — if target is e.g. −20 from current and the observed value is +1 or −21
+  (i.e. wrong direction / overshoot beyond our step) that's an override; a value consistent with our own
+  in-flight step is not. The owner is fairly sure the Tasker version does exactly this. (Refines G2R-F26/
+  D-049 — the S12.6c settle-wait was insufficient.)
+- **G2R-F35** A manual override should post a **high-priority notification (with vibration) + a toast**,
+  same as Tasker.
+
+*Override points / graphs (much of this is S13 chart work):*
+- **G2R-F36** Manual override points on the curve graph are **deletable by tapping** them (Tasker draws
+  them slightly larger for a bigger tap target); a tap shows the lux/brightness pair and asks to confirm
+  deletion.
+- **G2R-F37** All Tasker graphs have a **dashed golden reference line** = the default (mostly hard-coded)
+  values that were loaded; currently missing on every chart.
+- **G2R-F55** Graphs have **no axis labels**, and Chart.js let you **drag a finger across to read the
+  numeric current + reference values**. The y-axis values feel arbitrary (e.g. 191.25 — should be logical
+  integers); the x-axis should start at **0.1, not 1** (log lux). (S13.)
+- **G2R-F62** **Curve fitting belongs on the Curve view**, not Tools-only — the point is to *see* the
+  fitted curve's impact against the recorded data points + the reference curve. (Move/echo the wizard
+  result onto the curve chart.)
+
+*Profile & Context UI design (large HTML-scene ports):*
+- **G2R-F38** The Tasker **Profile + Contexts scenes showed a full list of every setting and its value,
+  with any value changed-vs-default coloured gold**, via many modals. Inspect the scene HTML and translate
+  it properly into the profile/context UI. (Context **resume is much smoother** in Tasker.)
+- **G2R-F39** The **Circadian scene had a Date/Latitude/Longitude web element** to set them directly;
+  unset → defaults to **today + current location**. Add this to the Circadian screen.
+
+*Notification:*
+- **G2R-F40** The notification offers **Pause but no Resume** action — add Resume (and reflect paused
+  state), parity with Tasker.
+
+*Wi-Fi SSID acquisition (extends G2R-F22 — the S12.6e fix was the wrong primary path):*
+- **G2R-F41 (SSID half)** Don't require Location for the SSID. Per **`_GetWifiNoLocation V3`** (task105/633):
+  1) **with Shizuku**, run `cmd wifi status | grep "Wifi is connected to" | cut -d\" -f2`;
+  2) **with WRITE_SECURE_SETTINGS / dump access (no Shizuku)**, run
+  `dumpsys wifi | grep mWifiInfo | grep COMPLETED` and regex the SSID out;
+  3) only fall back to the Location-gated `NetworkCallback` path. The current message "requires location
+  permission, grant it in setup" is both wrong-priority and points to a Setup option that doesn't exist
+  (see F33/F41-perm).
+
+*Context system:*
+- **G2R-F42** Context-rule "use current location" **wrongly reports Location permission not granted** (even
+  when it is) — likely a stale/sync permission check; recheck on use (cf. the permission-propagation delay
+  the owner saw in F44).
+- **G2R-F43** The **context-rule list is ordered by creation time** (oldest first); it should be ordered by
+  **priority (highest first)** to match the resolution model (D-014).
+- **G2R-F44** Context-rule creation only offers **built-in profiles**; **imported legacy profiles** (loaded
+  from `Download/AAB/configs`) are NOT selectable as a rule target — only after re-saving them as a new
+  profile. The legacy import must register into the profile catalog the rule editor reads (extends D-042c).
+- **G2R-F45** **Context location matching + listener lifecycle.** Test setup (lat 55.83, lon 4.99, 2000 m,
+  highest priority) initially read "active rule: none"; debug toasts showed **`loc 0.0,0.0`** even with
+  Location enabled. It later started working (permission-propagation delay), BUT the **location listener
+  dies the instant the app is backgrounded** → reverts to no-rule. Needs a proper **foreground/zombie-
+  guarded location listener** (Tasker's "super smart location listener"), and the **0.0,0.0** read is a
+  bug. Also the context-location debug toasts are **not debounced to ≥100 m** changes and are near-constant,
+  **blocking text input**.
+- **G2R-F46 (semantics)** **"Manual profile load = override" misunderstanding.** After a manual profile
+  load the Menu says **no context override active** — but a manual load IS the override (it should latch +
+  display it, smoother Resume). Conversely, **a context rule being active is NOT an "override"** and must
+  not be labelled one. Fix the override/lock semantics + the Menu/label wording (refines G2R-F30/D-038a).
+
+*Debug / toasts:*
+- **G2R-F47** **Context-automation debug toasts are missing.** Tasker flashed these constantly: on app
+  switch, on auto-loading a profile — showing **context trigger, context, profile, and rule (with
+  priority)**. Surface them under the Context Automation debug category.
+- **G2R-F48** **Dynamic Scale debug** fires on **every light change**; it should fire **every 2 minutes
+  into a dawn/dusk transition** only.
+- **G2R-F49** **Overlay Preview debug** (privilege≈none fallback) should **toast the colour of the
+  semi-transparent overlay** (not tested on-device, but the toast is expected).
+- **G2R-F50** Toasts **only show while the app is in the foreground**; Tasker showed flash messages
+  **everywhere** (likely via Accessibility). Decide on a global-toast mechanism.
+- **G2R-F51** Toasts **stack instead of cancelling** each other — after disabling "Light Eval Thresholds"
+  the queued toasts keep appearing for a while. Each new debug toast should cancel the previous.
+- **G2R-F52** **"Debug Off" is not instant** — it only takes effect after backing out of the screen; in
+  Tasker the selector applies immediately.
+
+*Pipeline correctness / diagnostics:*
+- **G2R-F53** On the Live Debug screen, **LuxAlpha shows a NEGATIVE value for one cycle** after it settles
+  — impossible for `1 - exp(-…)` ∈ [0,1]; investigate (stale/uninitialised read or a settle-cycle artefact).
+- **G2R-F54** **Sensor dead zone may be mis-configured** — lots of activity under Performance & Timings in
+  a dimly lit (stable) room. Verify `%AAB_ThreshAbsLow/High` seeding + the prof760 gate.
+
+*Per-screen live readouts & labels (extends G2R-F7/F8):*
+- **G2R-F56** **Reactivity "live reactivity" threshold should be shown as a percentage** (current 0.5 →
+  display "50%"). (The bound vars are `%aab_thresh*pc` percentages.)
+- **G2R-F57** **First boot after granting permissions loads a non-functional Dashboard** — can't navigate
+  back to the Menu, and the hardware Back key closes the app. (Onboarding "Done" routes to Dashboard, not
+  Menu — should land on the Menu hub, cf. S12.6a.)
+- **G2R-F58** **Every settings screen needs the Tasker live-readout block.** Examples: Curve & Brightness →
+  "Current smoothed lux [%SmoothedLux]" + "Current brightness (%AAB_MinBright–%AAB_MaxBright)
+  [%AAB_CurrentBright]"; Misc → "Current throttle [%AAB_Throttle] ms" + "Current smoothing α [%LuxAlpha]".
+  (Big-bold label + gold value, like the diagnostic cards.)
+- **G2R-F59** Reactivity **"dynamic threshold" description shows the literal `%AAB_ThreshDynamic`** (Tasker
+  substitutes the live value), AND that description is **not gated behind the ⓘ info button** like the
+  other labels. Substitute the value + move it behind the info reveal (or make it a live readout).
+- **G2R-F60** Under **Misc, "Scale" should become an automatic read-only field showing the current
+  dynamic scale** when circadian scaling is enabled (mirrors the Tasker scale_dynamic auto field).
+- **G2R-F61** Under **Curve & Brightness, form2A / form3A look like placeholders** — label them **"Zone 2
+  alignment" / "Zone 3 alignment"** (they are the derived continuity hinge points).
+
+*Re-re-test clarifications + additional findings (owner, 2026-06-14 19:24) + owner answers to the open questions:*
+- **CONFIRMED WORKING (retractions / no action):** boot self-start; screen off→on reinit; block-Apply gate;
+  per-screen reset; override-point persistence; PWM-sensitive **hardware-floor** lock. **G2R-F37 RETRACTED**
+  — the dashed **gold reference line IS present** on the graphs; it only needs a **legend** now (→ G2R-F66).
+- **G2R-F63** **QS tile state is not live** — Off→Starting "hangs" until the QS panel is closed+reopened;
+  state transitions only render when not being watched. Needs `TileService.requestListeningState` /
+  `Tile.updateTile` on every state change (and a refresh on `onStartListening`).
+- **G2R-F64** **Spurious "instant override" on service start / display-on (race).** QS Off→On sometimes
+  lands in *override* instead of resuming; a display off→on cycle sometimes leaves it *paused*. Both point
+  to a manual-override being detected at start/reinit (the observer firing on our own initial write).
+  Confirmed in the Dashboard; hard to reproduce once cleared. Likely a race in OverrideMonitor vs the
+  initial `setInitialBrightness` write — gate override detection until the first self-write settles.
+  (Tightly related to G2R-F34; fix together.)
+- **G2R-F65** **Super dimming does not Extra-Dim.** With PWM-sensitive on, the hardware floor locks to the
+  setpoint correctly, BUT the **secure `reduce_bright_colors` (Extra Dim) layer never actually dims** below
+  it. The ELEVATED super-dimming engage path is not taking effect on-device (separate from the PWM floor).
+- **G2R-F66** Graphs need a **legend** for the (now-confirmed) dashed gold reference line + the live curve.
+- **G2R-F67** Context rules also need **day-of-week selection** (Tasker `<Day>` rules) with **smart
+  midnight wrapping**. The domain `ContextTriggers.days` + resolver already exist (D-014); the rule editor
+  exposes no day picker.
+- **G2R-F68** The rule editor's **Sunrise/Sunset tokens should also display the resolved current
+  time-of-day** for today, in theme **gold** (Tasker shows e.g. "SUNRISE (06:42)").
+- **OWNER ANSWERS to S12.6e open questions:** (F34) **yes — transcribe the real task567 override logic**
+  from the XML, don't approximate. (F41) provide **guidance on granting `DUMP` and/or using Shizuku** for
+  the no-Location SSID path. (F50) **yes, use an AccessibilityService** for global toasts — distribution is
+  **F-Droid/GitHub, not Play Store**, so the sensitive permission is acceptable. (F38/F39) the "modals" =
+  the **load / save / create-rule / edit-rule** dialogs — they feel **more polished** in Tasker's WebViews
+  than the current M3; raise the fidelity (full settings list w/ gold changed-vs-default values; smoother
+  context resume). (F46) **confirmed** — manual profile load = an override (latch + Menu shows it + Resume
+  clears); a context rule being active is NOT an override.
 
 ### Gate 3 (after S14) — pending
 

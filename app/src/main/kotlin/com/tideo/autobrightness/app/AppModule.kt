@@ -7,6 +7,7 @@ import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
 import com.tideo.autobrightness.app.runtime.ContextEngine
 import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
+import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
@@ -64,6 +65,8 @@ class AppModule(context: Context) {
             signalSource = AndroidContextSignalSource(appContext),
             onProfileChanged = { controller.onContextChanged() },
             debugSink = debugSink,
+            // G2R-F25: toast on a runtime context-rule profile load (unconditional, not debug-gated).
+            contextLoadSink = ToastContextLoadSink(appContext),
         )
 
         controller = BrightnessPipelineController(

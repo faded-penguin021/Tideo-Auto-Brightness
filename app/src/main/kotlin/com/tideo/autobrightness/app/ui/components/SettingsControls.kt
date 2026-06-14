@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -51,6 +52,19 @@ private fun sameNumber(a: Number, b: Number, isInt: Boolean): Boolean =
     if (isInt) a.toInt() == b.toInt() else a.toFloat() == b.toFloat()
 
 /**
+ * The "ⓘ" affordance that reveals a control's **Tasker long-press help** (G2R-F19/F20/F21). In the
+ * Tasker scenes each parameter label carries a `longclick` help task that Flashes an explanatory
+ * string; we port that verbatim and surface it on tap (the modern equivalent of Tasker's long-tap),
+ * keeping the help text out of the way until requested. [tag] keys the button so a test can reveal it.
+ */
+@Composable
+private fun HelpInfoButton(tag: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.testTag("help_$tag")) {
+        Text("ⓘ", color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/**
  * Outlined numeric field for the draft-edit model (S12.5b). The text is seeded **once per draft
  * epoch** ([epoch]) rather than re-keyed on the incoming [value]: re-seeding on every emission of a
  * committed value corrupted input mid-keystroke ("8.8" → backspace → "8.80.0", G2-F7). An empty
@@ -70,11 +84,13 @@ fun NumberSettingField(
     committed: Number? = null,
     error: String? = null,
     helper: String? = null,
+    help: String? = null,
     enabled: Boolean = true,
     isInt: Boolean = true,
     testTag: String = label,
 ) {
     var text by remember(epoch) { mutableStateOf(formatNumber(value, isInt)) }
+    var showHelp by remember { mutableStateOf(false) }
     val bracket = committed?.takeIf { !sameNumber(it, value, isInt) }
         ?.let { " [${formatNumber(it, isInt)}]" } ?: ""
     OutlinedTextField(
@@ -87,9 +103,15 @@ fun NumberSettingField(
         enabled = enabled,
         isError = error != null,
         singleLine = true,
+        trailingIcon = if (help != null) {
+            { HelpInfoButton(testTag) { showHelp = !showHelp } }
+        } else {
+            null
+        },
         supportingText = {
-            val msg = error ?: helper
-            if (msg != null) Text(msg)
+            // Tasker long-press help wins when revealed; validation errors always take priority.
+            val msg = error ?: help?.takeIf { showHelp } ?: helper
+            if (msg != null) Text(msg, modifier = Modifier.testTag("helptext_$testTag"))
         },
         keyboardOptions = KeyboardOptions(
             keyboardType = if (isInt) KeyboardType.Number else KeyboardType.Decimal,
@@ -112,16 +134,22 @@ fun IntSliderSettingField(
     modifier: Modifier = Modifier,
     committed: Int? = null,
     helper: String? = null,
+    help: String? = null,
     enabled: Boolean = true,
     testTag: String = label,
 ) {
     val bracket = committed?.takeIf { it != value }?.let { " [$it]" } ?: ""
+    var showHelp by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(
-            "$label: $value$bracket",
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "$label: $value$bracket",
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (help != null) HelpInfoButton(testTag) { showHelp = !showHelp }
+        }
         Slider(
             value = value.coerceIn(range).toFloat(),
             onValueChange = { onCommit(it.roundToInt().coerceIn(range.first, range.last)) },
@@ -130,11 +158,13 @@ fun IntSliderSettingField(
             enabled = enabled,
             modifier = modifier.fillMaxWidth().testTag(testTag),
         )
-        if (helper != null) {
+        val msg = help?.takeIf { showHelp } ?: helper
+        if (msg != null) {
             Text(
-                helper,
+                msg,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("helptext_$testTag"),
             )
         }
     }
@@ -148,9 +178,11 @@ fun SwitchSettingRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     helper: String? = null,
+    help: String? = null,
     enabled: Boolean = true,
     testTag: String = label,
 ) {
+    var showHelp by remember { mutableStateOf(false) }
     Row(
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -158,14 +190,17 @@ fun SwitchSettingRow(
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
-            if (helper != null) {
+            val msg = help?.takeIf { showHelp } ?: helper
+            if (msg != null) {
                 Text(
-                    helper,
+                    msg,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("helptext_$testTag"),
                 )
             }
         }
+        if (help != null) HelpInfoButton(testTag) { showHelp = !showHelp }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,

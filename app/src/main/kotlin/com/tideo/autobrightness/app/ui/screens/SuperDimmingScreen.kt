@@ -89,41 +89,42 @@ fun SuperDimmingContent(
                 }
             }
             val dimEnabled = tier == Tier.ELEVATED
+            // Labels + verbatim long-press help from extraction/scenes/superdimming_settings.md (S12.6e).
             // task509/511 _DimmingUIToggle — ELEVATED-gated (secure reduce_bright_colors path, D-040a).
             // Mutually exclusive with PWM/software dimming (G2-F10): enabling super dimming disables PWM.
             SwitchSettingRow(
-                "Enable super dimming", draft.dimmingEnabled,
+                "Use super dimming", draft.dimmingEnabled,
                 { on -> onEdit { s -> s.copy(dimmingEnabled = on, pwmSensitive = if (on) false else s.pwmSensitive) } },
                 enabled = dimEnabled,
-                helper = "Extra dimming below the threshold (Android Extra Dim).",
+                help = TaskerHelp.DIMMING_ENABLED,
                 testTag = "switch_dimmingEnabled",
             )
             NumberSettingField(
-                "Dimming strength", draft.dimmingStrength, { onEdit { s -> s.copy(dimmingStrength = it.toInt()) } },
+                "Strength setpoint", draft.dimmingStrength, { onEdit { s -> s.copy(dimmingStrength = it.toInt()) } },
                 epoch = epoch, committed = committed.dimmingStrength, enabled = dimEnabled,
-                helper = "Maximum super-dimming strength (0–100).", testTag = "field_dimmingStrength",
+                help = TaskerHelp.DIMMING_STRENGTH, testTag = "field_dimmingStrength",
             )
             NumberSettingField(
-                "Dimming exponent", draft.dimmingExponent, { onEdit { s -> s.copy(dimmingExponent = it.toFloat()) } },
+                "SD exponent", draft.dimmingExponent, { onEdit { s -> s.copy(dimmingExponent = it.toFloat()) } },
                 epoch = epoch, committed = committed.dimmingExponent, isInt = false, enabled = dimEnabled,
-                helper = "How gradually dimming kicks in.", testTag = "field_dimmingExponent",
+                help = TaskerHelp.DIMMING_EXPONENT, testTag = "field_dimmingExponent",
             )
             NumberSettingField(
-                "Dimming threshold", draft.dimmingThreshold, { onEdit { s -> s.copy(dimmingThreshold = it.toInt()) } },
+                "Threshold", draft.dimmingThreshold, { onEdit { s -> s.copy(dimmingThreshold = it.toInt()) } },
                 epoch = epoch, committed = committed.dimmingThreshold, enabled = dimEnabled,
-                helper = "Screen brightness below which dimming engages.", testTag = "field_dimmingThreshold",
+                help = TaskerHelp.DIMMING_THRESHOLD, testTag = "field_dimmingThreshold",
             )
             // task513/610: threshold must not sit below minimum brightness.
             if (draft.dimmingThreshold < draft.minBrightness) {
                 ErrorBanner("Dimming threshold is below minimum brightness.", "error_dimmingThreshold")
             }
-            // G2-F11: dim spread is the CIRCADIAN dim-strength spread (task646 DimDynamic) — it only
-            // does anything when circadian scaling is on, so gate the field on it + correct the label.
+            // G2-F11: "Spread" is the CIRCADIAN dim-strength spread (task646 DimDynamic) — it only does
+            // anything when circadian scaling is on, so gate the field on it (Tasker label "Spread").
             NumberSettingField(
-                "Circadian dim spread", draft.dimSpread, { onEdit { s -> s.copy(dimSpread = it.toInt()) } },
+                "Spread (circadian)", draft.dimSpread, { onEdit { s -> s.copy(dimSpread = it.toInt()) } },
                 epoch = epoch, committed = committed.dimSpread,
                 enabled = dimEnabled && draft.scalingEnabled,
-                helper = "How much the dimming strength shifts across the day (needs circadian scaling).",
+                help = TaskerHelp.DIM_SPREAD,
                 testTag = "field_dimSpread",
             )
 
@@ -133,13 +134,13 @@ fun SuperDimmingContent(
             SwitchSettingRow(
                 "Use software dimming (PWM-sensitive)", draft.pwmSensitive,
                 { on -> onEdit { s -> s.copy(pwmSensitive = on, dimmingEnabled = if (on) false else s.dimmingEnabled) } },
-                helper = "Gamma-like compression for flicker-sensitive eyes (disables super dimming).",
+                help = TaskerHelp.PWM_SENSITIVE,
                 testTag = "switch_pwmSensitive",
             )
             NumberSettingField(
-                "PWM exponent", draft.pwmExponent, { onEdit { s -> s.copy(pwmExponent = it.toFloat()) } },
+                "Software exponent (PWM)", draft.pwmExponent, { onEdit { s -> s.copy(pwmExponent = it.toFloat()) } },
                 epoch = epoch, committed = committed.pwmExponent, isInt = false,
-                helper = "Shape of the PWM compression curve.", testTag = "field_pwmExponent",
+                help = TaskerHelp.PWM_EXPONENT, testTag = "field_pwmExponent",
             )
 
             // Circadian dimming chart (re-homed here per D-026) is render-deferred to S13.

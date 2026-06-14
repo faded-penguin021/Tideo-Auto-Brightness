@@ -12,7 +12,10 @@ import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.platform.context.AndroidForegroundAppMonitor
+import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.AndroidWifiInfoReader
+import com.tideo.autobrightness.platform.context.LocationSnapshot
+import com.tideo.autobrightness.platform.context.SsidResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +34,7 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
     private val store: ContextRuleStore = appModule.contextRuleStore
     private val userProfiles: UserProfileStore = appModule.userProfileStore
     private val wifi = AndroidWifiInfoReader(application)
+    private val location = AndroidLocationReader(application)
     private val foregroundApp = AndroidForegroundAppMonitor(application)
 
     val rules: StateFlow<List<ContextRule>> = store.rulesFlow()
@@ -44,8 +48,16 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
     fun save(rule: ContextRule) = viewModelScope.launch { store.save(rule) }
     fun delete(id: String) = viewModelScope.launch { store.delete(id) }
 
-    /** The currently-connected Wi-Fi SSID for the "use current SSID" helper (null if not on Wi-Fi). */
-    suspend fun currentSsid(): String? = withContext(Dispatchers.Default) { wifi.currentSsid() }
+    /**
+     * The currently-connected Wi-Fi SSID for the "use current SSID" helper (G2R-F22). Returns a typed
+     * [SsidResult] so the screen can show a targeted message (not-on-Wi-Fi vs needs-location vs
+     * location-services-off) instead of a blanket "Not connected".
+     */
+    suspend fun currentSsid(): SsidResult = wifi.currentSsid()
+
+    /** Last known device location for the "use current location" helper (null if unavailable). */
+    fun currentLocation(): LocationSnapshot? =
+        runCatching { location.lastKnownLocation() }.getOrNull()
 
     /** task43 reads %APP_FOREGROUND via usage stats — app rules are dead without this grant. */
     fun hasUsageAccess(): Boolean = foregroundApp.hasUsageAccessPermission()

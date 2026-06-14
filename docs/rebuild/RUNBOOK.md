@@ -1015,6 +1015,191 @@ addressed**; screen_map/checklist updated; pushed. → **re-run HUMAN GATE 2.**
 
 ---
 
+## S12.7 — Gate-2 re-re-test salvage: runtime correctness, context, permissions, debug, fidelity (a–h)
+
+**Model:** Opus / high (ALL sub-segments) · **Size:** large (8 sub-segments) · **Preconditions:** S12.6
+merged to main. **Run setup script.** **Origin:** the Gate-2 RE-RE-TEST (STATE.md "Gate 2 RE-RE-TEST"),
+findings **G2R-F33…F68** + the owner answers logged there. Same prime directive: **port Tasker behaviour/
+feel exactly; modernise the *how*, never the *what*.** UI/app/platform-glue layer only — **domain/ + golden
+vectors stay fenced; `ChartCanvas` may be extended ONLY in S12.7g** (the chart sub-segment).
+
+### Binding owner answers (from the re-re-test Q&A; do NOT re-litigate)
+1. **Transcribe the real task567 override logic** from the XML (XML_RECIPES R2) — do NOT approximate. The
+   intended behaviour: a manual override is a brightness change that is **inconsistent with our own in-flight
+   animation step** (wrong direction, or magnitude beyond our step), checked **target-vs-actual**; while an
+   animation is mid-flight there is a **mutex** so our own per-frame writes never self-trigger. (F34/F64.)
+2. **Manual profile load = an override** (latch `%AAB_ContextOverride`, show it in the Menu, Resume clears
+   it). **A context rule being active is NOT an override** — never label it one. (F46.)
+3. **Global toasts via an AccessibilityService** are sanctioned (distribution is F-Droid/GitHub, not Play
+   Store). It must be optional/opt-in with a clear rationale screen. (F50.)
+4. **Wi-Fi SSID without Location**: prefer `_GetWifiNoLocation V3` (task105/633) — Shizuku
+   `cmd wifi status | grep "Wifi is connected to"` then `dumpsys wifi | grep mWifiInfo | grep COMPLETED`
+   with a regex; the Location `NetworkCallback` path is the **last** fallback. Guide the user on granting
+   `DUMP` / using Shizuku. (F41.)
+
+**Sub-segment ordering:** S12.7a FIRST (override-engine correctness underpins the service surfaces in b and
+the override semantics that c/h depend on). b–h are largely disjoint; if run in parallel sessions, rebase
+before push and expect STATE.md/screen_map append-merges. Each ends green on the full ladder + pushes; the
+**owner re-tests Gate 2 again after S12.7h**. Re-read the cited extraction docs/tasks before each fix; do
+not invent behaviour.
+
+---
+
+### S12.7a — Manual-override engine correctness *(Opus/high · large)*
+
+**Objective:** Eliminate override false-positives and the spurious instant-override-on-start, by porting
+Tasker's actual override-detection logic and fixing the start/reinit race.
+
+**Deliverables:**
+1. **Transcribe task567** `_DetectManualOverride` (+ task525/526 toggle, prof755 gate) from the XML and
+   re-implement `OverrideMonitor`/`handleOverride` to match: a **target-vs-actual delta check** (compare the
+   observed brightness against our last-applied target — same direction & within our step ⇒ ours; opposite
+   direction or beyond ⇒ override), gated by an **animation mutex** so per-frame self-writes never trigger
+   (F34). Supersedes the S12.6c settle-wait (D-049/D-051d) where they conflict; record the transcription.
+2. **Kill the instant-override-on-start race** (F64): override detection must be **suppressed until the
+   first `setInitialBrightness` self-write has settled** on service start, screen-on reinit, resume, and
+   QS-on. Repro path: QS Off→On / display off→on landing in override/paused.
+3. **Override semantics** (F46): a **manual profile load latches the override** (Menu reflects it, Resume
+   clears it); a context rule being active is **not** an override. Align `ContextEngine`/Menu/labels.
+
+**Acceptance:** ladder green; a regression test that a from→to animation with interleaved self-writes emits
+NO override but an opposing external write does; a test that start/reinit does not emit a spurious override;
+STATE.md flips F34/F64/F46. **Fence: domain/ untouched.**
+
+---
+
+### S12.7b — Runtime feedback surfaces: notification, QS tile, super dimming *(Opus/high · medium)*
+
+**Deliverables:**
+1. **Override notification + toast** (F35): a manual override posts a **high-priority notification with
+   vibration** + a toast (Tasker parity).
+2. **Notification Resume action** (F40): add Resume alongside Pause; reflect paused/override state.
+3. **QS tile live state** (F63): `Tile.updateTile` on every state change + refresh on `onStartListening`
+   (+ `requestListeningState`) so Off→Starting→Active renders without reopening the panel.
+4. **Super dimming Extra-Dim fix** (F65): the ELEVATED secure `reduce_bright_colors` engage path locks the
+   PWM floor but never actually dims — diagnose `SuperDimmingCoordinator`/`AndroidSecureDimmingController`
+   (is the secure key written? is engage gated out?) and make Extra Dim apply below the threshold.
+
+**Acceptance:** ladder green; tests for the override notification (high-priority + action) and QS tile state
+mapping; Super-dimming engage path covered/diagnosed; STATE.md flips F35/F40/F63/F65.
+
+---
+
+### S12.7c — Context system: location lifecycle, ordering, legacy targets, days *(Opus/high · large)*
+
+**Deliverables:**
+1. **Foreground/zombie-guarded location listener** (F45): the listener must survive backgrounding (it dies
+   instantly today → reverts to no-rule); fix the **0.0,0.0** reads; **debounce to ≥100 m** changes so the
+   debug toasts aren't near-constant / input-blocking.
+2. **use-current-location perm recheck** (F42): re-check the grant at call time (it wrongly reports
+   not-granted; cf. the permission-propagation delay the owner saw).
+3. **Rule list ordered by priority** (highest first), not creation time (F43).
+4. **Legacy-imported profiles as rule targets** (F44): a profile imported from `Download/AAB/configs` must
+   register into the catalog the rule editor reads (extends D-042c) without a manual re-save.
+5. **Day-of-week rules + smart midnight wrapping** (F67): expose `ContextTriggers.days` in the editor; the
+   resolver already supports it (D-014) — verify the overnight/midnight-wrap interaction.
+6. **Sunrise/Sunset show the resolved time** (F68): the tokens display today's computed time in theme gold
+   (e.g. "SUNRISE (06:42)").
+7. **Context-automation debug toasts** (F47): on app switch / auto profile load, flash **trigger, context,
+   profile, rule (with priority)** under the Context Automation category.
+
+**Acceptance:** ladder green; tests for priority ordering, legacy-target visibility, the day picker, and the
+sunrise-value formatting; STATE.md flips F42/F43/F44/F45/F47/F67/F68. **Fence: domain/ untouched.**
+
+---
+
+### S12.7d — Permissions, Wi-Fi acquisition, first-boot nav *(Opus/high · medium)*
+
+**Deliverables:**
+1. **Restricted-settings flow** (F33): detect the Android "restricted settings" block for sideloaded apps
+   and instruct the user to "Allow restricted settings" (App info) before the grant flow.
+2. **Location grant in Setup** (F41): add a Location-permission step (needed for the SSID fallback + context
+   location).
+3. **Wi-Fi SSID without Location** (F41): implement the `_GetWifiNoLocation V3` order — Shizuku
+   `cmd wifi status` → `dumpsys wifi` (DUMP) → Location `NetworkCallback` last; surface grant guidance for
+   DUMP/Shizuku. Keep the typed `SsidResult` messaging.
+4. **First-boot navigation** (F57): after granting permissions the app must land on the **Menu** hub (not a
+   dead Dashboard); Back must navigate, not close the app.
+
+**Acceptance:** ladder green; tests for the SSID-source selection order (fake Shizuku/dump/callback) and the
+post-onboarding route to Menu; STATE.md flips F33/F41/F57.
+
+---
+
+### S12.7e — Debug / toast infrastructure *(Opus/high · medium)*
+
+**Deliverables:**
+1. **Accessibility global toasts** (F50): an opt-in `AccessibilityService` that shows the AAB flash messages
+   system-wide (foreground-only today). Rationale/opt-in screen; degrade gracefully when off.
+2. **Toasts cancel, not stack** (F51): each new debug toast cancels the previous; disabling a category stops
+   its queue immediately.
+3. **Instant debug-off** (F52): the selector applies immediately (no back-out needed).
+4. **Dynamic-scale debug timing** (F48): fire only **~2 min into a dawn/dusk transition**, not on every
+   light change.
+5. **Overlay-preview colour toast** (F49): the privilege≈none overlay-preview category toasts the overlay
+   colour.
+
+**Acceptance:** ladder green; tests for toast-cancel + instant-off + the dynamic-scale timing gate; STATE.md
+flips F48/F49/F50/F51/F52.
+
+---
+
+### S12.7f — Per-screen live readouts + label/value fidelity *(Opus/high · medium)*
+
+**Deliverables (re-derive every string/value from extraction/scenes):**
+1. **Live readout blocks** on every settings screen (F58): big-bold label + gold value, e.g. Curve &
+   Brightness → "Current smoothed lux [%SmoothedLux]" + "Current brightness (%AAB_MinBright–%AAB_MaxBright)
+   [%AAB_CurrentBright]"; Misc → "Current throttle [%AAB_Throttle] ms" + "Current smoothing α [%LuxAlpha]".
+2. **Reactivity threshold as a percentage** (F56): live reactivity shows 0.5 → "50%".
+3. **Dynamic-threshold description** (F59): substitute the live `%AAB_ThreshDynamic` value (not the literal)
+   and move it behind the ⓘ reveal like the others (or make it a live readout).
+4. **Misc "Scale" → auto dynamic-scale readout** when circadian scaling is enabled (F60).
+5. **form2A/form3A labels** → "Zone 2 alignment" / "Zone 3 alignment" (F61).
+
+**Acceptance:** ladder green; tests that the live-readout block renders seeded values + the percentage
+formatting + the form2A/3A labels; STATE.md flips F56/F58/F59/F60/F61. **Fence: domain/ untouched.**
+
+---
+
+### S12.7g — Charts & curve view *(Opus/high · large — MAY extend ChartCanvas)*
+
+**Note:** this is the one sub-segment allowed to extend `ChartCanvas` (axis labels + interactive readout are
+engine features); coordinate with S13 (which copies this template). domain/ + golden vectors still fenced.
+
+**Deliverables:**
+1. **Axis labels + log-x** (F55): label both axes; the lux x-axis is **log** starting at **0.1**; pick
+   logical y ticks (no 191.25 artefacts).
+2. **Interactive scrub** (F55): drag a finger across the chart to read the current + reference values at the
+   touch point (Chart.js parity).
+3. **Reference-line legend** (F66): legend distinguishing the live curve from the dashed gold reference line.
+4. **Curve fitting on the curve view** (F62): show the wizard's suggested curve **on the Curve & Brightness
+   chart** against the recorded points + reference, so the impact is visible (not Tools-only).
+5. **Tap-to-delete override points** (F36): points are larger tap targets; tapping shows the lux/brightness
+   pair and confirms deletion (writes back to `OverridePointStore`).
+
+**Acceptance:** ladder green; tests for the log-x/tick mapping, the legend, and override-point deletion;
+STATE.md flips F36/F55/F62/F66; screen_map/checklist updated. **S13 scope note:** after this, S13 = the
+remaining charts (copying this richer template) + About/User Guide static screens.
+
+---
+
+### S12.7h — Rich editors / scene fidelity *(Opus/high · large — owner-facing polish)*
+
+**Inputs:** `extraction/scenes/profile.md`, `menu.md`, `experiment_settings.md` + the scene HTML for the
+load/save/create-rule/edit-rule modals.
+
+**Deliverables:**
+1. **Polished profile/context modals** (F38): rebuild the load / save / create-rule / edit-rule dialogs to
+   match Tasker's feel; show a **full list of every setting with its value, gold-highlighting any value
+   changed vs default**; make **context resume** as smooth as Tasker.
+2. **Circadian Date/Lat/Lon element** (F39): a Date + Latitude + Longitude editor on the Circadian screen;
+   unset → defaults to **today + current location** (reuse the S12.7c location helper).
+
+**Acceptance:** ladder green; tests for the changed-vs-default gold highlighting + the Circadian date/loc
+defaults; STATE.md flips F38/F39; screen_map/checklist updated. → **re-run HUMAN GATE 2 (4th).**
+
+---
+
 ## S13 — Chart replication + static screens
 
 **Model:** Haiku / high · **Size:** medium · **Preconditions:** S12.6 DONE (template + faithful screens +
