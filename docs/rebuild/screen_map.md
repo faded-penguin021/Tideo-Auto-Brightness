@@ -23,13 +23,20 @@ rects and `PropertiesElement` scene-chrome are dropped (replaced by the M3 Scaff
 > 10 `%AAB_Debug` categories (D-023); confirmations/warnings toast across screens (G2-F12); the QS
 > tile shows the live paused/running state (G2-F17). Behaviour-only — the screen set is unchanged.
 
+> **S12.6a update (IA + naming, G2R-F1/F2/F3/F4):** the **AAB Menu is now a real home screen** (hub +
+> back-target; route `menu`) — the S12.5a nav drawer was promoted into it, and the Profiles/Contexts
+> hero cards moved off the Dashboard onto the Menu. The Dashboard is now a focused live-status screen
+> reached from the Menu (back → Menu, not Dashboard). Two screens are **renamed** to the Tasker names:
+> `Animation & Dimming` → **Super Dimming** (`super_dimming`), `Dynamic Scale` → **Circadian** (`circadian`).
+
 | Screen | Source scenes | Charts |
 |---|---|---|
-| **Dashboard** | Menu (nav), Misc Settings (service switch) | — |
+| **Menu** (home hub) | AAB Menu scene (banner + grouped nav + Profiles/Contexts hero cards) | — |
+| **Dashboard** (live status) | Misc Settings (service switch), live pipeline readout | — |
 | **Curve & Brightness** | Brightness Settings (curve coefficients), Brightness Graph | BrightnessCurveChart |
 | **Reactivity** | Reactivity Settings, Reactivity Graph, Alpha Graph | ReactivityChart |
-| **Animation & Dimming** | Superdimming Settings, Color Filter, Dimming/Circadian Graphs | DimmingChart, CircadianChart |
-| **Dynamic Scale** | Experiment Settings, Experiment Graph, Taper Graph | ExperimentChart, TaperChart |
+| **Super Dimming** | Superdimming Settings, Color Filter, Dimming/Circadian Graphs | DimmingChart, CircadianChart |
+| **Circadian** | Experiment Settings, Experiment Graph, Taper Graph | ExperimentChart, TaperChart |
 | **Misc** | Misc Settings (min/max/offset/scale, anim steps + waits + throttle, notifications, debug) | — |
 | **Contexts** | (rules surfaced from contexts_spec — no dedicated Tasker scene; editor lives in AAB Profile) | — |
 | **Tools** | Debug Scene (wizard), Power Draw Graph, (wizard from Brightness Graph 'Suggest', calibration from task524) | PowerDrawChart |
@@ -55,12 +62,19 @@ Every Chart.js WebElement maps to a named Compose-Canvas chart (built S12/S13). 
 
 ## Per-scene element dispositions (all 450 rows)
 
-### AAB Menu  ·  `menu`  ·  XML L4462–4717  ·  3 elements  → (nav hub)
+### AAB Menu  ·  `menu`  ·  XML L4462–4717  ·  3 elements  → **Menu home screen**
 
-**S12.5a:** rebuilt as the `AabNavDrawer` (`ModalNavigationDrawer`, `ui/components/AppShell.kt`) opened
-from the branded `AabTopBar` hamburger — the menu's three HTML "cards" become drawer groups
+**S12.5a:** first rebuilt as the `AabNavDrawer` (`ModalNavigationDrawer`, `ui/components/AppShell.kt`)
+opened from the branded `AabTopBar` hamburger — the menu's three HTML "cards" become groups
 (Profiles&Contexts hero / Settings / Info&Help); Recheck Permissions → Onboarding; the Chart.js License
-entry is dropped (D-046). Profiles + Contexts also surface as hero cards on the Dashboard.
+entry is dropped (D-046).
+
+**S12.6a (G2R-F1/F2):** promoted into a real `AppRoute.Menu` home screen (`ui/screens/MenuScreen.kt`)
+= the app hub and the **start destination after onboarding**. Renders the gold-sun teal banner
+(`AabMenuBanner`, branded "Tideo Auto Brightness"), the **Profiles + Contexts hero cards** (moved OFF
+the Dashboard), and the Settings / Info&Help nav groups. Every settings/tool screen's back returns
+here (`navigateTopLevel` roots the back stack at `menu`). The Dashboard is now just another menu
+destination. The S12.5a drawer is retired.
 
 | Element | Type | Disposition |
 |---|---|---|

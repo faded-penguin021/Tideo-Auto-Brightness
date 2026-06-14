@@ -70,23 +70,23 @@ filled by S1/S2 during extraction.
 
 | Scene | XML | Ported to | Status |
 |---|---|---|---|
-| AAB Menu | L4462 | Dashboard (M3 nav) | ported (S11 — M3 nav shell + live Dashboard; nav to all target screens) |
+| AAB Menu | L4462 | Menu (home hub) | ported (S11 nav shell → S12.6a promoted to a real `Menu` home screen: banner + Profiles/Contexts hero cards + grouped nav; start dest + back-target for all screens) |
 | AAB Brightness Settings | L1415 | Curve & Brightness | ported (S12.5b — curve-zone coefficients + live form2A/3A + draft→Apply preview chart; min/max/offset/scale moved to Misc, G2-F2) |
 | AAB Reactivity Settings | L6739 | Reactivity | ported (S12.5b — thresholds + DetectOverrides/trust; draft→Apply; chart slot S13) |
-| AAB Superdimming Settings | L7533 | Animation & Dimming | ported (S12.5b — ELEVATED-gated super dimming + PWM, mutually-exclusive (G2-F10), dim-spread gated on circadian (G2-F11); anim moved to Misc; chart slot S13) |
+| AAB Superdimming Settings | L7533 | Super Dimming (renamed S12.6a/G2R-F3) | ported (S12.5b — ELEVATED-gated super dimming + PWM, mutually-exclusive (G2-F10), dim-spread gated on circadian (G2-F11); anim moved to Misc; chart slot S13) |
 | AAB Misc Settings | L4718 | Misc | ported (S12.5b — dedicated Misc screen, G2-F2: min/max sliders 0–75/150–255, offset/scale text, anim sliders + derived throttle, notifications + debug selector) |
-| AAB Experiment Settings | L3334 | Dynamic Scale | ported (S12.5b — scaling/taper + taper-midpoint slider 130–240 (G2-F13) + warnings; chart slot S13) |
+| AAB Experiment Settings | L3334 | Circadian (renamed S12.6a/G2R-F4) | ported (S12.5b — scaling/taper + taper-midpoint slider 130–240 (G2-F13) + warnings; chart slot S13) |
 | AAB Profile | L5724 | Profiles & Import/Export | ported (S12 — built-in profiles + reset + JSON/legacy import-export + context CRUD; reapply-on-load S12.5b; context-rule editor fidelity S12.5c — `<queries>` app list w/ icons, use-current-SSID, SUNRISE/SUNSET tokens, usage-access prompt, save/delete toasts; profile-load keeps DetectOverrides G2-F8) |
 | AAB Debug Scene | L2583 | Tools/Misc | ported (S12.5b — 10-label debug selector moved to Misc; S12.5c — selector now drives runtime debug toasts G2-F15 + %AAB_Test wizard report→clipboard; Tools keeps wizard + calibration entry) |
-| AAB Color Filter | L2552 | Animation & Dimming | ported (S12 — PWM-sensitive + exponent rows) |
+| AAB Color Filter | L2552 | Super Dimming | ported (S12 — PWM-sensitive + exponent rows) |
 | AAB Brightness Graph | L1202 | Curve & Brightness (BrightnessCurveChart) | ported (S12 — BrightnessCurveChart = chart template; ChartCanvas engine) |
 | AAB Alpha Graph | L1038 | Reactivity (alpha overlay) | partial (S12 host slot; chart render S13) |
 | AAB Reactivity Graph | L6563 | Reactivity (ReactivityChart) | partial (S12 host slot; chart render S13) |
-| AAB Dimming Graph | L3006 | Animation & Dimming (DimmingChart) | partial (S12 host slot; chart render S13) |
-| AAB Circadian Dimming Graph | L2388 | Animation & Dimming (CircadianChart; re-homed S3.5/D-026, visible only when %AAB_ScalingUse on) | partial (S12 host slot; chart render S13) |
-| AAB Taper Graph | L8387 | Dynamic Scale (TaperChart) | partial (S12 host slot; chart render S13) |
+| AAB Dimming Graph | L3006 | Super Dimming (DimmingChart) | partial (S12 host slot; chart render S13) |
+| AAB Circadian Dimming Graph | L2388 | Super Dimming (CircadianChart; re-homed S3.5/D-026, visible only when %AAB_ScalingUse on) | partial (S12 host slot; chart render S13) |
+| AAB Taper Graph | L8387 | Circadian (TaperChart) | partial (S12 host slot; chart render S13) |
 | AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | partial (S12 host slot; chart + on-device calibration S13/Gate) |
-| AAB Experiment Graph | L3170 | Dynamic Scale (ExperimentChart) | partial (S12 host slot; chart render S13) |
+| AAB Experiment Graph | L3170 | Circadian (ExperimentChart) | partial (S12 host slot; chart render S13) |
 | AAB About | L799 | About+Guide+Onboarding | partial (S11 — onboarding/privilege stepper done; About content S13) |
 | AAB User Guide | L8551 | About+Guide+Onboarding | partial (S11 — onboarding done; User Guide content S13) |
 | AAB Chart.Js License | L2194 | dropped(Chart.js removed) | pending (S2 extracted) |

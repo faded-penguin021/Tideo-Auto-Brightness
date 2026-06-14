@@ -18,6 +18,9 @@ data class PipelineState(
     val lastRawLux: Double? = null,
     /** %LastAAB — TIMEMS of the last accepted tick (throttle anchor); null until first accept. */
     val lastAcceptedMs: Long? = null,
+    /** TIMEMS of the last sensor sample the collector saw (any sample, not just accepted ticks);
+     *  drives the Dashboard "last sample: Xs ago" health readout (G2R-F5). */
+    val lastSampleMs: Long? = null,
     /** %AAB_ThreshAbsLow — absolute dead-band low (task546); null until seeded. */
     val threshAbsLow: Double? = null,
     /** %AAB_ThreshAbsHigh — absolute dead-band high (task546). */
