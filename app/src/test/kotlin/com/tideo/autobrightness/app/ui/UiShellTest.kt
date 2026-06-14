@@ -71,6 +71,29 @@ class UiShellTest {
     }
 
     @Test
+    fun menuContexts_distinguishesManualOverrideFromActiveContextRule() {
+        // S12.7a/F46: a manual profile load IS the override; a context rule being active is NOT.
+        compose.setContent {
+            MaterialTheme {
+                MenuContent(activeContext = "Evening", manualOverride = false, onNavigate = {}, onRecheckPermissions = {})
+            }
+        }
+        // A context rule active is surfaced as automation, never as an "override".
+        compose.onNodeWithText("Context active: Evening").assertExists()
+    }
+
+    @Test
+    fun menuContexts_showsManualOverrideWhenLatched() {
+        // S12.7a/F46: with the manual-load lock latched, the card says override + Resume.
+        compose.setContent {
+            MaterialTheme {
+                MenuContent(activeContext = null, manualOverride = true, onNavigate = {}, onRecheckPermissions = {})
+            }
+        }
+        compose.onNodeWithText("Manual override active — Resume on Profiles").assertExists()
+    }
+
+    @Test
     fun renamedRoutes_resolveToTaskerNames() {
         // S12.6a (G2R-F3/F4): the routes carry the Tasker names.
         assertEquals("super_dimming", AppRoute.SuperDimming.route)

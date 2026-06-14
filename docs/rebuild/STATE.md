@@ -34,11 +34,20 @@ next session does not know it.
 | S12.6c pipeline behaviour correctness | 2026-06-14 | Opus/high | DONE | (see push) | Fixed the runtime bugs the re-test found + wired override-point capture (D-051; G2R-F11/F12/F13/F14/F26/F27). **G2R-F11/F12** (Apply/profile-load + min-brightness ignored until a light change): root = the pipeline's `settingsProvider`=`ContextEngine.effectiveSettings()` served the STALE cached `_effective` snapshot. Added `ContextEngine.reevaluate()` (re-reads the FRESH baseline + re-merges the active profile, no watcher re-resolution) and the service's `ACTION_REAPPLY` now calls it BEFORE `controller.reapply()` → manual edits take effect immediately (min-bright no longer "stuck at 10"). **G2R-F13** override-point capture (closes D-044c): new `OverridePointStore` (DataStore, newest-first cap 50) + `OverridePointSink`; `handleOverride` persists the de-compressed point; `SettingsViewModel`/`DraftSettingsViewModel` expose `overridePoints`; Tools wizard reads the recorded set. **G2R-F14** `BrightnessCurveChart` overlays the recorded points as dots + shows the fitted/suggested curve only at ≥9 points (ChartCanvas unchanged). **G2R-F26/D-049** override false-positives: `handleOverride` now does the task567 act8 settle (wait %AAB_CycleTime → re-read → only pause if still ≠ our last applied) + the AnimationRunner read-back is now device-exact (`ScreenBrightnessController.isOnScreenSelfWrite`, kills OEM round-trip drift, D-049 #4). **G2R-F27/D-050** PWM-sensitive hardware floor: `applyPwmFloor` clamps the hardware write up to `dimmingThreshold` when `pwmSensitive && target<threshold` (task698 step3) in runCycle + setInitialBrightness. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas API untouched.** New tests: controller minBrightness/PWM-floor/override-false-positive (3), ContextEngine reevaluate-fresh-baseline, OverridePointStore (3). Full ladder GREEN: `:platform:test :app:testDebugUnitTest`(104) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.6e labels/help audit + context editor + onboarding | 2026-06-14 | Opus/high | DONE | (this push) | Last S12.6 sub-segment (D-053; G2R-F19…F25 + F28/F29). **Label + verbatim long-press-help audit** (G2R-F19/F20/F21): new `TaskerHelp.kt` holds the 30 verbatim Flash help strings (decoded from the reactivity/brightness/misc/superdimming scene `longclick` tasks via XML_RECIPES R2); `NumberSettingField`/`IntSliderSettingField`/`SwitchSettingRow` gained a `help=` param surfaced via an "ⓘ" reveal (Tasker longtap → tap, `helptext_<tag>`); every control on Reactivity/Curve/Misc/SuperDimming relabelled to the Tasker scene labels + the verbatim help wired. **WIRING AUDIT (G2R-F20): the owner-flagged "delta factor" was MIS-LABELLED/MIS-HELPED, not mis-wired** — `%AAB_DeltaFactor` IS the sensor-smoothing alpha factor (`luxAlpha=1-exp(-deltaFactor·effectiveDelta)`, BrightnessEngine); relabelled "Smoothing Δ" + verbatim help. No other binding bug found; all field→`%AAB_*` bindings cross-checked vs AabSettingsContract. **Context Wi-Fi/location (G2R-F22):** `WifiInfoReader.currentSsid()` is now a `suspend` returning a typed `SsidResult` (one-shot `NetworkCallback` w/ `FLAG_INCLUDE_LOCATION_INFO`+2s timeout; targeted NotOnWifi/NeedsLocationPermission/LocationServicesOff/Unknown messages — fixes the API-29+ `<unknown ssid>` redaction); rule editor gained lat/lon/radius fields + "Use current location" (AndroidLocationReader). **Time picker (G2R-F28):** From/To open the M3 `TimePicker` modal (SUNRISE/SUNSET tokens kept). **Usage access (G2R-F23/F24):** onboarding always shows the usage step, labelled "(optional)" by default / "(needed for per-app rules)" once an app rule exists; the rule-editor grant prompt was already present. **Toast on load (G2R-F25):** new `ContextLoadSink`/`ToastContextLoadSink` → unconditional teal-less toast when a runtime context rule loads its profile; Profiles-screen apply already toasted. **Live Debug Performance & Timings (G2R-F29):** `PipelineState` gains `luxAlpha`/`animationSteps`/`animationWaitMs`/`throttleMs`/`lastUpdateMs` (populated in runCycle from existing engine output, no domain change) → Live Debug card now shows LuxAlpha / cycle / reactivity-cooldown / last-animation (steps×wait) / last-update. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: SettingsScreens +5 (delta-factor verbatim help reveal, time-picker modal, use-current-SSID fills field, location fields, Live Debug timings) + ContextEngine contextLoad-fires-sink (1). Full ladder GREEN (`:app:testDebugUnitTest`=122 `:app:assembleDebug :app:lintDebug :domain:test :platform:test`). No compaction. **GATE 2 RE-TEST (again) READY.** |
 | S12.6d profiles + legacy import + reset + Apply-gate | 2026-06-14 | Opus/high | DONE | (see push) | Real user-profile management + legacy import + validation gate (D-052; G2R-F15/F16/F17/F18/F30 + owner findings F31/F32). **G2R-F15** user-editable profiles: new `UserProfileStore` (DataStore `SavedProfiles`: built-ins seeded once, Save-current-as, overwrite-in-place [keeps built-in flag], delete, **Restore factory profiles**); `AppProfileCatalog` converted object→class reading the store (built-in fallback) so context rules target user profiles too (closes D-042c); `SettingsViewModel` gains saveCurrentAs/deleteProfile/restoreFactoryProfiles/profiles flow; ContextsViewModel.profileNames now a StateFlow off the store. **G2R-F16** legacy SAF import: `LegacyConfigImporter` (OpenDocumentTree grant→takePersistableUriPermission, list `*.json` via DocumentsContract — no MANAGE_EXTERNAL_STORAGE/no new dep) wired into the rewritten ProfilesScreen (link-folder + per-file Load) alongside the single-file picker. **G2R-F17** per-screen reset: `DraftSettingsScaffold` gains an `onReset` TopAppBar action; each of the 5 draft screens resets only its own fields to the task570 baseline + toast. **G2R-F18/D-052** block-Apply: `FieldError` gains `Severity`; the 3 task583 form errors (form2A/3A<0, form2C>zone1End) are CRITICAL; `DraftSettingsViewModel.hasCriticalError` disables `DraftApplyBar` Apply (+ hint) while one stands — sanctioned deviation from Tasker's advisory model. **G2R-F30** manual-load context lock: applyProfile/replaceAll latch `contextOverride=true`; `ContextEngine.reevaluate()` honours the lock (drops active context, runs the manual baseline); Profiles screen shows a Resume banner → `resumeContextAutomation()` clears it + reapplies. **Owner findings during S12.6d:** **G2R-F31** battery % from/to added to the context rule editor (BatteryTrigger min/max; resolver already supported it); **G2R-F32** curve-wizard report was too terse — Tools now shows + copies the FULL `diagnosticsLog` (the engine already produced it; app-layer only). **HARD FENCE honoured: domain/, golden vectors, ChartCanvas untouched.** Tests: UserProfileStoreTest(5), SettingsValidator severity(1), SettingsScreens criticalError-gate/reset/profiles/context-lock/battery(5), ContextEngine reevaluate-lock(1). Full ladder GREEN: `:app:testDebugUnitTest`(116) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
+| S12.7a manual-override engine correctness | 2026-06-14 | Opus/high | DONE | (this push) | Ported the REAL task567/task696 override logic (D-054; G2R-F34/F64/F46). **F34:** `AnimationRunner` replaced the exact-match `isOnScreenSelfWrite()` (false-fired on OEM round-trip drift) with task696's band+debounce — band `[minTarget-2, maxTarget+2]` spanning the sweep, override only after **2 consecutive** out-of-band reads (every-frame, since the every-5th was a Tasker IPC optimization). **F64:** `OverrideMonitor` gained a settle-suppression gate; `setInitialBrightness` arms a 1500ms window after each initial self-write so the start/reinit/resume/QS-on observer echo (incl. the AUTO→MANUAL mode-flip recompute) is not flagged as an override; the S12.6c idle-path settle-wait kept. **F46:** manual profile load = override (`LiveRuntimeState.manualOverride` published from `%AAB_ContextOverride` via the service) shown in the Menu; a context rule active is no longer labelled an override (Menu Contexts card relabelled). Tests: AnimationRunner +3 (self-writes complete / opposing-write overridden / single-transient debounced), controller +1 (init-echo suppressed then real-write pauses post-window), UiShell +2 (Menu label semantics). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(128) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**ALL of S12.6 (a–e) DONE; GATE 2 RE-RE-TESTED (2026-06-14) → 36 new findings G2R-F33…F68 → S12.7 (a–h) is
+**S12.7a DONE (2026-06-14) → S12.7 b–h remain.** S12.7a ported the real task567/task696 manual-override
+logic (D-054): the band+debounce override detector (F34, was an exact-match self-write check that false-
+fired on OEM drift), a post-init settle-suppression window (F64, kills the start/reinit/resume/QS-on echo
+race), and the F46 override-vs-context-rule semantics (manual profile load = override surfaced in the Menu;
+a context rule active is no longer labelled one). domain/ + golden vectors stayed fenced. Ladder GREEN
+(`:app:testDebugUnitTest`=128). **Next: S12.7 b–h (b–h largely disjoint; rebase before push), then owner
+re-tests Gate 2 a 4th time after S12.7h.**
+
+**(historical) ALL of S12.6 (a–e) DONE; GATE 2 RE-RE-TESTED (2026-06-14) → 36 new findings G2R-F33…F68 → S12.7 (a–h) is
 the next work (planned in RUNBOOK, all Opus/high).** The owner re-tested the S12.6e dist/ APK on-device:
 "definitely going in the right direction" but a further batch of parity/behaviour gaps remains (see "Gate 2
 RE-RE-TEST" below) — manual-override false-positives + spurious instant-override-on-start race (need the real
@@ -218,9 +227,11 @@ AppModule is now the real DI root.
   D-053). **ALL S12.6 sub-segments complete.** Domain/ + golden vectors + ChartCanvas API stayed fenced.
 - **GATE 2 RE-RE-TEST DONE (2026-06-14) → 36 findings G2R-F33…F68** (see "Gate 2 RE-RE-TEST"). Gate 2
   still NOT signed off.
-- **S12.7 — Gate-2 re-re-test salvage (a–h, all Opus/high)** is the NEXT work (brief in RUNBOOK). Split:
+- **S12.7 — Gate-2 re-re-test salvage (a–h, all Opus/high)** (brief in RUNBOOK). **a DONE** (D-054:
+  band+debounce override detector from task696 + post-init settle-suppression window + F46 override/
+  context-rule semantics). **b–h remain.** Split:
   **a** manual-override engine (transcribe task567: anim mutex + target-vs-actual delta) + instant-override
-  race + override semantics (F34/F64/F46); **b** runtime feedback surfaces — override notification+vibration
+  race + override semantics (F34/F64/F46) — DONE; **b** runtime feedback surfaces — override notification+vibration
   +toast, notification Resume, QS tile live refresh, super-dimming Extra-Dim fix (F35/F40/F63/F65); **c**
   context system — location listener lifecycle/0.0,0.0/debounce, use-current-location perm recheck, priority
   ordering, legacy-profile rule targets, context-automation debug toasts, day-of-week rules+midnight wrap,
@@ -1069,7 +1080,31 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   fence honoured). (Affects S12.6e; Gate 2 re-test; S13 inherits the help-reveal pattern + the
   Experiment-scene help gap.)
 
-Append new entries as D-054, D-055, … with which segments they affect.
+- D-054: S12.7a MANUAL-OVERRIDE ENGINE — the REAL task567/task696 transcription (G2R-F34/F64/F46).
+  **The override DELTA check is NOT in task567** (task567 `_DetectManualOverride`, XML L20525-L20885, is
+  the *pause/notify/stop-other-tasks* handler: act0 gates `%caller1 = *Allow Override*|*Smooth Brightness
+  Transition*`; acts 1-6 are code-137 **Stop** naming the SIX pipeline tasks to abort — "Process Sensor
+  Event", "Evaluate Light Change V2", "Lux Smoothing", etc.; act7 Wait `%AAB_CycleTime`; act8 re-check
+  Stop). **The actual detection lives in task696 "Smooth Brightness Transition V5 (Java)"** (java/task696_1,
+  XML L35734-L35886): it computes a band `minTarget = from<to ? from : to-1`, `maxTarget = from<to ? to+1 :
+  from` (L49-56) and flags an override only when `actual > maxTarget+2 || actual < minTarget-2` for
+  **2 consecutive** reads (`overrideTriggerThreshold`, L126-134) — i.e. wrong-direction / overshoot-beyond-
+  step. The mutex is **`%AutoBrightRunning`** (prof755 con1/c1 `=0` gate + task696 sets it `0` only at the
+  very end, L160), so per-frame self-writes never fire prof755. Tasker checked every 5th frame **purely as
+  an IPC optimization** (explicit comment L98-101) → the Kotlin port checks every frame (a *how*, the band+
+  2-read debounce is the *what*). FIX: `AnimationRunner` now uses this band+debounce (replaces the old
+  exact-match `isOnScreenSelfWrite()` that false-fired on OEM round-trip drift); `OverrideMonitor` gains a
+  post-init **settle-suppression** gate and `BrightnessPipelineController.setInitialBrightness` arms a 1500ms
+  window after each initial self-write (F64 — kills the start/reinit/resume/QS-on echo race where the
+  AUTO→MANUAL mode-flip recompute looked external). The S12.6c handleOverride settle-wait (D-049/D-051d) is
+  KEPT for the idle-observer path (complements, not conflicts). **F46 semantics:** a manual profile load IS
+  the override (`%AAB_ContextOverride` latch, surfaced in the Menu via `LiveRuntimeState.manualOverride`,
+  Resume clears it); a context *rule* being active is NOT an override and is no longer labelled one (Menu
+  Contexts card: "Context active: X" / "Manual override active — Resume on Profiles" / "No active context").
+  **Fence honoured: domain/ + golden vectors untouched** (band logic is app-layer; `OverrideRules` unchanged).
+  (Affects S12.7a; S12.7b reuses the override→notification path; S12.7c/h depend on the F46 lock semantics.)
+
+Append new entries as D-055, D-056, … with which segments they affect.
 
 ## Blockers
 
@@ -1394,12 +1429,13 @@ at the end).
   location-based SSID path + context location. (With Location enabled via Android app settings it works.)
 
 *Manual override detection & feedback:*
-- **G2R-F34** Manual-override **false positives persist** — the app can't tell a true override from a new
-  sensor reading. Owner spec: while an animation is **mid-flight there must be a mutex lock**, plus a
-  **target-vs-actual delta check** — if target is e.g. −20 from current and the observed value is +1 or −21
-  (i.e. wrong direction / overshoot beyond our step) that's an override; a value consistent with our own
-  in-flight step is not. The owner is fairly sure the Tasker version does exactly this. (Refines G2R-F26/
-  D-049 — the S12.6c settle-wait was insufficient.)
+- **G2R-F34** ✅ RESOLVED S12.7a (D-054). Manual-override **false positives persist** — the app can't tell a
+  true override from a new sensor reading. Owner spec: while an animation is **mid-flight there must be a
+  mutex lock**, plus a **target-vs-actual delta check** — if target is e.g. −20 from current and the observed
+  value is +1 or −21 (i.e. wrong direction / overshoot beyond our step) that's an override; a value
+  consistent with our own in-flight step is not. The owner is fairly sure the Tasker version does exactly
+  this. (Refines G2R-F26/D-049 — the S12.6c settle-wait was insufficient.) → Ported task696's band+2-read
+  debounce in `AnimationRunner`; mutex = `%AutoBrightRunning`.
 - **G2R-F35** A manual override should post a **high-priority notification (with vibration) + a toast**,
   same as Tasker.
 
@@ -1452,7 +1488,7 @@ at the end).
   guarded location listener** (Tasker's "super smart location listener"), and the **0.0,0.0** read is a
   bug. Also the context-location debug toasts are **not debounced to ≥100 m** changes and are near-constant,
   **blocking text input**.
-- **G2R-F46 (semantics)** **"Manual profile load = override" misunderstanding.** After a manual profile
+- **G2R-F46 (semantics)** ✅ RESOLVED S12.7a (D-054). **"Manual profile load = override" misunderstanding.** After a manual profile
   load the Menu says **no context override active** — but a manual load IS the override (it should latch +
   display it, smoother Resume). Conversely, **a context rule being active is NOT an "override"** and must
   not be labelled one. Fix the override/lock semantics + the Menu/label wording (refines G2R-F30/D-038a).
@@ -1503,7 +1539,7 @@ at the end).
 - **G2R-F63** **QS tile state is not live** — Off→Starting "hangs" until the QS panel is closed+reopened;
   state transitions only render when not being watched. Needs `TileService.requestListeningState` /
   `Tile.updateTile` on every state change (and a refresh on `onStartListening`).
-- **G2R-F64** **Spurious "instant override" on service start / display-on (race).** QS Off→On sometimes
+- **G2R-F64** ✅ RESOLVED S12.7a (D-054). **Spurious "instant override" on service start / display-on (race).** QS Off→On sometimes
   lands in *override* instead of resuming; a display off→on cycle sometimes leaves it *paused*. Both point
   to a manual-override being detected at start/reinit (the observer firing on our own initial write).
   Confirmed in the Dashboard; hard to reproduce once cleared. Likely a race in OverrideMonitor vs the

@@ -56,8 +56,10 @@ import com.tideo.autobrightness.app.ui.theme.AabGold
 @Composable
 fun MenuScreen(navController: NavHostController) {
     val activeContext by LiveRuntimeState.activeContext.collectAsStateWithLifecycle()
+    val manualOverride by LiveRuntimeState.manualOverride.collectAsStateWithLifecycle()
     MenuContent(
         activeContext = activeContext,
+        manualOverride = manualOverride,
         onNavigate = { route -> navController.navigateTopLevel(route) },
         onRecheckPermissions = { navController.navigateTopLevel(AppRoute.Onboarding) },
     )
@@ -66,6 +68,7 @@ fun MenuScreen(navController: NavHostController) {
 @Composable
 fun MenuContent(
     activeContext: String?,
+    manualOverride: Boolean = false,
     onNavigate: (AppRoute) -> Unit,
     onRecheckPermissions: () -> Unit,
 ) {
@@ -93,7 +96,14 @@ fun MenuContent(
             MenuHeroCard(
                 icon = Icons.Filled.Place,
                 title = "Contexts",
-                subtitle = activeContext?.let { "Active: $it" } ?: "No context override active",
+                // F46 semantics: a manual profile load IS the override (latched %AAB_ContextOverride —
+                // shown here, cleared by Resume on the Profiles screen). A context *rule* being active
+                // is automation working as intended and must NOT be labelled an override.
+                subtitle = when {
+                    manualOverride -> "Manual override active — Resume on Profiles"
+                    activeContext != null -> "Context active: $activeContext"
+                    else -> "No active context"
+                },
                 testTag = "hero_contexts",
                 onClick = { onNavigate(AppRoute.Contexts) },
             )

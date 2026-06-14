@@ -64,6 +64,12 @@ class BrightnessPipelineController(
     @Volatile private var autoRunning = false
     @Volatile private var initializing = false
 
+    // Post-init override-suppression deadline (S12.7a, F64): override detection is suppressed until
+    // `clock() >= this`. Armed after every Set Initial Brightness self-write (service start / screen-on
+    // reinit / resume / context swap) so the ContentObserver echo of our own write — delivered after
+    // `initializing` resets — cannot spuriously pause/override on start. 0 = no window open.
+    @Volatile private var suppressOverrideUntilMs = 0L
+
     // %AAB_MainLoop re-entry mutex: true while a sensor cycle is claimed or running.
     private val inCycle = AtomicBoolean(false)
 
@@ -80,6 +86,7 @@ class BrightnessPipelineController(
             paused = s.paused,
             initializing = initializing,
             detectOverrides = cachedSettings?.detectOverrides ?: false,
+            suppressed = clock() < suppressOverrideUntilMs,
         )
     }
 
@@ -403,6 +410,10 @@ class BrightnessPipelineController(
             brightness.forceManualMode()
             brightness.write(target)
             dimming.apply(target, settings)
+            // F64: arm the post-init settle window so the ContentObserver echo of THIS self-write
+            // (and any AUTO→MANUAL mode-flip recompute) — delivered after `initializing` clears below
+            // — is not flagged as a manual override on start/reinit/resume/context swap.
+            suppressOverrideUntilMs = clock() + INITIAL_SETTLE_MS
             _state.update {
                 it.copy(
                     lastAppliedBrightness = target,
@@ -434,6 +445,11 @@ class BrightnessPipelineController(
 
     private companion object {
         const val PANIC_BRIGHTNESS = 255
+
+        // F64 settle window: long enough to outlast the async ContentObserver delivery of our own
+        // initial write + the mode-flip recompute, short enough that a real user override moments
+        // after a reinit is still caught by the next observer event.
+        const val INITIAL_SETTLE_MS = 1500L
     }
 }
 

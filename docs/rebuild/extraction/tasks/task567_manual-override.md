@@ -45,3 +45,26 @@
 **Variables written:** `%AAB_DimmingStatus`, `%AAB_Manual_Override`, `%AAB_ResumeTapped`
 
 **Variables read:** (none)
+
+## S12.7a transcription note (D-054) — where the override DELTA actually lives
+
+task567 is the **handler**, not the **detector**. It runs when something has *already decided* an override
+happened (its act0 gate only proceeds for `%caller1 = *Allow Override*` (prof755) or `*Smooth Brightness
+Transition*` (task696)). Its job: **abort the in-flight pipeline** (acts 1-6 are code-137 **Stop** naming the
+six pipeline tasks — *Process Sensor Event (Java)*, *Evaluate Light Change (Java) V2*, *Lux Smoothing*, … —
+to kill the running animation/loop), wait `%AAB_CycleTime` (act7), re-check the gate (act8 Stop on
+`Service=Off ∨ AutoBrightRunning=1 ∨ Manual_Override=true ∨ Initializing=true`), then pause + notify +
+`%AAB_Manual_Override=true` + disengage dimming.
+
+The actual **target-vs-actual delta check** is in **task696 "Smooth Brightness Transition V5 (Java)"**
+(`java/task696_1`, XML L35734-L35886):
+- band: `minTarget = from<to ? from : to-1`, `maxTarget = from<to ? to+1 : from` (L49-56);
+- override iff `actual > maxTarget+2 || actual < minTarget-2` for **2 consecutive** reads
+  (`overrideTriggerThreshold`, L126-134) → sets `%AAB_Manual_Override=true`, calls this task567;
+- mutex: `%AutoBrightRunning` (prof755 con1 c1 `=0` gate; task696 writes it `0` only at L160, the very end),
+  so per-frame self-writes never fire prof755;
+- the every-5th-frame cadence (L98-101) is an explicit **IPC optimization comment**, not behaviour.
+
+The Kotlin rebuild ports the band+debounce into `app/runtime/AnimationRunner.kt` (checks every frame; the
+band + 2-read debounce is the behaviour that matters) and adds a post-init settle-suppression window in
+`BrightnessPipelineController` for the start/reinit/resume/QS-on echo race (F64). See D-054.

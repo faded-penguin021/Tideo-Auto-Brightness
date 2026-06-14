@@ -25,11 +25,21 @@ class OverrideMonitor(
         val paused: Boolean,
         val initializing: Boolean,
         val detectOverrides: Boolean,
+        /**
+         * True while the post-init settle window is open (S12.7a, F64). Set Initial Brightness writes
+         * synchronously under `initializing`, but the ContentObserver callback for that write — and for
+         * any system brightness recompute the AUTO→MANUAL mode flip triggers — can be delivered *after*
+         * `initializing` has reset, racing the observer into flagging our own start/reinit/resume/QS-on
+         * write as a manual override. The controller holds this true for a short settle after each
+         * initial write so that trailing self-write echo is ignored.
+         */
+        val suppressed: Boolean = false,
     )
 
     /** Emits observed brightness values that qualify as manual overrides. */
     fun overrides(): Flow<Int> = observer.externalChanges().mapNotNull { observed ->
         val g = gateProvider()
+        if (g.suppressed) return@mapNotNull null
         val isOverride = OverrideRules.isManualOverride(
             isServiceOn = g.serviceOn,
             isAutoRunning = g.autoRunning,

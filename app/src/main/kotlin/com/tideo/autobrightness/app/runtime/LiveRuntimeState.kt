@@ -22,19 +22,29 @@ object LiveRuntimeState {
     private val _activeContext = MutableStateFlow<String?>(null)
     val activeContext: StateFlow<String?> = _activeContext.asStateFlow()
 
+    /**
+     * `%AAB_ContextOverride` — true while a MANUAL profile load has latched the override lock
+     * (S12.7a, F46). This is distinct from [activeContext]: a context *rule* being active is NOT an
+     * override (it is automation working as configured); only a manual load is. Resume clears it.
+     */
+    private val _manualOverride = MutableStateFlow(false)
+    val manualOverride: StateFlow<Boolean> = _manualOverride.asStateFlow()
+
     /** True while a foreground service instance is publishing (i.e. the loop is alive). */
     private val _serviceRunning = MutableStateFlow(false)
     val serviceRunning: StateFlow<Boolean> = _serviceRunning.asStateFlow()
 
-    fun publish(state: PipelineState, activeContext: String?) {
+    fun publish(state: PipelineState, activeContext: String?, manualOverride: Boolean = false) {
         _pipeline.value = state
         _activeContext.value = activeContext
+        _manualOverride.value = manualOverride
         _serviceRunning.value = true
     }
 
     fun reset() {
         _pipeline.value = PipelineState()
         _activeContext.value = null
+        _manualOverride.value = false
         _serviceRunning.value = false
     }
 }
