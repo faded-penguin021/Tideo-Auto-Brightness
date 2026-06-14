@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
+import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCard
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
@@ -41,6 +42,9 @@ fun ReactivityContent(
     DraftSettingsScaffold("Reactivity", dirty, onApply, onDiscard, onBack) { padding ->
         SettingsColumn(padding) {
             ChartPlaceholder("ReactivityChart", "reactivity_chart")
+
+            // Live glass-box readout: current dynamic threshold + sensor dead zone (G2R-F7).
+            ReactivityDiagnosticCard()
 
             SectionHeader("Smoothing thresholds")
             NumberSettingField(

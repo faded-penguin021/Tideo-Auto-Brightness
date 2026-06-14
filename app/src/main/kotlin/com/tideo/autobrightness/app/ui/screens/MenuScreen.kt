@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -106,6 +107,7 @@ fun MenuContent(
 
             AabSectionLabel("Info & Help")
             MenuNavRow(AppRoute.Tools, Icons.Filled.Build, onNavigate)
+            MenuNavRow(AppRoute.LiveDebug, Icons.Filled.Search, onNavigate)
             MenuNavRow(AppRoute.About, Icons.Filled.Info, onNavigate)
             ListItem(
                 headlineContent = { Text("Recheck Permissions") },

@@ -176,4 +176,15 @@ class ContextEngineTest {
         assertEquals(true, merged.detectOverrides, "detectOverrides comes from the baseline")
         assertEquals(99, merged.minBrightness, "curve/brightness params still come from the profile")
     }
+
+    @Test
+    fun mergeProfile_preservesDebugLevel_G2RF9() {
+        // debugLevel is a GLOBAL preference (Live Debug scene), NOT a task626 snapshot key: a context
+        // profile swap must keep the selected debug category (G2R-F9).
+        val base = AabSettings(debugLevel = 4, minBrightness = 7)
+        val profile = AabSettings(debugLevel = 0, minBrightness = 99)
+        val merged = mergeProfile(base, profile)
+        assertEquals(4, merged.debugLevel, "debugLevel comes from the baseline")
+        assertEquals(99, merged.minBrightness, "curve/brightness params still come from the profile")
+    }
 }

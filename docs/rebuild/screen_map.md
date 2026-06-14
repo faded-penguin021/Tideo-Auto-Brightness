@@ -37,9 +37,10 @@ rects and `PropertiesElement` scene-chrome are dropped (replaced by the M3 Scaff
 | **Reactivity** | Reactivity Settings, Reactivity Graph, Alpha Graph | ReactivityChart |
 | **Super Dimming** | Superdimming Settings, Color Filter, Dimming/Circadian Graphs | DimmingChart, CircadianChart |
 | **Circadian** | Experiment Settings, Experiment Graph, Taper Graph | ExperimentChart, TaperChart |
-| **Misc** | Misc Settings (min/max/offset/scale, anim steps + waits + throttle, notifications, debug) | — |
+| **Misc** | Misc Settings (min/max/offset/scale, anim steps + waits + throttle, notifications) | — |
+| **Live Debug Info** | AAB Debug Scene (live %AAB_* glass-box readout + global debug-category selector, S12.6b) | — |
 | **Contexts** | (rules surfaced from contexts_spec — no dedicated Tasker scene; editor lives in AAB Profile) | — |
-| **Tools** | Debug Scene (wizard), Power Draw Graph, (wizard from Brightness Graph 'Suggest', calibration from task524) | PowerDrawChart |
+| **Tools** | Debug Scene power-draw calibration, Power Draw Graph, (wizard from Brightness Graph 'Suggest', calibration from task524) | PowerDrawChart |
 | **Profiles & Import/Export** | AAB Profile (profile manager + context-rule editor) | — |
 | **About+Guide+Onboarding** | AAB About, AAB User Guide, privilege onboarding | — |
 | _(dropped)_ | AAB Chart.Js License (Chart.js removed) | — |
@@ -623,14 +624,22 @@ destination. The S12.5a drawer is retired.
 | background#1 | Rect | dropped(decorative/background rect) |
 | props | Properties | merged-into Profiles & Import/Export |
 
-### AAB Debug Scene  ·  `debug`  ·  XML L2583–3005  ·  4 elements  → Tools
+### AAB Debug Scene  ·  `debug`  ·  XML L2583–3005  ·  4 elements  → LiveDebug
+
+> S12.6b (G2R-F6): rebuilt as the dedicated **Live Debug Info** screen (`AppRoute.LiveDebug`, reached from
+> the Menu) — a glass-box readout of the live `%AAB_*` runtime vars grouped per the WebElement's HTML cards
+> (Core Metrics / Circadian & Scale / System Status / Performance & Timings), gold `#FFC107` values, plus
+> the now-GLOBAL 10-label debug-category selector (moved off Misc, G2R-F9). The in-scene close button +
+> back-key props are handled by Compose nav. Per-screen `DiagnosticCard`s embed the same live readout on
+> Reactivity (threshold + dead zone) and Circadian (uncompressed vs true scale) (G2R-F7/F8). Power-draw
+> calibration stays on Tools.
 
 | Element | Type | Disposition |
 |---|---|---|
-| elements0 | Web | merged-into Tools |
+| elements0 | Web | merged-into LiveDebug (live %AAB_* readout + global debug selector); power-draw calibration → Tools |
 | background#1 | Rect | dropped(decorative/background rect) |
-| elements1 | Button | merged-into Tools |
-| props | Properties | merged-into Tools |
+| elements1 | Button | dropped(M3 nav back replaces in-scene close) |
+| props | Properties | dropped(handled by Compose navigation) |
 
 ## Summary
 

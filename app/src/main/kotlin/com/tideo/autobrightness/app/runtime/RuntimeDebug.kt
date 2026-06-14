@@ -2,7 +2,7 @@ package com.tideo.autobrightness.app.runtime
 
 /**
  * The 10 `%AAB_Debug` categories from the Debug-scene selector (D-023). [level] is the `debugLevel`
- * value that activates the category (the selector index in `MiscScreen.DEBUG_LABELS`); level 0
+ * value that activates the category (the selector index in `LiveDebugScreen.DEBUG_LABELS`); level 0
  * ("Off") has no category, so it is absent here. In Tasker the selector is single-valued — exactly
  * ONE category is live at a time — and each Flashes its info on the matching pipeline event.
  */

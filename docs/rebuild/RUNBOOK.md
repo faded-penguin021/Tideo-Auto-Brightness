@@ -935,12 +935,23 @@ overlay + wizard have real input.
    read-back (compare in device space / with tolerance — see D-049 #2/#4). Add a regression test: a rapid
    from→to with interleaved self-writes must NOT emit `OverrideDetected`, but a genuine external write after
    settling MUST. Stay within the single-pipeline-coroutine model (D-027).
+6. **PWM-sensitive: lock the hardware brightness floor** (G2R-F27, added 2026-06-14; full code-grounded
+   analysis in STATE.md **D-050**). `pwmSensitive` is persisted + toggled in the UI but **never read by the
+   pipeline**, so the task661 act22-26 / task698 floor is unimplemented: when "Use software dimming
+   (PWM-sensitive)" is on and the target falls below `dimmingThreshold`, the *hardware* brightness must be
+   floored at the threshold (task698 step 3: `hardwareTarget = max(round(target), round(dimmingThreshold))`
+   when below), with further darkening left to the secure/overlay layer — not by writing a lower hardware
+   value. Wire this as a controller/coordinator-level clamp (mind OEM range normalization, cf. D-049 #4).
+   The broader unprivileged software-overlay path stays deferred (D-040); the hardware floor is independent.
+   Add a regression test: `pwmSensitive=true` + target below threshold ⇒ applied hardware brightness equals
+   the threshold, not the raw target.
 
 **Non-goals:** the curve-fitting math (S6, golden), ChartCanvas internals. **HARD FENCE: domain/ untouched.**
 
 **Acceptance:** `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug :domain:test :platform:test`
 green; regression tests for the reapply-uses-fresh-settings + min-brightness paths + override-point
-persistence + the rapid-light-change override false-positive (G2R-F26/D-049); STATE.md/checklist updated; pushed.
+persistence + the rapid-light-change override false-positive (G2R-F26/D-049) + the PWM-sensitive
+hardware-floor clamp (G2R-F27/D-050); STATE.md/checklist updated; pushed.
 
 ---
 

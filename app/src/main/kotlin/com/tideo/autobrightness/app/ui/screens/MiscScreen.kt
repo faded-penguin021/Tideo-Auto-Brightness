@@ -1,17 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -26,17 +16,12 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 
-/** %AAB_Debug 10 named categories, verbatim (D-023). Index == debugLevel. */
-val DEBUG_LABELS = listOf(
-    "Off", "Skip Animations", "Animation Details", "Light Eval Thresholds", "Dynamic Scale Calcs",
-    "Super Dimming Info", "Overlay Preview", "Graph Metrics", "Context Automation", "Context Location",
-)
-
 /**
  * Misc / General (Tasker "AAB Misc Settings" scene). Re-adds the field grouping Tasker actually uses
  * (G2-F2): the brightness range (min/max as **sliders**, offset/scale as text), animation (steps +
- * min/max wait as **sliders**, derived throttle), notifications and the debug-category selector.
- * Slider ranges are the exact Tasker SliderElement bounds (extraction/scenes/misc_settings.md).
+ * min/max wait as **sliders**, derived throttle) and notifications. The debug-category selector moved
+ * to the global Live Debug scene in S12.6b (G2R-F9). Slider ranges are the exact Tasker SliderElement
+ * bounds (extraction/scenes/misc_settings.md).
  */
 @Composable
 fun MiscScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
@@ -119,30 +104,12 @@ fun MiscContent(
                 ErrorBanner("Minimum wait cannot exceed maximum wait.", "error_waits")
             }
 
-            SectionHeader("Notifications & debug")
+            SectionHeader("Notifications")
             SwitchSettingRow(
                 "Show notifications", draft.notificationsEnabled,
                 { onEdit { s -> s.copy(notificationsEnabled = it) } },
                 helper = "Show the ongoing auto-brightness notification.",
                 testTag = "switch_notifications",
-            )
-            DebugLevelSelector(draft.debugLevel) { level -> onEdit { s -> s.copy(debugLevel = level) } }
-        }
-    }
-}
-
-/** The %AAB_Debug 10-category selector (D-023). Persisted now; runtime toasts wired in S12.5c. */
-@Composable
-fun DebugLevelSelector(current: Int, onSelect: (Int) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().testTag("debug_selector")) {
-        Text("Debug: ${DEBUG_LABELS.getOrElse(current) { "Off" }}")
-    }
-    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-        DEBUG_LABELS.forEachIndexed { level, label ->
-            DropdownMenuItem(
-                text = { Text(label) },
-                onClick = { onSelect(level); expanded = false },
             )
         }
     }

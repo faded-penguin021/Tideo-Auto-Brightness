@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
+import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCard
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
 import com.tideo.autobrightness.app.ui.components.IntSliderSettingField
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
@@ -45,6 +46,12 @@ fun CircadianContent(
     DraftSettingsScaffold("Circadian", dirty, onApply, onDiscard, onBack) { padding ->
         SettingsColumn(padding) {
             ChartPlaceholder("ExperimentChart / TaperChart", "dynamic_scale_chart")
+
+            // Live glass-box readout: uncompressed vs true (taper-compressed) circadian scale (G2R-F8).
+            CircadianDiagnosticCard(
+                minBrightness = committed.minBrightness,
+                maxBrightness = committed.maxBrightness,
+            )
 
             SectionHeader("Circadian scaling")
             SwitchSettingRow(

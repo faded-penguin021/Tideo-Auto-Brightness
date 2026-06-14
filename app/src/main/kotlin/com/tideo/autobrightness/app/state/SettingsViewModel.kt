@@ -54,10 +54,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun resetDefaults() {
         viewModelScope.launch {
             val updated = app.settingsDataStore.updateData { current ->
-                // Preserve runtime/identity fields; reset only the tunable parameter set.
+                // Preserve runtime/identity + the global preferences; reset only the tunable set.
+                // debugLevel + detectOverrides are GLOBAL (not per-profile), so a reset must keep
+                // them — debugLevel belongs to the Live Debug scene now (G2R-F9), detectOverrides
+                // is a global reactivity preference (G2-F8).
                 AabSettings(
                     serviceEnabled = current.serviceEnabled,
                     contextOverride = current.contextOverride,
+                    detectOverrides = current.detectOverrides,
+                    debugLevel = current.debugLevel,
                 )
             }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
@@ -65,10 +70,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Apply a built-in named profile (task592 set). The live service-enabled flag and
-     * `detectOverrides` are preserved: the latter is a global reactivity preference, not part of the
-     * task626 profile snapshot, so loading a profile must not turn manual-override detection off
-     * (G2-F8).
+     * Apply a built-in named profile (task592 set). The live service-enabled flag plus the GLOBAL
+     * preferences `detectOverrides` and `debugLevel` are preserved: neither is part of the task626
+     * profile snapshot, so loading a profile must not turn manual-override detection off (G2-F8) nor
+     * change the selected debug category (G2R-F9).
      */
     fun applyProfile(name: String) {
         val profile = DefaultProfiles.all[name] ?: return
@@ -77,6 +82,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 profile.copy(
                     serviceEnabled = current.serviceEnabled,
                     detectOverrides = current.detectOverrides,
+                    debugLevel = current.debugLevel,
                 )
             }
             // task592/626 apply re-runs Advanced Auto Brightness so the new curve takes effect
@@ -88,10 +94,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun replaceAll(newSettings: AabSettings) {
         viewModelScope.launch {
             val updated = app.settingsDataStore.updateData { current ->
-                // Preserve the live service flag + the global DetectOverrides preference (G2-F8).
+                // Preserve the live service flag + the global DetectOverrides (G2-F8) and debugLevel
+                // (G2R-F9) preferences — neither belongs to an imported profile's parameter set.
                 newSettings.copy(
                     serviceEnabled = current.serviceEnabled,
                     detectOverrides = current.detectOverrides,
+                    debugLevel = current.debugLevel,
                 )
             }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)

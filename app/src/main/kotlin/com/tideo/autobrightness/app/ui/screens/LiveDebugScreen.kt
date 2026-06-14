@@ -1,0 +1,152 @@
+package com.tideo.autobrightness.app.ui.screens
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.runtime.PipelineState
+import com.tideo.autobrightness.app.state.LiveDebugUiState
+import com.tideo.autobrightness.app.state.LiveDebugViewModel
+import com.tideo.autobrightness.app.ui.components.AabTopBar
+import com.tideo.autobrightness.app.ui.components.DiagnosticCard
+import com.tideo.autobrightness.app.ui.components.DiagnosticLine
+import com.tideo.autobrightness.app.ui.components.fmt
+import com.tideo.autobrightness.app.ui.components.fmtInt
+import com.tideo.autobrightness.app.ui.components.goldValue
+
+/** %AAB_Debug 10 named categories, verbatim (D-023). Index == debugLevel. Lives on the Live Debug
+ *  scene now (G2R-F9), the global home for the debug-category selector. */
+val DEBUG_LABELS = listOf(
+    "Off", "Skip Animations", "Animation Details", "Light Eval Thresholds", "Dynamic Scale Calcs",
+    "Super Dimming Info", "Overlay Preview", "Graph Metrics", "Context Automation", "Context Location",
+)
+
+/**
+ * The **Live Debug Info** scene (S12.6b, G2R-F6): the Compose rebuild of the Tasker AAB Debug scene
+ * (extraction/scenes/debug.md, XML L2583) — a glass-box readout of the live `%AAB_*` runtime vars
+ * (gold-highlighted, the Tasker debug "strong" colour) grouped as in the original HTML dashboard, plus
+ * the now-GLOBAL debug-category selector (moved off Misc, G2R-F9). Reached from the Menu hub.
+ */
+@Composable
+fun LiveDebugScreen(navController: NavHostController, vm: LiveDebugViewModel = viewModel()) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    LiveDebugContent(
+        state = state,
+        onSelectDebug = vm::setDebugLevel,
+        onBack = { navController.popBackStack() },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LiveDebugContent(
+    state: LiveDebugUiState,
+    onSelectDebug: (Int) -> Unit,
+    onBack: () -> Unit,
+) {
+    val p = state.pipeline
+    Scaffold(topBar = { AabTopBar(title = "Live Debug Info", onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
+                .testTag("live_debug_screen"),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Core Metrics (debug.md HTML group 1): the smoothing + threshold + brightness figures.
+            DiagnosticCard("Core Metrics", "debug_core_metrics") {
+                Metric("Smoothed lux", fmt(p.smoothedLux), "debug_smoothed_lux")
+                Metric("Raw lux", fmt(p.lastRawLux), "debug_raw_lux")
+                Metric("Dynamic threshold", fmt(p.threshDynamic), "debug_dynamic_threshold")
+                Metric("Dead zone (lx)", "${fmt(p.threshAbsLow)} – ${fmt(p.threshAbsHigh)}", "debug_dead_zone")
+                Metric("Current brightness", fmtInt(p.lastAppliedBrightness), "debug_current_bright")
+                Metric("Target brightness", fmtInt(p.targetBrightness), "debug_target_bright")
+            }
+
+            // Circadian & dimming scale (debug.md "Dimming Engine"): uncompressed vs taper-true scale.
+            DiagnosticCard("Circadian & Scale", "debug_scale") {
+                Metric("Uncompressed scale", fmt(p.scaleDynamic, 3), "debug_scale_dynamic")
+                Metric("True (compressed) scale", fmt(p.scaleDynamicCompress, 3), "debug_scale_compress")
+            }
+
+            // System Status (debug.md group 2): service / override / active rule.
+            DiagnosticCard("System Status", "debug_system_status") {
+                Metric("Service", if (state.serviceRunning) "Running" else "Stopped", "debug_service")
+                Metric("Manual override", if (p.paused) "Paused" else "No", "debug_override")
+                Metric("Active rule", state.activeContext ?: "None", "debug_active_rule")
+            }
+
+            // Performance & Timings (debug.md group 5): last cycle duration + last sample age.
+            DiagnosticCard("Performance & Timings", "debug_performance") {
+                Metric("Cycle time (ms)", fmt(p.cycleTimeMs, 0), "debug_cycle_time")
+                Metric("Last sample", lastSampleLabel(p.lastSampleMs), "debug_last_sample")
+            }
+
+            DebugLevelSelector(state.debugLevel, onSelectDebug)
+        }
+    }
+}
+
+/** A `label: value` debug line with the live value highlighted gold (the Tasker debug strong colour). */
+@Composable
+private fun Metric(label: String, value: String, testTag: String) {
+    DiagnosticLine(testTag) {
+        append("$label: ")
+        goldValue(value)
+    }
+}
+
+private fun lastSampleLabel(ms: Long?, now: Long = System.currentTimeMillis()): String {
+    if (ms == null) return "never"
+    val secs = ((now - ms) / 1000L).coerceAtLeast(0L)
+    return when {
+        secs < 1L -> "just now"
+        secs < 60L -> "${secs}s ago"
+        secs < 3600L -> "${secs / 60L}m ago"
+        else -> "${secs / 3600L}h ago"
+    }
+}
+
+/**
+ * The %AAB_Debug 10-category selector (D-023), now a GLOBAL control on the Live Debug scene (G2R-F9):
+ * it writes `debugLevel` straight to the DataStore (never via a profile/parameter draft), so loading a
+ * profile or applying a parameter screen leaves the selected category untouched.
+ */
+@Composable
+fun DebugLevelSelector(current: Int, onSelect: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    OutlinedButton(
+        onClick = { expanded = true },
+        modifier = Modifier.fillMaxWidth().testTag("debug_selector"),
+    ) {
+        Text("Debug: ${DEBUG_LABELS.getOrElse(current) { "Off" }}")
+    }
+    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DEBUG_LABELS.forEachIndexed { level, label ->
+            DropdownMenuItem(
+                text = { Text(label) },
+                onClick = { onSelect(level); expanded = false },
+            )
+        }
+    }
+}

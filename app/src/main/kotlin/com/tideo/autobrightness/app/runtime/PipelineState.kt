@@ -25,8 +25,14 @@ data class PipelineState(
     val threshAbsLow: Double? = null,
     /** %AAB_ThreshAbsHigh — absolute dead-band high (task546). */
     val threshAbsHigh: Double? = null,
+    /** %AAB_ThreshDynamic — last dynamic (lux-adaptive) reactivity threshold (task544); null until
+     *  the first cycle. Surfaced for the Reactivity diagnostic card / Live Debug scene (G2R-F6/F7). */
+    val threshDynamic: Double? = null,
     /** %AAB_CycleTime — measured duration of the last cycle, feeds task543's throttle. */
     val cycleTimeMs: Double? = null,
+    /** %AAB_ScaleDynamic — last UNCOMPRESSED circadian/base scale (task90 output, pre-taper); null
+     *  until the first cycle. Surfaced for the Circadian diagnostic card / Live Debug scene (G2R-F8). */
+    val scaleDynamic: Double? = null,
     /** %AAB_ScaleDynamicCompress — last taper effective scale (task561 de-compression input). */
     val scaleDynamicCompress: Double = 1.0,
     /** Last %AAB_ScalingUse seen (task561 gate). */
