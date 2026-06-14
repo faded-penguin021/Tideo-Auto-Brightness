@@ -32,6 +32,7 @@ import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
+import com.tideo.autobrightness.app.ui.components.rememberToaster
 import kotlinx.coroutines.launch
 
 /** Profiles & Import/Export (Tasker AAB Profile — task592/637/622 defaults + file import/export). */
@@ -42,6 +43,7 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
     val scope = rememberCoroutineScope()
     val manager = remember { ProfileImportExportManager(context.applicationContext) }
     var status by remember { mutableStateOf<String?>(null) }
+    val toast = rememberToaster()
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -49,6 +51,7 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
         if (uri != null) scope.launch {
             status = runCatching { manager.exportToDocument(uri, settings); "Exported." }
                 .getOrElse { "Export failed: ${it.message}" }
+            status?.let(toast)
         }
     }
 
@@ -61,6 +64,7 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
                 vm.replaceAll(imported)
                 "Imported."
             }.getOrElse { "Import failed: ${it.message}" }
+            status?.let(toast)
         }
     }
 
@@ -68,8 +72,8 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
         profileNames = DefaultProfiles.all.keys.toList(),
         status = status,
         onBack = { navController.popBackStack() },
-        onApplyProfile = vm::applyProfile,
-        onReset = vm::resetDefaults,
+        onApplyProfile = { name -> vm.applyProfile(name); toast("Applied profile: $name") },
+        onReset = { vm.resetDefaults(); toast("Reset to defaults") },
         onExport = { exportLauncher.launch("tideo-profile.json") },
         onImport = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
     )

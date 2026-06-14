@@ -50,6 +50,7 @@ class BrightnessPipelineController(
     private val clock: () -> Long = System::currentTimeMillis,
     private val animationRunner: AnimationRunner = AnimationRunner(brightness),
     private val dimming: DimmingCoordinator = NoOpDimmingCoordinator,
+    private val debugSink: DebugSink = NoOpDebugSink,
 ) {
     private val engine = BrightnessEngine()
 
@@ -221,22 +222,39 @@ class BrightnessPipelineController(
             val from = brightness.read()
             val target = output.targetBrightness
 
+            // %AAB_Debug 3/4: Flash the light-evaluation + dynamic-scale figures (D-023, G2-F15).
+            emitDebug(DebugCategory.LIGHT_EVAL, settings) {
+                "lux ${round3(rawLux)}→${output.smoothedLux.toInt()} · thr ${output.thresholdLow.toInt()}–${output.thresholdHigh.toInt()} · →$target"
+            }
+            emitDebug(DebugCategory.DYNAMIC_SCALE, settings) { "scaleCompress ${output.scaleDynamicCompress}" }
+
             if (target != from) {
                 brightness.forceManualMode()
-                val result = animationRunner.animate(
-                    from = from,
-                    to = target,
-                    steps = output.animationSteps,
-                    waitMs = output.animationWaitMs,
-                    detectOverrides = settings.detectOverrides,
-                )
-                if (result == AnimationRunner.Result.OVERRIDDEN) {
-                    events.trySend(PipelineEvent.OverrideDetected(brightness.read()))
-                    return
+                // %AAB_Debug 1 "Skip Animations": jump straight to the target (Tasker debug mode).
+                if (settings.debugLevel == DebugCategory.SKIP_ANIMATIONS.level) {
+                    brightness.write(target)
+                    emitDebug(DebugCategory.SKIP_ANIMATIONS, settings) { "skip → $target" }
+                } else {
+                    emitDebug(DebugCategory.ANIMATION_DETAILS, settings) {
+                        "animate $from→$target in ${output.animationSteps}×${output.animationWaitMs}ms"
+                    }
+                    val result = animationRunner.animate(
+                        from = from,
+                        to = target,
+                        steps = output.animationSteps,
+                        waitMs = output.animationWaitMs,
+                        detectOverrides = settings.detectOverrides,
+                    )
+                    if (result == AnimationRunner.Result.OVERRIDDEN) {
+                        events.trySend(PipelineEvent.OverrideDetected(brightness.read()))
+                        return
+                    }
                 }
             }
 
             val cycleTotal = (clock() - cycleStart).toDouble()
+            // %AAB_Debug 7 "Graph Metrics": Flash the measured cycle duration (feeds throttle).
+            emitDebug(DebugCategory.GRAPH_METRICS, settings) { "cycle ${cycleTotal.toInt()}ms" }
             _state.update {
                 it.copy(
                     smoothedLux = output.smoothedLux,
@@ -355,6 +373,10 @@ class BrightnessPipelineController(
             initializing = false
         }
     }
+
+    /** Emit a runtime debug Flash for [category] gated on the live debugLevel (D-023, G2-F15). */
+    private fun emitDebug(category: DebugCategory, settings: AabSettings, message: () -> String) =
+        debugSink.emit(category, settings.debugLevel, message)
 
     // Tasker round3 idiom: Math.round(x*1000)/1000 (ties toward +∞).
     private fun round3(value: Double): Double = Math.round(value * 1000.0) / 1000.0

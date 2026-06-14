@@ -165,4 +165,15 @@ class ContextEngineTest {
         assertEquals("Cinema", engine.activeContext.value)
         scope.cancel()
     }
+
+    @Test
+    fun mergeProfile_preservesDetectOverrides_G2F8() {
+        // detectOverrides is a global reactivity preference, NOT a task626 snapshot key: a context
+        // profile swap must keep the user's manual-override detection setting (G2-F8).
+        val base = AabSettings(detectOverrides = true, minBrightness = 7)
+        val profile = AabSettings(detectOverrides = false, minBrightness = 99)
+        val merged = mergeProfile(base, profile)
+        assertEquals(true, merged.detectOverrides, "detectOverrides comes from the baseline")
+        assertEquals(99, merged.minBrightness, "curve/brightness params still come from the profile")
+    }
 }

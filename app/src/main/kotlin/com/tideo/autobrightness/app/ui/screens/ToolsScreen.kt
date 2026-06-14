@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
@@ -14,7 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,6 +27,7 @@ import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
+import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionResult
@@ -88,6 +92,8 @@ private fun WizardCard(
     var result by remember { mutableStateOf<CurveSuggestionResult?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var recorded by remember { mutableStateOf<List<OverridePoint>>(emptyList()) }
+    val clipboard = LocalClipboardManager.current
+    val toast = rememberToaster()
 
     Card(Modifier.fillMaxWidth().testTag("wizard_card")) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -110,10 +116,20 @@ private fun WizardCard(
 
             result?.let { r ->
                 r.qualityLines.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
-                OutlinedButton(
-                    onClick = { onApplyWizard(r); message = "Suggestion applied." },
-                    modifier = Modifier.testTag("apply_wizard"),
-                ) { Text("Apply suggestion") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { onApplyWizard(r); toast("Suggestion applied") },
+                        modifier = Modifier.testTag("apply_wizard"),
+                    ) { Text("Apply suggestion") }
+                    // %AAB_Test diagnostics → clipboard (D-025, G2-F15): the wizard's R²/nRMSE/bias report.
+                    OutlinedButton(
+                        onClick = {
+                            clipboard.setText(AnnotatedString(r.qualityLines.joinToString("\n")))
+                            toast("Diagnostics copied to clipboard")
+                        },
+                        modifier = Modifier.testTag("copy_diagnostics"),
+                    ) { Text("Copy report") }
+                }
             }
         }
     }

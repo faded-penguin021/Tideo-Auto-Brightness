@@ -64,12 +64,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /** Apply a built-in named profile (task592 set), preserving the live service-enabled flag. */
+    /**
+     * Apply a built-in named profile (task592 set). The live service-enabled flag and
+     * `detectOverrides` are preserved: the latter is a global reactivity preference, not part of the
+     * task626 profile snapshot, so loading a profile must not turn manual-override detection off
+     * (G2-F8).
+     */
     fun applyProfile(name: String) {
         val profile = DefaultProfiles.all[name] ?: return
         viewModelScope.launch {
             val updated = app.settingsDataStore.updateData { current ->
-                profile.copy(serviceEnabled = current.serviceEnabled)
+                profile.copy(
+                    serviceEnabled = current.serviceEnabled,
+                    detectOverrides = current.detectOverrides,
+                )
             }
             // task592/626 apply re-runs Advanced Auto Brightness so the new curve takes effect
             // immediately, not at the next sensor tick (G2-F16).
@@ -80,7 +88,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun replaceAll(newSettings: AabSettings) {
         viewModelScope.launch {
             val updated = app.settingsDataStore.updateData { current ->
-                newSettings.copy(serviceEnabled = current.serviceEnabled)
+                // Preserve the live service flag + the global DetectOverrides preference (G2-F8).
+                newSettings.copy(
+                    serviceEnabled = current.serviceEnabled,
+                    detectOverrides = current.detectOverrides,
+                )
             }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
         }

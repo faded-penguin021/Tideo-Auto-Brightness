@@ -32,6 +32,7 @@ object NoOpDimmingCoordinator : DimmingCoordinator {
 
 class SuperDimmingCoordinator(
     private val secureDimming: SecureDimmingController,
+    private val debugSink: DebugSink = NoOpDebugSink,
     private val tierProvider: () -> Tier,
 ) : DimmingCoordinator {
 
@@ -50,6 +51,15 @@ class SuperDimmingCoordinator(
             targetBrightness < settings.dimmingThreshold
 
         if (!shouldEngage) {
+            // %AAB_Debug 5: surface WHY dimming is not on (G2-F9 device diagnosis) — most often the
+            // tier or the threshold gate, not the secure write itself.
+            emitDebug(settings) {
+                when {
+                    !settings.dimmingEnabled -> "off: dimming disabled"
+                    !elevated -> "off: needs WRITE_SECURE_SETTINGS"
+                    else -> "off: $targetBrightness ≥ threshold ${settings.dimmingThreshold}"
+                }
+            }
             disengage()
             return
         }
@@ -68,12 +78,23 @@ class SuperDimmingCoordinator(
         )
 
         // task650 act10-14: write reduce_bright_colors_activated=1 once, then the level each cycle.
+        // NOTE (G2-F9, device gate): these are the AOSP "Extra dim" secure keys
+        // (reduce_bright_colors_activated / reduce_bright_colors_level). Some OEM skins ship a
+        // renamed/relocated key (or require the accessibility feature pre-enabled); if engagement
+        // logs "ON" here (debug 5) but the screen does not visibly dim on a given device, that is OEM
+        // secure-key variance, not a logic bug — see SecureDimmingController + STATE.md D-048.
+        val level = Math.round(dimShell).toInt()
         if (!engaged) {
             secureDimming.setActivated(true)
             engaged = true
         }
-        secureDimming.setLevel(Math.round(dimShell).toInt())
+        secureDimming.setLevel(level)
+        emitDebug(settings) { "ON level $level (target $targetBrightness < ${settings.dimmingThreshold})" }
     }
+
+    /** %AAB_Debug 5 "Super Dimming Info" (D-023, G2-F15). */
+    private fun emitDebug(settings: AabSettings, message: () -> String) =
+        debugSink.emit(DebugCategory.SUPER_DIMMING, settings.debugLevel, message)
 
     /** task645: level→0 then activated→0; %AAB_DimmingStatus=0. */
     override fun disengage() {

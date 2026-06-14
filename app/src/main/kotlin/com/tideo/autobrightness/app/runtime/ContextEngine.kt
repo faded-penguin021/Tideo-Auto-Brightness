@@ -41,6 +41,7 @@ class ContextEngine(
     private val onProfileChanged: () -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
     private val userProfileName: String = "Default",
+    private val debugSink: DebugSink = NoOpDebugSink,
 ) {
     private val _activeContext = MutableStateFlow<String?>(null)
     /** `%AAB_ActiveContext` — the winning rule's name, or null when running the user baseline. */
@@ -165,6 +166,10 @@ class ContextEngine(
 
         // PASS 3/4 — pure decision.
         val baseline = baselineProvider()
+        // %AAB_Debug 9 "Context Location" (D-023, G2-F15): Flash the signals feeding this evaluation.
+        debugSink.emit(DebugCategory.CONTEXT_LOCATION, baseline.debugLevel) {
+            "app ${signals.app.ifEmpty { "—" }} · loc ${signals.lat},${signals.lon} · wifi ${signals.wifi.ifEmpty { "—" }}"
+        }
         val knownProfiles = profileCatalog.names()
         val resolution = ContextOverrideResolver.resolve(
             rules = rules.map { it.toSpec() },
@@ -221,7 +226,13 @@ class ContextEngine(
         }
 
         // task43 act21: re-run Set Initial Brightness when the profile actually changed.
-        if (changed) onProfileChanged()
+        if (changed) {
+            // %AAB_Debug 8 "Context Automation" (D-023, G2-F15).
+            debugSink.emit(DebugCategory.CONTEXT_AUTOMATION, baseline.debugLevel) {
+                "context ${resolution.activeContextName ?: "(none)"} → profile $target"
+            }
+            onProfileChanged()
+        }
     }
 
     private companion object {
@@ -266,12 +277,17 @@ interface ProfileCatalog {
 /**
  * Overlay a context profile's parameter set onto the baseline. The fields swapped are exactly Tasker
  * task626 `_ContextResume`'s 39-key snapshot (the LOAD_FILE parameter set); fields outside it
- * (service enable, manual context lock, debug level, setup title, schema version, and the
- * snapshot-omitted %AAB_ThreshDynamic) are preserved from the baseline.
+ * (service enable, manual context lock, debug level, setup title, schema version, the
+ * snapshot-omitted %AAB_ThreshDynamic, and `detectOverrides`) are preserved from the baseline.
+ *
+ * `detectOverrides` (%AAB_DetectOverrides) is a GLOBAL reactivity preference, NOT one of task626's
+ * curve/min-max/threshold/dimming snapshot keys (contexts_spec §4 enumerates the snapshot), so a
+ * context profile swap must not silently turn manual-override detection off (G2-F8).
  */
 internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSettings = profile.copy(
     serviceEnabled = baseline.serviceEnabled,
     contextOverride = baseline.contextOverride,
+    detectOverrides = baseline.detectOverrides,
     debugLevel = baseline.debugLevel,
     setupTitle = baseline.setupTitle,
     schemaVersion = baseline.schemaVersion,
