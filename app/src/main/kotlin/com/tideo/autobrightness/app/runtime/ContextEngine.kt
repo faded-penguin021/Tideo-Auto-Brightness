@@ -75,11 +75,17 @@ class ContextEngine(
     @Volatile private var latestBatt = 0
     @Volatile private var latestPlug = false
     @Volatile private var latestWifi = ""
+    @Volatile private var latestLat = 0.0
+    @Volatile private var latestLon = 0.0
+    // Last location that actually triggered a LOCATION evaluation — the ≥100 m debounce anchor (F45).
+    private var lastLocEvalLat: Double? = null
+    private var lastLocEvalLon: Double? = null
 
     private var scope: CoroutineScope? = null
     private var batteryJob: Job? = null
     private var wifiJob: Job? = null
     private var appJob: Job? = null
+    private var locationJob: Job? = null
     @Volatile private var screenOn = true
 
     /** Effective settings for the pipeline's settingsProvider: active profile override or baseline. */
@@ -136,6 +142,7 @@ class ContextEngine(
             // Seed the effective settings + active profile from a first general evaluation.
             evaluate(ContextCaller.GENERAL)
             startAppPollIfNeeded()
+            startLocationListenerIfNeeded()
         }
     }
 
@@ -143,6 +150,7 @@ class ContextEngine(
         batteryJob?.cancel(); batteryJob = null
         wifiJob?.cancel(); wifiJob = null
         appJob?.cancel(); appJob = null
+        locationJob?.cancel(); locationJob = null
         scope = null
     }
 
@@ -151,6 +159,7 @@ class ContextEngine(
         screenOn = true
         scope?.launch {
             startAppPollIfNeeded()
+            startLocationListenerIfNeeded()
             evaluate(ContextCaller.TIME)
         }
     }
@@ -179,6 +188,35 @@ class ContextEngine(
         }
     }
 
+    /**
+     * Start the "super smart location listener" (G2R-F45) only when a rule actually uses location —
+     * Tasker gates the listener profile on `%AAB_ContextCache` containing `[LOC]` so the GPS/network
+     * listener never runs without a location rule (battery cost gate). Hosted in the service scope so
+     * it survives backgrounding; updates feed [latestLat]/[latestLon] and fire a LOCATION evaluation
+     * only after a ≥100 m move (the input-blocking near-constant toast fix). Kept alive across
+     * screen-off (a "near home" context should hold while the display is off).
+     */
+    private suspend fun startLocationListenerIfNeeded() {
+        if (locationJob?.isActive == true) return
+        val tokens = ContextSignalTokens.from(rulesProvider())
+        if (!tokens.usesLocation) return // [LOC] gate — no GPS listener without a location rule
+        locationJob = scope?.launch {
+            signalSource.locationFlow().collect { loc ->
+                latestLat = loc.lat
+                latestLon = loc.lon
+                val prevLat = lastLocEvalLat
+                val prevLon = lastLocEvalLon
+                val moved = prevLat == null || prevLon == null ||
+                    haversineMeters(prevLat, prevLon, loc.lat, loc.lon) >= LOCATION_DEBOUNCE_M
+                if (moved) {
+                    lastLocEvalLat = loc.lat
+                    lastLocEvalLon = loc.lon
+                    evaluate(ContextCaller.LOCATION)
+                }
+            }
+        }
+    }
+
     private suspend fun evaluate(caller: ContextCaller) = evalMutex.withLock {
         val rules = rulesProvider()
         val tokens = ContextSignalTokens.from(rules)
@@ -189,7 +227,7 @@ class ContextEngine(
         val last = lastEvalTime
         if (cooldown > 0 && last != null && now - last < cooldown) return@withLock
 
-        val signals = signalSource.assemble(latestApp, latestBatt, latestPlug, latestWifi)
+        val signals = signalSource.assemble(latestApp, latestBatt, latestPlug, latestWifi, latestLat, latestLon)
 
         // PASS 2 — veto gates.
         if (!shouldProceed(caller, signals, tokens)) return@withLock
@@ -210,7 +248,7 @@ class ContextEngine(
             userProfile = userProfileName,
             profileExists = { knownProfiles.contains(it) },
         )
-        apply(resolution, baseline)
+        apply(resolution, baseline, rules, caller)
     }
 
     private fun shouldProceed(caller: ContextCaller, signals: ContextSignals, tokens: ContextSignalTokens): Boolean {
@@ -239,7 +277,12 @@ class ContextEngine(
         lastWifi = signals.wifi
     }
 
-    private suspend fun apply(resolution: ContextResolution, baseline: AabSettings) {
+    private suspend fun apply(
+        resolution: ContextResolution,
+        baseline: AabSettings,
+        rules: List<ContextRule>,
+        caller: ContextCaller,
+    ) {
         _nextContextTime.value = resolution.nextContextTime
 
         // Manual context lock (%AAB_ContextOverride): wake times refresh, profile switch skipped.
@@ -259,9 +302,16 @@ class ContextEngine(
 
         // task43 act21: re-run Set Initial Brightness when the profile actually changed.
         if (changed) {
-            // %AAB_Debug 8 "Context Automation" (D-023, G2-F15).
+            // %AAB_Debug 8 "Context Automation" (D-023, G2-F15, enriched for G2R-F47): Flash the
+            // trigger, context, profile, and winning rule (with its priority) on every auto-load.
+            val winner = rules.firstOrNull { it.id == resolution.matchedRuleId }
             debugSink.emit(DebugCategory.CONTEXT_AUTOMATION, baseline.debugLevel) {
-                "context ${resolution.activeContextName ?: "(none)"} → profile $target"
+                buildString {
+                    append("trigger ${caller.name.lowercase()}")
+                    append(" · context ${resolution.activeContextName ?: "(none)"}")
+                    append(" · profile $target")
+                    winner?.let { append(" · rule ${it.name} (priority ${it.priority})") }
+                }
             }
             // G2R-F25: confirm the load to the user (Tasker flashes when a context loads its profile).
             // Fires only when a named rule actually wins (not when reverting to the user baseline).
@@ -270,9 +320,21 @@ class ContextEngine(
         }
     }
 
+    /** Great-circle distance in metres for the ≥100 m location debounce (F45). */
+    private fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+            kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
+        return EARTH_RADIUS_M * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    }
+
     private companion object {
         const val APP_POLL_INTERVAL_MS = 2500L
         const val BATTERY_DELTA_THRESHOLD = 5
+        const val LOCATION_DEBOUNCE_M = 100.0
+        const val EARTH_RADIUS_M = 6_371_000.0
     }
 }
 
@@ -290,6 +352,9 @@ enum class ContextCaller(val cooldownMs: Long) {
 /** A point-in-time battery reading (decoupled from the platform `BatteryState` so the engine is JVM-testable). */
 data class BatterySignal(val percent: Int, val plugged: Boolean)
 
+/** A point-in-time location fix (decoupled from the platform `LocationSnapshot`). */
+data class LocationSignal(val lat: Double, val lon: Double)
+
 /**
  * Platform signal acquisition for the context engine. The Android impl wires the S7 readers
  * (battery/wifi/foreground-app/location) and computes day-of-week + local seconds + solar times.
@@ -299,8 +364,18 @@ interface ContextSignalSource {
     fun wifiFlow(): Flow<String?>
     fun foregroundAppFlow(intervalMs: Long): Flow<String?>
 
+    /** Continuous location fixes (G2R-F45); collected only when a rule uses location (the [LOC] gate). */
+    fun locationFlow(): Flow<LocationSignal>
+
     /** Assemble a full snapshot from the latest cached signal pieces + current clock/location/solar. */
-    suspend fun assemble(app: String, batteryPercent: Int, plugged: Boolean, wifi: String): ContextSignals
+    suspend fun assemble(
+        app: String,
+        batteryPercent: Int,
+        plugged: Boolean,
+        wifi: String,
+        lat: Double,
+        lon: Double,
+    ): ContextSignals
 }
 
 /**

@@ -5,6 +5,7 @@ import com.tideo.autobrightness.app.settings.BatteryTrigger
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextTriggers
 import com.tideo.autobrightness.app.settings.DefaultProfiles
+import com.tideo.autobrightness.app.settings.LocationTrigger
 import com.tideo.autobrightness.domain.context.ContextSignals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -58,14 +59,25 @@ class ContextEngineTest {
         val battery = MutableSharedFlow<BatterySignal>(extraBufferCapacity = 16)
         val wifi_ = MutableSharedFlow<String?>(extraBufferCapacity = 16)
         val appFlow = MutableSharedFlow<String?>(extraBufferCapacity = 16)
+        val locations = MutableSharedFlow<LocationSignal>(extraBufferCapacity = 16)
+        /** lat/lon the engine passed into [assemble] on the last evaluation (location-listener wiring). */
+        var lastAssembledLat = 0.0
+        var lastAssembledLon = 0.0
         override fun batteryFlow(): Flow<BatterySignal> = battery
         override fun wifiFlow(): Flow<String?> = wifi_
         override fun foregroundAppFlow(intervalMs: Long): Flow<String?> = appFlow
-        override suspend fun assemble(app: String, batteryPercent: Int, plugged: Boolean, wifi: String) =
-            ContextSignals(
-                app = this.app, batteryPercent = this.batteryPercent, plugged = this.plugged,
+        override fun locationFlow(): Flow<LocationSignal> = locations
+        override suspend fun assemble(
+            app: String, batteryPercent: Int, plugged: Boolean, wifi: String, lat: Double, lon: Double,
+        ): ContextSignals {
+            lastAssembledLat = lat
+            lastAssembledLon = lon
+            return ContextSignals(
+                app = this.app, lat = lat, lon = lon,
+                batteryPercent = this.batteryPercent, plugged = this.plugged,
                 wifi = this.wifi, dayOfWeek = dayOfWeek, nowSecondsOfDay = nowSecondsOfDay,
             )
+        }
     }
 
     private fun TestScope.engine(
@@ -238,6 +250,70 @@ class ContextEngineTest {
         engine.start(scope)
         advanceUntilIdle()
         assertEquals(listOf("Cinema" to "Video Streaming"), loads)
+        scope.cancel()
+    }
+
+    @Test
+    fun locationListener_debouncesSub100mMovesAndFiresOn100mMove_G2RF45() = runTest {
+        // G2R-F45: the smart location listener feeds fixes; a ≥100 m move re-evaluates, a sub-100 m
+        // nudge is debounced (so the context-location debug toasts aren't near-constant). The [LOC]
+        // gate keeps the listener off when no rule uses location — here one does.
+        var now = 0L
+        val locRule = ContextRule(
+            id = "loc", name = "AtHome", profile = "Battery Saver", priority = 10,
+            triggers = ContextTriggers(location = LocationTrigger(lat = 10.0, lon = 10.0, radius = 200.0)),
+        )
+        val src = FakeSignalSource()
+        val (engine, scope) = engine(listOf(locRule), src, clock = { now })
+        engine.start(scope)
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value)
+
+        // First fix (far away) always fires; no match.
+        now = 10_000L
+        src.locations.emit(LocationSignal(20.0, 20.0))
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value)
+        assertEquals(20.0, src.lastAssembledLat, "first fix is evaluated")
+
+        // A ~44 m nudge → debounced: no re-evaluation (assemble not re-run with the new coords).
+        now = 30_000L
+        src.locations.emit(LocationSignal(20.0004, 20.0))
+        advanceUntilIdle()
+        assertEquals(20.0, src.lastAssembledLat, "sub-100 m move must be debounced (no re-eval)")
+
+        // Move onto the rule's location (>100 m) → re-evaluate → rule matches.
+        now = 50_000L
+        src.locations.emit(LocationSignal(10.0, 10.0))
+        advanceUntilIdle()
+        assertEquals("AtHome", engine.activeContext.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun contextAutomationDebug_includesTriggerRuleAndPriority_G2RF47() = runTest {
+        // G2R-F47: the Context Automation debug toast must name the trigger, context, profile and the
+        // winning rule with its priority (not just "context → profile").
+        val messages = mutableListOf<String>()
+        val sink = DebugSink { category, activeLevel, message ->
+            if (category == DebugCategory.CONTEXT_AUTOMATION && activeLevel == category.level) messages += message()
+        }
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { listOf(videoStreamingRule) },
+            baselineProvider = { baseline.copy(debugLevel = DebugCategory.CONTEXT_AUTOMATION.level) },
+            profileCatalog = catalog,
+            signalSource = FakeSignalSource(app = "com.netflix.mediaclient"),
+            onProfileChanged = {},
+            clock = { 0L },
+            debugSink = sink,
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+        assertTrue(
+            messages.any { it.contains("trigger") && it.contains("rule Cinema (priority 10)") },
+            "expected enriched context-automation toast, got $messages",
+        )
         scope.cancel()
     }
 

@@ -69,4 +69,17 @@ class ContextRuleStoreTest {
         val json = config.toTaskerJson()
         assertTrue(json.trimStart().startsWith("["), "Tasker interop export must be a bare JSON array")
     }
+
+    @Test
+    fun byPriority_ordersHighestFirst_thenName_G2RF43() {
+        // G2R-F43: the rule list must display by priority (highest first), not creation order; ties
+        // break on a stable, case-insensitive name order.
+        val rules = listOf(
+            ContextRule(id = "1", name = "zeta", profile = "P", priority = 1),
+            ContextRule(id = "2", name = "alpha", profile = "P", priority = 5),
+            ContextRule(id = "3", name = "Beta", profile = "P", priority = 5),
+            ContextRule(id = "4", name = "gamma", profile = "P", priority = 9),
+        )
+        assertEquals(listOf("gamma", "alpha", "Beta", "zeta"), rules.byPriority().map { it.name })
+    }
 }

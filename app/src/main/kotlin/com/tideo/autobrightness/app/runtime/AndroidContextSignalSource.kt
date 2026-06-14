@@ -37,11 +37,16 @@ class AndroidContextSignalSource(
     override fun foregroundAppFlow(intervalMs: Long): Flow<String?> =
         foregroundApp.foregroundPackage(intervalMs)
 
+    override fun locationFlow(): Flow<LocationSignal> =
+        location.locationUpdates().map { LocationSignal(it.latitude, it.longitude) }
+
     override suspend fun assemble(
         app: String,
         batteryPercent: Int,
         plugged: Boolean,
         wifi: String,
+        lat: Double,
+        lon: Double,
     ): ContextSignals {
         val cal = Calendar.getInstance()
         cal.timeInMillis = clock()
@@ -49,14 +54,19 @@ class AndroidContextSignalSource(
         val nowSecs = cal.get(Calendar.HOUR_OF_DAY) * 3600 +
             cal.get(Calendar.MINUTE) * 60 + cal.get(Calendar.SECOND)
 
-        val loc = runCatching { location.lastKnownLocation() }.getOrNull()
+        // lat/lon now come from the engine's live location listener (G2R-F45). 0.0,0.0 = no fix yet:
+        // fall back to last-known for the solar computation but report the (0,0) so the gate stays off.
+        val haveFix = lat != 0.0 || lon != 0.0
+        val solarLoc = if (haveFix) lat to lon else {
+            runCatching { location.lastKnownLocation() }.getOrNull()?.let { it.latitude to it.longitude }
+        }
         val offsetSecs = cal.timeZone.getOffset(cal.timeInMillis) / 1000L
-        val (sunrise, sunset) = solarLocalSeconds(loc?.latitude, loc?.longitude, cal.timeInMillis / 1000L, offsetSecs)
+        val (sunrise, sunset) = solarLocalSeconds(solarLoc?.first, solarLoc?.second, cal.timeInMillis / 1000L, offsetSecs)
 
         return ContextSignals(
             app = app,
-            lat = loc?.latitude ?: 0.0,
-            lon = loc?.longitude ?: 0.0,
+            lat = lat,
+            lon = lon,
             batteryPercent = batteryPercent,
             plugged = plugged,
             dayOfWeek = dayOfWeek,

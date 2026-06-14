@@ -4,6 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -19,6 +21,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -46,6 +49,8 @@ import com.tideo.autobrightness.app.settings.ContextTriggers
 import com.tideo.autobrightness.app.settings.LocationTrigger
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.ContextsViewModel
+import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.platform.context.LocationResult
 import com.tideo.autobrightness.platform.context.SsidResult
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
@@ -62,6 +67,9 @@ fun ContextsScreen(navController: NavHostController, vm: ContextsViewModel = vie
     val profileNames by vm.profileNames.collectAsStateWithLifecycle()
     var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
     androidx.compose.runtime.LaunchedEffect(Unit) { apps = runCatching { vm.installedApps() }.getOrDefault(emptyList()) }
+    // G2R-F68: resolve today's sunrise/sunset for the token labels (gold "Sunrise (06:42)").
+    var solarLabel by remember { mutableStateOf<Pair<String, String>?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { solarLabel = runCatching { vm.solarTimes() }.getOrNull() }
     val toast = rememberToaster()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -69,6 +77,7 @@ fun ContextsScreen(navController: NavHostController, vm: ContextsViewModel = vie
         rules = rules,
         profileNames = profileNames.ifEmpty { listOf("Default") },
         apps = apps,
+        solarLabel = solarLabel,
         onBack = { navController.popBackStack() },
         onSave = { toast("Rule saved"); vm.save(it) },
         onDelete = { vm.delete(it); toast("Rule deleted") },
@@ -87,13 +96,19 @@ fun ContextsScreen(navController: NavHostController, vm: ContextsViewModel = vie
             }
         },
         onUseCurrentLocation = { setLatLon ->
-            // G2R-F22 (live location): fill lat/lon from the last known device location.
-            val loc = vm.currentLocation()
-            if (loc != null) {
-                setLatLon(loc.latitude, loc.longitude)
-                toast("Location: %.4f, %.4f".format(loc.latitude, loc.longitude))
-            } else {
-                toast("No location available (grant Location permission and try again)")
+            // G2R-F22/F42: recheck the grant at call time + request a fresh fix; targeted message
+            // per outcome (no longer wrongly reports "not granted" right after the grant).
+            scope.launch {
+                when (val result = vm.currentLocation()) {
+                    is LocationResult.Available -> {
+                        setLatLon(result.snapshot.latitude, result.snapshot.longitude)
+                        toast("Location: %.4f, %.4f".format(result.snapshot.latitude, result.snapshot.longitude))
+                    }
+                    LocationResult.NeedsPermission ->
+                        toast("Grant Location permission to use the current location")
+                    LocationResult.Unavailable ->
+                        toast("No location fix yet — try again in a moment")
+                }
             }
         },
         hasUsageAccess = vm::hasUsageAccess,
@@ -109,6 +124,7 @@ fun ContextsContent(
     rules: List<ContextRule>,
     profileNames: List<String>,
     apps: List<AppEntry>,
+    solarLabel: Pair<String, String>? = null,
     onBack: () -> Unit,
     onSave: (ContextRule) -> Unit,
     onDelete: (String) -> Unit,
@@ -144,6 +160,7 @@ fun ContextsContent(
                     rule = current,
                     profileNames = profileNames,
                     apps = apps,
+                    solarLabel = solarLabel,
                     onCancel = { editing = null },
                     onSave = { onSave(it); editing = null },
                     onUseCurrentSsid = onUseCurrentSsid,
@@ -176,17 +193,22 @@ private fun ContextTriggers.summary(): String {
         apps?.takeIf { it.isNotEmpty() }?.let { add("${it.size} app(s)") }
         wifi?.takeIf { it.isNotEmpty() }?.let { add("Wi-Fi ${it.joinToString()}") }
         timeRange?.takeIf { it.size == 2 }?.let { add("${it[0]}–${it[1]}") }
+        days?.takeIf { it.isNotEmpty() }?.let { add(it.sorted().joinToString("") { d -> DAY_LABELS.getOrElse(d - 1) { "?" } }) }
         battery?.let { add(if (it.onPower == true) "charging" else if (it.onPower == false) "on battery" else "battery ${it.min}-${it.max}%") }
         location?.let { add("near location") }
     }
     return if (parts.isEmpty()) "Always active" else parts.joinToString(" · ")
 }
 
+/** Calendar.DAY_OF_WEEK index (1=Sun..7=Sat) → short label; the day picker maps positions to these. */
+private val DAY_LABELS = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
+
 @Composable
 private fun RuleEditor(
     rule: ContextRule,
     profileNames: List<String>,
     apps: List<AppEntry>,
+    solarLabel: Pair<String, String>?,
     onCancel: () -> Unit,
     onSave: (ContextRule) -> Unit,
     onUseCurrentSsid: ((String) -> Unit) -> Unit,
@@ -200,6 +222,8 @@ private fun RuleEditor(
     var wifi by remember { mutableStateOf(rule.triggers.wifi?.joinToString(", ") ?: "") }
     var startTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(0) ?: "") }
     var endTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(1) ?: "") }
+    // Day-of-week selection (G2R-F67): Calendar.DAY_OF_WEEK values 1=Sun..7=Sat; empty = all days.
+    val selectedDays = remember { mutableStateOf(rule.triggers.days?.toSet() ?: emptySet()) }
     var charging by remember { mutableStateOf(rule.triggers.battery?.onPower == true) }
     // Location window (G2R-F22): lat/lon/radius editor + "use current location".
     var lat by remember { mutableStateOf(rule.triggers.location?.lat?.toString() ?: "") }
@@ -246,12 +270,19 @@ private fun RuleEditor(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Column(Modifier.weight(1f)) {
             TimeField("From", startTime, "start") { startTime = it }
-            TimeTokenRow("start") { startTime = it }
+            TimeTokenRow("start", solarLabel) { startTime = it }
         }
         Column(Modifier.weight(1f)) {
             TimeField("To", endTime, "end") { endTime = it }
-            TimeTokenRow("end") { endTime = it }
+            TimeTokenRow("end", solarLabel) { endTime = it }
         }
+    }
+
+    // Day-of-week picker (G2R-F67): overnight windows (start > end) wrap to the next day; the
+    // resolver attributes the post-midnight tail to the previous day's membership (D-014).
+    Text("Days (none = every day):", style = MaterialTheme.typography.labelMedium)
+    DayPicker(selectedDays.value) { day ->
+        selectedDays.value = if (day in selectedDays.value) selectedDays.value - day else selectedDays.value + day
     }
 
     SectionHeader("Location")
@@ -366,6 +397,8 @@ private fun RuleEditor(
                         null
                     },
                     timeRange = if (startTime.isNotBlank() && endTime.isNotBlank()) listOf(startTime.trim(), endTime.trim()) else null,
+                    // All 7 (or none) selected = "every day" → omit (G2R-F67).
+                    days = selectedDays.value.takeIf { it.isNotEmpty() && it.size < 7 }?.sorted(),
                 )
                 // Prompt for usage access on save if the rule targets apps and it is not granted.
                 if (triggers.apps != null && !hasUsageAccess()) onRequestUsageAccess()
@@ -425,11 +458,38 @@ private fun parseHhMm(value: String): Pair<Int, Int>? {
     return if (h in 0..23 && m in 0..59) h to m else null
 }
 
-/** SUNRISE/SUNSET quick-insert tokens for a time field (the resolver accepts them, G2-F14). */
+/**
+ * SUNRISE/SUNSET quick-insert tokens for a time field (the resolver accepts them, G2-F14). G2R-F68:
+ * when today's resolved sunrise/sunset is known, show it in theme gold (e.g. "Sunrise (06:42)").
+ */
 @Composable
-private fun TimeTokenRow(which: String, onPick: (String) -> Unit) {
+private fun TimeTokenRow(which: String, solarLabel: Pair<String, String>?, onPick: (String) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextButton(onClick = { onPick("SUNRISE") }, modifier = Modifier.testTag("${which}_sunrise")) { Text("Sunrise") }
-        TextButton(onClick = { onPick("SUNSET") }, modifier = Modifier.testTag("${which}_sunset")) { Text("Sunset") }
+        TextButton(onClick = { onPick("SUNRISE") }, modifier = Modifier.testTag("${which}_sunrise")) {
+            Text(buildString { append("Sunrise"); solarLabel?.first?.let { append(" ($it)") } }, color = AabGold)
+        }
+        TextButton(onClick = { onPick("SUNSET") }, modifier = Modifier.testTag("${which}_sunset")) {
+            Text(buildString { append("Sunset"); solarLabel?.second?.let { append(" ($it)") } }, color = AabGold)
+        }
+    }
+}
+
+/**
+ * Day-of-week multi-select (G2R-F67): one filter chip per day, Calendar.DAY_OF_WEEK 1=Sun..7=Sat.
+ * Wraps so all seven fit on narrow screens. None selected = every day.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DayPicker(selected: Set<Int>, onToggle: (Int) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        DAY_LABELS.forEachIndexed { index, label ->
+            val day = index + 1
+            FilterChip(
+                selected = day in selected,
+                onClick = { onToggle(day) },
+                label = { Text(label) },
+                modifier = Modifier.testTag("day_$day"),
+            )
+        }
     }
 }
