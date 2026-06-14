@@ -23,6 +23,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -111,12 +112,17 @@ class AmbientMonitoringService : Service() {
         controller.start()
         contextEngine.start(scope)
         if (notificationJob?.isActive == true) return
+        val manualOverrideFlow = applicationContext.settingsDataStore.data
+            .map { it.contextOverride }
+            .distinctUntilChanged()
         notificationJob = scope.launch {
-            combine(controller.state, contextEngine.activeContext) { state, ctx ->
+            combine(controller.state, contextEngine.activeContext, manualOverrideFlow) { state, ctx, manualOverride ->
                 // Each accepted cycle drives time-window re-evaluation (contexts_spec — prof764).
                 contextEngine.onPipelineTick()
-                // Republish the live snapshot so the in-app Dashboard can render it (S11).
-                LiveRuntimeState.publish(state, ctx)
+                // Republish the live snapshot so the in-app Dashboard / Menu can render it (S11). The
+                // manual-load override lock (%AAB_ContextOverride) is surfaced separately from the
+                // active context rule (F46) so the Menu can distinguish them.
+                LiveRuntimeState.publish(state, ctx, manualOverride)
                 NotificationModel(state.smoothedLux, state.targetBrightness, state.paused, state.serviceOn, ctx)
             }
                 .distinctUntilChanged()

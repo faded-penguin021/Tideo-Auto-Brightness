@@ -13,7 +13,7 @@ filled by S1/S2 during extraction.
 |---|---|---|---|
 | prof753 Hibernate (Display Off) → task585 | L3 | runtime/BrightnessPipelineController.hibernate (S9a) | ported |
 | prof754 Throttle Reinitialization → task566 | L16 | runtime/BrightnessPipelineController.reinit (S9a) | ported |
-| prof755 Allow Override → task567 | L56 | runtime/OverrideMonitor + ProfileGates.allowOverrideGate (S9a) | ported |
+| prof755 Allow Override → task567 | L56 | runtime/OverrideMonitor + ProfileGates.allowOverrideGate (S9a); S12.7a adds post-init settle-suppression (F64) + corrected override/context-rule semantics (F46, D-054) | ported |
 | prof756 Repost Paused Notification → task567 | L111 | runtime/AmbientMonitoringService paused notification (S9a) | ported |
 | prof757 Repost Foreground Notification → task584 | L156 | runtime/AmbientMonitoringService live notification (S9a) | ported |
 | prof758 Dynamic Scale Engine → task90 | L195 | gate transcribed: ProfileGates.dynamicScaleGate + truth-table test (S9a); task90 scheduling S9b/S12 | partial (gate S9a) |
@@ -125,7 +125,7 @@ filled by S1/S2 during extraction.
 | task655 L32591 · _SetSuggestedVariables | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.applyToLiveCurve (S6) | ported |
 | task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
 | task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 (cross-validation oracle, D-002) | chart render = S13 BrightnessCurveChart | reference (chart S13) |
-| task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner (S9a) | ported |
+| task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner (S9a); S12.7a ports the REAL band+2-read-debounce override detector (java L49-56/L121-137) replacing the exact-match self-write check (F34, D-054) | ported |
 | task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner brightness path (S9a); S9b wires the ELEVATED secure-dimming layer (task646/650/645 via SuperDimmingCoordinator); S12.6c adds the **PWM-sensitive hardware floor** (step 3: clamp hardware up to dimmingThreshold, G2R-F27/D-050); DC-like unprivileged overlay still deferred (D-040) | ported (brightness + secure dimming + PWM hardware floor; overlay deferred) |
 | task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
 | task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |

@@ -274,6 +274,46 @@ class BrightnessPipelineControllerTest {
         scope.cancel()
     }
 
+    // S12.7a/F64: after a Set Initial Brightness self-write (context swap / reinit / resume), the
+    // ContentObserver echo of our OWN write must NOT be flagged as an override during the settle
+    // window — but a genuine external write after the window still pauses.
+    @Test
+    fun initialWrite_suppressesOverrideEcho_thenPausesAfterWindow() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        var now = 1000L
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = brightness, brightnessObserver = observer,
+            settingsProvider = { settings }, scope = scope, clock = { now },
+        )
+        controller.start()
+
+        // Seed a reading so Set Initial Brightness has a lux to act on; runCycle does NOT arm the window.
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        // A context swap re-runs Set Initial Brightness → arms the settle window (now=1000 → 2500).
+        controller.onContextChanged()
+        advanceUntilIdle()
+        val applied = controller.state.value.lastAppliedBrightness!!
+
+        // A divergent value on screen (e.g. the AUTO→MANUAL mode-flip recompute) echoes through the
+        // observer DURING the settle window → must be suppressed even though it differs from ours.
+        brightness.current = applied + 80
+        observer.flow.emit(applied + 80)
+        advanceUntilIdle()
+        assertTrue(!controller.state.value.paused, "own init-time echo must not pause during the window (F64)")
+
+        // Past the settle window the same divergent external value still pauses.
+        now = 4000L
+        observer.flow.emit(applied + 80)
+        advanceUntilIdle()
+        assertTrue(controller.state.value.paused, "a real external write after the window must pause")
+        scope.cancel()
+    }
+
     @Test
     fun screenOff_hibernatesRuntimeState() = runTest {
         val sensor = FakeSensor()

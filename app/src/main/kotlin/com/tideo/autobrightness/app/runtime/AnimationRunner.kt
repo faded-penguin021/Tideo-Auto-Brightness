@@ -4,17 +4,32 @@ import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import kotlinx.coroutines.delay
 
 /**
- * Executes an animated brightness transition with per-frame read-back override detection.
+ * Executes an animated brightness transition with per-frame band-checked override detection.
  *
- * Tasker: task696 "Smooth Brightness Transition" (XML, java/task696_1) and the DC-like dimming
- * variant task698. Steps `loops` times writing an intermediate brightness with `wait` ms between
- * frames; before each frame it re-reads the system value and, if it drifted away from our last
- * self-write while override detection is on, aborts and signals a manual override
- * (→ prof755/task567). Our own writes are expected (suppress-echo); an unexpected external write
- * is an override.
+ * Tasker: task696 "Smooth Brightness Transition V5 (Java)" (XML L35734-L35886, java/task696_1) and
+ * the DC-like dimming variant task698. Steps `loops` times writing an intermediate brightness with
+ * `wait` ms between frames; while [detectOverrides] is on it re-reads the system value and aborts
+ * with [Result.OVERRIDDEN] when the observed brightness leaves our animation band.
  *
- * Super-dimming (task698) writes are wired in S9b; this S9a runner handles the brightness-only
- * path (task696). It is a plain suspend function with no Android dependencies beyond the
+ * **Override band (S12.7a, F34 — the *real* task696 logic, not the old exact-match self-write
+ * check).** The legacy `isOnScreenSelfWrite()` equality test produced false positives (any OEM
+ * round-trip drift / a delayed callback for an adjacent frame looked like an override). task696
+ * instead defines a tolerance band spanning the whole sweep and only fires after the observed value
+ * stays out of it for [OVERRIDE_TRIGGER_THRESHOLD] consecutive checks:
+ *   - `minTarget = from < to ? from : to - 1`, `maxTarget = from < to ? to + 1 : from` (java L49-56).
+ *   - an override is `actual > maxTarget + 2 || actual < minTarget - 2`, i.e. a value in the *wrong
+ *     direction* or *overshooting beyond our step* (java L126); a value consistent with our in-flight
+ *     interpolation is ours. The ±2 tolerance also absorbs the domain↔device round-trip drift that
+ *     made the equality check fire on every multi-frame transition (D-049 #4).
+ *   - the trigger requires two consecutive out-of-band reads (java L129) so a single transient does
+ *     not pause the loop.
+ *
+ * Tasker checked only every 5th frame purely to dodge per-frame IPC cost (java L98-101, an explicit
+ * optimization comment); that is a *how*, not a *what*, so the Kotlin port checks every frame — the
+ * band + 2-consecutive-read debounce is the behaviour that matters.
+ *
+ * Super-dimming (task698) writes are wired in S9b; this runner handles the brightness-only path
+ * (task696). It is a plain suspend function with no Android dependencies beyond the
  * ScreenBrightnessController interface, so it is unit-testable with a fake controller.
  */
 class AnimationRunner(
@@ -36,7 +51,7 @@ class AnimationRunner(
      * @param to      Target brightness (domain 0–255).
      * @param steps   Frame count (task543 %loops, ≥1).
      * @param waitMs  Per-frame delay (task543 %wait).
-     * @param detectOverrides %AAB_DetectOverrides — when false, read-back checks are skipped.
+     * @param detectOverrides %AAB_DetectOverrides — when false, the band checks are skipped.
      * @return COMPLETED, or OVERRIDDEN if an external write was detected mid-animation.
      */
     suspend fun animate(
@@ -47,23 +62,40 @@ class AnimationRunner(
         detectOverrides: Boolean,
     ): Result {
         val frames = steps.coerceAtLeast(1)
+        // task696 java L49-56: the band the on-screen value is expected to stay within as we sweep.
+        val minTarget = if (from < to) from else to - 1
+        val maxTarget = if (from < to) to + 1 else from
+        var consecutiveOutOfBounds = 0
         for (i in 1..frames) {
-            // task696: re-read before writing the next frame; if the on-screen value is no longer
-            // our last self-write, an external app/user changed it → abort + override. The check is
-            // device-exact ([isOnScreenSelfWrite]) so OEM ranges where read() ≠ identity do not fire
-            // a spurious override on every frame (D-049 #4).
+            // Re-read before writing the next frame; an out-of-band value for two consecutive checks
+            // is a genuine external override (task696 java L121-137). Skipped on the first frame —
+            // our own write has not landed yet, so there is nothing of ours to compare against.
             if (detectOverrides && i > 1) {
-                if (!controller.isOnScreenSelfWrite()) return Result.OVERRIDDEN
+                consecutiveOutOfBounds = if (isOutOfBand(minTarget, maxTarget)) consecutiveOutOfBounds + 1 else 0
+                if (consecutiveOutOfBounds >= OVERRIDE_TRIGGER_THRESHOLD) return Result.OVERRIDDEN
             }
             // Linear interpolation; the final frame lands exactly on `to`.
             val frame = if (i == frames) to else from + ((to - from) * i) / frames
             controller.write(frame)
             if (waitMs > 0) sleep(waitMs)
         }
-        // Final read-back: catch an override that landed during the last frame's wait.
-        if (detectOverrides) {
-            if (!controller.isOnScreenSelfWrite()) return Result.OVERRIDDEN
+        // Final read-back: catch an override that landed during the last frame's wait. The settled
+        // value sitting out of band counts as the next consecutive read.
+        if (detectOverrides && isOutOfBand(minTarget, maxTarget)) {
+            consecutiveOutOfBounds += 1
+            if (consecutiveOutOfBounds >= OVERRIDE_TRIGGER_THRESHOLD) return Result.OVERRIDDEN
         }
         return Result.COMPLETED
+    }
+
+    // task696 java L126: the observed brightness is out of band when it overshoots either end of the
+    // sweep by more than the ±2 tolerance (wrong direction, or beyond our current step).
+    private fun isOutOfBand(minTarget: Int, maxTarget: Int): Boolean {
+        val actual = controller.read()
+        return actual > maxTarget + 2 || actual < minTarget - 2
+    }
+
+    private companion object {
+        const val OVERRIDE_TRIGGER_THRESHOLD = 2
     }
 }
