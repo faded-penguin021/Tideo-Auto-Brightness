@@ -1,14 +1,21 @@
 package com.tideo.autobrightness.app.state
 
 import android.app.Application
+import android.content.ComponentName
+import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.tideo.autobrightness.app.runtime.AabFlash
+import com.tideo.autobrightness.app.runtime.AabToastAccessibilityService
+import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.storage.settingsDataStore
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -22,6 +29,8 @@ data class LiveDebugUiState(
     val maxBrightness: Int = 255,
     /** The GLOBAL %AAB_Debug category (G2R-F9) — the selector lives here, not on Misc. */
     val debugLevel: Int = 0,
+    /** Whether the opt-in global-flash AccessibilityService is enabled (G2R-F50). */
+    val globalToastsEnabled: Boolean = false,
 )
 
 /**
@@ -37,12 +46,17 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
     private val settingsFlow = app.settingsDataStore.data
         .map { Triple(it.minBrightness, it.maxBrightness, it.debugLevel) }
 
+    // Re-read on demand (the screen pokes this on resume) since enabling the AccessibilityService
+    // happens in system Settings, outside any DataStore/flow we observe (G2R-F50).
+    private val globalToasts = MutableStateFlow(isGlobalToastServiceEnabled())
+
     val state: StateFlow<LiveDebugUiState> = combine(
         LiveRuntimeState.pipeline,
         LiveRuntimeState.activeContext,
         LiveRuntimeState.serviceRunning,
         settingsFlow,
-    ) { pipeline, context, running, settings ->
+        globalToasts,
+    ) { pipeline, context, running, settings, global ->
         LiveDebugUiState(
             pipeline = pipeline,
             serviceRunning = running,
@@ -50,10 +64,32 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
             minBrightness = settings.first,
             maxBrightness = settings.second,
             debugLevel = settings.third,
+            globalToastsEnabled = global,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LiveDebugUiState())
 
     fun setDebugLevel(level: Int) {
-        viewModelScope.launch { app.settingsDataStore.updateData { it.copy(debugLevel = level) } }
+        viewModelScope.launch {
+            app.settingsDataStore.updateData { it.copy(debugLevel = level) }
+            // Instant debug-off / instant-switch (G2R-F52): clear any flash on screen now, and push
+            // the new selection into the running pipeline immediately. The pipeline reads its settings
+            // through the ContextEngine's cached effective snapshot, so a bare DataStore write would
+            // not take effect until the next reapply — reapply() re-reads the fresh baseline.
+            if (level == 0) AabFlash.cancel()
+            if (app.settingsDataStore.data.first().serviceEnabled) AutoBrightnessRuntime.reapply(app)
+        }
+    }
+
+    /** Re-poll whether the global-flash AccessibilityService is enabled (call on screen resume). */
+    fun refreshGlobalToastStatus() {
+        globalToasts.value = isGlobalToastServiceEnabled()
+    }
+
+    private fun isGlobalToastServiceEnabled(): Boolean {
+        val flattened = Settings.Secure.getString(
+            app.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        val component = ComponentName(app, AabToastAccessibilityService::class.java).flattenToString()
+        return flattened.split(':').any { it.equals(component, ignoreCase = true) }
     }
 }

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Tideo Auto Brightness</string>
+    <string name="global_toasts_a11y_description">Shows Auto Brightness debug flash messages system-wide (over other apps). This optional service only draws the message overlays — it never reads screen content. Enable it only if you want the diagnostic flashes visible while using other apps.</string>
 </resources>

@@ -1,24 +1,18 @@
 package com.tideo.autobrightness.app.runtime
 
 import android.content.Context
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
-import android.util.TypedValue
-import android.view.Gravity
-import android.widget.TextView
-import android.widget.Toast
 
 /**
- * Android [DebugSink]: shows a Toast for a debug message only when the live `debugLevel` selects that
- * category (G2-F15). Toasts must post on the main thread; the pipeline emits from a background
+ * Android [DebugSink]: shows a flash for a debug message only when the live `debugLevel` selects that
+ * category (G2-F15). Flashes must post on the main thread; the pipeline emits from a background
  * coroutine, so each message is hopped onto the main looper. The category name is prefixed so the
  * tester can see which selector level produced the line during the Gate-2 walkthrough.
  *
- * S12.6b (G2R-F10): the toast uses the **AAB teal** brand colour. System toast text cannot be
- * recoloured reliably, so a custom teal-rounded [TextView] is inflated for the toast — the app shows
- * these while in the foreground during the debug walkthrough, where custom toast views still render.
+ * S12.7e: routes through the shared [AabFlash] channel so each new flash cancels the previous instead
+ * of stacking (G2R-F51) and renders system-wide when the opt-in Accessibility overlay is enabled
+ * (G2R-F50). [AabFlash] owns the AAB-teal styling (G2R-F10).
  */
 class ToastDebugSink(context: Context) : DebugSink {
     private val appContext = context.applicationContext
@@ -27,46 +21,18 @@ class ToastDebugSink(context: Context) : DebugSink {
     override fun emit(category: DebugCategory, activeLevel: Int, message: () -> String) {
         if (category.level != activeLevel) return
         val text = "[${category.label}] ${message()}"
-        mainHandler.post { tealToast(text).show() }
+        mainHandler.post { AabFlash.show(appContext, text) }
     }
-
-    @Suppress("DEPRECATION") // Toast.setView: deprecated for background toasts, fine for foreground app toasts.
-    private fun tealToast(text: String): Toast {
-        val view = TextView(appContext).apply {
-            this.text = text
-            setTextColor(Color.WHITE)
-            val pad = dp(14)
-            setPadding(pad, dp(10), pad, dp(10))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat()
-                setColor(AAB_TEAL)
-            }
-        }
-        // Built via makeText so the message is still recorded (Robolectric ShadowToast + a11y), then
-        // re-skinned with the teal custom view for the on-device walkthrough (G2R-F10).
-        return Toast.makeText(appContext, text, Toast.LENGTH_SHORT).apply {
-            setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(80))
-            setView(view)
-        }
-    }
-
-    private fun dp(value: Int): Int = TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), appContext.resources.displayMetrics,
-    ).toInt()
 
     private val DebugCategory.label: String
         get() = name.split('_').joinToString(" ") { it.lowercase().replaceFirstChar(Char::uppercase) }
-
-    private companion object {
-        // AabTeal #007C63 (ui.theme.Color) as an android.graphics ARGB int.
-        const val AAB_TEAL = 0xFF007C63.toInt()
-    }
 }
 
 /**
- * Android [ContextLoadSink] (S12.6e, G2R-F25): an unconditional user-visible toast when a context rule
- * loads its profile at runtime (Tasker flashes on a context load). Posts on the main looper since the
- * engine emits from a background coroutine.
+ * Android [ContextLoadSink] (S12.6e, G2R-F25): an unconditional user-visible flash when a context
+ * rule loads its profile at runtime (Tasker flashes on a context load). Posts on the main looper
+ * since the engine emits from a background coroutine; routes through [AabFlash] (S12.7e) so it shares
+ * the cancel-previous + global-overlay behaviour with the debug flashes.
  */
 class ToastContextLoadSink(context: Context) : ContextLoadSink {
     private val appContext = context.applicationContext
@@ -74,6 +40,6 @@ class ToastContextLoadSink(context: Context) : ContextLoadSink {
 
     override fun onContextLoaded(contextName: String, profileName: String) {
         val text = "Context \"$contextName\" → profile \"$profileName\""
-        mainHandler.post { Toast.makeText(appContext, text, Toast.LENGTH_SHORT).show() }
+        mainHandler.post { AabFlash.show(appContext, text) }
     }
 }

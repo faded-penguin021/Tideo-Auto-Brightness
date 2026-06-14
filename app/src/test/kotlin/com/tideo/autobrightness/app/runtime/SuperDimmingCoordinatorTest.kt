@@ -24,6 +24,14 @@ class SuperDimmingCoordinatorTest {
         }
     }
 
+    /** Records flashes that the live debugLevel actually selects (mirrors the real sink gate). */
+    private class RecordingDebugSink : DebugSink {
+        val emitted = mutableListOf<Pair<DebugCategory, String>>()
+        override fun emit(category: DebugCategory, activeLevel: Int, message: () -> String) {
+            if (category.level == activeLevel) emitted += category to message()
+        }
+    }
+
     private val dimmingOn = AabSettings(
         dimmingEnabled = true,
         dimmingThreshold = 15,
@@ -87,6 +95,37 @@ class SuperDimmingCoordinatorTest {
 
         assertNull(secure.activated)
         assertTrue(secure.levels.isEmpty())
+    }
+
+    @Test
+    fun unprivilegedFallback_belowThreshold_flashesOverlayColour() {
+        // G2R-F49: with dimming on + target below threshold but the tier unable to write secure
+        // settings, the OVERLAY_PREVIEW category (level 6) flashes the computed overlay colour.
+        val secure = FakeSecureDimming()
+        val sink = RecordingDebugSink()
+        val coordinator = SuperDimmingCoordinator(secure, debugSink = sink) { Tier.BASIC }
+
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn.copy(debugLevel = 6))
+
+        // No secure write (unprivileged), but the overlay colour is surfaced.
+        assertNull(secure.activated)
+        val overlay = sink.emitted.firstOrNull { it.first == DebugCategory.OVERLAY_PREVIEW }
+        assertTrue(overlay != null, "an OVERLAY_PREVIEW flash should be offered")
+        assertTrue(
+            Regex("overlay #[0-9A-F]{2}000000").containsMatchIn(overlay!!.second),
+            "overlay flash should carry a black ARGB hex: ${overlay.second}",
+        )
+    }
+
+    @Test
+    fun elevated_belowThreshold_doesNotFlashOverlayPreview() {
+        // The overlay preview is the unprivileged fallback only; the privileged path engages instead.
+        val sink = RecordingDebugSink()
+        val coordinator = SuperDimmingCoordinator(FakeSecureDimming(), debugSink = sink) { Tier.ELEVATED }
+
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn.copy(debugLevel = 6))
+
+        assertTrue(sink.emitted.none { it.first == DebugCategory.OVERLAY_PREVIEW })
     }
 
     @Test

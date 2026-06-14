@@ -46,9 +46,14 @@ class SuperDimmingCoordinator(
      */
     override fun apply(targetBrightness: Int, settings: AabSettings) {
         val elevated = tierProvider() >= Tier.ELEVATED
-        val shouldEngage = settings.dimmingEnabled &&
-            elevated &&
-            targetBrightness < settings.dimmingThreshold
+        val wantsDim = settings.dimmingEnabled && targetBrightness < settings.dimmingThreshold
+        val shouldEngage = wantsDim && elevated
+
+        // %AAB_Debug 6 "Overlay Preview" (G2R-F49): when dimming WOULD engage but the tier can't write
+        // secure settings, Tasker fell back to a semi-transparent screen overlay (the AAB Color Filter
+        // scene, task653/654). The overlay window is deferred (D-040); surface its computed colour so
+        // the unprivileged user can still see what the fallback would do.
+        if (wantsDim && !elevated) emitOverlayPreview(targetBrightness, settings)
 
         if (!shouldEngage) {
             // %AAB_Debug 5: surface WHY dimming is not on (G2-F9 device diagnosis) — most often the
@@ -95,6 +100,28 @@ class SuperDimmingCoordinator(
     /** %AAB_Debug 5 "Super Dimming Info" (D-023, G2-F15). */
     private fun emitDebug(settings: AabSettings, message: () -> String) =
         debugSink.emit(DebugCategory.SUPER_DIMMING, settings.debugLevel, message)
+
+    /**
+     * %AAB_Debug 6 "Overlay Preview" (G2R-F49): Flash the computed overlay colour for the unprivileged
+     * software-dimming fallback. Mirrors the Tasker math: dim_shell → dim_alpha_dec = 2.55 × dim_shell
+     * (task653 act4) → "ARGB To Hex" black overlay `%AAB_HexOverlay` (task654, AAB Color Filter scene
+     * = `#AA000000`). Computed via the golden-tested [SoftwareDimming.dimShell]; the overlay alpha is
+     * the dim strength mapped onto 0–255.
+     */
+    private fun emitOverlayPreview(targetBrightness: Int, settings: AabSettings) {
+        debugSink.emit(DebugCategory.OVERLAY_PREVIEW, settings.debugLevel) {
+            val dimShell = SoftwareDimming.dimShell(
+                brightness = targetBrightness.toDouble(),
+                minBrightness = settings.minBrightness.toDouble(),
+                dimmingThreshold = settings.dimmingThreshold.toDouble(),
+                dimmingExponent = settings.dimmingExponent.toDouble(),
+                dimmingStrength = settings.dimmingStrength.toDouble(),
+                dimDynamic = null,
+            )
+            val alpha = Math.round(2.55 * dimShell).toInt().coerceIn(0, 255)
+            "overlay ${"#%02X000000".format(alpha)}"
+        }
+    }
 
     /** task645: level→0 then activated→0; %AAB_DimmingStatus=0. */
     override fun disengage() {

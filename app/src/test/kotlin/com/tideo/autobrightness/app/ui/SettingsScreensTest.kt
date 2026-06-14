@@ -452,6 +452,25 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun liveDebug_globalFlashCard_rendersStatusAndEnableButton() {
+        // G2R-F50: the opt-in global-flash card shows the enablement status + the Accessibility CTA.
+        var enableClicked = false
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(serviceRunning = true, globalToastsEnabled = false),
+                    onSelectDebug = {}, onBack = {},
+                    onEnableGlobalToasts = { enableClicked = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("global_flash_status").performScrollTo().assertExists()
+        compose.onNodeWithText("Off (foreground only)", substring = true).assertExists()
+        compose.onNodeWithTag("global_flash_enable").performScrollTo().performClick()
+        assertTrue(enableClicked, "the Accessibility CTA invokes the enable callback")
+    }
+
+    @Test
     fun draftBar_applyAndDiscard_invokeCallbacks() {
         var applied = false
         var discarded = false

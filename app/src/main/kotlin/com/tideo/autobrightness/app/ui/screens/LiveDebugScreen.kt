@@ -13,13 +13,20 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.provider.Settings
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -49,9 +56,31 @@ val DEBUG_LABELS = listOf(
 @Composable
 fun LiveDebugScreen(navController: NavHostController, vm: LiveDebugViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // Re-poll the global-flash AccessibilityService enablement on resume (it is toggled in system
+    // Settings, outside any flow we observe — G2R-F50).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.refreshGlobalToastStatus()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     LiveDebugContent(
         state = state,
         onSelectDebug = vm::setDebugLevel,
+        onEnableGlobalToasts = {
+            // Deep-link to the system Accessibility settings so the user can enable the overlay.
+            runCatching {
+                context.startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+        },
         onBack = { navController.popBackStack() },
     )
 }
@@ -62,6 +91,7 @@ fun LiveDebugContent(
     state: LiveDebugUiState,
     onSelectDebug: (Int) -> Unit,
     onBack: () -> Unit,
+    onEnableGlobalToasts: () -> Unit = {},
 ) {
     val p = state.pipeline
     Scaffold(topBar = { AabTopBar(title = "Live Debug Info", onBack = onBack) }) { padding ->
@@ -108,6 +138,38 @@ fun LiveDebugContent(
             }
 
             DebugLevelSelector(state.debugLevel, onSelectDebug)
+
+            GlobalFlashCard(state.globalToastsEnabled, onEnableGlobalToasts)
+        }
+    }
+}
+
+/**
+ * Opt-in card for the system-wide flash overlay (G2R-F50). The debug/context flashes are
+ * foreground-only by default; enabling the [com.tideo.autobrightness.app.runtime.AabToastAccessibilityService]
+ * shows them over other apps. Presentation-only AccessibilityService (no content reading); degrades to
+ * a foreground toast when off, so this is purely optional.
+ */
+@Composable
+private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
+    DiagnosticCard(
+        title = "Global flash (system-wide)",
+        testTag = "global_flash_card",
+    ) {
+        DiagnosticLine("global_flash_status") {
+            append("Status: ")
+            goldValue(if (enabled) "Enabled" else "Off (foreground only)")
+        }
+        Text(
+            "Show debug/context flashes over other apps via an optional Accessibility overlay. " +
+                "It only draws the messages — it never reads screen content.",
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+        )
+        OutlinedButton(
+            onClick = onEnable,
+            modifier = Modifier.fillMaxWidth().testTag("global_flash_enable"),
+        ) {
+            Text(if (enabled) "Open Accessibility settings" else "Enable in Accessibility settings")
         }
     }
 }
