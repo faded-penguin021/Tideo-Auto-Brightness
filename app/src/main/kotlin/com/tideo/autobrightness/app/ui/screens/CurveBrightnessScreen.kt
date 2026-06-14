@@ -6,7 +6,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,6 +25,10 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.graph.BrightnessCurveChart
+import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
+import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
+import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
+import com.tideo.autobrightness.domain.wizard.OverridePoint
 
 internal fun List<FieldError>.forField(name: String): String? = firstOrNull { it.field == name }?.message
 
@@ -38,12 +44,17 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val errors by vm.errors.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
+    val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
     CurveBrightnessContent(
         draft, committed, errors, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
+        overridePoints = overridePoints,
     )
 }
+
+/** task38 needs ≥ 9 recorded override points before it fits/suggests a curve. */
+private const val MIN_FIT_POINTS = 9
 
 @Composable
 fun CurveBrightnessContent(
@@ -56,10 +67,29 @@ fun CurveBrightnessContent(
     onApply: () -> Unit,
     onDiscard: () -> Unit,
     onBack: () -> Unit,
+    overridePoints: List<OverridePoint> = emptyList(),
 ) {
     DraftSettingsScaffold("Curve & Brightness", dirty, onApply, onDiscard, onBack) { padding ->
         SettingsColumn(padding) {
-            BrightnessCurveChart(draft.toBrightnessCurveConfig(), modifier = Modifier.testTag("brightness_curve_chart"))
+            val curveConfig = draft.toBrightnessCurveConfig()
+            val overlay = remember(overridePoints) {
+                overridePoints.map { Offset(it.lux.toFloat(), it.brightness.toFloat()) }
+            }
+            // The fitted/suggested curve only appears once ≥ 9 points are recorded (task38, G2R-F14).
+            val fittedCurve: BrightnessCurveConfig? = remember(overridePoints, curveConfig) {
+                if (overridePoints.size >= MIN_FIT_POINTS) {
+                    CurveSuggestionEngine.suggest(CurveSuggestionInput(overridePoints, curveConfig))
+                        ?.let { CurveSuggestionEngine.applyToLiveCurve(it, curveConfig) }
+                } else {
+                    null
+                }
+            }
+            BrightnessCurveChart(
+                curveConfig,
+                modifier = Modifier.testTag("brightness_curve_chart"),
+                overridePoints = overlay,
+                fittedCurve = fittedCurve,
+            )
 
             SectionHeader("Curve zones")
             NumberSettingField(

@@ -38,7 +38,9 @@ import com.tideo.autobrightness.domain.wizard.OverridePoint
 @Composable
 fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewModel()) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
     ToolsContent(
+        recordedPoints = overridePoints,
         onBack = { navController.popBackStack() },
         onRunWizard = { overrides ->
             CurveSuggestionEngine.suggest(
@@ -65,10 +67,11 @@ fun ToolsContent(
     onBack: () -> Unit,
     onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
+    recordedPoints: List<OverridePoint> = emptyList(),
 ) {
     SettingsScaffold("Tools", onBack) { padding ->
         SettingsColumn(padding) {
-            WizardCard(onRunWizard, onApplyWizard)
+            WizardCard(recordedPoints, onRunWizard, onApplyWizard)
 
             SectionHeader("Power-draw calibration")
             Text(
@@ -84,14 +87,14 @@ fun ToolsContent(
 
 @Composable
 private fun WizardCard(
+    recorded: List<OverridePoint>,
     onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
 ) {
-    // Override-point capture/persistence is not yet wired (D-044); the wizard runs on demand against
-    // the currently-available recorded points. With < 9 it returns null (task38 error path).
+    // Override points are now captured at runtime + persisted (G2R-F13). The wizard runs against the
+    // recorded set; with < 9 it returns null (task38 error path).
     var result by remember { mutableStateOf<CurveSuggestionResult?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
-    var recorded by remember { mutableStateOf<List<OverridePoint>>(emptyList()) }
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
 

@@ -15,6 +15,7 @@ import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,6 +52,7 @@ class BrightnessPipelineController(
     private val animationRunner: AnimationRunner = AnimationRunner(brightness),
     private val dimming: DimmingCoordinator = NoOpDimmingCoordinator,
     private val debugSink: DebugSink = NoOpDebugSink,
+    private val overrideSink: OverridePointSink = NoOpOverridePointSink,
 ) {
     private val engine = BrightnessEngine()
 
@@ -226,7 +228,8 @@ class BrightnessPipelineController(
         try {
             val output = engine.evaluate(buildInput(rawLux, settings, s))
             val from = brightness.read()
-            val target = output.targetBrightness
+            // task661 act22-26 / task698 step 3: hold the hardware floor in PWM-sensitive mode (D-050).
+            val target = applyPwmFloor(output.targetBrightness, settings)
 
             // %AAB_Debug 3/4: Flash the light-evaluation + dynamic-scale figures (D-023, G2-F15).
             emitDebug(DebugCategory.LIGHT_EVAL, settings) {
@@ -305,22 +308,45 @@ class BrightnessPipelineController(
         )
     }
 
-    /** task567 Manual Override: record the point and latch paused; the service posts the notification. */
-    private fun handleOverride(observed: Int) {
+    /**
+     * task567 Manual Override: record the point and latch paused; the service posts the notification.
+     *
+     * task567 act8 settle: wait `%AAB_CycleTime` for the new brightness to "take hold", then RE-READ
+     * and re-check the gate before committing the pause. A rapid light swing makes the pipeline write
+     * its own multi-frame transition whose ContentObserver callbacks can lag/coalesce; only a value
+     * that, after settling, is still NOT what we last applied is a genuine manual override — so a fast
+     * lux swing no longer false-pauses the loop (G2R-F26/D-049 #1). This runs in the single pipeline
+     * consumer (D-027), so the settle delay simply defers the next event.
+     */
+    private suspend fun handleOverride(observed: Int) {
         val s = _state.value
-        // task567 act8 re-check guard (mirrors the prof755 gate after the cycle-time wait).
         if (!OverrideRules.shouldCommitPause(s.serviceOn, autoRunning, s.paused, initializing)) return
+
+        val settleMs = (s.cycleTimeMs?.toLong() ?: cachedSettings?.throttleDefaultMs ?: 0L).coerceAtLeast(0L)
+        if (settleMs > 0) delay(settleMs)
+
+        val s2 = _state.value
+        // Re-check the gate: a cycle/pause/panic may have started during the settle wait.
+        if (!OverrideRules.shouldCommitPause(s2.serviceOn, autoRunning, s2.paused, initializing)) return
+        val settled = brightness.read()
+        // Settled back to OUR last applied brightness → it was our in-flight write / a transient during
+        // a rapid swing, not a manual override (D-049 #1). Don't pause.
+        if (s2.lastAppliedBrightness != null && settled == s2.lastAppliedBrightness) return
+
         val history = OverrideRules.recordOverridePoint(
-            history = s.overrideHistory,
-            lux = s.smoothedLux ?: 0.0,
-            brightness = observed.toDouble(),
-            dynamicCompress = s.scaleDynamicCompress,
-            scalingUse = s.scalingUse,
+            history = s2.overrideHistory,
+            lux = s2.smoothedLux ?: 0.0,
+            brightness = settled.toDouble(),
+            dynamicCompress = s2.scaleDynamicCompress,
+            scalingUse = s2.scalingUse,
         )
         brightness.clearSelfWriteMarker()
         // task567: a manual override disengages any active super dimming.
         dimming.disengage()
         _state.update { it.copy(paused = true, overrideHistory = history) }
+        // Persist the captured training point (newest first) so the wizard + curve overlay have real
+        // input across restarts (G2R-F13; closes D-044c).
+        history.firstOrNull()?.let { (lux, bright) -> overrideSink.record(lux, bright) }
     }
 
     private fun pauseInternal() {
@@ -367,13 +393,14 @@ class BrightnessPipelineController(
         try {
             // previous = null → engine's first-run path maps the reading straight to a target.
             val output = engine.evaluate(buildInput(lux, settings, PipelineState()))
+            val target = applyPwmFloor(output.targetBrightness, settings)
             brightness.forceManualMode()
-            brightness.write(output.targetBrightness)
-            dimming.apply(output.targetBrightness, settings)
+            brightness.write(target)
+            dimming.apply(target, settings)
             _state.update {
                 it.copy(
-                    lastAppliedBrightness = output.targetBrightness,
-                    targetBrightness = output.targetBrightness,
+                    lastAppliedBrightness = target,
+                    targetBrightness = target,
                     lastAcceptedMs = clock(),
                 )
             }
@@ -381,6 +408,16 @@ class BrightnessPipelineController(
             initializing = false
         }
     }
+
+    /**
+     * task661 act22-26 / task698 step 3 hardware floor (D-050): when "Use software dimming
+     * (PWM-sensitive)" is on and the target falls below the dimming threshold, hold the HARDWARE
+     * brightness at the threshold (the panel's PWM-flicker floor). Further darkening is the
+     * secure/overlay layer's job (deferred, D-040) — not by writing a lower hardware value. The floor
+     * is in domain space; [ScreenBrightnessController] maps it onto the device range (cf. D-049 #4).
+     */
+    private fun applyPwmFloor(target: Int, settings: AabSettings): Int =
+        if (settings.pwmSensitive && target < settings.dimmingThreshold) settings.dimmingThreshold else target
 
     /** Emit a runtime debug Flash for [category] gated on the live debugLevel (D-023, G2-F15). */
     private fun emitDebug(category: DebugCategory, settings: AabSettings, message: () -> String) =
@@ -392,4 +429,18 @@ class BrightnessPipelineController(
     private companion object {
         const val PANIC_BRIGHTNESS = 255
     }
+}
+
+/**
+ * Sink for captured manual-override training points (task561 %AAB_Overrides). The runtime persists
+ * each genuine override so the curve wizard + curve overlay have real input (G2R-F13). Kept as a
+ * small interface so the controller stays unit-testable without a DataStore.
+ */
+fun interface OverridePointSink {
+    suspend fun record(lux: Double, brightness: Double)
+}
+
+/** No-op sink for controller unit tests / when no persistence is wired. */
+object NoOpOverridePointSink : OverridePointSink {
+    override suspend fun record(lux: Double, brightness: Double) = Unit
 }

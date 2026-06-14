@@ -47,24 +47,22 @@ class AnimationRunner(
         detectOverrides: Boolean,
     ): Result {
         val frames = steps.coerceAtLeast(1)
-        var lastWritten = from
         for (i in 1..frames) {
             // task696: re-read before writing the next frame; if the on-screen value is no longer
-            // our last self-write, an external app/user changed it → abort + override.
+            // our last self-write, an external app/user changed it → abort + override. The check is
+            // device-exact ([isOnScreenSelfWrite]) so OEM ranges where read() ≠ identity do not fire
+            // a spurious override on every frame (D-049 #4).
             if (detectOverrides && i > 1) {
-                val observed = controller.read()
-                if (observed != lastWritten) return Result.OVERRIDDEN
+                if (!controller.isOnScreenSelfWrite()) return Result.OVERRIDDEN
             }
             // Linear interpolation; the final frame lands exactly on `to`.
             val frame = if (i == frames) to else from + ((to - from) * i) / frames
             controller.write(frame)
-            lastWritten = frame
             if (waitMs > 0) sleep(waitMs)
         }
         // Final read-back: catch an override that landed during the last frame's wait.
         if (detectOverrides) {
-            val observed = controller.read()
-            if (observed != lastWritten) return Result.OVERRIDDEN
+            if (!controller.isOnScreenSelfWrite()) return Result.OVERRIDDEN
         }
         return Result.COMPLETED
     }

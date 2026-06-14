@@ -36,12 +36,14 @@ class BrightnessPipelineControllerTest {
     private class FakeBrightness : ScreenBrightnessController {
         val writes = mutableListOf<Int>()
         var current = 0
+        private var lastWrite: Int? = null
         override fun read(): Int = current
-        override fun write(level: Int) { current = level; writes += level }
+        override fun write(level: Int) { current = level; lastWrite = level; writes += level }
         override fun forceManualMode() = Unit
         override fun restoreMode() = Unit
-        override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == current
-        override fun clearSelfWriteMarker() = Unit
+        override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
+        override fun isOnScreenSelfWrite(): Boolean = current == lastWrite
+        override fun clearSelfWriteMarker() { lastWrite = null }
     }
 
     private fun sample(lux: Double, accuracy: Int = 3) = LightSample(lux.toFloat(), accuracy, 0L)
@@ -154,6 +156,9 @@ class BrightnessPipelineControllerTest {
         advanceUntilIdle()
         assertNotNull(controller.state.value.smoothedLux)
 
+        // Simulate the external write landing on the system setting, then the observer firing: after
+        // the settle wait the on-screen value (200) is no longer our last applied → genuine override.
+        brightness.current = 200
         observer.flow.emit(200)
         advanceUntilIdle()
         assertTrue(controller.state.value.paused)
@@ -190,6 +195,82 @@ class BrightnessPipelineControllerTest {
         sensor.flow.emit(sample(lux = 5000.0))
         advanceUntilIdle()
         assertEquals(writesAfter, brightness.writes.size, "no writes after emergency stop")
+        scope.cancel()
+    }
+
+    // G2R-F11/F12: a settings change must reach the pipeline. The controller reads settingsProvider()
+    // freshly each cycle, so a higher minBrightness floors the applied target on the next reading.
+    @Test
+    fun minBrightness_isHonouredAtRuntime() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        // High min brightness; low lux → mapped target would be ~5, but must be floored to 90.
+        val high = settings.copy(minBrightness = 90)
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = { high }, scope = scope, clock = { 1000L },
+        )
+        controller.start()
+        sensor.flow.emit(sample(lux = 1.0))
+        advanceUntilIdle()
+        assertEquals(90, controller.state.value.targetBrightness, "min brightness must floor the target")
+        assertEquals(90, brightness.writes.last())
+        scope.cancel()
+    }
+
+    // G2R-F27/D-050: in PWM-sensitive mode the HARDWARE brightness is floored at the dimming
+    // threshold when the target would fall below it (task698 step 3).
+    @Test
+    fun pwmSensitive_floorsHardwareAtDimmingThreshold() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val pwm = settings.copy(minBrightness = 1, pwmSensitive = true, dimmingThreshold = 40)
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = { pwm }, scope = scope, clock = { 1000L },
+        )
+        controller.start()
+        sensor.flow.emit(sample(lux = 1.0)) // maps to ~5, below threshold 40
+        advanceUntilIdle()
+        assertEquals(40, controller.state.value.targetBrightness, "PWM floor holds hardware at threshold")
+        assertEquals(40, brightness.writes.last())
+        scope.cancel()
+    }
+
+    // G2R-F26/D-049: handleOverride waits %AAB_CycleTime then RE-READS — a value that settles back to
+    // our applied brightness during the wait must NOT pause; one still external after it MUST.
+    @Test
+    fun rapidLightChange_doesNotFalsePause_butRealOverrideDoes() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        // Advancing clock so the cycle records a non-zero %AAB_CycleTime → the settle wait is real.
+        var nowMs = 1000L
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { nowMs += 50; nowMs })
+        controller.start()
+
+        // Establish a committed cycle so lastAppliedBrightness is set and on-screen.
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+        val applied = controller.state.value.lastAppliedBrightness!!
+        assertEquals(applied, brightness.current)
+
+        // False positive: an external value is present when the observer fires, but our pipeline
+        // restores our value before the cycle-time settle completes → must NOT pause (D-049 #1).
+        brightness.current = applied + 30
+        observer.flow.emit(applied + 30)
+        brightness.current = applied // settled back to our value during the wait
+        advanceUntilIdle()
+        assertTrue(!controller.state.value.paused, "transient settling to our value must not pause")
+
+        // Genuine override: the external value stays on screen through the settle wait.
+        brightness.current = applied + 60
+        observer.flow.emit(applied + 60)
+        advanceUntilIdle()
+        assertTrue(controller.state.value.paused, "a real external write must pause")
+        assertEquals(1, controller.state.value.overrideHistory.size)
         scope.cancel()
     }
 

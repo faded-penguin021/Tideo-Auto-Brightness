@@ -40,11 +40,22 @@ next session does not know it.
 | S12.6a IA & naming | 2026-06-14 | Opus/high | DONE | (see push) | Menu-as-home reshape + two renames + Dashboard last-sample fix (G2R-F1…F5). **AAB Menu promoted to a real home hub** (`AppRoute.Menu` + `ui/screens/MenuScreen.kt`): gold-sun teal banner (rebranded "Tideo Auto Brightness", not "Advanced"), Profiles/Contexts **hero cards moved off the Dashboard**, Settings/Info&Help nav groups; it is the start destination after onboarding (tier!=NONE→Menu) and the back-target from every settings/tool screen via new `NavHostController.navigateTopLevel` (popUpTo(menu)). The S12.5a `AabNavDrawer` retired; `AabTopBar` gained an optional back arrow (AutoMirrored). Dashboard slimmed to live-status (tier badge, master switch, live readout, health) + back→Menu. **Renames:** `AnimationDimming`→`SuperDimming` (route `super_dimming`, title "Super Dimming", G2R-F3); `DynamicScale`→`Circadian` (route `circadian`, title "Circadian", G2R-F4) — files `AnimationDimmingScreen.kt`→`SuperDimmingScreen.kt`, `DynamicScaleScreen.kt`→`CircadianScreen.kt` (composables + content fns + NavGraph + tests). **Last-sample fix (G2R-F5):** `PipelineState.lastSampleMs` recorded for every delivered sample in `onSensorSample` (atomic StateFlow.update), surfaced via LiveRuntimeState→DashboardUiState, rendered as relative "Xs ago" (replaces the never-written health-store source). Domain/golden/ChartCanvas untouched. Tests: `UiShellTest` rewritten (Menu hero+nav, renames resolve, start-on-Menu + back-from-settings→Menu, last-sample renders); `SettingsScreensTest` SuperDimming rename. Ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug`. No compaction. |
 
 | S12.6b glass-box diagnostics + Live Debug scene | 2026-06-14 | Opus/high | DONE | (see push) | The runtime "glass box" surfaced (G2R-F6…F10). New: **Live Debug Info** scene (`AppRoute.LiveDebug`, in the Menu Info&Help group + `navigateTopLevel` back→Menu) = `LiveDebugScreen`/`LiveDebugContent` over `LiveDebugViewModel` (combines LiveRuntimeState pipeline/context/running + DataStore min/max/debugLevel) — live `%AAB_*` readout grouped per debug.md HTML cards (Core Metrics / Circadian & Scale / System Status / Performance & Timings), gold `#FFC107` values via new `ui/components/DiagnosticCard.kt` (`DiagnosticCard`/`DiagnosticLine`/`goldValue`). **Per-screen DiagnosticCards** (G2R-F7/F8): `ReactivityDiagnosticCard` (threshold + dead zone) + `CircadianDiagnosticCard` (uncompressed vs true scale + min/max) embedded on those screens; stateless `*Content(state)` builders for tests. To feed them, `PipelineState` gains `threshDynamic` (%AAB_ThreshDynamic) + `scaleDynamic` (%AAB_ScaleDynamic uncompressed), populated in `runCycle` from existing `BrightnessPolicyOutput.dynamicThreshold`/`scaleDynamic` (no domain API change). **Debug selector → global + relocated** (G2R-F9): moved off Misc to Live Debug (`LiveDebugViewModel.setDebugLevel` writes DataStore directly); `debugLevel` now preserved across `SettingsViewModel.applyProfile/replaceAll/resetDefaults` + `DraftSettingsViewModel.apply`/re-sync (already in `mergeProfile`) — `DEBUG_LABELS`/`DebugLevelSelector` moved MiscScreen→LiveDebugScreen. **Teal debug toasts** (G2R-F10): `ToastDebugSink` builds a teal-rounded custom TextView (via `makeText`+`setView` so ShadowToast still records text). Tests: SettingsScreensTest (Live Debug + Reactivity/Circadian diagnostic cards render seeded PipelineState; selector relocation) + new `SettingsViewModelTest` (debugLevel survives profile apply + reset) + ContextEngineTest `mergeProfile_preservesDebugLevel`. Full ladder GREEN: `:app:testDebugUnitTest`(102) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **NEW FINDING recorded (verified, deferred to S12.6c): G2R-F27/D-050 — PWM-sensitive mode never locks the hardware brightness floor (`pwmSensitive` unread by the runtime).** |
+| S12.6c pipeline behaviour correctness | 2026-06-14 | Opus/high | DONE | (see push) | Fixed the runtime bugs the re-test found + wired override-point capture (D-051; G2R-F11/F12/F13/F14/F26/F27). **G2R-F11/F12** (Apply/profile-load + min-brightness ignored until a light change): root = the pipeline's `settingsProvider`=`ContextEngine.effectiveSettings()` served the STALE cached `_effective` snapshot. Added `ContextEngine.reevaluate()` (re-reads the FRESH baseline + re-merges the active profile, no watcher re-resolution) and the service's `ACTION_REAPPLY` now calls it BEFORE `controller.reapply()` → manual edits take effect immediately (min-bright no longer "stuck at 10"). **G2R-F13** override-point capture (closes D-044c): new `OverridePointStore` (DataStore, newest-first cap 50) + `OverridePointSink`; `handleOverride` persists the de-compressed point; `SettingsViewModel`/`DraftSettingsViewModel` expose `overridePoints`; Tools wizard reads the recorded set. **G2R-F14** `BrightnessCurveChart` overlays the recorded points as dots + shows the fitted/suggested curve only at ≥9 points (ChartCanvas unchanged). **G2R-F26/D-049** override false-positives: `handleOverride` now does the task567 act8 settle (wait %AAB_CycleTime → re-read → only pause if still ≠ our last applied) + the AnimationRunner read-back is now device-exact (`ScreenBrightnessController.isOnScreenSelfWrite`, kills OEM round-trip drift, D-049 #4). **G2R-F27/D-050** PWM-sensitive hardware floor: `applyPwmFloor` clamps the hardware write up to `dimmingThreshold` when `pwmSensitive && target<threshold` (task698 step3) in runCycle + setInitialBrightness. **HARD FENCE honoured: domain/, golden vectors, ChartCanvas API untouched.** New tests: controller minBrightness/PWM-floor/override-false-positive (3), ContextEngine reevaluate-fresh-baseline, OverridePointStore (3). Full ladder GREEN: `:platform:test :app:testDebugUnitTest`(104) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.6a (IA & naming) + S12.6b (glass-box diagnostics) DONE → S12.6c/d/e remain (parallel window).**
+**S12.6a + S12.6b + S12.6c DONE → S12.6d/e remain.** S12.6c (pipeline behaviour correctness, D-051)
+fixed the runtime bugs the re-test found: Apply/profile-load + min-brightness now take effect immediately
+(reevaluate-fresh-baseline before reapply, G2R-F11/F12); manual override points are captured + persisted
+(OverridePointStore) and overlaid on the curve with a ≥9-point fitted curve (G2R-F13/F14); rapid-light
+override false-positives are fixed (task567 settle-wait re-read + device-exact AnimationRunner read-back,
+G2R-F26/D-049); PWM-sensitive now floors the hardware brightness at the dimming threshold
+(G2R-F27/D-050). domain/, golden vectors and ChartCanvas stayed fenced. Ladder GREEN
+(`:app:testDebugUnitTest`=104, `:platform:test :domain:test :app:assembleDebug :app:lintDebug`).
+**Next: S12.6d/e, then HUMAN GATE 2 re-test after S12.6e.**
+
+**(historical) S12.6a (IA & naming) + S12.6b (glass-box diagnostics) DONE → S12.6c/d/e remain (parallel window).**
 The AAB Menu is the home hub; Super Dimming / Circadian renames + Dashboard last-sample fix landed in
 S12.6a. **S12.6b** added the runtime glass box: a dedicated **Live Debug Info** scene in the Menu (live
 `%AAB_*` readout grouped per the Tasker debug scene, gold values) + live `DiagnosticCard`s on Reactivity
@@ -171,9 +182,9 @@ AppModule is now the real DI root.
   restore; SAF folder grant for legacy import). **S12.6a DONE** (menu-as-home reshape + Super Dimming /
   Circadian renames + Dashboard last-sample fix — landed the nav/testTag reshape b/c/d/e depend on).
   **S12.6b DONE** (Live Debug scene + per-screen diagnostic cards + global debug selector + teal toasts).
-  Remaining: **S12.6c** (reapply-uses-fresh-settings + min-bright runtime bug + override-point capture + curve
-  overlay + **override false-positives on rapid light changes, G2R-F26/D-049** + **PWM-sensitive
-  hardware-floor clamp, G2R-F27/D-050**), **S12.6d** (profile
+  **S12.6c DONE** (reapply-uses-fresh-settings + min-bright runtime fix G2R-F11/F12 + override-point
+  capture/persistence G2R-F13 + curve overlay G2R-F14 + override false-positives G2R-F26/D-049 +
+  PWM-sensitive hardware-floor clamp G2R-F27/D-050 — D-051). Remaining: **S12.6d** (profile
   save/overwrite/factory-restore + SAF legacy import + per-screen reset +
   Apply-gate), **S12.6e** (label/long-press-help audit + context Wi-Fi/location + usage-access flow +
   load toasts). b/c/d/e are a parallel window now that a is merged. Domain/ + golden vectors +
@@ -949,7 +960,49 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   `pwmSensitive=true` and a target below the threshold, the applied hardware brightness equals the
   threshold, not the raw (lower) target. (Affects S12.6c.)
 
-Append new entries as D-051, D-052, … with which segments they affect.
+- D-051: S12.6c PIPELINE BEHAVIOUR CORRECTNESS (UI/app/platform-glue; sanctioned by the S12.6c brief;
+  HARD FENCE honoured — domain/, golden vectors, ChartCanvas public API untouched).
+  (a) **G2R-F11/F12 stale-effective-settings → FIXED.** The pipeline's `settingsProvider` is
+  `ContextEngine.effectiveSettings()`, which served the cached `_effective` snapshot from the last
+  watcher eval; a manual Apply/profile-load edits the DataStore baseline but fires no context signal,
+  so the runtime kept using stale settings (min-bright "stuck at 10"; Apply needed a light change).
+  Fix: new `ContextEngine.reevaluate()` re-reads the FRESH baseline and re-merges the *currently
+  resolved* active profile (it does NOT re-run the watcher resolution → cannot spuriously switch
+  context, and handles the manual-context-lock case where the resolver would return a null target);
+  `AmbientMonitoringService.ACTION_REAPPLY` now `reevaluate()`s BEFORE `controller.reapply()`. Min
+  brightness already threaded correctly through the mapper→engine (`coerceIn(min,max)`), so F12 shared
+  F11's root; a controller regression test asserts a high minBrightness floors the applied target.
+  (b) **G2R-F13 override-point capture → WIRED (closes D-044c).** New `OverridePointStore`
+  (`overridePointsDataStore`, newest-first, capped at `OverridePoints.MAX_POINTS`=50 = task561) +
+  `OverridePointSink` (`fun interface`, NoOp default). `BrightnessPipelineController.handleOverride`
+  persists the de-compressed point (`history.first()` from `OverrideRules.recordOverridePoint`).
+  `AppModule` exposes the store + wires the sink. `SettingsViewModel.overridePoints` (Tools wizard)
+  and `DraftSettingsViewModel.overridePoints` (curve overlay) surface it.
+  (c) **G2R-F14 curve overlay → DONE.** `BrightnessCurveChart` gains `overridePoints: List<Offset>`
+  (rendered as scatter dots via single-point `ChartSeries` — ChartCanvas's existing <2-points→dot
+  path, NO ChartCanvas change) + `fittedCurve: BrightnessCurveConfig?`; `CurveBrightnessScreen`
+  computes the fit (CurveSuggestionEngine.suggest→applyToLiveCurve) and passes it ONLY at ≥9 points
+  (task38 threshold).
+  (d) **G2R-F26/D-049 override false-positives → FIXED (#1 + #4).** `handleOverride` is now `suspend`
+  and performs the task567 act8 settle: wait `%AAB_CycleTime` (fallback throttle), re-check the gate,
+  RE-READ, and pause ONLY if the settled value is still ≠ our last applied brightness (a rapid swing
+  that resolves to our own write no longer false-pauses). The AnimationRunner read-back is now
+  DEVICE-EXACT via new `ScreenBrightnessController.isOnScreenSelfWrite()` (compares the raw on-screen
+  device value to the last self-written device value), removing the OEM `toDomain(toDevice(x))`
+  round-trip drift that fired spurious OVERRIDDEN on `deviceMax≠255` (D-049 #4). **DECISION:** the
+  single-latest self-write marker (D-049 #2) is RETAINED as-is — D-034 deliberately chose single-latest
+  (a multi-value token set had four enumerated defects) and `ScreenBrightnessControllerTest` enforces
+  it; the settle re-check (#1) is the authoritative gate and the device-exact comparison (#4) removes
+  the actual cause, so a recent-set was judged net-negative. Regression test: a transient settling back
+  to our value does NOT pause; a value still external after the settle MUST.
+  (e) **G2R-F27/D-050 PWM hardware floor → DONE.** `BrightnessPipelineController.applyPwmFloor` clamps
+  the HARDWARE write up to `dimmingThreshold` when `settings.pwmSensitive && target < dimmingThreshold`
+  (task698 step 3), applied in `runCycle` + `setInitialBrightness` (domain space; ScreenBrightnessController
+  maps to device range). The unprivileged software overlay (task698 DC-like/653/654) stays deferred
+  (D-040); the hardware floor is independent. Regression test asserts the applied value == threshold.
+  (Affects S12.6d/e, S13, Gate 2.)
+
+Append new entries as D-052, D-053, … with which segments they affect.
 
 ## Blockers
 
@@ -1132,25 +1185,28 @@ snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
 - **G2R-F10** Minor: the debug toasts should use the **characteristic teal colour**.
 
 *Pipeline behaviour correctness (→ S12.6c):*
-- **G2R-F11** Applying a profile manually **does not take effect until a light change** (the Apply/reapply
-  path isn't producing an immediate re-evaluate for a manual profile/settings apply).
-- **G2R-F12** **Min brightness is ignored in actual behaviour — appears stuck at 10** (the graph honours
-  it, G2-F4, but the runtime does not — likely the same stale-effectiveSettings root as F11).
-- **G2R-F13** **Manual override points are not recorded** (the wizard's input; D-044c capture still unwired).
+- **G2R-F11** Applying a profile manually **does not take effect until a light change**.
+  **→ FIXED by S12.6c (D-051a):** `ContextEngine.reevaluate()` re-reads the fresh baseline before
+  `controller.reapply()` so a manual Apply/profile-load re-evaluates immediately.
+- **G2R-F12** **Min brightness is ignored in actual behaviour — appears stuck at 10.**
+  **→ FIXED by S12.6c (D-051a):** same stale-effectiveSettings root as F11; min-bright threads correctly
+  through the mapper→engine; controller regression test added.
+- **G2R-F13** **Manual override points are not recorded.**
+  **→ FIXED by S12.6c (D-051b):** `OverridePointStore` persists the points the pipeline detects; the
+  wizard reads the recorded set.
 - **G2R-F14** The brightness curve used to **overlay all recorded override points**; the fitted curve only
-  appeared with **> 8 points**. Restore the point overlay + fit-only-when-≥9 behaviour.
-- **G2R-F26** (owner-reported 2026-06-14, post-S12.6a; NOT in the original re-test batch) **Manual-override
-  FALSE POSITIVES on rapid light changes** — a fast lux swing makes the pipeline pause as if the user
-  grabbed the slider, when nothing external wrote. Owner's read: a mutex issue, or new light readings are
-  allowed before the new brightness has "taken hold". **Deferred to S12.6c** (do NOT touch domain/; this is
-  controller/animation/observer glue). Code-grounded root-cause analysis + recommended fix in **D-049**.
-- **G2R-F27** (owner-reported 2026-06-14, post-S12.6a; NOT in the original re-test batch) **PWM-sensitive
-  mode does not lock the brightness floor** — with "Use software dimming (PWM-sensitive)" on, the hardware
-  brightness is not held at the dimming threshold floor when the target falls below it. **Deferred to
-  S12.6c** (S12.6b verified it; this is `app/runtime` controller/coordinator glue, NOT domain/). Root cause:
-  `pwmSensitive` is persisted + has a UI toggle but is **never read by the pipeline** — the task661 act22-26
-  PWM branch / task698 hardware-floor clamp is unimplemented. Code-grounded analysis + recommended fix in
-  **D-050**.
+  appeared with **> 8 points**.
+  **→ FIXED by S12.6c (D-051c):** `BrightnessCurveChart` overlays the points as dots + shows the fitted
+  curve only at ≥9 (ChartCanvas unchanged).
+- **G2R-F26** (owner-reported 2026-06-14, post-S12.6a) **Manual-override FALSE POSITIVES on rapid light
+  changes.**
+  **→ FIXED by S12.6c (D-051d):** task567 act8 settle-wait re-read in `handleOverride` (pause only if
+  still ≠ our last applied) + device-exact AnimationRunner read-back (`isOnScreenSelfWrite`, kills OEM
+  round-trip drift). Single-latest marker (D-049 #2) retained per D-034 (decision recorded).
+- **G2R-F27** (owner-reported 2026-06-14, post-S12.6a) **PWM-sensitive mode does not lock the brightness
+  floor.**
+  **→ FIXED by S12.6c (D-051e):** `applyPwmFloor` clamps the hardware write up to `dimmingThreshold` when
+  `pwmSensitive && target<threshold` (task698 step 3), in runCycle + setInitialBrightness.
 
 *Profiles & persistence (→ S12.6d):*
 - **G2R-F15** **Cannot save a custom profile**, and want to be able to **overwrite existing profiles** too
