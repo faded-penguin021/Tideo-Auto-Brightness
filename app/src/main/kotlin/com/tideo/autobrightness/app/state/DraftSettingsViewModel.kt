@@ -69,6 +69,9 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                             contextOverride = c.contextOverride,
                             schemaVersion = c.schemaVersion,
                             setupTitle = c.setupTitle,
+                            // debugLevel is GLOBAL (owned by the Live Debug scene, G2R-F9): track the
+                            // committed value so an open draft never re-commits a stale category.
+                            debugLevel = c.debugLevel,
                         )
                     }
                 }
@@ -105,6 +108,8 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                 toCommit.copy(
                     serviceEnabled = current.serviceEnabled,
                     contextOverride = current.contextOverride,
+                    // debugLevel is owned by the Live Debug scene (G2R-F9), never a parameter screen.
+                    debugLevel = current.debugLevel,
                 )
             }
             // UNLIMITED control event — takes effect even with no new sensor reading (G2-F16). Only

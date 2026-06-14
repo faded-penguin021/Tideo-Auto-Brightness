@@ -24,6 +24,9 @@ enum class AppRoute(val route: String, val label: String, val owner: String) {
     Misc("misc", "Misc", "S12.5b"),
     Contexts("contexts", "Contexts", "S12"),
     Tools("tools", "Tools", "S12"),
+    // S12.6b (G2R-F6): the AAB Debug scene rebuilt as a glass-box Live Debug Info destination — the
+    // live %AAB_* runtime readout + the (now global) debug-category selector, reached from the Menu.
+    LiveDebug("live_debug", "Live Debug Info", "S12.6b"),
     Profiles("profiles", "Profiles & Import/Export", "S12"),
     About("about", "About & Guide", "S13");
 
@@ -36,8 +39,8 @@ enum class AppRoute(val route: String, val label: String, val owner: String) {
             CurveBrightness, Reactivity, SuperDimming, Circadian, Misc,
         )
 
-        /** Tools + reference content — the Menu "Info & Help" group. */
-        val infoDestinations: List<AppRoute> = listOf(Tools, About)
+        /** Tools + Live Debug + reference content — the Menu "Info & Help" group. */
+        val infoDestinations: List<AppRoute> = listOf(Tools, LiveDebug, About)
 
         /**
          * Every destination surfaced as a plain navigation ROW in the Menu (the hero cards render

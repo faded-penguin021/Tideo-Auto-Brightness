@@ -11,12 +11,17 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.state.AppEntry
+import com.tideo.autobrightness.app.state.LiveDebugUiState
+import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCardContent
+import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
 import com.tideo.autobrightness.app.ui.screens.ContextsContent
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
+import com.tideo.autobrightness.app.ui.screens.LiveDebugContent
 import com.tideo.autobrightness.app.ui.screens.MiscContent
 import com.tideo.autobrightness.app.ui.screens.ReactivityContent
 import com.tideo.autobrightness.app.ui.screens.ToolsContent
@@ -102,16 +107,49 @@ class SettingsScreensTest {
     }
 
     @Test
-    fun misc_debugSelector_showsCurrentLabel() {
+    fun liveDebug_debugSelector_showsCurrentLabel_andRendersSeededMetrics() {
+        // S12.6b: the debug-category selector is now global on the Live Debug scene (G2R-F9), and the
+        // scene renders live %AAB_* values from a seeded PipelineState (G2R-F6).
+        val seeded = PipelineState(
+            smoothedLux = 123.4, lastRawLux = 130.0, threshDynamic = 45.0,
+            threshAbsLow = 10.0, threshAbsHigh = 800.0, scaleDynamic = 1.25,
+            scaleDynamicCompress = 0.9, lastAppliedBrightness = 88, targetBrightness = 90,
+        )
         compose.setContent {
             MaterialTheme {
-                MiscContent(
-                    AabSettings(debugLevel = 3), AabSettings(debugLevel = 3), emptyList(), 0, false,
-                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                LiveDebugContent(
+                    state = LiveDebugUiState(pipeline = seeded, serviceRunning = true, debugLevel = 3),
+                    onSelectDebug = {}, onBack = {},
                 )
             }
         }
         compose.onNodeWithText("Debug: Light Eval Thresholds").performScrollTo().assertExists()
+        compose.onNodeWithTag("debug_smoothed_lux").performScrollTo().assertExists()
+        compose.onNodeWithText("123.4", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun reactivityDiagnosticCard_rendersThresholdAndDeadZone() {
+        // G2R-F7: the Reactivity glass-box card surfaces the live dynamic threshold + dead zone.
+        val seeded = PipelineState(smoothedLux = 50.0, threshDynamic = 42.0, threshAbsLow = 5.0, threshAbsHigh = 600.0)
+        compose.setContent {
+            MaterialTheme { ReactivityDiagnosticCardContent(seeded) }
+        }
+        compose.onNodeWithTag("diag_reactivity_threshold").assertExists()
+        compose.onNodeWithTag("diag_reactivity_deadzone").assertExists()
+        compose.onNodeWithText("42.0", substring = true).assertExists()
+    }
+
+    @Test
+    fun circadianDiagnosticCard_rendersUncompressedAndTrueScale() {
+        // G2R-F8: the Circadian glass-box card surfaces uncompressed vs true (compressed) scale.
+        val seeded = PipelineState(scaleDynamic = 1.5, scaleDynamicCompress = 0.8, lastAppliedBrightness = 120)
+        compose.setContent {
+            MaterialTheme { CircadianDiagnosticCardContent(seeded, minBrightness = 10, maxBrightness = 255, timeLabel = "14:30") }
+        }
+        compose.onNodeWithTag("diag_circadian_uncompressed").assertExists()
+        compose.onNodeWithTag("diag_circadian_true").assertExists()
+        compose.onNodeWithText("14:30", substring = true).assertExists()
     }
 
     @Test
