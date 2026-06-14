@@ -42,10 +42,10 @@ class ToastDebugSink(context: Context) : DebugSink {
                 setColor(AAB_TEAL)
             }
         }
-        return Toast(appContext).apply {
-            duration = Toast.LENGTH_SHORT
+        // Built via makeText so the message is still recorded (Robolectric ShadowToast + a11y), then
+        // re-skinned with the teal custom view for the on-device walkthrough (G2R-F10).
+        return Toast.makeText(appContext, text, Toast.LENGTH_SHORT).apply {
             setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(80))
-            @Suppress("DEPRECATION")
             setView(view)
         }
     }

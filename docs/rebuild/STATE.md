@@ -39,19 +39,24 @@ next session does not know it.
 
 | S12.6a IA & naming | 2026-06-14 | Opus/high | DONE | (see push) | Menu-as-home reshape + two renames + Dashboard last-sample fix (G2R-F1…F5). **AAB Menu promoted to a real home hub** (`AppRoute.Menu` + `ui/screens/MenuScreen.kt`): gold-sun teal banner (rebranded "Tideo Auto Brightness", not "Advanced"), Profiles/Contexts **hero cards moved off the Dashboard**, Settings/Info&Help nav groups; it is the start destination after onboarding (tier!=NONE→Menu) and the back-target from every settings/tool screen via new `NavHostController.navigateTopLevel` (popUpTo(menu)). The S12.5a `AabNavDrawer` retired; `AabTopBar` gained an optional back arrow (AutoMirrored). Dashboard slimmed to live-status (tier badge, master switch, live readout, health) + back→Menu. **Renames:** `AnimationDimming`→`SuperDimming` (route `super_dimming`, title "Super Dimming", G2R-F3); `DynamicScale`→`Circadian` (route `circadian`, title "Circadian", G2R-F4) — files `AnimationDimmingScreen.kt`→`SuperDimmingScreen.kt`, `DynamicScaleScreen.kt`→`CircadianScreen.kt` (composables + content fns + NavGraph + tests). **Last-sample fix (G2R-F5):** `PipelineState.lastSampleMs` recorded for every delivered sample in `onSensorSample` (atomic StateFlow.update), surfaced via LiveRuntimeState→DashboardUiState, rendered as relative "Xs ago" (replaces the never-written health-store source). Domain/golden/ChartCanvas untouched. Tests: `UiShellTest` rewritten (Menu hero+nav, renames resolve, start-on-Menu + back-from-settings→Menu, last-sample renders); `SettingsScreensTest` SuperDimming rename. Ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug`. No compaction. |
 
+| S12.6b glass-box diagnostics + Live Debug scene | 2026-06-14 | Opus/high | DONE | (see push) | The runtime "glass box" surfaced (G2R-F6…F10). New: **Live Debug Info** scene (`AppRoute.LiveDebug`, in the Menu Info&Help group + `navigateTopLevel` back→Menu) = `LiveDebugScreen`/`LiveDebugContent` over `LiveDebugViewModel` (combines LiveRuntimeState pipeline/context/running + DataStore min/max/debugLevel) — live `%AAB_*` readout grouped per debug.md HTML cards (Core Metrics / Circadian & Scale / System Status / Performance & Timings), gold `#FFC107` values via new `ui/components/DiagnosticCard.kt` (`DiagnosticCard`/`DiagnosticLine`/`goldValue`). **Per-screen DiagnosticCards** (G2R-F7/F8): `ReactivityDiagnosticCard` (threshold + dead zone) + `CircadianDiagnosticCard` (uncompressed vs true scale + min/max) embedded on those screens; stateless `*Content(state)` builders for tests. To feed them, `PipelineState` gains `threshDynamic` (%AAB_ThreshDynamic) + `scaleDynamic` (%AAB_ScaleDynamic uncompressed), populated in `runCycle` from existing `BrightnessPolicyOutput.dynamicThreshold`/`scaleDynamic` (no domain API change). **Debug selector → global + relocated** (G2R-F9): moved off Misc to Live Debug (`LiveDebugViewModel.setDebugLevel` writes DataStore directly); `debugLevel` now preserved across `SettingsViewModel.applyProfile/replaceAll/resetDefaults` + `DraftSettingsViewModel.apply`/re-sync (already in `mergeProfile`) — `DEBUG_LABELS`/`DebugLevelSelector` moved MiscScreen→LiveDebugScreen. **Teal debug toasts** (G2R-F10): `ToastDebugSink` builds a teal-rounded custom TextView (via `makeText`+`setView` so ShadowToast still records text). Tests: SettingsScreensTest (Live Debug + Reactivity/Circadian diagnostic cards render seeded PipelineState; selector relocation) + new `SettingsViewModelTest` (debugLevel survives profile apply + reset) + ContextEngineTest `mergeProfile_preservesDebugLevel`. Full ladder GREEN: `:app:testDebugUnitTest`(102) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **NEW FINDING recorded (verified, deferred to S12.6c): G2R-F27/D-050 — PWM-sensitive mode never locks the hardware brightness floor (`pwmSensitive` unread by the runtime).** |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.6a (IA & naming) DONE → S12.6b/c/d/e remain (parallel window).** The AAB Menu is now the app's
-home hub (start destination + back-target); the Profiles/Contexts hero cards live there (off the
-Dashboard), which is slimmed to a live-status screen reached from the Menu. `Animation & Dimming` is
-renamed **Super Dimming** and `Dynamic Scale` **Circadian** (routes, titles, files, tests). The
-Dashboard "Last sensor sample: never" bug is fixed (G2R-F5): the pipeline now records every sample's
-time in `PipelineState.lastSampleMs` and the Dashboard renders it as a live "Xs ago". The banner is
-rebranded "Tideo Auto Brightness" (owner note — was "Advanced"). Ladder GREEN
-(`:app:assembleDebug :app:testDebugUnitTest :app:lintDebug`). **Next: S12.6b/c/d/e (now unblocked — the
-nav/testTag reshape they depend on is landed), then HUMAN GATE 2 re-test after S12.6e.**
+**S12.6a (IA & naming) + S12.6b (glass-box diagnostics) DONE → S12.6c/d/e remain (parallel window).**
+The AAB Menu is the home hub; Super Dimming / Circadian renames + Dashboard last-sample fix landed in
+S12.6a. **S12.6b** added the runtime glass box: a dedicated **Live Debug Info** scene in the Menu (live
+`%AAB_*` readout grouped per the Tasker debug scene, gold values) + live `DiagnosticCard`s on Reactivity
+(threshold + dead zone) and Circadian (uncompressed vs true scale); the 10-category debug selector moved
+off Misc onto Live Debug and is now a GLOBAL preference (preserved across profile/reset/draft applies,
+like `detectOverrides`); debug toasts are AAB-teal. `PipelineState` now carries `threshDynamic` +
+`scaleDynamic` (surfaced from the existing engine output, no domain change). Ladder GREEN
+(`:app:testDebugUnitTest`=102, `:app:assembleDebug :app:lintDebug :domain:test :platform:test`).
+**A new owner finding surfaced during S12.6b and is DEFERRED to S12.6c: G2R-F27/D-050 — PWM-sensitive
+mode does not lock the hardware brightness floor (`pwmSensitive` is persisted/toggled but never read by
+the pipeline → task661/task698 floor unimplemented).** **Next: S12.6c/d/e, then HUMAN GATE 2 re-test
+after S12.6e.**
 
 **(historical) S12.5 UI salvage DONE + GATE-2 RE-TEST done → S12.6 planned (next work).** The owner re-tested the
 S12.5c build on-device (2026-06-14): two S12.5 fixes re-confirmed (min-bright graph, QS tile) but a
@@ -164,10 +169,11 @@ AppModule is now the real DI root.
 - **S12.6 — Gate-2 re-test salvage (a–e, all Opus/high)** is the NEXT work (brief in RUNBOOK). Owner
   decisions are binding (menu-as-home; block-Apply-on-critical-errors; all-profiles-editable+factory-
   restore; SAF folder grant for legacy import). **S12.6a DONE** (menu-as-home reshape + Super Dimming /
-  Circadian renames + Dashboard last-sample fix — landed the nav/testTag reshape b/c/d/e depend on),
-  then **S12.6b** (Live Debug scene + per-screen diagnostic cards + global debug selector + teal toasts),
-  **S12.6c** (reapply-uses-fresh-settings + min-bright runtime bug + override-point capture + curve
-  overlay + **override false-positives on rapid light changes, G2R-F26/D-049**), **S12.6d** (profile
+  Circadian renames + Dashboard last-sample fix — landed the nav/testTag reshape b/c/d/e depend on).
+  **S12.6b DONE** (Live Debug scene + per-screen diagnostic cards + global debug selector + teal toasts).
+  Remaining: **S12.6c** (reapply-uses-fresh-settings + min-bright runtime bug + override-point capture + curve
+  overlay + **override false-positives on rapid light changes, G2R-F26/D-049** + **PWM-sensitive
+  hardware-floor clamp, G2R-F27/D-050**), **S12.6d** (profile
   save/overwrite/factory-restore + SAF legacy import + per-screen reset +
   Apply-gate), **S12.6e** (label/long-press-help audit + context Wi-Fi/location + usage-access flow +
   load toasts). b/c/d/e are a parallel window now that a is merged. Domain/ + golden vectors +
@@ -909,7 +915,41 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   from→to with an interleaved self-write sequence must NOT yield `OverrideDetected`; and a real external
   write after settling MUST. Keep it inside the single-pipeline-coroutine model (D-027). (Affects S12.6c.)
 
-Append new entries as D-049, D-050, … with which segments they affect.
+- D-050: PWM-SENSITIVE MODE DOES NOT LOCK THE HARDWARE BRIGHTNESS FLOOR (owner-reported 2026-06-14, G2R-F27).
+  **DEFERRED to S12.6c — not yet fixed.** Symptom: with "Use software dimming (PWM-sensitive)" on, the
+  hardware screen brightness is NOT held at the `%AAB_DimmingThreshold` floor when the calculated target
+  drops below it (the floor is what keeps the panel above its low-brightness PWM-flicker band; further
+  darkening is meant to come from a software/secure overlay, not from lowering hardware brightness).
+  Code-grounded analysis (S12.6b investigated, did NOT change source — this is `app/runtime` glue, NOT
+  domain/):
+  **ROOT CAUSE — `pwmSensitive` is never read by the runtime.** `grep pwmSensitive` over `app/runtime`,
+  `domain/`, `platform/` is EMPTY: the setting is persisted (`AabSettings.pwmSensitive`), has a UI toggle
+  (SuperDimmingScreen) + legacy round-trip (TaskerLegacyProfileSerializer) + a profile default
+  (DefaultProfiles "Night Reading"), but the pipeline never consults it. So the PWM branch of task661
+  (act22-26) is unimplemented.
+  **What Tasker does (task661 + task698):** task661 act22 — `if PWMSensitive == true AND
+  calculated_brightness < DimmingThreshold` → it Performs task700 (software-dimming opacity → `%final_dim`)
+  and task698 "Smooth DC-Like Brightness Transition", then **Stops** (act26) so it NEVER reaches the plain
+  `Set Display Brightness = calculated_brightness` at act45. task698 step 3 (L36-80 of the extracted Java)
+  is the floor: `hardwareTarget = (calculated_bright < dimmingThreshold) ? round(dimmingThreshold) :
+  round(calculated_bright)` then writes `SCREEN_BRIGHTNESS = hardwareTarget` — i.e. the hardware brightness
+  is CLAMPED UP to the threshold, and the remaining darkening is the overlay alpha (`dim_val`).
+  **In the rebuild:** `BrightnessPipelineController.runCycle` writes `output.targetBrightness` (clamped only
+  to `[MinBright, MaxBright]` by the engine) straight to hardware regardless of `pwmSensitive`; the floor is
+  never applied. `SuperDimmingCoordinator` only drives the ELEVATED secure `reduce_bright_colors` overlay
+  and also ignores `pwmSensitive`.
+  **RECOMMENDED for S12.6c:** floor the *hardware* write at `dimmingThreshold` when
+  `settings.pwmSensitive && target < settings.dimmingThreshold` (controller-level clamp; the overlay/secure
+  layer supplies the rest), faithful to task698 step 3. This is pure controller/coordinator glue — keep the
+  HARD FENCE on domain/ (task700's opacity math, if/when the software-overlay path is wired, is the
+  golden-tested `SoftwareDimming`). Mind the OEM range normalization (compare/clamp consistently with
+  `ScreenBrightnessController`'s device↔domain mapping, cf. D-049 #4). Note the broader unprivileged
+  software-overlay path (task698 DC-like / 653/654 color filter) is STILL deferred (D-040) — but the
+  hardware-floor clamp is independent of the overlay and should land regardless. Add a regression test: with
+  `pwmSensitive=true` and a target below the threshold, the applied hardware brightness equals the
+  threshold, not the raw (lower) target. (Affects S12.6c.)
+
+Append new entries as D-051, D-052, … with which segments they affect.
 
 ## Blockers
 
@@ -1104,6 +1144,13 @@ snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
   grabbed the slider, when nothing external wrote. Owner's read: a mutex issue, or new light readings are
   allowed before the new brightness has "taken hold". **Deferred to S12.6c** (do NOT touch domain/; this is
   controller/animation/observer glue). Code-grounded root-cause analysis + recommended fix in **D-049**.
+- **G2R-F27** (owner-reported 2026-06-14, post-S12.6a; NOT in the original re-test batch) **PWM-sensitive
+  mode does not lock the brightness floor** — with "Use software dimming (PWM-sensitive)" on, the hardware
+  brightness is not held at the dimming threshold floor when the target falls below it. **Deferred to
+  S12.6c** (S12.6b verified it; this is `app/runtime` controller/coordinator glue, NOT domain/). Root cause:
+  `pwmSensitive` is persisted + has a UI toggle but is **never read by the pipeline** — the task661 act22-26
+  PWM branch / task698 hardware-floor clamp is unimplemented. Code-grounded analysis + recommended fix in
+  **D-050**.
 
 *Profiles & persistence (→ S12.6d):*
 - **G2R-F15** **Cannot save a custom profile**, and want to be able to **overwrite existing profiles** too
