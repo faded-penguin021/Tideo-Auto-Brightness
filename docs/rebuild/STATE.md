@@ -41,8 +41,18 @@ Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.5c (feature & behaviour fidelity) DONE — the S12.5 UI salvage is complete; GATE 2 ready for
-re-test.** The remaining six Gate-2 behaviour gaps are closed (D-048), all in the UI/app/platform-glue
+**S12.5 UI salvage DONE + GATE-2 RE-TEST done → S12.6 planned (next work).** The owner re-tested the
+S12.5c build on-device (2026-06-14): two S12.5 fixes re-confirmed (min-bright graph, QS tile) but a
+second, larger batch of parity/behaviour gaps surfaced — **25 findings G2R-F1…F25** (see "Gate 2
+RE-TEST" below), structured and routed into a new **S12.6** (a–e, all Opus/high; RUNBOOK). Four binding
+owner decisions taken: (1) the **AAB Menu becomes a real home screen** (hub + back-target; Dashboard
+becomes a live-status screen); (2) **block Apply on critical validation errors** (form2A/form3A<0,
+form2C>zone1End — sanctioned deviation from Tasker's advisory model); (3) **all profiles editable +
+"Restore factory profiles"**; (4) **legacy import via a one-time SAF folder grant** to
+`Download/AAB/configs` (no MANAGE_EXTERNAL_STORAGE). **Gate 2 stays NOT signed off** — re-tested again
+after S12.6e. The dist/ Gate-2 re-test APK + README are committed for the owner (delete before merge).
+
+**(historical) S12.5c (feature & behaviour fidelity) DONE.** The remaining six Gate-2 behaviour gaps are closed (D-048), all in the UI/app/platform-glue
 layer (domain/, golden vectors, ChartCanvas API untouched): **G2-F8** — loading a profile no longer
 disables manual-override detection (`detectOverrides` is a global preference, not a task626 snapshot
 key, so it is preserved across `mergeProfile` + `applyProfile`/`replaceAll`). **G2-F12** — Flash/toast
@@ -137,17 +147,20 @@ AppModule is now the real DI root.
   D-047). **S12.5c DONE** (context-editor fidelity G2-F14, toasts G2-F12, debug→runtime toasts G2-F15,
   profile-load-keeps-DetectOverrides G2-F8, super-dimming verify+diagnose G2-F9, QS-tile paused state
   G2-F17 — D-048).
-- **HUMAN GATE 2 — RE-TEST** (RUNBOOK "Human gates", after S12.5c). Full UI walkthrough — every field
-  edits/persists/rejects-invalid-with-red; live form2A/form3A; wizard produces+applies suggestions +
-  Copy-report → clipboard; Shizuku ELEVATED flow; QS tile (now shows paused); per-app override (app
-  list now populated w/ icons + usage-access prompt); charging+time contexts (SUNRISE/SUNSET tokens);
-  brightness-chart shape; legacy Tasker import. **Verify the S12.5c flips**: profile-load keeps override
-  detection on (G2-F8); toasts appear on Apply/save/import (G2-F12); selecting a `%AAB_Debug` level
-  produces runtime toasts (G2-F15); super dimming engages below threshold with ELEVATED — if the
-  SUPER_DIMMING debug toast says "ON level N" but the screen doesn't dim, that is OEM secure-key variance
-  (D-048), report the device/skin. Findings → "Gate findings".
-- **S13** (chart replication + static screens) is next on the serial spine — preconditions S12.5 DONE
-  (template + faithful screens exist), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over
+- **GATE-2 RE-TEST DONE (2026-06-14) → 25 findings G2R-F1…F25** (see "Gate 2 RE-TEST"). Gate 2 NOT
+  signed off.
+- **S12.6 — Gate-2 re-test salvage (a–e, all Opus/high)** is the NEXT work (brief in RUNBOOK). Owner
+  decisions are binding (menu-as-home; block-Apply-on-critical-errors; all-profiles-editable+factory-
+  restore; SAF folder grant for legacy import). **S12.6a FIRST** (menu-as-home reshape + Super Dimming /
+  Circadian renames + Dashboard last-sample fix — touches all nav/testTags), then **S12.6b** (Live Debug
+  scene + per-screen diagnostic cards + global debug selector + teal toasts), **S12.6c** (reapply-uses-
+  fresh-settings + min-bright runtime bug + override-point capture + curve overlay), **S12.6d** (profile
+  save/overwrite/factory-restore + SAF legacy import + per-screen reset + Apply-gate), **S12.6e** (label/
+  long-press-help audit + context Wi-Fi/location + usage-access flow + load toasts). b/c/d/e are a
+  parallel window after a. Domain/ + golden vectors + ChartCanvas API stay fenced.
+- **HUMAN GATE 2 — RE-TEST AGAIN** after S12.6e. Re-verify all G2R-Fn + the original Gate-2 set.
+- **S13** (chart replication + static screens) follows S12.6 on the serial spine — preconditions S12.6
+  DONE (faithful screens + menu IA), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over
   read-only `ChartCanvas.kt`) into the six remaining charts and fills their `ChartPlaceholder` host slots
   (tagged in screen_map + anonymous_handlers `deferred-S13`), plus About/UserGuide content. Haiku/high.
 - Carried for S12.5/S13/S14 (D-040, D-044): unprivileged overlay dimming (task698 DC-like / 653/654) is
@@ -996,7 +1009,71 @@ Gate 2 stays open and is re-tested after S12.5. **Gate 2 NOT signed off.** D-045
 
 **S12.5 salvage complete (S12.5a D-046 ∥ S12.5b D-047 ∥ S12.5c D-048):** all 18 findings now have an
 ADDRESSED/FIXED disposition (F1–F7,F10,F11,F13,F16 → S12.5b; F18 → S12.5a; F8,F9,F12,F14,F15,F17 →
-S12.5c). **Gate 2 is ready for the on-device re-test.** Build GREEN; lint baseline unchanged.
+S12.5c). The on-device re-test (below) confirmed two fixes and surfaced a fresh, larger batch → **S12.6**.
+
+### Gate 2 RE-TEST (after S12.5c) — findings recorded → S12.6 (Gate 2 still NOT signed off)
+
+**Owner on-device re-test 2026-06-14 ~08:00–09:30 UTC.** The S12.5 reskin is "a decent improvement" but
+a substantial second batch of parity/behaviour gaps remains. Findings structured below as **G2R-Fn**
+(Gate-2 Re-test) and routed to the S12.6 sub-segments (RUNBOOK). The owner's verbatim Tasker diagnostic
+snippets are preserved (gold `#FFC107` highlight = the AAB value colour).
+
+**RE-CONFIRMED FIXED (S12.5):** min-brightness moves the curve graph (S12.5b G2-F4); QS tile works
+(S12.5c G2-F17).
+
+**FINDINGS:**
+
+*Information architecture & naming (→ S12.6a):*
+- **G2R-F1** Back from a settings screen returns to the Dashboard; it should return to the **menu**.
+- **G2R-F2** The Profiles + Contexts **hero cards belong in the menu**, not on the Dashboard.
+- **G2R-F3** "Animation & Dimming" is **misnamed — it is Super Dimming**; rename.
+- **G2R-F4** "Dynamic Scale" should be **renamed "Circadian"**.
+- **G2R-F5** Dashboard always shows **"Last sensor sample: never"** regardless of activity (bug).
+
+*Glass-box diagnostics & live debug (→ S12.6b):*
+- **G2R-F6** There is **no extensive Live Debug Info scene** — vital for the glass-box metrics.
+- **G2R-F7** Every settings screen should carry a few **live diagnostic cards**. Reactivity example:
+  "Current threshold `[%AAB_ThreshDynamic]` at `[%SmoothedLux]` lx; Sensor dead zone `[%AAB_ThreshAbsLow]`
+  lx to `[%AAB_ThreshAbsHigh]` lx" (values in gold #FFC107).
+- **G2R-F8** Circadian example card: "Uncompressed scale `[%AAB_ScaleDynamic]` at `[%TIME]`; True scale
+  `[%AAB_ScaleDynamicCompress]` at `[%AAB_CurrentBright]` brightness (`%AAB_MinBright`–`%AAB_MaxBright`)".
+- **G2R-F9** The **debug-category selector must be GLOBAL** — it must NOT change on profile load — and
+  belongs on the live debug-info scene, not Misc.
+- **G2R-F10** Minor: the debug toasts should use the **characteristic teal colour**.
+
+*Pipeline behaviour correctness (→ S12.6c):*
+- **G2R-F11** Applying a profile manually **does not take effect until a light change** (the Apply/reapply
+  path isn't producing an immediate re-evaluate for a manual profile/settings apply).
+- **G2R-F12** **Min brightness is ignored in actual behaviour — appears stuck at 10** (the graph honours
+  it, G2-F4, but the runtime does not — likely the same stale-effectiveSettings root as F11).
+- **G2R-F13** **Manual override points are not recorded** (the wizard's input; D-044c capture still unwired).
+- **G2R-F14** The brightness curve used to **overlay all recorded override points**; the fitted curve only
+  appeared with **> 8 points**. Restore the point overlay + fit-only-when-≥9 behaviour.
+
+*Profiles & persistence (→ S12.6d):*
+- **G2R-F15** **Cannot save a custom profile**, and want to be able to **overwrite existing profiles** too
+  (as the Tasker project allows). [decision: scope of overwrite — see S12.6 open questions]
+- **G2R-F16** **Cannot load a legacy profile** from `Download/AAB/configs` — the app doesn't see that
+  directory (only `Download/AAB` + my own folders), likely a scoped-storage / Tasker-ownership conflict.
+- **G2R-F17** Settings screens have **no reset-to-defaults button**.
+- **G2R-F18** **Invalid settings are appliable** (e.g. form3A negative). [decision: block vs Tasker's
+  advisory model — see S12.6 open questions]
+
+*Labels, tooltips, context editor & onboarding (→ S12.6e):*
+- **G2R-F19** Some **labels don't match their meaning** (e.g. *delta factor*). Tasker's long-press shows an
+  explanatory toast: *"Controls how much to smooth out sensor readings. Higher values react faster to
+  small light changes, but may increase jitter. Lower values are more stable, but might feel sluggish."*
+- **G2R-F20** The label mismatches lead to a suspicion that the **underlying behaviour/wiring is also
+  wrong** — audit each parameter label → variable → runtime use against the extraction.
+- **G2R-F21** The long-press explanations are **embedded in the scenes as long-press triggers** — port/fix
+  them all (every scene's help longclicks).
+- **G2R-F22** Context rule creation **still cannot get the Wi-Fi SSID** (`_GetWifiNoLocation V3`) nor live
+  location.
+- **G2R-F23** On rule creation, **usage access is greyed out**; the original permission onboarding had an
+  instruction on how to fix it (surface that instruction/flow here).
+- **G2R-F24** The setup/permissions screen should show **usage access as optional by default**.
+- **G2R-F25** There is **no toast when a rule/profile is loaded**.
+
 ### Gate 3 (after S14) — pending
 
 The human records on-device findings here; the next session triages them.
