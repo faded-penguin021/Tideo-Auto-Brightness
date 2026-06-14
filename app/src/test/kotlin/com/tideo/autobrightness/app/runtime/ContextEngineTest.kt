@@ -107,6 +107,34 @@ class ContextEngineTest {
     }
 
     @Test
+    fun reevaluate_withContextLock_dropsActiveContextAndRunsBaseline() = runTest {
+        // G2R-F30: a manual profile load latches %AAB_ContextOverride=true. reevaluate() must drop any
+        // active context and run the (now manually-chosen) baseline, so watchers stop overriding.
+        var live = baseline
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { listOf(videoStreamingRule) },
+            baselineProvider = { live },
+            profileCatalog = catalog,
+            signalSource = FakeSignalSource(app = "com.netflix.mediaclient"),
+            onProfileChanged = {},
+            clock = { 0L },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+        assertEquals("Cinema", engine.activeContext.value, "a rule is active before the lock")
+
+        // Manual profile load: baseline becomes a chosen profile WITH the context lock latched.
+        live = baseline.copy(contextOverride = true, minBrightness = 42)
+        engine.reevaluate()
+        advanceUntilIdle()
+
+        assertNull(engine.activeContext.value, "the lock drops the active context")
+        assertEquals(42, engine.effectiveSettings().minBrightness, "the manual baseline now runs")
+        scope.cancel()
+    }
+
+    @Test
     fun noMatch_revertsToBaseline() = runTest {
         val src = FakeSignalSource(app = "com.other.app")
         val (engine, scope) = engine(listOf(videoStreamingRule), src)

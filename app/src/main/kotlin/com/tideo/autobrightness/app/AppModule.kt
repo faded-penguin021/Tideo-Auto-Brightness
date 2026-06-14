@@ -10,9 +10,11 @@ import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
+import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.storage.contextRulesDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
+import com.tideo.autobrightness.app.storage.userProfilesDataStore
 import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
 import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
@@ -40,6 +42,9 @@ class AppModule(context: Context) {
      *  curve overlay (G2R-F13/F14). */
     val overridePointStore: OverridePointStore = OverridePointStore(appContext.overridePointsDataStore)
 
+    /** User-editable named profiles (S12.6d, G2R-F15): the Profiles screen + the context catalog. */
+    val userProfileStore: UserProfileStore = UserProfileStore(appContext.userProfilesDataStore)
+
     /**
      * Build a fresh runtime graph for a service lifetime. The brightness writer and observer SHARE
      * one instance so the suppress-echo marker is per-instance (D-034). The pipeline reads its
@@ -55,7 +60,7 @@ class AppModule(context: Context) {
         val contextEngine = ContextEngine(
             rulesProvider = { contextRuleStore.rules() },
             baselineProvider = { appContext.settingsDataStore.data.first() },
-            profileCatalog = AppProfileCatalog,
+            profileCatalog = AppProfileCatalog(userProfileStore),
             signalSource = AndroidContextSignalSource(appContext),
             onProfileChanged = { controller.onContextChanged() },
             debugSink = debugSink,

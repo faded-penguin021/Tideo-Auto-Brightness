@@ -20,6 +20,7 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
+import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /**
@@ -35,11 +36,26 @@ fun SuperDimmingScreen(navController: NavHostController, vm: DraftSettingsViewMo
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val tier by vm.tier.collectAsStateWithLifecycle()
+    val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
+    val toast = rememberToaster()
     SuperDimmingContent(
         draft, committed, epoch, dirty, tier,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         onOpenOnboarding = { navController.navigate(AppRoute.Onboarding.route) },
+        criticalError = criticalError,
+        // G2R-F17: reset only the super-dimming + PWM fields to the task570 baseline.
+        onReset = {
+            vm.edit { s ->
+                val d = AabSettings()
+                s.copy(
+                    dimmingEnabled = d.dimmingEnabled, dimmingStrength = d.dimmingStrength,
+                    dimmingExponent = d.dimmingExponent, dimmingThreshold = d.dimmingThreshold,
+                    dimSpread = d.dimSpread, pwmSensitive = d.pwmSensitive, pwmExponent = d.pwmExponent,
+                )
+            }
+            toast("Reset to defaults")
+        },
     )
 }
 
@@ -55,8 +71,10 @@ fun SuperDimmingContent(
     onDiscard: () -> Unit,
     onBack: () -> Unit,
     onOpenOnboarding: () -> Unit,
+    criticalError: Boolean = false,
+    onReset: (() -> Unit)? = null,
 ) {
-    DraftSettingsScaffold("Super Dimming", dirty, onApply, onDiscard, onBack) { padding ->
+    DraftSettingsScaffold("Super Dimming", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             SectionHeader("Super dimming")
             if (tier != Tier.ELEVATED) {

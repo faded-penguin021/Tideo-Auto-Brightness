@@ -618,6 +618,15 @@ destination. The S12.5a drawer is retired.
 
 ### AAB Profile  ·  `profile`  ·  XML L5724–6562  ·  3 elements  → Profiles & Import/Export
 
+> S12.6d (G2R-F15/F16/F17/F18/F30): the Profiles screen now manages user-editable saved profiles
+> (`UserProfileStore` — built-ins seeded once + Save-current-as + per-entry Overwrite/Delete + Restore
+> factory profiles), legacy import via a one-time SAF folder grant to `Download/AAB/configs`
+> (`LegacyConfigImporter`, no MANAGE_EXTERNAL_STORAGE) listing/loading the `*.json` there, the existing
+> single-file import/export, a "Reset settings to defaults", and a manual-load context-lock Resume banner
+> (G2R-F30). The 5 draft settings screens each gained a per-screen Reset action (G2R-F17), and their Apply
+> is blocked on CRITICAL curve errors (G2R-F18/D-052). Context rule editor gained battery % from/to
+> (G2R-F31); Tools wizard surfaces the full verbose report (G2R-F32).
+
 | Element | Type | Disposition |
 |---|---|---|
 | elements0 | Web | merged-into Profiles & Import/Export |

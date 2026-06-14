@@ -7,6 +7,7 @@ import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.FieldError
+import com.tideo.autobrightness.app.settings.Severity
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.domain.wizard.OverridePoint
@@ -93,6 +94,15 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
     val errors: StateFlow<List<FieldError>> = _draft
         .map { SettingsValidator.validate(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * True when the draft carries a CRITICAL validation error (form2A<0, form3A<0, form2C>zone1End).
+     * The Apply button is disabled while one stands (G2R-F18 / owner-decision 2 / D-052) — a sanctioned
+     * deviation from Tasker's advisory-only model. Advisory warnings never block Apply.
+     */
+    val hasCriticalError: StateFlow<Boolean> = errors
+        .map { list -> list.any { it.severity == Severity.CRITICAL } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val tier: StateFlow<Tier> = privilegeManager.tierFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Tier.NONE)
