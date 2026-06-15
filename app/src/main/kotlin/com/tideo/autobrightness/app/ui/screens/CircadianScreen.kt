@@ -1,11 +1,33 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.ExperimentDateLocation
+import com.tideo.autobrightness.app.state.CircadianExtrasViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCard
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
@@ -15,24 +37,53 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.rememberToaster
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Circadian (Tasker AAB Experiment Settings + Experiment/Taper graphs). Renamed from "Dynamic Scale"
  * in S12.6a (G2R-F4) to match the Tasker name for the day/night curve scaling. Draft → Apply (S12.5b).
  */
 @Composable
-fun CircadianScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
+fun CircadianScreen(
+    navController: NavHostController,
+    vm: DraftSettingsViewModel = viewModel(),
+    extras: CircadianExtrasViewModel = viewModel(),
+) {
     val draft by vm.draft.collectAsStateWithLifecycle()
     val committed by vm.committed.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
     val toast = rememberToaster()
+    val scope = rememberCoroutineScope()
+
+    // F39: the Circadian fixed date/location override + its live-data defaults (today + location).
+    val dateLocation by extras.dateLocation.collectAsStateWithLifecycle()
+    var defaultLatLon by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        defaultLatLon = runCatching { extras.defaultLatLon() }.getOrNull()
+    }
+
     CircadianContent(
         draft, committed, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         criticalError = criticalError,
+        dateLocation = dateLocation,
+        todayDate = extras.today(),
+        defaultLatLon = defaultLatLon,
+        onSetDateLocation = { date, lat, lon -> extras.set(date, lat, lon); toast("Fixed date/location set") },
+        onUseLiveData = { extras.useLiveData(); toast("Using live data") },
+        onUseCurrentLocation = { fill ->
+            scope.launch {
+                val latLon = runCatching { extras.freshLatLon() }.getOrNull()
+                if (latLon != null) fill(latLon.first, latLon.second)
+                else toast("No location fix yet — grant Location and try again")
+            }
+        },
         // G2R-F17: reset only the circadian scaling + taper fields to the task570 baseline.
         onReset = {
             vm.edit { s ->
@@ -60,6 +111,12 @@ fun CircadianContent(
     onBack: () -> Unit,
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
+    dateLocation: ExperimentDateLocation = ExperimentDateLocation(),
+    todayDate: String = "",
+    defaultLatLon: Pair<Double, Double>? = null,
+    onSetDateLocation: (String, Double, Double) -> Unit = { _, _, _ -> },
+    onUseLiveData: () -> Unit = {},
+    onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
 ) {
     DraftSettingsScaffold("Circadian", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
@@ -115,6 +172,120 @@ fun CircadianContent(
                 epoch = epoch, committed = committed.scaleTaperSteepness, isInt = false,
                 helper = "Slope of the dynamic-range compression.", testTag = "field_scaleTaperSteepness",
             )
+
+            // F39: fixed Date + Lat/Lon preview override (experiment_settings.md elements35–37).
+            CircadianDateLocationCard(
+                value = dateLocation,
+                todayDate = todayDate,
+                currentLatLon = defaultLatLon,
+                onSet = onSetDateLocation,
+                onUseLiveData = onUseLiveData,
+                onUseCurrentLocation = onUseCurrentLocation,
+            )
         }
     }
 }
+
+/**
+ * The Circadian "Date & location" element (experiment_settings.md elements35–37; G2R-F39). Lets the
+ * user pin a fixed date + latitude/longitude to preview the circadian curve for any day/place
+ * (`_ExperimentSetDate`), or revert to **live data** — today + the current location
+ * (`_ExperimentClearDate`). When nothing is pinned the fields are pre-filled with those live defaults
+ * so the screen always shows a concrete date/location.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CircadianDateLocationCard(
+    value: ExperimentDateLocation,
+    todayDate: String,
+    currentLatLon: Pair<Double, Double>?,
+    onSet: (String, Double, Double) -> Unit,
+    onUseLiveData: () -> Unit,
+    onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
+) {
+    // Effective defaults shown when nothing is pinned: today + current location (G2R-F39).
+    val effDate = value.date ?: todayDate
+    val effLat = value.latitude ?: currentLatLon?.first
+    val effLon = value.longitude ?: currentLatLon?.second
+
+    var dateText by remember(effDate) { mutableStateOf(effDate) }
+    var latText by remember(effLat) { mutableStateOf(effLat?.let { "%.5f".format(it) } ?: "") }
+    var lonText by remember(effLon) { mutableStateOf(effLon?.let { "%.5f".format(it) } ?: "") }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    SectionHeader("Date & location (preview)")
+    Text(
+        if (value.isUnset) {
+            "Live data — today + current location."
+        } else {
+            "Fixed: ${value.date} @ ${fmtCoord(value.latitude)}, ${fmtCoord(value.longitude)}"
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.testTag("exp_status"),
+    )
+    OutlinedButton(
+        onClick = { showDatePicker = true },
+        modifier = Modifier.fillMaxWidth().testTag("exp_date_value"),
+    ) { Text("Date: $dateText") }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = latText, onValueChange = { latText = it.filter { c -> c.isDigit() || c == '.' || c == '-' } },
+            label = { Text("Latitude") }, singleLine = true,
+            modifier = Modifier.weight(1f).testTag("exp_lat"),
+        )
+        OutlinedTextField(
+            value = lonText, onValueChange = { lonText = it.filter { c -> c.isDigit() || c == '.' || c == '-' } },
+            label = { Text("Longitude") }, singleLine = true,
+            modifier = Modifier.weight(1f).testTag("exp_lon"),
+        )
+    }
+    OutlinedButton(
+        onClick = { onUseCurrentLocation { la, lo -> latText = "%.5f".format(la); lonText = "%.5f".format(lo) } },
+        modifier = Modifier.testTag("exp_use_location"),
+    ) { Text("Use current location") }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = {
+                val lat = latText.trim().toDoubleOrNull()
+                val lon = lonText.trim().toDoubleOrNull()
+                if (lat != null && lon != null && dateText.isNotBlank()) onSet(dateText.trim(), lat, lon)
+            },
+            modifier = Modifier.testTag("exp_set"),
+        ) { Text("Set fixed") }
+        TextButton(onClick = onUseLiveData, modifier = Modifier.testTag("exp_use_live")) {
+            Text("Use live data")
+        }
+    }
+
+    if (showDatePicker) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = parseDateMillis(dateText))
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        state.selectedDateMillis?.let { dateText = formatDateMillis(it) }
+                        showDatePicker = false
+                    },
+                    modifier = Modifier.testTag("exp_date_ok"),
+                ) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
+        ) { DatePicker(state = state) }
+    }
+}
+
+private fun fmtCoord(v: Double?): String = v?.let { "%.5f".format(it) } ?: "—"
+
+private val EXP_DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+    timeZone = TimeZone.getTimeZone("UTC")
+}
+
+/** Parse a `YYYY-MM-DD` string to UTC millis for the DatePicker; null (→ today) on any failure. */
+private fun parseDateMillis(date: String): Long? =
+    runCatching { EXP_DATE_FORMAT.parse(date)?.time }.getOrNull()
+
+private fun formatDateMillis(millis: Long): String = EXP_DATE_FORMAT.format(java.util.Date(millis))

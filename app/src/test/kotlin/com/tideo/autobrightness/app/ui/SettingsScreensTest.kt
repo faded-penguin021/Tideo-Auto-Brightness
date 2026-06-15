@@ -15,11 +15,16 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.ExperimentDateLocation
+import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.LiveDebugUiState
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCardContent
+import com.tideo.autobrightness.app.ui.components.SettingsDiffList
+import com.tideo.autobrightness.app.ui.screens.CircadianDateLocationCard
+import com.tideo.autobrightness.app.ui.screens.LoadProfileDialog
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
 import com.tideo.autobrightness.app.ui.screens.ContextsContent
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
@@ -584,6 +589,84 @@ class SettingsScreensTest {
         compose.onNodeWithText("88", substring = true).assertExists()
         compose.onNodeWithTag("override_delete_confirm").performClick()
         assertTrue(confirmed, "confirming the dialog deletes the point")
+    }
+
+    @Test
+    fun settingsDiffList_highlightsChangedFromDefault_G2RF38() {
+        // G2R-F38: the Tasker dashboard's full settings list — a tuned value (minBrightness 99) is
+        // flagged changed-vs-default; the summary counts it.
+        compose.setContent {
+            MaterialTheme { SettingsDiffList(AabSettings(minBrightness = 99)) }
+        }
+        compose.onNodeWithTag("settings_diff_summary")
+            .assertTextContains("1 setting", substring = true)
+        compose.onNodeWithTag("diffval_%AAB_MinBright").performScrollTo()
+            .assertTextContains("99", substring = true)
+    }
+
+    @Test
+    fun settingsDiffList_allDefaults_reportsNoChanges_G2RF38() {
+        compose.setContent {
+            MaterialTheme { SettingsDiffList(AabSettings()) }
+        }
+        compose.onNodeWithText("All settings at factory defaults", substring = true).assertExists()
+    }
+
+    @Test
+    fun loadProfileDialog_showsDiffAndConfirms_G2RF38() {
+        // G2R-F38: the "Load Anyway" modal previews the profile's settings and Apply fires onConfirm.
+        var confirmed = false
+        compose.setContent {
+            MaterialTheme {
+                LoadProfileDialog(
+                    profile = SavedProfile("Bright", AabSettings(maxBrightness = 255, scale = 1.5f)),
+                    onDismiss = {},
+                    onConfirm = { confirmed = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("settings_diff_list").assertExists()
+        compose.onNodeWithTag("confirm_load_profile").performClick()
+        assertTrue(confirmed, "Apply in the load modal confirms the load")
+    }
+
+    @Test
+    fun circadianDateLocationCard_defaultsToTodayAndCurrentLocation_G2RF39() {
+        // G2R-F39: when nothing is pinned, the fields default to today + the current location.
+        compose.setContent {
+            MaterialTheme {
+                CircadianDateLocationCard(
+                    value = ExperimentDateLocation(),
+                    todayDate = "2026-06-15",
+                    currentLatLon = 55.95000 to -3.19000,
+                    onSet = { _, _, _ -> },
+                    onUseLiveData = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("exp_status").assertTextContains("Live data", substring = true)
+        compose.onNodeWithTag("exp_date_value").assertTextContains("2026-06-15", substring = true)
+        compose.onNodeWithTag("exp_lat").assertTextContains("55.95000", substring = true)
+        compose.onNodeWithTag("exp_lon").assertTextContains("-3.19000", substring = true)
+    }
+
+    @Test
+    fun circadianDateLocationCard_setFixed_emitsDateAndCoords_G2RF39() {
+        var captured: Triple<String, Double, Double>? = null
+        compose.setContent {
+            MaterialTheme {
+                CircadianDateLocationCard(
+                    value = ExperimentDateLocation(date = "2025-12-21", latitude = 51.5, longitude = 0.0),
+                    todayDate = "2026-06-15",
+                    currentLatLon = null,
+                    onSet = { d, la, lo -> captured = Triple(d, la, lo) },
+                    onUseLiveData = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("exp_status").assertTextContains("Fixed", substring = true)
+        compose.onNodeWithTag("exp_set").performClick()
+        assertEquals(Triple("2025-12-21", 51.5, 0.0), captured)
     }
 
     @Test
