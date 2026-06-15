@@ -18,11 +18,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.runtime.LiveRuntimeState
+import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.state.derivedCoefficients
+import com.tideo.autobrightness.app.ui.components.CurveBrightnessDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.DerivedReadout
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
@@ -50,6 +53,7 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
     val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
+    val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = com.tideo.autobrightness.app.ui.components.rememberToaster()
     CurveBrightnessContent(
         draft, committed, errors, epoch, dirty,
@@ -58,6 +62,7 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
         overridePoints = overridePoints,
         criticalError = criticalError,
         onDeleteOverridePoint = vm::deleteOverridePoint,
+        live = live,
         // G2R-F17: reset only the curve-zone coefficients to the task570 baseline (defaults).
         onReset = {
             vm.edit { s ->
@@ -90,6 +95,7 @@ fun CurveBrightnessContent(
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
     onDeleteOverridePoint: ((OverridePoint) -> Unit)? = null,
+    live: PipelineState = PipelineState(),
 ) {
     DraftSettingsScaffold("Curve & Brightness", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
@@ -140,6 +146,10 @@ fun CurveBrightnessContent(
                 )
             }
 
+            // Tasker live readout (current_lux_and_bright, brightness_settings.md elements22, G2R-F58):
+            // current smoothed lux + current brightness within the active min–max range.
+            CurveBrightnessDiagnosticCardContent(live, committed.minBrightness, committed.maxBrightness)
+
             // Labels + verbatim long-press help re-derived from extraction/scenes/brightness_settings.md
             // (S12.6e, G2R-F19/F21). Tasker labels: "Zone 1 Scaling" (form1A), "Zone 2 Scaling" (form2B),
             // "Zone 2 Offset" (form2C); zone-end fields keep the lux annotation.
@@ -171,10 +181,11 @@ fun CurveBrightnessContent(
             )
 
             // task659 live-derived continuity coefficients (task613/614/615 _UpdateBrightnessFormulae).
+            // G2R-F61: labelled as the zone-alignment hinge points (not bare "form2A/form3A" placeholders).
             SectionHeader("Derived (continuity)")
             val coeffs = draft.derivedCoefficients()
-            DerivedReadout("form2A", coeffs.form2A.fmtCoeff("%.3f"), testTag = "derived_form2A")
-            DerivedReadout("form3A", coeffs.form3A.fmtCoeff("%.1f"), testTag = "derived_form3A")
+            DerivedReadout("Zone 2 alignment (form2A)", coeffs.form2A.fmtCoeff("%.3f"), testTag = "derived_form2A")
+            DerivedReadout("Zone 3 alignment (form3A)", coeffs.form3A.fmtCoeff("%.1f"), testTag = "derived_form3A")
             errors.forField("form2A")?.let { ErrorBanner(it, "error_form2A") }
             errors.forField("form3A")?.let { ErrorBanner(it, "error_form3A") }
             errors.forField("zone2End")?.let { ErrorBanner(it, "error_zone2End") }

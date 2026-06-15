@@ -131,15 +131,97 @@ class SettingsScreensTest {
     }
 
     @Test
-    fun reactivityDiagnosticCard_rendersThresholdAndDeadZone() {
-        // G2R-F7: the Reactivity glass-box card surfaces the live dynamic threshold + dead zone.
-        val seeded = PipelineState(smoothedLux = 50.0, threshDynamic = 42.0, threshAbsLow = 5.0, threshAbsHigh = 600.0)
+    fun reactivityDiagnosticCard_rendersThresholdAsPercent_andDeadZone() {
+        // G2R-F7 + G2R-F56: the Reactivity glass-box card surfaces the live dynamic threshold as a
+        // percentage (0.42 → "42%") plus the absolute dead zone.
+        val seeded = PipelineState(smoothedLux = 50.0, threshDynamic = 0.42, threshAbsLow = 5.0, threshAbsHigh = 600.0)
         compose.setContent {
             MaterialTheme { ReactivityDiagnosticCardContent(seeded) }
         }
         compose.onNodeWithTag("diag_reactivity_threshold").assertExists()
         compose.onNodeWithTag("diag_reactivity_deadzone").assertExists()
-        compose.onNodeWithText("42.0", substring = true).assertExists()
+        compose.onNodeWithText("42%", substring = true).assertExists()
+    }
+
+    @Test
+    fun curveBrightness_liveReadout_rendersSmoothedLuxAndCurrentBright_G2RF58() {
+        // G2R-F58: the Curve & Brightness screen shows the Tasker current_lux_and_bright live readout.
+        val seeded = PipelineState(smoothedLux = 123.4, lastAppliedBrightness = 88)
+        compose.setContent {
+            MaterialTheme {
+                CurveBrightnessContent(
+                    AabSettings(minBrightness = 10, maxBrightness = 255), AabSettings(), emptyList(),
+                    epoch = 0, dirty = false, onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                    live = seeded,
+                )
+            }
+        }
+        compose.onNodeWithTag("diag_curve_smoothed_lux").performScrollTo().assertExists()
+        compose.onNodeWithTag("diag_curve_current_bright").performScrollTo()
+            .assertTextContains("88", substring = true)
+    }
+
+    @Test
+    fun curveBrightness_derivedCoefficients_useZoneAlignmentLabels_G2RF61() {
+        // G2R-F61: form2A/form3A are labelled as the zone-alignment hinge points, not bare placeholders.
+        compose.setContent {
+            MaterialTheme {
+                CurveBrightnessContent(AabSettings(), AabSettings(), emptyList(), 0, false, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("derived_form2A").performScrollTo().assertExists()
+        compose.onNodeWithText("Zone 2 alignment", substring = true).assertExists()
+        compose.onNodeWithText("Zone 3 alignment", substring = true).assertExists()
+    }
+
+    @Test
+    fun misc_liveReadout_rendersThrottleAndAlpha_G2RF58() {
+        // G2R-F58: the Misc screen shows the Tasker current_throttle_and_alpha live readout.
+        val seeded = PipelineState(throttleMs = 1310L, luxAlpha = 0.421)
+        compose.setContent {
+            MaterialTheme {
+                MiscContent(
+                    AabSettings(), AabSettings(), emptyList(), 0, false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, live = seeded,
+                )
+            }
+        }
+        compose.onNodeWithTag("diag_misc_throttle").performScrollTo()
+            .assertTextContains("1310", substring = true)
+        compose.onNodeWithTag("diag_misc_alpha").performScrollTo()
+            .assertTextContains("0.421", substring = true)
+    }
+
+    @Test
+    fun misc_scaleBecomesAutoReadout_whenCircadianEnabled_G2RF60() {
+        // G2R-F60: with dynamic scaling on, the static Scale field is replaced by the read-only
+        // "(auto)" dynamic-scale readout; with it off the editable field is shown.
+        val seeded = PipelineState(scaleDynamicCompress = 0.873)
+        compose.setContent {
+            MaterialTheme {
+                MiscContent(
+                    AabSettings(scalingEnabled = true), AabSettings(), emptyList(), 0, false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, live = seeded,
+                )
+            }
+        }
+        compose.onNodeWithTag("derived_scaleDynamic").performScrollTo().assertExists()
+        compose.onNodeWithText("0.873", substring = true).assertExists()
+        compose.onNodeWithTag("field_scale").assertDoesNotExist()
+    }
+
+    @Test
+    fun misc_scaleIsEditable_whenCircadianDisabled_G2RF60() {
+        compose.setContent {
+            MaterialTheme {
+                MiscContent(
+                    AabSettings(scalingEnabled = false), AabSettings(), emptyList(), 0, false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("field_scale").performScrollTo().assertExists()
+        compose.onNodeWithTag("derived_scaleDynamic").assertDoesNotExist()
     }
 
     @Test

@@ -68,6 +68,14 @@ internal fun fmt(value: Double?, digits: Int = 1): String =
 
 internal fun fmtInt(value: Int?): String = value?.toString() ?: "—"
 
+/**
+ * Format a 0..1 reactivity fraction as a whole percentage (G2R-F56): the Tasker scenes bind the
+ * threshold readouts to the `%aab_thresh*pc` percentage variables, so 0.5 must read "50%". Rounds to
+ * the nearest whole percent (the on-screen Tasker value carries no decimals).
+ */
+internal fun fmtPercent(value: Double?): String =
+    value?.let { "${Math.round(it * 100.0)}%" } ?: "—"
+
 private fun nowHhMm(): String {
     val c = Calendar.getInstance()
     return "%02d:%02d".format(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE))
@@ -84,7 +92,9 @@ fun ReactivityDiagnosticCardContent(state: PipelineState) {
     DiagnosticCard("Live reactivity", "reactivity_diagnostic_card") {
         DiagnosticLine("diag_reactivity_threshold") {
             append("Current threshold ")
-            goldValue(fmt(state.threshDynamic))
+            // G2R-F56: the live reactivity threshold (%AAB_ThreshDynamic, a 0..1 fraction) reads as a
+            // percentage in the Tasker scene (bound to %aab_thresh*pc) — 0.5 → "50%".
+            goldValue(fmtPercent(state.threshDynamic))
             append(" at ")
             goldValue(fmt(state.smoothedLux))
             append(" lx")
@@ -146,4 +156,65 @@ fun CircadianDiagnosticCardContent(
 fun CircadianDiagnosticCard(minBrightness: Int, maxBrightness: Int) {
     val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     CircadianDiagnosticCardContent(state, minBrightness, maxBrightness, nowHhMm())
+}
+
+// --- Curve & Brightness screen card (G2R-F58) ---------------------------------------------------
+
+/**
+ * Stateless Curve & Brightness live readout (Tasker `current_lux_and_bright`, brightness_settings.md
+ * elements22): "Current smoothed lux [%SmoothedLux]" + "Current brightness (%AAB_MinBright–
+ * %AAB_MaxBright) [%AAB_CurrentBright]" (G2R-F58). [minBrightness]/[maxBrightness] are the committed
+ * range; %AAB_CurrentBright is the last brightness the pipeline applied.
+ */
+@Composable
+fun CurveBrightnessDiagnosticCardContent(state: PipelineState, minBrightness: Int, maxBrightness: Int) {
+    DiagnosticCard("Live brightness", "curve_diagnostic_card") {
+        DiagnosticLine("diag_curve_smoothed_lux") {
+            append("Current smoothed lux ")
+            goldValue(fmt(state.smoothedLux))
+        }
+        DiagnosticLine("diag_curve_current_bright") {
+            append("Current brightness (")
+            goldValue(minBrightness.toString())
+            append("–")
+            goldValue(maxBrightness.toString())
+            append(") ")
+            goldValue(fmtInt(state.lastAppliedBrightness))
+        }
+    }
+}
+
+/** Live wrapper: collects the pipeline snapshot and renders the Curve & Brightness readout. */
+@Composable
+fun CurveBrightnessDiagnosticCard(minBrightness: Int, maxBrightness: Int) {
+    val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
+    CurveBrightnessDiagnosticCardContent(state, minBrightness, maxBrightness)
+}
+
+// --- Misc screen card (G2R-F58) -----------------------------------------------------------------
+
+/**
+ * Stateless Misc live readout (Tasker `current_throttle_and_alpha`, misc_settings.md elements31):
+ * "Current throttle [%AAB_Throttle] ms" + "Current smoothing α [%LuxAlpha]" (G2R-F58).
+ */
+@Composable
+fun MiscDiagnosticCardContent(state: PipelineState) {
+    DiagnosticCard("Live timing", "misc_diagnostic_card") {
+        DiagnosticLine("diag_misc_throttle") {
+            append("Current throttle ")
+            goldValue(state.throttleMs?.toString() ?: "—")
+            append(" ms")
+        }
+        DiagnosticLine("diag_misc_alpha") {
+            append("Current smoothing α ")
+            goldValue(fmt(state.luxAlpha, 3))
+        }
+    }
+}
+
+/** Live wrapper: collects the pipeline snapshot and renders the Misc readout. */
+@Composable
+fun MiscDiagnosticCard() {
+    val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
+    MiscDiagnosticCardContent(state)
 }
