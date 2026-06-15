@@ -377,6 +377,35 @@ class BrightnessPipelineControllerTest {
         scope.cancel()
     }
 
+    // G2R-F71: the manual-override settle waits %AAB_CycleTime (task567 act7), NOT the %AAB_Throttle
+    // reactivity cooldown. prof755→task567 override detection is a separate Tasker profile from the
+    // task544 main loop the throttle gates, so a genuine override must still be acted on inside the
+    // cooldown window. With a deliberately long throttle and no measured CycleTime yet, the override
+    // pauses promptly (settle ≈ 0) — a throttle-coupled settle would have stalled it ~60s.
+    @Test
+    fun override_settleIsNotGatedByThrottleCooldown() = runTest {
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val longThrottle = settings.copy(throttleDefaultMs = 60_000L)
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = FakeSensor(), brightness = brightness, brightnessObserver = observer,
+            settingsProvider = { longThrottle }, scope = scope,
+            clock = { testScheduler.currentTime },
+        )
+        controller.start()
+
+        val before = testScheduler.currentTime
+        brightness.current = 200
+        observer.flow.emit(200)
+        advanceUntilIdle()
+        val elapsed = testScheduler.currentTime - before
+
+        assertTrue(controller.state.value.paused, "override must pause even within the throttle cooldown")
+        assertTrue(elapsed < 1_000L, "override settle must not borrow the throttle window (was ${elapsed}ms)")
+        scope.cancel()
+    }
+
     @Test
     fun screenOff_hibernatesRuntimeState() = runTest {
         val sensor = FakeSensor()

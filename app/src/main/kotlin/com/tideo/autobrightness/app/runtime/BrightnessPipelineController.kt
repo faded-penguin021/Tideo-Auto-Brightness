@@ -365,18 +365,25 @@ class BrightnessPipelineController(
     /**
      * task567 Manual Override: record the point and latch paused; the service posts the notification.
      *
-     * task567 act8 settle: wait `%AAB_CycleTime` for the new brightness to "take hold", then RE-READ
-     * and re-check the gate before committing the pause. A rapid light swing makes the pipeline write
-     * its own multi-frame transition whose ContentObserver callbacks can lag/coalesce; only a value
-     * that, after settling, is still NOT what we last applied is a genuine manual override — so a fast
-     * lux swing no longer false-pauses the loop (G2R-F26/D-049 #1). This runs in the single pipeline
-     * consumer (D-027), so the settle delay simply defers the next event.
+     * task567 act7/act8 settle: wait `%AAB_CycleTime` for the new brightness to "take hold", then
+     * RE-READ and re-check the gate before committing the pause. A rapid light swing makes the pipeline
+     * write its own multi-frame transition whose ContentObserver callbacks can lag/coalesce; only a
+     * value that, after settling, is still NOT what we last applied is a genuine manual override — so a
+     * fast lux swing no longer false-pauses the loop (G2R-F26/D-049 #1). This runs in the single
+     * pipeline consumer (D-027), so the settle delay simply defers the next event.
+     *
+     * G2R-F71: the settle is `%AAB_CycleTime` ONLY — NOT the `%AAB_Throttle` reactivity cooldown. The
+     * throttle gates the task544 main loop alone (prof760, see [runCycle]); prof755→task567 override
+     * detection is a SEPARATE Tasker profile and must not borrow the cooldown window, or a genuine
+     * override goes unacknowledged for the entire throttle (which on a long throttle is the override
+     * being "swallowed"). When no cycle has measured a CycleTime yet (`cycleTimeMs == null`), settle
+     * immediately — Tasker's "Wait %AAB_CycleTime" on an unset variable is a 0 ms wait, not the cooldown.
      */
     private suspend fun handleOverride(observed: Int) {
         val s = _state.value
         if (!OverrideRules.shouldCommitPause(s.serviceOn, autoRunning, s.paused, initializing)) return
 
-        val settleMs = (s.cycleTimeMs?.toLong() ?: cachedSettings?.throttleDefaultMs ?: 0L).coerceAtLeast(0L)
+        val settleMs = (s.cycleTimeMs?.toLong() ?: 0L).coerceAtLeast(0L)
         if (settleMs > 0) delay(settleMs)
 
         val s2 = _state.value
