@@ -67,9 +67,12 @@ the task544 main loop), so an override is detected inside the throttle window; *
 affordance nulls a rule's `timeRange`. `domain/` + golden vectors + ChartCanvas stayed fenced. Ladder GREEN
 (`:app:testDebugUnitTest`=176).
 
-**Next:** (1) **owner re-runs HUMAN GATE 2** (4th) on the full S12.7 build (now incl. F70–F73); (2) **S13** =
-the remaining charts (copying the S12.7g template) + About/User Guide static screens. The entire Gate-2
-re-re-test finding set (F33–F73) is now addressed.
+**Next:** a **new polish stage** (not yet briefed in RUNBOOK) to clear the Gate-2 (4th re-test) findings,
+then re-test Gate 2 again, then **S13** (remaining charts via the S12.7g template + About/User Guide,
+which also carries F80). The Gate-2 (4th) results are recorded under "Gate findings → Gate 2 (4th re-test)":
+most of F33–F73 are **confirmed fixed**; reopened with corrected specs = **F39/F62/F65/F70/F73**; follow-ups
+on F35/F50/F58/F59/F68; still-open **F45/F67/F71**; and **20 new findings G2R-F74…F89** (incl. **CRITICAL
+F85**: `%AAB_ThreshDynamic` must not be a user setting — schema change, re-scope the domain fence).
 
 ---
 
@@ -1896,6 +1899,106 @@ at the end).
   context resume). (F46) **confirmed** — manual profile load = an override (latch + Menu shows it + Resume
   clears); a context rule being active is NOT an override.
 
-### Gate 3 (after S14) — pending
+### Gate 2 (4th re-test, after S12.7i) — findings recorded → next polish stage (Gate 2 still NOT signed off)
 
-The human records on-device findings here; the next session triages them.
+**Owner on-device test 2026-06-15 ~19:00 UTC** (S12.7i build, dist/ APK; dist/ since removed). Device:
+**OnePlus 13, Android 16.** "Definitely hitting polishing territory." The large majority of the S12.7
+finding set (F33–F73) is **confirmed fixed**; a handful are reopened with corrected specs (the original spec
+was wrong in some cases), a few remain untestable, and the owner raised **20 new observations → G2R-F74…F89
+plus reopens**. Gate 2 stays NOT signed off; these route to the next polish stage (a future segment — NOT
+yet briefed in RUNBOOK). domain/ is touched by at least F85 (schema) and possibly F73 — re-scope the fence
+when briefing. Recorded verbatim-faithful below; owner parity hints preserved (they are authoritative).
+
+*Confirmed FIXED this round (close):* F33, F34, F40, F41, F42, F43, F44, F46, F47, F48, F49, F51, F52, F55,
+F56, F57, F60, F61, F63, F66, F69, F72, F36. (F35/F38/F50/F58/F59/F68 also "correct" but carry follow-ups —
+see below.)
+
+*Untestable / partially verified (keep OPEN):*
+- **G2R-F45 OPEN** — foreground/zombie-guarded location listener: owner could not test at home this round;
+  keep open until they can exercise the location lifecycle on the move.
+- **G2R-F67 PARTIAL** — day-of-week picker present; **midnight/overnight wrapping not yet verified** on device.
+- **G2R-F71 TENTATIVE** — override-during-cooldown appears correct, but the owner is unsure the manual test
+  was valid. Treat as provisionally fixed; needs a clean confirmation.
+
+*Reopened with CORRECTED specs (the original understanding was wrong):*
+- **G2R-F65 REOPENED — the S12.7b "two cooperating layers" model was WRONG.** PWM-sensitive mode and the
+  Super-Dimming toggle are **intentionally mutually exclusive**. PWM-sensitive means: **lock the hardware
+  brightness, then dim using Android "Extra Dim"** — see **Map Lux to Brightness (Java) V2, actions 23→38**
+  (cross-check the ledger note that task661's runtime math lives in Variable-Set 547, not Java). The
+  S12.7b change that fed the un-floored target so the secure layer engaged *alongside* PWM-floor must be
+  re-examined against this exclusivity.
+- **G2R-F70 REOPENED — legacy load is imperfect.** Import works (nested JSON parses), but **Form1A didn't
+  stick / was rounded**, and **misc settings appeared inherited from the previously loaded built-in
+  profile**. Root model: **Tasker loads the hard-coded defaults FIRST, then applies the legacy file's diffs**
+  — legacy configs store **only the diffs vs the hard-coded defaults**. The rebuild must reset to the
+  task570 hard-coded defaults before applying a legacy profile (not merge onto the current/previous set).
+- **G2R-F62 REOPENED — wizard suggestion line not drawn.** The suggested-curve series does not appear on the
+  Curve & Brightness chart (it shows the regular line only). Also the **wizard ran with just 7 override
+  points** (the ≥9 gate didn't hold) — suspect the synthetic priors are being counted toward the threshold.
+- **G2R-F73 REOPENED — still ~1 h off.** At 20:58 local the scale dropped to **1.025 (as if an hour early)**,
+  yet the **context-rule sunrise/sunset are obtained correctly**. So the dynamic-scale time frame disagrees
+  with the (correct) context solar calc — likely a tz/DST handling gap in `CircadianWindowProvider`/
+  `buildInput` (UTC-frame windows vs the device's actual offset), NOT the golden domain math. Investigate
+  the app-layer wiring first (per D-061's lesson); re-scope the domain fence only if proven necessary.
+- **G2R-F39 REOPENED — the S12.7h spec was wrong.** The Circadian fixed **Date / Lat / Lon** must be a real,
+  persisted override that **changes the circadian scaling logic** (Tasker parity) — setting e.g. 21 Dec
+  and/or a location must hold and take effect. Currently **"Set fixed" does nothing** (the setting isn't
+  applied). It is NOT merely a preview. (See also F83: the daily-location-refresh subsystem this feeds.)
+
+*Follow-ups on otherwise-correct findings:*
+- **G2R-F58 PARTIAL** — Super Dimming screen shows **no live readout**. Tasker shows: *dimming strength (rel)*
+  `[%AAB_DimmingCurrent]` and *super dimming strength (abs)* `[%AAB_DimmingDS]` at `[%AAB_CurrentBright]`
+  brightness. Add this live block.
+- **G2R-F59 PARTIAL** — the dynamic-threshold help still prints the literal text **"%AAB_ThreshDynamic"**; it
+  should substitute the **value only** (the current threshold).
+- **G2R-F68 PARTIAL (UI bug)** — in the context rule editor, **"Sunset (22:00)" wraps vertically, one letter
+  per line**, while "Sunrise (5:20)" renders normally. Layout/width bug on the token button.
+- **G2R-F50 NOTE (likely wontfix)** — the Accessibility service **sometimes disables itself automatically**
+  (Android 16 / OnePlus 13). Probably an OS limitation; owner is content to wontfix.
+- **G2R-F35 NOTE** — high-priority override notification works; but its Resume action and stacking behaviour
+  are buggy → see F74/F75.
+
+*New findings (G2R-F74…F89):*
+- **G2R-F74** — the **Resume** action on the high-priority override notification **does nothing**; it must
+  resume the pipeline (task569).
+- **G2R-F75** — the high-priority override notification must **cancel/replace the existing ongoing
+  notification** when it fires (don't stack two notifications).
+- **G2R-F76** — the **ongoing service notification's Pause** action behaves like / triggers an override and
+  is confusing; **remove it** (a user who wants to stop should just disable the service). Ties to the
+  dashboard rethink (F79).
+- **G2R-F77** — **prof769 panic not firing**: upside-down + display-on + significant-motion does **not**
+  trigger the S.O.S. / max-brightness flash pattern (task528). Verify the sensor wiring (orientation + shake).
+- **G2R-F78** — **%AAB_Throttle must be computed from the ACTUAL `steps*wait`**, not `maxSteps*maxWait`. The
+  max value is the **ceiling** applied by the *Throttle Reinitialization* profile after **10 s of no
+  brightness change** (stop polling the sensor when nothing's happening). Port that reinit profile (task566)
+  rather than hard-defaulting the throttle to the max.
+- **G2R-F79** — **Dashboard redesign**: current dashboard feels clumsy and its purpose is unclear. Resume-
+  manual-override is useful; the **Pause** control is weird (why not just disable?). Design a more insightful
+  dashboard that surfaces genuinely useful live info. (Pairs with F76.)
+- **G2R-F80** — show the **User Guide after permissions onboarding on first launch** (Tasker does this).
+  Deferred to **S13** (User Guide screen is built there).
+- **G2R-F81** — **graph placement is inconsistent**: the Dimming/Circadian charts render **below** all
+  settings while others are **above**. The relevant graph should sit **above** its settings; cycle between
+  the relevant graphs by **swipe** (NOT stacked vertically).
+- **G2R-F82** — **settings grouping**: settings that feed a single graph should be **subtly visually grouped**
+  and it should be clear **which graph** they pertain to. (Pairs with F81.)
+- **G2R-F83** — **dynamic-scale daily location refresh** (verify/port): Tasker briefly **toggles location
+  once per day** when `%AAB_SunLastDate != %DATE` (needs WRITE_SECURE_SETTINGS); **skips** it if
+  `%AAB_Latitude`/`%AAB_Longitude` are set; the **final fallback is ip-api.com**. Confirm whether the rebuild
+  has any of this (it likely does not) and port it (feeds F39).
+- **G2R-F84** — the settings-list modal (F38) uses **cryptic raw names** (e.g. "form1A") the end user won't
+  understand; use friendly labels. Some Tasker keys (e.g. `QSUse`) don't really belong here but are harmless.
+- **G2R-F85 (CRITICAL)** — **`%AAB_ThreshDynamic` must NOT be a user-editable setting.** It is the *outcome*
+  of the threshold calculation for the current lux level, not an input. Remove `thresholdDynamic` from the
+  editable settings schema/UI (it stays a runtime/computed value). **Touches `AabSettings` (domain-adjacent
+  schema) — re-scope the fence when briefing.**
+- **G2R-F86** — **LuxAlpha still occasionally shows negative values** (live readout / engine output).
+  Investigate the smoothing-alpha path (`1 - exp(-deltaFactor·effectiveDelta)` should be ≥ 0).
+- **G2R-F87** — the **app list in the context rule editor** should be **taller** (still scrollable) — F45-era
+  `heightIn(max=220.dp)` is too short.
+- **G2R-F88** — **tap-to-dismiss flashes/toasts** (Tasker lets you tap a flash to dismiss it).
+- **G2R-F89** — some permissions were **not explicitly requested** but appear in ADB's per-app list:
+  **background location, DUMP, package usage stats**. Verify whether they're requestable / needed; wontfix
+  if appropriate.
+
+
