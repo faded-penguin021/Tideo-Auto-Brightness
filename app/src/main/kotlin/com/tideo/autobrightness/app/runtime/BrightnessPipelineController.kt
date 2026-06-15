@@ -5,6 +5,7 @@ import com.tideo.autobrightness.app.settings.toAnimationConfig
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.settings.toDynamicScalingConfig
 import com.tideo.autobrightness.app.settings.toThresholdConfig
+import com.tideo.autobrightness.domain.brightness.BrightnessContext
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
 import com.tideo.autobrightness.domain.brightness.OverrideRules
@@ -53,6 +54,9 @@ class BrightnessPipelineController(
     private val dimming: DimmingCoordinator = NoOpDimmingCoordinator,
     private val debugSink: DebugSink = NoOpDebugSink,
     private val overrideSink: OverridePointSink = NoOpOverridePointSink,
+    // F73: real solar ramp windows for the dynamic-scale engine. Default `{ null }` keeps the old
+    // fixed-window behaviour (and existing tests) intact; AppModule supplies the live provider.
+    private val circadianWindowsProvider: (transitionFactor: Double) -> CircadianWindows? = { null },
 ) {
     private val engine = BrightnessEngine()
 
@@ -323,16 +327,33 @@ class BrightnessPipelineController(
     }
 
     private fun buildInput(rawLux: Double, settings: AabSettings, s: PipelineState): BrightnessPolicyInput {
-        // UTC seconds-of-day; real local time + solar ramp windows are wired with circadian in S9b/S12.
+        // UTC seconds-of-day — the same frame as the solar ramp windows below (buildScheduleWindows
+        // derives them as riseEpochSec % 86400). Both UTC ⇒ the ramp tracks the real sun (F73).
         val secondsOfDay = ((clock() / 1000L) % 86_400L).toDouble()
         val previous = if (s.smoothedLux != null && s.lastRawLux != null) {
             PreviousState(smoothedLux = s.smoothedLux, lastRawLux = s.lastRawLux, cycleTimeMs = s.cycleTimeMs)
         } else {
             null
         }
+        // F73: feed the REAL sunrise/sunset windows (not the fixed 6–8am-UTC TimeContext defaults) so
+        // %AAB_ScaleDynamic ramps with the actual day. Null (no location yet) → keep the old defaults.
+        val windows = circadianWindowsProvider(settings.scaleTransitionFactor.toDouble())
+        val time = if (windows != null) {
+            TimeContext(
+                secondsOfDay = secondsOfDay,
+                morningStart = windows.morningStart,
+                morningEnd = windows.morningEnd,
+                eveningStart = windows.eveningStart,
+                eveningEnd = windows.eveningEnd,
+                sunlightDurationMinutes = windows.sunlightDurationMinutes,
+            )
+        } else {
+            TimeContext(secondsOfDay = secondsOfDay)
+        }
         return BrightnessPolicyInput(
             lux = rawLux,
-            time = TimeContext(secondsOfDay = secondsOfDay),
+            time = time,
+            context = BrightnessContext(isPolarDayNight = windows?.isPolar ?: false),
             thresholds = settings.toThresholdConfig(),
             curve = settings.toBrightnessCurveConfig(),
             animation = settings.toAnimationConfig(),

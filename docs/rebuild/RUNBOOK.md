@@ -1207,19 +1207,27 @@ defaults; STATE.md flips F38/F39; screen_map/checklist updated. → **re-run HUM
 ### S12.7i — During-S12.7 deferral cleanup *(Opus/high · medium)*
 
 **Model:** Opus / high · **Size:** medium · **Preconditions:** S12.7a–h merged to main. **Run setup
-script.** **Origin:** three findings the owner logged *during* the S12.7 work and explicitly deferred to a
-later session (STATE.md G2R-F70/F71/F72). Same prime directive: **port Tasker behaviour exactly; modernise
-the *how*, never the *what*.** UI/app/runtime-glue only — **domain/ + golden vectors stay fenced.** Re-read
-the cited XML/extraction before each fix; do not invent behaviour.
+script.** **Origin:** four findings the owner logged *during* the S12.7 work and deferred (STATE.md
+G2R-F70/F71/F72/F73). Same prime directive: **port Tasker behaviour exactly; modernise the *how*, never
+the *what*.** UI/app/runtime-glue only — **domain/ + golden vectors stay fenced.** Re-read the cited
+XML/extraction before each fix; do not invent behaviour.
 
-> **NOT in scope (record, don't action): G2R-F73** — `%AAB_ScaleDynamic` drops below 1 at ~07:13, a
-> suspected **UTC-vs-local-time** bug in `DynamicScaleEngine`/`SolarTimes` (`secondsOfDay` from the UTC
-> wall-clock, D-039d). That math lives in `domain/`, which every S12.7 segment fences. It needs a
-> **dedicated domain mini-segment** that changes the reference impl + regenerates the golden circadian
-> vectors with proof (per the CLAUDE.md golden-vector rule), not an app-layer patch. Leave F73 for that
-> segment; do **not** "fix" it by guessing here.
+> **F73 turned out APP-LAYER, not a domain bug — already landed (2026-06-15).** The suspected
+> UTC-vs-local issue was real *in spirit* but the root cause was that the live pipeline never wired real
+> solar windows: `BrightnessPipelineController.buildInput` fed the dynamic-scale engine `TimeContext`'s
+> **fixed defaults** (6–8am / 18–20pm *UTC* morning/evening), so "morning" was pinned to 06–08 UTC = a
+> couple hours late in local time → `%AAB_ScaleDynamic` 0.852 at 06:13 UTC regardless of the user's clock
+> (07:13 at UTC+1, 08:13 at UTC+2 — both 06:13 UTC, the owner confirmed both). The fix wires the
+> already-fenced, golden-tested `SolarCalculator.compute`/`buildScheduleWindows` (new
+> `CircadianWindowProvider`, F39 date/loc override aware) into `buildInput`; `now` stays UTC seconds-of-day
+> to match `buildScheduleWindows`' UTC-frame windows. **domain/ + golden vectors untouched.** Verified:
+> Utrecht 2026-06-15 sunrise 05:18 local → scaleDynamic 1.15 at 08:13 local (was 0.852). Done as the first
+> S12.7i deliverable; remaining work below.
 
 **Deliverables:**
+0. **(DONE 2026-06-15) Circadian solar-window wiring** (F73): `buildInput` now feeds the real
+   sunrise/sunset ramp windows. `CircadianWindowProvider` (+ pure `compute`) + `CircadianWindowProviderTest`
+   (Utrecht bug→fix regression). See the box above; domain/ fenced.
 1. **Legacy load actually applies** (F70): importing a legacy Tasker `.json` (Profiles → legacy folder/file
    load) currently registers the profile + latches the context override but **never commits the parsed
    settings into the active DataStore + re-evaluates**, so nothing changes on screen. Make a legacy load
@@ -1240,9 +1248,9 @@ the cited XML/extraction before each fix; do not invent behaviour.
 
 **Acceptance:** ladder green; tests for (1) a legacy import committing parsed values + triggering reapply,
 (2) an override detected during the throttle/cooldown window (controller/monitor test against the
-transcribed task543/567 logic), (3) the clear-time affordance nulling `timeRange`; STATE.md flips
-F70/F71/F72 (and re-confirms F73 stays open for a domain segment); checklist updated. **Fence: domain/ +
-golden vectors untouched.**
+transcribed task543/567 logic), (3) the clear-time affordance nulling `timeRange`; F73 already has its
+regression test; STATE.md flips F70/F71/F72/F73; checklist updated. **Fence: domain/ + golden vectors
+untouched.**
 
 ---
 

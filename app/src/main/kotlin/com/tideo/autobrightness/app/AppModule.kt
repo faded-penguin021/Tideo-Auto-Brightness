@@ -9,15 +9,19 @@ import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
+import com.tideo.autobrightness.app.runtime.CircadianWindowProvider
 import com.tideo.autobrightness.app.settings.ContextRuleStore
+import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
 import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.storage.contextRulesDataStore
+import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.storage.userProfilesDataStore
 import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
+import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
@@ -69,6 +73,14 @@ class AppModule(context: Context) {
             contextLoadSink = ToastContextLoadSink(appContext),
         )
 
+        // F73: real solar ramp windows for the dynamic-scale engine (today + last-known location, or
+        // the F39 fixed date/location override), so %AAB_ScaleDynamic tracks the actual sunrise.
+        val circadianWindows = CircadianWindowProvider(
+            scope = scope,
+            experimentStore = ExperimentPrefsStore(appContext.experimentPrefsDataStore),
+            location = AndroidLocationReader(appContext),
+        )
+
         controller = BrightnessPipelineController(
             lightSensor = AndroidLightSensorSource(appContext),
             brightness = brightness,
@@ -76,6 +88,7 @@ class AppModule(context: Context) {
             // Effective settings = active context profile merged over the baseline, or the baseline.
             settingsProvider = { contextEngine.effectiveSettings() },
             scope = scope,
+            circadianWindowsProvider = circadianWindows::current,
             dimming = SuperDimmingCoordinator(
                 secureDimming = AndroidSecureDimmingController(appContext, privilegeManager),
                 // Re-detect each cycle so a WRITE_SECURE_SETTINGS grant made AFTER the service
