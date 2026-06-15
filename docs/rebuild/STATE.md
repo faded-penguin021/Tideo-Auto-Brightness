@@ -67,9 +67,12 @@ the task544 main loop), so an override is detected inside the throttle window; *
 affordance nulls a rule's `timeRange`. `domain/` + golden vectors + ChartCanvas stayed fenced. Ladder GREEN
 (`:app:testDebugUnitTest`=176).
 
-**Next:** a **new polish stage** (not yet briefed in RUNBOOK) to clear the Gate-2 (4th re-test) findings,
-then re-test Gate 2 again, then **S13** (remaining charts via the S12.7g template + About/User Guide,
-which also carries F80). The Gate-2 (4th) results are recorded under "Gate findings → Gate 2 (4th re-test)":
+**Next:** **S12.8 is now BRIEFED in RUNBOOK** (a–d, all Opus/high) to clear the Gate-2 (4th re-test)
+findings — **S12.8a** Runtime (override notif/throttle/panic/PWM-dimming), **S12.8b** UI (dashboard/graph
+placement/context editor), **S12.8c** Settings & profiles (schema hygiene incl. CRITICAL F85/legacy load/
+wizard), **S12.8d** Circadian (DST fix/fixed date-loc/ip-api). Land a→c→d then b; then re-test Gate 2 (5th);
+then **S13** (remaining charts via the S12.7g template + About/User Guide, which carries F80). The Gate-2
+(4th) results are recorded under "Gate findings → Gate 2 (4th re-test)":
 most of F33–F73 are **confirmed fixed**; reopened with corrected specs = **F39/F62/F65/F70/F73**; follow-ups
 on F35/F50/F58/F59/F68; still-open **F45/F67/F71**; and **20 new findings G2R-F74…F89** (incl. **CRITICAL
 F85**: `%AAB_ThreshDynamic` must not be a user setting — schema change, re-scope the domain fence).
