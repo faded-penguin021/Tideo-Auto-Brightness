@@ -43,6 +43,7 @@ next session does not know it.
 | S12.7g charts & curve view | 2026-06-15 | Opus/high | DONE | (this push) | Curve chart enriched + `ChartCanvas` extended (D-059; G2R-F36/F55/F62/F66/F69). **Merged with S12.7f** (PR #40; CurveBrightnessScreen.kt `live` readout + SettingsScreensTest both kept). **F55** `ChartCanvas` gained `xAxisLabel`/`yAxisLabel` (Lux/Brightness), a `niceTicks` 1/2/5×10ⁿ y-tick generator (0/50/…/250, kills the 191.25 artefact), log-x now sampled from **0.1**→100k, and an opt-in `interactive` drag/tap **scrub** that draws a vertical line + per-series readout box at the touch point (pure `seriesValueAt` interpolation). **F66** opt-in `showLegend` Row above the canvas — solid/dashed swatch + label per series (`legend_Curve`, dashed `legend_Reference`, `legend_Suggested`) + "Overrides" scatter. **F69** new `referenceCurve` param: `CurveBrightnessContent` samples it from the **committed** snapshot (`remember(committed)`) → FIXED dashed-gold reference that does NOT track the draft (replaces the old draft-derived moving "Taper" overlay); the live "Curve" tracks the draft. **F36** override points are now a tappable `ChartScatter` (12px dots, white ring); `ChartCanvas` hit-tests via `nearestIndex` → data-space callback → `OverridePointDeleteDialog` (lux/brightness pair + confirm) → new `OverridePointStore.delete` + `DraftSettingsViewModel.deleteOverridePoint`. **F62** verified the wizard's "Suggested" fit (≥9 pts, task38) draws on the curve view against scatter+reference. New owner finding logged + deferred: **G2R-F73** (`%AAB_ScaleDynamic` <1 at ~07:13, suspected UTC bug; domain-fenced). **Fence: domain/ + golden vectors untouched; ChartCanvas extended (sanctioned for S12.7g only).** Tests: `ChartCanvasTest` (4 — niceTicks/logSpaced/seriesValueAt/nearestIndex, pure JVM), OverridePointStore.delete (1), SettingsScreens +2 (legend Reference/Curve, delete-dialog confirm). Full ladder GREEN: `:app:testDebugUnitTest`(159) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.7h rich editors / scene fidelity | 2026-06-15 | Opus/high | DONE | (this push) | The last S12.7 sub-segment — profile/settings-list fidelity + Circadian date/location (D-060; G2R-F38/F39). **F38** the Tasker dashboard's "full list of every setting w/ gold changed-vs-default": new `settings/SettingsDisplay.kt` (`AabSettings.displayRows(reference)`/`changedCount`/`valueFor` — explicit per-key `when`, NO reflection per owner caution; excludes runtime/identity keys serviceEnabled/contextOverride) + `ui/components/SettingsDiffList.kt` (changed rows in teal-gold `AabGold` + SemiBold, count summary). Wired into a new **`LoadProfileDialog`** ("Load Anyway" preview→Apply modal, replaces the old direct Apply button), the **Save dialog** (shows the live set being saved), and a **"View current settings"** dialog (active-vs-default compare = the dashboard); each ProfileCard now shows its changed-count. **F39** Circadian fixed Date/Lat/Lon element (experiment_settings.md elements35–37, `_ExperimentSetDate`/`_ExperimentClearDate`): new `CircadianDateLocationCard` (M3 DatePicker + lat/lon fields + "Use current location" + "Use live data") backed by new `settings/ExperimentPrefsStore.kt` (`experimentPrefsDataStore` — `%AAB_Date`/`%AAB_Latitude`/`%AAB_Longitude`) via new `state/CircadianExtrasViewModel.kt`; unset → fields pre-fill **today + `lastKnownLocation`**; preview-only (never enters AabSettings/profiles/export). The ExperimentChart remains the S13 host slot. Tests: SettingsScreens +5 (diff-list changed/all-default, LoadProfileDialog confirm, Circadian defaults-to-today+loc, set-fixed emits) + new `SettingsDisplayTest` (3, pure JVM). **Fence: domain/ + golden vectors + ChartCanvas untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(167) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **ALL S12.7 (a–h) DONE → GATE 2 RE-RE-TEST (4th) READY. S12.7i queued for the during-S12.7 deferrals (F70/F71/F72); F73 needs a domain segment.** |
 | S12.7i (F73 first) circadian solar-window wiring | 2026-06-15 | Opus/high | DONE (F73) | (this push) | First S12.7i deliverable: **F73 fixed — and it was APP-LAYER, not the suspected domain bug** (D-061). Root cause: `BrightnessPipelineController.buildInput` built `TimeContext(secondsOfDay=…)` but left every solar window at its **default (6–8am / 18–20pm UTC)** — the real sunrise was NEVER wired (the D-039d "circadian wired in S9b/S12" carryover that never happened). So the dynamic-scale morning ramp ran 06–08 UTC for everyone → `%AAB_ScaleDynamic`=0.852 at **06:13 UTC** irrespective of the device clock (owner saw it at 07:13 @UTC+1 AND 08:13 @UTC+2 — both 06:13 UTC, confirming the frame, not a local bug). Fix: new `runtime/CircadianWindowProvider.kt` (pure `compute(lat,lon,dateEpochSec,tz,factor)` → `CircadianWindows` via the **already-fenced, golden-tested** `SolarCalculator.compute`/`buildScheduleWindows`; stateful `current()` resolves the F39 fixed date/loc override else today + `lastKnownLocation`, day/loc/factor-cached, returns null→keep old defaults when no fix). `buildInput` now feeds the real morning/evening/sunlight/polar fields; `now` stays UTC seconds-of-day to match `buildScheduleWindows`' UTC-frame windows. `BrightnessPipelineController` gains `circadianWindowsProvider` (default `{null}` → existing tests/behaviour intact); `AppModule.createRuntime` wires the live provider. **Verified end-to-end: Utrecht 2026-06-15 sunrise 05:18 local → scaleDynamic 1.15 at 08:13 local (was 0.852).** Tests: `CircadianWindowProviderTest` (4, pure JVM — Utrecht sunrise≈05:18 + daytime 1.15, default-window bug repro 0.852, window ordering/non-polar). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (only *called*).** Full ladder GREEN: `:app:testDebugUnitTest`(171) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **S12.7i F70/F71/F72 still remain.** |
+| S12.7i (F70/F71/F72) deferral cleanup | 2026-06-15 | Opus/high | DONE | (this push) | The three remaining during-S12.7 deferrals closed (D-062; F73 already landed). **F70 legacy-load-doesn't-apply — root cause was the PARSER, not the wiring:** ProfilesScreen already called `vm.replaceAll(imported)` (commit+reapply) since S12.7c, but `TaskerLegacyProfileSerializer` only parsed `%AAB_Key=value` plaintext, so a REAL Tasker config (nested JSON — `{meta,general,misc,reactivity,circadian,superdimming}`, task637 `_ProfileManager.performSave` XML L29365+) parsed to all-defaults → "loaded by name", nothing changed. Rewrote the serializer to detect `{`-JSON and map the snake_case keys per task637 `performLoad` (L29490+); derived form2A/2D/3A intentionally NOT stored (recomputed at read-time, ledger). `%AAB_Key=value` fallback kept. **F71 reactivity-cooldown-swallows-overrides:** transcribed task544 (throttle gate `elapsed<%AAB_Throttle`→`%AAB_MainLoop=0`→Stop is the MAIN-LOOP gate, prof760) vs task567 (prof755 override handler: act7 "Wait %AAB_CycleTime", act8 re-gate) — the throttle gates ONLY the task544 main loop; prof755→task567 override detection is a SEPARATE profile. `handleOverride`'s settle fallback to `throttleDefaultMs` was the lone conflation; changed to `%AAB_CycleTime` only (0 when unset) so an override is detected inside the cooldown window. **F72 can't-clear-a-time-rule:** added a "Clear time" affordance in the context rule editor that blanks From/To → `ContextTriggers.timeRange` saves null. **Fence: domain/ + golden vectors + ChartCanvas untouched.** Tests: LegacyImportRoundTrip +2 (nested-JSON full parse, partial-section defaults), SettingsViewModel +1 (replaceAll commits parsed legacy values + triggers ACTION_REAPPLY), BrightnessPipelineController +1 (override settle not gated by a 60s throttle), SettingsScreens +1 (Clear time nulls timeRange). Full ladder GREEN: `:app:testDebugUnitTest`(176) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **ALL S12.7 (a–i) DONE → GATE 2 RE-RE-TEST (4th) READY.** |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
@@ -57,16 +58,24 @@ settings"** dashboard dialog on Profiles; **F39** the Circadian **fixed Date/Lat
 current location** when unset, preview-only (never enters profiles/export). domain/ + golden vectors +
 ChartCanvas stayed fenced. Ladder GREEN (`:app:testDebugUnitTest`=167).
 
-**S12.7i STARTED (2026-06-15): G2R-F73 DONE first** (it turned out app-layer, not the suspected domain bug
-— see the segment-log row + D-061). The live pipeline now wires the real sunrise windows into the
-dynamic-scale engine (`CircadianWindowProvider`); `domain/` + golden vectors stayed fenced. Verified
-Utrecht sunrise 05:18 → scaleDynamic 1.15 at 08:13 local (was 0.852).
+**S12.7i COMPLETE (2026-06-15): all four deferrals (F70/F71/F72/F73) closed → ALL of S12.7 (a–i) DONE.**
+F73 landed first (app-layer solar-window wiring, D-061). This final push closed the last three (D-062):
+**F70** legacy "Load" now parses the REAL nested-JSON Tasker config (the parser, not the wiring, was the
+bug — replaceAll+reapply was already wired) and commits+reapplies the parsed settings; **F71** the manual-
+override settle waits `%AAB_CycleTime` (task567 act7), never the `%AAB_Throttle` cooldown (which gates only
+the task544 main loop), so an override is detected inside the throttle window; **F72** a "Clear time"
+affordance nulls a rule's `timeRange`. `domain/` + golden vectors + ChartCanvas stayed fenced. Ladder GREEN
+(`:app:testDebugUnitTest`=176).
 
-**Next:** (1) **owner re-runs HUMAN GATE 2** (4th) on the full S12.7 build (now incl. the F73 fix);
-(2) **finish S12.7i** — the three remaining app-layer findings (G2R-F70 legacy-load-doesn't-apply,
-F71 reactivity-cooldown-swallows-overrides, F72 can't-clear-a-time-rule); (3) **S13** = the remaining
-charts (copying the S12.7g template) + About/User Guide. Other than those, the Gate-2 re-re-test finding
-set (F33–F69) + F73 is fully addressed.
+**Next:** **S12.8 is now BRIEFED in RUNBOOK** (a–d, all Opus/high) to clear the Gate-2 (4th re-test)
+findings — **S12.8a** Runtime (override notif/throttle/panic/PWM-dimming), **S12.8b** UI (dashboard/graph
+placement/context editor), **S12.8c** Settings & profiles (schema hygiene incl. CRITICAL F85/legacy load/
+wizard), **S12.8d** Circadian (DST fix/fixed date-loc/ip-api). Land a→c→d then b; then re-test Gate 2 (5th);
+then **S13** (remaining charts via the S12.7g template + About/User Guide, which carries F80). The Gate-2
+(4th) results are recorded under "Gate findings → Gate 2 (4th re-test)":
+most of F33–F73 are **confirmed fixed**; reopened with corrected specs = **F39/F62/F65/F70/F73**; follow-ups
+on F35/F50/F58/F59/F68; still-open **F45/F67/F71**; and **20 new findings G2R-F74…F89** (incl. **CRITICAL
+F85**: `%AAB_ThreshDynamic` must not be a user setting — schema change, re-scope the domain fence).
 
 ---
 
@@ -1315,7 +1324,26 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   proposing to regenerate golden vectors. (Affects S12.7i; S13's circadian/experiment chart can reuse
   `CircadianWindowProvider.compute`.)
 
-Append new entries as D-062, … with which segments they affect.
+- **D-062 (S12.7i) — F70/F71/F72 cleanup; two of the three were misdiagnosed in the original report.**
+  (1) **F70** ("legacy load doesn't apply") was NOT an apply-wiring gap — ProfilesScreen has called
+  `vm.replaceAll(imported)` (commit + reapply) since S12.7c. The real bug: `TaskerLegacyProfileSerializer`
+  only parsed `%AAB_Key=value` plaintext, but the on-device app saves **nested JSON** (task637
+  `_ProfileManager` performSave, XML L29365+: `{meta,general,misc,reactivity,circadian,superdimming}` with
+  snake_case keys). A real config therefore parsed to all-defaults. The serializer now sniffs a leading `{`
+  and decodes the nested schema (key→field map ported from performLoad L29490+); the plaintext path is the
+  fallback. **Derived form2A/form2D/form3A are deliberately NOT read** — performLoad recomputes them, as
+  does `derivedCoefficients()` at read-time (ledger). Moral (again): "doesn't apply" can be a parse bug, not
+  a commit bug — verify the parser produces non-default values before touching the apply path.
+  (2) **F71** ("cooldown swallows overrides"): per task544 vs task567, `%AAB_Throttle` gates ONLY the
+  prof760 main loop (`elapsed<min_interval`→`%AAB_MainLoop=0`→Stop); prof755→task567 override detection is a
+  separate profile whose settle is task567 act7 "Wait **%AAB_CycleTime**". The runtime's lone conflation was
+  `handleOverride`'s settle falling back to `throttleDefaultMs` when CycleTime was unset; now it uses
+  `%AAB_CycleTime` only (0 ms when unset). No throttle gate ever touched `OverrideMonitor`/the override
+  event path — architecture was already separate.
+  (3) **F72**: a "Clear time" button in the context rule editor blanks From/To → `timeRange` saves null.
+  **Fence honoured: domain/ + golden vectors + ChartCanvas untouched.** Affects S12.7i only.
+
+Append new entries as D-063, … with which segments they affect.
 
 ## Blockers
 
@@ -1815,8 +1843,15 @@ at the end).
   `referenceCurve` param; `CurveBrightnessContent` samples it from the **committed** snapshot
   (`remember(committed)`), drawn dashed gold and FIXED, while the live "Curve" series tracks the draft.
   (Replaces the old draft-derived "Taper" overlay that moved.)
-- **G2R-F70 (owner, 2026-06-15 — DEFERRED → scheduled S12.7i)** **Loading a legacy Tasker JSON config does not
-  apply.** Importing a legacy `.json` (Profiles screen → legacy folder/file load) **toasts "loaded" and the
+- **G2R-F70** ✅ RESOLVED S12.7i (D-062) — **the bug was the PARSER, not the apply-wiring.** ProfilesScreen
+  already called `vm.replaceAll(imported)` (commit + `AutoBrightnessRuntime.reapply`) since S12.7c, but
+  `TaskerLegacyProfileSerializer` only understood `%AAB_Key=value` plaintext. A real Tasker AAB config is
+  **nested JSON** (`{meta,general,misc,reactivity,circadian,superdimming}`, task637 `_ProfileManager`
+  performSave XML L29365+ / performLoad L29490+), so it parsed to all-defaults → the file "loaded" by name
+  but no value changed. The serializer now detects `{`-JSON and maps the snake_case keys per performLoad
+  (derived form2A/2D/3A not stored — recomputed at read-time, per the ledger); the plaintext path is kept.
+  Original report below.
+  **Loading a legacy Tasker JSON config does not apply.** Importing a legacy `.json` (Profiles screen → legacy folder/file load) **toasts "loaded" and the
   Menu shows the context-override latch, but none of the imported settings actually take hold** (the live
   brightness/curve/etc. behaviour is unchanged). The import path appears to register the profile + latch the
   override (S12.7c F44 wired `saveImportedProfile`) but never **commits the parsed settings into the active
@@ -1825,8 +1860,13 @@ at the end).
   `SettingsViewModel.replaceAll(parsed)` + `AutoBrightnessRuntime.reapply` (cf. the manual Apply path).
   Repro: import a legacy config that differs from current, observe no change. Fix: make legacy load apply the
   parsed settings exactly like a profile apply (commit + reapply), not just register/latch. **App-layer.**
-- **G2R-F71 (owner, 2026-06-15 — DEFERRED → scheduled S12.7i)** **Reactivity cooldown is fixed to
-  `%AAB_Throttle`, which blocks manual overrides — not how Tasker does it.** The runtime currently gates the
+- **G2R-F71** ✅ RESOLVED S12.7i (D-062). Transcribed task544 (the throttle gate
+  `elapsed<%AAB_Throttle`→`%AAB_MainLoop=0`→Stop gates ONLY the prof760 main loop) vs task567 (prof755
+  override handler: act7 "Wait %AAB_CycleTime", act8 re-gate) — override detection is a SEPARATE Tasker
+  profile from the throttle-gated main loop. The only conflation in the runtime was `handleOverride`'s
+  settle falling back to `throttleDefaultMs`; now it waits `%AAB_CycleTime` only (0 ms when unset), so a
+  genuine override is acted on inside the throttle window. domain/ fenced. Original report below.
+  **Reactivity cooldown is fixed to `%AAB_Throttle`, which blocks manual overrides — not how Tasker does it.** The runtime currently gates the
   reactivity cooldown on a fixed `%AAB_Throttle` window; while that window is in force a genuine manual
   brightness override is missed/suppressed. Tasker's real model does NOT hard-pin the cooldown to throttle in
   a way that swallows overrides — re-derive the actual task543/task567 cooldown-vs-override interaction from
@@ -1834,7 +1874,10 @@ at the end).
   touches the runtime override/throttle interaction (BrightnessPipelineController/OverrideMonitor); verify
   against the real task logic — do NOT approximate. domain/ stays fenced.** (Related to the S12.7a override
   work but distinct: this is the cooldown gate, not the detector.)
-- **G2R-F72 (owner, 2026-06-15 — DEFERRED → scheduled S12.7i)** **Cannot remove a time rule from a context.**
+- **G2R-F72** ✅ RESOLVED S12.7i (D-062) — the context rule editor now shows a "Clear time" action
+  (visible once a From/To is set) that blanks both fields → `ContextTriggers.timeRange` saves null, making a
+  time-constrained rule time-agnostic again. Original report below.
+  **Cannot remove a time rule from a context.**
   In the context rule editor, once a context has a time (From/To) rule there is **no way to clear/remove it**
   — the time fields can be set but not unset back to "no time constraint". Add a clear/remove affordance
   (e.g. a "Clear time" action that nulls `ContextTriggers.from`/`to`) so a time-constrained rule can become
@@ -1859,6 +1902,106 @@ at the end).
   context resume). (F46) **confirmed** — manual profile load = an override (latch + Menu shows it + Resume
   clears); a context rule being active is NOT an override.
 
-### Gate 3 (after S14) — pending
+### Gate 2 (4th re-test, after S12.7i) — findings recorded → next polish stage (Gate 2 still NOT signed off)
 
-The human records on-device findings here; the next session triages them.
+**Owner on-device test 2026-06-15 ~19:00 UTC** (S12.7i build, dist/ APK; dist/ since removed). Device:
+**OnePlus 13, Android 16.** "Definitely hitting polishing territory." The large majority of the S12.7
+finding set (F33–F73) is **confirmed fixed**; a handful are reopened with corrected specs (the original spec
+was wrong in some cases), a few remain untestable, and the owner raised **20 new observations → G2R-F74…F89
+plus reopens**. Gate 2 stays NOT signed off; these route to the next polish stage (a future segment — NOT
+yet briefed in RUNBOOK). domain/ is touched by at least F85 (schema) and possibly F73 — re-scope the fence
+when briefing. Recorded verbatim-faithful below; owner parity hints preserved (they are authoritative).
+
+*Confirmed FIXED this round (close):* F33, F34, F40, F41, F42, F43, F44, F46, F47, F48, F49, F51, F52, F55,
+F56, F57, F60, F61, F63, F66, F69, F72, F36. (F35/F38/F50/F58/F59/F68 also "correct" but carry follow-ups —
+see below.)
+
+*Untestable / partially verified (keep OPEN):*
+- **G2R-F45 OPEN** — foreground/zombie-guarded location listener: owner could not test at home this round;
+  keep open until they can exercise the location lifecycle on the move.
+- **G2R-F67 PARTIAL** — day-of-week picker present; **midnight/overnight wrapping not yet verified** on device.
+- **G2R-F71 TENTATIVE** — override-during-cooldown appears correct, but the owner is unsure the manual test
+  was valid. Treat as provisionally fixed; needs a clean confirmation.
+
+*Reopened with CORRECTED specs (the original understanding was wrong):*
+- **G2R-F65 REOPENED — the S12.7b "two cooperating layers" model was WRONG.** PWM-sensitive mode and the
+  Super-Dimming toggle are **intentionally mutually exclusive**. PWM-sensitive means: **lock the hardware
+  brightness, then dim using Android "Extra Dim"** — see **Map Lux to Brightness (Java) V2, actions 23→38**
+  (cross-check the ledger note that task661's runtime math lives in Variable-Set 547, not Java). The
+  S12.7b change that fed the un-floored target so the secure layer engaged *alongside* PWM-floor must be
+  re-examined against this exclusivity.
+- **G2R-F70 REOPENED — legacy load is imperfect.** Import works (nested JSON parses), but **Form1A didn't
+  stick / was rounded**, and **misc settings appeared inherited from the previously loaded built-in
+  profile**. Root model: **Tasker loads the hard-coded defaults FIRST, then applies the legacy file's diffs**
+  — legacy configs store **only the diffs vs the hard-coded defaults**. The rebuild must reset to the
+  task570 hard-coded defaults before applying a legacy profile (not merge onto the current/previous set).
+- **G2R-F62 REOPENED — wizard suggestion line not drawn.** The suggested-curve series does not appear on the
+  Curve & Brightness chart (it shows the regular line only). Also the **wizard ran with just 7 override
+  points** (the ≥9 gate didn't hold) — suspect the synthetic priors are being counted toward the threshold.
+- **G2R-F73 REOPENED — still ~1 h off.** At 20:58 local the scale dropped to **1.025 (as if an hour early)**,
+  yet the **context-rule sunrise/sunset are obtained correctly**. So the dynamic-scale time frame disagrees
+  with the (correct) context solar calc — likely a tz/DST handling gap in `CircadianWindowProvider`/
+  `buildInput` (UTC-frame windows vs the device's actual offset), NOT the golden domain math. Investigate
+  the app-layer wiring first (per D-061's lesson); re-scope the domain fence only if proven necessary.
+- **G2R-F39 REOPENED — the S12.7h spec was wrong.** The Circadian fixed **Date / Lat / Lon** must be a real,
+  persisted override that **changes the circadian scaling logic** (Tasker parity) — setting e.g. 21 Dec
+  and/or a location must hold and take effect. Currently **"Set fixed" does nothing** (the setting isn't
+  applied). It is NOT merely a preview. (See also F83: the daily-location-refresh subsystem this feeds.)
+
+*Follow-ups on otherwise-correct findings:*
+- **G2R-F58 PARTIAL** — Super Dimming screen shows **no live readout**. Tasker shows: *dimming strength (rel)*
+  `[%AAB_DimmingCurrent]` and *super dimming strength (abs)* `[%AAB_DimmingDS]` at `[%AAB_CurrentBright]`
+  brightness. Add this live block.
+- **G2R-F59 PARTIAL** — the dynamic-threshold help still prints the literal text **"%AAB_ThreshDynamic"**; it
+  should substitute the **value only** (the current threshold).
+- **G2R-F68 PARTIAL (UI bug)** — in the context rule editor, **"Sunset (22:00)" wraps vertically, one letter
+  per line**, while "Sunrise (5:20)" renders normally. Layout/width bug on the token button.
+- **G2R-F50 NOTE (likely wontfix)** — the Accessibility service **sometimes disables itself automatically**
+  (Android 16 / OnePlus 13). Probably an OS limitation; owner is content to wontfix.
+- **G2R-F35 NOTE** — high-priority override notification works; but its Resume action and stacking behaviour
+  are buggy → see F74/F75.
+
+*New findings (G2R-F74…F89):*
+- **G2R-F74** — the **Resume** action on the high-priority override notification **does nothing**; it must
+  resume the pipeline (task569).
+- **G2R-F75** — the high-priority override notification must **cancel/replace the existing ongoing
+  notification** when it fires (don't stack two notifications).
+- **G2R-F76** — the **ongoing service notification's Pause** action behaves like / triggers an override and
+  is confusing; **remove it** (a user who wants to stop should just disable the service). Ties to the
+  dashboard rethink (F79).
+- **G2R-F77** — **prof769 panic not firing**: upside-down + display-on + significant-motion does **not**
+  trigger the S.O.S. / max-brightness flash pattern (task528). Verify the sensor wiring (orientation + shake).
+- **G2R-F78** — **%AAB_Throttle must be computed from the ACTUAL `steps*wait`**, not `maxSteps*maxWait`. The
+  max value is the **ceiling** applied by the *Throttle Reinitialization* profile after **10 s of no
+  brightness change** (stop polling the sensor when nothing's happening). Port that reinit profile (task566)
+  rather than hard-defaulting the throttle to the max.
+- **G2R-F79** — **Dashboard redesign**: current dashboard feels clumsy and its purpose is unclear. Resume-
+  manual-override is useful; the **Pause** control is weird (why not just disable?). Design a more insightful
+  dashboard that surfaces genuinely useful live info. (Pairs with F76.)
+- **G2R-F80** — show the **User Guide after permissions onboarding on first launch** (Tasker does this).
+  Deferred to **S13** (User Guide screen is built there).
+- **G2R-F81** — **graph placement is inconsistent**: the Dimming/Circadian charts render **below** all
+  settings while others are **above**. The relevant graph should sit **above** its settings; cycle between
+  the relevant graphs by **swipe** (NOT stacked vertically).
+- **G2R-F82** — **settings grouping**: settings that feed a single graph should be **subtly visually grouped**
+  and it should be clear **which graph** they pertain to. (Pairs with F81.)
+- **G2R-F83** — **dynamic-scale daily location refresh** (verify/port): Tasker briefly **toggles location
+  once per day** when `%AAB_SunLastDate != %DATE` (needs WRITE_SECURE_SETTINGS); **skips** it if
+  `%AAB_Latitude`/`%AAB_Longitude` are set; the **final fallback is ip-api.com**. Confirm whether the rebuild
+  has any of this (it likely does not) and port it (feeds F39).
+- **G2R-F84** — the settings-list modal (F38) uses **cryptic raw names** (e.g. "form1A") the end user won't
+  understand; use friendly labels. Some Tasker keys (e.g. `QSUse`) don't really belong here but are harmless.
+- **G2R-F85 (CRITICAL)** — **`%AAB_ThreshDynamic` must NOT be a user-editable setting.** It is the *outcome*
+  of the threshold calculation for the current lux level, not an input. Remove `thresholdDynamic` from the
+  editable settings schema/UI (it stays a runtime/computed value). **Touches `AabSettings` (domain-adjacent
+  schema) — re-scope the fence when briefing.**
+- **G2R-F86** — **LuxAlpha still occasionally shows negative values** (live readout / engine output).
+  Investigate the smoothing-alpha path (`1 - exp(-deltaFactor·effectiveDelta)` should be ≥ 0).
+- **G2R-F87** — the **app list in the context rule editor** should be **taller** (still scrollable) — F45-era
+  `heightIn(max=220.dp)` is too short.
+- **G2R-F88** — **tap-to-dismiss flashes/toasts** (Tasker lets you tap a flash to dismiss it).
+- **G2R-F89** — some permissions were **not explicitly requested** but appear in ADB's per-app list:
+  **background location, DUMP, package usage stats**. Verify whether they're requestable / needed; wontfix
+  if appropriate.
+
+

@@ -449,6 +449,32 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun contextEditor_clearTime_nullsTimeRange_G2RF72() {
+        // G2R-F72: once a From/To time is set, the picker can only change it. "Clear time" blanks both
+        // fields so the saved rule's timeRange is null → the rule becomes time-agnostic again.
+        val rule = com.tideo.autobrightness.app.settings.ContextRule(
+            id = "r1", name = "Evening", profile = "Default",
+            triggers = com.tideo.autobrightness.app.settings.ContextTriggers(
+                timeRange = listOf("08:00", "20:00"),
+            ),
+        )
+        var saved: com.tideo.autobrightness.app.settings.ContextRule? = null
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = listOf(rule), profileNames = listOf("Default"), apps = emptyList(),
+                    onBack = {}, onSave = { saved = it }, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
+        // The clear affordance is only shown when a time is set.
+        compose.onNodeWithTag("clear_time").performScrollTo().performClick()
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        assertEquals(null, saved?.triggers?.timeRange, "Clear time must null the saved time range")
+    }
+
+    @Test
     fun contextEditor_useCurrentSsid_fillsField() {
         // G2R-F22: "use current Wi-Fi" returns the SSID and fills the field.
         compose.setContent {

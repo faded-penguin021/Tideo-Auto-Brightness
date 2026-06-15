@@ -133,6 +133,85 @@ class LegacyImportRoundTripTest {
         assertEquals(0.8f, s.scale, 0.001f)
     }
 
+    // G2R-F70: the REAL Tasker AAB config format is nested JSON (task637 _ProfileManager.performSave,
+    // XML L29365+), NOT %AAB_Key=value. Before the fix this parsed to all-defaults, so a legacy "Load"
+    // changed nothing on screen. Keys/defaults mirror performSave; values here are deliberately
+    // non-default so a defaults-only parse would fail every assertion.
+    private val nestedJsonConfig = """
+        {
+          "meta": { "name": "Night", "version": "3.3", "timestamp": 1700000000000 },
+          "general": { "z1_end": 50.0, "z2_end": 8000.0, "form1a": 7.0, "form2a": 49.5,
+                       "form2b": 9.9, "form2c": 20.0, "form2d": 50.0, "form3a": 2000.0 },
+          "misc": { "min_bright": 3.0, "max_bright": 200.0, "scale": 0.8, "offset": 5.0,
+                    "anim_steps": 40, "min_wait": 10, "max_wait": 50, "delta_factor": 2.2,
+                    "throttle": 1500 },
+          "reactivity": { "detect_overrides": true, "thresh_dark": 0.4, "thresh_dim": 0.2,
+                          "thresh_bright": 0.06, "thresh_steepness": 2.5, "thresh_midpoint": 3.5,
+                          "trust_unreliable": true },
+          "circadian": { "spread": 20.0, "transition": 0.2, "steepness": 8.0, "enabled": true,
+                         "taper_mid": 200.0, "taper_steep": 0.05, "qs_use": true },
+          "superdimming": { "enabled": true, "threshold": 25.0, "strength": 30.0, "exponent": 3.0,
+                            "spread": 120.0, "pwm_exp": 0.9, "pwm_sensitive": true }
+        }
+    """.trimIndent()
+
+    @Test
+    fun `nested Tasker JSON config parses every section`() {
+        val s = TaskerLegacyProfileSerializer.deserialize(nestedJsonConfig)
+
+        // general
+        assertEquals(50, s.zone1End)
+        assertEquals(8000, s.zone2End)
+        assertEquals(7, s.form1A)
+        assertEquals(9.9f, s.form2B, 0.001f)
+        assertEquals(20, s.form2C)
+        // misc
+        assertEquals(3, s.minBrightness)
+        assertEquals(200, s.maxBrightness)
+        assertEquals(0.8f, s.scale, 0.001f)
+        assertEquals(5, s.offset)
+        assertEquals(40, s.animSteps)
+        assertEquals(10, s.minWaitMs)
+        assertEquals(50, s.maxWaitMs)
+        assertEquals(2.2f, s.deltaFactor, 0.001f)
+        assertEquals(1500L, s.throttleDefaultMs)
+        // reactivity
+        assertTrue(s.detectOverrides)
+        assertEquals(0.4f, s.thresholdDark, 0.001f)
+        assertEquals(0.2f, s.thresholdDim, 0.001f)
+        assertEquals(0.06f, s.thresholdBright, 0.001f)
+        assertEquals(2.5f, s.thresholdSteepness, 0.001f)
+        assertEquals(3.5, s.thresholdMidpoint, 0.001)
+        assertTrue(s.trustUnreliableSensor)
+        // circadian
+        assertEquals(20, s.scaleSpread)
+        assertEquals(0.2f, s.scaleTransitionFactor, 0.001f)
+        assertEquals(8, s.scaleSteepness)
+        assertEquals(200, s.scaleTaperMidpoint)
+        assertEquals(0.05f, s.scaleTaperSteepness, 0.0001f)
+        assertTrue(s.scalingEnabled)
+        assertTrue(s.quickSettingsEnabled)
+        // superdimming
+        assertTrue(s.dimmingEnabled)
+        assertEquals(25, s.dimmingThreshold)
+        assertEquals(30, s.dimmingStrength)
+        assertEquals(3.0f, s.dimmingExponent, 0.001f)
+        assertEquals(120, s.dimSpread)
+        assertEquals(0.9f, s.pwmExponent, 0.001f)
+        assertTrue(s.pwmSensitive)
+    }
+
+    @Test
+    fun `nested JSON with a missing section keeps defaults for that section`() {
+        // Only `misc` present (cf. performLoad's emergency Default which omits circadian/superdimming
+        // detail): the parsed fields apply, everything else stays at the baseline default.
+        val partial = """{ "meta": { "name": "x" }, "misc": { "min_bright": 30.0 } }"""
+        val s = TaskerLegacyProfileSerializer.deserialize(partial)
+        assertEquals(30, s.minBrightness)
+        assertEquals(255, s.maxBrightness, "absent key keeps the default")
+        assertFalse(s.scalingEnabled, "absent circadian section keeps the default")
+    }
+
     @Test
     fun `unknown variables are ignored`() {
         val raw = """

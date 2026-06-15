@@ -55,6 +55,42 @@ class SettingsViewModelTest {
         assertEquals(true, result.detectOverrides, "detectOverrides is global — preserved across profile load")
     }
 
+    // G2R-F70: a legacy "Load" must COMMIT the parsed settings into the active DataStore and trigger a
+    // reapply (exactly like a profile apply) — not merely register the profile by name. Drives the same
+    // SettingsViewModel.replaceAll() the Profiles screen calls with the deserialized legacy config.
+    @Test
+    fun replaceAll_commitsParsedLegacyValues_andTriggersReapply() {
+        runBlocking {
+            app.settingsDataStore.updateData {
+                AabSettings(serviceEnabled = true, minBrightness = 99, maxBrightness = 255, scale = 1.0f)
+            }
+        }
+        idle()
+
+        val parsed = com.tideo.autobrightness.app.settings.TaskerLegacyProfileSerializer.deserialize(
+            """{ "misc": { "min_bright": 12.0, "max_bright": 180.0, "scale": 0.7 } }""",
+        )
+
+        val vm = SettingsViewModel(app)
+        vm.replaceAll(parsed)
+
+        // The parsed values land in the active settings…
+        val result = awaitCommitted { it.minBrightness == 12 }
+        assertEquals(12, result.minBrightness, "legacy load must commit the parsed min brightness")
+        assertEquals(180, result.maxBrightness)
+        assertEquals(0.7f, result.scale, 0.001f)
+        assertEquals(true, result.serviceEnabled, "the live service flag is preserved across a load")
+
+        // …and a re-evaluate is requested (service running), so the change takes effect immediately.
+        idle()
+        val started = shadowOf(app).nextStartedService
+        assertEquals(
+            com.tideo.autobrightness.app.runtime.AmbientMonitoringService.ACTION_REAPPLY,
+            started?.action,
+            "a legacy load with the service on must trigger an immediate reapply",
+        )
+    }
+
     @Test
     fun resetDefaults_preservesGlobalDebugLevel() {
         runBlocking {

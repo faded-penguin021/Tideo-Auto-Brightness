@@ -1254,6 +1254,172 @@ untouched.**
 
 ---
 
+## S12.8 — Gate-2 4th-re-test salvage: runtime, UI, settings/profiles, circadian (a–d)
+
+**Model:** Opus / high (ALL sub-segments) · **Size:** large (4 sub-segments) · **Preconditions:** S12.7
+merged to main. **Run setup script.** **Origin:** the **Gate 2 (4th re-test)** on-device against the S12.7i
+build (OnePlus 13 / Android 16) — findings recorded in STATE.md "Gate findings → Gate 2 (4th re-test)":
+reopens with corrected specs (**F39/F62/F65/F70/F73**), follow-ups (**F35/F50/F58/F59/F68**), still-open
+(**F45/F67/F71**), and new findings **G2R-F74…F89** (incl. **CRITICAL F85**). Same prime directive: **port
+Tasker behaviour/feel exactly; modernise the *how*, never the *what*.**
+
+### Binding owner decisions (from the 4th-re-test planning Q&A; do NOT re-litigate)
+1. **Segmentation = 4 larger sub-segments** (Runtime · UI · Settings/Profiles · Circadian), below.
+2. **F86 negative LuxAlpha = clamp the DISPLAY only.** The domain formula is intentional Tasker parity
+   (task535 unclamped, D-010a) — `domain/` stays untouched; only the Live-Debug/readout rendering clamps ≥0.
+3. **F83 circadian location = FULL parity.** Port Tasker's once-a-day location refresh (briefly enable
+   location via `WRITE_SECURE_SETTINGS` when `%AAB_SunLastDate != %DATE` — ELEVATED), **skip** when fixed
+   lat/lon set (F39), final fallback **ip-api.com** (`http://ip-api.com/json`).
+
+**Stage-wide fence:** `domain/` + golden vectors + `ChartCanvas.kt` are **NOT modified** — they may only be
+*called* (`SoftwareDimming.dimShell`, `SolarCalculator`, and `BrightnessCurveChart` already exposes a
+`fittedCurve` param, so no ChartCanvas change is needed). Each sub-segment ends green on the full ladder
+(`:app:testDebugUnitTest :app:assembleDebug :app:lintDebug :domain:test :platform:test`), updates STATE.md +
+PARITY_CHECKLIST, and pushes on its own session branch.
+
+**Sub-segment ordering / rebase:** the three chart-host screens (Reactivity / SuperDimming / Circadian) are
+touched by multiple sub-segments — land **a → c → d**, then **b last** (its graph-placement reshape rebases
+onto the settled screen content). Expect STATE.md append-merges.
+
+**Recorded as deferred (NOT S12.8 work items):** **F45** (location lifecycle) + **F67** (midnight wrap) —
+owner couldn't verify on device, re-test after S12.8; **F50** accessibility self-disable (Android 16/
+OnePlus 13) — likely an OS limit, owner content to **wontfix**; **F80** (show the User Guide after
+onboarding on first launch) → **S13**. **F71** gets its confirmation regression in S12.8a.
+
+---
+
+### S12.8a — Runtime: override feedback, throttle, panic, super-dimming/PWM *(Opus/high · large)*
+
+**Objective:** fix the runtime feedback surfaces + behaviours the re-test flagged; port the missing panic
+detector and the throttle-reinitialization. **Fence: domain/ + golden + ChartCanvas untouched (call only).**
+
+**Deliverables:**
+1. **F74** — the **Resume** action on the high-priority override notification does nothing; make it resume
+   the pipeline (task569). Trace `AmbientMonitoringService` override-notif action → `ACTION_RESUME` →
+   `controller.resume()`; debug why it's inert when paused-by-override.
+2. **F75** — the high-priority override notification must **cancel/replace** any prior override notification
+   and not stack with the ongoing one (manage `OVERRIDE_NOTIFICATION_ID` lifecycle).
+3. **F76** — **remove the Pause action from the ongoing service notification** (it behaves like an override
+   and confuses; stopping = disable the service). Keep Reset/Disable; keep Resume while paused.
+4. **F71** — add a clean regression confirming a manual override is detected **inside** the throttle window
+   (the owner was unsure their manual test was valid). Controller test against the S12.7i settle change.
+5. **F88** — **tap-to-dismiss** flashes (Tasker lets you tap a flash to dismiss it). `AabFlash` /
+   `ToastDebugSink` presentation.
+6. **F78** — derive the effective throttle from the **actual `steps*wait`** used this cycle, and port the
+   **Throttle Reinitialization** watchdog (task566 / prof754: after ~10 s of no brightness change push the
+   throttle up to the `AnimSteps*MaxWait+10` ceiling so the sensor stops polling). Runtime state in
+   `BrightnessPipelineController` (throttle gate ~`:238`); `extraction/tasks/task566_reset-throttle.md`.
+7. **F77** — **panic / S.O.S. detector** (prof769 + task528): a NEW platform sensor source
+   (`TYPE_SIGNIFICANT_MOTION`/shake + orientation **upside-down** + display-on) that triggers the SOS
+   **morse flash pattern** + brightness 255 + disable super dimming + `%AAB_Service=Off`. Extend
+   `emergencyStop()`; `extraction/profiles.md` prof769, `extraction/tasks/task528_panicbutton.md`. Currently
+   only the manual notification "Reset" invokes the panic; there is NO sensor detector.
+8. **F65 (REOPENED — corrected spec)** — PWM-sensitive mode is **mutually exclusive** with the Super-Dimming
+   toggle (already enforced in UI). Its real behaviour: **lock the hardware brightness** (existing
+   `applyPwmFloor`) **AND dim below the floor via Android Extra Dim** — today PWM-sensitive only floors and
+   never dims. Port **Map Lux to Brightness (Java) V2 actions 23→38** (extract from the XML; cross-check the
+   ledger note that task661's runtime math lives in Variable-Set 547, not Java). `SuperDimmingCoordinator` +
+   the `BrightnessPipelineController` dimming path. (The S12.7b "two cooperating layers" model was wrong.)
+9. **F58** — Super-Dimming screen **live readout**: dimming strength *rel* `[%AAB_DimmingCurrent]` + *abs*
+   `[%AAB_DimmingDS]` at `[%AAB_CurrentBright]` brightness. Compute from `SoftwareDimming` (domain,
+   call-only) into new `PipelineState` fields; render on `SuperDimmingScreen.kt`.
+10. **F86** — clamp the **displayed** LuxAlpha to ≥ 0 in Live Debug / readouts; **leave the engine value
+    unchanged** (parity, D-010a — `domain/` untouched). Note it in STATE.md.
+
+**Acceptance:** ladder green; tests for override-notif Resume + no-stack, throttle reinit (idle→ceiling) +
+actual-steps throttle, panic detector trigger→SOS, PWM Extra-Dim engage, the dimming readout, and the
+LuxAlpha display clamp; STATE.md flips F58/F65/F71/F74/F75/F76/F77/F78/F86/F88.
+
+---
+
+### S12.8b — UI: dashboard, graph placement/grouping, context editor, permissions *(Opus/high · large)*
+
+**Objective:** the cross-cutting UI/layout polish. **Preconditions also:** rebase onto S12.8a/c/d
+screen-content changes (shared chart-host screens). **Fence: domain/ + golden + ChartCanvas untouched.**
+
+**Deliverables:**
+1. **F79** — **redesign the Dashboard** to be insightful: drop the confusing Pause control, keep
+   Resume-after-override, surface genuinely useful live state. `DashboardScreen`/`DashboardViewModel`/
+   `DashboardState`, `runtime/LiveRuntimeState`.
+2. **F81** — **consistent graph placement**: the relevant chart sits **above** its settings on every screen
+   (today SuperDimming/Circadian render it below); **cycle** between the relevant graphs by **swipe** (a
+   pager), not vertical stacking. Shared scaffold across the chart-host screens; **coordinate with S13**
+   (which fills the chart slots).
+3. **F82** — **per-graph settings grouping**: settings feeding one graph are visually grouped and it is
+   clear which graph they affect.
+4. **F68 (UI bug)** — fix the **"Sunset (22:00)" vertical one-letter-per-line wrap** in the context rule
+   editor (`ContextsScreen.kt` `TimeTokenRow` — add `maxLines=1` / width handling; "Sunrise (5:20)" is fine).
+5. **F87** — make the context-rule **app list taller** (still scrollable); `ContextsScreen.kt`
+   `heightIn(max=220.dp)`.
+6. **F89** — **permissions audit**: background location, DUMP, package usage stats appeared in ADB's per-app
+   list but weren't explicitly requested — confirm each is requestable/needed; request or wontfix-with-note.
+
+**Acceptance:** ladder green; tests for the redesigned dashboard content, graph-above-settings ordering +
+swipe pager, the single-line sunset label, and the taller app list; STATE.md flips F68/F79/F81/F82/F87/F89.
+
+---
+
+### S12.8c — Settings & profiles: schema hygiene, labels, legacy load, wizard *(Opus/high · large)*
+
+**Objective:** remove the dead/cryptic settings, fix legacy-load fidelity and the wizard fit. **Fence:
+domain/ + golden + ChartCanvas untouched (call only).**
+
+**Deliverables:**
+1. **F85 (CRITICAL)** — `%AAB_ThreshDynamic` must **NOT** be a user-editable setting (it is the *computed*
+   threshold output for the current lux). Remove `thresholdDynamic` from `AabSettings`, `AabSettingsContract`,
+   the `ReactivityScreen` editor, `SettingsDisplay`, and the legacy key=value parser; **keep** the computed
+   `PipelineState.threshDynamic`. Bump `CURRENT_SCHEMA_VERSION` + migrate (drop the field; ensure
+   `ignoreUnknownKeys` on read). **App-layer only** — the engine already ignores the field.
+2. **F59** — the dynamic-threshold help text must substitute **the value only**, not the literal string
+   "`%AAB_ThreshDynamic`" (`ReactivityScreen.kt`).
+3. **F84 + modal exclusions** — give the settings-diff modal **friendly labels** (replace the raw
+   `humanize()` of keys like "form1A"; `SettingsDisplay.kt`) and **exclude irrelevant keys** from the diff
+   (`debugLevel`, `detectOverrides`, `quickSettingsEnabled`, `notificationsEnabled`, derived
+   `thresholdMidpoint`) via `SettingsDisplay` EXCLUDED_KEYS.
+4. **F70 (REOPENED)** — **legacy-load fidelity**: reproduce + fix "Form1A didn't stick / misc inherited from
+   the previous profile". A legacy load must = **hard-coded task570 defaults THEN the file's diffs** (legacy
+   configs store only diffs vs the hard-coded defaults); verify Form1A integer handling in the nested-JSON
+   parser. `TaskerLegacyProfileSerializer`, `SettingsViewModel.replaceAll`.
+5. **F62 (REOPENED)** — wizard fit: **don't count synthetic/ghost priors** toward the ≥9-point gate
+   (reconcile the UI gate `ToolsScreen` vs the domain gate `CurveSuggestionEngine` vs the OverridePointStore
+   contents — the owner ran it on just 7 real points), and make the wizard's **suggested curve actually
+   draw** on the Curve & Brightness chart (it shows the plain line today). `BrightnessCurveChart` already
+   accepts `fittedCurve` — wire it from the wizard result (ChartCanvas untouched).
+
+**Acceptance:** ladder green; tests for thresholdDynamic removal + migration, the value-only help, friendly
+labels + exclusions, legacy load = defaults+diffs (Form1A sticks), and the ghost-point gate + suggestion-line
+draw; STATE.md flips F59/F62/F70/F84/F85.
+
+---
+
+### S12.8d — Circadian time & location correctness *(Opus/high · medium-large)*
+
+**Objective:** make the dynamic-scale ramp track the real local sun and the fixed-date/loc override work;
+port Tasker's location acquisition. **Fence: domain/ + golden untouched (call `SolarCalculator` only).**
+
+**Deliverables:**
+1. **F73 (REOPENED)** — fix the **~1 h DST/offset** error (owner saw scale 1.025 at 20:58 local while the
+   **context-rule** sunrise/sunset are correct). Audit the tz offset `CircadianWindowProvider.compute`
+   passes to `SolarCalculator.compute` — it must reflect the device's **current** offset incl. **DST** — and
+   ensure the dynamic-scale ramp matches the (already-correct) context solar path. App-layer
+   (`CircadianWindowProvider`, `BrightnessPipelineController.buildInput`); the golden domain math is correct.
+2. **F39 (REOPENED — spec was wrong)** — make the Circadian **fixed Date/Lat/Lon** actually persist + apply
+   ("Set fixed" is inert today). It is NOT preview-only: setting a date (e.g. 21 Dec) and/or a location must
+   change the circadian scaling. Debug the `CircadianScreen` card handler → `ExperimentPrefsStore` →
+   `CircadianWindowProvider` path; allow **either or both** (date and/or location).
+3. **F83 (FULL parity)** — location acquisition: port Tasker's **once-a-day** refresh (when
+   `%AAB_SunLastDate != %DATE`, briefly enable location via `WRITE_SECURE_SETTINGS` — ELEVATED), **skip**
+   when fixed lat/lon set (F39), and **fall back to ip-api.com** (`http://ip-api.com/json`) when no Android
+   fix. New platform geolocation client + **INTERNET** permission;
+   `extraction/tasks/task090_dynamic_scale.md` (act26–30), `CircadianWindowProvider`,
+   `platform/.../context/LocationReader`.
+
+**Acceptance:** ladder green; tests for the DST-correct ramp framing, the fixed date/loc round-trip applying
+to the windows, and the ip-api fallback (+ skip-when-fixed); STATE.md flips F39/F73/F83. **→ re-run HUMAN
+GATE 2 (5th).**
+
+---
+
 ## S13 — Chart replication + static screens
 
 **Model:** Haiku / high · **Size:** medium · **Preconditions:** S12.6 DONE (template + faithful screens +
@@ -1274,7 +1440,9 @@ PowerDrawChart,ExperimentChart}.kt` each: sample its domain function per the sce
 series/axes, render via ChartCanvas, wire into its host screen (slots were left by S12);
 `ui/screens/AboutScreen.kt` + `UserGuideScreen.kt` porting the extracted text (drop Chart.js
 license screen — flip its checklist row `dropped(Chart.js removed)`); a trivial compose
-instantiation test per chart.
+instantiation test per chart. **G2R-F80 (Gate-2 4th re-test):** show the **User Guide after the
+permissions onboarding on first launch** (Tasker does this) — wire `UserGuideScreen` as the
+post-onboarding first-run destination.
 
 **Non-goals (HARD FENCE):** Do NOT modify `ChartCanvas.kt`, anything in `domain/`, `runtime/`,
 gradle files, manifest, or `SettingsValidator`. If a chart needs a ChartCanvas capability that

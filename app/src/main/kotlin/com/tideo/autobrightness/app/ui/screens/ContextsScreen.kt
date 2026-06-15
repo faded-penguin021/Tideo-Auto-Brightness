@@ -277,6 +277,15 @@ private fun RuleEditor(
             TimeTokenRow("end", solarLabel) { endTime = it }
         }
     }
+    // G2R-F72: once a From/To time is set the picker can only change it, never unset it. Offer a
+    // "Clear time" action that blanks both fields → on save `timeRange` becomes null, so a
+    // time-constrained rule can become time-agnostic ("Always active") again.
+    if (startTime.isNotBlank() || endTime.isNotBlank()) {
+        TextButton(
+            onClick = { startTime = ""; endTime = "" },
+            modifier = Modifier.testTag("clear_time"),
+        ) { Text("Clear time") }
+    }
 
     // Day-of-week picker (G2R-F67): overnight windows (start > end) wrap to the next day; the
     // resolver attributes the post-midnight tail to the previous day's membership (D-014).
