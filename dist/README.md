@@ -33,25 +33,81 @@ To grant ELEVATED from a PC: `adb shell pm grant com.tideo.autobrightness androi
 
 ## What to check for Gate 2
 
-The full Gate-2 re-re-test finding set (**F33–F73**) is addressed. Walk the app and confirm behaviour;
-log anything wrong in `docs/rebuild/STATE.md` under the Gate findings. Highlights from this last session
-(**S12.7i**, the bits most worth verifying on-device):
+This build closes the **entire Gate-2 re-re-test finding set (F33–F73)** across S12.7 a–i. The checklist
+below is grouped by where you'll exercise each item; the **F-number** maps to the finding in
+`docs/rebuild/STATE.md` so you can log results against it. Tick what passes, note anything that doesn't.
 
-- **F70 — legacy import actually applies.** Profiles → *Link legacy configs folder* (grant
-  `Download/AAB/configs`) → **Load** a real Tasker `.json` config. The imported curve/min-max/etc. should
-  now **take effect immediately** on screen (previously it "loaded" by name but nothing changed).
-- **F71 — override during the cooldown.** With *Detect overrides* on, manually change brightness shortly
-  after the app last adjusted it (inside the throttle window). It should **pause/flag the override** rather
-  than ignore it until the cooldown expires.
-- **F72 — clear a time rule.** Contexts → edit a rule that has a From/To time → **Clear time** → Save. The
-  rule should go back to "Always active" (no time constraint).
-- **F73 — circadian scale tracks your real local sun.** With circadian scaling on, the morning ramp should
-  follow your actual sunrise (not ~2 h late); `%AAB_ScaleDynamic` in **Live Debug** should be ≥ 1 during the
-  day, not drop to ~0.85 mid-morning.
+### Onboarding, permissions & navigation (S12.7d)
+- **F33** Sideloaded install shows an *"Allow restricted settings"* card linking to App info before the grants.
+- **F41** Setup has a **Location** permission step; Wi-Fi SSID can be read **without** Location (Shizuku
+  `cmd wifi` → `dumpsys wifi` → Location callback as last resort).
+- **F57** After granting permissions you land on the **Menu** hub (not a dead screen); **Back** navigates,
+  it doesn't close the app.
 
-Also re-verify the earlier S12.7 areas if you want full coverage: override notification + QS-tile state,
-context location lifecycle, no-Location Wi-Fi SSID, debug flashes / Live Debug scene, per-screen live
-readouts, the curve chart (axis labels, legend, tap-to-delete points), and the profile load/save modals.
+### Manual-override engine (S12.7a)
+- **F34** Normal auto-animations do **not** self-trigger an override; an opposing external brightness write does.
+- **F64** Starting the service / turning the screen on / Resume / QS-on does **not** spuriously land in
+  "paused by override".
+- **F46** A manual **profile load** counts as an override (Menu shows it; **Resume** clears it). A context
+  rule merely being active is **not** labelled an override.
+
+### Runtime feedback — notification, QS tile, super dimming (S12.7b)
+- **F35** A manual override posts a **high-priority, vibrating** notification **+ a toast**.
+- **F40** The ongoing notification offers **Resume** alongside Pause and reflects paused/override state.
+- **F63** The QS tile updates live (**Off → Starting → Active/Paused**) without reopening the panel.
+- **F65** With **Super Dimming** + PWM-sensitive on (ELEVATED), "Extra Dim" actually **darkens below the
+  threshold** (not just holds the floor).
+
+### Context system (S12.7c)
+- **F42** *"Use current location"* works right after granting (no false "not granted").
+- **F43** The rule list is ordered by **priority, highest first**.
+- **F44** A **legacy-imported** profile is selectable as a context-rule target without re-saving it.
+- **F45** The location listener survives backgrounding (rules keep working), never reads `0,0`, and only
+  re-fires after a **≥100 m** move (no toast spam).
+- **F47** On an auto profile switch, the Context-Automation flash shows **trigger · context · profile ·
+  rule (priority)**.
+- **F67** The rule editor has a **day-of-week** picker; overnight windows wrap correctly past midnight.
+- **F68** **SUNRISE/SUNSET** tokens show today's resolved time in gold (e.g. "Sunrise (06:42)").
+- **F72** *(S12.7i)* **Clear time** removes a From/To rule so it returns to "Always active".
+
+### Debug / toast infrastructure (S12.7e)
+- **F48** The Dynamic-Scale debug flash fires **~2 min into a dawn/dusk transition**, not on every light change.
+- **F49** On the unprivileged super-dimming fallback, an **overlay-preview** toast shows the overlay colour.
+- **F50** Opt-in **Accessibility** service shows the flash messages **system-wide** (with a rationale screen);
+  degrades to in-app toasts when off.
+- **F51** Debug toasts **cancel, not stack**; turning a category off stops it immediately.
+- **F52** The debug-category selector applies **instantly** (no back-out needed).
+
+### Per-screen live readouts & labels (S12.7f)
+- **F56** Live reactivity shows the threshold as a **percentage** (0.5 → "50%").
+- **F58** **Curve & Brightness** and **Misc** show live readout blocks (smoothed lux / current brightness /
+  throttle / smoothing α).
+- **F59** The dynamic-threshold help substitutes the **live value** behind the ⓘ reveal.
+- **F60** On **Misc**, "Scale" becomes a read-only **"(auto — dynamic)"** readout while circadian scaling is on.
+- **F61** `form2A`/`form3A` are labelled **"Zone 2 / Zone 3 alignment"**.
+
+### Charts & curve view (S12.7g)
+- **F55** Both axes are labelled; the lux x-axis is **log (from 0.1)**; y-ticks are sane (no 191.25); drag/tap
+  **scrubs** a readout across the chart.
+- **F66** A **legend** distinguishes the live curve from the dashed gold reference line.
+- **F62** The wizard's **suggested** curve is drawn on the Curve & Brightness chart (≥ 9 recorded points).
+- **F69** The dashed reference line is **fixed** (committed snapshot) — it doesn't move as you edit fields.
+- **F36** Override points are **tappable to delete** (shows the lux/brightness pair, confirms, writes back).
+
+### Profiles, modals & circadian editor (S12.7h)
+- **F38** Load / Save / Create-rule / Edit-rule modals show a **full settings list with gold
+  changed-vs-default** highlighting; context **resume** feels smooth.
+- **F39** The Circadian screen has a **Date + Latitude + Longitude** editor that defaults to **today +
+  current location** when unset (preview-only).
+
+### S12.7i fixes (verify these closely — newest)
+- **F70** Profiles → *Link legacy configs folder* (`Download/AAB/configs`) → **Load** a real Tasker `.json`:
+  the imported settings should **take effect immediately** on screen (not just "loaded by name").
+- **F71** With *Detect overrides* on, manually change brightness shortly after the app last adjusted it
+  (inside the throttle window): it should **pause/flag the override**, not ignore it until the cooldown ends.
+- **F72** See *Context system* above.
+- **F73** With circadian scaling on, the morning ramp follows your **real local sunrise** (not ~2 h late);
+  in **Live Debug**, `%AAB_ScaleDynamic` is ≥ 1 during the day, not ~0.85 mid-morning.
 
 ## After testing
 
