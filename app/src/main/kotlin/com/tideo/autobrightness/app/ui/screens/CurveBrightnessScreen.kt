@@ -1,12 +1,16 @@
 package com.tideo.autobrightness.app.ui.screens
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
@@ -53,6 +57,7 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
         onBack = { navController.popBackStack() },
         overridePoints = overridePoints,
         criticalError = criticalError,
+        onDeleteOverridePoint = vm::deleteOverridePoint,
         // G2R-F17: reset only the curve-zone coefficients to the task570 baseline (defaults).
         onReset = {
             vm.edit { s ->
@@ -84,10 +89,14 @@ fun CurveBrightnessContent(
     overridePoints: List<OverridePoint> = emptyList(),
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
+    onDeleteOverridePoint: ((OverridePoint) -> Unit)? = null,
 ) {
     DraftSettingsScaffold("Curve & Brightness", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             val curveConfig = draft.toBrightnessCurveConfig()
+            // F69: the dashed gold reference line is the FIXED committed snapshot, not the live draft,
+            // so an edit shows against where it started. The live "Curve" tracks the draft.
+            val referenceConfig = remember(committed) { committed.toBrightnessCurveConfig() }
             val overlay = remember(overridePoints) {
                 overridePoints.map { Offset(it.lux.toFloat(), it.brightness.toFloat()) }
             }
@@ -100,12 +109,36 @@ fun CurveBrightnessContent(
                     null
                 }
             }
+            // F36: tapping a recorded override dot raises a confirm dialog before deleting it.
+            var pendingDelete by remember { mutableStateOf<OverridePoint?>(null) }
             BrightnessCurveChart(
                 curveConfig,
                 modifier = Modifier.testTag("brightness_curve_chart"),
                 overridePoints = overlay,
                 fittedCurve = fittedCurve,
+                referenceCurve = referenceConfig,
+                onDeleteOverridePoint = if (onDeleteOverridePoint == null) {
+                    null
+                } else {
+                    { tapped ->
+                        pendingDelete = overridePoints.minByOrNull { p ->
+                            val dl = p.lux - tapped.x
+                            val db = p.brightness - tapped.y
+                            dl * dl + db * db
+                        }
+                    }
+                },
             )
+            pendingDelete?.let { pt ->
+                OverridePointDeleteDialog(
+                    point = pt,
+                    onConfirm = {
+                        onDeleteOverridePoint?.invoke(pt)
+                        pendingDelete = null
+                    },
+                    onDismiss = { pendingDelete = null },
+                )
+            }
 
             // Labels + verbatim long-press help re-derived from extraction/scenes/brightness_settings.md
             // (S12.6e, G2R-F19/F21). Tasker labels: "Zone 1 Scaling" (form1A), "Zone 2 Scaling" (form2B),
@@ -152,6 +185,30 @@ fun CurveBrightnessContent(
 
 /** Format a derived coefficient, guarding the NaN that an inverted zone range produces (G2-F6). */
 private fun Double.fmtCoeff(fmt: String): String = if (isNaN()) "—" else fmt.format(this)
+
+/**
+ * Tap-to-delete confirmation for a recorded override point (F36): shows the captured lux/brightness
+ * pair and confirms before removing it from [OverridePointStore].
+ */
+@Composable
+fun OverridePointDeleteDialog(point: OverridePoint, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("override_delete_dialog"),
+        title = { Text("Delete override point?") },
+        text = {
+            Text("Lux ${"%.1f".format(point.lux)} → brightness ${point.brightness.toInt()}")
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, modifier = Modifier.testTag("override_delete_confirm")) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
 
 @Composable
 internal fun ErrorBanner(message: String, testTag: String) {

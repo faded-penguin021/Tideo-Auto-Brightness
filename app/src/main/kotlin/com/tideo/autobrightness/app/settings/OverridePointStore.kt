@@ -68,6 +68,19 @@ class OverridePointStore(private val dataStore: DataStore<OverridePoints>) {
         }
     }
 
+    /**
+     * Delete the recorded point matching [point] (tap-to-delete on the curve chart, F36). Matches on
+     * the (lux, brightness) pair and removes only the first such record so duplicates are not all wiped.
+     */
+    suspend fun delete(point: OverridePoint) {
+        dataStore.updateData { current ->
+            val idx = current.points.indexOfFirst {
+                it.lux == point.lux && it.brightness == point.brightness
+            }
+            if (idx < 0) current else OverridePoints(current.points.filterIndexed { i, _ -> i != idx })
+        }
+    }
+
     /** Clear all recorded points (Tools "reset overrides"). */
     suspend fun clear() {
         dataStore.updateData { OverridePoints() }

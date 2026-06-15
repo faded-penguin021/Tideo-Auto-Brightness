@@ -49,7 +49,7 @@ Every Chart.js WebElement maps to a named Compose-Canvas chart (built S12/S13). 
 
 | Scene | HTML var | Generator task | Series / axes | Compose chart |
 |---|---|---|---|---|
-| AAB Brightness Graph | %AAB_HTML_Graph | task663 | log lux → level 0–255, 3 series (new curve, reference, override scatter) | BrightnessCurveChart |
+| AAB Brightness Graph | %AAB_HTML_Graph | task663 | log lux (0.1→100k) → level 0–255, series: Curve (live draft) + dashed-gold Reference (FIXED committed snapshot, F69) + Suggested (wizard fit, ≥9 pts) + tappable override scatter; legend + interactive scrub readout + nice y-ticks/axis labels (S12.7g: F36/F55/F62/F66/F69) | BrightnessCurveChart |
 | AAB Reactivity Graph | %AAB_HTML_Graph2 | task703 | log lux (39 pts) → threshold % 0–100, 2 series (new, reference) | ReactivityChart |
 | AAB Alpha Graph | %AAB_HTML_Graph3 | task557 | lux-delta (39 pts) → smoothing alpha 0–1, 2 series | ReactivityChart (alpha overlay) |
 | AAB Dimming Graph | %AAB_HTML_Graph6 | task556 | brightness level → dim % 0–100, 3 series (dim, reference, shell) | DimmingChart |
