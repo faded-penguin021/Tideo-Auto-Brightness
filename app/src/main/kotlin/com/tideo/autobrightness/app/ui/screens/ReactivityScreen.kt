@@ -6,10 +6,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.runtime.LiveRuntimeState
+import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
-import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCard
+import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
+import com.tideo.autobrightness.app.ui.components.fmtPercent
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
@@ -23,12 +26,14 @@ fun ReactivityScreen(navController: NavHostController, vm: DraftSettingsViewMode
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
+    val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = rememberToaster()
     ReactivityContent(
         draft, committed, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         criticalError = criticalError,
+        live = live,
         // G2R-F17: reset only this screen's reactivity fields to the task570 baseline (defaults).
         onReset = {
             vm.edit { s ->
@@ -57,13 +62,14 @@ fun ReactivityContent(
     onBack: () -> Unit,
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
+    live: PipelineState = PipelineState(),
 ) {
     DraftSettingsScaffold("Reactivity", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             ChartPlaceholder("ReactivityChart", "reactivity_chart")
 
-            // Live glass-box readout: current dynamic threshold + sensor dead zone (G2R-F7).
-            ReactivityDiagnosticCard()
+            // Live glass-box readout: current dynamic threshold (as %, G2R-F56) + sensor dead zone (G2R-F7).
+            ReactivityDiagnosticCardContent(live)
 
             // Labels + verbatim long-press help re-derived from extraction/scenes/reactivity_settings.md
             // (S12.6e, G2R-F19/F20/F21). The threshold fields are %aab_thresh*pc reactivity levels.
@@ -93,10 +99,14 @@ fun ReactivityContent(
                 epoch = epoch, committed = committed.thresholdMidpoint, isInt = false,
                 help = TaskerHelp.CURVE_MID, testTag = "field_thresholdMidpoint",
             )
+            // G2R-F59: the dynamic-threshold description must substitute the LIVE %AAB_ThreshDynamic
+            // value (not the literal token) and sit behind the ⓘ reveal like the other help (use
+            // help= not helper=). The live runtime value is a 0..1 fraction → shown as a percentage.
             NumberSettingField(
                 "Dynamic threshold", draft.thresholdDynamic, { onEdit { s -> s.copy(thresholdDynamic = it.toInt()) } },
                 epoch = epoch, committed = committed.thresholdDynamic,
-                helper = "Adaptive dead-band scaling (%AAB_ThreshDynamic).", testTag = "field_thresholdDynamic",
+                help = "Adaptive dead-band scaling. Current %AAB_ThreshDynamic: ${fmtPercent(live.threshDynamic)}.",
+                testTag = "field_thresholdDynamic",
             )
             // G2R-F19/F20: "Delta factor" was mislabelled with a wrong help ("brightness only changes
             // once lux exceeds this"). It is the SENSOR-SMOOTHING factor (%AAB_DeltaFactor, Misc scene
