@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import kotlin.math.log10
@@ -13,15 +14,20 @@ private val engine = BrightnessEngine()
 
 /**
  * THE chart template (Tasker: AAB Brightness Graph / task663 `_GenerateGraph`). Samples the domain
- * `mapLuxToBrightness` over a log-spaced lux grid and draws lux→brightness with a taper overlay and
- * an optional current-operating-point marker, on the reusable [ChartCanvas].
+ * `mapLuxToBrightness` over a log-spaced lux grid and draws lux→brightness, on the reusable
+ * [ChartCanvas].
  *
- * **S13 / Haiku: copy this pattern exactly for the other six charts.** The recipe is:
- *   1. sample a domain function over a grid → `List<Offset>` in data-space,
- *   2. wrap each line in a [ChartSeries] with an M3 color,
- *   3. add any threshold/marker via [ChartMarker],
- *   4. hand it all to [ChartCanvas] with the right [AxisScale] and ranges.
- * Do NOT compute anything chart-specific inside ChartCanvas; keep the math here.
+ * Series (S12.7g):
+ *   - **Curve** (primary, solid) = the live [curve] = the draft the user is editing — it tracks edits.
+ *   - **Reference** (gold, dashed) = the FIXED [referenceCurve] snapshot (the committed/default curve),
+ *     so a draft edit shows *against* where you started (F69). It does NOT move with the draft.
+ *   - **Suggested** (secondary) = the wizard fit, shown only once ≥ 9 override points exist (F62/G2R-F14).
+ *   - **Overrides** = the recorded manual-override points as tappable scatter dots (tap → delete, F36).
+ *
+ * **S13 / Haiku: copy this pattern exactly for the other six charts.** The recipe is: sample a domain
+ * function over a grid → `List<Offset>` in data-space, wrap each line in a [ChartSeries], add markers/
+ * scatter, hand it to [ChartCanvas] with the right [AxisScale] + ranges. Keep math here, not in
+ * ChartCanvas.
  */
 @Composable
 fun BrightnessCurveChart(
@@ -31,44 +37,43 @@ fun BrightnessCurveChart(
     currentBrightness: Int? = null,
     overridePoints: List<Offset> = emptyList(),
     fittedCurve: BrightnessCurveConfig? = null,
+    referenceCurve: BrightnessCurveConfig? = null,
+    onDeleteOverridePoint: ((Offset) -> Unit)? = null,
 ) {
-    val minLux = 1f
-    val maxLux = 120_000f
+    // brightness_graph.md: the Tasker x-axis is 41 log-spaced lux values 0.1 → 100000 (F55).
+    val minLux = 0.1f
+    val maxLux = 100_000f
     val samples = 80
 
-    // 1. sample mapLuxToBrightness over a log-spaced lux grid (the "new curve" series). Floor at
-    // minBrightness — the applied brightness is clamped to [min, max], so the curve floor must move
-    // with Min brightness rather than sitting on 0 (G2-F4).
-    val curvePoints = logSpaced(minLux, maxLux, samples).map { lux ->
-        val b = engine.mapLuxToBrightness(lux.toDouble(), curve)
-            .coerceIn(curve.minBrightness.toDouble(), curve.maxBrightness.toDouble())
+    fun sample(c: BrightnessCurveConfig): List<Offset> = logSpaced(minLux, maxLux, samples).map { lux ->
+        val b = engine.mapLuxToBrightness(lux.toDouble(), c)
+            .coerceIn(c.minBrightness.toDouble(), c.maxBrightness.toDouble())
         Offset(lux, b.toFloat())
     }
 
-    // taper overlay: the same curve through calculatedBrightness (scaling/taper applied at scale=1)
-    val taperPoints = logSpaced(minLux, maxLux, samples).map { lux ->
-        val b = engine.calculatedBrightness(lux.toDouble(), curve, scaleDynamic = 1.0)
-        Offset(lux, b.toFloat())
-    }
+    // 1. live curve through mapLuxToBrightness, floored at minBrightness (G2-F4).
+    val curvePoints = sample(curve)
 
-    // task38/task663: the suggested (fitted) curve, shown only when ≥ 9 override points exist — the
-    // caller passes a non-null fittedCurve only then (G2R-F14).
-    val fittedPoints = fittedCurve?.let { fc ->
-        logSpaced(minLux, maxLux, samples).map { lux ->
-            val b = engine.mapLuxToBrightness(lux.toDouble(), fc)
-                .coerceIn(fc.minBrightness.toDouble(), fc.maxBrightness.toDouble())
-            Offset(lux, b.toFloat())
-        }
-    }
+    // 2. FIXED reference = the committed/default snapshot (dashed gold), never the live draft (F69).
+    val referencePoints = referenceCurve?.let { sample(it) }
+
+    // 3. task38/task663 suggested (fitted) curve, only once ≥ 9 override points exist (G2R-F14/F62).
+    val fittedPoints = fittedCurve?.let { sample(it) }
 
     val series = buildList {
+        referencePoints?.let { add(ChartSeries("Reference", it, AabGold, strokeWidthPx = 3f, dashed = true)) }
         add(ChartSeries("Curve", curvePoints, MaterialTheme.colorScheme.primary))
-        if (curve.scalingUse) add(ChartSeries("Taper", taperPoints, MaterialTheme.colorScheme.tertiary, strokeWidthPx = 2f))
         fittedPoints?.let { add(ChartSeries("Suggested", it, MaterialTheme.colorScheme.secondary, strokeWidthPx = 2f)) }
-        // Recorded override points (task561 %AAB_Overrides) overlaid as scatter dots: each is a
-        // single-point series, which ChartCanvas renders as a dot (G2R-F14; ChartCanvas unchanged).
-        val pointColor = MaterialTheme.colorScheme.error
-        overridePoints.forEach { add(ChartSeries("override", listOf(it), pointColor)) }
+    }
+
+    val scatter = if (overridePoints.isNotEmpty()) {
+        ChartScatter(
+            points = overridePoints,
+            color = MaterialTheme.colorScheme.error,
+            onTap = onDeleteOverridePoint,
+        )
+    } else {
+        null
     }
 
     val markers = buildList {
@@ -84,6 +89,11 @@ fun BrightnessCurveChart(
         yRange = 0f..curve.maxBrightness.toFloat(),
         xScale = AxisScale.Log10,
         markers = markers,
+        scatter = scatter,
+        xAxisLabel = "Lux",
+        yAxisLabel = "Brightness",
+        showLegend = true,
+        interactive = true,
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -39,27 +39,37 @@ next session does not know it.
 | S12.7d permissions, Wi-Fi acquisition, first-boot nav | 2026-06-14 | Opus/high | DONE | (this push) | Permissions/SSID/nav batch (D-057; G2R-F33/F41/F57). **F41 (SSID):** ported the real `_GetWifiNoLocation V3` order (task105/633) — `AndroidWifiInfoReader.currentSsid` now tries the no-Location strategies FIRST (`WifiSsidStrategies.kt`: `ShizukuWifiSsidStrategy` runs `cmd wifi status` via new `ShizukuShell.exec` + AIDL `exec(String[])` on the existing user service → `DumpsysWifiSsidStrategy` runs in-process `dumpsys wifi`, parsing the `mWifiInfo`/`COMPLETED` line), and only falls back to the Location-gated `NetworkCallback` last; strategies are constructor-injectable so the source-order is unit-tested. **F41 (perm):** Setup gained a Location step (RequestMultiplePermissions FINE+COARSE, labelled optional). **F33:** onboarding shows a `RestrictedSettingsCard` ("Allow restricted settings" + Open-App-info deep-link) when `isLikelySideloaded` (install source not a known store). **F57:** new `NavHostController.completeOnboarding()` lands on `AppRoute.Menu` with `popUpTo(Onboarding, inclusive)` (was Dashboard) → Back from Menu exits cleanly. **Fence: domain/ + golden vectors untouched.** Tests: `WifiSsidStrategyTest` (9 — source order with fakes + cmd/dumpsys parsers + normalize), UiShell +3 (Location step renders, restricted hint when sideloaded, completeOnboarding→Menu drops Onboarding). Full ladder GREEN: `:platform:test :app:testDebugUnitTest`(140) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.7a manual-override engine correctness | 2026-06-14 | Opus/high | DONE | (this push) | Ported the REAL task567/task696 override logic (D-054; G2R-F34/F64/F46). **F34:** `AnimationRunner` replaced the exact-match `isOnScreenSelfWrite()` (false-fired on OEM round-trip drift) with task696's band+debounce — band `[minTarget-2, maxTarget+2]` spanning the sweep, override only after **2 consecutive** out-of-band reads (every-frame, since the every-5th was a Tasker IPC optimization). **F64:** `OverrideMonitor` gained a settle-suppression gate; `setInitialBrightness` arms a 1500ms window after each initial self-write so the start/reinit/resume/QS-on observer echo (incl. the AUTO→MANUAL mode-flip recompute) is not flagged as an override; the S12.6c idle-path settle-wait kept. **F46:** manual profile load = override (`LiveRuntimeState.manualOverride` published from `%AAB_ContextOverride` via the service) shown in the Menu; a context rule active is no longer labelled an override (Menu Contexts card relabelled). Tests: AnimationRunner +3 (self-writes complete / opposing-write overridden / single-transient debounced), controller +1 (init-echo suppressed then real-write pauses post-window), UiShell +2 (Menu label semantics). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(128) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.7e debug / toast infrastructure | 2026-06-14 | Opus/high | DONE | (this push) | Debug/toast surfaces fixed (D-058; G2R-F48/F49/F50/F51/F52). **F50** global flashes: new `AabToastAccessibilityService` (opt-in `AccessibilityService`, `TYPE_ACCESSIBILITY_OVERLAY` window — no `SYSTEM_ALERT_WINDOW`, presentation-only, `canRetrieveWindowContent=false`) registers as the presenter of a new process-wide `AabFlash` channel; manifest service + `res/xml/aab_accessibility_service.xml` + rationale string; Live Debug gained an opt-in card (status + Accessibility-settings deep-link, re-polled on resume). Degrades to the foreground teal toast when off. **F51** cancel-not-stack: ALL flashes (`ToastDebugSink` + `ToastContextLoadSink`) route through `AabFlash.show`, which cancels the previous flash before posting the next (teal styling moved into `AabFlash`). **F52** instant debug-off: `LiveDebugViewModel.setDebugLevel` now `AabFlash.cancel()`s on Off **and** triggers `AutoBrightnessRuntime.reapply` (gated on serviceEnabled) so the pipeline's stale `ContextEngine` effective-snapshot picks up the new category immediately (root cause: `effectiveSettings()` served the cached snapshot). **F48** dynamic-scale timing: new pure `DynamicScaleDebugGate` (fires only ~2 min into a dawn/dusk transition, then ≤ once per 2 min; resets when the time-driven scale settles) gates the `DYNAMIC_SCALE` flash in `runCycle` (transition = `scaleDynamic` changing between cycles) — no longer per light change. **F49** overlay-preview colour: `SuperDimmingCoordinator` now emits `OVERLAY_PREVIEW` (level 6) with the computed black-overlay hex (task653 `dim_alpha_dec=2.55·dim_shell` → task654 `%AAB_HexOverlay`, via golden `SoftwareDimming.dimShell`) on the unprivileged (`<ELEVATED`) below-threshold fallback. **Fence: domain/ + golden vectors untouched.** Tests: RuntimeDebug +4 (gate timing ×2, flash cancel-previous/instant-cancel, foreground fallback), SuperDimming +2 (overlay-preview on unprivileged / none when elevated), SettingsScreens +1 (global-flash card). Full ladder GREEN: `:app:testDebugUnitTest`(147) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
-| S12.7f per-screen live readouts + label/value fidelity | 2026-06-15 | Opus/high | DONE | (this push) | Live-readout/label batch (G2R-F56/F58/F59/F60/F61). **F58** Tasker live-readout blocks added to the two screens missing them: **Curve & Brightness** (`CurveBrightnessDiagnosticCard*`, brightness_settings.md `current_lux_and_bright` — "Current smoothed lux [%SmoothedLux]" + "Current brightness (min–max) [%AAB_CurrentBright]") and **Misc** (`MiscDiagnosticCard*`, misc_settings.md `current_throttle_and_alpha` — "Current throttle [%AAB_Throttle] ms" + "Current smoothing α [%LuxAlpha]"); Reactivity already had its card. **F56** the Live-reactivity card's dynamic threshold now renders as a **percentage** (new `fmtPercent`, 0.5→"50%"; the bound `%aab_thresh*pc` are percentages). **F59** Reactivity "Dynamic threshold" description now **substitutes the live `%AAB_ThreshDynamic`** value (as %) and sits **behind the ⓘ reveal** (`help=` not `helper=`). **F60** Misc **"Scale" becomes a read-only "(auto — dynamic)" readout** of `%AAB_ScaleDynamicCompress` when circadian scaling is on (editable field otherwise). **F61** `form2A`/`form3A` relabelled **"Zone 2 alignment" / "Zone 3 alignment"**. The 3 screens gained a `live: PipelineState` param (wrappers collect `LiveRuntimeState.pipeline`). **Also (owner msg):** `rememberToaster` now routes through the shared teal `AabFlash` channel so UI confirmations (profile apply/save/import/copy) get the **same AAB-teal styling** as runtime flashes + cancel-not-stack (was plain system toasts). **3 owner findings logged + deferred: G2R-F70/F71/F72.** Tests: SettingsScreens +5 (threshold-%, curve+misc live readouts, F61 labels, F60 auto-scale on/off); existing reactivity-card test updated to %. **Fence: domain/ + golden vectors untouched.** Ladder GREEN: `:app:testDebugUnitTest`(152) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
+| S12.7f per-screen live readouts + label/value fidelity | 2026-06-15 | Opus/high | DONE | (see push) | Live-readout/label batch (G2R-F56/F58/F59/F60/F61). **F58** Tasker live-readout blocks added to the two screens missing them: **Curve & Brightness** (`CurveBrightnessDiagnosticCard*`, brightness_settings.md `current_lux_and_bright` — "Current smoothed lux [%SmoothedLux]" + "Current brightness (min–max) [%AAB_CurrentBright]") and **Misc** (`MiscDiagnosticCard*`, misc_settings.md `current_throttle_and_alpha` — "Current throttle [%AAB_Throttle] ms" + "Current smoothing α [%LuxAlpha]"); Reactivity already had its card. **F56** the Live-reactivity card's dynamic threshold now renders as a **percentage** (new `fmtPercent`, 0.5→"50%"; the bound `%aab_thresh*pc` are percentages). **F59** Reactivity "Dynamic threshold" description now **substitutes the live `%AAB_ThreshDynamic`** value (as %) and sits **behind the ⓘ reveal** (`help=` not `helper=`). **F60** Misc **"Scale" becomes a read-only "(auto — dynamic)" readout** of `%AAB_ScaleDynamicCompress` when circadian scaling is on (editable field otherwise). **F61** `form2A`/`form3A` relabelled **"Zone 2 alignment" / "Zone 3 alignment"**. The 3 screens gained a `live: PipelineState` param (wrappers collect `LiveRuntimeState.pipeline`). **Also (owner msg):** `rememberToaster` now routes through the shared teal `AabFlash` channel so UI confirmations (profile apply/save/import/copy) get the **same AAB-teal styling** as runtime flashes + cancel-not-stack (was plain system toasts). **3 owner findings logged + deferred: G2R-F70/F71/F72.** Tests: SettingsScreens +5 (threshold-%, curve+misc live readouts, F61 labels, F60 auto-scale on/off); existing reactivity-card test updated to %. **Fence: domain/ + golden vectors untouched.** Ladder GREEN: `:app:testDebugUnitTest`(152) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
+| S12.7g charts & curve view | 2026-06-15 | Opus/high | DONE | (this push) | Curve chart enriched + `ChartCanvas` extended (D-059; G2R-F36/F55/F62/F66/F69). **Merged with S12.7f** (PR #40; CurveBrightnessScreen.kt `live` readout + SettingsScreensTest both kept). **F55** `ChartCanvas` gained `xAxisLabel`/`yAxisLabel` (Lux/Brightness), a `niceTicks` 1/2/5×10ⁿ y-tick generator (0/50/…/250, kills the 191.25 artefact), log-x now sampled from **0.1**→100k, and an opt-in `interactive` drag/tap **scrub** that draws a vertical line + per-series readout box at the touch point (pure `seriesValueAt` interpolation). **F66** opt-in `showLegend` Row above the canvas — solid/dashed swatch + label per series (`legend_Curve`, dashed `legend_Reference`, `legend_Suggested`) + "Overrides" scatter. **F69** new `referenceCurve` param: `CurveBrightnessContent` samples it from the **committed** snapshot (`remember(committed)`) → FIXED dashed-gold reference that does NOT track the draft (replaces the old draft-derived moving "Taper" overlay); the live "Curve" tracks the draft. **F36** override points are now a tappable `ChartScatter` (12px dots, white ring); `ChartCanvas` hit-tests via `nearestIndex` → data-space callback → `OverridePointDeleteDialog` (lux/brightness pair + confirm) → new `OverridePointStore.delete` + `DraftSettingsViewModel.deleteOverridePoint`. **F62** verified the wizard's "Suggested" fit (≥9 pts, task38) draws on the curve view against scatter+reference. New owner finding logged + deferred: **G2R-F73** (`%AAB_ScaleDynamic` <1 at ~07:13, suspected UTC bug; domain-fenced). **Fence: domain/ + golden vectors untouched; ChartCanvas extended (sanctioned for S12.7g only).** Tests: `ChartCanvasTest` (4 — niceTicks/logSpaced/seriesValueAt/nearestIndex, pure JVM), OverridePointStore.delete (1), SettingsScreens +2 (legend Reference/Curve, delete-dialog confirm). Full ladder GREEN: `:app:testDebugUnitTest`(159) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.7f DONE (2026-06-15) → S12.7 g–h remain.** S12.7f closed the per-screen live-readout / label-fidelity
-batch (G2R-F56/F58/F59/F60/F61). Every settings screen now carries its Tasker **live-readout block**: added
-the **Curve & Brightness** ("Current smoothed lux" + "Current brightness (min–max) [%AAB_CurrentBright]") and
-**Misc** ("Current throttle [ms]" + "Current smoothing α") readout cards (Reactivity already had its card,
-now with the threshold shown as a **percentage**, F56). Reactivity's "Dynamic threshold" description
-substitutes the **live %AAB_ThreshDynamic** value behind the ⓘ reveal (F59); Misc's **"Scale" turns
-read-only "(auto)"** showing the live dynamic scale when circadian scaling is on (F60); `form2A`/`form3A`
-relabelled **"Zone 2/3 alignment"** (F61). The three screens gained a `live: PipelineState` param fed from
-`LiveRuntimeState`. **Owner-msg fix:** `rememberToaster` now routes through the teal `AabFlash` channel so
-profile-apply/save/import/copy confirmations match the runtime flashes (were plain system toasts). **Three
-new owner findings logged + deferred for a future session: G2R-F70** (legacy JSON import toasts "loaded" +
-latches override but the settings never apply — load must commit+reapply like a profile Apply), **G2R-F71**
-(reactivity cooldown is hard-pinned to %AAB_Throttle, which swallows manual overrides — re-derive the real
-task543/567 cooldown-vs-override interaction), **G2R-F72** (no way to clear a time rule from a context once
-set). domain/ + golden vectors stayed fenced. Ladder GREEN (`:app:testDebugUnitTest`=152). **Next: S12.7 g–h
-(g may extend ChartCanvas; rebase before push), then owner re-tests Gate 2 again after S12.7h.**
+**S12.7f + S12.7g DONE (2026-06-15; g merged onto f via PR #40) → only S12.7h remains.** S12.7g enriched the
+Curve & Brightness chart and extended `ChartCanvas` (the one sub-segment allowed to — D-059;
+G2R-F36/F55/F62/F66/F69) on top of the already-merged S12.7f (live readouts/labels). The chart engine now
+carries **axis labels**, a **`niceTicks` 1/2/5×10ⁿ** y-tick generator (0/50/…/250 — no 191.25), **log-x
+from 0.1**, an opt-in **interactive scrub** readout (drag/tap → vertical line + per-series value box, pure
+`seriesValueAt`), an opt-in **legend** Row (solid/dashed swatches), and a tappable **`ChartScatter`** with
+`nearestIndex` hit-testing. The curve view: a **FIXED dashed-gold reference** sampled from the *committed*
+snapshot (F69 — no longer tracks the draft; replaces the old moving "Taper" overlay), the **wizard fit**
+("Suggested" series ≥9 pts, F62), and **tap-to-delete** override points (F36 → `OverridePointDeleteDialog`
+→ `OverridePointStore.delete`). The S12.7f `live` readout card on Curve & Brightness was preserved through
+the merge. domain/ + golden vectors stayed fenced. Ladder GREEN (`:app:testDebugUnitTest`=159).
+
+S12.7f (merged first) had closed the per-screen live-readout / label-fidelity batch (G2R-F56/F58/F59/F60/F61):
+Curve & Brightness + Misc gained Tasker live-readout cards (Reactivity already had one, now with the
+threshold as a **percentage**, F56); Reactivity's dynamic-threshold help substitutes the live value behind
+the ⓘ reveal (F59); Misc's "Scale" turns read-only "(auto)" under circadian scaling (F60); form2A/3A →
+"Zone 2/3 alignment" (F61); `rememberToaster` now routes through the teal `AabFlash` channel. **Next: S12.7h
+(rich editors / scene fidelity, F38/F39), then owner re-tests Gate 2 again.**
+
+⚠️ **NEW owner finding 2026-06-15 (G2R-F73, DEFERRED — domain-fenced):** `%AAB_ScaleDynamic` erroneously
+drops **below 1 around 07:13 in the morning** — suspected a **UTC vs local-time** bug in the solar/dynamic-
+scale ramp. The dynamic-scale + solar math lives in `domain/` (`DynamicScaleEngine`/`SolarTimes`,
+`secondsOfDay` is derived from UTC wall-clock — see D-039d/the S5 note), which S12.7 fences off, so it
+cannot be fixed in this stage. Needs a domain segment (re-open with golden-vector proof per the coding
+rules). Logged for triage; **do not "fix" by guessing.** (Numbered F73 because S12.7f claimed F70/F71/F72.)
 
 **(historical) S12.7e DONE (2026-06-14) → S12.7 f–h remain.** S12.7e closed the debug/toast-infrastructure batch (D-058;
 G2R-F48/F49/F50/F51/F52). The headline is **F50's global flashes**: a new opt-in
@@ -1596,17 +1606,21 @@ at the end).
   same as Tasker. → `pausedByOverride` rising edge → new `manual_override` HIGH channel notif (Resume action) + toast.
 
 *Override points / graphs (much of this is S13 chart work):*
-- **G2R-F36** Manual override points on the curve graph are **deletable by tapping** them (Tasker draws
+- **G2R-F36** ✅ RESOLVED S12.7g (D-059). Manual override points on the curve graph are **deletable by tapping** them (Tasker draws
   them slightly larger for a bigger tap target); a tap shows the lux/brightness pair and asks to confirm
-  deletion.
+  deletion. → `ChartScatter` draws larger (12px) tap targets; `ChartCanvas` hit-tests taps via
+  `nearestIndex` and calls back the data-space point; `OverridePointDeleteDialog` confirms → `OverridePointStore.delete`.
 - **G2R-F37** All Tasker graphs have a **dashed golden reference line** = the default (mostly hard-coded)
   values that were loaded; currently missing on every chart.
-- **G2R-F55** Graphs have **no axis labels**, and Chart.js let you **drag a finger across to read the
+- **G2R-F55** ✅ RESOLVED S12.7g (D-059). Graphs have **no axis labels**, and Chart.js let you **drag a finger across to read the
   numeric current + reference values**. The y-axis values feel arbitrary (e.g. 191.25 — should be logical
-  integers); the x-axis should start at **0.1, not 1** (log lux). (S13.)
-- **G2R-F62** **Curve fitting belongs on the Curve view**, not Tools-only — the point is to *see* the
-  fitted curve's impact against the recorded data points + the reference curve. (Move/echo the wizard
-  result onto the curve chart.)
+  integers); the x-axis should start at **0.1, not 1** (log lux). → `ChartCanvas` gains `xAxisLabel`/
+  `yAxisLabel` (Lux / Brightness), `niceTicks` (1/2/5×10ⁿ — 0/50/…/250, no 191.25), log-x sampled from
+  **0.1**→100k, and an `interactive` drag/tap scrub that draws a vertical line + per-series readout box.
+- **G2R-F62** ✅ RESOLVED S12.7g (D-059). **Curve fitting belongs on the Curve view**, not Tools-only — the point is to *see* the
+  fitted curve's impact against the recorded data points + the reference curve. → the wizard's suggested
+  curve (≥9 recorded points, task38) is drawn as the "Suggested" series on `BrightnessCurveChart` against
+  the override scatter + the fixed reference (was wired in G2R-F14; verified on the curve view here).
 
 *Profile & Context UI design (large HTML-scene ports):*
 - **G2R-F38** The Tasker **Profile + Contexts scenes showed a full list of every setting and its value,
@@ -1725,7 +1739,9 @@ at the end).
   → ROOT CAUSE: the pipeline fed `dimming.apply` the **PWM-floored** target (== `dimmingThreshold`), so the
   coordinator's `target < dimmingThreshold` gate was never true. Now feeds the **un-floored engine target**
   (task646 `%AAB_CurrentBright`); the hardware floors while the secure layer darkens below it.
-- **G2R-F66** Graphs need a **legend** for the (now-confirmed) dashed gold reference line + the live curve.
+- **G2R-F66** ✅ RESOLVED S12.7g (D-059). Graphs need a **legend** for the (now-confirmed) dashed gold reference line + the live curve.
+  → `ChartCanvas` renders an opt-in `showLegend` Row above the canvas: a solid/dashed swatch + label per
+  series (`legend_Curve`, dashed `legend_Reference`, `legend_Suggested`) + an "Overrides" scatter swatch.
 - **G2R-F67** ✅ RESOLVED S12.7c (D-056). Context rules also need **day-of-week selection** (Tasker `<Day>` rules) with **smart
   midnight wrapping**. The domain `ContextTriggers.days` + resolver already exist (D-014); the rule editor
   exposes no day picker. → added a 7-`FilterChip` day picker wired to `ContextTriggers.days` (all/none =
@@ -1734,12 +1750,12 @@ at the end).
 - **G2R-F68** ✅ RESOLVED S12.7c (D-056). The rule editor's **Sunrise/Sunset tokens should also display the resolved current
   time-of-day** for today, in theme **gold** (Tasker shows e.g. "SUNRISE (06:42)"). → `solarTimes()`
   computes today's rise/set for the last-known location; the tokens render "Sunrise (06:42)" in `AabGold`.
-- **G2R-F69 (owner, 2026-06-14 20:33 — DEFERRED to S12.7g)** On the **Curve & Brightness** screen the
+- **G2R-F69** ✅ RESOLVED S12.7g (D-059). On the **Curve & Brightness** screen the
   **dashed gold reference line moves as you edit the field values** — it should be a FIXED reference (the
-  default / last-loaded curve) so edits are visible *against* it. The live curve should track the draft;
-  the reference must NOT. Likely `BrightnessCurveChart` is sampling the reference series from the draft
-  settings instead of a snapshot of the committed/default curve. (Chart sub-segment — S12.7g, where
-  `ChartCanvas`/curve view work is sanctioned.)
+  default / last-loaded curve) so edits are visible *against* it. → `BrightnessCurveChart` gained a
+  `referenceCurve` param; `CurveBrightnessContent` samples it from the **committed** snapshot
+  (`remember(committed)`), drawn dashed gold and FIXED, while the live "Curve" series tracks the draft.
+  (Replaces the old draft-derived "Taper" overlay that moved.)
 - **G2R-F70 (owner, 2026-06-15 — DEFERRED, future session)** **Loading a legacy Tasker JSON config does not
   apply.** Importing a legacy `.json` (Profiles screen → legacy folder/file load) **toasts "loaded" and the
   Menu shows the context-override latch, but none of the imported settings actually take hold** (the live
@@ -1764,6 +1780,12 @@ at the end).
   — the time fields can be set but not unset back to "no time constraint". Add a clear/remove affordance
   (e.g. a "Clear time" action that nulls `ContextTriggers.from`/`to`) so a time-constrained rule can become
   time-agnostic again. **App-layer (ContextsScreen rule editor).**
+- **G2R-F73 (owner, 2026-06-15 — DEFERRED, domain-fenced)** `%AAB_ScaleDynamic` **drops below 1 at ~07:13
+  in the morning** when it should not — suspected **UTC vs local-time** bug in the solar / dynamic-scale
+  ramp. The math is in `domain/` (`DynamicScaleEngine`/`SolarTimes`; `secondsOfDay` derived from the UTC
+  wall-clock, cf. D-039d), which S12.7 fences. NOT fixable in this stage — needs a dedicated domain
+  segment (golden-vector proof required per the coding rules before changing the reference). Surfaced
+  during S12.7g; logged, not actioned. (Numbered F73 because S12.7f claimed F70/F71/F72.)
 - **OWNER ANSWERS to S12.6e open questions:** (F34) **yes — transcribe the real task567 override logic**
   from the XML, don't approximate. (F41) provide **guidance on granting `DUMP` and/or using Shizuku** for
   the no-Location SSID path. (F50) **yes, use an AccessibilityService** for global toasts — distribution is

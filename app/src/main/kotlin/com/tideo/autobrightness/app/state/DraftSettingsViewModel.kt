@@ -112,6 +112,11 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
     /** Edit the draft only — nothing persists until [apply] (G2-F1 temporary preview). */
     fun edit(transform: (AabSettings) -> AabSettings) = _draft.update(transform)
 
+    /** Delete a recorded override training point (tap-to-delete on the curve chart, S12.7g / F36). */
+    fun deleteOverridePoint(point: OverridePoint) {
+        viewModelScope.launch { appModule.overridePointStore.delete(point) }
+    }
+
     /**
      * Commit draft → DataStore and force an immediate pipeline re-evaluate (G2-F1/F16). The
      * service/identity fields are preserved from the live committed value (never edited here), so an

@@ -45,6 +45,19 @@ class OverridePointStoreTest {
     }
 
     @Test
+    fun delete_removesMatchingPoint_keepingDuplicates() = runTest {
+        // F36 tap-to-delete: only the first record with the matching (lux, brightness) pair is removed.
+        val s = store()
+        s.record(10.0, 20.0)
+        s.record(30.0, 40.0)
+        s.record(10.0, 20.0)
+        s.delete(com.tideo.autobrightness.domain.wizard.OverridePoint(10.0, 20.0))
+        val points = s.points().first()
+        assertEquals(2, points.size, "exactly one matching point is deleted")
+        assertEquals(1, points.count { it.lux == 10.0 && it.brightness == 20.0 }, "a duplicate survives")
+    }
+
+    @Test
     fun clear_emptiesHistory() = runTest {
         val s = store()
         s.record(1.0, 2.0)

@@ -553,6 +553,40 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun curveChart_legend_distinguishesReferenceAndCurve_G2RF66() {
+        // F66/F69: a committed snapshot differing from the draft gives a fixed dashed "Reference" line
+        // alongside the live "Curve"; the legend names both.
+        val draft = AabSettings(form1A = 8)
+        val committed = AabSettings(form1A = 5)
+        compose.setContent {
+            MaterialTheme {
+                CurveBrightnessContent(draft, committed, emptyList(), epoch = 0, dirty = true, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("legend_Curve").assertExists()
+        compose.onNodeWithTag("legend_Reference").assertExists()
+    }
+
+    @Test
+    fun curveChart_overrideDeleteDialog_confirmsDeletion_G2RF36() {
+        // F36: the tap-to-delete confirm dialog shows the lux/brightness pair and fires onConfirm.
+        var confirmed = false
+        compose.setContent {
+            MaterialTheme {
+                com.tideo.autobrightness.app.ui.screens.OverridePointDeleteDialog(
+                    point = com.tideo.autobrightness.domain.wizard.OverridePoint(123.0, 88.0),
+                    onConfirm = { confirmed = true },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("123", substring = true).assertExists()
+        compose.onNodeWithText("88", substring = true).assertExists()
+        compose.onNodeWithTag("override_delete_confirm").performClick()
+        assertTrue(confirmed, "confirming the dialog deletes the point")
+    }
+
+    @Test
     fun draftBar_applyAndDiscard_invokeCallbacks() {
         var applied = false
         var discarded = false
