@@ -42,6 +42,7 @@ next session does not know it.
 | S12.7f per-screen live readouts + label/value fidelity | 2026-06-15 | Opus/high | DONE | (see push) | Live-readout/label batch (G2R-F56/F58/F59/F60/F61). **F58** Tasker live-readout blocks added to the two screens missing them: **Curve & Brightness** (`CurveBrightnessDiagnosticCard*`, brightness_settings.md `current_lux_and_bright` — "Current smoothed lux [%SmoothedLux]" + "Current brightness (min–max) [%AAB_CurrentBright]") and **Misc** (`MiscDiagnosticCard*`, misc_settings.md `current_throttle_and_alpha` — "Current throttle [%AAB_Throttle] ms" + "Current smoothing α [%LuxAlpha]"); Reactivity already had its card. **F56** the Live-reactivity card's dynamic threshold now renders as a **percentage** (new `fmtPercent`, 0.5→"50%"; the bound `%aab_thresh*pc` are percentages). **F59** Reactivity "Dynamic threshold" description now **substitutes the live `%AAB_ThreshDynamic`** value (as %) and sits **behind the ⓘ reveal** (`help=` not `helper=`). **F60** Misc **"Scale" becomes a read-only "(auto — dynamic)" readout** of `%AAB_ScaleDynamicCompress` when circadian scaling is on (editable field otherwise). **F61** `form2A`/`form3A` relabelled **"Zone 2 alignment" / "Zone 3 alignment"**. The 3 screens gained a `live: PipelineState` param (wrappers collect `LiveRuntimeState.pipeline`). **Also (owner msg):** `rememberToaster` now routes through the shared teal `AabFlash` channel so UI confirmations (profile apply/save/import/copy) get the **same AAB-teal styling** as runtime flashes + cancel-not-stack (was plain system toasts). **3 owner findings logged + deferred: G2R-F70/F71/F72.** Tests: SettingsScreens +5 (threshold-%, curve+misc live readouts, F61 labels, F60 auto-scale on/off); existing reactivity-card test updated to %. **Fence: domain/ + golden vectors untouched.** Ladder GREEN: `:app:testDebugUnitTest`(152) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 | S12.7g charts & curve view | 2026-06-15 | Opus/high | DONE | (this push) | Curve chart enriched + `ChartCanvas` extended (D-059; G2R-F36/F55/F62/F66/F69). **Merged with S12.7f** (PR #40; CurveBrightnessScreen.kt `live` readout + SettingsScreensTest both kept). **F55** `ChartCanvas` gained `xAxisLabel`/`yAxisLabel` (Lux/Brightness), a `niceTicks` 1/2/5×10ⁿ y-tick generator (0/50/…/250, kills the 191.25 artefact), log-x now sampled from **0.1**→100k, and an opt-in `interactive` drag/tap **scrub** that draws a vertical line + per-series readout box at the touch point (pure `seriesValueAt` interpolation). **F66** opt-in `showLegend` Row above the canvas — solid/dashed swatch + label per series (`legend_Curve`, dashed `legend_Reference`, `legend_Suggested`) + "Overrides" scatter. **F69** new `referenceCurve` param: `CurveBrightnessContent` samples it from the **committed** snapshot (`remember(committed)`) → FIXED dashed-gold reference that does NOT track the draft (replaces the old draft-derived moving "Taper" overlay); the live "Curve" tracks the draft. **F36** override points are now a tappable `ChartScatter` (12px dots, white ring); `ChartCanvas` hit-tests via `nearestIndex` → data-space callback → `OverridePointDeleteDialog` (lux/brightness pair + confirm) → new `OverridePointStore.delete` + `DraftSettingsViewModel.deleteOverridePoint`. **F62** verified the wizard's "Suggested" fit (≥9 pts, task38) draws on the curve view against scatter+reference. New owner finding logged + deferred: **G2R-F73** (`%AAB_ScaleDynamic` <1 at ~07:13, suspected UTC bug; domain-fenced). **Fence: domain/ + golden vectors untouched; ChartCanvas extended (sanctioned for S12.7g only).** Tests: `ChartCanvasTest` (4 — niceTicks/logSpaced/seriesValueAt/nearestIndex, pure JVM), OverridePointStore.delete (1), SettingsScreens +2 (legend Reference/Curve, delete-dialog confirm). Full ladder GREEN: `:app:testDebugUnitTest`(159) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.7h rich editors / scene fidelity | 2026-06-15 | Opus/high | DONE | (this push) | The last S12.7 sub-segment — profile/settings-list fidelity + Circadian date/location (D-060; G2R-F38/F39). **F38** the Tasker dashboard's "full list of every setting w/ gold changed-vs-default": new `settings/SettingsDisplay.kt` (`AabSettings.displayRows(reference)`/`changedCount`/`valueFor` — explicit per-key `when`, NO reflection per owner caution; excludes runtime/identity keys serviceEnabled/contextOverride) + `ui/components/SettingsDiffList.kt` (changed rows in teal-gold `AabGold` + SemiBold, count summary). Wired into a new **`LoadProfileDialog`** ("Load Anyway" preview→Apply modal, replaces the old direct Apply button), the **Save dialog** (shows the live set being saved), and a **"View current settings"** dialog (active-vs-default compare = the dashboard); each ProfileCard now shows its changed-count. **F39** Circadian fixed Date/Lat/Lon element (experiment_settings.md elements35–37, `_ExperimentSetDate`/`_ExperimentClearDate`): new `CircadianDateLocationCard` (M3 DatePicker + lat/lon fields + "Use current location" + "Use live data") backed by new `settings/ExperimentPrefsStore.kt` (`experimentPrefsDataStore` — `%AAB_Date`/`%AAB_Latitude`/`%AAB_Longitude`) via new `state/CircadianExtrasViewModel.kt`; unset → fields pre-fill **today + `lastKnownLocation`**; preview-only (never enters AabSettings/profiles/export). The ExperimentChart remains the S13 host slot. Tests: SettingsScreens +5 (diff-list changed/all-default, LoadProfileDialog confirm, Circadian defaults-to-today+loc, set-fixed emits) + new `SettingsDisplayTest` (3, pure JVM). **Fence: domain/ + golden vectors + ChartCanvas untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(167) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **ALL S12.7 (a–h) DONE → GATE 2 RE-RE-TEST (4th) READY. S12.7i queued for the during-S12.7 deferrals (F70/F71/F72); F73 needs a domain segment.** |
+| S12.7i (F73 first) circadian solar-window wiring | 2026-06-15 | Opus/high | DONE (F73) | (this push) | First S12.7i deliverable: **F73 fixed — and it was APP-LAYER, not the suspected domain bug** (D-061). Root cause: `BrightnessPipelineController.buildInput` built `TimeContext(secondsOfDay=…)` but left every solar window at its **default (6–8am / 18–20pm UTC)** — the real sunrise was NEVER wired (the D-039d "circadian wired in S9b/S12" carryover that never happened). So the dynamic-scale morning ramp ran 06–08 UTC for everyone → `%AAB_ScaleDynamic`=0.852 at **06:13 UTC** irrespective of the device clock (owner saw it at 07:13 @UTC+1 AND 08:13 @UTC+2 — both 06:13 UTC, confirming the frame, not a local bug). Fix: new `runtime/CircadianWindowProvider.kt` (pure `compute(lat,lon,dateEpochSec,tz,factor)` → `CircadianWindows` via the **already-fenced, golden-tested** `SolarCalculator.compute`/`buildScheduleWindows`; stateful `current()` resolves the F39 fixed date/loc override else today + `lastKnownLocation`, day/loc/factor-cached, returns null→keep old defaults when no fix). `buildInput` now feeds the real morning/evening/sunlight/polar fields; `now` stays UTC seconds-of-day to match `buildScheduleWindows`' UTC-frame windows. `BrightnessPipelineController` gains `circadianWindowsProvider` (default `{null}` → existing tests/behaviour intact); `AppModule.createRuntime` wires the live provider. **Verified end-to-end: Utrecht 2026-06-15 sunrise 05:18 local → scaleDynamic 1.15 at 08:13 local (was 0.852).** Tests: `CircadianWindowProviderTest` (4, pure JVM — Utrecht sunrise≈05:18 + daytime 1.15, default-window bug repro 0.852, window ordering/non-polar). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (only *called*).** Full ladder GREEN: `:app:testDebugUnitTest`(171) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **S12.7i F70/F71/F72 still remain.** |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
@@ -56,12 +57,16 @@ settings"** dashboard dialog on Profiles; **F39** the Circadian **fixed Date/Lat
 current location** when unset, preview-only (never enters profiles/export). domain/ + golden vectors +
 ChartCanvas stayed fenced. Ladder GREEN (`:app:testDebugUnitTest`=167).
 
-**Next:** (1) **owner re-runs HUMAN GATE 2** (4th) on the full S12.7 build; (2) **S12.7i** is queued in the
-RUNBOOK to clear the three app-layer findings that surfaced *during* S12.7 (G2R-F70 legacy-load-doesn't-
-apply, F71 reactivity-cooldown-swallows-overrides, F72 can't-clear-a-time-rule); (3) **G2R-F73** (the
-`%AAB_ScaleDynamic`<1 ~07:13 UTC bug) is **domain-fenced** → needs a dedicated domain mini-segment with a
-golden-vector proof, NOT S12.7i; (4) **S13** = the remaining charts (copying the S12.7g template) +
-About/User Guide. Other than those, the Gate-2 re-re-test finding set (F33–F69) is fully addressed.
+**S12.7i STARTED (2026-06-15): G2R-F73 DONE first** (it turned out app-layer, not the suspected domain bug
+— see the segment-log row + D-061). The live pipeline now wires the real sunrise windows into the
+dynamic-scale engine (`CircadianWindowProvider`); `domain/` + golden vectors stayed fenced. Verified
+Utrecht sunrise 05:18 → scaleDynamic 1.15 at 08:13 local (was 0.852).
+
+**Next:** (1) **owner re-runs HUMAN GATE 2** (4th) on the full S12.7 build (now incl. the F73 fix);
+(2) **finish S12.7i** — the three remaining app-layer findings (G2R-F70 legacy-load-doesn't-apply,
+F71 reactivity-cooldown-swallows-overrides, F72 can't-clear-a-time-rule); (3) **S13** = the remaining
+charts (copying the S12.7g template) + About/User Guide. Other than those, the Gate-2 re-re-test finding
+set (F33–F69) + F73 is fully addressed.
 
 ---
 
@@ -1297,7 +1302,20 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   this segment supplies the data + editor only. (Affects S12.7h; S13 reads `ExperimentPrefsStore` when it
   renders the circadian/experiment chart.)
 
-Append new entries as D-061, … with which segments they affect.
+- **D-061 (S12.7i) — F73 circadian scale was an app-layer wiring gap, NOT a domain bug; the domain fence
+  held.** The dynamic-scale + solar math (`DynamicScaleEngine`, `SolarCalculator`, `buildScheduleWindows`)
+  is correct and golden-tested; the pipeline simply never fed it real windows (`buildInput` used
+  `TimeContext`'s 6–8am-UTC defaults — the never-completed D-039d "circadian wired in S9b/S12"). New
+  `CircadianWindowProvider` *calls* the fenced domain to supply real sunrise windows; `now` stays **UTC
+  seconds-of-day** because `buildScheduleWindows` derives windows as `riseEpochSec % 86400` (also UTC) —
+  the two MUST share a frame (do not "convert now to local" without also rebuilding windows in local). The
+  provider returns `null` with no location → the controller keeps the old default windows (graceful
+  degrade). F39's `ExperimentPrefsStore` override feeds it (fixed date/loc preview). The morale: a
+  symptom that looks like a domain/golden bug can be an app-layer feed bug — check the wiring before
+  proposing to regenerate golden vectors. (Affects S12.7i; S13's circadian/experiment chart can reuse
+  `CircadianWindowProvider.compute`.)
+
+Append new entries as D-062, … with which segments they affect.
 
 ## Blockers
 
@@ -1821,12 +1839,17 @@ at the end).
   — the time fields can be set but not unset back to "no time constraint". Add a clear/remove affordance
   (e.g. a "Clear time" action that nulls `ContextTriggers.from`/`to`) so a time-constrained rule can become
   time-agnostic again. **App-layer (ContextsScreen rule editor).**
-- **G2R-F73 (owner, 2026-06-15 — DEFERRED, domain-fenced)** `%AAB_ScaleDynamic` **drops below 1 at ~07:13
-  in the morning** when it should not — suspected **UTC vs local-time** bug in the solar / dynamic-scale
-  ramp. The math is in `domain/` (`DynamicScaleEngine`/`SolarTimes`; `secondsOfDay` derived from the UTC
-  wall-clock, cf. D-039d), which S12.7 fences. NOT fixable in this stage — needs a dedicated domain
-  segment (golden-vector proof required per the coding rules before changing the reference). Surfaced
-  during S12.7g; logged, not actioned. (Numbered F73 because S12.7f claimed F70/F71/F72.)
+- **G2R-F73** ✅ RESOLVED S12.7i (D-061) — **and it was APP-LAYER, not the domain bug it looked like.**
+  `%AAB_ScaleDynamic` dropped below 1 (0.852) in the morning. Suspected UTC-vs-local in
+  `DynamicScaleEngine`/`SolarTimes` — but those (and `SolarCalculator`) are correct + golden-tested. The
+  real cause: `BrightnessPipelineController.buildInput` fed the dynamic-scale engine `TimeContext`'s
+  **fixed default windows** (6–8am / 18–20pm UTC) and **never wired the real sunrise** (the D-039d
+  carryover). So "morning" was 06–08 UTC for everyone → 0.852 at **06:13 UTC** regardless of clock (owner
+  saw it at 07:13 @UTC+1 *and* 08:13 @UTC+2 = both 06:13 UTC — confirming the frame, not a local bug). →
+  new app-layer `CircadianWindowProvider` wires the fenced `SolarCalculator.compute`/`buildScheduleWindows`
+  (F39 date/loc override aware) into `buildInput`; `now` kept UTC seconds-of-day to match the windows'
+  UTC frame. **domain/ + golden vectors untouched.** Verified: Utrecht 2026-06-15 sunrise 05:18 local →
+  scaleDynamic 1.15 at 08:13 local. (Numbered F73 because S12.7f claimed F70/F71/F72.)
 - **OWNER ANSWERS to S12.6e open questions:** (F34) **yes — transcribe the real task567 override logic**
   from the XML, don't approximate. (F41) provide **guidance on granting `DUMP` and/or using Shizuku** for
   the no-Location SSID path. (F50) **yes, use an AccessibilityService** for global toasts — distribution is
