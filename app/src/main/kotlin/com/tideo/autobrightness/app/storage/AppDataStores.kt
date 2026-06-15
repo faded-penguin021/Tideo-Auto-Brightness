@@ -19,6 +19,10 @@ val Context.settingsDataStore: DataStore<AabSettings> by dataStore(
 )
 val Context.serviceHealthDataStore by preferencesDataStore(name = "service_health")
 
+// Circadian "Experiment" fixed date + lat/lon override (experiment_settings.md elements37: %AAB_Date /
+// %AAB_Latitude / %AAB_Longitude). Unset = live data (today + current location). S12.7h / G2R-F39.
+val Context.experimentPrefsDataStore by preferencesDataStore(name = "experiment_prefs")
+
 // Context-override rules (S10): the rebuild's store for the rule set (Tasker contexts.json + caches).
 val Context.contextRulesDataStore: DataStore<ContextOverrideConfig> by dataStore(
     fileName = "aab_context_rules.json",

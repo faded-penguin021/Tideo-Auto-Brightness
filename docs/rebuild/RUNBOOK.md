@@ -1204,6 +1204,48 @@ defaults; STATE.md flips F38/F39; screen_map/checklist updated. → **re-run HUM
 
 ---
 
+### S12.7i — During-S12.7 deferral cleanup *(Opus/high · medium)*
+
+**Model:** Opus / high · **Size:** medium · **Preconditions:** S12.7a–h merged to main. **Run setup
+script.** **Origin:** three findings the owner logged *during* the S12.7 work and explicitly deferred to a
+later session (STATE.md G2R-F70/F71/F72). Same prime directive: **port Tasker behaviour exactly; modernise
+the *how*, never the *what*.** UI/app/runtime-glue only — **domain/ + golden vectors stay fenced.** Re-read
+the cited XML/extraction before each fix; do not invent behaviour.
+
+> **NOT in scope (record, don't action): G2R-F73** — `%AAB_ScaleDynamic` drops below 1 at ~07:13, a
+> suspected **UTC-vs-local-time** bug in `DynamicScaleEngine`/`SolarTimes` (`secondsOfDay` from the UTC
+> wall-clock, D-039d). That math lives in `domain/`, which every S12.7 segment fences. It needs a
+> **dedicated domain mini-segment** that changes the reference impl + regenerates the golden circadian
+> vectors with proof (per the CLAUDE.md golden-vector rule), not an app-layer patch. Leave F73 for that
+> segment; do **not** "fix" it by guessing here.
+
+**Deliverables:**
+1. **Legacy load actually applies** (F70): importing a legacy Tasker `.json` (Profiles → legacy folder/file
+   load) currently registers the profile + latches the context override but **never commits the parsed
+   settings into the active DataStore + re-evaluates**, so nothing changes on screen. Make a legacy load
+   commit the parsed `AabSettings` exactly like a profile apply — `SettingsViewModel.replaceAll(parsed)`
+   (or equivalent) **+ `AutoBrightnessRuntime.reapply`** — in addition to the existing
+   `saveImportedProfile` registration. Verify `LegacyConfigImporter`/`TaskerLegacyProfileSerializer`
+   actually parse the file's values (not just the name). **App-layer.**
+2. **Reactivity cooldown must not swallow manual overrides** (F71): the runtime gates the reactivity
+   cooldown on a fixed `%AAB_Throttle` window, and a genuine manual override during that window is
+   missed/suppressed. **Re-derive the real task543/task567 cooldown-vs-override interaction from the XML
+   (XML_RECIPES R2)** and re-implement so an override is still detected during the cooldown — do NOT
+   approximate. Likely touches `BrightnessPipelineController`/`OverrideMonitor` (distinct from S12.7a's
+   detector work: this is the cooldown gate). Record the transcription. **domain/ stays fenced.**
+3. **Clear/remove a time rule from a context** (F72): in the context rule editor a From/To time, once set,
+   cannot be unset back to "no time constraint". Add a "Clear time" affordance that nulls the time range
+   (`ContextTriggers.timeRange` → null) so a time-constrained rule can become time-agnostic again.
+   **App-layer (ContextsScreen rule editor).**
+
+**Acceptance:** ladder green; tests for (1) a legacy import committing parsed values + triggering reapply,
+(2) an override detected during the throttle/cooldown window (controller/monitor test against the
+transcribed task543/567 logic), (3) the clear-time affordance nulling `timeRange`; STATE.md flips
+F70/F71/F72 (and re-confirms F73 stays open for a domain segment); checklist updated. **Fence: domain/ +
+golden vectors untouched.**
+
+---
+
 ## S13 — Chart replication + static screens
 
 **Model:** Haiku / high · **Size:** medium · **Preconditions:** S12.6 DONE (template + faithful screens +

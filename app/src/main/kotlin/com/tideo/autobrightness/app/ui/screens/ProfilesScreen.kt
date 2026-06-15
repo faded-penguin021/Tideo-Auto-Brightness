@@ -30,13 +30,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.LegacyConfigEntry
 import com.tideo.autobrightness.app.settings.LegacyConfigImporter
 import com.tideo.autobrightness.app.settings.ProfileImportExportManager
 import com.tideo.autobrightness.app.settings.SavedProfile
+import com.tideo.autobrightness.app.settings.changedCount
 import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
+import com.tideo.autobrightness.app.ui.components.SettingsDiffList
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import kotlinx.coroutines.launch
@@ -107,6 +110,7 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
         profiles = profiles,
         legacyEntries = legacyEntries,
         contextLocked = settings.contextOverride,
+        currentSettings = settings,
         status = status,
         onBack = { navController.popBackStack() },
         onApplyProfile = { name -> vm.applyProfile(name); toast("Applied profile: $name") },
@@ -143,6 +147,7 @@ fun ProfilesContent(
     contextLocked: Boolean,
     status: String?,
     onBack: () -> Unit,
+    currentSettings: AabSettings = AabSettings(),
     onApplyProfile: (String) -> Unit,
     onOverwriteProfile: (String) -> Unit,
     onDeleteProfile: (String) -> Unit,
@@ -156,6 +161,10 @@ fun ProfilesContent(
     onLoadLegacy: (LegacyConfigEntry) -> Unit,
 ) {
     var showSaveDialog by remember { mutableStateOf(false) }
+    // G2R-F38: the Tasker "Load Anyway" modal — preview the profile's full settings list (gold
+    // changed-vs-default) before applying. `previewProfile` holds the entry whose modal is open.
+    var previewProfile by remember { mutableStateOf<SavedProfile?>(null) }
+    var showCurrentSettings by remember { mutableStateOf(false) }
 
     SettingsScaffold("Profiles & Import/Export", onBack) { padding ->
         SettingsColumn(padding) {
@@ -183,10 +192,16 @@ fun ProfilesContent(
                 Text("No saved profiles yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             profiles.forEach { entry ->
-                ProfileCard(entry, onApplyProfile, onOverwriteProfile, onDeleteProfile)
+                ProfileCard(entry, onApply = { previewProfile = entry }, onOverwriteProfile, onDeleteProfile)
             }
 
             SectionHeader("Manage profiles")
+            // G2R-F38: the Tasker dashboard compares active settings vs factory defaults (tuned
+            // values shown yellow) — surface the live set with the same gold highlighting.
+            OutlinedButton(
+                onClick = { showCurrentSettings = true },
+                modifier = Modifier.fillMaxWidth().testTag("view_current_settings"),
+            ) { Text("View current settings…") }
             Button(
                 onClick = { showSaveDialog = true },
                 modifier = Modifier.fillMaxWidth().testTag("save_profile_as"),
@@ -241,8 +256,25 @@ fun ProfilesContent(
 
     if (showSaveDialog) {
         SaveProfileDialog(
+            currentSettings = currentSettings,
             onDismiss = { showSaveDialog = false },
             onConfirm = { name -> showSaveDialog = false; onSaveCurrentAs(name) },
+        )
+    }
+
+    // G2R-F38: the "Load Anyway" modal — full settings list, gold changed-vs-default, then Apply.
+    previewProfile?.let { entry ->
+        LoadProfileDialog(
+            profile = entry,
+            onDismiss = { previewProfile = null },
+            onConfirm = { previewProfile = null; onApplyProfile(entry.name) },
+        )
+    }
+
+    if (showCurrentSettings) {
+        CurrentSettingsDialog(
+            settings = currentSettings,
+            onDismiss = { showCurrentSettings = false },
         )
     }
 }
@@ -250,19 +282,25 @@ fun ProfilesContent(
 @Composable
 private fun ProfileCard(
     entry: SavedProfile,
-    onApply: (String) -> Unit,
+    onApply: () -> Unit,
     onOverwrite: (String) -> Unit,
     onDelete: (String) -> Unit,
 ) {
+    val changed = entry.settings.changedCount()
     Card(Modifier.fillMaxWidth().testTag("profile_${entry.name}")) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 entry.name + if (entry.builtIn) "  (built-in)" else "",
                 style = MaterialTheme.typography.titleMedium,
             )
+            Text(
+                if (changed == 0) "Factory defaults" else "$changed changed from default",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = { onApply(entry.name) },
+                    onClick = onApply,
                     modifier = Modifier.testTag("apply_profile_${entry.name}"),
                 ) { Text("Apply") }
                 OutlinedButton(
@@ -279,19 +317,28 @@ private fun ProfileCard(
 }
 
 @Composable
-private fun SaveProfileDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+private fun SaveProfileDialog(
+    currentSettings: AabSettings,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Save profile") },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Profile name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag("save_profile_name"),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Profile name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("save_profile_name"),
+                )
+                Text("Saving these settings:", style = MaterialTheme.typography.labelMedium)
+                // G2R-F38: show exactly what is being saved, gold-highlighting changed-vs-default.
+                SettingsDiffList(currentSettings, maxHeight = 260)
+            }
         },
         confirmButton = {
             TextButton(
@@ -300,5 +347,48 @@ private fun SaveProfileDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit
             ) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/**
+ * The Tasker "Load Anyway" modal (profile.md `performTask('_ProfileManager', …, 'LOAD_FILE', …)`,
+ * G2R-F38): preview the profile's full settings list (gold changed-vs-default) before applying it to
+ * the live configuration.
+ */
+@Composable
+fun LoadProfileDialog(profile: SavedProfile, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Load “${profile.name}”?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "These settings will replace your current configuration.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                SettingsDiffList(profile.settings)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, modifier = Modifier.testTag("confirm_load_profile")) {
+                Text("Apply")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Read-only "current settings vs factory defaults" view (profile.md dashboard, G2R-F38). */
+@Composable
+fun CurrentSettingsDialog(settings: AabSettings, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Current settings") },
+        text = { SettingsDiffList(settings) },
+        confirmButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("close_current_settings")) {
+                Text("Close")
+            }
+        },
     )
 }
