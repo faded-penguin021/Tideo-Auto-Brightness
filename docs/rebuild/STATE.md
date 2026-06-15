@@ -38,11 +38,28 @@ next session does not know it.
 | S12.7c context system: location lifecycle, ordering, legacy targets, days | 2026-06-14 | Opus/high | DONE | (this push) | Context-system parity batch (D-056; G2R-F42/F43/F44/F45/F47/F67/F68). **F45 smart location listener:** `LocationReader.locationUpdates()` (continuous `requestLocationUpdates` NETWORK+GPS, seeds best last-known, filters (0,0) null-island reads) replaces the on-demand passive read that died on backgrounding + read `0.0,0.0`; hosted in the FGS scope; `ContextEngine.startLocationListenerIfNeeded()` gated on `tokens.usesLocation` (Tasker's `[LOC]`-in-ContextCache cost gate — owner-confirmed) + a ≥100 m haversine debounce before firing the LOCATION eval (kills the near-constant/input-blocking toasts); `assemble()` now takes engine-fed lat/lon (new `LocationSignal`). **F42** `currentLocation()` → typed `LocationResult` (NeedsPermission/Unavailable/Available) with a call-time permission recheck + fresh `getCurrentLocation` fix (no longer falsely "not granted" post-grant). **F43** rule list `byPriority()` (highest first, name tie-break) not creation order. **F44** legacy load registers the profile into `UserProfileStore` (file name) → selectable as a rule target without a re-save (`SettingsViewModel.saveImportedProfile`). **F67** day-of-week `FilterChip` picker → `ContextTriggers.days` (resolver/overnight-wrap already supported, domain fenced). **F68** SUNRISE/SUNSET tokens show today's resolved time in theme gold ("Sunrise (06:42)", `ContextsViewModel.solarTimes()`). **F47** Context Automation debug toast enriched: trigger · context · profile · rule (priority). Tests: ContextEngine +2 (location ≥100 m debounce, enriched F47 toast), AppProfileCatalog +1 (legacy target visible), ContextRuleStore +1 (byPriority), SettingsScreens +2 (day picker saves DAY_OF_WEEK, sunrise resolved-time). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(138) `:platform:test :domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.7d permissions, Wi-Fi acquisition, first-boot nav | 2026-06-14 | Opus/high | DONE | (this push) | Permissions/SSID/nav batch (D-057; G2R-F33/F41/F57). **F41 (SSID):** ported the real `_GetWifiNoLocation V3` order (task105/633) — `AndroidWifiInfoReader.currentSsid` now tries the no-Location strategies FIRST (`WifiSsidStrategies.kt`: `ShizukuWifiSsidStrategy` runs `cmd wifi status` via new `ShizukuShell.exec` + AIDL `exec(String[])` on the existing user service → `DumpsysWifiSsidStrategy` runs in-process `dumpsys wifi`, parsing the `mWifiInfo`/`COMPLETED` line), and only falls back to the Location-gated `NetworkCallback` last; strategies are constructor-injectable so the source-order is unit-tested. **F41 (perm):** Setup gained a Location step (RequestMultiplePermissions FINE+COARSE, labelled optional). **F33:** onboarding shows a `RestrictedSettingsCard` ("Allow restricted settings" + Open-App-info deep-link) when `isLikelySideloaded` (install source not a known store). **F57:** new `NavHostController.completeOnboarding()` lands on `AppRoute.Menu` with `popUpTo(Onboarding, inclusive)` (was Dashboard) → Back from Menu exits cleanly. **Fence: domain/ + golden vectors untouched.** Tests: `WifiSsidStrategyTest` (9 — source order with fakes + cmd/dumpsys parsers + normalize), UiShell +3 (Location step renders, restricted hint when sideloaded, completeOnboarding→Menu drops Onboarding). Full ladder GREEN: `:platform:test :app:testDebugUnitTest`(140) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.7a manual-override engine correctness | 2026-06-14 | Opus/high | DONE | (this push) | Ported the REAL task567/task696 override logic (D-054; G2R-F34/F64/F46). **F34:** `AnimationRunner` replaced the exact-match `isOnScreenSelfWrite()` (false-fired on OEM round-trip drift) with task696's band+debounce — band `[minTarget-2, maxTarget+2]` spanning the sweep, override only after **2 consecutive** out-of-band reads (every-frame, since the every-5th was a Tasker IPC optimization). **F64:** `OverrideMonitor` gained a settle-suppression gate; `setInitialBrightness` arms a 1500ms window after each initial self-write so the start/reinit/resume/QS-on observer echo (incl. the AUTO→MANUAL mode-flip recompute) is not flagged as an override; the S12.6c idle-path settle-wait kept. **F46:** manual profile load = override (`LiveRuntimeState.manualOverride` published from `%AAB_ContextOverride` via the service) shown in the Menu; a context rule active is no longer labelled an override (Menu Contexts card relabelled). Tests: AnimationRunner +3 (self-writes complete / opposing-write overridden / single-transient debounced), controller +1 (init-echo suppressed then real-write pauses post-window), UiShell +2 (Menu label semantics). **Fence: domain/ + golden vectors untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(128) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
+| S12.7e debug / toast infrastructure | 2026-06-14 | Opus/high | DONE | (this push) | Debug/toast surfaces fixed (D-058; G2R-F48/F49/F50/F51/F52). **F50** global flashes: new `AabToastAccessibilityService` (opt-in `AccessibilityService`, `TYPE_ACCESSIBILITY_OVERLAY` window — no `SYSTEM_ALERT_WINDOW`, presentation-only, `canRetrieveWindowContent=false`) registers as the presenter of a new process-wide `AabFlash` channel; manifest service + `res/xml/aab_accessibility_service.xml` + rationale string; Live Debug gained an opt-in card (status + Accessibility-settings deep-link, re-polled on resume). Degrades to the foreground teal toast when off. **F51** cancel-not-stack: ALL flashes (`ToastDebugSink` + `ToastContextLoadSink`) route through `AabFlash.show`, which cancels the previous flash before posting the next (teal styling moved into `AabFlash`). **F52** instant debug-off: `LiveDebugViewModel.setDebugLevel` now `AabFlash.cancel()`s on Off **and** triggers `AutoBrightnessRuntime.reapply` (gated on serviceEnabled) so the pipeline's stale `ContextEngine` effective-snapshot picks up the new category immediately (root cause: `effectiveSettings()` served the cached snapshot). **F48** dynamic-scale timing: new pure `DynamicScaleDebugGate` (fires only ~2 min into a dawn/dusk transition, then ≤ once per 2 min; resets when the time-driven scale settles) gates the `DYNAMIC_SCALE` flash in `runCycle` (transition = `scaleDynamic` changing between cycles) — no longer per light change. **F49** overlay-preview colour: `SuperDimmingCoordinator` now emits `OVERLAY_PREVIEW` (level 6) with the computed black-overlay hex (task653 `dim_alpha_dec=2.55·dim_shell` → task654 `%AAB_HexOverlay`, via golden `SoftwareDimming.dimShell`) on the unprivileged (`<ELEVATED`) below-threshold fallback. **Fence: domain/ + golden vectors untouched.** Tests: RuntimeDebug +4 (gate timing ×2, flash cancel-previous/instant-cancel, foreground fallback), SuperDimming +2 (overlay-preview on unprivileged / none when elevated), SettingsScreens +1 (global-flash card). Full ladder GREEN: `:app:testDebugUnitTest`(147) `:domain:test :platform:test :app:assembleDebug :app:lintDebug`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
-**S12.7d DONE (2026-06-14) → S12.7 e–h remain.** S12.7d closed the permissions/SSID/first-boot-nav batch
+**S12.7e DONE (2026-06-14) → S12.7 f–h remain.** S12.7e closed the debug/toast-infrastructure batch (D-058;
+G2R-F48/F49/F50/F51/F52). The headline is **F50's global flashes**: a new opt-in
+`AabToastAccessibilityService` (presentation-only `AccessibilityService` drawing a
+`TYPE_ACCESSIBILITY_OVERLAY` window — no `SYSTEM_ALERT_WINDOW`, never reads window content) registers as
+the presenter of a **new process-wide `AabFlash` channel** that ALL flashes (debug + context-load) now
+route through. That channel also fixes **F51** (each `show` cancels the previous flash → no stacking)
+and **F52** (`setDebugLevel` `AabFlash.cancel()`s on Off **and** `reapply`s so the pipeline's stale
+`ContextEngine` effective-snapshot picks the new category up immediately — the real root cause of the
+"not instant" bug). **F48:** a pure `DynamicScaleDebugGate` fires the dynamic-scale flash only ~2 min
+into a dawn/dusk transition (scale changing) then ≤ once/2 min, never per light change. **F49:** the
+unprivileged super-dimming fallback now flashes the computed black-overlay hex (`OVERLAY_PREVIEW`,
+task653/654 math via golden `SoftwareDimming.dimShell`). Live Debug gained an opt-in global-flash card
+(status + Accessibility deep-link, re-polled on resume). domain/ + golden vectors stayed fenced. Ladder
+GREEN (`:app:testDebugUnitTest`=147). **Next: S12.7 f–h (largely disjoint; rebase before push), then
+owner re-tests Gate 2 again after S12.7h.**
+
+**(historical) S12.7d DONE (2026-06-14) → S12.7 e–h remain.** S12.7d closed the permissions/SSID/first-boot-nav batch
 (D-057; G2R-F33/F41/F57). The headline is **F41's `_GetWifiNoLocation V3` port**: `AndroidWifiInfoReader`
 now reads the connected SSID **without Location** by trying the no-Location strategies first — Shizuku
 `cmd wifi status` (via a new `ShizukuShell.exec` + an `exec(String[])` method added to the existing AIDL
@@ -282,7 +299,7 @@ AppModule is now the real DI root.
   restricted-settings guidance, Location grant in Setup, `_GetWifiNoLocation V3` Shizuku/dump SSID path +
   grant guidance, first-boot→Menu (F33/F41/F57) — DONE (D-057); **e** debug/toast infra — Accessibility global toasts,
   cancel-previous, instant debug-off, dynamic-scale timing, overlay-preview colour toast (F48/F49/F50/F51/
-  F52); **f** per-screen live readouts + labels — readout blocks, reactivity %, var-substitution+info-gate,
+  F52) — DONE (D-058); **f** per-screen live readouts + labels — readout blocks, reactivity %, var-substitution+info-gate,
   Misc auto-scale, form2A/3A labels (F56/F58/F59/F60/F61); **g** charts & curve view (may lift the
   ChartCanvas fence) — axis labels + interactive scrub + log-x, curve-fitting on the curve view, reference-
   line legend (F55/F62/F66 [+F36 tap-to-delete points]); **h** rich editors / scene fidelity — polished
@@ -1196,7 +1213,33 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   on Menu and drops Onboarding from the back stack). (Affects S12.7d; the SSID strategy + Location helper
   are reused by any future Wi-Fi/location work; S12.7e's permission-aware toasts can lean on the same gates.)
 
-Append new entries as D-058, D-059, … with which segments they affect.
+- D-058: **S12.7e debug / toast infrastructure** (G2R-F48/F49/F50/F51/F52; UI/app/platform-glue only,
+  domain/ + golden vectors fenced). **F50/F51/F52 — new process-wide flash channel (headline):** new
+  `app/runtime/AabFlash.kt` (object) is the single channel ALL runtime flashes go through. `show()` cancels
+  the previous flash before posting the next (**F51** no-stack); `cancel()` clears immediately (**F52**
+  instant-off). It uses an opt-in `Presenter` when registered (system-wide overlay) else falls back to the
+  foreground AAB-teal `Toast` (teal styling moved here from `ToastDebugSink`). `ToastDebugSink` +
+  `ToastContextLoadSink` now just format text + `AabFlash.show`. **F50 — global flashes:** new
+  `app/runtime/AabToastAccessibilityService.kt` (opt-in `AccessibilityService`, presentation-only:
+  `canRetrieveWindowContent=false`, no event handling) registers an `AabFlash.Presenter` that draws a
+  `TYPE_ACCESSIBILITY_OVERLAY` window (no `SYSTEM_ALERT_WINDOW`) for ~2.5 s; manifest service +
+  `res/xml/aab_accessibility_service.xml` + `global_toasts_a11y_description` string; Live Debug screen got
+  an opt-in card (status + `ACTION_ACCESSIBILITY_SETTINGS` deep-link, re-polled on `ON_RESUME` via
+  `LiveDebugViewModel.refreshGlobalToastStatus`/`isGlobalToastServiceEnabled`). Distribution is F-Droid/GitHub
+  so the sensitive permission is sanctioned (owner answer). **F52 root cause:** `setDebugLevel` wrote the
+  DataStore but the pipeline reads via `ContextEngine.effectiveSettings()` which serves a CACHED snapshot →
+  the new category never took effect until a reapply. Fixed: `setDebugLevel` now `AabFlash.cancel()`s on Off
+  and `AutoBrightnessRuntime.reapply`s (gated on serviceEnabled). **F48 — dynamic-scale timing:** new pure
+  `DynamicScaleDebugGate` (in `RuntimeDebug.kt`): first flash ~2 min into a transition, then ≤ once/2 min,
+  resets when the (time-driven) `scaleDynamic` settles; the controller computes `transitionActive` =
+  `scaleDynamic` changed between cycles and gates the `DYNAMIC_SCALE` emit. **F49 — overlay-preview colour:**
+  `SuperDimmingCoordinator.apply` emits `OVERLAY_PREVIEW` (level 6) with the black-overlay hex
+  (`2.55·dimShell` → `#AA000000`, task653/654 via golden `SoftwareDimming.dimShell`) on the unprivileged
+  (`tier < ELEVATED`) below-threshold fallback only. Tests: RuntimeDebug +4, SuperDimming +2, SettingsScreens
+  +1 (147 app unit tests). (Affects S12.7e; `AabFlash` is the channel any future flash should use — S12.7f/h
+  toasts and the deferred overlay window (D-040) can reuse it / the AccessibilityService.)
+
+Append new entries as D-059, D-060, … with which segments they affect.
 
 ## Blockers
 
@@ -1601,16 +1644,23 @@ at the end).
   switch, on auto-loading a profile — showing **context trigger, context, profile, and rule (with
   priority)**. Surface them under the Context Automation debug category. → the CONTEXT_AUTOMATION toast on
   each auto-load now reads "trigger … · context … · profile … · rule X (priority N)".
-- **G2R-F48** **Dynamic Scale debug** fires on **every light change**; it should fire **every 2 minutes
-  into a dawn/dusk transition** only.
-- **G2R-F49** **Overlay Preview debug** (privilege≈none fallback) should **toast the colour of the
-  semi-transparent overlay** (not tested on-device, but the toast is expected).
-- **G2R-F50** Toasts **only show while the app is in the foreground**; Tasker showed flash messages
-  **everywhere** (likely via Accessibility). Decide on a global-toast mechanism.
-- **G2R-F51** Toasts **stack instead of cancelling** each other — after disabling "Light Eval Thresholds"
-  the queued toasts keep appearing for a while. Each new debug toast should cancel the previous.
-- **G2R-F52** **"Debug Off" is not instant** — it only takes effect after backing out of the screen; in
-  Tasker the selector applies immediately.
+- **G2R-F48** ✅ RESOLVED S12.7e (D-058). **Dynamic Scale debug** fired on **every light change**; should fire **~2 minutes
+  into a dawn/dusk transition** only. → new pure `DynamicScaleDebugGate` (first flash 2 min into a
+  transition, then ≤ once/2 min, resets when the time-driven scale settles) gates the `DYNAMIC_SCALE`
+  flash in `runCycle`; a "transition" = `scaleDynamic` changing between cycles.
+- **G2R-F49** ✅ RESOLVED S12.7e (D-058). **Overlay Preview debug** (privilege≈none fallback) should **toast the colour of the
+  semi-transparent overlay**. → `SuperDimmingCoordinator` emits `OVERLAY_PREVIEW` with the computed
+  black-overlay hex (task653 `2.55·dim_shell` → task654 `%AAB_HexOverlay`) on the unprivileged
+  below-threshold fallback (overlay window itself still deferred, D-040).
+- **G2R-F50** ✅ RESOLVED S12.7e (D-058). Toasts only showed **in the foreground**; Tasker flashed **everywhere** (Accessibility).
+  → opt-in `AabToastAccessibilityService` (presentation-only `TYPE_ACCESSIBILITY_OVERLAY`) registers as
+  the presenter of the new process-wide `AabFlash` channel; Live Debug opt-in card + rationale; degrades
+  to the foreground teal toast when off.
+- **G2R-F51** ✅ RESOLVED S12.7e (D-058). Toasts **stacked instead of cancelling**. → all flashes route through `AabFlash.show`,
+  which cancels the previous flash before posting the next.
+- **G2R-F52** ✅ RESOLVED S12.7e (D-058). **"Debug Off" was not instant**. → `setDebugLevel` now `AabFlash.cancel()`s on Off and
+  triggers `reapply` so the pipeline's cached `ContextEngine` effective-snapshot picks up the new
+  category immediately (root cause: the stale `effectiveSettings()` snapshot).
 
 *Pipeline correctness / diagnostics:*
 - **G2R-F53** On the Live Debug screen, **LuxAlpha shows a NEGATIVE value for one cycle** after it settles

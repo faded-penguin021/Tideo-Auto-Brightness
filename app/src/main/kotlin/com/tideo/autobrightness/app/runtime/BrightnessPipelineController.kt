@@ -76,6 +76,12 @@ class BrightnessPipelineController(
     // Cached so the per-sample prof760 gate does not hit DataStore on every reading.
     @Volatile private var cachedSettings: AabSettings? = null
 
+    // F48: the Dynamic Scale debug Flash fires only while the circadian scale is actively ramping and
+    // is throttled to ~once per 2 min — not on every light change. `lastScaleDynamicSeen` detects an
+    // in-progress transition (the scale value is time-driven, so a change means a dawn/dusk ramp).
+    private val dynamicScaleDebugGate = DynamicScaleDebugGate()
+    @Volatile private var lastScaleDynamicSeen: Double? = null
+
     private val events = Channel<PipelineEvent>(Channel.UNLIMITED)
 
     private val overrideMonitor = OverrideMonitor(brightnessObserver) {
@@ -242,7 +248,16 @@ class BrightnessPipelineController(
             emitDebug(DebugCategory.LIGHT_EVAL, settings) {
                 "lux ${round3(rawLux)}→${output.smoothedLux.toInt()} · thr ${output.thresholdLow.toInt()}–${output.thresholdHigh.toInt()} · →$target"
             }
-            emitDebug(DebugCategory.DYNAMIC_SCALE, settings) { "scaleCompress ${output.scaleDynamicCompress}" }
+            // %AAB_Debug 4 "Dynamic Scale Calcs": fire only ~2 min into a dawn/dusk transition, not on
+            // every light change (G2R-F48). A transition is the time-driven circadian scale changing.
+            val prevScale = lastScaleDynamicSeen
+            val transitionActive = prevScale != null && kotlin.math.abs(output.scaleDynamic - prevScale) > 1e-4
+            lastScaleDynamicSeen = output.scaleDynamic
+            if (dynamicScaleDebugGate.shouldEmit(now, transitionActive)) {
+                emitDebug(DebugCategory.DYNAMIC_SCALE, settings) {
+                    "scale ${round3(output.scaleDynamic)} · compress ${output.scaleDynamicCompress}"
+                }
+            }
 
             if (target != from) {
                 brightness.forceManualMode()

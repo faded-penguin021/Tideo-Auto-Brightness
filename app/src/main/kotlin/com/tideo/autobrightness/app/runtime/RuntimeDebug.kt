@@ -33,3 +33,34 @@ fun interface DebugSink {
 object NoOpDebugSink : DebugSink {
     override fun emit(category: DebugCategory, activeLevel: Int, message: () -> String) = Unit
 }
+
+/**
+ * Timing gate for the **Dynamic Scale** debug Flash (G2R-F48). In Tasker this fired ~2 minutes into a
+ * dawn/dusk transition, NOT on every light change. The dynamic scale is a function of time-of-day
+ * only (the circadian ramp), so a "transition is in progress" whenever its value is actively changing
+ * between cycles; while it is settled (daytime / nighttime plateau) the gate stays closed and resets.
+ *
+ * Behaviour: once a transition has been active for [delayMs] the first Flash fires; subsequent Flashes
+ * are then throttled to at most once per [intervalMs]. When the transition settles the gate resets so
+ * the next ramp again waits [delayMs] before flashing. Pure state machine so the timing is unit-tested
+ * without the pipeline ([BrightnessPipelineController] feeds it `now` + whether the scale is ramping).
+ */
+class DynamicScaleDebugGate(
+    private val delayMs: Long = 120_000L,
+    private val intervalMs: Long = 120_000L,
+) {
+    private var transitionStartMs: Long? = null
+    private var lastEmitMs: Long? = null
+
+    fun shouldEmit(nowMs: Long, transitionActive: Boolean): Boolean {
+        if (!transitionActive) {
+            transitionStartMs = null
+            return false
+        }
+        val start = transitionStartMs ?: nowMs.also { transitionStartMs = it }
+        if (nowMs - start < delayMs) return false
+        lastEmitMs?.let { if (nowMs - it < intervalMs) return false }
+        lastEmitMs = nowMs
+        return true
+    }
+}
