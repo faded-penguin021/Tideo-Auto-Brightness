@@ -37,10 +37,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private data class Live(
         val running: Boolean,
         val paused: Boolean,
+        val pausedByOverride: Boolean,
         val rawLux: Double?,
         val smoothedLux: Double?,
         val current: Int?,
         val target: Int?,
+        val circadianScale: Double?,
+        val dimmingStrength: Double,
+        val throttleMs: Long?,
         val context: String?,
         val lastSampleMs: Long?,
     )
@@ -50,7 +54,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         LiveRuntimeState.activeContext,
         LiveRuntimeState.serviceRunning,
     ) { p, ctx, running ->
-        Live(running, p.paused, p.lastRawLux, p.smoothedLux, p.lastAppliedBrightness, p.targetBrightness, ctx, p.lastSampleMs)
+        Live(
+            running, p.paused, p.pausedByOverride, p.lastRawLux, p.smoothedLux,
+            p.lastAppliedBrightness, p.targetBrightness, p.scaleDynamicCompress, p.dimmingCurrent,
+            p.throttleMs, ctx, p.lastSampleMs,
+        )
     }
 
     private val healthFlow = healthStore.telemetry.map {
@@ -73,10 +81,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             tier = tier,
             serviceRunning = live.running,
             paused = live.paused,
+            pausedByOverride = live.pausedByOverride,
             rawLux = live.rawLux,
             smoothedLux = live.smoothedLux,
             currentBrightness = live.current,
             targetBrightness = live.target,
+            circadianScale = live.circadianScale,
+            dimmingStrength = live.dimmingStrength,
+            throttleMs = live.throttleMs,
             activeContext = live.context,
             lastSampleMs = live.lastSampleMs,
             health = health,
@@ -94,6 +106,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun pause() = AutoBrightnessRuntime.pause(app)
+    // G2R-F79: the Dashboard no longer exposes a Pause control (stopping = disable the service). Only
+    // Resume remains, to clear a DETECTED manual override (pausedByOverride). The runtime Pause/Resume
+    // events still exist for the notification/override path; the dashboard just doesn't offer Pause.
     fun resume() = AutoBrightnessRuntime.resume(app)
 }

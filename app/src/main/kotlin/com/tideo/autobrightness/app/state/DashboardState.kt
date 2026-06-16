@@ -13,10 +13,19 @@ data class DashboardUiState(
     val tier: Tier = Tier.NONE,
     val serviceRunning: Boolean = false,
     val paused: Boolean = false,
+    /** true when [paused] was latched by a DETECTED manual brightness override (prof755/task567), as
+     *  opposed to nothing. Drives the redesigned dashboard's Resume-after-override card (G2R-F79). */
+    val pausedByOverride: Boolean = false,
     val rawLux: Double? = null,
     val smoothedLux: Double? = null,
     val currentBrightness: Int? = null,
     val targetBrightness: Int? = null,
+    /** %AAB_ScaleDynamicCompress — the effective circadian scale applied now (1.0 = no shift). */
+    val circadianScale: Double? = null,
+    /** %AAB_DimmingCurrent — relative super-dimming strength now (0 = not dimming). */
+    val dimmingStrength: Double = 0.0,
+    /** %AAB_Throttle — the reactivity cooldown (ms) currently in force. */
+    val throttleMs: Long? = null,
     val activeContext: String? = null,
     /** TIMEMS of the last sensor sample the pipeline saw (live), for the "Xs ago" readout (G2R-F5). */
     val lastSampleMs: Long? = null,

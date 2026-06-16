@@ -17,7 +17,10 @@ import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
+import com.tideo.autobrightness.app.ui.components.ChartPager
+import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
+import com.tideo.autobrightness.app.ui.components.GraphSettingsGroup
 import com.tideo.autobrightness.app.ui.components.SuperDimmingDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -81,6 +84,22 @@ fun SuperDimmingContent(
 ) {
     DraftSettingsScaffold("Super Dimming", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
+            // G2R-F81: the dimming graph now sits ABOVE the settings (it previously rendered below the
+            // whole form). Single relevant graph → no swipe indicator. Circadian dimming chart
+            // re-homed here per D-026; S13 fills the slot.
+            ChartPager(
+                listOf(
+                    ChartSlot("Dimming curve", "dimming_chart") {
+                        ChartPlaceholder("DimmingChart", "dimming_chart")
+                    },
+                ),
+            )
+
+            // G2R-F58 live readout: %AAB_DimmingCurrent (rel) / %AAB_DimmingDS (abs) at %AAB_CurrentBright.
+            SuperDimmingDiagnosticCardContent(live)
+
+            // G2R-F82: the dimming + PWM controls feed the dimming graph above.
+            GraphSettingsGroup("Dimming curve") {
             SectionHeader("Super dimming")
             if (tier != Tier.ELEVATED) {
                 Text(
@@ -147,12 +166,7 @@ fun SuperDimmingContent(
                 epoch = epoch, committed = committed.pwmExponent, isInt = false,
                 help = TaskerHelp.PWM_EXPONENT, testTag = "field_pwmExponent",
             )
-
-            // G2R-F58 live readout: %AAB_DimmingCurrent (rel) / %AAB_DimmingDS (abs) at %AAB_CurrentBright.
-            SuperDimmingDiagnosticCardContent(live)
-
-            // Circadian dimming chart (re-homed here per D-026) is render-deferred to S13.
-            ChartPlaceholder("DimmingChart / CircadianChart", "dimming_chart")
+            }
         }
     }
 }

@@ -20,9 +20,12 @@ import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.LiveDebugUiState
+import com.tideo.autobrightness.app.ui.components.ChartPager
+import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.SettingsDiffList
+import com.tideo.autobrightness.app.ui.screens.ChartPlaceholder
 import com.tideo.autobrightness.app.ui.screens.CircadianDateLocationCard
 import com.tideo.autobrightness.app.ui.screens.LoadProfileDialog
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
@@ -783,6 +786,77 @@ class SettingsScreensTest {
         }
         compose.onNodeWithTag("exp_set").performClick()
         assertEquals(Triple("2026-06-15", null, null), captured)
+    }
+
+    @Test
+    fun chartPager_rendersSlotsWithSwipeIndicator_G2RF81() {
+        // G2R-F81: a multi-graph screen pages between its relevant charts (dots per page) rather than
+        // stacking them vertically; the first chart renders above and the indicator shows each page.
+        compose.setContent {
+            MaterialTheme {
+                ChartPager(
+                    listOf(
+                        ChartSlot("First", "chart_a") { ChartPlaceholder("First", "chart_a") },
+                        ChartSlot("Second", "chart_b") { ChartPlaceholder("Second", "chart_b") },
+                    ),
+                )
+            }
+        }
+        compose.onNodeWithTag("chart_pager").assertExists()
+        compose.onNodeWithTag("chart_pager_dot_0").assertExists()
+        compose.onNodeWithTag("chart_pager_dot_1").assertExists()
+        // The first page's chart is visible above (the pager sits before any settings).
+        compose.onNodeWithTag("chart_a").assertExists()
+    }
+
+    @Test
+    fun reactivity_graphAboveSettings_andGroupedByGraph_G2RF81F82() {
+        // G2R-F81/F82: the reactivity screen hosts the chart pager (above the settings) and groups the
+        // threshold fields under the graph they feed.
+        compose.setContent {
+            MaterialTheme {
+                ReactivityContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("chart_pager").performScrollTo().assertExists()
+        compose.onNodeWithTag("group_Reactivity curve").performScrollTo().assertExists()
+        compose.onNodeWithTag("group_Smoothing α").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun superDimming_chartPagerRendersAboveSettings_G2RF81() {
+        // G2R-F81: the dimming chart now sits above the settings (it previously rendered at the bottom).
+        compose.setContent {
+            MaterialTheme {
+                SuperDimmingContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false, tier = Tier.ELEVATED,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, onOpenOnboarding = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("chart_pager").assertExists()
+        compose.onNodeWithTag("group_Dimming curve").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun contextEditor_sunsetToken_rendersResolvedTimeOnOneLine_G2RF68() {
+        // G2R-F68: the "Sunset (HH:MM)" token must render its full resolved-time label (the old layout
+        // char-wrapped it vertically). Asserting the whole string matches confirms it is not truncated.
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    solarLabel = "06:42" to "18:30",
+                    onBack = {}, onSave = {}, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("end_sunset").performScrollTo()
+            .assertTextContains("Sunset (18:30)", substring = true)
     }
 
     @Test

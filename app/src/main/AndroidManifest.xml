@@ -10,14 +10,26 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- F89 audit (G2R-F89): special "Usage access" appop — needed so per-app context rules can read
+         the foreground app; granted via the usage-access onboarding deep-link, not a runtime dialog. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- F89 audit: the context-rule location gate + once-a-day circadian sun refresh read location
+         from the foreground service while the UI is backgrounded (specialUse FGS, not a location FGS),
+         which needs background-location access on API 29+. Declared so the capability exists; the
+         "Allow all the time" upgrade is offered from the Setup Location step (a Settings deep-link). -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- task528 panic: S.O.S. morse vibration pattern (prof769 → _PanicButton act0, code62). -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- task90 act28: geo-IP location fallback (http://ip-api.com/json) when no Android fix (F83). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- F89 audit — android.permission.DUMP is intentionally NOT declared: it is signature|privileged,
+         so it cannot be granted to a normal app. The no-Location SSID path's in-process `dumpsys wifi`
+         (WifiSsidStrategies) is permission-denied without it and simply falls through to the next
+         strategy (Shizuku `cmd wifi status` → Location callback). Declaring it would have no effect. -->
+
 
     <!-- Android 11+ package visibility: see launchable apps so the per-app context-rule picker is
          not empty (G2-F14). Mirrors Tasker's app-list query for prof762 _ContextAppChanged. -->

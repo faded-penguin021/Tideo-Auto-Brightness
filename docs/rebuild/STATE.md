@@ -47,6 +47,7 @@ next session does not know it.
 | S12.8a runtime: override feedback, throttle, panic, PWM-dimming | 2026-06-16 | Opus/high | DONE | (this push) | First S12.8 sub-segment — 10 runtime findings (D-063; F58/F65/F71/F74/F75/F76/F77/F78/F86/F88). **F74** (Resume inert) ROOT CAUSE: a notification action can be delivered to a freshly (re)created service whose pipeline consumer was never `start()`ed (the paused-override notification survives a service kill, prof756) → the Resume event sat unconsumed in the channel. `ACTION_RESUME` now `ensureRunning()` BEFORE `controller.resume()`. **F75** override alert cancelled on the falling edge of `pausedByOverride` + on resume/teardown (no stacking with the ongoing notif). **F76** removed the **Pause** action from the ongoing notification (Reset/Disable kept; Resume only while paused). **F77** NEW prof769 panic detector: `platform/.../sensor/PanicSensorSource.kt` (`PanicGestureDetector` pure low-pass-gravity upside-down + linear-accel shake; `AndroidPanicSensorSource` gates on display-on + cooldown) → service collects → SOS morse **vibration** (task528 act0 code62 pattern) + `controller.emergencyStop()` (255 + drop dimming + Service=Off). VIBRATE permission added. **F78** new `ThrottleController` (%AAB_Throttle = ACTUAL `steps×wait` floored at the setting; **Throttle Reinitialization** watchdog task566/prof754 → ceiling `AnimSteps×MaxWait+10` after ~10 s of no change); controller uses it for the throttle gate + publishes it. **F65** (REOPENED) PWM-sensitive now ALSO dims below the floor via Extra Dim: `SuperDimmingCoordinator` engages `reduce_bright_colors` using task700 `finalDimLevel` (Map Lux to Brightness V2 act23) when `pwmSensitive`, vs `dimShell` for the super-dimming toggle. **F58** Super Dimming live readout (%AAB_DimmingCurrent rel / %AAB_DimmingDS abs at %AAB_CurrentBright) — new PipelineState fields computed from golden `SoftwareDimming`, `SuperDimmingDiagnosticCard` on the screen. **F86** displayed LuxAlpha clamped ≥0 (`fmtAlpha`; engine value untouched, parity D-010a). **F88** tap-to-dismiss flashes (AccessibilityService overlay made touchable → click hides; foreground-toast fallback can't be tapped — Android limit, noted). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Tests: PanicGestureDetector(4, platform), ThrottleController(4), SuperDimmingCoordinator +2 (PWM engage/above-threshold), BrightnessPipelineController +2 (actual-steps throttle / dimming readout), AmbientMonitoringService +1 (no Pause action), SettingsScreens +2 (F58 readout, F86 clamp) +1 (F88 FlashPill tap). **2nd pass (owner device re-test):** F75 now folds the alert into the single FGS notification ID (no stacking); F77 requires a SUSTAINED dominant-axis inversion (no upright/flat trigger, heavier low-pass); F78 uses the engine's actual `transitionDurationMs` (the setting floor I first added equalled the ceiling, so it always read MaxSteps×MaxWait+10 — removed); F88 adds an in-app tap-to-dismiss surface (`AabFlashHost`/`FlashPill`) since a Toast can't be tapped. Full ladder GREEN: `:platform:test :domain:test :app:testDebugUnitTest`(188) `:app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.8c settings/profiles: schema hygiene, labels, legacy load, wizard | 2026-06-16 | Opus/high | DONE | (this push) | Third S12.8 sub-segment — 5 findings (D-064; F59/F62/F70/F84/F85). **F85 (CRITICAL)** `%AAB_ThreshDynamic` is the COMPUTED task544 reactivity-threshold output (task570 act31 only seeds it), never a user input — removed the bogus editable `thresholdDynamic: Int` from `AabSettings` + `AabSettingsContract` + mapper `validate` + `SettingsDisplay.valueFor` + the `ReactivityScreen` editor field + `ContextEngine.mergeProfile`. **Schema v2→v3**: `CURRENT_SCHEMA_VERSION=3`; serializer migration bumps the stamp and the stale key is dropped on read via the existing `ignoreUnknownKeys=true` (verified by test). App-layer only — the engine never consumed the field (it reads the runtime `PipelineState.threshDynamic`, kept). **F59** resolved by the F85 removal: the only user-visible literal "%AAB_ThreshDynamic" string was that field's help; the live reactivity card already shows the VALUE as a %. **F84 + exclusions** `SettingsDisplay` diff list now uses friendly labels (`form1A`→"Zone 1 scaling", etc.; explicit map, no reflection) and `EXCLUDED_KEYS` adds debugLevel/detectOverrides/quickSettingsEnabled/notificationsEnabled (global prefs) + thresholdMidpoint (derived). **F70** legacy-load fidelity: the serializer ALREADY did task570-defaults-THEN-diffs (starts from `AabSettings()`), proven by a new no-inheritance regression through `replaceAll`. The real "Form1A didn't stick / was rounded" bug was an **integer-handling class bug**: decimal-encoded ints (Tasker stores curve params as continuous doubles) silently dropped — `String.toIntOrNull()` returns null on "6.8". Fixed across the WHOLE class: the key=value path now rounds every int/long field (`asRoundedInt`/`asRoundedLong`), the nested-JSON path already used `intRound`, and the wizard-apply now `Math.round`s form1A/form2C (was `.toInt()` truncation). **F62** the Tools wizard now gates on ≥9 **real** recorded points (shared `MIN_FIT_POINTS` with the Curve screen) — the domain engine injects synthetic "ghost" priors that cleared its own ≥9 gate at 7 real points; the suggested curve already draws on the Curve & Brightness chart at ≥9 real points (verified). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Tests: LegacyImportRoundTrip +3 (decimal-round, JSON-fractional Form1A, partial-config-resets-to-defaults), AabSettingsMigration +1 (v2→v3 drops thresholdDynamic), SettingsDisplay +2 (exclusions + friendly labels), SettingsViewModel +1 (replaceAll no-inheritance), SettingsScreens +1 (wizard <9-real-points gate). Full ladder GREEN: `:app:testDebugUnitTest`(196) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 | S12.8d circadian time & location correctness | 2026-06-16 | Opus/high | DONE | (this push) | Fourth S12.8 sub-segment — 3 findings (D-065; F39/F73/F83). **F73 (REOPENED) — the UTC frame was NOT the bug.** Tasker task90 act0 (`%AAB_NowSS=%TIMES%86400`) and act59 (windows `%ss_*%86400`) are BOTH UTC-seconds-of-day, and `riseEpochSec` is tz-independent (the `zoneOffset` cancels between `startOfDay` and the local event hour), so the rebuild's UTC frame already matched Tasker exactly. The residual ~1h-early evening ramp (owner: scale 1.025 @20:58 local) was the **location-null → default-windows fallback** (`TimeContext` default eveningStart=18:00 UTC = 20:00 local @UTC+2) — `lastKnownLocation()` is frequently null. Fixes: (a) `CircadianWindowProvider` now reads the tz offset at the **target date instant** (DST-aware; matters for fixed dates in another season) via `tzOffsetForDate`, and (b) a real location is supplied (F83). **F39 (REOPENED — was wrongly preview-only):** the fixed Date and Location now resolve **independently** — date-only / loc-only / both — and DRIVE the live scaling (the old `current()` only honoured the override when BOTH lat AND lon were set, so a date-only override silently fell to live). `ExperimentPrefsStore.set` + `CircadianExtrasViewModel.set` take nullable coords (null field = live for that field); the `CircadianDateLocationCard` "Set fixed" now accepts blank coords (date-only). **F83 (FULL parity):** ported task90 act5–41 acquisition order — `CircadianWindowProvider` acquires once a day (re-acquired when the day rolls over, the `%AAB_SunLastDate != %DATE` guard), **skips** entirely when a fixed lat/lon is pinned, and falls back through Android last-known → fresh fix → **ip-api.com** geo-IP (new `platform/.../context/GeoIpLocationClient.kt`, injectable HTTP fetch, regex parse). Added INTERNET permission + `res/xml/network_security_config.xml` (cleartext scoped to ip-api.com only). The WRITE_SECURE_SETTINGS `location_mode` toggle (act14/19/34, ELEVATED) is intentionally NOT ported — ip-api covers the no-fix case for all tiers and `location_mode` secure-writes are unreliable on minSdk 31 (noted in D-065). Provider decoupled from the store (takes `overrideFlow: Flow<ExperimentDateLocation>`) + geo-IP injected as `suspend () -> LocationSnapshot?` for pure-JVM tests. **HARD FENCE honoured: domain/ + golden vectors + ChartCanvas untouched (SolarCalculator only *called*).** Tests: GeoIpLocationClient (4, platform — parse success/fail/null-island/injected-fetch), CircadianWindowProvider +6 (fixed-date shortens daylight, fixed-loc applies+skips-acquire, date-only uses live loc, ip-api fallback, no-fix→null, tz-at-target-instant), SettingsScreens +1 (date-only set → null coords). Full ladder GREEN: `:app:testDebugUnitTest`(203) `:platform:test`(47) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. **→ all of S12.8 a/c/d done on their branches; S12.8b (UI) rebases LAST, then re-run HUMAN GATE 2 (5th).** |
+| S12.8b UI: dashboard, graph placement, context editor, permissions | 2026-06-16 | Opus/high | DONE | (this push) | Final S12.8 sub-segment — the cross-cutting UI polish (D-066; F68/F79/F81/F82/F87/F89). **Rebased LAST onto S12.8a+c+d** (all merged to main first), so the chart-host screen *content* was already settled. **F79 Dashboard redesign:** dropped the confusing **Pause** control (master switch = on/off; `DashboardViewModel.pause()` removed), kept **Resume** but only on a DETECTED manual override (new `pausedByOverride`/`circadianScale`/`dimmingStrength`/`throttleMs` in `DashboardUiState`, fed from `PipelineState`); rebuilt `DashboardContent` into purposeful cards — status headline, Resume-after-override card (only when `pausedByOverride`), ambient-light (raw/smoothed + last-sample age), brightness (current→target + circadian scale ×/super-dim % when active), active-context, degraded-only health. **F81 graph placement:** new reusable `ui/components/GraphScaffold.kt` — `ChartPager` (HorizontalPager over `ChartSlot`s + dot indicator + title; foundation Pager, no new dep) puts the relevant graph(s) **above** the settings on every chart-host screen and **swipes** between related graphs instead of vertical stacking; SuperDimming's chart moved up from the bottom; Reactivity pages Reactivity↔Alpha, Circadian pages Experiment↔Taper, SuperDimming = single Dimming slot. **S13 coordination:** `ChartSlot.content` is the swap point — S13 fills the real chart for the same title/testTag with no pager/screen change. **F82 grouping:** new `GraphSettingsGroup(graph)` outlined card labels "Affects the {graph} graph" and wraps the controls feeding it (Reactivity curve / Smoothing α / Experiment / Taper / Dimming). **F68:** the context-editor SUNRISE/SUNSET tokens stack vertically with `maxLines=1`/`softWrap=false` → "Sunset (22:00)" no longer char-wraps. **F87:** context app picker `heightIn(max=220→400.dp)`. **F89 permissions audit:** declared `ACCESS_BACKGROUND_LOCATION` (context location gate + daily sun refresh read location from the specialUse FGS while backgrounded; "Allow all the time" offered from the Setup Location step) + documented PACKAGE_USAGE_STATS (usage-access appop, already wired) and DUMP (signature-only → NOT declared, the dumpsys SSID path degrades). **HARD FENCE honoured: domain/ + golden vectors + ChartCanvas untouched.** Tests: UiShell +2 (Dashboard Resume-only-on-override / no-override + Pause gone), SettingsScreens +4 (ChartPager swipe indicator, Reactivity graph-above+grouped, SuperDimming chart-above+grouped, single-line Sunset token). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(209) `:app:lintDebug :domain:test :platform:test`. No compaction. **→ ALL S12.8 (a–d) DONE → re-run HUMAN GATE 2 (5th).** |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
@@ -114,10 +115,18 @@ once-a-day location acquisition with skip-when-fixed + ip-api.com geo-IP fallbac
 INTERNET perm + ip-api-scoped cleartext config). domain/ + golden vectors + ChartCanvas stayed fenced
 (SolarCalculator called only). Ladder GREEN (`:app:testDebugUnitTest`=203, `:platform:test`=47).
 
-**Next:** **S12.8b** UI (dashboard redesign / graph placement+swipe / context editor / permissions) LAST —
-all of a/c/d are now done on their branches, so S12.8b rebases onto the settled shared screen content per
-the ordering note. Then re-test Gate 2 (5th);
-then **S13** (remaining charts via the S12.7g template + About/User Guide, which carries F80). The Gate-2
+**S12.8b DONE (2026-06-16) → ALL of S12.8 (a–d) COMPLETE → re-run HUMAN GATE 2 (5th).** The final UI-polish
+sub-segment shipped (D-066) — rebased LAST onto the merged a+c+d (settled shared screen content): **F79**
+Dashboard redesign (Pause dropped, Resume-on-override only, purposeful live cards); **F81** new `ChartPager`
+(`ui/components/GraphScaffold.kt`) puts the graph **above** its settings on every chart-host screen and
+**swipes** between related graphs (S13 fills the `ChartSlot`s); **F82** `GraphSettingsGroup` per-graph
+grouping; **F68** single-line Sunset token; **F87** taller context app list; **F89** permissions audit
+(declared ACCESS_BACKGROUND_LOCATION; DUMP wontfix signature-only; usage-stats kept). domain/ + golden
+vectors + ChartCanvas stayed fenced. Ladder GREEN (`:app:testDebugUnitTest`=209).
+
+**Next:** **re-run HUMAN GATE 2 (5th)** against an S12.8 build; then **S13** (remaining charts via the S12.7g
+template + About/User Guide, which carries F80 — and **inherits the `ChartSlot`/`ChartPager` contract** from
+S12.8b for the chart slots). The Gate-2
 (4th) results are recorded under "Gate findings → Gate 2 (4th re-test)":
 most of F33–F73 are **confirmed fixed**; reopened with corrected specs = **F39/F62/F65/F70/F73**; follow-ups
 on F35/F50/F58/F59/F68; still-open **F45/F67/F71**; and **20 new findings G2R-F74…F89** (incl. **CRITICAL
@@ -415,10 +424,21 @@ AppModule is now the real DI root.
   Date/Lat/Lon element (F39). domain/ + golden vectors stay fenced except S12.7g (charts) which may extend
   ChartCanvas.
 - **HUMAN GATE 2 — RE-TEST (4th) AGAIN** after S12.7. Re-verify all G2R-Fn + the original Gate-2 set.
+- **GATE 2 (4th re-test) → S12.8 salvage (a–d, all Opus/high)** (brief in RUNBOOK). **a DONE** (D-063:
+  override notif Resume/no-stack, no-Pause notif, throttle reinit + actual-steps, panic SOS detector,
+  PWM Extra-Dim, dimming readout, LuxAlpha display clamp). **c DONE** (D-064: F85 thresholdDynamic removed
+  + schema v3 migration, value-only help, friendly diff labels + exclusions, legacy load defaults+diffs,
+  ghost-point wizard gate). **d DONE** (D-065: DST/location ramp framing, fixed date/loc apply, ip-api
+  fallback). **b DONE** (D-066: Dashboard redesign F79, ChartPager graph-above+swipe F81, per-graph grouping
+  F82, single-line Sunset F68, taller app list F87, permissions audit F89). **ALL S12.8 (a–d) COMPLETE.**
+  domain/ + golden vectors + ChartCanvas stayed fenced throughout.
+- **HUMAN GATE 2 — RE-TEST (5th)** after S12.8. Re-verify all G2R-Fn + the original Gate-2 set.
 - **S13** (chart replication + static screens) follows S12.6 on the serial spine — preconditions S12.6
   DONE (faithful screens + menu IA), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over
-  read-only `ChartCanvas.kt`) into the six remaining charts and fills their `ChartPlaceholder` host slots
-  (tagged in screen_map + anonymous_handlers `deferred-S13`), plus About/UserGuide content. Haiku/high.
+  read-only `ChartCanvas.kt`) into the six remaining charts and fills their host slots — now the
+  **`ChartSlot.content` lambdas inside `ChartPager`** (S12.8b/D-066) on the chart-host screens, plus the
+  remaining `ChartPlaceholder`s (tagged in screen_map + anonymous_handlers `deferred-S13`) — plus
+  About/UserGuide content + F80 (User Guide after onboarding). Haiku/high.
 - Carried for S12.5/S13/S14 (D-040, D-044): unprivileged overlay dimming (task698 DC-like / 653/654) is
   NOT wired (S9b did the ELEVATED secure path only); DimDynamic (circadian dim strength, task646
   ScalingUse branch) passes null pending real solar windows (D-039d); proximity damp (task545) still
@@ -1445,7 +1465,25 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (`SolarCalculator` called only).** Affects
   S12.8d only.
 
-Append new entries as D-066, … with which segments they affect.
+- **D-066 (S12.8b) — final S12.8 UI polish; rebased LAST onto a+c+d.** Six findings, app/UI-layer only.
+  (1) **F79 Dashboard redesign:** dropped Pause (master switch is the only on/off; `DashboardViewModel.pause()`
+  removed); Resume shown only on `pausedByOverride`; `DashboardUiState` gained `pausedByOverride`/`circadianScale`/
+  `dimmingStrength`/`throttleMs` (from `PipelineState`); `DashboardContent` rebuilt into status/override/light/
+  brightness/context/health cards. (2) **F81 graph placement:** new reusable `ui/components/GraphScaffold.kt`
+  — `ChartPager` (foundation `HorizontalPager` + dot indicator + title over `ChartSlot`s) renders the relevant
+  graph(s) **above** the settings and swipes between related graphs; SuperDimming's chart moved up from the
+  bottom; Reactivity = Reactivity+Alpha slots, Circadian = Experiment+Taper slots, SuperDimming = single
+  Dimming slot. **No new dependency** (Pager is transitive via material3→foundation 1.7.6). **S13 coordination:**
+  `ChartSlot.content` is the single swap point — S13 fills the real chart for the same title/testTag without
+  touching the pager or the host screen. (3) **F82 grouping:** new `GraphSettingsGroup(graph)` outlined card
+  ("Affects the {graph} graph") wraps each graph's controls. (4) **F68:** `TimeTokenRow` stacks the SUNRISE/
+  SUNSET tokens vertically with `maxLines=1`/`softWrap=false` (no more char-wrap). (5) **F87:** app picker
+  `heightIn(max=220→400.dp)`. (6) **F89 permissions audit:** declared `ACCESS_BACKGROUND_LOCATION` (FGS reads
+  location while backgrounded); PACKAGE_USAGE_STATS kept (usage-access appop, already wired); DUMP NOT declared
+  (signature-only, the dumpsys SSID path degrades). **Fence honoured: domain/ + golden vectors + ChartCanvas
+  untouched.** Affects S12.8b only; **S13 inherits the `ChartSlot`/`ChartPager` contract** for the chart slots.
+
+Append new entries as D-067, … with which segments they affect.
 
 ## Blockers
 
@@ -2068,8 +2106,9 @@ see below.)
 - **G2R-F59 PARTIAL** ✅ RESOLVED S12.8c (D-064) — resolved by the F85 removal: the only user-visible literal
   "%AAB_ThreshDynamic" string was that editable field's help, now deleted. The live reactivity card already
   substitutes the VALUE (as a %), not the token.
-- **G2R-F68 PARTIAL (UI bug)** — in the context rule editor, **"Sunset (22:00)" wraps vertically, one letter
-  per line**, while "Sunrise (5:20)" renders normally. Layout/width bug on the token button.
+- **G2R-F68 PARTIAL (UI bug)** ✅ RESOLVED S12.8b (D-066). The context-editor SUNRISE/SUNSET tokens now stack
+  vertically (each gets the full From/To column width) with `maxLines=1`/`softWrap=false` (`ContextsScreen`
+  `TimeTokenRow`) → "Sunset (22:00)" renders on one line.
 - **G2R-F50 NOTE (likely wontfix)** — the Accessibility service **sometimes disables itself automatically**
   (Android 16 / OnePlus 13). Probably an OS limitation; owner is content to wontfix.
 - **G2R-F35 NOTE** — high-priority override notification works; but its Resume action and stacking behaviour
@@ -2090,16 +2129,21 @@ see below.)
 - **G2R-F78** ✅ RESOLVED S12.8a (D-063, 2nd pass). %AAB_Throttle = the engine's ACTUAL `transitionDurationMs`
   (loops×wait+10, golden task543) with NO setting floor (the prior floor equalled the ceiling, so it always read
   `MaxSteps×MaxWait+10`); the task566/prof754 watchdog raises it to that ceiling only after ~10 s idle.
-- **G2R-F79** — **Dashboard redesign**: current dashboard feels clumsy and its purpose is unclear. Resume-
-  manual-override is useful; the **Pause** control is weird (why not just disable?). Design a more insightful
-  dashboard that surfaces genuinely useful live info. (Pairs with F76.)
+- **G2R-F79** ✅ RESOLVED S12.8b (D-066). The **Pause** control is gone (master switch = on/off); **Resume**
+  remains only when auto-control paused itself for a DETECTED manual override (`pausedByOverride`). `DashboardContent`
+  rebuilt into purposeful live cards — status headline, override+Resume card, ambient-light (raw/smoothed +
+  last-sample age), brightness (current→target + circadian scale ×/super-dim % when active), active-context,
+  degraded-only health. `DashboardViewModel.pause()` removed.
 - **G2R-F80** — show the **User Guide after permissions onboarding on first launch** (Tasker does this).
   Deferred to **S13** (User Guide screen is built there).
-- **G2R-F81** — **graph placement is inconsistent**: the Dimming/Circadian charts render **below** all
-  settings while others are **above**. The relevant graph should sit **above** its settings; cycle between
-  the relevant graphs by **swipe** (NOT stacked vertically).
-- **G2R-F82** — **settings grouping**: settings that feed a single graph should be **subtly visually grouped**
-  and it should be clear **which graph** they pertain to. (Pairs with F81.)
+- **G2R-F81** ✅ RESOLVED S12.8b (D-066). New `ui/components/GraphScaffold.kt` `ChartPager` (foundation
+  HorizontalPager + dot indicator + title) places the relevant graph(s) **above** the settings on every
+  chart-host screen and **swipes** between related graphs (Reactivity↔Alpha, Experiment↔Taper; SuperDimming =
+  single Dimming slot, moved up from the bottom). `ChartSlot.content` is the S13 swap point (real chart, same
+  title/testTag, no pager/screen change). No new dep (Pager is transitive via material3→foundation).
+- **G2R-F82** ✅ RESOLVED S12.8b (D-066). New `GraphSettingsGroup(graph)` outlined card labels "Affects the
+  {graph} graph" and wraps the controls feeding it (Reactivity curve / Smoothing α / Experiment / Taper /
+  Dimming).
 - **G2R-F83** ✅ RESOLVED S12.8d (D-065). The rebuild had **none** of this (confirmed). Ported task90 act5–41:
   `CircadianWindowProvider` acquires location **once a day** (re-acquired on the day roll-over = the
   `%AAB_SunLastDate != %DATE` guard), **skips** entirely when a fixed `%AAB_Latitude`/`%AAB_Longitude` is
@@ -2116,14 +2160,17 @@ see below.)
   for the current lux level, not an input (task570 act31 only seeds it).
 - **G2R-F86** ✅ RESOLVED S12.8a (D-063). The DISPLAY clamps to ≥ 0 (`fmtAlpha` on the Misc card + Live Debug);
   the engine value is intentionally left unclamped (task535 parity, D-010a — domain/ untouched per owner decision).
-- **G2R-F87** — the **app list in the context rule editor** should be **taller** (still scrollable) — F45-era
-  `heightIn(max=220.dp)` is too short.
+- **G2R-F87** ✅ RESOLVED S12.8b (D-066). The context app picker `heightIn(max=220→400.dp)` (still scrollable).
 - **G2R-F88** ✅ RESOLVED S12.8a (D-063, 2nd pass). Added an in-app tap-to-dismiss flash surface
   (`AabFlashHost`/`FlashPill`, registered as the foreground `AabFlash` presenter) so in-app flashes ("Applied",
   foreground debug toasts) are tappable; the global a11y overlay is also touchable. Priority: global overlay →
   in-app surface → plain Toast (the Toast fallback, only when backgrounded + overlay off, stays non-interactive).
-- **G2R-F89** — some permissions were **not explicitly requested** but appear in ADB's per-app list:
-  **background location, DUMP, package usage stats**. Verify whether they're requestable / needed; wontfix
-  if appropriate.
+- **G2R-F89** ✅ RESOLVED S12.8b (D-066). Audit: **(1) PACKAGE_USAGE_STATS** — needed (per-app rules read the
+  foreground app), granted via the usage-access onboarding deep-link, already wired; kept + documented. **(2)
+  background location** — `ACCESS_BACKGROUND_LOCATION` now declared (the context location gate + daily sun
+  refresh read location from the specialUse FGS while the UI is backgrounded, which needs it on API 29+); the
+  "Allow all the time" upgrade is offered from the Setup Location step. **(3) DUMP** — signature|privileged,
+  **not grantable to a normal app** → deliberately NOT declared (wontfix-with-note); the no-Location `dumpsys
+  wifi` SSID path is permission-denied without it and falls through to the next strategy.
 
 
