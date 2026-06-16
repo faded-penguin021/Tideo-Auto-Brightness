@@ -48,6 +48,22 @@ class AmbientMonitoringServiceTest {
         )
     }
 
+    // S12.8a/G2R-F76: the ongoing service notification must NOT carry a Pause action (it behaved like
+    // an override and confused users); Reset + Disable remain.
+    @Test
+    fun ongoingNotification_hasNoPauseAction() {
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        val intent = Intent().setAction(AmbientMonitoringService.ACTION_PAUSE)
+        val service = controller.withIntent(intent).startCommand(0, 0).get()
+
+        val notification = shadowOf(service).lastForegroundNotification
+        assertNotNull(notification)
+        val actions = notification.actions?.map { it.title.toString() } ?: emptyList()
+        assertTrue(!actions.contains("Pause"), "ongoing notification must not offer Pause (F76)")
+        assertTrue(actions.contains("Reset"), "Reset (panic) is kept")
+        assertTrue(actions.contains("Disable"), "Disable is kept")
+    }
+
     @Test
     fun lifecycle_createStartDestroy_doesNotThrow() {
         val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()

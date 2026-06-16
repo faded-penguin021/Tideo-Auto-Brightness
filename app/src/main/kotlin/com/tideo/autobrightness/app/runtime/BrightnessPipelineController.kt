@@ -10,6 +10,7 @@ import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
 import com.tideo.autobrightness.domain.brightness.OverrideRules
 import com.tideo.autobrightness.domain.brightness.PreviousState
+import com.tideo.autobrightness.domain.brightness.SoftwareDimming
 import com.tideo.autobrightness.domain.brightness.TimeContext
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
@@ -60,6 +61,9 @@ class BrightnessPipelineController(
 ) {
     private val engine = BrightnessEngine()
 
+    // %AAB_Throttle + Throttle Reinitialization watchdog (task566 / prof754, G2R-F78).
+    private val throttle = ThrottleController()
+
     private val _state = MutableStateFlow(PipelineState())
     val state: StateFlow<PipelineState> = _state.asStateFlow()
 
@@ -109,7 +113,7 @@ class BrightnessPipelineController(
         if (consumerJob != null) return
         _state.update { it.copy(serviceOn = true) }
         consumerJob = scope.launch {
-            cachedSettings = settingsProvider()
+            cachedSettings = settingsProvider().also { throttle.seed(it.throttleDefaultMs) }
             for (event in events) {
                 handle(event)
             }
@@ -235,9 +239,11 @@ class BrightnessPipelineController(
 
         val now = clock()
         val s = _state.value
-        // Throttle gate (task544 act2-9): drop ticks inside the throttle window.
+        // Throttle gate (task544 act2-9): drop ticks inside the THROTTLE window. The active window is
+        // the runtime %AAB_Throttle (actual steps×wait, or the idle ceiling — G2R-F78), not the raw
+        // setting; ThrottleController.seed() initialised it to the setting at start.
         s.lastAcceptedMs?.let { last ->
-            if (now - last < settings.throttleDefaultMs) return
+            if (now - last < throttle.throttleMs) return
         }
 
         val cycleStart = now
@@ -263,6 +269,7 @@ class BrightnessPipelineController(
                 }
             }
 
+            val brightnessChanged = target != from
             if (target != from) {
                 brightness.forceManualMode()
                 // %AAB_Debug 1 "Skip Animations": jump straight to the target (Tasker debug mode).
@@ -287,9 +294,30 @@ class BrightnessPipelineController(
                 }
             }
 
+            // Super-dimming layer (task646→650/645): engage below DimmingThreshold, else disengage.
+            // Runs from the pipeline coroutine so the secure write is serialized with the cycle.
+            // F65: feed the UN-FLOORED engine target (%AAB_CurrentBright in task646 act1/act2), NOT the
+            // PWM-floored hardware value — when pwmSensitive raises `target` UP to dimmingThreshold the
+            // floored value is never < threshold, so the secure reduce_bright_colors layer would never
+            // engage and "Extra Dim" never applied. The two layers cooperate: the hardware sits at the
+            // PWM floor while the secure layer darkens visually below it (task661/698 floor ⟂ task650).
+            dimming.apply(output.targetBrightness, settings)
+            // F58 live readout: %AAB_DimmingDS (abs reduce_bright_colors level) + %AAB_DimmingCurrent
+            // (relative strength) for the Super Dimming screen, computed from the golden SoftwareDimming.
+            val (dimCurrent, dimDS) = dimmingReadout(output.targetBrightness, settings)
+
             val cycleTotal = (clock() - cycleStart).toDouble()
             // %AAB_Debug 7 "Graph Metrics": Flash the measured cycle duration (feeds throttle).
             emitDebug(DebugCategory.GRAPH_METRICS, settings) { "cycle ${cycleTotal.toInt()}ms" }
+            // task566 / prof754: set %AAB_Throttle from the ACTUAL steps×wait this cycle, or push to the
+            // idle ceiling after ~10 s of no brightness change (G2R-F78). The setting is the floor.
+            throttle.onCycleComplete(
+                now = now,
+                brightnessChanged = brightnessChanged,
+                stepsTimesWaitMs = output.animationSteps.toLong() * output.animationWaitMs,
+                ceilingMs = throttle.ceiling(settings.animSteps, settings.maxWaitMs),
+                baselineMs = settings.throttleDefaultMs,
+            )
             _state.update {
                 it.copy(
                     smoothedLux = output.smoothedLux,
@@ -304,25 +332,62 @@ class BrightnessPipelineController(
                     scalingUse = settings.scalingEnabled,
                     lastAppliedBrightness = target,
                     targetBrightness = target,
+                    dimmingCurrent = dimCurrent,
+                    dimmingDS = dimDS,
                     // Live Debug "Performance & Timings" parity (G2R-F29).
                     luxAlpha = output.luxAlpha,
                     animationSteps = output.animationSteps,
                     animationWaitMs = output.animationWaitMs,
-                    throttleMs = settings.throttleDefaultMs,
+                    throttleMs = throttle.throttleMs,
                     lastUpdateMs = clock(),
                 )
             }
-
-            // Super-dimming layer (task646→650/645): engage below DimmingThreshold, else disengage.
-            // Runs from the pipeline coroutine so the secure write is serialized with the cycle.
-            // F65: feed the UN-FLOORED engine target (%AAB_CurrentBright in task646 act1/act2), NOT the
-            // PWM-floored hardware value — when pwmSensitive raises `target` UP to dimmingThreshold the
-            // floored value is never < threshold, so the secure reduce_bright_colors layer would never
-            // engage and "Extra Dim" never applied. The two layers cooperate: the hardware sits at the
-            // PWM floor while the secure layer darkens visually below it (task661/698 floor ⟂ task650).
-            dimming.apply(output.targetBrightness, settings)
         } finally {
             autoRunning = false
+        }
+    }
+
+    /**
+     * task650 act28/act30: the Super Dimming live-readout pair `%AAB_DimmingDS` (abs reduce_bright_colors
+     * level) and `%AAB_DimmingCurrent` (relative strength = dim_shell × dim_progress), for the
+     * un-floored engine target (G2R-F58). Computed from the golden-tested [SoftwareDimming] (call only).
+     * Zero when no dim path is active (target ≥ threshold or both dim toggles off), mirroring
+     * task661 act33/34 which clears both when disengaging.
+     *
+     * @return (dimmingCurrent, dimmingDS)
+     */
+    private fun dimmingReadout(target: Int, settings: AabSettings): Pair<Double, Double> {
+        if (target >= settings.dimmingThreshold) return 0.0 to 0.0
+        return when {
+            // PWM-sensitive: the level is task700 finalDimLevel; it has no separate progress term, so
+            // the relative + absolute readouts coincide.
+            settings.pwmSensitive -> {
+                val ds = SoftwareDimming.finalDimLevel(
+                    targetBrightness = target.toDouble(),
+                    isElevated = true,
+                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
+                    pwmExp = settings.pwmExponent.toDouble(),
+                )
+                ds to ds
+            }
+            settings.dimmingEnabled -> {
+                val ds = SoftwareDimming.dimShell(
+                    brightness = target.toDouble(),
+                    minBrightness = settings.minBrightness.toDouble(),
+                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
+                    dimmingExponent = settings.dimmingExponent.toDouble(),
+                    dimmingStrength = settings.dimmingStrength.toDouble(),
+                    dimDynamic = null,
+                )
+                val progress = SoftwareDimming.dimProgress(
+                    brightness = target.toDouble(),
+                    minBrightness = settings.minBrightness.toDouble(),
+                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
+                    dimmingExponent = settings.dimmingExponent.toDouble(),
+                )
+                (ds * progress) to ds
+            }
+            else -> 0.0 to 0.0
         }
     }
 

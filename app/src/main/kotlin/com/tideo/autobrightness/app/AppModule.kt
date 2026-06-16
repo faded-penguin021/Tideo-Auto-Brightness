@@ -26,6 +26,8 @@ import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.sensor.AndroidLightSensorSource
+import com.tideo.autobrightness.platform.sensor.AndroidPanicSensorSource
+import com.tideo.autobrightness.platform.sensor.PanicSensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -101,17 +103,22 @@ class AppModule(context: Context) {
             overrideSink = { lux, brightness -> overridePointStore.record(lux, brightness) },
         )
 
-        return RuntimeGraph(controller, contextEngine)
+        // prof769/task528 panic: upside-down + shake (display on) → SOS + restore + full stop (F77).
+        val panicSensor = AndroidPanicSensorSource(appContext)
+
+        return RuntimeGraph(controller, contextEngine, panicSensor)
     }
 }
 
 /**
- * The composed runtime: the brightness pipeline + the context engine that feeds it. The service
- * drives both lifecycles together and reads [activeContext] for the notification's context line.
+ * The composed runtime: the brightness pipeline + the context engine that feeds it + the panic
+ * gesture source. The service drives both lifecycles together and reads [activeContext] for the
+ * notification's context line; [panicSensor] fires the task528 panic on the prof769 gesture.
  */
 class RuntimeGraph(
     val controller: BrightnessPipelineController,
     val contextEngine: ContextEngine,
+    val panicSensor: PanicSensorSource,
 ) {
     val activeContext: StateFlow<String?> = contextEngine.activeContext
 }

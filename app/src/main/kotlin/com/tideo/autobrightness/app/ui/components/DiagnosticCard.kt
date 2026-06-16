@@ -76,6 +76,13 @@ internal fun fmtInt(value: Int?): String = value?.toString() ?: "—"
 internal fun fmtPercent(value: Double?): String =
     value?.let { "${Math.round(it * 100.0)}%" } ?: "—"
 
+/**
+ * Format the smoothing alpha for DISPLAY, clamped to ≥ 0 (G2R-F86). The engine value is intentionally
+ * left unclamped (Tasker task535 parity, D-010a — `domain/` untouched); a brief transient can compute a
+ * small negative `1 - exp(-Δ·effectiveDelta)` which is meaningless to show, so only the readout floors.
+ */
+internal fun fmtAlpha(value: Double?): String = fmt(value?.coerceAtLeast(0.0), 3)
+
 private fun nowHhMm(): String {
     val c = Calendar.getInstance()
     return "%02d:%02d".format(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE))
@@ -207,7 +214,8 @@ fun MiscDiagnosticCardContent(state: PipelineState) {
         }
         DiagnosticLine("diag_misc_alpha") {
             append("Current smoothing α ")
-            goldValue(fmt(state.luxAlpha, 3))
+            // G2R-F86: display clamps to ≥ 0 (engine value left unclamped for parity).
+            goldValue(fmtAlpha(state.luxAlpha))
         }
     }
 }
@@ -217,4 +225,35 @@ fun MiscDiagnosticCardContent(state: PipelineState) {
 fun MiscDiagnosticCard() {
     val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     MiscDiagnosticCardContent(state)
+}
+
+// --- Super Dimming screen card (G2R-F58) --------------------------------------------------------
+
+/**
+ * Stateless Super Dimming live readout (superdimming_settings.md): "Dimming strength (rel)
+ * [%AAB_DimmingCurrent]" + "Dimming level (abs) [%AAB_DimmingDS]" + "at [%AAB_CurrentBright]
+ * brightness" (G2R-F58). The values are 0 while dimming is not engaged (target ≥ threshold).
+ */
+@Composable
+fun SuperDimmingDiagnosticCardContent(state: PipelineState) {
+    DiagnosticCard("Live super dimming", "super_dimming_diagnostic_card") {
+        DiagnosticLine("diag_dimming_rel") {
+            append("Dimming strength (rel) ")
+            goldValue(fmt(state.dimmingCurrent, 1))
+        }
+        DiagnosticLine("diag_dimming_abs") {
+            append("Dimming level (abs) ")
+            goldValue(fmt(state.dimmingDS, 1))
+            append(" at ")
+            goldValue(fmtInt(state.lastAppliedBrightness))
+            append(" brightness")
+        }
+    }
+}
+
+/** Live wrapper: collects the pipeline snapshot and renders the Super Dimming readout. */
+@Composable
+fun SuperDimmingDiagnosticCard() {
+    val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
+    SuperDimmingDiagnosticCardContent(state)
 }

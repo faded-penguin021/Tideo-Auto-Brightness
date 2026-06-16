@@ -43,7 +43,9 @@ class AmbientMonitoringService : Service() {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private lateinit var controller: BrightnessPipelineController
     private lateinit var contextEngine: ContextEngine
+    private lateinit var panicSensor: com.tideo.autobrightness.platform.sensor.PanicSensorSource
     private var notificationJob: Job? = null
+    private var panicJob: Job? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // Rising-edge latch so the high-priority override alert + toast fire ONCE per override, not on
@@ -70,6 +72,7 @@ class AmbientMonitoringService : Service() {
         val runtime = AppModule(applicationContext).createRuntime(scope)
         controller = runtime.controller
         contextEngine = runtime.contextEngine
+        panicSensor = runtime.panicSensor
 
         registerReceiver(
             screenReceiver,
@@ -90,7 +93,18 @@ class AmbientMonitoringService : Service() {
 
         when (intent?.action) {
             ACTION_PAUSE -> controller.pause()
-            ACTION_RESUME -> controller.resume()
+            ACTION_RESUME -> {
+                // F74: ensureRunning() FIRST. The override Resume action can be delivered to a freshly
+                // (re)created service whose pipeline consumer was never start()ed (the paused-override
+                // notification persists across a service kill, prof756). Without the running consumer the
+                // Resume event sits unconsumed in the channel → the button looks inert. ensureRunning()
+                // starts the consumer + sensor + notification job before the Resume event is posted.
+                ensureRunning()
+                controller.resume()
+                // F75: clear the high-priority override alert so it does not linger beside the ongoing
+                // notification after the user resumes.
+                getSystemService(NotificationManager::class.java).cancel(OVERRIDE_NOTIFICATION_ID)
+            }
             ACTION_REAPPLY -> {
                 // Settings Apply / profile load: re-run the pipeline now (G2-F16). ensureRunning()
                 // first so an Apply made while the service is up (but this start re-delivers) is safe.
@@ -121,6 +135,7 @@ class AmbientMonitoringService : Service() {
     private fun ensureRunning() {
         controller.start()
         contextEngine.start(scope)
+        startPanicDetector()
         if (notificationJob?.isActive == true) return
         val manualOverrideFlow = applicationContext.settingsDataStore.data
             .map { it.contextOverride }
@@ -151,10 +166,40 @@ class AmbientMonitoringService : Service() {
                     // renders without the panel being closed+reopened. The tile re-reads the live
                     // LiveRuntimeState/DataStore in onStartListening.
                     requestTileRefresh()
-                    // High-priority override alert + toast, once on the rising edge (G2R-F35).
-                    if (model.pausedByOverride && !alertedOverride) notifyManualOverride()
+                    // High-priority override alert + toast, once on the rising edge (G2R-F35); cancel it
+                    // on the falling edge so it does not stack with the ongoing notification (G2R-F75).
+                    if (model.pausedByOverride && !alertedOverride) {
+                        notifyManualOverride()
+                    } else if (!model.pausedByOverride && alertedOverride) {
+                        getSystemService(NotificationManager::class.java).cancel(OVERRIDE_NOTIFICATION_ID)
+                    }
                     alertedOverride = model.pausedByOverride
                 }
+        }
+    }
+
+    /**
+     * prof769/task528 panic detector (G2R-F77): collect the upside-down + shake gesture and fire the
+     * task528 panic — SOS vibration + restore brightness 255 + disable super dimming + service Off.
+     */
+    private fun startPanicDetector() {
+        if (panicJob?.isActive == true) return
+        panicJob = scope.launch {
+            panicSensor.events().collect {
+                vibrateSos()
+                panicAndStop()
+            }
+        }
+    }
+
+    /**
+     * task528 act0 (code62 Vibrate Pattern): the S.O.S. morse pattern. `setView`-less vibration so the
+     * "flash" the owner expects is the SOS buzz + the brightness jump to 255 (task528 act6).
+     */
+    private fun vibrateSos() {
+        val vibrator = getSystemService(android.os.Vibrator::class.java) ?: return
+        runCatching {
+            vibrator.vibrate(android.os.VibrationEffect.createWaveform(SOS_MORSE_PATTERN, -1))
         }
     }
 
@@ -172,6 +217,8 @@ class AmbientMonitoringService : Service() {
         // Persist the disable so boot/screen receivers do not restart the loop.
         applicationContext.settingsDataStore.updateData { it.copy(serviceEnabled = false) }
         LiveRuntimeState.reset()
+        // F75: drop the high-priority override alert if one is up so it does not outlive the service.
+        getSystemService(NotificationManager::class.java).cancel(OVERRIDE_NOTIFICATION_ID)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -264,10 +311,11 @@ class AmbientMonitoringService : Service() {
             .setOnlyAlertOnce(true)
         contextLine?.let { builder.setSubText(it) }
 
+        // F76: NO Pause action on the ongoing notification — pausing from here behaved like a manual
+        // override and confused users; to stop, disable the service. Resume is still offered while
+        // paused (after a real override); Reset (panic) + Disable remain.
         if (model.paused) {
             builder.addAction(0, "Resume", actionIntent(ACTION_RESUME))
-        } else {
-            builder.addAction(0, "Pause", actionIntent(ACTION_PAUSE))
         }
         builder.addAction(0, "Reset", actionIntent(ACTION_PANIC))
         builder.addAction(0, "Disable", actionIntent(ACTION_DISABLE))
@@ -286,6 +334,7 @@ class AmbientMonitoringService : Service() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenReceiver) }
+        panicJob?.cancel(); panicJob = null
         contextEngine.stop()
         controller.stop()
         LiveRuntimeState.reset()
@@ -307,5 +356,14 @@ class AmbientMonitoringService : Service() {
         private const val OVERRIDE_CHANNEL_ID = "manual_override"
         private const val NOTIFICATION_ID = 1001
         private const val OVERRIDE_NOTIFICATION_ID = 1002
+
+        // task528 act0 (code62): S.O.S. in morse code. Tasker arg0 was
+        // "0,100,100,100,100,100,300,300,100,300,100,300,300,100,100,10" — the same on/off durations
+        // (ms) as a VibrationEffect waveform (index 0 = initial off delay).
+        private val SOS_MORSE_PATTERN = longArrayOf(
+            0, 100, 100, 100, 100, 100, // S: dot dot dot
+            300, 300, 100, 300, 100, 300, // O: dash dash dash
+            300, 100, 100, 10, // S: dot dot dot (trailing)
+        )
     }
 }

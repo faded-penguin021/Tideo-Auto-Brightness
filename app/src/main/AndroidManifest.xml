@@ -14,6 +14,8 @@
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- task528 panic: S.O.S. morse vibration pattern (prof769 → _PanicButton act0, code62). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Android 11+ package visibility: see launchable apps so the per-app context-rule picker is
          not empty (G2-F14). Mirrors Tasker's app-list query for prof762 _ContextAppChanged. -->

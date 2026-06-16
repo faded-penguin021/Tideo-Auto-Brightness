@@ -44,6 +44,7 @@ next session does not know it.
 | S12.7h rich editors / scene fidelity | 2026-06-15 | Opus/high | DONE | (this push) | The last S12.7 sub-segment — profile/settings-list fidelity + Circadian date/location (D-060; G2R-F38/F39). **F38** the Tasker dashboard's "full list of every setting w/ gold changed-vs-default": new `settings/SettingsDisplay.kt` (`AabSettings.displayRows(reference)`/`changedCount`/`valueFor` — explicit per-key `when`, NO reflection per owner caution; excludes runtime/identity keys serviceEnabled/contextOverride) + `ui/components/SettingsDiffList.kt` (changed rows in teal-gold `AabGold` + SemiBold, count summary). Wired into a new **`LoadProfileDialog`** ("Load Anyway" preview→Apply modal, replaces the old direct Apply button), the **Save dialog** (shows the live set being saved), and a **"View current settings"** dialog (active-vs-default compare = the dashboard); each ProfileCard now shows its changed-count. **F39** Circadian fixed Date/Lat/Lon element (experiment_settings.md elements35–37, `_ExperimentSetDate`/`_ExperimentClearDate`): new `CircadianDateLocationCard` (M3 DatePicker + lat/lon fields + "Use current location" + "Use live data") backed by new `settings/ExperimentPrefsStore.kt` (`experimentPrefsDataStore` — `%AAB_Date`/`%AAB_Latitude`/`%AAB_Longitude`) via new `state/CircadianExtrasViewModel.kt`; unset → fields pre-fill **today + `lastKnownLocation`**; preview-only (never enters AabSettings/profiles/export). The ExperimentChart remains the S13 host slot. Tests: SettingsScreens +5 (diff-list changed/all-default, LoadProfileDialog confirm, Circadian defaults-to-today+loc, set-fixed emits) + new `SettingsDisplayTest` (3, pure JVM). **Fence: domain/ + golden vectors + ChartCanvas untouched.** Full ladder GREEN: `:app:testDebugUnitTest`(167) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **ALL S12.7 (a–h) DONE → GATE 2 RE-RE-TEST (4th) READY. S12.7i queued for the during-S12.7 deferrals (F70/F71/F72); F73 needs a domain segment.** |
 | S12.7i (F73 first) circadian solar-window wiring | 2026-06-15 | Opus/high | DONE (F73) | (this push) | First S12.7i deliverable: **F73 fixed — and it was APP-LAYER, not the suspected domain bug** (D-061). Root cause: `BrightnessPipelineController.buildInput` built `TimeContext(secondsOfDay=…)` but left every solar window at its **default (6–8am / 18–20pm UTC)** — the real sunrise was NEVER wired (the D-039d "circadian wired in S9b/S12" carryover that never happened). So the dynamic-scale morning ramp ran 06–08 UTC for everyone → `%AAB_ScaleDynamic`=0.852 at **06:13 UTC** irrespective of the device clock (owner saw it at 07:13 @UTC+1 AND 08:13 @UTC+2 — both 06:13 UTC, confirming the frame, not a local bug). Fix: new `runtime/CircadianWindowProvider.kt` (pure `compute(lat,lon,dateEpochSec,tz,factor)` → `CircadianWindows` via the **already-fenced, golden-tested** `SolarCalculator.compute`/`buildScheduleWindows`; stateful `current()` resolves the F39 fixed date/loc override else today + `lastKnownLocation`, day/loc/factor-cached, returns null→keep old defaults when no fix). `buildInput` now feeds the real morning/evening/sunlight/polar fields; `now` stays UTC seconds-of-day to match `buildScheduleWindows`' UTC-frame windows. `BrightnessPipelineController` gains `circadianWindowsProvider` (default `{null}` → existing tests/behaviour intact); `AppModule.createRuntime` wires the live provider. **Verified end-to-end: Utrecht 2026-06-15 sunrise 05:18 local → scaleDynamic 1.15 at 08:13 local (was 0.852).** Tests: `CircadianWindowProviderTest` (4, pure JVM — Utrecht sunrise≈05:18 + daytime 1.15, default-window bug repro 0.852, window ordering/non-polar). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (only *called*).** Full ladder GREEN: `:app:testDebugUnitTest`(171) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **S12.7i F70/F71/F72 still remain.** |
 | S12.7i (F70/F71/F72) deferral cleanup | 2026-06-15 | Opus/high | DONE | (this push) | The three remaining during-S12.7 deferrals closed (D-062; F73 already landed). **F70 legacy-load-doesn't-apply — root cause was the PARSER, not the wiring:** ProfilesScreen already called `vm.replaceAll(imported)` (commit+reapply) since S12.7c, but `TaskerLegacyProfileSerializer` only parsed `%AAB_Key=value` plaintext, so a REAL Tasker config (nested JSON — `{meta,general,misc,reactivity,circadian,superdimming}`, task637 `_ProfileManager.performSave` XML L29365+) parsed to all-defaults → "loaded by name", nothing changed. Rewrote the serializer to detect `{`-JSON and map the snake_case keys per task637 `performLoad` (L29490+); derived form2A/2D/3A intentionally NOT stored (recomputed at read-time, ledger). `%AAB_Key=value` fallback kept. **F71 reactivity-cooldown-swallows-overrides:** transcribed task544 (throttle gate `elapsed<%AAB_Throttle`→`%AAB_MainLoop=0`→Stop is the MAIN-LOOP gate, prof760) vs task567 (prof755 override handler: act7 "Wait %AAB_CycleTime", act8 re-gate) — the throttle gates ONLY the task544 main loop; prof755→task567 override detection is a SEPARATE profile. `handleOverride`'s settle fallback to `throttleDefaultMs` was the lone conflation; changed to `%AAB_CycleTime` only (0 when unset) so an override is detected inside the cooldown window. **F72 can't-clear-a-time-rule:** added a "Clear time" affordance in the context rule editor that blanks From/To → `ContextTriggers.timeRange` saves null. **Fence: domain/ + golden vectors + ChartCanvas untouched.** Tests: LegacyImportRoundTrip +2 (nested-JSON full parse, partial-section defaults), SettingsViewModel +1 (replaceAll commits parsed legacy values + triggers ACTION_REAPPLY), BrightnessPipelineController +1 (override settle not gated by a 60s throttle), SettingsScreens +1 (Clear time nulls timeRange). Full ladder GREEN: `:app:testDebugUnitTest`(176) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **ALL S12.7 (a–i) DONE → GATE 2 RE-RE-TEST (4th) READY.** |
+| S12.8a runtime: override feedback, throttle, panic, PWM-dimming | 2026-06-16 | Opus/high | DONE | (this push) | First S12.8 sub-segment — 10 runtime findings (D-063; F58/F65/F71/F74/F75/F76/F77/F78/F86/F88). **F74** (Resume inert) ROOT CAUSE: a notification action can be delivered to a freshly (re)created service whose pipeline consumer was never `start()`ed (the paused-override notification survives a service kill, prof756) → the Resume event sat unconsumed in the channel. `ACTION_RESUME` now `ensureRunning()` BEFORE `controller.resume()`. **F75** override alert cancelled on the falling edge of `pausedByOverride` + on resume/teardown (no stacking with the ongoing notif). **F76** removed the **Pause** action from the ongoing notification (Reset/Disable kept; Resume only while paused). **F77** NEW prof769 panic detector: `platform/.../sensor/PanicSensorSource.kt` (`PanicGestureDetector` pure low-pass-gravity upside-down + linear-accel shake; `AndroidPanicSensorSource` gates on display-on + cooldown) → service collects → SOS morse **vibration** (task528 act0 code62 pattern) + `controller.emergencyStop()` (255 + drop dimming + Service=Off). VIBRATE permission added. **F78** new `ThrottleController` (%AAB_Throttle = ACTUAL `steps×wait` floored at the setting; **Throttle Reinitialization** watchdog task566/prof754 → ceiling `AnimSteps×MaxWait+10` after ~10 s of no change); controller uses it for the throttle gate + publishes it. **F65** (REOPENED) PWM-sensitive now ALSO dims below the floor via Extra Dim: `SuperDimmingCoordinator` engages `reduce_bright_colors` using task700 `finalDimLevel` (Map Lux to Brightness V2 act23) when `pwmSensitive`, vs `dimShell` for the super-dimming toggle. **F58** Super Dimming live readout (%AAB_DimmingCurrent rel / %AAB_DimmingDS abs at %AAB_CurrentBright) — new PipelineState fields computed from golden `SoftwareDimming`, `SuperDimmingDiagnosticCard` on the screen. **F86** displayed LuxAlpha clamped ≥0 (`fmtAlpha`; engine value untouched, parity D-010a). **F88** tap-to-dismiss flashes (AccessibilityService overlay made touchable → click hides; foreground-toast fallback can't be tapped — Android limit, noted). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Tests: PanicGestureDetector(4, platform), ThrottleController(4), SuperDimmingCoordinator +2 (PWM engage/above-threshold), BrightnessPipelineController +2 (actual-steps throttle / dimming readout), AmbientMonitoringService +1 (no Pause action), SettingsScreens +2 (F58 readout, F86 clamp). Full ladder GREEN: `:platform:test :domain:test :app:testDebugUnitTest`(187) `:app:assembleDebug :app:lintDebug`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
@@ -67,10 +68,20 @@ the task544 main loop), so an override is detected inside the throttle window; *
 affordance nulls a rule's `timeRange`. `domain/` + golden vectors + ChartCanvas stayed fenced. Ladder GREEN
 (`:app:testDebugUnitTest`=176).
 
-**Next:** **S12.8 is now BRIEFED in RUNBOOK** (a–d, all Opus/high) to clear the Gate-2 (4th re-test)
-findings — **S12.8a** Runtime (override notif/throttle/panic/PWM-dimming), **S12.8b** UI (dashboard/graph
-placement/context editor), **S12.8c** Settings & profiles (schema hygiene incl. CRITICAL F85/legacy load/
-wizard), **S12.8d** Circadian (DST fix/fixed date-loc/ip-api). Land a→c→d then b; then re-test Gate 2 (5th);
+**S12.8a DONE (2026-06-16):** the **Runtime** sub-segment of the Gate-2 4th-re-test salvage shipped
+(D-063) — 10 runtime findings: F74 Resume-inert (consumer-not-started after a service kill →
+`ACTION_RESUME` now `ensureRunning()` first), F75 override-alert no-stack, F76 Pause action removed from
+the ongoing notification, **F77 NEW prof769 panic detector** (upside-down + shake → SOS vibration +
+brightness 255 + Service Off; new `PanicSensorSource`/`PanicGestureDetector` + VIBRATE perm), F78 throttle
+= actual `steps×wait` + task566/prof754 idle→ceiling watchdog (`ThrottleController`), **F65 PWM-sensitive
+now dims below the floor via Extra Dim** (task700 `finalDimLevel`), F58 Super Dimming live readout, F86
+LuxAlpha display clamp (engine untouched), F88 tap-to-dismiss flashes. domain/ + golden + ChartCanvas
+fenced (called only). Ladder GREEN (`:app:testDebugUnitTest`=187). Debug APK in `/dist/` for Gate testing.
+
+**Next:** **S12.8 remaining sub-segments** (all Opus/high) — **S12.8c** Settings & profiles (schema
+hygiene incl. CRITICAL F85/legacy load/wizard), **S12.8d** Circadian (DST fix/fixed date-loc/ip-api),
+then **S12.8b** UI (dashboard/graph placement/context editor) LAST (rebases onto a/c/d's screen content
+per the ordering note). Land a→c→d then b; then re-test Gate 2 (5th);
 then **S13** (remaining charts via the S12.7g template + About/User Guide, which carries F80). The Gate-2
 (4th) results are recorded under "Gate findings → Gate 2 (4th re-test)":
 most of F33–F73 are **confirmed fixed**; reopened with corrected specs = **F39/F62/F65/F70/F73**; follow-ups
@@ -1920,11 +1931,14 @@ see below.)
 - **G2R-F45 OPEN** — foreground/zombie-guarded location listener: owner could not test at home this round;
   keep open until they can exercise the location lifecycle on the move.
 - **G2R-F67 PARTIAL** — day-of-week picker present; **midnight/overnight wrapping not yet verified** on device.
-- **G2R-F71 TENTATIVE** — override-during-cooldown appears correct, but the owner is unsure the manual test
-  was valid. Treat as provisionally fixed; needs a clean confirmation.
+- **G2R-F71 TENTATIVE** ✅ CONFIRMED S12.8a (D-063). The S12.7i settle (waits %AAB_CycleTime, never the throttle
+  cooldown) is now covered by the `override_settleIsNotGatedByThrottleCooldown` controller regression — a manual
+  override is detected INSIDE the throttle window.
 
 *Reopened with CORRECTED specs (the original understanding was wrong):*
-- **G2R-F65 REOPENED — the S12.7b "two cooperating layers" model was WRONG.** PWM-sensitive mode and the
+- **G2R-F65 REOPENED** ✅ RESOLVED S12.8a (D-063). PWM-sensitive now engages Extra Dim below the floor via the
+  task700 `finalDimLevel` (`SuperDimmingCoordinator` PWM branch); the super-dimming toggle keeps the `dimShell`
+  path. — **the S12.7b "two cooperating layers" model was WRONG.** PWM-sensitive mode and the
   Super-Dimming toggle are **intentionally mutually exclusive**. PWM-sensitive means: **lock the hardware
   brightness, then dim using Android "Extra Dim"** — see **Map Lux to Brightness (Java) V2, actions 23→38**
   (cross-check the ledger note that task661's runtime math lives in Variable-Set 547, not Java). The
@@ -1949,9 +1963,9 @@ see below.)
   applied). It is NOT merely a preview. (See also F83: the daily-location-refresh subsystem this feeds.)
 
 *Follow-ups on otherwise-correct findings:*
-- **G2R-F58 PARTIAL** — Super Dimming screen shows **no live readout**. Tasker shows: *dimming strength (rel)*
-  `[%AAB_DimmingCurrent]` and *super dimming strength (abs)* `[%AAB_DimmingDS]` at `[%AAB_CurrentBright]`
-  brightness. Add this live block.
+- **G2R-F58 PARTIAL** ✅ RESOLVED S12.8a (D-063). The Super Dimming screen now shows the live readout
+  (`SuperDimmingDiagnosticCard`): dimming strength (rel) `%AAB_DimmingCurrent` + (abs) `%AAB_DimmingDS` at
+  `%AAB_CurrentBright`, computed from the golden `SoftwareDimming` into new PipelineState fields.
 - **G2R-F59 PARTIAL** — the dynamic-threshold help still prints the literal text **"%AAB_ThreshDynamic"**; it
   should substitute the **value only** (the current threshold).
 - **G2R-F68 PARTIAL (UI bug)** — in the context rule editor, **"Sunset (22:00)" wraps vertically, one letter
@@ -1962,19 +1976,17 @@ see below.)
   are buggy → see F74/F75.
 
 *New findings (G2R-F74…F89):*
-- **G2R-F74** — the **Resume** action on the high-priority override notification **does nothing**; it must
-  resume the pipeline (task569).
-- **G2R-F75** — the high-priority override notification must **cancel/replace the existing ongoing
-  notification** when it fires (don't stack two notifications).
-- **G2R-F76** — the **ongoing service notification's Pause** action behaves like / triggers an override and
-  is confusing; **remove it** (a user who wants to stop should just disable the service). Ties to the
-  dashboard rethink (F79).
-- **G2R-F77** — **prof769 panic not firing**: upside-down + display-on + significant-motion does **not**
-  trigger the S.O.S. / max-brightness flash pattern (task528). Verify the sensor wiring (orientation + shake).
-- **G2R-F78** — **%AAB_Throttle must be computed from the ACTUAL `steps*wait`**, not `maxSteps*maxWait`. The
-  max value is the **ceiling** applied by the *Throttle Reinitialization* profile after **10 s of no
-  brightness change** (stop polling the sensor when nothing's happening). Port that reinit profile (task566)
-  rather than hard-defaulting the throttle to the max.
+- **G2R-F74** ✅ RESOLVED S12.8a (D-063). Resume was inert because the action reached a (re)created service whose
+  pipeline consumer was never `start()`ed; `ACTION_RESUME` now `ensureRunning()` before `controller.resume()`.
+- **G2R-F75** ✅ RESOLVED S12.8a (D-063). The override alert is cancelled on the falling edge of `pausedByOverride`
+  + on resume/teardown, so it no longer stacks with the ongoing notification.
+- **G2R-F76** ✅ RESOLVED S12.8a (D-063). The Pause action was removed from the ongoing notification (Reset/Disable
+  kept; Resume shown only while paused).
+- **G2R-F77** ✅ RESOLVED S12.8a (D-063). New prof769 detector (`PanicSensorSource`/`PanicGestureDetector`:
+  upside-down via low-pass gravity + linear-accel shake, display-on gated) → SOS morse vibration (task528 act0)
+  + `emergencyStop()` (255 + drop dimming + Service Off).
+- **G2R-F78** ✅ RESOLVED S12.8a (D-063). New `ThrottleController`: %AAB_Throttle = ACTUAL `steps×wait` (floored at
+  the setting) + the task566/prof754 watchdog pushes it to the `AnimSteps×MaxWait+10` ceiling after ~10 s idle.
 - **G2R-F79** — **Dashboard redesign**: current dashboard feels clumsy and its purpose is unclear. Resume-
   manual-override is useful; the **Pause** control is weird (why not just disable?). Design a more insightful
   dashboard that surfaces genuinely useful live info. (Pairs with F76.)
@@ -1995,11 +2007,13 @@ see below.)
   of the threshold calculation for the current lux level, not an input. Remove `thresholdDynamic` from the
   editable settings schema/UI (it stays a runtime/computed value). **Touches `AabSettings` (domain-adjacent
   schema) — re-scope the fence when briefing.**
-- **G2R-F86** — **LuxAlpha still occasionally shows negative values** (live readout / engine output).
-  Investigate the smoothing-alpha path (`1 - exp(-deltaFactor·effectiveDelta)` should be ≥ 0).
+- **G2R-F86** ✅ RESOLVED S12.8a (D-063). The DISPLAY clamps to ≥ 0 (`fmtAlpha` on the Misc card + Live Debug);
+  the engine value is intentionally left unclamped (task535 parity, D-010a — domain/ untouched per owner decision).
 - **G2R-F87** — the **app list in the context rule editor** should be **taller** (still scrollable) — F45-era
   `heightIn(max=220.dp)` is too short.
-- **G2R-F88** — **tap-to-dismiss flashes/toasts** (Tasker lets you tap a flash to dismiss it).
+- **G2R-F88** ✅ RESOLVED S12.8a (D-063). The global-flash AccessibilityService overlay is now touchable and
+  dismisses on tap. (The foreground-toast fallback cannot be tapped — Android toasts are non-interactive; the
+  overlay is the faithful Tasker-flash surface.)
 - **G2R-F89** — some permissions were **not explicitly requested** but appear in ADB's per-app list:
   **background location, DUMP, package usage stats**. Verify whether they're requestable / needed; wontfix
   if appropriate.
