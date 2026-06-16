@@ -17,9 +17,10 @@ import kotlin.math.sqrt
  * prof769's `<ConditionList>` is `Event 2083 (shake/significant-motion)` ∧ `State 120/3
  * (orientation = upside down)` ∧ `State 123/1 (display on)` → task528 `_PanicButton`. The orientation
  * + shake are both derivable from the accelerometer:
- *  - **Gravity** (a low-pass of the raw accelerometer) gives the device orientation. Held upright in
- *    portrait the gravity vector points toward the bottom of the screen (`y ≈ −9.8`); held **upside
- *    down** it points toward the top (`y ≈ +9.8`). So upside-down ≡ `gravityY > [upsideDownGravityY]`.
+ *  - **Gravity** (a low-pass of the raw accelerometer) gives the device orientation. Android's
+ *    accelerometer reads **+9.8 on whichever axis points up** at rest, so held upright (top edge up)
+ *    `gravity.y ≈ +9.8`; held **upside down** (top edge down) it points the other way, `gravity.y ≈
+ *    −9.8`. So upside-down ≡ `gravity.y < −[upsideDownGravityY]` and y is the dominant axis.
  *  - **Shake** is the residual linear acceleration magnitude (raw − gravity); a spike past
  *    [shakeThreshold] m/s² is a shake (the Tasker "shake" event).
  *
@@ -43,9 +44,9 @@ class PanicGestureDetector(
     /**
      * Feed one raw accelerometer reading (m/s², device frame). Returns true on the reading that
      * completes the panic gesture: the device has been **stably upside down** AND a shake spike is
-     * present. "Upside down" means the gravity vector points toward the **top** of the screen (+y) AND
-     * y is the dominant axis (gy > |gx|, |gz|) — so a phone lying flat / held upright / in landscape
-     * does not qualify even while shaking (G2R-F77).
+     * present. "Upside down" means the gravity vector points toward the **bottom** of the screen
+     * (gravity.y ≈ −9.8) AND y is the dominant axis (|gy| > |gx|, |gz|) — so a phone lying flat / held
+     * upright / in landscape does not qualify even while shaking (G2R-F77).
      */
     fun onAccelerometer(x: Float, y: Float, z: Float): Boolean {
         if (!seeded) {
@@ -58,9 +59,9 @@ class PanicGestureDetector(
         gravity[2] = gravityAlpha * gravity[2] + (1 - gravityAlpha) * z
 
         val gy = gravity[1]
-        val upsideDown = gy > upsideDownGravityY &&
-            gy >= kotlin.math.abs(gravity[0]) &&
-            gy >= kotlin.math.abs(gravity[2])
+        val upsideDown = gy < -upsideDownGravityY &&
+            kotlin.math.abs(gy) >= kotlin.math.abs(gravity[0]) &&
+            kotlin.math.abs(gy) >= kotlin.math.abs(gravity[2])
         upsideDownStreak = if (upsideDown) upsideDownStreak + 1 else 0
 
         val lx = x - gravity[0]

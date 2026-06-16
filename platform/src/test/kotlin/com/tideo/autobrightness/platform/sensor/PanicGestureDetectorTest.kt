@@ -18,25 +18,26 @@ class PanicGestureDetectorTest {
     @Test
     fun upsideDownPlusShake_fires() {
         val d = PanicGestureDetector()
-        d.settle(9.8f) // held upside down: gravity points toward the top of the screen (+y)
+        // Held upside down: Android reads gravity toward the bottom of the screen (−y) at rest.
+        d.settle(-9.8f)
         // A hard shake while inverted: a large y deviation past the shake threshold.
-        assertTrue(d.onAccelerometer(0f, 30f, 0f), "upside-down + shake must trigger the panic gesture")
+        assertTrue(d.onAccelerometer(0f, -30f, 0f), "upside-down + shake must trigger the panic gesture")
     }
 
     @Test
     fun upsideDownButSteady_doesNotFire() {
         val d = PanicGestureDetector()
-        d.settle(9.8f)
+        d.settle(-9.8f)
         // Inverted but no shake (no linear-accel spike) → no panic.
-        assertFalse(d.onAccelerometer(0f, 9.8f, 0f), "no shake → no panic")
+        assertFalse(d.onAccelerometer(0f, -9.8f, 0f), "no shake → no panic")
     }
 
     @Test
     fun shakeWhileUpright_doesNotFire() {
         val d = PanicGestureDetector()
-        // Upright portrait: gravity points toward the bottom of the screen (−y), so not upside down.
-        d.settle(-9.8f)
-        assertFalse(d.onAccelerometer(0f, -30f, 0f), "a shake the right way up must not trigger panic")
+        // Upright portrait: Android reads +9.8 on +y (the axis pointing up) → not upside down.
+        d.settle(9.8f)
+        assertFalse(d.onAccelerometer(0f, 30f, 0f), "a shake the right way up must not trigger panic")
     }
 
     @Test
@@ -58,10 +59,10 @@ class PanicGestureDetectorTest {
     fun inversionMustBeSustained_beforeAShakeFires() {
         // G2R-F77: the inversion has to be held for `sustainedFrames` before a shake counts.
         val d = PanicGestureDetector(sustainedFrames = 5)
-        d.onAccelerometer(0f, 9.8f, 0f) // seed inverted (does not count toward the streak)
+        d.onAccelerometer(0f, -9.8f, 0f) // seed inverted (does not count toward the streak)
         repeat(4) {
-            assertFalse(d.onAccelerometer(0f, 40f, 0f), "a shake before the inversion is sustained must not fire")
+            assertFalse(d.onAccelerometer(0f, -40f, 0f), "a shake before the inversion is sustained must not fire")
         }
-        assertTrue(d.onAccelerometer(0f, 40f, 0f), "fires once the inversion has been sustained")
+        assertTrue(d.onAccelerometer(0f, -40f, 0f), "fires once the inversion has been sustained")
     }
 }

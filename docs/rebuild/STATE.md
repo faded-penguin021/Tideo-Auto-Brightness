@@ -72,8 +72,9 @@ affordance nulls a rule's `timeRange`. `domain/` + golden vectors + ChartCanvas 
 **F75** the override alert is now the SAME foreground notification (NOTIFICATION_ID) raised to the
 high-priority channel on the rising edge — never a separate ID — so it cannot stack/leave a stale alert
 (the prior fix posted a 2nd ID that didn't get cancelled on a new override). **F77** the detector
-triggered upright too; now requires gravity to be **dominant-axis +y AND sustained ≥5 frames** with a
-heavier low-pass (α 0.9) so a shake the right way up / lying flat can't cross the inversion threshold.
+triggered upright too; now requires a **sustained ≥5-frame, dominant-y inversion** with a heavier low-pass
+(α 0.9). (3rd pass: also a **sign-convention fix** — Android reads +9.8 on the axis pointing up, so
+upside-down is `gravity.y ≈ −9.8`; the gate is `gy < −7`, not `gy > +7` which matched upright.)
 **F78** root cause: I floored the throttle at `throttleDefaultMs` which equals `MaxSteps×MaxWait+10`, so
 it always read the ceiling; now uses the engine's actual `BrightnessPolicyOutput.transitionDurationMs`
 (loops×wait+10, golden task543) with NO floor (ceiling only via the idle watchdog). **F88** the foreground
@@ -1996,9 +1997,10 @@ see below.)
   stack with / leave a stale override notification.
 - **G2R-F76** ✅ RESOLVED S12.8a (D-063). The Pause action was removed from the ongoing notification (Reset/Disable
   kept; Resume shown only while paused).
-- **G2R-F77** ✅ RESOLVED S12.8a (D-063, 2nd pass). New prof769 detector (`PanicGestureDetector`) — inverted ONLY
-  (dominant-axis +y, sustained ≥5 frames, heavy low-pass so a shake can't drag gravity past the threshold);
-  display-on gated → SOS morse vibration (task528 act0) + `emergencyStop()` (255 + drop dimming + Service Off).
+- **G2R-F77** ✅ RESOLVED S12.8a (D-063, 3rd pass). New prof769 detector (`PanicGestureDetector`) — inverted ONLY
+  (sustained ≥5 frames, dominant y-axis, heavy low-pass). **Sign-convention fix:** Android reads +9.8 on the axis
+  pointing UP, so upright = `gravity.y ≈ +9.8` and upside-down = `gravity.y ≈ −9.8`; the gate is `gy < −7` (the
+  2nd-pass `gy > +7` matched upright). Display-on gated → SOS morse vibration (task528 act0) + `emergencyStop()`.
 - **G2R-F78** ✅ RESOLVED S12.8a (D-063, 2nd pass). %AAB_Throttle = the engine's ACTUAL `transitionDurationMs`
   (loops×wait+10, golden task543) with NO setting floor (the prior floor equalled the ceiling, so it always read
   `MaxSteps×MaxWait+10`); the task566/prof754 watchdog raises it to that ceiling only after ~10 s idle.
