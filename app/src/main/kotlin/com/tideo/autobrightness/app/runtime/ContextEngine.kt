@@ -401,8 +401,8 @@ interface ProfileCatalog {
 /**
  * Overlay a context profile's parameter set onto the baseline. The fields swapped are exactly Tasker
  * task626 `_ContextResume`'s 39-key snapshot (the LOAD_FILE parameter set); fields outside it
- * (service enable, manual context lock, debug level, setup title, schema version, the
- * snapshot-omitted %AAB_ThreshDynamic, and `detectOverrides`) are preserved from the baseline.
+ * (service enable, manual context lock, debug level, setup title, schema version, and
+ * `detectOverrides`) are preserved from the baseline.
  *
  * `detectOverrides` (%AAB_DetectOverrides) is a GLOBAL reactivity preference, NOT one of task626's
  * curve/min-max/threshold/dimming snapshot keys (contexts_spec §4 enumerates the snapshot), so a
@@ -415,5 +415,4 @@ internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSetti
     debugLevel = baseline.debugLevel,
     setupTitle = baseline.setupTitle,
     schemaVersion = baseline.schemaVersion,
-    thresholdDynamic = baseline.thresholdDynamic,
 )

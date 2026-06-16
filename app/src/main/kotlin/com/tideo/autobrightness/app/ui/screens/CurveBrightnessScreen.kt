@@ -77,8 +77,14 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     )
 }
 
-/** task38 needs ≥ 9 recorded override points before it fits/suggests a curve. */
-private const val MIN_FIT_POINTS = 9
+/**
+ * task38 needs ≥ 9 **real, user-recorded** override points before it fits/suggests a curve. This is
+ * the single user-facing gate, shared with the Tools wizard (G2R-F62): the domain engine has its own
+ * post-ghost-injection ≥9 check, but ghost/synthetic priors must NOT count toward the gate the user
+ * sees — the owner ran the wizard on just 7 real points and it still fired. [OverridePointStore] only
+ * holds real points, so gating on its size is correct.
+ */
+internal const val MIN_FIT_POINTS = 9
 
 @Composable
 fun CurveBrightnessContent(

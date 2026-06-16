@@ -34,7 +34,9 @@ data class AabSettings(
     val thresholdBright: Float = 0.08f,
     val thresholdDark: Float = 0.3f,
     val thresholdDim: Float = 0.25f,
-    val thresholdDynamic: Int = 5,
+    // NOTE (G2R-F85): %AAB_ThreshDynamic is the COMPUTED dynamic reactivity threshold for the current
+    // lux (task544 output), never a user input — task570 act31 only seeds it. It lived here as a bogus
+    // editable Int in v1/v2; removed in v3. The live computed value is PipelineState.threshDynamic.
     val thresholdSteepness: Float = 2.1f,
     // Tasker: %AAB_ThreshMidpoint = log10(%AAB_Zone2End) = log10(10000) = 4; DERIVED-but-persisted (D-004/D-008)
     val thresholdMidpoint: Double = 4.0,
@@ -59,7 +61,9 @@ data class AabSettings(
 )
 
 // Schema v2: added animSteps, thresholdMidpoint, contextOverride, setupTitle; scale Float (was Int v1)
-const val CURRENT_SCHEMA_VERSION = 2
+// Schema v3: removed thresholdDynamic (G2R-F85) — it was never an input. The stale key is dropped on
+// read via the serializer's ignoreUnknownKeys; migration only bumps the version stamp.
+const val CURRENT_SCHEMA_VERSION = 3
 
 enum class AabValueType {
     Boolean,
@@ -106,7 +110,7 @@ object AabSettingsContract {
         AabSettingRule("%AAB_ThreshBright", "thresholdBright", AabValueType.Float, "0.08", "range 0.0..1.0"),
         AabSettingRule("%AAB_ThreshDark", "thresholdDark", AabValueType.Float, "0.3", "range 0.0..1.0"),
         AabSettingRule("%AAB_ThreshDim", "thresholdDim", AabValueType.Float, "0.25", "range 0.0..1.0"),
-        AabSettingRule("%AAB_ThreshDynamic", "thresholdDynamic", AabValueType.Int, "5", "range 1..20"),
+        // %AAB_ThreshDynamic removed (G2R-F85): it is a computed runtime value, not a user setting.
         AabSettingRule("%AAB_ThreshSteepness", "thresholdSteepness", AabValueType.Float, "2.1", "range 0.1..10.0"),
         AabSettingRule("%AAB_ThreshMidpoint", "thresholdMidpoint", AabValueType.Double, "4.0", "range 0.0..6.0 (derived=log10(zone2End))"),
         AabSettingRule("%AAB_ScalingUse", "scalingEnabled", AabValueType.Boolean, "false", "must be true|false"),

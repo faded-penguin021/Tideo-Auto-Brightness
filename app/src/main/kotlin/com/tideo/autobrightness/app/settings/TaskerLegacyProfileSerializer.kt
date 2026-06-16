@@ -101,43 +101,43 @@ object TaskerLegacyProfileSerializer {
 
         map["%AAB_Service"]?.let { settings = settings.copy(serviceEnabled = it.asBoolean(settings.serviceEnabled)) }
         map["%AAB_DetectOverrides"]?.let { settings = settings.copy(detectOverrides = it.asBoolean(settings.detectOverrides)) }
-        map["%AAB_MinBright"]?.toIntOrNull()?.let { settings = settings.copy(minBrightness = it) }
-        map["%AAB_MaxBright"]?.toIntOrNull()?.let { settings = settings.copy(maxBrightness = it) }
-        map["%AAB_Offset"]?.toIntOrNull()?.let { settings = settings.copy(offset = it) }
+        map["%AAB_MinBright"]?.asRoundedInt()?.let { settings = settings.copy(minBrightness = it) }
+        map["%AAB_MaxBright"]?.asRoundedInt()?.let { settings = settings.copy(maxBrightness = it) }
+        map["%AAB_Offset"]?.asRoundedInt()?.let { settings = settings.copy(offset = it) }
         map["%AAB_Scale"]?.toFloatOrNull()?.let { settings = settings.copy(scale = it) }
-        map["%AAB_Zone1End"]?.toIntOrNull()?.let { settings = settings.copy(zone1End = it) }
-        map["%AAB_Zone2End"]?.toIntOrNull()?.let { settings = settings.copy(zone2End = it) }
-        map["%AAB_Form1A"]?.toIntOrNull()?.let { settings = settings.copy(form1A = it) }
+        map["%AAB_Zone1End"]?.asRoundedInt()?.let { settings = settings.copy(zone1End = it) }
+        map["%AAB_Zone2End"]?.asRoundedInt()?.let { settings = settings.copy(zone2End = it) }
+        map["%AAB_Form1A"]?.asRoundedInt()?.let { settings = settings.copy(form1A = it) }
         map["%AAB_Form2B"]?.toFloatOrNull()?.let { settings = settings.copy(form2B = it) }
-        map["%AAB_Form2C"]?.toIntOrNull()?.let { settings = settings.copy(form2C = it) }
+        map["%AAB_Form2C"]?.asRoundedInt()?.let { settings = settings.copy(form2C = it) }
         map["%AAB_DimmingEnabled"]?.let { settings = settings.copy(dimmingEnabled = it.asBoolean(settings.dimmingEnabled)) }
-        map["%AAB_DimmingStrength"]?.toIntOrNull()?.let { settings = settings.copy(dimmingStrength = it) }
+        map["%AAB_DimmingStrength"]?.asRoundedInt()?.let { settings = settings.copy(dimmingStrength = it) }
         map["%AAB_DimmingExponent"]?.toFloatOrNull()?.let { settings = settings.copy(dimmingExponent = it) }
-        map["%AAB_DimmingThreshold"]?.toIntOrNull()?.let { settings = settings.copy(dimmingThreshold = it) }
-        map["%AAB_DimSpread"]?.toIntOrNull()?.let { settings = settings.copy(dimSpread = it) }
+        map["%AAB_DimmingThreshold"]?.asRoundedInt()?.let { settings = settings.copy(dimmingThreshold = it) }
+        map["%AAB_DimSpread"]?.asRoundedInt()?.let { settings = settings.copy(dimSpread = it) }
         map["%AAB_PWMSensitive"]?.let { settings = settings.copy(pwmSensitive = it.asBoolean(settings.pwmSensitive)) }
         map["%AAB_PWMExp"]?.toFloatOrNull()?.let { settings = settings.copy(pwmExponent = it) }
         // Tasker uses %AAB_Throttle; legacy exports may also use %AAB_DefaultThrottle (old naming)
-        (map["%AAB_Throttle"] ?: map["%AAB_DefaultThrottle"])?.toLongOrNull()?.let { settings = settings.copy(throttleDefaultMs = it) }
-        map["%AAB_MinWait"]?.toIntOrNull()?.let { settings = settings.copy(minWaitMs = it) }
-        map["%AAB_MaxWait"]?.toIntOrNull()?.let { settings = settings.copy(maxWaitMs = it) }
+        (map["%AAB_Throttle"] ?: map["%AAB_DefaultThrottle"])?.asRoundedLong()?.let { settings = settings.copy(throttleDefaultMs = it) }
+        map["%AAB_MinWait"]?.asRoundedInt()?.let { settings = settings.copy(minWaitMs = it) }
+        map["%AAB_MaxWait"]?.asRoundedInt()?.let { settings = settings.copy(maxWaitMs = it) }
         map["%AAB_DeltaFactor"]?.toFloatOrNull()?.let { settings = settings.copy(deltaFactor = it) }
         map["%AAB_ThreshBright"]?.toFloatOrNull()?.let { settings = settings.copy(thresholdBright = it) }
         map["%AAB_ThreshDark"]?.toFloatOrNull()?.let { settings = settings.copy(thresholdDark = it) }
         map["%AAB_ThreshDim"]?.toFloatOrNull()?.let { settings = settings.copy(thresholdDim = it) }
-        map["%AAB_ThreshDynamic"]?.toIntOrNull()?.let { settings = settings.copy(thresholdDynamic = it) }
+        // %AAB_ThreshDynamic intentionally dropped (G2R-F85): a computed runtime value, not a setting.
         map["%AAB_ThreshSteepness"]?.toFloatOrNull()?.let { settings = settings.copy(thresholdSteepness = it) }
         map["%AAB_ScalingUse"]?.let { settings = settings.copy(scalingEnabled = it.asBoolean(settings.scalingEnabled)) }
-        map["%AAB_ScaleSpread"]?.toIntOrNull()?.let { settings = settings.copy(scaleSpread = it) }
-        map["%AAB_ScaleSteepness"]?.toIntOrNull()?.let { settings = settings.copy(scaleSteepness = it) }
-        map["%AAB_ScaleTaperMidpoint"]?.toIntOrNull()?.let { settings = settings.copy(scaleTaperMidpoint = it) }
+        map["%AAB_ScaleSpread"]?.asRoundedInt()?.let { settings = settings.copy(scaleSpread = it) }
+        map["%AAB_ScaleSteepness"]?.asRoundedInt()?.let { settings = settings.copy(scaleSteepness = it) }
+        map["%AAB_ScaleTaperMidpoint"]?.asRoundedInt()?.let { settings = settings.copy(scaleTaperMidpoint = it) }
         map["%AAB_ScaleTaperSteepness"]?.toFloatOrNull()?.let { settings = settings.copy(scaleTaperSteepness = it) }
         map["%AAB_ScaleTransitionFactor"]?.toFloatOrNull()?.let { settings = settings.copy(scaleTransitionFactor = it) }
         map["%AAB_TrustUnreliable"]?.let { settings = settings.copy(trustUnreliableSensor = it.asBoolean(settings.trustUnreliableSensor)) }
         map["%AAB_QSUse"]?.let { settings = settings.copy(quickSettingsEnabled = it.asBoolean(settings.quickSettingsEnabled)) }
         map["%AAB_NotifyUse"]?.let { settings = settings.copy(notificationsEnabled = it.asBoolean(settings.notificationsEnabled)) }
-        map["%AAB_Debug"]?.toIntOrNull()?.let { settings = settings.copy(debugLevel = it) }
-        map["%AAB_AnimSteps"]?.toIntOrNull()?.let { settings = settings.copy(animSteps = it) }
+        map["%AAB_Debug"]?.asRoundedInt()?.let { settings = settings.copy(debugLevel = it) }
+        map["%AAB_AnimSteps"]?.asRoundedInt()?.let { settings = settings.copy(animSteps = it) }
         map["%AAB_ThreshMidpoint"]?.toDoubleOrNull()?.let { settings = settings.copy(thresholdMidpoint = it) }
         map["%AAB_ContextOverride"]?.let { settings = settings.copy(contextOverride = it.asBoolean(settings.contextOverride)) }
         map["%AAB_SetupTitle"]?.let { settings = settings.copy(setupTitle = it) }
@@ -152,6 +152,14 @@ object TaskerLegacyProfileSerializer {
             else -> default
         }
     }
+
+    // G2R-F70: Tasker stores curve params (Form1A, Form2C, …) as continuous doubles
+    // (`String.valueOf(c_form1a)` → e.g. "6.834"); a key=value export therefore carries decimals for
+    // fields the rebuild models as Int. The old `toIntOrNull()` returned null on a decimal string, so
+    // the field silently kept its default — the "Form1A didn't stick" symptom. Round instead (matching
+    // the nested-JSON path's `intRound`). A plain integer string ("5") rounds to itself.
+    private fun String.asRoundedInt(): Int? = trim().toDoubleOrNull()?.let { Math.round(it).toInt() }
+    private fun String.asRoundedLong(): Long? = trim().toDoubleOrNull()?.let { Math.round(it) }
 
     // --- nested-JSON value readers (tolerant: numbers stored as JSON doubles, booleans as JSON bools
     //     by performSave's getG/getI/getB, but accept "On"/"Off"/"1" string variants too) ---

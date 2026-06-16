@@ -26,7 +26,7 @@ fun AabSettings.displayRows(reference: AabSettings = AabSettings()): List<Settin
             val mine = valueFor(rule.key)
             val theirs = reference.valueFor(rule.key)
             SettingDisplayRow(
-                label = humanize(rule.taskerVariable),
+                label = friendlyLabel(rule.key, rule.taskerVariable),
                 taskerVariable = rule.taskerVariable,
                 value = mine,
                 changed = mine != theirs,
@@ -37,7 +37,65 @@ fun AabSettings.displayRows(reference: AabSettings = AabSettings()): List<Settin
 fun AabSettings.changedCount(reference: AabSettings = AabSettings()): Int =
     displayRows(reference).count { it.changed }
 
-private val EXCLUDED_KEYS = setOf("serviceEnabled", "contextOverride")
+/**
+ * Keys excluded from the changed-vs-default diff (G2R-F84 + modal exclusions). `serviceEnabled` and
+ * `contextOverride` are runtime/identity latches (never profile parameters). `debugLevel`,
+ * `detectOverrides`, `quickSettingsEnabled` and `notificationsEnabled` are GLOBAL preferences the
+ * profile load deliberately preserves (G2-F8/G2R-F9) — listing them in a profile diff is misleading.
+ * `thresholdMidpoint` is DERIVED (log10(zone2End), task570 act39), not an independent tuned value.
+ */
+private val EXCLUDED_KEYS = setOf(
+    "serviceEnabled",
+    "contextOverride",
+    "debugLevel",
+    "detectOverrides",
+    "quickSettingsEnabled",
+    "notificationsEnabled",
+    "thresholdMidpoint",
+)
+
+/**
+ * Friendly, end-user labels for the diff list (G2R-F84): the raw camelCase/`form1A` names are
+ * meaningless to a user. Explicit map (no reflection, owner caution); kept in step with the screen
+ * labels so the dashboard reads the same as the editors. Anything unmapped falls back to [humanize].
+ */
+private val FRIENDLY_LABELS: Map<String, String> = mapOf(
+    "minBrightness" to "Min brightness",
+    "maxBrightness" to "Max brightness",
+    "offset" to "Brightness offset",
+    "scale" to "Brightness scale",
+    "zone1End" to "Zone 1 end (lux)",
+    "zone2End" to "Zone 2 end (lux)",
+    "form1A" to "Zone 1 scaling",
+    "form2B" to "Zone 2 scaling",
+    "form2C" to "Zone 2 offset",
+    "dimmingEnabled" to "Super dimming",
+    "dimmingStrength" to "Dimming strength",
+    "dimmingExponent" to "Dimming curve",
+    "dimmingThreshold" to "Dimming threshold",
+    "dimSpread" to "Dimming spread",
+    "pwmSensitive" to "PWM-sensitive mode",
+    "pwmExponent" to "PWM curve",
+    "throttleDefaultMs" to "Throttle (ms)",
+    "minWaitMs" to "Min step wait (ms)",
+    "maxWaitMs" to "Max step wait (ms)",
+    "animSteps" to "Animation steps",
+    "deltaFactor" to "Smoothing Δ",
+    "thresholdBright" to "Bright threshold",
+    "thresholdDark" to "Dark threshold",
+    "thresholdDim" to "Dim threshold",
+    "thresholdSteepness" to "Curve slope",
+    "scalingEnabled" to "Circadian scaling",
+    "scaleSpread" to "Scale spread",
+    "scaleSteepness" to "Scale steepness",
+    "scaleTaperMidpoint" to "Taper midpoint",
+    "scaleTaperSteepness" to "Taper steepness",
+    "scaleTransitionFactor" to "Scale transition",
+    "trustUnreliableSensor" to "Trust low-accuracy sensor",
+)
+
+internal fun friendlyLabel(key: String, taskerVariable: String): String =
+    FRIENDLY_LABELS[key] ?: humanize(taskerVariable)
 
 /** Formatted value for a contract key. Explicit `when` (no reflection) — keep aligned with the contract. */
 internal fun AabSettings.valueFor(key: String): String = when (key) {
@@ -67,7 +125,6 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "thresholdBright" -> thresholdBright.toString()
     "thresholdDark" -> thresholdDark.toString()
     "thresholdDim" -> thresholdDim.toString()
-    "thresholdDynamic" -> thresholdDynamic.toString()
     "thresholdSteepness" -> thresholdSteepness.toString()
     "thresholdMidpoint" -> thresholdMidpoint.toString()
     "scalingEnabled" -> scalingEnabled.toString()

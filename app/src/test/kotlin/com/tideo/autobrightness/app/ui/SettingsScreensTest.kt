@@ -666,6 +666,29 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun toolsWizard_under9RealPoints_doesNotRunAndWarns_G2RF62() {
+        // G2R-F62: with only 7 real recorded points the wizard must NOT fit (the domain engine would
+        // otherwise inject ghost priors to clear its own ≥9 gate). The run callback must not fire.
+        var ran = false
+        val sevenPoints = (1..7).map {
+            com.tideo.autobrightness.domain.wizard.OverridePoint(it * 10.0, it * 20.0)
+        }
+        compose.setContent {
+            MaterialTheme {
+                ToolsContent(
+                    onBack = {},
+                    onRunWizard = { ran = true; null },
+                    onApplyWizard = {},
+                    recordedPoints = sevenPoints,
+                )
+            }
+        }
+        compose.onNodeWithTag("run_wizard").performScrollTo().performClick()
+        assertTrue(!ran, "the wizard must not run with fewer than 9 real points")
+        compose.onNodeWithText("need ≥ 9 real points", substring = true).assertExists()
+    }
+
+    @Test
     fun settingsDiffList_highlightsChangedFromDefault_G2RF38() {
         // G2R-F38: the Tasker dashboard's full settings list — a tuned value (minBrightness 99) is
         // flagged changed-vs-default; the summary counts it.

@@ -27,10 +27,15 @@ object AabSettingsSerializer : Serializer<AabSettings> {
     // v1→v2: added animSteps(20), thresholdMidpoint(4.0), contextOverride(false), setupTitle;
     // scale type Int→Float (transparent — JSON integers decode as Float without loss).
     // New fields absent from v1 JSON get Kotlin default values automatically via ignoreUnknownKeys.
+    //
+    // v2→v3 (G2R-F85): dropped the editable `thresholdDynamic` field. A v2 JSON still carries
+    // `"thresholdDynamic": N`; `ignoreUnknownKeys = true` (above) discards it on read without error, so
+    // migration only needs to stamp the new version. No data is lost — the field was never a real input.
     internal fun migrate(settings: AabSettings): AabSettings {
         if (settings.schemaVersion >= CURRENT_SCHEMA_VERSION) return settings
         var s = settings
         if (s.schemaVersion < 2) s = s.copy(schemaVersion = 2)
+        if (s.schemaVersion < 3) s = s.copy(schemaVersion = 3)
         return s
     }
 }

@@ -88,7 +88,6 @@ fun AabSettings.validate(): AabSettings {
         thresholdBright = thresholdBright.coerceIn(0f, 1f),
         thresholdDark = thresholdDark.coerceIn(0f, 1f),
         thresholdDim = thresholdDim.coerceIn(0f, 1f),
-        thresholdDynamic = thresholdDynamic.coerceIn(1, 20),
         thresholdSteepness = thresholdSteepness.coerceIn(0.1f, 10f),
         thresholdMidpoint = thresholdMidpoint.coerceIn(0.0, 6.0),
         scaleSpread = scaleSpread.coerceIn(1, 100),

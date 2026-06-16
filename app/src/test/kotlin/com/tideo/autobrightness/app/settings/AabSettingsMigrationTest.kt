@@ -38,9 +38,9 @@ class AabSettingsMigrationTest {
     }
 
     @Test
-    fun `v1 json schema version is bumped to 2 after migration`() = runTest {
+    fun `v1 json schema version is bumped to current after migration`() = runTest {
         val settings = AabSettingsSerializer.readFrom(v1Json.byteInputStream())
-        assertEquals(CURRENT_SCHEMA_VERSION, settings.schemaVersion, "schemaVersion should be bumped to v2")
+        assertEquals(CURRENT_SCHEMA_VERSION, settings.schemaVersion, "schemaVersion should be bumped to the current schema")
     }
 
     @Test
@@ -71,6 +71,27 @@ class AabSettingsMigrationTest {
         // v1 stored scale as Int (e.g. 1); v2 is Float. JSON integer decodes safely to Float.
         val settings = AabSettingsSerializer.readFrom(v1Json.byteInputStream())
         assertEquals(1.0f, settings.scale, 0.001f)
+    }
+
+    // G2R-F85: v2 stored a bogus editable `thresholdDynamic`. v3 removed it. A v2 JSON still carrying
+    // the key must decode cleanly (ignoreUnknownKeys drops it) and migrate to v3 — no data loss, no error.
+    private val v2JsonWithThreshDynamic = """
+        {
+          "schemaVersion": 2,
+          "serviceEnabled": true,
+          "minBrightness": 14,
+          "thresholdDynamic": 12,
+          "animSteps": 20,
+          "thresholdMidpoint": 4.0
+        }
+    """.trimIndent()
+
+    @Test
+    fun `v2 json with dropped thresholdDynamic key decodes and migrates to v3`() = runTest {
+        val settings = AabSettingsSerializer.readFrom(v2JsonWithThreshDynamic.byteInputStream())
+        assertEquals(14, settings.minBrightness, "known keys still read")
+        assertEquals(3, settings.schemaVersion, "schemaVersion bumped to v3")
+        assertEquals(3, CURRENT_SCHEMA_VERSION, "v3 is the current schema after F85")
     }
 
     @Test
