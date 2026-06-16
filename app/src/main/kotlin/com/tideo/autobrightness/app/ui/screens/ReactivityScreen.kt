@@ -12,7 +12,6 @@ import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
 import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
-import com.tideo.autobrightness.app.ui.components.fmtPercent
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
@@ -41,7 +40,7 @@ fun ReactivityScreen(navController: NavHostController, vm: DraftSettingsViewMode
                 s.copy(
                     thresholdDark = d.thresholdDark, thresholdDim = d.thresholdDim,
                     thresholdBright = d.thresholdBright, thresholdSteepness = d.thresholdSteepness,
-                    thresholdMidpoint = d.thresholdMidpoint, thresholdDynamic = d.thresholdDynamic,
+                    thresholdMidpoint = d.thresholdMidpoint,
                     deltaFactor = d.deltaFactor, trustUnreliableSensor = d.trustUnreliableSensor,
                 )
             }
@@ -99,15 +98,10 @@ fun ReactivityContent(
                 epoch = epoch, committed = committed.thresholdMidpoint, isInt = false,
                 help = TaskerHelp.CURVE_MID, testTag = "field_thresholdMidpoint",
             )
-            // G2R-F59: the dynamic-threshold description must substitute the LIVE %AAB_ThreshDynamic
-            // value (not the literal token) and sit behind the ⓘ reveal like the other help (use
-            // help= not helper=). The live runtime value is a 0..1 fraction → shown as a percentage.
-            NumberSettingField(
-                "Dynamic threshold", draft.thresholdDynamic, { onEdit { s -> s.copy(thresholdDynamic = it.toInt()) } },
-                epoch = epoch, committed = committed.thresholdDynamic,
-                help = "Adaptive dead-band scaling. Current %AAB_ThreshDynamic: ${fmtPercent(live.threshDynamic)}.",
-                testTag = "field_thresholdDynamic",
-            )
+            // G2R-F85: there is NO editable "Dynamic threshold" field — %AAB_ThreshDynamic is the
+            // COMPUTED adaptive dead-band for the current lux (task544), surfaced read-only in the live
+            // reactivity card above (which shows the value as a percentage, not the literal token →
+            // also closes G2R-F59). It was never an input; the seed in task570 act31 is runtime-only.
             // G2R-F19/F20: "Delta factor" was mislabelled with a wrong help ("brightness only changes
             // once lux exceeds this"). It is the SENSOR-SMOOTHING factor (%AAB_DeltaFactor, Misc scene
             // "Smoothing Δ"): luxAlpha = 1 - exp(-deltaFactor·effectiveDelta) in BrightnessEngine — the

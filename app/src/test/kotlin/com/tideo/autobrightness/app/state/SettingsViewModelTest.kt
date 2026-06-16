@@ -91,6 +91,38 @@ class SettingsViewModelTest {
         )
     }
 
+    // G2R-F70: a legacy load = task570 defaults THEN the file's diffs. A field the config omits must
+    // reset to its default, NEVER inherit the previously-loaded profile's value ("misc inherited from
+    // the previous profile"). Start from a heavily-tuned live state, load a config that only sets
+    // zone1End, and assert the omitted fields snapped back to the baseline.
+    @Test
+    fun replaceAll_resetsOmittedFieldsToDefaults_noInheritanceFromPrevious() {
+        runBlocking {
+            app.settingsDataStore.updateData {
+                AabSettings(
+                    serviceEnabled = true,
+                    form1A = 17, minBrightness = 80, maxBrightness = 200,
+                    deltaFactor = 3.3f, animSteps = 90,
+                )
+            }
+        }
+        idle()
+
+        val parsed = com.tideo.autobrightness.app.settings.TaskerLegacyProfileSerializer.deserialize(
+            """{ "general": { "z1_end": 50.0 } }""",
+        )
+        val vm = SettingsViewModel(app)
+        vm.replaceAll(parsed)
+
+        val baseline = AabSettings()
+        val result = awaitCommitted { it.zone1End == 50 }
+        assertEquals(50, result.zone1End, "the file's diff applies")
+        assertEquals(baseline.form1A, result.form1A, "omitted form1A resets to default, no inheritance")
+        assertEquals(baseline.minBrightness, result.minBrightness)
+        assertEquals(baseline.maxBrightness, result.maxBrightness)
+        assertEquals(baseline.animSteps, result.animSteps)
+    }
+
     @Test
     fun resetDefaults_preservesGlobalDebugLevel() {
         runBlocking {

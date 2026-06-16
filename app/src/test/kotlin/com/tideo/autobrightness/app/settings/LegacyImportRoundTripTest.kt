@@ -42,7 +42,6 @@ class LegacyImportRoundTripTest {
         %AAB_ThreshBright = 0.08
         %AAB_ThreshDark = 0.3
         %AAB_ThreshDim = 0.25
-        %AAB_ThreshDynamic = 5
         %AAB_ThreshSteepness = 2.1
         %AAB_ThreshMidpoint = 4.0
         %AAB_ScalingUse = false
@@ -88,7 +87,6 @@ class LegacyImportRoundTripTest {
         assertEquals(0.08f, settings.thresholdBright, 0.001f)
         assertEquals(0.3f, settings.thresholdDark, 0.001f)
         assertEquals(0.25f, settings.thresholdDim, 0.001f)
-        assertEquals(5, settings.thresholdDynamic)
         assertEquals(2.1f, settings.thresholdSteepness, 0.001f)
         assertEquals(4.0, settings.thresholdMidpoint, 0.001)
         assertFalse(settings.scalingEnabled)
@@ -210,6 +208,47 @@ class LegacyImportRoundTripTest {
         assertEquals(30, s.minBrightness)
         assertEquals(255, s.maxBrightness, "absent key keeps the default")
         assertFalse(s.scalingEnabled, "absent circadian section keeps the default")
+    }
+
+    // G2R-F70: Tasker stores curve params as continuous doubles, so a legacy export may carry a
+    // decimal for an Int-typed field (e.g. Form1A from the wizard fit). The old `toIntOrNull()`
+    // returned null on "6.8", silently leaving the default — the "Form1A didn't stick" symptom.
+    @Test
+    fun `key=value decimal integers round instead of dropping`() {
+        val raw = """
+            %AAB_Form1A = 6.8
+            %AAB_Form2C = 17.4
+            %AAB_MinBright = 12.0
+            %AAB_Throttle = 1500.6
+        """.trimIndent()
+        val s = TaskerLegacyProfileSerializer.deserialize(raw)
+        assertEquals(7, s.form1A, "6.8 must round to 7, not drop to the default 5")
+        assertEquals(17, s.form2C, "17.4 rounds to 17")
+        assertEquals(12, s.minBrightness)
+        assertEquals(1501L, s.throttleDefaultMs, "1500.6 rounds to 1501")
+    }
+
+    @Test
+    fun `nested JSON fractional Form1A rounds`() {
+        val s = TaskerLegacyProfileSerializer.deserialize(
+            """{ "general": { "form1a": 6.834 } }""",
+        )
+        assertEquals(7, s.form1A)
+    }
+
+    // G2R-F70: a legacy load = hard-coded task570 defaults THEN the file's diffs. A config that omits a
+    // field must reset it to its task570 default, NOT inherit whatever was loaded before. The serializer
+    // starts from AabSettings() (= task570 baseline), so a partial config drops back to defaults.
+    @Test
+    fun `partial config resets unspecified fields to task570 defaults not previous values`() {
+        // Only zone1End differs; everything else must equal the hard-coded baseline.
+        val s = TaskerLegacyProfileSerializer.deserialize("""{ "general": { "z1_end": 50.0 } }""")
+        assertEquals(50, s.zone1End, "the file's diff applies")
+        val baseline = AabSettings()
+        assertEquals(baseline.form1A, s.form1A, "absent form1A resets to the default, never inherits")
+        assertEquals(baseline.minBrightness, s.minBrightness)
+        assertEquals(baseline.scale, s.scale, 0.001f)
+        assertEquals(baseline.deltaFactor, s.deltaFactor, 0.001f)
     }
 
     @Test

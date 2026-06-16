@@ -50,12 +50,15 @@ fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewMo
         onApplyWizard = { result ->
             val cfg = CurveSuggestionEngine.applyToLiveCurve(result, settings.toBrightnessCurveConfig())
             vm.update { s ->
+                // G2R-F70: the fitted curve params are continuous doubles; ROUND (not truncate) into the
+                // Int-typed schema fields so e.g. a suggested form1A of 6.8 lands as 7, not 6 — `.toInt()`
+                // truncation was a Form1A precision loss that made suggestions look like they "didn't stick".
                 s.copy(
-                    form1A = cfg.form1A.toInt(),
-                    zone1End = cfg.zone1End.toInt(),
+                    form1A = Math.round(cfg.form1A).toInt(),
+                    zone1End = Math.round(cfg.zone1End).toInt(),
                     form2B = cfg.form2B.toFloat(),
-                    form2C = cfg.form2C.toInt(),
-                    zone2End = cfg.zone2End.toInt(),
+                    form2C = Math.round(cfg.form2C).toInt(),
+                    zone2End = Math.round(cfg.zone2End).toInt(),
                 )
             }
         },
@@ -108,9 +111,18 @@ private fun WizardCard(
             Text("Recorded points: ${recorded.size}", style = MaterialTheme.typography.bodyMedium)
             OutlinedButton(
                 onClick = {
-                    val r = onRunWizard(recorded)
-                    result = r
-                    message = if (r == null) "Not enough recorded override points (need ≥ 9)." else null
+                    // G2R-F62: gate on REAL recorded points only (MIN_FIT_POINTS), matching the Curve &
+                    // Brightness chart's gate. The domain engine would otherwise inject synthetic "ghost"
+                    // priors and fit on as few as 7 real points — the owner saw exactly that. Block here
+                    // before calling the engine so the user-facing contract ("needs ≥ 9") actually holds.
+                    if (recorded.size < MIN_FIT_POINTS) {
+                        result = null
+                        message = "Not enough recorded override points (need ≥ $MIN_FIT_POINTS real points, have ${recorded.size})."
+                    } else {
+                        val r = onRunWizard(recorded)
+                        result = r
+                        message = if (r == null) "Could not fit a curve to the recorded points." else null
+                    }
                 },
                 modifier = Modifier.testTag("run_wizard"),
             ) { Text("Run wizard") }

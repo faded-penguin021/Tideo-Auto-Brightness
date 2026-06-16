@@ -45,6 +45,7 @@ next session does not know it.
 | S12.7i (F73 first) circadian solar-window wiring | 2026-06-15 | Opus/high | DONE (F73) | (this push) | First S12.7i deliverable: **F73 fixed — and it was APP-LAYER, not the suspected domain bug** (D-061). Root cause: `BrightnessPipelineController.buildInput` built `TimeContext(secondsOfDay=…)` but left every solar window at its **default (6–8am / 18–20pm UTC)** — the real sunrise was NEVER wired (the D-039d "circadian wired in S9b/S12" carryover that never happened). So the dynamic-scale morning ramp ran 06–08 UTC for everyone → `%AAB_ScaleDynamic`=0.852 at **06:13 UTC** irrespective of the device clock (owner saw it at 07:13 @UTC+1 AND 08:13 @UTC+2 — both 06:13 UTC, confirming the frame, not a local bug). Fix: new `runtime/CircadianWindowProvider.kt` (pure `compute(lat,lon,dateEpochSec,tz,factor)` → `CircadianWindows` via the **already-fenced, golden-tested** `SolarCalculator.compute`/`buildScheduleWindows`; stateful `current()` resolves the F39 fixed date/loc override else today + `lastKnownLocation`, day/loc/factor-cached, returns null→keep old defaults when no fix). `buildInput` now feeds the real morning/evening/sunlight/polar fields; `now` stays UTC seconds-of-day to match `buildScheduleWindows`' UTC-frame windows. `BrightnessPipelineController` gains `circadianWindowsProvider` (default `{null}` → existing tests/behaviour intact); `AppModule.createRuntime` wires the live provider. **Verified end-to-end: Utrecht 2026-06-15 sunrise 05:18 local → scaleDynamic 1.15 at 08:13 local (was 0.852).** Tests: `CircadianWindowProviderTest` (4, pure JVM — Utrecht sunrise≈05:18 + daytime 1.15, default-window bug repro 0.852, window ordering/non-polar). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (only *called*).** Full ladder GREEN: `:app:testDebugUnitTest`(171) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **S12.7i F70/F71/F72 still remain.** |
 | S12.7i (F70/F71/F72) deferral cleanup | 2026-06-15 | Opus/high | DONE | (this push) | The three remaining during-S12.7 deferrals closed (D-062; F73 already landed). **F70 legacy-load-doesn't-apply — root cause was the PARSER, not the wiring:** ProfilesScreen already called `vm.replaceAll(imported)` (commit+reapply) since S12.7c, but `TaskerLegacyProfileSerializer` only parsed `%AAB_Key=value` plaintext, so a REAL Tasker config (nested JSON — `{meta,general,misc,reactivity,circadian,superdimming}`, task637 `_ProfileManager.performSave` XML L29365+) parsed to all-defaults → "loaded by name", nothing changed. Rewrote the serializer to detect `{`-JSON and map the snake_case keys per task637 `performLoad` (L29490+); derived form2A/2D/3A intentionally NOT stored (recomputed at read-time, ledger). `%AAB_Key=value` fallback kept. **F71 reactivity-cooldown-swallows-overrides:** transcribed task544 (throttle gate `elapsed<%AAB_Throttle`→`%AAB_MainLoop=0`→Stop is the MAIN-LOOP gate, prof760) vs task567 (prof755 override handler: act7 "Wait %AAB_CycleTime", act8 re-gate) — the throttle gates ONLY the task544 main loop; prof755→task567 override detection is a SEPARATE profile. `handleOverride`'s settle fallback to `throttleDefaultMs` was the lone conflation; changed to `%AAB_CycleTime` only (0 when unset) so an override is detected inside the cooldown window. **F72 can't-clear-a-time-rule:** added a "Clear time" affordance in the context rule editor that blanks From/To → `ContextTriggers.timeRange` saves null. **Fence: domain/ + golden vectors + ChartCanvas untouched.** Tests: LegacyImportRoundTrip +2 (nested-JSON full parse, partial-section defaults), SettingsViewModel +1 (replaceAll commits parsed legacy values + triggers ACTION_REAPPLY), BrightnessPipelineController +1 (override settle not gated by a 60s throttle), SettingsScreens +1 (Clear time nulls timeRange). Full ladder GREEN: `:app:testDebugUnitTest`(176) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **ALL S12.7 (a–i) DONE → GATE 2 RE-RE-TEST (4th) READY.** |
 | S12.8a runtime: override feedback, throttle, panic, PWM-dimming | 2026-06-16 | Opus/high | DONE | (this push) | First S12.8 sub-segment — 10 runtime findings (D-063; F58/F65/F71/F74/F75/F76/F77/F78/F86/F88). **F74** (Resume inert) ROOT CAUSE: a notification action can be delivered to a freshly (re)created service whose pipeline consumer was never `start()`ed (the paused-override notification survives a service kill, prof756) → the Resume event sat unconsumed in the channel. `ACTION_RESUME` now `ensureRunning()` BEFORE `controller.resume()`. **F75** override alert cancelled on the falling edge of `pausedByOverride` + on resume/teardown (no stacking with the ongoing notif). **F76** removed the **Pause** action from the ongoing notification (Reset/Disable kept; Resume only while paused). **F77** NEW prof769 panic detector: `platform/.../sensor/PanicSensorSource.kt` (`PanicGestureDetector` pure low-pass-gravity upside-down + linear-accel shake; `AndroidPanicSensorSource` gates on display-on + cooldown) → service collects → SOS morse **vibration** (task528 act0 code62 pattern) + `controller.emergencyStop()` (255 + drop dimming + Service=Off). VIBRATE permission added. **F78** new `ThrottleController` (%AAB_Throttle = ACTUAL `steps×wait` floored at the setting; **Throttle Reinitialization** watchdog task566/prof754 → ceiling `AnimSteps×MaxWait+10` after ~10 s of no change); controller uses it for the throttle gate + publishes it. **F65** (REOPENED) PWM-sensitive now ALSO dims below the floor via Extra Dim: `SuperDimmingCoordinator` engages `reduce_bright_colors` using task700 `finalDimLevel` (Map Lux to Brightness V2 act23) when `pwmSensitive`, vs `dimShell` for the super-dimming toggle. **F58** Super Dimming live readout (%AAB_DimmingCurrent rel / %AAB_DimmingDS abs at %AAB_CurrentBright) — new PipelineState fields computed from golden `SoftwareDimming`, `SuperDimmingDiagnosticCard` on the screen. **F86** displayed LuxAlpha clamped ≥0 (`fmtAlpha`; engine value untouched, parity D-010a). **F88** tap-to-dismiss flashes (AccessibilityService overlay made touchable → click hides; foreground-toast fallback can't be tapped — Android limit, noted). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Tests: PanicGestureDetector(4, platform), ThrottleController(4), SuperDimmingCoordinator +2 (PWM engage/above-threshold), BrightnessPipelineController +2 (actual-steps throttle / dimming readout), AmbientMonitoringService +1 (no Pause action), SettingsScreens +2 (F58 readout, F86 clamp) +1 (F88 FlashPill tap). **2nd pass (owner device re-test):** F75 now folds the alert into the single FGS notification ID (no stacking); F77 requires a SUSTAINED dominant-axis inversion (no upright/flat trigger, heavier low-pass); F78 uses the engine's actual `transitionDurationMs` (the setting floor I first added equalled the ceiling, so it always read MaxSteps×MaxWait+10 — removed); F88 adds an in-app tap-to-dismiss surface (`AabFlashHost`/`FlashPill`) since a Toast can't be tapped. Full ladder GREEN: `:platform:test :domain:test :app:testDebugUnitTest`(188) `:app:assembleDebug :app:lintDebug`. No compaction. |
+| S12.8c settings/profiles: schema hygiene, labels, legacy load, wizard | 2026-06-16 | Opus/high | DONE | (this push) | Third S12.8 sub-segment — 5 findings (D-064; F59/F62/F70/F84/F85). **F85 (CRITICAL)** `%AAB_ThreshDynamic` is the COMPUTED task544 reactivity-threshold output (task570 act31 only seeds it), never a user input — removed the bogus editable `thresholdDynamic: Int` from `AabSettings` + `AabSettingsContract` + mapper `validate` + `SettingsDisplay.valueFor` + the `ReactivityScreen` editor field + `ContextEngine.mergeProfile`. **Schema v2→v3**: `CURRENT_SCHEMA_VERSION=3`; serializer migration bumps the stamp and the stale key is dropped on read via the existing `ignoreUnknownKeys=true` (verified by test). App-layer only — the engine never consumed the field (it reads the runtime `PipelineState.threshDynamic`, kept). **F59** resolved by the F85 removal: the only user-visible literal "%AAB_ThreshDynamic" string was that field's help; the live reactivity card already shows the VALUE as a %. **F84 + exclusions** `SettingsDisplay` diff list now uses friendly labels (`form1A`→"Zone 1 scaling", etc.; explicit map, no reflection) and `EXCLUDED_KEYS` adds debugLevel/detectOverrides/quickSettingsEnabled/notificationsEnabled (global prefs) + thresholdMidpoint (derived). **F70** legacy-load fidelity: the serializer ALREADY did task570-defaults-THEN-diffs (starts from `AabSettings()`), proven by a new no-inheritance regression through `replaceAll`. The real "Form1A didn't stick / was rounded" bug was an **integer-handling class bug**: decimal-encoded ints (Tasker stores curve params as continuous doubles) silently dropped — `String.toIntOrNull()` returns null on "6.8". Fixed across the WHOLE class: the key=value path now rounds every int/long field (`asRoundedInt`/`asRoundedLong`), the nested-JSON path already used `intRound`, and the wizard-apply now `Math.round`s form1A/form2C (was `.toInt()` truncation). **F62** the Tools wizard now gates on ≥9 **real** recorded points (shared `MIN_FIT_POINTS` with the Curve screen) — the domain engine injects synthetic "ghost" priors that cleared its own ≥9 gate at 7 real points; the suggested curve already draws on the Curve & Brightness chart at ≥9 real points (verified). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Tests: LegacyImportRoundTrip +3 (decimal-round, JSON-fractional Form1A, partial-config-resets-to-defaults), AabSettingsMigration +1 (v2→v3 drops thresholdDynamic), SettingsDisplay +2 (exclusions + friendly labels), SettingsViewModel +1 (replaceAll no-inheritance), SettingsScreens +1 (wizard <9-real-points gate). Full ladder GREEN: `:app:testDebugUnitTest`(196) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
@@ -92,10 +93,20 @@ now dims below the floor via Extra Dim** (task700 `finalDimLevel`), F58 Super Di
 LuxAlpha display clamp (engine untouched), F88 tap-to-dismiss flashes. domain/ + golden + ChartCanvas
 fenced (called only). Ladder GREEN (`:app:testDebugUnitTest`=187). Debug APK in `/dist/` for Gate testing.
 
-**Next:** **S12.8 remaining sub-segments** (all Opus/high) — **S12.8c** Settings & profiles (schema
-hygiene incl. CRITICAL F85/legacy load/wizard), **S12.8d** Circadian (DST fix/fixed date-loc/ip-api),
-then **S12.8b** UI (dashboard/graph placement/context editor) LAST (rebases onto a/c/d's screen content
-per the ordering note). Land a→c→d then b; then re-test Gate 2 (5th);
+**S12.8c DONE (2026-06-16):** the **Settings & profiles** sub-segment shipped (D-064) — 5 findings:
+**F85 (CRITICAL)** removed the bogus editable `thresholdDynamic` (it is the computed task544 output,
+not an input) → schema **v2→v3** (migration bumps the stamp; the stale key drops via `ignoreUnknownKeys`
+on read); **F59** resolved by that removal (the live card already shows the VALUE as a %); **F84** diff
+list uses friendly labels + excludes global/derived keys; **F70** legacy load is task570-defaults-THEN-
+diffs (already correct — proven by a no-inheritance regression) and the real bug was an integer-handling
+**class** (decimal-encoded ints silently dropped) fixed across both parser paths + wizard-apply (round,
+don't truncate/drop → Form1A sticks); **F62** the Tools wizard now gates on ≥9 **real** points (no ghost-
+prior inflation). domain/ + golden vectors + ChartCanvas stayed fenced (called only). Ladder GREEN
+(`:app:testDebugUnitTest`=196).
+
+**Next:** **S12.8 remaining sub-segments** (all Opus/high) — **S12.8d** Circadian (DST fix/fixed date-loc/
+ip-api), then **S12.8b** UI (dashboard/graph placement/context editor) LAST (rebases onto a/c/d's screen
+content per the ordering note). Land a→c→d then b; then re-test Gate 2 (5th);
 then **S13** (remaining charts via the S12.7g template + About/User Guide, which carries F80). The Gate-2
 (4th) results are recorded under "Gate findings → Gate 2 (4th re-test)":
 most of F33–F73 are **confirmed fixed**; reopened with corrected specs = **F39/F62/F65/F70/F73**; follow-ups
@@ -1368,7 +1379,31 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (3) **F72**: a "Clear time" button in the context rule editor blanks From/To → `timeRange` saves null.
   **Fence honoured: domain/ + golden vectors + ChartCanvas untouched.** Affects S12.7i only.
 
-Append new entries as D-063, … with which segments they affect.
+- **D-064 (S12.8c) — settings/profiles schema hygiene; the "integer handling" was a whole class, not just Form1A.**
+  (1) **F85**: `%AAB_ThreshDynamic` was a bogus editable Int in the schema. It is the computed task544
+  reactivity-threshold output (task570 act31 only seeds it when unset). Removed `thresholdDynamic` everywhere
+  (AabSettings field + contract rule, mapper `validate`, `SettingsDisplay.valueFor`, the ReactivityScreen
+  editor field, `ContextEngine.mergeProfile`); **schema v2→v3** (`CURRENT_SCHEMA_VERSION=3`, migration bumps
+  the stamp). A v2 JSON still carrying the key decodes fine — `ignoreUnknownKeys=true` was already set on the
+  read path (verified by `AabSettingsMigrationTest`), so no field-drop migration code is needed. The engine
+  never read the setting (it uses the runtime `PipelineState.threshDynamic`), so this is purely app-layer.
+  (2) **F59** fell out of (1): the only user-visible literal "%AAB_ThreshDynamic" was that field's help text.
+  (3) **F84**: `SettingsDisplay` friendly-label map (no reflection) + `EXCLUDED_KEYS` += global prefs +
+  derived thresholdMidpoint.
+  (4) **F70 — moral repeat of D-062: "doesn't apply" was a parse bug, not an apply bug.** The
+  defaults-THEN-diffs model was already correct (serializer starts from `AabSettings()`; `replaceAll` fully
+  replaces). The real defect: Tasker stores curve params as continuous doubles, so a decimal-encoded int hit
+  `String.toIntOrNull()` → null → field kept its default ("Form1A didn't stick / was rounded"). This was a
+  CLASS bug across every Int/Long field, not just Form1A — fixed uniformly: key=value path `asRoundedInt`/
+  `asRoundedLong`, nested-JSON path already `intRound`/`longRound`, wizard-apply `Math.round` (was `.toInt()`
+  truncation). The "misc inherited from previous" symptom was NOT reproducible in the parser/`replaceAll`
+  path; added a no-inheritance regression to lock the contract.
+  (5) **F62**: the wizard's ≥9 gate must count REAL points, not the engine's ghost-inflated total. Gated the
+  Tools wizard on `MIN_FIT_POINTS` real points (shared with the Curve screen). Domain engine fenced — its
+  internal ≥9-after-ghost-injection check is unchanged; the user-facing gate is now app-layer.
+  **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Affects S12.8c only.
+
+Append new entries as D-065, … with which segments they affect.
 
 ## Blockers
 
@@ -1958,14 +1993,19 @@ see below.)
   (cross-check the ledger note that task661's runtime math lives in Variable-Set 547, not Java). The
   S12.7b change that fed the un-floored target so the secure layer engaged *alongside* PWM-floor must be
   re-examined against this exclusivity.
-- **G2R-F70 REOPENED — legacy load is imperfect.** Import works (nested JSON parses), but **Form1A didn't
-  stick / was rounded**, and **misc settings appeared inherited from the previously loaded built-in
-  profile**. Root model: **Tasker loads the hard-coded defaults FIRST, then applies the legacy file's diffs**
-  — legacy configs store **only the diffs vs the hard-coded defaults**. The rebuild must reset to the
-  task570 hard-coded defaults before applying a legacy profile (not merge onto the current/previous set).
-- **G2R-F62 REOPENED — wizard suggestion line not drawn.** The suggested-curve series does not appear on the
-  Curve & Brightness chart (it shows the regular line only). Also the **wizard ran with just 7 override
-  points** (the ≥9 gate didn't hold) — suspect the synthetic priors are being counted toward the threshold.
+- **G2R-F70 REOPENED** ✅ RESOLVED S12.8c (D-064). The defaults-THEN-diffs model was ALREADY correct (the
+  serializer starts from `AabSettings()` = task570 baseline; `replaceAll` fully replaces, no merge) — proven
+  by a new no-inheritance regression. The real bug was an **integer-handling class bug**: Tasker stores curve
+  params as continuous doubles, so a decimal-encoded int ("6.8") hit `String.toIntOrNull()` → null → the
+  field kept its default ("Form1A didn't stick"). Fixed across the whole class: key=value path rounds every
+  int/long (`asRoundedInt`/`asRoundedLong`), nested-JSON already used `intRound`, wizard-apply now `Math.round`s
+  form1A/form2C (was `.toInt()` truncation). The "misc inherited" symptom could not be reproduced in the
+  parser/`replaceAll` path (both reset to defaults); the integer-drop fix is the most likely on-device cause.
+- **G2R-F62 REOPENED** ✅ RESOLVED S12.8c (D-064). The ghost-point inflation was the cause: the domain engine
+  injects synthetic priors that cleared its own post-injection ≥9 gate at 7 real points. The Tools wizard now
+  gates on ≥9 **real** recorded points (shared `MIN_FIT_POINTS` with the Curve screen; `OverridePointStore`
+  holds only real points). The suggested curve already draws on the Curve & Brightness chart at ≥9 real
+  points (S12.7g wiring, verified) — domain engine fenced (its internal ≥9-after-ghost check is untouched).
 - **G2R-F73 REOPENED — still ~1 h off.** At 20:58 local the scale dropped to **1.025 (as if an hour early)**,
   yet the **context-rule sunrise/sunset are obtained correctly**. So the dynamic-scale time frame disagrees
   with the (correct) context solar calc — likely a tz/DST handling gap in `CircadianWindowProvider`/
@@ -1980,8 +2020,9 @@ see below.)
 - **G2R-F58 PARTIAL** ✅ RESOLVED S12.8a (D-063). The Super Dimming screen now shows the live readout
   (`SuperDimmingDiagnosticCard`): dimming strength (rel) `%AAB_DimmingCurrent` + (abs) `%AAB_DimmingDS` at
   `%AAB_CurrentBright`, computed from the golden `SoftwareDimming` into new PipelineState fields.
-- **G2R-F59 PARTIAL** — the dynamic-threshold help still prints the literal text **"%AAB_ThreshDynamic"**; it
-  should substitute the **value only** (the current threshold).
+- **G2R-F59 PARTIAL** ✅ RESOLVED S12.8c (D-064) — resolved by the F85 removal: the only user-visible literal
+  "%AAB_ThreshDynamic" string was that editable field's help, now deleted. The live reactivity card already
+  substitutes the VALUE (as a %), not the token.
 - **G2R-F68 PARTIAL (UI bug)** — in the context rule editor, **"Sunset (22:00)" wraps vertically, one letter
   per line**, while "Sunrise (5:20)" renders normally. Layout/width bug on the token button.
 - **G2R-F50 NOTE (likely wontfix)** — the Accessibility service **sometimes disables itself automatically**
@@ -2018,12 +2059,14 @@ see below.)
   once per day** when `%AAB_SunLastDate != %DATE` (needs WRITE_SECURE_SETTINGS); **skips** it if
   `%AAB_Latitude`/`%AAB_Longitude` are set; the **final fallback is ip-api.com**. Confirm whether the rebuild
   has any of this (it likely does not) and port it (feeds F39).
-- **G2R-F84** — the settings-list modal (F38) uses **cryptic raw names** (e.g. "form1A") the end user won't
-  understand; use friendly labels. Some Tasker keys (e.g. `QSUse`) don't really belong here but are harmless.
-- **G2R-F85 (CRITICAL)** — **`%AAB_ThreshDynamic` must NOT be a user-editable setting.** It is the *outcome*
-  of the threshold calculation for the current lux level, not an input. Remove `thresholdDynamic` from the
-  editable settings schema/UI (it stays a runtime/computed value). **Touches `AabSettings` (domain-adjacent
-  schema) — re-scope the fence when briefing.**
+- **G2R-F84** ✅ RESOLVED S12.8c (D-064). `SettingsDisplay` diff rows use friendly labels (`form1A`→"Zone 1
+  scaling", etc.; explicit map, no reflection) and `EXCLUDED_KEYS` now also drops the global prefs
+  (debugLevel/detectOverrides/quickSettingsEnabled/notificationsEnabled) + derived thresholdMidpoint.
+- **G2R-F85 (CRITICAL)** ✅ RESOLVED S12.8c (D-064). Removed `thresholdDynamic` from `AabSettings`/contract/
+  mapper/`SettingsDisplay`/`ReactivityScreen`/`ContextEngine.mergeProfile`; **schema v2→v3** (migration bumps
+  the stamp, the stale key drops via `ignoreUnknownKeys` on read). App-layer only — the engine reads the
+  runtime `PipelineState.threshDynamic`, never the setting. — It is the *outcome* of the threshold calculation
+  for the current lux level, not an input (task570 act31 only seeds it).
 - **G2R-F86** ✅ RESOLVED S12.8a (D-063). The DISPLAY clamps to ≥ 0 (`fmtAlpha` on the Misc card + Live Debug);
   the engine value is intentionally left unclamped (task535 parity, D-010a — domain/ untouched per owner decision).
 - **G2R-F87** — the **app list in the context rule editor** should be **taller** (still scrollable) — F45-era
