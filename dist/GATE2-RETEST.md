@@ -1,5 +1,20 @@
 # Gate 2 (5th re-test) — build brief
 
+> **APK refreshed 2026-06-16 18:57** — round-2 fixes (F39/F73 confirmed parity by you; thanks):
+> - **Throttle climb:** leave the screen on in steady light — after ~10 s with no significant change
+>   `%AAB_Throttle` should rise to the ceiling (`AnimSteps×MaxWait+10`, ~1310 at defaults). Watch it on
+>   **Live Debug** (it now updates from the sensor path, not only on a cycle). Root cause: stable
+>   readings are dropped by the dead-band gate, so the watchdog never ran — now it runs per sample.
+> - **Screen off→on resumes context automation:** load a profile manually (locks context), then turn
+>   the screen off and on — context automation should resume (the manual lock clears).
+> - **Sub-0.1-lux overrides:** a 0-lux override now draws at the left edge of the curve chart and is
+>   tappable (was invisible).
+> - **Wizard "Preview graph":** Tools → run the wizard → **Preview graph** jumps to Curve & Brightness
+>   to see the suggested line.
+>
+> ---
+
+
 > **APK refreshed 2026-06-16 16:16** with the follow-up fixes from your first pass. Re-check these:
 > - **F70 (Form1A decimal):** load the legacy JSON with `Form1A 5.833` again — the Curve & Brightness
 >   field should now read **5.833**, not 6. (Root cause was the schema storing form1A as an integer; it's
