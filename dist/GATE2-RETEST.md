@@ -1,5 +1,24 @@
 # Gate 2 (5th re-test) — build brief
 
+> **APK refreshed 2026-06-16 16:16** with the follow-up fixes from your first pass. Re-check these:
+> - **F70 (Form1A decimal):** load the legacy JSON with `Form1A 5.833` again — the Curve & Brightness
+>   field should now read **5.833**, not 6. (Root cause was the schema storing form1A as an integer; it's
+>   now a continuous Double, so the wizard's suggested form1A also lands exactly.)
+> - **Dashboard brightness:** the "X → Y" readout is now a single **`N / 255`** value (the two numbers
+>   were always identical because the pipeline only reports state after the animation finishes).
+> - **Charts:** Circadian's first graph is now titled **"Circadian"** (not "Experiment"); **Super Dimming
+>   now swipes between "Dimming curve" and "Circadian Dimming"**, and the **Spread (circadian)** control is
+>   grouped under "Circadian Dimming". The **suggested curve + override dots are now Tasker blue**
+>   (`rgb 54,162,235`), not gold.
+> - **F59:** no change needed — F85 already removed the field that printed the literal token; the value
+>   shows as a % in the live reactivity card.
+> - **F39/F73:** your observed **1.131** is *correct for the frame used* but ~1 h off the intuitive
+>   "21 Dec @ 17:34 local" (it applies today's summer +2 offset to a winter date). That's the **F73
+>   fixed-date offset residual** you're checking this evening — a circadian (S12.8d) item, not UI.
+>
+> ---
+
+
 **APK:** `dist/app-debug.apk` (com.tideo.autobrightness, debug, versionName 1.0)
 **Build branch:** `claude/modest-tesla-mpe7es` (S12.8b) — contains **all of S12.8 a + b + c + d**.
 **Device target:** OnePlus 13 / Android 16 (your last test rig).
