@@ -34,12 +34,16 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         )
     }
 
-    /** Store a fixed date (`YYYY-MM-DD`) + latitude/longitude — mirrors `_ExperimentSetDate`. */
-    suspend fun set(date: String, latitude: Double, longitude: Double) {
+    /**
+     * Store a fixed override — mirrors `_ExperimentSetDate`. Date and location are **independent**
+     * (G2R-F39): a null field is removed (reverts to live for that field), so callers can pin a date
+     * only (live location), a location only (today's date), or both.
+     */
+    suspend fun set(date: String?, latitude: Double?, longitude: Double?) {
         dataStore.edit { prefs ->
-            prefs[DATE] = date
-            prefs[LAT] = latitude
-            prefs[LON] = longitude
+            if (date != null) prefs[DATE] = date else prefs.remove(DATE)
+            if (latitude != null) prefs[LAT] = latitude else prefs.remove(LAT)
+            if (longitude != null) prefs[LON] = longitude else prefs.remove(LON)
         }
     }
 

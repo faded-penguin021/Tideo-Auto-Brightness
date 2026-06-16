@@ -749,7 +749,7 @@ class SettingsScreensTest {
 
     @Test
     fun circadianDateLocationCard_setFixed_emitsDateAndCoords_G2RF39() {
-        var captured: Triple<String, Double, Double>? = null
+        var captured: Triple<String, Double?, Double?>? = null
         compose.setContent {
             MaterialTheme {
                 CircadianDateLocationCard(
@@ -764,6 +764,25 @@ class SettingsScreensTest {
         compose.onNodeWithTag("exp_status").assertTextContains("Fixed", substring = true)
         compose.onNodeWithTag("exp_set").performClick()
         assertEquals(Triple("2025-12-21", 51.5, 0.0), captured)
+    }
+
+    @Test
+    fun circadianDateLocationCard_setDateOnly_emitsNullCoords_G2RF39() {
+        // F39: a fixed date with blank coordinates pins the date only (live location) — coords null.
+        var captured: Triple<String, Double?, Double?>? = null
+        compose.setContent {
+            MaterialTheme {
+                CircadianDateLocationCard(
+                    value = ExperimentDateLocation(),
+                    todayDate = "2026-06-15",
+                    currentLatLon = null, // no current fix → lat/lon fields blank
+                    onSet = { d, la, lo -> captured = Triple(d, la, lo) },
+                    onUseLiveData = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("exp_set").performClick()
+        assertEquals(Triple("2026-06-15", null, null), captured)
     }
 
     @Test

@@ -41,7 +41,8 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
         (location.currentLocation() as? LocationResult.Available)
             ?.snapshot?.let { it.latitude to it.longitude }
 
-    fun set(date: String, latitude: Double, longitude: Double) {
+    /** Pin a fixed date and/or location (G2R-F39); null fields revert to live for that field. */
+    fun set(date: String?, latitude: Double?, longitude: Double?) {
         viewModelScope.launch { store.set(date, latitude, longitude) }
     }
 

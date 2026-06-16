@@ -46,6 +46,7 @@ next session does not know it.
 | S12.7i (F70/F71/F72) deferral cleanup | 2026-06-15 | Opus/high | DONE | (this push) | The three remaining during-S12.7 deferrals closed (D-062; F73 already landed). **F70 legacy-load-doesn't-apply — root cause was the PARSER, not the wiring:** ProfilesScreen already called `vm.replaceAll(imported)` (commit+reapply) since S12.7c, but `TaskerLegacyProfileSerializer` only parsed `%AAB_Key=value` plaintext, so a REAL Tasker config (nested JSON — `{meta,general,misc,reactivity,circadian,superdimming}`, task637 `_ProfileManager.performSave` XML L29365+) parsed to all-defaults → "loaded by name", nothing changed. Rewrote the serializer to detect `{`-JSON and map the snake_case keys per task637 `performLoad` (L29490+); derived form2A/2D/3A intentionally NOT stored (recomputed at read-time, ledger). `%AAB_Key=value` fallback kept. **F71 reactivity-cooldown-swallows-overrides:** transcribed task544 (throttle gate `elapsed<%AAB_Throttle`→`%AAB_MainLoop=0`→Stop is the MAIN-LOOP gate, prof760) vs task567 (prof755 override handler: act7 "Wait %AAB_CycleTime", act8 re-gate) — the throttle gates ONLY the task544 main loop; prof755→task567 override detection is a SEPARATE profile. `handleOverride`'s settle fallback to `throttleDefaultMs` was the lone conflation; changed to `%AAB_CycleTime` only (0 when unset) so an override is detected inside the cooldown window. **F72 can't-clear-a-time-rule:** added a "Clear time" affordance in the context rule editor that blanks From/To → `ContextTriggers.timeRange` saves null. **Fence: domain/ + golden vectors + ChartCanvas untouched.** Tests: LegacyImportRoundTrip +2 (nested-JSON full parse, partial-section defaults), SettingsViewModel +1 (replaceAll commits parsed legacy values + triggers ACTION_REAPPLY), BrightnessPipelineController +1 (override settle not gated by a 60s throttle), SettingsScreens +1 (Clear time nulls timeRange). Full ladder GREEN: `:app:testDebugUnitTest`(176) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. **ALL S12.7 (a–i) DONE → GATE 2 RE-RE-TEST (4th) READY.** |
 | S12.8a runtime: override feedback, throttle, panic, PWM-dimming | 2026-06-16 | Opus/high | DONE | (this push) | First S12.8 sub-segment — 10 runtime findings (D-063; F58/F65/F71/F74/F75/F76/F77/F78/F86/F88). **F74** (Resume inert) ROOT CAUSE: a notification action can be delivered to a freshly (re)created service whose pipeline consumer was never `start()`ed (the paused-override notification survives a service kill, prof756) → the Resume event sat unconsumed in the channel. `ACTION_RESUME` now `ensureRunning()` BEFORE `controller.resume()`. **F75** override alert cancelled on the falling edge of `pausedByOverride` + on resume/teardown (no stacking with the ongoing notif). **F76** removed the **Pause** action from the ongoing notification (Reset/Disable kept; Resume only while paused). **F77** NEW prof769 panic detector: `platform/.../sensor/PanicSensorSource.kt` (`PanicGestureDetector` pure low-pass-gravity upside-down + linear-accel shake; `AndroidPanicSensorSource` gates on display-on + cooldown) → service collects → SOS morse **vibration** (task528 act0 code62 pattern) + `controller.emergencyStop()` (255 + drop dimming + Service=Off). VIBRATE permission added. **F78** new `ThrottleController` (%AAB_Throttle = ACTUAL `steps×wait` floored at the setting; **Throttle Reinitialization** watchdog task566/prof754 → ceiling `AnimSteps×MaxWait+10` after ~10 s of no change); controller uses it for the throttle gate + publishes it. **F65** (REOPENED) PWM-sensitive now ALSO dims below the floor via Extra Dim: `SuperDimmingCoordinator` engages `reduce_bright_colors` using task700 `finalDimLevel` (Map Lux to Brightness V2 act23) when `pwmSensitive`, vs `dimShell` for the super-dimming toggle. **F58** Super Dimming live readout (%AAB_DimmingCurrent rel / %AAB_DimmingDS abs at %AAB_CurrentBright) — new PipelineState fields computed from golden `SoftwareDimming`, `SuperDimmingDiagnosticCard` on the screen. **F86** displayed LuxAlpha clamped ≥0 (`fmtAlpha`; engine value untouched, parity D-010a). **F88** tap-to-dismiss flashes (AccessibilityService overlay made touchable → click hides; foreground-toast fallback can't be tapped — Android limit, noted). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Tests: PanicGestureDetector(4, platform), ThrottleController(4), SuperDimmingCoordinator +2 (PWM engage/above-threshold), BrightnessPipelineController +2 (actual-steps throttle / dimming readout), AmbientMonitoringService +1 (no Pause action), SettingsScreens +2 (F58 readout, F86 clamp) +1 (F88 FlashPill tap). **2nd pass (owner device re-test):** F75 now folds the alert into the single FGS notification ID (no stacking); F77 requires a SUSTAINED dominant-axis inversion (no upright/flat trigger, heavier low-pass); F78 uses the engine's actual `transitionDurationMs` (the setting floor I first added equalled the ceiling, so it always read MaxSteps×MaxWait+10 — removed); F88 adds an in-app tap-to-dismiss surface (`AabFlashHost`/`FlashPill`) since a Toast can't be tapped. Full ladder GREEN: `:platform:test :domain:test :app:testDebugUnitTest`(188) `:app:assembleDebug :app:lintDebug`. No compaction. |
 | S12.8c settings/profiles: schema hygiene, labels, legacy load, wizard | 2026-06-16 | Opus/high | DONE | (this push) | Third S12.8 sub-segment — 5 findings (D-064; F59/F62/F70/F84/F85). **F85 (CRITICAL)** `%AAB_ThreshDynamic` is the COMPUTED task544 reactivity-threshold output (task570 act31 only seeds it), never a user input — removed the bogus editable `thresholdDynamic: Int` from `AabSettings` + `AabSettingsContract` + mapper `validate` + `SettingsDisplay.valueFor` + the `ReactivityScreen` editor field + `ContextEngine.mergeProfile`. **Schema v2→v3**: `CURRENT_SCHEMA_VERSION=3`; serializer migration bumps the stamp and the stale key is dropped on read via the existing `ignoreUnknownKeys=true` (verified by test). App-layer only — the engine never consumed the field (it reads the runtime `PipelineState.threshDynamic`, kept). **F59** resolved by the F85 removal: the only user-visible literal "%AAB_ThreshDynamic" string was that field's help; the live reactivity card already shows the VALUE as a %. **F84 + exclusions** `SettingsDisplay` diff list now uses friendly labels (`form1A`→"Zone 1 scaling", etc.; explicit map, no reflection) and `EXCLUDED_KEYS` adds debugLevel/detectOverrides/quickSettingsEnabled/notificationsEnabled (global prefs) + thresholdMidpoint (derived). **F70** legacy-load fidelity: the serializer ALREADY did task570-defaults-THEN-diffs (starts from `AabSettings()`), proven by a new no-inheritance regression through `replaceAll`. The real "Form1A didn't stick / was rounded" bug was an **integer-handling class bug**: decimal-encoded ints (Tasker stores curve params as continuous doubles) silently dropped — `String.toIntOrNull()` returns null on "6.8". Fixed across the WHOLE class: the key=value path now rounds every int/long field (`asRoundedInt`/`asRoundedLong`), the nested-JSON path already used `intRound`, and the wizard-apply now `Math.round`s form1A/form2C (was `.toInt()` truncation). **F62** the Tools wizard now gates on ≥9 **real** recorded points (shared `MIN_FIT_POINTS` with the Curve screen) — the domain engine injects synthetic "ghost" priors that cleared its own ≥9 gate at 7 real points; the suggested curve already draws on the Curve & Brightness chart at ≥9 real points (verified). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Tests: LegacyImportRoundTrip +3 (decimal-round, JSON-fractional Form1A, partial-config-resets-to-defaults), AabSettingsMigration +1 (v2→v3 drops thresholdDynamic), SettingsDisplay +2 (exclusions + friendly labels), SettingsViewModel +1 (replaceAll no-inheritance), SettingsScreens +1 (wizard <9-real-points gate). Full ladder GREEN: `:app:testDebugUnitTest`(196) `:app:assembleDebug :app:lintDebug :domain:test :platform:test`. No compaction. |
+| S12.8d circadian time & location correctness | 2026-06-16 | Opus/high | DONE | (this push) | Fourth S12.8 sub-segment — 3 findings (D-065; F39/F73/F83). **F73 (REOPENED) — the UTC frame was NOT the bug.** Tasker task90 act0 (`%AAB_NowSS=%TIMES%86400`) and act59 (windows `%ss_*%86400`) are BOTH UTC-seconds-of-day, and `riseEpochSec` is tz-independent (the `zoneOffset` cancels between `startOfDay` and the local event hour), so the rebuild's UTC frame already matched Tasker exactly. The residual ~1h-early evening ramp (owner: scale 1.025 @20:58 local) was the **location-null → default-windows fallback** (`TimeContext` default eveningStart=18:00 UTC = 20:00 local @UTC+2) — `lastKnownLocation()` is frequently null. Fixes: (a) `CircadianWindowProvider` now reads the tz offset at the **target date instant** (DST-aware; matters for fixed dates in another season) via `tzOffsetForDate`, and (b) a real location is supplied (F83). **F39 (REOPENED — was wrongly preview-only):** the fixed Date and Location now resolve **independently** — date-only / loc-only / both — and DRIVE the live scaling (the old `current()` only honoured the override when BOTH lat AND lon were set, so a date-only override silently fell to live). `ExperimentPrefsStore.set` + `CircadianExtrasViewModel.set` take nullable coords (null field = live for that field); the `CircadianDateLocationCard` "Set fixed" now accepts blank coords (date-only). **F83 (FULL parity):** ported task90 act5–41 acquisition order — `CircadianWindowProvider` acquires once a day (re-acquired when the day rolls over, the `%AAB_SunLastDate != %DATE` guard), **skips** entirely when a fixed lat/lon is pinned, and falls back through Android last-known → fresh fix → **ip-api.com** geo-IP (new `platform/.../context/GeoIpLocationClient.kt`, injectable HTTP fetch, regex parse). Added INTERNET permission + `res/xml/network_security_config.xml` (cleartext scoped to ip-api.com only). The WRITE_SECURE_SETTINGS `location_mode` toggle (act14/19/34, ELEVATED) is intentionally NOT ported — ip-api covers the no-fix case for all tiers and `location_mode` secure-writes are unreliable on minSdk 31 (noted in D-065). Provider decoupled from the store (takes `overrideFlow: Flow<ExperimentDateLocation>`) + geo-IP injected as `suspend () -> LocationSnapshot?` for pure-JVM tests. **HARD FENCE honoured: domain/ + golden vectors + ChartCanvas untouched (SolarCalculator only *called*).** Tests: GeoIpLocationClient (4, platform — parse success/fail/null-island/injected-fetch), CircadianWindowProvider +6 (fixed-date shortens daylight, fixed-loc applies+skips-acquire, date-only uses live loc, ip-api fallback, no-fix→null, tz-at-target-instant), SettingsScreens +1 (date-only set → null coords). Full ladder GREEN: `:app:testDebugUnitTest`(203) `:platform:test`(47) `:domain:test :app:assembleDebug :app:lintDebug`. No compaction. **→ all of S12.8 a/c/d done on their branches; S12.8b (UI) rebases LAST, then re-run HUMAN GATE 2 (5th).** |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
@@ -104,9 +105,18 @@ don't truncate/drop → Form1A sticks); **F62** the Tools wizard now gates on �
 prior inflation). domain/ + golden vectors + ChartCanvas stayed fenced (called only). Ladder GREEN
 (`:app:testDebugUnitTest`=196).
 
-**Next:** **S12.8 remaining sub-segments** (all Opus/high) — **S12.8d** Circadian (DST fix/fixed date-loc/
-ip-api), then **S12.8b** UI (dashboard/graph placement/context editor) LAST (rebases onto a/c/d's screen
-content per the ordering note). Land a→c→d then b; then re-test Gate 2 (5th);
+**S12.8d DONE (2026-06-16):** the **Circadian time & location** sub-segment shipped (D-065) — 3 findings:
+**F73** the UTC frame was already Tasker-faithful (act0/act59 both `%…%86400`); the real ~1h-early evening
+ramp was the location-null → default-window fallback, so the fix was a robust location + a target-instant
+DST-aware tz offset, NOT the golden math; **F39** the fixed Date/Location now resolve independently
+(date-only/loc-only/both) and drive the live scaling (no longer preview-only); **F83** ported task90's
+once-a-day location acquisition with skip-when-fixed + ip-api.com geo-IP fallback (`GeoIpLocationClient`,
+INTERNET perm + ip-api-scoped cleartext config). domain/ + golden vectors + ChartCanvas stayed fenced
+(SolarCalculator called only). Ladder GREEN (`:app:testDebugUnitTest`=203, `:platform:test`=47).
+
+**Next:** **S12.8b** UI (dashboard redesign / graph placement+swipe / context editor / permissions) LAST —
+all of a/c/d are now done on their branches, so S12.8b rebases onto the settled shared screen content per
+the ordering note. Then re-test Gate 2 (5th);
 then **S13** (remaining charts via the S12.7g template + About/User Guide, which carries F80). The Gate-2
 (4th) results are recorded under "Gate findings → Gate 2 (4th re-test)":
 most of F33–F73 are **confirmed fixed**; reopened with corrected specs = **F39/F62/F65/F70/F73**; follow-ups
@@ -1403,7 +1413,39 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   internal ≥9-after-ghost-injection check is unchanged; the user-facing gate is now app-layer.
   **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Affects S12.8c only.
 
-Append new entries as D-065, … with which segments they affect.
+- **D-065 (S12.8d) — circadian time/location; F73's "DST bug" was a location-null fallback, NOT a frame bug.**
+  Three findings (F39/F73/F83):
+  (1) **F73 — the UTC frame already matched Tasker; do not "fix" the golden math.** task90 act0 sets
+  `%AAB_NowSS = %TIMES % 86400` and act59 builds the windows from `%ss_* % 86400` — BOTH UTC-seconds-of-day.
+  Further, `riseEpochSec` (= `startOfDay + localHour·3600`) is **tz-independent**: the `zoneOffset` cancels
+  (`startOfDay` shifts earlier by the offset, `localHour` shifts later by it), so the window positions in UTC
+  seconds-of-day do not depend on the tz at all (only `dayOfYear`). The rebuild's pipeline `now`
+  (`currentTimeMillis/1000 % 86400`, UTC) and `CircadianWindowProvider`/`buildScheduleWindows` (`epoch % 86400`,
+  UTC) therefore already tracked the real sun. The owner's "scale 1.025 @20:58 local" was the
+  **location-null → `TimeContext` default-windows fallback** (default eveningStart=18:00 UTC = 20:00 local
+  @UTC+2, so the evening ramp fired ~1h early) — `lastKnownLocation()` returns null on a device that hasn't
+  actively used GPS. Fixes: read the tz offset at the **target date instant** (DST-aware; only matters for a
+  fixed date in another season — F39) and, crucially, supply a reliable location (F83). The context-rule solar
+  path (AndroidContextSignalSource) was "correct" only because it uses the live `locationUpdates` listener (a
+  fix), not lastKnown.
+  (2) **F39 — the fixed Date and Location are INDEPENDENT overrides, not preview-only.** `current()` used to
+  require BOTH lat AND lon to honour the override, so a date-only override silently fell back to live → "Set
+  fixed does nothing" for a date. Now date and location resolve separately (date-only / loc-only / both) and
+  drive the live scaling. `ExperimentPrefsStore.set`/`CircadianExtrasViewModel.set` take nullable coords (null =
+  live for that field); `CircadianDateLocationCard` "Set fixed" accepts blank coords.
+  (3) **F83 — ported task90 act5–41 acquisition order:** skip when a fixed lat/lon is pinned → Android
+  last-known → fresh fix → **ip-api.com** geo-IP fallback (`platform/.../context/GeoIpLocationClient.kt`),
+  cached once a day and re-acquired on the day roll-over (the `%AAB_SunLastDate != %DATE` guard). Added INTERNET
+  permission + `res/xml/network_security_config.xml` (cleartext scoped to `ip-api.com` ONLY; everything else
+  stays HTTPS). **Deliberately NOT ported:** the WRITE_SECURE_SETTINGS `location_mode`-flip (act14/19/34, an
+  ELEVATED-only "briefly enable location" optimization) — ip-api covers the no-fix case for every tier and the
+  `location_mode` secure setting is deprecated/unreliable on minSdk 31; record-and-skip rather than ship a
+  fragile privileged write. Provider decoupled from `ExperimentPrefsStore` (takes `overrideFlow:
+  Flow<ExperimentDateLocation>`) and geo-IP injected as `suspend () -> LocationSnapshot?` for pure-JVM tests.
+  **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (`SolarCalculator` called only).** Affects
+  S12.8d only.
+
+Append new entries as D-066, … with which segments they affect.
 
 ## Blockers
 
@@ -2006,15 +2048,18 @@ see below.)
   gates on ≥9 **real** recorded points (shared `MIN_FIT_POINTS` with the Curve screen; `OverridePointStore`
   holds only real points). The suggested curve already draws on the Curve & Brightness chart at ≥9 real
   points (S12.7g wiring, verified) — domain engine fenced (its internal ≥9-after-ghost check is untouched).
-- **G2R-F73 REOPENED — still ~1 h off.** At 20:58 local the scale dropped to **1.025 (as if an hour early)**,
-  yet the **context-rule sunrise/sunset are obtained correctly**. So the dynamic-scale time frame disagrees
-  with the (correct) context solar calc — likely a tz/DST handling gap in `CircadianWindowProvider`/
-  `buildInput` (UTC-frame windows vs the device's actual offset), NOT the golden domain math. Investigate
-  the app-layer wiring first (per D-061's lesson); re-scope the domain fence only if proven necessary.
-- **G2R-F39 REOPENED — the S12.7h spec was wrong.** The Circadian fixed **Date / Lat / Lon** must be a real,
-  persisted override that **changes the circadian scaling logic** (Tasker parity) — setting e.g. 21 Dec
-  and/or a location must hold and take effect. Currently **"Set fixed" does nothing** (the setting isn't
-  applied). It is NOT merely a preview. (See also F83: the daily-location-refresh subsystem this feeds.)
+- **G2R-F73 REOPENED** ✅ RESOLVED S12.8d (D-065) — **and per D-061's lesson it was APP-LAYER (location), not
+  the tz/DST frame.** The UTC-seconds-of-day frame already matched Tasker exactly (act0 `%TIMES%86400`, act59
+  `%ss_*%86400`) and `riseEpochSec` is tz-independent, so the windows were astronomically correct. The ~1h-early
+  evening ramp at 20:58 local was the **location-null → `TimeContext` default-windows fallback** (eveningStart
+  18:00 UTC = 20:00 local @UTC+2); the context path looked correct only because it uses the live location
+  listener, not `lastKnownLocation()`. Fix: supply a robust location (F83) + read the tz offset at the target
+  date instant (DST-aware, for fixed dates). domain/ + golden fenced.
+- **G2R-F39 REOPENED** ✅ RESOLVED S12.8d (D-065). The fixed **Date / Lat / Lon** now resolve **independently**
+  (date-only / loc-only / both) and DRIVE the live circadian scaling — not preview-only. Root cause of "Set
+  fixed does nothing": `current()` honoured the override only when BOTH lat AND lon were set, so a date-only
+  override silently fell to live. `ExperimentPrefsStore`/`CircadianExtrasViewModel`/`CircadianDateLocationCard`
+  now persist nullable coords; the provider resolves date and location separately.
 
 *Follow-ups on otherwise-correct findings:*
 - **G2R-F58 PARTIAL** ✅ RESOLVED S12.8a (D-063). The Super Dimming screen now shows the live readout
@@ -2055,10 +2100,12 @@ see below.)
   the relevant graphs by **swipe** (NOT stacked vertically).
 - **G2R-F82** — **settings grouping**: settings that feed a single graph should be **subtly visually grouped**
   and it should be clear **which graph** they pertain to. (Pairs with F81.)
-- **G2R-F83** — **dynamic-scale daily location refresh** (verify/port): Tasker briefly **toggles location
-  once per day** when `%AAB_SunLastDate != %DATE` (needs WRITE_SECURE_SETTINGS); **skips** it if
-  `%AAB_Latitude`/`%AAB_Longitude` are set; the **final fallback is ip-api.com**. Confirm whether the rebuild
-  has any of this (it likely does not) and port it (feeds F39).
+- **G2R-F83** ✅ RESOLVED S12.8d (D-065). The rebuild had **none** of this (confirmed). Ported task90 act5–41:
+  `CircadianWindowProvider` acquires location **once a day** (re-acquired on the day roll-over = the
+  `%AAB_SunLastDate != %DATE` guard), **skips** entirely when a fixed `%AAB_Latitude`/`%AAB_Longitude` is
+  pinned, and falls back Android last-known → fresh fix → **ip-api.com** (`GeoIpLocationClient`, INTERNET perm +
+  ip-api-scoped cleartext config). The ELEVATED `location_mode`-flip (act14/19/34) was deliberately NOT ported
+  (ip-api covers no-fix for all tiers; the secure setting is unreliable on minSdk 31). Feeds F39/F73.
 - **G2R-F84** ✅ RESOLVED S12.8c (D-064). `SettingsDisplay` diff rows use friendly labels (`form1A`→"Zone 1
   scaling", etc.; explicit map, no reflection) and `EXCLUDED_KEYS` now also drops the global prefs
   (debugLevel/detectOverrides/quickSettingsEnabled/notificationsEnabled) + derived thresholdMidpoint.

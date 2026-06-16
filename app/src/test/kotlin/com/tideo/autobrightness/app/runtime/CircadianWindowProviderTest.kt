@@ -1,10 +1,26 @@
 package com.tideo.autobrightness.app.runtime
 
+import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
 import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
+import com.tideo.autobrightness.platform.context.LocationReader
+import com.tideo.autobrightness.platform.context.LocationResult
+import com.tideo.autobrightness.platform.context.LocationSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.util.Calendar
 import java.util.SimpleTimeZone
+import java.util.TimeZone
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -101,5 +117,151 @@ class CircadianWindowProviderTest {
         assertTrue(w.morningStart < w.morningEnd, "morning window ordered")
         assertTrue(w.eveningStart < w.eveningEnd, "evening window ordered")
         assertTrue(w.morningEnd <= w.eveningStart, "day spans morningEnd..eveningStart")
+    }
+
+    // ----- F39: fixed Date / Location override actually changes the scaling -----
+
+    private fun decEpochSec(): Long {
+        val cal = Calendar.getInstance(SimpleTimeZone(1 * 3_600_000, "CET")) // NL winter = UTC+1
+        cal.set(2025, Calendar.DECEMBER, 21, 12, 0, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis / 1000L
+    }
+
+    @Test
+    fun fixedDate_changesSunlightDuration_G2RF39() {
+        // A fixed 21-Dec date must produce a much shorter day than mid-June at the same location.
+        val june = CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor)
+        val dec = CircadianWindowProvider.compute(lat, lon, decEpochSec(), 1.0, transitionFactor)
+        assertTrue(
+            dec.sunlightDurationMinutes < june.sunlightDurationMinutes - 200,
+            "Utrecht winter solstice (${dec.sunlightDurationMinutes}m) << midsummer (${june.sunlightDurationMinutes}m)",
+        )
+    }
+
+    @Test
+    fun fixedLocationOverride_appliesAndSkipsAcquisition_G2RF39_F83() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        var geoIpCalled = false
+        val loc = FakeLocationReader() // would return null → forces fallback IF consulted
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation(date = "2025-12-21", latitude = lat, longitude = lon)),
+            location = loc,
+            geoIpFallback = { geoIpCalled = true; null },
+            clock = { decEpochSec() * 1000L },
+            tzOffsetForDate = { 1.0 },
+        )
+        val w = provider.current(transitionFactor)
+        assertNotNull(w, "fixed date+location yields windows directly")
+        assertFalse(geoIpCalled, "fixed lat/lon must skip the geo-IP acquisition (task90 skip-when-fixed)")
+        assertFalse(loc.lastKnownCalled, "fixed lat/lon must not consult Android location")
+        // Equivalent to the pure winter-solstice computation.
+        assertEquals(CircadianWindowProvider.compute(lat, lon, decEpochSec(), 1.0, transitionFactor), w)
+        scope.cancel()
+    }
+
+    @Test
+    fun dateOnlyOverride_usesLiveLocation_G2RF39() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val loc = FakeLocationReader(lastKnown = LocationSnapshot(lat, lon))
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            // date pinned, NO coords → live (last-known) location
+            overrideFlow = MutableStateFlow(ExperimentDateLocation(date = "2025-12-21")),
+            location = loc,
+            geoIpFallback = { null },
+            clock = { midJuneEpochSec() * 1000L }, // "now" is June, but the fixed Dec date must win
+            tzOffsetForDate = { 1.0 },
+        )
+        val w = provider.current(transitionFactor)
+        assertNotNull(w)
+        assertTrue(loc.lastKnownCalled, "date-only override still acquires the live location")
+        // Windows reflect the FIXED Dec date (short day), not today's June.
+        assertEquals(CircadianWindowProvider.compute(lat, lon, decEpochSec(), 1.0, transitionFactor), w)
+        scope.cancel()
+    }
+
+    // ----- F83: geo-IP fallback when no Android fix is available -----
+
+    @Test
+    fun noAndroidFix_fallsBackToGeoIp_G2RF83() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val loc = FakeLocationReader() // no last-known, currentLocation Unavailable
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = loc,
+            geoIpFallback = { LocationSnapshot(lat, lon) }, // ip-api yields Utrecht
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        // The acquire launch runs inline (Unconfined) → first call already has the geo-IP fix.
+        val w = provider.current(transitionFactor)
+        assertNotNull(w, "geo-IP fallback supplies a location when Android has none")
+        assertEquals(CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor), w)
+        scope.cancel()
+    }
+
+    @Test
+    fun noLocationAtAll_returnsNull_keepsDefaultWindows_G2RF73() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(),
+            geoIpFallback = { null }, // network also down
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        assertNull(provider.current(transitionFactor), "no fix anywhere → null → pipeline keeps default windows")
+        scope.cancel()
+    }
+
+    // ----- F73: tz offset is taken at the TARGET date instant (DST-aware) -----
+
+    @Test
+    fun tzOffset_isEvaluatedAtTargetDateInstant_G2RF73() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val seenOffsets = mutableListOf<Double>()
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            // fixed Dec date + location so the path is deterministic and skips acquisition
+            overrideFlow = MutableStateFlow(ExperimentDateLocation(date = "2025-12-21", latitude = lat, longitude = lon)),
+            location = FakeLocationReader(),
+            geoIpFallback = { null },
+            clock = { midJuneEpochSec() * 1000L }, // "now" is summer (would be +2 if naively used)
+            tzOffsetForDate = { epochSec ->
+                // Real DST-aware default would do exactly this; we record what instant it is asked about.
+                val off = TimeZone.getTimeZone("Europe/Amsterdam").getOffset(epochSec * 1000L) / 3_600_000.0
+                seenOffsets += off
+                off
+            },
+        )
+        val w = provider.current(transitionFactor)
+        assertNotNull(w)
+        // The window math must have used the WINTER (+1) offset of the fixed Dec date, never the
+        // summer (+2) offset of "now" — proving the offset is read at the target instant, not now.
+        assertTrue(seenOffsets.contains(1.0), "Dec target instant → +1 offset used; saw $seenOffsets")
+        assertEquals(CircadianWindowProvider.compute(lat, lon, decEpochSec(), 1.0, transitionFactor), w)
+        scope.cancel()
+    }
+
+    /** Minimal [LocationReader] fake: configurable last-known; current/updates inert. */
+    private class FakeLocationReader(
+        private val lastKnown: LocationSnapshot? = null,
+    ) : LocationReader {
+        var lastKnownCalled = false
+            private set
+
+        override fun lastKnownLocation(): LocationSnapshot? {
+            lastKnownCalled = true
+            return lastKnown
+        }
+
+        override fun locationUpdates(minTimeMs: Long, minDistanceM: Float): Flow<LocationSnapshot> = emptyFlow()
+
+        override suspend fun currentLocation(): LocationResult =
+            lastKnown?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
     }
 }

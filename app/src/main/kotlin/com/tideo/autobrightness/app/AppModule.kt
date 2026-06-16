@@ -22,6 +22,7 @@ import com.tideo.autobrightness.app.storage.userProfilesDataStore
 import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
+import com.tideo.autobrightness.platform.context.GeoIpLocationClient
 import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
@@ -79,8 +80,10 @@ class AppModule(context: Context) {
         // the F39 fixed date/location override), so %AAB_ScaleDynamic tracks the actual sunrise.
         val circadianWindows = CircadianWindowProvider(
             scope = scope,
-            experimentStore = ExperimentPrefsStore(appContext.experimentPrefsDataStore),
+            overrideFlow = ExperimentPrefsStore(appContext.experimentPrefsDataStore).dateLocation,
             location = AndroidLocationReader(appContext),
+            // F83: ip-api.com geo-IP fallback when no Android fix is available (task90 act28).
+            geoIpFallback = GeoIpLocationClient()::resolve,
         )
 
         controller = BrightnessPipelineController(

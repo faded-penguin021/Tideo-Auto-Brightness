@@ -1,15 +1,18 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
-import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.domain.circadian.SolarCalculator
 import com.tideo.autobrightness.platform.context.LocationReader
+import com.tideo.autobrightness.platform.context.LocationResult
+import com.tideo.autobrightness.platform.context.LocationSnapshot
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.SimpleTimeZone
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The real circadian ramp windows (seconds-of-day) for the dynamic-scale computation — morning/evening
@@ -17,7 +20,9 @@ import java.util.TimeZone
  *
  * **Frame:** UTC seconds-of-day — `SolarCalculator.buildScheduleWindows` derives them as
  * `riseEpochSec % 86400` etc., and the pipeline's `now` is `(currentTimeMillis/1000) % 86400`, also
- * UTC. The two share a frame, so the ramp tracks the real sun regardless of the device's clock label.
+ * UTC. This matches Tasker exactly: task90 act0 sets `%AAB_NowSS = %TIMES % 86400` and act59 sets the
+ * windows from `%ss_* % 86400` — both UTC-seconds-of-day. `riseEpochSec` is tz-independent (the
+ * `zoneOffset` cancels between `startOfDay` and `localHour`), so the ramp tracks the real sun.
  */
 data class CircadianWindows(
     val morningStart: Double,
@@ -29,60 +34,101 @@ data class CircadianWindows(
 )
 
 /**
- * Supplies live [CircadianWindows] to the pipeline (G2R-F73). Until now the pipeline fed
- * `TimeContext`'s **defaults** (a fixed 6–8am / 18–20pm *UTC* morning/evening) to the dynamic-scale
- * engine — never the real sunrise — so for any non-UTC device the morning ramp was hours off (e.g. a
- * UTC+1 user saw `%AAB_ScaleDynamic` < 1 at 07:13 local, because "morning" was pinned to 06–08 UTC =
- * 07–09 local). This wires the already-fenced, golden-tested [SolarCalculator] into the runtime.
+ * Supplies live [CircadianWindows] to the pipeline (G2R-F73). Before this, the pipeline fed
+ * `TimeContext`'s **defaults** (a fixed 6–8am / 18–20pm UTC morning/evening) whenever no location was
+ * known — and `lastKnownLocation()` is frequently null on a device that has not actively used GPS, so
+ * the default eveningStart (18:00 UTC = 20:00 local @UTC+2) made the evening ramp fire ~1 h early
+ * (the owner's "scale 1.025 at 20:58 local" — Gate 2 4th re-test). This now:
  *
- * Source of truth: the F39 fixed date/location override when set, else today + last-known location.
- * Returns `null` when no location is known → the pipeline keeps the old default windows (degrade, no
- * crash). Solar is recomputed only when the day/location/transition-factor actually change.
+ *  - **F73** computes the tz offset at the **target date instant** (DST-aware), so the live ramp uses
+ *    today's current offset and a fixed winter date uses the winter offset; the UTC frame already
+ *    matched Tasker (above), so the residual error was the missing location, not the math.
+ *  - **F39** resolves the fixed Date and Location **independently** — either, both, or neither — so a
+ *    date-only override (e.g. 21 Dec, live location) or a location-only override actually applies.
+ *  - **F83** ports task90's once-a-day location acquisition (act5–41): **skip** when a fixed lat/lon
+ *    is pinned; otherwise acquire from Android (last-known → fresh fix) and, failing that, fall back
+ *    to **ip-api.com** geo-IP (act28). The result is cached per day and re-acquired when the day rolls
+ *    over (`%AAB_SunLastDate != %DATE`). Acquisition is async (it can hit the network); `current()`
+ *    stays non-blocking and returns the old windows until the first fix lands.
  *
  * domain/ stays fenced: this only *calls* `SolarCalculator.compute`/`buildScheduleWindows`.
  */
 class CircadianWindowProvider(
-    scope: CoroutineScope,
-    experimentStore: ExperimentPrefsStore,
+    private val scope: CoroutineScope,
+    overrideFlow: Flow<ExperimentDateLocation>,
     private val location: LocationReader,
+    // F83: ip-api.com geo-IP fallback (task90 act28), injected as a suspend fn for testability.
+    private val geoIpFallback: suspend () -> LocationSnapshot?,
     private val clock: () -> Long = System::currentTimeMillis,
-    private val tzOffsetHours: () -> Double = {
-        TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 3_600_000.0
+    // F73: offset at the TARGET instant, not "now" — covers DST and fixed dates in another season.
+    private val tzOffsetForDate: (dateEpochSec: Long) -> Double = { dateEpochSec ->
+        TimeZone.getDefault().getOffset(dateEpochSec * 1000L) / 3_600_000.0
     },
 ) {
     @Volatile private var override: ExperimentDateLocation = ExperimentDateLocation()
     @Volatile private var cacheKey: String? = null
     @Volatile private var cached: CircadianWindows? = null
 
+    // F83: the once-a-day acquired location (Android or geo-IP), keyed by the day it was acquired for.
+    @Volatile private var resolvedLoc: LocationSnapshot? = null
+    @Volatile private var resolvedDay: Long = Long.MIN_VALUE
+    private val acquiring = AtomicBoolean(false)
+
     init {
-        // F39 override drives the preview; invalidate the cache when it changes.
-        scope.launch { experimentStore.dateLocation.collect { override = it; cacheKey = null } }
+        // F39 override drives the windows; invalidate the cache (and force a re-acquire) when it changes.
+        scope.launch {
+            overrideFlow.collect {
+                override = it
+                cacheKey = null
+                resolvedDay = Long.MIN_VALUE
+            }
+        }
     }
 
     /** Windows for the active location/date at [transitionFactor], or null when no location is known. */
     fun current(transitionFactor: Double): CircadianWindows? {
         val ov = override
-        val tz = tzOffsetHours()
-        val lat: Double
-        val lon: Double
-        val dateEpochSec: Long
-        if (!ov.isUnset && ov.latitude != null && ov.longitude != null) {
-            lat = ov.latitude!!
-            lon = ov.longitude!!
-            dateEpochSec = parseDateEpochSec(ov.date, tz) ?: (clock() / 1000L)
+        val nowSec = clock() / 1000L
+
+        // F39: fixed Date is independent of fixed Location. No date override → today.
+        val dateEpochSec = ov.date?.let { parseDateEpochSec(it, tzOffsetForDate(nowSec)) } ?: nowSec
+        val tz = tzOffsetForDate(dateEpochSec)
+        val day = dateEpochSec / 86_400L
+
+        val loc: LocationSnapshot = if (ov.latitude != null && ov.longitude != null) {
+            // F83: fixed lat/lon → use it directly, skip all acquisition.
+            LocationSnapshot(ov.latitude!!, ov.longitude!!)
         } else {
-            val loc = runCatching { location.lastKnownLocation() }.getOrNull() ?: return null
-            lat = loc.latitude
-            lon = loc.longitude
-            dateEpochSec = clock() / 1000L
+            // F83: acquire (once a day, async) when we have no fix or the day rolled over.
+            if (resolvedLoc == null || resolvedDay != day) triggerAcquire(day)
+            resolvedLoc ?: return null
         }
 
-        val key = "${dateEpochSec / 86_400L}|${round4(lat)}|${round4(lon)}|$transitionFactor|$tz"
+        val key = "$day|${round4(loc.latitude)}|${round4(loc.longitude)}|$transitionFactor|$tz"
         if (key == cacheKey) return cached
-        val windows = compute(lat, lon, dateEpochSec, tz, transitionFactor)
+        val windows = compute(loc.latitude, loc.longitude, dateEpochSec, tz, transitionFactor)
         cacheKey = key
         cached = windows
         return windows
+    }
+
+    // F83: task90 act5–41 acquisition order, async — Android last-known → fresh fix → ip-api.com.
+    private fun triggerAcquire(day: Long) {
+        if (!acquiring.compareAndSet(false, true)) return
+        scope.launch {
+            try {
+                val snap = location.lastKnownLocation()
+                    ?: (runCatching { location.currentLocation() }.getOrNull() as? LocationResult.Available)?.snapshot
+                    ?: geoIpFallback()
+                if (snap != null) {
+                    resolvedLoc = snap
+                    resolvedDay = day
+                    cacheKey = null // recompute windows with the freshly acquired location
+                }
+            } finally {
+                acquiring.set(false)
+            }
+        }
     }
 
     companion object {
