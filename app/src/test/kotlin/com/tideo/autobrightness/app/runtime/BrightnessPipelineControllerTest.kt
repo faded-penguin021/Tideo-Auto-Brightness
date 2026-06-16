@@ -406,6 +406,50 @@ class BrightnessPipelineControllerTest {
         scope.cancel()
     }
 
+    // G2R-F78: after a cycle that changes brightness, the published throttle (%AAB_Throttle) is the
+    // engine's ACTUAL animation duration (loops×wait+10, first cycle has no prior cycle-time), NOT
+    // floored at MaxSteps×MaxWait+10 — so it must be able to read below the ceiling.
+    @Test
+    fun publishedThrottle_isActualEngineValue_notCeiling() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        controller.start()
+
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val st = controller.state.value
+        // First cycle: prev=null → no cycle-time term, so throttle == loops×wait+10.
+        val expected = st.animationSteps!!.toLong() * st.animationWaitMs!! + 10L
+        assertEquals(expected, st.throttleMs, "throttle should be the actual steps×wait+10")
+        val ceiling = settings.animSteps.toLong() * settings.maxWaitMs + 10L
+        assertTrue(st.throttleMs!! < ceiling, "actual throttle must be below the MaxSteps×MaxWait+10 ceiling")
+        scope.cancel()
+    }
+
+    // G2R-F58: the Super Dimming live readout (%AAB_DimmingDS abs / %AAB_DimmingCurrent rel) is
+    // populated from SoftwareDimming whenever the target falls below the dimming threshold.
+    @Test
+    fun dimmingReadout_populatedBelowThreshold() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val dim = settings.copy(minBrightness = 1, dimmingEnabled = true, dimmingThreshold = 40)
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = { dim }, scope = scope, clock = { 1000L },
+        )
+        controller.start()
+        sensor.flow.emit(sample(lux = 1.0)) // maps to ~5, below the threshold 40
+        advanceUntilIdle()
+
+        val st = controller.state.value
+        assertTrue(st.dimmingDS > 0.0, "abs dimming level should be positive below the threshold")
+        assertTrue(st.dimmingCurrent > 0.0, "relative dimming strength should be positive below the threshold")
+        scope.cancel()
+    }
+
     @Test
     fun screenOff_hibernatesRuntimeState() = runTest {
         val sensor = FakeSensor()

@@ -27,6 +27,7 @@ import com.tideo.autobrightness.app.ui.screens.CircadianDateLocationCard
 import com.tideo.autobrightness.app.ui.screens.LoadProfileDialog
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
 import com.tideo.autobrightness.app.ui.screens.ContextsContent
+import com.tideo.autobrightness.app.ui.components.FlashPill
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
 import com.tideo.autobrightness.app.ui.screens.LiveDebugContent
 import com.tideo.autobrightness.app.ui.screens.MiscContent
@@ -111,6 +112,53 @@ class SettingsScreensTest {
         }
         // The grant link is shown when not ELEVATED.
         compose.onNodeWithTag("dimming_grant_link").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun superDimming_liveReadout_rendersRelAndAbs_G2RF58() {
+        // G2R-F58: the Super Dimming screen shows the live %AAB_DimmingCurrent (rel) / %AAB_DimmingDS
+        // (abs) at the current brightness.
+        val seeded = PipelineState(dimmingCurrent = 12.3, dimmingDS = 45.6, lastAppliedBrightness = 8)
+        compose.setContent {
+            MaterialTheme {
+                SuperDimmingContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false, tier = Tier.ELEVATED,
+                    live = seeded,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, onOpenOnboarding = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("diag_dimming_rel").performScrollTo().assertTextContains("12.3", substring = true)
+        compose.onNodeWithTag("diag_dimming_abs").performScrollTo().assertTextContains("45.6", substring = true)
+    }
+
+    @Test
+    fun inAppFlash_isTapToDismiss_G2RF88() {
+        // G2R-F88: the in-app flash renders as a tappable pill that dismisses on tap (a plain Toast,
+        // which passes clicks through, cannot). Tests the FlashPill wiring directly.
+        var dismissed = false
+        compose.setContent {
+            MaterialTheme { FlashPill("Applied") { dismissed = true } }
+        }
+        compose.onNodeWithTag("aab_flash").assertExists()
+        compose.onNodeWithTag("aab_flash").performClick()
+        assertTrue(dismissed, "tapping the flash should dismiss it (F88)")
+    }
+
+    @Test
+    fun misc_negativeLuxAlpha_isClampedToZeroInDisplay_G2RF86() {
+        // G2R-F86: a transient negative smoothing alpha shows as "0.000" (display clamp only; the
+        // engine value is intentionally left unclamped for parity, D-010a).
+        val seeded = PipelineState(throttleMs = 1310L, luxAlpha = -0.42)
+        compose.setContent {
+            MaterialTheme {
+                MiscContent(
+                    AabSettings(), AabSettings(), emptyList(), 0, false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, live = seeded,
+                )
+            }
+        }
+        compose.onNodeWithTag("diag_misc_alpha").performScrollTo().assertTextContains("0.000", substring = true)
     }
 
     @Test

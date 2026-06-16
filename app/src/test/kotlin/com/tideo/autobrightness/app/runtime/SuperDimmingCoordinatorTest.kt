@@ -50,6 +50,37 @@ class SuperDimmingCoordinatorTest {
         assertTrue(secure.levels.last() > 0, "below-threshold dimming should be a positive level")
     }
 
+    // G2R-F65 (REOPENED): PWM-sensitive mode also engages Extra Dim below the threshold (via the
+    // task700 finalDimLevel), not only the hardware floor. The previous build only floored.
+    @Test
+    fun pwmSensitive_belowThreshold_engagesExtraDim() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+        val pwm = AabSettings(
+            dimmingEnabled = false,
+            pwmSensitive = true,
+            dimmingThreshold = 40,
+            pwmExponent = 0.8f,
+            minBrightness = 1,
+        )
+
+        coordinator.apply(targetBrightness = 5, settings = pwm)
+
+        assertEquals(true, secure.activated, "PWM-sensitive below threshold should engage Extra Dim")
+        assertTrue(secure.levels.last() > 0, "a positive reduce_bright_colors level should be written")
+    }
+
+    @Test
+    fun pwmSensitive_aboveThreshold_doesNotEngage() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+        val pwm = AabSettings(dimmingEnabled = false, pwmSensitive = true, dimmingThreshold = 40)
+
+        coordinator.apply(targetBrightness = 100, settings = pwm)
+
+        assertNull(secure.activated, "above the threshold PWM dimming must not engage")
+    }
+
     @Test
     fun basicTier_doesNotEngage() {
         val secure = FakeSecureDimming()

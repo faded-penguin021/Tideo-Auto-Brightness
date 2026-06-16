@@ -56,13 +56,16 @@ class AabToastAccessibilityService : AccessibilityService() {
                 cornerRadius = dp(12).toFloat()
                 setColor(AAB_TEAL)
             }
+            // F88: tap the flash to dismiss it immediately (Tasker lets you tap a flash away).
+            setOnClickListener { removeOverlay() }
         }
+        // NOTE (F88): the window is focusable-NOT but touchABLE so the tap-to-dismiss click lands; it
+        // is small + bottom-anchored, so it does not steal general input.
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL

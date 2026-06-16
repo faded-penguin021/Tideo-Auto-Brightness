@@ -51,6 +51,12 @@ data class PipelineState(
     val scaleDynamicCompress: Double = 1.0,
     /** Last %AAB_ScalingUse seen (task561 gate). */
     val scalingUse: Boolean = true,
+    /** %AAB_DimmingCurrent — relative super-dimming strength now (dim_shell × dim_progress, task650
+     *  act30); 0 when dimming is not engaged. Surfaced on the Super Dimming live readout (G2R-F58). */
+    val dimmingCurrent: Double = 0.0,
+    /** %AAB_DimmingDS — absolute reduce_bright_colors level now (dim_shell, task650 act28); 0 when not
+     *  engaged. The "abs" half of the Super Dimming live readout (G2R-F58). */
+    val dimmingDS: Double = 0.0,
     /** Last brightness this pipeline applied (domain 0–255); null before the first write. */
     val lastAppliedBrightness: Int? = null,
     /** Last target the engine produced (for the notification "target" readout). */

@@ -40,13 +40,24 @@ class SuperDimmingCoordinator(
     private var engaged = false
 
     /**
-     * task646 act0/act1: engage only when dimming is enabled, the target sits below the threshold,
-     * and the tier can write secure settings; otherwise disengage. Mirrors the
-     * "below threshold engage / above threshold disengage" decider (pipeline_spec §1d step 5).
+     * task646 act0/act1: engage the Android "Extra Dim" (reduce_bright_colors) secure layer when the
+     * target sits below the threshold and the tier can write secure settings; otherwise disengage.
+     *
+     * Two mutually-exclusive engage paths (the UI enforces the exclusivity, G2-F10):
+     *  - **Super dimming** (`dimmingEnabled`): the level is the task646 `dim_shell`
+     *    (clamped_strength × dim_progress).
+     *  - **PWM-sensitive** (`pwmSensitive`, G2R-F65 REOPENED): the hardware brightness is held at the
+     *    threshold by the pipeline ([BrightnessPipelineController.applyPwmFloor], task661 act22/698) AND
+     *    the screen is darkened *below* that floor via Extra Dim using the task700 `finalDimLevel`
+     *    (Map Lux to Brightness V2 act23 → "Software Dimming V2"). The previous rebuild only floored
+     *    and never dimmed — this restores the dim-below-floor half.
      */
     override fun apply(targetBrightness: Int, settings: AabSettings) {
         val elevated = tierProvider() >= Tier.ELEVATED
-        val wantsDim = settings.dimmingEnabled && targetBrightness < settings.dimmingThreshold
+        val belowThreshold = targetBrightness < settings.dimmingThreshold
+        val pwmPath = settings.pwmSensitive && belowThreshold
+        val superPath = settings.dimmingEnabled && belowThreshold
+        val wantsDim = pwmPath || superPath
         val shouldEngage = wantsDim && elevated
 
         // %AAB_Debug 6 "Overlay Preview" (G2R-F49): when dimming WOULD engage but the tier can't write
@@ -60,7 +71,7 @@ class SuperDimmingCoordinator(
             // tier or the threshold gate, not the secure write itself.
             emitDebug(settings) {
                 when {
-                    !settings.dimmingEnabled -> "off: dimming disabled"
+                    !settings.dimmingEnabled && !settings.pwmSensitive -> "off: dimming disabled"
                     !elevated -> "off: needs WRITE_SECURE_SETTINGS"
                     else -> "off: $targetBrightness ≥ threshold ${settings.dimmingThreshold}"
                 }
@@ -69,18 +80,33 @@ class SuperDimmingCoordinator(
             return
         }
 
-        // task646 act3-16: dim_shell = clamped_strength × dim_progress.
-        // DimDynamic (the circadian strength multiplier, task646 act6 ScalingUse branch) is wired
-        // with the real solar windows in S12 (D-040); the baseline/default config has scaling off,
-        // so the plain-strength branch (dimDynamic = null) is the correct path here.
-        val dimShell = SoftwareDimming.dimShell(
-            brightness = targetBrightness.toDouble(),
-            minBrightness = settings.minBrightness.toDouble(),
-            dimmingThreshold = settings.dimmingThreshold.toDouble(),
-            dimmingExponent = settings.dimmingExponent.toDouble(),
-            dimmingStrength = settings.dimmingStrength.toDouble(),
-            dimDynamic = null,
-        )
+        val level: Int = if (pwmPath) {
+            // task700 "Software Dimming V2" (task661 act23): the reduce_bright_colors level for the
+            // PWM-floored hardware. finalDimLevel is in the privileged 0–99 secure range when elevated.
+            Math.round(
+                SoftwareDimming.finalDimLevel(
+                    targetBrightness = targetBrightness.toDouble(),
+                    isElevated = true,
+                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
+                    pwmExp = settings.pwmExponent.toDouble(),
+                ),
+            ).toInt()
+        } else {
+            // task646 act3-16: dim_shell = clamped_strength × dim_progress.
+            // DimDynamic (the circadian strength multiplier, task646 act6 ScalingUse branch) is wired
+            // with the real solar windows in S12 (D-040); the baseline/default config has scaling off,
+            // so the plain-strength branch (dimDynamic = null) is the correct path here.
+            Math.round(
+                SoftwareDimming.dimShell(
+                    brightness = targetBrightness.toDouble(),
+                    minBrightness = settings.minBrightness.toDouble(),
+                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
+                    dimmingExponent = settings.dimmingExponent.toDouble(),
+                    dimmingStrength = settings.dimmingStrength.toDouble(),
+                    dimDynamic = null,
+                ),
+            ).toInt()
+        }
 
         // task650 act10-14: write reduce_bright_colors_activated=1 once, then the level each cycle.
         // NOTE (G2-F9, device gate): these are the AOSP "Extra dim" secure keys
@@ -88,13 +114,13 @@ class SuperDimmingCoordinator(
         // renamed/relocated key (or require the accessibility feature pre-enabled); if engagement
         // logs "ON" here (debug 5) but the screen does not visibly dim on a given device, that is OEM
         // secure-key variance, not a logic bug — see SecureDimmingController + STATE.md D-048.
-        val level = Math.round(dimShell).toInt()
         if (!engaged) {
             secureDimming.setActivated(true)
             engaged = true
         }
         secureDimming.setLevel(level)
-        emitDebug(settings) { "ON level $level (target $targetBrightness < ${settings.dimmingThreshold})" }
+        val mode = if (pwmPath) "PWM" else "SD"
+        emitDebug(settings) { "ON ($mode) level $level (target $targetBrightness < ${settings.dimmingThreshold})" }
     }
 
     /** %AAB_Debug 5 "Super Dimming Info" (D-023, G2-F15). */

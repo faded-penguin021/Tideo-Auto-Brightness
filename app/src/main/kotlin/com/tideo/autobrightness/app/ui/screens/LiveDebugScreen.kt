@@ -37,6 +37,7 @@ import com.tideo.autobrightness.app.ui.components.AabTopBar
 import com.tideo.autobrightness.app.ui.components.DiagnosticCard
 import com.tideo.autobrightness.app.ui.components.DiagnosticLine
 import com.tideo.autobrightness.app.ui.components.fmt
+import com.tideo.autobrightness.app.ui.components.fmtAlpha
 import com.tideo.autobrightness.app.ui.components.fmtInt
 import com.tideo.autobrightness.app.ui.components.goldValue
 
@@ -129,7 +130,7 @@ fun LiveDebugContent(
             // Performance & Timings (debug.md L19-23): luxAlpha, cycle total, reactivity cooldown
             // (throttle), last animation (steps×wait) and last update — full Tasker parity (G2R-F29).
             DiagnosticCard("Performance & Timings", "debug_performance") {
-                Metric("Smoothing α (LuxAlpha)", fmt(p.luxAlpha, 3), "debug_lux_alpha")
+                Metric("Smoothing α (LuxAlpha)", fmtAlpha(p.luxAlpha), "debug_lux_alpha")
                 Metric("Cycle time (ms)", fmt(p.cycleTimeMs, 0), "debug_cycle_time")
                 Metric("Reactivity cooldown (ms)", p.throttleMs?.toString() ?: "—", "debug_throttle")
                 Metric("Last animation", animationLabel(p.animationSteps, p.animationWaitMs), "debug_last_animation")

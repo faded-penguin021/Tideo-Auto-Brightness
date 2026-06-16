@@ -13,9 +13,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.navigation.AppRoute
+import com.tideo.autobrightness.app.runtime.LiveRuntimeState
+import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
+import com.tideo.autobrightness.app.ui.components.SuperDimmingDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
@@ -37,9 +40,10 @@ fun SuperDimmingScreen(navController: NavHostController, vm: DraftSettingsViewMo
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val tier by vm.tier.collectAsStateWithLifecycle()
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
+    val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = rememberToaster()
     SuperDimmingContent(
-        draft, committed, epoch, dirty, tier,
+        draft, committed, epoch, dirty, tier, live,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         onOpenOnboarding = { navController.navigate(AppRoute.Onboarding.route) },
@@ -66,6 +70,7 @@ fun SuperDimmingContent(
     epoch: Int,
     dirty: Boolean,
     tier: Tier,
+    live: PipelineState = PipelineState(),
     onEdit: ((AabSettings) -> AabSettings) -> Unit,
     onApply: () -> Unit,
     onDiscard: () -> Unit,
@@ -142,6 +147,9 @@ fun SuperDimmingContent(
                 epoch = epoch, committed = committed.pwmExponent, isInt = false,
                 help = TaskerHelp.PWM_EXPONENT, testTag = "field_pwmExponent",
             )
+
+            // G2R-F58 live readout: %AAB_DimmingCurrent (rel) / %AAB_DimmingDS (abs) at %AAB_CurrentBright.
+            SuperDimmingDiagnosticCardContent(live)
 
             // Circadian dimming chart (re-homed here per D-026) is render-deferred to S13.
             ChartPlaceholder("DimmingChart / CircadianChart", "dimming_chart")
