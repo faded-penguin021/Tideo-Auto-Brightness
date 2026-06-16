@@ -36,6 +36,31 @@ class ThrottleControllerTest {
     }
 
     @Test
+    fun onSample_stableLightForTenSeconds_climbsToCeiling_evenWithoutACycle() {
+        // The owner's report: in stable light prof760 drops every reading and no cycle runs, so the
+        // watchdog must run on the SAMPLE path. Only-in-band samples for >10 s → ceiling.
+        val t = ThrottleController(idleMs = 10_000L)
+        t.seed(510L) // a small actual value from the last change
+        t.onSample(now = 1_000L, significant = true, ceilingMs = 1310L) // anchor on a real change
+        t.onSample(now = 9_000L, significant = false, ceilingMs = 1310L)
+        assertEquals(510L, t.throttleMs, "still within the idle window")
+        t.onSample(now = 12_000L, significant = false, ceilingMs = 1310L)
+        assertEquals(1310L, t.throttleMs, "10 s of in-band readings → throttle climbs to the ceiling")
+    }
+
+    @Test
+    fun onSample_significantReadingReanchorsTheIdleTimer() {
+        val t = ThrottleController(idleMs = 10_000L)
+        t.seed(510L)
+        t.onSample(now = 1_000L, significant = true, ceilingMs = 1310L)
+        t.onSample(now = 9_000L, significant = false, ceilingMs = 1310L)
+        // A significant reading at 9 s resets the clock, so 12 s is only 3 s of idle → no ceiling yet.
+        t.onSample(now = 9_000L, significant = true, ceilingMs = 1310L)
+        t.onSample(now = 12_000L, significant = false, ceilingMs = 1310L)
+        assertEquals(510L, t.throttleMs, "a significant reading re-anchored the idle window")
+    }
+
+    @Test
     fun afterTenSecondsOfNoChange_throttleClimbsToCeiling() {
         val t = ThrottleController(idleMs = 10_000L)
         t.seed(1310L)

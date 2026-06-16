@@ -22,10 +22,14 @@ package com.tideo.autobrightness.app.runtime
 class ThrottleController(private val idleMs: Long = 10_000L) {
 
     /** The throttle window currently in force (ms). Read by the gate; published to Live Debug. */
+    @Volatile
     var throttleMs: Long = 0L
         private set
 
-    // TIMEMS of the last brightness change; the watchdog measures idle time from here.
+    // TIMEMS of the last SIGNIFICANT change (a brightness write, or a sensor reading outside the
+    // absolute dead band); the watchdog measures idle time from here. Volatile because it is touched
+    // from both the sensor-collector ([onSample]) and the consumer ([onCycleComplete]) coroutines.
+    @Volatile
     private var lastChangeMs: Long? = null
 
     /** Seed the throttle from the user setting (service start / first cycle). */
@@ -36,6 +40,30 @@ class ThrottleController(private val idleMs: Long = 10_000L) {
 
     /** task566 act0: the throttle ceiling = AnimSteps × MaxWait + 10 (ms). */
     fun ceiling(animSteps: Int, maxWaitMs: Int): Long = animSteps.toLong() * maxWaitMs + 10L
+
+    /**
+     * Throttle Reinitialization watchdog driven from EVERY delivered sensor sample (G2R-F78
+     * follow-up). The prof760 dead-band gate drops every reading in stable light, so no cycle (and no
+     * [onCycleComplete]) ever runs there — the watchdog therefore never fired and the throttle stayed
+     * stuck at the last small value (the owner's report). Running it on the sample path fixes that:
+     *
+     *  - a **significant** sample (lux below `%AAB_ThreshAbsLow` or above `%AAB_ThreshAbsHigh`) is a
+     *    real light change → re-anchor the idle timer;
+     *  - a **stable** sample (within the dead band) past the [idleMs] window → raise the throttle to
+     *    the `AnimSteps×MaxWait+10` ceiling (task566) so the sensor stops polling in unchanging light.
+     *
+     * @param now         monotonic clock
+     * @param significant true when the raw lux fell outside the absolute dead band this sample
+     * @param ceilingMs   the [ceiling] for the current settings
+     */
+    fun onSample(now: Long, significant: Boolean, ceilingMs: Long) {
+        if (significant) {
+            lastChangeMs = now
+        } else {
+            val anchor = lastChangeMs ?: now.also { lastChangeMs = it }
+            if (now - anchor > idleMs) throttleMs = ceilingMs
+        }
+    }
 
     /**
      * Update the throttle after a cycle completes.

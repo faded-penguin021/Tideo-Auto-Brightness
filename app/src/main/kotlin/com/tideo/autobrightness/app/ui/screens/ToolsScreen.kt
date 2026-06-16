@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -42,6 +43,8 @@ fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewMo
     ToolsContent(
         recordedPoints = overridePoints,
         onBack = { navController.popBackStack() },
+        // Gate-2(5th) obs: jump straight to Curve & Brightness to see the suggested line on the chart.
+        onPreviewGraph = { navController.navigate(AppRoute.CurveBrightness.route) },
         onRunWizard = { overrides ->
             CurveSuggestionEngine.suggest(
                 CurveSuggestionInput(overrides, settings.toBrightnessCurveConfig()),
@@ -70,10 +73,11 @@ fun ToolsContent(
     onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
     recordedPoints: List<OverridePoint> = emptyList(),
+    onPreviewGraph: () -> Unit = {},
 ) {
     SettingsScaffold("Tools", onBack) { padding ->
         SettingsColumn(padding) {
-            WizardCard(recordedPoints, onRunWizard, onApplyWizard)
+            WizardCard(recordedPoints, onRunWizard, onApplyWizard, onPreviewGraph)
 
             SectionHeader("Power-draw calibration")
             Text(
@@ -92,6 +96,7 @@ private fun WizardCard(
     recorded: List<OverridePoint>,
     onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
+    onPreviewGraph: () -> Unit = {},
 ) {
     // Override points are now captured at runtime + persisted (G2R-F13). The wizard runs against the
     // recorded set; with < 9 it returns null (task38 error path).
@@ -146,6 +151,12 @@ private fun WizardCard(
                         onClick = { onApplyWizard(r); toast("Suggestion applied") },
                         modifier = Modifier.testTag("apply_wizard"),
                     ) { Text("Apply suggestion") }
+                    // Gate-2(5th) obs: jump to the Curve & Brightness chart to see the suggested line
+                    // (the chart draws the fit from the recorded points once ≥ 9 exist).
+                    OutlinedButton(
+                        onClick = onPreviewGraph,
+                        modifier = Modifier.testTag("preview_graph"),
+                    ) { Text("Preview graph") }
                     // %AAB_Test diagnostics → clipboard (D-025, G2-F15): copy the FULL verbose report.
                     OutlinedButton(
                         onClick = {

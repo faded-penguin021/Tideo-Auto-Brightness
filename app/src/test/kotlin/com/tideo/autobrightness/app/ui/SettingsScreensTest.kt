@@ -692,6 +692,34 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun toolsWizard_previewGraphButton_navigates() {
+        // Gate-2(5th) obs: the wizard offers a "Preview graph" button (≥9 real points → a result is
+        // shown with the preview action that jumps to the Curve & Brightness chart).
+        var previewed = false
+        val ninePoints = (1..9).map {
+            com.tideo.autobrightness.domain.wizard.OverridePoint(it * 10.0, it * 20.0)
+        }
+        val stubResult = com.tideo.autobrightness.domain.wizard.CurveSuggestionResult(
+            zone1End = 35L, zone2End = 10_000L, form1a = "5.0", form2a = "1.0", form2b = "8.8",
+            form2c = "18", form2d = 0L, form3a = "1.0", diagnosticsLog = "ok", qualityLines = listOf("R²=0.99"),
+        )
+        compose.setContent {
+            MaterialTheme {
+                ToolsContent(
+                    onBack = {},
+                    onRunWizard = { stubResult },
+                    onApplyWizard = {},
+                    recordedPoints = ninePoints,
+                    onPreviewGraph = { previewed = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("run_wizard").performScrollTo().performClick()
+        compose.onNodeWithTag("preview_graph").performScrollTo().performClick()
+        assertTrue(previewed, "Preview graph jumps to the curve chart")
+    }
+
+    @Test
     fun settingsDiffList_highlightsChangedFromDefault_G2RF38() {
         // G2R-F38: the Tasker dashboard's full settings list — a tuned value (minBrightness 99) is
         // flagged changed-vs-default; the summary counts it.
