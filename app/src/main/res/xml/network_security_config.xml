@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ip-api.com's free geo-IP endpoint is HTTP-only (task90 act28 GET http://ip-api.com/json, F83).
+  Permit cleartext ONLY to that host; everything else stays HTTPS-only (the minSdk-31 default).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">ip-api.com</domain>
+    </domain-config>
+</network-security-config>

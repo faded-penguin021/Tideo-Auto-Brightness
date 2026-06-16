@@ -114,7 +114,7 @@ fun CircadianContent(
     dateLocation: ExperimentDateLocation = ExperimentDateLocation(),
     todayDate: String = "",
     defaultLatLon: Pair<Double, Double>? = null,
-    onSetDateLocation: (String, Double, Double) -> Unit = { _, _, _ -> },
+    onSetDateLocation: (String, Double?, Double?) -> Unit = { _, _, _ -> },
     onUseLiveData: () -> Unit = {},
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
 ) {
@@ -173,7 +173,8 @@ fun CircadianContent(
                 helper = "Slope of the dynamic-range compression.", testTag = "field_scaleTaperSteepness",
             )
 
-            // F39: fixed Date + Lat/Lon preview override (experiment_settings.md elements35–37).
+            // F39: fixed Date and/or Lat/Lon override — drives the live circadian scaling, not just a
+            // preview (experiment_settings.md elements35–37; _ExperimentSetDate/_ExperimentClearDate).
             CircadianDateLocationCard(
                 value = dateLocation,
                 todayDate = todayDate,
@@ -199,7 +200,7 @@ fun CircadianDateLocationCard(
     value: ExperimentDateLocation,
     todayDate: String,
     currentLatLon: Pair<Double, Double>?,
-    onSet: (String, Double, Double) -> Unit,
+    onSet: (String, Double?, Double?) -> Unit,
     onUseLiveData: () -> Unit,
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
 ) {
@@ -213,12 +214,14 @@ fun CircadianDateLocationCard(
     var lonText by remember(effLon) { mutableStateOf(effLon?.let { "%.5f".format(it) } ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    SectionHeader("Date & location (preview)")
+    SectionHeader("Date & location")
     Text(
-        if (value.isUnset) {
-            "Live data — today + current location."
-        } else {
-            "Fixed: ${value.date} @ ${fmtCoord(value.latitude)}, ${fmtCoord(value.longitude)}"
+        when {
+            value.isUnset -> "Live data — today + current location."
+            // F39: date and location pin independently — show whichever is fixed.
+            value.latitude == null || value.longitude == null ->
+                "Fixed date: ${value.date ?: "live"} (live location)"
+            else -> "Fixed: ${value.date ?: "today"} @ ${fmtCoord(value.latitude)}, ${fmtCoord(value.longitude)}"
         },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -249,9 +252,14 @@ fun CircadianDateLocationCard(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = {
+                // F39: date and location are independent. Blank coords → date-only override (live
+                // location); valid coords → pin both. Date defaults to today, so it is always present.
                 val lat = latText.trim().toDoubleOrNull()
                 val lon = lonText.trim().toDoubleOrNull()
-                if (lat != null && lon != null && dateText.isNotBlank()) onSet(dateText.trim(), lat, lon)
+                val coordsBlank = latText.isBlank() && lonText.isBlank()
+                if (dateText.isNotBlank() && (coordsBlank || (lat != null && lon != null))) {
+                    onSet(dateText.trim(), lat, lon)
+                }
             },
             modifier = Modifier.testTag("exp_set"),
         ) { Text("Set fixed") }
