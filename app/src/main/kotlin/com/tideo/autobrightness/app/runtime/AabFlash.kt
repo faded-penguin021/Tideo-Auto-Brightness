@@ -33,6 +33,10 @@ object AabFlash {
     }
 
     @Volatile private var presenter: Presenter? = null
+    // F88: an in-app, tap-to-dismiss surface registered by the foreground UI ([AabFlashHost]). Used
+    // when the global Accessibility overlay is NOT enabled, so in-app flashes ("Applied", debug toasts
+    // while the app is foreground) are still dismissible by tap — a plain Toast is not tappable.
+    @Volatile private var foregroundPresenter: Presenter? = null
     private var lastToast: Toast? = null
 
     /**
@@ -44,13 +48,26 @@ object AabFlash {
         this.presenter = presenter
     }
 
+    /**
+     * Register (or clear) the foreground in-app presenter ([AabFlashHost]); lower priority than the
+     * global overlay. Cleared when the host leaves composition (app backgrounded). (F88)
+     */
+    fun registerForeground(presenter: Presenter?) {
+        if (presenter == null) foregroundPresenter?.hide()
+        this.foregroundPresenter = presenter
+    }
+
     /** True when a global presenter (the Accessibility overlay) is active. */
     fun isGlobal(): Boolean = presenter != null
 
-    /** Show [text], cancelling any in-flight flash first (G2R-F51). */
+    /**
+     * Show [text], cancelling any in-flight flash first (G2R-F51). Surface priority: the global
+     * Accessibility overlay → the foreground in-app surface → a plain Toast (F88: the first two are
+     * tap-to-dismiss; the Toast fallback is only used when neither is available, e.g. backgrounded).
+     */
     fun show(context: Context, text: String) {
         cancel()
-        val p = presenter
+        val p = presenter ?: foregroundPresenter
         if (p != null) {
             p.show(text)
         } else {
@@ -65,6 +82,7 @@ object AabFlash {
         lastToast?.cancel()
         lastToast = null
         presenter?.hide()
+        foregroundPresenter?.hide()
     }
 
     /**

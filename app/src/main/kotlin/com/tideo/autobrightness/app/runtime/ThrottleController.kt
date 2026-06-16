@@ -8,9 +8,11 @@ package com.tideo.autobrightness.app.runtime
  * Tasker model:
  *  - The main-loop throttle gate (task544) drops sensor readings that arrive within `%AAB_Throttle`
  *    of the last accepted one.
- *  - After a brightness change, `%AAB_Throttle` is set to the **actual** animation duration
- *    (`steps * wait`) — NOT a hard `MaxSteps * MaxWait` default — so the loop re-evaluates no faster
- *    than it can animate (the previous rebuild hard-defaulted it to the setting, F78).
+ *  - After a brightness change, `%AAB_Throttle` is the **actual** animation duration the engine
+ *    computed for this cycle (`loops*wait + 10 (+cycleTime)`, golden task543 — exposed as
+ *    `BrightnessPolicyOutput.transitionDurationMs`). It is NOT floored at `MaxSteps*MaxWait+10`; that
+ *    figure is only the watchdog ceiling. (The previous rebuild floored it at the setting, which
+ *    happens to equal the ceiling at defaults, so the throttle always read `MaxSteps*MaxWait+10` — F78.)
  *  - When the brightness has not changed for ~10 s (the watchdog [idleMs]), prof754 → task566 pushes
  *    the throttle up to the **ceiling** `AnimSteps * MaxWait + 10` (task566 act0) so the sensor stops
  *    polling in unchanging light (battery). The next change resets it back to the actual duration.
@@ -40,20 +42,19 @@ class ThrottleController(private val idleMs: Long = 10_000L) {
      *
      * @param now                monotonic clock
      * @param brightnessChanged  true when this cycle actually wrote a new brightness
-     * @param stepsTimesWaitMs   the actual `animationSteps × animationWaitMs` used this cycle
+     * @param actualThrottleMs   the engine's computed throttle this cycle
+     *                           (`BrightnessPolicyOutput.transitionDurationMs`, the actual steps×wait+10)
      * @param ceilingMs          the [ceiling] for the current settings
-     * @param baselineMs         the user's throttle setting (the floor for the active window)
      */
     fun onCycleComplete(
         now: Long,
         brightnessChanged: Boolean,
-        stepsTimesWaitMs: Long,
+        actualThrottleMs: Long,
         ceilingMs: Long,
-        baselineMs: Long,
     ) {
         if (brightnessChanged) {
-            // Effective throttle = the real animation duration, never below the user's setting.
-            throttleMs = stepsTimesWaitMs.coerceAtLeast(baselineMs)
+            // Effective throttle = the engine's actual animation duration (NO setting floor — F78).
+            throttleMs = actualThrottleMs.coerceAtLeast(0L)
             lastChangeMs = now
         } else {
             val since = lastChangeMs ?: now.also { lastChangeMs = it }

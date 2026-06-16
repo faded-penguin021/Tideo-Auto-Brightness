@@ -309,14 +309,14 @@ class BrightnessPipelineController(
             val cycleTotal = (clock() - cycleStart).toDouble()
             // %AAB_Debug 7 "Graph Metrics": Flash the measured cycle duration (feeds throttle).
             emitDebug(DebugCategory.GRAPH_METRICS, settings) { "cycle ${cycleTotal.toInt()}ms" }
-            // task566 / prof754: set %AAB_Throttle from the ACTUAL steps×wait this cycle, or push to the
-            // idle ceiling after ~10 s of no brightness change (G2R-F78). The setting is the floor.
+            // task566 / prof754: %AAB_Throttle is the engine's ACTUAL animation duration this cycle
+            // (transitionDurationMs = loops×wait+10+cycleTime, golden task543), NOT MaxSteps×MaxWait+10
+            // (G2R-F78). After ~10 s of no brightness change the watchdog raises it to that ceiling.
             throttle.onCycleComplete(
                 now = now,
                 brightnessChanged = brightnessChanged,
-                stepsTimesWaitMs = output.animationSteps.toLong() * output.animationWaitMs,
+                actualThrottleMs = output.transitionDurationMs,
                 ceilingMs = throttle.ceiling(settings.animSteps, settings.maxWaitMs),
-                baselineMs = settings.throttleDefaultMs,
             )
             _state.update {
                 it.copy(

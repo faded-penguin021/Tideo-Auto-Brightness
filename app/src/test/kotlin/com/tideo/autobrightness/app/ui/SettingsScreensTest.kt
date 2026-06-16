@@ -27,6 +27,7 @@ import com.tideo.autobrightness.app.ui.screens.CircadianDateLocationCard
 import com.tideo.autobrightness.app.ui.screens.LoadProfileDialog
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
 import com.tideo.autobrightness.app.ui.screens.ContextsContent
+import com.tideo.autobrightness.app.ui.components.FlashPill
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
 import com.tideo.autobrightness.app.ui.screens.LiveDebugContent
 import com.tideo.autobrightness.app.ui.screens.MiscContent
@@ -129,6 +130,19 @@ class SettingsScreensTest {
         }
         compose.onNodeWithTag("diag_dimming_rel").performScrollTo().assertTextContains("12.3", substring = true)
         compose.onNodeWithTag("diag_dimming_abs").performScrollTo().assertTextContains("45.6", substring = true)
+    }
+
+    @Test
+    fun inAppFlash_isTapToDismiss_G2RF88() {
+        // G2R-F88: the in-app flash renders as a tappable pill that dismisses on tap (a plain Toast,
+        // which passes clicks through, cannot). Tests the FlashPill wiring directly.
+        var dismissed = false
+        compose.setContent {
+            MaterialTheme { FlashPill("Applied") { dismissed = true } }
+        }
+        compose.onNodeWithTag("aab_flash").assertExists()
+        compose.onNodeWithTag("aab_flash").performClick()
+        assertTrue(dismissed, "tapping the flash should dismiss it (F88)")
     }
 
     @Test

@@ -65,6 +65,9 @@ class AmbientMonitoringService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        // F75: clear any stale separate override notification left by an older build (pre-fold) so it
+        // cannot linger beside the single foreground notification this build now uses.
+        getSystemService(NotificationManager::class.java).cancel(OVERRIDE_NOTIFICATION_ID)
 
         // AppModule composes the real graph (S7 adapters + S9a pipeline + S9b super dimming +
         // S10 context engine); writer and observer share one instance for the suppress-echo
@@ -101,9 +104,6 @@ class AmbientMonitoringService : Service() {
                 // starts the consumer + sensor + notification job before the Resume event is posted.
                 ensureRunning()
                 controller.resume()
-                // F75: clear the high-priority override alert so it does not linger beside the ongoing
-                // notification after the user resumes.
-                getSystemService(NotificationManager::class.java).cancel(OVERRIDE_NOTIFICATION_ID)
             }
             ACTION_REAPPLY -> {
                 // Settings Apply / profile load: re-run the pipeline now (G2-F16). ensureRunning()
@@ -160,19 +160,21 @@ class AmbientMonitoringService : Service() {
                 .distinctUntilChanged()
                 .collect { model ->
                     if (!model.serviceOn) return@collect
-                    getSystemService(NotificationManager::class.java)
-                        .notify(NOTIFICATION_ID, buildNotification(model))
+                    // F75: the override alert is the SAME notification (NOTIFICATION_ID), raised to the
+                    // high-priority channel on the rising edge — so it never stacks with a second one.
+                    // It pops + buzzes once, then settles back into the ongoing paused/active form on the
+                    // next emission. No separate notification ID is ever posted.
+                    val rising = model.pausedByOverride && !alertedOverride
+                    if (rising) {
+                        notifyManualOverride()
+                    } else {
+                        getSystemService(NotificationManager::class.java)
+                            .notify(NOTIFICATION_ID, buildNotification(model))
+                    }
                     // QS tile live refresh (G2R-F63): ping the tile so Off→Starting→Active/Paused
                     // renders without the panel being closed+reopened. The tile re-reads the live
                     // LiveRuntimeState/DataStore in onStartListening.
                     requestTileRefresh()
-                    // High-priority override alert + toast, once on the rising edge (G2R-F35); cancel it
-                    // on the falling edge so it does not stack with the ongoing notification (G2R-F75).
-                    if (model.pausedByOverride && !alertedOverride) {
-                        notifyManualOverride()
-                    } else if (!model.pausedByOverride && alertedOverride) {
-                        getSystemService(NotificationManager::class.java).cancel(OVERRIDE_NOTIFICATION_ID)
-                    }
                     alertedOverride = model.pausedByOverride
                 }
         }
@@ -217,8 +219,6 @@ class AmbientMonitoringService : Service() {
         // Persist the disable so boot/screen receivers do not restart the loop.
         applicationContext.settingsDataStore.updateData { it.copy(serviceEnabled = false) }
         LiveRuntimeState.reset()
-        // F75: drop the high-priority override alert if one is up so it does not outlive the service.
-        getSystemService(NotificationManager::class.java).cancel(OVERRIDE_NOTIFICATION_ID)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -244,22 +244,26 @@ class AmbientMonitoringService : Service() {
     }
 
     /**
-     * Post the high-priority manual-override notification (heads-up + vibration) and flash a toast
-     * (G2R-F35). Fired once on the override rising edge; the ongoing notification separately reflects
-     * the paused state with the Resume action (G2R-F40).
+     * Raise the **ongoing** foreground notification (NOTIFICATION_ID) to the high-priority override
+     * channel so it pops as a heads-up + buzzes once, and flash a toast (G2R-F35/F75). Because it
+     * reuses the foreground notification ID — never a second ID — it can never stack with the ongoing
+     * notification; the next emission settles it back to the low-importance paused form (G2R-F40). It
+     * keeps the ongoing FGS contract (setOngoing) + the Reset/Disable actions.
      */
     internal fun notifyManualOverride() {
         val alert = NotificationCompat.Builder(this, OVERRIDE_CHANNEL_ID)
             .setContentTitle("Manual override detected")
             .setContentText("Auto Brightness paused — tap Resume to continue")
             .setSmallIcon(R.drawable.ic_stat_brightness)
+            .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVibrate(longArrayOf(0, 200, 100, 200))
-            .setAutoCancel(true)
             .addAction(0, "Resume", actionIntent(ACTION_RESUME))
+            .addAction(0, "Reset", actionIntent(ACTION_PANIC))
+            .addAction(0, "Disable", actionIntent(ACTION_DISABLE))
             .build()
-        getSystemService(NotificationManager::class.java).notify(OVERRIDE_NOTIFICATION_ID, alert)
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, alert)
         mainHandler.post {
             Toast.makeText(this, "Manual override — auto brightness paused", Toast.LENGTH_SHORT).show()
         }

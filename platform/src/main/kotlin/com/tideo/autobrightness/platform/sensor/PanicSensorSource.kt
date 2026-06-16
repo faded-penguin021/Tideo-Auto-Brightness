@@ -29,16 +29,23 @@ import kotlin.math.sqrt
 class PanicGestureDetector(
     private val upsideDownGravityY: Float = 7.0f,
     private val shakeThreshold: Float = 12.0f,
-    // Low-pass coefficient isolating gravity from the raw accelerometer (standard Android idiom).
-    private val gravityAlpha: Float = 0.8f,
+    // Heavy low-pass so a vigorous shake does NOT drag the gravity estimate across the upside-down
+    // threshold (G2R-F77: panic must fire ONLY when genuinely inverted, never the right way up).
+    private val gravityAlpha: Float = 0.9f,
+    // The inversion must be held for this many readings before a shake can fire — a transient flip
+    // during a shake the right way up cannot satisfy it.
+    private val sustainedFrames: Int = 5,
 ) {
     private val gravity = FloatArray(3)
     private var seeded = false
+    private var upsideDownStreak = 0
 
     /**
      * Feed one raw accelerometer reading (m/s², device frame). Returns true on the reading that
-     * completes the panic gesture: the device is upside down AND a shake spike is present. Gravity is
-     * tracked across calls via the low-pass filter, so a few readings are needed before it is stable.
+     * completes the panic gesture: the device has been **stably upside down** AND a shake spike is
+     * present. "Upside down" means the gravity vector points toward the **top** of the screen (+y) AND
+     * y is the dominant axis (gy > |gx|, |gz|) — so a phone lying flat / held upright / in landscape
+     * does not qualify even while shaking (G2R-F77).
      */
     fun onAccelerometer(x: Float, y: Float, z: Float): Boolean {
         if (!seeded) {
@@ -50,16 +57,22 @@ class PanicGestureDetector(
         gravity[1] = gravityAlpha * gravity[1] + (1 - gravityAlpha) * y
         gravity[2] = gravityAlpha * gravity[2] + (1 - gravityAlpha) * z
 
-        val upsideDown = gravity[1] > upsideDownGravityY
+        val gy = gravity[1]
+        val upsideDown = gy > upsideDownGravityY &&
+            gy >= kotlin.math.abs(gravity[0]) &&
+            gy >= kotlin.math.abs(gravity[2])
+        upsideDownStreak = if (upsideDown) upsideDownStreak + 1 else 0
+
         val lx = x - gravity[0]
         val ly = y - gravity[1]
         val lz = z - gravity[2]
         val shakeMag = sqrt(lx * lx + ly * ly + lz * lz)
-        return upsideDown && shakeMag > shakeThreshold
+        return upsideDownStreak >= sustainedFrames && shakeMag > shakeThreshold
     }
 
     fun reset() {
         seeded = false
+        upsideDownStreak = 0
         gravity.fill(0f)
     }
 }

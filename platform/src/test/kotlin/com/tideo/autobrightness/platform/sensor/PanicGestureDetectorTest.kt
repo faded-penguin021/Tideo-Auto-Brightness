@@ -45,4 +45,23 @@ class PanicGestureDetectorTest {
         // The very first reading seeds the gravity filter and never fires (even if extreme).
         assertFalse(d.onAccelerometer(0f, 30f, 0f), "first reading only seeds gravity")
     }
+
+    @Test
+    fun shakeWhileFlatFaceUp_doesNotFire() {
+        val d = PanicGestureDetector()
+        // Flat on a table: gravity dominated by +z, y ≈ 0 → not upside down.
+        repeat(20) { d.onAccelerometer(0f, 0f, 9.8f) }
+        assertFalse(d.onAccelerometer(0f, 25f, 9.8f), "a shake while lying flat must not trigger panic")
+    }
+
+    @Test
+    fun inversionMustBeSustained_beforeAShakeFires() {
+        // G2R-F77: the inversion has to be held for `sustainedFrames` before a shake counts.
+        val d = PanicGestureDetector(sustainedFrames = 5)
+        d.onAccelerometer(0f, 9.8f, 0f) // seed inverted (does not count toward the streak)
+        repeat(4) {
+            assertFalse(d.onAccelerometer(0f, 40f, 0f), "a shake before the inversion is sustained must not fire")
+        }
+        assertTrue(d.onAccelerometer(0f, 40f, 0f), "fires once the inversion has been sustained")
+    }
 }

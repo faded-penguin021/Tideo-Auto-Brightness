@@ -407,9 +407,10 @@ class BrightnessPipelineControllerTest {
     }
 
     // G2R-F78: after a cycle that changes brightness, the published throttle (%AAB_Throttle) is the
-    // ACTUAL steps×wait used, floored at the user setting — not a hard max default.
+    // engine's ACTUAL animation duration (loops×wait+10, first cycle has no prior cycle-time), NOT
+    // floored at MaxSteps×MaxWait+10 — so it must be able to read below the ceiling.
     @Test
-    fun publishedThrottle_isActualStepsTimesWait() = runTest {
+    fun publishedThrottle_isActualEngineValue_notCeiling() = runTest {
         val sensor = FakeSensor()
         val brightness = FakeBrightness()
         val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
@@ -419,8 +420,11 @@ class BrightnessPipelineControllerTest {
         advanceUntilIdle()
 
         val st = controller.state.value
-        val expected = maxOf(st.animationSteps!!.toLong() * st.animationWaitMs!!, settings.throttleDefaultMs)
-        assertEquals(expected, st.throttleMs, "throttle should be the actual steps×wait (floored at the setting)")
+        // First cycle: prev=null → no cycle-time term, so throttle == loops×wait+10.
+        val expected = st.animationSteps!!.toLong() * st.animationWaitMs!! + 10L
+        assertEquals(expected, st.throttleMs, "throttle should be the actual steps×wait+10")
+        val ceiling = settings.animSteps.toLong() * settings.maxWaitMs + 10L
+        assertTrue(st.throttleMs!! < ceiling, "actual throttle must be below the MaxSteps×MaxWait+10 ceiling")
         scope.cancel()
     }
 
