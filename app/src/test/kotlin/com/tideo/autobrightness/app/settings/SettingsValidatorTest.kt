@@ -38,7 +38,7 @@ class SettingsValidatorTest {
     @Test
     fun `negative form2A triggers advisory error`() {
         // form2A = form1A * sqrt(zone1End); make form1A negative to force form2A < 0
-        val settings = AabSettings(form1A = -1, zone1End = 35)
+        val settings = AabSettings(form1A = -1.0, zone1End = 35)
         val errors = SettingsValidator.validate(settings)
         assertTrue(errors.any { it.field == "form2A" }, "Expected form2A error; got: $errors")
     }
@@ -50,7 +50,7 @@ class SettingsValidatorTest {
         val s = AabSettings(
             zone1End = 10,
             zone2End = 2000,
-            form1A = 1,
+            form1A = 1.0,
             form2B = 0.1f,
             form2C = 5,
             maxBrightness = 255,
@@ -72,7 +72,7 @@ class SettingsValidatorTest {
         val s = AabSettings(
             zone1End = 2000,
             zone2End = 10_000,
-            form1A = 1,
+            form1A = 1.0,
             form2B = 0.1f,
             form2C = 5,
             maxBrightness = 255,
@@ -103,7 +103,7 @@ class SettingsValidatorTest {
         val s = AabSettings(
             zone1End = 5,
             zone2End = 999,
-            form1A = 1,
+            form1A = 1.0,
             form2B = 0.1f,
             form2C = 2,
             maxBrightness = 255,
@@ -117,8 +117,8 @@ class SettingsValidatorTest {
 
     @Test
     fun `multiple advisory errors accumulate`() {
-        // form2C > zone1End AND form2A < 0 (form1A = -1) should both appear
-        val s = AabSettings(form1A = -1, form2C = 50, zone1End = 35)
+        // form2C > zone1End AND form2A < 0 (form1A = -1.0) should both appear
+        val s = AabSettings(form1A = -1.0, form2C = 50, zone1End = 35)
         val errors = SettingsValidator.validate(s)
         val fields = errors.map { it.field }.toSet()
         assertTrue("form2A" in fields, "Expected form2A error; got $fields")
@@ -135,7 +135,7 @@ class SettingsValidatorTest {
     @Test
     fun `the three form errors are CRITICAL and the rest are advisory`() {
         // S12.6d/G2R-F18/D-052: form2A/form3A/form2C are CRITICAL (block Apply); safety/range warn only.
-        val critical = SettingsValidator.validate(AabSettings(form1A = -1, form2C = 50, zone1End = 35))
+        val critical = SettingsValidator.validate(AabSettings(form1A = -1.0, form2C = 50, zone1End = 35))
         assertTrue(
             critical.filter { it.field in setOf("form2A", "form3A", "form2C") }
                 .all { it.severity == Severity.CRITICAL },
@@ -144,7 +144,7 @@ class SettingsValidatorTest {
 
         // A dim-but-valid curve (no form errors) only raises an ADVISORY safety warning.
         val advisory = SettingsValidator.validate(
-            AabSettings(zone1End = 10, zone2End = 2000, form1A = 1, form2B = 0.1f, form2C = 5),
+            AabSettings(zone1End = 10, zone2End = 2000, form1A = 1.0, form2B = 0.1f, form2C = 5),
         )
         assertTrue(advisory.isNotEmpty() && advisory.none { it.severity == Severity.CRITICAL })
     }

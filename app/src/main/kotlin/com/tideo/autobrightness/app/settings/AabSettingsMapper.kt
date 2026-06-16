@@ -72,7 +72,7 @@ fun AabSettings.validate(): AabSettings {
         scale = scale.coerceIn(0.1f, 10.0f),
         zone1End = clampedZone1End,
         zone2End = zone2End.coerceIn(clampedZone1End, 100_000),
-        form1A = form1A.coerceIn(1, 20),
+        form1A = form1A.coerceIn(1.0, 20.0),
         form2B = form2B.coerceIn(0.1f, 30f),
         form2C = form2C.coerceIn(1, 50),
         dimmingStrength = dimmingStrength.coerceIn(0, 100),

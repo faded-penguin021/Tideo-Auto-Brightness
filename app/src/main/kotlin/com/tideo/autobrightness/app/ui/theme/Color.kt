@@ -29,6 +29,11 @@ val AabTealLink = Color(0xFF00C79E)    // bright link / hyperlink text (about.md
 // --- Gold / amber family ---
 val AabGold = Color(0xFFFFC107)        // "strong" accent, warnings, chart current-series
 
+// Chart.js default dataset[0] blue — `rgb(54, 162, 235)`, the `Yo[0]` palette entry the Tasker
+// brightness graph (task663 `_GenerateGraph`) uses for the curve + the override scatter + the
+// suggested fit. Gate-2(5th) obs: the rebuild rendered those gold; this restores the Tasker blue.
+val AabChartBlue = Color(0xFF36A2EB)
+
 // --- Neutral surfaces (dark-first, from the scene backgrounds) ---
 val AabBackgroundDark = Color(0xFF333333) // scene bg (about.md)
 val AabSurfaceDark = Color(0xFF383838)    // card / license box (about.md)

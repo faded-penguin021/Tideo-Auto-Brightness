@@ -109,8 +109,11 @@ fun CurveBrightnessContent(
             // F69: the dashed gold reference line is the FIXED committed snapshot, not the live draft,
             // so an edit shows against where it started. The live "Curve" tracks the draft.
             val referenceConfig = remember(committed) { committed.toBrightnessCurveConfig() }
+            // Gate-2(5th) obs: a 0-lux override (which can happen) would plot at/below the log x-axis
+            // floor (0.1) and be invisible/un-tappable — clamp the DISPLAYED lux up to 0.1 so it draws
+            // at the left edge. The recorded value is untouched (deletion matches against the original).
             val overlay = remember(overridePoints) {
-                overridePoints.map { Offset(it.lux.toFloat(), it.brightness.toFloat()) }
+                overridePoints.map { Offset(it.lux.toFloat().coerceAtLeast(0.1f), it.brightness.toFloat()) }
             }
             // The fitted/suggested curve only appears once ≥ 9 points are recorded (task38, G2R-F14).
             val fittedCurve: BrightnessCurveConfig? = remember(overridePoints, curveConfig) {
@@ -161,8 +164,8 @@ fun CurveBrightnessContent(
             // "Zone 2 Offset" (form2C); zone-end fields keep the lux annotation.
             SectionHeader("Curve zones")
             NumberSettingField(
-                "Zone 1 scaling (form1A)", draft.form1A, { onEdit { s -> s.copy(form1A = it.toInt()) } },
-                epoch = epoch, committed = committed.form1A,
+                "Zone 1 scaling (form1A)", draft.form1A, { onEdit { s -> s.copy(form1A = it) } },
+                epoch = epoch, committed = committed.form1A, isInt = false,
                 help = TaskerHelp.FORM_1A, testTag = "field_form1A",
             )
             NumberSettingField(

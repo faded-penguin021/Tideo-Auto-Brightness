@@ -107,7 +107,8 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "scale" -> scale.toString()
     "zone1End" -> zone1End.toString()
     "zone2End" -> zone2End.toString()
-    "form1A" -> form1A.toString()
+    // G2R-F70: form1A is a Double; show whole values without a trailing ".0" (5.0 → "5", 5.833 → "5.833").
+    "form1A" -> if (form1A % 1.0 == 0.0) form1A.toInt().toString() else form1A.toString()
     "form2B" -> form2B.toString()
     "form2C" -> form2C.toString()
     "dimmingEnabled" -> dimmingEnabled.toString()

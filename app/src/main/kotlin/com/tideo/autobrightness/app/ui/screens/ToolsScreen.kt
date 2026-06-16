@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -42,6 +43,8 @@ fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewMo
     ToolsContent(
         recordedPoints = overridePoints,
         onBack = { navController.popBackStack() },
+        // Gate-2(5th) obs: jump straight to Curve & Brightness to see the suggested line on the chart.
+        onPreviewGraph = { navController.navigate(AppRoute.CurveBrightness.route) },
         onRunWizard = { overrides ->
             CurveSuggestionEngine.suggest(
                 CurveSuggestionInput(overrides, settings.toBrightnessCurveConfig()),
@@ -50,11 +53,10 @@ fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewMo
         onApplyWizard = { result ->
             val cfg = CurveSuggestionEngine.applyToLiveCurve(result, settings.toBrightnessCurveConfig())
             vm.update { s ->
-                // G2R-F70: the fitted curve params are continuous doubles; ROUND (not truncate) into the
-                // Int-typed schema fields so e.g. a suggested form1A of 6.8 lands as 7, not 6 — `.toInt()`
-                // truncation was a Form1A precision loss that made suggestions look like they "didn't stick".
+                // G2R-F70: the fitted curve params are continuous doubles; form1A keeps its decimal now
+                // (Double schema) — the wizard suggestion lands exactly. The remaining Int fields round.
                 s.copy(
-                    form1A = Math.round(cfg.form1A).toInt(),
+                    form1A = cfg.form1A,
                     zone1End = Math.round(cfg.zone1End).toInt(),
                     form2B = cfg.form2B.toFloat(),
                     form2C = Math.round(cfg.form2C).toInt(),
@@ -71,10 +73,11 @@ fun ToolsContent(
     onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
     recordedPoints: List<OverridePoint> = emptyList(),
+    onPreviewGraph: () -> Unit = {},
 ) {
     SettingsScaffold("Tools", onBack) { padding ->
         SettingsColumn(padding) {
-            WizardCard(recordedPoints, onRunWizard, onApplyWizard)
+            WizardCard(recordedPoints, onRunWizard, onApplyWizard, onPreviewGraph)
 
             SectionHeader("Power-draw calibration")
             Text(
@@ -93,6 +96,7 @@ private fun WizardCard(
     recorded: List<OverridePoint>,
     onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
+    onPreviewGraph: () -> Unit = {},
 ) {
     // Override points are now captured at runtime + persisted (G2R-F13). The wizard runs against the
     // recorded set; with < 9 it returns null (task38 error path).
@@ -147,6 +151,12 @@ private fun WizardCard(
                         onClick = { onApplyWizard(r); toast("Suggestion applied") },
                         modifier = Modifier.testTag("apply_wizard"),
                     ) { Text("Apply suggestion") }
+                    // Gate-2(5th) obs: jump to the Curve & Brightness chart to see the suggested line
+                    // (the chart draws the fit from the recorded points once ≥ 9 exist).
+                    OutlinedButton(
+                        onClick = onPreviewGraph,
+                        modifier = Modifier.testTag("preview_graph"),
+                    ) { Text("Preview graph") }
                     // %AAB_Test diagnostics → clipboard (D-025, G2-F15): copy the FULL verbose report.
                     OutlinedButton(
                         onClick = {

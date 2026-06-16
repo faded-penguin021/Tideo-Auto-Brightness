@@ -111,7 +111,7 @@ class UiShellTest {
             MaterialTheme {
                 DashboardContent(
                     state = DashboardUiState(
-                        serviceEnabled = false,
+                        serviceEnabled = true,
                         tier = Tier.BASIC,
                         serviceRunning = true,
                         smoothedLux = 42.0,
@@ -119,7 +119,6 @@ class UiShellTest {
                         targetBrightness = 120,
                     ),
                     onToggleService = { toggled = it },
-                    onPause = {},
                     onResume = {},
                     onOpenOnboarding = {},
                     onBack = { backed = true },
@@ -129,13 +128,52 @@ class UiShellTest {
 
         compose.onNodeWithText("Dashboard").assertExists()
         compose.onNodeWithTag("tier_badge").assertExists()
+        // G2R-F79: the master switch is the only on/off control; there is no Pause button.
+        compose.onNodeWithTag("pause_button").assertDoesNotExist()
         compose.onNodeWithTag("service_switch").performClick()
-        assertEquals(true, toggled)
-        // The live last-sample age renders (G2R-F5).
+        assertEquals(false, toggled)
+        // The live readouts render: status, lux, brightness, last-sample age (G2R-F5/F79).
+        compose.onNodeWithTag("dashboard_status").assertExists()
+        compose.onNodeWithTag("dashboard_brightness").performScrollTo().assertExists()
         compose.onNodeWithTag("last_sample_age").performScrollTo().assertExists()
         // Back returns to the Menu hub.
         compose.onNodeWithTag("back_button").performClick()
         assertTrue(backed)
+    }
+
+    @Test
+    fun dashboardContent_resumeOnlyShownOnManualOverride_G2RF79() {
+        // G2R-F79: Resume is shown only when auto-control paused itself for a DETECTED manual override.
+        var resumed = false
+        compose.setContent {
+            MaterialTheme {
+                DashboardContent(
+                    state = DashboardUiState(
+                        serviceEnabled = true, tier = Tier.BASIC, serviceRunning = true,
+                        paused = true, pausedByOverride = true,
+                    ),
+                    onToggleService = {}, onResume = { resumed = true },
+                    onOpenOnboarding = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("override_card").assertExists()
+        compose.onNodeWithTag("resume_button").performScrollTo().performClick()
+        assertTrue(resumed)
+    }
+
+    @Test
+    fun dashboardContent_noOverrideCard_whenNotOverridden_G2RF79() {
+        compose.setContent {
+            MaterialTheme {
+                DashboardContent(
+                    state = DashboardUiState(serviceEnabled = true, serviceRunning = true),
+                    onToggleService = {}, onResume = {}, onOpenOnboarding = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("override_card").assertDoesNotExist()
+        compose.onNodeWithTag("resume_button").assertDoesNotExist()
     }
 
     @Test

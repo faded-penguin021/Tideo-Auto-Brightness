@@ -28,6 +28,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -57,8 +58,26 @@ class AmbientMonitoringService : Service() {
         override fun onReceive(context: Context, intent: Intent?) {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> { controller.onScreenOff(); contextEngine.onScreenOff() }
-                Intent.ACTION_SCREEN_ON -> { controller.onScreenOn(); contextEngine.onScreenOn() }
+                Intent.ACTION_SCREEN_ON -> onScreenOn()
             }
+        }
+    }
+
+    /**
+     * Display ON (prof761 reinit). In Tasker, waking the screen resumes context automation: the reinit
+     * clears the manual context lock (`%AAB_ContextOverride`) so the context rules take over again
+     * instead of staying pinned to a manually-loaded profile (owner: screen off→on resumes context
+     * automation). Clear the latch first (when set), then run the normal reinit + context re-evaluation.
+     */
+    private fun onScreenOn() {
+        controller.onScreenOn()
+        scope.launch {
+            if (applicationContext.settingsDataStore.data.first().contextOverride) {
+                applicationContext.settingsDataStore.updateData { it.copy(contextOverride = false) }
+                contextEngine.reevaluate()
+                controller.reapply()
+            }
+            contextEngine.onScreenOn()
         }
     }
 

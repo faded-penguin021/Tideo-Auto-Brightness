@@ -29,8 +29,11 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.app.state.CircadianExtrasViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
+import com.tideo.autobrightness.app.ui.components.ChartPager
+import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCard
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
+import com.tideo.autobrightness.app.ui.components.GraphSettingsGroup
 import com.tideo.autobrightness.app.ui.components.IntSliderSettingField
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -120,7 +123,20 @@ fun CircadianContent(
 ) {
     DraftSettingsScaffold("Circadian", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
-            ChartPlaceholder("ExperimentChart / TaperChart", "dynamic_scale_chart")
+            // G2R-F81: the two relevant graphs sit ABOVE the settings and are swiped between — the
+            // Circadian (scaling) curve and the Taper (compression) curve. S13 fills the chart slots.
+            // Gate-2(5th) obs: the scaling graph is just "Circadian" (Tasker AAB Experiment Graph), not
+            // "Experiment"; the separate "Circadian Dimming" graph lives on the Super Dimming screen.
+            ChartPager(
+                listOf(
+                    ChartSlot("Circadian", "dynamic_scale_chart") {
+                        ChartPlaceholder("CircadianChart", "dynamic_scale_chart")
+                    },
+                    ChartSlot("Taper", "taper_chart") {
+                        ChartPlaceholder("TaperChart", "taper_chart")
+                    },
+                ),
+            )
 
             // Live glass-box readout: uncompressed vs true (taper-compressed) circadian scale (G2R-F8).
             CircadianDiagnosticCard(
@@ -128,50 +144,55 @@ fun CircadianContent(
                 maxBrightness = committed.maxBrightness,
             )
 
-            SectionHeader("Circadian scaling")
-            SwitchSettingRow(
-                "Enable dynamic scaling", draft.scalingEnabled,
-                { onEdit { s -> s.copy(scalingEnabled = it) } },
-                helper = "Shift the whole curve across the day using sun position.",
-                testTag = "switch_scalingEnabled",
-            )
-            NumberSettingField(
-                "Scale spread", draft.scaleSpread, { onEdit { s -> s.copy(scaleSpread = it.toInt()) } },
-                epoch = epoch, committed = committed.scaleSpread,
-                helper = "How wide the scale shifts over the day (%).", testTag = "field_scaleSpread",
-            )
-            NumberSettingField(
-                "Scale steepness", draft.scaleSteepness, { onEdit { s -> s.copy(scaleSteepness = it.toInt()) } },
-                epoch = epoch, committed = committed.scaleSteepness,
-                helper = "Sharpness of the day/night transition.", testTag = "field_scaleSteepness",
-            )
-            NumberSettingField(
-                "Transition factor", draft.scaleTransitionFactor, { onEdit { s -> s.copy(scaleTransitionFactor = it.toFloat()) } },
-                epoch = epoch, committed = committed.scaleTransitionFactor, isInt = false,
-                helper = "Duration of the dawn/dusk transition.", testTag = "field_scaleTransitionFactor",
-            )
-            // task517/674: large transition factors make the graph non-sensical.
-            if (draft.scaleTransitionFactor > 0.5f) {
-                ErrorBanner("Transition factor > 0.5 may produce a non-sensical curve.", "error_scaleTransitionFactor")
+            // G2R-F82: scaling fields feed the Circadian graph; taper fields feed the Taper graph.
+            GraphSettingsGroup("Circadian") {
+                SectionHeader("Circadian scaling")
+                SwitchSettingRow(
+                    "Enable dynamic scaling", draft.scalingEnabled,
+                    { onEdit { s -> s.copy(scalingEnabled = it) } },
+                    helper = "Shift the whole curve across the day using sun position.",
+                    testTag = "switch_scalingEnabled",
+                )
+                NumberSettingField(
+                    "Scale spread", draft.scaleSpread, { onEdit { s -> s.copy(scaleSpread = it.toInt()) } },
+                    epoch = epoch, committed = committed.scaleSpread,
+                    helper = "How wide the scale shifts over the day (%).", testTag = "field_scaleSpread",
+                )
+                NumberSettingField(
+                    "Scale steepness", draft.scaleSteepness, { onEdit { s -> s.copy(scaleSteepness = it.toInt()) } },
+                    epoch = epoch, committed = committed.scaleSteepness,
+                    helper = "Sharpness of the day/night transition.", testTag = "field_scaleSteepness",
+                )
+                NumberSettingField(
+                    "Transition factor", draft.scaleTransitionFactor, { onEdit { s -> s.copy(scaleTransitionFactor = it.toFloat()) } },
+                    epoch = epoch, committed = committed.scaleTransitionFactor, isInt = false,
+                    helper = "Duration of the dawn/dusk transition.", testTag = "field_scaleTransitionFactor",
+                )
+                // task517/674: large transition factors make the graph non-sensical.
+                if (draft.scaleTransitionFactor > 0.5f) {
+                    ErrorBanner("Transition factor > 0.5 may produce a non-sensical curve.", "error_scaleTransitionFactor")
+                }
             }
 
-            SectionHeader("Compression taper")
-            // Tasker Experiment slider: taper midpoint 130–240 (experiment_settings.md elements26, G2-F13).
-            IntSliderSettingField(
-                "Taper midpoint", draft.scaleTaperMidpoint, 130..240,
-                { onEdit { s -> s.copy(scaleTaperMidpoint = it) } },
-                committed = committed.scaleTaperMidpoint,
-                helper = "Brightness level where compression centres.", testTag = "slider_scaleTaperMidpoint",
-            )
-            // task689: taper midpoint cannot exceed current maximum brightness.
-            if (draft.scaleTaperMidpoint > draft.maxBrightness) {
-                ErrorBanner("Taper midpoint cannot exceed maximum brightness.", "error_scaleTaperMidpoint")
+            GraphSettingsGroup("Taper") {
+                SectionHeader("Compression taper")
+                // Tasker Experiment slider: taper midpoint 130–240 (experiment_settings.md elements26, G2-F13).
+                IntSliderSettingField(
+                    "Taper midpoint", draft.scaleTaperMidpoint, 130..240,
+                    { onEdit { s -> s.copy(scaleTaperMidpoint = it) } },
+                    committed = committed.scaleTaperMidpoint,
+                    helper = "Brightness level where compression centres.", testTag = "slider_scaleTaperMidpoint",
+                )
+                // task689: taper midpoint cannot exceed current maximum brightness.
+                if (draft.scaleTaperMidpoint > draft.maxBrightness) {
+                    ErrorBanner("Taper midpoint cannot exceed maximum brightness.", "error_scaleTaperMidpoint")
+                }
+                NumberSettingField(
+                    "Taper steepness", draft.scaleTaperSteepness, { onEdit { s -> s.copy(scaleTaperSteepness = it.toFloat()) } },
+                    epoch = epoch, committed = committed.scaleTaperSteepness, isInt = false,
+                    helper = "Slope of the dynamic-range compression.", testTag = "field_scaleTaperSteepness",
+                )
             }
-            NumberSettingField(
-                "Taper steepness", draft.scaleTaperSteepness, { onEdit { s -> s.copy(scaleTaperSteepness = it.toFloat()) } },
-                epoch = epoch, committed = committed.scaleTaperSteepness, isInt = false,
-                helper = "Slope of the dynamic-range compression.", testTag = "field_scaleTaperSteepness",
-            )
 
             // F39: fixed Date and/or Lat/Lon override — drives the live circadian scaling, not just a
             // preview (experiment_settings.md elements35–37; _ExperimentSetDate/_ExperimentClearDate).

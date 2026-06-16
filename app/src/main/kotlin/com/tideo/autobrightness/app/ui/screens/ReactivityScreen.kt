@@ -9,7 +9,10 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
+import com.tideo.autobrightness.app.ui.components.ChartPager
+import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
+import com.tideo.autobrightness.app.ui.components.GraphSettingsGroup
 import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -65,39 +68,54 @@ fun ReactivityContent(
 ) {
     DraftSettingsScaffold("Reactivity", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
-            ChartPlaceholder("ReactivityChart", "reactivity_chart")
+            // G2R-F81: the relevant graphs sit ABOVE the settings, swiped between (no vertical stack).
+            // The smoothing-threshold fields feed the reactivity curve; Smoothing Δ feeds the alpha
+            // curve — the two graphs the user pages through here. S13 fills the chart slots.
+            ChartPager(
+                listOf(
+                    ChartSlot("Reactivity curve", "reactivity_chart") {
+                        ChartPlaceholder("ReactivityChart", "reactivity_chart")
+                    },
+                    ChartSlot("Smoothing α", "alpha_chart") {
+                        ChartPlaceholder("AlphaChart", "alpha_chart")
+                    },
+                ),
+            )
 
             // Live glass-box readout: current dynamic threshold (as %, G2R-F56) + sensor dead zone (G2R-F7).
             ReactivityDiagnosticCardContent(live)
 
             // Labels + verbatim long-press help re-derived from extraction/scenes/reactivity_settings.md
             // (S12.6e, G2R-F19/F20/F21). The threshold fields are %aab_thresh*pc reactivity levels.
-            SectionHeader("Smoothing thresholds")
-            NumberSettingField(
-                "Dark threshold", draft.thresholdDark, { onEdit { s -> s.copy(thresholdDark = it.toFloat()) } },
-                epoch = epoch, committed = committed.thresholdDark, isInt = false,
-                help = TaskerHelp.THRESH_DARK, testTag = "field_thresholdDark",
-            )
-            NumberSettingField(
-                "Dim threshold", draft.thresholdDim, { onEdit { s -> s.copy(thresholdDim = it.toFloat()) } },
-                epoch = epoch, committed = committed.thresholdDim, isInt = false,
-                help = TaskerHelp.THRESH_DIM, testTag = "field_thresholdDim",
-            )
-            NumberSettingField(
-                "Bright threshold", draft.thresholdBright, { onEdit { s -> s.copy(thresholdBright = it.toFloat()) } },
-                epoch = epoch, committed = committed.thresholdBright, isInt = false,
-                help = TaskerHelp.THRESH_BRIGHT, testTag = "field_thresholdBright",
-            )
-            NumberSettingField(
-                "Curve slope", draft.thresholdSteepness, { onEdit { s -> s.copy(thresholdSteepness = it.toFloat()) } },
-                epoch = epoch, committed = committed.thresholdSteepness, isInt = false,
-                help = TaskerHelp.CURVE_SLOPE, testTag = "field_thresholdSteepness",
-            )
-            NumberSettingField(
-                "Curve mid (log lux)", draft.thresholdMidpoint, { onEdit { s -> s.copy(thresholdMidpoint = it) } },
-                epoch = epoch, committed = committed.thresholdMidpoint, isInt = false,
-                help = TaskerHelp.CURVE_MID, testTag = "field_thresholdMidpoint",
-            )
+            // G2R-F82: grouped + labelled by the graph they feed (the reactivity curve).
+            GraphSettingsGroup("Reactivity curve") {
+                SectionHeader("Smoothing thresholds")
+                NumberSettingField(
+                    "Dark threshold", draft.thresholdDark, { onEdit { s -> s.copy(thresholdDark = it.toFloat()) } },
+                    epoch = epoch, committed = committed.thresholdDark, isInt = false,
+                    help = TaskerHelp.THRESH_DARK, testTag = "field_thresholdDark",
+                )
+                NumberSettingField(
+                    "Dim threshold", draft.thresholdDim, { onEdit { s -> s.copy(thresholdDim = it.toFloat()) } },
+                    epoch = epoch, committed = committed.thresholdDim, isInt = false,
+                    help = TaskerHelp.THRESH_DIM, testTag = "field_thresholdDim",
+                )
+                NumberSettingField(
+                    "Bright threshold", draft.thresholdBright, { onEdit { s -> s.copy(thresholdBright = it.toFloat()) } },
+                    epoch = epoch, committed = committed.thresholdBright, isInt = false,
+                    help = TaskerHelp.THRESH_BRIGHT, testTag = "field_thresholdBright",
+                )
+                NumberSettingField(
+                    "Curve slope", draft.thresholdSteepness, { onEdit { s -> s.copy(thresholdSteepness = it.toFloat()) } },
+                    epoch = epoch, committed = committed.thresholdSteepness, isInt = false,
+                    help = TaskerHelp.CURVE_SLOPE, testTag = "field_thresholdSteepness",
+                )
+                NumberSettingField(
+                    "Curve mid (log lux)", draft.thresholdMidpoint, { onEdit { s -> s.copy(thresholdMidpoint = it) } },
+                    epoch = epoch, committed = committed.thresholdMidpoint, isInt = false,
+                    help = TaskerHelp.CURVE_MID, testTag = "field_thresholdMidpoint",
+                )
+            }
             // G2R-F85: there is NO editable "Dynamic threshold" field — %AAB_ThreshDynamic is the
             // COMPUTED adaptive dead-band for the current lux (task544), surfaced read-only in the live
             // reactivity card above (which shows the value as a percentage, not the literal token →
@@ -106,11 +124,14 @@ fun ReactivityContent(
             // once lux exceeds this"). It is the SENSOR-SMOOTHING factor (%AAB_DeltaFactor, Misc scene
             // "Smoothing Δ"): luxAlpha = 1 - exp(-deltaFactor·effectiveDelta) in BrightnessEngine — the
             // binding was already correct, only the label/help were wrong. Fixed to the verbatim help.
-            NumberSettingField(
-                "Smoothing Δ", draft.deltaFactor, { onEdit { s -> s.copy(deltaFactor = it.toFloat()) } },
-                epoch = epoch, committed = committed.deltaFactor, isInt = false,
-                help = TaskerHelp.DELTA_FACTOR, testTag = "field_deltaFactor",
-            )
+            GraphSettingsGroup("Smoothing α") {
+                SectionHeader("Sensor smoothing")
+                NumberSettingField(
+                    "Smoothing Δ", draft.deltaFactor, { onEdit { s -> s.copy(deltaFactor = it.toFloat()) } },
+                    epoch = epoch, committed = committed.deltaFactor, isInt = false,
+                    help = TaskerHelp.DELTA_FACTOR, testTag = "field_deltaFactor",
+                )
+            }
 
             SectionHeader("Override & trust")
             // task525/526 _OverrideToggle — DetectOverrides (Gate-1 G1-F2 deferral, surfaced in S12).

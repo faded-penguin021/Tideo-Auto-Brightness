@@ -14,7 +14,10 @@ data class AabSettings(
     val scale: Float = 1.0f,
     val zone1End: Int = 35,
     val zone2End: Int = 10_000,
-    val form1A: Int = 5,
+    // G2R-F70: %AAB_Form1A is a CONTINUOUS curve coefficient in Tasker (the wizard suggests e.g.
+    // 5.833); modelling it as Int silently rounded a loaded value (5.833 → 6). Stored as Double so the
+    // decimal survives a legacy load / wizard apply. Old int-encoded values read back transparently.
+    val form1A: Double = 5.0,
     val form2B: Float = 8.8f,
     val form2C: Int = 18,
     val dimmingEnabled: Boolean = false,
@@ -92,7 +95,7 @@ object AabSettingsContract {
         AabSettingRule("%AAB_Scale", "scale", AabValueType.Float, "1.0", "range 0.1..10.0"),
         AabSettingRule("%AAB_Zone1End", "zone1End", AabValueType.Int, "35", "range 1..20000"),
         AabSettingRule("%AAB_Zone2End", "zone2End", AabValueType.Int, "10000", "range 1..100000 and >= zone1End"),
-        AabSettingRule("%AAB_Form1A", "form1A", AabValueType.Int, "5", "range 1..20"),
+        AabSettingRule("%AAB_Form1A", "form1A", AabValueType.Double, "5.0", "range 1..20"),
         AabSettingRule("%AAB_Form2B", "form2B", AabValueType.Float, "8.8", "range 0.1..30.0"),
         AabSettingRule("%AAB_Form2C", "form2C", AabValueType.Int, "18", "range 1..50"),
         AabSettingRule("%AAB_DimmingEnabled", "dimmingEnabled", AabValueType.Boolean, "false", "must be true|false"),

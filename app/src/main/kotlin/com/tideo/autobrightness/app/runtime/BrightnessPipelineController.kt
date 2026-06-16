@@ -182,15 +182,26 @@ class BrightnessPipelineController(
      * and enqueue a [PipelineEvent.SensorTick]; everything else is dropped here (never queued).
      */
     private fun onSensorSample(lux: Double, accuracy: Int) {
-        // Record every delivered sample so the UI can show a live "last sample" age (G2R-F5), even
-        // for readings the prof760 dead-band/throttle gates later drop. This is the one PipelineState
-        // field written from the sensor collector rather than the consumer; it is a monotonic
-        // timestamp and MutableStateFlow.update is atomic (CAS retry), so it cannot corrupt or be
-        // lost against the consumer's snapshot writes.
-        _state.update { it.copy(lastSampleMs = clock()) }
-        val settings = cachedSettings ?: return
-        if (!settings.serviceEnabled) return
+        // Sensor-collector path. The two PipelineState fields written here (lastSampleMs, throttleMs)
+        // come from the collector rather than the consumer; both are monotonic and MutableStateFlow
+        // .update is atomic (CAS retry), so they cannot corrupt or be lost against the consumer's
+        // snapshot writes.
+        val now = clock()
+        val settings = cachedSettings
         val s = _state.value
+        // Throttle Reinitialization watchdog (task566/prof754, G2R-F78 follow-up): run it on EVERY
+        // delivered sample, because in stable light prof760's dead-band gate drops every reading and no
+        // cycle ever runs — so the throttle would otherwise stay stuck at its last small value. A
+        // reading outside [ThreshAbsLow, ThreshAbsHigh] is a significant change; 10 s of only-in-band
+        // readings raises the throttle to the AnimSteps×MaxWait+10 ceiling (stops polling).
+        if (settings != null && s.threshAbsLow != null) {
+            val significant = lux < (s.threshAbsLow ?: 0.0) || lux > (s.threshAbsHigh ?: 0.0)
+            throttle.onSample(now, significant, throttle.ceiling(settings.animSteps, settings.maxWaitMs))
+        }
+        // Record every delivered sample (live "last sample" age, G2R-F5) + the current throttle so the
+        // idle climb is visible in Live Debug without a cycle. MutableStateFlow.update is atomic.
+        _state.update { it.copy(lastSampleMs = now, throttleMs = throttle.throttleMs) }
+        if (settings == null || !settings.serviceEnabled) return
         val passes = ProfileGates.monitorAmbientLightGate(
             trustUnreliable = settings.trustUnreliableSensor,
             accuracy = accuracy,

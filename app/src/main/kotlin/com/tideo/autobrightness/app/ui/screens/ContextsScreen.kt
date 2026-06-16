@@ -352,7 +352,8 @@ private fun RuleEditor(
                 }
             }
         }
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+        // G2R-F87: the app picker is taller (still scrollable) so more apps are visible at once.
+        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
             items(apps, key = { it.packageName }) { entry ->
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -470,15 +471,31 @@ private fun parseHhMm(value: String): Pair<Int, Int>? {
 /**
  * SUNRISE/SUNSET quick-insert tokens for a time field (the resolver accepts them, G2-F14). G2R-F68:
  * when today's resolved sunrise/sunset is known, show it in theme gold (e.g. "Sunrise (06:42)").
+ *
+ * G2R-F68 (UI bug): the tokens live inside a half-width From/To column, so "Sunset (22:00)" used to
+ * char-wrap one letter per line. They are now stacked vertically (each gets the full column width)
+ * with `maxLines = 1` / `softWrap = false` so the resolved-time label always renders on one line.
  */
 @Composable
 private fun TimeTokenRow(which: String, solarLabel: Pair<String, String>?, onPick: (String) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextButton(onClick = { onPick("SUNRISE") }, modifier = Modifier.testTag("${which}_sunrise")) {
-            Text(buildString { append("Sunrise"); solarLabel?.first?.let { append(" ($it)") } }, color = AabGold)
+    Column {
+        TextButton(
+            onClick = { onPick("SUNRISE") },
+            modifier = Modifier.fillMaxWidth().testTag("${which}_sunrise"),
+        ) {
+            Text(
+                buildString { append("Sunrise"); solarLabel?.first?.let { append(" ($it)") } },
+                color = AabGold, maxLines = 1, softWrap = false, modifier = Modifier.fillMaxWidth(),
+            )
         }
-        TextButton(onClick = { onPick("SUNSET") }, modifier = Modifier.testTag("${which}_sunset")) {
-            Text(buildString { append("Sunset"); solarLabel?.second?.let { append(" ($it)") } }, color = AabGold)
+        TextButton(
+            onClick = { onPick("SUNSET") },
+            modifier = Modifier.fillMaxWidth().testTag("${which}_sunset"),
+        ) {
+            Text(
+                buildString { append("Sunset"); solarLabel?.second?.let { append(" ($it)") } },
+                color = AabGold, maxLines = 1, softWrap = false, modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

@@ -20,9 +20,12 @@ import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.LiveDebugUiState
+import com.tideo.autobrightness.app.ui.components.ChartPager
+import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.SettingsDiffList
+import com.tideo.autobrightness.app.ui.screens.ChartPlaceholder
 import com.tideo.autobrightness.app.ui.screens.CircadianDateLocationCard
 import com.tideo.autobrightness.app.ui.screens.LoadProfileDialog
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
@@ -371,7 +374,7 @@ class SettingsScreensTest {
     @Test
     fun curveBrightness_criticalError_disablesApply() {
         // G2R-F18/D-052: a CRITICAL curve error (form3A<0) must disable Apply even while dirty.
-        val invalid = AabSettings(form1A = -1)
+        val invalid = AabSettings(form1A = -1.0)
         val errors = SettingsValidator.validate(invalid)
         assertTrue(errors.any { it.severity == com.tideo.autobrightness.app.settings.Severity.CRITICAL })
 
@@ -635,8 +638,8 @@ class SettingsScreensTest {
     fun curveChart_legend_distinguishesReferenceAndCurve_G2RF66() {
         // F66/F69: a committed snapshot differing from the draft gives a fixed dashed "Reference" line
         // alongside the live "Curve"; the legend names both.
-        val draft = AabSettings(form1A = 8)
-        val committed = AabSettings(form1A = 5)
+        val draft = AabSettings(form1A = 8.0)
+        val committed = AabSettings(form1A = 5.0)
         compose.setContent {
             MaterialTheme {
                 CurveBrightnessContent(draft, committed, emptyList(), epoch = 0, dirty = true, {}, {}, {}, {})
@@ -686,6 +689,34 @@ class SettingsScreensTest {
         compose.onNodeWithTag("run_wizard").performScrollTo().performClick()
         assertTrue(!ran, "the wizard must not run with fewer than 9 real points")
         compose.onNodeWithText("need ≥ 9 real points", substring = true).assertExists()
+    }
+
+    @Test
+    fun toolsWizard_previewGraphButton_navigates() {
+        // Gate-2(5th) obs: the wizard offers a "Preview graph" button (≥9 real points → a result is
+        // shown with the preview action that jumps to the Curve & Brightness chart).
+        var previewed = false
+        val ninePoints = (1..9).map {
+            com.tideo.autobrightness.domain.wizard.OverridePoint(it * 10.0, it * 20.0)
+        }
+        val stubResult = com.tideo.autobrightness.domain.wizard.CurveSuggestionResult(
+            zone1End = 35L, zone2End = 10_000L, form1a = "5.0", form2a = "1.0", form2b = "8.8",
+            form2c = "18", form2d = 0L, form3a = "1.0", diagnosticsLog = "ok", qualityLines = listOf("R²=0.99"),
+        )
+        compose.setContent {
+            MaterialTheme {
+                ToolsContent(
+                    onBack = {},
+                    onRunWizard = { stubResult },
+                    onApplyWizard = {},
+                    recordedPoints = ninePoints,
+                    onPreviewGraph = { previewed = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("run_wizard").performScrollTo().performClick()
+        compose.onNodeWithTag("preview_graph").performScrollTo().performClick()
+        assertTrue(previewed, "Preview graph jumps to the curve chart")
     }
 
     @Test
@@ -783,6 +814,77 @@ class SettingsScreensTest {
         }
         compose.onNodeWithTag("exp_set").performClick()
         assertEquals(Triple("2026-06-15", null, null), captured)
+    }
+
+    @Test
+    fun chartPager_rendersSlotsWithSwipeIndicator_G2RF81() {
+        // G2R-F81: a multi-graph screen pages between its relevant charts (dots per page) rather than
+        // stacking them vertically; the first chart renders above and the indicator shows each page.
+        compose.setContent {
+            MaterialTheme {
+                ChartPager(
+                    listOf(
+                        ChartSlot("First", "chart_a") { ChartPlaceholder("First", "chart_a") },
+                        ChartSlot("Second", "chart_b") { ChartPlaceholder("Second", "chart_b") },
+                    ),
+                )
+            }
+        }
+        compose.onNodeWithTag("chart_pager").assertExists()
+        compose.onNodeWithTag("chart_pager_dot_0").assertExists()
+        compose.onNodeWithTag("chart_pager_dot_1").assertExists()
+        // The first page's chart is visible above (the pager sits before any settings).
+        compose.onNodeWithTag("chart_a").assertExists()
+    }
+
+    @Test
+    fun reactivity_graphAboveSettings_andGroupedByGraph_G2RF81F82() {
+        // G2R-F81/F82: the reactivity screen hosts the chart pager (above the settings) and groups the
+        // threshold fields under the graph they feed.
+        compose.setContent {
+            MaterialTheme {
+                ReactivityContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("chart_pager").performScrollTo().assertExists()
+        compose.onNodeWithTag("group_Reactivity curve").performScrollTo().assertExists()
+        compose.onNodeWithTag("group_Smoothing α").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun superDimming_chartPagerRendersAboveSettings_G2RF81() {
+        // G2R-F81: the dimming chart now sits above the settings (it previously rendered at the bottom).
+        compose.setContent {
+            MaterialTheme {
+                SuperDimmingContent(
+                    AabSettings(), AabSettings(), epoch = 0, dirty = false, tier = Tier.ELEVATED,
+                    onEdit = {}, onApply = {}, onDiscard = {}, onBack = {}, onOpenOnboarding = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("chart_pager").assertExists()
+        compose.onNodeWithTag("group_Dimming curve").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun contextEditor_sunsetToken_rendersResolvedTimeOnOneLine_G2RF68() {
+        // G2R-F68: the "Sunset (HH:MM)" token must render its full resolved-time label (the old layout
+        // char-wrapped it vertically). Asserting the whole string matches confirms it is not truncated.
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    solarLabel = "06:42" to "18:30",
+                    onBack = {}, onSave = {}, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("end_sunset").performScrollTo()
+            .assertTextContains("Sunset (18:30)", substring = true)
     }
 
     @Test

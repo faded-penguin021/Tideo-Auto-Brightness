@@ -101,7 +101,7 @@ class SettingsViewModelTest {
             app.settingsDataStore.updateData {
                 AabSettings(
                     serviceEnabled = true,
-                    form1A = 17, minBrightness = 80, maxBrightness = 200,
+                    form1A = 17.0, minBrightness = 80, maxBrightness = 200,
                     deltaFactor = 3.3f, animSteps = 90,
                 )
             }

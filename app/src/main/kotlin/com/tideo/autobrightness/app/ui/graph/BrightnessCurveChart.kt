@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import com.tideo.autobrightness.app.ui.theme.AabChartBlue
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
@@ -63,13 +64,15 @@ fun BrightnessCurveChart(
     val series = buildList {
         referencePoints?.let { add(ChartSeries("Reference", it, AabGold, strokeWidthPx = 3f, dashed = true)) }
         add(ChartSeries("Curve", curvePoints, MaterialTheme.colorScheme.primary))
-        fittedPoints?.let { add(ChartSeries("Suggested", it, MaterialTheme.colorScheme.secondary, strokeWidthPx = 2f)) }
+        // Gate-2(5th) obs: Tasker draws the suggested fit + the override scatter in the Chart.js blue
+        // (rgb 54,162,235), not gold/red — restore it for parity.
+        fittedPoints?.let { add(ChartSeries("Suggested", it, AabChartBlue, strokeWidthPx = 2f)) }
     }
 
     val scatter = if (overridePoints.isNotEmpty()) {
         ChartScatter(
             points = overridePoints,
-            color = MaterialTheme.colorScheme.error,
+            color = AabChartBlue,
             onTap = onDeleteOverridePoint,
         )
     } else {
