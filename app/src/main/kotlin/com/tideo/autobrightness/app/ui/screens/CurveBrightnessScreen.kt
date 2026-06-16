@@ -161,8 +161,8 @@ fun CurveBrightnessContent(
             // "Zone 2 Offset" (form2C); zone-end fields keep the lux annotation.
             SectionHeader("Curve zones")
             NumberSettingField(
-                "Zone 1 scaling (form1A)", draft.form1A, { onEdit { s -> s.copy(form1A = it.toInt()) } },
-                epoch = epoch, committed = committed.form1A,
+                "Zone 1 scaling (form1A)", draft.form1A, { onEdit { s -> s.copy(form1A = it) } },
+                epoch = epoch, committed = committed.form1A, isInt = false,
                 help = TaskerHelp.FORM_1A, testTag = "field_form1A",
             )
             NumberSettingField(

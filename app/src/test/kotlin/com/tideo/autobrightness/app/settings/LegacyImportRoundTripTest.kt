@@ -69,7 +69,7 @@ class LegacyImportRoundTripTest {
         assertEquals(1.0f, settings.scale, 0.001f)
         assertEquals(35, settings.zone1End)
         assertEquals(10000, settings.zone2End)
-        assertEquals(5, settings.form1A)
+        assertEquals(5.0, settings.form1A, 0.0001)
         assertEquals(8.8f, settings.form2B, 0.001f)
         assertEquals(18, settings.form2C)
         assertFalse(settings.dimmingEnabled)
@@ -160,7 +160,7 @@ class LegacyImportRoundTripTest {
         // general
         assertEquals(50, s.zone1End)
         assertEquals(8000, s.zone2End)
-        assertEquals(7, s.form1A)
+        assertEquals(7.0, s.form1A, 0.0001)
         assertEquals(9.9f, s.form2B, 0.001f)
         assertEquals(20, s.form2C)
         // misc
@@ -211,10 +211,11 @@ class LegacyImportRoundTripTest {
     }
 
     // G2R-F70: Tasker stores curve params as continuous doubles, so a legacy export may carry a
-    // decimal for an Int-typed field (e.g. Form1A from the wizard fit). The old `toIntOrNull()`
-    // returned null on "6.8", silently leaving the default — the "Form1A didn't stick" symptom.
+    // decimal for fields the rebuild keeps as Int (Form2C/MinBright/Throttle round); but Form1A is a
+    // continuous Double (G2R-F70) and must keep its decimal — the old `toIntOrNull()` returned null on
+    // "6.8" (dropping to the default), and the 8c round (6.8 → 7) lost the precision the owner reported.
     @Test
-    fun `key=value decimal integers round instead of dropping`() {
+    fun `key=value Form1A keeps its decimal while Int fields round`() {
         val raw = """
             %AAB_Form1A = 6.8
             %AAB_Form2C = 17.4
@@ -222,18 +223,18 @@ class LegacyImportRoundTripTest {
             %AAB_Throttle = 1500.6
         """.trimIndent()
         val s = TaskerLegacyProfileSerializer.deserialize(raw)
-        assertEquals(7, s.form1A, "6.8 must round to 7, not drop to the default 5")
-        assertEquals(17, s.form2C, "17.4 rounds to 17")
+        assertEquals(6.8, s.form1A, 1e-9, "6.8 must be preserved exactly, not rounded to 7 or dropped to 5")
+        assertEquals(17, s.form2C, "17.4 rounds to 17 (still Int)")
         assertEquals(12, s.minBrightness)
         assertEquals(1501L, s.throttleDefaultMs, "1500.6 rounds to 1501")
     }
 
     @Test
-    fun `nested JSON fractional Form1A rounds`() {
+    fun `nested JSON fractional Form1A is preserved`() {
         val s = TaskerLegacyProfileSerializer.deserialize(
             """{ "general": { "form1a": 6.834 } }""",
         )
-        assertEquals(7, s.form1A)
+        assertEquals(6.834, s.form1A, 1e-9)
     }
 
     // G2R-F70: a legacy load = hard-coded task570 defaults THEN the file's diffs. A config that omits a

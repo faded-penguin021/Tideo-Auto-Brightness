@@ -374,7 +374,7 @@ class SettingsScreensTest {
     @Test
     fun curveBrightness_criticalError_disablesApply() {
         // G2R-F18/D-052: a CRITICAL curve error (form3A<0) must disable Apply even while dirty.
-        val invalid = AabSettings(form1A = -1)
+        val invalid = AabSettings(form1A = -1.0)
         val errors = SettingsValidator.validate(invalid)
         assertTrue(errors.any { it.severity == com.tideo.autobrightness.app.settings.Severity.CRITICAL })
 
@@ -638,8 +638,8 @@ class SettingsScreensTest {
     fun curveChart_legend_distinguishesReferenceAndCurve_G2RF66() {
         // F66/F69: a committed snapshot differing from the draft gives a fixed dashed "Reference" line
         // alongside the live "Curve"; the legend names both.
-        val draft = AabSettings(form1A = 8)
-        val committed = AabSettings(form1A = 5)
+        val draft = AabSettings(form1A = 8.0)
+        val committed = AabSettings(form1A = 5.0)
         compose.setContent {
             MaterialTheme {
                 CurveBrightnessContent(draft, committed, emptyList(), epoch = 0, dirty = true, {}, {}, {}, {})

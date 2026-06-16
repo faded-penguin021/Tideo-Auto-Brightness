@@ -40,7 +40,8 @@ object TaskerLegacyProfileSerializer {
         (root["general"] as? JsonObject)?.let { g ->
             g.intRound("z1_end")?.let { s = s.copy(zone1End = it) }
             g.intRound("z2_end")?.let { s = s.copy(zone2End = it) }
-            g.intRound("form1a")?.let { s = s.copy(form1A = it) }
+            // G2R-F70: form1a is a continuous double in Tasker (e.g. 5.833) — keep the decimal.
+            g.dbl("form1a")?.let { s = s.copy(form1A = it) }
             g.flt("form2b")?.let { s = s.copy(form2B = it) }
             g.intRound("form2c")?.let { s = s.copy(form2C = it) }
             // form2a/form2d/form3a are DERIVED (task637 performLoad recomputes them) — not stored.
@@ -107,7 +108,8 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_Scale"]?.toFloatOrNull()?.let { settings = settings.copy(scale = it) }
         map["%AAB_Zone1End"]?.asRoundedInt()?.let { settings = settings.copy(zone1End = it) }
         map["%AAB_Zone2End"]?.asRoundedInt()?.let { settings = settings.copy(zone2End = it) }
-        map["%AAB_Form1A"]?.asRoundedInt()?.let { settings = settings.copy(form1A = it) }
+        // G2R-F70: keep Form1A's decimal (continuous coefficient), do not round to Int.
+        map["%AAB_Form1A"]?.trim()?.toDoubleOrNull()?.let { settings = settings.copy(form1A = it) }
         map["%AAB_Form2B"]?.toFloatOrNull()?.let { settings = settings.copy(form2B = it) }
         map["%AAB_Form2C"]?.asRoundedInt()?.let { settings = settings.copy(form2C = it) }
         map["%AAB_DimmingEnabled"]?.let { settings = settings.copy(dimmingEnabled = it.asBoolean(settings.dimmingEnabled)) }

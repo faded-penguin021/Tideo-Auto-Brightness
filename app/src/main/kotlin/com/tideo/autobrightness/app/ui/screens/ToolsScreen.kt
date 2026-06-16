@@ -50,11 +50,10 @@ fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewMo
         onApplyWizard = { result ->
             val cfg = CurveSuggestionEngine.applyToLiveCurve(result, settings.toBrightnessCurveConfig())
             vm.update { s ->
-                // G2R-F70: the fitted curve params are continuous doubles; ROUND (not truncate) into the
-                // Int-typed schema fields so e.g. a suggested form1A of 6.8 lands as 7, not 6 — `.toInt()`
-                // truncation was a Form1A precision loss that made suggestions look like they "didn't stick".
+                // G2R-F70: the fitted curve params are continuous doubles; form1A keeps its decimal now
+                // (Double schema) — the wizard suggestion lands exactly. The remaining Int fields round.
                 s.copy(
-                    form1A = Math.round(cfg.form1A).toInt(),
+                    form1A = cfg.form1A,
                     zone1End = Math.round(cfg.zone1End).toInt(),
                     form2B = cfg.form2B.toFloat(),
                     form2C = Math.round(cfg.form2C).toInt(),

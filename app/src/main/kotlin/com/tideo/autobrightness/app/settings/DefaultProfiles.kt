@@ -44,7 +44,7 @@ object DefaultProfiles {
         throttleDefaultMs = 5010L, // 50*100+10
         thresholdBright = 0.3f,
         thresholdDark = 0.4f,
-        form1A = 6,
+        form1A = 6.0,
         dimmingEnabled = true,
         dimmingThreshold = 20,
     )
@@ -58,7 +58,7 @@ object DefaultProfiles {
         animSteps = 10,
         minWaitMs = 10,
         deltaFactor = 4.0f,
-        form1A = 8,
+        form1A = 8.0,
         zone1End = 55,
         zone2End = 18000,
     )

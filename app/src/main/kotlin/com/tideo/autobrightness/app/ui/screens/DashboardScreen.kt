@@ -188,8 +188,17 @@ private fun BrightnessCard(state: DashboardUiState) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text("Brightness", style = MaterialTheme.typography.labelMedium)
+            // Gate-2(5th) obs: the pipeline only publishes its state AFTER the animation settles, so the
+            // applied and target values are always equal here (mid-animation frames are never surfaced) —
+            // showing "X → Y" was confusing because X==Y. Render the single applied level, and only fall
+            // back to the "→ target" form on the rare snapshot where they genuinely differ.
+            val cur = state.currentBrightness
+            val tgt = state.targetBrightness
             Text(
-                "${state.currentBrightness.fmtInt()} → ${state.targetBrightness.fmtInt()} (target)",
+                when {
+                    cur != null && tgt != null && cur != tgt -> "$cur → $tgt (target)"
+                    else -> "${(cur ?: tgt).fmtInt()} / 255"
+                },
                 modifier = Modifier.testTag("dashboard_brightness"),
             )
             // Only surface circadian scale when it is actually shifting the curve.

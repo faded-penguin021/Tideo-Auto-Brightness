@@ -124,13 +124,15 @@ fun CircadianContent(
     DraftSettingsScaffold("Circadian", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             // G2R-F81: the two relevant graphs sit ABOVE the settings and are swiped between — the
-            // Experiment (scaling) curve and the Taper (compression) curve. S13 fills the chart slots.
+            // Circadian (scaling) curve and the Taper (compression) curve. S13 fills the chart slots.
+            // Gate-2(5th) obs: the scaling graph is just "Circadian" (Tasker AAB Experiment Graph), not
+            // "Experiment"; the separate "Circadian Dimming" graph lives on the Super Dimming screen.
             ChartPager(
                 listOf(
-                    ChartSlot("Experiment curve", "dynamic_scale_chart") {
-                        ChartPlaceholder("ExperimentChart", "dynamic_scale_chart")
+                    ChartSlot("Circadian", "dynamic_scale_chart") {
+                        ChartPlaceholder("CircadianChart", "dynamic_scale_chart")
                     },
-                    ChartSlot("Taper curve", "taper_chart") {
+                    ChartSlot("Taper", "taper_chart") {
                         ChartPlaceholder("TaperChart", "taper_chart")
                     },
                 ),
@@ -142,8 +144,8 @@ fun CircadianContent(
                 maxBrightness = committed.maxBrightness,
             )
 
-            // G2R-F82: scaling fields feed the Experiment graph; taper fields feed the Taper graph.
-            GraphSettingsGroup("Experiment curve") {
+            // G2R-F82: scaling fields feed the Circadian graph; taper fields feed the Taper graph.
+            GraphSettingsGroup("Circadian") {
                 SectionHeader("Circadian scaling")
                 SwitchSettingRow(
                     "Enable dynamic scaling", draft.scalingEnabled,
@@ -172,7 +174,7 @@ fun CircadianContent(
                 }
             }
 
-            GraphSettingsGroup("Taper curve") {
+            GraphSettingsGroup("Taper") {
                 SectionHeader("Compression taper")
                 // Tasker Experiment slider: taper midpoint 130–240 (experiment_settings.md elements26, G2-F13).
                 IntSliderSettingField(
