@@ -17,6 +17,33 @@ android {
         versionName = "1.0"
     }
 
+    // Release signing is driven entirely by environment variables so that no
+    // keystore material ever lives in the repo. In CI (release-signing.yml) the
+    // keystore is base64-decoded from the ANDROID_KEYSTORE secret to the path in
+    // ANDROID_KEYSTORE_FILE. Locally, with the env unset, the release build is
+    // left unsigned (debug builds are unaffected).
+    val keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+    val hasReleaseSigning = !keystoreFile.isNullOrBlank() && file(keystoreFile).exists()
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(keystoreFile)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+
     buildFeatures {
         compose = true
     }
