@@ -1,30 +1,19 @@
-name: Release Signing
+name: Release
 
-# Builds, tests, and signs a release APK on every APK-affecting push to main,
-# uploading it as a downloadable artifact so any merge can be side-loaded and
-# tested. This does NOT create a GitHub Release — that's release.yml, triggered
-# by pushing a v* tag. The `paths` filter skips docs-only / STATE-only merges.
+# Publishes a GitHub Release with the signed APK attached — but ONLY when you
+# push a version tag (e.g. `git tag v1.0.0 && git push origin v1.0.0`).
+# The Releases page therefore means "I decided this is a release", not "every
+# merge". Continuous build/test/artifact on main lives in release-signing.yml.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'app/**'
-      - 'domain/**'
-      - 'platform/**'
-      - 'gradle/**'
-      - 'build.gradle.kts'
-      - 'settings.gradle.kts'
-      - 'gradle.properties'
-      - 'gradle/libs.versions.toml'
-      - '.github/workflows/release-signing.yml'
-  # Allow manual runs for testing the pipeline.
-  workflow_dispatch:
+    tags:
+      - 'v*'
 
 permissions:
-  contents: read
+  contents: write  # needed to create the GitHub Release + upload assets
 
 jobs:
-  build-signed-apk:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,7 +37,7 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      # Acceptance ladder (CLAUDE.md) — fail before we sign a broken build.
+      # Acceptance ladder (CLAUDE.md) — never cut a release from a broken tree.
       - name: Test + lint
         run: ./gradlew :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug --no-daemon
 
@@ -76,10 +65,10 @@ jobs:
           "$APKSIGNER" verify --print-certs \
             app/build/outputs/apk/release/app-release.apk
 
-      - name: Upload signed APK artifact
-        uses: actions/upload-artifact@v4
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: app-release
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-          retention-days: 30
+          # tag_name / name default to the pushed tag (github.ref_name).
+          files: app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true
+          generate_release_notes: true
