@@ -72,3 +72,6 @@ jobs:
           files: app/build/outputs/apk/release/app-release.apk
           fail_on_unmatched_files: true
           generate_release_notes: true
+          # Tags with a pre-release suffix (a hyphen, e.g. v0.1.0-rc1) are
+          # published as pre-releases; clean semver tags (v1.0.0) are full releases.
+          prerelease: ${{ contains(github.ref_name, '-') }}
