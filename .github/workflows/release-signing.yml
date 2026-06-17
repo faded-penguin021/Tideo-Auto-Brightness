@@ -1,7 +1,7 @@
 name: Release Signing
 
-# Builds and signs a release APK when APK-affecting changes land on main.
-# The `paths` filter keeps this from running on docs-only / STATE-only merges.
+# Builds, signs, and publishes a release APK when APK-affecting changes land on
+# main. The `paths` filter keeps this from running on docs-only / STATE-only merges.
 on:
   push:
     branches: [main]
@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # needed to create the GitHub Release + tag
 
 jobs:
   build-signed-apk:
@@ -46,6 +46,10 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      # Acceptance ladder (CLAUDE.md) — fail before we sign a broken build.
+      - name: Test + lint
+        run: ./gradlew :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug --no-daemon
+
       - name: Decode keystore
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
@@ -63,9 +67,33 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/release.jks"
 
-      - name: Upload signed APK
+      # Hard-fail if the APK isn't actually signed (regression guard).
+      - name: Verify APK is signed
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs \
+            app/build/outputs/apk/release/app-release.apk
+
+      # Derive the release tag: v<versionName>-build<run#>, e.g. v1.0-build42.
+      - name: Compute release tag
+        id: tag
+        run: |
+          VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
+          echo "tag=v${VERSION_NAME}-build${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          files: app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+          retention-days: 30
