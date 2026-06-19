@@ -5,7 +5,7 @@
 | Task id | `task38` (`<id>38</id>`) |
 | Name | `_SuggestCurveParameters V24 (Hybrid)` |
 | XML line range | L9779–L10913 (17 actions, `act0`–`act16`) |
-| Big Java block | `act4`, `<code>474</code>` at L9921, source `arg0` L9922–L10868 (decoded: `docs/rebuild/extraction/java/task38_1_suggestcurveparameters-v24-hybrid.java`, "AAB Curve Fitting Engine V43.8") |
+| Big Java block | `act4`, `<code>474</code>` at L9921, source `arg0` L9922–L10868 (decoded: `docs/rebuild/extraction/_source/java/task38_1_suggestcurveparameters-v24-hybrid.java.txt`, "AAB Curve Fitting Engine V43.8") |
 | Applier task | `task655 "_SetSuggestedVariables"` (L32574–L32829) — maps `%suggestion_*` → live `%AAB_*` |
 
 ---

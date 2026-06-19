@@ -1,8 +1,9 @@
 # Tideo Auto Brightness — Tasker → Kotlin rebuild
 
 You are one session in a multi-session rebuild program. The program converts the Tasker project
-`Advanced_Auto_Brightness_V3.3.prj_9.xml` (repo root, 1.6 MB — **NEVER read it wholesale; use
-`docs/rebuild/XML_RECIPES.md`**) into a modern Kotlin/Compose Android app with feature parity.
+`Advanced_Auto_Brightness_V3.3.prj_9.xml` (`docs/rebuild/extraction/_source/`, gitignored, 1.6 MB —
+**NEVER read it wholesale; use `docs/rebuild/XML_RECIPES.md`**) into a modern Kotlin/Compose Android app
+with feature parity.
 A previous AI conversion attempt was audited: parts are salvaged (see ledger below), the rest is
 rebuilt segment by segment. Work happens on **your session's assigned `claude/*` branch** (see Git rules).
 
@@ -47,7 +48,6 @@ and there is no wrapper; S3 bootstraps via `/opt/gradle/bin/gradle` (8.14.3, Jav
   foreground-app readers.
 - `:app` — Compose M3 UI (~9 screens), DataStore settings (`AabSettings`), foreground service
   runtime (`specialUse` type), QS tile, boot receiver, notification with actions.
-- `:data` — orphaned legacy module, retired in S3. Do not add code to it.
 
 Privilege tiers: BASIC = user-grantable WRITE_SETTINGS → full core pipeline works.
 ELEVATED = WRITE_SECURE_SETTINGS via one-time `pm grant` (adb / Shizuku / root) → super

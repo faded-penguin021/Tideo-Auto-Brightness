@@ -8,7 +8,7 @@ Java blocks decoded with Python `html.unescape`. Provenance is stamped in every 
 
 | Deliverable | Path | Count |
 |---|---|---|
-| Embedded Java blocks (verbatim, decoded) | `extraction/java/task<id>_<n>_<slug>.java` | **40** (matches R7 census) |
+| Embedded Java blocks (verbatim, decoded) | `extraction/_source/java/task<id>_<n>_<slug>.java.txt` | **40** (matches R7 census) |
 | Pipeline/feature task transcriptions | `extraction/tasks/task<id>_<slug>.md` | **28** |
 | Pipeline-triggering profiles | `extraction/profiles.md` | 10 (prof753,754,755,756,757,758,759,760,761,769) |
 | End-to-end pipeline spec | `extraction/pipeline_spec.md` | 1 |

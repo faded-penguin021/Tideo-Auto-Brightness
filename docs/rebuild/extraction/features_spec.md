@@ -3,7 +3,7 @@
 Ground-truth extraction of 7 ancillary feature clusters (QS tile, foreground notification, power
 calibration, debug, **formula validation**, import/export + default profiles, privilege detection/learn).
 Source: `Advanced_Auto_Brightness_V3.3.prj_9.xml` (sed windows ≤150 lines, entities `html.unescape`-decoded).
-Java blocks cross-referenced from `extraction/java/`. Provenance line numbers stamped per item.
+Java blocks cross-referenced from `extraction/_source/java/`. Provenance line numbers stamped per item.
 
 Action-code legend used below (from INDEX.md, verified in place):
 37/38/43 = If/EndIf/Else · 47 = Show Scene · 49 = Hide Scene · 51 = Element Text(set) · 53 = Element Web JS ·
@@ -90,7 +90,7 @@ Settings toggle for the notification feature. State machine on **`%AAB_NotifyUse
 
 ## 3. Power-draw calibration — task524 `_CalibratePowerDraw` (Java, L14247-14702)
 
-Full Java in `extraction/java/task524_1_calibratepowerdraw.java`. Builds an empirical
+Full Java in `extraction/_source/java/task524_1_calibratepowerdraw.java.txt`. Builds an empirical
 brightness→power(mA/W) curve by sweeping the screen and reading the battery current sensor.
 
 **Entry (`tasker.doWithActivity`):** if `%AAB_HTML_Graph8` already has data (>50 chars) show an

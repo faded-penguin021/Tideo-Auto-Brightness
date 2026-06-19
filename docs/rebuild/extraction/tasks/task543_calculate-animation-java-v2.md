@@ -8,7 +8,7 @@
 
 | act | line | code | detail | condition |
 |---|---|---|---|---|
-| 0 | L15877 | 474 Java Code | **Java Code** → `` (see `java/task543_*.java`) |  |
+| 0 | L15877 | 474 Java Code | **Java Code** → `` (see `_source/java/task543_*.java.txt`) |  |
 | 1 | L15920 | 126 Return | **Return** `%loops,%wait` |  |
 
 **Variables written:** (none)

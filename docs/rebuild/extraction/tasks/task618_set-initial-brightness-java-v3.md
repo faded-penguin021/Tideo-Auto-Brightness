@@ -23,7 +23,7 @@
 | 12 | L25798 | 135 Stop(?) | **Stop(?)** arg0=1 arg1=1 arg2=`top_of_loop` |  |
 | 13 | L25804 | 38 End If | **End If** |  |
 | 14 | L25807 | 598 Variable Search Replace | **Var Search/Replace** in `%as_values1` arg0=`%as_values1` arg1=`^\[(.+)\]$` arg6=1 arg7=`$1` | `%as_values1 is set ` |
-| 15 | L25825 | 474 Java Code | **Java Code** → `` (see `java/task618_*.java`) |  |
+| 15 | L25825 | 474 Java Code | **Java Code** → `` (see `_source/java/task618_*.java.txt`) |  |
 | 16 | L25849 | 547 Variable Set | _This skips animations during Map Lux to Brightness_ — **Set** `%orig_debug` = `1` | `%AAB_PWMSensitive != true` |
 | 17 | L25867 | 547 Variable Set | _This skips smoothing and ensures the new value is set with a maximum alpha. Passed as %par2 into Map Lux To Brightness task._ — **Set** `%LuxAlpha` = `1` |  |
 | 18 | L25878 | 159 code159 | **code159** arg0=`Monitor Ambient Light` |  |
@@ -44,7 +44,7 @@
 | 33 | L26051 | 547 Variable Set | **Set** `%AAB_Throttle` = `%AAB_AnimSteps * %AAB_MaxWait + 10` [DoMaths] |  |
 | 34 | L26061 | 547 Variable Set | **Set** `%AAB_LastSensorAccuracy` = `%as_accuracy` | `%as_accuracy is set ` |
 | 35 | L26078 | 547 Variable Set | **Set** `%AAB_LastRawLux` = `%as_values1` | `%as_values1 is set ` |
-| 36 | L26095 | 474 Java Code | _This prevents Monitor Ambient Light profile from interfering from the brightness set in this task._ — **Java Code** → `` (see `java/task618_*.java`) | `%AAB_DefaultThrottle is set ` |
+| 36 | L26095 | 474 Java Code | _This prevents Monitor Ambient Light profile from interfering from the brightness set in this task._ — **Java Code** → `` (see `_source/java/task618_*.java.txt`) | `%AAB_DefaultThrottle is set ` |
 | 37 | L26124 | 130 Perform Task | **Perform Task** "_ContextF5NetLoc V8" (pri=%priority) | `%AAB_Manual_Override != true` **And** `%AAB_Service = On` **And** `%AAB_ContextCache = *[LOC]*` **And** `%AAB_ContextOverride != true` |
 | 38 | L26165 | 159 code159 | **code159** arg0=`Monitor Ambient Light` arg1=1 |  |
 | 39 | L26170 | 159 code159 | **code159** arg0=`Proximity Detection` arg1=1 |  |

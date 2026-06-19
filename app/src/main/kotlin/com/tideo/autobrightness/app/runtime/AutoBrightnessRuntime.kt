@@ -3,7 +3,6 @@ package com.tideo.autobrightness.app.runtime
 import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -44,11 +43,8 @@ object AutoBrightnessRuntime {
         val appContext = context.applicationContext
         val intent = Intent(appContext, AmbientMonitoringService::class.java).setAction(action)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                appContext.startForegroundService(intent)
-            } else {
-                appContext.startService(intent)
-            }
+            // minSdk 31 ≥ O, so startForegroundService is always available (S12.9a dead-branch removal).
+            appContext.startForegroundService(intent)
         } catch (_: IllegalStateException) {
             // Service not currently running — pause/resume only apply while it is, so ignore.
         }
@@ -70,11 +66,8 @@ object AutoBrightnessRuntime {
             putExtra(AmbientMonitoringService.EXTRA_REASON, reason)
         }
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                appContext.startForegroundService(intent)
-            } else {
-                appContext.startService(intent)
-            }
+            // minSdk 31 ≥ O, so startForegroundService is always available (S12.9a dead-branch removal).
+            appContext.startForegroundService(intent)
         } catch (error: ForegroundServiceStartNotAllowedException) {
             CoroutineScope(Dispatchers.IO).launch {
                 ServiceHealthStore(appContext.serviceHealthDataStore).markDegraded(

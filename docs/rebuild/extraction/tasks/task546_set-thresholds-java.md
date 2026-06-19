@@ -8,7 +8,7 @@
 
 | act | line | code | detail | condition |
 |---|---|---|---|---|
-| 0 | L16480 | 474 Java Code | **Java Code** → `` (see `java/task546_*.java`) |  |
+| 0 | L16480 | 474 Java Code | **Java Code** → `` (see `_source/java/task546_*.java.txt`) |  |
 
 **Variables written:** (none)
 

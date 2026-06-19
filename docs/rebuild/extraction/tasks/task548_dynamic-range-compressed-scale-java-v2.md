@@ -8,7 +8,7 @@
 
 | act | line | code | detail | condition |
 |---|---|---|---|---|
-| 0 | L16629 | 474 Java Code | **Java Code** → `%dr_results` (see `java/task548_*.java`) |  |
+| 0 | L16629 | 474 Java Code | **Java Code** → `%dr_results` (see `_source/java/task548_*.java.txt`) |  |
 | 1 | L16702 | 126 Return | **Return** `%dr_results` |  |
 
 **Variables written:** `%dr_results`

@@ -24,7 +24,7 @@
 | 13 | L36002 | 389 code389 | **code389** arg1=`%AAB_LastAnimation=%TIMEMS¶%AAB_CycleTime=%TIMEMS - %AAB_Cyc` arg4=`=` arg5=1 arg6=3 arg8=1 |  |
 | 14 | L36020 | 159 code159 | **code159** arg0=`Allow Override` |  |
 | 15 | L36026 | 810 Set Display Brightness | **Set Display Brightness** arg0=`%AAB_DimmingThreshold` | `%BRIGHT != %AAB_DimmingThreshold` |
-| 16 | L36042 | 474 Java Code | **Java Code** → `` (see `java/task698_*.java`) |  |
+| 16 | L36042 | 474 Java Code | **Java Code** → `` (see `_source/java/task698_*.java.txt`) |  |
 | 17 | L36302 | 37 If | _Shows 1 decimal point in the scene below %AAB_DimmingThreshold lux and is used for higher accuracy in super dimming._ — **If** | `%calculated_brightness_smooth < %AAB_DimmingThreshold` |
 | 18 | L36313 | 547 Variable Set | **Set** `%AAB_PrevBright` = `%calculated_brightness_smooth` [DoMaths] |  |
 | 19 | L36323 | 43 Else/Else-If | **Else/Else-If** |  |
