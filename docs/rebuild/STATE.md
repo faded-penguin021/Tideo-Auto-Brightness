@@ -52,13 +52,17 @@ next session does not know it.
 | S12.8b'' Gate-2(5th) round-2 | 2026-06-16 | Opus/high | DONE | (this push) | Second Gate-2(5th) device-pass follow-ups (D-068; same branch). **F39/F73 confirmed full parity by owner** (1.148 @20:45 at their location). Four observations fixed: **(1) Throttle never rose in stable light** — `prof760`'s dead-band gate drops every reading when light is steady, so `runCycle`/`onCycleComplete` (hence the task566/prof754 watchdog) never ran → throttle stuck at the last small value. Fix: `ThrottleController.onSample(now, significant, ceiling)` is now driven from `onSensorSample` on EVERY delivered sample — a reading outside `[ThreshAbsLow,ThreshAbsHigh]` re-anchors the idle timer; 10 s of only-in-band readings raises `%AAB_Throttle` to the `AnimSteps×MaxWait+10` ceiling (now also published from the sensor path so Live Debug shows the climb). `throttleMs`/`lastChangeMs` made `@Volatile` (collector+consumer touch them). **(2) Screen off→on now resumes context automation** (Tasker reinit, prof761): new `AmbientMonitoringService.onScreenOn()` clears the manual context lock (`%AAB_ContextOverride`) when set → `contextEngine.reevaluate()` + `controller.reapply()` so context rules take over again on wake. **(3) Sub-0.1-lux overrides visible:** `CurveBrightnessContent` clamps the DISPLAYED override-scatter lux up to 0.1 (the log x-axis floor) so a 0-lux override draws at the left edge + stays tappable (recorded value untouched; deletion still matches the original). **(4) Wizard "Preview graph" button:** Tools wizard result now has a `preview_graph` button → navigates to Curve & Brightness to see the suggested line on the chart. **HARD FENCE honoured: domain/ + golden vectors + ChartCanvas untouched.** Tests: ThrottleController +2 (onSample idle→ceiling without a cycle / significant-reading re-anchor), SettingsScreens +1 (wizard preview button navigates). Full ladder GREEN: `:app:testDebugUnitTest :app:assembleDebug :app:lintDebug :domain:test :platform:test`. |
 | S12.9a repo hygiene & build integrity | 2026-06-19 | Opus/high | DONE | (this push) | First S12.9 sub-segment — repo-ballast + dead-code cleanup + lint-as-gate, NO runtime behaviour change (D-071). **(1) Tasker XML out of the tree:** `git mv` `Advanced_Auto_Brightness_V3.3.prj_9.xml` (1.6 MB) repo-root→`docs/rebuild/extraction/_source/`, then `git rm --cached` + `.gitignore` that path (no remote LFS → owner picks LFS-vs-ignore at PR review). CLAUDE.md line-4 pointer + XML_RECIPES.md intro/`X=`/python-recipe paths updated. `git ls-files \| grep prj_9` now EMPTY. **(2) `.gitignore` Android pass:** `.idea/`, `*.iml`, `.DS_Store`, `captures/`, `.cxx/`, `*.hprof`. **(3) Dead API-26 branches removed:** `AutoBrightnessRuntime.kt` `if (SDK_INT >= O) startForegroundService else startService` (×2) → direct `startForegroundService` (O=26 ≤ minSdk 31); unused `Build` import dropped. New `DeadApiCheckTest` greps `app/src/main/kotlin/` for statically-constant `SDK_INT` comparisons vs API ≤ 31 — and a self-test proving the LIVE `< TIRAMISU` (33) POST_NOTIFICATIONS guards (MainActivity/OnboardingScreen) are NOT flagged. **(4) Java extracts relocated:** 40 `extraction/java/*.java` → `extraction/_source/java/*.java.txt` (+ `INDEX.md`); all `java/task*_*.java` refs in tasks/*.md + features_spec/contexts_spec/INDEX.md updated. **(5) `:data` ghost:** removed the retired-`:data` bullet from CLAUDE.md module layout (RUNBOOK's only `:data` mentions are inside the COMPLETED S3 brief = audit trail, left intact). **(6) `Main.kt`→`MainActivity.kt`** (class already `MainActivity`, FQ manifest `.app.MainActivity` — pure rename). **(7) Lint is a gate:** deleted `app/lint-baseline.xml`, flipped `abortOnError=false→true`; fixed the hidden issues — `ObsoleteSdkInt` (gone via #3 + `mipmap-anydpi-v26`→`mipmap-anydpi` folder rename), `VectorPath` (959-char `ic_stat_brightness` path → short circle+stroked-rays), `MonochromeLauncherIcon` (new `drawable/ic_launcher_monochrome.xml` + `<monochrome>` in adaptive icon — note: drawable/, not the brief's literal mipmap path, D-071), `DataExtractionRules` (new `res/xml/data_extraction_rules.xml` stub + manifest attr); new `app/lint.xml` ignores `GradleDependency`+`AndroidGradlePluginVersion` with rationale (version-locked build, S14 owns bumps). **(8) README seeded** (~60 lines: what Tideo is, 3-module layout, 4 gradle commands, doc links, Status line + `TODO(S14)`); CI already shipped (record-only). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched.** 2 residual lint **Warnings** remain (DefaultLocale, InlinedApi FOREGROUND_SERVICE_TYPE_SPECIAL_USE) — post-date the frozen baseline, out of S12.9a scope, do NOT fail the gate (warnings≠errors). Full ladder GREEN: `:domain:test :platform:test :app:testDebugUnitTest`(211) `:app:assembleDebug :app:lintDebug` (abortOnError=true, no baseline). No compaction. |
 | S12.9b runtime parity: circadian dimming wiring | 2026-06-19 | Opus/high | DONE | (this push) | Second S12.9 sub-segment — the ONE real runtime-parity gap + two UX refinements, app-layer only (D-072). **HEADLINE G2R-F90 — circadian dimming was inert (closes the `dimDynamic=null` deferral D-040):** `SuperDimmingCoordinator.apply` hardcoded `dimDynamic = null`, so `%AAB_DimSpread` (Spread (Circadian), default 100 — confirmed via `circadian_dimming_graph.md` Y-formula + task646 act6/act7) never modulated super-dimming and dimming engaged at full strength even in circadian-scaled daylight (`scaleDynamic ≈ 1.15`). **Fix (no domain/golden change — `dimShell` already accepts the param):** `DimmingCoordinator.apply` gains a `scaleDynamic` arg (neutral default 1.0); the controller passes the cycle's `output.scaleDynamic` at both call sites (runCycle + setInitialBrightness). New top-level `circadianDimMultiplier(scaleDynamic, settings)` recovers task90's shared tanh day/night `modifier` from the published scale — `DimDynamic = 1 − (DimSpread/ScaleSpread)·(ScaleDynamic−1)`, BigDecimal HALF_UP scale-3, returns `null` when `!scalingEnabled` (task646 act9 plain-strength) — exact & ScaleSpread-independent because `ScaleSpread ∈ 1..100` (contract). Semantics: DimSpread 100 → suppress in daylight (→0), 0 → engage normally (1.0 ≡ the old null path), −100 → boost (→2.0). The F58 live readout (`dimmingReadout`) uses the SAME multiplier so the Super Dimming card matches the applied Extra Dim. **G2R-F91 — override flash:** the manual-override toast was a bare `Toast` (could stack, not tappable); now routed through the shared teal `AabFlash` operational surface (global a11y overlay → in-app pill → Toast fallback), consistent with the profile/context-load flashes; string marked `// TODO(S12.9d): strings.xml`. **Shizuku grant UX (not a hang fix):** `pingBinder()` couldn't tell *not-installed* from *installed-not-running*; new `ShizukuAvailability` (RUNNING/INSTALLED_NOT_RUNNING/NOT_INSTALLED) via `ShizukuGrantGateway.isInstalled`/`availability` (PackageManager `moe.shizuku.privileged.api`); `PrivilegeManager.isShizukuAvailable()`→`shizukuAvailability()`; onboarding shows a "start Shizuku" prompt for INSTALLED_NOT_RUNNING, the one-tap button only when RUNNING, and ADB ALWAYS offered. **Rejected (D-069): NO AnimationRunner 5th-frame stride re-port.** Fence honoured: domain/ + golden `superdimming.csv` + ChartCanvas untouched. Tests: SuperDimmingCoordinator spread 100/0/−100 + night-no-effect (4), `circadian_spread0 ≡ no-scaling` parity; AmbientMonitoringService override-flash-through-AabFlash; PrivilegeManager availability states + ADB-always; UiShell Shizuku running/installed-not-running; controller `FakeDimming` records scaleDynamic. PARITY_CHECKLIST L76 flipped. Full ladder GREEN: `:domain:test :platform:test`(50) `:app:testDebugUnitTest`(221) `:app:assembleDebug :app:lintDebug`. No compaction. |
+| S12.9c schema ergonomics, validation & error handling | 2026-06-19 | Opus/high | DONE | (this push) | Third S12.9 sub-segment — make the settings model decomposable, fail-fast on drift, surface profile-load errors, validate the circadian spread, audit validation parity, honest-ify placeholders, and document the storage/privilege/permission surfaces. App-layer + docs only (D-073). **(1) Nested AabSettings:** new `AabSettingsGroups.kt` with 7 `@Serializable` records (`BrightnessBounds`/`CurveParams`/`DimmingConfig`/`AnimationConfig`/`ThresholdConfig`/`ScalingConfig`/`GlobalPrefs`) exposed as **computed group views** over the flat fields — flat v3 JSON stays the on-disk schema (`CURRENT_SCHEMA_VERSION`=3, no migration; ~395-call-site churn avoided, D-073). `NestedSchemaRoundTripTest` asserts flat JSON loads into the groups + re-encode stays flat. `mergeProfile` kept behaviour-identical (preserves exactly the 5 GlobalPrefs identity/runtime fields + schemaVersion; NOT quickSettings/notifications, which are in task626's profile snapshot — documented). **(2) `valueFor` fail-fast:** `else -> ""` → `throw IllegalArgumentException`; `SettingsDisplayContractDriftTest` (every contract key resolves, count matches, unknown throws). **(3) `ProfileLoadResult`** sealed type (Success/LegacyFallback/TotalFailure); `ProfileImportExportManager.decodePayload` logs via `android.util.Log` + returns it; ProfilesScreen shows a user-visible error card on TotalFailure (`load_error_card`); 4-case `ProfileLoadResultTest`. **(4) Legacy parser throws** `LegacyProfileParseException` on structurally-invalid input (no JSON object / no `%AAB_` lines); a valid-but-empty config still loads to task570 defaults; `LegacyProfileParseTest`. **(5) DataStore map:** `architecture/datastore_map.md` (6 stores, schemas, independence rationale) + `SCHEMA_VERSION` consts on the 3 typed-JSON models + `DataStoreSchemaVersionTest` (const matches serializer default). **(6) Spread (Circadian) validation:** `SettingsValidator` dimSpread −100..100 advisory + boundary test (−101/−100/0/100/101); ALSO fixed `AabSettings.validate()` clamp `1..300`→`-100..100` + contract range — the old clamp turned S12.9b's negative-boost path into 1 on every save (latent runtime fix). **(7) Validation parity audit:** `extraction/validation_audit.md` (every Tasker guard vs coverage); added the top gap validators (dimming-strength>65 task607, dimming-threshold<minBright task513, taper-mid>maxBright task665/689, min-wait>max-wait task403); ~14 cosmetic reformat guards deferred to S14 (logged); 2 pre-existing `⚠️` glyphs stripped (no-glyph policy). **(8) Placeholders honest:** `PlaceholderScreen`/`ChartPlaceholder` "Coming in …" → "not available yet" + `TODO(S13)` marker; `PlaceholderScreenAuditTest` fails on any "coming in" in `ui/screens/`. **(9) Docs:** `architecture/privilege_tiers.md` + `architecture/permission_audit.md`. **Dropped (D-069): Haversine de-dup is a no-op (one impl).** Fence honoured: domain/ + golden vectors + ChartCanvas untouched. New tests: NestedSchemaRoundTrip(3), SettingsDisplayContractDrift(3), ProfileLoadResult(4), LegacyProfileParse(5), DataStoreSchemaVersion(4), SettingsValidator spread(3), PlaceholderScreenAudit(1); LegacyImportRoundTrip dimSpread fixture 120→80 (now clamped). Full ladder GREEN: `:domain:test :platform:test`(50) `:app:testDebugUnitTest`(244) `:app:lintDebug :app:assembleDebug`. No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
 **S12.8 (a–d + b'/b'') DONE → Gate 2 (5th re-test) device-passed. S12.9a DONE (repo hygiene + lint-as-gate +
-README seed, D-071). S12.9b DONE (circadian-dimming wiring + override-flash + Shizuku-UX, D-072). NEXT: S12.9c
-— schema ergonomics, validation & error handling (RUNBOOK §S12.9c, D-069).** S12.9 lands repo hygiene
+README seed, D-071). S12.9b DONE (circadian-dimming wiring + override-flash + Shizuku-UX, D-072). S12.9c DONE
+(nested `AabSettings` group views + fail-fast `valueFor` + `ProfileLoadResult` error card + legacy-parse throw +
+DataStore map/version test + signed dimSpread −100..100 validator&clamp fix + validation_audit + honest
+placeholders + privilege/permission docs, D-073). NEXT: S12.9d — i18n strings + test backfill + LiveRuntimeState
+staleness gate (RUNBOOK §S12.9d, D-069).** S12.9 lands repo hygiene
 (XML + extraction-java out of the tree, dead API-26 branches, lint-as-gate, README seed, `:data` ghost,
 `Main.kt`→`MainActivity.kt`), the one real runtime-parity fix (**G2R-F90** circadian dimming inert —
 `SuperDimmingCoordinator` hardcoded `dimDynamic=null`; FIXED app-layer in S12.9b, no domain/golden change), schema
@@ -455,11 +459,12 @@ AppModule is now the real DI root.
 - **S12.9 — engineering-quality & parity-debt remediation (a–f, Opus/high) is in progress** (brief in RUNBOOK
   §S12.9, D-069). **a DONE** (D-071: XML+Java-extracts out of the tree, dead API-26 branches + `DeadApiCheckTest`,
   `Main.kt`→`MainActivity.kt`, `:data` ghost, lint-as-gate [baseline deleted, `abortOnError=true`, `app/lint.xml`,
-  VectorPath/Monochrome/DataExtractionRules/ObsoleteSdkInt fixed], README seed). **NEXT: b** the one runtime-parity fix (**G2R-F90**
-  circadian dimming inert — wire `dimDynamic` from `PipelineState.scaleDynamic`, app-layer only) + override-toast
-  surface (G2R-F91) + Shizuku installed-not-running refinement; **c** schema ergonomics (nested `AabSettings`,
-  fail-fast `valueFor`, surfaced profile-load errors, spread validation, validation/privilege/permission/datastore
-  docs); **d** i18n strings + test backfill + `LiveRuntimeState` staleness gate; **e** concurrency hardening
+  VectorPath/Monochrome/DataExtractionRules/ObsoleteSdkInt fixed], README seed). **b DONE** (D-072: **G2R-F90**
+  circadian dimming wired from `PipelineState.scaleDynamic`, app-layer; override-toast→`AabFlash` G2R-F91;
+  Shizuku three-state availability). **c DONE** (D-073: nested `AabSettings` group views + fail-fast `valueFor`
+  + `ProfileLoadResult` error card + legacy-parse throw + DataStore map/version test + signed dimSpread
+  −100..100 validator&clamp fix + validation_audit + honest placeholders + privilege/permission docs).
+  **NEXT: d** i18n strings + test backfill + `LiveRuntimeState` staleness gate; **e** concurrency hardening
   (`AppProcessScope`/`goAsync`, kill the `lateinit` controller cycle, volatile audit, decompose the 596-LOC
   controller); **f** the **Profiles+Contexts → one-screen merge** (plumbing). Mis-diagnosed audit items rejected
   in D-069 (AnimationRunner stride, Haversine, `Main.kt` Tiramisu deletion, Shizuku "hang"). domain/ + golden
@@ -1611,7 +1616,62 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Affects S12.9b (closed); the override string is picked up by S12.9d's string extraction; the `dimSpread`
   −100..100 validator is S12.9c's deliverable #6 (the coordinator math already handles negatives).
 
-Append new entries as D-073, … with which segments they affect.
+- **D-073 (S12.9c) — schema ergonomics, validation & error handling landed; key decisions/deviations.**
+  App-layer + docs only; domain/ + golden vectors + ChartCanvas untouched.
+  (1) **AabSettings decomposed via computed group VIEWS, not a nested source-of-truth.** The brief said
+  "AabSettings becomes their composite". A literal nested-constructor refactor would rewrite ~395 flat
+  field accesses + `.copy(field=)` edit sites (258 reads + 137 copy-writes across screens/serializer/
+  tests) — oversized and risky for a "medium" sub-segment. Instead the 7 records are `@Serializable` and
+  exposed as computed `val bounds/curve/dimming/animation/thresholds/scaling/global` over the flat fields,
+  so the flat v3 JSON stays the on-disk schema BYTE-FOR-BYTE (wire compat is more robustly preserved) and
+  "flat JSON loads into the nested fields" holds via the projections (`NestedSchemaRoundTripTest`). This
+  satisfies every acceptance bullet; a future segment can flip the source-of-truth if wanted.
+  (2) **`mergeProfile` left behaviour-identical.** `GlobalPrefs` groups 7 app-wide prefs, but only 5
+  (serviceEnabled/detectOverrides/debugLevel/contextOverride/setupTitle) are merge-preserved; the literal
+  `copy(global = baseline.global)` was NOT used because `quickSettingsEnabled`/`notificationsEnabled` ARE
+  in task626's per-profile snapshot (must come from the loaded profile). The explicit 6-field copy stays;
+  the G2-F8 preserved set is unchanged (under test).
+  (3) **dimSpread range corrected to −100..100 (latent runtime fix).** The clamp was `1..300`, so a
+  negative spread (S12.9b's daylight-boost path) was clamped to 1 on every save and unreachable in
+  production. Fixed the clamp + the contract range + a `SettingsValidator` advisory + boundary test.
+  `LegacyImportRoundTripTest`'s nested-JSON fixture changed `spread 120→80` (120 now clamps to 100; 80
+  keeps it a true parse assertion).
+  (4) **Validation parity:** `validation_audit.md` enumerates every Tasker guard; 5 real-consequence gaps
+  fixed (dimSpread, strength>65, threshold<minBright, taperMid>maxBright, minWait>maxWait), ~14 cosmetic
+  reformat/clamp guards deferred to S14 (logged). The two pre-existing `⚠️` glyphs were stripped to honour
+  the no-glyph non-goal.
+  (5) **Profile-load errors:** `ProfileLoadResult` (Success/LegacyFallback/TotalFailure); a Tasker config
+  or `%AAB_` dump = LegacyFallback (applied, jsonError logged), garbage = TotalFailure (error card). The
+  legacy parser now throws `LegacyProfileParseException` on garbage but still returns defaults for a
+  valid-but-empty config.
+  (6) **DataStore versioning:** added `SCHEMA_VERSION=1` consts to the 3 typed-JSON models (not serialized;
+  payloads still evolve additively via `ignoreUnknownKeys`); the 2 Preferences stores are schema-less
+  (documented). `datastore_map.md` + `DataStoreSchemaVersionTest`.
+  (7) **Dropped (D-069):** the Haversine de-dup — one impl exists; no domain util added (fence preserved).
+  Affects S12.9c (closed); the new override string from S12.9b is still picked up by S12.9d; nested groups
+  are available to S12.9e/f and S13 if they want cohesive sub-configs.
+
+- **D-074 (post-S12.9c device finding) — app/location context rules created at runtime never fired.**
+  Owner Gate-2 finding: creating a per-app context rule (e.g. "load Outdoors when Google Photos opens")
+  did nothing, and the "Context Automation" debug flash never appeared. Root cause: `ContextEngine`
+  started the foreground-app poll (`startAppPollIfNeeded`) and the location listener
+  (`startLocationListenerIfNeeded`) ONLY at `start()` and `onScreenOn()`. The engine pulls rules
+  (`rulesProvider`) but never *observed* the rule set, so a rule added while the service was already
+  running never started its poller — the rule silently never triggered until the next screen-off/on
+  cycle or a reboot (battery/wifi/time rules were unaffected because those collectors run continuously).
+  No evaluation ran for the app change ⇒ no `CONTEXT_AUTOMATION`/`CONTEXT_LOCATION` debug flash either.
+  **Fix (app-layer):** `ContextEngine` now takes a `rulesFlow: Flow<List<ContextRule>>` (wired to
+  `ContextRuleStore.rulesFlow()` in `AppModule`) and, in `start()`, collects it to `refreshSignalListeners()`
+  — (re)start the app/location listeners when a rule begins using that signal, cancel them when none do
+  (cost gate preserved) — then re-resolve so a rule that already matches applies immediately. Default
+  `emptyFlow()` keeps the existing static-rule tests valid. The usage-access requirement is unchanged
+  but now also surfaced on the rules LIST (not just the editor): a saved per-app rule with no usage-access
+  grant shows a "Per-app rules need usage access…" card with a Grant button (the rule cannot read the
+  foreground app without it). Test: `ContextEngineTest.newAppRuleAtRuntime_startsForegroundPollAndApplies`.
+  Domain/ + golden + ChartCanvas untouched. Full ladder green. Affects the context system (S10/S12.7c);
+  no schema change.
+
+Append new entries as D-075, … with which segments they affect.
 
 ## Blockers
 

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -36,6 +37,11 @@ import kotlin.math.abs
 class ContextEngine(
     private val rulesProvider: suspend () -> List<ContextRule>,
     private val baselineProvider: suspend () -> AabSettings,
+    // Live rule set: the engine reacts to rule add/edit/delete so a newly-created app or location rule
+    // starts its foreground/location listener immediately, instead of only at start()/screen-on (the
+    // "a new app rule does nothing until you toggle the screen / reboot" bug). emptyFlow() = no live
+    // updates (tests that pass a static rule list and rely on start()'s seed).
+    private val rulesFlow: Flow<List<ContextRule>> = emptyFlow(),
     private val profileCatalog: ProfileCatalog,
     private val signalSource: ContextSignalSource,
     private val onProfileChanged: () -> Unit,
@@ -86,6 +92,7 @@ class ContextEngine(
     private var wifiJob: Job? = null
     private var appJob: Job? = null
     private var locationJob: Job? = null
+    private var rulesJob: Job? = null
     @Volatile private var screenOn = true
 
     /** Effective settings for the pipeline's settingsProvider: active profile override or baseline. */
@@ -144,6 +151,16 @@ class ContextEngine(
             startAppPollIfNeeded()
             startLocationListenerIfNeeded()
         }
+        // React to rule add/edit/delete at runtime: (re)start or stop the foreground-app / location
+        // listeners as the rule set gains or loses app/location triggers, then re-resolve so a rule
+        // that already matches the current state applies immediately. Without this, a rule created
+        // while the service is running never starts its poller until the next screen-on / reboot.
+        rulesJob = scope.launch {
+            rulesFlow.collect {
+                refreshSignalListeners()
+                evaluate(ContextCaller.GENERAL)
+            }
+        }
     }
 
     fun stop() {
@@ -151,7 +168,19 @@ class ContextEngine(
         wifiJob?.cancel(); wifiJob = null
         appJob?.cancel(); appJob = null
         locationJob?.cancel(); locationJob = null
+        rulesJob?.cancel(); rulesJob = null
         scope = null
+    }
+
+    /**
+     * Align the foreground-app and location listeners with the current rule set: start a listener when
+     * a rule now uses that signal, cancel it when no rule does (cost gate). Idempotent — the start
+     * helpers no-op when already running, so a no-op rule edit costs nothing.
+     */
+    private suspend fun refreshSignalListeners() {
+        val tokens = ContextSignalTokens.from(rulesProvider())
+        if (tokens.usesApps) startAppPollIfNeeded() else { appJob?.cancel(); appJob = null }
+        if (tokens.usesLocation) startLocationListenerIfNeeded() else { locationJob?.cancel(); locationJob = null }
     }
 
     /** Screen ON (prof761 reinit): resume foreground-app polling + re-evaluate time windows. */
@@ -407,6 +436,11 @@ interface ProfileCatalog {
  * `detectOverrides` (%AAB_DetectOverrides) is a GLOBAL reactivity preference, NOT one of task626's
  * curve/min-max/threshold/dimming snapshot keys (contexts_spec §4 enumerates the snapshot), so a
  * context profile swap must not silently turn manual-override detection off (G2-F8).
+ *
+ * S12.9c #1: these are exactly five of the seven [com.tideo.autobrightness.app.settings.GlobalPrefs]
+ * fields. The full `copy(global = baseline.global)` is intentionally NOT used: GlobalPrefs also holds
+ * `quickSettingsEnabled`/`notificationsEnabled`, which ARE in task626's per-profile snapshot and so
+ * must come from the loaded profile, not the baseline.
  */
 internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSettings = profile.copy(
     serviceEnabled = baseline.serviceEnabled,

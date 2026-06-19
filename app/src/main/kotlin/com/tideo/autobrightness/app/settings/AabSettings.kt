@@ -102,7 +102,9 @@ object AabSettingsContract {
         AabSettingRule("%AAB_DimmingStrength", "dimmingStrength", AabValueType.Int, "25", "range 0..100"),
         AabSettingRule("%AAB_DimmingExponent", "dimmingExponent", AabValueType.Float, "2.5", "range 0.5..5.0"),
         AabSettingRule("%AAB_DimmingThreshold", "dimmingThreshold", AabValueType.Int, "15", "range 0..100"),
-        AabSettingRule("%AAB_DimSpread", "dimSpread", AabValueType.Int, "100", "range 1..300"),
+        // S12.9c #6: spread is signed (−100=boost dimming in daylight … 0=off … 100=suppress in
+        // daylight); circadian_dimming_graph.md `dim_val = 2 − (1 + (dimspread/100)·modifier)`.
+        AabSettingRule("%AAB_DimSpread", "dimSpread", AabValueType.Int, "100", "range -100..100"),
         AabSettingRule("%AAB_PWMSensitive", "pwmSensitive", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_PWMExp", "pwmExponent", AabValueType.Float, "0.8", "range 0.1..3.0"),
         AabSettingRule("%AAB_Throttle", "throttleDefaultMs", AabValueType.Long, "1310", "range 100..60000"),

@@ -12,6 +12,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -314,6 +315,51 @@ class ContextEngineTest {
             messages.any { it.contains("trigger") && it.contains("rule Cinema (priority 10)") },
             "expected enriched context-automation toast, got $messages",
         )
+        scope.cancel()
+    }
+
+    @Test
+    fun newAppRuleAtRuntime_startsForegroundPollAndApplies() = runTest {
+        // Owner finding: creating an app context rule while the service is running did nothing — the
+        // foreground-app poll only started at start()/screen-on, so a rule added later never triggered
+        // (and its Context Automation debug flash never fired). The engine now reacts to the rule set.
+        var now = 0L
+        val rulesFlow = MutableStateFlow<List<ContextRule>>(emptyList())
+        val src = FakeSignalSource()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { rulesFlow.value },
+            rulesFlow = rulesFlow,
+            baselineProvider = { baseline },
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { now },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+
+        // No app rule yet: the foreground poll isn't running, so opening the app does nothing.
+        src.app = "com.netflix.mediaclient"
+        src.appFlow.emit("com.netflix.mediaclient")
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "no rule yet → no poll, no match")
+
+        // Create the app rule at runtime (as the Contexts screen save would). A DIFFERENT app is in the
+        // foreground, so the rule exists but does not yet match.
+        now = 1_000L
+        src.app = "com.other.app"
+        rulesFlow.value = listOf(videoStreamingRule)
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "rule created but its app isn't foreground")
+
+        // Switch to the rule's app: the now-running poll detects it and applies the profile (without the
+        // fix the emit has no collector → activeContext stays null).
+        now = 2_000L
+        src.app = "com.netflix.mediaclient"
+        src.appFlow.emit("com.netflix.mediaclient")
+        advanceUntilIdle()
+        assertEquals("Cinema", engine.activeContext.value, "the newly-started poll resolves the app rule")
         scope.cancel()
     }
 

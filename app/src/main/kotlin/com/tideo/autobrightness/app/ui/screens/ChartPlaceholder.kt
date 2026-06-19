@@ -14,9 +14,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 /**
- * A reserved slot for a chart whose RENDER is deferred to S13 (the chart-generation handler rows are
- * tagged `deferred-S13` in the anonymous_handlers triage). S12 leaves the host hook; S13 drops the
- * named chart (copied from [com.tideo.autobrightness.app.ui.graph.BrightnessCurveChart]) in here.
+ * A reserved slot for a chart whose RENDER is deferred (the chart-generation handler rows are tagged
+ * `deferred-S13` in the anonymous_handlers triage). The host hook is in place; the named chart (copied
+ * from [com.tideo.autobrightness.app.ui.graph.BrightnessCurveChart]) drops in here later.
+ *
+ * S12.9c #8: the user-facing copy no longer names the internal segment (audit-forbidden).
+ * TODO(S13): implement this chart — see S13d.
  */
 @Composable
 fun ChartPlaceholder(chartName: String, testTag: String) {
@@ -26,7 +29,7 @@ fun ChartPlaceholder(chartName: String, testTag: String) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "$chartName — chart coming in S13",
+                "$chartName — chart not available yet",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

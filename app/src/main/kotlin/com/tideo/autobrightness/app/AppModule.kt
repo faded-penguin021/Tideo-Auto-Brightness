@@ -67,6 +67,9 @@ class AppModule(context: Context) {
         lateinit var controller: BrightnessPipelineController
         val contextEngine = ContextEngine(
             rulesProvider = { contextRuleStore.rules() },
+            // React to rule add/edit/delete at runtime (a new app/location rule starts its listener
+            // immediately, not only at next screen-on/reboot).
+            rulesFlow = contextRuleStore.rulesFlow(),
             baselineProvider = { appContext.settingsDataStore.data.first() },
             profileCatalog = AppProfileCatalog(userProfileStore),
             signalSource = AndroidContextSignalSource(appContext),

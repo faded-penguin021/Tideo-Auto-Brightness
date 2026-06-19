@@ -26,15 +26,35 @@ object TaskerLegacyProfileSerializer {
      * Derived coefficients form2A/form2D/form3A are NOT stored: task637 `performLoad` recomputes them
      * from form1A/zone1End/form2B/form2C/maxBright, exactly as [derivedCoefficients] does at read-time.
      */
+    /**
+     * Thrown when the input is structurally not an AAB profile at all (S12.9c #4): neither a JSON
+     * object nor any `%AAB_` key=value line. A *valid but empty* profile (e.g. `{}` or a config with no
+     * recognized fields) is NOT an error — it parses to the task570 defaults. This lets
+     * [ProfileImportExportManager] distinguish "garbage file" from "blank profile" and build a
+     * `ProfileLoadResult.TotalFailure` for the former.
+     */
+    class LegacyProfileParseException(message: String) : Exception(message)
+
     fun deserialize(raw: String): AabSettings {
-        val trimmed = raw.trimStart()
-        return if (trimmed.startsWith("{")) deserializeJson(trimmed) else deserializeKeyValue(raw)
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) {
+            throw LegacyProfileParseException("Empty legacy profile input")
+        }
+        if (trimmed.startsWith("{")) {
+            val root = runCatching { json.parseToJsonElement(trimmed) as? JsonObject }.getOrNull()
+            if (root != null) return deserializeJson(root)
+            // Looked like JSON but did not parse to an object — fall through to the key=value attempt.
+        }
+        if (raw.lineSequence().any { it.trim().startsWith("%AAB_") && it.contains('=') }) {
+            return deserializeKeyValue(raw)
+        }
+        throw LegacyProfileParseException(
+            "Not a recognizable AAB profile: no JSON object and no '%AAB_…=…' lines",
+        )
     }
 
     /** Parse the nested Tasker AAB JSON config (task637 performSave/performLoad schema). */
-    private fun deserializeJson(content: String): AabSettings {
-        val root = runCatching { json.parseToJsonElement(content) as? JsonObject }.getOrNull()
-            ?: return deserializeKeyValue(content)
+    private fun deserializeJson(root: JsonObject): AabSettings {
         var s = AabSettings()
 
         (root["general"] as? JsonObject)?.let { g ->
