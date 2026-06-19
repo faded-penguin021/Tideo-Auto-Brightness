@@ -1,13 +1,36 @@
 # Debug APK — temporary (delete on merge)
 
 `tideo-auto-brightness-S12.9c-debug.apk` — debug build of branch
-`claude/great-fermi-rw07ys` at commit `751ffa4` (S12.9c).
+`claude/great-fermi-rw07ys` (S12.9c + the context-rule fix below).
 
 > This folder is a throwaway hand-off artifact. **It will be deleted at merge.**
 > Debug-signed, not for release. `minSdk 31`, `versionCode 1`.
 
 Install: `adb install -r tideo-auto-brightness-S12.9c-debug.apk`
 (or copy to the device and tap it; allow "install unknown apps").
+
+## Context-rule fix (D-074) — please re-test this
+
+Your finding: a per-app rule (e.g. "load Outdoors when Google Photos opens")
+did nothing, and no "Context Automation" debug flash appeared. Cause: the engine
+only started the foreground-app watcher at service start / screen-on, so a rule
+**created while the service was already running** never started watching — it
+stayed dormant until a screen off/on or reboot. Fixed: the engine now reacts to
+rules being added/edited/deleted and starts the watcher immediately.
+
+To verify:
+1. Make sure the service is running, then create the app rule.
+2. **Grant usage access** if asked (per-app rules can't read the foreground app
+   without it). The Contexts list now shows a red "Per-app rules need usage
+   access…" card with a Grant button whenever an app rule exists without the
+   grant — if you don't see that card, usage access is already granted.
+3. Set debug to **Context Automation** (Live Debug), open Google Photos → you
+   should now get the flash and the profile should switch. Switching away should
+   revert. (Previously this only worked after toggling the screen off/on.)
+
+Note on the "didn't request usage stats" observation: that's expected if you'd
+already granted usage access during onboarding — the app won't ask again. The
+real bug was the dormant watcher, not the permission.
 
 ## What S12.9c changed (what to look out for)
 

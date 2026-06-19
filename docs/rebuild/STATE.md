@@ -1651,7 +1651,27 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Affects S12.9c (closed); the new override string from S12.9b is still picked up by S12.9d; nested groups
   are available to S12.9e/f and S13 if they want cohesive sub-configs.
 
-Append new entries as D-074, … with which segments they affect.
+- **D-074 (post-S12.9c device finding) — app/location context rules created at runtime never fired.**
+  Owner Gate-2 finding: creating a per-app context rule (e.g. "load Outdoors when Google Photos opens")
+  did nothing, and the "Context Automation" debug flash never appeared. Root cause: `ContextEngine`
+  started the foreground-app poll (`startAppPollIfNeeded`) and the location listener
+  (`startLocationListenerIfNeeded`) ONLY at `start()` and `onScreenOn()`. The engine pulls rules
+  (`rulesProvider`) but never *observed* the rule set, so a rule added while the service was already
+  running never started its poller — the rule silently never triggered until the next screen-off/on
+  cycle or a reboot (battery/wifi/time rules were unaffected because those collectors run continuously).
+  No evaluation ran for the app change ⇒ no `CONTEXT_AUTOMATION`/`CONTEXT_LOCATION` debug flash either.
+  **Fix (app-layer):** `ContextEngine` now takes a `rulesFlow: Flow<List<ContextRule>>` (wired to
+  `ContextRuleStore.rulesFlow()` in `AppModule`) and, in `start()`, collects it to `refreshSignalListeners()`
+  — (re)start the app/location listeners when a rule begins using that signal, cancel them when none do
+  (cost gate preserved) — then re-resolve so a rule that already matches applies immediately. Default
+  `emptyFlow()` keeps the existing static-rule tests valid. The usage-access requirement is unchanged
+  but now also surfaced on the rules LIST (not just the editor): a saved per-app rule with no usage-access
+  grant shows a "Per-app rules need usage access…" card with a Grant button (the rule cannot read the
+  foreground app without it). Test: `ContextEngineTest.newAppRuleAtRuntime_startsForegroundPollAndApplies`.
+  Domain/ + golden + ChartCanvas untouched. Full ladder green. Affects the context system (S10/S12.7c);
+  no schema change.
+
+Append new entries as D-075, … with which segments they affect.
 
 ## Blockers
 

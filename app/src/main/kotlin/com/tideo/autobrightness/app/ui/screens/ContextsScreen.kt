@@ -149,6 +149,29 @@ fun ContextsContent(
                     modifier = Modifier.fillMaxWidth().testTag("add_context_rule"),
                 ) { Text("Add rule") }
 
+                // A saved per-app rule can't trigger without usage access (it has no way to read the
+                // foreground app). Surface it on the list too, not only inside the editor, so a rule
+                // that silently never fires explains itself.
+                if (rules.any { !it.triggers.apps.isNullOrEmpty() } && !hasUsageAccess()) {
+                    Card(
+                        Modifier.fillMaxWidth().testTag("list_usage_access_prompt"),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                "Per-app rules need usage access to detect the foreground app. " +
+                                    "Without it they never trigger.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            OutlinedButton(
+                                onClick = onRequestUsageAccess,
+                                modifier = Modifier.testTag("list_grant_usage_access"),
+                            ) { Text("Grant usage access") }
+                        }
+                    }
+                }
+
                 if (rules.isEmpty()) {
                     Text("No rules yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
