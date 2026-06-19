@@ -2,12 +2,14 @@ package com.tideo.autobrightness.platform.privilege
 
 import android.Manifest
 import android.content.Context
+import android.content.pm.PackageInfo
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Before
 import org.robolectric.Shadows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -57,6 +59,32 @@ class PrivilegeManagerTest {
         manager.refresh()
         assertTrue(manager.currentTier() == Tier.ELEVATED)
         assertTrue(manager.tierFlow().value == Tier.ELEVATED)
+    }
+
+    @Test
+    fun shizukuAvailability_notInstalled_whenPackageAbsent() {
+        // No Shizuku manager app installed in the sandbox, and no live binder → NOT_INSTALLED.
+        assertEquals(ShizukuAvailability.NOT_INSTALLED, manager.shizukuAvailability())
+    }
+
+    @Test
+    fun shizukuAvailability_installedNotRunning_whenPackagePresentButBinderDead() {
+        // S12.9b G2R-F91: pingBinder() can't tell "not installed" from "installed but not running".
+        // With the manager app installed but no live binder (Robolectric), the state is the latter, so
+        // the UI can prompt "start Shizuku" instead of hiding the path.
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        Shadows.shadowOf(app.packageManager).installPackage(
+            PackageInfo().apply { packageName = ShizukuGrantGateway.SHIZUKU_PACKAGE },
+        )
+        assertEquals(ShizukuAvailability.INSTALLED_NOT_RUNNING, manager.shizukuAvailability())
+    }
+
+    @Test
+    fun adbGrantInstruction_isAlwaysOffered_regardlessOfShizuku() {
+        // The ADB channel is the no-companion-app path and must always be available.
+        assertTrue(manager.adbGrantInstruction().isNotBlank())
+        assertEquals(ShizukuAvailability.NOT_INSTALLED, manager.shizukuAvailability())
+        assertTrue(manager.adbGrantInstruction().contains("WRITE_SECURE_SETTINGS"))
     }
 
     @Test

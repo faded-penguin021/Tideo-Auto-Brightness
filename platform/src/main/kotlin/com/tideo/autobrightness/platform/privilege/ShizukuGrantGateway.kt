@@ -9,6 +9,13 @@ import rikka.shizuku.Shizuku
 import kotlin.concurrent.thread
 
 /**
+ * Three-state Shizuku readiness, so the onboarding UI can tell *not installed* (offer ADB only) from
+ * *installed but not running* (prompt the user to start the Shizuku app) from *running* (offer the
+ * one-tap grant). `pingBinder()` alone collapses the first two into a single "unavailable".
+ */
+enum class ShizukuAvailability { RUNNING, INSTALLED_NOT_RUNNING, NOT_INSTALLED }
+
+/**
  * Shizuku integration for the one-time WRITE_SECURE_SETTINGS grant (D-024: grant channel only;
  * after the grant the app uses Settings.Secure directly, never a runtime binder dependency).
  *
@@ -19,6 +26,9 @@ import kotlin.concurrent.thread
  */
 object ShizukuGrantGateway {
     private const val REQUEST_CODE = 1001
+
+    /** The Shizuku manager app package (Shizuku + the legacy Sui-less builds both use this id). */
+    const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
 
     /** Outcome of a grant attempt, surfaced to the onboarding UI. */
     sealed interface Result {
@@ -32,6 +42,23 @@ object ShizukuGrantGateway {
         Shizuku.pingBinder()
     } catch (_: Throwable) {
         false
+    }
+
+    /** Whether the Shizuku manager app is installed (regardless of whether its service is running). */
+    fun isInstalled(context: Context): Boolean = try {
+        context.packageManager.getPackageInfo(SHIZUKU_PACKAGE, 0)
+        true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    } catch (_: Throwable) {
+        false
+    }
+
+    /** Collapse the binder ping + install check into the three-state [ShizukuAvailability]. */
+    fun availability(context: Context): ShizukuAvailability = when {
+        isAvailable() -> ShizukuAvailability.RUNNING
+        isInstalled(context) -> ShizukuAvailability.INSTALLED_NOT_RUNNING
+        else -> ShizukuAvailability.NOT_INSTALLED
     }
 
     private fun hasPermission(): Boolean = try {

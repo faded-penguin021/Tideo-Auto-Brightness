@@ -4,6 +4,8 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.domain.brightness.SoftwareDimming
 import com.tideo.autobrightness.platform.brightness.SecureDimmingController
 import com.tideo.autobrightness.platform.privilege.Tier
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 /**
  * The super-dimming layer wired into the runtime pipeline (S9b).
@@ -17,8 +19,14 @@ import com.tideo.autobrightness.platform.privilege.Tier
  * ([BrightnessPipelineController]), so the engaged latch needs no synchronization.
  */
 interface DimmingCoordinator {
-    /** Engage or disengage super dimming for a freshly-computed [targetBrightness]. */
-    fun apply(targetBrightness: Int, settings: AabSettings)
+    /**
+     * Engage or disengage super dimming for a freshly-computed [targetBrightness].
+     *
+     * [scaleDynamic] is the cycle's `%AAB_ScaleDynamic` (the engine output; 1.0 when scaling is off).
+     * It drives the circadian dim-strength multiplier `%AAB_DimDynamic` (task646 act6/act7); the
+     * neutral default 1.0 ⇒ no circadian effect, matching the scaling-off path.
+     */
+    fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double = 1.0)
 
     /** Force-disengage (pause / override / panic / hibernate). */
     fun disengage()
@@ -26,8 +34,37 @@ interface DimmingCoordinator {
 
 /** Default no-op used when no dimming is wired (existing controller unit tests). */
 object NoOpDimmingCoordinator : DimmingCoordinator {
-    override fun apply(targetBrightness: Int, settings: AabSettings) = Unit
+    override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) = Unit
     override fun disengage() = Unit
+}
+
+/**
+ * task646 act6/act7 + task90 Block #2: the `%AAB_DimDynamic` circadian strength multiplier applied to
+ * `%AAB_DimmingStrength` before the [SoftwareDimming.dimShell] clamp, but ONLY when `%AAB_ScalingUse`
+ * (= [AabSettings.scalingEnabled]) is on (act9 otherwise uses plain strength → `null`).
+ *
+ * `%AAB_DimDynamic` and `%AAB_ScaleDynamic` are computed together in task90 from the SAME tanh
+ * day/night `modifier` (0 = night → 1 = day):
+ * ```
+ *   ScaleDynamic = 1 + (ScaleSpread/100)·modifier      // published in PipelineState / engine output
+ *   DimDynamic   = 1 − (DimSpread/100)·modifier         // %AAB_DimDynamic (task90 emits 2 − (1 + …))
+ * ```
+ * Eliminating the shared `modifier` (ScaleSpread ∈ 1..100 by contract, so never zero) gives an exact,
+ * scale-spread-independent expression in terms of the published scale:
+ * ```
+ *   DimDynamic = 1 − (DimSpread/ScaleSpread)·(ScaleDynamic − 1)
+ * ```
+ * Rounded HALF_UP to 3 decimals to match Tasker's stored `%AAB_DimDynamic` (task90 BigDecimal scale 3).
+ *
+ * Semantics (G2R-F90): DimSpread 100 → suppress dimming proportionally to daylight (day → 0);
+ * DimSpread 0 → engage normally (always 1.0); DimSpread −100 → boost during daylight (day → 2.0).
+ * Previously [SuperDimmingCoordinator] hardcoded `dimDynamic = null` (D-040), leaving circadian
+ * dimming inert: Spread had no effect and dimming engaged at full strength even in daylight.
+ */
+internal fun circadianDimMultiplier(scaleDynamic: Double, settings: AabSettings): Double? {
+    if (!settings.scalingEnabled || settings.scaleSpread == 0) return null
+    val raw = 1.0 - (settings.dimSpread.toDouble() / settings.scaleSpread) * (scaleDynamic - 1.0)
+    return BigDecimal(raw).setScale(3, RoundingMode.HALF_UP).toDouble()
 }
 
 class SuperDimmingCoordinator(
@@ -52,7 +89,7 @@ class SuperDimmingCoordinator(
      *    (Map Lux to Brightness V2 act23 → "Software Dimming V2"). The previous rebuild only floored
      *    and never dimmed — this restores the dim-below-floor half.
      */
-    override fun apply(targetBrightness: Int, settings: AabSettings) {
+    override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) {
         val elevated = tierProvider() >= Tier.ELEVATED
         val belowThreshold = targetBrightness < settings.dimmingThreshold
         val pwmPath = settings.pwmSensitive && belowThreshold
@@ -60,11 +97,14 @@ class SuperDimmingCoordinator(
         val wantsDim = pwmPath || superPath
         val shouldEngage = wantsDim && elevated
 
+        // task646 act6/act7: the circadian DimDynamic multiplier (G2R-F90 — was hardcoded null, D-040).
+        val dimDynamic = circadianDimMultiplier(scaleDynamic, settings)
+
         // %AAB_Debug 6 "Overlay Preview" (G2R-F49): when dimming WOULD engage but the tier can't write
         // secure settings, Tasker fell back to a semi-transparent screen overlay (the AAB Color Filter
         // scene, task653/654). The overlay window is deferred (D-040); surface its computed colour so
         // the unprivileged user can still see what the fallback would do.
-        if (wantsDim && !elevated) emitOverlayPreview(targetBrightness, settings)
+        if (wantsDim && !elevated) emitOverlayPreview(targetBrightness, settings, dimDynamic)
 
         if (!shouldEngage) {
             // %AAB_Debug 5: surface WHY dimming is not on (G2-F9 device diagnosis) — most often the
@@ -92,10 +132,9 @@ class SuperDimmingCoordinator(
                 ),
             ).toInt()
         } else {
-            // task646 act3-16: dim_shell = clamped_strength × dim_progress.
-            // DimDynamic (the circadian strength multiplier, task646 act6 ScalingUse branch) is wired
-            // with the real solar windows in S12 (D-040); the baseline/default config has scaling off,
-            // so the plain-strength branch (dimDynamic = null) is the correct path here.
+            // task646 act3-16: dim_shell = clamped_strength × dim_progress, where clamped_strength is
+            // DimmingStrength × DimDynamic when %AAB_ScalingUse is on (act7) — the circadian scale
+            // (G2R-F90); else plain DimmingStrength (act9, dimDynamic = null).
             Math.round(
                 SoftwareDimming.dimShell(
                     brightness = targetBrightness.toDouble(),
@@ -103,7 +142,7 @@ class SuperDimmingCoordinator(
                     dimmingThreshold = settings.dimmingThreshold.toDouble(),
                     dimmingExponent = settings.dimmingExponent.toDouble(),
                     dimmingStrength = settings.dimmingStrength.toDouble(),
-                    dimDynamic = null,
+                    dimDynamic = dimDynamic,
                 ),
             ).toInt()
         }
@@ -134,7 +173,7 @@ class SuperDimmingCoordinator(
      * = `#AA000000`). Computed via the golden-tested [SoftwareDimming.dimShell]; the overlay alpha is
      * the dim strength mapped onto 0–255.
      */
-    private fun emitOverlayPreview(targetBrightness: Int, settings: AabSettings) {
+    private fun emitOverlayPreview(targetBrightness: Int, settings: AabSettings, dimDynamic: Double?) {
         debugSink.emit(DebugCategory.OVERLAY_PREVIEW, settings.debugLevel) {
             val dimShell = SoftwareDimming.dimShell(
                 brightness = targetBrightness.toDouble(),
@@ -142,7 +181,7 @@ class SuperDimmingCoordinator(
                 dimmingThreshold = settings.dimmingThreshold.toDouble(),
                 dimmingExponent = settings.dimmingExponent.toDouble(),
                 dimmingStrength = settings.dimmingStrength.toDouble(),
-                dimDynamic = null,
+                dimDynamic = dimDynamic,
             )
             val alpha = Math.round(2.55 * dimShell).toInt().coerceIn(0, 255)
             "overlay ${"#%02X000000".format(alpha)}"

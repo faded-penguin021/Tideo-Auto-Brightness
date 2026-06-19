@@ -20,6 +20,7 @@ import com.tideo.autobrightness.app.ui.onboarding.OnboardingUiState
 import com.tideo.autobrightness.app.ui.screens.DashboardContent
 import com.tideo.autobrightness.app.ui.screens.MenuContent
 import com.tideo.autobrightness.app.ui.screens.PlaceholderScreen
+import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
 import com.tideo.autobrightness.platform.privilege.Tier
 import org.junit.Rule
 import org.junit.Test
@@ -249,6 +250,50 @@ class UiShellTest {
         compose.onNodeWithTag("step_usage_access").assertExists()
         compose.onNodeWithTag("onboarding_done").performScrollTo().performClick()
         assertTrue(done)
+    }
+
+    // S12.9b/G2R-F91 (Shizuku UX): ADB is ALWAYS offered; an installed-but-not-running Shizuku shows a
+    // "start Shizuku" prompt (not the one-tap grant button, which needs a live binder).
+    @Test
+    fun onboardingContent_shizukuInstalledNotRunning_promptsToStartAndAlwaysOffersAdb() {
+        compose.setContent {
+            MaterialTheme {
+                OnboardingContent(
+                    state = OnboardingUiState(
+                        tier = Tier.BASIC, // not yet elevated → the grant channels render
+                        shizukuAvailability = ShizukuAvailability.INSTALLED_NOT_RUNNING,
+                        adbCommand = "adb shell pm grant ...",
+                    ),
+                    onRequestNotifications = {}, onRequestWriteSettings = {}, onRequestLocation = {},
+                    onOpenAppInfo = {}, onCopyAdb = {}, onRequestShizuku = {}, onTryRoot = {},
+                    onRequestUsageAccess = {}, onDone = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("shizuku_start_prompt").assertExists()
+        compose.onNodeWithTag("copy_adb").assertExists() // ADB always offered
+        compose.onNodeWithTag("grant_shizuku").assertDoesNotExist() // no one-tap until running
+    }
+
+    @Test
+    fun onboardingContent_shizukuRunning_offersOneTapGrant() {
+        compose.setContent {
+            MaterialTheme {
+                OnboardingContent(
+                    state = OnboardingUiState(
+                        tier = Tier.BASIC,
+                        shizukuAvailability = ShizukuAvailability.RUNNING,
+                        adbCommand = "adb shell pm grant ...",
+                    ),
+                    onRequestNotifications = {}, onRequestWriteSettings = {}, onRequestLocation = {},
+                    onOpenAppInfo = {}, onCopyAdb = {}, onRequestShizuku = {}, onTryRoot = {},
+                    onRequestUsageAccess = {}, onDone = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("grant_shizuku").assertExists()
+        compose.onNodeWithTag("copy_adb").assertExists()
+        compose.onNodeWithTag("shizuku_start_prompt").assertDoesNotExist()
     }
 
     @Test

@@ -48,8 +48,12 @@ class BrightnessPipelineControllerTest {
 
     private class FakeDimming : DimmingCoordinator {
         val applied = mutableListOf<Int>()
+        val scaleDynamics = mutableListOf<Double>()
         var disengaged = 0
-        override fun apply(targetBrightness: Int, settings: AabSettings) { applied += targetBrightness }
+        override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) {
+            applied += targetBrightness
+            scaleDynamics += scaleDynamic
+        }
         override fun disengage() { disengaged++ }
     }
 
