@@ -58,8 +58,8 @@ android {
     }
 
     lint {
-        baseline = file("lint-baseline.xml")
-        abortOnError = false
+        // S12.9a: lint is a build gate now — no baseline; targeted suppressions live in app/lint.xml.
+        abortOnError = true
     }
 
     testOptions {

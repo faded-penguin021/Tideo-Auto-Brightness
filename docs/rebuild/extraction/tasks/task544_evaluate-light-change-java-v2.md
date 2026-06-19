@@ -26,7 +26,7 @@
 | 15 | L16037 | 130 Perform Task | **Perform Task** "Map Lux to Brightness (Java) V2" (pri=%priority+1) par1=`%SmoothedLux` par2=`%LuxAlpha` |  |
 | 16 | L16053 | 137 Stop | **Stop** |  |
 | 17 | L16058 | 38 End If | **End If** |  |
-| 18 | L16061 | 474 Java Code | **Java Code** → `` (see `java/task544_*.java`) |  |
+| 18 | L16061 | 474 Java Code | **Java Code** → `` (see `_source/java/task544_*.java.txt`) |  |
 | 19 | L16104 | 37 If | **If** | `%relative_change < %dynamic_threshold` |
 | 20 | L16132 | 130 Perform Task | **Perform Task** "Set Thresholds (Java)" (pri=%priority) par1=`%par1` par2=`%dynamic_threshold` |  |
 | 21 | L16148 | 549 Variable Clear | **Clear** `%AAB_CycleStart` |  |

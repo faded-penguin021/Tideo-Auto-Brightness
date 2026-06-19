@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!--
+       S12.9a: lint is now a build gate (abortOnError = true, no baseline). These two checks are
+       suppressed on purpose, with rationale, instead of being hidden in a baseline file:
+
+       GradleDependency / AndroidGradlePluginVersion — the rebuild pins exact, reproducible
+       versions via gradle/libs.versions.toml (Kotlin 2.0.21, AGP 8.7.3, compose-bom 2024.12.01,
+       per S3/D-007). "A newer version is available" is noise for a version-locked, offline-capable
+       build; dependency bumps are an explicit S14 release-prep task, not an ad-hoc lint nag.
+    -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+</lint>

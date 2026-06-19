@@ -1,11 +1,12 @@
 # XML_RECIPES — verified access patterns for Advanced_Auto_Brightness_V3.3.prj_9.xml
 
-The Tasker export `Advanced_Auto_Brightness_V3.3.prj_9.xml` (repo root) is 1.6 MB / 41,291 lines.
-**NEVER read it wholesale** (it would consume your entire context window). Every recipe below was
-executed and verified on 2026-06-11 against this exact file. `$X` means the XML path.
+The Tasker export `Advanced_Auto_Brightness_V3.3.prj_9.xml` lives at
+`docs/rebuild/extraction/_source/` (gitignored since S12.9a — owner picks LFS-vs-ignore at PR review)
+and is 1.6 MB / 41,291 lines. **NEVER read it wholesale** (it would consume your entire context window).
+Every recipe below was executed and verified on 2026-06-11 against this exact file. `$X` means the XML path.
 
 ```bash
-X=Advanced_Auto_Brightness_V3.3.prj_9.xml
+X=docs/rebuild/extraction/_source/Advanced_Auto_Brightness_V3.3.prj_9.xml
 ```
 
 ## R1 — Censuses (use these to sanity-check your extraction is complete)
@@ -160,7 +161,7 @@ Reusable census command (regenerates the table above):
 ```bash
 python3 - <<'EOF'
 import re
-lines = open('Advanced_Auto_Brightness_V3.3.prj_9.xml', encoding='utf-8').read().splitlines()
+lines = open('docs/rebuild/extraction/_source/Advanced_Auto_Brightness_V3.3.prj_9.xml', encoding='utf-8').read().splitlines()
 task_re, nme_re = re.compile(r'<Task sr="task(\d+)">'), re.compile(r'<nme>([^<]*)</nme>')
 cur, name, pending = None, None, False
 for i, l in enumerate(lines, 1):

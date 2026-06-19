@@ -11,7 +11,7 @@
 | 0 | L35699 | 389 code389 | **code389** arg1=`%AAB_LastAnimation=%TIMEMS¶%AAB_CycleTime=%TIMEMS - %AAB_Cyc` arg4=`=` arg5=1 arg6=3 arg8=1 |  |
 | 1 | L35717 | 547 Variable Set | **Set** `%AutoBrightRunning` = `1` |  |
 | 2 | L35727 | 159 code159 | **code159** arg0=`Allow Override` |  |
-| 3 | L35732 | 474 Java Code | **Java Code** → `` (see `java/task696_*.java`) |  |
+| 3 | L35732 | 474 Java Code | **Java Code** → `` (see `_source/java/task696_*.java.txt`) |  |
 | 4 | L35890 | 159 code159 | **code159** arg0=`Allow Override` arg1=1 |  |
 | 5 | L35895 | 548 Flash | **Flash** `Hardware mode¶Loops: %loops, wait step: %wait ms¶Java loop duration: %java_loop_duration ms¶Target brightness: %AAB_CurrentBright¶Maximum target: %max_target¶Minimum target: %min_target` | `%AAB_Debug = 2` |
 

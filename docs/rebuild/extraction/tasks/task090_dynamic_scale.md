@@ -3,7 +3,7 @@
 - **Task id:** task90 (`<id>90</id>`, priority `<pri>6</pri>`)
 - **XML line range:** L40051–L41290 (`Advanced_Auto_Brightness_V3.3.prj_9.xml`)
 - **Action count:** 85 (sr `act0`..`act84`)
-- **Two Java blocks (code 474):** Block #1 at L40429 (source L40430–L40693), Block #2 at L41085 (source L41086–L41207). Decoded copies: `docs/rebuild/extraction/java/task90_1_*.java`, `task90_2_*.java`.
+- **Two Java blocks (code 474):** Block #1 at L40429 (source L40430–L40693), Block #2 at L41085 (source L41086–L41207). Decoded copies: `docs/rebuild/extraction/_source/java/task90_1_*.java.txt`, `task90_2_*.java.txt`.
 
 > NOTE ON ORDERING: Tasker stores `<Action>` elements alphabetically by `sr` name (act0, act1, act10, act11 … act2, act20 …), NOT in execution order. Execution order is the numeric index. The transcription below is in **numeric execution order** (act0 → act84). The XML line for each is noted.
 

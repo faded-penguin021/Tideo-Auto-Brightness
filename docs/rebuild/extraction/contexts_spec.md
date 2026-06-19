@@ -8,7 +8,7 @@ _EvaluateContexts V2`) which picks a winning rule from `contexts.json` and appli
 
 Sources verified against XML this session: prof762–768, prof8 (awk-extracted), task26, task624
 head, task43 pre/post-Java actions. Java logic from already-decoded
-`docs/rebuild/extraction/java/{task43,623,625,626,630,631,633,105}`.
+`docs/rebuild/extraction/_source/java/{task43,623,625,626,630,631,633,105}*.java.txt`.
 
 Op-code legend (from `profiles.md`, project histogram): `2 ==` · `3 !=` · `12 isSet` ·
 `13 isNotSet` · `0 ~matches` · `6 <` · `7 >` · `9 >=`.

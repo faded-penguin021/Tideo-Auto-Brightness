@@ -4,3 +4,15 @@ build/
 local.properties
 .claude/settings.local.json
 .kotlin/
+
+# Android / IDE
+.idea/
+*.iml
+.DS_Store
+captures/
+.cxx/
+*.hprof
+
+# Tasker source project — kept out of the tree (1.6 MB); owner picks LFS-vs-ignore at PR review (S12.9a).
+# Reference recipes live in docs/rebuild/XML_RECIPES.md.
+docs/rebuild/extraction/_source/Advanced_Auto_Brightness_V3.3.prj_9.xml

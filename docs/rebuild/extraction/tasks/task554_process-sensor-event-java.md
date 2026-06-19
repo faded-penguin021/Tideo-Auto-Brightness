@@ -9,7 +9,7 @@
 | act | line | code | detail | condition |
 |---|---|---|---|---|
 | 0 | L18121 | 547 Variable Set | **Set** `%AAB_MainLoop` = `On` |  |
-| 1 | L18131 | 474 Java Code | **Java Code** → `` (see `java/task554_*.java`) |  |
+| 1 | L18131 | 474 Java Code | **Java Code** → `` (see `_source/java/task554_*.java.txt`) |  |
 | 2 | L18177 | 130 Perform Task | **Perform Task** "Evaluate Light Change (Java) V2" (pri=%priority) par1=`%as_values1` |  |
 
 **Variables written:** `%AAB_MainLoop`

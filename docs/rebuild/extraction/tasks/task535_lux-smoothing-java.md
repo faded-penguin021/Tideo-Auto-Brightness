@@ -8,7 +8,7 @@
 
 | act | line | code | detail | condition |
 |---|---|---|---|---|
-| 0 | L15203 | 474 Java Code | **Java Code** → `%output` (see `java/task535_*.java`) |  |
+| 0 | L15203 | 474 Java Code | **Java Code** → `%output` (see `_source/java/task535_*.java.txt`) |  |
 | 1 | L15252 | 126 Return | **Return** `%output` |  |
 
 **Variables written:** `%output`
