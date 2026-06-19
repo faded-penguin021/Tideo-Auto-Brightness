@@ -39,7 +39,16 @@ class BootCompletedReceiverTest {
 
         assertNull(
             shadowOf(context).nextStartedService,
-            "a non-boot action must not start the service",
+            "a non-boot action must not start the service (short-circuits before goAsync)",
         )
+    }
+
+    // S12.9e: the boot read now runs via goAsync(); a directly-invoked receiver gets a null
+    // PendingResult, which the helper finishes defensively — the dispatch must not throw on the
+    // calling thread (the async branch reads serviceEnabled=false by default and starts nothing).
+    @Test
+    fun receiver_bootAction_dispatchesWithoutThrowing() {
+        val context = RuntimeEnvironment.getApplication()
+        BootCompletedReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
     }
 }

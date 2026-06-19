@@ -10,6 +10,13 @@ package com.tideo.autobrightness.app.runtime
 data class PipelineState(
     /** %AAB_Service — master enable; false stops the loop. */
     val serviceOn: Boolean = false,
+    /** true while a sensor cycle is actively animating a brightness write (`autoBrightRunning`); read
+     *  by the override-detection gate. S12.9e moved this into the snapshot (was a controller @Volatile)
+     *  so the override gate reads serviceOn/autoRunning/paused/initializing as one atomic compound. */
+    val autoRunning: Boolean = false,
+    /** true while Set Initial Brightness is performing its own self-write (`initializing`); the
+     *  override gate suppresses on it. S12.9e moved this into the snapshot (was a controller @Volatile). */
+    val initializing: Boolean = false,
     /** true == paused by a manual override (%AAB_Manual_Override). */
     val paused: Boolean = false,
     /** true when [paused] was latched by a DETECTED manual brightness override (prof755/task567) as

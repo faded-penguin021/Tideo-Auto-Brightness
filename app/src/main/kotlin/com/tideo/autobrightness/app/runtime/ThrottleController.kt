@@ -21,7 +21,12 @@ package com.tideo.autobrightness.app.runtime
  */
 class ThrottleController(private val idleMs: Long = 10_000L) {
 
-    /** The throttle window currently in force (ms). Read by the gate; published to Live Debug. */
+    /**
+     * The throttle window currently in force (ms). Read by the gate; published to Live Debug.
+     * @Volatile (S12.9e audit): written from BOTH the sensor collector ([onSample]) and the consumer
+     * ([onCycleComplete]/[seed]) and read on either — a single Long with no compound invariant, so
+     * visibility-only volatility is sufficient (a momentarily stale window self-corrects next sample).
+     */
     @Volatile
     var throttleMs: Long = 0L
         private set

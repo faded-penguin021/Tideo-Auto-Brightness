@@ -12,6 +12,26 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+/*
+ * ROUNDING-MODE CONTRACT (S12.9e header consolidation — comment-only, no behaviour change).
+ *
+ * Tideo's engine reproduces three DISTINCT rounding idioms from the source project, deliberately, so
+ * its output is bit-for-bit identical to the golden vectors. The per-call `gap-0X` notes throughout
+ * this file refer back to this table; do NOT "simplify" any of them to `kotlin.math.round`/`%.2f`:
+ *
+ *   1. `Math.round(x * 10^n) / 10^n`  — the project's `round3`/`roundN` idiom. `Math.round` ties
+ *      toward +∞ (HALF_UP on the magnitude line), NOT banker's rounding. Used for smoothing deltas,
+ *      thresholds, taper, and the final brightness `Math.round` (gap-01 R2, gap-02, gap-04 R1).
+ *   2. `new BigDecimal(x).setScale(scale, HALF_UP)` — the EXACT-binary BigDecimal(double) constructor
+ *      (not `BigDecimal.valueOf`), so the smoothed-lux 2-dp/0-dp rounding matches the source's
+ *      String-free path (gap-01 R1, gap-02 R1). See [bigScale].
+ *   3. NO clamping where the source omits it — `lux_alpha` is not clamped to [0,1] (gap-01 R2), the
+ *      `^0.33` curve bases are not `coerceAtLeast`'d, and the post-curve value is not re-clamped to
+ *      [min,max] inside the map step (gap-03 R2 / D-010a/b).
+ *
+ * These are immutable fixtures: production code conforms to the golden vectors, never the reverse.
+ */
+
 // Tasker task548 result: the final calculated brightness (round1) + the effective compressed
 // scale (%AAB_ScaleDynamicCompress), which task561/OverrideRules consumes.
 data class CompressedScaleResult(val calculatedBrightness: Double, val effectiveScale: Double)

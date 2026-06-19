@@ -5,6 +5,7 @@ import com.tideo.autobrightness.app.runtime.AndroidContextSignalSource
 import com.tideo.autobrightness.app.runtime.AppProfileCatalog
 import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
 import com.tideo.autobrightness.app.runtime.ContextEngine
+import com.tideo.autobrightness.app.runtime.ControllerHookHolder
 import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
@@ -64,7 +65,10 @@ class AppModule(context: Context) {
         // matching debugLevel is selected; shared by the pipeline, dimming + context engine.
         val debugSink: DebugSink = ToastDebugSink(appContext)
 
-        lateinit var controller: BrightnessPipelineController
+        // S12.9e: late-bound hook instead of `lateinit var controller` — the engine is constructed
+        // before the controller (the controller's settingsProvider reads through it), so the engine
+        // calls the controller through this holder, whose hook is assigned right after construction.
+        val controllerHook = ControllerHookHolder()
         val contextEngine = ContextEngine(
             rulesProvider = { contextRuleStore.rules() },
             // React to rule add/edit/delete at runtime (a new app/location rule starts its listener
@@ -73,7 +77,7 @@ class AppModule(context: Context) {
             baselineProvider = { appContext.settingsDataStore.data.first() },
             profileCatalog = AppProfileCatalog(userProfileStore),
             signalSource = AndroidContextSignalSource(appContext),
-            onProfileChanged = { controller.onContextChanged() },
+            onProfileChanged = { controllerHook.fire() },
             debugSink = debugSink,
             // G2R-F25: toast on a runtime context-rule profile load (unconditional, not debug-gated).
             contextLoadSink = ToastContextLoadSink(appContext),
@@ -89,7 +93,7 @@ class AppModule(context: Context) {
             geoIpFallback = GeoIpLocationClient()::resolve,
         )
 
-        controller = BrightnessPipelineController(
+        val controller = BrightnessPipelineController(
             lightSensor = AndroidLightSensorSource(appContext),
             brightness = brightness,
             brightnessObserver = AndroidBrightnessObserver(appContext, brightness),
@@ -108,6 +112,8 @@ class AppModule(context: Context) {
             // Persist captured override points so the wizard + curve overlay have real input (G2R-F13).
             overrideSink = { lux, brightness -> overridePointStore.record(lux, brightness) },
         )
+        // Wire the late-bound hook now that the controller exists (replaces the lateinit cycle).
+        controllerHook.hook = controller
 
         // prof769/task528 panic: upside-down + shake (display on) → SOS + restore + full stop (F77).
         val panicSensor = AndroidPanicSensorSource(appContext)

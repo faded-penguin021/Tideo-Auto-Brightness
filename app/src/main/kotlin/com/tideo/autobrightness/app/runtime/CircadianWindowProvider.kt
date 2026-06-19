@@ -65,6 +65,11 @@ class CircadianWindowProvider(
         TimeZone.getDefault().getOffset(dateEpochSec * 1000L) / 3_600_000.0
     },
 ) {
+    // S12.9e volatile audit — these cross three coroutines (the overrideFlow collector, the async
+    // triggerAcquire launch, and current() on the pipeline consumer). Each holds a single independent
+    // value with no compound invariant between them (a stale read at worst recomputes one window or
+    // skips one cache hit, self-correcting next call), so @Volatile (visibility-only) is the right tool;
+    // the only multi-step action — the once-per-day acquire — is separately guarded by [acquiring].
     @Volatile private var override: ExperimentDateLocation = ExperimentDateLocation()
     @Volatile private var cacheKey: String? = null
     @Volatile private var cached: CircadianWindows? = null

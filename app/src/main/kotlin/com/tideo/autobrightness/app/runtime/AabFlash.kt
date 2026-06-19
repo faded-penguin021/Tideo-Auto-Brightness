@@ -32,6 +32,10 @@ object AabFlash {
         fun hide()
     }
 
+    // S12.9e volatile audit: both presenter references are @Volatile because they are ASSIGNED from the
+    // AccessibilityService connect/unbind + the UI host's composition (main thread) and READ from the
+    // runtime sinks that call show()/cancel() — a single-reference handoff with no compound invariant,
+    // so visibility-only volatility (not a lock) is the correct, minimal guarantee.
     @Volatile private var presenter: Presenter? = null
     // F88: an in-app, tap-to-dismiss surface registered by the foreground UI ([AabFlashHost]). Used
     // when the global Accessibility overlay is NOT enabled, so in-app flashes ("Applied", debug toasts
