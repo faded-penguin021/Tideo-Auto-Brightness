@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,7 +68,7 @@ fun ReactivityContent(
     onReset: (() -> Unit)? = null,
     live: PipelineState = PipelineState(),
 ) {
-    DraftSettingsScaffold("Reactivity", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
+    DraftSettingsScaffold(stringResource(R.string.title_reactivity), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             // G2R-F81: the relevant graphs sit ABOVE the settings, swiped between (no vertical stack).
             // The smoothing-threshold fields feed the reactivity curve; Smoothing Δ feeds the alpha

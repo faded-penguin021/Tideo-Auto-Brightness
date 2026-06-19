@@ -1,5 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  S12.9d i18n capability. Strings are extracted by priority (RUNBOOK §S12.9d): notification strings →
+  screen titles → button labels → key toasts/flashes → Dashboard labels. Section headers, per-field
+  labels, and long-press help text remain inline and are deferred to S14 (logged in STATE.md D-075);
+  HardcodedStringCheckTest ratchets the remaining count so no NEW hardcoded UI string slips in.
+  Keys are snake_case, screen/feature-prefixed. Do NOT extract log strings, %AAB_* provenance, or
+  developer-facing exception messages.
+-->
 <resources>
     <string name="app_name">Tideo Auto Brightness</string>
     <string name="global_toasts_a11y_description">Shows Auto Brightness debug flash messages system-wide (over other apps). This optional service only draws the message overlays — it never reads screen content. Enable it only if you want the diagnostic flashes visible while using other apps.</string>
+
+    <!-- Foreground-service notification (AmbientMonitoringService) -->
+    <string name="notif_channel_ambient">Ambient monitoring</string>
+    <string name="notif_channel_override">Manual override</string>
+    <string name="notif_title_permission_needed">Auto Brightness — permission needed</string>
+    <string name="notif_title_paused">Auto Brightness paused</string>
+    <string name="notif_title_active">Auto Brightness active</string>
+    <string name="notif_text_grant_write">Grant \'Modify system settings\' to control brightness</string>
+    <string name="notif_text_paused">Manual override active — tap Resume to continue</string>
+    <string name="notif_text_lux_brightness">Lux %1$d → brightness %2$d</string>
+    <string name="notif_text_monitoring">Monitoring ambient light</string>
+    <string name="notif_subtext_context">Context: %1$s</string>
+    <string name="notif_override_title">Manual override detected</string>
+    <string name="notif_override_text">Auto Brightness paused — tap Resume to continue</string>
+    <string name="flash_manual_override">Manual override — auto brightness paused</string>
+
+    <!-- Shared action / button labels -->
+    <string name="action_resume">Resume</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_disable">Disable</string>
+
+    <!-- Screen titles -->
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_live_debug">Live Debug Info</string>
+    <string name="title_reactivity">Reactivity</string>
+    <string name="title_curve_brightness">Curve &amp; Brightness</string>
+    <string name="title_misc">Misc</string>
+    <string name="title_super_dimming">Super Dimming</string>
+    <string name="title_circadian">Circadian</string>
+    <string name="title_contexts">Contexts</string>
+    <string name="title_profiles_import_export">Profiles &amp; Import/Export</string>
+    <string name="title_global_flash">Global flash (system-wide)</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_stale_banner">Live data may be stale — the monitor may have stopped responding.</string>
+    <string name="dashboard_tier_none">No write access — tap to set up</string>
+    <string name="dashboard_tier_basic">Basic access (Modify system settings)</string>
+    <string name="dashboard_tier_elevated">Elevated access (super dimming ready)</string>
+    <string name="dashboard_status_off">Off</string>
+    <string name="dashboard_status_starting">Starting…</string>
+    <string name="dashboard_status_paused_override">Paused — manual override</string>
+    <string name="dashboard_status_paused">Paused</string>
+    <string name="dashboard_status_active">Active — monitoring ambient light</string>
+    <string name="dashboard_auto_brightness">Auto brightness</string>
+    <string name="dashboard_manual_override">Manual override</string>
+    <string name="dashboard_override_explain">You changed the brightness yourself, so auto-control is paused. Resume to hand control back.</string>
+    <string name="dashboard_resume_button">Resume auto brightness</string>
+    <string name="dashboard_ambient_light">Ambient light</string>
+    <string name="dashboard_last_sample">Last sensor sample: %1$s</string>
+    <string name="dashboard_brightness">Brightness</string>
+    <string name="dashboard_active_context">Active context</string>
+    <string name="dashboard_service_health">Service health</string>
+    <string name="dashboard_degraded">Degraded: %1$s</string>
 </resources>

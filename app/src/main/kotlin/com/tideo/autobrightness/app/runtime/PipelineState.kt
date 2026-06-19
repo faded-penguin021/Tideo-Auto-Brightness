@@ -63,6 +63,10 @@ data class PipelineState(
     val targetBrightness: Int? = null,
     /** Recorded manual-override points (newest first), %AAB_Overrides (cap 50). */
     val overrideHistory: List<Pair<Double, Double>> = emptyList(),
+    /** TIMEMS when this snapshot was last republished to [LiveRuntimeState] (S12.9d). Stamped by
+     *  [LiveRuntimeState.publish]; drives the Dashboard staleness gate (FRESH/AGING/STALE). null until
+     *  the first publish (and after a reset) → treated as STALE. */
+    val lastPublishMs: Long? = null,
 )
 
 /** Events serialized through the single pipeline consumer (one runs to completion, D-027). */

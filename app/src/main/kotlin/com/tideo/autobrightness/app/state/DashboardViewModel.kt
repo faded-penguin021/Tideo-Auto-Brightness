@@ -7,6 +7,7 @@ import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.ServiceHealthStore
+import com.tideo.autobrightness.app.runtime.Staleness
 import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.storage.serviceHealthDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -47,17 +48,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val throttleMs: Long?,
         val context: String?,
         val lastSampleMs: Long?,
+        val stale: Boolean,
     )
 
     private val liveFlow = combine(
         LiveRuntimeState.pipeline,
         LiveRuntimeState.activeContext,
         LiveRuntimeState.serviceRunning,
-    ) { p, ctx, running ->
+        LiveRuntimeState.staleness(),
+    ) { p, ctx, running, staleness ->
         Live(
             running, p.paused, p.pausedByOverride, p.lastRawLux, p.smoothedLux,
             p.lastAppliedBrightness, p.targetBrightness, p.scaleDynamicCompress, p.dimmingCurrent,
-            p.throttleMs, ctx, p.lastSampleMs,
+            p.throttleMs, ctx, p.lastSampleMs, staleness == Staleness.STALE,
         )
     }
 
@@ -91,6 +94,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             throttleMs = live.throttleMs,
             activeContext = live.context,
             lastSampleMs = live.lastSampleMs,
+            stale = live.stale,
             health = health,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())

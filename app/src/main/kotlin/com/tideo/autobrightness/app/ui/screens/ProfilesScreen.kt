@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -191,7 +193,7 @@ fun ProfilesContent(
     var previewProfile by remember { mutableStateOf<SavedProfile?>(null) }
     var showCurrentSettings by remember { mutableStateOf(false) }
 
-    SettingsScaffold("Profiles & Import/Export", onBack) { padding ->
+    SettingsScaffold(stringResource(R.string.title_profiles_import_export), onBack) { padding ->
         SettingsColumn(padding) {
             // S12.9c #3: surface an unreadable-profile failure (ProfileLoadResult.TotalFailure).
             if (loadError != null) {

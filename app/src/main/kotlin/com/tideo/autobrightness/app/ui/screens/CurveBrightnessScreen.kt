@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -103,7 +105,7 @@ fun CurveBrightnessContent(
     onDeleteOverridePoint: ((OverridePoint) -> Unit)? = null,
     live: PipelineState = PipelineState(),
 ) {
-    DraftSettingsScaffold("Curve & Brightness", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
+    DraftSettingsScaffold(stringResource(R.string.title_curve_brightness), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             val curveConfig = draft.toBrightnessCurveConfig()
             // F69: the dashed gold reference line is the FIXED committed snapshot, not the live draft,

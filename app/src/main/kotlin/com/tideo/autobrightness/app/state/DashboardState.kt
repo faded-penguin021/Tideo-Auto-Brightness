@@ -29,6 +29,9 @@ data class DashboardUiState(
     val activeContext: String? = null,
     /** TIMEMS of the last sensor sample the pipeline saw (live), for the "Xs ago" readout (G2R-F5). */
     val lastSampleMs: Long? = null,
+    /** True when the published live snapshot has aged past STALE (>10 s) — the loop may be wedged.
+     *  Drives the amber "live data may be stale" banner, shown only while [serviceRunning] (S12.9d). */
+    val stale: Boolean = false,
     val health: ServiceHealthUiState = ServiceHealthUiState(),
 )
 
