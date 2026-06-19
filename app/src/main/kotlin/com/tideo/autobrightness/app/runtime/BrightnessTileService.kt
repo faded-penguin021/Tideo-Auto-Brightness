@@ -21,6 +21,9 @@ import kotlinx.coroutines.launch
  * enable flag and the live pipeline state.
  */
 class BrightnessTileService : TileService() {
+    // S12.9e scope audit: legitimately-owned, NOT a leak — this tile owns its lifecycle and cancels
+    // the scope in onDestroy(). It is therefore kept as a dedicated SupervisorJob scope rather than
+    // routed through AppProcessScope (which is for owner-less process-scoped work).
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     // Active only between onStartListening/onStopListening: pushes live state changes to the tile so

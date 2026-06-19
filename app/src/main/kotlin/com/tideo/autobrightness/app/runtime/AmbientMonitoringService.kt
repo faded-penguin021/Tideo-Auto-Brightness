@@ -40,6 +40,9 @@ import kotlinx.coroutines.launch
  * pipeline's reinit/hibernate paths (prof761/task618 and prof753/task585).
  */
 class AmbientMonitoringService : Service() {
+    // S12.9e scope audit: legitimately-owned, NOT a leak — the foreground service owns its lifecycle
+    // and cancels this scope in onDestroy(). It backs the whole runtime graph for the service lifetime,
+    // so it is a dedicated SupervisorJob scope rather than the owner-less AppProcessScope.
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private lateinit var controller: BrightnessPipelineController
     private lateinit var contextEngine: ContextEngine

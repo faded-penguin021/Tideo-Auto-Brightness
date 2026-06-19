@@ -11,15 +11,14 @@ import androidx.work.WorkManager
 import com.tideo.autobrightness.app.settings.SettingsStore
 import com.tideo.autobrightness.app.storage.serviceHealthDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 object AutoBrightnessRuntime {
     fun bootstrap(context: Context) {
         scheduleMaintenance(context)
-        CoroutineScope(Dispatchers.Default).launch {
+        // S12.9e: process-scoped + supervised + logged, not a detached per-call CoroutineScope.
+        AppProcessScope.launch {
             val settings = SettingsStore(context.settingsDataStore).readRawSettings()
             if (settings.serviceEnabled) {
                 startMonitoring(context, "bootstrap")
@@ -69,13 +68,13 @@ object AutoBrightnessRuntime {
             // minSdk 31 ≥ O, so startForegroundService is always available (S12.9a dead-branch removal).
             appContext.startForegroundService(intent)
         } catch (error: ForegroundServiceStartNotAllowedException) {
-            CoroutineScope(Dispatchers.IO).launch {
+            AppProcessScope.launch {
                 ServiceHealthStore(appContext.serviceHealthDataStore).markDegraded(
                     "Foreground start blocked: ${error.javaClass.simpleName}",
                 )
             }
         } catch (error: IllegalStateException) {
-            CoroutineScope(Dispatchers.IO).launch {
+            AppProcessScope.launch {
                 ServiceHealthStore(appContext.serviceHealthDataStore).markDegraded(
                     "Background restricted: ${error.javaClass.simpleName}",
                 )

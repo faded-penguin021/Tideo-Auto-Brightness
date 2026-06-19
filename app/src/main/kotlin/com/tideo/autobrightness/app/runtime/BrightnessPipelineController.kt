@@ -1,23 +1,12 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
-import com.tideo.autobrightness.app.settings.toAnimationConfig
-import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
-import com.tideo.autobrightness.app.settings.toDynamicScalingConfig
-import com.tideo.autobrightness.app.settings.toThresholdConfig
-import com.tideo.autobrightness.domain.brightness.BrightnessContext
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
-import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
-import com.tideo.autobrightness.domain.brightness.OverrideRules
-import com.tideo.autobrightness.domain.brightness.PreviousState
-import com.tideo.autobrightness.domain.brightness.SoftwareDimming
-import com.tideo.autobrightness.domain.brightness.TimeContext
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,14 +16,19 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * The runtime auto-brightness pipeline: the Kotlin rebuild of the Tasker sensor → brightness loop.
+ * The runtime auto-brightness pipeline ORCHESTRATOR: the Kotlin rebuild of the Tasker sensor →
+ * brightness loop's state machine. S12.9e decomposed the original 596-LOC class — the per-event math
+ * glue moved to [PipelineCycleRunner], the debug-flash surface to [PipelineDebugEmitter], and the
+ * panic effect to [PanicHandler]; this file owns construction, start/stop, the event loop, the prof760
+ * sensor gate, the [ControllerHook], and state exposure.
  *
  * Concurrency model (BINDING, D-027): the pipeline is serialized through a single consumer
  * coroutine. One [PipelineEvent] runs to completion — including its animation frames — before the
  * next is processed. Sensor ticks arriving while a cycle is in flight are **DROPPED, not queued**,
  * exactly as prof760's `%AAB_MainLoop != On` clause drops them in Tasker (a re-entry mutex, D-021),
  * implemented here as the [inCycle] busy flag. All durable runtime state lives in [state] and is
- * written ONLY from the consumer coroutine; the sensor/observer collectors signal it via [events].
+ * written ONLY from the consumer coroutine (via [PipelineRuntimeContext]); the sensor/observer
+ * collectors signal it via [events].
  *
  * Pipeline sources (pipeline_spec.md):
  *   - prof760/task554 main loop      → [LightSensorSource] → gated → [PipelineEvent.SensorTick]
@@ -58,7 +52,8 @@ class BrightnessPipelineController(
     // F73: real solar ramp windows for the dynamic-scale engine. Default `{ null }` keeps the old
     // fixed-window behaviour (and existing tests) intact; AppModule supplies the live provider.
     private val circadianWindowsProvider: (transitionFactor: Double) -> CircadianWindows? = { null },
-) {
+) : ControllerHook, PipelineRuntimeContext {
+
     private val engine = BrightnessEngine()
 
     // %AAB_Throttle + Throttle Reinitialization watchdog (task566 / prof754, G2R-F78).
@@ -67,28 +62,36 @@ class BrightnessPipelineController(
     private val _state = MutableStateFlow(PipelineState())
     val state: StateFlow<PipelineState> = _state.asStateFlow()
 
-    // Fast-changing intra-cycle flags read by the observer coroutine; kept outside the immutable
-    // snapshot because they flip many times within a single cycle (mid-write / initial write).
-    @Volatile private var autoRunning = false
-    @Volatile private var initializing = false
+    // Cached so the per-sample prof760 gate does not hit DataStore on every reading. @Volatile (S12.9e
+    // audit, survivor #1): written by the consumer (start/runCycle/setInitial) and read on the SENSOR
+    // collector ([onSensorSample]) + the OBSERVER gate — cross-coroutine single-reference handoff, each
+    // read independently atomic; no compound invariant rides on it.
+    @Volatile private var cachedSettings: AabSettings? = null
 
     // Post-init override-suppression deadline (S12.7a, F64): override detection is suppressed until
-    // `clock() >= this`. Armed after every Set Initial Brightness self-write (service start / screen-on
-    // reinit / resume / context swap) so the ContentObserver echo of our own write — delivered after
-    // `initializing` resets — cannot spuriously pause/override on start. 0 = no window open.
+    // `clock() >= this`. @Volatile (S12.9e audit, survivor #2): written by the consumer (setInitial via
+    // [armInitialSettle]) and read on the OBSERVER gate coroutine — a single monotonic Long, atomic.
+    // 0 = no window open.
     @Volatile private var suppressOverrideUntilMs = 0L
 
     // %AAB_MainLoop re-entry mutex: true while a sensor cycle is claimed or running.
     private val inCycle = AtomicBoolean(false)
 
-    // Cached so the per-sample prof760 gate does not hit DataStore on every reading.
-    @Volatile private var cachedSettings: AabSettings? = null
-
-    // F48: the Dynamic Scale debug Flash fires only while the circadian scale is actively ramping and
-    // is throttled to ~once per 2 min — not on every light change. `lastScaleDynamicSeen` detects an
-    // in-progress transition (the scale value is time-driven, so a change means a dawn/dusk ramp).
-    private val dynamicScaleDebugGate = DynamicScaleDebugGate()
-    @Volatile private var lastScaleDynamicSeen: Double? = null
+    private val debugEmitter = PipelineDebugEmitter(debugSink)
+    private val panicHandler = PanicHandler(brightness, dimming)
+    private val cycleRunner = PipelineCycleRunner(
+        ctx = this,
+        engine = engine,
+        brightness = brightness,
+        animationRunner = animationRunner,
+        dimming = dimming,
+        throttle = throttle,
+        debug = debugEmitter,
+        settingsProvider = settingsProvider,
+        circadianWindowsProvider = circadianWindowsProvider,
+        overrideSink = overrideSink,
+        clock = clock,
+    )
 
     private val events = Channel<PipelineEvent>(Channel.UNLIMITED)
 
@@ -96,9 +99,9 @@ class BrightnessPipelineController(
         val s = _state.value
         OverrideMonitor.GateState(
             serviceOn = s.serviceOn,
-            autoRunning = autoRunning,
+            autoRunning = s.autoRunning,
             paused = s.paused,
-            initializing = initializing,
+            initializing = s.initializing,
             detectOverrides = cachedSettings?.detectOverrides ?: false,
             suppressed = clock() < suppressOverrideUntilMs,
         )
@@ -107,6 +110,14 @@ class BrightnessPipelineController(
     private var consumerJob: Job? = null
     private var sensorJob: Job? = null
     private var overrideJob: Job? = null
+
+    // --- PipelineRuntimeContext: the single-writer accessors the cycle runner reaches state through ---
+
+    override val stateValue: PipelineState get() = _state.value
+    override fun update(transform: (PipelineState) -> PipelineState) = _state.update(transform)
+    override fun cacheSettings(settings: AabSettings) { cachedSettings = settings }
+    override fun armInitialSettle(untilMs: Long) { suppressOverrideUntilMs = untilMs }
+    override fun postOverrideDetected(observed: Int) { events.trySend(PipelineEvent.OverrideDetected(observed)) }
 
     /** Begin the pipeline: claim foreground state, start the consumer + sensor + observer flows. */
     fun start() {
@@ -142,7 +153,7 @@ class BrightnessPipelineController(
     fun resume() { events.trySend(PipelineEvent.Resume) }
 
     /** A context override swapped the active profile: re-apply the initial brightness (task43 act21). */
-    fun onContextChanged() { events.trySend(PipelineEvent.ContextChanged) }
+    override fun onContextChanged() { events.trySend(PipelineEvent.ContextChanged) }
 
     /**
      * A settings Apply / profile load committed new parameters: re-run the pipeline immediately so the
@@ -163,10 +174,7 @@ class BrightnessPipelineController(
         overrideJob?.cancel(); overrideJob = null
         consumerJob?.cancel(); consumerJob = null
         inCycle.set(false)
-        brightness.forceManualMode()
-        brightness.write(PANIC_BRIGHTNESS) // task528 act6: Set Display Brightness 255
-        brightness.restoreMode()
-        dimming.disengage() // task528 act7/8: Disable Super Dimming
+        panicHandler.execute() // task528 act6-8: restore 255 + drop dimming
         _state.value = PipelineState(serviceOn = false)
     }
 
@@ -223,7 +231,7 @@ class BrightnessPipelineController(
         when (event) {
             is PipelineEvent.SensorTick -> {
                 try {
-                    runCycle(event.lux)
+                    cycleRunner.runCycle(event.lux)
                 } finally {
                     inCycle.set(false)
                 }
@@ -231,264 +239,10 @@ class BrightnessPipelineController(
             PipelineEvent.ScreenOff -> hibernate()
             PipelineEvent.ScreenOn -> reinit()
             PipelineEvent.Pause -> pauseInternal()
-            PipelineEvent.Resume -> resumeInternal()
-            is PipelineEvent.OverrideDetected -> handleOverride(event.observedBrightness)
-            PipelineEvent.ContextChanged -> reapplyProfile()
+            PipelineEvent.Resume -> cycleRunner.resume()
+            is PipelineEvent.OverrideDetected -> cycleRunner.handleOverride(event.observedBrightness)
+            PipelineEvent.ContextChanged -> cycleRunner.reapplyProfile()
         }
-    }
-
-    /** task43 act21: a context profile swap re-runs Set Initial Brightness with the new (effective) settings. */
-    private suspend fun reapplyProfile() {
-        if (_state.value.paused || !_state.value.serviceOn) return
-        setInitialBrightness(settingsProvider().also { cachedSettings = it })
-    }
-
-    /** task554 → task544 → task535 → task661: ingest a reading and animate to the new brightness. */
-    private suspend fun runCycle(rawLux: Double) {
-        val settings = settingsProvider().also { cachedSettings = it }
-        if (!settings.serviceEnabled || _state.value.paused) return
-
-        val now = clock()
-        val s = _state.value
-        // Throttle gate (task544 act2-9): drop ticks inside the THROTTLE window. The active window is
-        // the runtime %AAB_Throttle (actual steps×wait, or the idle ceiling — G2R-F78), not the raw
-        // setting; ThrottleController.seed() initialised it to the setting at start.
-        s.lastAcceptedMs?.let { last ->
-            if (now - last < throttle.throttleMs) return
-        }
-
-        val cycleStart = now
-        autoRunning = true
-        try {
-            val output = engine.evaluate(buildInput(rawLux, settings, s))
-            val from = brightness.read()
-            // task661 act22-26 / task698 step 3: hold the hardware floor in PWM-sensitive mode (D-050).
-            val target = applyPwmFloor(output.targetBrightness, settings)
-
-            // %AAB_Debug 3/4: Flash the light-evaluation + dynamic-scale figures (D-023, G2-F15).
-            emitDebug(DebugCategory.LIGHT_EVAL, settings) {
-                "lux ${round3(rawLux)}→${output.smoothedLux.toInt()} · thr ${output.thresholdLow.toInt()}–${output.thresholdHigh.toInt()} · →$target"
-            }
-            // %AAB_Debug 4 "Dynamic Scale Calcs": fire only ~2 min into a dawn/dusk transition, not on
-            // every light change (G2R-F48). A transition is the time-driven circadian scale changing.
-            val prevScale = lastScaleDynamicSeen
-            val transitionActive = prevScale != null && kotlin.math.abs(output.scaleDynamic - prevScale) > 1e-4
-            lastScaleDynamicSeen = output.scaleDynamic
-            if (dynamicScaleDebugGate.shouldEmit(now, transitionActive)) {
-                emitDebug(DebugCategory.DYNAMIC_SCALE, settings) {
-                    "scale ${round3(output.scaleDynamic)} · compress ${output.scaleDynamicCompress}"
-                }
-            }
-
-            val brightnessChanged = target != from
-            if (target != from) {
-                brightness.forceManualMode()
-                // %AAB_Debug 1 "Skip Animations": jump straight to the target (Tasker debug mode).
-                if (settings.debugLevel == DebugCategory.SKIP_ANIMATIONS.level) {
-                    brightness.write(target)
-                    emitDebug(DebugCategory.SKIP_ANIMATIONS, settings) { "skip → $target" }
-                } else {
-                    emitDebug(DebugCategory.ANIMATION_DETAILS, settings) {
-                        "animate $from→$target in ${output.animationSteps}×${output.animationWaitMs}ms"
-                    }
-                    val result = animationRunner.animate(
-                        from = from,
-                        to = target,
-                        steps = output.animationSteps,
-                        waitMs = output.animationWaitMs,
-                        detectOverrides = settings.detectOverrides,
-                    )
-                    if (result == AnimationRunner.Result.OVERRIDDEN) {
-                        events.trySend(PipelineEvent.OverrideDetected(brightness.read()))
-                        return
-                    }
-                }
-            }
-
-            // Super-dimming layer (task646→650/645): engage below DimmingThreshold, else disengage.
-            // Runs from the pipeline coroutine so the secure write is serialized with the cycle.
-            // F65: feed the UN-FLOORED engine target (%AAB_CurrentBright in task646 act1/act2), NOT the
-            // PWM-floored hardware value — when pwmSensitive raises `target` UP to dimmingThreshold the
-            // floored value is never < threshold, so the secure reduce_bright_colors layer would never
-            // engage and "Extra Dim" never applied. The two layers cooperate: the hardware sits at the
-            // PWM floor while the secure layer darkens visually below it (task661/698 floor ⟂ task650).
-            dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
-            // F58 live readout: %AAB_DimmingDS (abs reduce_bright_colors level) + %AAB_DimmingCurrent
-            // (relative strength) for the Super Dimming screen, computed from the golden SoftwareDimming.
-            val (dimCurrent, dimDS) = dimmingReadout(output.targetBrightness, settings, output.scaleDynamic)
-
-            val cycleTotal = (clock() - cycleStart).toDouble()
-            // %AAB_Debug 7 "Graph Metrics": Flash the measured cycle duration (feeds throttle).
-            emitDebug(DebugCategory.GRAPH_METRICS, settings) { "cycle ${cycleTotal.toInt()}ms" }
-            // task566 / prof754: %AAB_Throttle is the engine's ACTUAL animation duration this cycle
-            // (transitionDurationMs = loops×wait+10+cycleTime, golden task543), NOT MaxSteps×MaxWait+10
-            // (G2R-F78). After ~10 s of no brightness change the watchdog raises it to that ceiling.
-            throttle.onCycleComplete(
-                now = now,
-                brightnessChanged = brightnessChanged,
-                actualThrottleMs = output.transitionDurationMs,
-                ceilingMs = throttle.ceiling(settings.animSteps, settings.maxWaitMs),
-            )
-            _state.update {
-                it.copy(
-                    smoothedLux = output.smoothedLux,
-                    lastRawLux = round3(rawLux),
-                    lastAcceptedMs = now,
-                    threshAbsLow = output.thresholdLow,
-                    threshAbsHigh = output.thresholdHigh,
-                    threshDynamic = output.dynamicThreshold,
-                    cycleTimeMs = cycleTotal,
-                    scaleDynamic = output.scaleDynamic,
-                    scaleDynamicCompress = output.scaleDynamicCompress,
-                    scalingUse = settings.scalingEnabled,
-                    lastAppliedBrightness = target,
-                    targetBrightness = target,
-                    dimmingCurrent = dimCurrent,
-                    dimmingDS = dimDS,
-                    // Live Debug "Performance & Timings" parity (G2R-F29).
-                    luxAlpha = output.luxAlpha,
-                    animationSteps = output.animationSteps,
-                    animationWaitMs = output.animationWaitMs,
-                    throttleMs = throttle.throttleMs,
-                    lastUpdateMs = clock(),
-                )
-            }
-        } finally {
-            autoRunning = false
-        }
-    }
-
-    /**
-     * task650 act28/act30: the Super Dimming live-readout pair `%AAB_DimmingDS` (abs reduce_bright_colors
-     * level) and `%AAB_DimmingCurrent` (relative strength = dim_shell × dim_progress), for the
-     * un-floored engine target (G2R-F58). Computed from the golden-tested [SoftwareDimming] (call only).
-     * Zero when no dim path is active (target ≥ threshold or both dim toggles off), mirroring
-     * task661 act33/34 which clears both when disengaging.
-     *
-     * @return (dimmingCurrent, dimmingDS)
-     */
-    private fun dimmingReadout(target: Int, settings: AabSettings, scaleDynamic: Double): Pair<Double, Double> {
-        if (target >= settings.dimmingThreshold) return 0.0 to 0.0
-        // G2R-F90: the readout must reflect the SAME circadian-scaled dim_shell that is applied
-        // (task646 act7), or the Super Dimming live values disagree with the actual Extra Dim level.
-        val dimDynamic = circadianDimMultiplier(scaleDynamic, settings)
-        return when {
-            // PWM-sensitive: the level is task700 finalDimLevel; it has no separate progress term, so
-            // the relative + absolute readouts coincide.
-            settings.pwmSensitive -> {
-                val ds = SoftwareDimming.finalDimLevel(
-                    targetBrightness = target.toDouble(),
-                    isElevated = true,
-                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
-                    pwmExp = settings.pwmExponent.toDouble(),
-                )
-                ds to ds
-            }
-            settings.dimmingEnabled -> {
-                val ds = SoftwareDimming.dimShell(
-                    brightness = target.toDouble(),
-                    minBrightness = settings.minBrightness.toDouble(),
-                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
-                    dimmingExponent = settings.dimmingExponent.toDouble(),
-                    dimmingStrength = settings.dimmingStrength.toDouble(),
-                    dimDynamic = dimDynamic,
-                )
-                val progress = SoftwareDimming.dimProgress(
-                    brightness = target.toDouble(),
-                    minBrightness = settings.minBrightness.toDouble(),
-                    dimmingThreshold = settings.dimmingThreshold.toDouble(),
-                    dimmingExponent = settings.dimmingExponent.toDouble(),
-                )
-                (ds * progress) to ds
-            }
-            else -> 0.0 to 0.0
-        }
-    }
-
-    private fun buildInput(rawLux: Double, settings: AabSettings, s: PipelineState): BrightnessPolicyInput {
-        // UTC seconds-of-day — the same frame as the solar ramp windows below (buildScheduleWindows
-        // derives them as riseEpochSec % 86400). Both UTC ⇒ the ramp tracks the real sun (F73).
-        val secondsOfDay = ((clock() / 1000L) % 86_400L).toDouble()
-        val previous = if (s.smoothedLux != null && s.lastRawLux != null) {
-            PreviousState(smoothedLux = s.smoothedLux, lastRawLux = s.lastRawLux, cycleTimeMs = s.cycleTimeMs)
-        } else {
-            null
-        }
-        // F73: feed the REAL sunrise/sunset windows (not the fixed 6–8am-UTC TimeContext defaults) so
-        // %AAB_ScaleDynamic ramps with the actual day. Null (no location yet) → keep the old defaults.
-        val windows = circadianWindowsProvider(settings.scaleTransitionFactor.toDouble())
-        val time = if (windows != null) {
-            TimeContext(
-                secondsOfDay = secondsOfDay,
-                morningStart = windows.morningStart,
-                morningEnd = windows.morningEnd,
-                eveningStart = windows.eveningStart,
-                eveningEnd = windows.eveningEnd,
-                sunlightDurationMinutes = windows.sunlightDurationMinutes,
-            )
-        } else {
-            TimeContext(secondsOfDay = secondsOfDay)
-        }
-        return BrightnessPolicyInput(
-            lux = rawLux,
-            time = time,
-            context = BrightnessContext(isPolarDayNight = windows?.isPolar ?: false),
-            thresholds = settings.toThresholdConfig(),
-            curve = settings.toBrightnessCurveConfig(),
-            animation = settings.toAnimationConfig(),
-            dynamicScaling = settings.toDynamicScalingConfig(),
-            previous = previous,
-        )
-    }
-
-    /**
-     * task567 Manual Override: record the point and latch paused; the service posts the notification.
-     *
-     * task567 act7/act8 settle: wait `%AAB_CycleTime` for the new brightness to "take hold", then
-     * RE-READ and re-check the gate before committing the pause. A rapid light swing makes the pipeline
-     * write its own multi-frame transition whose ContentObserver callbacks can lag/coalesce; only a
-     * value that, after settling, is still NOT what we last applied is a genuine manual override — so a
-     * fast lux swing no longer false-pauses the loop (G2R-F26/D-049 #1). This runs in the single
-     * pipeline consumer (D-027), so the settle delay simply defers the next event.
-     *
-     * G2R-F71: the settle is `%AAB_CycleTime` ONLY — NOT the `%AAB_Throttle` reactivity cooldown. The
-     * throttle gates the task544 main loop alone (prof760, see [runCycle]); prof755→task567 override
-     * detection is a SEPARATE Tasker profile and must not borrow the cooldown window, or a genuine
-     * override goes unacknowledged for the entire throttle (which on a long throttle is the override
-     * being "swallowed"). When no cycle has measured a CycleTime yet (`cycleTimeMs == null`), settle
-     * immediately — Tasker's "Wait %AAB_CycleTime" on an unset variable is a 0 ms wait, not the cooldown.
-     */
-    private suspend fun handleOverride(observed: Int) {
-        val s = _state.value
-        if (!OverrideRules.shouldCommitPause(s.serviceOn, autoRunning, s.paused, initializing)) return
-
-        val settleMs = (s.cycleTimeMs?.toLong() ?: 0L).coerceAtLeast(0L)
-        if (settleMs > 0) delay(settleMs)
-
-        val s2 = _state.value
-        // Re-check the gate: a cycle/pause/panic may have started during the settle wait.
-        if (!OverrideRules.shouldCommitPause(s2.serviceOn, autoRunning, s2.paused, initializing)) return
-        val settled = brightness.read()
-        // Settled back to OUR last applied brightness → it was our in-flight write / a transient during
-        // a rapid swing, not a manual override (D-049 #1). Don't pause.
-        if (s2.lastAppliedBrightness != null && settled == s2.lastAppliedBrightness) return
-
-        val history = OverrideRules.recordOverridePoint(
-            history = s2.overrideHistory,
-            lux = s2.smoothedLux ?: 0.0,
-            brightness = settled.toDouble(),
-            dynamicCompress = s2.scaleDynamicCompress,
-            scalingUse = s2.scalingUse,
-        )
-        brightness.clearSelfWriteMarker()
-        // task567: a manual override disengages any active super dimming.
-        dimming.disengage()
-        // pausedByOverride flags this as a DETECTED override (not a user Pause) so the service raises
-        // the high-priority notification + toast (G2R-F35).
-        _state.update { it.copy(paused = true, pausedByOverride = true, overrideHistory = history) }
-        // Persist the captured training point (newest first) so the wizard + curve overlay have real
-        // input across restarts (G2R-F13; closes D-044c).
-        history.firstOrNull()?.let { (lux, bright) -> overrideSink.record(lux, bright) }
     }
 
     private fun pauseInternal() {
@@ -498,17 +252,11 @@ class BrightnessPipelineController(
         _state.update { it.copy(paused = true, pausedByOverride = false) }
     }
 
-    /** task569 Resume After Override: re-establish the initial brightness and clear the pause latch. */
-    private suspend fun resumeInternal() {
-        _state.update { it.copy(paused = false, pausedByOverride = false) }
-        setInitialBrightness(settingsProvider().also { cachedSettings = it })
-    }
-
     /** prof761/task618 wake reinit: throttle resets to default (it is the setting), set initial brightness. */
     private suspend fun reinit() {
         val settings = settingsProvider().also { cachedSettings = it }
         startSensor()
-        if (!_state.value.paused) setInitialBrightness(settings)
+        if (!_state.value.paused) cycleRunner.setInitialBrightness(settings)
     }
 
     /** prof753/task585 hibernate: stop sensing and clear the runtime loop state. */
@@ -526,61 +274,6 @@ class BrightnessPipelineController(
                 cycleTimeMs = null,
             )
         }
-    }
-
-    /** task618 block#1: set a starting brightness immediately (no smoothing loop) on wake/resume. */
-    private fun setInitialBrightness(settings: AabSettings) {
-        val s = _state.value
-        val lux = s.smoothedLux ?: s.lastRawLux ?: return
-        initializing = true
-        try {
-            // previous = null → engine's first-run path maps the reading straight to a target.
-            val output = engine.evaluate(buildInput(lux, settings, PipelineState()))
-            val target = applyPwmFloor(output.targetBrightness, settings)
-            brightness.forceManualMode()
-            brightness.write(target)
-            // F65: dimming decides off the un-floored engine target, not the PWM-floored write (above).
-            dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
-            // F64: arm the post-init settle window so the ContentObserver echo of THIS self-write
-            // (and any AUTO→MANUAL mode-flip recompute) — delivered after `initializing` clears below
-            // — is not flagged as a manual override on start/reinit/resume/context swap.
-            suppressOverrideUntilMs = clock() + INITIAL_SETTLE_MS
-            _state.update {
-                it.copy(
-                    lastAppliedBrightness = target,
-                    targetBrightness = target,
-                    lastAcceptedMs = clock(),
-                )
-            }
-        } finally {
-            initializing = false
-        }
-    }
-
-    /**
-     * task661 act22-26 / task698 step 3 hardware floor (D-050): when "Use software dimming
-     * (PWM-sensitive)" is on and the target falls below the dimming threshold, hold the HARDWARE
-     * brightness at the threshold (the panel's PWM-flicker floor). Further darkening is the
-     * secure/overlay layer's job (deferred, D-040) — not by writing a lower hardware value. The floor
-     * is in domain space; [ScreenBrightnessController] maps it onto the device range (cf. D-049 #4).
-     */
-    private fun applyPwmFloor(target: Int, settings: AabSettings): Int =
-        if (settings.pwmSensitive && target < settings.dimmingThreshold) settings.dimmingThreshold else target
-
-    /** Emit a runtime debug Flash for [category] gated on the live debugLevel (D-023, G2-F15). */
-    private fun emitDebug(category: DebugCategory, settings: AabSettings, message: () -> String) =
-        debugSink.emit(category, settings.debugLevel, message)
-
-    // Tasker round3 idiom: Math.round(x*1000)/1000 (ties toward +∞).
-    private fun round3(value: Double): Double = Math.round(value * 1000.0) / 1000.0
-
-    private companion object {
-        const val PANIC_BRIGHTNESS = 255
-
-        // F64 settle window: long enough to outlast the async ContentObserver delivery of our own
-        // initial write + the mode-flip recompute, short enough that a real user override moments
-        // after a reinit is still caught by the next observer event.
-        const val INITIAL_SETTLE_MS = 1500L
     }
 }
 

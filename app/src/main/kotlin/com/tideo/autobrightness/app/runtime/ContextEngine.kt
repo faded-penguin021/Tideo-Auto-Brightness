@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -77,12 +78,10 @@ class ContextEngine(
     private var currentProfileName: String? = null
 
     // Latest live signal pieces fed by the reader flows; assembled into a full snapshot per eval.
-    @Volatile private var latestApp = ""
-    @Volatile private var latestBatt = 0
-    @Volatile private var latestPlug = false
-    @Volatile private var latestWifi = ""
-    @Volatile private var latestLat = 0.0
-    @Volatile private var latestLon = 0.0
+    // S12.9e: a single MutableStateFlow<SignalSnapshot> replaces six independent @Volatile fields so a
+    // single battery/wifi/app/location update is published atomically and an evaluation reads one
+    // untearable snapshot (battery percent + plug flag, or lat + lon, can no longer be read half-updated).
+    private val signalSnapshot = MutableStateFlow(SignalSnapshot())
     // Last location that actually triggered a LOCATION evaluation — the ≥100 m debounce anchor (F45).
     private var lastLocEvalLat: Double? = null
     private var lastLocEvalLon: Double? = null
@@ -93,6 +92,9 @@ class ContextEngine(
     private var appJob: Job? = null
     private var locationJob: Job? = null
     private var rulesJob: Job? = null
+    // The lone surviving @Volatile (S12.9e audit): written from the lifecycle callbacks onScreenOn/Off
+    // and read from the listener-start helpers on the engine scope — a single boolean, single-writer
+    // per transition, so a plain volatile read is sufficient (no compound invariant to protect).
     @Volatile private var screenOn = true
 
     /** Effective settings for the pipeline's settingsProvider: active profile override or baseline. */
@@ -134,14 +136,13 @@ class ContextEngine(
         this.scope = scope
         batteryJob = scope.launch {
             signalSource.batteryFlow().collect { snap ->
-                latestBatt = snap.percent
-                latestPlug = snap.plugged
+                signalSnapshot.update { it.copy(batteryPercent = snap.percent, plugged = snap.plugged) }
                 evaluate(ContextCaller.BATTERY)
             }
         }
         wifiJob = scope.launch {
             signalSource.wifiFlow().collect { ssid ->
-                latestWifi = ssid ?: ""
+                signalSnapshot.update { it.copy(wifi = ssid ?: "") }
                 evaluate(ContextCaller.WIFI)
             }
         }
@@ -211,7 +212,7 @@ class ContextEngine(
         if (!tokens.usesApps) return // poll only when ≥1 app rule is configured (cost gate)
         appJob = scope?.launch {
             signalSource.foregroundAppFlow(APP_POLL_INTERVAL_MS).collect { pkg ->
-                pkg?.let { latestApp = it }
+                pkg?.let { app -> signalSnapshot.update { it.copy(app = app) } }
                 evaluate(ContextCaller.APP_CHANGED)
             }
         }
@@ -231,8 +232,7 @@ class ContextEngine(
         if (!tokens.usesLocation) return // [LOC] gate — no GPS listener without a location rule
         locationJob = scope?.launch {
             signalSource.locationFlow().collect { loc ->
-                latestLat = loc.lat
-                latestLon = loc.lon
+                signalSnapshot.update { it.copy(lat = loc.lat, lon = loc.lon) }
                 val prevLat = lastLocEvalLat
                 val prevLon = lastLocEvalLon
                 val moved = prevLat == null || prevLon == null ||
@@ -256,7 +256,8 @@ class ContextEngine(
         val last = lastEvalTime
         if (cooldown > 0 && last != null && now - last < cooldown) return@withLock
 
-        val signals = signalSource.assemble(latestApp, latestBatt, latestPlug, latestWifi, latestLat, latestLon)
+        val snap = signalSnapshot.value
+        val signals = signalSource.assemble(snap.app, snap.batteryPercent, snap.plugged, snap.wifi, snap.lat, snap.lon)
 
         // PASS 2 — veto gates.
         if (!shouldProceed(caller, signals, tokens)) return@withLock
@@ -377,6 +378,19 @@ enum class ContextCaller(val cooldownMs: Long) {
     TIME(1_000L),
     GENERAL(500L),
 }
+
+/**
+ * The latest live signal pieces fed by the reader flows (S12.9e): one atomically-published value so a
+ * context evaluation reads an untearable snapshot instead of six independently-volatile fields.
+ */
+data class SignalSnapshot(
+    val app: String = "",
+    val batteryPercent: Int = 0,
+    val plugged: Boolean = false,
+    val wifi: String = "",
+    val lat: Double = 0.0,
+    val lon: Double = 0.0,
+)
 
 /** A point-in-time battery reading (decoupled from the platform `BatteryState` so the engine is JVM-testable). */
 data class BatterySignal(val percent: Int, val plugged: Boolean)
