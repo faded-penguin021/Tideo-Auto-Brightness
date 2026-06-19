@@ -78,7 +78,9 @@ fun AabSettings.validate(): AabSettings {
         dimmingStrength = dimmingStrength.coerceIn(0, 100),
         dimmingExponent = dimmingExponent.coerceIn(0.5f, 5f),
         dimmingThreshold = dimmingThreshold.coerceIn(0, 100),
-        dimSpread = dimSpread.coerceIn(1, 300),
+        // S12.9c #6: dimSpread is signed (−100..100). The old 1..300 clamp silently turned the S12.9b
+        // negative-spread "boost in daylight" path into 1 on every save, making it unreachable.
+        dimSpread = dimSpread.coerceIn(-100, 100),
         pwmExponent = pwmExponent.coerceIn(0.1f, 3f),
         throttleDefaultMs = throttleDefaultMs.coerceIn(100, 60_000),
         minWaitMs = clampedMinWait,

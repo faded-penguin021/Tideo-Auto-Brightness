@@ -25,6 +25,9 @@ data class OverridePoints(val points: List<OverridePointRecord> = emptyList()) {
     companion object {
         /** Tasker task561 caps %AAB_Overrides at 50 entries. */
         const val MAX_POINTS = 50
+
+        /** On-disk schema version (S12.9c #5; datastore_map.md). v1 = initial; bump on a breaking change. */
+        const val SCHEMA_VERSION = 1
     }
 }
 

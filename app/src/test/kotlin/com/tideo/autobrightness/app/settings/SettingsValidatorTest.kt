@@ -132,6 +132,36 @@ class SettingsValidatorTest {
         assertTrue(errors.all { it.message.isNotEmpty() }, "All errors should have non-empty messages")
     }
 
+    // --- S12.9c #6: Spread (Circadian) is signed −100..100 ---
+
+    @Test
+    fun `dimSpread within -100 to 100 is valid`() {
+        listOf(-100, 0, 100).forEach { spread ->
+            val errors = SettingsValidator.validate(AabSettings(dimSpread = spread))
+            assertTrue(
+                errors.none { it.field == "dimSpread" },
+                "dimSpread=$spread must be valid; got: $errors",
+            )
+        }
+    }
+
+    @Test
+    fun `dimSpread outside -100 to 100 triggers an advisory error`() {
+        listOf(-101, 101, 300).forEach { spread ->
+            val errors = SettingsValidator.validate(AabSettings(dimSpread = spread))
+            val err = errors.firstOrNull { it.field == "dimSpread" }
+            assertTrue(err != null, "dimSpread=$spread must error; got: $errors")
+            assertTrue(err.severity == Severity.ADVISORY, "spread error is advisory")
+        }
+    }
+
+    @Test
+    fun `dimSpread error message has no warning glyph`() {
+        val errors = SettingsValidator.validate(AabSettings(dimSpread = 200))
+        val err = errors.first { it.field == "dimSpread" }
+        assertTrue(!err.message.contains("⚠"), "no ⚠️ glyph: ${err.message}")
+    }
+
     @Test
     fun `the three form errors are CRITICAL and the rest are advisory`() {
         // S12.6d/G2R-F18/D-052: form2A/form3A/form2C are CRITICAL (block Apply); safety/range warn only.

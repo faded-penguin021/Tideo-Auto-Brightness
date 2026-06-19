@@ -59,7 +59,28 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
     val scope = rememberCoroutineScope()
     val manager = remember { ProfileImportExportManager(context.applicationContext) }
     var status by remember { mutableStateOf<String?>(null) }
+    // S12.9c #3: a user-visible error card for an unreadable profile file (ProfileLoadResult.TotalFailure).
+    var loadError by remember { mutableStateOf<String?>(null) }
     val toast = rememberToaster()
+
+    // Apply a ProfileLoadResult: Success/LegacyFallback both apply the settings; TotalFailure shows the
+    // error card. Returns the toast status string.
+    fun handleLoad(
+        result: com.tideo.autobrightness.app.settings.ProfileLoadResult,
+        okMessage: String,
+        apply: (AabSettings) -> Unit,
+    ): String = when (result) {
+        is com.tideo.autobrightness.app.settings.ProfileLoadResult.Success -> {
+            apply(result.settings); loadError = null; okMessage
+        }
+        is com.tideo.autobrightness.app.settings.ProfileLoadResult.LegacyFallback -> {
+            apply(result.settings); loadError = null; okMessage
+        }
+        is com.tideo.autobrightness.app.settings.ProfileLoadResult.TotalFailure -> {
+            loadError = "Couldn't read this profile. It isn't a Tideo export or a Tasker AAB config."
+            "Load failed"
+        }
+    }
 
     // Previously-granted Download/AAB/configs tree (persisted SAF permission), if any.
     var legacyTree by remember {
@@ -89,8 +110,8 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
     ) { uri: Uri? ->
         if (uri != null) scope.launch {
             status = runCatching {
-                vm.replaceAll(manager.importFromDocument(uri)); "Imported."
-            }.getOrElse { "Import failed: ${it.message}" }
+                handleLoad(manager.importFromDocument(uri), "Imported.") { vm.replaceAll(it) }
+            }.getOrElse { loadError = it.message; "Import failed: ${it.message}" }
             status?.let(toast)
         }
     }
@@ -126,17 +147,19 @@ fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = vie
         onLoadLegacy = { entry ->
             scope.launch {
                 status = runCatching {
-                    val imported = manager.importFromDocument(entry.uri)
-                    // G2R-F44: register the legacy profile under its file name so it's selectable as a
-                    // context-rule target without a manual re-save, then apply it to the live settings.
-                    val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
-                    vm.saveImportedProfile(profileName, imported)
-                    vm.replaceAll(imported)
-                    "Loaded ${entry.name}"
-                }.getOrElse { "Load failed: ${it.message}" }
+                    handleLoad(manager.importFromDocument(entry.uri), "Loaded ${entry.name}") { imported ->
+                        // G2R-F44: register the legacy profile under its file name so it's selectable as
+                        // a context-rule target without a manual re-save, then apply it to live settings.
+                        val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
+                        vm.saveImportedProfile(profileName, imported)
+                        vm.replaceAll(imported)
+                    }
+                }.getOrElse { loadError = it.message; "Load failed: ${it.message}" }
                 status?.let(toast)
             }
         },
+        loadError = loadError,
+        onDismissLoadError = { loadError = null },
     )
 }
 
@@ -159,6 +182,8 @@ fun ProfilesContent(
     onImport: () -> Unit,
     onChooseLegacyFolder: () -> Unit,
     onLoadLegacy: (LegacyConfigEntry) -> Unit,
+    loadError: String? = null,
+    onDismissLoadError: () -> Unit = {},
 ) {
     var showSaveDialog by remember { mutableStateOf(false) }
     // G2R-F38: the Tasker "Load Anyway" modal — preview the profile's full settings list (gold
@@ -168,6 +193,24 @@ fun ProfilesContent(
 
     SettingsScaffold("Profiles & Import/Export", onBack) { padding ->
         SettingsColumn(padding) {
+            // S12.9c #3: surface an unreadable-profile failure (ProfileLoadResult.TotalFailure).
+            if (loadError != null) {
+                Card(
+                    Modifier.fillMaxWidth().testTag("load_error_card"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            loadError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                        TextButton(onClick = onDismissLoadError, modifier = Modifier.testTag("dismiss_load_error")) {
+                            Text("Dismiss")
+                        }
+                    }
+                }
+            }
             // G2R-F30: a manual profile load pauses context automation; offer a Resume control.
             if (contextLocked) {
                 Card(

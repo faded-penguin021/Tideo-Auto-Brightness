@@ -13,8 +13,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
- * Stub for a screen owned by a later segment (S12 parameter/tool/profile screens; S13 About/Guide).
- * The S11 brief sanctions placeholder screens as long as navigation resolves to them.
+ * Honest "not built yet" screen for the remaining unimplemented destination (About & Guide).
+ *
+ * S12.9c #8: the old placeholder copy leaked the internal segment plan into the UI and the audit
+ * (`PlaceholderScreenAuditTest`) now forbids that phrasing. The destination is real and routable; only
+ * its content is deferred.
+ *
+ * TODO(S13): implement About & Guide (and the user guide) — see S13d.
  */
 @Composable
 fun PlaceholderScreen(title: String, owner: String) {
@@ -25,7 +30,7 @@ fun PlaceholderScreen(title: String, owner: String) {
     ) {
         Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Text(
-            "Coming in $owner",
+            "Not available yet.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

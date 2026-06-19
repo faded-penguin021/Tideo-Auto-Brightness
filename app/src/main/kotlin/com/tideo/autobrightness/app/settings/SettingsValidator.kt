@@ -76,7 +76,53 @@ object SettingsValidator {
         if (settings.scale < 0.5f) {
             errors += FieldError(
                 "scale",
-                "⚠️ Scale (${settings.scale}) is very low — the curve may be too dim to see.",
+                "Scale (${settings.scale}) is very low — the curve may be too dim to see.",
+            )
+        }
+
+        // --- S12.9c #6/#7: range + cross-field validators (validation_audit.md) ---
+
+        // S12.9c #6 — Spread (Circadian) is signed −100..100 (circadian_dimming_graph.md). Out-of-range
+        // values are clamped on save, so warn the user the entry will not be honoured.
+        if (settings.dimSpread < -100 || settings.dimSpread > 100) {
+            errors += FieldError(
+                "dimSpread",
+                "Spread (circadian) (${settings.dimSpread}) must be between -100 and 100.",
+            )
+        }
+
+        // task607 (AAB Superdimming Settings focuschange): strength is clamped to 65 to avoid a screen
+        // that is too dark — surface the clamp as an advisory rather than silently capping.
+        if (settings.dimmingStrength > 65) {
+            errors += FieldError(
+                "dimmingStrength",
+                "Dimming strength (${settings.dimmingStrength}) will be clamped to 65 to keep the screen readable.",
+            )
+        }
+
+        // task513 (dimming threshold guard): a dimming threshold below the minimum brightness can never
+        // engage super-dimming. Only meaningful while dimming is enabled.
+        if (settings.dimmingEnabled && settings.dimmingThreshold < settings.minBrightness) {
+            errors += FieldError(
+                "dimmingThreshold",
+                "Dimming threshold (${settings.dimmingThreshold}) is below min brightness (${settings.minBrightness}); super-dimming will never engage.",
+            )
+        }
+
+        // task665/689 (Dynamic Scale guard): the taper midpoint must not exceed max brightness or the
+        // taper has no headroom. Only meaningful while circadian scaling is enabled.
+        if (settings.scalingEnabled && settings.scaleTaperMidpoint > settings.maxBrightness) {
+            errors += FieldError(
+                "scaleTaperMidpoint",
+                "Taper midpoint (${settings.scaleTaperMidpoint}) must be ≤ max brightness (${settings.maxBrightness}).",
+            )
+        }
+
+        // task403/714/715 (animation cross-field guard): min step wait must not exceed max step wait.
+        if (settings.minWaitMs > settings.maxWaitMs) {
+            errors += FieldError(
+                "minWaitMs",
+                "Min step wait (${settings.minWaitMs}) must be ≤ max step wait (${settings.maxWaitMs}).",
             )
         }
 
@@ -104,7 +150,7 @@ object SettingsValidator {
         if (safeVal < 25.0) {
             errors += FieldError(
                 "safetyBrightness",
-                "⚠️ Safety Warning: Brightness too low at 1000 Lux (%.0f / 255). Please adjust parameters.".format(safeVal),
+                "Safety warning: brightness too low at 1000 lux (%.0f / 255). Please adjust the parameters.".format(safeVal),
             )
         }
 

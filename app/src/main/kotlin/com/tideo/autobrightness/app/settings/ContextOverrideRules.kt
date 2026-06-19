@@ -81,6 +81,9 @@ data class ContextOverrideConfig(
     )
 
     companion object {
+        /** On-disk schema version (S12.9c #5; datastore_map.md). v1 = initial; bump on a breaking change. */
+        const val SCHEMA_VERSION = 1
+
         fun fromJson(json: String): ContextOverrideConfig = runCatching {
             contextJson.decodeFromString(serializer(), json)
         }.getOrElse {

@@ -28,7 +28,12 @@ data class SavedProfile(
 data class SavedProfiles(
     val profiles: List<SavedProfile> = emptyList(),
     val seeded: Boolean = false,
-)
+) {
+    companion object {
+        /** On-disk schema version (S12.9c #5; datastore_map.md). v1 = initial; bump on a breaking change. */
+        const val SCHEMA_VERSION = 1
+    }
+}
 
 /** DataStore serializer for the saved profile set (mirrors [OverridePointsSerializer]). */
 object SavedProfilesSerializer : Serializer<SavedProfiles> {

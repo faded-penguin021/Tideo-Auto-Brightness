@@ -139,7 +139,9 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "notificationsEnabled" -> notificationsEnabled.toString()
     "debugLevel" -> debugLevel.toString()
     "contextOverride" -> contextOverride.toString()
-    else -> ""
+    // S12.9c #2: fail fast on schema drift. Every AabSettingsContract key must be handled above; a
+    // silent "" would hide a contract/extractor mismatch. SettingsDisplayContractDriftTest guards this.
+    else -> throw IllegalArgumentException("Unknown AabSettings key: '$key' (not in valueFor's when)")
 }
 
 /** "%AAB_MinBright" → "Min Bright": drop the prefix, space camelCase boundaries (readable, faithful). */

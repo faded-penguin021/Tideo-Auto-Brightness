@@ -149,7 +149,7 @@ class LegacyImportRoundTripTest {
           "circadian": { "spread": 20.0, "transition": 0.2, "steepness": 8.0, "enabled": true,
                          "taper_mid": 200.0, "taper_steep": 0.05, "qs_use": true },
           "superdimming": { "enabled": true, "threshold": 25.0, "strength": 30.0, "exponent": 3.0,
-                            "spread": 120.0, "pwm_exp": 0.9, "pwm_sensitive": true }
+                            "spread": 80.0, "pwm_exp": 0.9, "pwm_sensitive": true }
         }
     """.trimIndent()
 
@@ -194,7 +194,7 @@ class LegacyImportRoundTripTest {
         assertEquals(25, s.dimmingThreshold)
         assertEquals(30, s.dimmingStrength)
         assertEquals(3.0f, s.dimmingExponent, 0.001f)
-        assertEquals(120, s.dimSpread)
+        assertEquals(80, s.dimSpread)
         assertEquals(0.9f, s.pwmExponent, 0.001f)
         assertTrue(s.pwmSensitive)
     }
