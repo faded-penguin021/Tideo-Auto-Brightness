@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,7 +76,7 @@ fun MiscContent(
     onReset: (() -> Unit)? = null,
     live: PipelineState = PipelineState(),
 ) {
-    DraftSettingsScaffold("Misc", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
+    DraftSettingsScaffold(stringResource(R.string.title_misc), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             // Tasker live readout (current_throttle_and_alpha, misc_settings.md elements31, G2R-F58):
             // current throttle (ms) + current smoothing α.

@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -135,7 +137,7 @@ fun ContextsContent(
 ) {
     var editing by remember { mutableStateOf<ContextRule?>(null) }
 
-    SettingsScaffold("Contexts", onBack) { padding ->
+    SettingsScaffold(stringResource(R.string.title_contexts), onBack) { padding ->
         SettingsColumn(padding) {
             val current = editing
             if (current == null) {

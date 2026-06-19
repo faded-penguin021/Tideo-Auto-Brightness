@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -82,7 +84,7 @@ fun SuperDimmingContent(
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
 ) {
-    DraftSettingsScaffold("Super Dimming", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
+    DraftSettingsScaffold(stringResource(R.string.title_super_dimming), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             val dimEnabled = tier == Tier.ELEVATED
             // G2R-F81 + Gate-2(5th) obs: two relevant graphs sit ABOVE the settings and are swiped

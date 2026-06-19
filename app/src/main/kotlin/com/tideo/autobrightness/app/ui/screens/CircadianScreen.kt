@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -121,7 +123,7 @@ fun CircadianContent(
     onUseLiveData: () -> Unit = {},
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
 ) {
-    DraftSettingsScaffold("Circadian", dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
+    DraftSettingsScaffold(stringResource(R.string.title_circadian), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             // G2R-F81: the two relevant graphs sit ABOVE the settings and are swiped between — the
             // Circadian (scaling) curve and the Taper (compression) curve. S13 fills the chart slots.

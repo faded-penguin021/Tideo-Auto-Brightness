@@ -1,8 +1,32 @@
 package com.tideo.autobrightness.app.runtime
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+
+/**
+ * How fresh the published live pipeline snapshot is, by age of [PipelineState.lastPublishMs]
+ * (S12.9d): FRESH < 3 s, AGING 3–10 s, STALE > 10 s. The Dashboard surfaces a banner when the
+ * data is STALE while the service still claims to be running (a sign the loop has wedged).
+ */
+enum class Staleness { FRESH, AGING, STALE }
+
+/** Pure classifier shared by the Flow and its tests. null timestamp (never published / reset) = STALE. */
+internal fun classifyStaleness(lastPublishMs: Long?, now: Long): Staleness {
+    if (lastPublishMs == null) return Staleness.STALE
+    val age = now - lastPublishMs
+    return when {
+        age < 3_000L -> Staleness.FRESH
+        age <= 10_000L -> Staleness.AGING
+        else -> Staleness.STALE
+    }
+}
 
 /**
  * Process-wide bridge so the in-app UI can observe the live pipeline running inside
@@ -34,12 +58,35 @@ object LiveRuntimeState {
     private val _serviceRunning = MutableStateFlow(false)
     val serviceRunning: StateFlow<Boolean> = _serviceRunning.asStateFlow()
 
-    fun publish(state: PipelineState, activeContext: String?, manualOverride: Boolean = false) {
-        _pipeline.value = state
+    fun publish(
+        state: PipelineState,
+        activeContext: String?,
+        manualOverride: Boolean = false,
+        nowMs: Long = System.currentTimeMillis(),
+    ) {
+        // Stamp the publish time so the staleness gate can age the snapshot (S12.9d).
+        _pipeline.value = state.copy(lastPublishMs = nowMs)
         _activeContext.value = activeContext
         _manualOverride.value = manualOverride
         _serviceRunning.value = true
     }
+
+    /**
+     * Emits the freshness of the published snapshot, re-evaluated every [intervalMs] so a wedged loop
+     * ages into [Staleness.STALE] without a new publish (S12.9d). [clock] is injectable for tests.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun staleness(
+        clock: () -> Long = System::currentTimeMillis,
+        intervalMs: Long = 1_000L,
+    ): Flow<Staleness> = pipeline.flatMapLatest { state ->
+        flow {
+            while (true) {
+                emit(classifyStaleness(state.lastPublishMs, clock()))
+                delay(intervalMs)
+            }
+        }
+    }.distinctUntilChanged()
 
     fun reset() {
         _pipeline.value = PipelineState()

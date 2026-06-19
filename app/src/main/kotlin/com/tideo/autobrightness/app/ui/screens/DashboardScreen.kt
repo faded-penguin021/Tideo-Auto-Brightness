@@ -22,15 +22,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.state.DashboardUiState
 import com.tideo.autobrightness.app.state.DashboardViewModel
 import com.tideo.autobrightness.app.state.ServiceHealthUiState
 import com.tideo.autobrightness.app.ui.components.AabTopBar
+import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.app.ui.theme.AabOnGold
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /** Stateful wrapper: wires the [DashboardViewModel] and navigation. */
@@ -65,7 +69,7 @@ fun DashboardContent(
     onBack: () -> Unit,
 ) {
     Scaffold(
-        topBar = { AabTopBar(title = "Dashboard", onBack = onBack) },
+        topBar = { AabTopBar(title = stringResource(R.string.title_dashboard), onBack = onBack) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -75,6 +79,11 @@ fun DashboardContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TierBadge(tier = state.tier, onClick = onOpenOnboarding)
+            // S12.9d: the published live snapshot has aged past STALE while the service still claims to
+            // be running — the loop may be wedged. Warn rather than show a confidently-wrong readout.
+            if (state.stale && state.serviceRunning) {
+                StaleBanner()
+            }
             StatusCard(state, onToggleService)
             // The Resume-after-override affordance only appears when the engine paused itself because
             // the user changed brightness manually (prof755/task567) — the one case Resume is for.
@@ -91,12 +100,30 @@ fun DashboardContent(
     }
 }
 
+/** Amber "live data may be stale" banner (S12.9d). */
+@Composable
+private fun StaleBanner() {
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("stale_banner"),
+        colors = CardDefaults.cardColors(
+            containerColor = AabGold,
+            contentColor = AabOnGold,
+        ),
+    ) {
+        Text(
+            stringResource(R.string.dashboard_stale_banner),
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
 @Composable
 private fun TierBadge(tier: Tier, onClick: () -> Unit) {
     val (label, color) = when (tier) {
-        Tier.NONE -> "No write access — tap to set up" to MaterialTheme.colorScheme.error
-        Tier.BASIC -> "Basic access (Modify system settings)" to MaterialTheme.colorScheme.primary
-        Tier.ELEVATED -> "Elevated access (super dimming ready)" to MaterialTheme.colorScheme.tertiary
+        Tier.NONE -> stringResource(R.string.dashboard_tier_none) to MaterialTheme.colorScheme.error
+        Tier.BASIC -> stringResource(R.string.dashboard_tier_basic) to MaterialTheme.colorScheme.primary
+        Tier.ELEVATED -> stringResource(R.string.dashboard_tier_elevated) to MaterialTheme.colorScheme.tertiary
     }
     AssistChip(
         onClick = onClick,
@@ -110,11 +137,11 @@ private fun TierBadge(tier: Tier, onClick: () -> Unit) {
 @Composable
 private fun StatusCard(state: DashboardUiState, onToggle: (Boolean) -> Unit) {
     val status = when {
-        !state.serviceEnabled -> "Off"
-        !state.serviceRunning -> "Starting…"
-        state.pausedByOverride -> "Paused — manual override"
-        state.paused -> "Paused"
-        else -> "Active — monitoring ambient light"
+        !state.serviceEnabled -> stringResource(R.string.dashboard_status_off)
+        !state.serviceRunning -> stringResource(R.string.dashboard_status_starting)
+        state.pausedByOverride -> stringResource(R.string.dashboard_status_paused_override)
+        state.paused -> stringResource(R.string.dashboard_status_paused)
+        else -> stringResource(R.string.dashboard_status_active)
     }
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -124,7 +151,7 @@ private fun StatusCard(state: DashboardUiState, onToggle: (Boolean) -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Auto brightness", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.dashboard_auto_brightness), style = MaterialTheme.typography.titleMedium)
                     Text(
                         status,
                         style = MaterialTheme.typography.bodyMedium,
@@ -150,16 +177,16 @@ private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Manual override", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.dashboard_manual_override), style = MaterialTheme.typography.titleSmall)
             Text(
-                "You changed the brightness yourself, so auto-control is paused. Resume to hand control back.",
+                stringResource(R.string.dashboard_override_explain),
                 style = MaterialTheme.typography.bodyMedium,
             )
             FilledTonalButton(
                 onClick = onResume,
                 enabled = serviceRunning,
                 modifier = Modifier.testTag("resume_button"),
-            ) { Text("Resume auto brightness") }
+            ) { Text(stringResource(R.string.dashboard_resume_button)) }
         }
     }
 }
@@ -168,13 +195,13 @@ private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
 private fun LightCard(state: DashboardUiState) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Ambient light", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.dashboard_ambient_light), style = MaterialTheme.typography.labelMedium)
             Text(
                 "${state.rawLux.fmt()} lux raw · ${state.smoothedLux.fmt()} smoothed",
                 modifier = Modifier.testTag("dashboard_lux"),
             )
             Text(
-                "Last sensor sample: ${state.lastSampleMs.toRelativeAge()}",
+                stringResource(R.string.dashboard_last_sample, state.lastSampleMs.toRelativeAge()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("last_sample_age"),
@@ -187,7 +214,7 @@ private fun LightCard(state: DashboardUiState) {
 private fun BrightnessCard(state: DashboardUiState) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Brightness", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.dashboard_brightness), style = MaterialTheme.typography.labelMedium)
             // Gate-2(5th) obs: the pipeline only publishes its state AFTER the animation settles, so the
             // applied and target values are always equal here (mid-animation frames are never surfaced) —
             // showing "X → Y" was confusing because X==Y. Render the single applied level, and only fall
@@ -227,7 +254,7 @@ private fun BrightnessCard(state: DashboardUiState) {
 private fun ContextCard(activeContext: String) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Active context", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.dashboard_active_context), style = MaterialTheme.typography.labelMedium)
             Text(activeContext, modifier = Modifier.testTag("dashboard_context"))
         }
     }
@@ -238,9 +265,9 @@ private fun HealthCard(lastSampleMs: Long?, health: ServiceHealthUiState) {
     if (!health.degradedMode) return
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Service health", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.dashboard_service_health), style = MaterialTheme.typography.labelMedium)
             Text(
-                "Degraded: ${health.degradedReason ?: "unknown"}",
+                stringResource(R.string.dashboard_degraded, health.degradedReason ?: "unknown"),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag("dashboard_degraded"),
             )

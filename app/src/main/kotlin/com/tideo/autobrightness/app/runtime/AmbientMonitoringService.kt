@@ -244,7 +244,11 @@ class AmbientMonitoringService : Service() {
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Ambient monitoring", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.notif_channel_ambient),
+                NotificationManager.IMPORTANCE_LOW,
+            ),
         )
         // Separate HIGH-importance, vibrating channel for the manual-override alert (G2R-F35). The
         // ongoing FGS notification stays on the silent LOW channel; an override heads-up + buzz is a
@@ -252,7 +256,7 @@ class AmbientMonitoringService : Service() {
         manager.createNotificationChannel(
             NotificationChannel(
                 OVERRIDE_CHANNEL_ID,
-                "Manual override",
+                getString(R.string.notif_channel_override),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 enableVibration(true)
@@ -270,23 +274,23 @@ class AmbientMonitoringService : Service() {
      */
     internal fun notifyManualOverride() {
         val alert = NotificationCompat.Builder(this, OVERRIDE_CHANNEL_ID)
-            .setContentTitle("Manual override detected")
-            .setContentText("Auto Brightness paused — tap Resume to continue")
+            .setContentTitle(getString(R.string.notif_override_title))
+            .setContentText(getString(R.string.notif_override_text))
             .setSmallIcon(R.drawable.ic_stat_brightness)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVibrate(longArrayOf(0, 200, 100, 200))
-            .addAction(0, "Resume", actionIntent(ACTION_RESUME))
-            .addAction(0, "Reset", actionIntent(ACTION_PANIC))
-            .addAction(0, "Disable", actionIntent(ACTION_DISABLE))
+            .addAction(0, getString(R.string.action_resume), actionIntent(ACTION_RESUME))
+            .addAction(0, getString(R.string.action_reset), actionIntent(ACTION_PANIC))
+            .addAction(0, getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
             .build()
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, alert)
         // G2R-F91: route the override flash through the shared teal [AabFlash] operational surface
         // (global a11y overlay → in-app pill → Toast fallback), consistent with the profile/context-load
         // flashes — not a bare, non-tappable Toast that can stack independently.
         mainHandler.post {
-            AabFlash.show(this, "Manual override — auto brightness paused") // TODO(S12.9d): strings.xml
+            AabFlash.show(this, getString(R.string.flash_manual_override))
         }
     }
 
@@ -314,19 +318,19 @@ class AmbientMonitoringService : Service() {
         // surface why nothing is changing instead of looking silently broken.
         val canWrite = android.provider.Settings.System.canWrite(this)
         val title = when {
-            !canWrite -> "Auto Brightness — permission needed"
-            model.paused -> "Auto Brightness paused"
-            else -> "Auto Brightness active"
+            !canWrite -> getString(R.string.notif_title_permission_needed)
+            model.paused -> getString(R.string.notif_title_paused)
+            else -> getString(R.string.notif_title_active)
         }
         val text = when {
-            !canWrite -> "Grant 'Modify system settings' to control brightness"
-            model.paused -> "Manual override active — tap Resume to continue"
+            !canWrite -> getString(R.string.notif_text_grant_write)
+            model.paused -> getString(R.string.notif_text_paused)
             model.smoothedLux != null && model.targetBrightness != null ->
-                "Lux ${model.smoothedLux.toInt()} → brightness ${model.targetBrightness}"
-            else -> "Monitoring ambient light"
+                getString(R.string.notif_text_lux_brightness, model.smoothedLux.toInt(), model.targetBrightness)
+            else -> getString(R.string.notif_text_monitoring)
         }
         // Surface the active context override (%AAB_ActiveContext) as a second line when one is on.
-        val contextLine = model.activeContext?.let { "Context: $it" }
+        val contextLine = model.activeContext?.let { getString(R.string.notif_subtext_context, it) }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
@@ -340,10 +344,10 @@ class AmbientMonitoringService : Service() {
         // override and confused users; to stop, disable the service. Resume is still offered while
         // paused (after a real override); Reset (panic) + Disable remain.
         if (model.paused) {
-            builder.addAction(0, "Resume", actionIntent(ACTION_RESUME))
+            builder.addAction(0, getString(R.string.action_resume), actionIntent(ACTION_RESUME))
         }
-        builder.addAction(0, "Reset", actionIntent(ACTION_PANIC))
-        builder.addAction(0, "Disable", actionIntent(ACTION_DISABLE))
+        builder.addAction(0, getString(R.string.action_reset), actionIntent(ACTION_PANIC))
+        builder.addAction(0, getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
         return builder.build()
     }
 
@@ -357,14 +361,43 @@ class AmbientMonitoringService : Service() {
         )
     }
 
+    /**
+     * Swiped from recents (S12.9d). The system may keep a START_STICKY FGS alive and recreate it; arm
+     * the staleness watchdog rather than wiping the live state immediately so the UI does not flicker
+     * to "no data" if a fresh instance republishes within the grace window.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        armStalenessWatchdog()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenReceiver) }
         panicJob?.cancel(); panicJob = null
         contextEngine.stop()
         controller.stop()
-        LiveRuntimeState.reset()
+        // Watchdog instead of an immediate reset (S12.9d): if the OS restarts the FGS and it
+        // republishes within the grace window, the live data survives; otherwise it is cleared so the
+        // Dashboard does not show a stale "live" snapshot for a dead loop. A genuine user-driven stop
+        // (tearDownDisabled) already reset immediately, so this only softens system-driven teardowns.
+        armStalenessWatchdog()
         scope.cancel()
         super.onDestroy()
+    }
+
+    /**
+     * Reset [LiveRuntimeState] after [WATCHDOG_GRACE_MS] unless a newer publish (e.g. from a restarted
+     * service instance) arrived in the meantime. Posted on the main handler so it outlives [scope]'s
+     * cancellation during teardown.
+     */
+    private fun armStalenessWatchdog() {
+        val armedAt = System.currentTimeMillis()
+        mainHandler.postDelayed({
+            val lastPublish = LiveRuntimeState.pipeline.value.lastPublishMs
+            if (lastPublish == null || lastPublish < armedAt) {
+                LiveRuntimeState.reset()
+            }
+        }, WATCHDOG_GRACE_MS)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -381,6 +414,8 @@ class AmbientMonitoringService : Service() {
         private const val OVERRIDE_CHANNEL_ID = "manual_override"
         private const val NOTIFICATION_ID = 1001
         private const val OVERRIDE_NOTIFICATION_ID = 1002
+        // S12.9d: grace before the staleness watchdog wipes LiveRuntimeState on a system teardown.
+        private const val WATCHDOG_GRACE_MS = 5_000L
 
         // task528 act0 (code62): S.O.S. in morse code. Tasker arg0 was
         // "0,100,100,100,100,100,300,300,100,300,100,300,300,100,100,10" — the same on/off durations

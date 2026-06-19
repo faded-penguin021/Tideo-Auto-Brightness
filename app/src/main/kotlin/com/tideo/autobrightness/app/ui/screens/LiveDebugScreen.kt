@@ -1,5 +1,7 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -95,7 +97,7 @@ fun LiveDebugContent(
     onEnableGlobalToasts: () -> Unit = {},
 ) {
     val p = state.pipeline
-    Scaffold(topBar = { AabTopBar(title = "Live Debug Info", onBack = onBack) }) { padding ->
+    Scaffold(topBar = { AabTopBar(title = stringResource(R.string.title_live_debug), onBack = onBack) }) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -154,7 +156,7 @@ fun LiveDebugContent(
 @Composable
 private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
     DiagnosticCard(
-        title = "Global flash (system-wide)",
+        title = stringResource(R.string.title_global_flash),
         testTag = "global_flash_card",
     ) {
         DiagnosticLine("global_flash_status") {
