@@ -54,6 +54,20 @@ Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
 
+**S12.8 (a–d + b'/b'') DONE → Gate 2 (5th re-test) device-passed. NEXT: S12.9 (a–f) — engineering-quality &
+parity-debt remediation (RUNBOOK §S12.9, D-069), inserted between S12.8 and S13.** S12.9 lands repo hygiene
+(XML + extraction-java out of the tree, dead API-26 branches, lint-as-gate, README seed, `:data` ghost,
+`Main.kt`→`MainActivity.kt`), the one real runtime-parity fix (**G2R-F90** circadian dimming inert —
+`SuperDimmingCoordinator` hardcodes `dimDynamic=null`; app-layer wiring, no domain/golden change), schema
+ergonomics (nested `AabSettings`, fail-fast `valueFor`, surfaced profile-load errors, spread validation,
+validation/privilege/permission/datastore docs), i18n strings + test backfill + a `LiveRuntimeState` staleness
+gate, concurrency hardening (`AppProcessScope`/`goAsync`, kill the `lateinit` controller cycle, volatile audit
+incl. `CircadianWindowProvider`/`ThrottleController`/`AabFlash`, decompose the 596-LOC controller), and the
+**Profiles+Contexts → one-screen merge** (plumbing; S12.9f). **S13 is promoted to Opus/high (a–d):** Material 3
+design-system foundation + component library + screen-by-screen restyle + the original charts/About/Guide
+(D-070). The review's mis-diagnosed items were rejected (AnimationRunner stride re-port, Haversine de-dup,
+`Main.kt` Tiramisu-branch deletion, Shizuku "hang") — see D-069.
+
 **S12.7h DONE (2026-06-15) → ALL of S12.7 (a–h) COMPLETE → HUMAN GATE 2 RE-RE-TEST (4th) READY.** S12.7h
 landed the last two Gate-2 re-re-test findings (D-060; G2R-F38/F39): **F38** the Tasker Profile dashboard's
 full settings list with **gold changed-vs-default** highlighting (`SettingsDisplay.kt` `displayRows`/
@@ -434,17 +448,29 @@ AppModule is now the real DI root.
   fallback). **b DONE** (D-066: Dashboard redesign F79, ChartPager graph-above+swipe F81, per-graph grouping
   F82, single-line Sunset F68, taller app list F87, permissions audit F89). **ALL S12.8 (a–d) COMPLETE.**
   domain/ + golden vectors + ChartCanvas stayed fenced throughout.
-- **HUMAN GATE 2 — RE-TEST (5th)** after S12.8. Re-verify all G2R-Fn + the original Gate-2 set.
-- **S13** (chart replication + static screens) follows S12.6 on the serial spine — preconditions S12.6
-  DONE (faithful screens + menu IA), S6 DONE. S13 copies `ui/graph/BrightnessCurveChart.kt` (over
-  read-only `ChartCanvas.kt`) into the six remaining charts and fills their host slots — now the
-  **`ChartSlot.content` lambdas inside `ChartPager`** (S12.8b/D-066) on the chart-host screens, plus the
-  remaining `ChartPlaceholder`s (tagged in screen_map + anonymous_handlers `deferred-S13`) — plus
-  About/UserGuide content + F80 (User Guide after onboarding). Haiku/high.
+- **HUMAN GATE 2 — RE-TEST (5th)** after S12.8 — **device-passed.**
+- **S12.9 — engineering-quality & parity-debt remediation (a–f, Opus/high) is the NEXT work** (brief in RUNBOOK
+  §S12.9, D-069). **a** repo hygiene + lint-as-gate + README seed; **b** the one runtime-parity fix (**G2R-F90**
+  circadian dimming inert — wire `dimDynamic` from `PipelineState.scaleDynamic`, app-layer only) + override-toast
+  surface (G2R-F91) + Shizuku installed-not-running refinement; **c** schema ergonomics (nested `AabSettings`,
+  fail-fast `valueFor`, surfaced profile-load errors, spread validation, validation/privilege/permission/datastore
+  docs); **d** i18n strings + test backfill + `LiveRuntimeState` staleness gate; **e** concurrency hardening
+  (`AppProcessScope`/`goAsync`, kill the `lateinit` controller cycle, volatile audit, decompose the 596-LOC
+  controller); **f** the **Profiles+Contexts → one-screen merge** (plumbing). Mis-diagnosed audit items rejected
+  in D-069 (AnimationRunner stride, Haversine, `Main.kt` Tiramisu deletion, Shizuku "hang"). domain/ + golden
+  vectors + ChartCanvas stay fenced (one comment-only `BrightnessEngine` header exception in S12.9e).
+- **S13 — UI finalization (a–d, Opus/high, promoted from Haiku — D-070)** follows S12.9 on the serial spine.
+  S13a design-system foundation (`Dimens`/`Shape`/`Type` + `docs/rebuild/design/m3_audit.md`), S13b component
+  library (`SettingField`/`AabCard`/`EmptyState`/motion), S13c screen-by-screen Material 3 restyle (incl. the
+  merged Profiles/Contexts screen from S12.9f), S13d the original charts — fill the **`ChartSlot.content` lambdas
+  inside `ChartPager`** (S12.8b/D-066) over read-only `ChartCanvas.kt`, replace the remaining `ChartPlaceholder`s,
+  plus About/UserGuide content + F80 (User Guide after onboarding). Color scheme fixed (teal+gold); the actual
+  design decisions are generated in S13a (scaffolding + guardrails).
 - Carried for S12.5/S13/S14 (D-040, D-044): unprivileged overlay dimming (task698 DC-like / 653/654) is
   NOT wired (S9b did the ELEVATED secure path only); DimDynamic (circadian dim strength, task646
-  ScalingUse branch) passes null pending real solar windows (D-039d); proximity damp (task545) still
-  unwired; **curve-wizard override-point capture/persistence still NOT wired (D-044c) — deferred from
+  ScalingUse branch) passes null pending real solar windows (D-039d) — **the G2R-F90 root cause, now wired in
+  S12.9b** (`SuperDimmingCoordinator` reads `PipelineState.scaleDynamic`, app-layer; `dimShell`/golden unchanged);
+  proximity damp (task545) still unwired; **curve-wizard override-point capture/persistence still NOT wired (D-044c) — deferred from
   S12.5c (the wizard runs against an empty set → "need ≥ 9"); S13/S14 should add runtime override-point
   capture so the wizard has real input.**
 
@@ -1485,7 +1511,45 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (signature-only, the dumpsys SSID path degrades). **Fence honoured: domain/ + golden vectors + ChartCanvas
   untouched.** Affects S12.8b only; **S13 inherits the `ChartSlot`/`ChartPager` contract** for the chart slots.
 
-Append new entries as D-067, … with which segments they affect.
+- **D-069 (S12.9) — engineering-quality & parity-debt remediation stage created (a–f); review verified
+  against code.** A code-quality + owner-device review was triaged into the new S12.9 stage (RUNBOOK §S12.9).
+  Items were verified against the current tree; the mis-diagnosed / already-closed ones are recorded so they
+  are NOT redone:
+  (1) **Rejected — AnimationRunner 5th-frame stride re-port.** `AnimationRunner.kt:27-29` already documents the
+  every-5th-frame check as a Tasker IPC-cost *"how"* deliberately dropped per CLAUDE.md "modernize the how,
+  never the what"; the band + 2-consecutive-read debounce is the behaviour. Re-adding the stride would make
+  override-detection 5× less responsive — not done.
+  (2) **Dropped — Haversine de-dup.** Only ONE haversine exists (`ContextOverrideResolver.distanceMeters`); no
+  `ContextEngine` copy → no domain util added (hard fence preserved).
+  (3) **Reframed — `Main.kt` "dead Tiramisu branch".** `SDK_INT < TIRAMISU` (API 33) is LIVE on minSdk-31
+  (API 31/32 devices); it correctly guards `POST_NOTIFICATIONS`. Only the file rename (`Main.kt`→`MainActivity.kt`)
+  is done; the branch stays. `DeadApiCheckTest` must catch only `≤ minSdk` checks, never `< TIRAMISU`.
+  (4) **Downgraded — Shizuku "indefinite hang".** The `isShizukuAvailable()` preflight + `withTimeoutOrNull(BIND_TIMEOUT_MS)`
+  already exist; no hang. Residual is only the installed-but-not-running distinction + ADB-always-offered (S12.9b, minor).
+  (5) **Reframed — circadian-dimming fix is app-layer.** `SoftwareDimming.dimShell` already accepts `dimDynamic`;
+  the fix (S12.9b, G2R-F90) wires it from `PipelineState.scaleDynamic` — no domain/golden change, hard fence intact.
+  (6) **README is a 4-byte stub**, not absent → seed, not create (S12.9a). **CI already shipped** (`release-signing.yml`
+  + `release.yml`) → record-only; S14 owns the `prerelease` flip + tag/versionName drift check.
+  **Owner-binding rejections (one-line, do NOT re-audit):** the `AabToastAccessibilityService` teal overlay is
+  intentional (keep); the `ip-api.com` geo-IP cleartext fallback stays (transparent, parity); `CurveSuggestionEngine.kt`
+  stays monolithic (786 LOC); `// Tasker:` provenance comments stay at full density.
+  **Debt the review missed, now folded in:** two extra leaked scopes (`BrightnessTileService:24`,
+  `AmbientMonitoringService:44`) + three extra volatile clusters (`CircadianWindowProvider`/`ThrottleController`/
+  `AabFlash`) → S12.9e; the no-error-state-UI gap on the profile-load path → S12.9c. Affects S12.9a–e.
+
+- **D-070 (S12.9f → S13) — Profiles/Contexts IA merge split; S13 promoted to Opus/high with a Material 3 redesign.**
+  Per owner: fold the two top-level Profiles + Contexts destinations into ONE screen with context rules edited
+  in a modal (Tasker-style — a profile owns its rules; a rule targets a profile). The **plumbing** (single
+  destination, rule-editor modal, shared VM state, preserved triggers + context-lock) lands in **S12.9f**
+  (functional, minimally styled); the **visual polish** lands in **S13c**. S13 is promoted from Haiku/high
+  "chart replication" to **Opus/high (a–d)**: S13a design-system foundation (`Dimens`/`Shape`/`Type` tokens +
+  `docs/rebuild/design/m3_audit.md`), S13b component library (`SettingField`/`AabCard`/`EmptyState`/motion),
+  S13c screen-by-screen restyle (incl. the merged screen), S13d the original charts + About/User-Guide.
+  Guardrails: color scheme fixed (teal+gold), no new deps, `domain/`+golden+`ChartCanvas` fenced, strings via
+  `stringResource`, behaviour-preserving. The actual design decisions are generated in S13a (this is scaffolding).
+  DAG/serial-spine updated. Affects S12.9f + S13.
+
+Append new entries as D-071, … with which segments they affect.
 
 ## Blockers
 
@@ -2174,5 +2238,26 @@ see below.)
   "Allow all the time" upgrade is offered from the Setup Location step. **(3) DUMP** — signature|privileged,
   **not grantable to a normal app** → deliberately NOT declared (wontfix-with-note); the no-Location `dumpsys
   wifi` SSID path is permission-denied without it and falls through to the next strategy.
+
+### Code-quality & parity audit (after S12.8, pre-S13) — findings recorded → S12.9 (Gate 2 still NOT signed off)
+
+A combined engineering-quality + owner-device review surfaced one real runtime-parity gap plus a tranche of
+code-quality / tech-debt items; the latter are tracked as S12.9 deliverables (RUNBOOK §S12.9, D-069), not as
+gate findings. The two owner-reported behavioural findings:
+
+- **G2R-F90** (owner-reported, post-S12.8) **Circadian dimming is inert.** Two proofs: Spread (Circadian) at
+  100 vs 0 produces no observable change; super-dimming still engages in a dark room during circadian-scaled
+  daylight (`scaleDynamic ≈ 1.15`, a morning boost). **Root cause located:** `SuperDimmingCoordinator.apply`
+  (`app/.../runtime/SuperDimmingCoordinator.kt:106`) hardcodes `dimDynamic = null` in its `SoftwareDimming.dimShell`
+  call, never consulting the published `PipelineState.scaleDynamic` (a known deferral, D-040). **→ to be FIXED
+  by S12.9b:** wire `dimDynamic` from `scaleDynamic` + the confirmed spread field per task646 act6 semantics
+  (spread=100 suppresses super-dimming during daylight, 0 engages normally, −100 boosts). App-layer only —
+  `dimShell` and the golden `superdimming.csv` already support the parameter, so no domain/golden change. Owner
+  re-verifies on device at the next gate; the PARITY_CHECKLIST circadian-dimming row flips to `ported` when
+  S12.9b lands.
+- **G2R-F91** (owner-reported, post-S12.8) **Manual-override toast surface.** The manual-override flash may not
+  use the teal `AabFlash` operational surface like the profile/context-load flashes (visually inconsistent —
+  reads as a debug toast). **→ S12.9b:** verify the override path and route it through `AabFlash` only if it
+  isn't already (record as already-consistent if it is). Minor.
 
 
