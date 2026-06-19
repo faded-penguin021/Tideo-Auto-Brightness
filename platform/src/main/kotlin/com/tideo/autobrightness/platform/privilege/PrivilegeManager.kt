@@ -19,10 +19,15 @@ interface PrivilegeManager {
     fun currentTier(): Tier
     fun tierFlow(): StateFlow<Tier>
     fun refresh()
+    /** The ADB `pm grant` command — ALWAYS offered (the no-companion-app grant channel). */
     fun adbGrantInstruction(): String
     fun tryGrantViaRoot(): Boolean
-    /** Whether a Shizuku binder is reachable (so the UI can show/hide the Shizuku path). */
-    fun isShizukuAvailable(): Boolean
+    /**
+     * Three-state Shizuku readiness so the UI can offer the one-tap grant (RUNNING), prompt to start
+     * the app (INSTALLED_NOT_RUNNING), or hide the Shizuku path entirely (NOT_INSTALLED). The ADB path
+     * is offered regardless of this value.
+     */
+    fun shizukuAvailability(): ShizukuAvailability
     /**
      * Runs the Shizuku grant flow (permission request → user-service `pm grant`). [onResult] reports
      * the outcome for the UI; on success the tier is refreshed before [onResult] fires.
@@ -69,7 +74,7 @@ class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
         false
     }
 
-    override fun isShizukuAvailable(): Boolean = ShizukuGrantGateway.isAvailable()
+    override fun shizukuAvailability(): ShizukuAvailability = ShizukuGrantGateway.availability(context)
 
     // S11 (D-032 closed): full Shizuku grant via a bound user service that execs `pm grant`.
     override fun requestShizukuGrant(onResult: (ShizukuGrantGateway.Result) -> Unit) {

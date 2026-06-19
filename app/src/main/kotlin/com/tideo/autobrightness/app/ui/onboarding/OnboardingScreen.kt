@@ -46,6 +46,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.navigation.completeOnboarding
+import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
 import com.tideo.autobrightness.platform.privilege.ShizukuGrantGateway
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.flow.first
@@ -55,7 +56,7 @@ data class OnboardingUiState(
     val notificationsGranted: Boolean = true,
     val canWrite: Boolean = false,
     val tier: Tier = Tier.NONE,
-    val shizukuAvailable: Boolean = false,
+    val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
     val needsUsageAccess: Boolean = false,
     val usageAccessGranted: Boolean = false,
     val locationGranted: Boolean = false,
@@ -85,7 +86,7 @@ fun OnboardingScreen(navController: NavHostController) {
         mutableStateOf(
             OnboardingUiState(
                 adbCommand = privilegeManager.adbGrantInstruction(),
-                shizukuAvailable = privilegeManager.isShizukuAvailable(),
+                shizukuAvailability = privilegeManager.shizukuAvailability(),
                 sideloaded = isLikelySideloaded(context),
             ),
         )
@@ -97,7 +98,7 @@ fun OnboardingScreen(navController: NavHostController) {
             notificationsGranted = notificationsGranted(context),
             canWrite = Settings.System.canWrite(context),
             tier = privilegeManager.currentTier(),
-            shizukuAvailable = privilegeManager.isShizukuAvailable(),
+            shizukuAvailability = privilegeManager.shizukuAvailability(),
             usageAccessGranted = hasUsageAccess(context),
             locationGranted = hasLocationPermission(context),
         )
@@ -326,13 +327,25 @@ private fun ElevatedStepCard(
             if (state.tier == Tier.ELEVATED) {
                 Text("Granted ✓", color = MaterialTheme.colorScheme.tertiary)
             } else {
+                // ADB is ALWAYS offered — it is the channel that needs no companion app (the invariant
+                // the other channels layer on top of).
                 Text("ADB (from a computer):", style = MaterialTheme.typography.labelMedium)
                 Text(state.adbCommand, style = MaterialTheme.typography.bodySmall)
+                // Shizuku, when installed-but-not-running, can't be one-tap-granted: pingBinder() fails
+                // until the user starts the Shizuku app, so prompt for that instead of hiding the path.
+                if (state.shizukuAvailability == ShizukuAvailability.INSTALLED_NOT_RUNNING) {
+                    Text(
+                        "Shizuku is installed but not running — start the Shizuku app, then return here.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.testTag("shizuku_start_prompt"),
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onCopyAdb, modifier = Modifier.testTag("copy_adb")) {
                         Text("Copy command")
                     }
-                    if (state.shizukuAvailable) {
+                    if (state.shizukuAvailability == ShizukuAvailability.RUNNING) {
                         OutlinedButton(onClick = onRequestShizuku, modifier = Modifier.testTag("grant_shizuku")) {
                             Text("Use Shizuku")
                         }

@@ -15,7 +15,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.service.quicksettings.TileService
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.tideo.autobrightness.R
@@ -283,8 +282,11 @@ class AmbientMonitoringService : Service() {
             .addAction(0, "Disable", actionIntent(ACTION_DISABLE))
             .build()
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, alert)
+        // G2R-F91: route the override flash through the shared teal [AabFlash] operational surface
+        // (global a11y overlay → in-app pill → Toast fallback), consistent with the profile/context-load
+        // flashes — not a bare, non-tappable Toast that can stack independently.
         mainHandler.post {
-            Toast.makeText(this, "Manual override — auto brightness paused", Toast.LENGTH_SHORT).show()
+            AabFlash.show(this, "Manual override — auto brightness paused") // TODO(S12.9d): strings.xml
         }
     }
 

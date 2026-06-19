@@ -312,10 +312,10 @@ class BrightnessPipelineController(
             // floored value is never < threshold, so the secure reduce_bright_colors layer would never
             // engage and "Extra Dim" never applied. The two layers cooperate: the hardware sits at the
             // PWM floor while the secure layer darkens visually below it (task661/698 floor ⟂ task650).
-            dimming.apply(output.targetBrightness, settings)
+            dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
             // F58 live readout: %AAB_DimmingDS (abs reduce_bright_colors level) + %AAB_DimmingCurrent
             // (relative strength) for the Super Dimming screen, computed from the golden SoftwareDimming.
-            val (dimCurrent, dimDS) = dimmingReadout(output.targetBrightness, settings)
+            val (dimCurrent, dimDS) = dimmingReadout(output.targetBrightness, settings, output.scaleDynamic)
 
             val cycleTotal = (clock() - cycleStart).toDouble()
             // %AAB_Debug 7 "Graph Metrics": Flash the measured cycle duration (feeds throttle).
@@ -367,8 +367,11 @@ class BrightnessPipelineController(
      *
      * @return (dimmingCurrent, dimmingDS)
      */
-    private fun dimmingReadout(target: Int, settings: AabSettings): Pair<Double, Double> {
+    private fun dimmingReadout(target: Int, settings: AabSettings, scaleDynamic: Double): Pair<Double, Double> {
         if (target >= settings.dimmingThreshold) return 0.0 to 0.0
+        // G2R-F90: the readout must reflect the SAME circadian-scaled dim_shell that is applied
+        // (task646 act7), or the Super Dimming live values disagree with the actual Extra Dim level.
+        val dimDynamic = circadianDimMultiplier(scaleDynamic, settings)
         return when {
             // PWM-sensitive: the level is task700 finalDimLevel; it has no separate progress term, so
             // the relative + absolute readouts coincide.
@@ -388,7 +391,7 @@ class BrightnessPipelineController(
                     dimmingThreshold = settings.dimmingThreshold.toDouble(),
                     dimmingExponent = settings.dimmingExponent.toDouble(),
                     dimmingStrength = settings.dimmingStrength.toDouble(),
-                    dimDynamic = null,
+                    dimDynamic = dimDynamic,
                 )
                 val progress = SoftwareDimming.dimProgress(
                     brightness = target.toDouble(),
@@ -537,7 +540,7 @@ class BrightnessPipelineController(
             brightness.forceManualMode()
             brightness.write(target)
             // F65: dimming decides off the un-floored engine target, not the PWM-floored write (above).
-            dimming.apply(output.targetBrightness, settings)
+            dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
             // F64: arm the post-init settle window so the ContentObserver echo of THIS self-write
             // (and any AUTO→MANUAL mode-flip recompute) — delivered after `initializing` clears below
             // — is not flagged as a manual override on start/reinit/resume/context swap.

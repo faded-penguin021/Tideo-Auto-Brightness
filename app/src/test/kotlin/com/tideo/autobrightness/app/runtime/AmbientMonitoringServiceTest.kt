@@ -48,6 +48,29 @@ class AmbientMonitoringServiceTest {
         )
     }
 
+    // S12.9b/G2R-F91: the override flash must route through the shared AabFlash operational surface
+    // (so a registered presenter — the a11y overlay or the in-app pill — renders it), not a bare Toast.
+    @Test
+    fun manualOverride_flashesThroughAabFlashSurface() {
+        val shown = mutableListOf<String>()
+        val presenter = object : AabFlash.Presenter {
+            override fun show(text: String) { shown += text }
+            override fun hide() {}
+        }
+        AabFlash.register(presenter)
+        try {
+            val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+            service.notifyManualOverride()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(
+                shown.any { it.contains("Manual override") },
+                "override flash should be delivered to the AabFlash presenter, not a plain Toast",
+            )
+        } finally {
+            AabFlash.register(null)
+        }
+    }
+
     // S12.8a/G2R-F76: the ongoing service notification must NOT carry a Pause action (it behaved like
     // an override and confused users); Reset + Disable remain.
     @Test

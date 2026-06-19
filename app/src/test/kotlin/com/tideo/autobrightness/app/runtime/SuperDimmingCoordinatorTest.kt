@@ -159,6 +159,58 @@ class SuperDimmingCoordinatorTest {
         assertTrue(sink.emitted.none { it.first == DebugCategory.OVERLAY_PREVIEW })
     }
 
+    // G2R-F90: circadian dimming was inert (dimDynamic hardcoded null, D-040). With %AAB_ScalingUse on,
+    // the dim strength is scaled by %AAB_DimDynamic (task646 act7). During daylight (scaleDynamic 1.15
+    // ⇒ modifier 1.0 at the default ScaleSpread 15):
+    //   DimSpread 100  → DimDynamic 0   → dimming SUPPRESSED (level 0)
+    //   DimSpread 0    → DimDynamic 1   → dims normally (identical to the no-scaling path)
+    //   DimSpread −100 → DimDynamic 2   → dimming BOOSTED (level above the DimSpread-0 level)
+    private val scalingDay = dimmingOn.copy(scalingEnabled = true, scaleSpread = 15)
+    private val daylightScale = 1.15 // 1 + (15/100)·1.0
+
+    private fun engageLevel(settings: AabSettings, scaleDynamic: Double): Int {
+        val secure = FakeSecureDimming()
+        SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+            .apply(targetBrightness = 5, settings = settings, scaleDynamic = scaleDynamic)
+        return secure.levels.last()
+    }
+
+    @Test
+    fun circadian_spread100_daylight_suppressesDimming() {
+        assertEquals(
+            0,
+            engageLevel(scalingDay.copy(dimSpread = 100), daylightScale),
+            "DimSpread 100 in daylight should scale strength to zero (no Extra Dim)",
+        )
+    }
+
+    @Test
+    fun circadian_spread0_daylight_matchesNonScaledDimming() {
+        // DimSpread 0 ⇒ DimDynamic 1.0, which must equal the plain-strength (scaling off) level.
+        val scaled = engageLevel(scalingDay.copy(dimSpread = 0), daylightScale)
+        val plain = engageLevel(dimmingOn, scaleDynamic = 1.0) // scalingEnabled = false → dimDynamic null
+        assertEquals(plain, scaled, "DimSpread 0 must dim identically to the no-scaling path")
+        assertTrue(scaled > 0, "normal dimming below the threshold should be a positive level")
+    }
+
+    @Test
+    fun circadian_spreadNegative100_daylight_boostsBeyondNormal() {
+        val boosted = engageLevel(scalingDay.copy(dimSpread = -100), daylightScale)
+        val normal = engageLevel(scalingDay.copy(dimSpread = 0), daylightScale)
+        assertTrue(boosted > normal, "DimSpread −100 should boost dimming above the DimSpread-0 level")
+    }
+
+    @Test
+    fun circadian_atNight_spreadHasNoEffect() {
+        // scaleDynamic 1.0 ⇒ modifier 0 ⇒ DimDynamic 1.0 for every spread (night = no circadian shift).
+        val night = 1.0
+        assertEquals(
+            engageLevel(scalingDay.copy(dimSpread = 100), night),
+            engageLevel(scalingDay.copy(dimSpread = -100), night),
+            "at night (no daylight modifier) the spread must not change the dim level",
+        )
+    }
+
     @Test
     fun explicitDisengage_afterEngaged_clearsState() {
         val secure = FakeSecureDimming()
