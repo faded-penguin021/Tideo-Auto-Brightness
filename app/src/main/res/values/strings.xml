@@ -9,6 +9,9 @@
 -->
 <resources>
     <string name="app_name">Tideo Auto Brightness</string>
+    <string name="app_wordmark_primary">Tideo</string>
+    <string name="app_wordmark_secondary">Auto Brightness</string>
+    <string name="app_tagline">Deterministic ambient brightness</string>
     <string name="global_toasts_a11y_description">Shows Auto Brightness debug flash messages system-wide (over other apps). This optional service only draws the message overlays — it never reads screen content. Enable it only if you want the diagnostic flashes visible while using other apps.</string>
 
     <!-- Foreground-service notification (AmbientMonitoringService) -->
@@ -42,6 +45,10 @@
     <string name="title_contexts">Contexts</string>
     <string name="title_profiles_import_export">Profiles &amp; Import/Export</string>
     <string name="title_profiles_contexts">Profiles &amp; Contexts</string>
+    <string name="seg_profiles">Profiles</string>
+    <string name="seg_rules">Rules</string>
+    <string name="profile_more_actions">More actions</string>
+    <string name="legacy_import_header">Import from Tasker AAB</string>
     <string name="title_global_flash">Global flash (system-wide)</string>
 
     <!-- Dashboard -->
@@ -61,6 +68,10 @@
     <string name="dashboard_ambient_light">Ambient light</string>
     <string name="dashboard_last_sample">Last sensor sample: %1$s</string>
     <string name="dashboard_brightness">Brightness</string>
+    <string name="dashboard_applied_brightness">Applied brightness</string>
+    <string name="dashboard_circadian">Circadian</string>
+    <string name="dashboard_super_dimming">Super dimming</string>
+    <string name="dashboard_lux_raw">Raw %1$s lux · %2$s</string>
     <string name="dashboard_active_context">Active context</string>
     <string name="dashboard_service_health">Service health</string>
     <string name="dashboard_degraded">Degraded: %1$s</string>

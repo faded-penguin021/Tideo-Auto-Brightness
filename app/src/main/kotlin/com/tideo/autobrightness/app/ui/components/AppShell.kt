@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,12 +25,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.R
+import com.tideo.autobrightness.app.ui.theme.AabDataCaption
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.app.ui.theme.AabOnTeal
 import com.tideo.autobrightness.app.ui.theme.AabTeal
+import com.tideo.autobrightness.app.ui.theme.Dimens
 
 /**
  * The app shell chrome — the branded top bar and the Menu-screen building blocks. This is the
@@ -66,15 +70,19 @@ fun AabTopBar(title: String, onBack: (() -> Unit)? = null) {
     )
 }
 
-/** Teal banner header with the gold sun mark — the rebuild's "Tideo Auto Brightness" brand header. */
+/**
+ * The teal brand banner — the one place identity lives (S13c' §08). A clean gold sun/aperture mark, the
+ * wordmark in Plex Sans (SemiBold "Tideo" + Medium gold "Auto Brightness"), and a tracked Plex Mono
+ * tagline — intentional, not a coloured bar.
+ */
 @Composable
 fun AabMenuBanner() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(132.dp)
             .background(AabTeal)
-            .padding(16.dp)
+            .padding(horizontal = Dimens.cardPadding, vertical = Dimens.cardPadding)
             .testTag("menu_banner"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -82,21 +90,26 @@ fun AabMenuBanner() {
             painter = painterResource(R.drawable.ic_stat_brightness),
             contentDescription = null,
             tint = AabGold,
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(44.dp),
         )
-        Spacer(Modifier.width(12.dp))
-        Column {
+        Spacer(Modifier.width(Dimens.rowGapWide))
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.space1)) {
             Text(
-                "Tideo",
+                stringResource(R.string.app_wordmark_primary),
                 color = AabOnTeal,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "Auto Brightness",
+                stringResource(R.string.app_wordmark_secondary),
                 color = AabGold,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                stringResource(R.string.app_tagline).uppercase(),
+                color = AabOnTeal.copy(alpha = 0.66f),
+                style = AabDataCaption,
             )
         }
     }

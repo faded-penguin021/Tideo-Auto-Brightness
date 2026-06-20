@@ -192,3 +192,36 @@ filling the `ChartSlot.content` swap points, and removing `PlaceholderScreen.kt`
 - [x] Audit enumerates all 9 screens + the merged Profiles/Contexts screen (§3) with gap→target rows.
 - [x] ColorScheme role-mapping documented (§2.4); color scheme unchanged (behaviour-preserving).
 - [x] Build green (`:app:assembleDebug :app:testDebugUnitTest :app:lintDebug`).
+
+---
+
+## 6. S13c' — the polish pass (visual-elevation sibling of S13d)
+
+S13c made the app *consistent*; S13c' makes the instrument *land*. Palette frozen; type, layout, depth
+and motion only. No `domain`/`runtime`/`ChartCanvas`/golden/gradle/manifest edits.
+
+- [x] **Typography (§03, the big lever).** Bundled **IBM Plex Sans** (UI) + **IBM Plex Mono** (readouts)
+      as SIL-OFL `.ttf` in `res/font` (licence `docs/licenses/IBM-Plex-OFL.txt`; not a gradle dep).
+      `Type.kt` now drives `AabSans`/`AabMono`, two new instrument roles (`AabDataDisplay` tabular +
+      `AabDataCaption` tracked-uppercase), and `titleLarge` → SemiBold. Lands app-wide via `TideoTheme`.
+- [x] **Surface ladder (§04).** `AabCard` gains a `variant` (`Resting`/`Hero`/`Well`): hairline 1px
+      highlight + honest shadow, a teal accent-edge `Hero`, and a recessed `Well`. New tokens
+      `cardElevationHero`/`accentEdge`.
+- [x] **Data-pop (§05).** `KeyValueRow` rebuilt as an instrument readout line — tracked mono caption /
+      big tabular gold value / demoted `unit:` param / value crossfade. `DiagnosticCard.goldValue()` runs
+      now render in Plex Mono tabular. `testTag`/`value_*` contracts preserved.
+- [x] **Dashboard hero (§06).** New `BrightnessInstrument.kt`: the applied 0–255 level in near-white
+      Plex Mono, a thin teal `Canvas` track eased via `animateFloatAsState` (NOT `ChartCanvas`), a status
+      pill + master switch; greys out when off. Lux · circadian · context demoted to a readout strip.
+      Kept `dashboard_brightness`/`dashboard_status`/`service_switch`/`last_sample_age`/`tier_badge`.
+- [x] **Declutter Profiles & Contexts (§07).** A `SegmentedButton` splits the screen into **Profiles** /
+      **Rules** (one job at a time); profile-row secondary actions (Overwrite/Delete) collapse into a
+      per-row overflow menu (Apply stays primary) — **this clears the S13c-deferred §3-row-10 overflow
+      item**; the legacy Tasker import is demoted to a collapsed `ExpandableSection`. (The app-picker
+      `heightIn(max=400.dp)` stays — still illegal as a `weight` child of a `verticalScroll` — recorded.)
+- [x] **Motion / spacing / banner / icons (§08).** `fieldSpacing` 10→12, `heroCardPadding` 20→24,
+      `sectionSpacing` 8→16 (grid-normalised); the brand banner gets the Plex wordmark + tracked-mono
+      tagline; nav icons muted to `onSurfaceVariant`.
+- [x] Build green (`:app:assembleDebug :app:testDebugUnitTest :app:lintDebug :domain:test :platform:test`);
+      `HardcodedStringCheckTest` ceiling 92 unchanged (count held at 89). Tests touched: only layout/casing
+      assertions (KeyValueRow uppercase captions; the profile overflow menu).

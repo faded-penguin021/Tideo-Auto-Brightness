@@ -3,6 +3,12 @@ package com.tideo.autobrightness.app.ui.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,7 +16,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,7 +32,6 @@ import com.tideo.autobrightness.app.settings.ProfileLoadResult
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.ContextsViewModel
 import com.tideo.autobrightness.app.state.SettingsViewModel
-import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.rememberToaster
@@ -43,6 +50,7 @@ import kotlinx.coroutines.launch
  * Hosts both [SettingsViewModel] (profiles) and [ContextsViewModel] (rules); no change to
  * `ContextEngine`/`ContextOverrideResolver` or any store. Plumbing only — S13c restyles.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfilesContextsScreen(
     navController: NavHostController,
@@ -130,9 +138,29 @@ fun ProfilesContextsScreen(
     var solarLabel by remember { mutableStateOf<Pair<String, String>?>(null) }
     LaunchedEffect(Unit) { solarLabel = runCatching { contextsVm.solarTimes() }.getOrNull() }
 
+    // S13c' §07 declutter: the screen stacked a profile library ON TOP of the automation-rules list in
+    // one endless scroll. Split the two jobs behind a SegmentedButton so only one is shown at a time
+    // (half the scroll), while keeping the single destination (a rule targets a profile).
+    var tab by remember { mutableStateOf(0) }
+
     SettingsScaffold(stringResource(R.string.title_profiles_contexts), { navController.popBackStack() }) { padding ->
         SettingsColumn(padding) {
-            ProfilesBody(
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = tab == 0,
+                    onClick = { tab = 0 },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    modifier = Modifier.testTag("seg_profiles"),
+                ) { Text(stringResource(R.string.seg_profiles)) }
+                SegmentedButton(
+                    selected = tab == 1,
+                    onClick = { tab = 1 },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    modifier = Modifier.testTag("seg_rules"),
+                ) { Text(stringResource(R.string.seg_rules)) }
+            }
+
+            if (tab == 0) ProfilesBody(
                 profiles = profiles,
                 legacyEntries = legacyEntries,
                 contextLocked = settings.contextOverride,
@@ -166,8 +194,7 @@ fun ProfilesContextsScreen(
                 onDismissLoadError = { loadError = null },
             )
 
-            SectionHeader("Context rules")
-            ContextRulesSection(
+            if (tab == 1) ContextRulesSection(
                 rules = rules,
                 profileNames = profileNames.ifEmpty { listOf("Default") },
                 apps = apps,

@@ -63,7 +63,8 @@ class ComponentLibraryTest {
         }
         compose.onNodeWithTag("kv_lux").assertIsDisplayed()
         compose.onNodeWithTag("value_kv_lux").assertIsDisplayed()
-        compose.onNodeWithText("Current lux").assertExists()
+        // S13c' §05: the key is rendered as a tracked-uppercase instrument caption.
+        compose.onNodeWithText("CURRENT LUX").assertExists()
         compose.onNodeWithText("1234").assertExists()
     }
 

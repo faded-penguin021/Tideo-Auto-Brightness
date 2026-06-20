@@ -227,8 +227,9 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("derived_form2A").performScrollTo().assertExists()
-        compose.onNodeWithText("Zone 2 alignment", substring = true).assertExists()
-        compose.onNodeWithText("Zone 3 alignment", substring = true).assertExists()
+        // S13c' §05: KeyValueRow keys render as tracked-uppercase instrument captions.
+        compose.onNodeWithText("ZONE 2 ALIGNMENT", substring = true).assertExists()
+        compose.onNodeWithText("ZONE 3 ALIGNMENT", substring = true).assertExists()
     }
 
     @Test
@@ -427,7 +428,9 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("apply_profile_Mine").performScrollTo().assertExists()
-        compose.onNodeWithTag("overwrite_profile_Default").performScrollTo().assertExists()
+        // S13c' §07-B: Overwrite/Delete moved behind a per-row overflow menu — open it to reach them.
+        compose.onNodeWithTag("profile_menu_Default").performScrollTo().performClick()
+        compose.onNodeWithTag("overwrite_profile_Default").assertExists()
         compose.onNodeWithTag("save_profile_as").performScrollTo().assertExists()
         compose.onNodeWithTag("restore_factory").performScrollTo().assertExists()
     }

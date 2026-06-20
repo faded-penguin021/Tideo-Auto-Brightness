@@ -2,15 +2,25 @@ package com.tideo.autobrightness.app.ui.screens
 
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -21,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -121,6 +132,8 @@ fun ProfilesBody(
     // changed-vs-default) before applying. `previewProfile` holds the entry whose modal is open.
     var previewProfile by remember { mutableStateOf<SavedProfile?>(null) }
     var showCurrentSettings by remember { mutableStateOf(false) }
+    // S13c' §07-C: the legacy Tasker import is collapsed by default (one-time migration).
+    var showLegacy by remember { mutableStateOf(false) }
 
     // S12.9c #3: surface an unreadable-profile failure (ProfileLoadResult.TotalFailure).
     if (loadError != null) {
@@ -195,27 +208,35 @@ fun ProfilesBody(
         Text("Import a settings file (incl. legacy Tasker)…")
     }
 
-    SectionHeader("Legacy folder (Download/AAB/configs)", divider = true)
-    OutlinedButton(
-        onClick = onChooseLegacyFolder,
-        modifier = Modifier.fillMaxWidth().testTag("choose_legacy_folder"),
-    ) { Text(if (legacyEntries.isEmpty()) "Link legacy configs folder…" else "Re-link legacy folder…") }
-    if (legacyEntries.isEmpty()) {
-        Text(
-            "Grant the Download/AAB/configs folder once to load profiles saved by the Tasker app.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    legacyEntries.forEach { entry ->
-        AabCard(Modifier.testTag("legacy_${entry.name}")) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(entry.name, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(onClick = { onLoadLegacy(entry) }, modifier = Modifier.testTag("load_${entry.name}")) {
-                    Text("Load")
+    // S13c' §07-C: the legacy Tasker import is a one-time migration, not a daily control — demote it to
+    // a collapsed expandable (closed by default) so it no longer dominates the first screenful.
+    ExpandableSection(
+        title = stringResource(R.string.legacy_import_header),
+        expanded = showLegacy,
+        onToggle = { showLegacy = !showLegacy },
+        testTag = "legacy_section",
+    ) {
+        OutlinedButton(
+            onClick = onChooseLegacyFolder,
+            modifier = Modifier.fillMaxWidth().testTag("choose_legacy_folder"),
+        ) { Text(if (legacyEntries.isEmpty()) "Link legacy configs folder…" else "Re-link legacy folder…") }
+        if (legacyEntries.isEmpty()) {
+            Text(
+                "Grant the Download/AAB/configs folder once to load profiles saved by the Tasker app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        legacyEntries.forEach { entry ->
+            AabCard(Modifier.testTag("legacy_${entry.name}")) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(entry.name, style = MaterialTheme.typography.bodyMedium)
+                    OutlinedButton(onClick = { onLoadLegacy(entry) }, modifier = Modifier.testTag("load_${entry.name}")) {
+                        Text("Load")
+                    }
                 }
             }
         }
@@ -258,34 +279,89 @@ private fun ProfileCard(
     onDelete: (String) -> Unit,
 ) {
     val changed = entry.settings.changedCount()
+    var menu by remember { mutableStateOf(false) }
     AabCard(
         Modifier.testTag("profile_${entry.name}"),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(
-            entry.name + if (entry.builtIn) "  (built-in)" else "",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            if (changed == 0) "Factory defaults" else "$changed changed from default",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = onApply,
-                modifier = Modifier.testTag("apply_profile_${entry.name}"),
-            ) { Text("Apply") }
-            OutlinedButton(
-                onClick = { onOverwrite(entry.name) },
-                modifier = Modifier.testTag("overwrite_profile_${entry.name}"),
-            ) { Text("Overwrite") }
-            TextButton(
-                onClick = { onDelete(entry.name) },
-                modifier = Modifier.testTag("delete_profile_${entry.name}"),
-            ) { Text("Delete") }
+        // S13c' §07-B: the row shows the name + the PRIMARY action (Apply); secondary actions
+        // (Overwrite / Delete) collapse into a trailing overflow menu so the row reads clean.
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    entry.name + if (entry.builtIn) "  (built-in)" else "",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    if (changed == 0) "Factory defaults" else "$changed changed from default",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box {
+                IconButton(
+                    onClick = { menu = true },
+                    modifier = Modifier.testTag("profile_menu_${entry.name}"),
+                ) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.profile_more_actions),
+                    )
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Overwrite") },
+                        onClick = { menu = false; onOverwrite(entry.name) },
+                        modifier = Modifier.testTag("overwrite_profile_${entry.name}"),
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = { menu = false; onDelete(entry.name) },
+                        modifier = Modifier.testTag("delete_profile_${entry.name}"),
+                    )
+                }
+            }
         }
+        OutlinedButton(
+            onClick = onApply,
+            modifier = Modifier.fillMaxWidth().testTag("apply_profile_${entry.name}"),
+        ) { Text("Apply") }
     }
+}
+
+/**
+ * A lightweight collapsible group (S13c' §07): a clickable header row (title + chevron) over [content]
+ * shown only when [expanded]. Used to demote the one-time legacy Tasker import out of the daily flow.
+ */
+@Composable
+private fun ExpandableSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    testTag: String,
+    content: @Composable () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 8.dp)
+            .testTag(testTag),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.tertiary)
+        Icon(
+            if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (expanded) content()
 }
 
 @Composable
