@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -34,15 +35,25 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-/** A bold section label between groups of fields. */
+/**
+ * B1 (m3_audit §2.5) — a teal group label above a settings cluster. The optional [divider] draws a
+ * thin `outlineVariant` rule immediately below (the owner "Pro-Tool" structure cue). [divider]
+ * defaults to `false` so existing call sites are unchanged; S13c opts rows in as it groups screens.
+ */
 @Composable
-fun SectionHeader(text: String) {
+fun SectionHeader(text: String, divider: Boolean = false) {
     Text(
         text,
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 8.dp),
     )
+    if (divider) {
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }
 
 private fun formatNumber(value: Number, isInt: Boolean): String =
