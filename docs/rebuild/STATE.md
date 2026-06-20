@@ -1895,7 +1895,18 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   lint green. One note for S14: the knob `c(84,54) r6` reaches ≈r36 from centre, a hair past the r33 safe
   circle — fine under the standard masks in the spec mock, nudge inward only if a device clips it.
 
-Append new entries as D-080, … with which segments they affect.
+- **D-080 (S13c follow-up) — fixed a latent flaky test surfaced by CI on the post-merge `main`.** The
+  "Release Signing" workflow on the PR #60 merge commit went red on a single unrelated test,
+  `DraftSettingsViewModelTest.edit_marksDirty_thenDiscardReverts` (it had passed locally + on the branch CI).
+  **Root cause (test helper, not production):** `seededVm()` waited for `draft == committed()`, but when the
+  committed baseline equals the `AabSettings()` defaults (here `minBrightness = 10`) that is true from VM
+  construction — so the helper returned BEFORE the init collector's seed-once emission. The `idle()` after the
+  test's edit then delivered that first emission with `seeded` still false, clobbering the edit (42→10).
+  **Fix:** gate `seededVm()` on the VM's `epoch` bumping 0→1 (its real "seeded" signal) instead of value
+  equality. Test-only; the production seed-once behaviour is correct and untouched. Verified deterministic
+  (5× `--rerun-tasks` + full `:app:testDebugUnitTest`). (Affects S13c PR / `main`.)
+
+Append new entries as D-081, … with which segments they affect.
 
 ## Blockers
 
