@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -86,26 +85,20 @@ fun MenuContent(
             MenuNavRow(AppRoute.Dashboard, Icons.Filled.Home, onNavigate)
 
             AabSectionLabel("Profiles & Contexts")
+            // S12.9f (D-070): Profiles and Contexts are one destination now — a single hero card. It
+            // still surfaces the live context status. F46 semantics: a manual profile load IS the
+            // override (latched %AAB_ContextOverride, cleared by Resume on the merged screen); a
+            // context *rule* being active is automation working as intended, NOT an override.
             MenuHeroCard(
                 icon = Icons.Filled.Person,
-                title = "Profiles",
-                subtitle = "Save, load & import brightness profiles",
-                testTag = "hero_profiles",
-                onClick = { onNavigate(AppRoute.Profiles) },
-            )
-            MenuHeroCard(
-                icon = Icons.Filled.Place,
-                title = "Contexts",
-                // F46 semantics: a manual profile load IS the override (latched %AAB_ContextOverride —
-                // shown here, cleared by Resume on the Profiles screen). A context *rule* being active
-                // is automation working as intended and must NOT be labelled an override.
+                title = "Profiles & Contexts",
                 subtitle = when {
-                    manualOverride -> "Manual override active — Resume on Profiles"
+                    manualOverride -> "Manual override active — open to resume"
                     activeContext != null -> "Context active: $activeContext"
-                    else -> "No active context"
+                    else -> "Save & load profiles · automatic context rules"
                 },
-                testTag = "hero_contexts",
-                onClick = { onNavigate(AppRoute.Contexts) },
+                testTag = "hero_profiles_contexts",
+                onClick = { onNavigate(AppRoute.Profiles) },
             )
 
             AabSectionLabel("Settings")

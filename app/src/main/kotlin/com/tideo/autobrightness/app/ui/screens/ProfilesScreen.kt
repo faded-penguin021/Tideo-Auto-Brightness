@@ -2,9 +2,6 @@ package com.tideo.autobrightness.app.ui.screens
 
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,148 +20,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.LegacyConfigEntry
-import com.tideo.autobrightness.app.settings.LegacyConfigImporter
-import com.tideo.autobrightness.app.settings.ProfileImportExportManager
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.changedCount
-import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsDiffList
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
-import com.tideo.autobrightness.app.ui.components.rememberToaster
-import kotlinx.coroutines.launch
 
 /**
- * Profiles & Import/Export (Tasker AAB Profile — task592/637/622). S12.6d makes every profile an
- * editable saved entry (G2R-F15, owner-decision 3): save current as…, overwrite, delete, and
- * "Restore factory profiles". Legacy import is via a one-time SAF folder grant to
- * `Download/AAB/configs` (G2R-F16, owner-decision 4). A manual profile load latches the context lock,
- * surfaced here with a Resume banner (G2R-F30).
+ * Profiles & Import/Export content (Tasker AAB Profile — task592/637/622), the saved-profiles surface
+ * (save current as…, overwrite, delete, "Restore factory profiles", legacy SAF import). S12.9f folds
+ * this into the unified Profiles & Contexts screen ([ProfilesContextsScreen]) via [ProfilesBody];
+ * [ProfilesContent] keeps the standalone scaffold for the existing screen tests. A manual profile load
+ * latches the context lock, surfaced with a Resume banner (G2R-F30).
  */
-@Composable
-fun ProfilesScreen(navController: NavHostController, vm: SettingsViewModel = viewModel()) {
-    val settings by vm.settings.collectAsStateWithLifecycle()
-    val profiles by vm.profiles.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val manager = remember { ProfileImportExportManager(context.applicationContext) }
-    var status by remember { mutableStateOf<String?>(null) }
-    // S12.9c #3: a user-visible error card for an unreadable profile file (ProfileLoadResult.TotalFailure).
-    var loadError by remember { mutableStateOf<String?>(null) }
-    val toast = rememberToaster()
-
-    // Apply a ProfileLoadResult: Success/LegacyFallback both apply the settings; TotalFailure shows the
-    // error card. Returns the toast status string.
-    fun handleLoad(
-        result: com.tideo.autobrightness.app.settings.ProfileLoadResult,
-        okMessage: String,
-        apply: (AabSettings) -> Unit,
-    ): String = when (result) {
-        is com.tideo.autobrightness.app.settings.ProfileLoadResult.Success -> {
-            apply(result.settings); loadError = null; okMessage
-        }
-        is com.tideo.autobrightness.app.settings.ProfileLoadResult.LegacyFallback -> {
-            apply(result.settings); loadError = null; okMessage
-        }
-        is com.tideo.autobrightness.app.settings.ProfileLoadResult.TotalFailure -> {
-            loadError = "Couldn't read this profile. It isn't a Tideo export or a Tasker AAB config."
-            "Load failed"
-        }
-    }
-
-    // Previously-granted Download/AAB/configs tree (persisted SAF permission), if any.
-    var legacyTree by remember {
-        mutableStateOf(
-            context.contentResolver.persistedUriPermissions.firstOrNull { it.isReadPermission }?.uri,
-        )
-    }
-    var legacyEntries by remember { mutableStateOf<List<LegacyConfigEntry>>(emptyList()) }
-
-    fun refreshLegacy(tree: Uri?) {
-        legacyEntries = if (tree != null) LegacyConfigImporter.listJson(context, tree) else emptyList()
-    }
-    androidx.compose.runtime.LaunchedEffect(legacyTree) { refreshLegacy(legacyTree) }
-
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json"),
-    ) { uri: Uri? ->
-        if (uri != null) scope.launch {
-            status = runCatching { manager.exportToDocument(uri, settings); "Exported." }
-                .getOrElse { "Export failed: ${it.message}" }
-            status?.let(toast)
-        }
-    }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri: Uri? ->
-        if (uri != null) scope.launch {
-            status = runCatching {
-                handleLoad(manager.importFromDocument(uri), "Imported.") { vm.replaceAll(it) }
-            }.getOrElse { loadError = it.message; "Import failed: ${it.message}" }
-            status?.let(toast)
-        }
-    }
-
-    val folderLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree(),
-    ) { uri: Uri? ->
-        if (uri != null) {
-            LegacyConfigImporter.persistGrant(context, uri)
-            legacyTree = uri
-            refreshLegacy(uri)
-            toast("Folder linked")
-        }
-    }
-
-    ProfilesContent(
-        profiles = profiles,
-        legacyEntries = legacyEntries,
-        contextLocked = settings.contextOverride,
-        currentSettings = settings,
-        status = status,
-        onBack = { navController.popBackStack() },
-        onApplyProfile = { name -> vm.applyProfile(name); toast("Applied profile: $name") },
-        onOverwriteProfile = { name -> vm.saveCurrentAs(name); toast("Overwrote: $name") },
-        onDeleteProfile = { name -> vm.deleteProfile(name); toast("Deleted: $name") },
-        onSaveCurrentAs = { name -> vm.saveCurrentAs(name); toast("Saved profile: $name") },
-        onRestoreFactory = { vm.restoreFactoryProfiles(); toast("Factory profiles restored") },
-        onResumeContext = { vm.resumeContextAutomation(); toast("Context automation resumed") },
-        onReset = { vm.resetDefaults(); toast("Reset to defaults") },
-        onExport = { exportLauncher.launch("tideo-profile.json") },
-        onImport = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
-        onChooseLegacyFolder = { folderLauncher.launch(null) },
-        onLoadLegacy = { entry ->
-            scope.launch {
-                status = runCatching {
-                    handleLoad(manager.importFromDocument(entry.uri), "Loaded ${entry.name}") { imported ->
-                        // G2R-F44: register the legacy profile under its file name so it's selectable as
-                        // a context-rule target without a manual re-save, then apply it to live settings.
-                        val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
-                        vm.saveImportedProfile(profileName, imported)
-                        vm.replaceAll(imported)
-                    }
-                }.getOrElse { loadError = it.message; "Load failed: ${it.message}" }
-                status?.let(toast)
-            }
-        },
-        loadError = loadError,
-        onDismissLoadError = { loadError = null },
-    )
-}
-
 @Composable
 fun ProfilesContent(
     profiles: List<SavedProfile>,
@@ -187,116 +62,164 @@ fun ProfilesContent(
     loadError: String? = null,
     onDismissLoadError: () -> Unit = {},
 ) {
+    SettingsScaffold(stringResource(R.string.title_profiles_import_export), onBack) { padding ->
+        SettingsColumn(padding) {
+            ProfilesBody(
+                profiles = profiles,
+                legacyEntries = legacyEntries,
+                contextLocked = contextLocked,
+                status = status,
+                currentSettings = currentSettings,
+                onApplyProfile = onApplyProfile,
+                onOverwriteProfile = onOverwriteProfile,
+                onDeleteProfile = onDeleteProfile,
+                onSaveCurrentAs = onSaveCurrentAs,
+                onRestoreFactory = onRestoreFactory,
+                onResumeContext = onResumeContext,
+                onReset = onReset,
+                onExport = onExport,
+                onImport = onImport,
+                onChooseLegacyFolder = onChooseLegacyFolder,
+                onLoadLegacy = onLoadLegacy,
+                loadError = loadError,
+                onDismissLoadError = onDismissLoadError,
+            )
+        }
+    }
+}
+
+/**
+ * The saved-profiles + import/export body, emitted into a scrolling [Column] (e.g. [SettingsColumn]).
+ * Hosts its own save/load/current-settings dialog state. Reused by the unified
+ * [ProfilesContextsScreen] and the standalone [ProfilesContent] (S12.9f IA merge).
+ */
+@Composable
+fun ProfilesBody(
+    profiles: List<SavedProfile>,
+    legacyEntries: List<LegacyConfigEntry>,
+    contextLocked: Boolean,
+    status: String?,
+    currentSettings: AabSettings = AabSettings(),
+    onApplyProfile: (String) -> Unit,
+    onOverwriteProfile: (String) -> Unit,
+    onDeleteProfile: (String) -> Unit,
+    onSaveCurrentAs: (String) -> Unit,
+    onRestoreFactory: () -> Unit,
+    onResumeContext: () -> Unit,
+    onReset: () -> Unit,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+    onChooseLegacyFolder: () -> Unit,
+    onLoadLegacy: (LegacyConfigEntry) -> Unit,
+    loadError: String? = null,
+    onDismissLoadError: () -> Unit = {},
+) {
     var showSaveDialog by remember { mutableStateOf(false) }
     // G2R-F38: the Tasker "Load Anyway" modal — preview the profile's full settings list (gold
     // changed-vs-default) before applying. `previewProfile` holds the entry whose modal is open.
     var previewProfile by remember { mutableStateOf<SavedProfile?>(null) }
     var showCurrentSettings by remember { mutableStateOf(false) }
 
-    SettingsScaffold(stringResource(R.string.title_profiles_import_export), onBack) { padding ->
-        SettingsColumn(padding) {
-            // S12.9c #3: surface an unreadable-profile failure (ProfileLoadResult.TotalFailure).
-            if (loadError != null) {
-                Card(
-                    Modifier.fillMaxWidth().testTag("load_error_card"),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            loadError,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        TextButton(onClick = onDismissLoadError, modifier = Modifier.testTag("dismiss_load_error")) {
-                            Text("Dismiss")
-                        }
-                    }
-                }
-            }
-            // G2R-F30: a manual profile load pauses context automation; offer a Resume control.
-            if (contextLocked) {
-                Card(
-                    Modifier.fillMaxWidth().testTag("context_lock_banner"),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            "Context automation is paused after a manual profile load.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        )
-                        OutlinedButton(onClick = onResumeContext, modifier = Modifier.testTag("resume_context")) {
-                            Text("Resume context automation")
-                        }
-                    }
-                }
-            }
-
-            SectionHeader("Saved profiles")
-            if (profiles.isEmpty()) {
-                Text("No saved profiles yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            profiles.forEach { entry ->
-                ProfileCard(entry, onApply = { previewProfile = entry }, onOverwriteProfile, onDeleteProfile)
-            }
-
-            SectionHeader("Manage profiles")
-            // G2R-F38: the Tasker dashboard compares active settings vs factory defaults (tuned
-            // values shown yellow) — surface the live set with the same gold highlighting.
-            OutlinedButton(
-                onClick = { showCurrentSettings = true },
-                modifier = Modifier.fillMaxWidth().testTag("view_current_settings"),
-            ) { Text("View current settings…") }
-            Button(
-                onClick = { showSaveDialog = true },
-                modifier = Modifier.fillMaxWidth().testTag("save_profile_as"),
-            ) { Text("Save current settings as…") }
-            OutlinedButton(
-                onClick = onRestoreFactory,
-                modifier = Modifier.fillMaxWidth().testTag("restore_factory"),
-            ) { Text("Restore factory profiles") }
-            OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth().testTag("reset_defaults")) {
-                Text("Reset settings to defaults")
-            }
-
-            SectionHeader("Import / Export")
-            Button(onClick = onExport, modifier = Modifier.fillMaxWidth().testTag("export_profile")) {
-                Text("Export current settings…")
-            }
-            Button(onClick = onImport, modifier = Modifier.fillMaxWidth().testTag("import_profile")) {
-                Text("Import a settings file (incl. legacy Tasker)…")
-            }
-
-            SectionHeader("Legacy folder (Download/AAB/configs)")
-            OutlinedButton(
-                onClick = onChooseLegacyFolder,
-                modifier = Modifier.fillMaxWidth().testTag("choose_legacy_folder"),
-            ) { Text(if (legacyEntries.isEmpty()) "Link legacy configs folder…" else "Re-link legacy folder…") }
-            if (legacyEntries.isEmpty()) {
+    // S12.9c #3: surface an unreadable-profile failure (ProfileLoadResult.TotalFailure).
+    if (loadError != null) {
+        Card(
+            Modifier.fillMaxWidth().testTag("load_error_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "Grant the Download/AAB/configs folder once to load profiles saved by the Tasker app.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    loadError,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
                 )
-            }
-            legacyEntries.forEach { entry ->
-                Card(Modifier.fillMaxWidth().testTag("legacy_${entry.name}")) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(entry.name, style = MaterialTheme.typography.bodyMedium)
-                        OutlinedButton(onClick = { onLoadLegacy(entry) }, modifier = Modifier.testTag("load_${entry.name}")) {
-                            Text("Load")
-                        }
-                    }
+                TextButton(onClick = onDismissLoadError, modifier = Modifier.testTag("dismiss_load_error")) {
+                    Text("Dismiss")
                 }
-            }
-
-            status?.let {
-                Text(it, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(top = 8.dp))
             }
         }
+    }
+    // G2R-F30: a manual profile load pauses context automation; offer a Resume control.
+    if (contextLocked) {
+        Card(
+            Modifier.fillMaxWidth().testTag("context_lock_banner"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "Context automation is paused after a manual profile load.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                OutlinedButton(onClick = onResumeContext, modifier = Modifier.testTag("resume_context")) {
+                    Text("Resume context automation")
+                }
+            }
+        }
+    }
+
+    SectionHeader("Saved profiles")
+    if (profiles.isEmpty()) {
+        Text("No saved profiles yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    profiles.forEach { entry ->
+        ProfileCard(entry, onApply = { previewProfile = entry }, onOverwriteProfile, onDeleteProfile)
+    }
+
+    SectionHeader("Manage profiles")
+    // G2R-F38: the Tasker dashboard compares active settings vs factory defaults (tuned
+    // values shown yellow) — surface the live set with the same gold highlighting.
+    OutlinedButton(
+        onClick = { showCurrentSettings = true },
+        modifier = Modifier.fillMaxWidth().testTag("view_current_settings"),
+    ) { Text("View current settings…") }
+    Button(
+        onClick = { showSaveDialog = true },
+        modifier = Modifier.fillMaxWidth().testTag("save_profile_as"),
+    ) { Text("Save current settings as…") }
+    OutlinedButton(
+        onClick = onRestoreFactory,
+        modifier = Modifier.fillMaxWidth().testTag("restore_factory"),
+    ) { Text("Restore factory profiles") }
+    OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth().testTag("reset_defaults")) {
+        Text("Reset settings to defaults")
+    }
+
+    SectionHeader("Import / Export")
+    Button(onClick = onExport, modifier = Modifier.fillMaxWidth().testTag("export_profile")) {
+        Text("Export current settings…")
+    }
+    Button(onClick = onImport, modifier = Modifier.fillMaxWidth().testTag("import_profile")) {
+        Text("Import a settings file (incl. legacy Tasker)…")
+    }
+
+    SectionHeader("Legacy folder (Download/AAB/configs)")
+    OutlinedButton(
+        onClick = onChooseLegacyFolder,
+        modifier = Modifier.fillMaxWidth().testTag("choose_legacy_folder"),
+    ) { Text(if (legacyEntries.isEmpty()) "Link legacy configs folder…" else "Re-link legacy folder…") }
+    if (legacyEntries.isEmpty()) {
+        Text(
+            "Grant the Download/AAB/configs folder once to load profiles saved by the Tasker app.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    legacyEntries.forEach { entry ->
+        Card(Modifier.fillMaxWidth().testTag("legacy_${entry.name}")) {
+            Row(
+                Modifier.fillMaxWidth().padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(entry.name, style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = { onLoadLegacy(entry) }, modifier = Modifier.testTag("load_${entry.name}")) {
+                    Text("Load")
+                }
+            }
+        }
+    }
+
+    status?.let {
+        Text(it, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(top = 8.dp))
     }
 
     if (showSaveDialog) {

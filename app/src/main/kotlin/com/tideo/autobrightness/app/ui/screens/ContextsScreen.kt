@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -27,6 +30,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -35,92 +39,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.tideo.autobrightness.app.settings.BatteryTrigger
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextTriggers
 import com.tideo.autobrightness.app.settings.LocationTrigger
 import com.tideo.autobrightness.app.state.AppEntry
-import com.tideo.autobrightness.app.state.ContextsViewModel
 import com.tideo.autobrightness.app.ui.theme.AabGold
-import com.tideo.autobrightness.platform.context.LocationResult
-import com.tideo.autobrightness.platform.context.SsidResult
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
-import com.tideo.autobrightness.app.ui.components.rememberToaster
-import kotlinx.coroutines.launch
 import java.util.UUID
 
-/** Contexts (per-app / Wi-Fi / time / charging override rules — Tasker AAB Profile + contexts.json). */
-@Composable
-fun ContextsScreen(navController: NavHostController, vm: ContextsViewModel = viewModel()) {
-    val rules by vm.rules.collectAsStateWithLifecycle()
-    val profileNames by vm.profileNames.collectAsStateWithLifecycle()
-    var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { apps = runCatching { vm.installedApps() }.getOrDefault(emptyList()) }
-    // G2R-F68: resolve today's sunrise/sunset for the token labels (gold "Sunrise (06:42)").
-    var solarLabel by remember { mutableStateOf<Pair<String, String>?>(null) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { solarLabel = runCatching { vm.solarTimes() }.getOrNull() }
-    val toast = rememberToaster()
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    ContextsContent(
-        rules = rules,
-        profileNames = profileNames.ifEmpty { listOf("Default") },
-        apps = apps,
-        solarLabel = solarLabel,
-        onBack = { navController.popBackStack() },
-        onSave = { toast("Rule saved"); vm.save(it) },
-        onDelete = { vm.delete(it); toast("Rule deleted") },
-        onUseCurrentSsid = { setSsid ->
-            scope.launch {
-                // G2R-F22: targeted message per failure mode, not a blanket "Not connected".
-                when (val result = vm.currentSsid()) {
-                    is SsidResult.Connected -> { setSsid(result.ssid); toast("Wi-Fi: ${result.ssid}") }
-                    SsidResult.NotOnWifi -> toast("Not connected to Wi-Fi")
-                    SsidResult.NeedsLocationPermission ->
-                        toast("Reading the Wi-Fi name needs Location permission (grant it in Setup)")
-                    SsidResult.LocationServicesOff ->
-                        toast("Turn on Location services to read the Wi-Fi name")
-                    SsidResult.Unknown -> toast("Could not read the current Wi-Fi name")
-                }
-            }
-        },
-        onUseCurrentLocation = { setLatLon ->
-            // G2R-F22/F42: recheck the grant at call time + request a fresh fix; targeted message
-            // per outcome (no longer wrongly reports "not granted" right after the grant).
-            scope.launch {
-                when (val result = vm.currentLocation()) {
-                    is LocationResult.Available -> {
-                        setLatLon(result.snapshot.latitude, result.snapshot.longitude)
-                        toast("Location: %.4f, %.4f".format(result.snapshot.latitude, result.snapshot.longitude))
-                    }
-                    LocationResult.NeedsPermission ->
-                        toast("Grant Location permission to use the current location")
-                    LocationResult.Unavailable ->
-                        toast("No location fix yet — try again in a moment")
-                }
-            }
-        },
-        hasUsageAccess = vm::hasUsageAccess,
-        onRequestUsageAccess = {
-            toast("Grant usage access so per-app rules can detect the foreground app")
-            runCatching { context.startActivity(vm.usageAccessIntent()) }
-        },
-    )
-}
-
+/**
+ * Legacy standalone Contexts surface, retained only for the existing screen tests. S12.9f folded the
+ * live Contexts destination into the unified Profiles & Contexts screen
+ * ([ProfilesContextsScreen]); the rule list + editor now render via [ContextRulesSection], reused by
+ * both. The per-rule editor opens in a modal (see [ContextRulesSection]).
+ */
 @Composable
 fun ContextsContent(
     rules: List<ContextRule>,
@@ -135,64 +78,116 @@ fun ContextsContent(
     hasUsageAccess: () -> Boolean = { true },
     onRequestUsageAccess: () -> Unit = {},
 ) {
-    var editing by remember { mutableStateOf<ContextRule?>(null) }
-
     SettingsScaffold(stringResource(R.string.title_contexts), onBack) { padding ->
         SettingsColumn(padding) {
-            val current = editing
-            if (current == null) {
+            ContextRulesSection(
+                rules = rules,
+                profileNames = profileNames,
+                apps = apps,
+                solarLabel = solarLabel,
+                onSave = onSave,
+                onDelete = onDelete,
+                onUseCurrentSsid = onUseCurrentSsid,
+                onUseCurrentLocation = onUseCurrentLocation,
+                hasUsageAccess = hasUsageAccess,
+                onRequestUsageAccess = onRequestUsageAccess,
+            )
+        }
+    }
+}
+
+/**
+ * The Context-rules surface (S12.9f IA merge): a description, an "Add rule" action, and the
+ * priority-ordered rule list (each card showing its target profile + priority + trigger summary).
+ * Editing or adding a rule opens the full [RuleEditor] in a modal full-screen [Dialog] — this is the
+ * Tasker UX where a profile owns its context rules and a rule targets a saved profile. Emitted into a
+ * scrolling [Column] (e.g. [SettingsColumn]); reused by the unified [ProfilesContextsScreen] and the
+ * legacy [ContextsContent]. Plumbing only — S13 restyles.
+ */
+@Composable
+fun ContextRulesSection(
+    rules: List<ContextRule>,
+    profileNames: List<String>,
+    apps: List<AppEntry>,
+    solarLabel: Pair<String, String>? = null,
+    onSave: (ContextRule) -> Unit,
+    onDelete: (String) -> Unit,
+    onUseCurrentSsid: ((String) -> Unit) -> Unit = {},
+    onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
+    hasUsageAccess: () -> Boolean = { true },
+    onRequestUsageAccess: () -> Unit = {},
+) {
+    var editing by remember { mutableStateOf<ContextRule?>(null) }
+
+    Text(
+        "Switch to a different profile automatically based on the foreground app, " +
+            "Wi-Fi, time of day or charging state.",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Button(
+        onClick = { editing = ContextRule(id = UUID.randomUUID().toString(), name = "", profile = profileNames.firstOrNull() ?: "Default") },
+        modifier = Modifier.fillMaxWidth().testTag("add_context_rule"),
+    ) { Text("Add rule") }
+
+    // A saved per-app rule can't trigger without usage access (it has no way to read the foreground
+    // app). Surface it on the list too, not only inside the editor, so a rule that silently never
+    // fires explains itself.
+    if (rules.any { !it.triggers.apps.isNullOrEmpty() } && !hasUsageAccess()) {
+        Card(
+            Modifier.fillMaxWidth().testTag("list_usage_access_prompt"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "Switch to a different profile automatically based on the foreground app, " +
-                        "Wi-Fi, time of day or charging state.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    "Per-app rules need usage access to detect the foreground app. " +
+                        "Without it they never trigger.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
                 )
-                Button(
-                    onClick = { editing = ContextRule(id = UUID.randomUUID().toString(), name = "", profile = profileNames.firstOrNull() ?: "Default") },
-                    modifier = Modifier.fillMaxWidth().testTag("add_context_rule"),
-                ) { Text("Add rule") }
+                OutlinedButton(
+                    onClick = onRequestUsageAccess,
+                    modifier = Modifier.testTag("list_grant_usage_access"),
+                ) { Text("Grant usage access") }
+            }
+        }
+    }
 
-                // A saved per-app rule can't trigger without usage access (it has no way to read the
-                // foreground app). Surface it on the list too, not only inside the editor, so a rule
-                // that silently never fires explains itself.
-                if (rules.any { !it.triggers.apps.isNullOrEmpty() } && !hasUsageAccess()) {
-                    Card(
-                        Modifier.fillMaxWidth().testTag("list_usage_access_prompt"),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    ) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                "Per-app rules need usage access to detect the foreground app. " +
-                                    "Without it they never trigger.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                            )
-                            OutlinedButton(
-                                onClick = onRequestUsageAccess,
-                                modifier = Modifier.testTag("list_grant_usage_access"),
-                            ) { Text("Grant usage access") }
-                        }
-                    }
-                }
+    if (rules.isEmpty()) {
+        Text("No rules yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    rules.forEach { rule ->
+        RuleCard(rule, onEdit = { editing = rule }, onDelete = { onDelete(rule.id) })
+    }
 
-                if (rules.isEmpty()) {
-                    Text("No rules yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // S12.9f: edit/add opens the per-rule editor in a modal, replacing the standalone Contexts
+    // destination's inline editor (S13 restyles; a ModalBottomSheet is one option then).
+    val current = editing
+    if (current != null) {
+        Dialog(
+            onDismissRequest = { editing = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Surface(modifier = Modifier.fillMaxSize().testTag("rule_editor_modal")) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    RuleEditor(
+                        rule = current,
+                        profileNames = profileNames,
+                        apps = apps,
+                        solarLabel = solarLabel,
+                        onCancel = { editing = null },
+                        onSave = { onSave(it); editing = null },
+                        onUseCurrentSsid = onUseCurrentSsid,
+                        onUseCurrentLocation = onUseCurrentLocation,
+                        hasUsageAccess = hasUsageAccess,
+                        onRequestUsageAccess = onRequestUsageAccess,
+                    )
                 }
-                rules.forEach { rule ->
-                    RuleCard(rule, onEdit = { editing = rule }, onDelete = { onDelete(rule.id) })
-                }
-            } else {
-                RuleEditor(
-                    rule = current,
-                    profileNames = profileNames,
-                    apps = apps,
-                    solarLabel = solarLabel,
-                    onCancel = { editing = null },
-                    onSave = { onSave(it); editing = null },
-                    onUseCurrentSsid = onUseCurrentSsid,
-                    onUseCurrentLocation = onUseCurrentLocation,
-                    hasUsageAccess = hasUsageAccess,
-                    onRequestUsageAccess = onRequestUsageAccess,
-                )
             }
         }
     }
