@@ -32,7 +32,15 @@ fun TideoTheme(
         darkTheme -> AabDarkColorScheme
         else -> AabLightColorScheme
     }
-    MaterialTheme(colorScheme = colorScheme, content = content)
+    // S13a: wire the design-system foundation — the explicit AAB type scale (Type.kt) and the M3
+    // shape scale (Shape.kt). Both equal the values the app already rendered (behaviour-preserving);
+    // they give S13b/S13c a single owned place to tune typography emphasis and corner radii.
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = AabTypography,
+        shapes = AabShapes,
+        content = content,
+    )
 }
 
 /** Dark-first AAB scheme: charcoal surfaces, teal primary, gold secondary. */

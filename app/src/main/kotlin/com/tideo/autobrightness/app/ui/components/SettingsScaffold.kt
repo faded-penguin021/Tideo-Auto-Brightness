@@ -15,7 +15,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.tideo.autobrightness.app.ui.theme.Dimens
 
 /**
  * Shared M3 scaffold for every S12 parameter/tool screen: a top app bar with a back arrow (this is
@@ -54,9 +54,9 @@ fun SettingsColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding)
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = Dimens.screenPaddingHorizontal)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing),
     ) {
         content()
     }
