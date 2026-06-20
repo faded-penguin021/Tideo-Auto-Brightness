@@ -1884,6 +1884,16 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   indigo → AAB teal `#FF007C63`. `res/` is outside the S13 hard fence (which lists ChartCanvas/domain/golden/
   runtime/gradle/manifest/SettingsValidator), and the manifest's `@mipmap/ic_launcher` reference is untouched.
   (Affects S13d/S14.)
+  **Logo follow-up (owner-driven):** the first two in-session sketches were rejected; the owner produced a
+  proper design spec (Claude design) and chose **Direction C "Radial Dial"** — a gold sun whose 8 rays double
+  as dial ticks, a translucent-white ring + gold fill arc forming an auto-brightness gauge, and a white knob at
+  the level, over a vertical teal gradient (`#00A986`→`#007C63`). Implemented exactly per spec §02 by
+  translating the SVG arc paths 1:1 to VectorDrawable `pathData`: `ic_launcher_foreground.xml` (ticks/disc/
+  track/fill/knob), `ic_launcher_monochrome.xml` (one-ink simplification: uniform ticks + solid disc + full
+  305° track at one weight + hollow-ring knob), and a NEW `drawable/ic_launcher_background.xml` (gradient
+  vector, replacing the flat `@color`; `mipmap-anydpi/ic_launcher.xml` background now points at it). Build +
+  lint green. One note for S14: the knob `c(84,54) r6` reaches ≈r36 from centre, a hair past the r33 safe
+  circle — fine under the standard masks in the spec mock, nudge inward only if a device clips it.
 
 Append new entries as D-080, … with which segments they affect.
 

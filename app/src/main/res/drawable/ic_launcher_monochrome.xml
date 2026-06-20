@@ -1,27 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Monochrome layer for themed launcher icons (closes lint MonochromeLauncherIcon). Single-colour
-     sun + slider silhouette mirroring ic_launcher_foreground; the launcher applies its own tint. -->
+<!--
+  Monochrome layer for themed icons (closes lint MonochromeLauncherIcon). Direction C simplified to one
+  ink colour (designer spec §02 "Monochrome simplification"): 8 uniform ticks + solid sun disc + the
+  full 305° dial track at one weight (no translucency / no fill-vs-empty split); the knob becomes a
+  hollow ring so it still reads as a pointer against the arc. The launcher applies its own tint.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M54,31 A15,15 0 1,1 53.99,31 Z" />
-    <path
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="4"
-        android:strokeLineCap="round"
-        android:pathData="M54,27 L54,21 M54,65 L54,71 M73,46 L79,46 M35,46 L29,46
-            M67.4,32.6 L71.7,28.3 M40.6,32.6 L36.3,28.3
-            M67.4,59.4 L71.7,63.7 M40.6,59.4 L36.3,63.7" />
+
     <path
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="5"
         android:strokeLineCap="round"
-        android:pathData="M34,82 L74,82" />
+        android:pathData="M54,35 L54,29 M67.44,40.56 L71.68,36.32 M73,54 L79,54
+            M67.44,67.44 L71.68,71.68 M54,73 L54,79 M40.56,67.44 L36.32,71.68
+            M35,54 L29,54 M40.56,40.56 L36.32,36.32" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M56,76 A6,6 0 1,1 55.99,76 Z" />
+        android:pathData="M54,41 A13,13 0 1,1 53.99,41 Z" />
+    <!-- Full 305° dial track at one weight. -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,24 A30,30 0 1,1 29.43,71.21" />
+    <!-- Knob as a hollow ring (pointer notch). -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M84,49.5 A4.5,4.5 0 1,1 83.99,49.5 Z" />
 </vector>

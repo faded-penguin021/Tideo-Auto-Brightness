@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Tideo Auto Brightness launcher mark (S13c). A modern rebuild of the Tasker `_CreateLogo` art (a
-  sun whose rays contain a faded brightness slider) on the app's teal+gold brand: a gold sun disc +
-  rays over a faded white brightness slider, reading as "automatic brightness". Kept within the
-  adaptive-icon safe zone (≈ centre 66dp); short stroked paths so lint VectorPath stays quiet.
+  Tideo Auto Brightness launcher mark — Direction C "Radial Dial" (S13c, designer spec §02). A gold
+  sun whose 8 rays double as dial ticks; a translucent ring around the sun + a gold fill arc read as
+  an auto-brightness gauge, with a white knob at the level. Foreground layer (transparent); content
+  within r33 of centre (54,54). SVG arc paths translate 1:1 to VectorDrawable pathData.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -11,34 +11,36 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Sun disc (AabGold #FFC107). -->
-    <path
-        android:fillColor="#FFFFC107"
-        android:pathData="M54,31 A15,15 0 1,1 53.99,31 Z" />
-
-    <!-- Eight sun rays (AabGold), round-capped. -->
+    <!-- 8 ticks (rays-as-dial-marks), AabGold, r19→25 at every 45°. -->
     <path
         android:strokeColor="#FFFFC107"
-        android:strokeWidth="4"
+        android:strokeWidth="5"
         android:strokeLineCap="round"
-        android:pathData="M54,27 L54,21 M54,65 L54,71 M73,46 L79,46 M35,46 L29,46
-            M67.4,32.6 L71.7,28.3 M40.6,32.6 L36.3,28.3
-            M67.4,59.4 L71.7,63.7 M40.6,59.4 L36.3,63.7" />
+        android:pathData="M54,35 L54,29 M67.44,40.56 L71.68,36.32 M73,54 L79,54
+            M67.44,67.44 L71.68,71.68 M54,73 L54,79 M40.56,67.44 L36.32,71.68
+            M35,54 L29,54 M40.56,40.56 L36.32,36.32" />
 
-    <!-- Brightness slider track — faded white, the Tasker "slider in the rays" motif. -->
+    <!-- Sun disc, AabGold, c(54,54) r13. -->
     <path
-        android:strokeColor="#59FFFFFF"
+        android:fillColor="#FFFFC107"
+        android:pathData="M54,41 A13,13 0 1,1 53.99,41 Z" />
+
+    <!-- Dial track — translucent white, c(54,54) r30, from 90°(top) clockwise 305°. -->
+    <path
+        android:strokeColor="#47FFFFFF"
         android:strokeWidth="5"
         android:strokeLineCap="round"
-        android:pathData="M34,82 L74,82" />
-    <!-- Filled (active) portion up to the knob, solid white. -->
+        android:pathData="M54,24 A30,30 0 1,1 29.43,71.21" />
+
+    <!-- Dial fill — AabGold, same ring 90°→0° (90° clockwise), the current brightness level. -->
     <path
-        android:strokeColor="#FFFFFFFF"
+        android:strokeColor="#FFFFC107"
         android:strokeWidth="5"
         android:strokeLineCap="round"
-        android:pathData="M34,82 L56,82" />
-    <!-- Slider knob. -->
+        android:pathData="M54,24 A30,30 0 0,1 84,54" />
+
+    <!-- Knob at the level, white, c(84,54) r6. -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M56,76 A6,6 0 1,1 55.99,76 Z" />
+        android:pathData="M84,48 A6,6 0 1,1 83.99,48 Z" />
 </vector>
