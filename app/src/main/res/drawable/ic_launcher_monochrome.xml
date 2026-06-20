@@ -1,17 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Monochrome layer for themed launcher icons (S12.9a: closes lint MonochromeLauncherIcon).
-     Single-colour sun silhouette; the launcher applies its own themed tint. -->
+<!--
+  Monochrome layer for themed icons (closes lint MonochromeLauncherIcon). Direction C simplified to one
+  ink colour (designer spec §02 "Monochrome simplification"): 8 uniform ticks + solid sun disc + the
+  full 305° dial track at one weight (no translucency / no fill-vs-empty split); the knob becomes a
+  hollow ring so it still reads as a pointer against the arc. The launcher applies its own tint.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,35 L54,29 M67.44,40.56 L71.68,36.32 M73,54 L79,54
+            M67.44,67.44 L71.68,71.68 M54,73 L54,79 M40.56,67.44 L36.32,71.68
+            M35,54 L29,54 M40.56,40.56 L36.32,36.32" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M54,24 A30,30 0 1,1 53.999,24 Z
-            M54,36 A18,18 0 1,0 54.001,36 Z
-            M54,14 L54,20 M54,88 L54,94
-            M14,54 L20,54 M88,54 L94,54
-            M25.51,25.51 L29.75,29.75 M78.25,78.25 L82.49,82.49
-            M82.49,25.51 L78.25,29.75 M29.75,78.25 L25.51,82.49" />
+        android:pathData="M54,41 A13,13 0 1,1 53.99,41 Z" />
+    <!-- Full 305° dial track at one weight. -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,24 A30,30 0 1,1 29.43,71.21" />
+    <!-- Knob as a hollow ring (pointer notch). -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M84,49.5 A4.5,4.5 0 1,1 83.99,49.5 Z" />
 </vector>

@@ -1,15 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tideo Auto Brightness launcher mark — Direction C "Radial Dial" (S13c, designer spec §02). A gold
+  sun whose 8 rays double as dial ticks; a translucent ring around the sun + a gold fill arc read as
+  an auto-brightness gauge, with a white knob at the level. Foreground layer (transparent); content
+  within r33 of centre (54,54). SVG arc paths translate 1:1 to VectorDrawable pathData.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- 8 ticks (rays-as-dial-marks), AabGold, r19→25 at every 45°. -->
+    <path
+        android:strokeColor="#FFFFC107"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,35 L54,29 M67.44,40.56 L71.68,36.32 M73,54 L79,54
+            M67.44,67.44 L71.68,71.68 M54,73 L54,79 M40.56,67.44 L36.32,71.68
+            M35,54 L29,54 M40.56,40.56 L36.32,36.32" />
+
+    <!-- Sun disc, AabGold, c(54,54) r13. -->
+    <path
+        android:fillColor="#FFFFC107"
+        android:pathData="M54,41 A13,13 0 1,1 53.99,41 Z" />
+
+    <!-- Dial track — translucent white, c(54,54) r30, from 90°(top) clockwise 305°. -->
+    <path
+        android:strokeColor="#47FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,24 A30,30 0 1,1 29.43,71.21" />
+
+    <!-- Dial fill — AabGold, same ring 90°→0° (90° clockwise), the current brightness level. -->
+    <path
+        android:strokeColor="#FFFFC107"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,24 A30,30 0 0,1 84,54" />
+
+    <!-- Knob at the level, white, c(84,54) r6. -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M54,24 A30,30 0 1,1 53.999,24 Z
-            M54,36 A18,18 0 1,0 54.001,36 Z
-            M54,14 L54,20 M54,88 L54,94
-            M14,54 L20,54 M88,54 L94,54
-            M25.51,25.51 L29.75,29.75 M78.25,78.25 L82.49,82.49
-            M82.49,25.51 L78.25,29.75 M29.75,78.25 L25.51,82.49" />
+        android:pathData="M84,48 A6,6 0 1,1 83.99,48 Z" />
 </vector>

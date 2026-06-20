@@ -27,9 +27,10 @@ import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.state.derivedCoefficients
+import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.CurveBrightnessDiagnosticCardContent
-import com.tideo.autobrightness.app.ui.components.DerivedReadout
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
+import com.tideo.autobrightness.app.ui.components.KeyValueRow
 import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
@@ -164,43 +165,49 @@ fun CurveBrightnessContent(
             // Labels + verbatim long-press help re-derived from extraction/scenes/brightness_settings.md
             // (S12.6e, G2R-F19/F21). Tasker labels: "Zone 1 Scaling" (form1A), "Zone 2 Scaling" (form2B),
             // "Zone 2 Offset" (form2C); zone-end fields keep the lux annotation.
-            SectionHeader("Curve zones")
-            NumberSettingField(
-                "Zone 1 scaling (form1A)", draft.form1A, { onEdit { s -> s.copy(form1A = it) } },
-                epoch = epoch, committed = committed.form1A, isInt = false,
-                help = TaskerHelp.FORM_1A, testTag = "field_form1A",
-            )
-            NumberSettingField(
-                "Zone 1 end (lux)", draft.zone1End, { onEdit { s -> s.copy(zone1End = it.toInt()) } },
-                epoch = epoch, committed = committed.zone1End,
-                help = TaskerHelp.ZONE_1_END, testTag = "field_zone1End",
-            )
-            NumberSettingField(
-                "Zone 2 scaling (form2B)", draft.form2B, { onEdit { s -> s.copy(form2B = it.toFloat()) } },
-                epoch = epoch, committed = committed.form2B, isInt = false,
-                help = TaskerHelp.FORM_2B, testTag = "field_form2B",
-            )
-            NumberSettingField(
-                "Zone 2 offset (form2C)", draft.form2C, { onEdit { s -> s.copy(form2C = it.toInt()) } },
-                epoch = epoch, committed = committed.form2C, error = errors.forField("form2C"),
-                help = TaskerHelp.FORM_2C, testTag = "field_form2C",
-            )
-            NumberSettingField(
-                "Zone 2 end (lux)", draft.zone2End, { onEdit { s -> s.copy(zone2End = it.toInt()) } },
-                epoch = epoch, committed = committed.zone2End, error = errors.forField("zone2End"),
-                help = TaskerHelp.ZONE_2_END, testTag = "field_zone2End",
-            )
+            // S13c restyle (m3_audit §3 row 3): the bare field stack is grouped into an `AabCard`; the
+            // derived continuity readout becomes a distinct gold `KeyValueRow` data-pop card (§4 B4).
+            AabCard {
+                SectionHeader("Curve zones", divider = true)
+                NumberSettingField(
+                    "Zone 1 scaling (form1A)", draft.form1A, { onEdit { s -> s.copy(form1A = it) } },
+                    epoch = epoch, committed = committed.form1A, isInt = false,
+                    help = TaskerHelp.FORM_1A, testTag = "field_form1A",
+                )
+                NumberSettingField(
+                    "Zone 1 end (lux)", draft.zone1End, { onEdit { s -> s.copy(zone1End = it.toInt()) } },
+                    epoch = epoch, committed = committed.zone1End,
+                    help = TaskerHelp.ZONE_1_END, testTag = "field_zone1End",
+                )
+                NumberSettingField(
+                    "Zone 2 scaling (form2B)", draft.form2B, { onEdit { s -> s.copy(form2B = it.toFloat()) } },
+                    epoch = epoch, committed = committed.form2B, isInt = false,
+                    help = TaskerHelp.FORM_2B, testTag = "field_form2B",
+                )
+                NumberSettingField(
+                    "Zone 2 offset (form2C)", draft.form2C, { onEdit { s -> s.copy(form2C = it.toInt()) } },
+                    epoch = epoch, committed = committed.form2C, error = errors.forField("form2C"),
+                    help = TaskerHelp.FORM_2C, testTag = "field_form2C",
+                )
+                NumberSettingField(
+                    "Zone 2 end (lux)", draft.zone2End, { onEdit { s -> s.copy(zone2End = it.toInt()) } },
+                    epoch = epoch, committed = committed.zone2End, error = errors.forField("zone2End"),
+                    help = TaskerHelp.ZONE_2_END, testTag = "field_zone2End",
+                )
+            }
 
             // task659 live-derived continuity coefficients (task613/614/615 _UpdateBrightnessFormulae).
             // G2R-F61: labelled as the zone-alignment hinge points (not bare "form2A/form3A" placeholders).
-            SectionHeader("Derived (continuity)")
-            val coeffs = draft.derivedCoefficients()
-            DerivedReadout("Zone 2 alignment (form2A)", coeffs.form2A.fmtCoeff("%.3f"), testTag = "derived_form2A")
-            DerivedReadout("Zone 3 alignment (form3A)", coeffs.form3A.fmtCoeff("%.1f"), testTag = "derived_form3A")
-            errors.forField("form2A")?.let { ErrorBanner(it, "error_form2A") }
-            errors.forField("form3A")?.let { ErrorBanner(it, "error_form3A") }
-            errors.forField("zone2End")?.let { ErrorBanner(it, "error_zone2End") }
-            errors.forField("safetyBrightness")?.let { ErrorBanner(it, "error_safetyBrightness") }
+            AabCard {
+                SectionHeader("Derived (continuity)", divider = true)
+                val coeffs = draft.derivedCoefficients()
+                KeyValueRow("Zone 2 alignment (form2A)", coeffs.form2A.fmtCoeff("%.3f"), testTag = "derived_form2A")
+                KeyValueRow("Zone 3 alignment (form3A)", coeffs.form3A.fmtCoeff("%.1f"), testTag = "derived_form3A", showDivider = false)
+                errors.forField("form2A")?.let { ErrorBanner(it, "error_form2A") }
+                errors.forField("form3A")?.let { ErrorBanner(it, "error_form3A") }
+                errors.forField("zone2End")?.let { ErrorBanner(it, "error_zone2End") }
+                errors.forField("safetyBrightness")?.let { ErrorBanner(it, "error_safetyBrightness") }
+            }
         }
     }
 }

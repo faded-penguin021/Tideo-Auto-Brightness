@@ -52,10 +52,13 @@ import com.tideo.autobrightness.app.settings.ContextTriggers
 import com.tideo.autobrightness.app.settings.LocationTrigger
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.app.ui.components.AabCard
+import com.tideo.autobrightness.app.ui.components.EmptyState
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
+import com.tideo.autobrightness.app.ui.theme.Dimens
 import java.util.UUID
 
 /**
@@ -153,7 +156,7 @@ fun ContextRulesSection(
     }
 
     if (rules.isEmpty()) {
-        Text("No rules yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        EmptyState("No rules yet.", testTag = "empty_rules")
     }
     rules.forEach { rule ->
         RuleCard(rule, onEdit = { editing = rule }, onDelete = { onDelete(rule.id) })
@@ -167,7 +170,7 @@ fun ContextRulesSection(
             onDismissRequest = { editing = null },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            Surface(modifier = Modifier.fillMaxSize().testTag("rule_editor_modal")) {
+            Surface(modifier = Modifier.fillMaxSize().testTag("rule_editor_modal"), tonalElevation = Dimens.cardElevationRaised) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -195,15 +198,17 @@ fun ContextRulesSection(
 
 @Composable
 private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Card(Modifier.fillMaxWidth().testTag("rule_${rule.id}")) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(rule.name.ifBlank { "(unnamed)" }, style = MaterialTheme.typography.titleMedium)
-            Text("→ ${rule.profile}  ·  priority ${rule.priority}", style = MaterialTheme.typography.bodyMedium)
-            Text(rule.triggers.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit_${rule.id}")) { Text("Edit") }
-                TextButton(onClick = onDelete, modifier = Modifier.testTag("delete_${rule.id}")) { Text("Delete") }
-            }
+    // S13c restyle (m3_audit §3 row 10): rule rows are elevated `AabCard`s.
+    AabCard(
+        Modifier.testTag("rule_${rule.id}"),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(rule.name.ifBlank { "(unnamed)" }, style = MaterialTheme.typography.titleMedium)
+        Text("→ ${rule.profile}  ·  priority ${rule.priority}", style = MaterialTheme.typography.bodyMedium)
+        Text(rule.triggers.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit_${rule.id}")) { Text("Edit") }
+            TextButton(onClick = onDelete, modifier = Modifier.testTag("delete_${rule.id}")) { Text("Delete") }
         }
     }
 }
@@ -303,7 +308,7 @@ private fun RuleEditor(
         TextButton(onClick = onCancel, modifier = Modifier.testTag("cancel_rule")) { Text("Cancel") }
     }
 
-    SectionHeader("Rule")
+    SectionHeader("Rule", divider = true)
     OutlinedTextField(
         value = name, onValueChange = { name = it }, label = { Text("Name") },
         singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_name"),
@@ -322,7 +327,7 @@ private fun RuleEditor(
         singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_priority"),
     )
 
-    SectionHeader("Triggers")
+    SectionHeader("Triggers", divider = true)
     OutlinedTextField(
         value = wifi, onValueChange = { wifi = it }, label = { Text("Wi-Fi SSIDs (comma-separated)") },
         modifier = Modifier.fillMaxWidth().testTag("rule_wifi"),
@@ -362,7 +367,7 @@ private fun RuleEditor(
         selectedDays.value = if (day in selectedDays.value) selectedDays.value - day else selectedDays.value + day
     }
 
-    SectionHeader("Location")
+    SectionHeader("Location", divider = true)
     OutlinedButton(
         onClick = { onUseCurrentLocation { la, lo -> lat = "%.5f".format(la); lon = "%.5f".format(lo) } },
         modifier = Modifier.testTag("use_current_location"),

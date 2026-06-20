@@ -31,6 +31,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.app.state.CircadianExtrasViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
+import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.ChartPager
 import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCard
@@ -148,7 +149,7 @@ fun CircadianContent(
 
             // G2R-F82: scaling fields feed the Circadian graph; taper fields feed the Taper graph.
             GraphSettingsGroup("Circadian") {
-                SectionHeader("Circadian scaling")
+                SectionHeader("Circadian scaling", divider = true)
                 SwitchSettingRow(
                     "Enable dynamic scaling", draft.scalingEnabled,
                     { onEdit { s -> s.copy(scalingEnabled = it) } },
@@ -177,7 +178,7 @@ fun CircadianContent(
             }
 
             GraphSettingsGroup("Taper") {
-                SectionHeader("Compression taper")
+                SectionHeader("Compression taper", divider = true)
                 // Tasker Experiment slider: taper midpoint 130–240 (experiment_settings.md elements26, G2-F13).
                 IntSliderSettingField(
                     "Taper midpoint", draft.scaleTaperMidpoint, 130..240,
@@ -237,7 +238,9 @@ fun CircadianDateLocationCard(
     var lonText by remember(effLon) { mutableStateOf(effLon?.let { "%.5f".format(it) } ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    SectionHeader("Date & location")
+    // S13c restyle (m3_audit §3 row 6): the inline date/location controls are grouped into an `AabCard`.
+    AabCard {
+    SectionHeader("Date & location", divider = true)
     Text(
         when {
             value.isUnset -> "Live data — today + current location."
@@ -306,6 +309,7 @@ fun CircadianDateLocationCard(
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
         ) { DatePicker(state = state) }
+    }
     }
 }
 
