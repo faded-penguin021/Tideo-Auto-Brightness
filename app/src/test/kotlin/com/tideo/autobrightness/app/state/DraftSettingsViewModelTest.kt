@@ -47,10 +47,15 @@ class DraftSettingsViewModelTest {
 
     private fun seededVm(): DraftSettingsViewModel {
         val vm = DraftSettingsViewModel(app)
-        // Wait for the init collector to seed the draft from the committed baseline.
+        // Wait for the init collector to ACTUALLY seed the draft. The VM bumps `epoch` 0→1 on its
+        // first committed emission, so gate on that — NOT on `draft == committed()`, which is already
+        // true from construction when the committed baseline equals the AabSettings() defaults (e.g.
+        // minBrightness = 10). Returning early there left `seeded` false, so the first emission fired
+        // during a later idle() and clobbered the test's edit back to the committed value (flaky
+        // edit_marksDirty_thenDiscardReverts).
         repeat(100) {
             idle()
-            if (vm.draft.value == committed()) return vm
+            if (vm.epoch.value >= 1) return vm
             Thread.sleep(10)
         }
         return vm
