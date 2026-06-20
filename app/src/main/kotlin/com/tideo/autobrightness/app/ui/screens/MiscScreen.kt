@@ -148,7 +148,8 @@ fun MiscContent(
                 )
                 // task714 throttle derivation: AnimSteps*MaxWait+10 (read-only live readout, elements31).
                 val derivedThrottle = draft.animSteps * draft.maxWaitMs + 10
-                KeyValueRow("Throttle (derived)", "$derivedThrottle ms", testTag = "derived_throttle")
+                // S13c' §05: the unit is split out so it stays muted (never inherits the gold value).
+                KeyValueRow("Throttle (derived)", "$derivedThrottle", unit = "ms", testTag = "derived_throttle")
                 if (draft.minWaitMs > draft.maxWaitMs) {
                     ErrorBanner("Minimum wait cannot exceed maximum wait.", "error_waits")
                 }

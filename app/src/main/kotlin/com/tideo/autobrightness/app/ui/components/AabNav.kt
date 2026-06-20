@@ -132,7 +132,13 @@ fun NavRow(
         horizontalArrangement = Arrangement.spacedBy(Dimens.rowGap),
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+            // S13c' §08 "quiet the icons": nav icons orient, they don't compete with data — muted tint.
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(Dimens.iconSize),
+            )
         }
         Text(
             label,

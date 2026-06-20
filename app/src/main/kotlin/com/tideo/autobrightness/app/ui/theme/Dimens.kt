@@ -35,10 +35,10 @@ object Dimens {
     /** Vertical page padding for the Menu hub's content column (was `12.dp`). */
     val screenPaddingVertical = space4
     /** Vertical rhythm between stacked settings fields in [com.tideo.autobrightness.app.ui.components.SettingsColumn].
-     *  Off-grid 10 dp carried over from S12.5b's draft-edit screens; flagged in m3_audit.md for S13c review. */
-    val fieldSpacing = 10.dp
-    /** Gap between grouped menu rows / section blocks (was `8.dp`). */
-    val sectionSpacing = space3
+     *  S13c' normalised the off-grid 10 dp (S12.5b draft-edit carry-over) onto the 4 dp grid → 12 dp. */
+    val fieldSpacing = space4
+    /** Gap between grouped card sections. S13c' bumped 8 → 16 dp for instrument-panel breathing room. */
+    val sectionSpacing = space5
     /** Tight vertical padding inside a single field row (slider/derived readout, was `2.dp`). */
     val fieldRowPaddingTight = space1
     /** Standard inter-control gap inside a row (button bar, hero row, was `12.dp`/`16.dp` — see [rowGapWide]). */
@@ -48,12 +48,16 @@ object Dimens {
     // --- Cards / containers ---
     /** Inner padding for the standard `AabCard` (S13b) and section containers (was `16.dp`). */
     val cardPadding = space5
-    /** Inner padding for the prominent Menu hero cards (was `20.dp`). */
-    val heroCardPadding = 20.dp
+    /** Inner padding for the prominent Menu/Dashboard hero cards. S13c' normalised 20 → 24 dp (grid). */
+    val heroCardPadding = space6
     /** Resting elevation for content cards. */
     val cardElevation = 1.dp
     /** Raised elevation for the sticky Apply bar / overlays (was the `tonalElevation = 3.dp`). */
     val cardElevationRaised = 3.dp
+    /** S13c' hero/instrument elevation — the single raised focal card per screen (surface ladder L2). */
+    val cardElevationHero = 6.dp
+    /** S13c' teal accent-edge width on hero/instrument cards (surface ladder L2). */
+    val accentEdge = 3.dp
 
     // --- Components ---
     val iconSize = space6

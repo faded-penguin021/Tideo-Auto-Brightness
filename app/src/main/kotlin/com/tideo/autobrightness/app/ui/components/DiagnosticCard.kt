@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.app.ui.theme.AabMono
 import com.tideo.autobrightness.app.ui.theme.AabTeal
 import java.util.Calendar
 
@@ -58,9 +59,18 @@ fun DiagnosticLine(testTag: String? = null, build: AnnotatedString.Builder.() ->
     )
 }
 
-/** Append a live value highlighted in the AAB gold accent (the Tasker debug "strong" colour). */
+/** Append a live value highlighted in the AAB gold accent (the Tasker debug "strong" colour). S13c':
+ *  the gold run is set in Plex Mono with tabular figures so the glass-box readouts read as instrument
+ *  data, not inline prose. */
 fun AnnotatedString.Builder.goldValue(value: String) {
-    withStyle(SpanStyle(color = AabGold, fontWeight = FontWeight.SemiBold)) { append(value) }
+    withStyle(
+        SpanStyle(
+            color = AabGold,
+            fontFamily = AabMono,
+            fontWeight = FontWeight.Medium,
+            fontFeatureSettings = "tnum",
+        ),
+    ) { append(value) }
 }
 
 internal fun fmt(value: Double?, digits: Int = 1): String =

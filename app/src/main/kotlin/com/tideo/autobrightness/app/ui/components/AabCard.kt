@@ -1,12 +1,20 @@
 package com.tideo.autobrightness.app.ui.components
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
@@ -19,87 +27,143 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.tideo.autobrightness.app.ui.theme.AabDataCaption
+import com.tideo.autobrightness.app.ui.theme.AabDataDisplay
 import com.tideo.autobrightness.app.ui.theme.Dimens
 
 /**
- * S13b component library — the reusable "Lego blocks" that replace the per-screen ad-hoc compositions
- * catalogued in `docs/rebuild/design/m3_audit.md` (§2.5 owner "Pro-Tool" blueprints, §4 cross-cutting
- * gaps). These are *built* here and *applied* screen-by-screen in S13c; this file is behaviour-neutral
- * until a screen adopts it. Every value comes from the S13a [Dimens] tokens / the frozen teal+gold
- * `colorScheme` role-map — no raw `dp` literals, no recoloring.
+ * S13b component library → **S13c' surface & data pass**. The reusable "Lego blocks" that replace the
+ * per-screen ad-hoc compositions catalogued in `docs/rebuild/design/m3_audit.md`. Every value comes from
+ * the S13a [Dimens] tokens / the frozen teal+gold `colorScheme` role-map — no raw brand recolouring.
  */
 
 /**
+ * The surface ladder (S13c' §04). M3 tonal elevation on a dark theme only uniformly lightens, so 14
+ * resting cards read as one mass. Instead each card declares **intent**, and depth comes from a 1px
+ * hairline highlight + honest shadow rather than glow/bevel:
+ *  - **[Resting]** — the default content card (ladder L1): hairline edge + soft shadow.
+ *  - **[Hero]** — the single focal/instrument card per screen (L2): raised elevation + teal accent edge.
+ *  - **[Well]** — a recessed diagnostic/log surface (the glass-box well): variant fill, reads "behind".
+ */
+enum class AabCardVariant { Resting, Hero, Well }
+
+/** The 1px highlight that defines a card edge on the dark ladder (S13c' §04 — a neutral compositing
+ *  highlight, NOT a brand colour; the frozen palette is untouched). */
+private val Hairline = Color.White.copy(alpha = 0.05f)
+
+/**
  * The single elevated section container (m3_audit §4 "No shared card style"). Every place a screen
- * groups settings/readouts into a bare `Column` or a raw `Card` becomes an [AabCard]: medium shape,
- * resting [Dimens.cardElevation] (or [Dimens.cardElevationRaised] when [raised]), uniform
- * [Dimens.cardPadding], and a default [Dimens.fieldSpacing] vertical rhythm between children.
+ * groups settings/readouts becomes an [AabCard]; the [variant] picks where it sits on the surface
+ * ladder. Medium shape, uniform [Dimens.cardPadding], and a [Dimens.fieldSpacing] vertical rhythm.
  */
 @Composable
 fun AabCard(
     modifier: Modifier = Modifier,
-    raised: Boolean = false,
+    variant: AabCardVariant = AabCardVariant.Resting,
     contentPadding: PaddingValues = PaddingValues(Dimens.cardPadding),
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(Dimens.fieldSpacing),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val shape = MaterialTheme.shapes.medium
+    val elevation = when (variant) {
+        AabCardVariant.Hero -> Dimens.cardElevationHero
+        AabCardVariant.Well -> 0.dp
+        AabCardVariant.Resting -> Dimens.cardElevation
+    }
+    val container = when (variant) {
+        AabCardVariant.Well -> MaterialTheme.colorScheme.surfaceVariant
+        else -> MaterialTheme.colorScheme.surface
+    }
     ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        elevation = CardDefaults.elevatedCardElevation(
-            defaultElevation = if (raised) Dimens.cardElevationRaised else Dimens.cardElevation,
-        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(Dimens.dividerThickness, Hairline, shape),
+        shape = shape,
+        colors = CardDefaults.elevatedCardColors(containerColor = container),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = elevation),
     ) {
-        Column(
-            modifier = Modifier.padding(contentPadding),
-            verticalArrangement = verticalArrangement,
-            content = content,
-        )
+        if (variant == AabCardVariant.Hero) {
+            // L2 hero: a teal accent edge marks the one focal card per screen.
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                Box(
+                    Modifier
+                        .width(Dimens.accentEdge)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+                Column(
+                    modifier = Modifier.padding(contentPadding),
+                    verticalArrangement = verticalArrangement,
+                    content = content,
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(contentPadding),
+                verticalArrangement = verticalArrangement,
+                content = content,
+            )
+        }
     }
 }
 
 /**
- * B4 — the **critical high-contrast data readout** the owner spec flags (m3_audit §2.5/§4). A
- * `SpaceBetween` row: the [key] left (`bodyLarge`, `onSurface`) and the [value] right in **bold gold**
- * (`secondary`, the frozen `AabGold`) for the "data-pop", with a subtle `outlineVariant` bottom border.
+ * B4 → **S13c' readout line** (§05). The critical high-contrast data readout, recomposed as an
+ * instrument line instead of a bolded sentence: a **tracked mono caption** above ([key]), then the big
+ * **tabular gold value** ([value], the [AabDataDisplay] role), with the [unit] demoted to a small
+ * `onSurfaceVariant` mark trailing the figure (a separate param so it never inherits gold). A subtle
+ * `outlineVariant` bottom border closes the line.
  *
- * Use for every derived/live numeric — Dashboard lux/target, derived form2A/form3A, throttle, dimming
- * readouts. The gold value uses the *theme role* ([androidx.compose.material3.ColorScheme.secondary]),
- * not a raw `AabGold`, so it tracks the scheme; [valueColor] overrides only when a row needs it.
+ * The value crossfades on change ([AabMotion.valueSpec]) so the glass box feels alive. The row keeps its
+ * [testTag] and the value keeps `value_<testTag>` for the existing test contracts.
  */
 @Composable
 fun KeyValueRow(
     key: String,
     value: String,
     modifier: Modifier = Modifier,
+    unit: String? = null,
     valueColor: Color = MaterialTheme.colorScheme.secondary,
     showDivider: Boolean = true,
     testTag: String = key,
 ) {
-    Column(modifier = modifier.fillMaxWidth().testTag(testTag)) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = Dimens.space2)
+            .testTag(testTag),
+    ) {
+        Text(
+            key.uppercase(),
+            style = AabDataCaption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = Dimens.rowGap / 2),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = Dimens.space1),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Text(
-                key,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f).padding(end = Dimens.rowGap),
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = valueColor,
-                modifier = Modifier.testTag("value_$testTag"),
-            )
+            Crossfade(targetState = value, animationSpec = AabMotion.valueSpec(), label = "kv_$testTag") { v ->
+                Text(
+                    v,
+                    style = AabDataDisplay,
+                    color = valueColor,
+                    modifier = Modifier.testTag("value_$testTag"),
+                )
+            }
+            if (unit != null) {
+                Text(
+                    unit,
+                    style = AabDataCaption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = Dimens.space2, bottom = Dimens.space1),
+                )
+            }
         }
         if (showDivider) {
             HorizontalDivider(
+                modifier = Modifier.padding(top = Dimens.space3),
                 thickness = Dimens.dividerThickness,
                 color = MaterialTheme.colorScheme.outlineVariant,
             )

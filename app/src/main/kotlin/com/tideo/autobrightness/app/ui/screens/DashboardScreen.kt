@@ -15,15 +15,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -34,9 +31,12 @@ import com.tideo.autobrightness.app.state.DashboardViewModel
 import com.tideo.autobrightness.app.state.ServiceHealthUiState
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.AabTopBar
+import com.tideo.autobrightness.app.ui.components.BrightnessInstrument
+import com.tideo.autobrightness.app.ui.theme.AabDataCaption
+import com.tideo.autobrightness.app.ui.theme.AabDataDisplay
 import com.tideo.autobrightness.app.ui.theme.AabGold
-import com.tideo.autobrightness.app.ui.theme.Dimens
 import com.tideo.autobrightness.app.ui.theme.AabOnGold
+import com.tideo.autobrightness.app.ui.theme.Dimens
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /** Stateful wrapper: wires the [DashboardViewModel] and navigation. */
@@ -55,11 +55,11 @@ fun DashboardScreen(navController: NavHostController, viewModel: DashboardViewMo
 /**
  * Stateless, fully driven by [state] + callbacks so it can render under a Robolectric compose test.
  *
- * S12.8b (G2R-F79): redesigned to be a focused, insightful live-status screen. The confusing **Pause**
- * control is gone (stopping = disable the service via the master switch); only **Resume** remains, and
- * only when a manual brightness override has paused auto-control (`pausedByOverride`). The live state
- * is broken into purposeful cards — status, light, brightness/circadian/dimming — so the screen
- * actually explains what the engine is doing right now.
+ * S13c' (§06) — the screen now leads with a single **brightness instrument** hero (the applied 0–255
+ * level + teal track + status pill + master switch) that answers "what is my screen doing?" at a glance,
+ * then a quiet **readout strip** (lux · circadian · context) demoted below it. The stale / override /
+ * degraded banners keep their tinted surfaces — those encode state. There is no Pause control (G2R-F79):
+ * stopping = the master switch.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,9 +76,9 @@ fun DashboardContent(
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = Dimens.screenPaddingHorizontal)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing),
         ) {
             TierBadge(tier = state.tier, onClick = onOpenOnboarding)
             // S12.9d: the published live snapshot has aged past STALE while the service still claims to
@@ -86,18 +86,15 @@ fun DashboardContent(
             if (state.stale && state.serviceRunning) {
                 StaleBanner()
             }
-            StatusCard(state, onToggleService)
+            // The hero instrument — the one focal element (carries the status, switch + applied level).
+            BrightnessInstrument(state = state, onToggleService = onToggleService)
             // The Resume-after-override affordance only appears when the engine paused itself because
             // the user changed brightness manually (prof755/task567) — the one case Resume is for.
             if (state.pausedByOverride) {
                 OverrideCard(state.serviceRunning, onResume)
             }
-            LightCard(state)
-            BrightnessCard(state)
-            if (state.activeContext != null) {
-                ContextCard(state.activeContext)
-            }
-            HealthCard(state.lastSampleMs, state.health)
+            ReadoutStrip(state)
+            HealthCard(state.health)
         }
     }
 }
@@ -114,7 +111,7 @@ private fun StaleBanner() {
     ) {
         Text(
             stringResource(R.string.dashboard_stale_banner),
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Dimens.cardPadding),
             style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -135,41 +132,6 @@ private fun TierBadge(tier: Tier, onClick: () -> Unit) {
     )
 }
 
-/** Status headline + the master switch (the only on/off control — there is no Pause, G2R-F79). */
-@Composable
-private fun StatusCard(state: DashboardUiState, onToggle: (Boolean) -> Unit) {
-    val status = when {
-        !state.serviceEnabled -> stringResource(R.string.dashboard_status_off)
-        !state.serviceRunning -> stringResource(R.string.dashboard_status_starting)
-        state.pausedByOverride -> stringResource(R.string.dashboard_status_paused_override)
-        state.paused -> stringResource(R.string.dashboard_status_paused)
-        else -> stringResource(R.string.dashboard_status_active)
-    }
-    // S13c restyle (m3_audit §3 row 2): the ad-hoc status blocks become uniform `AabCard`s.
-    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.dashboard_auto_brightness), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    status,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("dashboard_status"),
-                )
-            }
-            Switch(
-                checked = state.serviceEnabled,
-                onCheckedChange = onToggle,
-                modifier = Modifier.testTag("service_switch"),
-            )
-        }
-    }
-}
-
 /** Shown only while [pausedByOverride]: explains the pause and offers the one Resume control. */
 @Composable
 private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
@@ -177,7 +139,10 @@ private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
         modifier = Modifier.testTag("override_card"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier.padding(Dimens.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing),
+        ) {
             Text(stringResource(R.string.dashboard_manual_override), style = MaterialTheme.typography.titleSmall)
             Text(
                 stringResource(R.string.dashboard_override_explain),
@@ -192,71 +157,86 @@ private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
     }
 }
 
+/**
+ * The quiet readout strip below the hero (S13c' §06): lux · circadian · context, each shown only when
+ * meaningful (existing `takeIf` guards). The raw-lux + last-sample age and the super-dimming line sit
+ * beneath as supporting detail. Values render in tabular Plex Mono via [ReadoutCell].
+ */
 @Composable
-private fun LightCard(state: DashboardUiState) {
-    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldRowPaddingTight)) {
-        Text(stringResource(R.string.dashboard_ambient_light), style = MaterialTheme.typography.labelMedium)
+private fun ReadoutStrip(state: DashboardUiState) {
+    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.rowGap),
+        ) {
+            ReadoutCell(
+                caption = stringResource(R.string.dashboard_ambient_light),
+                value = state.smoothedLux.fmt(),
+                valueTag = "dashboard_lux",
+                modifier = Modifier.weight(1f),
+            )
+            state.circadianScale?.takeIf { kotlin.math.abs(it - 1.0) > 0.001 }?.let {
+                ReadoutCell(
+                    caption = stringResource(R.string.dashboard_circadian),
+                    value = "%.2f×".format(it),
+                    valueTag = "dashboard_scale",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            state.activeContext?.let {
+                ReadoutCell(
+                    caption = stringResource(R.string.dashboard_active_context),
+                    value = it,
+                    valueTag = "dashboard_context",
+                    mono = false,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         Text(
-            "${state.rawLux.fmt()} lux raw · ${state.smoothedLux.fmt()} smoothed",
-            modifier = Modifier.testTag("dashboard_lux"),
-        )
-        Text(
-            stringResource(R.string.dashboard_last_sample, state.lastSampleMs.toRelativeAge()),
+            stringResource(R.string.dashboard_lux_raw, state.rawLux.fmt(), state.lastSampleMs.toRelativeAge()),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("last_sample_age"),
         )
-    }
-}
-
-@Composable
-private fun BrightnessCard(state: DashboardUiState) {
-    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldRowPaddingTight)) {
-            Text(stringResource(R.string.dashboard_brightness), style = MaterialTheme.typography.labelMedium)
-            // Gate-2(5th) obs: the pipeline only publishes its state AFTER the animation settles, so the
-            // applied and target values are always equal here (mid-animation frames are never surfaced) —
-            // showing "X → Y" was confusing because X==Y. Render the single applied level, and only fall
-            // back to the "→ target" form on the rare snapshot where they genuinely differ.
-            val cur = state.currentBrightness
-            val tgt = state.targetBrightness
+        // Only surface dimming when engaged.
+        state.dimmingStrength.takeIf { it > 0.0 }?.let {
             Text(
-                when {
-                    cur != null && tgt != null && cur != tgt -> "$cur → $tgt (target)"
-                    else -> "${(cur ?: tgt).fmtInt()} / 255"
-                },
-                modifier = Modifier.testTag("dashboard_brightness"),
+                stringResource(R.string.dashboard_super_dimming) + " %.0f%%".format(it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("dashboard_dimming"),
             )
-            // Only surface circadian scale when it is actually shifting the curve.
-            state.circadianScale?.takeIf { kotlin.math.abs(it - 1.0) > 0.001 }?.let {
-                Text(
-                    "Circadian scale: ${"%.2f".format(it)}×",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("dashboard_scale"),
-                )
-            }
-            // Only surface dimming when engaged.
-            state.dimmingStrength.takeIf { it > 0.0 }?.let {
-                Text(
-                    "Super dimming: ${"%.0f".format(it)}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("dashboard_dimming"),
-                )
-            }
+        }
+    }
+}
+
+/** One labelled readout in the strip: a tracked caption above a tabular-mono (or plain) value. */
+@Composable
+private fun ReadoutCell(
+    caption: String,
+    value: String,
+    valueTag: String,
+    modifier: Modifier = Modifier,
+    mono: Boolean = true,
+) {
+    Column(modifier = modifier) {
+        Text(
+            caption.uppercase(),
+            style = AabDataCaption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            value,
+            style = if (mono) AabDataDisplay else MaterialTheme.typography.titleMedium,
+            color = if (mono) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = Dimens.space1).testTag(valueTag),
+        )
     }
 }
 
 @Composable
-private fun ContextCard(activeContext: String) {
-    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldRowPaddingTight)) {
-        Text(stringResource(R.string.dashboard_active_context), style = MaterialTheme.typography.labelMedium)
-        Text(activeContext, modifier = Modifier.testTag("dashboard_context"))
-    }
-}
-
-@Composable
-private fun HealthCard(lastSampleMs: Long?, health: ServiceHealthUiState) {
+private fun HealthCard(health: ServiceHealthUiState) {
     if (!health.degradedMode) return
     AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldRowPaddingTight)) {
         Text(stringResource(R.string.dashboard_service_health), style = MaterialTheme.typography.labelMedium)
@@ -269,7 +249,6 @@ private fun HealthCard(lastSampleMs: Long?, health: ServiceHealthUiState) {
 }
 
 private fun Double?.fmt(): String = this?.let { "%.0f".format(it) } ?: "—"
-private fun Int?.fmtInt(): String = this?.toString() ?: "—"
 
 /** Relative "Xs ago" age for a millis timestamp; "never" when the sensor has not fired yet. */
 private fun Long?.toRelativeAge(now: Long = System.currentTimeMillis()): String {
