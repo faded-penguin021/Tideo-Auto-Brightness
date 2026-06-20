@@ -1593,6 +1593,11 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   `ProfilesContextsScreen`). No change to `ContextEngine`/`ContextOverrideResolver`/`ContextRuleStore` or any store;
   rule→profile relationship intact. domain/ + golden + ChartCanvas fenced. New tests:
   `SettingsScreensTest.profilesContextsMerge_*` + `UiShellTest.profilesContextsMerge_oneDestination_noContextsRoute`.
+  **Owner-feedback follow-up (same segment):** the rule editor's Save/Cancel were at the very bottom (you had to
+  scroll past the tall foreground-app picker to reach them) — pinned them to the TOP of the editor instead (the
+  save logic hoisted into a local `saveRule()`; test tags `save_rule`/`cancel_rule` unchanged). S13c may make it a
+  sticky bar. **Discovery (not mine, non-blocking):** `DraftSettingsViewModelTest.edit_marksDirty_thenDiscardReverts`
+  is flaky under the full suite (DataStore timing) — passes in isolation/on re-run; flagged for a future stabilise.
 
 - **D-071 (S12.9a) — repo hygiene & build integrity landed; two scoped deviations recorded.** All 8 S12.9a
   deliverables done with NO runtime behaviour change (see segment-log row). Deviations / discoveries, none

@@ -255,6 +255,54 @@ private fun RuleEditor(
     val selectedApps = remember { mutableStateOf(rule.triggers.apps?.toSet() ?: emptySet()) }
     var profileMenu by remember { mutableStateOf(false) }
 
+    fun saveRule() {
+        val minPct = battMin.trim().toIntOrNull()?.coerceIn(0, 100)
+        val maxPct = battMax.trim().toIntOrNull()?.coerceIn(0, 100)
+        val hasBattery = charging || minPct != null || maxPct != null
+        val latV = lat.trim().toDoubleOrNull()
+        val lonV = lon.trim().toDoubleOrNull()
+        val radiusV = radius.trim().toDoubleOrNull()
+        val triggers = ContextTriggers(
+            apps = selectedApps.value.takeIf { it.isNotEmpty() }?.toList(),
+            wifi = wifi.split(",").map { it.trim() }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() },
+            battery = if (hasBattery) {
+                BatteryTrigger(
+                    min = minPct ?: 0,
+                    max = maxPct ?: 100,
+                    onPower = if (charging) true else null,
+                )
+            } else {
+                null
+            },
+            location = if (latV != null && lonV != null && radiusV != null && radiusV > 0) {
+                LocationTrigger(lat = latV, lon = lonV, radius = radiusV)
+            } else {
+                null
+            },
+            timeRange = if (startTime.isNotBlank() && endTime.isNotBlank()) listOf(startTime.trim(), endTime.trim()) else null,
+            // All 7 (or none) selected = "every day" → omit (G2R-F67).
+            days = selectedDays.value.takeIf { it.isNotEmpty() && it.size < 7 }?.sorted(),
+        )
+        // Prompt for usage access on save if the rule targets apps and it is not granted.
+        if (triggers.apps != null && !hasUsageAccess()) onRequestUsageAccess()
+        onSave(
+            rule.copy(
+                name = name,
+                profile = profile,
+                priority = priorityText.trim().toIntOrNull() ?: 0,
+                triggers = triggers,
+            ),
+        )
+    }
+
+    // Owner feedback (S12.9f): Save/Cancel are pinned at the TOP of the editor so they are reachable
+    // without scrolling past the (tall) trigger list incl. the foreground-app picker. S13 may turn
+    // this into a sticky bottom action bar during the restyle.
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { saveRule() }, modifier = Modifier.testTag("save_rule")) { Text("Save rule") }
+        TextButton(onClick = onCancel, modifier = Modifier.testTag("cancel_rule")) { Text("Cancel") }
+    }
+
     SectionHeader("Rule")
     OutlinedTextField(
         value = name, onValueChange = { name = it }, label = { Text("Name") },
@@ -400,51 +448,6 @@ private fun RuleEditor(
         }
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-        Button(
-            onClick = {
-                val minPct = battMin.trim().toIntOrNull()?.coerceIn(0, 100)
-                val maxPct = battMax.trim().toIntOrNull()?.coerceIn(0, 100)
-                val hasBattery = charging || minPct != null || maxPct != null
-                val latV = lat.trim().toDoubleOrNull()
-                val lonV = lon.trim().toDoubleOrNull()
-                val radiusV = radius.trim().toDoubleOrNull()
-                val triggers = ContextTriggers(
-                    apps = selectedApps.value.takeIf { it.isNotEmpty() }?.toList(),
-                    wifi = wifi.split(",").map { it.trim() }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() },
-                    battery = if (hasBattery) {
-                        BatteryTrigger(
-                            min = minPct ?: 0,
-                            max = maxPct ?: 100,
-                            onPower = if (charging) true else null,
-                        )
-                    } else {
-                        null
-                    },
-                    location = if (latV != null && lonV != null && radiusV != null && radiusV > 0) {
-                        LocationTrigger(lat = latV, lon = lonV, radius = radiusV)
-                    } else {
-                        null
-                    },
-                    timeRange = if (startTime.isNotBlank() && endTime.isNotBlank()) listOf(startTime.trim(), endTime.trim()) else null,
-                    // All 7 (or none) selected = "every day" → omit (G2R-F67).
-                    days = selectedDays.value.takeIf { it.isNotEmpty() && it.size < 7 }?.sorted(),
-                )
-                // Prompt for usage access on save if the rule targets apps and it is not granted.
-                if (triggers.apps != null && !hasUsageAccess()) onRequestUsageAccess()
-                onSave(
-                    rule.copy(
-                        name = name,
-                        profile = profile,
-                        priority = priorityText.trim().toIntOrNull() ?: 0,
-                        triggers = triggers,
-                    ),
-                )
-            },
-            modifier = Modifier.testTag("save_rule"),
-        ) { Text("Save rule") }
-        TextButton(onClick = onCancel, modifier = Modifier.testTag("cancel_rule")) { Text("Cancel") }
-    }
 }
 
 /**
