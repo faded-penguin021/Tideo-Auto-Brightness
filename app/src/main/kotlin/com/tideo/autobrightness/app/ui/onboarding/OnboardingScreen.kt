@@ -253,7 +253,7 @@ fun OnboardingContent(
                         "service can detect the foreground app."
                 } else {
                     "Only needed if you later add a context rule that switches profiles per app. " +
-                        "You can skip this for now and grant it from the Contexts screen later."
+                        "You can skip this for now and grant it from the Profiles & Contexts screen later."
                 },
                 done = state.usageAccessGranted,
                 actionLabel = "Open usage access",

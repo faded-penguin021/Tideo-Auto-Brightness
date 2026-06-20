@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
@@ -885,6 +886,47 @@ class SettingsScreensTest {
         compose.onNodeWithTag("add_context_rule").performClick()
         compose.onNodeWithTag("end_sunset").performScrollTo()
             .assertTextContains("Sunset (18:30)", substring = true)
+    }
+
+    @Test
+    fun profilesContextsMerge_showsBothSurfaces_andEditsRuleInModal_S12_9f() {
+        // S12.9f (D-070): the merged Profiles & Contexts surface hosts the saved-profiles body AND the
+        // context-rules section; editing a rule opens the full editor in a modal (with all triggers).
+        var savedRule: com.tideo.autobrightness.app.settings.ContextRule? = null
+        val rule = com.tideo.autobrightness.app.settings.ContextRule(
+            id = "r1", name = "Cinema", profile = "Movies",
+            triggers = com.tideo.autobrightness.app.settings.ContextTriggers(wifi = listOf("Home")),
+        )
+        compose.setContent {
+            MaterialTheme {
+                com.tideo.autobrightness.app.ui.components.SettingsColumn(
+                    androidx.compose.foundation.layout.PaddingValues(0.dp),
+                ) {
+                    com.tideo.autobrightness.app.ui.screens.ProfilesBody(
+                        profiles = listOf(SavedProfile("Movies", AabSettings())),
+                        legacyEntries = emptyList(), contextLocked = false, status = null,
+                        onApplyProfile = {}, onOverwriteProfile = {}, onDeleteProfile = {},
+                        onSaveCurrentAs = {}, onRestoreFactory = {}, onResumeContext = {}, onReset = {},
+                        onExport = {}, onImport = {}, onChooseLegacyFolder = {}, onLoadLegacy = {},
+                    )
+                    com.tideo.autobrightness.app.ui.screens.ContextRulesSection(
+                        rules = listOf(rule), profileNames = listOf("Movies"), apps = emptyList(),
+                        onSave = { savedRule = it }, onDelete = {},
+                    )
+                }
+            }
+        }
+
+        // Both surfaces coexist on one screen: a saved profile card and a context-rule card.
+        compose.onNodeWithTag("profile_Movies").performScrollTo().assertExists()
+        compose.onNodeWithTag("rule_r1").performScrollTo().assertExists()
+
+        // Editing the rule opens the editor modal; saving routes back through onSave.
+        compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
+        compose.onNodeWithTag("rule_editor_modal").assertExists()
+        compose.onNodeWithTag("rule_name").performScrollTo().assertExists()
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        assertEquals("Cinema", savedRule?.name, "saving the rule in the modal routes through onSave")
     }
 
     @Test

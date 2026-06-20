@@ -9,14 +9,13 @@ import androidx.navigation.compose.composable
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.ui.onboarding.OnboardingScreen
 import com.tideo.autobrightness.app.ui.screens.CircadianScreen
-import com.tideo.autobrightness.app.ui.screens.ContextsScreen
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessScreen
 import com.tideo.autobrightness.app.ui.screens.DashboardScreen
 import com.tideo.autobrightness.app.ui.screens.LiveDebugScreen
 import com.tideo.autobrightness.app.ui.screens.MenuScreen
 import com.tideo.autobrightness.app.ui.screens.MiscScreen
 import com.tideo.autobrightness.app.ui.screens.PlaceholderScreen
-import com.tideo.autobrightness.app.ui.screens.ProfilesScreen
+import com.tideo.autobrightness.app.ui.screens.ProfilesContextsScreen
 import com.tideo.autobrightness.app.ui.screens.ReactivityScreen
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingScreen
 import com.tideo.autobrightness.app.ui.screens.ToolsScreen
@@ -42,10 +41,10 @@ fun AppNavGraph(
         composable(AppRoute.SuperDimming.route) { SuperDimmingScreen(navController) }
         composable(AppRoute.Circadian.route) { CircadianScreen(navController) }
         composable(AppRoute.Misc.route) { MiscScreen(navController) }
-        composable(AppRoute.Contexts.route) { ContextsScreen(navController) }
         composable(AppRoute.Tools.route) { ToolsScreen(navController) }
         composable(AppRoute.LiveDebug.route) { LiveDebugScreen(navController) }
-        composable(AppRoute.Profiles.route) { ProfilesScreen(navController) }
+        // S12.9f (D-070): Profiles + Contexts merged into one destination.
+        composable(AppRoute.Profiles.route) { ProfilesContextsScreen(navController) }
         // S13-owned:
         composable(AppRoute.About.route) { PlaceholderScreen(AppRoute.About.label, AppRoute.About.owner) }
     }

@@ -41,6 +41,7 @@
     <string name="title_circadian">Circadian</string>
     <string name="title_contexts">Contexts</string>
     <string name="title_profiles_import_export">Profiles &amp; Import/Export</string>
+    <string name="title_profiles_contexts">Profiles &amp; Contexts</string>
     <string name="title_global_flash">Global flash (system-wide)</string>
 
     <!-- Dashboard -->

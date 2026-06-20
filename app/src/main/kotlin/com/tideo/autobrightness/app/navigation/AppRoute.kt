@@ -22,17 +22,18 @@ enum class AppRoute(val route: String, val label: String, val owner: String) {
     // (min/max/offset/scale), animation (steps + min/max wait + throttle), notifications and debug
     // fields live here — they were wrongly scattered onto other screens in S12.
     Misc("misc", "Misc", "S12.5b"),
-    Contexts("contexts", "Contexts", "S12"),
     Tools("tools", "Tools", "S12"),
     // S12.6b (G2R-F6): the AAB Debug scene rebuilt as a glass-box Live Debug Info destination — the
     // live %AAB_* runtime readout + the (now global) debug-category selector, reached from the Menu.
     LiveDebug("live_debug", "Live Debug Info", "S12.6b"),
-    Profiles("profiles", "Profiles & Import/Export", "S12"),
+    // S12.9f (D-070): Profiles + Contexts folded into one destination — saved profiles + their
+    // context rules (rule editing in a modal). Replaces the separate Profiles and Contexts screens.
+    Profiles("profiles", "Profiles & Contexts", "S12.9f"),
     About("about", "About & Guide", "S13");
 
     companion object {
-        /** Profiles + Contexts — surfaced as the Menu's prominent hero cards (moved off the Dashboard). */
-        val heroDestinations: List<AppRoute> = listOf(Profiles, Contexts)
+        /** Profiles & Contexts — the Menu's prominent hero card (one merged destination, S12.9f). */
+        val heroDestinations: List<AppRoute> = listOf(Profiles)
 
         /** The tunable parameter screens — the Menu "Settings" group. */
         val settingsDestinations: List<AppRoute> = listOf(

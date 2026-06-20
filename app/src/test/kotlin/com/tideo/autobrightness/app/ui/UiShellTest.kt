@@ -43,7 +43,7 @@ class UiShellTest {
 
     @Test
     fun menuContent_rendersHeroCardsAndNavigatesEveryDestination() {
-        // S12.6a (G2R-F2): the Profiles + Contexts hero cards live on the Menu hub, not the Dashboard.
+        // S12.9f (D-070): Profiles + Contexts are one merged hero card on the Menu hub.
         var navigated: AppRoute? = null
         var recheck = false
         compose.setContent {
@@ -56,10 +56,8 @@ class UiShellTest {
             }
         }
 
-        compose.onNodeWithTag("hero_profiles").performScrollTo().performClick()
+        compose.onNodeWithTag("hero_profiles_contexts").performScrollTo().performClick()
         assertEquals(AppRoute.Profiles, navigated)
-        compose.onNodeWithTag("hero_contexts").performScrollTo().performClick()
-        assertEquals(AppRoute.Contexts, navigated)
 
         // Every plain nav row (Dashboard + Settings + Info & Help groups) navigates.
         AppRoute.menuNavDestinations.forEach { route ->
@@ -92,7 +90,7 @@ class UiShellTest {
                 MenuContent(activeContext = null, manualOverride = true, onNavigate = {}, onRecheckPermissions = {})
             }
         }
-        compose.onNodeWithText("Manual override active — Resume on Profiles").assertExists()
+        compose.onNodeWithText("Manual override active — open to resume").assertExists()
     }
 
     @Test
@@ -102,6 +100,18 @@ class UiShellTest {
         assertEquals("Super Dimming", AppRoute.SuperDimming.label)
         assertEquals("circadian", AppRoute.Circadian.route)
         assertEquals("Circadian", AppRoute.Circadian.label)
+    }
+
+    @Test
+    fun profilesContextsMerge_oneDestination_noContextsRoute_S12_9f() {
+        // S12.9f (D-070): Profiles + Contexts folded into ONE destination. The standalone Contexts
+        // route is gone and the Menu surfaces a single "Profiles & Contexts" hero destination.
+        assertTrue(
+            AppRoute.entries.none { it.route == "contexts" },
+            "the standalone Contexts route must be removed after the merge",
+        )
+        assertEquals("Profiles & Contexts", AppRoute.Profiles.label)
+        assertEquals(listOf(AppRoute.Profiles), AppRoute.heroDestinations)
     }
 
     @Test
