@@ -106,7 +106,7 @@ fun SuperDimmingContent(
 
             // G2R-F82: the super-dimming + PWM controls shape the lux→dim "Dimming curve" graph above.
             GraphSettingsGroup("Dimming curve") {
-                SectionHeader("Super dimming")
+                SectionHeader("Super dimming", divider = true)
                 if (tier != Tier.ELEVATED) {
                     Text(
                         "Super dimming needs elevated access (WRITE_SECURE_SETTINGS).",
@@ -148,7 +148,7 @@ fun SuperDimmingContent(
                     ErrorBanner("Dimming threshold is below minimum brightness.", "error_dimmingThreshold")
                 }
 
-                SectionHeader("PWM (flicker) handling")
+                SectionHeader("PWM (flicker) handling", divider = true)
                 // Software dimming / PWM-sensitive — no ELEVATED needed (superdimming_settings.md note);
                 // mutually exclusive with super dimming (G2-F10).
                 SwitchSettingRow(
@@ -169,7 +169,7 @@ fun SuperDimmingContent(
             // lux→dim curve, so it is grouped under that graph (matching Tasker). G2-F11: only effective
             // when circadian scaling is on, so the field stays gated on it.
             GraphSettingsGroup("Circadian Dimming") {
-                SectionHeader("Circadian dim spread")
+                SectionHeader("Circadian dim spread", divider = true)
                 NumberSettingField(
                     "Spread (circadian)", draft.dimSpread, { onEdit { s -> s.copy(dimSpread = it.toInt()) } },
                     epoch = epoch, committed = committed.dimSpread,

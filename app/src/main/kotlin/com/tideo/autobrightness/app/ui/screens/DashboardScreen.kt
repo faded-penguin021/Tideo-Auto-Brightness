@@ -32,8 +32,10 @@ import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.state.DashboardUiState
 import com.tideo.autobrightness.app.state.DashboardViewModel
 import com.tideo.autobrightness.app.state.ServiceHealthUiState
+import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.AabTopBar
 import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.app.ui.theme.Dimens
 import com.tideo.autobrightness.app.ui.theme.AabOnGold
 import com.tideo.autobrightness.platform.privilege.Tier
 
@@ -143,28 +145,27 @@ private fun StatusCard(state: DashboardUiState, onToggle: (Boolean) -> Unit) {
         state.paused -> stringResource(R.string.dashboard_status_paused)
         else -> stringResource(R.string.dashboard_status_active)
     }
-    Card {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.dashboard_auto_brightness), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        status,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag("dashboard_status"),
-                    )
-                }
-                Switch(
-                    checked = state.serviceEnabled,
-                    onCheckedChange = onToggle,
-                    modifier = Modifier.testTag("service_switch"),
+    // S13c restyle (m3_audit §3 row 2): the ad-hoc status blocks become uniform `AabCard`s.
+    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.dashboard_auto_brightness), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    status,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("dashboard_status"),
                 )
             }
+            Switch(
+                checked = state.serviceEnabled,
+                onCheckedChange = onToggle,
+                modifier = Modifier.testTag("service_switch"),
+            )
         }
     }
 }
@@ -193,27 +194,24 @@ private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
 
 @Composable
 private fun LightCard(state: DashboardUiState) {
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.dashboard_ambient_light), style = MaterialTheme.typography.labelMedium)
-            Text(
-                "${state.rawLux.fmt()} lux raw · ${state.smoothedLux.fmt()} smoothed",
-                modifier = Modifier.testTag("dashboard_lux"),
-            )
-            Text(
-                stringResource(R.string.dashboard_last_sample, state.lastSampleMs.toRelativeAge()),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("last_sample_age"),
-            )
-        }
+    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldRowPaddingTight)) {
+        Text(stringResource(R.string.dashboard_ambient_light), style = MaterialTheme.typography.labelMedium)
+        Text(
+            "${state.rawLux.fmt()} lux raw · ${state.smoothedLux.fmt()} smoothed",
+            modifier = Modifier.testTag("dashboard_lux"),
+        )
+        Text(
+            stringResource(R.string.dashboard_last_sample, state.lastSampleMs.toRelativeAge()),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("last_sample_age"),
+        )
     }
 }
 
 @Composable
 private fun BrightnessCard(state: DashboardUiState) {
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldRowPaddingTight)) {
             Text(stringResource(R.string.dashboard_brightness), style = MaterialTheme.typography.labelMedium)
             // Gate-2(5th) obs: the pipeline only publishes its state AFTER the animation settles, so the
             // applied and target values are always equal here (mid-animation frames are never surfaced) —
@@ -246,32 +244,27 @@ private fun BrightnessCard(state: DashboardUiState) {
                     modifier = Modifier.testTag("dashboard_dimming"),
                 )
             }
-        }
     }
 }
 
 @Composable
 private fun ContextCard(activeContext: String) {
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.dashboard_active_context), style = MaterialTheme.typography.labelMedium)
-            Text(activeContext, modifier = Modifier.testTag("dashboard_context"))
-        }
+    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldRowPaddingTight)) {
+        Text(stringResource(R.string.dashboard_active_context), style = MaterialTheme.typography.labelMedium)
+        Text(activeContext, modifier = Modifier.testTag("dashboard_context"))
     }
 }
 
 @Composable
 private fun HealthCard(lastSampleMs: Long?, health: ServiceHealthUiState) {
     if (!health.degradedMode) return
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.dashboard_service_health), style = MaterialTheme.typography.labelMedium)
-            Text(
-                stringResource(R.string.dashboard_degraded, health.degradedReason ?: "unknown"),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag("dashboard_degraded"),
-            )
-        }
+    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldRowPaddingTight)) {
+        Text(stringResource(R.string.dashboard_service_health), style = MaterialTheme.typography.labelMedium)
+        Text(
+            stringResource(R.string.dashboard_degraded, health.degradedReason ?: "unknown"),
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.testTag("dashboard_degraded"),
+        )
     }
 }
 

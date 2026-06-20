@@ -28,6 +28,8 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.LegacyConfigEntry
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.changedCount
+import com.tideo.autobrightness.app.ui.components.AabCard
+import com.tideo.autobrightness.app.ui.components.EmptyState
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsDiffList
@@ -157,15 +159,16 @@ fun ProfilesBody(
         }
     }
 
-    SectionHeader("Saved profiles")
+    // S13c restyle (m3_audit §3 row 10): empty hints become `EmptyState`; rows become `AabCard`s.
+    SectionHeader("Saved profiles", divider = true)
     if (profiles.isEmpty()) {
-        Text("No saved profiles yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        EmptyState("No saved profiles yet.", testTag = "empty_profiles")
     }
     profiles.forEach { entry ->
         ProfileCard(entry, onApply = { previewProfile = entry }, onOverwriteProfile, onDeleteProfile)
     }
 
-    SectionHeader("Manage profiles")
+    SectionHeader("Manage profiles", divider = true)
     // G2R-F38: the Tasker dashboard compares active settings vs factory defaults (tuned
     // values shown yellow) — surface the live set with the same gold highlighting.
     OutlinedButton(
@@ -184,7 +187,7 @@ fun ProfilesBody(
         Text("Reset settings to defaults")
     }
 
-    SectionHeader("Import / Export")
+    SectionHeader("Import / Export", divider = true)
     Button(onClick = onExport, modifier = Modifier.fillMaxWidth().testTag("export_profile")) {
         Text("Export current settings…")
     }
@@ -192,7 +195,7 @@ fun ProfilesBody(
         Text("Import a settings file (incl. legacy Tasker)…")
     }
 
-    SectionHeader("Legacy folder (Download/AAB/configs)")
+    SectionHeader("Legacy folder (Download/AAB/configs)", divider = true)
     OutlinedButton(
         onClick = onChooseLegacyFolder,
         modifier = Modifier.fillMaxWidth().testTag("choose_legacy_folder"),
@@ -205,9 +208,9 @@ fun ProfilesBody(
         )
     }
     legacyEntries.forEach { entry ->
-        Card(Modifier.fillMaxWidth().testTag("legacy_${entry.name}")) {
+        AabCard(Modifier.testTag("legacy_${entry.name}")) {
             Row(
-                Modifier.fillMaxWidth().padding(12.dp),
+                Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(entry.name, style = MaterialTheme.typography.bodyMedium)
@@ -255,31 +258,32 @@ private fun ProfileCard(
     onDelete: (String) -> Unit,
 ) {
     val changed = entry.settings.changedCount()
-    Card(Modifier.fillMaxWidth().testTag("profile_${entry.name}")) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                entry.name + if (entry.builtIn) "  (built-in)" else "",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                if (changed == 0) "Factory defaults" else "$changed changed from default",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = onApply,
-                    modifier = Modifier.testTag("apply_profile_${entry.name}"),
-                ) { Text("Apply") }
-                OutlinedButton(
-                    onClick = { onOverwrite(entry.name) },
-                    modifier = Modifier.testTag("overwrite_profile_${entry.name}"),
-                ) { Text("Overwrite") }
-                TextButton(
-                    onClick = { onDelete(entry.name) },
-                    modifier = Modifier.testTag("delete_profile_${entry.name}"),
-                ) { Text("Delete") }
-            }
+    AabCard(
+        Modifier.testTag("profile_${entry.name}"),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            entry.name + if (entry.builtIn) "  (built-in)" else "",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            if (changed == 0) "Factory defaults" else "$changed changed from default",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = onApply,
+                modifier = Modifier.testTag("apply_profile_${entry.name}"),
+            ) { Text("Apply") }
+            OutlinedButton(
+                onClick = { onOverwrite(entry.name) },
+                modifier = Modifier.testTag("overwrite_profile_${entry.name}"),
+            ) { Text("Overwrite") }
+            TextButton(
+                onClick = { onDelete(entry.name) },
+                modifier = Modifier.testTag("delete_profile_${entry.name}"),
+            ) { Text("Delete") }
         }
     }
 }

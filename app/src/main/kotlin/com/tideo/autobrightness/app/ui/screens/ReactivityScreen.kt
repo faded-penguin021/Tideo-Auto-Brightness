@@ -11,6 +11,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
+import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.ChartPager
 import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.DraftSettingsScaffold
@@ -91,7 +92,7 @@ fun ReactivityContent(
             // (S12.6e, G2R-F19/F20/F21). The threshold fields are %aab_thresh*pc reactivity levels.
             // G2R-F82: grouped + labelled by the graph they feed (the reactivity curve).
             GraphSettingsGroup("Reactivity curve") {
-                SectionHeader("Smoothing thresholds")
+                SectionHeader("Smoothing thresholds", divider = true)
                 NumberSettingField(
                     "Dark threshold", draft.thresholdDark, { onEdit { s -> s.copy(thresholdDark = it.toFloat()) } },
                     epoch = epoch, committed = committed.thresholdDark, isInt = false,
@@ -127,7 +128,7 @@ fun ReactivityContent(
             // "Smoothing Δ"): luxAlpha = 1 - exp(-deltaFactor·effectiveDelta) in BrightnessEngine — the
             // binding was already correct, only the label/help were wrong. Fixed to the verbatim help.
             GraphSettingsGroup("Smoothing α") {
-                SectionHeader("Sensor smoothing")
+                SectionHeader("Sensor smoothing", divider = true)
                 NumberSettingField(
                     "Smoothing Δ", draft.deltaFactor, { onEdit { s -> s.copy(deltaFactor = it.toFloat()) } },
                     epoch = epoch, committed = committed.deltaFactor, isInt = false,
@@ -135,20 +136,23 @@ fun ReactivityContent(
                 )
             }
 
-            SectionHeader("Override & trust")
-            // task525/526 _OverrideToggle — DetectOverrides (Gate-1 G1-F2 deferral, surfaced in S12).
-            SwitchSettingRow(
-                "Use override detection", draft.detectOverrides,
-                { onEdit { s -> s.copy(detectOverrides = it) } },
-                help = TaskerHelp.DETECT_OVERRIDES,
-                testTag = "switch_detectOverrides",
-            )
-            SwitchSettingRow(
-                "Trust low-accuracy sensor", draft.trustUnreliableSensor,
-                { onEdit { s -> s.copy(trustUnreliableSensor = it) } },
-                help = TaskerHelp.TRUST_UNRELIABLE,
-                testTag = "switch_trustUnreliableSensor",
-            )
+            // S13c restyle (m3_audit §3 row 4): the trailing bare switch stack is grouped into an `AabCard`.
+            AabCard {
+                SectionHeader("Override & trust", divider = true)
+                // task525/526 _OverrideToggle — DetectOverrides (Gate-1 G1-F2 deferral, surfaced in S12).
+                SwitchSettingRow(
+                    "Use override detection", draft.detectOverrides,
+                    { onEdit { s -> s.copy(detectOverrides = it) } },
+                    help = TaskerHelp.DETECT_OVERRIDES,
+                    testTag = "switch_detectOverrides",
+                )
+                SwitchSettingRow(
+                    "Trust low-accuracy sensor", draft.trustUnreliableSensor,
+                    { onEdit { s -> s.copy(trustUnreliableSensor = it) } },
+                    help = TaskerHelp.TRUST_UNRELIABLE,
+                    testTag = "switch_trustUnreliableSensor",
+                )
+            }
         }
     }
 }

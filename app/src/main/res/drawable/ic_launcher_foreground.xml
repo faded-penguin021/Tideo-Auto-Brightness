@@ -1,15 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tideo Auto Brightness launcher mark (S13c). A modern rebuild of the Tasker `_CreateLogo` art (a
+  sun whose rays contain a faded brightness slider) on the app's teal+gold brand: a gold sun disc +
+  rays over a faded white brightness slider, reading as "automatic brightness". Kept within the
+  adaptive-icon safe zone (≈ centre 66dp); short stroked paths so lint VectorPath stays quiet.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Sun disc (AabGold #FFC107). -->
+    <path
+        android:fillColor="#FFFFC107"
+        android:pathData="M54,31 A15,15 0 1,1 53.99,31 Z" />
+
+    <!-- Eight sun rays (AabGold), round-capped. -->
+    <path
+        android:strokeColor="#FFFFC107"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M54,27 L54,21 M54,65 L54,71 M73,46 L79,46 M35,46 L29,46
+            M67.4,32.6 L71.7,28.3 M40.6,32.6 L36.3,28.3
+            M67.4,59.4 L71.7,63.7 M40.6,59.4 L36.3,63.7" />
+
+    <!-- Brightness slider track — faded white, the Tasker "slider in the rays" motif. -->
+    <path
+        android:strokeColor="#59FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M34,82 L74,82" />
+    <!-- Filled (active) portion up to the knob, solid white. -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M34,82 L56,82" />
+    <!-- Slider knob. -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M54,24 A30,30 0 1,1 53.999,24 Z
-            M54,36 A18,18 0 1,0 54.001,36 Z
-            M54,14 L54,20 M54,88 L54,94
-            M14,54 L20,54 M88,54 L94,54
-            M25.51,25.51 L29.75,29.75 M78.25,78.25 L82.49,82.49
-            M82.49,25.51 L78.25,29.75 M29.75,78.25 L25.51,82.49" />
+        android:pathData="M56,76 A6,6 0 1,1 55.99,76 Z" />
 </vector>

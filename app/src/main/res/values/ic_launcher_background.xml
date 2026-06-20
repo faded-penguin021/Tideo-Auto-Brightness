@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher icon background — the AAB brand teal (AabTeal #007C63), replacing the generic indigo
+     so the adaptive icon matches the in-app teal+gold identity (S13c logo refresh). -->
 <resources>
-    <color name="ic_launcher_background">#FF1A237E</color>
+    <color name="ic_launcher_background">#FF007C63</color>
 </resources>

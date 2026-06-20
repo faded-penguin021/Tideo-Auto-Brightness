@@ -7,6 +7,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.tideo.autobrightness.app.AppModule
+import com.tideo.autobrightness.app.ui.components.AabMotion
 import com.tideo.autobrightness.app.ui.onboarding.OnboardingScreen
 import com.tideo.autobrightness.app.ui.screens.CircadianScreen
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessScreen
@@ -32,7 +33,15 @@ fun AppNavGraph(
     navController: NavHostController,
     startDestination: String = rememberStartDestination(),
 ) {
-    NavHost(navController = navController, startDestination = startDestination) {
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        // S13c (m3_audit §4 "No motion"): consistent screen enter/exit via the S13b motion helpers.
+        enterTransition = { AabMotion.screenEnter },
+        exitTransition = { AabMotion.screenExit },
+        popEnterTransition = { AabMotion.screenEnter },
+        popExitTransition = { AabMotion.screenExit },
+    ) {
         composable(AppRoute.Menu.route) { MenuScreen(navController) }
         composable(AppRoute.Dashboard.route) { DashboardScreen(navController) }
         composable(AppRoute.Onboarding.route) { OnboardingScreen(navController) }

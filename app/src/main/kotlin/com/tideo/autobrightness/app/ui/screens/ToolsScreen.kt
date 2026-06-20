@@ -1,11 +1,8 @@
 package com.tideo.autobrightness.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -25,6 +22,7 @@ import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.state.SettingsViewModel
+import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
@@ -79,14 +77,17 @@ fun ToolsContent(
         SettingsColumn(padding) {
             WizardCard(recordedPoints, onRunWizard, onApplyWizard, onPreviewGraph)
 
-            SectionHeader("Power-draw calibration")
-            Text(
-                "Measures screen power across brightness levels to build the power-draw chart. " +
-                    "On-device calibration (battery-current sampling) runs at Gate 2/3.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ChartPlaceholder("PowerDrawChart", "power_draw_chart")
+            // S13c restyle (m3_audit §3 row 8): each tool is its own `AabCard` with a clear title.
+            AabCard {
+                SectionHeader("Power-draw calibration", divider = true)
+                Text(
+                    "Measures screen power across brightness levels to build the power-draw chart. " +
+                        "On-device calibration (battery-current sampling) runs at Gate 2/3.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ChartPlaceholder("PowerDrawChart", "power_draw_chart")
+            }
         }
     }
 }
@@ -105,8 +106,7 @@ private fun WizardCard(
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
 
-    Card(Modifier.fillMaxWidth().testTag("wizard_card")) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AabCard(Modifier.testTag("wizard_card")) {
             Text("Curve suggestion wizard", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Fits a brightness curve to your recorded manual overrides (needs ≥ 9 points).",
@@ -138,12 +138,11 @@ private fun WizardCard(
                 // The full Tasker-style %AAB_Test diagnostics report (zone boundaries, curve params,
                 // per-zone R²/nRMSE/bias, fit stability) — the engine already produces it verbatim, so
                 // surface ALL of it, not just the 4-line summary (owner finding: report too terse).
-                Card(Modifier.fillMaxWidth().testTag("wizard_report")) {
+                AabCard(Modifier.testTag("wizard_report")) {
                     Text(
                         r.diagnosticsLog.trim(),
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        modifier = Modifier.padding(12.dp),
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -167,6 +166,5 @@ private fun WizardCard(
                     ) { Text("Copy full report") }
                 }
             }
-        }
     }
 }
