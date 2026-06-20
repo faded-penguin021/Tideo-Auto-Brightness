@@ -47,6 +47,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val dimmingStrength: Double,
         val throttleMs: Long?,
         val context: String?,
+        val profile: String?,
         val lastSampleMs: Long?,
         val stale: Boolean,
     )
@@ -56,11 +57,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         LiveRuntimeState.activeContext,
         LiveRuntimeState.serviceRunning,
         LiveRuntimeState.staleness(),
-    ) { p, ctx, running, staleness ->
+        LiveRuntimeState.activeProfile,
+    ) { p, ctx, running, staleness, profile ->
         Live(
             running, p.paused, p.pausedByOverride, p.lastRawLux, p.smoothedLux,
             p.lastAppliedBrightness, p.targetBrightness, p.scaleDynamicCompress, p.dimmingCurrent,
-            p.throttleMs, ctx, p.lastSampleMs, staleness == Staleness.STALE,
+            p.throttleMs, ctx, profile, p.lastSampleMs, staleness == Staleness.STALE,
         )
     }
 
@@ -93,6 +95,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             dimmingStrength = live.dimmingStrength,
             throttleMs = live.throttleMs,
             activeContext = live.context,
+            activeProfile = live.profile,
             lastSampleMs = live.lastSampleMs,
             stale = live.stale,
             health = health,

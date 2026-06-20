@@ -29,6 +29,9 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.rememberToaster
+import com.tideo.autobrightness.app.ui.graph.CircadianDimmingChart
+import com.tideo.autobrightness.app.ui.graph.DimmingChart
+import com.tideo.autobrightness.app.settings.toDynamicScalingConfig
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /**
@@ -93,10 +96,19 @@ fun SuperDimmingContent(
             ChartPager(
                 listOf(
                     ChartSlot("Dimming curve", "dimming_chart") {
-                        ChartPlaceholder("DimmingChart", "dimming_chart")
+                        DimmingChart(
+                            minBrightness = draft.minBrightness,
+                            dimmingThreshold = draft.dimmingThreshold,
+                            dimmingExponent = draft.dimmingExponent.toDouble(),
+                            dimmingStrength = draft.dimmingStrength,
+                            modifier = Modifier.testTag("dimming_chart"),
+                        )
                     },
                     ChartSlot("Circadian Dimming", "circadian_dimming_chart") {
-                        ChartPlaceholder("CircadianDimmingChart", "circadian_dimming_chart")
+                        CircadianDimmingChart(
+                            draft.toDynamicScalingConfig(),
+                            Modifier.testTag("circadian_dimming_chart"),
+                        )
                     },
                 ),
             )

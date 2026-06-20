@@ -22,10 +22,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 /**
- * One swipeable chart page in a [ChartPager] (G2R-F81). [content] is the actual chart composable;
- * S12 passes the deferred [com.tideo.autobrightness.app.ui.screens.ChartPlaceholder], and **S13
- * swaps in the real chart** for the same `title`/`testTag` without touching the pager or the host
- * screen. Keeping the slot list here is the single coordination point promised to S13.
+ * One swipeable chart page in a [ChartPager] (G2R-F81). [content] is the actual chart composable.
+ * S12 passed a deferred placeholder here; **S13d swapped in the real charts** (the `ui.graph` chart
+ * composables) for the same `title`/`testTag` without touching the pager or the host screen. The slot
+ * list is the single coordination point between the host screens and the chart library.
  */
 class ChartSlot(
     val title: String,

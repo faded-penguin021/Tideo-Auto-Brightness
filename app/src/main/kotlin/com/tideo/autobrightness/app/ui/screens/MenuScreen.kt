@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
@@ -115,6 +116,7 @@ fun MenuContent(
             AabCard {
                 MenuNavRow(AppRoute.Tools, Icons.Filled.Build, onNavigate)
                 MenuNavRow(AppRoute.LiveDebug, Icons.Filled.Search, onNavigate)
+                MenuNavRow(AppRoute.UserGuide, Icons.AutoMirrored.Filled.List, onNavigate)
                 MenuNavRow(AppRoute.About, Icons.Filled.Info, onNavigate)
                 NavRow(
                     "Recheck Permissions", onRecheckPermissions,

@@ -54,6 +54,20 @@ object LiveRuntimeState {
     private val _manualOverride = MutableStateFlow(false)
     val manualOverride: StateFlow<Boolean> = _manualOverride.asStateFlow()
 
+    /**
+     * `%AAB_CurrentActiveProfile` — the name of the profile currently in force, set when the user
+     * loads one manually (SettingsViewModel) or a context rule loads one (ContextEngine). Distinct from
+     * [activeContext] (the matching rule's name) so the Dashboard can show both "Profile: X" and the
+     * context that selected it. In-memory like [activeContext]; cleared on [reset].
+     */
+    private val _activeProfile = MutableStateFlow<String?>(null)
+    val activeProfile: StateFlow<String?> = _activeProfile.asStateFlow()
+
+    /** Publish the active profile name (manual or context-driven load). */
+    fun setActiveProfile(name: String?) {
+        _activeProfile.value = name
+    }
+
     /** True while a foreground service instance is publishing (i.e. the loop is alive). */
     private val _serviceRunning = MutableStateFlow(false)
     val serviceRunning: StateFlow<Boolean> = _serviceRunning.asStateFlow()
@@ -93,5 +107,6 @@ object LiveRuntimeState {
         _activeContext.value = null
         _manualOverride.value = false
         _serviceRunning.value = false
+        _activeProfile.value = null
     }
 }

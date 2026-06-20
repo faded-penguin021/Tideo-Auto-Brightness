@@ -149,12 +149,13 @@ private fun BrightnessTrack(applied: Int?, target: Int?, enabled: Boolean) {
 /** Status pill: a teal/gold/red dot + the existing status string (tagged `dashboard_status`). */
 @Composable
 private fun StatusPill(state: DashboardUiState) {
+    // Compact labels so the pill never wraps next to the "APPLIED BRIGHTNESS" caption (owner feedback).
     val (label, dot) = when {
-        !state.serviceEnabled -> stringResource(R.string.dashboard_status_off) to MaterialTheme.colorScheme.error
-        !state.serviceRunning -> stringResource(R.string.dashboard_status_starting) to MaterialTheme.colorScheme.secondary
-        state.pausedByOverride -> stringResource(R.string.dashboard_status_paused_override) to MaterialTheme.colorScheme.secondary
-        state.paused -> stringResource(R.string.dashboard_status_paused) to MaterialTheme.colorScheme.secondary
-        else -> stringResource(R.string.dashboard_status_active) to MaterialTheme.colorScheme.tertiary
+        !state.serviceEnabled -> stringResource(R.string.dashboard_pill_off) to MaterialTheme.colorScheme.error
+        !state.serviceRunning -> stringResource(R.string.dashboard_pill_starting) to MaterialTheme.colorScheme.secondary
+        state.pausedByOverride -> stringResource(R.string.dashboard_pill_override) to MaterialTheme.colorScheme.secondary
+        state.paused -> stringResource(R.string.dashboard_pill_paused) to MaterialTheme.colorScheme.secondary
+        else -> stringResource(R.string.dashboard_pill_active) to MaterialTheme.colorScheme.tertiary
     }
     Row(
         modifier = Modifier
@@ -170,6 +171,8 @@ private fun StatusPill(state: DashboardUiState) {
             label,
             style = AabDataCaption,
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.testTag("dashboard_status"),
         )
     }

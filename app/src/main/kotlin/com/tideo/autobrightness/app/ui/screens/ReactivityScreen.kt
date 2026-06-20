@@ -4,6 +4,8 @@ import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -22,6 +24,9 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.rememberToaster
+import com.tideo.autobrightness.app.ui.graph.AlphaResponseChart
+import com.tideo.autobrightness.app.ui.graph.ReactivityChart
+import com.tideo.autobrightness.app.settings.toThresholdConfig
 
 /** Reactivity (Tasker AAB Reactivity Settings + Reactivity/Alpha graphs). Draft → Apply (S12.5b). */
 @Composable
@@ -77,10 +82,10 @@ fun ReactivityContent(
             ChartPager(
                 listOf(
                     ChartSlot("Reactivity curve", "reactivity_chart") {
-                        ChartPlaceholder("ReactivityChart", "reactivity_chart")
+                        ReactivityChart(draft.toThresholdConfig(), Modifier.testTag("reactivity_chart"))
                     },
                     ChartSlot("Smoothing α", "alpha_chart") {
-                        ChartPlaceholder("AlphaChart", "alpha_chart")
+                        AlphaResponseChart(draft.deltaFactor.toDouble(), Modifier.testTag("alpha_chart"))
                     },
                 ),
             )

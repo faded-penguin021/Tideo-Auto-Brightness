@@ -80,16 +80,16 @@ filled by S1/S2 during extraction.
 | AAB Debug Scene | L2583 | LiveDebug | ported (S12.6b — rebuilt as the dedicated **Live Debug Info** scene: glass-box %AAB_* readout grouped per the debug.md HTML cards + the now-global 10-label debug selector, G2R-F6/F9; S12.5c selector drives runtime debug toasts G2-F15; %AAB_Test wizard report→clipboard stays on Tools, which keeps wizard + calibration entry; **S12.6e**: Performance & Timings card reaches Tasker parity — luxAlpha/cycle/throttle/last-animation(steps×wait)/last-update, G2R-F29) |
 | AAB Color Filter | L2552 | Super Dimming | ported (S12 — PWM-sensitive + exponent rows; **S12.7e** surfaces the computed overlay hex via the `OVERLAY_PREVIEW` debug flash on the unprivileged fallback, G2R-F49; the actual overlay window still deferred, D-040) |
 | AAB Brightness Graph | L1202 | Curve & Brightness (BrightnessCurveChart) | ported (S12 — BrightnessCurveChart = chart template; ChartCanvas engine; **S12.7g**: log-x from 0.1 + nice y-ticks + axis labels (F55), interactive scrub readout (F55), Reference/Curve legend (F66), FIXED dashed-gold committed reference (F69), wizard fit on the curve view ≥9 pts (F62), tap-to-delete override points (F36); **S12.8c**: the Tools wizard now gates on ≥9 **real** recorded points too (no ghost-prior inflation), F62) |
-| AAB Alpha Graph | L1038 | Reactivity (alpha overlay) | partial (S12 host slot → S12.8b `ChartPager` above settings, swipe; chart render S13) |
-| AAB Reactivity Graph | L6563 | Reactivity (ReactivityChart) | partial (S12 host slot → S12.8b `ChartPager` above settings, swipe; chart render S13) |
-| AAB Dimming Graph | L3006 | Super Dimming (DimmingChart) | partial (S12 host slot → S12.8b `ChartPager` above settings, swipe; chart render S13) |
-| AAB Circadian Dimming Graph | L2388 | Super Dimming (CircadianChart; re-homed S3.5/D-026, visible only when %AAB_ScalingUse on) | partial (S12 host slot → S12.8b `ChartPager` above settings, swipe; chart render S13) |
-| AAB Taper Graph | L8387 | Circadian (TaperChart) | partial (S12 host slot → S12.8b `ChartPager` above settings, swipe; chart render S13) |
-| AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | partial (S12 host slot; chart + on-device calibration S13/Gate) |
-| AAB Experiment Graph | L3170 | Circadian (ExperimentChart) | partial (S12 host slot → S12.8b `ChartPager` above settings, swipe; chart render S13) |
-| AAB About | L799 | About+Guide+Onboarding | partial (S11 — onboarding/privilege stepper done; About content S13) |
-| AAB User Guide | L8551 | About+Guide+Onboarding | partial (S11 — onboarding done; User Guide content S13) |
-| AAB Chart.Js License | L2194 | dropped(Chart.js removed) | pending (S2 extracted) |
+| AAB Alpha Graph | L1038 | Reactivity (alpha overlay) | ported (S13d — `AlphaResponseChart` = `1−exp(−deltaFactor·delta)` vs ref 1.8 over log delta, on `ChartCanvas`; fills the `alpha_chart` ChartSlot) |
+| AAB Reactivity Graph | L6563 | Reactivity (ReactivityChart) | ported (S13d — `ReactivityChart` samples `BrightnessEngine.dynamicThreshold×100` vs hardcoded ref over log lux; fills `reactivity_chart`) |
+| AAB Dimming Graph | L3006 | Super Dimming (DimmingChart) | ported (S13d — `DimmingChart` = `SoftwareDimming.dimProgress×100` + dim-shell + ref `pow(1−b/15,2.5)` over brightness; fills `dimming_chart`) |
+| AAB Circadian Dimming Graph | L2388 | Super Dimming (CircadianChart; re-homed S3.5/D-026, visible only when %AAB_ScalingUse on) | ported (S13d — `CircadianDimmingChart` plots `DynamicScaleEngine.dimDynamic` over the day via `SolarCalculator` windows; fills `circadian_dimming_chart`) |
+| AAB Taper Graph | L8387 | Circadian (TaperChart) | ported (S13d — `TaperChart` = `BrightnessEngine.compressedDynamicScale.effectiveScale` for day/night spread over brightness; fills `taper_chart`) |
+| AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | ported (S13d — `PowerDrawChart` renders measured power/current via `ChartCanvas`, EmptyState until on-device calibration runs (D-044/Gate); fills `power_draw_chart`) |
+| AAB Experiment Graph | L3170 | Circadian (ExperimentChart) | ported (S13d — `CircadianScaleChart` plots `DynamicScaleEngine.scaleDynamic` over the day; fills `dynamic_scale_chart`) |
+| AAB About | L799 | About+Guide+Onboarding | ported (S13d — `AboutScreen`: banner + intro + acknowledgments + MIT license, app version; Chart.js ack dropped) |
+| AAB User Guide | L8551 | About+Guide+Onboarding | ported (S13d — `UserGuideScreen`: 9-section manual in M3 cards; post-onboarding first-run destination, G2R-F80) |
+| AAB Chart.Js License | L2194 | dropped(Chart.js removed) | dropped(Chart.js removed — S13d; native Compose charts, no Chart.js) |
 
 ## Java blocks (40, anchors verified — see XML_RECIPES.md R7 for the full line↔task table)
 
@@ -105,10 +105,10 @@ filled by S1/S2 during extraction.
 | task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | BrightnessEngine.dynamicThreshold (S5) | ported |
 | task546 L16481 · Set Thresholds | ✓ S1 | ✓ S4 | BrightnessEngine.absoluteThresholds (S5) | ported |
 | task548 L16630 · DR Compressed Scale | ✓ S1 | ✓ S4 | BrightnessEngine.compressedDynamicScale (S5) | ported |
-| task549 L17138 · _GenerateCircadianGraph | ✓ S1 | | | pending |
+| task549 L17138 · _GenerateCircadianGraph | ✓ S1 | | ui/graph/ExperimentChart.kt `CircadianScaleChart` (S13d — `DynamicScaleEngine.scaleDynamic` over the day) | ported (chart render S13d) |
 | task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | BrightnessEngine.kt ingest (S5) | ported |
-| task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | | pending |
-| task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | | pending |
+| task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | ui/graph/DimmingChart.kt (S13d — `SoftwareDimming.dimProgress`/dim-shell) | ported (chart render S13d) |
+| task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | ui/graph/ReactivityChart.kt `AlphaResponseChart` (S13d) | ported (chart render S13d) |
 | task563 L19677 · _AskPermissionsV7 | ✓ S1 | | app/ui/onboarding/OnboardingScreen.kt — notifications → WRITE_SETTINGS → Location → ELEVATED → usage; S12.7d adds restricted-settings hint (F33) + Location step (F41) + Menu landing (F57) | ported (onboarding gates) |
 | task592 L24132 · _CreateDefaultProfiles | ✓ S1 | | | pending |
 | task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | ✓ S4 | InitialBrightness.kt (S5) | ported |
@@ -123,10 +123,10 @@ filled by S1/S2 during extraction.
 | task637 L29303 · _ProfileManager | ✓ S1 | | | pending |
 | task643 L30505 · _LearnWriteSecure | ✓ S1 | | | pending |
 | task655 L32591 · _SetSuggestedVariables | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.applyToLiveCurve (S6) | ported |
-| task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | | pending |
+| task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | ui/graph/TaperChart.kt (S13d — `BrightnessEngine.compressedDynamicScale.effectiveScale`) | ported (chart render S13d) |
 | task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 (cross-validation oracle, D-002) | chart render = S13 BrightnessCurveChart | reference (chart S13) |
 | task696 L35733 · Smooth Brightness Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner (S9a); S12.7a ports the REAL band+2-read-debounce override detector (java L49-56/L121-137) replacing the exact-match self-write check (F34, D-054) | ported |
 | task698 L36043 · Smooth DC-Like Transition | ✓ S1 | ✓ S4 | runtime/AnimationRunner brightness path (S9a); S9b wires the ELEVATED secure-dimming layer (task646/650/645 via SuperDimmingCoordinator); S12.6c adds the **PWM-sensitive hardware floor** (step 3: clamp hardware up to dimmingThreshold, G2R-F27/D-050); DC-like unprivileged overlay still deferred (D-040) | ported (brightness + secure dimming + PWM hardware floor; overlay deferred) |
-| task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | | pending |
-| task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | | pending |
+| task703 L36847 · _GenerateReactivityGraph | ✓ S1 | | ui/graph/ReactivityChart.kt (S13d — `BrightnessEngine.dynamicThreshold×100`) | ported (chart render S13d) |
+| task705 L37517 · _GenerateCircadianDimmingGraph | ✓ S1 | | ui/graph/CircadianChart.kt `CircadianDimmingChart` (S13d — `DynamicScaleEngine.dimDynamic`) | ported (chart render S13d) |
 | task90 L40429+L41085 · Dynamic Scale V13 (×2) | ✓ S1 | ✓ S6 (delegate) | SolarCalculator.kt + DynamicScaleEngine.kt (S6); **S12.8d**: act5–41 location-acquisition chain ported (CircadianWindowProvider + GeoIpLocationClient: once-a-day, skip-when-fixed, ip-api.com fallback, F83) | ported |
