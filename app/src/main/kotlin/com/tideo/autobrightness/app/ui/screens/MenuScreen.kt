@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.navigation.AppRoute
@@ -42,6 +41,7 @@ import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.ui.components.AabMenuBanner
 import com.tideo.autobrightness.app.ui.components.AabSectionLabel
 import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.app.ui.theme.Dimens
 
 /**
  * The AAB **Menu** home screen (S12.6a, G2R-F1/F2): the Compose rebuild of the Tasker AAB Menu scene
@@ -78,8 +78,11 @@ fun MenuContent(
     ) {
         AabMenuBanner()
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(
+                horizontal = Dimens.screenPaddingHorizontal,
+                vertical = Dimens.screenPaddingVertical,
+            ),
+            verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing),
         ) {
             // Live status — the former start destination, now reached from the hub.
             MenuNavRow(AppRoute.Dashboard, Icons.Filled.Home, onNavigate)
@@ -152,9 +155,9 @@ private fun MenuHeroCard(
         ),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(Dimens.heroCardPadding),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.rowGapWide),
         ) {
             Icon(icon, contentDescription = null, tint = AabGold)
             Column {
