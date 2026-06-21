@@ -12,8 +12,8 @@ import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
  * the brightness-scaling multiplier across the day (`scaled_value = 1 + (spread/100)·modifier` = the
  * engine's `scaleDynamic`), highest by day — the inverse of the Circadian Dimming graph.
  *
- * Shares [circadianDaySamples] / [DynamicScaleEngine] with [CircadianDimmingChart]; this instance just
- * picks the scale series instead of the dim series, per the [BrightnessCurveChart] template recipe.
+ * Shares [circadianCurve] / [DynamicScaleEngine] with [CircadianDimmingChart]; this instance picks the
+ * scale series and runs in the same UTC time-of-day frame with the five sun-event lines.
  */
 @Composable
 fun CircadianScaleChart(
@@ -23,21 +23,23 @@ fun CircadianScaleChart(
     longitude: Double? = null,
     dateEpochSec: Long = System.currentTimeMillis() / 1000L,
 ) {
-    val tz = remember(dateEpochSec) { deviceTzOffsetHours(dateEpochSec) }
-    val points = remember(scaling, latitude, longitude, dateEpochSec, tz) {
-        circadianDaySamples(scaling, latitude, longitude, dateEpochSec, tz, pickScale = true)
+    val curve = remember(scaling, latitude, longitude, dateEpochSec) {
+        circadianCurve(scaling, latitude, longitude, dateEpochSec, pickScale = true)
     }
-    val yMin = (points.minOf { it.y } - 0.05f)
-    val yMax = (points.maxOf { it.y } + 0.05f)
+    val yMin = curve.points.minOf { it.y } - 0.05f
+    val yMax = curve.points.maxOf { it.y } + 0.05f
+    val eventColor = MaterialTheme.colorScheme.outline
 
     ChartCanvas(
-        series = listOf(ChartSeries("Scale ×", points, MaterialTheme.colorScheme.primary)),
+        series = listOf(ChartSeries("Scale ×", curve.points, MaterialTheme.colorScheme.primary)),
         xRange = 0f..24f,
         yRange = yMin..yMax,
-        markers = listOf(ChartMarker(color = MaterialTheme.colorScheme.outline, y = 1f)),
-        xAxisLabel = "Hour",
+        markers = eventMarkers(curve.events, eventColor) +
+            ChartMarker(color = MaterialTheme.colorScheme.outlineVariant, y = 1f),
+        xAxisLabel = "Time of day (UTC)",
         yAxisLabel = "Scale ×",
-        interactive = true,
+        xTickFormatter = ::hourToHhmm,
+        interactive = false, // allow the ChartPager to swipe
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

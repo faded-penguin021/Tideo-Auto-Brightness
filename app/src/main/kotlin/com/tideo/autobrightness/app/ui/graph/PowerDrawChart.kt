@@ -53,7 +53,7 @@ fun PowerDrawChart(
         xAxisLabel = "Brightness",
         yAxisLabel = "Power (W)",
         showLegend = true,
-        interactive = true,
+        interactive = false, // allow the ChartPager to swipe
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

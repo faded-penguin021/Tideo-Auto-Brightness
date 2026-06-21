@@ -4,7 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.app.ui.theme.AabChartBlue
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 
@@ -48,8 +48,9 @@ fun TaperChart(
     val yMin = ys.min() - 0.05f
     val yMax = ys.max() + 0.05f
 
+    // Day = primary teal, Night = blue (gold is reserved for reference lines, Tasker convention).
     val series = listOf(
-        ChartSeries("Night", nightPoints, AabGold, strokeWidthPx = 3f),
+        ChartSeries("Night", nightPoints, AabChartBlue, strokeWidthPx = 3f),
         ChartSeries("Day", dayPoints, MaterialTheme.colorScheme.primary),
     )
 
@@ -61,7 +62,7 @@ fun TaperChart(
         xAxisLabel = "Brightness",
         yAxisLabel = "Scale ×",
         showLegend = true,
-        interactive = true,
+        interactive = false, // allow the ChartPager to swipe
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

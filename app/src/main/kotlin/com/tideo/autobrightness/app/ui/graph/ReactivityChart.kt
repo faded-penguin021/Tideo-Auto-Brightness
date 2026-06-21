@@ -48,20 +48,28 @@ fun ReactivityChart(
         threshSteepness = 2.1, threshMidpoint = 4.0, zone1End = 35.0,
     )
 
+    val curvePoints = sample(threshold)
+    val referencePoints = sample(referenceCfg)
     val series = listOf(
-        ChartSeries("Reference", sample(referenceCfg), AabGold, strokeWidthPx = 3f, dashed = true),
-        ChartSeries("Curve", sample(threshold), MaterialTheme.colorScheme.primary),
+        ChartSeries("Reference", referencePoints, AabGold, strokeWidthPx = 3f, dashed = true),
+        ChartSeries("Curve", curvePoints, MaterialTheme.colorScheme.primary),
     )
+
+    // Dynamic y-axis: reactivity thresholds top out well below 100 % (≈8–35 %), so a fixed 0–100 axis
+    // wasted most of the height — frame to the data (rounded up, min 1) keeping the 0 baseline.
+    val yMax = ((curvePoints + referencePoints).maxOf { it.y } * 1.2f).coerceAtLeast(1f)
 
     ChartCanvas(
         series = series,
         xRange = minLux..maxLux,
-        yRange = 0f..100f,
+        yRange = 0f..yMax,
         xScale = AxisScale.Log10,
         xAxisLabel = "Lux",
         yAxisLabel = "Threshold %",
         showLegend = true,
-        interactive = true,
+        // No interactive scrub: it captured horizontal drags and blocked the ChartPager swipe between
+        // graphs. The y-axis ticks give read-off precision instead.
+        interactive = false,
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -105,7 +113,7 @@ fun AlphaResponseChart(
         xAxisLabel = "Lux change",
         yAxisLabel = "Alpha",
         showLegend = true,
-        interactive = true,
+        interactive = false, // allow the ChartPager to swipe
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

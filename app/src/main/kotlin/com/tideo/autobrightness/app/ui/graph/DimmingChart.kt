@@ -51,21 +51,28 @@ fun DimmingChart(
         referencePoints += Offset(b, ref.toFloat())
     }
 
+    // Tasker's dimming graph has TWO y-axes (dimming_graph.md): LEFT = dim progress % (the user curve +
+    // the gold reference); RIGHT = the dim-shell magnitude (strength × progress, a different unit). The
+    // reference is ALWAYS the gold line (Tasker convention, user_guide.md §8).
     val series = listOf(
-        ChartSeries("Reference", referencePoints, AabChartBlue, strokeWidthPx = 2f, dashed = true),
-        ChartSeries("Dim shell", shellPoints, AabGold, strokeWidthPx = 3f),
+        ChartSeries("Reference", referencePoints, AabGold, strokeWidthPx = 3f, dashed = true),
+        ChartSeries("Dim shell", shellPoints, AabChartBlue, strokeWidthPx = 2f, onSecondaryAxis = true),
         ChartSeries("Dim %", progressPoints, MaterialTheme.colorScheme.primary),
     )
+    // Right axis spans 0 → dimming strength (the shell's natural range, dim_ds = strength × progress).
+    val shellMax = dimmingStrength.toFloat().coerceAtLeast(1f)
 
     ChartCanvas(
         series = series,
         xRange = xStart..xEnd,
         yRange = 0f..100f,
+        secondaryYRange = 0f..shellMax,
+        secondaryYAxisLabel = "Dim shell",
         xScale = AxisScale.Linear,
         xAxisLabel = "Brightness",
         yAxisLabel = "Dim %",
         showLegend = true,
-        interactive = true,
+        interactive = false, // allow the ChartPager to swipe
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

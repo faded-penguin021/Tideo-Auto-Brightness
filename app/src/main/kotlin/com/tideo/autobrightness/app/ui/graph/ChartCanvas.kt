@@ -54,6 +54,9 @@ data class ChartSeries(
     val dashed: Boolean = false,
     /** Whether this series appears in the legend (override scatter etc. opt out). */
     val inLegend: Boolean = true,
+    /** Map this series against the RIGHT (secondary) y-axis instead of the left (S13d — dual-axis
+     *  dimming graph). Requires [ChartCanvas]'s `secondaryYRange` to be set; ignored otherwise. */
+    val onSecondaryAxis: Boolean = false,
 )
 
 /** A reference line: vertical at data-[x] or horizontal at data-[y] (e.g. a threshold or marker). */
@@ -98,6 +101,11 @@ fun ChartCanvas(
     scatter: ChartScatter? = null,
     xAxisLabel: String? = null,
     yAxisLabel: String? = null,
+    /** Optional secondary (right) y-axis range; series with `onSecondaryAxis=true` map against it. */
+    secondaryYRange: ClosedFloatingPointRange<Float>? = null,
+    secondaryYAxisLabel: String? = null,
+    /** Custom formatter for linear x-axis tick labels (e.g. hour → "HH:MM"); null = default numeric. */
+    xTickFormatter: ((Float) -> String)? = null,
     showLegend: Boolean = false,
     interactive: Boolean = false,
     height: Dp = 240.dp,
@@ -113,7 +121,8 @@ fun ChartCanvas(
     val leftPad = with(density) { (if (yAxisLabel != null) 46.dp else 34.dp).toPx() }
     val bottomPad = with(density) { (if (xAxisLabel != null) 32.dp else 18.dp).toPx() }
     val topPad = with(density) { 8.dp.toPx() }
-    val rightPad = with(density) { 10.dp.toPx() }
+    // Room on the right for the secondary y-axis ticks + rotated title when present.
+    val rightPad = with(density) { (if (secondaryYRange != null) 46.dp else 10.dp).toPx() }
 
     // Scrub position in px (null = not scrubbing). Set by tap/drag when [interactive].
     var scrubPx by remember { mutableStateOf<Float?>(null) }
@@ -166,16 +175,29 @@ fun ChartCanvas(
 
             fun toPxX(x: Float) = xToPx(x, xScale, xRange, plotLeft, plotW)
             fun toPxY(y: Float) = yToPx(y, yRange, plotTop, plotH)
+            // Secondary (right) axis mapping for series flagged onSecondaryAxis (dual-axis dimming).
+            fun toPxYSec(y: Float) = yToPx(y, secondaryYRange ?: yRange, plotTop, plotH)
 
             // ---- gridlines + axis ticks --------------------------------------------------------
             drawAxisTicks(
                 xScale, xRange, yRange, measurer, labelStyle, gridColor,
-                plotLeft, plotRight, plotTop, plotBottom, ::toPxX, ::toPxY,
+                plotLeft, plotRight, plotTop, plotBottom, ::toPxX, ::toPxY, xTickFormatter,
             )
+            // Right-side ticks for the secondary axis (no gridlines — they belong to the left axis).
+            if (secondaryYRange != null) {
+                niceTicks(secondaryYRange.start, secondaryYRange.endInclusive).forEach { v ->
+                    val py = toPxYSec(v)
+                    val txt = measurer.measure(formatTick(v), labelStyle)
+                    drawText(txt, topLeft = Offset(plotRight + 4f, py - txt.size.height / 2f))
+                }
+            }
 
             // axes
             drawLine(axisColor, Offset(plotLeft, plotTop), Offset(plotLeft, plotBottom), 2f)
             drawLine(axisColor, Offset(plotLeft, plotBottom), Offset(plotRight, plotBottom), 2f)
+            if (secondaryYRange != null) {
+                drawLine(axisColor, Offset(plotRight, plotTop), Offset(plotRight, plotBottom), 2f)
+            }
 
             // ---- axis titles -------------------------------------------------------------------
             xAxisLabel?.let {
@@ -191,25 +213,44 @@ fun ChartCanvas(
                     drawText(t, topLeft = Offset(cx - t.size.width / 2f, cy - t.size.height / 2f))
                 }
             }
+            secondaryYAxisLabel?.let {
+                val t = measurer.measure(it, labelStyle)
+                val cx = size.width - t.size.height / 2f
+                val cy = (plotTop + plotBottom) / 2f
+                rotate(degrees = 90f, pivot = Offset(cx, cy)) {
+                    drawText(t, topLeft = Offset(cx - t.size.width / 2f, cy - t.size.height / 2f))
+                }
+            }
 
             // ---- marker / threshold lines ------------------------------------------------------
             markers.forEach { m ->
-                m.x?.let { drawLine(m.color, Offset(toPxX(it), plotTop), Offset(toPxX(it), plotBottom), 2f) }
+                m.x?.let {
+                    val mx = toPxX(it)
+                    drawLine(m.color, Offset(mx, plotTop), Offset(mx, plotBottom), 2f)
+                    // Vertical event label (e.g. "Sunrise") parked just inside the line near the top.
+                    m.label?.let { lbl ->
+                        val t = measurer.measure(lbl, TextStyle(color = m.color, fontSize = 8.sp))
+                        rotate(degrees = -90f, pivot = Offset(mx + 4f, plotTop + t.size.width / 2f + 2f)) {
+                            drawText(t, topLeft = Offset(mx + 4f, plotTop + 2f))
+                        }
+                    }
+                }
                 m.y?.let { drawLine(m.color, Offset(plotLeft, toPxY(it)), Offset(plotRight, toPxY(it)), 2f) }
             }
 
             // ---- series polylines --------------------------------------------------------------
             series.forEach { s ->
+                val mapY: (Float) -> Float = if (s.onSecondaryAxis) ::toPxYSec else ::toPxY
                 if (s.points.size < 2) {
                     s.points.firstOrNull()?.let { p ->
-                        drawCircle(s.color, radius = 5f, center = Offset(toPxX(p.x), toPxY(p.y)))
+                        drawCircle(s.color, radius = 5f, center = Offset(toPxX(p.x), mapY(p.y)))
                     }
                     return@forEach
                 }
                 val path = Path()
                 s.points.forEachIndexed { i, p ->
                     val px = toPxX(p.x)
-                    val py = toPxY(p.y)
+                    val py = mapY(p.y)
                     if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
                 }
                 val effect = if (s.dashed) PathEffect.dashPathEffect(floatArrayOf(14f, 10f)) else null
@@ -354,6 +395,7 @@ private fun DrawScope.drawAxisTicks(
     plotBottom: Float,
     xToPx: (Float) -> Float,
     yToPx: (Float) -> Float,
+    xTickFormatter: ((Float) -> String)? = null,
 ) {
     // Y ticks: nice rounded values (no 191.25 artefacts, F55).
     niceTicks(yRange.start, yRange.endInclusive).forEach { v ->
@@ -369,7 +411,7 @@ private fun DrawScope.drawAxisTicks(
             niceTicks(xRange.start, xRange.endInclusive).forEach { v ->
                 val px = xToPx(v)
                 drawLine(gridColor, Offset(px, plotTop), Offset(px, plotBottom), 1f)
-                val txt = measurer.measure(formatTick(v), labelStyle)
+                val txt = measurer.measure(xTickFormatter?.invoke(v) ?: formatTick(v), labelStyle)
                 drawText(txt, topLeft = Offset(px - txt.size.width / 2f, plotBottom + 2f))
             }
         }
