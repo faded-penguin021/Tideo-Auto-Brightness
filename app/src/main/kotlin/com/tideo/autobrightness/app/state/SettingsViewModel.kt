@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
+import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.FieldError
@@ -109,6 +110,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     contextOverride = true, // latch the manual context lock (G2R-F30)
                 )
             }
+            // Surface the loaded profile on the Dashboard (LiveRuntimeState, in-memory bridge).
+            LiveRuntimeState.setActiveProfile(name)
             // task592/626 apply re-runs Advanced Auto Brightness so the new curve takes effect
             // immediately, not at the next sensor tick (G2-F16).
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)

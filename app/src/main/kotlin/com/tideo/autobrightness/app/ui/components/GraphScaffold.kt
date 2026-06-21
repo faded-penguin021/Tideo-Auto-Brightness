@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,16 +17,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 /**
- * One swipeable chart page in a [ChartPager] (G2R-F81). [content] is the actual chart composable;
- * S12 passes the deferred [com.tideo.autobrightness.app.ui.screens.ChartPlaceholder], and **S13
- * swaps in the real chart** for the same `title`/`testTag` without touching the pager or the host
- * screen. Keeping the slot list here is the single coordination point promised to S13.
+ * One swipeable chart page in a [ChartPager] (G2R-F81). [content] is the actual chart composable.
+ * S12 passed a deferred placeholder here; **S13d swapped in the real charts** (the `ui.graph` chart
+ * composables) for the same `title`/`testTag` without touching the pager or the host screen. The slot
+ * list is the single coordination point between the host screens and the chart library.
  */
 class ChartSlot(
     val title: String,
@@ -34,40 +39,51 @@ class ChartSlot(
 )
 
 /**
- * Horizontal swipe pager over a screen's **relevant graphs** (G2R-F81). Replaces the previous
- * vertical stacking of multiple charts: the relevant graph sits **above** its settings on every
- * chart-host screen, and the user swipes between the related graphs rather than scrolling past a
- * stack. A dot indicator + the current chart's title make the paging discoverable; a single-slot
- * pager renders just the chart (no indicator). Carries the `chart_pager` test tag.
+ * Pager over a screen's **relevant graphs** (G2R-F81): the relevant graph sits **above** its settings,
+ * and the user pages between related graphs rather than scrolling past a vertical stack.
+ *
+ * The charts themselves are **interactive** (drag-scrub readout — owner requirement), which consumes
+ * the horizontal drag the pager would otherwise swipe on. So page navigation is by **tap**: ‹ › arrows
+ * flanking the title + clickable page dots (`pagerState.userScrollEnabled=false`). A single-slot pager
+ * renders just the chart. Carries the `chart_pager` test tag.
  */
 @Composable
 fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
     if (slots.isEmpty()) return
     val pagerState = rememberPagerState(pageCount = { slots.size })
+    val scope = rememberCoroutineScope()
+    val multi = slots.size > 1
     Column(modifier.fillMaxWidth().testTag("chart_pager"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (multi) {
+                PagerArrow("‹", "chart_pager_prev") {
+                    val target = (pagerState.currentPage - 1 + slots.size) % slots.size
+                    scope.launch { pagerState.animateScrollToPage(target) }
+                }
+            }
             Text(
                 slots[pagerState.currentPage].title,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.testTag("chart_pager_title"),
+                modifier = Modifier.weight(1f).testTag("chart_pager_title"),
+                textAlign = TextAlign.Center,
             )
-            if (slots.size > 1) {
-                Text(
-                    "Swipe to compare ›",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (multi) {
+                PagerArrow("›", "chart_pager_next") {
+                    val target = (pagerState.currentPage + 1) % slots.size
+                    scope.launch { pagerState.animateScrollToPage(target) }
+                }
             }
         }
-        HorizontalPager(state = pagerState) { page ->
+        // userScrollEnabled=false: the interactive chart owns horizontal drags; pages change via taps.
+        HorizontalPager(state = pagerState, userScrollEnabled = false) { page ->
             slots[page].content()
         }
-        if (slots.size > 1) {
+        if (multi) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -81,13 +97,29 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                         modifier = Modifier
                             .padding(horizontal = 3.dp)
-                            .size(if (selected) 8.dp else 6.dp)
+                            .size(if (selected) 10.dp else 8.dp)
+                            .clickable { scope.launch { pagerState.animateScrollToPage(i) } }
                             .testTag("chart_pager_dot_$i"),
                     ) {}
                 }
             }
         }
     }
+}
+
+/** A tappable ‹ / › page-step affordance for the [ChartPager] (swipe is consumed by the chart scrub). */
+@Composable
+private fun PagerArrow(glyph: String, testTag: String, onClick: () -> Unit) {
+    Text(
+        glyph,
+        style = MaterialTheme.typography.titleLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .testTag(testTag),
+    )
 }
 
 /**

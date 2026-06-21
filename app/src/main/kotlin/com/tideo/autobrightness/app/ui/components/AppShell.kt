@@ -19,7 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,11 +61,9 @@ fun AabTopBar(title: String, onBack: (() -> Unit)? = null) {
                 }
             }
         },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = AabTeal,
-            titleContentColor = AabOnTeal,
-            navigationIconContentColor = AabGold,
-        ),
+        // Owner feedback: the teal banner belongs to the Menu hub only (its gold-sun [AabMenuBanner]).
+        // Every other screen uses the default M3 surface app bar so the app reads coherently — Dashboard
+        // and Live Debug no longer carry a second teal header.
     )
 }
 
@@ -94,18 +91,22 @@ fun AabMenuBanner() {
         )
         Spacer(Modifier.width(Dimens.rowGapWide))
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.space1)) {
-            Text(
-                stringResource(R.string.app_wordmark_primary),
-                color = AabOnTeal,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                stringResource(R.string.app_wordmark_secondary),
-                color = AabGold,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-            )
+            // The full wordmark reads on ONE line — "Tideo" white + "Auto Brightness" gold (owner
+            // feedback: the stacked two-line wordmark looked broken).
+            Row {
+                Text(
+                    stringResource(R.string.app_wordmark_primary) + " ",
+                    color = AabOnTeal,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    stringResource(R.string.app_wordmark_secondary),
+                    color = AabGold,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
             Text(
                 stringResource(R.string.app_tagline).uppercase(),
                 color = AabOnTeal.copy(alpha = 0.66f),

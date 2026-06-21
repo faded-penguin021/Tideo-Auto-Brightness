@@ -183,15 +183,27 @@ private fun ReadoutStrip(state: DashboardUiState) {
                     modifier = Modifier.weight(1f),
                 )
             }
-            state.activeContext?.let {
-                ReadoutCell(
-                    caption = stringResource(R.string.dashboard_active_context),
-                    value = it,
-                    valueTag = "dashboard_context",
-                    mono = false,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+        }
+        // Profile + active context, always shown so the user can see which profile is in force and
+        // whether a context rule selected it (owner request).
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.rowGap),
+        ) {
+            ReadoutCell(
+                caption = stringResource(R.string.dashboard_active_profile),
+                value = state.activeProfile ?: "—",
+                valueTag = "dashboard_profile",
+                mono = false,
+                modifier = Modifier.weight(1f),
+            )
+            ReadoutCell(
+                caption = stringResource(R.string.dashboard_active_context),
+                value = state.activeContext ?: stringResource(R.string.dashboard_context_none),
+                valueTag = "dashboard_context",
+                mono = false,
+                modifier = Modifier.weight(1f),
+            )
         }
         Text(
             stringResource(R.string.dashboard_lux_raw, state.rawLux.fmt(), state.lastSampleMs.toRelativeAge()),

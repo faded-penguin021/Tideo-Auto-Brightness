@@ -321,6 +321,9 @@ class ContextEngine(
         val changed = target != currentProfileName
         currentProfileName = target
         _activeContext.value = resolution.activeContextName
+        // Surface the context-selected profile on the Dashboard (manual loads set it via SettingsViewModel;
+        // under the manual lock this code returned early above, so it never clobbers a manual choice).
+        LiveRuntimeState.setActiveProfile(target)
 
         _effective.value = if (resolution.activeContextName != null) {
             // A rule won — swap the entire active profile (load-current-file, D-038(ii) simplification).

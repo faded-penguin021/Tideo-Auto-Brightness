@@ -27,6 +27,8 @@ data class DashboardUiState(
     /** %AAB_Throttle — the reactivity cooldown (ms) currently in force. */
     val throttleMs: Long? = null,
     val activeContext: String? = null,
+    /** %AAB_CurrentActiveProfile — the profile currently in force (manual or context load), or null. */
+    val activeProfile: String? = null,
     /** TIMEMS of the last sensor sample the pipeline saw (live), for the "Xs ago" readout (G2R-F5). */
     val lastSampleMs: Long? = null,
     /** True when the published live snapshot has aged past STALE (>10 s) — the loop may be wedged.

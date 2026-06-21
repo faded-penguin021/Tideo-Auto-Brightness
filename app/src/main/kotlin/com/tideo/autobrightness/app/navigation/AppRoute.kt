@@ -29,7 +29,10 @@ enum class AppRoute(val route: String, val label: String, val owner: String) {
     // S12.9f (D-070): Profiles + Contexts folded into one destination — saved profiles + their
     // context rules (rule editing in a modal). Replaces the separate Profiles and Contexts screens.
     Profiles("profiles", "Profiles & Contexts", "S12.9f"),
-    About("about", "About & Guide", "S13");
+    // S13d: the static reference screens (extraction/scenes/about.md + user_guide.md). The User Guide
+    // is also the post-onboarding first-run destination (G2R-F80).
+    UserGuide("user_guide", "User Guide", "S13d"),
+    About("about", "About", "S13d");
 
     companion object {
         /** Profiles & Contexts — the Menu's prominent hero card (one merged destination, S12.9f). */
@@ -41,7 +44,7 @@ enum class AppRoute(val route: String, val label: String, val owner: String) {
         )
 
         /** Tools + Live Debug + reference content — the Menu "Info & Help" group. */
-        val infoDestinations: List<AppRoute> = listOf(Tools, LiveDebug, About)
+        val infoDestinations: List<AppRoute> = listOf(Tools, LiveDebug, UserGuide, About)
 
         /**
          * Every destination surfaced as a plain navigation ROW in the Menu (the hero cards render

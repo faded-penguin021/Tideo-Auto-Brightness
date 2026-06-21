@@ -56,7 +56,10 @@ fun AabSettings.toBrightnessCurveConfig(): BrightnessCurveConfig {
 
 fun AabSettings.toDynamicScalingConfig(): DynamicScalingConfig = DynamicScalingConfig(
     enabled = scalingEnabled,
-    spreadPercent = scaleSpread.toDouble(),
+    // SAFETY: the circadian SCALE spread must stay positive (1..100). A negative value flips the
+    // day/night curve and can drive ScaleDynamic to ≤0 → a black screen. Only the super-dimming
+    // circadian spread (dimSpreadPercent) is allowed to go negative (boost-in-daylight, D-072).
+    spreadPercent = scaleSpread.coerceIn(1, 100).toDouble(),
     dimSpreadPercent = dimSpread.toDouble(),
     steepness = scaleSteepness.toDouble(),
 )

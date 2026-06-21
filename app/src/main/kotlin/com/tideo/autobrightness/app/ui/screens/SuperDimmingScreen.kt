@@ -7,7 +7,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -18,6 +22,7 @@ import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.state.CircadianExtrasViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.ui.components.ChartPager
 import com.tideo.autobrightness.app.ui.components.ChartSlot
@@ -29,6 +34,9 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.rememberToaster
+import com.tideo.autobrightness.app.ui.graph.CircadianDimmingChart
+import com.tideo.autobrightness.app.ui.graph.DimmingChart
+import com.tideo.autobrightness.app.settings.toDynamicScalingConfig
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /**
@@ -38,7 +46,11 @@ import com.tideo.autobrightness.platform.privilege.Tier
  * **mutually exclusive** (G2-F10); the circadian dim-spread field is gated on circadian scaling (G2-F11).
  */
 @Composable
-fun SuperDimmingScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
+fun SuperDimmingScreen(
+    navController: NavHostController,
+    vm: DraftSettingsViewModel = viewModel(),
+    extras: CircadianExtrasViewModel = viewModel(),
+) {
     val draft by vm.draft.collectAsStateWithLifecycle()
     val committed by vm.committed.collectAsStateWithLifecycle()
     val dirty by vm.dirty.collectAsStateWithLifecycle()
@@ -47,12 +59,20 @@ fun SuperDimmingScreen(navController: NavHostController, vm: DraftSettingsViewMo
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = rememberToaster()
+    // The Circadian Dimming chart shares the F39 fixed date/location override (Circadian screen) so it
+    // tracks the date too. Read-only here (no editor on this screen).
+    val dateLocation by extras.dateLocation.collectAsStateWithLifecycle()
+    var defaultLatLon by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    LaunchedEffect(Unit) { defaultLatLon = runCatching { extras.defaultLatLon() }.getOrNull() }
     SuperDimmingContent(
         draft, committed, epoch, dirty, tier, live,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         onOpenOnboarding = { navController.navigate(AppRoute.Onboarding.route) },
         criticalError = criticalError,
+        circadianLat = dateLocation.latitude ?: defaultLatLon?.first,
+        circadianLon = dateLocation.longitude ?: defaultLatLon?.second,
+        circadianDateSec = chartDateEpochSec(dateLocation.date),
         // G2R-F17: reset only the super-dimming + PWM fields to the task570 baseline.
         onReset = {
             vm.edit { s ->
@@ -83,6 +103,9 @@ fun SuperDimmingContent(
     onOpenOnboarding: () -> Unit,
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
+    circadianLat: Double? = null,
+    circadianLon: Double? = null,
+    circadianDateSec: Long = System.currentTimeMillis() / 1000L,
 ) {
     DraftSettingsScaffold(stringResource(R.string.title_super_dimming), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
@@ -93,10 +116,21 @@ fun SuperDimmingContent(
             ChartPager(
                 listOf(
                     ChartSlot("Dimming curve", "dimming_chart") {
-                        ChartPlaceholder("DimmingChart", "dimming_chart")
+                        DimmingChart(
+                            minBrightness = draft.minBrightness,
+                            dimmingThreshold = draft.dimmingThreshold,
+                            dimmingExponent = draft.dimmingExponent.toDouble(),
+                            dimmingStrength = draft.dimmingStrength,
+                            modifier = Modifier.testTag("dimming_chart"),
+                        )
                     },
                     ChartSlot("Circadian Dimming", "circadian_dimming_chart") {
-                        ChartPlaceholder("CircadianDimmingChart", "circadian_dimming_chart")
+                        CircadianDimmingChart(
+                            draft.toDynamicScalingConfig(),
+                            Modifier.testTag("circadian_dimming_chart"),
+                            latitude = circadianLat, longitude = circadianLon,
+                            dateEpochSec = circadianDateSec,
+                        )
                     },
                 ),
             )

@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,7 +20,6 @@ import com.tideo.autobrightness.app.ui.onboarding.OnboardingContent
 import com.tideo.autobrightness.app.ui.onboarding.OnboardingUiState
 import com.tideo.autobrightness.app.ui.screens.DashboardContent
 import com.tideo.autobrightness.app.ui.screens.MenuContent
-import com.tideo.autobrightness.app.ui.screens.PlaceholderScreen
 import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
 import com.tideo.autobrightness.platform.privilege.Tier
 import org.junit.Rule
@@ -196,7 +196,7 @@ class UiShellTest {
             nav = rememberNavController()
             NavHost(navController = nav, startDestination = AppRoute.Menu.route) {
                 AppRoute.entries.forEach { route ->
-                    composable(route.route) { PlaceholderScreen(route.label, route.owner) }
+                    composable(route.route) { Text(route.label) }
                 }
             }
         }
@@ -215,7 +215,7 @@ class UiShellTest {
             nav = rememberNavController()
             NavHost(navController = nav, startDestination = AppRoute.Menu.route) {
                 AppRoute.entries.forEach { route ->
-                    composable(route.route) { PlaceholderScreen(route.label, route.owner) }
+                    composable(route.route) { Text(route.label) }
                 }
             }
         }
@@ -333,24 +333,28 @@ class UiShellTest {
     }
 
     @Test
-    fun completeOnboarding_landsOnMenuAndDropsOnboarding() {
-        // G2R-F57: finishing onboarding routes to the Menu hub, not the Dashboard, and Onboarding is
-        // removed from the back stack so Back from the Menu exits rather than returning to setup.
+    fun completeOnboarding_landsOnUserGuideOverMenuAndDropsOnboarding() {
+        // G2R-F57 + S13d/G2R-F80: finishing onboarding shows the User Guide (the first-run destination)
+        // with the Menu seeded beneath it, and Onboarding is removed from the back stack.
         lateinit var nav: androidx.navigation.NavHostController
         compose.setContent {
             nav = rememberNavController()
             NavHost(navController = nav, startDestination = AppRoute.Onboarding.route) {
                 AppRoute.entries.forEach { route ->
-                    composable(route.route) { PlaceholderScreen(route.label, route.owner) }
+                    composable(route.route) { Text(route.label) }
                 }
             }
         }
 
         compose.runOnUiThread { nav.completeOnboarding() }
-        compose.onNodeWithText(AppRoute.Menu.label).assertExists()
+        // First-run lands on the User Guide.
+        assertEquals(AppRoute.UserGuide.route, nav.currentDestination?.route)
+        // Back from the Guide returns to the Menu (seeded beneath), not the dropped Onboarding.
+        var popped = false
+        compose.runOnUiThread { popped = nav.popBackStack() }
+        assertTrue(popped)
         assertEquals(AppRoute.Menu.route, nav.currentDestination?.route)
-        // Onboarding is gone from the back stack: a back press has nothing to pop above the Menu.
-        var popped = true
+        // Onboarding is gone: a further back press has nothing to pop above the Menu.
         compose.runOnUiThread { popped = nav.popBackStack() }
         assertTrue(!popped)
     }

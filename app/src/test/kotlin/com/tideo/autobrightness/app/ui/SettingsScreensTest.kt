@@ -25,8 +25,8 @@ import com.tideo.autobrightness.app.ui.components.ChartPager
 import com.tideo.autobrightness.app.ui.components.ChartSlot
 import com.tideo.autobrightness.app.ui.components.CircadianDiagnosticCardContent
 import com.tideo.autobrightness.app.ui.components.ReactivityDiagnosticCardContent
+import com.tideo.autobrightness.app.ui.components.EmptyState
 import com.tideo.autobrightness.app.ui.components.SettingsDiffList
-import com.tideo.autobrightness.app.ui.screens.ChartPlaceholder
 import com.tideo.autobrightness.app.ui.screens.CircadianDateLocationCard
 import com.tideo.autobrightness.app.ui.screens.LoadProfileDialog
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
@@ -828,8 +828,8 @@ class SettingsScreensTest {
             MaterialTheme {
                 ChartPager(
                     listOf(
-                        ChartSlot("First", "chart_a") { ChartPlaceholder("First", "chart_a") },
-                        ChartSlot("Second", "chart_b") { ChartPlaceholder("Second", "chart_b") },
+                        ChartSlot("First", "chart_a") { EmptyState("First", testTag = "chart_a") },
+                        ChartSlot("Second", "chart_b") { EmptyState("Second", testTag = "chart_b") },
                     ),
                 )
             }

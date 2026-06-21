@@ -60,9 +60,22 @@ next session does not know it.
 | S13b component library | 2026-06-20 | Opus/high | DONE | (this push) | Second S13 sub-segment — build the reusable "Lego blocks" from `m3_audit.md` §2.5 blueprints + §4 cross-cutting gaps; behaviour-neutral until S13c adopts them (no screen rewrites, no recolor, fence honoured). **New files:** `components/AabCard.kt` (`AabCard` elevated section container [medium shape, `cardElevation`/`Raised`, `cardPadding`, default `fieldSpacing` rhythm]; **`KeyValueRow`** B4 — the critical bold-**gold** [`secondary` role, not raw `AabGold`] data-pop with `outlineVariant` bottom border; `EmptyState` icon+muted-text placeholder); `components/AabNav.kt` (**`HeroNavCard`** B2 — promoted from MenuScreen's private hero: `large` shape, teal left-edge accent bar, gold-sun icon [sanctioned raw tint], chevron, press-scale motion; **`NavRow`** B3 — in-card clickable row w/ chevron; **`ActionButtonBar`** B5 — generalised from `DraftApplyBar`, weight-even tonal/outlined buttons w/ leading icons via `ActionButton`/`ActionButtonStyle`); `components/AabMotion.kt` (`AabMotion` object — screen enter/exit, list item enter/exit, `valueSpec`, `PRESS_SCALE`); `components/SettingField.kt` (unified **`SettingField`** + `SettingFieldSpec` sealed `Decimal`/`Slider`/`Toggle` — **delegates** to the existing `NumberSettingField`/`IntSliderSettingField`/`SwitchSettingRow` so the draft-epoch/committed-bracket/help logic [G2-F7/F1] is unchanged → existing field tests stay green). **Enhanced in place:** `SectionHeader(text, divider=false)` (B1 — opt-in `outlineVariant` rule below; default false keeps all current call sites unchanged). **Acceptance:** `ComponentLibraryTest` (Robolectric+Compose, rendered in real `TideoTheme`) — 10 instantiation tests: AabCard groups content, KeyValueRow key+gold value tags, EmptyState, NavRow click, HeroNavCard title/subtitle/click, ActionButtonBar weighted+disabled+click, SectionHeader+divider, SettingField Decimal `[committed]` bracket / Toggle flip / Slider in-range. The MenuScreen's private `MenuHeroCard`/`MenuNavRow` stay until S13c migrates screens. **Fence honoured: `ChartCanvas`/`domain`/golden/`runtime`/gradle/manifest/`SettingsValidator` untouched; no new deps; `HardcodedStringCheckTest` ceiling 92 unchanged (components take caller-supplied strings — no new literals).** Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest`(254) `:app:lintDebug :domain:test :platform:test`. No compaction. **Next: S13c** (apply the library screen-by-screen; check off m3_audit §3). |
 | S13c screen-by-screen restyle | 2026-06-20 | Opus/high | DONE | (this push) | Third S13 sub-segment — apply the S13b component library across every screen; behaviour-preserving (every test-pinned `testTag` + the draft/validation/diagnostic semantics unchanged), no recolor, fence honoured (D-079). **Restyled (m3_audit §3 rows 1–10 all flipped ✅):** **Menu** — hero → shared `HeroNavCard` (teal edge + press-scale motion), Dashboard/Settings/Info rows → `NavRow` grouped in `AabCard` sections (private `MenuHeroCard`/`MenuNavRow` deleted); **Dashboard** — plain status/light/brightness/context/health blocks → `AabCard` (the stale/override **tinted** banners kept as semantic `Card`); **Curve & Brightness** — curve-zone fields in an `AabCard`, derived form2A/form3A → distinct `AabCard` of gold `KeyValueRow` data-pops (B4); **Reactivity** — override/trust switches grouped into an `AabCard` (threshold/α keep `GraphSettingsGroup` for the `group_<graph>` G2R-F82 contract); **Super Dimming** — `SectionHeader(divider=true)` over the existing `GraphSettingsGroup`s; **Circadian** — date/location block → `AabCard`; **Misc** — Brightness-range/Animation/Notifications each an `AabCard`, throttle + auto-scale readouts → gold `KeyValueRow`; **Tools** — `WizardCard`/report/power-draw → `AabCard`; **Live Debug** — left on the glass-box `DiagnosticCard` (already the right component); **Profiles & Contexts** — profile/rule/legacy rows → `AabCard`, "no profiles"/"no rules" hints → `EmptyState`, rule-editor modal gains `tonalElevation`. **Cross-cutting motion (§4):** app-wide screen enter/exit wired via `AabMotion.screenEnter/Exit` on `AppNavGraph`'s `NavHost`. **`DerivedReadout` retired** at call sites (folded into `KeyValueRow`; the helper remains for any future use). **Owner extra — launcher logo refresh:** rebuilt the Tasker `_CreateLogo` art (sun whose rays hold a faded brightness slider) as a modern adaptive icon on the AAB brand — `ic_launcher_foreground.xml` (gold sun + rays + faded white slider + knob), matching `ic_launcher_monochrome.xml`, and `ic_launcher_background` recoloured generic indigo → AAB teal `#FF007C63`. **Deferred to S14 (recorded, not blocking):** Profiles/Contexts 3-dot overflow for secondary row actions + dropping the app-picker `heightIn(max=400.dp)` — both kept because the screen tests find `apply/overwrite/delete_*` directly (overflow hides them) and the picker sits inside a `verticalScroll` (a `weight` child is illegal there). **i18n:** no new `Text("…")` literals — converting empty hints to `EmptyState` + the Menu row label off `Text(…)` actually **lowered** the count 92→89 (ceiling 92, `HardcodedStringCheckTest` green). **Fence honoured: `ChartCanvas`/`domain`/golden/`runtime`/gradle/manifest/`SettingsValidator` untouched; no new deps** (`res/` is not fenced). Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug :domain:test :platform:test`. No compaction. **Next: S13d** (real charts filling the `ChartSlot` swap points + About/User-Guide static screens; remove placeholders). |
 | S13c' polish pass | 2026-06-20 | Opus/high | DONE | (this push) | Owner-supplied design spec (not in RUNBOOK) run as a visual-elevation sibling of S13d: make the instrument *land*. Palette FROZEN; type/layout/depth/motion only; `domain`/`runtime`/`ChartCanvas`/golden/gradle/manifest untouched; all test-pinned `testTag`s preserved (m3_audit §6). **(1) Typography (the big lever):** bundled **IBM Plex Sans** (UI) + **IBM Plex Mono** (readouts) as SIL-OFL `.ttf` in `res/font` (licence `docs/licenses/IBM-Plex-OFL.txt` — a static asset, NOT a gradle dep; `res/` unfenced). `Type.kt` → `AabSans`/`AabMono`, two new instrument roles `AabDataDisplay` (Plex Mono Medium, tabular `tnum`, 26sp) + `AabDataCaption` (tracked-uppercase mono), `titleLarge`→SemiBold; lands app-wide via `TideoTheme`. **(2) Surface ladder:** `AabCard` gains `variant` (`Resting`/`Hero`/`Well`) — 1px white-alpha hairline + honest shadow, teal accent-edge on `Hero`, recessed `surfaceVariant` `Well`; new tokens `cardElevationHero`=6 / `accentEdge`=3. **(3) Data-pop:** `KeyValueRow` rebuilt as a readout line (tracked mono caption / big tabular gold value / demoted `unit:` param / value `Crossfade`); `DiagnosticCard.goldValue()` → Plex Mono tabular; `value_*` tags intact. **(4) Dashboard hero:** new `components/BrightnessInstrument.kt` — applied 0–255 in near-white Plex Mono, a thin teal `Canvas` track eased via `animateFloatAsState` (NOT `ChartCanvas`), status pill + master switch, greys out when off; lux·circadian·context demoted to a readout strip. Kept `dashboard_brightness`/`dashboard_status`/`service_switch`/`last_sample_age`/`tier_badge`/`override_card`/`resume_button`; no `pause_button`. **(5) Declutter Profiles & Contexts:** a `SegmentedButton` splits **Profiles**/**Rules** (one job at a time, single destination kept); profile-row secondary actions (Overwrite/Delete) → per-row 3-dot overflow (Apply stays primary) — **clears the S13c-deferred §3-row-10 overflow item**; legacy Tasker import → collapsed `ExpandableSection`. App-picker `heightIn(max=400.dp)` still kept (illegal `weight` child of `verticalScroll`) — recorded. **(6) Polish:** `fieldSpacing` 10→12, `heroCardPadding` 20→24, `sectionSpacing` 8→16 (grid); brand banner gets Plex wordmark + tracked-mono tagline; nav icons muted to `onSurfaceVariant`. **i18n:** new strings via `stringResource`; `Text("…")` literals held at 89 (ceiling 92, `HardcodedStringCheckTest` green). **Tests touched (sanctioned, layout/casing only):** `ComponentLibraryTest`/`SettingsScreensTest` KeyValueRow uppercase-caption assertions; `SettingsScreensTest` profile overflow-menu open. Full ladder GREEN: `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug :domain:test :platform:test`. No compaction. **Next: S13d** (real charts into the `ChartSlot` swap points + About/User-Guide; remove placeholders). |
+| S13d static content & charts | 2026-06-20 | Opus/high | DONE | (this push) | Final S13 sub-segment — the original S13 scope: real charts + About/User-Guide, replacing all placeholders. Followed the `BrightnessCurveChart` template exactly (sample a domain fn over a grid → `List<Offset>` → `ChartSeries` → `ChartCanvas`); **`ChartCanvas` fence honoured (called only)**. **6 chart files filling the S12.8b `ChartSlot.content` swap points (D-066):** `ReactivityChart.kt` (`ReactivityChart` = `BrightnessEngine.dynamicThreshold×100` vs hardcoded ref over log lux → `reactivity_chart`; `AlphaResponseChart` = `1−exp(−deltaFactor·Δ)` vs ref 1.8 → `alpha_chart`), `DimmingChart.kt` (`SoftwareDimming.dimProgress×100` + dim-shell + ref `pow(1−b/15,2.5)` → `dimming_chart`), `CircadianChart.kt` (`CircadianDimmingChart` = `DynamicScaleEngine.dimDynamic` over the day via `SolarCalculator` windows + shared `circadianDaySamples`/`deviceTzOffsetHours` helpers → `circadian_dimming_chart`), `ExperimentChart.kt` (`CircadianScaleChart` = `DynamicScaleEngine.scaleDynamic` over the day → `dynamic_scale_chart`), `TaperChart.kt` (`BrightnessEngine.compressedDynamicScale.effectiveScale` day/night over brightness → `taper_chart`), `PowerDrawChart.kt` (renders measured power/current; `EmptyState` until on-device calibration runs, D-044/Gate → `power_draw_chart`). All 4 chart-host screens (Reactivity/Circadian/SuperDimming/Tools) swapped their `ChartPlaceholder` for the real charts; Circadian passes the F39 fixed/live lat-lon to the solar charts. **Static screens:** `AboutScreen.kt` (banner + intro + acknowledgments + MIT license + app version; Chart.js ack DROPPED) + `UserGuideScreen.kt` (9-section manual in M3 cards, ported from user_guide.md). **`PlaceholderScreen.kt`/`ChartPlaceholder.kt` deleted** (git rm); the 2 tests that used them as generic stand-ins updated (inline `Text`/`EmptyState`). **G2R-F80:** `AppRoute.UserGuide` added; `completeOnboarding()` now lands on the User Guide (Menu seeded beneath → Back→Menu) as the post-onboarding first-run destination; About relabelled "About", both in the Menu Info&Help group. **i18n:** all About/Guide copy + new dashboard strings via `stringResource` (strings.xml +~40); no new `Text("…")` literals (ceiling 92 held). **Owner UI feedback (during S13d) also fixed:** (a) Circadian fields converted `helper=`→`help=` so they get the "ⓘ tap to view explanation" affordance like every sibling screen; (b) Menu banner wordmark now ONE line ("Tideo" white + "Auto Brightness" gold); (c) `AabTopBar` de-teal'd (default M3 surface) so the teal banner is Menu-only (Dashboard/Live Debug no longer carry a second teal header); (d) Dashboard status pill uses compact labels (no wrap next to "APPLIED BRIGHTNESS"); (e) **Dashboard now shows the active Profile + active Context** (always-visible readout) via a new in-memory `LiveRuntimeState.activeProfile` (`%AAB_CurrentActiveProfile`) published by `SettingsViewModel.applyProfile` (manual) + `ContextEngine` (rule loads), surfaced through `DashboardViewModel`/`DashboardUiState`. **Fence honoured: `ChartCanvas`/`domain`/golden/`runtime` pipeline/gradle/manifest/`SettingsValidator` untouched.** Full ladder GREEN: `:app:assembleDebug :app:lintDebug :app:testDebugUnitTest`(283) `:domain:test :platform:test`. No compaction. **→ ALL of S13 (a–d) DONE → S14 (release-grade finalization).** |
+| S13d' chart fidelity + guide WebView (owner feedback) | 2026-06-21 | Opus/high | DONE | (this push) | Owner device-review follow-ups on S13d (D-083). **ChartCanvas fence LIFTED with explicit owner sanction** ("free to break the fence if it is a blocker") — additive only: `ChartSeries.onSecondaryAxis`, `ChartCanvas.secondaryYRange`/`secondaryYAxisLabel` (dual y-axis, right ticks+title), `xTickFormatter` (custom x labels), and `ChartMarker.label` now rendered (rotated). **Fixes:** (1) **charts stay interactive (owner: "charts have to be interactive")** — the drag-scrub readout is kept on, which consumes the `ChartPager` horizontal swipe, so page navigation moved to **tap**: ‹ › arrows flanking the title + clickable page dots (`userScrollEnabled=false`). Swipe-between-graphs is intentionally gone. (2) **dynamic y-axis** on Reactivity (was fixed 0–100; thresholds top ~35 %). (3) **reference is always gold** — DimmingChart reference→gold, dim-% teal, dim-shell blue; TaperChart night→blue (gold reserved for references). (4) **Dimming dual y-axis** — dim-% + gold reference on LEFT (0–100), dim-shell on RIGHT (0–strength), matching Tasker. (5) **Circadian charts** — switched to the **UTC frame** (tz=0, matches Tasker `%TIMES%86400` + runtime D-061/D-065), x-axis now **HH:MM** via `xTickFormatter` (no more "5.8h"), the five **sun-event lines labelled** Dawn/Sunrise/Noon/Sunset/Dusk, axis titled "Time of day (UTC)"; the weird scrub rounding (1.1 vs 1.15) is gone with `interactive=false` (y-ticks show 1.00/1.05/1.10/1.15). (6) **About** — acknowledgements reworded so João Dias is clearly Tasker's creator (not AAB's), author credit to /u/v_uurtjevragen; **MIT license year 2025→2026**. (7) **User Guide → WebView/HTML** (Tasker rendered it as styled HTML) — `UserGuideScreen` now renders an AAB-themed static HTML doc (teal headers/gold accents/dark surface) in a no-JS/no-network `WebView` (no new dep); copy still from `strings.xml` (i18n preserved), markup local. Fresh `/dist/` debug APK rebuilt. Tests/ladder GREEN (`:app:testDebugUnitTest`=283 `:app:assembleDebug :app:lintDebug :domain:test :platform:test`). No compaction. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
+
+**S13d DONE (2026-06-20) — ALL of S13 (a–d) COMPLETE → next is S14.** The original S13 scope landed: six
+real charts (`ui/graph/{Reactivity,Dimming,Circadian,Experiment,Taper,PowerDraw}Chart.kt`) built on the frozen
+`ChartCanvas` per the `BrightnessCurveChart` template, filling the S12.8b `ChartSlot` swap points on
+Reactivity/Circadian/Super Dimming/Tools; `AboutScreen` + `UserGuideScreen` ported from the scene docs (Chart.js
+ack dropped); `PlaceholderScreen`/`ChartPlaceholder` deleted; **G2R-F80** wires the User Guide as the
+post-onboarding first-run destination. Owner UI feedback fixed in the same pass: Circadian ⓘ-help affordance
+restored, Menu wordmark on one line, teal banner is Menu-only (`AabTopBar` de-teal'd), Dashboard status pill no
+longer wraps, and the **Dashboard now shows the active Profile + Context** (new in-memory
+`LiveRuntimeState.activeProfile`). Fence honoured (`ChartCanvas`/domain/golden/runtime/gradle/manifest
+untouched). Full ladder green (`:app:testDebugUnitTest`=283); `Text("…")` literals held at ceiling 92.
 
 **S13c' DONE (2026-06-20) — the polish pass (owner design spec, visual-elevation sibling of S13d): the app
 now reads as a precision instrument. Bundled IBM Plex Sans/Mono with two tabular instrument type roles
@@ -465,8 +478,20 @@ AppModule is now the real DI root.
   `KeyValueRow` readout-line rebuild + `DiagnosticCard` mono gold; Dashboard `BrightnessInstrument` hero +
   eased teal `Canvas` track; Profiles/Rules `SegmentedButton` + per-row overflow [clears the S13c overflow
   deferral] + collapsed legacy import; spacing/banner/icon polish — palette frozen, fence honoured, testTags
-  intact, literals 89/92; D-081). **Next: S13d** (real charts into the `ChartSlot` swap points + About/
-  User-Guide static screens; remove `PlaceholderScreen`/`ChartPlaceholder`).
+  intact, literals 89/92; D-081). **S13d DONE** (static content & charts — the original S13 scope: six real
+  charts on the frozen `ChartCanvas` filling the S12.8b `ChartSlot`s [Reactivity/Alpha, Circadian-scale/Taper,
+  Dimming/Circadian-Dimming, Power-Draw], `AboutScreen`+`UserGuideScreen` ported [Chart.js ack dropped],
+  `Placeholder`/`ChartPlaceholder` deleted, **G2R-F80** User-Guide-first-run; plus owner UI fixes — Circadian
+  ⓘ-help, one-line Menu wordmark, Menu-only teal banner, Dashboard pill no-wrap, Dashboard active
+  Profile+Context via `LiveRuntimeState.activeProfile`; D-082). **→ ALL of S13 (a–d) DONE → S14.**
+- **S14 carry-forward — settings safety (from D-085, owner-reported):** `DraftSettingsViewModel.apply()`
+  commits the raw draft to DataStore **without running the mapper's `validate()` clamp**, so out-of-range
+  values entered on a draft screen persist and reach the engine. S13d fixed the one safety-critical case at
+  its consumption point (circadian `scaleSpread` clamped to 1..100 in `toDynamicScalingConfig` + on the
+  field), but the general hole stands. **S14 should do a clamp-on-Apply / per-field bounds pass** (e.g. run
+  `AabSettings.validate()` on commit, or give each draft field explicit bounds) so no parameter screen can
+  persist an unsafe value. Keep `dimSpread` signed (-100..100); everything else has positive/range bounds in
+  `AabSettingsMapper.validate` + the contract.
 - **HUMAN GATE 1** (RUNBOOK "Human gates"): install app-debug.apk, grant WRITE_SETTINGS, verify the
   core loop (sensor → animate, slider → pause/resume, screen off/on → reinit, reboot → self-start,
   notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
@@ -1958,7 +1983,108 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Full ladder green (`:app:assembleDebug :app:testDebugUnitTest :app:lintDebug :domain:test :platform:test`).
   (Affects S13d/S14 — they inherit the type roles + `AabCard` variants; S13d charts can sit in `Hero`/`Well`.)
 
-Append new entries as D-082, … with which segments they affect.
+- **D-082 (S13d) — static content & charts; the original S13 scope, plus owner UI feedback fixed in-pass.**
+  Six charts (`ui/graph/{Reactivity,Dimming,Circadian,Experiment,Taper,PowerDraw}Chart.kt`) built strictly on
+  the frozen `ChartCanvas` per the `BrightnessCurveChart` template — each samples a **golden-tested domain
+  function** (`BrightnessEngine.dynamicThreshold`/`compressedDynamicScale`, `SoftwareDimming.dimProgress`,
+  `DynamicScaleEngine` over `SolarCalculator` windows) and the math lives in the chart file, never in
+  `ChartCanvas`. **Key decisions:**
+  - **Chart↔slot mapping** (the S12.8b' rename reshuffle resolved by testTag, not by the brief's file names):
+    `reactivity_chart`→ReactivityChart, `alpha_chart`→AlphaResponseChart, `dimming_chart`→DimmingChart,
+    `circadian_dimming_chart`→CircadianDimmingChart (= scene `CircadianChart`), `dynamic_scale_chart`→
+    CircadianScaleChart (= scene `ExperimentChart`, the day-scaling-over-time curve), `taper_chart`→TaperChart,
+    `power_draw_chart`→PowerDrawChart.
+  - **Time-of-day charts use local-frame windows** (`SolarCalculator.compute` with the device tz offset) so the
+    x-axis reads as local hours — correct for a *preview* (distinct from the runtime's UTC frame, D-061/D-065,
+    which is unchanged). A representative lat/lon (51.5/0.0) is the fallback when no fix is available; Circadian
+    passes the F39 fixed/live coords.
+  - **PowerDrawChart renders an `EmptyState`** until on-device calibration (task524) produces samples — the
+    measurement pipeline is still deferred (D-044/Gate). The chart component is real and wired.
+  - **Placeholders deleted, not repurposed.** `PlaceholderScreen.kt`/`ChartPlaceholder.kt` removed; the 2 tests
+    that used them as generic stand-ins now use inline `Text`/`EmptyState`.
+  - **G2R-F80** `completeOnboarding()` lands on `UserGuide` with `Menu` seeded beneath (Back→Menu), shown once
+    post-onboarding (after first run the app starts on Menu, tier!=NONE). `AppRoute.UserGuide` added; About
+    relabelled "About".
+  - **i18n:** About/Guide long-form copy + new dashboard strings all via `stringResource` (strings.xml
+    +~40 entries); no new `Text("…")` literals → `HardcodedStringCheckTest` ceiling 92 held.
+  - **Owner UI feedback (during S13d), all app/`res`-layer, fence intact:** (a) Circadian fields `helper=`→
+    `help=` so they carry the "ⓘ" reveal like every other settings screen (it never had it — made consistent);
+    (b) Menu banner wordmark on ONE line ("Tideo" white + "Auto Brightness" gold); (c) `AabTopBar` de-teal'd
+    (default M3 surface) so the teal banner is Menu-only (Dashboard/Live Debug had a second teal header);
+    (d) Dashboard status pill uses compact labels + `softWrap=false` (was wrapping next to the caption);
+    (e) Dashboard shows the active **Profile + Context** (always visible) via a new in-memory
+    `LiveRuntimeState.activeProfile` set by `SettingsViewModel.applyProfile` (manual) and `ContextEngine`
+    (rule load) — distinct from `activeContext`.
+  - **`/dist/` debug APK** built at the owner's request (debug `app-debug.apk` + a short README); the owner
+    deletes `/dist/` before merging, so it is gitignored — not part of the source deliverable.
+
+  Full ladder green (`:app:assembleDebug :app:lintDebug :app:testDebugUnitTest`=283 `:domain:test :platform:test`).
+  (Affects S14 — the UI surface is now complete; S14 owns copy review, translations, screenshots, Gate 3.)
+
+- **D-083 (S13d' — owner chart-fidelity review; the ChartCanvas fence was LIFTED with explicit owner
+  sanction).** The owner reviewed the S13d build on-device and asked for Tasker-fidelity chart fixes; several
+  needed `ChartCanvas` capabilities the S13 hard fence forbade. The owner then said **"You are free to break
+  the fence if it is a blocker"** → I extended `ChartCanvas` **additively** (no behaviour change to existing
+  callers): `ChartSeries.onSecondaryAxis`, `secondaryYRange`/`secondaryYAxisLabel` (dual y-axis + right ticks/
+  title), `xTickFormatter` (custom x-tick labels), and rendering `ChartMarker.label` (rotated text by the line).
+  **Decisions:**
+  - **Scrub vs swipe (owner decided scrub wins):** the `ChartPager` swipe and the chart's interactive
+    drag-scrub both want horizontal drags → conflict. First attempt set paged charts `interactive=false`
+    (swipe wins); owner reversed it ("charts have to be interactive"). Final: ALL charts keep
+    `interactive=true`, the pager's `userScrollEnabled=false`, and page navigation is by **tap** — ‹ › arrows
+    flanking the title (`chart_pager_prev`/`chart_pager_next`, wrap-around) + clickable page dots
+    (`chart_pager_dot_*`). **Scrub tooltip rounding FIXED:** `ChartCanvas.formatReadout` now shows ~3
+    significant figures by magnitude with trailing zeros trimmed (1.15 reads "1.15", 5.8 "5.8", 35 "35"),
+    and the tooltip's x line reuses `xTickFormatter` so the time charts read HH:MM; the scrub dot now maps
+    secondary-axis series correctly.
+  - **Circadian frame = UTC** (was local). Tasker's circadian graphs are UTC (`%TIMES%86400`), as is the
+    runtime (D-061/D-065); the preview now matches, x-axis titled "Time of day (UTC)", **HH:MM** ticks via
+    `xTickFormatter`, five labelled sun-event lines (Dawn/Sunrise/Noon/Sunset/Dusk).
+  - **Gold = reference, always** (Tasker convention, user_guide §8): DimmingChart reference→gold; TaperChart
+    night→blue (it has no reference series, so gold would mislead).
+  - **Dimming dual y-axis:** dim-% + gold reference LEFT (0–100), dim-shell RIGHT (0–strength) — the real
+    Tasker two-axis layout, now possible post-fence-lift.
+  - **About copy:** João Dias reworded to clearly credit *Tasker* (not AAB); license year 2025→2026.
+  - **User Guide → WebView/HTML:** Tasker styled it as an HTML manual; rebuilt as an AAB-themed static HTML
+    doc in a no-JS/no-network `WebView` (SDK WebView, no new dep). Copy stays in `strings.xml` (assembled into
+    HTML at render) so i18n is preserved; only the markup/CSS is local. About stays M3-card (short, fine).
+  - **`HardcodedStringCheckTest`** unaffected (WebView HTML + `stringResource` escape the `Text("…")` regex).
+
+  Full ladder green (`:app:assembleDebug :app:lintDebug :app:testDebugUnitTest`=283 `:domain:test
+  :platform:test`). (Affects S14 — `ChartCanvas` now has dual-axis/custom-tick/marker-label capability the
+  owner sanctioned; treat as part of the chart engine going forward.)
+
+- **D-084 (S13d — circadian date wiring + "Now" line; owner bug report).** The Circadian/Circadian-Dimming
+  charts ignored the F39 fixed **date** — the screen passed lat/lon to the chart but not the date, so the
+  curve always plotted today. **Fixes:** (1) `CircadianScreen` resolves `chartDateEpochSec(dateLocation.date)`
+  (UTC-midnight parse, else today) and passes it to `CircadianScaleChart`; the Super Dimming screen now reads
+  the same `ExperimentPrefsStore` override (via `CircadianExtrasViewModel`) and feeds date/lat/lon to
+  `CircadianDimmingChart`. (2) **Runtime, not just the chart:** the fixed date/location drive the LIVE scaling
+  (CircadianWindowProvider already observes the override), but nothing forced a recompute — so
+  `CircadianExtrasViewModel.set()`/`useLiveData()` now call `AutoBrightnessRuntime.reapply` (gated on
+  serviceEnabled), so the new `%AAB_ScaleDynamic` lands immediately instead of waiting for the next light
+  change (prof760 drops steady-light cycles). (3) **"Now" event line** added to both circadian charts
+  (Tasker `now_utc`) — a red vertical marker at the current UTC time-of-day, alongside the five labelled sun
+  events. Full ladder green. (Affects S14.)
+
+- **D-085 (S13d — owner review batch 3).** (1) **Import placement:** the single-file "Import a settings
+  file" picker moved from a top-level button into the collapsed **"Import from Tasker AAB"** expandable on
+  Profiles & Contexts (it loads Tideo exports AND legacy Tasker configs), grouped with the folder-link
+  import; the standalone section is now just "Export". (2) **User Guide design language:** the WebView HTML
+  now mirrors Tasker's guide styling — a teal banner, teal-accent section rules, **gold** `**emphasis**`,
+  an intro/outro **blockquote**, and dedicated **tip** (teal) and **warning** (red, no glyph per policy)
+  callout boxes. Content markup lives in the i18n strings (`**bold**`, `[TIP]`, `[WARN]`); the renderer
+  converts it. (3) **scaleSpread safety bug:** `DraftSettingsViewModel.apply()` commits the raw draft
+  WITHOUT the mapper's `validate()` clamp, so a negative circadian **Scale spread** persisted and reached
+  the engine/chart via `toDynamicScalingConfig()` → ScaleDynamic could flip ≤0 (black screen). Fixed where
+  consumed: `toDynamicScalingConfig` clamps `spreadPercent` to 1..100 (covers runtime AND the chart, which
+  share the mapper), and the Circadian "Scale spread" field clamps input to 1..100 on edit. The
+  super-dimming circadian `dimSpread` stays signed (-100..100, D-072) — only the scaling spread is forced
+  positive. (Broader note: Apply not running `validate()` means other fields could also persist
+  out-of-range; flagged for S14 — a general clamp-on-Apply or per-field bounds pass.) Full ladder green.
+  (Affects S14.)
+
+Append new entries as D-086, … with which segments they affect.
 
 ## Blockers
 

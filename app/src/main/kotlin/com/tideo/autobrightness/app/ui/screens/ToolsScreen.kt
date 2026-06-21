@@ -27,6 +27,7 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.rememberToaster
+import com.tideo.autobrightness.app.ui.graph.PowerDrawChart
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionResult
@@ -86,7 +87,9 @@ fun ToolsContent(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                ChartPlaceholder("PowerDrawChart", "power_draw_chart")
+                // Measured at runtime (task524) — no data until on-device calibration runs (Gate/D-044),
+                // so this shows an empty state today and the real chart once samples exist.
+                PowerDrawChart(emptyList(), Modifier.testTag("power_draw_chart"))
             }
         }
     }
