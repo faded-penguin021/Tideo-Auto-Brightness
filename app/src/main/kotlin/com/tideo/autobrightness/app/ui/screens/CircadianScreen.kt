@@ -180,9 +180,12 @@ fun CircadianContent(
                     testTag = "switch_scalingEnabled",
                 )
                 NumberSettingField(
-                    "Scale spread", draft.scaleSpread, { onEdit { s -> s.copy(scaleSpread = it.toInt()) } },
+                    // SAFETY: scale spread stays positive (1..100) — negative inverts the curve and can
+                    // push the scale multiplier to ≤0 (black screen). Only the super-dimming circadian
+                    // spread may go negative. Clamped on edit so the unsafe value never enters the draft.
+                    "Scale spread", draft.scaleSpread, { onEdit { s -> s.copy(scaleSpread = it.toInt().coerceIn(1, 100)) } },
                     epoch = epoch, committed = committed.scaleSpread,
-                    help = "How wide the scale shifts over the day (%).", testTag = "field_scaleSpread",
+                    help = "How wide the scale shifts over the day (%, 1–100).", testTag = "field_scaleSpread",
                 )
                 NumberSettingField(
                     "Scale steepness", draft.scaleSteepness, { onEdit { s -> s.copy(scaleSteepness = it.toInt()) } },

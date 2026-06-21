@@ -200,22 +200,24 @@ fun ProfilesBody(
         Text("Reset settings to defaults")
     }
 
-    SectionHeader("Import / Export", divider = true)
+    SectionHeader("Export", divider = true)
     Button(onClick = onExport, modifier = Modifier.fillMaxWidth().testTag("export_profile")) {
         Text("Export current settings…")
     }
-    Button(onClick = onImport, modifier = Modifier.fillMaxWidth().testTag("import_profile")) {
-        Text("Import a settings file (incl. legacy Tasker)…")
-    }
 
     // S13c' §07-C: the legacy Tasker import is a one-time migration, not a daily control — demote it to
-    // a collapsed expandable (closed by default) so it no longer dominates the first screenful.
+    // a collapsed expandable (closed by default) so it no longer dominates the first screenful. Owner:
+    // the single-file "Import a settings file" picker belongs here too (it loads Tideo exports AND legacy
+    // Tasker configs), grouped with the folder-link import rather than as a top-level button.
     ExpandableSection(
         title = stringResource(R.string.legacy_import_header),
         expanded = showLegacy,
         onToggle = { showLegacy = !showLegacy },
         testTag = "legacy_section",
     ) {
+        Button(onClick = onImport, modifier = Modifier.fillMaxWidth().testTag("import_profile")) {
+            Text("Import a settings file…")
+        }
         OutlinedButton(
             onClick = onChooseLegacyFolder,
             modifier = Modifier.fillMaxWidth().testTag("choose_legacy_folder"),

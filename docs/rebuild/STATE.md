@@ -2059,7 +2059,24 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (Tasker `now_utc`) — a red vertical marker at the current UTC time-of-day, alongside the five labelled sun
   events. Full ladder green. (Affects S14.)
 
-Append new entries as D-085, … with which segments they affect.
+- **D-085 (S13d — owner review batch 3).** (1) **Import placement:** the single-file "Import a settings
+  file" picker moved from a top-level button into the collapsed **"Import from Tasker AAB"** expandable on
+  Profiles & Contexts (it loads Tideo exports AND legacy Tasker configs), grouped with the folder-link
+  import; the standalone section is now just "Export". (2) **User Guide design language:** the WebView HTML
+  now mirrors Tasker's guide styling — a teal banner, teal-accent section rules, **gold** `**emphasis**`,
+  an intro/outro **blockquote**, and dedicated **tip** (teal) and **warning** (red, no glyph per policy)
+  callout boxes. Content markup lives in the i18n strings (`**bold**`, `[TIP]`, `[WARN]`); the renderer
+  converts it. (3) **scaleSpread safety bug:** `DraftSettingsViewModel.apply()` commits the raw draft
+  WITHOUT the mapper's `validate()` clamp, so a negative circadian **Scale spread** persisted and reached
+  the engine/chart via `toDynamicScalingConfig()` → ScaleDynamic could flip ≤0 (black screen). Fixed where
+  consumed: `toDynamicScalingConfig` clamps `spreadPercent` to 1..100 (covers runtime AND the chart, which
+  share the mapper), and the Circadian "Scale spread" field clamps input to 1..100 on edit. The
+  super-dimming circadian `dimSpread` stays signed (-100..100, D-072) — only the scaling spread is forced
+  positive. (Broader note: Apply not running `validate()` means other fields could also persist
+  out-of-range; flagged for S14 — a general clamp-on-Apply or per-field bounds pass.) Full ladder green.
+  (Affects S14.)
+
+Append new entries as D-086, … with which segments they affect.
 
 ## Blockers
 
