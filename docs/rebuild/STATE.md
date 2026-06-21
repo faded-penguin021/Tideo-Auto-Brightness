@@ -484,6 +484,14 @@ AppModule is now the real DI root.
   `Placeholder`/`ChartPlaceholder` deleted, **G2R-F80** User-Guide-first-run; plus owner UI fixes — Circadian
   ⓘ-help, one-line Menu wordmark, Menu-only teal banner, Dashboard pill no-wrap, Dashboard active
   Profile+Context via `LiveRuntimeState.activeProfile`; D-082). **→ ALL of S13 (a–d) DONE → S14.**
+- **S14 carry-forward — settings safety (from D-085, owner-reported):** `DraftSettingsViewModel.apply()`
+  commits the raw draft to DataStore **without running the mapper's `validate()` clamp**, so out-of-range
+  values entered on a draft screen persist and reach the engine. S13d fixed the one safety-critical case at
+  its consumption point (circadian `scaleSpread` clamped to 1..100 in `toDynamicScalingConfig` + on the
+  field), but the general hole stands. **S14 should do a clamp-on-Apply / per-field bounds pass** (e.g. run
+  `AabSettings.validate()` on commit, or give each draft field explicit bounds) so no parameter screen can
+  persist an unsafe value. Keep `dimSpread` signed (-100..100); everything else has positive/range bounds in
+  `AabSettingsMapper.validate` + the contract.
 - **HUMAN GATE 1** (RUNBOOK "Human gates"): install app-debug.apk, grant WRITE_SETTINGS, verify the
   core loop (sensor → animate, slider → pause/resume, screen off/on → reinit, reboot → self-start,
   notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
