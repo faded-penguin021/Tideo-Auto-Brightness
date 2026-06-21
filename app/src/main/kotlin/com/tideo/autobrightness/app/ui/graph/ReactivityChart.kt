@@ -67,9 +67,7 @@ fun ReactivityChart(
         xAxisLabel = "Lux",
         yAxisLabel = "Threshold %",
         showLegend = true,
-        // No interactive scrub: it captured horizontal drags and blocked the ChartPager swipe between
-        // graphs. The y-axis ticks give read-off precision instead.
-        interactive = false,
+        interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -113,7 +111,7 @@ fun AlphaResponseChart(
         xAxisLabel = "Lux change",
         yAxisLabel = "Alpha",
         showLegend = true,
-        interactive = false, // allow the ChartPager to swipe
+        interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

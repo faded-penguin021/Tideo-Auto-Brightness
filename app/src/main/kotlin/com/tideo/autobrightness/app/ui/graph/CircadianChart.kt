@@ -110,7 +110,7 @@ fun CircadianDimmingChart(
         xAxisLabel = "Time of day (UTC)",
         yAxisLabel = "Dim ×",
         xTickFormatter = ::hourToHhmm,
-        interactive = false, // allow the ChartPager to swipe
+        interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

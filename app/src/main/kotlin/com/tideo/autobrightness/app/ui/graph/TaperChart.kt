@@ -62,7 +62,7 @@ fun TaperChart(
         xAxisLabel = "Brightness",
         yAxisLabel = "Scale ×",
         showLegend = true,
-        interactive = false, // allow the ChartPager to swipe
+        interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
