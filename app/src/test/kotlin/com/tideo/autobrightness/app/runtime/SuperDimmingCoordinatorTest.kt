@@ -38,6 +38,20 @@ class SuperDimmingCoordinatorTest {
         minBrightness = 0,
     )
 
+    // S14 (refresh-caching fix): apply() must read the tier provider EXACTLY ONCE per cycle, never per
+    // animation frame. The provider now returns the cached tier (AppModule); the per-cycle permission
+    // check (privilegeManager.refresh()) was moved to the service resume points. Guards against a
+    // regression that re-introduces an IPC permission check inside the dimming hot path.
+    @Test
+    fun apply_readsTierProviderExactlyOncePerCycle() {
+        var reads = 0
+        val coordinator = SuperDimmingCoordinator(FakeSecureDimming()) { reads++; Tier.ELEVATED }
+
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+
+        assertEquals(1, reads, "the tier should be sampled once per dimming cycle, not repeatedly")
+    }
+
     @Test
     fun elevated_belowThreshold_engagesAndWritesLevel() {
         val secure = FakeSecureDimming()

@@ -5,6 +5,7 @@ import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSample
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
+import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,6 +58,11 @@ class BrightnessPipelineControllerTest {
         override fun disengage() { disengaged++ }
     }
 
+    private class FakeProximity : ProximitySensorSource {
+        val flow = MutableSharedFlow<Boolean>(extraBufferCapacity = 8)
+        override fun near(): Flow<Boolean> = flow
+    }
+
     private fun sample(lux: Double, accuracy: Int = 3) = LightSample(lux.toFloat(), accuracy, 0L)
 
     // trustUnreliable=true keeps the accuracy gate out of the way; detectOverrides=true for the
@@ -86,6 +92,35 @@ class BrightnessPipelineControllerTest {
             clock = clock,
         )
         return controller to scope
+    }
+
+    @Test
+    fun proximityNear_propagatesToPipelineState() = runTest {
+        // prof759/task545: the proximity collector flips %AAB_Proximity in the runtime state, which the
+        // cycle runner feeds into BrightnessPolicyInput.proximityNear (×0.1 alpha damp). It never pauses.
+        val proximity = FakeProximity()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = FakeSensor(),
+            brightness = FakeBrightness(),
+            brightnessObserver = FakeObserver(),
+            settingsProvider = { settings },
+            scope = scope,
+            clock = { 0L },
+            proximitySource = proximity,
+        )
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(false, controller.state.value.proximityNear)
+
+        proximity.flow.emit(true)
+        advanceUntilIdle()
+        assertTrue(controller.state.value.proximityNear, "near should set %AAB_Proximity in state")
+
+        proximity.flow.emit(false)
+        advanceUntilIdle()
+        assertEquals(false, controller.state.value.proximityNear, "far should clear it")
+        scope.cancel()
     }
 
     @Test

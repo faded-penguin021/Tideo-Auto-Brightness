@@ -28,7 +28,9 @@ import kotlin.math.sqrt
  * feeds it raw accelerometer triples and gates the result on the display being on (State 123/1).
  */
 class PanicGestureDetector(
-    private val upsideDownGravityY: Float = 7.0f,
+    // S14 (owner: panic too sensitive): require a more committed inversion. gy < −8.0 ≈ within ~35° of
+    // fully upside down (was −7.0 ≈ 44°), so a phone held at a casual downward angle no longer counts.
+    private val upsideDownGravityY: Float = 8.0f,
     private val shakeThreshold: Float = 12.0f,
     // Heavy low-pass so a vigorous shake does NOT drag the gravity estimate across the upside-down
     // threshold (G2R-F77: panic must fire ONLY when genuinely inverted, never the right way up).
@@ -79,6 +81,54 @@ class PanicGestureDetector(
 }
 
 /**
+ * Lifecycle gate around [PanicGestureDetector] for the Android source (S14, owner: the panic fired
+ * when grabbing the phone out of a pocket and turning the screen on). Two protections beyond the
+ * detector's orientation/shake test:
+ *
+ *  - **Screen-on grace:** waking the phone (grab + press) IS a shake, usually while the device is still
+ *    being rotated upright. For [screenOnGraceMs] after the display becomes interactive no panic can
+ *    fire, and the caller resets the detector on the wake edge so an inversion+shake streak built up in
+ *    the pocket cannot complete the gesture the instant the screen turns on.
+ *  - **Cooldown:** a detected gesture fires the panic at most once per [cooldownMs] (debounce).
+ *
+ * Pure + clock-injected so the timing is unit-testable without a SensorManager/PowerManager.
+ */
+class PanicGate(
+    private val screenOnGraceMs: Long = 3_000L,
+    private val cooldownMs: Long = 3_000L,
+) {
+    private var wasInteractive = false
+    private var graceUntilMs = 0L
+    // null = never fired. (A sentinel like Long.MIN_VALUE would overflow `now - lastFiredMs`.)
+    private var lastFiredMs: Long? = null
+
+    /**
+     * Feed the display-interactive state for this reading (call BEFORE the detector). Returns true on
+     * the rising edge (the screen just turned on) so the caller resets the gesture detector and the
+     * [screenOnGraceMs] window opens.
+     */
+    fun onScreenState(now: Long, interactive: Boolean): Boolean {
+        val justWoke = interactive && !wasInteractive
+        if (justWoke) graceUntilMs = now + screenOnGraceMs
+        wasInteractive = interactive
+        return justWoke
+    }
+
+    /**
+     * Whether a detector-reported gesture should actually fire now: display on (State 123/1), past the
+     * wake grace, and past the cooldown. Records the fire time when it returns true.
+     */
+    fun shouldFire(now: Long, interactive: Boolean): Boolean {
+        if (!interactive) return false
+        if (now < graceUntilMs) return false
+        val last = lastFiredMs
+        if (last != null && now - last < cooldownMs) return false
+        lastFiredMs = now
+        return true
+    }
+}
+
+/**
  * Emits a [Unit] each time the prof769 panic gesture (upside-down + shake, display on) is detected.
  * The runtime maps each emission to the task528 panic (SOS + brightness 255 + full stop).
  */
@@ -94,7 +144,7 @@ interface PanicSensorSource {
 class AndroidPanicSensorSource(
     private val context: Context,
     private val detector: PanicGestureDetector = PanicGestureDetector(),
-    private val cooldownMs: Long = 3_000L,
+    private val gate: PanicGate = PanicGate(),
     private val clock: () -> Long = System::currentTimeMillis,
 ) : PanicSensorSource {
     override fun events(): Flow<Unit> = callbackFlow {
@@ -105,17 +155,16 @@ class AndroidPanicSensorSource(
             close()
             return@callbackFlow
         }
-        var lastFiredMs = 0L
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                val fired = detector.onAccelerometer(event.values[0], event.values[1], event.values[2])
-                if (!fired) return
-                // State 123/1: only while the display is on (a face-down phone in a pocket must not fire).
-                if (!power.isInteractive) return
                 val now = clock()
-                if (now - lastFiredMs < cooldownMs) return
-                lastFiredMs = now
-                trySend(Unit)
+                val interactive = power.isInteractive
+                // On the screen-on edge, reset the gesture streak so an inversion+shake built up in the
+                // pocket can't complete the instant the display wakes (owner: false-fired on grab-to-wake).
+                if (gate.onScreenState(now, interactive)) detector.reset()
+                val fired = detector.onAccelerometer(event.values[0], event.values[1], event.values[2])
+                // Gate on display-on (State 123/1) + the post-wake grace + the one-shot cooldown.
+                if (fired && gate.shouldFire(now, interactive)) trySend(Unit)
             }
 
             override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit

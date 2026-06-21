@@ -1,13 +1,13 @@
 # PARITY_CHECKLIST — every Tasker artifact, tracked to disposition
 
-Statuses: `pending` → `ported` (with target) / `dropped(reason)` → `device-verified` (human, Gates).
-Segments flip rows they own; S14 enforces zero `pending`; the human flips to `device-verified`.
+Statuses: a row starts un-dispositioned → `ported` (with target) / `dropped(reason)` → `device-verified` (human, Gates).
+Segments flip rows they own; S14 enforces that every row is dispositioned (none left un-dispositioned); the human flips to `device-verified`.
 XML anchors: profiles/scenes verified line numbers (see XML_RECIPES.md R4/R5/R7); task anchors
 filled by S1/S2 during extraction.
 
 ## Profiles (18)
 
-> S1 extracted profiles 753–761, 769 → `extraction/profiles.md` (context+gate+enter/exit+pri). Profiles 762–768, 8 are S2. Status stays `pending` until ported to Kotlin (S9+).
+> S1 extracted profiles 753–761, 769 → `extraction/profiles.md` (context+gate+enter/exit+pri). Profiles 762–768, 8 are S2. Each profile's status below reflects its Kotlin port (S9+).
 
 | Profile | XML | Ported to | Status |
 |---|---|---|---|
@@ -17,7 +17,7 @@ filled by S1/S2 during extraction.
 | prof756 Repost Paused Notification → task567 | L111 | runtime/AmbientMonitoringService paused notification (S9a) | ported |
 | prof757 Repost Foreground Notification → task584 | L156 | runtime/AmbientMonitoringService live notification (S9a) | ported |
 | prof758 Dynamic Scale Engine → task90 | L195 | gate transcribed: ProfileGates.dynamicScaleGate + truth-table test (S9a); **S12.8d**: task90 scheduling fully wired — `CircadianWindowProvider` feeds real solar windows + DST-aware tz at the target instant (F73), fixed Date/Loc override (F39), daily location acquisition incl. ip-api fallback (F83) | ported |
-| prof759 Proximity Detection → task545 | L300 | | pending |
+| prof759 Proximity Detection → task545 | L300 | platform/sensor/ProximitySensorSource (TYPE_PROXIMITY near/far) → BrightnessPipelineController proximity flag → BrightnessEngine LuxAlpha ×0.1 damp (task544 act28/29 / `PROXIMITY_ALPHA_DAMP`, S14); never pauses | ported |
 | prof760 Monitor Ambient Light → task554 (incl. ConditionList gate) | L318 | ProfileGates.monitorAmbientLightGate + truth-table test + BrightnessPipelineController (S9a) | ported |
 | prof761 Initialize (Display On) → task618 | L386 | runtime/BrightnessPipelineController.reinit/setInitialBrightness (S9a) | ported |
 | prof762 Context: App Changed → task43 | L398 | runtime/ContextEngine (S10 — foreground-app poll → APP_CHANGED veto → ContextOverrideResolver); AndroidContextSignalSource | ported (engine; rule UI S12) |
@@ -32,7 +32,7 @@ filled by S1/S2 during extraction.
 
 ## Pipeline & feature task clusters (~25)
 
-> S1 transcribed the core-pipeline tasks (554, 544, 535, 546, 661, 548, 659, 543, 696, 698, 700, 618, 585, 566, 567, 569, 561, 528, 570, 645–654, 644, 551, 584) → `extraction/tasks/*.md` + `pipeline_spec.md` + `defaults_audit.md`. Status stays `pending` until ported (S4–S9). Non-pipeline clusters (90, 43/contexts, 38/655, 524, 592/637/622, debug, misc UI) are S2.
+> S1 transcribed the core-pipeline tasks (554, 544, 535, 546, 661, 548, 659, 543, 696, 698, 700, 618, 585, 566, 567, 569, 561, 528, 570, 645–654, 644, 551, 584) → `extraction/tasks/*.md` + `pipeline_spec.md` + `defaults_audit.md`. Each cluster's status below reflects its port (S4–S9). Non-pipeline clusters (90, 43/contexts, 38/655, 524, 592/637/622, debug, misc UI) are S2.
 
 | Cluster (tasks) | XML | Ported to | Status |
 |---|---|---|---|
@@ -50,7 +50,7 @@ filled by S1/S2 during extraction.
 | Throttle reset: 566 | | runtime/BrightnessPipelineController.reinit (S9a — throttle = settings default on wake) | ported |
 | Manual override detect/resume: 567, 569, 561, 640, 641, 636 | | OverrideRules.kt (S5 pure logic, OverrideRulesTest.kt S5); runtime wiring: OverrideMonitor + controller pause/resume + recordOverridePoint (S9a); S12.6c added the task567 act8 settle-wait re-read (no rapid-light false-pause, G2R-F26/D-049) + device-exact AnimationRunner read-back, and **captures+persists** the points to `OverridePointStore` (G2R-F13, closes D-044c). 640/641/636 override-array CRUD UI = S12.6d; **S12.7i** decouples the override settle from the reactivity cooldown (settle = `%AAB_CycleTime`, not `%AAB_Throttle`; G2R-F71, D-062) | ported (detect/pause/resume + capture/persist) |
 | Panic reset: 528 | | runtime/BrightnessPipelineController.emergencyStop + notification Reset action; Gate-1 G1-F4 fix: panic is a FULL STOP (restore 255 + drop dimming + %AAB_Service=Off + service teardown), not a pausable state (D-041); **S12.8a/G2R-F77**: sensor gesture detector + SOS morse vibration (task528 act0 code62) | ported |
-| Init/defaults: 570 Initialize AAB Defaults | | | pending |
+| Init/defaults: 570 Initialize AAB Defaults | | `AabSettings()` field defaults + `AabSettingsSerializer` v3 migration (S8) + `DefaultProfiles.kt` (S8); every value sourced from `defaults_audit.md` (task570/592/637) | ported |
 | Circadian dynamic scale: 90 (+ polar handling) | | SolarCalculator.kt + DynamicScaleEngine.kt (S6 domain, golden-tested circadian.csv 576 rows, CircadianParityTest + 4 polar assertions); BrightnessEngine delegates computeDynamicScale (D-031). **S12.7i (F73)**: the live pipeline now feeds the REAL sunrise windows — `CircadianWindowProvider` wires `SolarCalculator.compute`/`buildScheduleWindows` (today+location, or the F39 fixed override) into `buildInput` (was the fixed 6–8am-UTC `TimeContext` defaults → `%AAB_ScaleDynamic` 0.852 at 06:13 UTC for everyone, D-061); `now` UTC-frame matches the windows. **S12.8d (F73/F39/F83)**: tz offset now read at the TARGET date instant (DST-aware; matters for fixed dates) — the UTC frame already matched Tasker (act0/act59 both `%…%86400`), so the residual ~1h-early evening ramp was the location-null → default-window fallback; fixed Date/Location resolve INDEPENDENTLY (date-only/loc-only/both); task90 act5–41 daily location acquisition ported (skip-when-fixed → Android last-known/fresh → ip-api.com geo-IP fallback, INTERNET perm + scoped cleartext). domain/ fenced | ported (engine + runtime solar-window wiring + DST + location acquisition) |
 | Context evaluation: 43, 623, 624, 625, 626, 628, 630, 631, 633, 105, 26 | | S10: ContextOverrideResolver (task43 PASS3/4, 21-case matrix test) + ContextEngine (PASS1 cooldown/PASS2 veto) + ContextRuleStore (task623 upsert/delete CRUD); S12.7c lands the 630/631 location-listener subsystem (continuous gated/debounced `locationUpdates`, D-056), priority-ordered rule list (F43), legacy profiles as rule targets (F44), day-of-week picker (F67) + sunrise/sunset resolved-time tokens (F68); **S12.7i**: "Clear time" affordance nulls `ContextTriggers.timeRange` so a time-constrained rule can become time-agnostic again (G2R-F72, D-062) | ported (eval + CRUD + location listener + rule-UI fidelity) |
 | Privilege detection/grant: 378, 643, 563 | | S2 extracted → features_spec.md; platform layer: AndroidPrivilegeManager + ShizukuGrantGateway (S7); S11 UI: OnboardingScreen stepper (POST_NOTIFICATIONS → WRITE_SETTINGS re-check → optional ELEVATED with adb-copy/Shizuku/root + usage-access) and Dashboard tier badge; Shizuku user-service `pm grant` exec completed (AIDL IShizukuUserService, closes D-032) | ported (detect + grant UI + Shizuku exec) |
@@ -58,15 +58,15 @@ filled by S1/S2 during extraction.
 | Foreground notification: 584, 692 | | S2 extracted → features_spec.md; runtime/AmbientMonitoringService live lux/target notification + Pause/Resume/Reset/Disable actions (S9a) | ported |
 | Curve suggestion wizard: 38, 655 | | CurveSuggestionEngine.kt (S6 domain, golden-tested wizard.csv 12 rows, WizardParityTest); applyToLiveCurve = task655 | ported |
 | Formula validation: 583, 707 | | S2 extracted → features_spec.md; SettingsValidator.kt (S8 — 5 rules: form2A<0, form3A<0, form2C>zone1End + predicted-brightness@1000lux<25 safety). S12.6d: the 3 form-coefficient rules now carry `Severity.CRITICAL` and **block Apply** (G2R-F18/D-052 sanctioned deviation); safety/range stay advisory. **S12.9c** (#6/#7): signed Spread (Circadian) `-100..100` validator + clamp fix (the negative-boost path was being clamped to 1, defeating S12.9b); cross-field advisories for dimming-strength>65 (task607), dimming-threshold<minBright (task513), taper-midpoint>maxBright (task665/689), min-wait>max-wait (task403); `validation_audit.md` audits all Tasker guards (5 fixed, ~14 cosmetic deferred to S14); pre-existing `⚠️` glyphs stripped (no-glyph policy) | ported |
-| Power draw calibration: 524 | | S2 extracted → features_spec.md; Tools entry + PowerDrawChart slot (S12); on-device current-sampling measurement deferred (D-044) | partial (UI entry S12; measurement deferred) |
+| Power draw calibration: 524 | | S2 → features_spec.md. **S14 full port:** `domain/power/PowerDrawCalibration` (geometric steps + µA→mA normalize + net-of-idle post-process, golden-style tested) + `platform/context/PowerMeter` (CURRENT_NOW/voltage/status) + `app/runtime/PowerDrawCalibrator` (ramp→baseline→latch-breaker sweep, fake-meter tested) + `PowerDrawStore` persistence + Tools calibrate flow (prep dialog → drives the Activity window brightness → progress) → `PowerDrawChart` renders the measured curve | ported |
 | Profiles/import/export/defaults: 592, 637, 622 | | DefaultProfiles.kt (S8); AabSettings v2 + migration + TaskerLegacyProfileSerializer (S8); ContextRuleStore (S10); Profiles screen (S12 — apply/reset + CreateDocument/OpenDocument import-export incl. legacy). **S12.6d**: user-editable saved profiles (UserProfileStore: built-ins seeded once + Save-current-as + overwrite + delete + **Restore factory profiles**, G2R-F15); AppProfileCatalog reads the store so context rules target user profiles (closes D-042c); **SAF folder grant** (OpenDocumentTree→Download/AAB/configs, list+load *.json via LegacyConfigImporter, G2R-F16); per-screen reset (G2R-F17); manual-load context lock + Resume (G2R-F30). **S12.7i**: legacy "Load" now parses the REAL nested-JSON config (task637 performSave/performLoad schema, not just `%AAB_Key=value`) and COMMITS the parsed `AabSettings` + reapplies (G2R-F70, D-062) — previously a JSON config parsed to all-defaults. **S12.9c** (#3/#4): profile load returns a typed `ProfileLoadResult` (Success/LegacyFallback/TotalFailure); an unreadable file shows a user-visible error card instead of failing silently; `TaskerLegacyProfileSerializer` throws `LegacyProfileParseException` on structurally-invalid input (a valid-but-empty config still loads to task570 defaults) | ported |
 | Debug tooling: 634, 635 | | S12.6b: dedicated **Live Debug Info** scene (AppRoute.LiveDebug, in Menu) = glass-box %AAB_* readout grouped per debug.md (Core Metrics / Circadian & Scale / System Status / Performance), gold values, G2R-F6; the 10-label debug selector is now GLOBAL there (moved off Misc, preserved across profile/reset/draft applies, G2R-F9) + per-screen DiagnosticCards on Reactivity/Circadian (G2R-F7/F8); teal custom-view debug toasts (G2R-F10). Runtime debug toasts for all 10 %AAB_Debug categories via DebugSink/ToastDebugSink (S12.5c, G2-F15: LIGHT_EVAL/ANIMATION/DYNAMIC_SCALE/GRAPH_METRICS/SKIP_ANIMATIONS in the pipeline, SUPER_DIMMING in the coordinator, CONTEXT_AUTOMATION/LOCATION in ContextEngine); **S12.7e**: flashes routed through a process-wide `AabFlash` channel — cancel-previous not stack (G2R-F51), instant debug-off via cancel+reapply (G2R-F52), opt-in system-wide flashes via `AabToastAccessibilityService` overlay (G2R-F50), `DynamicScaleDebugGate` 2-min transition timing (G2R-F48), `OVERLAY_PREVIEW` colour flash on the unprivileged super-dimming fallback (G2R-F49); persistent in-app log view deferred (D-044) | ported (Live Debug scene + global selector + diagnostic cards + runtime toasts + global/cancel/instant-off + overlay-preview; log view deferred) |
-| Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | S2 extracted → screen_map.md (scene dispositions) | pending |
+| Misc UI plumbing tasks (scene-resize 620, exits 656, toggles 547/553/555/558/560/576/587/589/638/648/649, chartjs cache 581, logo 619, color 639/379/579/652, about/license/guide 380/401/512, updates 706, experiments 540/541/542/381/382) | | S2 → screen_map.md. **Ported as Compose equivalents:** logo 619→adaptive launcher icon (S13c/S14); colours 639/379/579/652→`theme/Color.kt` (S12.5a); about/license/guide 380/401/512→About/UserGuide screens (S13d); experiments 540/541/542→Circadian date/loc + charts (S12.7h/S12.8d); toggles 547/…→Compose switches/state (S12). **Dropped as obsolete in native Compose:** scene-resize 620, scene-exits 656, Chart.js cache 581, in-app update-check 706 (no Tasker scenes / no Chart.js / store-managed updates) | ported (live tasks ported; Tasker-scene-only tasks dropped as obsolete) |
 | **Anonymous scene-handler tasks (168 unnamed**, incl. 34 `keyTask` back-key handlers) | various | S3.5 census + S12 Step-0 triage (a/b/c buckets) → extraction/tasks/anonymous_handlers.md | ported (S12 — (a)/(b) dropped w/ shared reasons, (c) ported into 7 screens; chart-gen rows deferred-S13) |
 
 ## Scenes (20) → M3 screens (~9, per S2 screen_map.md)
 
-> S2 extracted all 20 scenes → `extraction/scenes/*.md` (450-element tables) + `screen_map.md` (full disposition matrix). 'Ported to' = target M3 screen; Status `pending` until rendered (S11–S13).
+> S2 extracted all 20 scenes → `extraction/scenes/*.md` (450-element tables) + `screen_map.md` (full disposition matrix). 'Ported to' = target M3 screen; each row's status reflects the rendered screen (S11–S13).
 
 | Scene | XML | Ported to | Status |
 |---|---|---|---|
@@ -85,7 +85,7 @@ filled by S1/S2 during extraction.
 | AAB Dimming Graph | L3006 | Super Dimming (DimmingChart) | ported (S13d — `DimmingChart` = `SoftwareDimming.dimProgress×100` + dim-shell + ref `pow(1−b/15,2.5)` over brightness; fills `dimming_chart`) |
 | AAB Circadian Dimming Graph | L2388 | Super Dimming (CircadianChart; re-homed S3.5/D-026, visible only when %AAB_ScalingUse on) | ported (S13d — `CircadianDimmingChart` plots `DynamicScaleEngine.dimDynamic` over the day via `SolarCalculator` windows; fills `circadian_dimming_chart`) |
 | AAB Taper Graph | L8387 | Circadian (TaperChart) | ported (S13d — `TaperChart` = `BrightnessEngine.compressedDynamicScale.effectiveScale` for day/night spread over brightness; fills `taper_chart`) |
-| AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | ported (S13d — `PowerDrawChart` renders measured power/current via `ChartCanvas`, EmptyState until on-device calibration runs (D-044/Gate); fills `power_draw_chart`) |
+| AAB Power Draw Graph | L5611 | Tools (PowerDrawChart) | ported (S13d chart render; **S14** wires the real task524 calibration that feeds it — `EmptyState` until the user runs a calibration, then the measured power/current curve; fills `power_draw_chart`) |
 | AAB Experiment Graph | L3170 | Circadian (ExperimentChart) | ported (S13d — `CircadianScaleChart` plots `DynamicScaleEngine.scaleDynamic` over the day; fills `dynamic_scale_chart`) |
 | AAB About | L799 | About+Guide+Onboarding | ported (S13d — `AboutScreen`: banner + intro + acknowledgments + MIT license, app version; Chart.js ack dropped) |
 | AAB User Guide | L8551 | About+Guide+Onboarding | ported (S13d — `UserGuideScreen`: 9-section manual in M3 cards; post-onboarding first-run destination, G2R-F80) |
@@ -96,10 +96,10 @@ filled by S1/S2 during extraction.
 | Block (task · line) | Extracted (S1/S2) | Reference impl (S4/S6) | Production port | Status |
 |---|---|---|---|---|
 | task105 L8906 · _GetWifiNoLocation | ✓ S1 | | platform/WifiInfoReader: real _GetWifiNoLocation V3 order (S12.7d, G2R-F41) — Shizuku `cmd wifi status` (ShizukuShell.exec) → in-process `dumpsys wifi` → Location NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) last (WifiSsidStrategies.kt) | ported (no-Location SSID order) |
-| task378 L9468 · _PrivilegeDetection | ✓ S1 | | | pending |
+| task378 L9468 · _PrivilegeDetection | ✓ S1 | | platform/privilege/AndroidPrivilegeManager.detectTier (S7) — WRITE_SECURE→WRITE_SETTINGS→NONE first-hit probe (D-016/D-024; never reads the adbwp pref) | ported |
 | task38 L9921 · _SuggestCurveParameters | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.kt (S6) | ported |
 | task43 L12091 · _EvaluateContexts | ✓ S1 | | domain/context/ContextOverrideResolver.kt + app/runtime/ContextEngine.kt (S10) | ported |
-| task524 L14246 · _CalibratePowerDraw | ✓ S1 | | | pending |
+| task524 L14246 · _CalibratePowerDraw | ✓ S1 | ✓ S14 (`PowerDrawCalibration`) | domain `PowerDrawCalibration` + platform `PowerMeter` + app `PowerDrawCalibrator` (latch-breaker sweep) + `PowerDrawStore` + Tools calibrate UI (drives the Activity window) → `PowerDrawChart` (S14) | ported |
 | task535 L15204 · Lux Smoothing | ✓ S1 | ✓ S4 | BrightnessEngine.smoothLux (S5) | ported |
 | task543 L15878 · Calculate Animation | ✓ S1 | ✓ S4 | BrightnessEngine.calculateAnimation (S5) | ported |
 | task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | BrightnessEngine.dynamicThreshold (S5) | ported |
@@ -110,18 +110,18 @@ filled by S1/S2 during extraction.
 | task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | ui/graph/DimmingChart.kt (S13d — `SoftwareDimming.dimProgress`/dim-shell) | ported (chart render S13d) |
 | task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | ui/graph/ReactivityChart.kt `AlphaResponseChart` (S13d) | ported (chart render S13d) |
 | task563 L19677 · _AskPermissionsV7 | ✓ S1 | | app/ui/onboarding/OnboardingScreen.kt — notifications → WRITE_SETTINGS → Location → ELEVATED → usage; S12.7d adds restricted-settings hint (F33) + Location step (F41) + Menu landing (F57) | ported (onboarding gates) |
-| task592 L24132 · _CreateDefaultProfiles | ✓ S1 | | | pending |
+| task592 L24132 · _CreateDefaultProfiles | ✓ S1 | | DefaultProfiles.kt (S8 — 5 presets from task592) + UserProfileStore built-in seeding + factory restore (S12.6d) | ported |
 | task618 L25826+L26096 · Set Initial Brightness (×2) | ✓ S1 | ✓ S4 | InitialBrightness.kt (S5) | ported |
-| task620 L26400 · _AdaptiveBrightnessSceneSize | ✓ S1 | | | pending |
+| task620 L26400 · _AdaptiveBrightnessSceneSize | ✓ S1 | | — | dropped(Tasker scene auto-sizing — obsolete; Compose lays out responsively, no fixed-size scenes) |
 | task623 L26926 · _ContextManager | ✓ S1 | | app/settings/ContextRuleStore.kt (S10 — upsert/delete CRUD) | ported |
-| task625 L27185 · _AppPicker | ✓ S1 | | | pending |
+| task625 L27185 · _AppPicker | ✓ S1 | | Compose app picker in the context-rule editor (S12.5c/S12.9f) — `ContextsViewModel.installedApps()` via `PackageManager.queryIntentActivities(LAUNCHER)` + launcher `<queries>` + icons | ported |
 | task626 L27355 · _ContextResume | ✓ S1 | | mergeProfile() 39-key snapshot (S10); RESUME caller (cooldown 0/forced eval) | ported (snapshot+caller) |
-| task630 L27585+L27817 · _ContextLocnListener (×2) | ✓ S1 | | | pending |
-| task631 L27939+L28432 · _ContextF5NetLoc (×2) | ✓ S1 | | | pending |
+| task630 L27585+L27817 · _ContextLocnListener (×2) | ✓ S1 | | platform/context/AndroidLocationReader.locationUpdates continuous listener hosted in the FGS scope, gated on the [LOC] token + ≥100 m debounce (S12.7c, prof765/766, D-056) | ported |
+| task631 L27939+L28432 · _ContextF5NetLoc (×2) | ✓ S1 | | subsumed by the continuous `locationUpdates` listener (S12.7c/D-056); task631's adaptive-backoff/zombie watchdog folds into the OS `requestLocationUpdates` lifecycle | ported (subsumed) |
 | task633 L28827 · _GetWifiForContext | ✓ S1 | | platform/WifiInfoReader.currentSsid (S12.7d) — typed SsidResult feeding the rule editor's "use current SSID" via the no-Location order | ported (editor SSID read) |
-| task636 L28993 · _DeleteOverridePoint | ✓ S1 | | | pending |
-| task637 L29303 · _ProfileManager | ✓ S1 | | | pending |
-| task643 L30505 · _LearnWriteSecure | ✓ S1 | | | pending |
+| task636 L28993 · _DeleteOverridePoint | ✓ S1 | | OverridePointStore.delete + tap-to-delete on BrightnessCurveChart (S12.7g, F36); DraftSettingsViewModel.deleteOverridePoint | ported |
+| task637 L29303 · _ProfileManager | ✓ S1 | | UserProfileStore + ProfileImportExportManager + TaskerLegacyProfileSerializer nested-JSON (task637 performSave/performLoad schema) (S12.6d/S12.7i/S12.9c) | ported |
+| task643 L30505 · _LearnWriteSecure | ✓ S1 | | PrivilegeManager grant helpers (adb instruction / Shizuku user-service / root, S7) + OnboardingScreen ELEVATED step (S11) + Shizuku three-state availability (S12.9b); D-016/D-024 — never reads the adbwp pref | ported |
 | task655 L32591 · _SetSuggestedVariables | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.applyToLiveCurve (S6) | ported |
 | task657 L32986 · _GenerateCompressionGraph | ✓ S1 | | ui/graph/TaperChart.kt (S13d — `BrightnessEngine.compressedDynamicScale.effectiveScale`) | ported (chart render S13d) |
 | task663 L33944+L34370 · _GenerateGraph (×2) | ✓ S1 | ✓ S4 (cross-validation oracle, D-002) | chart render = S13 BrightnessCurveChart | reference (chart S13) |

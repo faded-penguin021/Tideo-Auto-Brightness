@@ -7,9 +7,10 @@ import androidx.compose.ui.geometry.Offset
 import com.tideo.autobrightness.app.ui.components.EmptyState
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.app.ui.theme.AabTeal
+import com.tideo.autobrightness.domain.power.PowerDrawSample
 
-/** One measured calibration point (Tasker: task524 `_CalibratePowerDraw` JSON `data` row). */
-data class PowerDrawSample(val brightness: Int, val powerW: Double, val currentMa: Double)
+// S14: `PowerDrawSample` is now the canonical domain type (com.tideo.autobrightness.domain.power) so the
+// calibrator (task524 port) produces the exact rows this chart renders. Fields are accessed by name.
 
 /**
  * AAB Power Draw Graph (Tasker: task524 `_CalibratePowerDraw`, feeds %AAB_HTML_Graph8). Unlike the

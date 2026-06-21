@@ -5,6 +5,7 @@ import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
+import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -52,6 +53,9 @@ class BrightnessPipelineController(
     // F73: real solar ramp windows for the dynamic-scale engine. Default `{ null }` keeps the old
     // fixed-window behaviour (and existing tests) intact; AppModule supplies the live provider.
     private val circadianWindowsProvider: (transitionFactor: Double) -> CircadianWindows? = { null },
+    // prof759/task545 proximity damp. Optional: null (controller unit tests / no proximity sensor) →
+    // never near → no damp, so existing behaviour and golden parity are unchanged.
+    private val proximitySource: ProximitySensorSource? = null,
 ) : ControllerHook, PipelineRuntimeContext {
 
     private val engine = BrightnessEngine()
@@ -111,6 +115,12 @@ class BrightnessPipelineController(
     private var sensorJob: Job? = null
     private var overrideJob: Job? = null
 
+    // prof759/task545 proximity → %AAB_Proximity (the ×0.1 smoothing damp). Its job lifecycle lives in
+    // ProximityTracker so this stays an orchestrator (PipelineFileLayoutTest); written via atomic update.
+    private val proximityTracker = ProximityTracker(proximitySource, scope) { near ->
+        _state.update { it.copy(proximityNear = near) }
+    }
+
     // --- PipelineRuntimeContext: the single-writer accessors the cycle runner reaches state through ---
 
     override val stateValue: PipelineState get() = _state.value
@@ -143,6 +153,7 @@ class BrightnessPipelineController(
         sensorJob?.cancel(); sensorJob = null
         overrideJob?.cancel(); overrideJob = null
         consumerJob?.cancel(); consumerJob = null
+        proximityTracker.stop()
         inCycle.set(false)
     }
 
@@ -173,6 +184,7 @@ class BrightnessPipelineController(
         sensorJob?.cancel(); sensorJob = null
         overrideJob?.cancel(); overrideJob = null
         consumerJob?.cancel(); consumerJob = null
+        proximityTracker.stop()
         inCycle.set(false)
         panicHandler.execute() // task528 act6-8: restore 255 + drop dimming
         _state.value = PipelineState(serviceOn = false)
@@ -183,6 +195,7 @@ class BrightnessPipelineController(
         sensorJob = scope.launch {
             lightSensor.samples().collect { sample -> onSensorSample(sample.lux.toDouble(), sample.accuracy) }
         }
+        proximityTracker.start()
     }
 
     /**
@@ -262,6 +275,7 @@ class BrightnessPipelineController(
     /** prof753/task585 hibernate: stop sensing and clear the runtime loop state. */
     private fun hibernate() {
         sensorJob?.cancel(); sensorJob = null
+        proximityTracker.stop()
         inCycle.set(false)
         dimming.disengage() // task585: drop super dimming when the display goes off
         _state.update {
@@ -272,6 +286,7 @@ class BrightnessPipelineController(
                 threshAbsLow = null,
                 threshAbsHigh = null,
                 cycleTimeMs = null,
+                proximityNear = false,
             )
         }
     }

@@ -94,6 +94,20 @@ class DraftSettingsViewModelTest {
     }
 
     @Test
+    fun apply_clampsOutOfRangeValues() {
+        // D-085 (S14): a parameter screen must never persist an unsafe value. An out-of-range draft
+        // (maxBrightness 999) is clamped on Apply (→ 255) rather than written raw to the engine.
+        setBaseline(AabSettings(maxBrightness = 200))
+        val vm = seededVm()
+        vm.edit { it.copy(maxBrightness = 999) }
+        idle()
+        vm.apply()
+
+        val result = awaitCommitted { it.maxBrightness == 255 }
+        assertEquals(255, result.maxBrightness, "Apply clamps out-of-range values (validate)")
+    }
+
+    @Test
     fun apply_preservesServiceEnabledFromCommitted() {
         // serviceEnabled is a runtime/identity field — Apply must not flip the master switch.
         setBaseline(AabSettings(serviceEnabled = false, offset = 0))

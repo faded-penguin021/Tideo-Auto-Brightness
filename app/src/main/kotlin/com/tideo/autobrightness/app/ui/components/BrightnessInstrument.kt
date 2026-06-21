@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -57,6 +58,16 @@ fun BrightnessInstrument(
     val applied = state.currentBrightness ?: state.targetBrightness
     val target = state.targetBrightness
 
+    // Roll the big number to its new value instead of snapping (owner: "numbers changing"). The
+    // pipeline publishes a settled value per cycle, so without this the figure jumps in one step. On
+    // first composition animateIntAsState initialises to the target (no spurious count-up from 0).
+    val displayValue = applied ?: target
+    val animatedValue by animateIntAsState(
+        targetValue = displayValue ?: 0,
+        animationSpec = tween(AabMotion.DURATION_MEDIUM),
+        label = "instrument_value",
+    )
+
     // Greyed out when off; near-white instrument readout when running.
     val numberColor by animateColorAsState(
         if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -81,7 +92,7 @@ fun BrightnessInstrument(
         // The big number: applied 0–255 level, tabular Plex Mono.
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                applied?.toString() ?: "—",
+                if (displayValue != null) animatedValue.toString() else "—",
                 style = AabDataDisplayLarge,
                 color = numberColor,
                 modifier = Modifier.testTag("dashboard_brightness"),

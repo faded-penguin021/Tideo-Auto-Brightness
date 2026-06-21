@@ -9,6 +9,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.settings.Severity
 import com.tideo.autobrightness.app.settings.SettingsValidator
+import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
@@ -123,7 +124,12 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
      * Apply cannot flip the master switch or the context lock.
      */
     fun apply() {
-        val toCommit = _draft.value
+        // D-085 (S14 carry-forward): clamp out-of-range fields on commit so a parameter screen can
+        // never persist an unsafe value (e.g. maxBrightness 999, scale 0). This is the same per-field
+        // clamp every other persistence path already runs (SettingsStore, import/export, legacy); the
+        // draft Apply used to bypass it and write the raw draft straight to DataStore. Critical errors
+        // (form coefficients) still block Apply earlier via hasCriticalError.
+        val toCommit = _draft.value.validate()
         viewModelScope.launch {
             val committedNow = app.settingsDataStore.updateData { current ->
                 toCommit.copy(

@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.platform.context
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
@@ -67,6 +68,9 @@ class AndroidWifiInfoReader(
     }
 
     // The Location-gated NetworkCallback path — the LAST fallback (was the only path pre-S12.7d).
+    // MissingPermission: ConnectivityManager needs ACCESS_NETWORK_STATE (a normal perm the app declares);
+    // the SSID read is additionally Location-gated by the checkSelfPermission below.
+    @SuppressLint("MissingPermission")
     private suspend fun locationCallbackSsid(): SsidResult {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val caps = cm.getNetworkCapabilities(cm.activeNetwork)
@@ -102,6 +106,7 @@ class AndroidWifiInfoReader(
         return ssid?.let { SsidResult.Connected(it) } ?: SsidResult.Unknown
     }
 
+    @SuppressLint("MissingPermission") // ConnectivityManager registerNetworkCallback needs ACCESS_NETWORK_STATE (app-declared).
     override fun ssidFlow(): Flow<String?> = callbackFlow {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val request = NetworkRequest.Builder()

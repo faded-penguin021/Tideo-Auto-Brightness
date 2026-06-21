@@ -122,6 +122,9 @@ fun SuperDimmingContent(
                             dimmingExponent = draft.dimmingExponent.toDouble(),
                             dimmingStrength = draft.dimmingStrength,
                             modifier = Modifier.testTag("dimming_chart"),
+                            // Live "Now" line at the current brightness, only while Extra Dim is engaged.
+                            currentBrightness = live.targetBrightness
+                                ?.takeIf { live.serviceOn && (live.dimmingDS > 0.0 || live.dimmingCurrent > 0.0) },
                         )
                     },
                     ChartSlot("Circadian Dimming", "circadian_dimming_chart") {

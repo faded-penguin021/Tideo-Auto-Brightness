@@ -146,4 +146,18 @@
     <string name="guide_s9_body">• **Apply:** makes changes active immediately, but not written to disk — lost on a profile load or app restart.\n• **Save (Profiles screen):** writes current settings to the selected profile — the only way to make changes permanent.\n• **Reset:** reverts the current tab to defaults.\n[TIP] After editing multiple tabs, save to your active profile; if using the context engine, overwrite the relevant profile or your changes are replaced when a rule fires.</string>
     <string name="guide_outro">Enjoy your new intelligent auto brightness!</string>
     <string name="guide_done">Got it</string>
+
+    <!-- Power-draw calibration (S14 — task524 _CalibratePowerDraw). -->
+    <string name="power_desc">Measures screen power across brightness levels by sweeping the display and sampling battery current (task524). Best with Airplane Mode on and the charger unplugged.</string>
+    <string name="power_calibrate">Calibrate power draw</string>
+    <string name="power_recalibrate">Recalibrate power draw</string>
+    <string name="power_calibrating">Calibrating…</string>
+    <string name="power_prep_title">Calibration prep</string>
+    <string name="power_prep_message">For accurate results:\n\n1. Enable Airplane Mode (important)\n2. Close background apps\n3. Do not touch the screen during the test\n4. Unplug the charger\n\nThe screen will sweep through brightness levels for ~1–2 minutes.</string>
+    <string name="power_start">Start</string>
+    <string name="power_cancel">Cancel</string>
+    <string name="power_result_success">Calibration complete (%1$d points)</string>
+    <string name="power_result_no_sensor">Battery current sensor not available on this device</string>
+    <string name="power_result_charging">Please unplug the charger and try again</string>
+    <string name="power_result_cancelled">Calibration cancelled</string>
 </resources>

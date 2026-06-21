@@ -82,7 +82,11 @@ fun ReactivityContent(
             ChartPager(
                 listOf(
                     ChartSlot("Reactivity curve", "reactivity_chart") {
-                        ReactivityChart(draft.toThresholdConfig(), Modifier.testTag("reactivity_chart"))
+                        ReactivityChart(
+                            draft.toThresholdConfig(), Modifier.testTag("reactivity_chart"),
+                            // Live "Now" line at the current smoothed lux (only while running).
+                            currentLux = live.smoothedLux?.takeIf { live.serviceOn },
+                        )
                     },
                     ChartSlot("Smoothing α", "alpha_chart") {
                         AlphaResponseChart(draft.deltaFactor.toDouble(), Modifier.testTag("alpha_chart"))

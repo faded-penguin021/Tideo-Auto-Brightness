@@ -48,6 +48,9 @@ class AmbientMonitoringService : Service() {
     private lateinit var controller: BrightnessPipelineController
     private lateinit var contextEngine: ContextEngine
     private lateinit var panicSensor: com.tideo.autobrightness.platform.sensor.PanicSensorSource
+    // Shared tier cache. Refreshed only at resume points (start + screen-on) so the dimming
+    // coordinator can read the cached tier per cycle instead of re-checking the permission (G1-F5).
+    private lateinit var privilegeManager: com.tideo.autobrightness.platform.privilege.PrivilegeManager
     private var notificationJob: Job? = null
     private var panicJob: Job? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -73,6 +76,9 @@ class AmbientMonitoringService : Service() {
      * automation). Clear the latch first (when set), then run the normal reinit + context re-evaluation.
      */
     private fun onScreenOn() {
+        // Re-detect the privilege tier on wake so a WRITE_SECURE_SETTINGS grant made while the service
+        // was running (ADB/Shizuku) is picked up here, rather than on every dimming cycle (G1-F5).
+        privilegeManager.refresh()
         controller.onScreenOn()
         scope.launch {
             if (applicationContext.settingsDataStore.data.first().contextOverride) {
@@ -98,6 +104,7 @@ class AmbientMonitoringService : Service() {
         controller = runtime.controller
         contextEngine = runtime.contextEngine
         panicSensor = runtime.panicSensor
+        privilegeManager = runtime.privilegeManager
 
         registerReceiver(
             screenReceiver,
@@ -155,6 +162,10 @@ class AmbientMonitoringService : Service() {
     }
 
     private fun ensureRunning() {
+        // Refresh the cached tier at the service-resume points (start / resume / reapply) so an
+        // out-of-band grant is reflected without the per-cycle permission check the dimming path used
+        // to do (G1-F5). currentTier() reads this cache thereafter.
+        privilegeManager.refresh()
         controller.start()
         contextEngine.start(scope)
         startPanicDetector()

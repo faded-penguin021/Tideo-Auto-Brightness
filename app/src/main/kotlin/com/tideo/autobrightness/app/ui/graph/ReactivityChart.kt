@@ -29,6 +29,9 @@ private val engine = BrightnessEngine()
 fun ReactivityChart(
     threshold: ThresholdConfig,
     modifier: Modifier = Modifier,
+    // S14: the live smoothed lux, shown as a "Now" line so the user sees where on the curve the
+    // pipeline is currently operating. null (service off / no reading yet) → no line.
+    currentLux: Double? = null,
 ) {
     val minLux = 1f
     val maxLux = 100_000f
@@ -59,11 +62,17 @@ fun ReactivityChart(
     // wasted most of the height — frame to the data (rounded up, min 1) keeping the 0 baseline.
     val yMax = ((curvePoints + referencePoints).maxOf { it.y } * 1.2f).coerceAtLeast(1f)
 
+    // S14: live "Now" line at the current smoothed lux (clamped into range so it stays visible).
+    val markers = currentLux?.let {
+        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(minLux, maxLux), label = "Now"))
+    } ?: emptyList()
+
     ChartCanvas(
         series = series,
         xRange = minLux..maxLux,
         yRange = 0f..yMax,
         xScale = AxisScale.Log10,
+        markers = markers,
         xAxisLabel = "Lux",
         yAxisLabel = "Threshold %",
         showLegend = true,

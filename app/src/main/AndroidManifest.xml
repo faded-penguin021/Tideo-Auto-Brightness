@@ -25,6 +25,9 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- task90 act28: geo-IP location fallback (http://ip-api.com/json) when no Android fix (F83). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- S14: ConnectivityManager (WifiInfoReader SSID NetworkCallback fallback) needs network state.
+         A normal permission, auto-granted at install — its absence would SecurityException that path. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- F89 audit — android.permission.DUMP is intentionally NOT declared: it is signature|privileged,
          so it cannot be granted to a normal app. The no-Location SSID path's in-process `dumpsys wifi`
          (WifiSsidStrategies) is permission-denied without it and simply falls through to the next

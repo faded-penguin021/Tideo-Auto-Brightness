@@ -13,8 +13,10 @@ android {
         applicationId = "com.tideo.autobrightness"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // S14 release prep: first acceptance-candidate build. 0.9.0 = "feature-complete, pending the
+        // Gate-3 on-device soak"; bumps to 1.0.0 once Gate 3 passes.
+        versionCode = 2
+        versionName = "0.9.0"
     }
 
     // Release signing is driven entirely by environment variables so that no
@@ -67,6 +69,17 @@ android {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
         }
+    }
+}
+
+// S14: unit tests run on the DEBUG variant only. The acceptance ladder is `:app:testDebugUnitTest`; the
+// Compose UI-test harness (`compose-ui-test-manifest`) is `debugImplementation` (its test ComponentActivity
+// is absent in release → "Unable to resolve activity"); and release unit tests re-run identical sources
+// with no added coverage. Disabling them keeps `./gradlew build` green + meaningful (it still assembles +
+// lints the release variant).
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variant ->
+        (variant as com.android.build.api.variant.HasUnitTestBuilder).enableUnitTest = false
     }
 }
 

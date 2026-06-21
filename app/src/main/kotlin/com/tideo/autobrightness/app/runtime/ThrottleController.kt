@@ -17,7 +17,11 @@ package com.tideo.autobrightness.app.runtime
  *    the throttle up to the **ceiling** `AnimSteps * MaxWait + 10` (task566 act0) so the sensor stops
  *    polling in unchanging light (battery). The next change resets it back to the actual duration.
  *
- * Single-writer: invoked only from the pipeline consumer coroutine (D-027), so no synchronization.
+ * Concurrency: [onSample] runs on the sensor-collector coroutine while [onCycleComplete]/[seed] run on
+ * the pipeline consumer (S12.8b'' moved the watchdog onto the sample path so it fires in stable light).
+ * The two touched fields are plain Longs with no compound invariant between them, so the `@Volatile`
+ * markers give the needed cross-thread visibility; a momentarily stale window self-corrects next sample
+ * (see the field rationale + the S12.9e volatile audit). No lock is warranted.
  */
 class ThrottleController(private val idleMs: Long = 10_000L) {
 

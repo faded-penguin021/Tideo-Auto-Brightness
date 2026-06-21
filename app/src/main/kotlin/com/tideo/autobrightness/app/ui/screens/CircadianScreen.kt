@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.runtime.LiveRuntimeState
+import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
@@ -67,6 +69,7 @@ fun CircadianScreen(
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
+    val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = rememberToaster()
     val scope = rememberCoroutineScope()
 
@@ -82,6 +85,7 @@ fun CircadianScreen(
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         criticalError = criticalError,
+        live = live,
         dateLocation = dateLocation,
         todayDate = extras.today(),
         defaultLatLon = defaultLatLon,
@@ -121,6 +125,7 @@ fun CircadianContent(
     onBack: () -> Unit,
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
+    live: PipelineState = PipelineState(),
     dateLocation: ExperimentDateLocation = ExperimentDateLocation(),
     todayDate: String = "",
     defaultLatLon: Pair<Double, Double>? = null,
@@ -157,6 +162,12 @@ fun CircadianContent(
                         TaperChart(
                             draft.toBrightnessCurveConfig(), draft.scaleSpread,
                             Modifier.testTag("taper_chart"),
+                            // Live "Now" line at the current brightness, only while circadian scaling
+                            // is actually shifting the curve (scaleDynamic ≠ 1).
+                            currentBrightness = live.targetBrightness?.takeIf {
+                                live.serviceOn && live.scalingUse &&
+                                    kotlin.math.abs((live.scaleDynamic ?: 1.0) - 1.0) > 0.001
+                            },
                         )
                     },
                 ),

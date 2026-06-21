@@ -4,12 +4,19 @@
   sun whose 8 rays double as dial ticks; a translucent ring around the sun + a gold fill arc read as
   an auto-brightness gauge, with a white knob at the level. Foreground layer (transparent); content
   within r33 of centre (54,54). SVG arc paths translate 1:1 to VectorDrawable pathData.
+
+  S14: the artwork is wrapped in a 0.88 scale group around the centre. At full size the dial knob
+  reached ~r36 — outside the r33 adaptive-icon safe zone — so it grazed the mask edge and felt
+  cramped (owner). Scaling to 0.88 pulls the widest point (the knob) in to ~r31.7, giving breathing
+  room without redrawing any path.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.88" android:scaleY="0.88">
 
     <!-- 8 ticks (rays-as-dial-marks), AabGold, r19→25 at every 45°. -->
     <path
@@ -43,4 +50,6 @@
     <path
         android:fillColor="#FFFFFFFF"
         android:pathData="M84,48 A6,6 0 1,1 83.99,48 Z" />
+
+    </group>
 </vector>

@@ -1,11 +1,16 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import android.app.Activity
+import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,14 +18,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import com.tideo.autobrightness.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.navigation.AppRoute
+import com.tideo.autobrightness.app.runtime.PowerDrawCalibrator
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
+import com.tideo.autobrightness.app.state.PowerDrawViewModel
 import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -28,17 +38,32 @@ import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.graph.PowerDrawChart
+import com.tideo.autobrightness.domain.power.PowerDrawSample
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionResult
 import com.tideo.autobrightness.domain.wizard.OverridePoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Tools: curve wizard + power-draw calibration (Tasker Debug Scene + wizard). The debug-category
  * selector moved to the Misc screen (G2-F2). */
 @Composable
-fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewModel()) {
+fun ToolsScreen(
+    navController: NavHostController,
+    vm: SettingsViewModel = viewModel(),
+    powerVm: PowerDrawViewModel = viewModel(),
+) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
+    val powerSamples by powerVm.samples.collectAsStateWithLifecycle()
+    val powerRunning by powerVm.running.collectAsStateWithLifecycle()
+    val powerProgress by powerVm.progress.collectAsStateWithLifecycle()
+    val powerHasData by powerVm.hasData.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val toast = rememberToaster()
+    var showPrep by remember { mutableStateOf(false) }
+
     ToolsContent(
         recordedPoints = overridePoints,
         onBack = { navController.popBackStack() },
@@ -63,6 +88,68 @@ fun ToolsScreen(navController: NavHostController, vm: SettingsViewModel = viewMo
                 )
             }
         },
+        powerSamples = powerSamples,
+        powerRunning = powerRunning,
+        powerProgress = powerProgress?.let { "${it.message} (${it.step}/${it.total})" },
+        powerHasData = powerHasData,
+        onCalibratePower = { showPrep = true },
+    )
+
+    // task524 entry: the prep dialog (Airplane Mode / close apps / don't touch / unplug) → Start runs
+    // the sweep, driving THIS Activity's window brightness (no WRITE_SETTINGS) and restoring it after.
+    if (showPrep) {
+        PowerCalibrationPrepDialog(
+            onStart = {
+                showPrep = false
+                val activity = context as? Activity
+                powerVm.calibrate(
+                    setScreenBrightness = { level ->
+                        withContext(Dispatchers.Main) { activity?.applyWindowBrightness(level) }
+                    },
+                    onResult = { result ->
+                        activity?.clearWindowBrightness()
+                        toast(powerResultMessage(context, result))
+                    },
+                )
+            },
+            onCancel = { showPrep = false },
+        )
+    }
+}
+
+private fun Activity.applyWindowBrightness(level: Int) {
+    val lp = window.attributes
+    lp.screenBrightness = (level / 255f).coerceIn(0.004f, 1f)
+    window.attributes = lp
+}
+
+private fun Activity.clearWindowBrightness() {
+    val lp = window.attributes
+    lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+    window.attributes = lp
+}
+
+private fun powerResultMessage(context: android.content.Context, result: PowerDrawCalibrator.Result): String =
+    when (result) {
+        is PowerDrawCalibrator.Result.Success -> context.getString(R.string.power_result_success, result.samples.size)
+        PowerDrawCalibrator.Result.SensorUnavailable -> context.getString(R.string.power_result_no_sensor)
+        PowerDrawCalibrator.Result.Charging -> context.getString(R.string.power_result_charging)
+        PowerDrawCalibrator.Result.Cancelled -> context.getString(R.string.power_result_cancelled)
+    }
+
+@Composable
+private fun PowerCalibrationPrepDialog(onStart: () -> Unit, onCancel: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.power_prep_title)) },
+        text = { Text(stringResource(R.string.power_prep_message)) },
+        confirmButton = {
+            Button(onClick = onStart, modifier = Modifier.testTag("power_start")) {
+                Text(stringResource(R.string.power_start))
+            }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.power_cancel)) } },
+        modifier = Modifier.testTag("power_prep_dialog"),
     )
 }
 
@@ -73,6 +160,11 @@ fun ToolsContent(
     onApplyWizard: (CurveSuggestionResult) -> Unit,
     recordedPoints: List<OverridePoint> = emptyList(),
     onPreviewGraph: () -> Unit = {},
+    powerSamples: List<PowerDrawSample> = emptyList(),
+    powerRunning: Boolean = false,
+    powerProgress: String? = null,
+    powerHasData: Boolean = false,
+    onCalibratePower: () -> Unit = {},
 ) {
     SettingsScaffold("Tools", onBack) { padding ->
         SettingsColumn(padding) {
@@ -82,14 +174,27 @@ fun ToolsContent(
             AabCard {
                 SectionHeader("Power-draw calibration", divider = true)
                 Text(
-                    "Measures screen power across brightness levels to build the power-draw chart. " +
-                        "On-device calibration (battery-current sampling) runs at Gate 2/3.",
+                    stringResource(R.string.power_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                // Measured at runtime (task524) — no data until on-device calibration runs (Gate/D-044),
-                // so this shows an empty state today and the real chart once samples exist.
-                PowerDrawChart(emptyList(), Modifier.testTag("power_draw_chart"))
+                // The real measured chart once samples exist; an EmptyState until the first calibration.
+                PowerDrawChart(powerSamples, Modifier.testTag("power_draw_chart"))
+                if (powerRunning) {
+                    Text(
+                        powerProgress ?: stringResource(R.string.power_calibrating),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.testTag("power_progress"),
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = onCalibratePower,
+                        modifier = Modifier.fillMaxWidth().testTag("calibrate_power"),
+                    ) {
+                        Text(stringResource(if (powerHasData) R.string.power_recalibrate else R.string.power_calibrate))
+                    }
+                }
             }
         }
     }

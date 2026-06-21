@@ -260,6 +260,8 @@ internal class PipelineCycleRunner(
             animation = settings.toAnimationConfig(),
             dynamicScaling = settings.toDynamicScalingConfig(),
             previous = previous,
+            // prof759/task545: damp the smoothing alpha ×0.1 while the proximity sensor reads near.
+            proximityNear = s.proximityNear,
         )
     }
 
