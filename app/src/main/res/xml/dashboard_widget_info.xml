@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AppWidget metadata for the dashboard widget. updatePeriodMillis=0 → the system never polls us;
+  updates are pushed event-driven from the running foreground service's publish path (battery-
+  efficient, per the owner's "provided that it can be done in a battery effective fashion"). The
+  widget shows live Brightness / lux / profile / context and offers service toggle + reset.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_dashboard"
+    android:previewLayout="@layout/widget_dashboard"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_description" />

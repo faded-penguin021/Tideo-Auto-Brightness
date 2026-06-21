@@ -132,6 +132,9 @@ fun ProfilesBody(
     // changed-vs-default) before applying. `previewProfile` holds the entry whose modal is open.
     var previewProfile by remember { mutableStateOf<SavedProfile?>(null) }
     var showCurrentSettings by remember { mutableStateOf(false) }
+    // Owner (final pre-S14): "Manage profiles & Export" collapse into ONE toggle so the saved-profiles
+    // list is the uncluttered default surface; the management/export actions are one tap away.
+    var showManage by remember { mutableStateOf(false) }
     // S13c' §07-C: the legacy Tasker import is collapsed by default (one-time migration).
     var showLegacy by remember { mutableStateOf(false) }
 
@@ -181,28 +184,33 @@ fun ProfilesBody(
         ProfileCard(entry, onApply = { previewProfile = entry }, onOverwriteProfile, onDeleteProfile)
     }
 
-    SectionHeader("Manage profiles", divider = true)
-    // G2R-F38: the Tasker dashboard compares active settings vs factory defaults (tuned
-    // values shown yellow) — surface the live set with the same gold highlighting.
-    OutlinedButton(
-        onClick = { showCurrentSettings = true },
-        modifier = Modifier.fillMaxWidth().testTag("view_current_settings"),
-    ) { Text("View current settings…") }
-    Button(
-        onClick = { showSaveDialog = true },
-        modifier = Modifier.fillMaxWidth().testTag("save_profile_as"),
-    ) { Text("Save current settings as…") }
-    OutlinedButton(
-        onClick = onRestoreFactory,
-        modifier = Modifier.fillMaxWidth().testTag("restore_factory"),
-    ) { Text("Restore factory profiles") }
-    OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth().testTag("reset_defaults")) {
-        Text("Reset settings to defaults")
-    }
-
-    SectionHeader("Export", divider = true)
-    Button(onClick = onExport, modifier = Modifier.fillMaxWidth().testTag("export_profile")) {
-        Text("Export current settings…")
+    // Owner (final pre-S14): the profile-management actions + Export folded under ONE collapsed toggle.
+    ExpandableSection(
+        title = stringResource(R.string.manage_profiles_header),
+        expanded = showManage,
+        onToggle = { showManage = !showManage },
+        testTag = "manage_section",
+    ) {
+        // G2R-F38: the Tasker dashboard compares active settings vs factory defaults (tuned
+        // values shown yellow) — surface the live set with the same gold highlighting.
+        OutlinedButton(
+            onClick = { showCurrentSettings = true },
+            modifier = Modifier.fillMaxWidth().testTag("view_current_settings"),
+        ) { Text("View current settings…") }
+        Button(
+            onClick = { showSaveDialog = true },
+            modifier = Modifier.fillMaxWidth().testTag("save_profile_as"),
+        ) { Text("Save current settings as…") }
+        OutlinedButton(
+            onClick = onRestoreFactory,
+            modifier = Modifier.fillMaxWidth().testTag("restore_factory"),
+        ) { Text("Restore factory profiles") }
+        OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth().testTag("reset_defaults")) {
+            Text("Reset settings to defaults")
+        }
+        Button(onClick = onExport, modifier = Modifier.fillMaxWidth().testTag("export_profile")) {
+            Text("Export current settings…")
+        }
     }
 
     // S13c' §07-C: the legacy Tasker import is a one-time migration, not a daily control — demote it to

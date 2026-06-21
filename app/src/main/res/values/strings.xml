@@ -49,6 +49,7 @@
     <string name="seg_rules">Rules</string>
     <string name="profile_more_actions">More actions</string>
     <string name="legacy_import_header">Import from Tasker AAB</string>
+    <string name="manage_profiles_header">Manage profiles &amp; Export</string>
     <string name="title_global_flash">Global flash (system-wide)</string>
 
     <!-- Dashboard -->
@@ -83,6 +84,29 @@
     <string name="dashboard_active_context">Active context</string>
     <string name="dashboard_service_health">Service health</string>
     <string name="dashboard_degraded">Degraded: %1$s</string>
+    <!-- Dashboard quick actions (owner: service toggle/reset + add QS tile / add widget). -->
+    <string name="dashboard_quick_actions">Quick actions</string>
+    <string name="dashboard_reset_auto">Reset to auto</string>
+    <string name="dashboard_add_tile">Add Quick Settings tile</string>
+    <string name="dashboard_add_widget">Add home-screen widget</string>
+    <string name="dashboard_tile_added">Quick Settings tile already added</string>
+    <string name="dashboard_tile_request_failed">Couldn\'t open the tile picker on this device</string>
+
+    <!-- Home-screen widget -->
+    <string name="widget_title">Tideo Auto Brightness</string>
+    <string name="widget_description">Live brightness, lux, profile and context with a quick service toggle and reset.</string>
+    <string name="widget_status_off">Off</string>
+    <string name="widget_status_active">Active</string>
+    <string name="widget_status_paused">Paused</string>
+    <string name="widget_status_starting">Starting…</string>
+    <string name="widget_caption_brightness">BRIGHTNESS</string>
+    <string name="widget_caption_lux">LUX</string>
+    <string name="widget_caption_profile">PROFILE</string>
+    <string name="widget_caption_context">CONTEXT</string>
+    <string name="widget_dash">—</string>
+    <string name="widget_turn_on">Turn on</string>
+    <string name="widget_turn_off">Turn off</string>
+    <string name="widget_reset">Reset</string>
 
     <!-- About screen (S13d — extraction/scenes/about.md). Chart.js acknowledgment dropped (removed in
          the Kotlin rebuild). -->

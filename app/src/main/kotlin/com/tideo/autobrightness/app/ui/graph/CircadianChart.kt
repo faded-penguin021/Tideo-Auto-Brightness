@@ -30,11 +30,15 @@ internal fun circadianCurve(
     longitude: Double?,
     dateEpochSec: Long,
     pickScale: Boolean,
+    // %AAB_ScaleTransitionFactor — widens the dawn/dusk ramp windows (task90 act76). Previously
+    // hard-coded to 0.1 here, so the Circadian-screen "Transition factor" field changed nothing on the
+    // graph even though the runtime honoured it (PipelineCycleRunner). Now threaded from the setting.
+    transitionFactor: Double = 0.1,
     steps: Int = 96,
 ): CircadianCurve {
     // UTC frame (tzOffsetHours = 0) → windows are UTC seconds-of-day, so the x-axis reads as UTC time.
     val solar = SolarCalculator.compute(latitude ?: DEFAULT_LAT, longitude ?: DEFAULT_LON, dateEpochSec, 0.0)
-    val windows = SolarCalculator.buildScheduleWindows(solar, scaleTransitionFactor = 0.1)
+    val windows = SolarCalculator.buildScheduleWindows(solar, scaleTransitionFactor = transitionFactor)
     val isPolar = solar.sunStatus == "polar"
 
     val points = (0..steps).map { i ->
@@ -96,9 +100,10 @@ fun CircadianDimmingChart(
     latitude: Double? = null,
     longitude: Double? = null,
     dateEpochSec: Long = System.currentTimeMillis() / 1000L,
+    transitionFactor: Double = 0.1,
 ) {
-    val curve = remember(scaling, latitude, longitude, dateEpochSec) {
-        circadianCurve(scaling, latitude, longitude, dateEpochSec, pickScale = false)
+    val curve = remember(scaling, latitude, longitude, dateEpochSec, transitionFactor) {
+        circadianCurve(scaling, latitude, longitude, dateEpochSec, pickScale = false, transitionFactor = transitionFactor)
     }
     val yMin = curve.points.minOf { it.y } - 0.05f
     val yMax = curve.points.maxOf { it.y } + 0.05f

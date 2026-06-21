@@ -20,6 +20,7 @@ import androidx.core.app.ServiceCompat
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.storage.settingsDataStore
+import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -196,6 +197,9 @@ class AmbientMonitoringService : Service() {
                     // renders without the panel being closed+reopened. The tile re-reads the live
                     // LiveRuntimeState/DataStore in onStartListening.
                     requestTileRefresh()
+                    // Home-screen widget live refresh: same event-driven path (only on a changed,
+                    // accepted cycle — no polling), so the widget tracks Brightness/lux/profile/context.
+                    DashboardWidgetProvider.refresh(applicationContext)
                     alertedOverride = model.pausedByOverride
                 }
         }
@@ -240,6 +244,8 @@ class AmbientMonitoringService : Service() {
         // Persist the disable so boot/screen receivers do not restart the loop.
         applicationContext.settingsDataStore.updateData { it.copy(serviceEnabled = false) }
         LiveRuntimeState.reset()
+        // Repaint the home-screen widget to its "Off" form now that the loop is gone.
+        DashboardWidgetProvider.refresh(applicationContext)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -399,6 +405,7 @@ class AmbientMonitoringService : Service() {
             val lastPublish = LiveRuntimeState.pipeline.value.lastPublishMs
             if (lastPublish == null || lastPublish < armedAt) {
                 LiveRuntimeState.reset()
+                DashboardWidgetProvider.refresh(applicationContext)
             }
         }, WATCHDOG_GRACE_MS)
     }

@@ -1,11 +1,19 @@
 package com.tideo.autobrightness.app.state
 
 import android.app.Application
+import android.app.StatusBarManager
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.graphics.drawable.Icon
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
+import com.tideo.autobrightness.app.runtime.BrightnessTileService
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
+import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
 import com.tideo.autobrightness.app.runtime.ServiceHealthStore
 import com.tideo.autobrightness.app.runtime.Staleness
 import com.tideo.autobrightness.app.settings.validate
@@ -117,4 +125,52 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // Resume remains, to clear a DETECTED manual override (pausedByOverride). The runtime Pause/Resume
     // events still exist for the notification/override path; the dashboard just doesn't offer Pause.
     fun resume() = AutoBrightnessRuntime.resume(app)
+
+    /** Owner: Reset = re-apply / snap to auto — force the pipeline to recompute now (clears a manual
+     *  override pause). No-op when the service is not running; the next start applies the settings. */
+    fun resetToAuto() = AutoBrightnessRuntime.reapply(app)
+
+    /** Whether the "Add Quick Settings tile" prompt is available (StatusBarManager API, Android 13+). */
+    fun canAddTile(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+    /** Whether to offer "Add widget": the launcher supports pinning AND none is placed yet (owner: only
+     *  offer it when one isn't already present). */
+    fun canAddWidget(): Boolean = runCatching {
+        AppWidgetManager.getInstance(app).isRequestPinAppWidgetSupported &&
+            !DashboardWidgetProvider.hasInstances(app)
+    }.getOrDefault(false)
+
+    /**
+     * Prompt the OS to add the QS tile (Android 13+). The system de-dupes: if the tile is already
+     * present it returns TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED — surfaced via [onResult] so the
+     * screen can toast "already added" rather than failing silently (owner: only when not present).
+     */
+    fun addTile(onResult: (Int) -> Unit) {
+        if (!canAddTile()) return
+        val sbm = app.getSystemService(StatusBarManager::class.java) ?: return
+        runCatching {
+            sbm.requestAddTileService(
+                ComponentName(app, BrightnessTileService::class.java),
+                app.getString(R.string.widget_title),
+                Icon.createWithResource(app, R.drawable.ic_stat_brightness),
+                app.mainExecutor,
+                { result -> onResult(result) },
+            )
+        }.onFailure { onResult(RESULT_REQUEST_FAILED) }
+    }
+
+    /** Prompt the launcher to pin the home-screen widget (no-op if unsupported). */
+    fun addWidget() {
+        runCatching {
+            val mgr = AppWidgetManager.getInstance(app)
+            if (mgr.isRequestPinAppWidgetSupported) {
+                mgr.requestPinAppWidget(ComponentName(app, DashboardWidgetProvider::class.java), null, null)
+            }
+        }
+    }
+
+    companion object {
+        /** Sentinel result for [addTile] when the request could not be dispatched at all. */
+        const val RESULT_REQUEST_FAILED = -1
+    }
 }

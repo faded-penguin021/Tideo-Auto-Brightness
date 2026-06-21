@@ -14,13 +14,16 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.app.ui.components.rememberToaster
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -43,10 +46,30 @@ import com.tideo.autobrightness.platform.privilege.Tier
 @Composable
 fun DashboardScreen(navController: NavHostController, viewModel: DashboardViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val toast = rememberToaster()
+    val tileAlreadyAdded = stringResource(R.string.dashboard_tile_added)
+    val tileFailed = stringResource(R.string.dashboard_tile_request_failed)
+    // Evaluated once when the dashboard is shown (cheap, non-reactive — these only change after the
+    // user adds a tile/widget, at which point they navigate away and back).
+    val canAddTile = remember { viewModel.canAddTile() }
+    val canAddWidget = remember { viewModel.canAddWidget() }
     DashboardContent(
         state = state,
         onToggleService = viewModel::setEnabled,
         onResume = viewModel::resume,
+        onResetToAuto = viewModel::resetToAuto,
+        canAddTile = canAddTile,
+        canAddWidget = canAddWidget,
+        onAddTile = {
+            viewModel.addTile { result ->
+                // TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED == 2 (Android 13+); only reachable there.
+                when (result) {
+                    2 -> toast(tileAlreadyAdded)
+                    DashboardViewModel.RESULT_REQUEST_FAILED -> toast(tileFailed)
+                }
+            }
+        },
+        onAddWidget = viewModel::addWidget,
         onOpenOnboarding = { navController.navigate(AppRoute.Onboarding.route) },
         onBack = { navController.popBackStack() },
     )
@@ -69,6 +92,11 @@ fun DashboardContent(
     onResume: () -> Unit,
     onOpenOnboarding: () -> Unit,
     onBack: () -> Unit,
+    onResetToAuto: () -> Unit = {},
+    canAddTile: Boolean = false,
+    canAddWidget: Boolean = false,
+    onAddTile: () -> Unit = {},
+    onAddWidget: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { AabTopBar(title = stringResource(R.string.title_dashboard), onBack = onBack) },
@@ -94,7 +122,54 @@ fun DashboardContent(
                 OverrideCard(state.serviceRunning, onResume)
             }
             ReadoutStrip(state)
+            QuickActionsCard(
+                serviceRunning = state.serviceRunning,
+                canAddTile = canAddTile,
+                canAddWidget = canAddWidget,
+                onResetToAuto = onResetToAuto,
+                onAddTile = onAddTile,
+                onAddWidget = onAddWidget,
+            )
             HealthCard(state.health)
+        }
+    }
+}
+
+/**
+ * Owner-requested quick actions: a "Reset to auto" control (re-apply / snap brightness to the
+ * computed value) shown while the service runs, plus one-tap shortcuts to add the Quick Settings tile
+ * and the home-screen widget — surfaced only when they can be added (the launcher supports pinning and
+ * no widget is placed yet; the tile prompt is Android 13+). Hidden entirely when nothing applies.
+ */
+@Composable
+private fun QuickActionsCard(
+    serviceRunning: Boolean,
+    canAddTile: Boolean,
+    canAddWidget: Boolean,
+    onResetToAuto: () -> Unit,
+    onAddTile: () -> Unit,
+    onAddWidget: () -> Unit,
+) {
+    if (!serviceRunning && !canAddTile && !canAddWidget) return
+    AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing)) {
+        Text(stringResource(R.string.dashboard_quick_actions), style = MaterialTheme.typography.labelMedium)
+        if (serviceRunning) {
+            FilledTonalButton(
+                onClick = onResetToAuto,
+                modifier = Modifier.fillMaxWidth().testTag("dashboard_reset"),
+            ) { Text(stringResource(R.string.dashboard_reset_auto)) }
+        }
+        if (canAddTile) {
+            OutlinedButton(
+                onClick = onAddTile,
+                modifier = Modifier.fillMaxWidth().testTag("dashboard_add_tile"),
+            ) { Text(stringResource(R.string.dashboard_add_tile)) }
+        }
+        if (canAddWidget) {
+            OutlinedButton(
+                onClick = onAddWidget,
+                modifier = Modifier.fillMaxWidth().testTag("dashboard_add_widget"),
+            ) { Text(stringResource(R.string.dashboard_add_widget)) }
         }
     }
 }

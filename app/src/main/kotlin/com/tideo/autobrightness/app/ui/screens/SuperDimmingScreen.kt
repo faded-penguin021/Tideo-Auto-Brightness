@@ -130,6 +130,7 @@ fun SuperDimmingContent(
                             Modifier.testTag("circadian_dimming_chart"),
                             latitude = circadianLat, longitude = circadianLon,
                             dateEpochSec = circadianDateSec,
+                            transitionFactor = draft.scaleTransitionFactor.toDouble(),
                         )
                     },
                 ),
