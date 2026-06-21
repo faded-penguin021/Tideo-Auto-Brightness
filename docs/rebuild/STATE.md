@@ -2025,8 +2025,10 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
     (swipe wins); owner reversed it ("charts have to be interactive"). Final: ALL charts keep
     `interactive=true`, the pager's `userScrollEnabled=false`, and page navigation is by **tap** — ‹ › arrows
     flanking the title (`chart_pager_prev`/`chart_pager_next`, wrap-around) + clickable page dots
-    (`chart_pager_dot_*`). The mis-rounded scrub readout (1.1 vs 1.15) is `ChartCanvas.formatReadout` — a
-    follow-up could refine its precision, noted for S14.
+    (`chart_pager_dot_*`). **Scrub tooltip rounding FIXED:** `ChartCanvas.formatReadout` now shows ~3
+    significant figures by magnitude with trailing zeros trimmed (1.15 reads "1.15", 5.8 "5.8", 35 "35"),
+    and the tooltip's x line reuses `xTickFormatter` so the time charts read HH:MM; the scrub dot now maps
+    secondary-axis series correctly.
   - **Circadian frame = UTC** (was local). Tasker's circadian graphs are UTC (`%TIMES%86400`), as is the
     runtime (D-061/D-065); the preview now matches, x-axis titled "Time of day (UTC)", **HH:MM** ticks via
     `xTickFormatter`, five labelled sun-event lines (Dawn/Sunrise/Noon/Sunset/Dusk).

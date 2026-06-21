@@ -271,10 +271,12 @@ fun ChartCanvas(
                 drawLine(axisColor, Offset(px, plotTop), Offset(px, plotBottom), 1.5f)
                 val dataX = pxToX(px, xScale, xRange, plotLeft, plotW)
                 val lines = buildList {
-                    add("x: ${formatReadout(dataX)}")
+                    // Match the x-axis label style (e.g. HH:MM on the time charts) when a formatter is set.
+                    add("x: ${xTickFormatter?.invoke(dataX) ?: formatReadout(dataX)}")
                     series.filter { it.inLegend && it.points.size >= 2 }.forEach { s ->
                         seriesValueAt(s.points, dataX)?.let { v ->
-                            drawCircle(s.color, radius = 5f, center = Offset(px, toPxY(v)))
+                            val py = if (s.onSecondaryAxis) toPxYSec(v) else toPxY(v)
+                            drawCircle(s.color, radius = 5f, center = Offset(px, py))
                             add("${s.label}: ${formatReadout(v)}")
                         }
                     }
@@ -494,11 +496,23 @@ internal fun nearestIndex(points: List<Offset>, target: Offset, maxDist: Float):
 private fun formatTick(v: Float): String =
     if (v >= 1000f || v == v.toInt().toFloat()) v.toInt().toString() else "%.2f".format(v)
 
-private fun formatReadout(v: Float): String = when {
-    abs(v) >= 1000f -> v.toInt().toString()
-    abs(v) >= 10f -> "%.0f".format(v)
-    abs(v) >= 1f -> "%.1f".format(v)
-    else -> "%.2f".format(v)
+/**
+ * Scrub-tooltip value format: ~3 significant figures by magnitude, with trailing zeros trimmed. So a
+ * circadian multiplier reads "1.15" (not "1.1"), an hour reads "5.8", a percent reads "35", and a lux
+ * reads "500" — full precision where it matters without noisy trailing zeros (owner: tooltip rounding).
+ */
+private fun formatReadout(v: Float): String {
+    val a = abs(v)
+    val s = when {
+        a == 0f -> "0"
+        a >= 1000f -> v.toInt().toString()
+        a >= 100f -> "%.0f".format(v)
+        a >= 10f -> "%.1f".format(v)
+        a >= 1f -> "%.2f".format(v)
+        a >= 0.1f -> "%.3f".format(v)
+        else -> "%.4f".format(v)
+    }
+    return if ('.' in s) s.trimEnd('0').trimEnd('.') else s
 }
 
 private fun formatDecade(d: Int): String = when {
