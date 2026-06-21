@@ -73,6 +73,9 @@ internal val EVENT_LABELS = listOf("Dawn", "Sunrise", "Noon", "Sunset", "Dusk")
 internal fun eventMarkers(events: List<Float>, color: androidx.compose.ui.graphics.Color): List<ChartMarker> =
     events.mapIndexed { i, h -> ChartMarker(color = color, x = h, label = EVENT_LABELS.getOrNull(i)) }
 
+/** Current UTC time-of-day as an hour (0..24) — the Tasker `now_utc` event line position. */
+internal fun nowUtcHour(): Float = (System.currentTimeMillis() / 1000L % 86_400L) / 3600f
+
 /** Format an hour-of-day (0..24, may be fractional) as a 24-h "HH:MM" clock label. */
 internal fun hourToHhmm(hour: Float): String {
     val total = (((hour % 24f) + 24f) % 24f) * 60f
@@ -106,7 +109,8 @@ fun CircadianDimmingChart(
         xRange = 0f..24f,
         yRange = yMin..yMax,
         markers = eventMarkers(curve.events, eventColor) +
-            ChartMarker(color = MaterialTheme.colorScheme.outlineVariant, y = 1f),
+            ChartMarker(color = MaterialTheme.colorScheme.outlineVariant, y = 1f) +
+            ChartMarker(color = MaterialTheme.colorScheme.error, x = nowUtcHour(), label = "Now"),
         xAxisLabel = "Time of day (UTC)",
         yAxisLabel = "Dim ×",
         xTickFormatter = ::hourToHhmm,

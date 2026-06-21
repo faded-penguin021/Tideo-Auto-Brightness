@@ -3,13 +3,16 @@ package com.tideo.autobrightness.app.state
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
+import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.LocationResult
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -41,13 +44,28 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
         (location.currentLocation() as? LocationResult.Available)
             ?.snapshot?.let { it.latitude to it.longitude }
 
-    /** Pin a fixed date and/or location (G2R-F39); null fields revert to live for that field. */
+    /** Pin a fixed date and/or location (G2R-F39); null fields revert to live for that field. The fixed
+     *  date/location drive the LIVE circadian scaling (CircadianWindowProvider), not just the preview, so
+     *  re-apply the pipeline immediately — otherwise the new %AAB_ScaleDynamic only lands on the next light
+     *  change (prof760 drops steady-light cycles). */
     fun set(date: String?, latitude: Double?, longitude: Double?) {
-        viewModelScope.launch { store.set(date, latitude, longitude) }
+        viewModelScope.launch {
+            store.set(date, latitude, longitude)
+            reapplyIfRunning()
+        }
     }
 
     fun useLiveData() {
-        viewModelScope.launch { store.clear() }
+        viewModelScope.launch {
+            store.clear()
+            reapplyIfRunning()
+        }
+    }
+
+    /** Force the runtime to recompute brightness with the new circadian windows (gated on serviceEnabled). */
+    private suspend fun reapplyIfRunning() {
+        val enabled = getApplication<Application>().settingsDataStore.data.first().serviceEnabled
+        if (enabled) AutoBrightnessRuntime.reapply(getApplication())
     }
 
     private companion object {

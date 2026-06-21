@@ -139,6 +139,9 @@ fun CircadianContent(
             // fallback inside the chart when no fix exists yet).
             val chartLat = dateLocation.latitude ?: defaultLatLon?.first
             val chartLon = dateLocation.longitude ?: defaultLatLon?.second
+            // The F39 fixed date must drive the chart too (sunrise/sunset shift with the date) — without
+            // this the curve ignored the date picker and always plotted today. Falls back to today.
+            val chartDateSec = chartDateEpochSec(dateLocation.date)
             ChartPager(
                 listOf(
                     ChartSlot("Circadian", "dynamic_scale_chart") {
@@ -146,6 +149,7 @@ fun CircadianContent(
                             draft.toDynamicScalingConfig(),
                             Modifier.testTag("dynamic_scale_chart"),
                             latitude = chartLat, longitude = chartLon,
+                            dateEpochSec = chartDateSec,
                         )
                     },
                     ChartSlot("Taper", "taper_chart") {
@@ -343,3 +347,7 @@ private fun parseDateMillis(date: String): Long? =
     runCatching { EXP_DATE_FORMAT.parse(date)?.time }.getOrNull()
 
 private fun formatDateMillis(millis: Long): String = EXP_DATE_FORMAT.format(java.util.Date(millis))
+
+/** Epoch seconds for the circadian charts: the fixed [date] (UTC midnight) if pinned, else now. */
+internal fun chartDateEpochSec(date: String?): Long =
+    date?.let { parseDateMillis(it)?.div(1000L) } ?: (System.currentTimeMillis() / 1000L)

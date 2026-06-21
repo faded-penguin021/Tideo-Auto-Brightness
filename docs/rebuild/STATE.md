@@ -2046,7 +2046,20 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   :platform:test`). (Affects S14 — `ChartCanvas` now has dual-axis/custom-tick/marker-label capability the
   owner sanctioned; treat as part of the chart engine going forward.)
 
-Append new entries as D-084, … with which segments they affect.
+- **D-084 (S13d — circadian date wiring + "Now" line; owner bug report).** The Circadian/Circadian-Dimming
+  charts ignored the F39 fixed **date** — the screen passed lat/lon to the chart but not the date, so the
+  curve always plotted today. **Fixes:** (1) `CircadianScreen` resolves `chartDateEpochSec(dateLocation.date)`
+  (UTC-midnight parse, else today) and passes it to `CircadianScaleChart`; the Super Dimming screen now reads
+  the same `ExperimentPrefsStore` override (via `CircadianExtrasViewModel`) and feeds date/lat/lon to
+  `CircadianDimmingChart`. (2) **Runtime, not just the chart:** the fixed date/location drive the LIVE scaling
+  (CircadianWindowProvider already observes the override), but nothing forced a recompute — so
+  `CircadianExtrasViewModel.set()`/`useLiveData()` now call `AutoBrightnessRuntime.reapply` (gated on
+  serviceEnabled), so the new `%AAB_ScaleDynamic` lands immediately instead of waiting for the next light
+  change (prof760 drops steady-light cycles). (3) **"Now" event line** added to both circadian charts
+  (Tasker `now_utc`) — a red vertical marker at the current UTC time-of-day, alongside the five labelled sun
+  events. Full ladder green. (Affects S14.)
+
+Append new entries as D-085, … with which segments they affect.
 
 ## Blockers
 

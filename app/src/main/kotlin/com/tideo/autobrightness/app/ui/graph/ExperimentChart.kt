@@ -35,7 +35,8 @@ fun CircadianScaleChart(
         xRange = 0f..24f,
         yRange = yMin..yMax,
         markers = eventMarkers(curve.events, eventColor) +
-            ChartMarker(color = MaterialTheme.colorScheme.outlineVariant, y = 1f),
+            ChartMarker(color = MaterialTheme.colorScheme.outlineVariant, y = 1f) +
+            ChartMarker(color = MaterialTheme.colorScheme.error, x = nowUtcHour(), label = "Now"),
         xAxisLabel = "Time of day (UTC)",
         yAxisLabel = "Scale ×",
         xTickFormatter = ::hourToHhmm,
