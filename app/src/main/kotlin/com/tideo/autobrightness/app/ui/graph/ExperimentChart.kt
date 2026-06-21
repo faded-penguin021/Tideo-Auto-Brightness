@@ -22,9 +22,10 @@ fun CircadianScaleChart(
     latitude: Double? = null,
     longitude: Double? = null,
     dateEpochSec: Long = System.currentTimeMillis() / 1000L,
+    transitionFactor: Double = 0.1,
 ) {
-    val curve = remember(scaling, latitude, longitude, dateEpochSec) {
-        circadianCurve(scaling, latitude, longitude, dateEpochSec, pickScale = true)
+    val curve = remember(scaling, latitude, longitude, dateEpochSec, transitionFactor) {
+        circadianCurve(scaling, latitude, longitude, dateEpochSec, pickScale = true, transitionFactor = transitionFactor)
     }
     val yMin = curve.points.minOf { it.y } - 0.05f
     val yMax = curve.points.maxOf { it.y } + 0.05f

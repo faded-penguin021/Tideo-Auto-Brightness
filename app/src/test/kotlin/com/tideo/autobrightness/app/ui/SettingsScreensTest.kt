@@ -431,6 +431,8 @@ class SettingsScreensTest {
         // S13c' §07-B: Overwrite/Delete moved behind a per-row overflow menu — open it to reach them.
         compose.onNodeWithTag("profile_menu_Default").performScrollTo().performClick()
         compose.onNodeWithTag("overwrite_profile_Default").assertExists()
+        // Owner (final pre-S14): manage/export actions live behind one collapsed toggle — open it first.
+        compose.onNodeWithTag("manage_section").performScrollTo().performClick()
         compose.onNodeWithTag("save_profile_as").performScrollTo().assertExists()
         compose.onNodeWithTag("restore_factory").performScrollTo().assertExists()
     }

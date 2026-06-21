@@ -150,6 +150,7 @@ fun CircadianContent(
                             Modifier.testTag("dynamic_scale_chart"),
                             latitude = chartLat, longitude = chartLon,
                             dateEpochSec = chartDateSec,
+                            transitionFactor = draft.scaleTransitionFactor.toDouble(),
                         )
                     },
                     ChartSlot("Taper", "taper_chart") {

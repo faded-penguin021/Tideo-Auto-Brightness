@@ -153,6 +153,44 @@ class UiShellTest {
     }
 
     @Test
+    fun dashboardContent_quickActions_resetAddTileAddWidget() {
+        // Owner: service toggle/reset + add-QS-tile / add-widget shortcuts on the Dashboard.
+        var reset = false; var addTile = false; var addWidget = false
+        compose.setContent {
+            MaterialTheme {
+                DashboardContent(
+                    state = DashboardUiState(serviceEnabled = true, serviceRunning = true),
+                    onToggleService = {}, onResume = {}, onOpenOnboarding = {}, onBack = {},
+                    onResetToAuto = { reset = true },
+                    canAddTile = true, canAddWidget = true,
+                    onAddTile = { addTile = true }, onAddWidget = { addWidget = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("dashboard_reset").performScrollTo().performClick()
+        compose.onNodeWithTag("dashboard_add_tile").performScrollTo().performClick()
+        compose.onNodeWithTag("dashboard_add_widget").performScrollTo().performClick()
+        assertTrue(reset && addTile && addWidget)
+    }
+
+    @Test
+    fun dashboardContent_quickActions_hiddenWhenNothingApplies() {
+        // Not running + can't add tile/widget → the whole quick-actions card is gone.
+        compose.setContent {
+            MaterialTheme {
+                DashboardContent(
+                    state = DashboardUiState(serviceEnabled = false, serviceRunning = false),
+                    onToggleService = {}, onResume = {}, onOpenOnboarding = {}, onBack = {},
+                    canAddTile = false, canAddWidget = false,
+                )
+            }
+        }
+        compose.onNodeWithTag("dashboard_reset").assertDoesNotExist()
+        compose.onNodeWithTag("dashboard_add_tile").assertDoesNotExist()
+        compose.onNodeWithTag("dashboard_add_widget").assertDoesNotExist()
+    }
+
+    @Test
     fun dashboardContent_resumeOnlyShownOnManualOverride_G2RF79() {
         // G2R-F79: Resume is shown only when auto-control paused itself for a DETECTED manual override.
         var resumed = false
