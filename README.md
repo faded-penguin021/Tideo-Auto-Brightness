@@ -16,8 +16,7 @@ Tideo is a ground-up Kotlin/Compose rebuild of the **[Advanced Auto Brightness][
 project, ported segment by segment to a native app with exact behavioural parity — the math and
 decision logic are golden-tested against a transcription of the original Tasker engine.
 
-> **Tideo is the native-app build of AAB.** The Tasker project [Advanced Auto Brightness][aab] is the
-> upstream **source of truth**. Feature discussion, bug triage, and contributions happen there — see
+> The Tasker project [Advanced Auto Brightness][aab] is the upstream **source of truth**. Feature discussion, bug triage, and most contributions happen there — see
 > [Contributing](#contributing).
 
 ## Features
@@ -87,8 +86,7 @@ adb shell pm grant com.tideo.autobrightness android.permission.WRITE_SECURE_SETT
 - **Root** — Tideo can run the same `pm grant` via `su` from the onboarding screen.
 
 After the grant, Tideo writes the secure setting **directly** (no Shizuku binder needed for dimming).
-The grant is detected on the next screen-on or when you re-open the app (it is *not* re-checked every
-cycle, to save battery).
+The grant is detected on the next screen-on or when you re-open the app.
 
 > **One runtime use of Shizuku.** Beyond the one-time grant, Shizuku is used at runtime in exactly one
 > optional place: the **no-Location Wi-Fi SSID** context strategy runs `cmd wifi status` through
@@ -100,9 +98,7 @@ cycle, to save battery).
 ## Troubleshooting
 
 - **Stuck on a black/too-dark screen?** Flip the phone upside-down (charging port up) and shake it.
-  Tideo answers with an SOS vibration and forces brightness to maximum. *(The gesture is suppressed
-  for a few seconds right after you wake the screen, so grabbing the phone out of a pocket won't
-  trigger it by accident.)*
+  Tideo answers with an SOS vibration and forces brightness to maximum.
 - **Service stops adapting after a while.** Aggressive OEM battery management may kill the foreground
   service. Exempt Tideo from battery optimization; see [dontkillmyapp.com][dkma] for device-specific
   steps.
@@ -122,7 +118,7 @@ request, and only as a last resort:
 - **IP-geolocation fallback (optional, cleartext).** Circadian scaling needs an approximate location
   to compute local sunrise/sunset. Tideo tries, in order: a fixed lat/lon you pin → the device's
   last-known location → a fresh GPS/network fix. Only if *all* of those are unavailable does it fall
-  back to a single `GET http://ip-api.com/json` (the original AAB behaviour) to estimate your city
+  back to a single `GET http://ip-api.com/json` to estimate your city
   from your public IP. This call is **cleartext HTTP** (ip-api.com's free tier has no HTTPS) and is
   scoped to that one host in `network_security_config.xml`. **You can turn it off** under
   **Circadian → Date & location → "IP-based location fallback"**; with it off, Tideo never contacts
@@ -174,7 +170,7 @@ brightness math and feature direction live.
 
 - **App-layer / Android-Kotlin bug fixes are welcome here** as pull requests — crashes, OEM
   brightness/secure-key quirks, battery-saver kills, Compose/UI leaks, packaging. They live only in
-  Tideo, so this is their home; PRs are triaged, not auto-closed.
+  Tideo, so this is their home; PRs are triaged.
 - **Features and brightness-logic changes go to AAB** — open an issue there first (the math and golden
   fixtures are locked downstream).
 
@@ -182,8 +178,6 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the **Bug report** issue template.
 
 ## Credits
 
-- **Advanced Auto Brightness** (the original Tasker project this is rebuilt from) — by
-  **/u/v_uurtjevragen**.
 - **Tasker** — by João Dias (Tideo automates the same system settings natively; it is not affiliated
   with Tasker).
 
