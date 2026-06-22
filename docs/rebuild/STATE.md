@@ -81,8 +81,14 @@ launcher icon scaled to 0.88; clamp-on-Apply (D-085). Quality: dead `LineGraph.k
 clean, and — per owner pushback — the brittle exact-count provenance test became content-based (`ProvenanceTest`)
 and the LOC guard was honored by extracting `ProximityTracker` (minimal 300→310 bump, not a lazy one).
 Release-grade README + CONTRIBUTING + DEVICE_TEST_SCRIPT; `versionName 0.9.0`; CI `build.yml` +
-`redirect-external-prs.yml`. Full ladder GREEN; TODO/FIXME = 0. **Owner runs `docs/rebuild/DEVICE_TEST_SCRIPT.md`
-(Gate 3); pass → bump to 1.0.0.**
+`redirect-external-prs.yml`. Full ladder GREEN; TODO/FIXME = 0.
+
+**→ GATE 3 RAN (owner device pass) — 18 deviations recorded in "Gate findings" → "Gate 3 (after S14)"
+(G3-F1…F18). NEXT SESSION (owner-binding): `git checkout claude/adoring-bardeen-37fb6m` and work the
+punch-list ON THIS BRANCH — do NOT branch from `main` (the S14 PR is unmerged, so main lacks all of S14).
+Several are real bugs (min-bright-0 clamp, dashboard not animating on-device, super-dim spread-100
+residual, QS-tile race, reset-to-auto no-op, alpha-axis label, applied-suggestion line); a few may touch
+the domain fence (curve-wizard `tau`/task38 — evidence-backed only). Gate 3 pass → bump to 1.0.0.**
 
 **S13d DONE (2026-06-20) — ALL of S13 (a–d) COMPLETE → next is S14.** The original S13 scope landed: six
 real charts (`ui/graph/{Reactivity,Dimming,Circadian,Experiment,Taper,PowerDraw}Chart.kt`) built on the frozen
@@ -2890,5 +2896,89 @@ gate findings. The two owner-reported behavioural findings:
   use the teal `AabFlash` operational surface like the profile/context-load flashes (visually inconsistent —
   reads as a debug toast). **→ S12.9b:** verify the override path and route it through `AabFlash` only if it
   isn't already (record as already-consistent if it is). Minor.
+
+### Gate 3 (after S14) — owner device findings → next punch-list session (Gate 3 NOT signed off)
+
+> **NEXT SESSION — BRANCH (owner-binding): check out and continue on `claude/adoring-bardeen-37fb6m`
+> (the S14 branch). Do NOT branch from `main` — the S14 PR is NOT merged, so `main` lacks all of S14
+> (proximity damp, power-draw calibration, the parity audit, README/CONTRIBUTING/DEVICE_TEST_SCRIPT,
+> CI). Basing on main would silently drop every S14 change. `git checkout claude/adoring-bardeen-37fb6m`
+> then work this punch-list on it.** Owner ran `DEVICE_TEST_SCRIPT.md`; everything else passed — these
+> are the deviations only. Model: Opus/high.
+
+Findings (owner wording preserved; triage hints from the S14 session in brackets):
+
+- **G3-F1 User Guide branding + stale tooltip text.** UserGuide still says "Advanced Auto Brightness" /
+  "AAB" — should be "Tideo Auto Brightness" / "TAB" (or just "Tideo" where it reads better). It also says
+  you can long-press tooltips, but the UI now uses a tappable "ⓘ" — fix that wording too.
+  [strings.xml `guide_*` / `about_*`; the long-press→ⓘ change was S12.6e.]
+- **G3-F2 Missing "now" indicators on graphs.** Brightness graph and Alpha graph have no live "now"
+  line. **Double-check ALL graphs** — if a current value can be shown as an event line, do it. [S14 added
+  "Now" markers to Reactivity/Dimming/Taper and the curve already had a current-point cross-hair, but the
+  owner still sees none on the brightness curve + alpha — verify the markers actually render on-device and
+  that `live`/`currentLux` is wired to those slots; Alpha needs a current value too (see G3-F15).]
+- **G3-F3 (BUG) Min brightness 0 is wrongly clamped to 1; Misc shows save/discard after Apply.** Setting
+  min brightness to 0 doesn't take hold (clamps to 1); 0 should be valid. And Misc shows the dirty
+  save/discard prompt even after applying. [`AabSettings.validate()` does `minBrightness.coerceIn(1,255)`
+  — S14's clamp-on-Apply (D-090c) now ROUNDS/clamps on commit, so committed=1 ≠ draft=0 → perpetually
+  dirty. Fix: allow min brightness 0 (change the clamp floor to 0 — verify the engine/OEM-range mapping
+  handles 0) so the value sticks and dirty clears. Likely the same root for the "always dirty" report.]
+- **G3-F4 (BUG?) "Add Quick Settings tile" says tile already exists on first add.** Possible race on the
+  first add. [`DashboardViewModel.addTile` / `canAddTile`; TILE_ALREADY_ADDED(2) returned spuriously.]
+- **G3-F5 (BUG/REGRESSION) Dashboard does not animate on device.** Numbers don't roll and the slider
+  doesn't animate. [S14 added `animateIntAsState` for the number + the bar already used
+  `animateFloatAsState`; on-device neither animates — investigate. Likely the pipeline publishes only a
+  settled value so target==applied each emission (no delta to animate from), or the state updates aren't
+  recomposing the instrument. May need to animate toward target during the cycle, not after it settles.]
+- **G3-F6 (BUG?) Super dimming at daytime with Spread (Circadian)=100 still dims slightly.** Extra Dim
+  engaging with effective dimming strength ~0 — Android quirk or genuine bug? If genuine, **force super
+  dimming OFF when dim_shell ≈ 0**. NB: reduce_bright_colors only takes INTEGER levels (so a tiny
+  fractional shell rounds to 1 and still dims). [`SuperDimmingCoordinator` — round the level and treat 0
+  as disengage; check `circadianDimMultiplier` at spread 100 doesn't leave a residual 1.]
+- **G3-F7 README lacks shields.io badges** like AAB has. [Add build/license/version badges to README.md.]
+- **G3-F8 CONTRIBUTING policy is too strict — blocks legitimate Android/Kotlin-layer contributions.**
+  Owner's point: a fix for a Tideo-only bug (e.g. `ShizukuGrantGateway` crashing on Android 15,
+  `AmbientMonitoringService` killed by Xiaomi battery saver, a `ChartCanvas` memory leak) can't go to
+  Tideo (auto-closed) NOR to AAB (Tasker repo, bug doesn't exist there). We're blocking community help for
+  exactly the layer where contributors are most useful (domain math is locked). **Rethink the policy:**
+  ALLOW Android/Kotlin-layer bug-fix PRs to Tideo; keep feature/brightness-logic upstream at AAB. Add
+  `.github/ISSUE_TEMPLATE/bug_report.md` (and likely loosen `redirect-external-prs.yml` so it redirects
+  *feature* PRs but not app-layer bug fixes, or drop the auto-close in favour of a label/triage). Update
+  CONTRIBUTING.md + README "Contributing" accordingly.
+- **G3-F9 (DOC BUG) README "Shizuku … never a runtime dependency" is inaccurate.** The `_GetWifiNoLocation`
+  SSID path runs `cmd wifi status` via Shizuku's shell at runtime for context automation (S12.7d
+  `ShizukuWifiSsidStrategy`/`ShizukuShell`). Update the README claim AND any code comments that repeat it
+  (grep "never … runtime"/"one-time grant"); state Shizuku's runtime SSID use honestly.
+- **G3-F10 Menu icons — review against Material Symbols.** Visit fonts.google.com/icons and pick better/
+  correct icons where the current choices are off. [MenuScreen / AabNav nav rows.]
+- **G3-F11 (BUG) Dashboard "Reset to auto" does nothing.** [S13e wired it to
+  `DashboardViewModel.resetToAuto` → `AutoBrightnessRuntime.reapply`; verify it actually re-applies / snaps
+  to the computed brightness, and clarify the label/affordance — owner couldn't tell what it does.]
+- **G3-F12 Safety audit.** Any glaring safety issues? Known/accepted: the cleartext ip-api.com geo-IP
+  fallback — must be **transparently documented** so privacy-conscious users can avoid it and ensure it is
+  never triggered (a visible setting/toggle + a README/privacy note; today it's silent). Sweep for others.
+- **G3-F13 Restricted-settings guidance incomplete.** Tasker explicitly tells the user to **"tap it
+  anyway"** (the slow/greyed restricted-settings option must be tapped to reveal it). Also the restricted
+  state can appear for **usage access**, not just WRITE_SETTINGS. [Onboarding `RestrictedSettingsCard`
+  (S12.7d/F33) — add the "tap it anyway" instruction + cover usage-access.]
+- **G3-F14 Profiles & Contexts hero card too prominent.** Make it more subtle as a hero on the Menu.
+  [MenuScreen `heroDestinations`/`HeroNavCard`.]
+- **G3-F15 (BUG) Alpha graph x-axis mislabelled.** It says "lux change" but it is a **fold change** — in
+  Tasker the axis is "relative change above the threshold" in **%**. [S14-confirmed: `AlphaResponseChart`
+  x is the smoothing delta, not lux. Relabel + rescale to %, and add the live "now" value (G3-F2).]
+- **G3-F16 (BUG) Applied suggestion leaves the "Suggested" line on the curve.** After Apply, the curve
+  should return to teal (the live curve) instead of continuing to draw the suggested line.
+  [`BrightnessCurveChart` `fittedCurve` should clear once applied; ToolsScreen `onApplyWizard`/state.]
+- **G3-F17 (PARITY) Curve suggestion quality is poor — verify the task38 port.** Is the Tasker curve-
+  fitting engine (`CurveSuggestionEngine`, S6) faithfully ported? **`tau` should be 0**; a default of 4
+  seems overkill — **expose `tau` as a user parameter in the wizard**. [May touch the domain fence
+  (`CurveSuggestionEngine` is in `:domain`); cross-check against task38 + the S6 reference/goldens before
+  changing — evidence-backed only.]
+- **G3-F18 (INFO) Battery usage baseline (not a bug).** ~5h30 SOT: Sensors **13 mAh** (good — the
+  event-driven loop + proximity/light are cheap), Wi-Fi 80 mAh, CPU 612 mAh, Screen 617 mAh, Media 198,
+  BT 151 (variance 685 = owner's own system mis-report, ignore). Record as the on-device power baseline;
+  no action unless a later change regresses sensors/CPU.
+
+
 
 
