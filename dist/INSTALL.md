@@ -1,7 +1,8 @@
 # Tideo Auto Brightness — debug build (0.9.0) for Gate-3 testing
 
 `tideo-0.9.0-debug.apk` — the S14 acceptance-candidate debug build, **refreshed with the Gate-3
-punch-list fixes (G3-F1…F18)**. **Temporary:** delete this `dist/` folder once Gate 3 is signed off
+punch-list fixes (G3-F1…F18) plus the R2 owner follow-ups** (power-draw white screen + mA axis, context
+editor rework, copy/honesty fixes). **Temporary:** delete this `dist/` folder once Gate 3 is signed off
 and the PR is merged.
 
 ## Install
@@ -62,6 +63,21 @@ These are the specific deviations from the previous Gate-3 pass, now fixed:
   **Usage access**, not just Modify system settings.
 - **G3-F14 / F10 — menu.** The **Profiles & Contexts** card is a quieter hero (no teal edge); the
   **Curve & Brightness** row icon is a pencil, no longer a duplicate gear.
+
+### Then, the R2 follow-ups
+
+- **Power draw runs on a WHITE screen.** Tools → Calibrate power draw → Start: the screen should fill
+  **white** with a progress overlay and step through brightness (OLED power is colour-dependent — this
+  is required for sane numbers). The result chart has **two y-axes**: Power (W) on the left, **Current
+  (mA) on the right** in real units.
+- **Context editor.** Open a rule (Profiles & Contexts → a rule → edit): triggers are **collapsible** —
+  each (Wi-Fi / Time & day / Location / Battery / Apps) has an on/off switch and only shows its fields
+  when on; an existing rule re-opens with exactly the triggers it uses. **Radius defaults to 200 m.**
+  **Save / Cancel sit in a bar at the bottom**, not the top.
+- **User Guide** no longer shows the teal banner (that belongs to the Menu only).
+- **Reactivity** screen: the threshold group is titled **"Reactivity thresholds"**.
+- **Onboarding** restricted-settings card: shorter wording, no emoji, still says to tap it anyway and
+  covers Usage access.
 
 ## Recovery
 
