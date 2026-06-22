@@ -22,7 +22,7 @@ itself. Fixes for that layer are welcome as pull requests here:
 - packaging, manifest, permissions, and build problems.
 
 These can't go to AAB (it's a Tasker project — the bug doesn't exist there), so this repository is the
-right place. PRs are **no longer auto-closed**; a maintainer triages them. Branch protection on `main`
+right place. The repo maintainer triages them. Branch protection on `main`
 (required reviews) is the authoritative guard, so review still gates every merge.
 
 When you open one, keep it scoped to the app layer and include device model + Android version. Please
@@ -43,7 +43,7 @@ device model, Android version, privilege tier (BASIC/ELEVATED), and steps to rep
 ## Maintainer note
 
 Branch protection on `main` is the authoritative guard (required reviews + restricted pushes). The
-`redirect-external-prs.yml` workflow now **triages** external PRs (a friendly comment + a
+`redirect-external-prs.yml` workflow  **triages** external PRs (a friendly comment + a
 `needs-triage` label) instead of auto-closing them, so app-layer bug-fix PRs can be reviewed and
 merged while feature PRs are redirected upstream.
 
