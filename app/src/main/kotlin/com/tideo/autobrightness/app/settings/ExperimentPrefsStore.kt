@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.settings
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -35,6 +36,19 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
     }
 
     /**
+     * G3-F12 (Gate 3 — privacy): whether the IP-geolocation fallback (`ip-api.com`, cleartext HTTP) may
+     * run as the LAST resort when no Android location fix is available and no fixed lat/lon is pinned
+     * (task90 act28). Default **on** (Tasker parity), but a privacy-conscious user can turn it off so
+     * the app never contacts ip-api.com — circadian then simply waits for an on-device fix.
+     */
+    val geoIpEnabled: Flow<Boolean> = dataStore.data.map { it[GEO_IP] ?: true }
+
+    /** Opt out of (or back into) the ip-api.com geo-IP location fallback (G3-F12). */
+    suspend fun setGeoIpEnabled(enabled: Boolean) {
+        dataStore.edit { it[GEO_IP] = enabled }
+    }
+
+    /**
      * Store a fixed override — mirrors `_ExperimentSetDate`. Date and location are **independent**
      * (G2R-F39): a null field is removed (reverts to live for that field), so callers can pin a date
      * only (live location), a location only (today's date), or both.
@@ -60,5 +74,6 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         val DATE = stringPreferencesKey("experiment_date")
         val LAT = doublePreferencesKey("experiment_lat")
         val LON = doublePreferencesKey("experiment_lon")
+        val GEO_IP = booleanPreferencesKey("geo_ip_fallback_enabled")
     }
 }

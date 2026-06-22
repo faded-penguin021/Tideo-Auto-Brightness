@@ -1,5 +1,11 @@
 # Tideo Auto Brightness
 
+[![Build](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml/badge.svg)](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.9.0-informational)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
+[![minSdk](https://img.shields.io/badge/minSdk-31-success)](https://developer.android.com/about/versions/12)
+[![Kotlin](https://img.shields.io/badge/Kotlin-Compose-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+
 **A glass-box replacement for Android's adaptive brightness.** You taught Android your brightness
 preferences and it is *still* wrong. Tideo replaces the opaque on-device ML with deterministic,
 inspectable math: a tunable lux→brightness curve you can see and shape, smooth animated transitions,
@@ -80,9 +86,16 @@ adb shell pm grant com.tideo.autobrightness android.permission.WRITE_SECURE_SETT
 - **Shizuku** — start the Shizuku app, then use the one-tap grant in Tideo's onboarding (Elevated step).
 - **Root** — Tideo can run the same `pm grant` via `su` from the onboarding screen.
 
-After the grant, Tideo writes the secure setting **directly** — Shizuku is used only for the one-time
-grant, never as a runtime dependency. The grant is detected on the next screen-on or when you re-open
-the app (it is *not* re-checked every cycle, to save battery).
+After the grant, Tideo writes the secure setting **directly** (no Shizuku binder needed for dimming).
+The grant is detected on the next screen-on or when you re-open the app (it is *not* re-checked every
+cycle, to save battery).
+
+> **One runtime use of Shizuku.** Beyond the one-time grant, Shizuku is used at runtime in exactly one
+> optional place: the **no-Location Wi-Fi SSID** context strategy runs `cmd wifi status` through
+> Shizuku's shell so Wi-Fi-based context rules can read the SSID *without* the Location permission. It
+> runs only when you create a Wi-Fi context rule and Shizuku is available; if Shizuku isn't running,
+> Tideo silently falls back to the Location-based SSID path. The brightness pipeline itself never binds
+> Shizuku.
 
 ## Troubleshooting
 
@@ -100,6 +113,22 @@ the app (it is *not* re-checked every cycle, to save battery).
   unusual OEM ranges the mapping is auto-detected from `config_screenBrightnessSettingMaximum`.
 - **Context rules not firing.** For per-app rules, grant Usage Access when prompted; for location/Wi-Fi
   rules, grant Location. Live Debug (level 8) shows the active context and any priority conflicts.
+
+## Privacy
+
+Tideo is local-first and has no analytics, ads, or accounts. It makes **one** outbound network
+request, and only as a last resort:
+
+- **IP-geolocation fallback (optional, cleartext).** Circadian scaling needs an approximate location
+  to compute local sunrise/sunset. Tideo tries, in order: a fixed lat/lon you pin → the device's
+  last-known location → a fresh GPS/network fix. Only if *all* of those are unavailable does it fall
+  back to a single `GET http://ip-api.com/json` (the original AAB behaviour) to estimate your city
+  from your public IP. This call is **cleartext HTTP** (ip-api.com's free tier has no HTTPS) and is
+  scoped to that one host in `network_security_config.xml`. **You can turn it off** under
+  **Circadian → Date & location → "IP-based location fallback"**; with it off, Tideo never contacts
+  ip-api.com and simply waits for an on-device fix.
+
+Everything else — the curve, smoothing, dimming, contexts — runs entirely on-device.
 
 ## Module layout
 
@@ -140,12 +169,16 @@ The rebuild is driven by documents under `docs/rebuild/`:
 
 ## Contributing
 
-Tideo is the build artifact; the **[Advanced Auto Brightness][aab]** Tasker project is where design and
-contributions live.
+Tideo is the build artifact; the **[Advanced Auto Brightness][aab]** Tasker project is where the
+brightness math and feature direction live.
 
-**Direct pull requests to this repository are not accepted** and are closed automatically. Please open
-an issue here for Tideo-specific bugs, and take feature ideas / patches to the upstream AAB project
-(discuss before opening a PR there too). See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- **App-layer / Android-Kotlin bug fixes are welcome here** as pull requests — crashes, OEM
+  brightness/secure-key quirks, battery-saver kills, Compose/UI leaks, packaging. They live only in
+  Tideo, so this is their home; PRs are triaged, not auto-closed.
+- **Features and brightness-logic changes go to AAB** — open an issue there first (the math and golden
+  fixtures are locked downstream).
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the **Bug report** issue template.
 
 ## Credits
 

@@ -89,7 +89,11 @@ fun ReactivityContent(
                         )
                     },
                     ChartSlot("Smoothing α", "alpha_chart") {
-                        AlphaResponseChart(draft.deltaFactor.toDouble(), Modifier.testTag("alpha_chart"))
+                        AlphaResponseChart(
+                            draft.deltaFactor.toDouble(), Modifier.testTag("alpha_chart"),
+                            // Live "Now" smoothing response (only while running).
+                            currentAlpha = live.luxAlpha?.takeIf { live.serviceOn },
+                        )
                     },
                 ),
             )

@@ -686,7 +686,7 @@ class SettingsScreensTest {
             MaterialTheme {
                 ToolsContent(
                     onBack = {},
-                    onRunWizard = { ran = true; null },
+                    onRunWizard = { _, _ -> ran = true; null },
                     onApplyWizard = {},
                     recordedPoints = sevenPoints,
                 )
@@ -713,7 +713,7 @@ class SettingsScreensTest {
             MaterialTheme {
                 ToolsContent(
                     onBack = {},
-                    onRunWizard = { stubResult },
+                    onRunWizard = { _, _ -> stubResult },
                     onApplyWizard = {},
                     recordedPoints = ninePoints,
                     onPreviewGraph = { previewed = true },

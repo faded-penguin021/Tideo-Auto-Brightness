@@ -59,6 +59,10 @@ fun HeroNavCard(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     testTag: String = title,
+    // G3-F14 (Gate 3): when false the card is toned down to a quiet, resting hero — no teal accent edge,
+    // resting elevation, a calmer surface and a smaller title — so it reads as a normal destination
+    // rather than dominating the Menu. Still a title+subtitle hero (icon, chevron, press motion intact).
+    prominent: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -71,22 +75,34 @@ fun HeroNavCard(
             .testTag(testTag),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            containerColor = if (prominent) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            contentColor = if (prominent) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = Dimens.cardElevationRaised),
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = if (prominent) Dimens.cardElevationRaised else Dimens.cardElevation,
+        ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Teal left-edge accent bar (m3_audit §2.5 B2).
-            Box(
-                modifier = Modifier
-                    .width(Dimens.space2)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.primary),
-            )
+            // Teal left-edge accent bar (m3_audit §2.5 B2) — only on the prominent variant.
+            if (prominent) {
+                Box(
+                    modifier = Modifier
+                        .width(Dimens.space2)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(Dimens.heroCardPadding),
                 verticalAlignment = Alignment.CenterVertically,
@@ -96,8 +112,12 @@ fun HeroNavCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        style = if (prominent) {
+                            MaterialTheme.typography.titleLarge
+                        } else {
+                            MaterialTheme.typography.titleMedium
+                        },
+                        fontWeight = if (prominent) FontWeight.Bold else FontWeight.SemiBold,
                     )
                     if (subtitle != null) {
                         Text(subtitle, style = MaterialTheme.typography.bodyMedium)

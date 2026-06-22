@@ -132,6 +132,10 @@ fun CurveBrightnessContent(
             BrightnessCurveChart(
                 curveConfig,
                 modifier = Modifier.testTag("brightness_curve_chart"),
+                // G3-F2: live "Now" cross-hair (current smoothed lux × applied brightness), only while
+                // the service is running. The chart draws both marker lines when BOTH are non-null.
+                currentLux = live.smoothedLux?.takeIf { live.serviceOn },
+                currentBrightness = live.lastAppliedBrightness?.takeIf { live.serviceOn },
                 overridePoints = overlay,
                 fittedCurve = fittedCurve,
                 referenceCurve = referenceConfig,

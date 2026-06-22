@@ -9,10 +9,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,9 +71,10 @@ fun ToolsScreen(
         onBack = { navController.popBackStack() },
         // Gate-2(5th) obs: jump straight to Curve & Brightness to see the suggested line on the chart.
         onPreviewGraph = { navController.navigate(AppRoute.CurveBrightness.route) },
-        onRunWizard = { overrides ->
+        onRunWizard = { overrides, tau ->
             CurveSuggestionEngine.suggest(
-                CurveSuggestionInput(overrides, settings.toBrightnessCurveConfig()),
+                // G3-F17: τ comes from the wizard control (default 0.001 = follow the recorded points).
+                CurveSuggestionInput(overrides, settings.toBrightnessCurveConfig(), tau = tau),
             )
         },
         onApplyWizard = { result ->
@@ -156,7 +159,7 @@ private fun PowerCalibrationPrepDialog(onStart: () -> Unit, onCancel: () -> Unit
 @Composable
 fun ToolsContent(
     onBack: () -> Unit,
-    onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
+    onRunWizard: (List<OverridePoint>, tau: Double) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
     recordedPoints: List<OverridePoint> = emptyList(),
     onPreviewGraph: () -> Unit = {},
@@ -203,7 +206,7 @@ fun ToolsContent(
 @Composable
 private fun WizardCard(
     recorded: List<OverridePoint>,
-    onRunWizard: (List<OverridePoint>) -> CurveSuggestionResult?,
+    onRunWizard: (List<OverridePoint>, tau: Double) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
     onPreviewGraph: () -> Unit = {},
 ) {
@@ -211,6 +214,10 @@ private fun WizardCard(
     // recorded set; with < 9 it returns null (task38 error path).
     var result by remember { mutableStateOf<CurveSuggestionResult?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    // G3-F17: inertia regularization τ, exposed so the user can trade fidelity-to-points vs.
+    // closeness-to-current-curve. Default 0.001 (≈0) = follow the recorded points (the faithful
+    // task38 act2 default); the Tasker label recommends 0.001–5, never exactly 0 (τ is a divisor).
+    var tau by remember { mutableFloatStateOf(0.001f) }
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
 
@@ -221,6 +228,17 @@ private fun WizardCard(
                 style = MaterialTheme.typography.bodySmall,
             )
             Text("Recorded points: ${recorded.size}", style = MaterialTheme.typography.bodyMedium)
+            // τ (inertia) control: lower = follow my points, higher = stay near the current curve.
+            Text(
+                "Inertia (τ): ${"%.3f".format(tau)} — lower follows your points, higher stays near the current curve",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Slider(
+                value = tau,
+                onValueChange = { tau = it },
+                valueRange = 0.001f..5f,
+                modifier = Modifier.testTag("wizard_tau"),
+            )
             OutlinedButton(
                 onClick = {
                     // G2R-F62: gate on REAL recorded points only (MIN_FIT_POINTS), matching the Curve &
@@ -231,7 +249,7 @@ private fun WizardCard(
                         result = null
                         message = "Not enough recorded override points (need ≥ $MIN_FIT_POINTS real points, have ${recorded.size})."
                     } else {
-                        val r = onRunWizard(recorded)
+                        val r = onRunWizard(recorded, tau.toDouble())
                         result = r
                         message = if (r == null) "Could not fit a curve to the recorded points." else null
                     }

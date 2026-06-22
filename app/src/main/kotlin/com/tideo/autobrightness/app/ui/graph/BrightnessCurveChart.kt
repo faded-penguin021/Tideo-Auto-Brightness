@@ -59,7 +59,12 @@ fun BrightnessCurveChart(
     val referencePoints = referenceCurve?.let { sample(it) }
 
     // 3. task38/task663 suggested (fitted) curve, only once ≥ 9 override points exist (G2R-F14/F62).
+    // G3-F16 (Gate 3): once the wizard suggestion is APPLIED, the live curve already IS the fit, so the
+    // blue "Suggested" line just overdraws the teal "Curve" and the owner sees blue where they expect
+    // teal. Suppress it when the sampled fit matches the live curve (≤ 1 brightness level everywhere) —
+    // there is nothing left to preview. A still-pending (un-applied or since-edited) fit still draws.
     val fittedPoints = fittedCurve?.let { sample(it) }
+        ?.takeUnless { fit -> fit.zip(curvePoints).all { (f, c) -> kotlin.math.abs(f.y - c.y) <= 1f } }
 
     val series = buildList {
         referencePoints?.let { add(ChartSeries("Reference", it, AabGold, strokeWidthPx = 3f, dashed = true)) }

@@ -191,10 +191,19 @@ class SuperDimmingCoordinatorTest {
 
     @Test
     fun circadian_spread100_daylight_suppressesDimming() {
-        assertEquals(
-            0,
-            engageLevel(scalingDay.copy(dimSpread = 100), daylightScale),
-            "DimSpread 100 in daylight should scale strength to zero (no Extra Dim)",
+        // G3-F6 (Gate 3): DimSpread 100 in full daylight drives DimDynamic→0 ⇒ dim_shell rounds to 0.
+        // The coordinator must DISENGAGE entirely — NOT write reduce_bright_colors_activated=1 at level
+        // 0, which still leaves Android's Extra Dim engaged and dims the screen slightly on-device.
+        val secure = FakeSecureDimming()
+        SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+            .apply(targetBrightness = 5, settings = scalingDay.copy(dimSpread = 100), scaleDynamic = daylightScale)
+        assertTrue(
+            secure.activated != true,
+            "DimSpread 100 in daylight must not engage Extra Dim (no residual dim at level 0)",
+        )
+        assertTrue(
+            secure.levels.none { it > 0 },
+            "no positive reduce_bright_colors level should be written when dimming is suppressed",
         )
     }
 

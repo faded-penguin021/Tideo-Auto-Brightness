@@ -90,4 +90,19 @@ class WizardParityTest {
         )
         assertNull(CurveSuggestionEngine.suggest(input), "fewer than 9 points must abort to null")
     }
+
+    /**
+     * G3-F17 (Gate 3): the default τ is the faithful task38 act2 value 0.001 (which the Java engine
+     * actually reads every real run), NOT the unreachable 4.0 Java-header fallback. Defaulting to 4.0
+     * over-damped suggestions toward the current curve ("suggestion quality is poor"). The goldens all
+     * pass τ explicitly, so they do not pin this default — this assertion does.
+     */
+    @Test
+    fun wizard_defaultTauIsTheFaithfulAct2Value() {
+        val input = CurveSuggestionInput(
+            overrides = listOf(OverridePoint(10.0, 20.0)),
+            currentCurve = BrightnessCurveConfig(),
+        )
+        assertEquals(0.001, input.tau, "default τ must be the act2 0.001, not the 4.0 fallback")
+    }
 }

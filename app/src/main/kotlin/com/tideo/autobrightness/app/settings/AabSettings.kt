@@ -89,7 +89,7 @@ object AabSettingsContract {
     val rules: List<AabSettingRule> = listOf(
         AabSettingRule("%AAB_Service", "serviceEnabled", AabValueType.Boolean, "true", "must be true|false"),
         AabSettingRule("%AAB_DetectOverrides", "detectOverrides", AabValueType.Boolean, "false", "must be true|false"),
-        AabSettingRule("%AAB_MinBright", "minBrightness", AabValueType.Int, "10", "range 1..255"),
+        AabSettingRule("%AAB_MinBright", "minBrightness", AabValueType.Int, "10", "range 0..255"),
         AabSettingRule("%AAB_MaxBright", "maxBrightness", AabValueType.Int, "255", "range 1..255 and >= minBrightness"),
         AabSettingRule("%AAB_Offset", "offset", AabValueType.Int, "0", "range -255..255"),
         AabSettingRule("%AAB_Scale", "scale", AabValueType.Float, "1.0", "range 0.1..10.0"),

@@ -58,10 +58,12 @@ fun BrightnessInstrument(
     val applied = state.currentBrightness ?: state.targetBrightness
     val target = state.targetBrightness
 
-    // Roll the big number to its new value instead of snapping (owner: "numbers changing"). The
-    // pipeline publishes a settled value per cycle, so without this the figure jumps in one step. On
-    // first composition animateIntAsState initialises to the target (no spurious count-up from 0).
-    val displayValue = applied ?: target
+    // Roll the big number to its new value instead of snapping (owner: "numbers changing"). G3-F5:
+    // the cycle now publishes the DESTINATION (targetBrightness) at the START of the on-device sweep
+    // (PipelineCycleRunner), so we animate toward `target` — the figure rolls DURING the transition
+    // rather than snapping after it settles. Falls back to the applied value before the first cycle.
+    // On first composition animateIntAsState initialises to that value (no spurious count-up from 0).
+    val displayValue = target ?: applied
     val animatedValue by animateIntAsState(
         targetValue = displayValue ?: 0,
         animationSpec = tween(AabMotion.DURATION_MEDIUM),
@@ -128,7 +130,9 @@ private val AabDataDisplayLarge = androidx.compose.ui.text.TextStyle(
 /** The teal 0–255 track — the only chart-free visualisation on the Dashboard. Eases to its new value. */
 @Composable
 private fun BrightnessTrack(applied: Int?, target: Int?, enabled: Boolean) {
-    val fraction = ((applied ?: target ?: 0).coerceIn(0, 255)) / 255f
+    // G3-F5: ease toward the destination (target leads applied during a sweep) so the fill animates
+    // in step with the big number rather than after the cycle settles.
+    val fraction = ((target ?: applied ?: 0).coerceIn(0, 255)) / 255f
     val animated by animateFloatAsState(
         targetValue = fraction,
         animationSpec = tween(AabMotion.DURATION_MEDIUM),

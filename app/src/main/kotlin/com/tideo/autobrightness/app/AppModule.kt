@@ -86,12 +86,15 @@ class AppModule(context: Context) {
 
         // F73: real solar ramp windows for the dynamic-scale engine (today + last-known location, or
         // the F39 fixed date/location override), so %AAB_ScaleDynamic tracks the actual sunrise.
+        val experimentPrefs = ExperimentPrefsStore(appContext.experimentPrefsDataStore)
+        val geoIpClient = GeoIpLocationClient()
         val circadianWindows = CircadianWindowProvider(
             scope = scope,
-            overrideFlow = ExperimentPrefsStore(appContext.experimentPrefsDataStore).dateLocation,
+            overrideFlow = experimentPrefs.dateLocation,
             location = AndroidLocationReader(appContext),
-            // F83: ip-api.com geo-IP fallback when no Android fix is available (task90 act28).
-            geoIpFallback = GeoIpLocationClient()::resolve,
+            // F83: ip-api.com geo-IP fallback when no Android fix is available (task90 act28). G3-F12
+            // (privacy): gated on the user's opt-out — when disabled the app never contacts ip-api.com.
+            geoIpFallback = { if (experimentPrefs.geoIpEnabled.first()) geoIpClient.resolve() else null },
         )
 
         val controller = BrightnessPipelineController(

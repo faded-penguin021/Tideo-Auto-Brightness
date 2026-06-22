@@ -126,9 +126,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // events still exist for the notification/override path; the dashboard just doesn't offer Pause.
     fun resume() = AutoBrightnessRuntime.resume(app)
 
-    /** Owner: Reset = re-apply / snap to auto — force the pipeline to recompute now (clears a manual
-     *  override pause). No-op when the service is not running; the next start applies the settings. */
-    fun resetToAuto() = AutoBrightnessRuntime.reapply(app)
+    /**
+     * Owner "Reset to auto": snap the screen back to the freshly-computed automatic brightness now AND
+     * clear any manual-override pause.
+     *
+     * G3-F11 (Gate 3): this used [AutoBrightnessRuntime.reapply] (a `ContextChanged` event →
+     * `reapplyProfile`), which returns early whenever the pipeline is `paused` — i.e. exactly the
+     * detected-override state in which the user reaches for "Reset to auto" — so it did nothing. The
+     * Resume path clears the pause flags and unconditionally re-runs Set Initial Brightness (writes the
+     * computed level), so it resets in BOTH states: paused-by-override and running-normally. No-op when
+     * the service is not running; the next start applies the settings.
+     */
+    fun resetToAuto() = AutoBrightnessRuntime.resume(app)
 
     /** Whether the "Add Quick Settings tile" prompt is available (StatusBarManager API, Android 13+). */
     fun canAddTile(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU

@@ -105,6 +105,13 @@ internal class PipelineCycleRunner(
             val brightnessChanged = target != from
             if (target != from) {
                 brightness.forceManualMode()
+                // G3-F5 (Gate 3): publish the DESTINATION now, before the on-device sweep, leaving
+                // lastAppliedBrightness at the previous value. The settled `lastAppliedBrightness=target`
+                // was previously the only emission, published AFTER the multi-second animation finished,
+                // so the Dashboard instrument stayed frozen during the transition and then snapped. With
+                // the target out early the instrument's animateIntAsState rolls toward it DURING the
+                // sweep; the final update below lands lastAppliedBrightness on it (no jump).
+                ctx.update { it.copy(targetBrightness = target) }
                 // %AAB_Debug 1 "Skip Animations": jump straight to the target (Tasker debug mode).
                 if (settings.debugLevel == DebugCategory.SKIP_ANIMATIONS.level) {
                     brightness.write(target)

@@ -88,23 +88,34 @@ fun ReactivityChart(
  * AAB Alpha Graph (Tasker: task557 `_GenerateAlphaGraph`, feeds %AAB_HTML_Graph3). The smoothing
  * response overlay shown alongside the reactivity curve.
  *
- * - X-axis: lux-change delta (log10, 0.01 → 20 — the task557 labelValues 1..2000 / 100).
+ * - X-axis: **relative lux change, in %** (log10, 1 → 2000). G3-F15: this is NOT an absolute "lux
+ *   change" — the underlying quantity is the fold change `luxDelta = |rawLux − prevSmoothed| /
+ *   (prevSmoothed + 1)` (BrightnessEngine.smoothLux), a *fraction*. Tasker's task557 `labelValues`
+ *   are 1..2000 and it divides each by 100 to get that fraction, so the native axis the user reads is
+ *   the relative change as a percentage. The rebuild previously plotted the raw fraction (0.01..20)
+ *   and labelled it "Lux change", which read as absolute lux. Now plotted/labelled as %.
  * - Y-axis: alpha (smoothing response factor) 0..1.
- * - **Curve**: `1 − exp(−deltaFactor · delta)` (the user's current alpha response, alpha_graph.md).
- * - **Reference** (gold, dashed): `1 − exp(−1.8 · delta)` (deltaFactor = 1.8 baseline).
+ * - **Curve**: `1 − exp(−deltaFactor · fraction)` (the user's current alpha response, alpha_graph.md).
+ * - **Reference** (gold, dashed): `1 − exp(−1.8 · fraction)` (deltaFactor = 1.8 baseline).
  */
 @Composable
 fun AlphaResponseChart(
     deltaFactor: Double,
     modifier: Modifier = Modifier,
+    // G3-F2/F15: the live smoothing response (%AAB_LuxAlpha) as a horizontal "Now" line, so the user
+    // sees how reactive smoothing is at this instant. null (service off / no reading yet) → no line.
+    currentAlpha: Double? = null,
 ) {
-    val minDelta = 0.01f
-    val maxDelta = 20f
+    // Percent axis (Tasker labelValues): 1 % → 2000 %. The alpha curve is evaluated on the underlying
+    // fraction (= percent / 100), but the axis the user reads is the relative change as a percentage.
+    val minPercent = 1f
+    val maxPercent = 2000f
     val samples = 80
 
-    fun sample(factor: Double): List<Offset> = logSpaced(minDelta, maxDelta, samples).map { delta ->
-        val alpha = 1.0 - exp(-factor * delta)
-        Offset(delta, alpha.toFloat())
+    fun sample(factor: Double): List<Offset> = logSpaced(minPercent, maxPercent, samples).map { pct ->
+        val fraction = pct / 100.0
+        val alpha = 1.0 - exp(-factor * fraction)
+        Offset(pct, alpha.toFloat())
     }
 
     val series = listOf(
@@ -112,12 +123,19 @@ fun AlphaResponseChart(
         ChartSeries("Curve", sample(deltaFactor), MaterialTheme.colorScheme.primary),
     )
 
+    // Live "Now" smoothing response as a horizontal line at the current alpha (the published curve
+    // output; the relative-change x is instantaneous, so the y-value is the stable thing to surface).
+    val markers = currentAlpha?.let {
+        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, y = it.toFloat().coerceIn(0f, 1f), label = "Now"))
+    } ?: emptyList()
+
     ChartCanvas(
         series = series,
-        xRange = minDelta..maxDelta,
+        xRange = minPercent..maxPercent,
         yRange = 0f..1f,
         xScale = AxisScale.Log10,
-        xAxisLabel = "Lux change",
+        markers = markers,
+        xAxisLabel = "Relative lux change %",
         yAxisLabel = "Alpha",
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
