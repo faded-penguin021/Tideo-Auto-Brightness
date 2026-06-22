@@ -105,7 +105,9 @@ fun ReactivityContent(
             // (S12.6e, G2R-F19/F20/F21). The threshold fields are %aab_thresh*pc reactivity levels.
             // G2R-F82: grouped + labelled by the graph they feed (the reactivity curve).
             GraphSettingsGroup("Reactivity curve") {
-                SectionHeader("Smoothing thresholds", divider = true)
+                // These are the reactivity dead-zone levels (Dark/Dim/Bright), not smoothing — they shape
+                // the reactivity curve above, so name them for what they are (owner finding).
+                SectionHeader("Reactivity thresholds", divider = true)
                 NumberSettingField(
                     "Dark threshold", draft.thresholdDark, { onEdit { s -> s.copy(thresholdDark = it.toFloat()) } },
                     epoch = epoch, committed = committed.thresholdDark, isInt = false,

@@ -50,14 +50,15 @@ private val GUIDE_SECTIONS = listOf(
 
 @Composable
 fun UserGuideContent(onBack: () -> Unit) {
-    val banner = stringResource(R.string.guide_banner)
+    // No in-page banner: the teal brand banner belongs to the Menu only (owner finding). The scaffold's
+    // top bar already titles this screen "User Guide".
     val welcomeTitle = stringResource(R.string.guide_welcome_title)
     val welcomeBody = stringResource(R.string.guide_welcome_body)
     val outro = stringResource(R.string.guide_outro)
     // The numbered sections only — Welcome is rendered specially (intro blockquote).
     val sections = GUIDE_SECTIONS.drop(1).map { (t, b) -> stringResource(t) to stringResource(b) }
-    val html = remember(banner, welcomeTitle, welcomeBody, sections, outro) {
-        buildGuideHtml(banner, welcomeTitle, welcomeBody, sections, outro)
+    val html = remember(welcomeTitle, welcomeBody, sections, outro) {
+        buildGuideHtml(welcomeTitle, welcomeBody, sections, outro)
     }
     val pageBg = AabBackgroundDark.toArgb()
 
@@ -88,7 +89,6 @@ fun UserGuideContent(onBack: () -> Unit) {
  * `**x**` = emphasis, a line starting `[TIP]` = a tip callout, `[WARN]` = a warning callout.
  */
 private fun buildGuideHtml(
-    banner: String,
     welcomeTitle: String,
     welcomeBody: String,
     sections: List<Pair<String, String>>,
@@ -110,8 +110,6 @@ private fun buildGuideHtml(
           :root { color-scheme: dark; }
           body { background:#333333; color:#ECECEC; font-family:sans-serif; line-height:1.55;
                  margin:0; padding:16px 18px 28px; font-size:15px; }
-          .banner { background:#007C63; color:#FFFFFF; margin:-16px -18px 18px; padding:18px;
-                    font-size:18px; font-weight:600; }
           h2 { color:#00A986; font-size:16px; margin:24px 0 6px; border-bottom:1px solid #4a4a4a;
                padding-bottom:4px; }
           p { margin:6px 0; }
@@ -129,7 +127,7 @@ private fun buildGuideHtml(
           .warn .lead { color:#FF8A80; font-weight:600; }
           .warn strong, .warn b { color:#FF8A80; }
         </style></head>
-        <body><div class="banner">${esc(banner)}</div>$body</body></html>
+        <body>$body</body></html>
     """.trimIndent()
 }
 

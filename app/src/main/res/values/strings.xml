@@ -150,12 +150,12 @@
     <string name="guide_done">Got it</string>
 
     <!-- Power-draw calibration (S14 — task524 _CalibratePowerDraw). -->
-    <string name="power_desc">Measures screen power across brightness levels by sweeping the display and sampling battery current (task524). Best with Airplane Mode on and the charger unplugged.</string>
+    <string name="power_desc">Measures how much power your screen draws at each brightness level: the display fills with white and steps through brightness while Tideo samples battery current. Best with Airplane Mode on and the charger unplugged.</string>
     <string name="power_calibrate">Calibrate power draw</string>
     <string name="power_recalibrate">Recalibrate power draw</string>
     <string name="power_calibrating">Calibrating…</string>
     <string name="power_prep_title">Calibration prep</string>
-    <string name="power_prep_message">For accurate results:\n\n1. Enable Airplane Mode (important)\n2. Close background apps\n3. Do not touch the screen during the test\n4. Unplug the charger\n\nThe screen will sweep through brightness levels for ~1–2 minutes.</string>
+    <string name="power_prep_message">For accurate results:\n\n1. Enable Airplane Mode (important)\n2. Close background apps\n3. Do not touch the screen during the test\n4. Unplug the charger\n\nThe screen will turn white and sweep through brightness levels for ~1–2 minutes.</string>
     <string name="power_start">Start</string>
     <string name="power_cancel">Cancel</string>
     <string name="power_result_success">Calibration complete (%1$d points)</string>

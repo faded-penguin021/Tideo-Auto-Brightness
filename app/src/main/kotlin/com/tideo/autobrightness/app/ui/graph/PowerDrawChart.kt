@@ -15,13 +15,14 @@ import com.tideo.autobrightness.domain.power.PowerDrawSample
 /**
  * AAB Power Draw Graph (Tasker: task524 `_CalibratePowerDraw`, feeds %AAB_HTML_Graph8). Unlike the
  * other charts this has no parametric formula — the data is *measured* at runtime by stepping the
- * screen through brightness levels and sampling battery current. The on-device calibration is deferred
- * (D-044 / Gate), so until samples exist this renders an [EmptyState]; once measured it plots them on
- * the [ChartCanvas] following the [BrightnessCurveChart] template.
+ * screen through brightness levels and sampling battery current. Until samples exist this renders an
+ * [EmptyState]; once measured it plots them on the [ChartCanvas] following the [BrightnessCurveChart]
+ * template, with the **dual y-axis the Tasker Chart.js graph uses** (owner finding): Power on the left,
+ * the real Current (mA) values on the right — NOT current rescaled onto the power axis.
  *
  * - X-axis: brightness level 0..255 (linear).
- * - **Power** (teal): measured screen power (W).
- * - **Current** (gold, dashed): measured current draw (mA), scaled onto the same axis for shape.
+ * - **Power** (teal, left axis): measured screen power (W).
+ * - **Current** (gold, dashed, right axis): measured current draw (mA), in its own real units.
  */
 @Composable
 fun PowerDrawChart(
@@ -35,22 +36,22 @@ fun PowerDrawChart(
     }
 
     val powerPoints = samples.map { Offset(it.brightness.toFloat(), it.powerW.toFloat()) }
+    val currentPoints = samples.map { Offset(it.brightness.toFloat(), it.currentMa.toFloat()) }
     val maxPower = (powerPoints.maxOf { it.y }).coerceAtLeast(0.001f)
-    val maxCurrent = (samples.maxOf { it.currentMa }).coerceAtLeast(0.001)
-    // The two series share one axis; rescale current onto the power range so both shapes read clearly.
-    val currentPoints = samples.map {
-        Offset(it.brightness.toFloat(), (it.currentMa / maxCurrent * maxPower).toFloat())
-    }
+    val maxCurrent = (currentPoints.maxOf { it.y }).coerceAtLeast(0.001f)
 
     val series = listOf(
         ChartSeries("Power (W)", powerPoints, AabTeal),
-        ChartSeries("Current (mA)", currentPoints, AabGold, strokeWidthPx = 2f, dashed = true),
+        // task524 chart: the Current dataset lives on its own right-hand mA axis (yAxisID 'y1').
+        ChartSeries("Current (mA)", currentPoints, AabGold, strokeWidthPx = 2f, dashed = true, onSecondaryAxis = true),
     )
 
     ChartCanvas(
         series = series,
         xRange = 0f..255f,
         yRange = 0f..(maxPower * 1.1f),
+        secondaryYRange = 0f..(maxCurrent * 1.1f),
+        secondaryYAxisLabel = "Current (mA)",
         xAxisLabel = "Brightness",
         yAxisLabel = "Power (W)",
         showLegend = true,

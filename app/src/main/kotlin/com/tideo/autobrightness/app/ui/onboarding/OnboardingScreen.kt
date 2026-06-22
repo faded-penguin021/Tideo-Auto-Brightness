@@ -274,16 +274,12 @@ private fun RestrictedSettingsCard(onOpenAppInfo: () -> Unit) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Heads up: restricted settings", style = MaterialTheme.typography.titleMedium)
             Text(
-                // G3-F13: (1) Tasker tells users to "tap it anyway" — the greyed toggle still responds
-                // and triggers Android's unlock prompt; (2) the same block applies to Usage access, not
-                // just Modify system settings.
-                "This app was installed outside the Play Store, so Android may block the " +
-                    "\"Modify system settings\" toggle below — and the same can happen for " +
-                    "\"Usage access\" (needed for per-app context rules). The option looks greyed out " +
-                    "or shows \"Restricted setting\". 👉 Tap it anyway: even when it looks " +
-                    "disabled, tapping usually triggers Android's unlock prompt. If it still won't " +
-                    "budge, open App info, tap the ⋮ menu (top-right), choose " +
-                    "\"Allow restricted settings\", then return here.",
+                // G3-F13: cover Usage access too, and tell the user to tap the greyed toggle anyway
+                // (it still triggers Android's unlock prompt). Kept short — no emoji.
+                "Installed outside the Play Store, Android may block the \"Modify system settings\" " +
+                    "toggle below (and \"Usage access\", for per-app rules) — it looks greyed out or " +
+                    "shows \"Restricted setting\". Tap it anyway; that usually shows the unlock prompt. " +
+                    "If not, open App info → ⋮ menu → \"Allow restricted settings\", then return here.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             OutlinedButton(onClick = onOpenAppInfo, modifier = Modifier.testTag("open_app_info")) {

@@ -1,36 +1,51 @@
 package com.tideo.autobrightness.app.ui.screens
 
-import android.app.Activity
 import android.view.WindowManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.tideo.autobrightness.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.runtime.PowerDrawCalibrator
+import com.tideo.autobrightness.app.runtime.PowerDrawProgress
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
 import com.tideo.autobrightness.app.state.PowerDrawViewModel
 import com.tideo.autobrightness.app.state.SettingsViewModel
@@ -98,38 +113,99 @@ fun ToolsScreen(
         onCalibratePower = { showPrep = true },
     )
 
-    // task524 entry: the prep dialog (Airplane Mode / close apps / don't touch / unplug) → Start runs
-    // the sweep, driving THIS Activity's window brightness (no WRITE_SETTINGS) and restoring it after.
+    // task524 entry: the prep dialog (Airplane Mode / close apps / don't touch / unplug) → Start shows
+    // the WHITE calibration overlay and runs the sweep. The owner finding: OLED power is colour-
+    // dependent, so the panel MUST draw a full-white screen during measurement (Tasker uses a white
+    // FrameLayout dialog). The overlay is a fullscreen white Dialog whose OWN window brightness the
+    // sweep drives (no WRITE_SETTINGS; the override dies with the dialog → nothing to restore).
+    var calibrating by remember { mutableStateOf(false) }
+    var cancelRequested by remember { mutableStateOf(false) }
     if (showPrep) {
         PowerCalibrationPrepDialog(
-            onStart = {
-                showPrep = false
-                val activity = context as? Activity
+            onStart = { showPrep = false; cancelRequested = false; calibrating = true },
+            onCancel = { showPrep = false },
+        )
+    }
+    if (calibrating) {
+        PowerCalibrationOverlay(
+            progress = powerProgress,
+            onCancel = { cancelRequested = true },
+            startCalibration = { setBrightness ->
                 powerVm.calibrate(
-                    setScreenBrightness = { level ->
-                        withContext(Dispatchers.Main) { activity?.applyWindowBrightness(level) }
-                    },
+                    setScreenBrightness = setBrightness,
+                    isCancelled = { cancelRequested },
                     onResult = { result ->
-                        activity?.clearWindowBrightness()
+                        calibrating = false
                         toast(powerResultMessage(context, result))
                     },
                 )
             },
-            onCancel = { showPrep = false },
         )
     }
 }
 
-private fun Activity.applyWindowBrightness(level: Int) {
-    val lp = window.attributes
-    lp.screenBrightness = (level / 255f).coerceIn(0.004f, 1f)
-    window.attributes = lp
-}
-
-private fun Activity.clearWindowBrightness() {
-    val lp = window.attributes
-    lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-    window.attributes = lp
+/**
+ * The full-white calibration screen (Tasker task524's white `FrameLayout` dialog). A fullscreen
+ * [Dialog] painted white so the OLED panel draws maximum-load white pixels while the sweep measures
+ * power; dark status text + a progress bar overlay it. The sweep drives THIS dialog window's
+ * `screenBrightness` (it is the front-most window), so no WRITE_SETTINGS is needed and the override is
+ * discarded when the dialog dismisses. [startCalibration] is invoked once the window is available, with
+ * a brightness setter bound to that window.
+ */
+@Composable
+private fun PowerCalibrationOverlay(
+    progress: PowerDrawProgress?,
+    onCancel: () -> Unit,
+    startCalibration: (setBrightness: suspend (Int) -> Unit) -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onCancel,
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false),
+    ) {
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        LaunchedEffect(window) {
+            val w = window ?: return@LaunchedEffect
+            w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            startCalibration { level ->
+                withContext(Dispatchers.Main) {
+                    val lp = w.attributes
+                    lp.screenBrightness = (level / 255f).coerceIn(0.004f, 1f)
+                    w.attributes = lp
+                }
+            }
+        }
+        Box(
+            Modifier.fillMaxSize().background(Color.White).testTag("power_calibration_overlay"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 40.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    stringResource(R.string.power_calibrating),
+                    color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    progress?.let { "${it.message} (${it.step}/${it.total})" } ?: "",
+                    color = Color(0xFF666666), fontSize = 14.sp,
+                )
+                LinearProgressIndicator(
+                    progress = {
+                        val total = progress?.total ?: 0
+                        if (total > 0) (progress!!.step.toFloat() / total).coerceIn(0f, 1f) else 0f
+                    },
+                    color = Color(0xFF007C63), // task524 progress-bar teal
+                    trackColor = Color(0xFFEEEEEE),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(onClick = onCancel, modifier = Modifier.testTag("power_cancel_overlay")) {
+                    Text(stringResource(R.string.power_cancel), color = Color.Black)
+                }
+            }
+        }
+    }
 }
 
 private fun powerResultMessage(context: android.content.Context, result: PowerDrawCalibrator.Result): String =
