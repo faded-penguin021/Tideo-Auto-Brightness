@@ -61,6 +61,27 @@ class BrightnessEngineContractTest {
     }
 
     @Test
+    fun proximityNear_dampsLuxAlphaByTenth() {
+        // prof759/task545 (task544 act28/29): while the proximity sensor reads "near", LuxAlpha is
+        // damped ×0.1 so a hand/ear over the light sensor doesn't jerk the brightness. It never pauses.
+        val base = BrightnessPolicyInput(
+            lux = 126.0,
+            time = TimeContext(secondsOfDay = 12 * 3600.0),
+            previous = PreviousState(smoothedLux = 100.0, lastRawLux = 100.0),
+        )
+        val far = engine.evaluate(base)
+        val near = engine.evaluate(base.copy(proximityNear = true))
+
+        assertTrue(far.luxAlpha > 0.0, "the un-damped alpha should be positive for this step")
+        assertEquals(far.luxAlpha * 0.1, near.luxAlpha, 1e-9)
+        // Lower alpha tracks the previous smoothed value more closely (less reactive), but still moves.
+        assertTrue(
+            kotlin.math.abs(near.smoothedLux - 100.0) <= kotlin.math.abs(far.smoothedLux - 100.0),
+            "near damps reactivity (smoothed stays closer to the previous value)",
+        )
+    }
+
+    @Test
     fun manualOverride_shortCircuitsEngine() {
         val output = engine.evaluate(
             BrightnessPolicyInput(

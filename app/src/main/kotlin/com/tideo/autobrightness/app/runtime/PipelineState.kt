@@ -23,6 +23,10 @@ data class PipelineState(
      *  opposed to a user-initiated Pause. Drives the high-priority override notification + toast
      *  (G2R-F35) so the service can alert only on a genuine override, not on every pause. */
     val pausedByOverride: Boolean = false,
+    /** %AAB_Proximity — true while the proximity sensor reads "near" (prof759/task545). Damps the
+     *  smoothing alpha ×0.1 (task544 act28/29); never pauses. Written from the proximity collector
+     *  via the atomic StateFlow.update (like lastSampleMs), read by the cycle runner. */
+    val proximityNear: Boolean = false,
     /** %SmoothedLux — EMA-smoothed lux; null until the first reading seeds it. */
     val smoothedLux: Double? = null,
     /** %AAB_LastRawLux — last raw lux (round3). */

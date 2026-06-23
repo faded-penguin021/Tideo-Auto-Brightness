@@ -47,6 +47,7 @@ import com.tideo.autobrightness.platform.privilege.Tier
 fun DashboardScreen(navController: NavHostController, viewModel: DashboardViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toast = rememberToaster()
+    val tileAddSuccess = stringResource(R.string.dashboard_tile_add_success)
     val tileAlreadyAdded = stringResource(R.string.dashboard_tile_added)
     val tileFailed = stringResource(R.string.dashboard_tile_request_failed)
     // Evaluated once when the dashboard is shown (cheap, non-reactive — these only change after the
@@ -62,9 +63,15 @@ fun DashboardScreen(navController: NavHostController, viewModel: DashboardViewMo
         canAddWidget = canAddWidget,
         onAddTile = {
             viewModel.addTile { result ->
-                // TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED == 2 (Android 13+); only reachable there.
+                // Android 13+ StatusBarManager result codes (only reachable there via canAddTile()):
+                //   2 = TILE_ADD_REQUEST_RESULT_TILE_ADDED (success),
+                //   1 = TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED,
+                //   0 = TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED (user dismissed → no toast).
+                // G3-F4 (Gate 3): result 2 was wrongly mapped to "already added", so a successful FIRST
+                // add reported "tile already exists". 2 is success; 1 is the already-added case.
                 when (result) {
-                    2 -> toast(tileAlreadyAdded)
+                    2 -> toast(tileAddSuccess)
+                    1 -> toast(tileAlreadyAdded)
                     DashboardViewModel.RESULT_REQUEST_FAILED -> toast(tileFailed)
                 }
             }
@@ -158,6 +165,12 @@ private fun QuickActionsCard(
                 onClick = onResetToAuto,
                 modifier = Modifier.fillMaxWidth().testTag("dashboard_reset"),
             ) { Text(stringResource(R.string.dashboard_reset_auto)) }
+            // G3-F11: the owner couldn't tell what "Reset to auto" did — spell it out.
+            Text(
+                stringResource(R.string.dashboard_reset_auto_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (canAddTile) {
             OutlinedButton(

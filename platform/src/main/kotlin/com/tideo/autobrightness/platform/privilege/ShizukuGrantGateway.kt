@@ -16,8 +16,11 @@ import kotlin.concurrent.thread
 enum class ShizukuAvailability { RUNNING, INSTALLED_NOT_RUNNING, NOT_INSTALLED }
 
 /**
- * Shizuku integration for the one-time WRITE_SECURE_SETTINGS grant (D-024: grant channel only;
- * after the grant the app uses Settings.Secure directly, never a runtime binder dependency).
+ * Shizuku integration for the one-time WRITE_SECURE_SETTINGS grant (D-024: this gateway is the grant
+ * channel only; after the grant the dimming path writes Settings.Secure directly, with no Shizuku
+ * binder). NB (G3-F9): Shizuku has one *other*, optional runtime use elsewhere — the no-Location
+ * Wi-Fi SSID strategy (`ShizukuWifiSsidStrategy` → `cmd wifi status`); that is a separate code path,
+ * not this gateway, and the brightness pipeline never binds Shizuku.
  *
  * S11 completes the path S7 stubbed (D-032): request the Shizuku permission, then bind a
  * privileged [ShizukuUserService] (via [Shizuku.bindUserService]) and have it exec `pm grant`.

@@ -346,6 +346,9 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
+        // G3: enable the collapsible Wi-Fi + Time sections to reveal their fields.
+        compose.onNodeWithTag("trigger_toggle_wifi").performScrollTo().performClick()
+        compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
         compose.onNodeWithTag("use_current_ssid").performScrollTo().assertExists()
         compose.onNodeWithTag("start_sunrise").performScrollTo().assertExists()
         compose.onNodeWithTag("end_sunset").performScrollTo().assertExists()
@@ -468,6 +471,8 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
+        // G3: triggers are collapsible — enable Battery to reveal its fields.
+        compose.onNodeWithTag("trigger_toggle_battery").performScrollTo().performClick()
         compose.onNodeWithTag("rule_batt_min").performScrollTo().assertExists()
         compose.onNodeWithTag("rule_batt_max").performScrollTo().assertExists()
     }
@@ -501,6 +506,7 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
         compose.onNodeWithTag("rule_start").performScrollTo().performClick()
         compose.onNodeWithTag("start_time_ok").assertExists()
     }
@@ -527,7 +533,7 @@ class SettingsScreensTest {
         compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
         // The clear affordance is only shown when a time is set.
         compose.onNodeWithTag("clear_time").performScrollTo().performClick()
-        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        compose.onNodeWithTag("save_rule").performClick()
         assertEquals(null, saved?.triggers?.timeRange, "Clear time must null the saved time range")
     }
 
@@ -544,6 +550,7 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("trigger_toggle_wifi").performScrollTo().performClick()
         compose.onNodeWithTag("use_current_ssid").performScrollTo().performClick()
         compose.onNodeWithText("HomeNet", substring = true).assertExists()
     }
@@ -560,9 +567,29 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("trigger_toggle_location").performScrollTo().performClick()
         compose.onNodeWithTag("use_current_location").performScrollTo().assertExists()
         compose.onNodeWithTag("rule_lat").performScrollTo().assertExists()
         compose.onNodeWithTag("rule_radius").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun contextEditor_triggersCollapsedByDefault_radiusDefaults200_G3() {
+        // G3 owner finding: a new rule starts with every trigger collapsed (only what's selected is
+        // shown); enabling Location reveals a radius pre-filled to 200 m, never blank.
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = emptyList(), profileNames = listOf("Default"), apps = emptyList(),
+                    onBack = {}, onSave = {}, onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("add_context_rule").performClick()
+        // Collapsed by default → the Wi-Fi field is absent until its section is switched on.
+        compose.onNodeWithTag("rule_wifi").assertDoesNotExist()
+        compose.onNodeWithTag("trigger_toggle_location").performScrollTo().performClick()
+        compose.onNodeWithTag("rule_radius").performScrollTo().assertTextContains("200", substring = true)
     }
 
     @Test
@@ -579,8 +606,9 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
         compose.onNodeWithTag("day_2").performScrollTo().performClick()
-        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        compose.onNodeWithTag("save_rule").performClick()
         assertEquals(listOf(2), saved?.triggers?.days, "Monday must be saved as DAY_OF_WEEK 2")
     }
 
@@ -597,6 +625,7 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
         compose.onNodeWithTag("start_sunrise").performScrollTo()
             .assertTextContains("Sunrise (06:42)", substring = true)
     }
@@ -686,7 +715,7 @@ class SettingsScreensTest {
             MaterialTheme {
                 ToolsContent(
                     onBack = {},
-                    onRunWizard = { ran = true; null },
+                    onRunWizard = { _, _ -> ran = true; null },
                     onApplyWizard = {},
                     recordedPoints = sevenPoints,
                 )
@@ -713,7 +742,7 @@ class SettingsScreensTest {
             MaterialTheme {
                 ToolsContent(
                     onBack = {},
-                    onRunWizard = { stubResult },
+                    onRunWizard = { _, _ -> stubResult },
                     onApplyWizard = {},
                     recordedPoints = ninePoints,
                     onPreviewGraph = { previewed = true },
@@ -889,6 +918,7 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
+        compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
         compose.onNodeWithTag("end_sunset").performScrollTo()
             .assertTextContains("Sunset (18:30)", substring = true)
     }
@@ -930,7 +960,7 @@ class SettingsScreensTest {
         compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
         compose.onNodeWithTag("rule_editor_modal").assertExists()
         compose.onNodeWithTag("rule_name").performScrollTo().assertExists()
-        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        compose.onNodeWithTag("save_rule").performClick()
         assertEquals("Cinema", savedRule?.name, "saving the rule in the modal routes through onSave")
     }
 

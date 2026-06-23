@@ -32,6 +32,14 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
     val dateLocation: StateFlow<ExperimentDateLocation> = store.dateLocation
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExperimentDateLocation())
 
+    /** G3-F12: whether the ip-api.com geo-IP location fallback may run (privacy opt-out, default on). */
+    val geoIpEnabled: StateFlow<Boolean> = store.geoIpEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun setGeoIpEnabled(enabled: Boolean) {
+        viewModelScope.launch { store.setGeoIpEnabled(enabled) }
+    }
+
     /** Today as `YYYY-MM-DD` — the live-data date default shown when no fixed date is set. */
     fun today(): String = DATE_FORMAT.format(Date())
 

@@ -10,6 +10,10 @@ data class BrightnessPolicyInput(
     val animation: AnimationConfig = AnimationConfig(),
     val dynamicScaling: DynamicScalingConfig = DynamicScalingConfig(),
     val previous: PreviousState? = null,
+    // Tasker prof759/task545: true while the proximity sensor reads "near" (phone at the ear / covered).
+    // task544 act28/29 then damps the smoothing alpha ×0.1 so a hand/ear briefly over the light sensor
+    // does not jerk the brightness. It NEVER pauses the pipeline. Default false = no damp.
+    val proximityNear: Boolean = false,
 )
 
 data class TimeContext(

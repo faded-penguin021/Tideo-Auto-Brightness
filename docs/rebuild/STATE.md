@@ -63,9 +63,78 @@ next session does not know it.
 | S13d static content & charts | 2026-06-20 | Opus/high | DONE | (this push) | Final S13 sub-segment — the original S13 scope: real charts + About/User-Guide, replacing all placeholders. Followed the `BrightnessCurveChart` template exactly (sample a domain fn over a grid → `List<Offset>` → `ChartSeries` → `ChartCanvas`); **`ChartCanvas` fence honoured (called only)**. **6 chart files filling the S12.8b `ChartSlot.content` swap points (D-066):** `ReactivityChart.kt` (`ReactivityChart` = `BrightnessEngine.dynamicThreshold×100` vs hardcoded ref over log lux → `reactivity_chart`; `AlphaResponseChart` = `1−exp(−deltaFactor·Δ)` vs ref 1.8 → `alpha_chart`), `DimmingChart.kt` (`SoftwareDimming.dimProgress×100` + dim-shell + ref `pow(1−b/15,2.5)` → `dimming_chart`), `CircadianChart.kt` (`CircadianDimmingChart` = `DynamicScaleEngine.dimDynamic` over the day via `SolarCalculator` windows + shared `circadianDaySamples`/`deviceTzOffsetHours` helpers → `circadian_dimming_chart`), `ExperimentChart.kt` (`CircadianScaleChart` = `DynamicScaleEngine.scaleDynamic` over the day → `dynamic_scale_chart`), `TaperChart.kt` (`BrightnessEngine.compressedDynamicScale.effectiveScale` day/night over brightness → `taper_chart`), `PowerDrawChart.kt` (renders measured power/current; `EmptyState` until on-device calibration runs, D-044/Gate → `power_draw_chart`). All 4 chart-host screens (Reactivity/Circadian/SuperDimming/Tools) swapped their `ChartPlaceholder` for the real charts; Circadian passes the F39 fixed/live lat-lon to the solar charts. **Static screens:** `AboutScreen.kt` (banner + intro + acknowledgments + MIT license + app version; Chart.js ack DROPPED) + `UserGuideScreen.kt` (9-section manual in M3 cards, ported from user_guide.md). **`PlaceholderScreen.kt`/`ChartPlaceholder.kt` deleted** (git rm); the 2 tests that used them as generic stand-ins updated (inline `Text`/`EmptyState`). **G2R-F80:** `AppRoute.UserGuide` added; `completeOnboarding()` now lands on the User Guide (Menu seeded beneath → Back→Menu) as the post-onboarding first-run destination; About relabelled "About", both in the Menu Info&Help group. **i18n:** all About/Guide copy + new dashboard strings via `stringResource` (strings.xml +~40); no new `Text("…")` literals (ceiling 92 held). **Owner UI feedback (during S13d) also fixed:** (a) Circadian fields converted `helper=`→`help=` so they get the "ⓘ tap to view explanation" affordance like every sibling screen; (b) Menu banner wordmark now ONE line ("Tideo" white + "Auto Brightness" gold); (c) `AabTopBar` de-teal'd (default M3 surface) so the teal banner is Menu-only (Dashboard/Live Debug no longer carry a second teal header); (d) Dashboard status pill uses compact labels (no wrap next to "APPLIED BRIGHTNESS"); (e) **Dashboard now shows the active Profile + active Context** (always-visible readout) via a new in-memory `LiveRuntimeState.activeProfile` (`%AAB_CurrentActiveProfile`) published by `SettingsViewModel.applyProfile` (manual) + `ContextEngine` (rule loads), surfaced through `DashboardViewModel`/`DashboardUiState`. **Fence honoured: `ChartCanvas`/`domain`/golden/`runtime` pipeline/gradle/manifest/`SettingsValidator` untouched.** Full ladder GREEN: `:app:assembleDebug :app:lintDebug :app:testDebugUnitTest`(283) `:domain:test :platform:test`. No compaction. **→ ALL of S13 (a–d) DONE → S14 (release-grade finalization).** |
 | S13d' chart fidelity + guide WebView (owner feedback) | 2026-06-21 | Opus/high | DONE | (this push) | Owner device-review follow-ups on S13d (D-083). **ChartCanvas fence LIFTED with explicit owner sanction** ("free to break the fence if it is a blocker") — additive only: `ChartSeries.onSecondaryAxis`, `ChartCanvas.secondaryYRange`/`secondaryYAxisLabel` (dual y-axis, right ticks+title), `xTickFormatter` (custom x labels), and `ChartMarker.label` now rendered (rotated). **Fixes:** (1) **charts stay interactive (owner: "charts have to be interactive")** — the drag-scrub readout is kept on, which consumes the `ChartPager` horizontal swipe, so page navigation moved to **tap**: ‹ › arrows flanking the title + clickable page dots (`userScrollEnabled=false`). Swipe-between-graphs is intentionally gone. (2) **dynamic y-axis** on Reactivity (was fixed 0–100; thresholds top ~35 %). (3) **reference is always gold** — DimmingChart reference→gold, dim-% teal, dim-shell blue; TaperChart night→blue (gold reserved for references). (4) **Dimming dual y-axis** — dim-% + gold reference on LEFT (0–100), dim-shell on RIGHT (0–strength), matching Tasker. (5) **Circadian charts** — switched to the **UTC frame** (tz=0, matches Tasker `%TIMES%86400` + runtime D-061/D-065), x-axis now **HH:MM** via `xTickFormatter` (no more "5.8h"), the five **sun-event lines labelled** Dawn/Sunrise/Noon/Sunset/Dusk, axis titled "Time of day (UTC)"; the weird scrub rounding (1.1 vs 1.15) is gone with `interactive=false` (y-ticks show 1.00/1.05/1.10/1.15). (6) **About** — acknowledgements reworded so João Dias is clearly Tasker's creator (not AAB's), author credit to /u/v_uurtjevragen; **MIT license year 2025→2026**. (7) **User Guide → WebView/HTML** (Tasker rendered it as styled HTML) — `UserGuideScreen` now renders an AAB-themed static HTML doc (teal headers/gold accents/dark surface) in a no-JS/no-network `WebView` (no new dep); copy still from `strings.xml` (i18n preserved), markup local. Fresh `/dist/` debug APK rebuilt. Tests/ladder GREEN (`:app:testDebugUnitTest`=283 `:app:assembleDebug :app:lintDebug :domain:test :platform:test`). No compaction. |
 | S13e final pre-S14 owner pass | 2026-06-21 | Opus/high | DONE | (this push) | Owner-sanctioned punch-list (not in RUNBOOK), 4 items + 1 retraction (D-086). **(1) CI Node-20 deprecation:** bumped `actions/checkout@v4→v5` + `actions/setup-java@v4→v5` (node24) in both `release.yml`/`release-signing.yml`; the remaining official actions (cache/upload-artifact v4, action-gh-release v2, setup-android v3) have no node24 major yet and are force-upgraded by the runner from June 2026 — nothing to bump. **(2) Profiles & Export collapsible:** folded the "Manage profiles" + "Export" sections of `ProfilesBody` into ONE collapsed `ExpandableSection` ("Manage profiles & Export", `manage_section` tag) so the saved-profiles list is the uncluttered default; SettingsScreensTest expands it first. **(3) Transition factor does nothing (REAL bug):** `circadianCurve` hard-coded `scaleTransitionFactor=0.1`, so the Circadian-screen "Transition factor" field changed nothing on the graph (the *runtime* honoured it via PipelineCycleRunner). Threaded the real `draft.scaleTransitionFactor` into `circadianCurve`/`CircadianScaleChart`/`CircadianDimmingChart` (added to the `remember` key); both Circadian + Super-Dimming charts now respond. **(4) Home-screen widget + Dashboard quick actions (owner):** new `widget/DashboardWidgetProvider` (RemoteViews: Brightness/lux/profile/context + service toggle + reset; `updatePeriodMillis=0`, repainted EVENT-DRIVEN from the FGS publish path's existing `distinctUntilChanged` collect — no polling; no-widget fast-path early-returns before any DataStore read), `res/layout/widget_dashboard.xml` + `res/xml/dashboard_widget_info.xml` + bg drawables + manifest receiver (APPWIDGET_UPDATE + TOGGLE/RESET actions). Dashboard gained a `QuickActionsCard`: **Reset to auto** (= re-apply/snap-to-auto per owner; `DashboardViewModel.resetToAuto`→`AutoBrightnessRuntime.reapply`), **Add Quick Settings tile** (`StatusBarManager.requestAddTileService`, API-33+ gated via auto-inferred `canAddTile()`, de-dupes via TILE_ALREADY_ADDED→toast), **Add home-screen widget** (`requestPinAppWidget`, shown only when supported ∧ `!hasInstances`). **(retraction) "date doesn't affect circadian graphs" — FALSE (owner mistake on their end); investigation independently confirmed the path is correct** (solar windows shift hours by date [Jun rise 3.71 vs Dec 8.05 UTC], store persists it, pager recomposes captured plain values). **Fence honoured: domain/ + golden vectors + ChartCanvas untouched** (chart change is app-layer wiring only). New tests: `DashboardWidgetProviderTest`(4, status mapping), UiShell +2 (quick-actions render/hidden). Full ladder GREEN: `:domain:test :platform:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug` (lint 0-error hard gate). No compaction. |
+| S14 final integration, parity audit, release prep | 2026-06-21 | Opus/high | DONE | (this push) | Whole-system finalization (D-087…D-090). **Parity audit:** every PARITY_CHECKLIST row → ported/dropped, **zero `pending`** (resolved 18 — most were already-implemented rows never flipped; verified each ported claim against real code). **Two deferred features PORTED to parity (owner: don't drop, parity is the goal):** (1) **prof759/task545 proximity damp** (D-087) — `platform/sensor/ProximitySensorSource` (TYPE_PROXIMITY near/far) → `ProximityTracker` → `PipelineState.proximityNear` → `BrightnessEngine.smoothLux` LuxAlpha ×0.1 (task544 act28/29, additive golden-preserving `luxAlphaDamp` param + `PROXIMITY_ALPHA_DAMP`); never pauses; (2) **task524 power-draw calibration** (D-088) — `domain/power/PowerDrawCalibration` (geometric steps + µA→mA + net-of-idle, tested) + `platform/context/PowerMeter` + `app/runtime/PowerDrawCalibrator` (ramp→baseline→latch-breaker sweep, fake-meter tested) + `PowerDrawStore` + Tools calibrate UI (prep dialog → drives the Activity window) → `PowerDrawChart`. **Validated owner feedback (refresh()):** TRUE that `SuperDimmingCoordinator.apply` triggered `privilegeManager.refresh()` (2 Binder permission checks) every cycle — but per *cycle*, not per *frame*; FIXED by caching the tier (`tierProvider = { currentTier() }`) and refreshing only on resume (service start + screen-on, AmbientMonitoringService). **Owner fixes:** panic too sensitive → `PanicGate` 3 s post-wake grace + detector reset on wake + stricter inversion (8.0); Dashboard brightness number now animates (`animateIntAsState`); live "Now" markers added to Reactivity (current lux) / Dimming (when engaged) / Taper (when scaling) charts; launcher icon scaled 0.88 (knob inside the r33 safe zone); **settings clamp-on-Apply** (D-085 — `DraftSettingsViewModel.apply` runs `validate()`). **Quality:** dead `LineGraph.kt` deleted; @Volatile audit (no inappropriate uses; fixed ThrottleController's stale "single-writer" header); **owner pushback adopted** — the brittle exact-count `ProvenanceCommentCountTest` → content-based `ProvenanceTest` (floor + rounding/task anchors; never needs bumping on legit additions), and the LOC guard was HONORED by extracting `ProximityTracker` (orchestrator stayed an orchestrator) with a minimal justified 300→310 bump, not a lazy one. **Deprecations:** none in our main source/build scripts; the "Gradle 9.0" notice is AGP-8.7.3-internal (needs an AGP bump, deferred); test-only Robolectric `withIntent`/`Notification.PRIORITY_HIGH` left as-is. **Release:** release-grade `README.md` (AAB-inspired, points contributions upstream) + `CONTRIBUTING.md` + `DEVICE_TEST_SCRIPT.md` (Gate-3); `versionName 0.9.0`/`versionCode 2`; CI `build.yml` + `redirect-external-prs.yml` (separate push — workflow scope). TODO/FIXME = 0. Full ladder GREEN (`:domain:test :platform:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`). No compaction. **→ HUMAN GATE 3.** |
+| Gate 3 punch-list (G3-F1…F18) | 2026-06-22 | Opus/high | DONE | (this push) | Worked the 18 owner device findings on this branch (per the binding hand-off note). **Real bugs fixed:** **G3-F3** `AabSettings.validate()` floored minBrightness 1→0 (Misc slider already exposes 0..75; the 0→1 clamp made committed≠draft so the screen stayed perpetually dirty and 0 never stuck; OEM `toDevice` already coerces 0..255 → dimmest, not off); contract range 1..255→0..255; `AabSettingsClampTest`. **G3-F4** QS-tile "already added" on first add — the result `when` mapped `2` (TILE_ADDED = success) to the "already added" toast; corrected to 2→added / 1→already-added (+`dashboard_tile_add_success`). **G3-F5** Dashboard didn't animate on-device — `PipelineCycleRunner` published `lastAppliedBrightness==targetBrightness` only AFTER the multi-second sweep, so the instrument snapped post-settle; now publishes `targetBrightness` (the destination) BEFORE animating and the `BrightnessInstrument` animates toward `target` → rolls DURING the transition. **G3-F6** super-dim residual at circadian Spread 100 daylight — `dimDynamic→0` ⇒ `dim_shell` rounds to 0 but the coordinator still wrote `activated=1` at level 0 (Android Extra Dim stayed engaged); now `level<=0` ⇒ disengage; updated `SuperDimmingCoordinatorTest.circadian_spread100…` to assert disengaged, not level-0-written. **G3-F11** "Reset to auto" no-op when paused — `reapply`→`reapplyProfile` early-returns on `paused` (the override state where you'd reset); rewired `DashboardViewModel.resetToAuto` to the Resume path (clears the pause + unconditionally re-runs Set Initial Brightness) + a hint line. **G3-F15** Alpha graph x-axis was "Lux change" but is a fold change; relabel "Relative lux change %" + rescale to 1..2000 % (task557 labelValues), + live "Now" alpha line. **G3-F16** applied wizard suggestion left the blue "Suggested" line overdrawing the teal curve; suppress the fitted series when its sampled curve matches the live curve (≤1 level). **G3-F2** brightness-curve "Now" cross-hair never rendered (screen never passed currentLux/currentBrightness) — now wired; alpha "Now" added. **G3-F17 (domain fence, evidence-backed):** curve-wizard `tau` default 4.0→**0.001** — task038 act2 (547) always sets `%tau=0.001` before the Java engine, so 0.001 is the operative default; 4.0 was the unreachable Java-header fallback that over-damped every suggestion ("poor quality"). All wizard goldens pass τ explicitly → no golden touched (`wizard_defaultTauIsTheFaithfulAct2Value` locks it); τ also **exposed as a wizard slider** (0.001–5, owner ask). **Docs/UX:** **G3-F1** User Guide/About branding AAB→Tideo + long-press→ⓘ wording; **G3-F7** README shields.io badges; **G3-F8** CONTRIBUTING/redirect-workflow now **triage (comment+label), not auto-close** — app-layer/Android bug-fix PRs welcome, features→AAB; `.github/ISSUE_TEMPLATE/bug_report.md` added; **G3-F9** README + `ShizukuGrantGateway` comment corrected — Shizuku has one runtime use (no-Location Wi-Fi SSID `cmd wifi status`), not "never runtime"; **G3-F12** ip-api.com geo-IP fallback now has a **privacy opt-out toggle** (Circadian → Date & location, `ExperimentPrefsStore.geoIpEnabled`, gated in AppModule) + a README Privacy section; **G3-F13** restricted-settings card adds "tap it anyway" + covers usage-access; **G3-F14** Profiles & Contexts hero toned down (`HeroNavCard(prominent=false)` — no teal edge, resting elevation); **G3-F10** Curve & Brightness icon Settings→Create (removed the dup with Misc) — fuller Material Symbols pass needs `material-icons-extended` (a dependency decision, deferred to owner, D-091). **G3-F18** battery baseline = info, recorded (no action). Full ladder GREEN. No compaction. **→ re-run HUMAN GATE 3.** |
+| Gate 3 punch-list R2 (owner device follow-ups) | 2026-06-22 | Opus/high | DONE | (this push) | Second owner round on the Gate-3 build (D-092). **Power-draw parity (task524 — owner supplied the verbatim Java):** the algorithm was already faithful (geometric steps, normalize-1st-to-0 + net-of-idle in `PowerDrawCalibration.postProcess`, nudge+settle latch-breaker in `PowerDrawCalibrator`), but two pieces were missing → "poor results": (1) **white screen** — Tasker measures on a white `FrameLayout` dialog (OLED power is colour-dependent); the rebuild swept brightness over the dark Tools UI. Added `PowerCalibrationOverlay` (fullscreen white `Dialog` + status/progress, drives ITS OWN window brightness — replaces the Activity-window approach); (2) **real dual y-axis** — `PowerDrawChart` faked the mA series by rescaling onto the power axis; now Power on the left axis, real **Current (mA) on a secondary right axis** (`secondaryYRange`), matching the Chart.js graph. **De-jargon:** `power_desc`/prep copy dropped "task524" and now say the screen turns white. **User Guide:** removed the in-HTML teal banner — the teal brand banner is Menu-only (the scaffold already titles the screen). **Context editor overhaul (owner: inferior to Tasker):** triggers are now **collapsible** — a `TriggerSection` per Wi-Fi / Time & day / Location / Battery / Foreground apps with an enable Switch (`trigger_toggle_*`), seeded from whether the rule uses that trigger (persists on edit), showing only what's selected; **radius defaults to 200 m** (never blank); **Save/Cancel moved to a sticky bottom bar** (was pinned top). `RuleEditor` owns its scroll + bottom bar; host simplified. **README:** added Stars + Downloads (+ dynamic Release) shields. **Shizuku honesty:** `CLAUDE.md` "used only in the grant flow, never a runtime binder dependency" was still false → corrected to own the optional runtime SSID use (`ShizukuWifiSsidStrategy` `cmd wifi status`). **Reactivity copy:** "Smoothing thresholds" → "Reactivity thresholds" (they're reactivity dead-zone levels). **Restricted-settings card:** removed the emoji + trimmed the verbosity (kept "tap it anyway" + usage-access). Tests: `AabSettingsClampTest` unchanged; new `contextEditor_triggersCollapsedByDefault_radiusDefaults200_G3`; updated 7 context-editor tests to enable sections / drop bottom-bar scroll. Full ladder GREEN. No compaction. **→ re-run HUMAN GATE 3.** |
+| External-AI review triage (4 holes + 1 nit) | 2026-06-23 | Opus/high | DONE | (this push) | Owner forwarded an external AI review claiming 4 "glaring holes" + 1 nit; verified each against real code (D-093). **3 VALID → fixed:** (1) **dead `ScreenStateReceiver`** — manifest `SCREEN_ON/OFF` are never delivered to manifest receivers (the class's own docstring claimed a cold-start role it can't fulfil); removed the manifest `<receiver>` + deleted the class + its test; resurrection is covered by `START_STICKY` (verified `startForeground` runs first on null-intent recreation) + the 15-min `MaintenanceWorker`. (2) **time contexts stall in constant light** (real + parity gap) — `ContextEngine` only re-evaluated time rules on a sensor sample / screen-on, but `TYPE_LIGHT` is on-change so in steady light nothing ticks and a 20:00/Sunset rule fired late; added a `timeJob` that `delay()`s until `millisUntilNextContextWake(nextContextTime)` then fires a TIME eval — matching Tasker prof764's self-scheduling Time context (the resolver comment already said `nextContextTime` "drives prof764's self-scheduling"); doze caveat documented (screen-on eval + MaintenanceWorker remain backstops); new pure `ContextScheduleTest`. (3) **background custom toast blocked (Android 11+)** — `AabFlash`'s fallback used `Toast.setView` (custom view), which the OS silently drops for background apps, so the manual-override flash vanished exactly when the user pulled the shade; fallback is now a plain text `Toast.makeText` (the presenters keep the styled/tap-to-dismiss surfaces for foreground/overlay). **1 REBUTTED:** OEM brightness range / "hidden API" — `Resources.getSystem().getIdentifier(config_screenBrightnessSettingMaximum)` is a framework *resource* lookup, NOT non-SDK reflection, so it is NOT blocked on API 28+ and does not "return 0"; the suggested `BrightnessInfo.brightnessMaximum` is the float (0.0–1.0) system, wrong for the legacy int `Settings.System.SCREEN_BRIGHTNESS` we read/write; the existing `config_screenBrightnessSettingMaximum` read is the correct, framework-blessed way to learn an OEM's int max and already handles 0–1023/0–4095 ranges. Declined an adaptive-`deviceMax` backstop (perturbs the override-detection band for a scenario the config read already covers). **1 NIT (non-issue):** Shizuku `unbindUserService(args, this)` — `this` correctly resolves to the enclosing `ServiceConnection` (a plain `thread{}` is not a receiver lambda); attempted the reviewer's "name it" tweak and it FAILED to compile (`this@ServiceConnection` / a captured `connection` ref are both illegal for an anonymous object), confirming `this` is the only clean form (reverted; added a clarifying comment). Full ladder GREEN. No compaction. |
+| Gate 3 sign-off + 1.0.0 release | 2026-06-23 | Opus/high | DONE | (this push) | Owner signed off Gate 3 → all three human gates passed; the Tasker→Kotlin rebuild is feature-complete and parity-verified. Finalization: `versionName 0.9.0→1.0.0` / `versionCode 2→3`; removed the throwaway `/dist/` debug-APK folder pre-merge (owner request); README status → "all gates passed / 1.0.0"; STATE Current-state + Gate-3 findings header marked SIGNED OFF. Completion sweep: TODO/FIXME = 0, `TODO(` = 0, PARITY_CHECKLIST `pending` = 0, no stale live `0.9.0`/"Gate 3 pending" copy (only historical segment-log/RUNBOOK refs retained). Full ladder GREEN. Owner merges to `main` to ship 1.0.0. |
 Status values: DONE · PARTIAL · BLOCKED (see failure protocol in CLAUDE.md).
 
 ## Current state
+
+**🎉 PROGRAM COMPLETE — GATE 3 SIGNED OFF (2026-06-23), v1.0.0.** All three on-device human gates
+passed (Gate 1 core loop, Gate 2 surfaces & tiers, Gate 3 acceptance soak). The Tasker
+`Advanced_Auto_Brightness_V3.3` project is fully rebuilt as a native Kotlin/Compose app with
+feature parity: PARITY_CHECKLIST is zero-`pending`, TODO/FIXME = 0, all golden parity tests green.
+**Release finalization:** `versionName 1.0.0` / `versionCode 3`; the throwaway `/dist/` debug-APK
+folder removed pre-merge (owner request); README status → "all gates passed". The two external-AI
+review passes were triaged (D-093/D-094): 3 real OS-lifecycle holes fixed (dead `ScreenStateReceiver`,
+time-context self-scheduler, background-toast `setView`), 1 panic-sensor IPC hot-loop fixed, and the
+brightness-range "hidden API" + Shizuku-`this` + exact-alarm claims rebutted with evidence. Owner
+merges this `claude/*` branch to `main` to ship 1.0.0.
+
+**Gate 3 punch-list R2 DONE (2026-06-22) — owner device follow-ups → re-run HUMAN GATE 3.** **Power-draw
+faithfulness (task524, owner gave the verbatim Java):** the math + nudge/settle were already faithful;
+the "poor results" were the missing **white calibration screen** (OLED power is colour-dependent — now a
+fullscreen white `Dialog` overlay driving its own window brightness) and the **real secondary mA y-axis**
+(was rescaled onto the power axis). **Context editor reworked** to collapsible per-trigger sections
+(seeded from the rule, persist on edit), **radius default 200 m**, and a **sticky bottom Save/Cancel bar**
+(was top). **User-Guide teal banner removed** (Menu-only). **Shizuku honesty:** corrected CLAUDE.md's false
+"never a runtime dependency" claim (the no-Location SSID path uses `cmd wifi status` at runtime).
+**Reactivity** "Smoothing thresholds" → "Reactivity thresholds"; **restricted-settings** card de-emoji'd +
+trimmed; **README** Stars/Downloads/Release shields; power-draw "task524" jargon removed from UI copy.
+New/updated tests; full ladder GREEN (D-092).
+
+**Gate 3 punch-list DONE (2026-06-22) — all 18 owner device findings (G3-F1…F18) worked → re-run HUMAN
+GATE 3.** Worked on this session's branch, carried forward from the S14 branch's content (all of S14
+intact — nothing based on bare `main`). **Real bugs fixed:** min-brightness-0 clamp/perpetual-dirty
+(G3-F3), QS-tile "already added" on first add (G3-F4 — `2`=TILE_ADDED was mapped to the wrong toast),
+Dashboard not animating on-device (G3-F5 — publish the target BEFORE the sweep, animate toward it),
+super-dim residual at circadian Spread 100 (G3-F6 — `level<=0` ⇒ disengage), "Reset to auto" no-op while
+paused (G3-F11 — route to Resume), alpha-axis mislabel + rescale to % (G3-F15), applied-suggestion line
+overdraw (G3-F16 — suppress when it matches the live curve), brightness/alpha "Now" markers (G3-F2).
+**Domain-fence, evidence-backed:** curve-wizard `tau` default 4.0→**0.001** (the task038 act2 value the
+Java engine actually reads; 4.0 was the unreachable fallback that over-damped suggestions) + `tau` exposed
+as a wizard slider (G3-F17) — **no golden touched** (all wizard goldens pass τ explicitly). **Docs/UX:**
+branding AAB→Tideo + long-press→ⓘ (G3-F1), README badges (G3-F7), CONTRIBUTING/workflow now triage-not-
+auto-close + bug-report template (G3-F8), honest Shizuku-runtime note (G3-F9), ip-api.com geo-IP **privacy
+opt-out toggle** + README Privacy section (G3-F12), "tap it anyway"/usage-access restricted-settings
+guidance (G3-F13), Profiles & Contexts hero toned down (G3-F14), one within-core menu-icon fix (G3-F10;
+fuller Material Symbols pass needs `material-icons-extended` → D-091). G3-F18 (battery baseline) = info,
+recorded. New tests: `AabSettingsClampTest`, `WizardParityTest.wizard_defaultTauIsTheFaithfulAct2Value`;
+`SuperDimmingCoordinatorTest.circadian_spread100…` updated to assert disengagement. Full ladder GREEN.
+
+**S14 DONE (2026-06-21) — final integration, parity audit & release prep → HUMAN GATE 3.** PARITY_CHECKLIST
+is **zero-`pending`** (all 18 resolved; ported claims verified against real code). Two previously-deferred
+features were **ported to parity at the owner's request** (parity is the goal, not dropping): **prof759/
+task545 proximity damp** (ProximitySensorSource → ProximityTracker → `BrightnessEngine` LuxAlpha ×0.1,
+task544 act28/29, additive golden-preserving) and **task524 power-draw calibration** (PowerDrawCalibration
+domain math + PowerMeter + PowerDrawCalibrator latch-breaker sweep + PowerDrawStore + Tools UI →
+PowerDrawChart). The owner `refresh()` feedback was **validated and fixed** (tier now cached + refreshed on
+resume, not 2 Binder checks/cycle). Owner UX fixes: panic 3 s post-wake grace + stricter inversion
+(`PanicGate`); Dashboard brightness number animates; live "Now" markers on Reactivity/Dimming/Taper charts;
+launcher icon scaled to 0.88; clamp-on-Apply (D-085). Quality: dead `LineGraph.kt` removed, @Volatile audit
+clean, and — per owner pushback — the brittle exact-count provenance test became content-based (`ProvenanceTest`)
+and the LOC guard was honored by extracting `ProximityTracker` (minimal 300→310 bump, not a lazy one).
+Release-grade README + CONTRIBUTING + DEVICE_TEST_SCRIPT; `versionName 0.9.0`; CI `build.yml` +
+`redirect-external-prs.yml`. Full ladder GREEN; TODO/FIXME = 0.
+
+**→ GATE 3 RAN (owner device pass) — 18 deviations recorded in "Gate findings" → "Gate 3 (after S14)"
+(G3-F1…F18). NEXT SESSION (owner-binding): `git checkout claude/adoring-bardeen-37fb6m` and work the
+punch-list ON THIS BRANCH — do NOT branch from `main` (the S14 PR is unmerged, so main lacks all of S14).
+Several are real bugs (min-bright-0 clamp, dashboard not animating on-device, super-dim spread-100
+residual, QS-tile race, reset-to-auto no-op, alpha-axis label, applied-suggestion line); a few may touch
+the domain fence (curve-wizard `tau`/task38 — evidence-backed only). Gate 3 pass → bump to 1.0.0.**
 
 **S13d DONE (2026-06-20) — ALL of S13 (a–d) COMPLETE → next is S14.** The original S13 scope landed: six
 real charts (`ui/graph/{Reactivity,Dimming,Circadian,Experiment,Taper,PowerDraw}Chart.kt`) built on the frozen
@@ -490,14 +559,15 @@ AppModule is now the real DI root.
   hard-coded 0.1); **home-screen widget** (battery-efficient, event-driven from the FGS publish path) +
   Dashboard quick actions (Reset-to-auto, Add-QS-tile, Add-widget). The "date doesn't affect circadian graphs"
   report was **retracted by the owner** (verified correct). domain/golden/ChartCanvas fenced; ladder green.
-- **S14 carry-forward — settings safety (from D-085, owner-reported):** `DraftSettingsViewModel.apply()`
-  commits the raw draft to DataStore **without running the mapper's `validate()` clamp**, so out-of-range
-  values entered on a draft screen persist and reach the engine. S13d fixed the one safety-critical case at
-  its consumption point (circadian `scaleSpread` clamped to 1..100 in `toDynamicScalingConfig` + on the
-  field), but the general hole stands. **S14 should do a clamp-on-Apply / per-field bounds pass** (e.g. run
-  `AabSettings.validate()` on commit, or give each draft field explicit bounds) so no parameter screen can
-  persist an unsafe value. Keep `dimSpread` signed (-100..100); everything else has positive/range bounds in
-  `AabSettingsMapper.validate` + the contract.
+- **S14 DONE — final integration, parity audit & release prep (D-087…D-090) → HUMAN GATE 3.** Zero-`pending`
+  checklist; proximity damp (D-087) + power-draw calibration (D-088) ported to parity; `refresh()` tier
+  caching (D-089); guard tests reworked + clamp-on-Apply + UX/icon/chart fixes (D-090). README/CONTRIBUTING/
+  DEVICE_TEST_SCRIPT shipped; `versionName 0.9.0`. Owner runs `DEVICE_TEST_SCRIPT.md`; pass → 1.0.0.
+- **S14 carry-forward — settings safety (D-085) — RESOLVED in S14 (D-090c).** `DraftSettingsViewModel.apply()`
+  used to commit the raw draft to DataStore **without** the mapper's `validate()` clamp, so out-of-range
+  values entered on a draft screen reached the engine. S14 runs `AabSettings.validate()` on commit (the same
+  per-field clamp every other persistence path uses; `dimSpread` stays signed −100..100). Test:
+  `DraftSettingsViewModelTest.apply_clampsOutOfRangeValues`.
 - **HUMAN GATE 1** (RUNBOOK "Human gates"): install app-debug.apk, grant WRITE_SETTINGS, verify the
   core loop (sensor → animate, slider → pause/resume, screen off/on → reinit, reboot → self-start,
   notification actions; optionally grant WRITE_SECURE_SETTINGS → super dimming engages below threshold).
@@ -2110,7 +2180,141 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   verified by a throwaway Robolectric probe). domain/ + golden + ChartCanvas stayed fenced. Full ladder green.
   (Affects S14.)
 
-Append new entries as D-087, … with which segments they affect.
+- **D-087 (S14 — prof759/task545 proximity damp PORTED).** Was a known unwired deferral; the owner asked
+  for parity, not a drop. The damp belongs in the domain (it is part of task544's alpha computation), so
+  `BrightnessEngine.smoothLux` gained an additive `luxAlphaDamp` param (default 1.0 ⇒ golden vectors
+  byte-identical) applied as `round3(1−exp(…)) × damp`, fed from a new `BrightnessPolicyInput.proximityNear`
+  (`evaluate` → ×`PROXIMITY_ALPHA_DAMP`=0.1 when near). Runtime: `platform/sensor/ProximitySensorSource`
+  (TYPE_PROXIMITY, near = value < maxRange) → `ProximityTracker` (its own file, started in `startSensor`,
+  stopped on hibernate/teardown) → `PipelineState.proximityNear` (atomic update from the collector, same
+  documented exception as `lastSampleMs`) → `buildInput`. Never pauses (task545). Tests: domain
+  `proximityNear_dampsLuxAlphaByTenth`, controller `proximityNear_propagatesToPipelineState`.
+
+- **D-088 (S14 — task524 power-draw calibration PORTED).** Was "measurement deferred" (old D-044); the
+  owner flagged it a real tour de force and wanted parity. Ported verbatim from the extracted Java:
+  `domain/power/PowerDrawCalibration` (geometric steps `(int)(255·(i/16)^0.45)` kept ≥5 apart ending 255;
+  µA→mA normalize `|raw|>50000 ⇒ /1000`; net-of-idle post-process with bogus-baseline zeroing) +
+  `platform/context/PowerMeter` (BATTERY_PROPERTY_CURRENT_NOW→AVERAGE fallback, EXTRA_VOLTAGE, STATUS) +
+  `app/runtime/PowerDrawCalibrator` (safety checks → ramp-down → 6 s baseline poll → latch-breaker sweep
+  with nudge → 2 s settle → sample; all side effects injected for testing) + `PowerDrawStore` (Preferences
+  JSON) + `PowerDrawViewModel` + Tools prep-dialog/Calibrate flow driving the Activity window brightness
+  (native equivalent of Tasker's fullscreen override; no WRITE_SETTINGS) → existing `PowerDrawChart`.
+  `PowerDrawSample` is now the canonical domain type (chart imports it). Tests: `PowerDrawCalibrationTest`,
+  `PowerDrawCalibratorTest` (fake meter), `PowerDrawStoreTest`. Chart.js HTML output NOT ported (native chart).
+
+- **D-089 (S14 — owner `refresh()` feedback validated + fixed).** The claim (`AndroidPrivilegeManager.refresh()`
+  every cycle in `SuperDimmingCoordinator.apply`, re-checking `checkSelfPermission`/`canWrite` uncached) was
+  **substantively correct** — the `AppModule` `tierProvider` lambda ran `refresh()` then `currentTier()`, so
+  every dimming evaluation did 2 Binder permission checks. **Imprecise on detail:** it is once per *cycle*
+  (one sensor evaluation), NOT per animation *frame* (frames are in `AnimationRunner`, which never reads the
+  tier), and it was wired in exactly ONE lambda, not "everywhere". Fix per the recommendation: `tierProvider`
+  reads the cached `currentTier()` (no IPC); `privilegeManager.refresh()` moved to the resume points
+  (`AmbientMonitoringService.ensureRunning` + `onScreenOn`), `RuntimeGraph` exposes the manager. A post-start
+  ADB/Shizuku grant is still picked up on the next wake. Test: `SuperDimmingCoordinatorTest.apply_readsTierProviderExactlyOncePerCycle`.
+
+- **D-090 (S14 — engineering quality, incl. two owner pushbacks on guard tests).** (a) **Provenance guard
+  reworked** — the owner noted an exact-count `// Tasker` test that you "bypass by bumping the number" guards
+  nothing (and a delete-one/add-one keeps the count). Replaced with content-based `ProvenanceTest` (a FLOOR +
+  presence of the parity-critical rounding anchors `Math.round`/`HALF_UP`/`round3` and each core task ID), so
+  honest additions never trip it while a targeted removal does. (b) **LOC guard honored, not bumped** — the
+  proximity wiring pushed the orchestrator past the 300-LOC re-bloat guard; instead of a lazy bump, the
+  proximity job lifecycle was extracted to `ProximityTracker` (the decomposition the guard encourages) and the
+  ceiling raised the minimal honest amount (300→310, documented as feature-growth ≠ monolith re-bloat). (c)
+  **Settings clamp-on-Apply** (closes S14 carry-forward D-085): `DraftSettingsViewModel.apply` now runs
+  `AabSettings.validate()` so a parameter screen can't persist an out-of-range value. (d) **Dead code:**
+  `ui/graph/LineGraph.kt` deleted (orphaned since ChartCanvas; referenced only by docs). (e) **@Volatile audit:**
+  no inappropriate uses (all visibility-only with benign/justified races, per S12.9e); fixed `ThrottleController`'s
+  stale "single-writer" header (S12.8b'' made it dual-writer). (f) **Dashboard:** the hero brightness number
+  animates via `animateIntAsState`. (g) **Charts:** live "Now" markers on Reactivity (current lux), Dimming
+  (when engaged) and Taper (when scaling active) — the circadian charts already had "Now". (h) **Icon:** the
+  launcher artwork scaled to 0.88 around centre so the dial knob sits inside the r33 adaptive safe zone. (i)
+  **Deprecations:** none in our main source or build scripts; the "incompatible with Gradle 9.0" notice is
+  AGP-8.7.3-internal (clears on an AGP bump — deferred, version-locked per `app/lint.xml`); test-only Robolectric
+  `withIntent`/`Notification.PRIORITY_HIGH` deprecations left as-is. (Affects S14.)
+
+- **D-091 (Gate 3 punch-list — the 18 G3-F findings).** Worked all 18 owner device findings on this
+  session's branch (fast-forwarded onto the S14 branch content per the hand-off note, so all of S14 is
+  carried — nothing rebased onto bare `main`). Highlights: **(G3-F17, domain fence)** the curve-wizard
+  `tau` default was 4.0 (the Java-header fallback) but task038 act2 (547) *always* sets `%tau=0.001`
+  before the Java engine reads it — so 0.001 is the operative default and 4.0 over-damped every
+  suggestion toward the current curve ("poor quality"). Changed the `CurveSuggestionInput.tau` default
+  to 0.001 (evidence: task038_curve_wizard.md L27/L69/L114). **Golden-safe:** every wizard golden passes
+  τ explicitly (4.0/1.0/2.0/8.0), so no vector moved; `wizard_defaultTauIsTheFaithfulAct2Value` locks
+  it. Also exposed τ as a wizard slider (0.001–5). **(G3-F3)** `AabSettings.validate()` floor for
+  minBrightness 1→0 (the Misc slider already exposes 0..75; the clamp made committed≠draft → perpetual
+  dirty; OEM `toDevice` coerces 0..255 so 0 = dimmest, not off). **(G3-F5)** decouple `targetBrightness`
+  (published before the sweep) from `lastAppliedBrightness` (at settle) so the Dashboard instrument
+  animates DURING the transition. **(G3-F6)** `SuperDimmingCoordinator` treats a computed `level<=0` as
+  disengage (no residual Extra Dim at level 0). **(G3-F11)** "Reset to auto" routed to the Resume path
+  (works while paused). **(G3-F12, privacy)** ip-api.com geo-IP fallback gained an opt-out toggle
+  (`ExperimentPrefsStore.geoIpEnabled`, gated in `AppModule`, surfaced on Circadian) + README Privacy
+  note. **(G3-F8)** the external-PR workflow now triages (comment + `needs-triage` label) instead of
+  auto-closing, so app-layer/Android bug-fix PRs are welcome (features still → AAB); added
+  `.github/ISSUE_TEMPLATE/bug_report.md`. **(G3-F10, DEFERRED)** menu icons: only `material-icons-core`
+  is a dependency (~50 icons), so most "correct" Material Symbols (Brightness*/Tune/DarkMode/BugReport)
+  aren't available; made the one clear within-core fix (Curve & Brightness gear→Create, removing the
+  duplicate with Misc) and left the rest. A fuller icon pass needs adding `material-icons-extended` — an
+  APK-size/dependency decision the brief doesn't sanction, so it's left for the owner. (Affects Gate 3 /
+  any follow-up.)
+
+- **D-092 (Gate 3 punch-list R2 — owner device follow-ups).** **Power-draw (task524):** the owner
+  supplied the verbatim task524 Java; cross-checked it — the domain math (`generateSteps`,
+  normalize-1st-to-0, net-of-idle) and the calibrator (nudge after 3.5 s, settle 2 s, latch-breaker)
+  were already faithful. The "poor results" came from two MISSING pieces, now fixed: the calibration
+  must run on a **full-white screen** (OLED power is colour-dependent — Tasker uses a white FrameLayout
+  dialog; the rebuild swept over the dark UI), so added a fullscreen white `Dialog` overlay
+  (`PowerCalibrationOverlay`) that drives its own window brightness; and the chart needed a **real
+  secondary mA y-axis** (it had been rescaling current onto the power axis). Net-of-idle / normalize are
+  unchanged (golden-tested). **Shizuku (CLAUDE.md):** the architecture doc still claimed Shizuku is
+  "never a runtime binder dependency" — false (the no-Location Wi-Fi SSID strategy runs `cmd wifi
+  status` via Shizuku at runtime). Corrected to own it as an optional runtime dependency. **Context
+  editor:** reworked from an all-expanded form with top buttons into collapsible per-trigger sections
+  (seeded from the rule, persist on edit) + radius default 200 m + a sticky bottom Save/Cancel bar —
+  the host (`ContextRulesSection`) no longer wraps the editor in its own scroll (the editor owns it).
+  **Smaller copy/UX:** User-Guide teal banner removed (Menu-only); Reactivity "Smoothing thresholds" →
+  "Reactivity thresholds"; restricted-settings card de-emoji'd + shortened; README Stars/Downloads/
+  Release shields; power-draw "task524" jargon removed from user-facing copy. **Editor polish (same
+  round):** the full-screen rule-editor Dialog wasn't inset-padded, so the sticky Save/Cancel bar
+  clipped behind the system nav bar → added `statusBarsPadding()`+`navigationBarsPadding()`; moved the
+  "Only while charging" control to the LEFT (it sat on the right like the section toggles); trigger
+  labels dropped `titleSmall`→`bodyMedium` (read too large). (Affects Gate 3 / any follow-up.)
+
+- **D-093 (external-AI review triage).** 3 of 4 "holes" valid + fixed; 1 hole + the nit rebutted.
+  **Fixed:** dead manifest `ScreenStateReceiver` removed (manifest `SCREEN_ON/OFF` undeliverable to
+  manifest receivers; START_STICKY + MaintenanceWorker resurrect); `ContextEngine` time-rule
+  self-scheduler (`timeJob` → `millisUntilNextContextWake` → TIME eval) so time/Sunrise/Sunset rules
+  fire on time in constant light (prof764 parity; doze backstops noted); `AabFlash` background fallback
+  → plain text toast (Android 11+ blocks background custom-view toasts). **Rebutted:** OEM brightness
+  range — `getIdentifier` on a framework resource is not non-SDK reflection (not blocked on API 28+),
+  the suggested `BrightnessInfo.brightnessMaximum` is the float API (wrong for the legacy int we
+  write), and the existing `config_screenBrightnessSettingMaximum` read already learns the OEM int max;
+  adaptive-`deviceMax` backstop declined (perturbs override-detection for a config-already-covered
+  case). **Nit rebutted:** Shizuku `this` is correct — the reviewer's rename suggestions don't compile
+  for an anonymous object. (Affects Gate 3 / 1.0 readiness.)
+
+- **D-094 (second review pass — panic IPC + exact-alarm question).** **VALID → fixed:**
+  `AndroidPanicSensorSource.onSensorChanged` read `power.isInteractive` on EVERY accelerometer sample
+  (`SENSOR_DELAY_UI` ≈ 16–60 Hz) — a synchronous Binder IPC to system_server per event (lock
+  contention / CPU / battery). Now the screen-interactive state is seeded once and kept current via the
+  cheap `SCREEN_ON/OFF` system broadcasts (a dynamic receiver in the same callbackFlow, unregistered in
+  `awaitClose`), stored in an `AtomicBoolean` the sensor callback reads from local memory. Behaviour
+  identical (the `PanicGate` logic is unchanged + still pure-tested); only the IPC is gone.
+  **AGREED, no change:** declaring `SCHEDULE_EXACT_ALARM` to dodge Doze for time contexts — confirmed
+  none is declared and the D-093 time scheduler is purely `delay()`-based (best-effort), which matches
+  the advice; auto-brightness context automation is best-effort runtime automation, not a clock/alarm
+  feature warranting exact-alarm special access. If on-device testing later shows the Doze delay is
+  unacceptable, the right move is an AlarmManager exact-alarm scheduler gated behind
+  `canScheduleExactAlarms()` — noted, not done. (Affects Gate 3 / 1.0 readiness.)
+
+- **D-095 (CI infra — PR #65 build.yml).** First PR-triggered `build.yml` run failed, but NOT on our
+  code — `android-actions/setup-android@v3` defaults to installing `tools platform-tools`, and the
+  obsolete `tools` package pulls the Android Emulator, whose download came back corrupt ("Error on
+  ZipFile unknown archive"). CI runs only unit tests + lint + assembleDebug (no emulator — there's no
+  KVM anywhere in this program). Fixed durably with `packages: ''` on the setup-android step (skips the
+  emulator entirely; cmdline-tools + licenses still set up, AGP fetches compile-SDK/build-tools on
+  demand). No source change — the 1.0.0 build itself is green locally. (Affects CI / release.)
+
+Append new entries as D-096, … with which segments they affect.
 
 ## Blockers
 
@@ -2820,5 +3024,97 @@ gate findings. The two owner-reported behavioural findings:
   use the teal `AabFlash` operational surface like the profile/context-load flashes (visually inconsistent —
   reads as a debug toast). **→ S12.9b:** verify the override path and route it through `AabFlash` only if it
   isn't already (record as already-consistent if it is). Minor.
+
+### Gate 3 (after S14) — owner device findings → ✅ SIGNED OFF (2026-06-23)
+
+> **✅ GATE 3 SIGNED OFF (2026-06-23): owner satisfied with the re-test after the punch-list rounds
+> (R1 G3-F1…F18 + R2 follow-ups + the two external-AI review passes). All three gates passed → v1.0.0.
+> The findings below are retained as the historical record.**
+
+> **STATUS (2026-06-22): ALL 18 worked in the "Gate 3 punch-list" segment above (see the segment-log row
+> for the per-finding fix). 17 fixed in code/docs; G3-F18 was info-only (recorded); G3-F10 partially done
+> (one within-core icon swap) with the fuller Material Symbols pass deferred pending a `material-icons-
+> extended` dependency decision (D-091). Re-run HUMAN GATE 3 on this build.** The findings below are kept
+> verbatim as the historical record.
+>
+> **(Original hand-off note, now satisfied:)** the work was done on `claude/adoring-bardeen-37fb6m`'s
+> content (the next session fast-forwarded its own branch onto it, so all of S14 — proximity damp,
+> power-draw calibration, parity audit, README/CONTRIBUTING/DEVICE_TEST_SCRIPT, CI — was carried, not
+> dropped). Owner ran `DEVICE_TEST_SCRIPT.md`; everything else passed — these were the deviations only.
+
+Findings (owner wording preserved; triage hints from the S14 session in brackets):
+
+- **G3-F1 User Guide branding + stale tooltip text.** UserGuide still says "Advanced Auto Brightness" /
+  "AAB" — should be "Tideo Auto Brightness" / "TAB" (or just "Tideo" where it reads better). It also says
+  you can long-press tooltips, but the UI now uses a tappable "ⓘ" — fix that wording too.
+  [strings.xml `guide_*` / `about_*`; the long-press→ⓘ change was S12.6e.]
+- **G3-F2 Missing "now" indicators on graphs.** Brightness graph and Alpha graph have no live "now"
+  line. **Double-check ALL graphs** — if a current value can be shown as an event line, do it. [S14 added
+  "Now" markers to Reactivity/Dimming/Taper and the curve already had a current-point cross-hair, but the
+  owner still sees none on the brightness curve + alpha — verify the markers actually render on-device and
+  that `live`/`currentLux` is wired to those slots; Alpha needs a current value too (see G3-F15).]
+- **G3-F3 (BUG) Min brightness 0 is wrongly clamped to 1; Misc shows save/discard after Apply.** Setting
+  min brightness to 0 doesn't take hold (clamps to 1); 0 should be valid. And Misc shows the dirty
+  save/discard prompt even after applying. [`AabSettings.validate()` does `minBrightness.coerceIn(1,255)`
+  — S14's clamp-on-Apply (D-090c) now ROUNDS/clamps on commit, so committed=1 ≠ draft=0 → perpetually
+  dirty. Fix: allow min brightness 0 (change the clamp floor to 0 — verify the engine/OEM-range mapping
+  handles 0) so the value sticks and dirty clears. Likely the same root for the "always dirty" report.]
+- **G3-F4 (BUG?) "Add Quick Settings tile" says tile already exists on first add.** Possible race on the
+  first add. [`DashboardViewModel.addTile` / `canAddTile`; TILE_ALREADY_ADDED(2) returned spuriously.]
+- **G3-F5 (BUG/REGRESSION) Dashboard does not animate on device.** Numbers don't roll and the slider
+  doesn't animate. [S14 added `animateIntAsState` for the number + the bar already used
+  `animateFloatAsState`; on-device neither animates — investigate. Likely the pipeline publishes only a
+  settled value so target==applied each emission (no delta to animate from), or the state updates aren't
+  recomposing the instrument. May need to animate toward target during the cycle, not after it settles.]
+- **G3-F6 (BUG?) Super dimming at daytime with Spread (Circadian)=100 still dims slightly.** Extra Dim
+  engaging with effective dimming strength ~0 — Android quirk or genuine bug? If genuine, **force super
+  dimming OFF when dim_shell ≈ 0**. NB: reduce_bright_colors only takes INTEGER levels (so a tiny
+  fractional shell rounds to 1 and still dims). [`SuperDimmingCoordinator` — round the level and treat 0
+  as disengage; check `circadianDimMultiplier` at spread 100 doesn't leave a residual 1.]
+- **G3-F7 README lacks shields.io badges** like AAB has. [Add build/license/version badges to README.md.]
+- **G3-F8 CONTRIBUTING policy is too strict — blocks legitimate Android/Kotlin-layer contributions.**
+  Owner's point: a fix for a Tideo-only bug (e.g. `ShizukuGrantGateway` crashing on Android 15,
+  `AmbientMonitoringService` killed by Xiaomi battery saver, a `ChartCanvas` memory leak) can't go to
+  Tideo (auto-closed) NOR to AAB (Tasker repo, bug doesn't exist there). We're blocking community help for
+  exactly the layer where contributors are most useful (domain math is locked). **Rethink the policy:**
+  ALLOW Android/Kotlin-layer bug-fix PRs to Tideo; keep feature/brightness-logic upstream at AAB. Add
+  `.github/ISSUE_TEMPLATE/bug_report.md` (and likely loosen `redirect-external-prs.yml` so it redirects
+  *feature* PRs but not app-layer bug fixes, or drop the auto-close in favour of a label/triage). Update
+  CONTRIBUTING.md + README "Contributing" accordingly.
+- **G3-F9 (DOC BUG) README "Shizuku … never a runtime dependency" is inaccurate.** The `_GetWifiNoLocation`
+  SSID path runs `cmd wifi status` via Shizuku's shell at runtime for context automation (S12.7d
+  `ShizukuWifiSsidStrategy`/`ShizukuShell`). Update the README claim AND any code comments that repeat it
+  (grep "never … runtime"/"one-time grant"); state Shizuku's runtime SSID use honestly.
+- **G3-F10 Menu icons — review against Material Symbols.** Visit fonts.google.com/icons and pick better/
+  correct icons where the current choices are off. [MenuScreen / AabNav nav rows.]
+- **G3-F11 (BUG) Dashboard "Reset to auto" does nothing.** [S13e wired it to
+  `DashboardViewModel.resetToAuto` → `AutoBrightnessRuntime.reapply`; verify it actually re-applies / snaps
+  to the computed brightness, and clarify the label/affordance — owner couldn't tell what it does.]
+- **G3-F12 Safety audit.** Any glaring safety issues? Known/accepted: the cleartext ip-api.com geo-IP
+  fallback — must be **transparently documented** so privacy-conscious users can avoid it and ensure it is
+  never triggered (a visible setting/toggle + a README/privacy note; today it's silent). Sweep for others.
+- **G3-F13 Restricted-settings guidance incomplete.** Tasker explicitly tells the user to **"tap it
+  anyway"** (the slow/greyed restricted-settings option must be tapped to reveal it). Also the restricted
+  state can appear for **usage access**, not just WRITE_SETTINGS. [Onboarding `RestrictedSettingsCard`
+  (S12.7d/F33) — add the "tap it anyway" instruction + cover usage-access.]
+- **G3-F14 Profiles & Contexts hero card too prominent.** Make it more subtle as a hero on the Menu.
+  [MenuScreen `heroDestinations`/`HeroNavCard`.]
+- **G3-F15 (BUG) Alpha graph x-axis mislabelled.** It says "lux change" but it is a **fold change** — in
+  Tasker the axis is "relative change above the threshold" in **%**. [S14-confirmed: `AlphaResponseChart`
+  x is the smoothing delta, not lux. Relabel + rescale to %, and add the live "now" value (G3-F2).]
+- **G3-F16 (BUG) Applied suggestion leaves the "Suggested" line on the curve.** After Apply, the curve
+  should return to teal (the live curve) instead of continuing to draw the suggested line.
+  [`BrightnessCurveChart` `fittedCurve` should clear once applied; ToolsScreen `onApplyWizard`/state.]
+- **G3-F17 (PARITY) Curve suggestion quality is poor — verify the task38 port.** Is the Tasker curve-
+  fitting engine (`CurveSuggestionEngine`, S6) faithfully ported? **`tau` should be 0**; a default of 4
+  seems overkill — **expose `tau` as a user parameter in the wizard**. [May touch the domain fence
+  (`CurveSuggestionEngine` is in `:domain`); cross-check against task38 + the S6 reference/goldens before
+  changing — evidence-backed only.]
+- **G3-F18 (INFO) Battery usage baseline (not a bug).** ~5h30 SOT: Sensors **13 mAh** (good — the
+  event-driven loop + proximity/light are cheap), Wi-Fi 80 mAh, CPU 612 mAh, Screen 617 mAh, Media 198,
+  BT 151 (variance 685 = owner's own system mis-report, ignore). Record as the on-device power baseline;
+  no action unless a later change regresses sensors/CPU.
+
+
 
 

@@ -48,6 +48,8 @@ class AppModuleTest {
             assertNotNull(graph.controller, "createRuntime must build a controller")
             assertNotNull(graph.contextEngine, "createRuntime must build a context engine")
             assertNotNull(graph.panicSensor, "createRuntime must build a panic sensor")
+            // S14: the graph exposes the shared tier source so the service can refresh it on resume.
+            assertNotNull(graph.privilegeManager, "createRuntime must expose the privilege manager")
             // The controller is the ControllerHook the engine fires through (no lateinit cycle).
             assertTrue(
                 graph.controller is ControllerHook,

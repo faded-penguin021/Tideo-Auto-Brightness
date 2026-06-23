@@ -65,7 +65,11 @@ fun AabSettings.toDynamicScalingConfig(): DynamicScalingConfig = DynamicScalingC
 )
 
 fun AabSettings.validate(): AabSettings {
-    val clampedMinBrightness = minBrightness.coerceIn(1, 255)
+    // G3-F3 (Gate 3): floor is 0, not 1. The Misc slider exposes 0..75 (Tasker %AAB_MinBright range);
+    // clamping 0→1 on Apply meant committed(1) ≠ draft(0) so the screen stayed perpetually dirty and the
+    // value never stuck. Domain 0 maps to the OEM minimum (ScreenBrightnessController.toDevice coerces
+    // 0..255) — dimmest, not screen-off — so 0 is a valid brightness.
+    val clampedMinBrightness = minBrightness.coerceIn(0, 255)
     val clampedZone1End = zone1End.coerceIn(1, 20_000)
     val clampedMinWait = minWaitMs.coerceIn(1, 5_000)
     return copy(

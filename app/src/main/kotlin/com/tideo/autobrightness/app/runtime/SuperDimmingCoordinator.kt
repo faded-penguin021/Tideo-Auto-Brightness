@@ -147,6 +147,17 @@ class SuperDimmingCoordinator(
             ).toInt()
         }
 
+        // G3-F6 (Gate 3): a computed level of 0 means "no dimming". At circadian Spread 100 in full
+        // daylight the DimDynamic multiplier drives clamped_strength→0, so dim_shell rounds to 0; writing
+        // reduce_bright_colors_activated=1 with level 0 still leaves Android's Extra Dim engaged and the
+        // owner saw a residual daytime dim (reduce_bright_colors only takes integer levels). Treat level
+        // ≤ 0 as disengage so daytime/zero-strength is truly undimmed.
+        if (level <= 0) {
+            emitDebug(settings) { "off: computed dim level 0 (target $targetBrightness, daylight/zero-strength)" }
+            disengage()
+            return
+        }
+
         // task650 act10-14: write reduce_bright_colors_activated=1 once, then the level each cycle.
         // NOTE (G2-F9, device gate): these are the AOSP "Extra dim" secure keys
         // (reduce_bright_colors_activated / reduce_bright_colors_level). Some OEM skins ship a

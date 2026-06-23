@@ -37,6 +37,12 @@ import kotlin.math.sqrt
 data class CompressedScaleResult(val calculatedBrightness: Double, val effectiveScale: Double)
 
 class BrightnessEngine {
+    companion object {
+        // Tasker task544 act28/29 / prof759 / task545: the smoothing-alpha damp factor applied while the
+        // proximity sensor reads "near" (phone at the ear / covered).
+        const val PROXIMITY_ALPHA_DAMP = 0.1
+    }
+
     fun evaluate(input: BrightnessPolicyInput): BrightnessPolicyOutput {
         input.overrides.manualBrightness?.let { manual ->
             return BrightnessPolicyOutput(
@@ -70,6 +76,8 @@ class BrightnessEngine {
                 thresholdDynamicPercent = dynamicThreshold * 100.0,
                 deltaFactor = input.thresholds.deltaFactor,
                 zone1End = input.thresholds.zone1End,
+                // Tasker task544 act28/29: ×0.1 alpha damp while proximity is near (prof759/task545).
+                luxAlphaDamp = if (input.proximityNear) PROXIMITY_ALPHA_DAMP else 1.0,
             )
         } else {
             prevSmoothedLux to 0.0
@@ -125,11 +133,15 @@ class BrightnessEngine {
         thresholdDynamicPercent: Double,
         deltaFactor: Double,
         zone1End: Double,
+        // Tasker task544 act28/29: LuxAlpha ×0.1 while proximity is "near" (prof759/task545). Default
+        // 1.0 = no damp, so the golden vectors (which never pass this) are byte-identical.
+        luxAlphaDamp: Double = 1.0,
     ): Pair<Double, Double> {
         val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
         val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
-        // Tasker task535: lux_alpha is NOT clamped to [0,1] (D-010a, gap-01 R2 fix)
-        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta))
+        // Tasker task535: lux_alpha is NOT clamped to [0,1] (D-010a, gap-01 R2 fix). task544 then damps
+        // it ×luxAlphaDamp (0.1 when proximity is near) before the EMA + downstream consumers.
+        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta)) * luxAlphaDamp
         val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
         // Tasker task535: BigDecimal(raw).setScale(2|0, HALF_UP) — exact-binary BigDecimal (gap-01 R1 fix)
         val rounded = if (smoothed < zone1End) bigScale(smoothed, 2) else bigScale(smoothed, 0)

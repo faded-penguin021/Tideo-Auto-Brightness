@@ -54,6 +54,10 @@ object ShizukuShell {
                             } catch (_: Throwable) {
                                 null
                             } finally {
+                                // `this` is the enclosing ServiceConnection — a plain thread{} lambda is
+                                // not a receiver lambda, so it does not shadow `this` (verified: reviewer's
+                                // suggested `this@ServiceConnection` / a captured-`connection` ref both fail
+                                // to compile for an anonymous object; `this` is the correct, only clean form).
                                 runCatching { Shizuku.unbindUserService(args, this, true) }
                             }
                             if (cont.isActive) cont.resume(out)

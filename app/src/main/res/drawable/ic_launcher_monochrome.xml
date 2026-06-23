@@ -4,12 +4,17 @@
   ink colour (designer spec §02 "Monochrome simplification"): 8 uniform ticks + solid sun disc + the
   full 305° dial track at one weight (no translucency / no fill-vs-empty split); the knob becomes a
   hollow ring so it still reads as a pointer against the arc. The launcher applies its own tint.
+
+  S14: wrapped in the same 0.88 centre-scale group as ic_launcher_foreground so the themed icon matches
+  the resized foreground (knob inside the r33 safe zone).
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.88" android:scaleY="0.88">
 
     <path
         android:strokeColor="#FFFFFFFF"
@@ -32,4 +37,6 @@
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="2.5"
         android:pathData="M84,49.5 A4.5,4.5 0 1,1 83.99,49.5 Z" />
+
+    </group>
 </vector>

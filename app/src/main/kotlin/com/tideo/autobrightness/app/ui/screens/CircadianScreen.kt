@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.runtime.LiveRuntimeState
+import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
@@ -67,11 +69,13 @@ fun CircadianScreen(
     val dirty by vm.dirty.collectAsStateWithLifecycle()
     val epoch by vm.epoch.collectAsStateWithLifecycle()
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
+    val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = rememberToaster()
     val scope = rememberCoroutineScope()
 
     // F39: the Circadian fixed date/location override + its live-data defaults (today + location).
     val dateLocation by extras.dateLocation.collectAsStateWithLifecycle()
+    val geoIpEnabled by extras.geoIpEnabled.collectAsStateWithLifecycle() // G3-F12 privacy opt-out
     var defaultLatLon by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         defaultLatLon = runCatching { extras.defaultLatLon() }.getOrNull()
@@ -82,6 +86,7 @@ fun CircadianScreen(
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         criticalError = criticalError,
+        live = live,
         dateLocation = dateLocation,
         todayDate = extras.today(),
         defaultLatLon = defaultLatLon,
@@ -94,6 +99,8 @@ fun CircadianScreen(
                 else toast("No location fix yet — grant Location and try again")
             }
         },
+        geoIpEnabled = geoIpEnabled,
+        onSetGeoIpEnabled = extras::setGeoIpEnabled,
         // G2R-F17: reset only the circadian scaling + taper fields to the task570 baseline.
         onReset = {
             vm.edit { s ->
@@ -121,12 +128,15 @@ fun CircadianContent(
     onBack: () -> Unit,
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
+    live: PipelineState = PipelineState(),
     dateLocation: ExperimentDateLocation = ExperimentDateLocation(),
     todayDate: String = "",
     defaultLatLon: Pair<Double, Double>? = null,
     onSetDateLocation: (String, Double?, Double?) -> Unit = { _, _, _ -> },
     onUseLiveData: () -> Unit = {},
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
+    geoIpEnabled: Boolean = true,
+    onSetGeoIpEnabled: (Boolean) -> Unit = {},
 ) {
     DraftSettingsScaffold(stringResource(R.string.title_circadian), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
@@ -157,6 +167,12 @@ fun CircadianContent(
                         TaperChart(
                             draft.toBrightnessCurveConfig(), draft.scaleSpread,
                             Modifier.testTag("taper_chart"),
+                            // Live "Now" line at the current brightness, only while circadian scaling
+                            // is actually shifting the curve (scaleDynamic ≠ 1).
+                            currentBrightness = live.targetBrightness?.takeIf {
+                                live.serviceOn && live.scalingUse &&
+                                    kotlin.math.abs((live.scaleDynamic ?: 1.0) - 1.0) > 0.001
+                            },
                         )
                     },
                 ),
@@ -233,6 +249,8 @@ fun CircadianContent(
                 onSet = onSetDateLocation,
                 onUseLiveData = onUseLiveData,
                 onUseCurrentLocation = onUseCurrentLocation,
+                geoIpEnabled = geoIpEnabled,
+                onSetGeoIpEnabled = onSetGeoIpEnabled,
             )
         }
     }
@@ -254,6 +272,8 @@ fun CircadianDateLocationCard(
     onSet: (String, Double?, Double?) -> Unit,
     onUseLiveData: () -> Unit,
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
+    geoIpEnabled: Boolean = true,
+    onSetGeoIpEnabled: (Boolean) -> Unit = {},
 ) {
     // Effective defaults shown when nothing is pinned: today + current location (G2R-F39).
     val effDate = value.date ?: todayDate
@@ -320,6 +340,18 @@ fun CircadianDateLocationCard(
             Text("Use live data")
         }
     }
+
+    // G3-F12 (privacy): the IP-geolocation fallback is the LAST resort in the location chain and uses a
+    // cleartext request to ip-api.com. Surface it as an explicit opt-out so privacy-conscious users can
+    // guarantee the app never contacts that server (circadian then waits for an on-device fix instead).
+    SwitchSettingRow(
+        label = "IP-based location fallback",
+        checked = geoIpEnabled,
+        onCheckedChange = onSetGeoIpEnabled,
+        help = "When GPS/network gives no fix and no fixed location is set, look up an approximate " +
+            "location from your public IP via ip-api.com (cleartext HTTP). Turn off to never contact it.",
+        testTag = "exp_geoip_toggle",
+    )
 
     if (showDatePicker) {
         val state = rememberDatePickerState(initialSelectedDateMillis = parseDateMillis(dateText))

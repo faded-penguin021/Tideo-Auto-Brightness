@@ -27,6 +27,9 @@ fun DimmingChart(
     dimmingExponent: Double,
     dimmingStrength: Int,
     modifier: Modifier = Modifier,
+    // S14: the current applied brightness, shown as a "Now" line — but only when super-dimming is
+    // actually engaged (the caller passes null otherwise, so an inactive setting shows no marker).
+    currentBrightness: Int? = null,
 ) {
     val xStart = minBrightness.toFloat()
     // dimming_graph.md: loop minbright → max(dimmingthreshold, 15).
@@ -62,12 +65,18 @@ fun DimmingChart(
     // Right axis spans 0 → dimming strength (the shell's natural range, dim_ds = strength × progress).
     val shellMax = dimmingStrength.toFloat().coerceAtLeast(1f)
 
+    // S14: live "Now" line at the current brightness (only supplied while dimming is engaged).
+    val markers = currentBrightness?.let {
+        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = "Now"))
+    } ?: emptyList()
+
     ChartCanvas(
         series = series,
         xRange = xStart..xEnd,
         yRange = 0f..100f,
         secondaryYRange = 0f..shellMax,
         secondaryYAxisLabel = "Dim shell",
+        markers = markers,
         xScale = AxisScale.Linear,
         xAxisLabel = "Brightness",
         yAxisLabel = "Dim %",

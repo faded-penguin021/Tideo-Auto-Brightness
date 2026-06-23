@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.platform.context
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
@@ -69,6 +70,9 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         return bestLastKnown(lm)
     }
 
+    // MissingPermission: this is a library adapter; the consuming app declares ACCESS_FINE/COARSE_LOCATION
+    // and this guards with hasLocationPermission() + a SecurityException catch before any request.
+    @SuppressLint("MissingPermission")
     override fun locationUpdates(minTimeMs: Long, minDistanceM: Float): Flow<LocationSnapshot> = callbackFlow {
         if (!hasLocationPermission()) { close(); return@callbackFlow }
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
@@ -97,6 +101,7 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         awaitClose { runCatching { lm.removeUpdates(listener) } }
     }
 
+    @SuppressLint("MissingPermission") // guarded by the hasLocationPermission() recheck below + SecurityException catch.
     override suspend fun currentLocation(): LocationResult {
         // Recheck the grant at call time (G2R-F42): the grant may have just been awarded, and the
         // OS permission propagation can lag a stale cached check.
@@ -134,6 +139,7 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
             context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     /** Newest valid (non null-island) last-known fix across GPS/network/passive providers. */
+    @SuppressLint("MissingPermission") // wrapped in runCatching + SecurityException catch; app declares the perms.
     private fun bestLastKnown(lm: LocationManager): LocationSnapshot? = try {
         listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
             .asSequence()

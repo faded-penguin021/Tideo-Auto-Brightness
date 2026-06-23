@@ -33,11 +33,18 @@ data class CurveSuggestionInput(
     /** Current active curve — used as benchmark and inertia anchor. */
     val currentCurve: BrightnessCurveConfig,
     /**
-     * Inertia regularization strength. act2 default = 0.001; engine default = 4.0 (used if
-     * the caller passes null / unset). Higher τ = stronger pull toward current curve.
-     * Tasker: task38 act2 sets %tau = 0.001 as default; Java engine reads %tau (fallback 4.0).
+     * Inertia regularization strength. Higher τ = stronger pull toward the current curve; lower τ ⇒
+     * confidence `1 − exp(−weightedCount/τ) → 1` ⇒ the fit follows the recorded points.
+     *
+     * G3-F17 (Gate 3): the faithful default is **0.001**, not 4.0. In Tasker task38 act2 (547) always
+     * sets `%tau = 0.001` BEFORE the Java engine runs (task038_curve_wizard.md L27/L69: "the default
+     * for the Java engine's tau"), so the engine reads 0.001 every real run. The 4.0 in the Java
+     * header is only an unreachable fallback for an unset `%tau`. Defaulting to 4.0 over-damped every
+     * suggestion toward the current curve — the owner's "suggestion quality is poor". 0.001 ≈ 0 (the
+     * label recommends 0.001–5, never exactly 0, since τ is a divisor). All wizard goldens pass τ
+     * explicitly (4.0/1.0/2.0/8.0), so this default change touches no golden vector.
      */
-    val tau: Double = 4.0,
+    val tau: Double = 0.001,
 )
 
 /**

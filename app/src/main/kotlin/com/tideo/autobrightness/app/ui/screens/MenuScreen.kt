@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -101,11 +102,16 @@ fun MenuContent(
                 },
                 testTag = "hero_profiles_contexts",
                 onClick = { onNavigate(AppRoute.Profiles) },
+                // G3-F14: the owner found the full-prominence hero too dominant — use the quiet variant.
+                prominent = false,
             )
 
             SectionHeader("Settings", divider = true)
             AabCard {
-                MenuNavRow(AppRoute.CurveBrightness, Icons.Filled.Settings, onNavigate)
+                // G3-F10: Curve & Brightness had the same gear as Misc; "Create" (edit) reads as
+                // shaping the curve and removes the duplicate. A fuller Material Symbols pass for the
+                // remaining rows needs material-icons-extended (a dependency decision → STATE.md).
+                MenuNavRow(AppRoute.CurveBrightness, Icons.Filled.Create, onNavigate)
                 MenuNavRow(AppRoute.Reactivity, Icons.Filled.Refresh, onNavigate)
                 MenuNavRow(AppRoute.SuperDimming, Icons.Filled.PlayArrow, onNavigate)
                 MenuNavRow(AppRoute.Circadian, Icons.Filled.DateRange, onNavigate)

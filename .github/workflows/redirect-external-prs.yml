@@ -1,0 +1,59 @@
+name: Triage external PRs
+
+# Tideo is the downstream native-app build of Advanced Auto Brightness (the upstream source of truth).
+# FEATURE and brightness-LOGIC changes belong upstream at AAB. But app-layer / Android-Kotlin BUG FIXES
+# (a crash, an OEM secure-key quirk, a battery-saver kill, a Compose leak) only exist in Tideo and
+# can't go to AAB — so we no longer auto-close external PRs (G3-F8). This workflow posts a friendly
+# triage comment and labels the PR; the maintainer then merges app-layer fixes or redirects features.
+# Branch protection on main remains the authoritative guard (required reviews + restricted pushes).
+#
+# Safe by construction: pull_request_target runs in the BASE repo context and this job never checks out
+# or executes the PR's code — it only posts a comment and adds a label.
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  triage:
+    # Skip the maintainer's own PRs and bot PRs (e.g. Dependabot).
+    if: >-
+      github.event.pull_request.user.login != 'faded-penguin021' &&
+      github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and label for triage
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = [
+              `Thanks for the PR, @${pr.user.login}! A quick note on how this repo works so we can route it correctly:`,
+              ``,
+              `**Tideo is the native-app _build_ of [Advanced Auto Brightness](https://github.com/faded-penguin021/AdvancedAutoBrightness) (AAB)**, which is the source of truth for the brightness math and feature direction.`,
+              ``,
+              `- **App-layer / Android-Kotlin bug fixes are welcome here** — crashes, OEM brightness/secure-key quirks, battery-saver kills, Compose/UI leaks, packaging. These live only in Tideo, so this is the right place. 🎉`,
+              `- **Features and brightness-logic changes go to AAB** — please open an issue there first; porting it into Tideo follows once it lands upstream.`,
+              ``,
+              `A maintainer will triage shortly. This PR is **left open** for review (it is *not* auto-closed). See [CONTRIBUTING.md](https://github.com/faded-penguin021/tideo-auto-brightness/blob/main/CONTRIBUTING.md).`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body,
+            });
+            // Best-effort label; never fail the PR if the label doesn't exist yet.
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['needs-triage'],
+              });
+            } catch (e) {
+              core.info(`Could not add label (non-fatal): ${e.message}`);
+            }

@@ -28,6 +28,9 @@ fun TaperChart(
     curve: BrightnessCurveConfig,
     scaleSpreadPercent: Int,
     modifier: Modifier = Modifier,
+    // S14: the current applied brightness, shown as a "Now" line — only supplied while circadian
+    // scaling is actually active (the caller passes null otherwise → no marker).
+    currentBrightness: Int? = null,
 ) {
     val xStart = curve.minBrightness.toFloat()
     val xEnd = curve.maxBrightness.toFloat().coerceAtLeast(xStart + 1f)
@@ -54,11 +57,19 @@ fun TaperChart(
         ChartSeries("Day", dayPoints, MaterialTheme.colorScheme.primary),
     )
 
+    val markers = buildList {
+        add(ChartMarker(color = MaterialTheme.colorScheme.outline, y = 1f)) // the 1.0 no-scale baseline
+        // S14: live "Now" line at the current brightness (only supplied while scaling is active).
+        currentBrightness?.let {
+            add(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = "Now"))
+        }
+    }
+
     ChartCanvas(
         series = series,
         xRange = xStart..xEnd,
         yRange = yMin..yMax,
-        markers = listOf(ChartMarker(color = MaterialTheme.colorScheme.outline, y = 1f)),
+        markers = markers,
         xAxisLabel = "Brightness",
         yAxisLabel = "Scale ×",
         showLegend = true,

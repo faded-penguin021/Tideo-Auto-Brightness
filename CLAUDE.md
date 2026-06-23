@@ -51,7 +51,10 @@ and there is no wrapper; S3 bootstraps via `/opt/gradle/bin/gradle` (8.14.3, Jav
 
 Privilege tiers: BASIC = user-grantable WRITE_SETTINGS → full core pipeline works.
 ELEVATED = WRITE_SECURE_SETTINGS via one-time `pm grant` (adb / Shizuku / root) → super
-dimming. Shizuku is used only in the grant flow, never as a runtime binder dependency.
+dimming. Shizuku is the grant channel for ELEVATED, and after the grant the dimming path
+writes Settings.Secure directly (no binder). It IS, however, a genuine **optional runtime**
+dependency in one place: the no-Location Wi-Fi SSID strategy (`ShizukuWifiSsidStrategy` →
+`cmd wifi status` via `ShizukuShell`). Own that honestly — it is not "grant-only".
 
 ## Facts & corrections ledger (hard-won; trust these over older docs/audits)
 

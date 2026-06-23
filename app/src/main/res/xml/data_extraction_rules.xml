@@ -6,9 +6,9 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: add <exclude> entries here if cloud backup should skip any files. -->
+        <!-- Add <exclude> entries here if cloud backup should skip any files. -->
     </cloud-backup>
     <device-transfer>
-        <!-- TODO: add <exclude> entries here if device-to-device transfer should skip any files. -->
+        <!-- Add <exclude> entries here if device-to-device transfer should skip any files. -->
     </device-transfer>
 </data-extraction-rules>

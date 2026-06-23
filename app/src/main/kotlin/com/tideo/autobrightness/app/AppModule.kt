@@ -29,6 +29,7 @@ import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.sensor.AndroidLightSensorSource
 import com.tideo.autobrightness.platform.sensor.AndroidPanicSensorSource
+import com.tideo.autobrightness.platform.sensor.AndroidProximitySensorSource
 import com.tideo.autobrightness.platform.sensor.PanicSensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -85,12 +86,15 @@ class AppModule(context: Context) {
 
         // F73: real solar ramp windows for the dynamic-scale engine (today + last-known location, or
         // the F39 fixed date/location override), so %AAB_ScaleDynamic tracks the actual sunrise.
+        val experimentPrefs = ExperimentPrefsStore(appContext.experimentPrefsDataStore)
+        val geoIpClient = GeoIpLocationClient()
         val circadianWindows = CircadianWindowProvider(
             scope = scope,
-            overrideFlow = ExperimentPrefsStore(appContext.experimentPrefsDataStore).dateLocation,
+            overrideFlow = experimentPrefs.dateLocation,
             location = AndroidLocationReader(appContext),
-            // F83: ip-api.com geo-IP fallback when no Android fix is available (task90 act28).
-            geoIpFallback = GeoIpLocationClient()::resolve,
+            // F83: ip-api.com geo-IP fallback when no Android fix is available (task90 act28). G3-F12
+            // (privacy): gated on the user's opt-out — when disabled the app never contacts ip-api.com.
+            geoIpFallback = { if (experimentPrefs.geoIpEnabled.first()) geoIpClient.resolve() else null },
         )
 
         val controller = BrightnessPipelineController(
@@ -103,14 +107,20 @@ class AppModule(context: Context) {
             circadianWindowsProvider = circadianWindows::current,
             dimming = SuperDimmingCoordinator(
                 secureDimming = AndroidSecureDimmingController(appContext, privilegeManager),
-                // Re-detect each cycle so a WRITE_SECURE_SETTINGS grant made AFTER the service
-                // started (Shizuku/ADB) is picked up without a restart (G1-F5).
-                tierProvider = { privilegeManager.refresh(); privilegeManager.currentTier() },
+                // Read the CACHED tier (no IPC) each cycle. The previous `refresh()`-per-cycle ran
+                // checkSelfPermission + Settings.System.canWrite (two Binder calls) on every dimming
+                // evaluation. The cache is refreshed at the resume points instead (service start /
+                // screen-on, AmbientMonitoringService) and after an in-app grant (PrivilegeManager),
+                // so a post-start ADB/Shizuku grant is still picked up on the next wake (G1-F5 intent
+                // preserved, the per-cycle permission check dropped).
+                tierProvider = { privilegeManager.currentTier() },
                 debugSink = debugSink,
             ),
             debugSink = debugSink,
             // Persist captured override points so the wizard + curve overlay have real input (G2R-F13).
             overrideSink = { lux, brightness -> overridePointStore.record(lux, brightness) },
+            // prof759/task545: proximity-near damps the smoothing alpha ×0.1 (never pauses).
+            proximitySource = AndroidProximitySensorSource(appContext),
         )
         // Wire the late-bound hook now that the controller exists (replaces the lateinit cycle).
         controllerHook.hook = controller
@@ -118,7 +128,7 @@ class AppModule(context: Context) {
         // prof769/task528 panic: upside-down + shake (display on) → SOS + restore + full stop (F77).
         val panicSensor = AndroidPanicSensorSource(appContext)
 
-        return RuntimeGraph(controller, contextEngine, panicSensor)
+        return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager)
     }
 }
 
@@ -131,6 +141,9 @@ class RuntimeGraph(
     val controller: BrightnessPipelineController,
     val contextEngine: ContextEngine,
     val panicSensor: PanicSensorSource,
+    /** Shared tier source. The service [refresh][PrivilegeManager.refresh]es it at resume points so a
+     *  post-start ADB/Shizuku grant is seen without re-checking the permission on every dimming cycle. */
+    val privilegeManager: PrivilegeManager,
 ) {
     val activeContext: StateFlow<String?> = contextEngine.activeContext
 }
