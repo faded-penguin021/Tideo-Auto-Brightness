@@ -60,8 +60,7 @@ decision logic are golden-tested against a transcription of the original Tasker 
 ## Install
 
 1. **Disable** the system's stock Adaptive/Auto Brightness (Settings → Display).
-2. Install the APK — a debug build is published under [Releases][releases] (or, during testing, a
-   `dist/app-debug.apk` is provided directly).
+2. Install the APK from [Releases][releases].
 3. Launch Tideo, complete onboarding (grant notifications + *Modify system settings*), and toggle the
    **main service** on from the Dashboard.
 
@@ -189,9 +188,9 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the **Bug report** issue template.
 
 ## Status
 
-`0.9.0` (acceptance candidate). Gates 1 & 2 passed on-device; **Gate 3** (the 24-hour soak in
-[`docs/rebuild/DEVICE_TEST_SCRIPT.md`](docs/rebuild/DEVICE_TEST_SCRIPT.md)) is pending. Bumps to
-`1.0.0` once Gate 3 passes.
+`1.0.0` — **all three on-device human gates passed.** Gate 3 (the
+[`docs/rebuild/DEVICE_TEST_SCRIPT.md`](docs/rebuild/DEVICE_TEST_SCRIPT.md) end-to-end run + soak) was
+signed off on 2026-06-23. Feature-complete and parity-verified against the original Tasker engine.
 
 [aab]: https://github.com/faded-penguin021/AdvancedAutoBrightness
 [releases]: https://github.com/faded-penguin021/tideo-auto-brightness/releases

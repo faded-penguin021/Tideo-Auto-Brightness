@@ -13,10 +13,10 @@ android {
         applicationId = "com.tideo.autobrightness"
         minSdk = 31
         targetSdk = 35
-        // S14 release prep: first acceptance-candidate build. 0.9.0 = "feature-complete, pending the
-        // Gate-3 on-device soak"; bumps to 1.0.0 once Gate 3 passes.
-        versionCode = 2
-        versionName = "0.9.0"
+        // 1.0.0 — all three human gates passed on-device (Gate 3 signed off 2026-06-23). Feature-
+        // complete, parity-verified, release build.
+        versionCode = 3
+        versionName = "1.0.0"
     }
 
     // Release signing is driven entirely by environment variables so that no

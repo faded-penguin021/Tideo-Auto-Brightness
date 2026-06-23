@@ -2,8 +2,9 @@
 
 Run this end-to-end on a real device (no emulator — the SoC has no KVM here, and the light/proximity/
 battery sensors, OEM brightness range, Shizuku binder, and doze are only exercisable on hardware). Tick
-each step's **Expected**; log any miss in `STATE.md` → "Gate findings". Install the debug APK from
-`dist/app-debug.apk` (or `app/build/outputs/apk/debug/app-debug.apk`).
+each step's **Expected**; log any miss in `STATE.md` → "Gate findings". Build + install the debug APK
+with `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` (or grab a published
+build from Releases).
 
 Legend: **[BASIC]** needs only WRITE_SETTINGS · **[ELEVATED]** needs WRITE_SECURE_SETTINGS · **[opt]**
 optional.
