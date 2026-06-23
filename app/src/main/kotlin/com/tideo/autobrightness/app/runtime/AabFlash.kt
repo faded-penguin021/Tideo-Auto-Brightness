@@ -1,11 +1,6 @@
 package com.tideo.autobrightness.app.runtime
 
 import android.content.Context
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
-import android.util.TypedValue
-import android.view.Gravity
-import android.widget.TextView
 import android.widget.Toast
 
 /**
@@ -66,8 +61,11 @@ object AabFlash {
 
     /**
      * Show [text], cancelling any in-flight flash first (G2R-F51). Surface priority: the global
-     * Accessibility overlay → the foreground in-app surface → a plain Toast (F88: the first two are
-     * tap-to-dismiss; the Toast fallback is only used when neither is available, e.g. backgrounded).
+     * Accessibility overlay → the foreground in-app surface → a plain Toast. The first two are
+     * tap-to-dismiss AND show system-wide / styled. The Toast fallback is used only when neither is
+     * available — which is precisely the BACKGROUND case (e.g. the user pulled the shade to grab the
+     * brightness slider). Android 11+ silently blocks **custom-view** toasts (`Toast.setView`) from a
+     * background app, so the fallback MUST be a plain text toast or the manual-override flash vanishes.
      */
     fun show(context: Context, text: String) {
         cancel()
@@ -75,7 +73,8 @@ object AabFlash {
         if (p != null) {
             p.show(text)
         } else {
-            val toast = tealToast(context.applicationContext, text)
+            // Plain text toast only — NO setView (blocked from the background on Android 11+).
+            val toast = Toast.makeText(context.applicationContext, text, Toast.LENGTH_SHORT)
             lastToast = toast
             toast.show()
         }
@@ -88,34 +87,4 @@ object AabFlash {
         presenter?.hide()
         foregroundPresenter?.hide()
     }
-
-    /**
-     * Build the AAB-teal fallback toast. System toast text cannot be recoloured reliably, so a custom
-     * teal-rounded [TextView] is inflated; built via [Toast.makeText] first so the message is still
-     * recorded (Robolectric ShadowToast + a11y) before the custom view is attached (G2R-F10).
-     */
-    @Suppress("DEPRECATION") // Toast.setView: deprecated for background toasts, fine for foreground app toasts.
-    private fun tealToast(appContext: Context, text: String): Toast {
-        val view = TextView(appContext).apply {
-            this.text = text
-            setTextColor(Color.WHITE)
-            val pad = dp(appContext, 14)
-            setPadding(pad, dp(appContext, 10), pad, dp(appContext, 10))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(appContext, 12).toFloat()
-                setColor(AAB_TEAL)
-            }
-        }
-        return Toast.makeText(appContext, text, Toast.LENGTH_SHORT).apply {
-            setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(appContext, 80))
-            setView(view)
-        }
-    }
-
-    private fun dp(context: Context, value: Int): Int = TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), context.resources.displayMetrics,
-    ).toInt()
-
-    // AabTeal #007C63 (ui.theme.Color) as an android.graphics ARGB int.
-    private const val AAB_TEAL = 0xFF007C63.toInt()
 }

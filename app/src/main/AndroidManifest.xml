@@ -92,16 +92,6 @@
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name=".app.runtime.ScreenStateReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.SCREEN_ON" />
-                <action android:name="android.intent.action.SCREEN_OFF" />
-            </intent-filter>
-        </receiver>
-
         <!-- Home-screen dashboard widget (Brightness / lux / profile / context + service toggle &
              reset). updatePeriodMillis=0: never polled — repainted event-driven from the running
              service's publish path. The custom TOGGLE/RESET actions are delivered via explicit

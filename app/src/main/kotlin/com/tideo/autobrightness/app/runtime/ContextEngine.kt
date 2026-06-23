@@ -9,15 +9,18 @@ import com.tideo.autobrightness.domain.context.ContextResolution
 import com.tideo.autobrightness.domain.context.ContextSignals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Calendar
 import kotlin.math.abs
 
 /**
@@ -92,6 +95,7 @@ class ContextEngine(
     private var appJob: Job? = null
     private var locationJob: Job? = null
     private var rulesJob: Job? = null
+    private var timeJob: Job? = null
     // The lone surviving @Volatile (S12.9e audit): written from the lifecycle callbacks onScreenOn/Off
     // and read from the listener-start helpers on the engine scope — a single boolean, single-writer
     // per transition, so a plain volatile read is sufficient (no compound invariant to protect).
@@ -162,6 +166,24 @@ class ContextEngine(
                 evaluate(ContextCaller.GENERAL)
             }
         }
+        // prof764 self-scheduling Time context (contexts_spec): wake EXACTLY at the next time boundary
+        // and re-evaluate, instead of waiting for the next light sample. TYPE_LIGHT is an on-change
+        // sensor, so in constant light (phone on a desk, screen off) no sample arrives and a 20:00 /
+        // Sunset rule would otherwise fire late — only when the user next disturbs the sensor or wakes
+        // the screen. `collectLatest` re-arms whenever the nearest boundary changes; the inner loop
+        // re-arms a same-time daily recurrence. NB: a coroutine delay() can be deferred during deep Doze,
+        // so onScreenOn()'s TIME eval and the 15-min MaintenanceWorker remain backstops for that case.
+        timeJob = scope.launch {
+            nextContextTime.collectLatest {
+                while (true) {
+                    val token = nextContextTime.value ?: break
+                    val waitMs = millisUntilNextContextWake(token, clock())
+                    if (waitMs < 0) break
+                    delay(waitMs)
+                    evaluate(ContextCaller.TIME)
+                }
+            }
+        }
     }
 
     fun stop() {
@@ -170,6 +192,7 @@ class ContextEngine(
         appJob?.cancel(); appJob = null
         locationJob?.cancel(); locationJob = null
         rulesJob?.cancel(); rulesJob = null
+        timeJob?.cancel(); timeJob = null
         scope = null
     }
 
@@ -369,6 +392,30 @@ class ContextEngine(
         const val LOCATION_DEBOUNCE_M = 100.0
         const val EARTH_RADIUS_M = 6_371_000.0
     }
+}
+
+/**
+ * Milliseconds from [now] until the next local-wall-clock occurrence of an `"HH.MM"` token (the
+ * resolver's `%AAB_NextContextTime` format, "%02d.%02d"). If that instant has already passed today it
+ * wraps to tomorrow (task43 L459-475 — a non-positive diff wraps a day). Returns -1 for an unparseable
+ * token so the scheduler can break instead of spinning. Pure (only `Calendar` + the default timezone),
+ * so it is unit-testable without coroutines.
+ */
+internal fun millisUntilNextContextWake(token: String, now: Long): Long {
+    val dot = token.indexOf('.')
+    if (dot <= 0) return -1
+    val hour = token.substring(0, dot).toIntOrNull() ?: return -1
+    val minute = token.substring(dot + 1).toIntOrNull() ?: return -1
+    if (hour !in 0..23 || minute !in 0..59) return -1
+    val cal = Calendar.getInstance().apply {
+        timeInMillis = now
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    if (cal.timeInMillis <= now) cal.add(Calendar.DAY_OF_MONTH, 1)
+    return cal.timeInMillis - now
 }
 
 /** Caller identity drives the PASS 1 cooldown + PASS 2 veto branch (task43 L31-57, L204-240). */
