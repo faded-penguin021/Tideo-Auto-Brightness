@@ -2306,7 +2306,15 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   unacceptable, the right move is an AlarmManager exact-alarm scheduler gated behind
   `canScheduleExactAlarms()` — noted, not done. (Affects Gate 3 / 1.0 readiness.)
 
-Append new entries as D-095, … with which segments they affect.
+- **D-095 (CI infra — PR #65 build.yml).** First PR-triggered `build.yml` run failed, but NOT on our
+  code — `android-actions/setup-android@v3` defaults to installing `tools platform-tools`, and the
+  obsolete `tools` package pulls the Android Emulator, whose download came back corrupt ("Error on
+  ZipFile unknown archive"). CI runs only unit tests + lint + assembleDebug (no emulator — there's no
+  KVM anywhere in this program). Fixed durably with `packages: ''` on the setup-android step (skips the
+  emulator entirely; cmdline-tools + licenses still set up, AGP fetches compile-SDK/build-tools on
+  demand). No source change — the 1.0.0 build itself is green locally. (Affects CI / release.)
+
+Append new entries as D-096, … with which segments they affect.
 
 ## Blockers
 

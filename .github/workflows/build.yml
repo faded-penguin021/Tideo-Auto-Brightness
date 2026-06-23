@@ -30,6 +30,13 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Skip the default `tools platform-tools` install: the obsolete `tools` package drags in the
+          # Android Emulator (a large, flaky download — it failed CI with "Error on ZipFile unknown
+          # archive"). This job runs only unit tests + lint + assembleDebug, so it needs no emulator;
+          # cmdline-tools + accepted licenses are still set up, and AGP fetches the compile SDK /
+          # build-tools on demand (the runner image already ships them).
+          packages: ''
 
       - name: Cache Gradle
         uses: actions/cache@v4
