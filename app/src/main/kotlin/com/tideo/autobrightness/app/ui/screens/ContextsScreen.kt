@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -59,7 +61,6 @@ import com.tideo.autobrightness.app.ui.components.EmptyState
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
-import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.theme.Dimens
 import java.util.UUID
 
@@ -311,8 +312,15 @@ private fun RuleEditor(
     }
 
     // The editor owns its layout: a scrollable field area + a sticky bottom Save/Cancel bar (G3 owner
-    // finding — top buttons + an all-expanded form read as inferior to the Tasker editor).
-    Column(Modifier.fillMaxSize()) {
+    // finding — top buttons + an all-expanded form read as inferior to the Tasker editor). The full-
+    // screen Dialog doesn't apply window insets, so pad for the status + navigation bars or the bottom
+    // action bar is clipped behind the system nav bar (owner: "Save/Cancel get clipped").
+    Column(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding(),
+    ) {
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -411,7 +419,20 @@ private fun RuleEditor(
             }
 
             TriggerSection("Battery", batteryEnabled, { batteryEnabled = it }, "battery") {
-                SwitchSettingRow("Only while charging", charging, { charging = it }, testTag = "rule_charging")
+                // Owner finding: put this toggle on the LEFT (the section-enable switches are on the
+                // right) so it doesn't read as another section toggle.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Switch(
+                        checked = charging,
+                        onCheckedChange = { charging = it },
+                        modifier = Modifier.testTag("rule_charging"),
+                    )
+                    Text("Only while charging", style = MaterialTheme.typography.bodyMedium)
+                }
                 // Battery percentage window (G2R-F31). Either bound may be left blank for "any".
                 Text("Battery percentage:", style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -514,7 +535,8 @@ private fun TriggerSection(
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            // Owner finding: the trigger labels read a bit large — use the lighter body style.
+            Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Switch(
                 checked = enabled,
                 onCheckedChange = onEnabledChange,

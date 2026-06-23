@@ -2260,8 +2260,11 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   the host (`ContextRulesSection`) no longer wraps the editor in its own scroll (the editor owns it).
   **Smaller copy/UX:** User-Guide teal banner removed (Menu-only); Reactivity "Smoothing thresholds" →
   "Reactivity thresholds"; restricted-settings card de-emoji'd + shortened; README Stars/Downloads/
-  Release shields; power-draw "task524" jargon removed from user-facing copy. (Affects Gate 3 / any
-  follow-up.)
+  Release shields; power-draw "task524" jargon removed from user-facing copy. **Editor polish (same
+  round):** the full-screen rule-editor Dialog wasn't inset-padded, so the sticky Save/Cancel bar
+  clipped behind the system nav bar → added `statusBarsPadding()`+`navigationBarsPadding()`; moved the
+  "Only while charging" control to the LEFT (it sat on the right like the section toggles); trigger
+  labels dropped `titleSmall`→`bodyMedium` (read too large). (Affects Gate 3 / any follow-up.)
 
 Append new entries as D-093, … with which segments they affect.
 
