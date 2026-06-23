@@ -313,13 +313,12 @@ private fun RuleEditor(
 
     // The editor owns its layout: a scrollable field area + a sticky bottom Save/Cancel bar (G3 owner
     // finding — top buttons + an all-expanded form read as inferior to the Tasker editor). The full-
-    // screen Dialog doesn't apply window insets, so pad for the status + navigation bars or the bottom
-    // action bar is clipped behind the system nav bar (owner: "Save/Cancel get clipped").
+    // screen Dialog draws edge-to-edge, so the top is inset for the status bar here; the bottom bar's
+    // SURFACE bleeds to the screen edge while its buttons are inset above the nav bar (see below).
     Column(
         Modifier
             .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding(),
+            .statusBarsPadding(),
     ) {
         Column(
             modifier = Modifier
@@ -500,19 +499,29 @@ private fun RuleEditor(
         }
 
         // Sticky bottom action bar (Save/Cancel always reachable, no scrolling past the trigger list).
-        HorizontalDivider()
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier.weight(1f).testTag("cancel_rule"),
-            ) { Text("Cancel") }
-            Button(
-                onClick = { saveRule() },
-                modifier = Modifier.weight(1f).testTag("save_rule"),
-            ) { Text("Save rule") }
+        // The Surface bleeds to the very bottom edge (behind the system nav bar); only the button Row is
+        // inset with navigationBarsPadding() so the buttons sit above the nav bar but the bar's surface
+        // still reaches the screen edge (owner: polished edge-to-edge bottom bar).
+        Surface(tonalElevation = Dimens.cardElevationHero) {
+            Column {
+                HorizontalDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TextButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f).testTag("cancel_rule"),
+                    ) { Text("Cancel") }
+                    Button(
+                        onClick = { saveRule() },
+                        modifier = Modifier.weight(1f).testTag("save_rule"),
+                    ) { Text("Save rule") }
+                }
+            }
         }
     }
 }
