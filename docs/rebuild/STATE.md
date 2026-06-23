@@ -2280,7 +2280,21 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   case). **Nit rebutted:** Shizuku `this` is correct — the reviewer's rename suggestions don't compile
   for an anonymous object. (Affects Gate 3 / 1.0 readiness.)
 
-Append new entries as D-094, … with which segments they affect.
+- **D-094 (second review pass — panic IPC + exact-alarm question).** **VALID → fixed:**
+  `AndroidPanicSensorSource.onSensorChanged` read `power.isInteractive` on EVERY accelerometer sample
+  (`SENSOR_DELAY_UI` ≈ 16–60 Hz) — a synchronous Binder IPC to system_server per event (lock
+  contention / CPU / battery). Now the screen-interactive state is seeded once and kept current via the
+  cheap `SCREEN_ON/OFF` system broadcasts (a dynamic receiver in the same callbackFlow, unregistered in
+  `awaitClose`), stored in an `AtomicBoolean` the sensor callback reads from local memory. Behaviour
+  identical (the `PanicGate` logic is unchanged + still pure-tested); only the IPC is gone.
+  **AGREED, no change:** declaring `SCHEDULE_EXACT_ALARM` to dodge Doze for time contexts — confirmed
+  none is declared and the D-093 time scheduler is purely `delay()`-based (best-effort), which matches
+  the advice; auto-brightness context automation is best-effort runtime automation, not a clock/alarm
+  feature warranting exact-alarm special access. If on-device testing later shows the Doze delay is
+  unacceptable, the right move is an AlarmManager exact-alarm scheduler gated behind
+  `canScheduleExactAlarms()` — noted, not done. (Affects Gate 3 / 1.0 readiness.)
+
+Append new entries as D-095, … with which segments they affect.
 
 ## Blockers
 

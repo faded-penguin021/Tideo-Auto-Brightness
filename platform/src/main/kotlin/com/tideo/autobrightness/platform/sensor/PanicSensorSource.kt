@@ -1,6 +1,9 @@
 package com.tideo.autobrightness.platform.sensor
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -9,6 +12,7 @@ import android.os.PowerManager
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.sqrt
 
 /**
@@ -155,21 +159,48 @@ class AndroidPanicSensorSource(
             close()
             return@callbackFlow
         }
+        // Screen-interactive state, kept current WITHOUT a per-event Binder call. Reading
+        // power.isInteractive inside onSensorChanged would be a synchronous IPC to system_server on
+        // every accelerometer sample (SENSOR_DELAY_UI ≈ 16–60 Hz) — heavy lock contention / CPU churn /
+        // battery drain. Instead: seed once, then flip it on the cheap SCREEN_ON/OFF system broadcasts
+        // (a dynamic receiver — those actions are only deliverable to dynamically-registered receivers
+        // anyway), so the sensor callback reads it from local memory for free.
+        val interactive = AtomicBoolean(power.isInteractive)
+        val screenReceiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_ON -> interactive.set(true)
+                    Intent.ACTION_SCREEN_OFF -> interactive.set(false)
+                }
+            }
+        }
+        // SCREEN_ON/OFF are protected system broadcasts, so no exported flag is needed (mirrors
+        // AmbientMonitoringService's own screen receiver).
+        context.registerReceiver(
+            screenReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            },
+        )
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 val now = clock()
-                val interactive = power.isInteractive
+                val isInteractive = interactive.get()
                 // On the screen-on edge, reset the gesture streak so an inversion+shake built up in the
                 // pocket can't complete the instant the display wakes (owner: false-fired on grab-to-wake).
-                if (gate.onScreenState(now, interactive)) detector.reset()
+                if (gate.onScreenState(now, isInteractive)) detector.reset()
                 val fired = detector.onAccelerometer(event.values[0], event.values[1], event.values[2])
                 // Gate on display-on (State 123/1) + the post-wake grace + the one-shot cooldown.
-                if (fired && gate.shouldFire(now, interactive)) trySend(Unit)
+                if (fired && gate.shouldFire(now, isInteractive)) trySend(Unit)
             }
 
             override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
         }
         sensorManager.registerListener(listener, accel, SensorManager.SENSOR_DELAY_UI)
-        awaitClose { sensorManager.unregisterListener(listener) }
+        awaitClose {
+            sensorManager.unregisterListener(listener)
+            runCatching { context.unregisterReceiver(screenReceiver) }
+        }
     }
 }
