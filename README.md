@@ -21,16 +21,10 @@ decision logic are golden-tested against a transcription of the original Tasker 
 > The Tasker project [Advanced Auto Brightness][aab] is the upstream **source of truth**. Feature discussion, bug triage, and most contributions happen there — see
 > [Contributing](#contributing).
 
-## Screenshots
-
-| | |
-|:---:|:---:|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Curve & Brightness](docs/screenshots/curve.png) |
-| **Dashboard** — live applied brightness, ambient lux, circadian scale, and active context. | **Curve & Brightness** — the editable three-zone lux→brightness graph with live readout. |
-| ![Circadian](docs/screenshots/circadian.png) | ![Settings](docs/screenshots/menu.png) |
-| **Circadian** — time-of-day scaling synced to local sunrise/sunset. | **Settings** — the glass-box surface for every tunable. |
-
 ## Features
+
+<img src="docs/screenshots/dashboard.png" align="right" width="280" alt="Dashboard — live applied brightness, ambient lux, circadian scale, and active context">
+
 
 - **Three-zone perceptual brightness curve** with a live, editable graph (low-light √, mid-range
   ∛-ish, high-light asymptotic tail — C0-continuous).
@@ -57,8 +51,12 @@ decision logic are golden-tested against a transcription of the original Tasker 
 
 ## How it works
 
+<img src="docs/screenshots/curve.png" align="right" width="280" alt="Curve & Brightness — the editable three-zone lux→brightness graph with live readout">
+
 - **Three-zone model.** Brightness is a C0-continuous piecewise function of lux; each zone has its own
-  scaling so low light stays sensitive and high light compresses gracefully.
+  scaling so low light stays sensitive and high light compresses gracefully. The graph is live and
+  editable — drag the zone scalings and boundaries and watch the curve, the reference, and your
+  recorded overrides redraw against the current smoothed lux.
 - **Curve fitting.** With override detection on, your manual corrections become training points; the
   wizard fits the three-part function and reports per-zone fit quality.
 - **Event-driven runtime.** The pipeline reacts to state changes (a light step past the dead band, an
@@ -66,7 +64,18 @@ decision logic are golden-tested against a transcription of the original Tasker 
 - **Context precedence.** When several context rules match, highest priority wins; on a tie, the most
   specific rule wins.
 
+<img src="docs/screenshots/circadian.png" align="right" width="280" alt="Circadian — time-of-day scaling synced to local sunrise/sunset">
+
+- **Circadian scaling.** A time-of-day multiplier follows your local sunrise/sunset (GPS, manual
+  lat/lon, or IP fallback), easing the whole curve up around midday and back down toward dusk; the
+  scale graph plots dawn, noon, sunset, and dusk against the current time.
+
+<br clear="all">
+
+
 ## Install
+
+<img src="docs/screenshots/menu.png" align="right" width="280" alt="Tideo settings — the glass-box surface for every tunable">
 
 1. **Disable** the system's stock Adaptive/Auto Brightness (Settings → Display).
 2. Install the APK from [Releases][releases].
@@ -74,6 +83,8 @@ decision logic are golden-tested against a transcription of the original Tasker 
    **main service** on from the Dashboard.
 
 `minSdk` 31 (Android 12) · `target`/`compile` SDK 35.
+
+<br clear="all">
 
 ## Privilege tiers
 
