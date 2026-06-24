@@ -90,4 +90,6 @@ the grant the dimming path writes `Settings.Secure` directly (no binder). Shizuk
 - Develop and push **only** on your session's assigned `claude/<codename>` branch (named in the
   session directive). Push with `git push -u origin <your-session-branch>` (retry up to 4× with
   backoff 2s/4s/8s/16s on network errors only). **Never force-push. Never push to `main`.**
-- The owner merges session branches to `main` via PR. Do not open a PR unless asked.
+- The owner merges session branches to `main` via PR — **squash-merge** (one commit per branch on
+  `main`; keeps intra-branch churn and any temporary artifacts out of history). Do not open a PR unless
+  asked.

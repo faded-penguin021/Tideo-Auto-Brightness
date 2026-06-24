@@ -47,13 +47,22 @@ When in use, track stages here:
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
 > during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-096** (historical high-water mark D-095); never restart at D-001. A deviation, once
+> **D-100** (historical high-water mark D-099); never restart at D-001. A deviation, once
 > numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-24 — 1.0.3 / `versionCode 5`: (D-098) rule-editor Save/Cancel STILL clipped after D-097 and a
+  follow-up that drove the dialog `Window` edge-to-edge — this Compose `Dialog` never delivers a bottom
+  (nav-bar/ime) inset to its content, only the top. Stopped fighting insets: dropped the sticky bottom bar,
+  Save/Cancel now ride at the end of the editor's scroll with a trailing `Spacer(48dp)` so they always
+  scroll clear of the gesture pill (top still uses `statusBarsPadding()`; `imePadding()` shrinks the
+  viewport for the keyboard). Tests updated to `performScrollTo()` the Save button. (D-099) in-app version
+  had drifted behind the `v1.0.2` tag (build said 1.0.1/4) — realigned to 1.0.3/5, added `changelogs/5.txt`,
+  and added RUNBOOK §6 "Cutting a release / version bump". UI + version only; bottom-inset behavior is owner
+  device-verified (not Robolectric-testable).
 - 2026-06-24 — Wi-Fi context fixes: (D-096) `WifiInfoReader.ssidFlow()` now runs the no-Location
   strategies (Shizuku→dumpsys) first like task43's `bypass_ssid`, so Wi-Fi context rules match with
   Location services OFF (was Location-only at eval time, even though the rule editor already read the
