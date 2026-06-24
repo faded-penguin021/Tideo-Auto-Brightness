@@ -13,10 +13,12 @@ android {
         applicationId = "com.tideo.autobrightness"
         minSdk = 31
         targetSdk = 35
-        // 1.0.0 — all three human gates passed on-device (Gate 3 signed off 2026-06-23). Feature-
-        // complete, parity-verified, release build.
-        versionCode = 3
-        versionName = "1.0.0"
+        // 1.0.0 (versionCode 3) — all three human gates passed on-device (Gate 3 signed off
+        // 2026-06-23); feature-complete, parity-verified release build. 1.0.1 (versionCode 4) is a
+        // packaging-only bump so the release tag carries the fastlane/ metadata F-Droid reads from
+        // the built commit (the 1.0.0 tag predated it); no app behaviour changed.
+        versionCode = 4
+        versionName = "1.0.1"
     }
 
     // Release signing is driven entirely by environment variables so that no
