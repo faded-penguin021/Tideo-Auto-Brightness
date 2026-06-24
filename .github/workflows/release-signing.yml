@@ -1,23 +1,11 @@
 name: Release Signing
 
-# Builds, tests, and signs a release APK on every APK-affecting push to main,
-# uploading it as a downloadable artifact so any merge can be side-loaded and
-# tested. This does NOT create a GitHub Release — that's release.yml, triggered
-# by pushing a v* tag. The `paths` filter skips docs-only / STATE-only merges.
+# Builds, tests, and signs a release APK ON DEMAND, uploading it as a downloadable artifact so a
+# specific build can be side-loaded and tested. Triggered manually (Actions tab) — NOT on every push
+# to main, which used to re-run build.yml's exact test+lint ladder in parallel and spend signing
+# secrets on non-release merges. Routine per-merge validation lives in build.yml (tests + lint + debug
+# APK); a tagged GitHub Release (build + sign + publish) lives in release.yml on a v* tag.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'app/**'
-      - 'domain/**'
-      - 'platform/**'
-      - 'gradle/**'
-      - 'build.gradle.kts'
-      - 'settings.gradle.kts'
-      - 'gradle.properties'
-      - 'gradle/libs.versions.toml'
-      - '.github/workflows/release-signing.yml'
-  # Allow manual runs for testing the pipeline.
   workflow_dispatch:
 
 permissions:
