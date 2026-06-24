@@ -23,9 +23,6 @@ decision logic are golden-tested against a transcription of the original Tasker 
 
 ## Features
 
-<img src="docs/screenshots/dashboard.png" align="right" width="280" alt="Dashboard — live applied brightness, ambient lux, circadian scale, and active context">
-
-
 - **Three-zone perceptual brightness curve** with a live, editable graph (low-light √, mid-range
   ∛-ish, high-light asymptotic tail — C0-continuous).
 - **Automatic curve fitting** — enable override detection, adjust brightness by hand during normal
@@ -49,33 +46,48 @@ decision logic are golden-tested against a transcription of the original Tasker 
 - **Surfaces** — foreground-service notification with actions, a Quick Settings tile, a home-screen
   widget, and boot-start.
 
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" width="300" alt="Tideo Dashboard">
+  <br>
+  <em>The Dashboard: applied brightness (55/255), the raw and smoothed ambient lux feeding it, the
+  current circadian multiplier (1.15×), the active profile and context, and the master service
+  toggle — the whole decision, on one screen.</em>
+</p>
+
 ## How it works
 
-<img src="docs/screenshots/curve.png" align="right" width="280" alt="Curve & Brightness — the editable three-zone lux→brightness graph with live readout">
-
 - **Three-zone model.** Brightness is a C0-continuous piecewise function of lux; each zone has its own
-  scaling so low light stays sensitive and high light compresses gracefully. The graph is live and
-  editable — drag the zone scalings and boundaries and watch the curve, the reference, and your
+  scaling so low light stays sensitive and high light compresses gracefully. The graph below is live
+  and editable — drag the zone scalings and boundaries and watch the curve, the reference, and your
   recorded overrides redraw against the current smoothed lux.
 - **Curve fitting.** With override detection on, your manual corrections become training points; the
   wizard fits the three-part function and reports per-zone fit quality.
+
+<p align="center">
+  <img src="docs/screenshots/curve.png" width="300" alt="Curve & Brightness editor">
+  <br>
+  <em>The Curve &amp; Brightness editor: the teal line is your lux→brightness curve, the dashed line
+  the reference, and the red cross-hairs mark the live point — 416 lux mapping to brightness 86. The
+  five fields below are the editable zone scalings and boundaries; the derived continuity values keep
+  the three zones C0-continuous.</em>
+</p>
+
 - **Event-driven runtime.** The pipeline reacts to state changes (a light step past the dead band, an
   app switch, a battery delta, a location drift) rather than polling — easy on the battery.
 - **Context precedence.** When several context rules match, highest priority wins; on a tie, the most
   specific rule wins.
-
-<img src="docs/screenshots/circadian.png" align="right" width="280" alt="Circadian — time-of-day scaling synced to local sunrise/sunset">
-
 - **Circadian scaling.** A time-of-day multiplier follows your local sunrise/sunset (GPS, manual
-  lat/lon, or IP fallback), easing the whole curve up around midday and back down toward dusk; the
-  scale graph plots dawn, noon, sunset, and dusk against the current time.
+  lat/lon, or IP fallback), easing the whole curve up around midday and back down toward dusk.
 
-<br clear="all">
-
+<p align="center">
+  <img src="docs/screenshots/circadian.png" width="300" alt="Circadian scaling editor">
+  <br>
+  <em>Circadian scaling across the day: the plateau is full daytime scale, tapering toward dawn and
+  dusk (the red line is now). The spread/steepness/transition controls shape that plateau, and the
+  location panel sets which sunrise/sunset it tracks.</em>
+</p>
 
 ## Install
-
-<img src="docs/screenshots/menu.png" align="right" width="280" alt="Tideo settings — the glass-box surface for every tunable">
 
 1. **Disable** the system's stock Adaptive/Auto Brightness (Settings → Display).
 2. Install the APK from [Releases][releases].
@@ -84,7 +96,13 @@ decision logic are golden-tested against a transcription of the original Tasker 
 
 `minSdk` 31 (Android 12) · `target`/`compile` SDK 35.
 
-<br clear="all">
+<p align="center">
+  <img src="docs/screenshots/menu.png" width="300" alt="Tideo settings home">
+  <br>
+  <em>Once installed, everything hangs off this home screen — Dashboard, Profiles &amp; Contexts, the
+  Curve / Reactivity / Super Dimming / Circadian / Misc settings groups, and the Tools, Live Debug,
+  and permission helpers.</em>
+</p>
 
 ## Privilege tiers
 
