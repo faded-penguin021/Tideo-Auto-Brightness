@@ -1,11 +1,13 @@
-# DEVIATIONS & DISCOVERIES LEDGER — frozen rebuild record (D-001…)
+# DEVIATIONS & DISCOVERIES LEDGER — permanent registry (D-001…)
 
-> **Frozen historical archive.** This is the deviations/discoveries ledger from the
-> Tasker→Kotlin migration (program complete, v1.0.0, Gate 3 signed off 2026-06-23). It is the
-> highest-value "don't repeat these mistakes" reference for future changes. Cite entries as
-> `DEVIATIONS_LEDGER D-0NN`. Code + golden vectors are ground truth; if an entry here conflicts
-> with the current code, trust the code. Do not append new entries here — record new maintenance
-> deviations in `docs/rebuild/STATE.md` (and promote durable ones back here only if curating).
+> **Append-only registry — NEVER archived, compressed, or truncated.** This is the canonical,
+> permanent home for every numbered deviation/discovery. Code comments and docs cite entries as
+> bare `D-0NN` and must always resolve here, so no entry may ever be deleted or summarized away.
+> **D-001…D-095 are the frozen migration block** (immutable). **Append new maintenance
+> deviations as D-096, D-097, … under "Maintenance deviations" at the bottom** — one continuous
+> sequence, never restart numbering. The highest-value "don't repeat these mistakes" reference.
+> Code + golden vectors are ground truth; if an entry conflicts with current code, trust the
+> code and correct the entry (don't delete it).
 
 ## Deviations & discoveries ledger
 
@@ -1662,5 +1664,11 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   emulator entirely; cmdline-tools + licenses still set up, AGP fetches compile-SDK/build-tools on
   demand). No source change — the 1.0.0 build itself is green locally. (Affects CI / release.)
 
-Append new entries as D-096, … with which segments they affect.
+## Maintenance deviations (post-1.0)
+
+Append new deviations here as `D-096`, `D-097`, … (continue the sequence; never restart). Same
+terse, provenance-stamped format as above; note which area/change they affect. These are part of
+the permanent registry — never compress or remove them.
+
+_(none yet)_
 

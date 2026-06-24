@@ -2,10 +2,10 @@
 
 > **Length guard (read before editing).** Steady-state target ≤ 12 KB. **If this file exceeds
 > 32 KB, aggressively compress before committing:** collapse each completed *Active work* stage
-> into one Changelog line, move any durable gotcha to `../history/DEVIATIONS_LEDGER.md` (or the
-> relevant live reference doc), and delete narrative/punch-list prose. The **Project** and
-> **Current state** sections must always survive compression. The full migration history is
-> already frozen in `../history/` — do not re-accumulate it here.
+> into one Changelog line, move any durable gotcha into `DEVIATIONS_LEDGER.md` (the permanent,
+> append-only registry — never compressed), and delete narrative/punch-list prose. The
+> **Project** and **Current state** sections must always survive compression. The full migration
+> narrative is already frozen in `../history/` — do not re-accumulate it here.
 
 ## Project
 
@@ -23,12 +23,12 @@ passed (Gate 1 core loop, Gate 2 surfaces & tiers, Gate 3 acceptance soak, signe
 2026-06-23). `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0.
 No active work in flight.
 
-How changes are made now: see `RUNBOOK.md` (change-type playbooks). Full rebuild record + the
-~96-entry deviations ledger are frozen in `../history/`.
+How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migration narrative
+(segment briefs, gate findings) is frozen in `../history/`; the deviations registry stays live.
 
-> Code/docs elsewhere cite migration deviations by number (e.g. `STATE.md D-048`, `F50`). Those
-> entries now live in `../history/DEVIATIONS_LEDGER.md` (and `../history/STATE_rebuild.md` for
-> gate findings) — look there.
+> Code/docs elsewhere cite deviations by number (e.g. `STATE.md D-048`, `F50`). All deviations
+> — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
+> findings are in `../history/STATE_rebuild.md`). Look there.
 
 ## Active work
 
@@ -44,11 +44,11 @@ When in use, track stages here:
 
 **New deviations (this work):** none.
 
-> Deviation numbering is a **single continuous sequence** shared with the frozen ledger — do
-> **not** restart at D-001. The historical high-water mark is **D-095**, so the next free number
-> is **D-096**; increment from there. Record new deviations here (terse, provenance-stamped);
-> promote durable ones into `../history/DEVIATIONS_LEDGER.md` only when curating, keeping the
-> same number.
+> Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
+> "Maintenance deviations" section), not here — this slot is only a transient staging note
+> during an in-flight change. Numbering is **one continuous sequence**: next free number is
+> **D-096** (historical high-water mark D-095); never restart at D-001. A deviation, once
+> numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
 

@@ -4,9 +4,10 @@ The Tasker→Kotlin rebuild is **done and shipped** (v1.0.0). This is the entry 
 *changing* the app afterward while preserving Tasker feature parity. Pick the change-type
 playbook that matches your task, read the reference docs it names, then do the work.
 
-The full migration record (segment briefs, gate findings, ~96 deviations) is frozen in
-`../history/` — consult it, don't extend it. **Code + golden vectors are ground truth**; where
-any doc disagrees with the code, trust the code (and fix the doc).
+The migration narrative (segment briefs, gate findings) is frozen in `../history/` — consult it,
+don't extend it. The numbered deviations live in `DEVIATIONS_LEDGER.md`, a permanent append-only
+registry (record new ones as D-096+; never compress it). **Code + golden vectors are ground
+truth**; where any doc disagrees with the code, trust the code (and fix the doc).
 
 ## Where logic lives
 
@@ -34,7 +35,7 @@ any doc disagrees with the code, trust the code (and fix the doc).
 | Known parity deviations / open gaps | `parity_gaps.md` |
 | Privilege tiers / permissions / DataStore schema | `architecture/*` |
 | Material 3 audit | `design/m3_audit.md` |
-| Solved mistakes from the rebuild (⭐) | `../history/DEVIATIONS_LEDGER.md` |
+| Numbered deviations — solved mistakes + ongoing (⭐, append D-096+) | `DEVIATIONS_LEDGER.md` |
 
 ## Change-type playbooks
 
@@ -98,9 +99,11 @@ Run the relevant subset until green (on-device behavior is owner-verified — no
 ## Self-adaptation — keep this runbook useful
 
 If this runbook lacks what you need for the task in front of you:
-1. Consult the live reference docs above and `../history/` (esp. `DEVIATIONS_LEDGER.md`).
-2. If you learn a durable fact future sessions need, append it to `STATE.md` (and/or correct
-   the relevant reference doc — provenance-stamped, terse).
+1. Consult the live reference docs above (esp. `DEVIATIONS_LEDGER.md`) and the frozen
+   `../history/` narrative.
+2. If you learn a durable fact future sessions need, record it as a new numbered deviation
+   (D-096+) in `DEVIATIONS_LEDGER.md` and/or correct the relevant reference doc —
+   provenance-stamped, terse.
 3. If a playbook here is wrong, stale, or missing a case you just handled, **fix this RUNBOOK in
    the same change.** Treat the runbook as code: it should always reflect how changes are
    actually made now.

@@ -5,8 +5,10 @@ A native **Kotlin/Compose** Android app that is a feature-parity rebuild of the 
 *maintenance* — changing profiles/tasks/scenes, fixing bugs, occasionally adding features.
 
 The original Tasker XML lives in `docs/rebuild/extraction/_source/` (gitignored, 1.6 MB —
-**never read it wholesale; use `docs/rebuild/XML_RECIPES.md`**). The full migration record
-(segment briefs, gate findings, ~96-entry deviations ledger) is frozen in `docs/history/`.
+**never read it wholesale; use `docs/rebuild/XML_RECIPES.md`**). The migration narrative
+(segment briefs, gate findings) is frozen in `docs/history/`. The numbered deviations live in
+`docs/rebuild/DEVIATIONS_LEDGER.md` — a **permanent, append-only registry** (code cites bare
+`D-NN`; never compress or delete entries; append new ones as D-096+).
 
 > **Ground truth:** code + golden test vectors. The docs under `docs/rebuild/` and
 > `docs/history/` describe the app as-built and may drift — when a doc conflicts with the code,
@@ -65,7 +67,7 @@ the grant the dimming path writes `Settings.Secure` directly (no binder). Shizuk
 - minSdk 31, target/compile 35. No legacy API branches below 31.
 - Kotlin official code style; match existing file/package layout.
 
-## Invariants that still bind (full catalog: `docs/history/DEVIATIONS_LEDGER.md`)
+## Invariants that still bind (full catalog: `docs/rebuild/DEVIATIONS_LEDGER.md`)
 
 - **Concurrency model is BINDING:** a single pipeline coroutine; one event runs to completion
   (including animation); events arriving mid-cycle are **DROPPED, not queued** (the Tasker

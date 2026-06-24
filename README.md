@@ -161,10 +161,11 @@ The rebuild is complete; maintenance is driven by documents under `docs/rebuild/
 - [`docs/rebuild/RUNBOOK.md`](docs/rebuild/RUNBOOK.md) — maintenance playbook (change-type guides).
 - [`docs/rebuild/PARITY_CHECKLIST.md`](docs/rebuild/PARITY_CHECKLIST.md) — every Tasker artifact tracked
   to a disposition.
+- [`docs/rebuild/DEVIATIONS_LEDGER.md`](docs/rebuild/DEVIATIONS_LEDGER.md) — permanent append-only
+  registry of numbered deviations (D-001…); consult to avoid repeating solved mistakes.
 - [`docs/rebuild/DEVICE_TEST_SCRIPT.md`](docs/rebuild/DEVICE_TEST_SCRIPT.md) — the on-device acceptance
   script.
-- [`docs/history/`](docs/history/) — frozen record of the migration (segment briefs, gate findings,
-  the ~96-entry deviations ledger) — consult to avoid repeating solved mistakes.
+- [`docs/history/`](docs/history/) — frozen record of the migration (segment briefs, gate findings).
 
 ## Contributing
 

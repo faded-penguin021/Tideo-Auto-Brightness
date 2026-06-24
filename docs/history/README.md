@@ -15,17 +15,19 @@ an Android `:platform` adapter layer, and a Compose `:app` with a foreground-ser
 QS tile, and boot receiver. Three on-device human gates (core loop, surfaces & tiers,
 acceptance soak) all passed.
 
-## Contents
+## Contents (frozen)
 
-- **`DEVIATIONS_LEDGER.md`** — ⭐ the highest-value reference. ~96 numbered deviations/
-  discoveries (D-001…), each a correction to an earlier wrong assumption (e.g. embedded Java is
-  action code 474 not 598; `task661` holds no Java; ConditionList children are alphabetical in
-  the XML; the single-coroutine drop-on-reentry concurrency model). **Read this before
-  touching ported pipeline logic.**
 - **`RUNBOOK_rebuild.md`** — the original segment briefs (S0–S14 + sub-segments), the execution
   DAG, and the global failure protocol used to drive the migration.
 - **`STATE_rebuild.md`** — the migration's cross-session memory: segment log, the layered
   "Current state" punch-list history, gate findings, and check results.
+
+> **The deviations ledger is NOT here — it lives at `docs/rebuild/DEVIATIONS_LEDGER.md`.** ⭐ It
+> is a **permanent, append-only registry** (not frozen): ~96 numbered corrections to earlier
+> wrong assumptions (e.g. embedded Java is action code 474 not 598; `task661` holds no Java;
+> ConditionList children are alphabetical in the XML; the single-coroutine drop-on-reentry
+> concurrency model), and the home for all future deviations (D-096+). Code cites bare `D-NN`,
+> so it is never compressed or deleted. **Read it before touching ported pipeline logic.**
 
 ## Caveat — frozen, may drift
 
