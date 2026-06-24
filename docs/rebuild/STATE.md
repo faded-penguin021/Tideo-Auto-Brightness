@@ -54,5 +54,8 @@ When in use, track stages here:
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-24 — F-Droid prep: added `fastlane/metadata/android/en-US/` (title, short/full
+  description, `changelogs/3.txt`, 4 phoneScreenshots). Repo-side only; submission to fdroiddata
+  + release tag are owner steps. No code/build change.
 - 2026-06-23 — v1.0.0: Tasker→Kotlin rebuild complete; Gate 3 signed off. Full history frozen
   in `../history/`.

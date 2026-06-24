@@ -1,0 +1,62 @@
+You taught Android your brightness preferences and it is still wrong. Tideo
+replaces the opaque on-device ML of stock adaptive brightness with deterministic,
+inspectable math: a tunable lux-to-brightness curve you can see and shape, smooth
+animated transitions, circadian (time-of-day) scaling, per-context overrides, and
+an optional privileged "super dimming" mode that takes the screen below the system
+minimum.
+
+To use it, first disable the system's stock Adaptive/Auto Brightness
+(Settings > Display), then launch Tideo, complete onboarding, and toggle the main
+service on from the Dashboard.
+
+Features:
+
+* Three-zone perceptual brightness curve with a live, editable graph.
+* Automatic curve fitting: adjust brightness by hand during normal use and, after
+  a handful of points across varied lighting, the wizard suggests a fitted curve.
+* Reactivity control: per-range dead zones that kill sensor jitter without making
+  the screen sluggish.
+* Smooth animated transitions with override detection: drag the system slider and
+  Tideo steps aside, then resumes per your rules.
+* Circadian scaling synced to local sunrise/sunset, shifting the whole curve
+  across the day.
+* Super dimming (privileged): drives Android's Reduce Bright Colors below the
+  hardware floor, plus a PWM-flicker-aware software-dimming mode.
+* Context automation: load profiles automatically by foreground app, time window,
+  location, charging state, Wi-Fi SSID, or day of week.
+* Profiles: five built-in presets plus save / overwrite / factory-restore and
+  JSON import/export.
+* Live Debug scene: a glass-box readout of every runtime variable and decision.
+* Emergency recovery: flip the phone upside-down and shake to force brightness to
+  max with an SOS vibration.
+* Surfaces: foreground-service notification with actions, a Quick Settings tile, a
+  home-screen widget, and boot-start.
+
+Privilege tiers:
+
+The core pipeline is fully functional at the BASIC tier, which uses only the
+user-grantable WRITE_SETTINGS permission. The optional ELEVATED tier unlocks super
+dimming and requires a one-time WRITE_SECURE_SETTINGS grant that YOU perform via
+adb, Shizuku, or root. It is never granted automatically.
+
+About the permissions Tideo requests:
+
+* Background location and location: used only by the optional location-aware
+  context rules and the once-a-day sunrise/sunset refresh for circadian scaling.
+* Usage access (PACKAGE_USAGE_STATS): used only by per-app context rules to read
+  the foreground app; granted from a Settings screen, not a runtime dialog.
+* Accessibility service: optional and presentation-only. It draws the debug/context
+  flash overlay system-wide. It does not read screen content and does not consume
+  input events. With it off, Tideo falls back to a foreground toast.
+
+Privacy:
+
+Tideo is local-first with no analytics, ads, or accounts. It makes one outbound
+network request, and only as a last resort: if you enable circadian scaling and no
+on-device location is available, it falls back to a single cleartext HTTP request
+to ip-api.com to estimate your city from your public IP. This fallback can be
+turned off under Circadian > Date & location, and the cleartext exception is scoped
+to that single host. Everything else runs entirely on-device.
+
+Tideo is a ground-up Kotlin/Compose rebuild of the Advanced Auto Brightness Tasker
+project, ported with exact behavioural parity. It is not affiliated with Tasker.
