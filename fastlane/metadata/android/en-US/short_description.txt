@@ -1,0 +1,1 @@
+A glass-box replacement for Android's adaptive brightness

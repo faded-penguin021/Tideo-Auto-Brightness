@@ -1,0 +1,7 @@
+First public release (1.0.0).
+
+A complete, native Kotlin/Compose replacement for Android's adaptive brightness:
+editable three-zone lux curve, automatic curve fitting, smooth transitions with
+override detection, circadian scaling, per-context profile automation, optional
+privileged super dimming, a Quick Settings tile, a home-screen widget, and an
+emergency shake-to-max recovery gesture.
