@@ -1,11 +1,19 @@
 package com.tideo.autobrightness.platform.context
 
 import android.content.Context
+import android.net.ConnectivityManager
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
+import org.robolectric.shadows.ShadowNetwork
+import org.robolectric.shadows.ShadowNetworkCapabilities
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -69,6 +77,33 @@ class WifiSsidStrategyTest {
         // fallback reports NotOnWifi (it is NOT a Connected result).
         assertTrue(shizuku.called && dump.called)
         assertTrue(result !is SsidResult.Connected)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun ssidFlow_resolvesViaNoLocationStrategy() = runTest {
+        // Regression (D-096): the runtime context-evaluation flow must run the SAME no-Location
+        // strategies as currentSsid(), not just the Location-gated callback — otherwise Wi-Fi context
+        // rules silently require Location services ON even when Shizuku can resolve the SSID.
+        val shizuku = FakeStrategy("HomeNet")
+        val reader = AndroidWifiInfoReader(context, listOf(shizuku))
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        val emissions = mutableListOf<String?>()
+        val collectJob = launch { reader.ssidFlow().collect { emissions.add(it) } }
+        runCurrent() // let the flow register its NetworkCallback
+
+        val callbacks = Shadows.shadowOf(cm).networkCallbacks
+        assertTrue(callbacks.isNotEmpty())
+        // Fire a Wi-Fi capabilities change; the no-Location strategy must resolve before any caps read.
+        val network = ShadowNetwork.newInstance(1)
+        val caps = ShadowNetworkCapabilities.newInstance()
+        callbacks.forEach { it.onCapabilitiesChanged(network, caps) }
+        advanceUntilIdle()
+
+        assertEquals("HomeNet", emissions.lastOrNull())
+        assertTrue(shizuku.called)
+        collectJob.cancel()
     }
 
     @Test

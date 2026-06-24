@@ -1670,5 +1670,30 @@ Append new deviations here as `D-096`, `D-097`, … (continue the sequence; neve
 terse, provenance-stamped format as above; note which area/change they affect. These are part of
 the permanent registry — never compress or remove them.
 
-_(none yet)_
+- **D-096: Wi-Fi context evaluation used Location-only SSID read (bug fix; platform/app-glue, domain
+  fenced).** `task43` (_EvaluateContexts V2, L154-181) reads the connected SSID via the no-Location
+  bypass FIRST (`bypass_ssid` = `_GetWifiNoLocation V3` output), only then the framework `WifiManager`
+  read. The 1.0 port honoured this for the **rule editor** (`WifiInfoReader.currentSsid`, D-057) but the
+  **runtime evaluation** path (`AndroidContextSignalSource.wifiFlow()` → `WifiInfoReader.ssidFlow()`) used
+  ONLY the Location-gated `NetworkCallback(FLAG_INCLUDE_LOCATION_INFO)` — so a user could pick "use
+  current SSID" via Shizuku with Location OFF when creating a rule, yet the rule never matched at eval
+  time without Location services ON. **Fix:** extracted the no-Location precedence into a shared
+  `AndroidWifiInfoReader.resolveNoLocationSsid()` (Shizuku→dumpsys, the same `noLocationStrategies` list
+  `currentSsid` uses) and made `ssidFlow()` resolve through it first on each `onCapabilitiesChanged`,
+  falling back to `normalizeSsid(transportInfo.ssid)` only when no strategy resolves. The NetworkCallback
+  is now just the change *trigger*; an `AtomicReference<Network>` skips the (costly) re-resolve once a
+  confirmed SSID is held for the current network and resets on a new network / `onLost` (so a first
+  redacted read is still retried). Test: `WifiSsidStrategyTest.ssidFlow_resolvesViaNoLocationStrategy`
+  (fires a Robolectric capabilities change, asserts the Shizuku-fake SSID is emitted). (Affects the
+  prof768/task43 Wi-Fi context row in `PARITY_CHECKLIST.md`.)
+
+- **D-097: context rule editor dialog not edge-to-edge → Save/Cancel clipped (bug fix; UI only).** The
+  per-rule editor `Dialog` (`ContextsScreen.kt`) used default `DialogProperties`
+  (`decorFitsSystemWindows = true`), so the dialog window fit system windows itself and reported ZERO
+  WindowInsets to its content. The editor's own `statusBarsPadding()` / `navigationBarsPadding()` (it
+  draws its own full-screen layout with a sticky bottom Save/Cancel bar) therefore collapsed to nothing:
+  the top fields slid under the status bar and the bottom action bar sat under the gesture nav bar
+  (buttons clipped). **Fix:** `DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows =
+  false)` — the dialog now draws edge-to-edge and the existing inset paddings position content correctly.
+  Buttons kept at the bottom (owner: do not move to top). No new layout, no test change.
 

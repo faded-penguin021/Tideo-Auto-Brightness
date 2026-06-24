@@ -13,13 +13,16 @@ import android.net.wifi.WifiInfo
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 // Tasker: prof768 Context: WiFi (Dis)connected → task43 matches SSID for per-WiFi context rules.
-// The connected SSID requires ACCESS_FINE_LOCATION at runtime on API 29+ AND location services ON;
-// it is only delivered through a NetworkCallback registered with FLAG_INCLUDE_LOCATION_INFO.
+// The framework SSID (via NetworkCallback FLAG_INCLUDE_LOCATION_INFO) requires ACCESS_FINE_LOCATION
+// AND location services ON on API 29+. Both the editor read (currentSsid) and the runtime flow
+// (ssidFlow) first try the no-Location bypass strategies (Shizuku/dumpsys, _GetWifiNoLocation V3)
+// so Wi-Fi context rules work with Location off — the framework path is the last fallback.
 interface WifiInfoReader {
     fun ssidFlow(): Flow<String?>
 
@@ -60,11 +63,21 @@ class AndroidWifiInfoReader(
 ) : WifiInfoReader {
     override suspend fun currentSsid(): SsidResult {
         // _GetWifiNoLocation V3 order: try Shizuku → dumpsys first; a hit returns without Location.
+        resolveNoLocationSsid()?.let { return SsidResult.Connected(it) }
+        return locationCallbackSsid()
+    }
+
+    // _GetWifiNoLocation V3 order (S12.7d/G2R-F41): try the no-Location strategies (Shizuku
+    // `cmd wifi status` → `dumpsys wifi`) in priority order; first hit wins. Returns null when none
+    // resolve, so callers fall back to the Location-gated path. Shared by both currentSsid() (rule
+    // editor) and ssidFlow() (runtime context evaluation) so the two paths can't drift again — the
+    // earlier drift (flow skipped these strategies) made Wi-Fi rules require Location at eval time.
+    private suspend fun resolveNoLocationSsid(): String? {
         for (strategy in noLocationStrategies) {
             val ssid = runCatching { strategy.trySsid() }.getOrNull()
-            if (!ssid.isNullOrEmpty()) return SsidResult.Connected(ssid)
+            if (!ssid.isNullOrEmpty()) return ssid
         }
-        return locationCallbackSsid()
+        return null
     }
 
     // The Location-gated NetworkCallback path — the LAST fallback (was the only path pre-S12.7d).
@@ -113,15 +126,28 @@ class AndroidWifiInfoReader(
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .build()
 
+        // task43 L154-181: context evaluation reads the SSID via the no-Location bypass FIRST
+        // (`bypass_ssid`), only then the standard framework read. So the runtime flow must run the same
+        // Shizuku→dumpsys strategies as currentSsid()/the rule editor — a Shizuku-resolved SSID drives
+        // Wi-Fi rules with Location services OFF. The NetworkCallback is just the change trigger here.
+        // Skip the (costly) re-resolve once we hold a confirmed SSID for the current network; reset it
+        // on a new network / loss so a real SSID is still picked up if the first read came back redacted.
+        val resolvedNetwork = java.util.concurrent.atomic.AtomicReference<Network?>(null)
+
         val callback = object : ConnectivityManager.NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) {
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                val raw = (caps.transportInfo as? WifiInfo)?.ssid
-                // Android wraps SSID in quotes; strip them for plain comparison against rule values.
-                val ssid = raw?.removeSurrounding("\"")?.takeIf { it != "<unknown ssid>" }
-                trySend(ssid)
+                if (network == resolvedNetwork.get()) return
+                launch {
+                    // Android wraps the framework SSID in quotes and redacts it without Location;
+                    // normalizeSsid strips quotes and rejects the <unknown ssid>/<redacted> placeholders.
+                    val ssid = resolveNoLocationSsid() ?: normalizeSsid((caps.transportInfo as? WifiInfo)?.ssid)
+                    if (ssid != null) resolvedNetwork.set(network)
+                    trySend(ssid)
+                }
             }
 
             override fun onLost(network: Network) {
+                resolvedNetwork.compareAndSet(network, null)
                 trySend(null)
             }
         }
