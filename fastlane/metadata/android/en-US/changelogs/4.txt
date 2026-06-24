@@ -1,0 +1,3 @@
+Packaging-only release for F-Droid: the release tag now carries the fastlane
+metadata (store description, changelog, screenshots) so the F-Droid listing is
+generated from this repository. No app behaviour changed since 1.0.0.
