@@ -54,6 +54,12 @@ When in use, track stages here:
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-24 — Wi-Fi context fixes: (D-096) `WifiInfoReader.ssidFlow()` now runs the no-Location
+  strategies (Shizuku→dumpsys) first like task43's `bypass_ssid`, so Wi-Fi context rules match with
+  Location services OFF (was Location-only at eval time, even though the rule editor already read the
+  SSID via Shizuku). (D-097) per-rule editor `Dialog` made edge-to-edge (`decorFitsSystemWindows =
+  false`) so its status/nav-bar insets apply — the Save/Cancel bar no longer sits clipped under the
+  gesture nav bar. Tests: WifiSsidStrategyTest +1 (flow uses no-Location strategy).
 - 2026-06-24 — F-Droid: bumped to 1.0.1 / `versionCode 4` (packaging only — gives a release tag
   that contains `fastlane/`, which the 1.0.0 tag predated; F-Droid reads metadata from the built
   commit). Added `changelogs/4.txt`. No app behaviour change. Owner tags `v1.0.1` after merge.

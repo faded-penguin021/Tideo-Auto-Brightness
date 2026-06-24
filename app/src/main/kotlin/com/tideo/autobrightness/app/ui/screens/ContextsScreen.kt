@@ -172,7 +172,12 @@ fun ContextRulesSection(
     if (current != null) {
         Dialog(
             onDismissRequest = { editing = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+            // decorFitsSystemWindows = false makes the full-screen dialog draw edge-to-edge so its
+            // content actually receives the status/navigation-bar WindowInsets. Without it the dialog
+            // window fits system windows itself and reports ZERO insets to the content, so the editor's
+            // statusBarsPadding()/navigationBarsPadding() collapsed — the top fields slid under the
+            // status bar and the sticky Save/Cancel bar sat under the gesture nav bar (clipped).
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         ) {
             Surface(modifier = Modifier.fillMaxSize().testTag("rule_editor_modal"), tonalElevation = Dimens.cardElevationRaised) {
                 RuleEditor(
