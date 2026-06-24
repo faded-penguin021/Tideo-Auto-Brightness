@@ -21,6 +21,15 @@ decision logic are golden-tested against a transcription of the original Tasker 
 > The Tasker project [Advanced Auto Brightness][aab] is the upstream **source of truth**. Feature discussion, bug triage, and most contributions happen there — see
 > [Contributing](#contributing).
 
+## Screenshots
+
+| | |
+|:---:|:---:|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Curve & Brightness](docs/screenshots/curve.png) |
+| **Dashboard** — live applied brightness, ambient lux, circadian scale, and active context. | **Curve & Brightness** — the editable three-zone lux→brightness graph with live readout. |
+| ![Circadian](docs/screenshots/circadian.png) | ![Settings](docs/screenshots/menu.png) |
+| **Circadian** — time-of-day scaling synced to local sunrise/sunset. | **Settings** — the glass-box surface for every tunable. |
+
 ## Features
 
 - **Three-zone perceptual brightness curve** with a live, editable graph (low-light √, mid-range
