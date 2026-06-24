@@ -84,6 +84,31 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 - No golden reference exists; still obey the coding conventions in `CLAUDE.md` and add tests.
 - **Record:** note the deviation-from-Tasker explicitly in `STATE.md`.
 
+### 6. Cutting a release / version bump
+The owner publishes releases by pushing a `vX.Y.Z` git tag on `main`; F-Droid then builds that
+tagged commit and reads its metadata. The **in-app version is decoupled from the tag** and has
+drifted before (the `v1.0.2` tag was cut while `build.gradle.kts` still said `1.0.1` / `versionCode
+4` — see D-099), so check it explicitly.
+
+- **Check the current release state first** (tags are not always present in a fresh clone):
+  ```bash
+  git fetch --tags origin
+  git tag --sort=-v:refname | head        # latest v* tag = the released version
+  git show "$(git describe --tags --abbrev=0)":app/build.gradle.kts | grep -E 'versionCode|versionName'
+  grep -E 'versionCode|versionName' app/build.gradle.kts   # what the working tree ships
+  ```
+- **Invariant — the build must never ship behind a tag.** Any change destined for a new release
+  must set, in `app/build.gradle.kts`:
+  - `versionName` ≥ the latest `v*` tag (use the next patch, e.g. latest tag `v1.0.2` → `1.0.3`);
+  - `versionCode` **strictly greater than every released code** (monotonic; F-Droid rejects a
+    re-used code). Bump by 1 from the highest code ever shipped, not from the last tag's code if
+    that tag forgot to bump.
+- **F-Droid changelog:** add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the
+  filename is the **versionCode**, not the name) with a short user-facing note.
+- **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
+  process, a `DEVIATIONS_LEDGER.md` row.
+- **Tagging stays an owner step** — do not create tags or open releases yourself.
+
 ## Acceptance ladder
 
 Run the relevant subset until green (on-device behavior is owner-verified — no emulator, no KVM):

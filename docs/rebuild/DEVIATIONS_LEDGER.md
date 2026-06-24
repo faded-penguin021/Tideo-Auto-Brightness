@@ -1697,18 +1697,31 @@ the permanent registry — never compress or remove them.
   false)` — the dialog now draws edge-to-edge and the existing inset paddings position content correctly.
   Buttons kept at the bottom (owner: do not move to top). No new layout, no test change.
 
-- **D-098: D-097 didn't actually take — drive the dialog Window directly (bug fix; UI only).** D-097's
-  `DialogProperties(decorFitsSystemWindows = false)` did not fix the clipped Save/Cancel bar on device.
-  Root cause: the host activity (`MainActivity`) is **not** edge-to-edge (no `enableEdgeToEdge()`), and on
-  this Compose BOM (`2024.12.01`) the `DialogProperties.decorFitsSystemWindows` flag does not reliably make
-  the dialog window span behind the system bars — so the dialog window kept fitting system windows and
-  reported a **ZERO bottom inset**, leaving `navigationBarsPadding()` a no-op (buttons under the gesture
-  pill). **Fix:** grab the real dialog `Window` via `DialogWindowProvider` (the same idiom already used in
-  `ToolsScreen.kt`) and, in a `SideEffect`, call `WindowCompat.setDecorFitsSystemWindows(window, false)` +
-  `window.setLayout(MATCH_PARENT, MATCH_PARENT)` + `SOFT_INPUT_ADJUST_RESIZE`. The window now spans behind
-  the bars, so `navigationBars`/`ime` insets are dispatched to the content. The sticky bottom Row pads by
-  `WindowInsets.navigationBars.union(WindowInsets.ime)` (combined, not stacked, so neither inset swallows
-  the other): idle it clears the gesture pill; with a field focused it rides above the keyboard. Inset
-  behavior is not exercisable under Robolectric (no real window/system bars) → owner device-verified;
-  existing `SettingsScreensTest` rule-editor cases (render + Save) are the regression guard.
+- **D-098: rule-editor Save/Cancel clipped by the gesture nav bar — stop fighting insets, scroll instead
+  (bug fix; UI only).** The per-rule editor `Dialog` (`ContextsScreen.kt`) kept its Save/Cancel in a
+  *sticky bottom bar* and padded it with the navigation-bar inset. That inset is **never delivered** to
+  this dialog window's content: the host activity (`MainActivity`) isn't edge-to-edge, and neither D-097's
+  `DialogProperties(decorFitsSystemWindows = false)` nor a follow-up that drove the real dialog `Window`
+  (`DialogWindowProvider` + `setDecorFitsSystemWindows(false)` + MATCH_PARENT layout + `ADJUST_RESIZE`,
+  Compose BOM `2024.12.01`) made the window report a non-zero **bottom** inset — both were tried and both
+  left the buttons under the gesture pill on device. The **top** (status-bar) inset *is* delivered, so
+  `statusBarsPadding()` for the first field is kept. **Final fix:** drop the sticky bar entirely. The
+  editor is one scrollable `Column`; Save/Cancel ride at the **end of the scroll** with a generous trailing
+  `Spacer(48.dp)`, so they can always be scrolled fully clear of the nav/gesture bar *regardless of insets*
+  (`imePadding()` on the outer column shrinks the scroll viewport above the keyboard). Buttons stay at the
+  bottom (the G3 owner finding). **Lesson:** a Compose `Dialog` here delivers the status-bar inset but not
+  the navigation-bar/ime inset to its content — do not rely on `navigationBarsPadding()`/`imePadding()`
+  *values* inside a dialog; make bottom controls scrollable with fixed clearance instead. Inset behavior
+  isn't exercisable under Robolectric → owner device-verified; `SettingsScreensTest` rule-editor cases
+  (render + Save) are the regression guard, updated to `performScrollTo()` the now-scrollable Save button.
+
+- **D-099: in-app version drifted behind the release tag; codified release/version rules (process;
+  build-config + docs).** The `v1.0.2` git tag on `main` was cut while `app/build.gradle.kts` still read
+  `versionName "1.0.1"` / `versionCode 4` — the in-app About screen reported a version *behind* the latest
+  release tag, and the tag's `versionCode` was never bumped past `1.0.1`'s. **Fix:** realigned to
+  `versionName "1.0.3"` / `versionCode 5` (ahead of the latest tag, code strictly above every shipped
+  code), added `fastlane/.../changelogs/5.txt`, and added RUNBOOK playbook **§6 "Cutting a release / version
+  bump"** with the invariant: build version ≥ latest `v*` tag and `versionCode` strictly monotonic; the
+  changelog filename is the **versionCode**; owner still owns tagging. No app behaviour change from the bump
+  itself (it ships alongside the D-098 fix).
 

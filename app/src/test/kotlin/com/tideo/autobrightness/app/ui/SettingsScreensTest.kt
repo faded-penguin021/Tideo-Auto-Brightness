@@ -533,7 +533,8 @@ class SettingsScreensTest {
         compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
         // The clear affordance is only shown when a time is set.
         compose.onNodeWithTag("clear_time").performScrollTo().performClick()
-        compose.onNodeWithTag("save_rule").performClick()
+        // Save/Cancel now ride at the end of the editor's scroll (D-098), so scroll to reach them.
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
         assertEquals(null, saved?.triggers?.timeRange, "Clear time must null the saved time range")
     }
 
@@ -608,7 +609,8 @@ class SettingsScreensTest {
         compose.onNodeWithTag("add_context_rule").performClick()
         compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
         compose.onNodeWithTag("day_2").performScrollTo().performClick()
-        compose.onNodeWithTag("save_rule").performClick()
+        // Save/Cancel now ride at the end of the editor's scroll (D-098), so scroll to reach them.
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
         assertEquals(listOf(2), saved?.triggers?.days, "Monday must be saved as DAY_OF_WEEK 2")
     }
 
@@ -960,7 +962,8 @@ class SettingsScreensTest {
         compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
         compose.onNodeWithTag("rule_editor_modal").assertExists()
         compose.onNodeWithTag("rule_name").performScrollTo().assertExists()
-        compose.onNodeWithTag("save_rule").performClick()
+        // Save/Cancel now ride at the end of the editor's scroll (D-098), so scroll to reach them.
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
         assertEquals("Cinema", savedRule?.name, "saving the rule in the modal routes through onSave")
     }
 

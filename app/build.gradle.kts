@@ -17,8 +17,12 @@ android {
         // 2026-06-23); feature-complete, parity-verified release build. 1.0.1 (versionCode 4) is a
         // packaging-only bump so the release tag carries the fastlane/ metadata F-Droid reads from
         // the built commit (the 1.0.0 tag predated it); no app behaviour changed.
-        versionCode = 4
-        versionName = "1.0.1"
+        // 1.0.2 (tag v1.0.2) was cut WITHOUT bumping these — the in-app version drifted behind the tag.
+        // 1.0.3 (versionCode 5) realigns the version ahead of the latest tag and ships the D-098
+        // rule-editor Save/Cancel fix. RULE: build version must be ≥ the latest `v*` tag on main and
+        // versionCode strictly greater than every released code — see RUNBOOK "Cutting a release".
+        versionCode = 5
+        versionName = "1.0.3"
     }
 
     // Release signing is driven entirely by environment variables so that no

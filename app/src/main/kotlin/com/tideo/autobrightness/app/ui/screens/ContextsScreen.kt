@@ -9,17 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -44,21 +42,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.WindowCompat
-import android.view.WindowManager
 import com.tideo.autobrightness.app.settings.BatteryTrigger
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextTriggers
@@ -174,35 +167,18 @@ fun ContextRulesSection(
         RuleCard(rule, onEdit = { editing = rule }, onDelete = { onDelete(rule.id) })
     }
 
-    // S12.9f: edit/add opens the per-rule editor in a modal. The editor owns its own scroll + a sticky
-    // bottom Save/Cancel bar (G3 owner finding: top buttons + everything-expanded read as inferior to
-    // Tasker), so the host just provides the full-screen Surface.
+    // S12.9f: edit/add opens the per-rule editor in a modal. The editor owns its own scroll; Save/Cancel
+    // ride at the END of that scroll (not a sticky bar — see RuleEditor), so the host just provides the
+    // full-screen Surface.
     val current = editing
     if (current != null) {
         Dialog(
             onDismissRequest = { editing = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+            // Edge-to-edge so the editor's top statusBarsPadding() positions the first field below the
+            // status bar. The BOTTOM is handled by scroll + padding inside RuleEditor, not insets — the
+            // dialog window never delivers a non-zero navigation-bar inset to its content here (D-098).
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         ) {
-            // Drive the real dialog Window edge-to-edge ourselves (same DialogWindowProvider idiom as
-            // ToolsScreen). DialogProperties.decorFitsSystemWindows (D-097) didn't take: the host
-            // activity isn't edge-to-edge, so the dialog window kept fitting system windows and
-            // reported a ZERO bottom inset — which is why navigationBarsPadding() never lifted the
-            // Save/Cancel bar off the gesture pill. setDecorFitsSystemWindows(false) + a MATCH_PARENT
-            // layout make the window span behind the bars so the navigationBars/ime insets are
-            // actually dispatched to the content (which pads itself); ADJUST_RESIZE makes the ime
-            // inset animate so the action bar rides above the keyboard.
-            val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
-            SideEffect {
-                dialogWindow?.let { w ->
-                    WindowCompat.setDecorFitsSystemWindows(w, false)
-                    w.setLayout(
-                        WindowManager.LayoutParams.MATCH_PARENT,
-                        WindowManager.LayoutParams.MATCH_PARENT,
-                    )
-                    @Suppress("DEPRECATION")
-                    w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-                }
-            }
             Surface(modifier = Modifier.fillMaxSize().testTag("rule_editor_modal"), tonalElevation = Dimens.cardElevationRaised) {
                 RuleEditor(
                     rule = current,
@@ -253,7 +229,6 @@ private fun ContextTriggers.summary(): String {
 /** Calendar.DAY_OF_WEEK index (1=Sun..7=Sat) → short label; the day picker maps positions to these. */
 private val DAY_LABELS = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RuleEditor(
     rule: ContextRule,
@@ -341,14 +316,18 @@ private fun RuleEditor(
         )
     }
 
-    // The editor owns its layout: a scrollable field area + a sticky bottom Save/Cancel bar (G3 owner
-    // finding — top buttons + an all-expanded form read as inferior to the Tasker editor). The full-
-    // screen Dialog draws edge-to-edge, so the top is inset for the status bar here; the bottom bar's
-    // SURFACE bleeds to the screen edge while its buttons are inset above the nav bar (see below).
+    // The editor is one scrollable field area with Save/Cancel at the END of the scroll (G3 owner finding
+    // — buttons stay at the bottom, not the top; an all-expanded form read as inferior to the Tasker
+    // editor). statusBarsPadding insets the first field below the status bar (the top inset IS delivered to
+    // this dialog window); imePadding shrinks the scroll viewport above the keyboard. The bottom is NOT
+    // inset-padded — the dialog window never delivers a navigation-bar inset to its content (D-098), so the
+    // earlier sticky bar kept clipping under the gesture pill; a trailing Spacer + scroll lets Save/Cancel
+    // always be scrolled fully clear of it instead.
     Column(
         Modifier
             .fillMaxSize()
-            .statusBarsPadding(),
+            .statusBarsPadding()
+            .imePadding(),
     ) {
         Column(
             modifier = Modifier
@@ -526,34 +505,28 @@ private fun RuleEditor(
                     }
                 }
             }
-        }
-
-        // Sticky bottom action bar (Save/Cancel always reachable, no scrolling past the trigger list).
-        // The Surface bleeds to the very bottom edge (behind the system nav bar); only the button Row is
-        // inset, so the bar's surface still reaches the screen edge (owner: polished edge-to-edge bottom
-        // bar). The Row pads by navigationBars ∪ ime: idle it clears the gesture pill, and when a field
-        // has focus it rides above the keyboard instead of hiding behind it (the two insets are combined,
-        // not stacked, so neither swallows the other).
-        Surface(tonalElevation = Dimens.cardElevationHero) {
-            Column {
-                HorizontalDivider()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    TextButton(
-                        onClick = onCancel,
-                        modifier = Modifier.weight(1f).testTag("cancel_rule"),
-                    ) { Text("Cancel") }
-                    Button(
-                        onClick = { saveRule() },
-                        modifier = Modifier.weight(1f).testTag("save_rule"),
-                    ) { Text("Save rule") }
-                }
+            // Save/Cancel ride at the END of the scroll, not in a sticky bar: the dialog window never
+            // delivers a navigation-bar inset to its content (D-098), so a sticky bar can't reliably clear
+            // the gesture pill. Inline + a generous trailing Spacer means they can always be scrolled fully
+            // clear of it regardless of insets (the G3 owner finding — buttons at the bottom — is kept).
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f).testTag("cancel_rule"),
+                ) { Text("Cancel") }
+                Button(
+                    onClick = { saveRule() },
+                    modifier = Modifier.weight(1f).testTag("save_rule"),
+                ) { Text("Save rule") }
             }
+            // Clearance below the buttons so they always scroll past the gesture pill / 3-button bar,
+            // even though the dialog reports a zero bottom inset here (D-098).
+            Spacer(Modifier.height(48.dp))
         }
     }
 }

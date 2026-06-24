@@ -1,0 +1,4 @@
+Bug fix: the per-rule context editor's Save / Cancel buttons are no longer
+clipped by the system navigation bar (gesture pill). They now sit at the end of
+the editor and always scroll fully clear of the navigation bar and the keyboard.
+Also realigns the in-app version with the latest release tag.
