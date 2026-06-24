@@ -47,13 +47,19 @@ When in use, track stages here:
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
 > during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-096** (historical high-water mark D-095); never restart at D-001. A deviation, once
+> **D-099** (historical high-water mark D-098); never restart at D-001. A deviation, once
 > numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-24 — (D-098) rule-editor Save/Cancel bar still clipped after D-097: the host activity isn't
+  edge-to-edge, so `DialogProperties(decorFitsSystemWindows=false)` didn't make the dialog window span the
+  system bars (bottom inset stayed 0 → `navigationBarsPadding()` no-op). Now drive the real dialog `Window`
+  in a `SideEffect` (`DialogWindowProvider` + `setDecorFitsSystemWindows(false)` + MATCH_PARENT layout +
+  ADJUST_RESIZE), and pad the bottom Row by `navigationBars ∪ ime` so it clears the gesture pill and rides
+  above the keyboard. UI only; inset behavior is owner device-verified (not Robolectric-testable).
 - 2026-06-24 — Wi-Fi context fixes: (D-096) `WifiInfoReader.ssidFlow()` now runs the no-Location
   strategies (Shizuku→dumpsys) first like task43's `bypass_ssid`, so Wi-Fi context rules match with
   Location services OFF (was Location-only at eval time, even though the rule editor already read the

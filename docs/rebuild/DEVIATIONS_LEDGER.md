@@ -1697,3 +1697,18 @@ the permanent registry — never compress or remove them.
   false)` — the dialog now draws edge-to-edge and the existing inset paddings position content correctly.
   Buttons kept at the bottom (owner: do not move to top). No new layout, no test change.
 
+- **D-098: D-097 didn't actually take — drive the dialog Window directly (bug fix; UI only).** D-097's
+  `DialogProperties(decorFitsSystemWindows = false)` did not fix the clipped Save/Cancel bar on device.
+  Root cause: the host activity (`MainActivity`) is **not** edge-to-edge (no `enableEdgeToEdge()`), and on
+  this Compose BOM (`2024.12.01`) the `DialogProperties.decorFitsSystemWindows` flag does not reliably make
+  the dialog window span behind the system bars — so the dialog window kept fitting system windows and
+  reported a **ZERO bottom inset**, leaving `navigationBarsPadding()` a no-op (buttons under the gesture
+  pill). **Fix:** grab the real dialog `Window` via `DialogWindowProvider` (the same idiom already used in
+  `ToolsScreen.kt`) and, in a `SideEffect`, call `WindowCompat.setDecorFitsSystemWindows(window, false)` +
+  `window.setLayout(MATCH_PARENT, MATCH_PARENT)` + `SOFT_INPUT_ADJUST_RESIZE`. The window now spans behind
+  the bars, so `navigationBars`/`ime` insets are dispatched to the content. The sticky bottom Row pads by
+  `WindowInsets.navigationBars.union(WindowInsets.ime)` (combined, not stacked, so neither inset swallows
+  the other): idle it clears the gesture pill; with a field focused it rides above the keyboard. Inset
+  behavior is not exercisable under Robolectric (no real window/system bars) → owner device-verified;
+  existing `SettingsScreensTest` rule-editor cases (render + Save) are the regression guard.
+

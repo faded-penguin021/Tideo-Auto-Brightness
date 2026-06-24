@@ -12,10 +12,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -40,16 +44,21 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import android.view.WindowManager
 import com.tideo.autobrightness.app.settings.BatteryTrigger
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextTriggers
@@ -172,13 +181,28 @@ fun ContextRulesSection(
     if (current != null) {
         Dialog(
             onDismissRequest = { editing = null },
-            // decorFitsSystemWindows = false makes the full-screen dialog draw edge-to-edge so its
-            // content actually receives the status/navigation-bar WindowInsets. Without it the dialog
-            // window fits system windows itself and reports ZERO insets to the content, so the editor's
-            // statusBarsPadding()/navigationBarsPadding() collapsed — the top fields slid under the
-            // status bar and the sticky Save/Cancel bar sat under the gesture nav bar (clipped).
-            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
+            // Drive the real dialog Window edge-to-edge ourselves (same DialogWindowProvider idiom as
+            // ToolsScreen). DialogProperties.decorFitsSystemWindows (D-097) didn't take: the host
+            // activity isn't edge-to-edge, so the dialog window kept fitting system windows and
+            // reported a ZERO bottom inset — which is why navigationBarsPadding() never lifted the
+            // Save/Cancel bar off the gesture pill. setDecorFitsSystemWindows(false) + a MATCH_PARENT
+            // layout make the window span behind the bars so the navigationBars/ime insets are
+            // actually dispatched to the content (which pads itself); ADJUST_RESIZE makes the ime
+            // inset animate so the action bar rides above the keyboard.
+            val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+            SideEffect {
+                dialogWindow?.let { w ->
+                    WindowCompat.setDecorFitsSystemWindows(w, false)
+                    w.setLayout(
+                        WindowManager.LayoutParams.MATCH_PARENT,
+                        WindowManager.LayoutParams.MATCH_PARENT,
+                    )
+                    @Suppress("DEPRECATION")
+                    w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+                }
+            }
             Surface(modifier = Modifier.fillMaxSize().testTag("rule_editor_modal"), tonalElevation = Dimens.cardElevationRaised) {
                 RuleEditor(
                     rule = current,
@@ -229,6 +253,7 @@ private fun ContextTriggers.summary(): String {
 /** Calendar.DAY_OF_WEEK index (1=Sun..7=Sat) → short label; the day picker maps positions to these. */
 private val DAY_LABELS = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RuleEditor(
     rule: ContextRule,
@@ -505,15 +530,17 @@ private fun RuleEditor(
 
         // Sticky bottom action bar (Save/Cancel always reachable, no scrolling past the trigger list).
         // The Surface bleeds to the very bottom edge (behind the system nav bar); only the button Row is
-        // inset with navigationBarsPadding() so the buttons sit above the nav bar but the bar's surface
-        // still reaches the screen edge (owner: polished edge-to-edge bottom bar).
+        // inset, so the bar's surface still reaches the screen edge (owner: polished edge-to-edge bottom
+        // bar). The Row pads by navigationBars ∪ ime: idle it clears the gesture pill, and when a field
+        // has focus it rides above the keyboard instead of hiding behind it (the two insets are combined,
+        // not stacked, so neither swallows the other).
         Surface(tonalElevation = Dimens.cardElevationHero) {
             Column {
                 HorizontalDivider()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
+                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
