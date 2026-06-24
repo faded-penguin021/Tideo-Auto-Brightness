@@ -42,8 +42,13 @@ When in use, track stages here:
 
 **Blockers:** none.
 
-**New deviations (this work):** none. *(Record durable facts future sessions need; promote
-lasting ones to `../history/DEVIATIONS_LEDGER.md` when curating.)*
+**New deviations (this work):** none.
+
+> Deviation numbering is a **single continuous sequence** shared with the frozen ledger — do
+> **not** restart at D-001. The historical high-water mark is **D-095**, so the next free number
+> is **D-096**; increment from there. Record new deviations here (terse, provenance-stamped);
+> promote durable ones into `../history/DEVIATIONS_LEDGER.md` only when curating, keeping the
+> same number.
 
 ## Changelog
 
