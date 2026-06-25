@@ -26,13 +26,13 @@ decision logic are golden-tested against a transcription of the original Tasker 
 - **Three-zone perceptual brightness curve** with a live, editable graph (low-light √, mid-range
   ∛-ish, high-light asymptotic tail — C0-continuous).
 - **Automatic curve fitting** — enable override detection, adjust brightness by hand during normal
-  use, and after ~9 points across varied lighting the wizard suggests a fitted curve.
+  use, and after >8 points across varied lighting the wizard suggests a fitted curve.
 - **Reactivity control** — per-range dead zones (dark / dim / bright) that kill sensor jitter without
   making the screen sluggish.
 - **Smooth animated transitions** with read-back override detection (drag the system slider and Tideo
   steps aside, then resumes per your rules).
 - **Circadian scaling** synced to local sunrise/sunset (GPS, manual lat/lon, or IP-geolocation
-  fallback) — shifts the whole curve warmer/dimmer across the day.
+  fallback) — shifts the whole curve brighter/dimmer across the day.
 - **Super dimming** (privileged) — drives Android's *Reduce Bright Colors* below the hardware floor,
   plus a PWM-flicker-aware software-dimming mode.
 - **Context automation** — load profiles automatically by foreground app, time window, location,
@@ -51,14 +51,14 @@ decision logic are golden-tested against a transcription of the original Tasker 
   <br>
   <em>The Dashboard: applied brightness (55/255), the raw and smoothed ambient lux feeding it, the
   current circadian multiplier (1.15×), the active profile and context, and the master service
-  toggle — the whole decision, on one screen.</em>
+  toggle — all decisions on one screen.</em>
 </p>
 
 ## How it works
 
 - **Three-zone model.** Brightness is a C0-continuous piecewise function of lux; each zone has its own
   scaling so low light stays sensitive and high light compresses gracefully. The graph below is live
-  and editable — drag the zone scalings and boundaries and watch the curve, the reference, and your
+  and editable — change the zone scaling and boundary values and watch the curve, the reference, and your
   recorded overrides redraw against the current smoothed lux.
 - **Curve fitting.** With override detection on, your manual corrections become training points; the
   wizard fits the three-part function and reports per-zone fit quality.
@@ -72,7 +72,7 @@ decision logic are golden-tested against a transcription of the original Tasker 
   the three zones C0-continuous.</em>
 </p>
 
-- **Event-driven runtime.** The pipeline reacts to state changes (a light step past the dead band, an
+- **Event-driven runtime.** The pipeline reacts to state changes (a light change past the sensor dead zone, an
   app switch, a battery delta, a location drift) rather than polling — easy on the battery.
 - **Context precedence.** When several context rules match, highest priority wins; on a tie, the most
   specific rule wins.
