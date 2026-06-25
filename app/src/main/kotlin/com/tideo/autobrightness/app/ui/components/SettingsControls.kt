@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -250,7 +252,20 @@ fun DraftApplyBar(
 ) {
     val toast = rememberToaster()
     Surface(tonalElevation = 3.dp) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        // Edge-to-edge (targetSdk 35, enforced on Android 15+): this sticky bottomBar draws behind the
+        // system navigation bar, so pad its content up clear of it — otherwise Discard/Apply sit under
+        // the nav bar (worst with 3-button navigation, which is taller than the gesture pill). Unlike
+        // the per-rule editor Dialog (D-098, where the nav-bar inset is never delivered to the dialog
+        // window), this bar lives in the MainActivity window, so navigationBarsPadding() resolves
+        // correctly; it reads 0 on pre-15 non-edge-to-edge windows, so no double padding. imePadding()
+        // lifts the bar above the keyboard while a field is being edited.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
             if (criticalError) {
                 Text(
                     "Fix the highlighted curve error before applying.",

@@ -19,10 +19,12 @@ android {
         // the built commit (the 1.0.0 tag predated it); no app behaviour changed.
         // 1.0.2 (tag v1.0.2) was cut WITHOUT bumping these — the in-app version drifted behind the tag.
         // 1.0.3 (versionCode 5) realigns the version ahead of the latest tag and ships the D-098
-        // rule-editor Save/Cancel fix. RULE: build version must be ≥ the latest `v*` tag on main and
-        // versionCode strictly greater than every released code — see RUNBOOK "Cutting a release".
-        versionCode = 5
-        versionName = "1.0.3"
+        // rule-editor Save/Cancel fix. 1.0.4 (versionCode 6) ships the D-100 main-window nav-bar inset
+        // fix (DraftApplyBar Apply/Discard + Menu "Recheck Permissions" clipped under a button/3-key
+        // nav bar). RULE: build version must be ≥ the latest `v*` tag on main and versionCode strictly
+        // greater than every released code — see RUNBOOK "Cutting a release".
+        versionCode = 6
+        versionName = "1.0.4"
     }
 
     // Release signing is driven entirely by environment variables so that no

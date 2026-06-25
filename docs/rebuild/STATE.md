@@ -47,13 +47,21 @@ When in use, track stages here:
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
 > during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-100** (historical high-water mark D-099); never restart at D-001. A deviation, once
+> **D-101** (historical high-water mark D-100); never restart at D-001. A deviation, once
 > numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-25 — 1.0.4 / `versionCode 6`: (D-100) main-window bottom controls clipped under the nav bar
+  with button/3-key navigation — the draft-settings `DraftApplyBar` (Discard/Apply) and the Menu's
+  final "Recheck Permissions" row drew behind the system nav bar (targetSdk 35 enforces edge-to-edge on
+  Android 15+). Fix: `navigationBarsPadding()` (+`imePadding()` on the bar) on the two spots not covered
+  by an M3 `Scaffold`'s content insets. Unlike D-098's `Dialog` (no bottom inset delivered), these are
+  in the MainActivity window where the inset resolves correctly (0 on pre-15, so no double padding).
+  UI + version only; bottom-inset behavior is owner device-verified (not Robolectric-testable). Added
+  `changelogs/6.txt`. Next free deviation: **D-101**.
 - 2026-06-24 — 1.0.3 / `versionCode 5`: (D-098) rule-editor Save/Cancel STILL clipped after D-097 and a
   follow-up that drove the dialog `Window` edge-to-edge — this Compose `Dialog` never delivers a bottom
   (nav-bar/ime) inset to its content, only the top. Stopped fighting insets: dropped the sticky bottom bar,

@@ -1725,3 +1725,23 @@ the permanent registry — never compress or remove them.
   changelog filename is the **versionCode**; owner still owns tagging. No app behaviour change from the bump
   itself (it ships alongside the D-098 fix).
 
+- **D-100: main-window bottom controls clipped under the nav bar with button/3-key navigation (bug
+  fix; UI only).** Reported on a device using 3-button navigation (taller than the gesture pill): the
+  draft-settings screens' **Discard/Apply** bar and the Menu's final **"Recheck Permissions"** row sat
+  buried under the system navigation bar. Root cause: `targetSdk 35` → Android 15+ **enforces
+  edge-to-edge** (the legacy auto-inset opt-out is gone), so content draws behind the system bars.
+  Most screens are fine because their M3 `Scaffold` feeds the nav-bar inset into the content
+  `PaddingValues` (`SettingsScaffold`, no `bottomBar`) — but two spots didn't: (1) `DraftApplyBar` is a
+  custom `Surface` used as `DraftSettingsScaffold`'s `bottomBar`, and a `Scaffold` does **not** auto-pad
+  a custom bottom bar for the nav bar (M3 nav bars do it themselves; a plain `Surface` must); (2)
+  `MenuContent` is a scaffold-less scrolling `Column` with no inset padding at all. **Fix:** added
+  `navigationBarsPadding()` to both (DraftApplyBar's inner content `Column`, plus `imePadding()` so it
+  rides above the keyboard; MenuContent's inner padded `Column`, inside the scroll so the last row
+  scrolls fully into view). **Why this differs from D-098:** D-097/D-098 were a `Dialog` window, which
+  never delivers the *bottom* (nav-bar/ime) inset to its content — so there scrolling-with-clearance was
+  the only fix. These two live in the **MainActivity window**, where the bottom inset *is* delivered, so
+  `navigationBarsPadding()` resolves correctly; it reads 0 on pre-15 / non-edge-to-edge windows, so
+  there's no double padding. Inset behavior isn't exercisable under Robolectric (zero insets) → owner
+  device-verified; existing `SettingsScreensTest` (Apply/Discard) and `UiShellTest` (`performScrollTo`
+  the recheck row) are the render-regression guard. Ships as 1.0.4 / versionCode 6.
+
