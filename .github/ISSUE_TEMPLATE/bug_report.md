@@ -32,7 +32,7 @@ A clear description of the bug and what you expected instead.
 
 ### Logs / diagnostics
 
-If relevant, enable **Live Debug** (Menu → Live Debug) and paste the readout, or attach a logcat /
+If relevant, enable **Live Debug** (Menu → Live Debug) and observe the readout toasts, or attach a logcat /
 the curve-wizard "Copy full report" output.
 
 ### Notes
