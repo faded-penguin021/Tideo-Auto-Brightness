@@ -1,0 +1,4 @@
+Bug fix: settings screens' Discard / Apply buttons and the Menu's "Recheck
+Permissions" row are no longer clipped under the system navigation bar. The fix
+pads them clear of the bar, so they're fully visible with button (3-key)
+navigation as well as the gesture pill.

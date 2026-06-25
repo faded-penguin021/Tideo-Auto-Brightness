@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -73,10 +74,17 @@ fun MenuContent(
     ) {
         AabMenuBanner()
         Column(
-            modifier = Modifier.padding(
-                horizontal = Dimens.screenPaddingHorizontal,
-                vertical = Dimens.screenPaddingVertical,
-            ),
+            // Edge-to-edge (targetSdk 35, enforced on Android 15+): this hub has no Scaffold to apply
+            // the system-bar inset, so its scrolling content drew under the nav bar — the last row,
+            // "Recheck Permissions", was buried (worst with 3-button navigation). navigationBarsPadding()
+            // sits inside the scroll, giving the final row clearance to scroll fully into view; it reads
+            // 0 on pre-15 non-edge-to-edge windows, so no extra gap there.
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(
+                    horizontal = Dimens.screenPaddingHorizontal,
+                    vertical = Dimens.screenPaddingVertical,
+                ),
             verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing),
         ) {
             // Live status — the former start destination, now reached from the hub.
