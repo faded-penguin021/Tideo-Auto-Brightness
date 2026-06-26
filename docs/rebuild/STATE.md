@@ -41,10 +41,16 @@ alone), then `targetSdk=36` + version bump (Stage 2). On-device Pass A (regressi
 |---|---|---|---|
 | 0 — impact matrix | 2026-06-26 | done | Zero required code changes (matrix below) |
 | 1 — compileSdk=36 | 2026-06-26 | done | ladder green; lint clean (no new findings); 16 KB alignment verified |
-| 2 — targetSdk=36 + ver | 2026-06-26 | in progress | 1.1.0 / versionCode 7 |
-| 3 — auto regression | — | pending | ladder green incl. golden vectors |
-| 4 — on-device A/B | — | pending | owner-verified |
-| 5 — record + RUNBOOK §7 | — | pending | playbook for next bump (37) |
+| 2 — targetSdk=36 + ver | 2026-06-26 | done | 1.1.0 / versionCode 7; Robolectric 4.14.1→4.16.1 (see below) |
+| 3 — auto regression | 2026-06-26 | done | full ladder green under SDK 36 incl. golden vectors |
+| 4 — on-device A/B | — | **pending (owner)** | Pass A/B in the plan; debug APK in `dist/` (temporary) |
+| 5 — record + RUNBOOK §7 | 2026-06-26 | done | RUNBOOK §7 added; playbook for next bump (37) |
+
+**Test-infra change:** Robolectric **4.14.1 → 4.16.1** — 4.14.1 caps at `maxSdkVersion=35`
+and threw `targetSdkVersion=36 > maxSdkVersion=35` once targetSdk flipped. 4.16 is the first
+release with SDK 36 (Baklava) and **requires JDK 21** to run SDK-36 tests (the Gradle JVM here
+is JDK 21, so OK; `sourceCompatibility` stays 17 — that's only bytecode target). Tests had no
+`@Config(sdk=…)` pins, so they auto-run under the manifest targetSdk; no per-suite config needed.
 
 **Android 16 impact matrix** (surfaces this app touches; all dispositions verified against code):
 
@@ -74,6 +80,12 @@ alone), then `targetSdk=36` + version bump (Stage 2). On-device Pass A (regressi
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-26 — 1.1.0 / `versionCode 7`: bumped **targetSdk 35 → 36** (Android 16), `compileSdk`
+  36 in app + platform. Android 16 impact review found zero required code changes (edge-to-edge
+  already enforced via D-097/098/100; back via AndroidX `BackHandler`; transitive native libs
+  already 16 KB-aligned; specialUse FGS property already declared). Robolectric 4.14.1 → 4.16.1
+  (needed for SDK 36; runs on JDK 21). Full ladder green; **on-device Pass A/B owner-pending**.
+  Added `changelogs/7.txt`, RUNBOOK §7 "Bumping targetSdk", temporary `dist/` debug APK.
 - 2026-06-25 — 1.0.4 / `versionCode 6`: (D-100) main-window bottom controls clipped under the nav bar
   with button/3-key navigation — the draft-settings `DraftApplyBar` (Discard/Apply) and the Menu's
   final "Recheck Permissions" row drew behind the system nav bar (targetSdk 35 enforces edge-to-edge on

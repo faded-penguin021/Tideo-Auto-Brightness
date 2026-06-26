@@ -109,6 +109,44 @@ drifted before (the `v1.0.2` tag was cut while `build.gradle.kts` still said `1.
   process, a `DEVIATIONS_LEDGER.md` row.
 - **Tagging stays an owner step** — do not create tags or open releases yourself.
 
+### 7. Bumping `targetSdk` (new Android platform)
+First done 35→36 (Android 16) — see `STATE.md` Changelog and the impact matrix it carried.
+Do it in two reviewable commits; on-device verification is owner-only (no emulator).
+
+- **Read first:** Google's "Behavior changes: Apps targeting Android <N>" + "Behavior
+  changes: all apps" pages. Build an **impact matrix** scoped to *this app's* surfaces only
+  (don't audit the whole OS): specialUse FGS + FGS background-job quotas, ongoing
+  notification + actions, `WRITE_SECURE_SETTINGS`/Settings writes, background location,
+  `PACKAGE_USAGE_STATS`, exported boot receiver, app widget, QS tile, accessibility overlay,
+  edge-to-edge enforcement, predictive back, package visibility `<queries>`, 16 KB page size.
+  Mark each row **no-op / config-only / code change / blocker**; put the matrix in `STATE.md`
+  Active work. Every "code change"/"blocker" row gets a sub-task before flipping targetSdk.
+- **Install the SDK platform** (fresh containers ship only the current one):
+  `sdkmanager "platforms;android-<N>" "build-tools;<N>.0.0"`.
+- **Commit 1 — `compileSdk` only** (keep `targetSdk` one behind). Bump `compileSdk` in
+  `app/build.gradle.kts` **and** `platform/build.gradle.kts`. Run the full ladder. This is
+  forward-compat with no behavior change and is independently shippable if the targetSdk flip
+  later stalls.
+- **Commit 2 — `targetSdk = <N>` + version bump.** Bump `targetSdk` (app only) and the
+  version per §6 (targetSdk is observable behavior → minor bump, e.g. 1.0.x → 1.1.0). Add the
+  `changelogs/<versionCode>.txt`. Address the matrix's code-change rows.
+- **Robolectric tracks the SDK.** Tests have no `@Config(sdk=…)` pins, so they auto-run under
+  the manifest `targetSdk`. Each new platform needs a Robolectric release that supports it
+  (36 → **4.16.1**, which **requires JDK 21** at test runtime — the Gradle JVM, not
+  `sourceCompatibility`). Symptom if too old: `targetSdkVersion=<N> > maxSdkVersion=<N-1>`
+  `IllegalArgumentException` (`initializationError` on every Robolectric class). Bump
+  `robolectric` in `gradle/libs.versions.toml`; the matching `android-all` jar is fetched from
+  Maven on first run.
+- **Native libs / 16 KB page size.** Even with no NDK code, transitive AndroidX libs ship
+  `.so`s (DataStore, graphics-path). Verify 16 KB alignment on the assembled APK:
+  `readelf -lW <lib>.so | grep LOAD` (want `0x4000`) and
+  `build-tools/<N>.0.0/zipalign -c -P 16 -v 4 <apk>`.
+- **Acceptance:** full ladder green, then **owner runs the on-device Pass A (regression) +
+  Pass B (feature-availability) matrices** — the ladder cannot catch "the OS silently stopped
+  delivering us X". Drop a debug APK in `dist/` (temporary, deleted before merge) for sideload.
+- **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
+  If anything here was wrong/stale, fix this section in the same change.
+
 ## Acceptance ladder
 
 Run the relevant subset until green (on-device behavior is owner-verified — no emulator, no KVM):

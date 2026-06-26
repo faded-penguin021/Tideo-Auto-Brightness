@@ -12,7 +12,7 @@ android {
     defaultConfig {
         applicationId = "com.tideo.autobrightness"
         minSdk = 31
-        targetSdk = 35
+        targetSdk = 36
         // 1.0.0 (versionCode 3) — all three human gates passed on-device (Gate 3 signed off
         // 2026-06-23); feature-complete, parity-verified release build. 1.0.1 (versionCode 4) is a
         // packaging-only bump so the release tag carries the fastlane/ metadata F-Droid reads from
@@ -21,10 +21,11 @@ android {
         // 1.0.3 (versionCode 5) realigns the version ahead of the latest tag and ships the D-098
         // rule-editor Save/Cancel fix. 1.0.4 (versionCode 6) ships the D-100 main-window nav-bar inset
         // fix (DraftApplyBar Apply/Discard + Menu "Recheck Permissions" clipped under a button/3-key
-        // nav bar). RULE: build version must be ≥ the latest `v*` tag on main and versionCode strictly
-        // greater than every released code — see RUNBOOK "Cutting a release".
-        versionCode = 6
-        versionName = "1.0.4"
+        // nav bar). 1.1.0 (versionCode 7) bumps targetSdk to 36 (Android 16). RULE: build version must be
+        // ≥ the latest `v*` tag on main and versionCode strictly greater than every released code — see
+        // RUNBOOK "Cutting a release".
+        versionCode = 7
+        versionName = "1.1.0"
     }
 
     // Release signing is driven entirely by environment variables so that no
