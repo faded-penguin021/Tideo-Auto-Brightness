@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.tideo.autobrightness.platform"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 31

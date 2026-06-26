@@ -32,17 +32,37 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 ## Active work
 
-*(none — base state. Populate this section only while a change needs multiple stages; clear it
-to a Changelog line on completion.)*
-
-When in use, track stages here:
+**targetSdk 35 → 36 bump** (Android 16). Owner's phone is on Android 16, making the bump
+on-device verifiable for the first time. Plan: `compileSdk=36` first (Stage 1, shippable
+alone), then `targetSdk=36` + version bump (Stage 2). On-device Pass A (regression) + Pass B
+(feature-availability) are owner-verified.
 
 | Stage | Date | Status | Notes |
 |---|---|---|---|
+| 0 — impact matrix | 2026-06-26 | done | Zero required code changes (matrix below) |
+| 1 — compileSdk=36 | 2026-06-26 | done | ladder green; lint clean (no new findings); 16 KB alignment verified |
+| 2 — targetSdk=36 + ver | 2026-06-26 | in progress | 1.1.0 / versionCode 7 |
+| 3 — auto regression | — | pending | ladder green incl. golden vectors |
+| 4 — on-device A/B | — | pending | owner-verified |
+| 5 — record + RUNBOOK §7 | — | pending | playbook for next bump (37) |
+
+**Android 16 impact matrix** (surfaces this app touches; all dispositions verified against code):
+
+| Surface | A16 change | Disposition |
+|---|---|---|
+| Edge-to-edge | opt-out fully disabled | no-op — never opted out; D-097/098/100 already adapted |
+| Predictive back | on by default, `onBackPressed()` dead | no-op — only AndroidX `BackHandler` (predictive-native), no override |
+| specialUse FGS | `<property>` + Play review | no-op — property declared; review is Play-only (we ship F-Droid) |
+| FGS bg-job quotas | jobs obey runtime quota | no-op — one 15-min periodic `MaintenanceWorker`, WorkManager-managed |
+| Local network perm | opt-in for raw sockets/mDNS | no-op — geo-IP is remote HTTP; SSID via Shizuku/dumpsys, no sockets |
+| Adaptive layouts ≥600dp | orientation attrs ignored | no-op — no `screenOrientation` set |
+| 16 KB page size | native libs must be 16 KB-aligned | no-op — transitive libs present (`libdatastore_shared_counter`, `libandroidx.graphics.path`) but all ELF LOAD + zip-aligned to 0x4000, verified at Stage 1 |
+| Secure/System writes | (no A16 change) | no-op — owner-verify (Pass B) |
+| Boot/notif/tile/widget | (no A16 targeting change) | no-op — owner-verify (Pass A) |
 
 **Blockers:** none.
 
-**New deviations (this work):** none.
+**New deviations (this work):** none yet (only if Android 16 forces a workaround → D-101).
 
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note

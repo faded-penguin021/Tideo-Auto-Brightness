@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.tideo.autobrightness"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.tideo.autobrightness"
