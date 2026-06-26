@@ -86,6 +86,9 @@ One line per shipped change (newest first). Keep terse.
   already 16 KB-aligned; specialUse FGS property already declared). Robolectric 4.14.1 → 4.16.1
   (needed for SDK 36; runs on JDK 21). Full ladder green; **on-device Pass A/B owner-pending**.
   Added `changelogs/7.txt`, RUNBOOK §7 "Bumping targetSdk", temporary `dist/` debug APK.
+  Debug build type now carries `applicationIdSuffix=".debug"` (+ `-debug` versionName, "Tideo
+  AB (Debug)" label) so a debug build coexists with the stable signed release without sharing
+  data; Shizuku provider authority is now `${applicationId}.shizuku` to follow the suffix.
 - 2026-06-25 — 1.0.4 / `versionCode 6`: (D-100) main-window bottom controls clipped under the nav bar
   with button/3-key navigation — the draft-settings `DraftApplyBar` (Discard/Apply) and the Menu's
   final "Recheck Permissions" row drew behind the system nav bar (targetSdk 35 enforces edge-to-edge on

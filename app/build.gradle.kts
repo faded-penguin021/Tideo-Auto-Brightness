@@ -26,6 +26,7 @@ android {
         // RUNBOOK "Cutting a release".
         versionCode = 7
         versionName = "1.1.0"
+        manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 
     // Release signing is driven entirely by environment variables so that no
@@ -52,6 +53,15 @@ android {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
+        }
+        getByName("debug") {
+            // Distinct applicationId so a debug build installs alongside the stable signed
+            // release without clobbering its data (profiles, context rules). The Shizuku
+            // provider authority is ${applicationId}.shizuku in the manifest, so it follows
+            // the suffix and the two packages don't conflict on install.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "Tideo AB (Debug)"
         }
     }
 
