@@ -40,10 +40,13 @@ adb install -r dist/tideo-auto-brightness-1.1.0-targetSdk36-debug.apk
 ## Findings investigated and NOT changed (with why)
 
 - **Did not start on reboot** — not the SDK bump. `specialUse` FGS is allowed from BOOT_COMPLETED
-  on both Android 15 and 16; the boot code is correct. Most likely Samsung's auto-start/battery
-  restriction on a freshly sideloaded package (your stable app earned that standing over time).
-  Check: Settings → Apps → "Tideo AB (Debug)" → Battery → **Allow background activity** /
-  unrestricted, and any Samsung "Auto-launch" toggle. Also confirm the service was enabled in the
+  on both Android 15 and 16; the boot code is correct. Most likely OnePlus/OxygenOS auto-start +
+  battery restriction on a freshly sideloaded package (OxygenOS is among the most aggressive OEMs at
+  killing background apps; the stable app earned its standing over time). Checks for "Tideo AB
+  (Debug)": Settings → Apps → app → Battery → **Allow background activity** + **Unrestricted**;
+  Settings → Battery → Battery optimization → **Don't optimize**; enable **Auto-launch / allow
+  auto-launch** (the BOOT_COMPLETED governor on OnePlus); exclude it from **Sleep standby /
+  Deep optimization**; optionally **lock it in Recents**. Also confirm the service was enabled in the
   debug app before rebooting.
 - **Circadian "noon @ 12"** — not a bug. The graph x-axis is UTC and falls back to longitude 0
   (solar noon ≈ 12:00 UTC) when it has no location fix. Grant Location to the debug app (or pin a
