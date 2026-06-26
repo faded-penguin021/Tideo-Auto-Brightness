@@ -29,6 +29,34 @@ adb install -r dist/tideo-auto-brightness-1.1.0-targetSdk36-debug.apk
 - Shizuku authority is `com.tideo.autobrightness.debug.shizuku` (isolated; no conflict).
 - Both apps may show a QS tile / widget with the same name — that's cosmetic only.
 
+## Fixes bundled in this build (beyond the bare targetSdk bump)
+
+- **Curve wizard now auto-copies %AAB_Test to the clipboard** on every successful run (Tasker
+  task38 act13 parity), and the action buttons now wrap so **"Copy full report" is reachable**
+  (it was pushed off-screen before). (D-102)
+- **Super-dimming / PWM threshold range raised 0..100 → 0..255** so dimming can engage above
+  brightness 100, matching the uncapped Tasker field. (D-101)
+
+## Findings investigated and NOT changed (with why)
+
+- **Did not start on reboot** — not the SDK bump. `specialUse` FGS is allowed from BOOT_COMPLETED
+  on both Android 15 and 16; the boot code is correct. Most likely Samsung's auto-start/battery
+  restriction on a freshly sideloaded package (your stable app earned that standing over time).
+  Check: Settings → Apps → "Tideo AB (Debug)" → Battery → **Allow background activity** /
+  unrestricted, and any Samsung "Auto-launch" toggle. Also confirm the service was enabled in the
+  debug app before rebooting.
+- **Circadian "noon @ 12"** — not a bug. The graph x-axis is UTC and falls back to longitude 0
+  (solar noon ≈ 12:00 UTC) when it has no location fix. Grant Location to the debug app (or pin a
+  fixed lat/lon on the Circadian screen) and the noon marker moves to true solar noon.
+- **Circadian scale uses defaults on screen-on (1.14 vs 1.15)** — confirmed real parity gap
+  (D-103, OPEN): the once-a-day location isn't persisted across process restarts, so a cold start
+  uses TimeContext defaults until re-acquired. Recommended fix tracked for a focused follow-up.
+- **Override scaling (unscale + clamp 255)** — verified already ported (OverrideRules, task561).
+- **Export location** — exported profiles go wherever you pick in the system "Create document"
+  dialog (e.g. Downloads), as a `.json`; Import reads it back. That's the round-trip.
+- **Dawn/sunrise & dusk/sunset label overlap** — deferred (D-104): the fix lives in the
+  fenced chart engine; minor cosmetic, not worth breaching the fence here.
+
 ## TODO — on-device acceptance (owner)
 
 Automated ladder is green under SDK 36; the OS-behavior checks below can't be covered by

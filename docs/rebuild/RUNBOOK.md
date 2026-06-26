@@ -99,10 +99,19 @@ drifted before (the `v1.0.2` tag was cut while `build.gradle.kts` still said `1.
   ```
 - **Invariant — the build must never ship behind a tag.** Any change destined for a new release
   must set, in `app/build.gradle.kts`:
-  - `versionName` ≥ the latest `v*` tag (use the next patch, e.g. latest tag `v1.0.2` → `1.0.3`);
+  - `versionName` ≥ the latest `v*` tag, bumped by **semantic versioning** — decide the field by the
+    *nature* of the change, do not reflexively bump patch:
+    - **patch** (`x.y.Z`) — bug fixes, doc/packaging, internal refactors; no user-visible behavior
+      or capability change (e.g. D-098 Save/Cancel clip fix → `1.0.3`).
+    - **minor** (`x.Y.0`) — new user-facing feature, a new setting/range, or **observable platform
+      behavior** such as a `targetSdk` bump (e.g. targetSdk 35→36 → `1.1.0`). Reset patch to 0.
+    - **major** (`X.0.0`) — a breaking change: a settings-schema migration that can't round-trip, a
+      dropped feature, a minSdk raise that strands devices, or any change that invalidates a user's
+      existing profiles/config. Reset minor and patch to 0.
+    - When a change spans categories, pick the **highest** that applies.
   - `versionCode` **strictly greater than every released code** (monotonic; F-Droid rejects a
     re-used code). Bump by 1 from the highest code ever shipped, not from the last tag's code if
-    that tag forgot to bump.
+    that tag forgot to bump. (versionCode is always +1 regardless of which semver field moved.)
 - **F-Droid changelog:** add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the
   filename is the **versionCode**, not the name) with a short user-facing note.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
@@ -158,6 +167,34 @@ Run the relevant subset until green (on-device behavior is owner-verified — no
 ./gradlew :app:assembleDebug      # APK
 ./gradlew :app:lintDebug          # lint vs frozen baseline
 ```
+
+## When CI fails on a PR (workflow vs code)
+
+The local ladder (above) and CI (`.github/workflows/build.yml`) run the *same* Gradle tasks, so a
+green local tree usually means green CI. When CI is red but local is green, the failure is in the
+**environment/workflow**, not your code — diagnose before "fixing tests". Triage in this order:
+
+1. **Read the failing step's log** — distinguish the three kinds:
+   - **Real failure** (a test assertion, a lint finding, a compile error): reproduce locally with the
+     exact failing task and fix the *code* (playbooks 1–5). This is the common case; trust it.
+   - **Toolchain/environment mismatch** (CI runner differs from local): the symptom is a failure that
+     does **not** reproduce locally. Fix the *workflow*, not the code. Known examples:
+     - **JDK version** — Robolectric 4.16+ needs **JDK 21** to run SDK-36 tests; all workflows pin
+       `java-version: '21'`. A `setup-java@v5` with 17 throws `initializationError` /
+       `targetSdkVersion > maxSdkVersion` only in CI. Bump the workflow JDK in lockstep with any
+       Robolectric/targetSdk change (RUNBOOK §7).
+     - **SDK/build-tools** — CI relies on AGP fetching the compile SDK on demand; a new `compileSdk`
+       just works, but a new build-tools requirement may need a `setup-android` tweak.
+   - **Flake** (network blip, cache corruption, runner OOM, `actions/*` outage): non-deterministic,
+     unrelated to the diff. Re-run the job once. If it passes, it was a flake — note it and move on;
+     do **not** "fix" code for a flake. If it recurs, treat it as an environment issue and harden the
+     workflow (pin the action version, add a retry, drop a poisoned cache key).
+2. **Changing a workflow is in scope** when the failure is environmental — workflows are code; fix
+   `.github/workflows/*` in the same PR as the change that needs it (don't disable a check to get
+   green). **Never** weaken a gate (skip tests, drop `abortOnError`, `continue-on-error`) to pass CI.
+3. **If a failure is real but out of scope** (a pre-existing flake in an unrelated suite, an upstream
+   action breakage you can't fix), say so in the PR with the log excerpt and where you're stuck —
+   don't silently retry forever.
 
 ## Self-adaptation — keep this runbook useful
 

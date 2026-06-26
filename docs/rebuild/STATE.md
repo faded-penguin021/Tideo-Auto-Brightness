@@ -68,7 +68,15 @@ is JDK 21, so OK; `sourceCompatibility` stays 17 — that's only bytecode target
 
 **Blockers:** none.
 
-**New deviations (this work):** none yet (only if Android 16 forces a workaround → D-101).
+**Owner test-pass findings (folded into 1.1.0):** D-101 dimming/PWM threshold range 0..100→0..255;
+D-102 curve wizard auto-copies %AAB_Test + button row wraps (FlowRow). D-103 (circadian once-a-day
+location not persisted → cold-start defaults) and D-104 (graph label overlap, chart-engine fenced)
+logged OPEN for focused follow-ups. Not-bugs: reboot (Samsung sideload auto-start, not the bump),
+solar-noon "@12" (no-location UTC fallback), override unscale+clamp255 (already ported, task561),
+export goes to the SAF-chosen location. Added CI `codeql.yml` (java-kotlin, build-mode none); bumped
+CI JDK 17→21 (Robolectric 4.16 needs it); RUNBOOK gained semver guidance (§6) + a CI-failure protocol.
+
+**New deviations (this work):** D-101, D-102 (fixed); D-103, D-104 (open). Next free: **D-105**.
 
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
@@ -89,6 +97,9 @@ One line per shipped change (newest first). Keep terse.
   Debug build type now carries `applicationIdSuffix=".debug"` (+ `-debug` versionName, "Tideo
   AB (Debug)" label) so a debug build coexists with the stable signed release without sharing
   data; Shizuku provider authority is now `${applicationId}.shizuku` to follow the suffix.
+  Owner test-pass fixes folded in: D-101 (dimming/PWM threshold 0..100→0..255), D-102 (curve
+  wizard auto-copies %AAB_Test + FlowRow button wrap). CI JDK 17→21 (Robolectric 4.16); added
+  `codeql.yml`; RUNBOOK semver guidance + CI-failure protocol. D-103/D-104 logged OPEN.
 - 2026-06-25 — 1.0.4 / `versionCode 6`: (D-100) main-window bottom controls clipped under the nav bar
   with button/3-key navigation — the draft-settings `DraftApplyBar` (Discard/Apply) and the Menu's
   final "Recheck Permissions" row drew behind the system nav bar (targetSdk 35 enforces edge-to-edge on

@@ -1745,3 +1745,45 @@ the permanent registry — never compress or remove them.
   device-verified; existing `SettingsScreensTest` (Apply/Discard) and `UiShellTest` (`performScrollTo`
   the recheck row) are the render-regression guard. Ships as 1.0.4 / versionCode 6.
 
+- **D-101: super-dimming/PWM threshold was clamped to 0..100 instead of the 0..255 brightness range
+  (bug fix; app settings).** `%AAB_DimmingThreshold` is a *brightness level* — super dimming engages
+  when `targetBrightness < dimmingThreshold` — so it spans the full 0..255 brightness domain like
+  `min`/`maxBrightness`. The rebuild's `AabSettingsMapper.validate()` clamped it
+  `coerceIn(0, 100)` (and `AabSettingsContract` documented "range 0..100"), an artifact with no Tasker
+  basis: `superdimming_settings.md` elements36 is an **uncapped numeric** EditText. Effect: a user
+  could not set the threshold above 100, so dimming could never be configured to engage in the
+  100–255 band (owner finding). **Fix:** `dimmingThreshold.coerceIn(0, 255)` + rule string
+  "range 0..255". No test pinned 100 (all fixtures ≤40); the `< minBrightness` advisory is unchanged.
+  Ships in 1.1.0. (Affects the Super Dimming threshold row in `PARITY_CHECKLIST.md`.)
+
+- **D-102: curve wizard did not auto-copy %AAB_Test to clipboard, and its "Copy full report" button
+  was off-screen (bug fix; UI only).** Tasker `task38 act13` is code 105 (Set Clipboard,
+  `arg0=%AAB_Test`): every successful wizard run copies the diagnostics to the clipboard. The rebuild
+  only copied on an explicit "Copy full report" button — *and* that button was the third in a fixed
+  `Row`, so on narrower screens it was pushed off-screen (owner saw only Apply + Preview), making the
+  feature look absent. **Fix (`ToolsScreen.kt`):** (1) auto-copy `r.diagnosticsLog` to the clipboard on
+  a successful run with a toast (mirrors act13); (2) switch the action `Row` → `FlowRow` so all three
+  buttons wrap and the copy button is always reachable. Ships in 1.1.0.
+
+- **D-103 ⭐ OPEN: circadian once-a-day location is not persisted → cold start uses TimeContext
+  defaults instead of the cached location (parity gap; runtime).** Tasker persisted the daily-resolved
+  location (`%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`), so a service/process restart reused it
+  until the day rolled over. The rebuild's `CircadianWindowProvider` holds it in `@Volatile` in-memory
+  fields only (`resolvedLoc`/`resolvedDay`); on a cold start (process death, service restart after
+  screen-on) it is null, so `current()` returns null and the pipeline falls back to the fixed
+  6–8/18–20 UTC `TimeContext` defaults until the async re-acquire lands — then self-corrects on the
+  next cycle (owner: scale 1.14 instead of 1.15 at 09:31 CEST on screen-on, corrects on first
+  significant light reading). **Recommended fix (deferred — needs its own DataStore field + test):**
+  persist `resolvedLoc`+`resolvedDay` (and ideally the last computed windows) and load them in `init`,
+  so `current()` returns the cached location immediately on cold start and only re-acquires when the
+  day rolls over — matching Tasker's `%AAB_SunLastDate` behavior. Not fixed in 1.1.0 to keep the
+  targetSdk-bump change set focused; tracked here for a dedicated follow-up.
+
+- **D-104 ⭐ OPEN (minor, deferred): circadian graph dawn/sunrise and dusk/sunset event labels can
+  overlap (cosmetic; chart engine).** The five vertical event-line labels in `ChartCanvas` are all
+  parked at the same top position, so when two events are close in x (dawn↔sunrise, dusk↔sunset) their
+  rotated labels overlap. A proper fix is generic label-collision avoidance in the marker renderer, but
+  `ChartCanvas.kt` carries the S13 **hard fence** ("forbids modifying this file"). Deferred rather than
+  breach the fence for a cosmetic issue the owner rated "very minor"; the proper path is a sanctioned
+  lift of that fence to add generic label declutter to the engine.
+

@@ -1,0 +1,48 @@
+name: CodeQL
+
+# Static security analysis for the Kotlin/Java sources. Justified by the app's privileged surface:
+# it holds WRITE_SECURE_SETTINGS, executes shell commands through a Shizuku user service
+# (`cmd wifi status`, `pm grant`), makes a cleartext geo-IP HTTP request (ip-api.com), and ships an
+# AccessibilityService. CodeQL's java-kotlin queries flag command injection, cleartext traffic,
+# path traversal, and similar — exactly this attack surface.
+#
+# build-mode: none — CodeQL analyses the sources directly (no Gradle/Android build), which avoids the
+# flaky "build an Android app inside CodeQL" autobuild and keeps CI cheap. If deeper dataflow coverage
+# is ever needed, switch to build-mode: manual and run `./gradlew :app:assembleDebug` before analyze.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly (Mon 06:00 UTC) so newly-published queries re-scan a quiet main.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write  # upload results to the Security tab
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"

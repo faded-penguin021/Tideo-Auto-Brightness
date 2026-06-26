@@ -5,7 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -279,6 +280,7 @@ fun ToolsContent(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class) // FlowRow (button row that wraps on narrow screens)
 @Composable
 private fun WizardCard(
     recorded: List<OverridePoint>,
@@ -328,6 +330,13 @@ private fun WizardCard(
                         val r = onRunWizard(recorded, tau.toDouble())
                         result = r
                         message = if (r == null) "Could not fit a curve to the recorded points." else null
+                        // Tasker: task38 "_SuggestCurveParameters" act13 code105 (Set Clipboard, arg0=%AAB_Test)
+                        // — every successful run copies the %AAB_Test diagnostics to the clipboard, not just
+                        // the manual "Copy full report" button below. Mirror that auto-copy here.
+                        if (r != null) {
+                            clipboard.setText(AnnotatedString(r.diagnosticsLog.trim()))
+                            toast("Diagnostics copied to clipboard (%AAB_Test)")
+                        }
                     }
                 },
                 modifier = Modifier.testTag("run_wizard"),
@@ -347,7 +356,12 @@ private fun WizardCard(
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // FlowRow so all three actions wrap onto the next line on narrow screens — in a fixed Row
+                // the third button ("Copy full report") was pushed off-screen and looked missing (owner).
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     OutlinedButton(
                         onClick = { onApplyWizard(r); toast("Suggestion applied") },
                         modifier = Modifier.testTag("apply_wizard"),
@@ -359,6 +373,7 @@ private fun WizardCard(
                         modifier = Modifier.testTag("preview_graph"),
                     ) { Text("Preview graph") }
                     // %AAB_Test diagnostics → clipboard (D-025, G2-F15): copy the FULL verbose report.
+                    // (The wizard also auto-copies on a successful run — task38 act13 code105.)
                     OutlinedButton(
                         onClick = {
                             clipboard.setText(AnnotatedString(r.diagnosticsLog.trim()))
