@@ -36,14 +36,16 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
     }
 
     /**
-     * G3-F12 (Gate 3 — privacy): whether the IP-geolocation fallback (`ip-api.com`, cleartext HTTP) may
+     * G3-F12 / D-105 (privacy): whether the IP-geolocation fallback (`ip-api.com`, cleartext HTTP) may
      * run as the LAST resort when no Android location fix is available and no fixed lat/lon is pinned
-     * (task90 act28). Default **on** (Tasker parity), but a privacy-conscious user can turn it off so
-     * the app never contacts ip-api.com — circadian then simply waits for an on-device fix.
+     * (task90 act28). Default **off — opt-in** (D-105): a cleartext request to a third party is not
+     * made unless the user explicitly enables it. (Tasker called ip-api.com unconditionally; the toggle
+     * itself was already a deviation, G3-F12 — D-105 only flips its default from on to off.) When off,
+     * the app never contacts ip-api.com — circadian simply waits for an on-device fix.
      */
-    val geoIpEnabled: Flow<Boolean> = dataStore.data.map { it[GEO_IP] ?: true }
+    val geoIpEnabled: Flow<Boolean> = dataStore.data.map { it[GEO_IP] ?: false }
 
-    /** Opt out of (or back into) the ip-api.com geo-IP location fallback (G3-F12). */
+    /** Opt in to (or back out of) the ip-api.com geo-IP location fallback (G3-F12 / D-105). */
     suspend fun setGeoIpEnabled(enabled: Boolean) {
         dataStore.edit { it[GEO_IP] = enabled }
     }

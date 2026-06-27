@@ -76,7 +76,8 @@ solar-noon "@12" (no-location UTC fallback), override unscale+clamp255 (already 
 export goes to the SAF-chosen location. Added CI `codeql.yml` (java-kotlin, build-mode none); bumped
 CI JDK 17→21 (Robolectric 4.16 needs it); RUNBOOK gained semver guidance (§6) + a CI-failure protocol.
 
-**New deviations (this work):** D-101, D-102 (fixed); D-103, D-104 (open). Next free: **D-105**.
+**New deviations (this work):** D-101, D-102, D-105 (fixed/applied); D-103, D-104 (open). D-105 =
+ip-api.com geo-IP fallback flipped to opt-in (default off). Next free: **D-106**.
 
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note

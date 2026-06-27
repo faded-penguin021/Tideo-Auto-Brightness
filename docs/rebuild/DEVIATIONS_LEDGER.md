@@ -1787,3 +1787,17 @@ the permanent registry — never compress or remove them.
   breach the fence for a cosmetic issue the owner rated "very minor"; the proper path is a sanctioned
   lift of that fence to add generic label declutter to the engine.
 
+- **D-105: ip-api.com geo-IP fallback is now opt-IN (default off), was opt-out (default on)
+  (privacy; further deviation from Tasker).** The circadian location chain's last resort is a
+  **cleartext HTTP** request to a third party (ip-api.com, task90 act28). Tasker called it
+  unconditionally; the 1.0 rebuild added a toggle but defaulted it **on** (G3-F12, opt-out). Owner
+  decision: a cleartext third-party network call should not happen unless the user explicitly enables
+  it — flipped the default to **off** (`ExperimentPrefsStore.geoIpEnabled` `?: false`,
+  `CircadianExtrasViewModel` stateIn initial `false`, composable defaults `false`, switch help reworded
+  to opt-in). Runtime gate in `AppModule` (`if (geoIpEnabled.first()) …`) is unchanged — flipping the
+  default is sufficient. Effect on existing installs: anyone who never toggled it (still on the default)
+  stops contacting ip-api.com after update — the safe direction for a privacy change (no surprise data
+  egress; a user who relied on it re-enables it on the Circadian screen). No test pinned the default
+  (provider tests inject `geoIpFallback` directly). Ships in 1.1.0. Aligns with the new CodeQL scan's
+  cleartext-traffic concern.
+
