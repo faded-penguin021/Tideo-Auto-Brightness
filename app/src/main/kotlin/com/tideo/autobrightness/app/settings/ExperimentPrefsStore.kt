@@ -5,8 +5,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
@@ -63,6 +65,29 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    /**
+     * D-103: the once-a-day resolved location (Android fix or geo-IP), persisted so a cold start
+     * (process death / service restart after screen-on) reuses it immediately instead of falling back
+     * to the fixed `TimeContext` defaults until the async re-acquire lands. Mirrors Tasker's persisted
+     * `%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`. [day] is epoch-days the fix was acquired for.
+     */
+    suspend fun readCachedSunLocation(): CachedSunLocation? {
+        val prefs = dataStore.data.first()
+        val lat = prefs[SUN_LAT] ?: return null
+        val lon = prefs[SUN_LON] ?: return null
+        val day = prefs[SUN_DAY] ?: return null
+        return CachedSunLocation(lat, lon, day)
+    }
+
+    /** Persist the daily-resolved location (D-103). */
+    suspend fun writeCachedSunLocation(latitude: Double, longitude: Double, day: Long) {
+        dataStore.edit { prefs ->
+            prefs[SUN_LAT] = latitude
+            prefs[SUN_LON] = longitude
+            prefs[SUN_DAY] = day
+        }
+    }
+
     /** Revert to live data (today + current location) — mirrors `_ExperimentClearDate`. */
     suspend fun clear() {
         dataStore.edit { prefs ->
@@ -77,5 +102,12 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         val LAT = doublePreferencesKey("experiment_lat")
         val LON = doublePreferencesKey("experiment_lon")
         val GEO_IP = booleanPreferencesKey("geo_ip_fallback_enabled")
+        // D-103: persisted once-a-day resolved location.
+        val SUN_LAT = doublePreferencesKey("sun_cached_lat")
+        val SUN_LON = doublePreferencesKey("sun_cached_lon")
+        val SUN_DAY = longPreferencesKey("sun_cached_day")
     }
 }
+
+/** D-103: a persisted daily-resolved location (epoch-[day] it was acquired for). */
+data class CachedSunLocation(val latitude: Double, val longitude: Double, val day: Long)

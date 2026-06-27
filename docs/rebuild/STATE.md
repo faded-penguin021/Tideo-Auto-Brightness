@@ -76,8 +76,9 @@ solar-noon "@12" (no-location UTC fallback), override unscale+clamp255 (already 
 export goes to the SAF-chosen location. Added CI `codeql.yml` (java-kotlin, build-mode none); bumped
 CI JDK 17→21 (Robolectric 4.16 needs it); RUNBOOK gained semver guidance (§6) + a CI-failure protocol.
 
-**New deviations (this work):** D-101, D-102, D-105 (fixed/applied); D-103, D-104 (open). D-105 =
-ip-api.com geo-IP fallback flipped to opt-in (default off). Next free: **D-106**.
+**New deviations (this work):** D-101 (PWM threshold 0..255), D-102 (wizard clipboard+FlowRow),
+D-103 (circadian location persisted across restarts), D-104 (chart label declutter + landscape height
+cap/scroll), D-105 (geo-IP opt-in) — all fixed in 1.1.0. Next free: **D-106**.
 
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note

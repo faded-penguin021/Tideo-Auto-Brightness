@@ -96,6 +96,10 @@ class AppModule(context: Context) {
             // D-105 (privacy): gated on the user's opt-IN (default off) — the app contacts ip-api.com
             // only when the user has explicitly enabled the fallback.
             geoIpFallback = { if (experimentPrefs.geoIpEnabled.first()) geoIpClient.resolve() else null },
+            // D-103: persist/restore the once-a-day resolved location so a cold start reuses it
+            // instead of falling back to TimeContext defaults until re-acquired (Tasker %AAB_SunLat/…).
+            loadCachedLocation = { experimentPrefs.readCachedSunLocation() },
+            persistLocation = { lat, lon, day -> experimentPrefs.writeCachedSunLocation(lat, lon, day) },
         )
 
         val controller = BrightnessPipelineController(

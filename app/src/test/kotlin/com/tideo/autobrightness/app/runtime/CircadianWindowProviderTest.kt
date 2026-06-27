@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.runtime
 
+import com.tideo.autobrightness.app.settings.CachedSunLocation
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
 import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
@@ -215,6 +216,54 @@ class CircadianWindowProviderTest {
             tzOffsetForDate = { 2.0 },
         )
         assertNull(provider.current(transitionFactor), "no fix anywhere → null → pipeline keeps default windows")
+        scope.cancel()
+    }
+
+    // ----- D-103: persist/restore the once-a-day location across process restarts -----
+
+    @Test
+    fun persistedLocation_isUsedOnColdStart_D103() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val loc = FakeLocationReader() // no live fix available this session
+        var geoIpCalled = false
+        val today = midJuneEpochSec() / 86_400L
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = loc,
+            geoIpFallback = { geoIpCalled = true; null },
+            // a persisted fix for TODAY (Tasker %AAB_SunLat/Lon + %AAB_SunLastDate)
+            loadCachedLocation = { CachedSunLocation(lat, lon, today) },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        val w = provider.current(transitionFactor)
+        assertNotNull(w, "a persisted location must produce windows on cold start instead of null/defaults (D-103)")
+        assertEquals(CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor), w)
+        assertFalse(geoIpCalled, "a persisted fix for today must not trigger a network re-acquire")
+        assertFalse(loc.lastKnownCalled, "a persisted fix for today must not consult Android location")
+        scope.cancel()
+    }
+
+    @Test
+    fun acquiredLocation_isPersisted_D103() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        var saved: Triple<Double, Double, Long>? = null
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(), // no Android fix → geo-IP path
+            geoIpFallback = { LocationSnapshot(lat, lon) },
+            persistLocation = { la, lo, day -> saved = Triple(la, lo, day) },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        provider.current(transitionFactor) // triggers the (inline, Unconfined) acquire
+        assertEquals(
+            Triple(lat, lon, midJuneEpochSec() / 86_400L),
+            saved,
+            "a freshly acquired location must be persisted for the next cold start (D-103)",
+        )
         scope.cancel()
     }
 

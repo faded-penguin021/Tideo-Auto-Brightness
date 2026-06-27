@@ -36,6 +36,14 @@ adb install -r dist/tideo-auto-brightness-1.1.0-targetSdk36-debug.apk
   (it was pushed off-screen before). (D-102)
 - **Super-dimming / PWM threshold range raised 0..100 → 0..255** so dimming can engage above
   brightness 100, matching the uncapped Tasker field. (D-101)
+- **Circadian location now persists across restarts** (D-103) — fixes the screen-on 1.14-vs-1.15:
+  a cold start reuses the cached location immediately instead of falling back to defaults until
+  re-acquired (matches Tasker's %AAB_SunLat/Lon/LastDate).
+- **Landscape graphs no longer block scrolling** (D-104) — charts are capped shorter in landscape
+  and vertical drags now scroll past them (only horizontal drags scrub). Also fixes the
+  dawn/sunrise & dusk/sunset **label overlap** (labels stagger when close).
+- **ip-api.com geo-IP fallback is now opt-IN** (default off) — privacy hardening (D-105). If you
+  rely on it (no GPS/network fix), enable it on the Circadian screen.
 
 ## Findings investigated and NOT changed (with why)
 
@@ -51,14 +59,9 @@ adb install -r dist/tideo-auto-brightness-1.1.0-targetSdk36-debug.apk
 - **Circadian "noon @ 12"** — not a bug. The graph x-axis is UTC and falls back to longitude 0
   (solar noon ≈ 12:00 UTC) when it has no location fix. Grant Location to the debug app (or pin a
   fixed lat/lon on the Circadian screen) and the noon marker moves to true solar noon.
-- **Circadian scale uses defaults on screen-on (1.14 vs 1.15)** — confirmed real parity gap
-  (D-103, OPEN): the once-a-day location isn't persisted across process restarts, so a cold start
-  uses TimeContext defaults until re-acquired. Recommended fix tracked for a focused follow-up.
 - **Override scaling (unscale + clamp 255)** — verified already ported (OverrideRules, task561).
 - **Export location** — exported profiles go wherever you pick in the system "Create document"
   dialog (e.g. Downloads), as a `.json`; Import reads it back. That's the round-trip.
-- **Dawn/sunrise & dusk/sunset label overlap** — deferred (D-104): the fix lives in the
-  fenced chart engine; minor cosmetic, not worth breaching the fence here.
 
 ## TODO — on-device acceptance (owner)
 

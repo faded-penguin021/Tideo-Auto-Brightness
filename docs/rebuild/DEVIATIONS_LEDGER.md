@@ -1765,27 +1765,34 @@ the permanent registry — never compress or remove them.
   a successful run with a toast (mirrors act13); (2) switch the action `Row` → `FlowRow` so all three
   buttons wrap and the copy button is always reachable. Ships in 1.1.0.
 
-- **D-103 ⭐ OPEN: circadian once-a-day location is not persisted → cold start uses TimeContext
-  defaults instead of the cached location (parity gap; runtime).** Tasker persisted the daily-resolved
-  location (`%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`), so a service/process restart reused it
-  until the day rolled over. The rebuild's `CircadianWindowProvider` holds it in `@Volatile` in-memory
-  fields only (`resolvedLoc`/`resolvedDay`); on a cold start (process death, service restart after
-  screen-on) it is null, so `current()` returns null and the pipeline falls back to the fixed
-  6–8/18–20 UTC `TimeContext` defaults until the async re-acquire lands — then self-corrects on the
-  next cycle (owner: scale 1.14 instead of 1.15 at 09:31 CEST on screen-on, corrects on first
-  significant light reading). **Recommended fix (deferred — needs its own DataStore field + test):**
-  persist `resolvedLoc`+`resolvedDay` (and ideally the last computed windows) and load them in `init`,
-  so `current()` returns the cached location immediately on cold start and only re-acquires when the
-  day rolls over — matching Tasker's `%AAB_SunLastDate` behavior. Not fixed in 1.1.0 to keep the
-  targetSdk-bump change set focused; tracked here for a dedicated follow-up.
+- **D-103: circadian once-a-day location is now persisted so a cold start reuses it instead of falling
+  back to defaults (parity fix; runtime).** Tasker persisted the daily-resolved location
+  (`%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`), so a service/process restart reused it until the
+  day rolled over. The 1.0 rebuild held it in `@Volatile` in-memory fields only
+  (`CircadianWindowProvider.resolvedLoc`/`resolvedDay`); on a cold start (process death, service restart
+  after screen-on) it was null, so `current()` returned null and the pipeline fell back to the fixed
+  6–8/18–20 UTC `TimeContext` defaults until the async re-acquire landed — then self-corrected next
+  cycle (owner: scale 1.14 instead of 1.15 at 09:31 CEST on screen-on, fixed on the first significant
+  light reading). **Fix:** persist the resolved location in `ExperimentPrefsStore`
+  (`readCachedSunLocation`/`writeCachedSunLocation` → `CachedSunLocation(lat, lon, day)`); the provider
+  seeds `resolvedLoc`/`resolvedDay` from it in `init` (without clobbering a fresher in-memory fix) and
+  writes back on every successful acquire. `current()` then returns the cached location immediately on
+  cold start and still re-acquires when the day rolls over (it keeps returning the cached value during
+  the async re-acquire) — matching `%AAB_SunLastDate`. New constructor params default to no-op so the
+  existing direct-construction tests are unaffected. Tests: `persistedLocation_isUsedOnColdStart_D103`,
+  `acquiredLocation_isPersisted_D103`. Ships in 1.1.0.
 
-- **D-104 ⭐ OPEN (minor, deferred): circadian graph dawn/sunrise and dusk/sunset event labels can
-  overlap (cosmetic; chart engine).** The five vertical event-line labels in `ChartCanvas` are all
-  parked at the same top position, so when two events are close in x (dawn↔sunrise, dusk↔sunset) their
-  rotated labels overlap. A proper fix is generic label-collision avoidance in the marker renderer, but
-  `ChartCanvas.kt` carries the S13 **hard fence** ("forbids modifying this file"). Deferred rather than
-  breach the fence for a cosmetic issue the owner rated "very minor"; the proper path is a sanctioned
-  lift of that fence to add generic label declutter to the engine.
+- **D-104: generic chart label-collision staggering (+ landscape height cap, horizontal-only scrub)
+  in the chart engine (UI fix; lifts the S13 build-phase fence).** (1) The five vertical event-line
+  labels in `ChartCanvas` were all parked at the same top position, so close events (dawn↔sunrise,
+  dusk↔sunset) overlapped. **Fix:** when a labelled vertical marker falls within a previous label's
+  rotated footprint, drop it to the next row (offset down the line) — generic, isolated markers stay at
+  row 0. (2) Landscape: a full-height (240 dp) interactive chart filled the short viewport with no room
+  to scroll past it, and its `detectDragGestures` ate the vertical scroll. **Fix:** cap chart height at
+  160 dp in landscape, and switch the scrub to `detectHorizontalDragGestures` so vertical drags scroll
+  the parent while horizontal drags still scrub. The S13 "do not modify `ChartCanvas.kt`" fence is
+  formally **lifted post-1.0 for generic engine improvements** (the keep-it-generic / no-per-chart
+  special-casing rule still binds); doc updated in-file. Ships in 1.1.0.
 
 - **D-105: ip-api.com geo-IP fallback is now opt-IN (default off), was opt-out (default on)
   (privacy; further deviation from Tasker).** The circadian location chain's last resort is a
