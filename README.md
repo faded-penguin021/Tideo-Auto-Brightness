@@ -160,7 +160,7 @@ or run `scripts/setup-android-sdk.sh`).
 
 The rebuild is complete. Maintenance is driven by documents under `docs/rebuild/`:
 
-- 
+- [`docs/rebuild/CLAUDE.md`](docs/rebuild/CLAUDE.md) — instructions for agentic workflow.
 - [`docs/rebuild/STATE.md`](docs/rebuild/STATE.md) — current project state and session memory.
 - [`docs/rebuild/RUNBOOK.md`](docs/rebuild/RUNBOOK.md) — maintenance playbook (change-type guides).
 - [`docs/rebuild/PARITY_CHECKLIST.md`](docs/rebuild/PARITY_CHECKLIST.md) — every Tasker artifact tracked
