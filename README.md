@@ -94,7 +94,7 @@ decision logic are golden-tested against a transcription of the original Tasker 
 3. Launch Tideo, complete onboarding (grant notifications + *Modify system settings*), and toggle the
    **main service** on from the Dashboard.
 
-`minSdk` 31 (Android 12) · `target`/`compile` SDK 35.
+`minSdk` 31 (Android 12) · `target`/`compile` SDK 36.
 
 <p align="center">
   <img src="docs/screenshots/menu.png" width="300" alt="Tideo settings home">
@@ -179,7 +179,7 @@ A 3-module Gradle build:
 
 ## Building
 
-Requires JDK 17+ (the toolchain targets 17) and the Android SDK (`local.properties` with `sdk.dir`,
+Requires JDK 21+ (the toolchain targets 21) and the Android SDK (`local.properties` with `sdk.dir`,
 or run `scripts/setup-android-sdk.sh`).
 
 ```bash
