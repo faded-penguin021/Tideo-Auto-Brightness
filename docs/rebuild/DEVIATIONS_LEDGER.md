@@ -1956,6 +1956,13 @@ the permanent registry — never compress or remove them.
   (`rule_priority_over_max`) when the value exceeds 100, and clamps to 1..100 ONLY on save — so an old
   150 is shown truthfully and capped to 100 only if/when the user re-saves that rule (relative ordering
   is preserved until then).
+  (e) **Disconnected dropdown menu fix (owner screenshot).** The rule editor's "Switch to profile"
+  `DropdownMenu` was a bare sibling of its anchor button in the scrolling editor `Column`, so it had no
+  layout anchor and the open menu floated DOWN over the Triggers section ("disconnected" list). Wrapped
+  the button + menu in a `Box` (the canonical Compose pattern, already used by `ProfileCard`'s overflow).
+  Swept the codebase for the same anti-pattern and fixed `LiveDebugScreen.DebugLevelSelector` too;
+  `ProfilesScreen`'s overflow was already boxed. **Lesson:** a `DropdownMenu` must share a `Box` with its
+  anchor — a bare sibling in a Column anchors to the wrong place.
 
 - **D-114: confirmation prompts for destructive profile/rule actions (owner-reported, 1.2.0).** Deleting
   a context rule, and deleting or overwriting a saved profile, fired immediately with no confirmation —

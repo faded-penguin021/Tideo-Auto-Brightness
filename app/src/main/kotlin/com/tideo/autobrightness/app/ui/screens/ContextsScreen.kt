@@ -401,13 +401,18 @@ private fun RuleEditor(
             Text("Switch to profile:", style = MaterialTheme.typography.labelMedium)
             // D-114b: emphasise the selected profile — gold + titleSmall (matching the rule card's
             // "Loads <profile>") with a dropdown caret, so the chosen target stands out in the editor.
-            OutlinedButton(onClick = { profileMenu = true }, modifier = Modifier.testTag("rule_profile")) {
-                Text(profile, style = MaterialTheme.typography.titleSmall, color = AabGold)
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
-                profileNames.forEach { p ->
-                    DropdownMenuItem(text = { Text(p) }, onClick = { profile = p; profileMenu = false })
+            // The DropdownMenu MUST be wrapped in a Box with its anchor button (like ProfileCard's
+            // overflow): a bare DropdownMenu sibling in the scrolling Column has no anchor and floats
+            // down over the Triggers ("disconnected" menu, owner screenshot).
+            Box {
+                OutlinedButton(onClick = { profileMenu = true }, modifier = Modifier.testTag("rule_profile")) {
+                    Text(profile, style = MaterialTheme.typography.titleSmall, color = AabGold)
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
+                    profileNames.forEach { p ->
+                        DropdownMenuItem(text = { Text(p) }, onClick = { profile = p; profileMenu = false })
+                    }
                 }
             }
 
