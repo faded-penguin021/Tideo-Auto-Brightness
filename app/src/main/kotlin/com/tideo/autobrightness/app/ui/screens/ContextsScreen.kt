@@ -215,6 +215,8 @@ private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit
     val cardModifier = Modifier.testTag("rule_${rule.id}").let {
         if (isActive) it.border(1.5.dp, AabGold, MaterialTheme.shapes.medium) else it
     }
+    // D-114: confirm before deleting a rule (Tasker prompted first).
+    var confirmDelete by remember { mutableStateOf(false) }
     AabCard(
         cardModifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -243,8 +245,19 @@ private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit
         Text(rule.triggers.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit_${rule.id}")) { Text("Edit") }
-            TextButton(onClick = onDelete, modifier = Modifier.testTag("delete_${rule.id}")) { Text("Delete") }
+            TextButton(onClick = { confirmDelete = true }, modifier = Modifier.testTag("delete_${rule.id}")) { Text("Delete") }
         }
+    }
+
+    if (confirmDelete) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_delete_rule_title),
+            message = stringResource(R.string.confirm_delete_rule_msg, rule.name.ifBlank { "(unnamed)" }),
+            confirmLabel = stringResource(R.string.confirm_delete),
+            confirmTag = "confirm_delete_${rule.id}",
+            onConfirm = { confirmDelete = false; onDelete() },
+            onDismiss = { confirmDelete = false },
+        )
     }
 }
 

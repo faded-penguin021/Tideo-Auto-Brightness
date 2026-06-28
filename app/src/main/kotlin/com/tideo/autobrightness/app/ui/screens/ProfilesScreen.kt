@@ -304,6 +304,42 @@ internal fun ContextLockBanner(onResumeContext: () -> Unit) {
     }
 }
 
+/**
+ * D-114: a reusable confirmation dialog for destructive profile/rule actions (Tasker prompted before
+ * delete/overwrite). Shared across the Profiles list and the Contexts rule list (same package). The
+ * confirm action is tinted [error] red when [destructive] so a delete reads as dangerous.
+ */
+@Composable
+internal fun ConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    confirmTag: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    destructive: Boolean = true,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag(confirmTag),
+                colors = if (destructive) {
+                    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                } else {
+                    ButtonDefaults.textButtonColors()
+                },
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.confirm_cancel)) }
+        },
+    )
+}
+
 @Composable
 internal fun ProfileCard(
     entry: SavedProfile,
@@ -314,6 +350,9 @@ internal fun ProfileCard(
 ) {
     val changed = entry.settings.changedCount()
     var menu by remember { mutableStateOf(false) }
+    // D-114: confirm before overwriting or deleting a saved profile (Tasker did this).
+    var confirmOverwrite by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     // D-111 (owner): highlight the in-force profile with a gold edge + an "Active" tag, so the list
     // answers "which profile is loaded right now?" the way Tasker's "Active Profile: …" readout does.
     val cardModifier = Modifier.testTag("profile_${entry.name}").let {
@@ -365,12 +404,12 @@ internal fun ProfileCard(
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
                         text = { Text("Overwrite") },
-                        onClick = { menu = false; onOverwrite(entry.name) },
+                        onClick = { menu = false; confirmOverwrite = true },
                         modifier = Modifier.testTag("overwrite_profile_${entry.name}"),
                     )
                     DropdownMenuItem(
                         text = { Text("Delete") },
-                        onClick = { menu = false; onDelete(entry.name) },
+                        onClick = { menu = false; confirmDelete = true },
                         modifier = Modifier.testTag("delete_profile_${entry.name}"),
                     )
                 }
@@ -380,6 +419,28 @@ internal fun ProfileCard(
             onClick = onApply,
             modifier = Modifier.fillMaxWidth().testTag("apply_profile_${entry.name}"),
         ) { Text("Apply") }
+    }
+
+    if (confirmOverwrite) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_overwrite_profile_title),
+            message = stringResource(R.string.confirm_overwrite_profile_msg, entry.name),
+            confirmLabel = stringResource(R.string.confirm_overwrite),
+            confirmTag = "confirm_overwrite_${entry.name}",
+            destructive = false,
+            onConfirm = { confirmOverwrite = false; onOverwrite(entry.name) },
+            onDismiss = { confirmOverwrite = false },
+        )
+    }
+    if (confirmDelete) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_delete_profile_title),
+            message = stringResource(R.string.confirm_delete_profile_msg, entry.name),
+            confirmLabel = stringResource(R.string.confirm_delete),
+            confirmTag = "confirm_delete_${entry.name}",
+            onConfirm = { confirmDelete = false; onDelete(entry.name) },
+            onDismiss = { confirmDelete = false },
+        )
     }
 }
 

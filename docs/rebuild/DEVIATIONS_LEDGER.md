@@ -1947,3 +1947,15 @@ the permanent registry — never compress or remove them.
   current SSID by overwriting the field; it now appends the SSID to the comma-separated list (de-duped),
   so a rule can match several networks — matching Tasker's behaviour. No new strings beyond the gold
   "Active" tag (reused `profiles_active_tag`); `HardcodedStringCheckTest` ratchet still ≤ 92.
+
+- **D-114: confirmation prompts for destructive profile/rule actions (owner-reported, 1.2.0).** Deleting
+  a context rule, and deleting or overwriting a saved profile, fired immediately with no confirmation —
+  Tasker prompted first. Added a shared `ConfirmDialog` (in `ProfilesScreen`, reused by `ContextsScreen`
+  in the same package): an `AlertDialog` with a red (`error`) confirm action for deletes, a neutral one
+  for overwrite, and a Cancel. The Profiles overflow menu's Delete/Overwrite and the rule card's Delete
+  now stage a confirmation (`confirm_delete_<name>` / `confirm_overwrite_<name>` / `confirm_delete_<ruleId>`)
+  instead of calling the callback directly; the callback fires only on confirm. All strings are resources
+  (ratchet unaffected). Tests: `SettingsScreensTest.profiles_deleteAndOverwrite_requireConfirmation_D114`
+  + `contexts_deleteRule_requiresConfirmation_D114` (assert the callback does NOT fire until the dialog is
+  confirmed). The existing render tests only assert the menu items EXIST (don't click through), so they
+  are unaffected.

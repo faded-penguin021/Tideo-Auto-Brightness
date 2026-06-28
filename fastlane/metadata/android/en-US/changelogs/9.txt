@@ -12,3 +12,4 @@ Bug fixes and polish:
   arrows now use proper icons.
 • Context rules: the profile a rule switches to is now shown prominently, priority is a
   1–100 scale, and "Use current Wi-Fi" adds to the network list instead of replacing it.
+• Deleting a rule, and deleting or overwriting a profile, now ask for confirmation first.

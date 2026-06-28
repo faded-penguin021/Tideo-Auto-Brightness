@@ -47,7 +47,7 @@ When in use, track stages here:
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
 > during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-114** (historical high-water mark D-113); never restart at D-001. A deviation, once
+> **D-115** (historical high-water mark D-114); never restart at D-001. A deviation, once
 > numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
@@ -67,7 +67,8 @@ One line per shipped change (newest first). Keep terse.
   majors; `build.yml` carries a node24 pin policy comment) + `clean-dist.yml` auto-removes a forgotten
   `dist/` APK from main. **D-113** Contexts rule list/editor: target profile emphasised (gold) +
   active-rule highlight; priority is a 1–100 scale (was 0..∞); "Use current Wi-Fi" appends to the SSID
-  list (Tasker parity). RUNBOOK gains a "Design coherence — read m3_audit.md for ANY UI change" callout
+  list (Tasker parity). **D-114** confirmation prompts before deleting a rule and deleting/overwriting a
+  profile (shared `ConfirmDialog`, Tasker parity). RUNBOOK gains a "Design coherence — read m3_audit.md for ANY UI change" callout
   (owner request). Changelog `9.txt`. Owner sideloads `dist/` debug APK, then squash-merges + tags
   `v1.2.0` (dist/ auto-cleaned by CI if forgotten). SEMVER: minor — new user-facing surfaces (staleness
   hints + Profiles redesign) outrank the patch-grade bug fixes (RUNBOOK §6 "highest category wins");
