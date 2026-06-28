@@ -1,0 +1,8 @@
+Reworked the Emergency UI Reset ("panic") gesture and added a Panic Sensitivity setting.
+
+The reset now arms only when the phone is held upside-down with the screen on and the
+proximity sensor uncovered (so it can't fire in a pocket or against your ear), then waits
+for a deliberate shake. A new Panic Sensitivity slider (0–10) at the bottom of the Live
+Debug screen tunes how hard/long that shake must be: 0 makes the reset fire immediately
+with no shake; higher values need a longer, more vigorous shake. If you don't shake within
+ten seconds the reset is cancelled until you turn the phone straight and upside-down again.

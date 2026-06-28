@@ -30,81 +30,22 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 > — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
 > findings are in `../history/STATE_rebuild.md`). Look there.
 
-## Active work — PANIC GESTURE OVERHAUL + PanicSensitivity (owner spec in `tmp/`, port then delete)
-
-**Branch:** `claude/nodejs-20-deprecation-53fg3b` (PR #78). PR #78 was the 1.2.1 release-pipeline fix
-(D-115); the owner then pushed new Tasker source to this branch to FOLD IN — so the release becomes a
-**1.3.0 feature** (new user-facing setting + Debug slider + changed panic behaviour). The D-115
-release.yml fix + 1.2.1 bump are already on the branch; on completion re-bump to **1.3.0 / versionCode 11**
-+ `changelogs/11.txt`. Git: the v1.2.0 squash on `main` was merged in via `-s ours` (conflict resolved,
-`main` is an ancestor). ⚠️ `[skip ci]` still lives in old commit `43f298b`'s body — strip it from the
-squash message at merge (D-115).
-
-**Spec source (`tmp/`, DELETE after porting — `tmp/Tmp.md` says so):** `Tmp.md` (overview),
-`Panic_profile_task.md` (prof769 "Panic (Reset)" + `_PanicButton` A2 Java shake-gate),
-`_SetPanicSensitivity task.md`, `Live_debug_info.html` (Debug scene incl. the slider markup L199-219).
-
-**Three core changes (Tasker):**
-1. **Panic (Reset) profile trigger** = Orientation Upside-Down ∧ Display-On ∧ **`%AAB_Proximity !~ Near`**
-   (proximity NOT near). The old "significant motion" EVENT is removed from the trigger; the shake is now
-   validated inside the task over a 10 s window.
-2. **`%AAB_PanicSensitivity`** (0–10, default **8** when unset) — a GLOBAL var, set from the Debug scene
-   via a 0–10 slider → `_SetPanicSensitivity` (`Variable Set %AAB_PanicSensitivity = %par1`).
-3. **`_PanicButton` A2 Java shake-gate** (leaky bucket): `targetScore = sens*40`, `threshold = sens*2`;
-   ~50 Hz linear-accel magnitude; if `mag > threshold` → `score = score*0.98 + (mag − threshold)` else
-   `score *= 0.90`; success when `score ≥ targetScore`; **sens 0 ⇒ pass immediately**; **10 s timeout ⇒
-   veto** (panic does NOT fire). Because the profile is a STATE (Upside-Down), after a timeout it won't
-   re-fire until the phone is flipped straight (exit state) then upside-down again (re-enter) — D-021
-   re-arm. On success: SOS vibrate + service-on + manual-override + stop animations + brightness 255 +
-   disable super dimming (= existing `PanicHandler`/`emergencyStop`).
-
-**Kotlin plan (current panic lives in `platform/.../sensor/PanicSensorSource.kt` =
-`PanicGestureDetector` (sustained upside-down + single shake spike) + `PanicGate` (screen-on grace +
-cooldown); wired in `AppModule` `AndroidPanicSensorSource`; fired in `AmbientMonitoringService` L226 →
-`controller.emergencyStop()`):**
-- **Stage A — `:domain` `PanicShakeGate`** (pure, golden/contract-tested vs the A2 Java): ctor `sensitivity`
-  → `targetScore`/`threshold`; `onSample(linearMag): Boolean` runs the 0.98/0.90 leaky bucket, completes at
-  target; `sensitivity 0 → completes on first sample`. Keep magnitude computation in platform (feed it the
-  gravity-stripped magnitude). Tests: `domain/src/test/.../PanicShakeGateTest`.
-- **Stage B — `:app` settings** `AabSettings.panicSensitivity: Int = 8` as a **GLOBAL** pref (like
-  `debugLevel`): add to `AabSettings`/`GlobalPrefs`, DataStore (`AabSettingsMapper`/contract), preserve it
-  in `mergeProfile` (it's NOT a task626 per-profile snapshot key — see ContextEngine.mergeProfile), and the
-  legacy `TaskerLegacyProfileSerializer` (`%AAB_PanicSensitivity`). Validate 0..10 in `SettingsValidator`.
-- **Stage C — `:platform` rework `AndroidPanicSensorSource`:** arm on sustained upside-down + display-on +
-  **proximity-not-near** (inject `isNear: () -> Boolean`); on arm, run a `PanicShakeGate(sensitivity)` over
-  ≤10 s of TYPE_LINEAR_ACCELERATION (fallback: high-pass TYPE_ACCELEROMETER like the Java) → emit on success;
-  on 10 s timeout veto + disarm until upside-down is exited and re-entered. Inject `sensitivity: () -> Int`.
-  Update `PanicGestureDetector`/`PanicGate` + their tests (`PanicGateTest`, `PanicGestureDetectorTest`).
-- **Stage D — `:app` UI + wiring:** Panic Sensitivity slider (0–10 step 1, ⓘ help: "Sets the shake
-  intensity/duration to trigger an Emergency UI Reset. 0 = pass-through (disables panic requirements); 10
-  = long vigorous shake") at the BOTTOM of the **Live Debug screen** (`LiveDebugScreen.kt` = the Debug
-  scene); persist via `panicSensitivity`. Wire `AppModule` to pass `panicSensitivity` + proximity-near into
-  `AndroidPanicSensorSource` (proximity already tracked via `ProximityTracker`/`AndroidProximitySensorSource`).
-  Then 1.3.0 bump + `changelogs/11.txt`; update `parity_gaps.md`/`PARITY_CHECKLIST.md` if relevant; run the
-  ladder; DELETE `tmp/`.
-
-| Stage | Date | Status | Notes |
-|---|---|---|---|
-| A domain gate | 2026-06-28 | TODO | PanicShakeGate + contract test vs A2 Java |
-| B settings | 2026-06-28 | TODO | panicSensitivity global 0..10 default 8 |
-| C platform | 2026-06-28 | TODO | proximity arm + 10s shake-gate + re-arm |
-| D ui+wire+rel | 2026-06-28 | TODO | Live Debug slider, AppModule, 1.3.0, delete tmp/ |
-
-**Blockers:** none (checkpoint before compaction — no Kotlin changed yet; branch is GREEN).
-
-**New deviations (this work):** assign **D-116** to the panic-overhaul port when implemented (record the
-proximity-condition + sensitivity gate + re-arm as the as-built behaviour).
-
-> Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
-> "Maintenance deviations" section), not here — this slot is only a transient staging note
-> during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-116** (historical high-water mark D-115); never restart at D-001. A deviation, once
-> numbered, lives in the registry forever — it is never compressed out.
-
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-28 — 1.3.0 / `versionCode 11` (MINOR — new user-facing setting + surface): **D-116** Panic
+  (Reset) gesture reworked from folded-in Tasker source. Trigger is now Upside-Down ∧ Display-On ∧
+  **Proximity-NOT-Near** (the significant-motion EVENT is gone); the shake is validated by a 10 s
+  sensitivity-gated leaky-bucket (`PanicShakeGate`, pure `:domain`, contract-tested vs the task528 A2
+  Java). New GLOBAL **`%AAB_PanicSensitivity`** (0–10, default 8) with a slider at the bottom of the
+  Live Debug screen (0 = pass-through, 10 = long vigorous shake; 10 s timeout = veto + re-arm only after
+  flipping straight then upside-down again, D-021). Platform: `PanicGestureDetector` → orientation only,
+  `PanicGate` → re-arm latch, `AndroidPanicSensorSource` arms + runs the gate over `TYPE_LINEAR_ACCELERATION`
+  (fallback high-passed accelerometer); `AppModule` injects sensitivity (new `ContextEngine.effectiveSnapshot`)
+  + proximity-near. Structurally retires the S14 grab-to-wake false-fire. Changelog `11.txt`; `tmp/` spec
+  deleted. Owner: when squash-merging, STRIP any `[skip ci]` from the commit body (D-115), merge, then
+  publish the v1.3.0 release from the GitHub UI.
 - 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut, no app change): **D-115** the v1.2.0 release
   workflow never ran — the squash-merge commit body carried a stray `[skip ci]` token (leaked from a
   commit message that described `clean-dist.yml`), which GitHub honored and skipped every workflow for

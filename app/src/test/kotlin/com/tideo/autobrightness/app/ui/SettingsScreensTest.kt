@@ -723,6 +723,38 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun liveDebug_panicSensitivityCard_rendersSliderAndValue() {
+        // D-116: the GLOBAL %AAB_PanicSensitivity slider sits at the bottom of the Live Debug scene.
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(serviceRunning = true, panicSensitivity = 8),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("panic_sensitivity_card").performScrollTo().assertExists()
+        compose.onNodeWithTag("panic_sensitivity_slider").performScrollTo().assertExists()
+        compose.onNodeWithText("Level: 8 / 10", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun liveDebug_panicSensitivityCard_showsPassThroughAtZero() {
+        // 0 is pass-through (the panic fires with no shake requirement) — surfaced distinctly.
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(serviceRunning = true, panicSensitivity = 0),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        // "(pass-through)" (parenthesised) is unique to the value label — the help text says
+        // "= pass-through (disables …" so a bare "pass-through" would match two nodes.
+        compose.onNodeWithText("(pass-through)", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
     fun curveChart_legend_distinguishesReferenceAndCurve_G2RF66() {
         // F66/F69: a committed snapshot differing from the draft gives a fixed dashed "Reference" line
         // alongside the live "Curve"; the legend names both.

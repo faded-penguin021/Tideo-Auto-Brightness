@@ -42,8 +42,12 @@ android {
         // commit + tag — D-115), so v1.2.0 never published its signed APK. v1.2.1 carries the release.yml
         // fix (now triggers on `release: published`, immune to skip-ci) and re-cuts the SAME app — no
         // app/runtime code changed since 1.2.0, so it is a patch.
-        versionCode = 10
-        versionName = "1.2.1"
+        // 1.3.0 (versionCode 11) is a MINOR feature release: the reworked Panic (Reset) gesture (D-116)
+        // — armed by upside-down + display-on + proximity-NOT-near, then a 10 s sensitivity-gated shake
+        // — plus a new user-facing global setting (Panic Sensitivity 0–10) with a slider on the Live
+        // Debug screen. A new user-facing surface ⇒ minor (RUNBOOK §6 "highest category wins").
+        versionCode = 11
+        versionName = "1.3.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 
