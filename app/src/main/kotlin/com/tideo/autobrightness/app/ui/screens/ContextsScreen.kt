@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.ui.screens
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -49,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -124,6 +127,8 @@ fun ContextRulesSection(
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
     hasUsageAccess: () -> Boolean = { true },
     onRequestUsageAccess: () -> Unit = {},
+    /** D-113: the winning rule's name (%AAB_ActiveContext) — highlighted in the list. */
+    activeContext: String? = null,
 ) {
     var editing by remember { mutableStateOf<ContextRule?>(null) }
 
@@ -164,7 +169,12 @@ fun ContextRulesSection(
         EmptyState("No rules yet.", testTag = "empty_rules")
     }
     rules.forEach { rule ->
-        RuleCard(rule, onEdit = { editing = rule }, onDelete = { onDelete(rule.id) })
+        RuleCard(
+            rule,
+            onEdit = { editing = rule },
+            onDelete = { onDelete(rule.id) },
+            isActive = rule.name.isNotBlank() && rule.name == activeContext,
+        )
     }
 
     // S12.9f: edit/add opens the per-rule editor in a modal. The editor owns its own scroll; Save/Cancel
@@ -198,14 +208,38 @@ fun ContextRulesSection(
 }
 
 @Composable
-private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit) {
-    // S13c restyle (m3_audit §3 row 10): rule rows are elevated `AabCard`s.
+private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit, isActive: Boolean = false) {
+    // S13c restyle (m3_audit §3 row 10): rule rows are elevated `AabCard`s. D-113: the rule currently
+    // in force gets a gold edge + "Active" tag (mirrors the Profiles list), and the target profile —
+    // the thing the rule switches TO — is rendered prominently in gold rather than buried in grey text.
+    val cardModifier = Modifier.testTag("rule_${rule.id}").let {
+        if (isActive) it.border(1.5.dp, AabGold, MaterialTheme.shapes.medium) else it
+    }
     AabCard(
-        Modifier.testTag("rule_${rule.id}"),
+        cardModifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(rule.name.ifBlank { "(unnamed)" }, style = MaterialTheme.typography.titleMedium)
-        Text("→ ${rule.profile}  ·  priority ${rule.priority}", style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(rule.name.ifBlank { "(unnamed)" }, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (isActive) {
+                Text(
+                    stringResource(R.string.profiles_active_tag),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AabGold,
+                    modifier = Modifier.testTag("rule_active_${rule.id}"),
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Loads", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                rule.profile,
+                style = MaterialTheme.typography.titleSmall,
+                color = AabGold,
+                modifier = Modifier.testTag("rule_target_${rule.id}"),
+            )
+            Text("· priority ${rule.priority}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Text(rule.triggers.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit_${rule.id}")) { Text("Edit") }
@@ -244,7 +278,9 @@ private fun RuleEditor(
 ) {
     var name by remember { mutableStateOf(rule.name) }
     var profile by remember { mutableStateOf(rule.profile) }
-    var priorityText by remember { mutableStateOf(rule.priority.toString()) }
+    // D-113: priority is a 1–100 scale (higher wins), not 0..∞. Seed from the rule, coercing a legacy/
+    // unset 0 up to 1 so the field always shows a valid value; clamped again on save.
+    var priorityText by remember { mutableStateOf(rule.priority.coerceIn(1, 100).toString()) }
     var wifi by remember { mutableStateOf(rule.triggers.wifi?.joinToString(", ") ?: "") }
     var startTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(0) ?: "") }
     var endTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(1) ?: "") }
@@ -310,7 +346,8 @@ private fun RuleEditor(
             rule.copy(
                 name = name,
                 profile = profile,
-                priority = priorityText.trim().toIntOrNull() ?: 0,
+                // D-113: clamp to the 1–100 scale (blank/invalid → 1, the lowest priority).
+                priority = priorityText.trim().toIntOrNull()?.coerceIn(1, 100) ?: 1,
                 triggers = triggers,
             ),
         )
@@ -352,8 +389,13 @@ private fun RuleEditor(
             }
 
             OutlinedTextField(
-                value = priorityText, onValueChange = { priorityText = it }, label = { Text("Priority (higher wins)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_priority"),
+                value = priorityText,
+                // 1–100 scale: digits only, max 3 chars; the value is clamped to 1..100 on save.
+                onValueChange = { priorityText = it.filter(Char::isDigit).take(3) },
+                label = { Text("Priority (1–100, higher wins)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth().testTag("rule_priority"),
             )
 
             SectionHeader("Triggers", divider = true)
@@ -370,7 +412,16 @@ private fun RuleEditor(
                     modifier = Modifier.fillMaxWidth().testTag("rule_wifi"),
                 )
                 TextButton(
-                    onClick = { onUseCurrentSsid { ssid -> wifi = ssid } },
+                    // D-113: APPEND the current SSID to the comma-separated list (like Tasker), don't
+                    // replace it — a rule can match several networks. De-duped, case-sensitively.
+                    onClick = {
+                        onUseCurrentSsid { ssid ->
+                            val existing = wifi.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                            if (ssid.isNotBlank() && ssid !in existing) {
+                                wifi = (existing + ssid).joinToString(", ")
+                            }
+                        }
+                    },
                     modifier = Modifier.testTag("use_current_ssid"),
                 ) { Text("Use current Wi-Fi") }
             }

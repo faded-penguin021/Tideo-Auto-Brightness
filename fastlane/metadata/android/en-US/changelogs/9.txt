@@ -8,4 +8,7 @@ Bug fixes and polish:
   show when the values are cached (and how old) until you refresh by turning Location on.
 • "Resume context automation" is now a clear gold banner with a play button.
 • Profiles & Contexts redesigned: a pinned Load / Save / Contexts bar over your profiles,
-  each opening its own dialog; navigation/back/chart arrows now use proper icons.
+  each opening its own dialog; the active profile is highlighted; navigation/back/chart
+  arrows now use proper icons.
+• Context rules: the profile a rule switches to is now shown prominently, priority is a
+  1–100 scale, and "Use current Wi-Fi" adds to the network list instead of replacing it.

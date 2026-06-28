@@ -1930,3 +1930,20 @@ the permanent registry — never compress or remove them.
   `softprops/action-gh-release@v2→v3`; `actions/checkout@v5` + `actions/setup-java@v5` were already
   node24. Added a "Node 24 runtime policy" comment block to `build.yml` documenting the pins so they
   aren't downgraded. No code/behaviour change.
+
+- **D-113: Contexts rule-list/editor polish (owner-reported, 1.2.0).** Three rule-creation refinements:
+  (a) **Emphasise the target profile.** A rule card buried its switch-to profile in grey `→ Profile ·
+  priority N` body text. The profile — the thing the rule loads — is now rendered prominently in gold
+  (`titleSmall`, `AabGold`) behind a "Loads" label, and the rule currently in force (its name ==
+  `%AAB_ActiveContext`, threaded in from `LiveRuntimeState.activeContext`) gets a gold edge + "Active"
+  tag, mirroring the Profiles list (D-111). `ContextRulesSection` gained an optional `activeContext`
+  param (default null → the legacy `ContextsContent` + its tests are unaffected).
+  (b) **Priority is a 1–100 scale, not 0..∞.** The editor field now accepts digits only (max 3), seeds a
+  legacy/unset 0 up to 1, labels itself "Priority (1–100, higher wins)", uses a numeric keyboard, and
+  clamps to `1..100` on save (blank/invalid → 1). This is a UI constraint only — `ContextOverrideResolver`
+  still ranks by raw int (D-014: higher wins), so no golden/resolver change and existing rules keep
+  resolving (a stored 0 simply coerces to 1 on next save).
+  (c) **"Use current Wi-Fi" APPENDS, not replaces (Tasker parity).** The rule editor's button added the
+  current SSID by overwriting the field; it now appends the SSID to the comma-separated list (de-duped),
+  so a rule can match several networks — matching Tasker's behaviour. No new strings beyond the gold
+  "Active" tag (reused `profiles_active_tag`); `HardcodedStringCheckTest` ratchet still ≤ 92.

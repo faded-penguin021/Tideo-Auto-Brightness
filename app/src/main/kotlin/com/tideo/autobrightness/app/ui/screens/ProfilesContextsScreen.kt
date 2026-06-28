@@ -95,6 +95,8 @@ fun ProfilesContextsScreen(
     // %AAB_CurrentActiveProfile — highlight the in-force profile in the list (owner: "seeing the active
     // profile here is useful"), mirroring Tasker's "Active Profile: …" readout.
     val activeProfile by com.tideo.autobrightness.app.runtime.LiveRuntimeState.activeProfile.collectAsStateWithLifecycle()
+    // %AAB_ActiveContext — the winning rule's name, to emphasise the active rule in the Contexts modal.
+    val activeContext by com.tideo.autobrightness.app.runtime.LiveRuntimeState.activeContext.collectAsStateWithLifecycle()
     val manager = remember { ProfileImportExportManager(context.applicationContext) }
     var status by remember { mutableStateOf<String?>(null) }
     // S12.9c #3: a user-visible error card for an unreadable profile file (ProfileLoadResult.TotalFailure).
@@ -292,6 +294,7 @@ fun ProfilesContextsScreen(
                 profileNames = profileNames.ifEmpty { listOf("Default") },
                 apps = apps,
                 solarLabel = solarLabel,
+                activeContext = activeContext,
                 onSave = { toast("Rule saved"); contextsVm.save(it) },
                 onDelete = { contextsVm.delete(it); toast("Rule deleted") },
                 onUseCurrentSsid = { setSsid ->
