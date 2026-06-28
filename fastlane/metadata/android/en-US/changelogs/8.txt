@@ -1,0 +1,3 @@
+Security hardening: the notification and home-screen-widget action buttons now
+use strictly explicit, immutable PendingIntents, so their intents can only ever
+target this app. No change to how the app looks or behaves.

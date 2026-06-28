@@ -140,8 +140,11 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         }
 
         private fun openAppIntent(context: Context): PendingIntent {
+            // Explicit target (component + package) on their own statements — see actionIntent in
+            // AmbientMonitoringService for why the chained form trips java/android/implicit-pendingintents.
             val intent = Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            intent.setPackage(context.packageName)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             return PendingIntent.getActivity(
                 context, REQ_OPEN, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -149,7 +152,9 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         }
 
         private fun broadcast(context: Context, action: String, requestCode: Int): PendingIntent {
-            val intent = Intent(context, DashboardWidgetProvider::class.java).setAction(action)
+            val intent = Intent(context, DashboardWidgetProvider::class.java)
+            intent.setPackage(context.packageName)
+            intent.action = action
             return PendingIntent.getBroadcast(
                 context, requestCode, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,

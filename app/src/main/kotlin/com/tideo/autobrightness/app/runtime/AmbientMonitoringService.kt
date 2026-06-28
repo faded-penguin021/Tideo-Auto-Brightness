@@ -372,7 +372,14 @@ class AmbientMonitoringService : Service() {
     }
 
     private fun actionIntent(action: String): PendingIntent {
-        val intent = Intent(this, AmbientMonitoringService::class.java).setAction(action)
+        // Keep the wrapped Intent unambiguously EXPLICIT (CWE-927 / java/android/implicit-pendingintents):
+        // target our own service by component AND package, set on their own statements. The previous
+        // one-liner `Intent(this, X).setAction(action)` is explicit at runtime, but CodeQL's Kotlin
+        // dataflow does not carry the constructor component through the chained `.setAction()` and
+        // flagged it as an implicit PendingIntent. FLAG_IMMUTABLE already prevents tampering.
+        val intent = Intent(this, AmbientMonitoringService::class.java)
+        intent.setPackage(packageName)
+        intent.action = action
         return PendingIntent.getService(
             this,
             action.hashCode(),

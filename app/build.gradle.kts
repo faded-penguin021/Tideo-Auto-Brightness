@@ -21,11 +21,13 @@ android {
         // 1.0.3 (versionCode 5) realigns the version ahead of the latest tag and ships the D-098
         // rule-editor Save/Cancel fix. 1.0.4 (versionCode 6) ships the D-100 main-window nav-bar inset
         // fix (DraftApplyBar Apply/Discard + Menu "Recheck Permissions" clipped under a button/3-key
-        // nav bar). 1.1.0 (versionCode 7) bumps targetSdk to 36 (Android 16). RULE: build version must be
-        // ≥ the latest `v*` tag on main and versionCode strictly greater than every released code — see
-        // RUNBOOK "Cutting a release".
-        versionCode = 7
-        versionName = "1.1.0"
+        // nav bar). 1.1.0 (versionCode 7) bumps targetSdk to 36 (Android 16). 1.1.1 (versionCode 8) is a
+        // security-hardening patch: notification/widget PendingIntents are made un-missably explicit
+        // (D-107, CodeQL java/android/implicit-pendingintents). RULE: build version must be ≥ the latest
+        // `v*` tag on main and versionCode strictly greater than every released code — see RUNBOOK
+        // "Cutting a release".
+        versionCode = 8
+        versionName = "1.1.1"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 
