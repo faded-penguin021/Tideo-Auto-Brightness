@@ -1819,3 +1819,20 @@ the permanent registry — never compress or remove them.
   test-round artifact: future debug/sideload builds always carry it. (The temporary `dist/` debug-APK
   drop used for the 1.1.0 on-device pass was removed before merge; this build-config preference stays.)
 
+
+- **D-107: notification/widget PendingIntents made un-missably explicit (security hardening;
+  CodeQL CWE-927).** CodeQL's first `main` scan after the 1.1.0 merge flagged
+  `java/android/implicit-pendingintents` (High) at `AmbientMonitoringService.actionIntent` (the
+  notification Pause/Resume/Reset/Disable actions) and the same chained pattern in
+  `DashboardWidgetProvider` (open-app + TOGGLE/RESET). The intents were already explicit at runtime
+  (`Intent(this, AmbientMonitoringService::class.java).setAction(action)`) and immutable
+  (`FLAG_IMMUTABLE`), so functionally safe — but CodeQL's Kotlin dataflow does **not** carry the
+  constructor component through the chained `.setAction()`/`.addFlags()` return value, so it saw the
+  wrapped Intent as implicit (the reported path: `new Intent(...)` → `setAction(...)` → "implicit not
+  null" → `getService(...)` → notification → `notify`). **Fix:** build each Intent on separate
+  statements and set the target explicitly — component (`Intent(ctx, Class)`) **and**
+  `setPackage(packageName)`, with `action`/`addFlags` assigned afterward — so the explicit target
+  survives dataflow and the PendingIntent can never resolve to another app. Behaviour is unchanged
+  (same component targeted, still `FLAG_IMMUTABLE`). Ships as 1.1.1 / versionCode 8. **Lesson:** for
+  CodeQL-Kotlin, prefer non-chained Intent construction + an explicit `setPackage` on PendingIntents;
+  the fluent one-liner reads as implicit even when it is not.

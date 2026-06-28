@@ -47,12 +47,20 @@ When in use, track stages here:
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
 > during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-107** (historical high-water mark D-106); never restart at D-001. A deviation, once
+> **D-108** (historical high-water mark D-107); never restart at D-001. A deviation, once
 > numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
+
+- 2026-06-28 — 1.1.1 / `versionCode 8`: (D-107) security hardening — notification (`actionIntent`)
+  and home-widget (`DashboardWidgetProvider`) PendingIntents made un-missably explicit (separate
+  statements + `setPackage`, still `FLAG_IMMUTABLE`) to clear CodeQL `java/android/implicit-pendingintents`
+  (High). The first post-1.1.0 CodeQL scan of `main` flagged the chained `Intent(this, X).setAction()`
+  one-liner as implicit (Kotlin dataflow drops the constructor component through `.setAction()`); intents
+  were already explicit + immutable at runtime, so no behaviour change. Added `changelogs/8.txt`. Owner
+  tags `v1.1.1`.
 
 - 2026-06-26 — 1.1.0 / `versionCode 7`: bumped **targetSdk 35 → 36** (Android 16), `compileSdk`
   36 in app + platform. Android 16 impact review found zero required platform code changes (edge-to-edge
