@@ -60,13 +60,16 @@ One line per shipped change (newest first). Keep terse.
   value; `lastAppliedBrightness` stays the floored hardware value for override detection). **D-110**
   circadian stale-location fallback across the day rollover + recompute-on-resolve (`onWindowsRefreshed`
   → `reapply`) + staleness hints (`CircadianLocationStatus`) on the Circadian screen + dashboard (gold
-  tinted-`Card`, m3_audit-coherent). **D-111** "Resume context automation" restyled to a gold banner +
-  ▶ play button. **D-112** GitHub Actions Node-20 → Node-24 (all actions bumped to node24 majors;
-  `build.yml` carries a node24 pin policy comment). RUNBOOK gains a "Design coherence — read m3_audit.md
-  for ANY UI change" callout (owner request). Changelog `9.txt`. Owner sideloads `dist/` debug APK,
-  then squash-merges + tags `v1.2.0` (dist/ removed before/at merge). **Open (owner clarification):**
-  the Profiles/Contexts IA part of the same report (load/save modals, non-sticky top controls, built-in
-  profile prominence) is deferred — see D-111 note.
+  tinted-`Card`, m3_audit-coherent). **D-111** gold "resume context automation" banner + play icon;
+  Tasker-style Profiles & Contexts IA (pinned Load/Save/Contexts action bar over the visible profile
+  list, each opening its own modal); app-wide icon-vs-glyph consistency (`‹`/`›` back + pager glyphs →
+  Material `IconButton`s). **D-112** GitHub Actions Node-20 → Node-24 (all actions bumped to node24
+  majors; `build.yml` carries a node24 pin policy comment) + `clean-dist.yml` auto-removes a forgotten
+  `dist/` APK from main. RUNBOOK gains a "Design coherence — read m3_audit.md for ANY UI change" callout
+  (owner request). Changelog `9.txt`. Owner sideloads `dist/` debug APK, then squash-merges + tags
+  `v1.2.0` (dist/ auto-cleaned by CI if forgotten). SEMVER: minor — new user-facing surfaces (staleness
+  hints + Profiles redesign) outrank the patch-grade bug fixes (RUNBOOK §6 "highest category wins");
+  rationale block in `app/build.gradle.kts`.
 - 2026-06-28 — 1.1.1 / `versionCode 8`: (D-107) security hardening — notification (`actionIntent`)
   and home-widget (`DashboardWidgetProvider`) PendingIntents made un-missably explicit (separate
   statements + `setPackage`, still `FLAG_IMMUTABLE`) to clear CodeQL `java/android/implicit-pendingintents`

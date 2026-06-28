@@ -25,11 +25,18 @@ android {
         // security-hardening patch: notification/widget PendingIntents are made un-missably explicit
         // (D-107, CodeQL java/android/implicit-pendingintents). 1.2.0 (versionCode 9) ships runtime
         // bug fixes + UX: D-108 service-start battery-saver flash, D-109 PWM-sensitive read-out tracks
-        // perceived brightness, D-110 circadian stale-location fallback + staleness hints (new
-        // user-facing surface → minor bump), D-111 golden "resume context automation" banner; plus the
-        // GitHub Actions Node-24 migration (CI only). RULE: build version must be ≥ the latest
-        // `v*` tag on main and versionCode strictly greater than every released code — see RUNBOOK
-        // "Cutting a release".
+        // perceived brightness, D-110 circadian stale-location fallback + staleness hints, D-111 golden
+        // "resume context automation" banner + Tasker-style sticky Load/Save/Contexts action bar;
+        // plus the GitHub Actions Node-24 migration (CI only).
+        //   SEMVER — why MINOR (1.1.1 → 1.2.0), not a patch (would have been 1.1.2): the three core
+        //   defect fixes (D-108/109/110a) are patch-grade on their own, BUT the same release ADDS new
+        //   user-facing surfaces — the circadian staleness hints on the Circadian screen + dashboard
+        //   (D-110) and the redesigned Profiles & Contexts screen (sticky action bar + load/save/contexts
+        //   modals, D-111). RUNBOOK §6: a new user-facing feature/surface is a MINOR, and when a release
+        //   spans categories you pick the HIGHEST that applies — so new-surface (minor) wins over
+        //   bug-fix (patch). No settings-schema break (round-trips), so it is not a major. RULE: build
+        //   version must be ≥ the latest `v*` tag on main and versionCode strictly greater than every
+        //   released code — see RUNBOOK "Cutting a release".
         versionCode = 9
         versionName = "1.2.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"

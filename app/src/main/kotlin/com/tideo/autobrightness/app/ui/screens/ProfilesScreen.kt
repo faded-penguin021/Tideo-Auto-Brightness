@@ -158,33 +158,7 @@ fun ProfilesBody(
             }
         }
     }
-    // G2R-F30 / D-111: a manual profile load pauses context automation; offer a Resume control. Styled
-    // as the Tasker "golden banner with a play button" — the gold `secondaryContainer` + leading ▶ icon,
-    // coherent with the dashboard's `OverrideCard` resume affordance and the M3 audit's gold-emphasis
-    // role (design/m3_audit.md §2.4: `secondary`/gold = emphasis/warnings). Was a teal `tertiaryContainer`
-    // card with a plain text button.
-    if (contextLocked) {
-        Card(
-            Modifier.fillMaxWidth().testTag("context_lock_banner"),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    "Context automation is paused after a manual profile load.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-                FilledTonalButton(onClick = onResumeContext, modifier = Modifier.testTag("resume_context")) {
-                    Icon(
-                        Icons.Filled.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
-                    Text("Resume context automation")
-                }
-            }
-        }
-    }
+    if (contextLocked) ContextLockBanner(onResumeContext)
 
     // S13c restyle (m3_audit §3 row 10): empty hints become `EmptyState`; rows become `AabCard`s.
     SectionHeader("Saved profiles", divider = true)
@@ -292,8 +266,35 @@ fun ProfilesBody(
     }
 }
 
+/**
+ * G2R-F30 / D-111: a manual profile load pauses context automation; offer a Resume control. Styled as
+ * the Tasker "golden banner with a play button" — the gold `secondaryContainer` + leading ▶ icon,
+ * coherent with the dashboard's `OverrideCard` resume affordance and the M3 audit's gold-emphasis role
+ * (design/m3_audit.md §2.4: `secondary`/gold = emphasis/warnings). Shared by [ProfilesBody] and the
+ * unified [ProfilesContextsScreen].
+ */
 @Composable
-private fun ProfileCard(
+internal fun ContextLockBanner(onResumeContext: () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth().testTag("context_lock_banner"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "Context automation is paused after a manual profile load.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            FilledTonalButton(onClick = onResumeContext, modifier = Modifier.testTag("resume_context")) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text("Resume context automation")
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ProfileCard(
     entry: SavedProfile,
     onApply: () -> Unit,
     onOverwrite: (String) -> Unit,
@@ -386,7 +387,7 @@ private fun ExpandableSection(
 }
 
 @Composable
-private fun SaveProfileDialog(
+internal fun SaveProfileDialog(
     currentSettings: AabSettings,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,

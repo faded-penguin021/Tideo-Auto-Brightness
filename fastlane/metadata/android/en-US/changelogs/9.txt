@@ -7,3 +7,5 @@ Bug fixes and polish:
   last cached sun position instead of a flat default. The Circadian screen and dashboard
   show when the values are cached (and how old) until you refresh by turning Location on.
 • "Resume context automation" is now a clear gold banner with a play button.
+• Profiles & Contexts redesigned: a pinned Load / Save / Contexts bar over your profiles,
+  each opening its own dialog; navigation/back/chart arrows now use proper icons.

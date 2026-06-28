@@ -1880,16 +1880,33 @@ the permanent registry — never compress or remove them.
   fallback). Tests: `CircadianWindowProviderTest.*_D110`. Banners follow the m3_audit tinted-`Card`
   convention (gold `secondary`/emphasis), coherent with the dashboard `StaleBanner`.
 
-- **D-111: "Resume context automation" is a gold banner with a play button (owner-reported, 1.2.0).**
-  The manual-context-lock resume control (`ProfilesScreen` `context_lock_banner`) used a teal
-  `tertiaryContainer` card with a plain outlined text button — the owner wanted the Tasker "golden
-  banner with a play button". Restyled to the gold `secondaryContainer` + a `FilledTonalButton` with a
-  leading ▶ `Icons.Filled.PlayArrow`, coherent with the dashboard `OverrideCard` resume affordance and
-  the m3_audit gold-emphasis role (`secondary`). UI-only; the resume wiring (`resumeContextAutomation`)
-  is unchanged. **Note:** the broader Profiles/Contexts information-architecture ask in the same report
-  (load/save as modals, non-sticky top controls, built-in-profile prominence) is NOT in this change —
-  the current screen already uses a scrolling `SegmentedButton` + per-profile load/save dialogs, so the
-  described layout didn't map cleanly; deferred pending owner clarification.
+- **D-111: gold resume banner + Tasker-style Profiles/Contexts IA + icon-vs-glyph consistency
+  (owner-reported, 1.2.0).** Three related UI changes from one owner report:
+  (a) **Resume banner.** The manual-context-lock resume control (`ProfilesScreen` `context_lock_banner`,
+  extracted to the shared `ContextLockBanner`) used a teal `tertiaryContainer` card with a plain
+  outlined text button — the owner wanted the Tasker "golden banner with a play button". Restyled to the
+  gold `secondaryContainer` + a `FilledTonalButton` with a leading `Icons.Filled.PlayArrow`, coherent
+  with the dashboard `OverrideCard` resume affordance and the m3_audit gold-emphasis role (`secondary`).
+  (b) **Profiles/Contexts information architecture (owner picked "Tasker-style sticky action bar").**
+  Replaced the scrolling `Profiles`/`Rules` `SegmentedButton` with a PINNED `Load` / `Save` / `Contexts`
+  action bar (m3_audit B5 `ActionButtonBar`, equal-weight `FilledTonalButton`s) that stays put while the
+  built-in/saved profiles list scrolls directly below it. Each action opens its own modal: **Save** →
+  `SaveProfileDialog`; **Load** → a "Load & manage" `AlertDialog` (import file / (re)link legacy folder +
+  load entries / restore factory / reset / export / view current); **Contexts** → a full-screen `Dialog`
+  hosting the existing `ContextRulesSection`. Applying a saved profile is the per-row Apply → `LoadProfileDialog`
+  preview. The component-level surfaces (`ProfilesBody`/`ProfilesContent`/`ContextRulesSection`) and their
+  tests are unchanged — only the unified host `ProfilesContextsScreen` was rebuilt; `ProfileCard`/`SaveProfileDialog`/`ContextLockBanner`
+  made `internal` for reuse. New strings extracted to `strings.xml` (the Load/manage labels are shared,
+  keeping the `HardcodedStringCheckTest` ratchet at 89 ≤ 92).
+  (c) **Icons, not glyphs (owner: "use icons instead of emoji" + "make it consistent everywhere the
+  same character is abused").** Replacing the `‹ Close` text glyph with `Icons.Filled.Close` triggered an
+  app-wide sweep of the `‹`/`›` characters used as icon stand-ins: the shared back buttons (`SettingsScaffold`,
+  `SettingsControls`) → `IconButton` + `Icons.AutoMirrored.Filled.ArrowBack`; the chart `PagerArrow`
+  (`GraphScaffold`) → `IconButton` + `Icons.AutoMirrored.Filled.KeyboardArrowLeft`/`Right`. All keep their
+  testTags (`back_button`, `chart_pager_prev`/`next`). The `ⓘ` help-reveal and the onboarding `✓` are
+  DIFFERENT glyphs (not the changed character) and were left as-is. **Lesson:** when swapping a Unicode
+  icon-stand-in for a real vector icon, grep the whole UI for that character and convert every abuse in
+  the same change, or the app looks half-migrated.
 
 - **D-112: GitHub Actions Node-20 → Node-24 runtime migration (CI only, 1.2.0).** GitHub deprecated the
   Node 20 action runtime (runners default to Node 24 from 2026-06-16, Node 20 removed 2026-09-16), so

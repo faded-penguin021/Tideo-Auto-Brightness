@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
@@ -60,7 +65,7 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (multi) {
-                PagerArrow("‹", "chart_pager_prev") {
+                PagerArrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous chart", "chart_pager_prev") {
                     val target = (pagerState.currentPage - 1 + slots.size) % slots.size
                     scope.launch { pagerState.animateScrollToPage(target) }
                 }
@@ -73,7 +78,7 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
                 textAlign = TextAlign.Center,
             )
             if (multi) {
-                PagerArrow("›", "chart_pager_next") {
+                PagerArrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next chart", "chart_pager_next") {
                     val target = (pagerState.currentPage + 1) % slots.size
                     scope.launch { pagerState.animateScrollToPage(target) }
                 }
@@ -107,19 +112,13 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
     }
 }
 
-/** A tappable ‹ / › page-step affordance for the [ChartPager] (swipe is consumed by the chart scrub). */
+/** A tappable page-step affordance for the [ChartPager] (swipe is consumed by the chart scrub).
+ *  Uses a real Material chevron icon rather than a ‹ / › text glyph (UI-consistency: icons, not glyphs). */
 @Composable
-private fun PagerArrow(glyph: String, testTag: String, onClick: () -> Unit) {
-    Text(
-        glyph,
-        style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .clip(CircleShape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 2.dp)
-            .testTag(testTag),
-    )
+private fun PagerArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, contentDescription: String, testTag: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.testTag(testTag)) {
+        Icon(icon, contentDescription = contentDescription, tint = MaterialTheme.colorScheme.primary)
+    }
 }
 
 /**
