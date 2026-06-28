@@ -1,16 +1,42 @@
 name: Release
 
-# Publishes a GitHub Release with the signed APK attached — but ONLY when you
-# push a version tag (e.g. `git tag v1.0.0 && git push origin v1.0.0`).
-# The Releases page therefore means "I decided this is a release", not "every
-# merge". Continuous build/test/artifact on main lives in release-signing.yml.
+# Builds, tests, signs the release APK and attaches it to a GitHub Release.
+#
+# Triggers (D-115):
+#  - release: published  — the PRIMARY trigger. Firing on the *release* event (not the tag push) makes
+#    this IMMUNE to `[skip ci]`: GitHub's skip-ci only suppresses `push`/`pull_request` events, so a
+#    stray `[skip ci]` in the tagged commit's message (e.g. leaked from a squash-merged commit body)
+#    no longer silently skips the release. This matches the owner's flow (releases are cut from the
+#    GitHub "Draft a new release" UI, which fires `release: published`).
+#  - workflow_dispatch — manual fallback: run the release for any existing tag (e.g. to recover a
+#    release whose `push` event was skipped, or to re-attach the APK).
+#  - push tags v* — kept for a plain `git tag && git push` flow. When a UI release fires BOTH this and
+#    `release: published`, the concurrency group collapses them to a single run.
+#
+# Continuous build/test/artifact on main lives in build.yml; on-demand signing in release-signing.yml.
 on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build, sign, and attach its APK to (e.g. v1.2.0)'
+        required: true
   push:
     tags:
       - 'v*'
 
 permissions:
-  contents: write  # needed to create the GitHub Release + upload assets
+  contents: write  # needed to create/update the GitHub Release + upload assets
+
+# The tag this run targets, whichever event fired. (env is unavailable in `concurrency`, so that key
+# repeats the expression.)
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -18,6 +44,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # Build the TAGGED commit regardless of which event fired (required for workflow_dispatch,
+          # explicit/safe for release + push).
+          ref: ${{ env.RELEASE_TAG }}
 
       # JDK 21: Robolectric 4.16+ needs it to run tests under SDK 36 (app still targets 17 bytecode).
       - name: Set up JDK 21
@@ -69,10 +99,11 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          # tag_name / name default to the pushed tag (github.ref_name).
+          tag_name: ${{ env.RELEASE_TAG }}
           files: app/build/outputs/apk/release/app-release.apk
           fail_on_unmatched_files: true
-          generate_release_notes: true
-          # Tags with a pre-release suffix (a hyphen, e.g. v0.1.0-rc1) are
-          # published as pre-releases; clean semver tags (v1.0.0) are full releases.
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          # NOTE: generate_release_notes is intentionally OFF — the owner writes the release notes in the
+          # UI before publishing; regenerating them here would overwrite that. This step only attaches
+          # the signed APK to the existing release (idempotent on re-run).
+          # Tags with a pre-release suffix (a hyphen, e.g. v0.1.0-rc1) are published as pre-releases.
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}

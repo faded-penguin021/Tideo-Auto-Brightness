@@ -47,13 +47,19 @@ When in use, track stages here:
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
 > during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-115** (historical high-water mark D-114); never restart at D-001. A deviation, once
+> **D-116** (historical high-water mark D-115); never restart at D-001. A deviation, once
 > numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-28 — CI/release-infra (no app change): **D-115** the v1.2.0 release workflow never ran because
+  the squash-merge commit body carried a stray `[skip ci]` token (leaked from a commit message that
+  described `clean-dist.yml`), which GitHub honored and skipped every workflow for that commit + tag.
+  `release.yml` now triggers on `release: published` (immune to skip-ci) + a `workflow_dispatch` tag
+  fallback; RUNBOOK §6 warns never to write the token in a commit/PR message. Recovery: `release-signing.yml`
+  dispatched for the signed v1.2.0 APK.
 - 2026-06-28 — 1.2.0 / `versionCode 9`: runtime bug fixes + UX. **D-108** service-start battery-saver
   flash (battery "unknown" `-1` sentinel; resolver won't match a battery rule until a real reading).
   **D-109** PWM-sensitive read-out now tracks PERCEIVED brightness (`targetBrightness` = un-floored engine

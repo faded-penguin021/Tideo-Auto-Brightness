@@ -1979,3 +1979,20 @@ the permanent registry — never compress or remove them.
   + `contexts_deleteRule_requiresConfirmation_D114` (assert the callback does NOT fire until the dialog is
   confirmed). The existing render tests only assert the menu items EXIST (don't click through), so they
   are unaffected.
+
+- **D-115: `[skip ci]` in a squash-merged commit silently skipped the v1.2.0 release (owner-reported).**
+  The v1.2.0 GitHub Release "didn't run" — `release.yml` never fired for the tag, and `build`/`codeql`
+  never ran for the merge-to-main commit either. ROOT CAUSE: the squash-merge commit body (PR #77)
+  contained the literal token `[ skip ci ]` (written without the space) — it leaked from a session
+  commit message that *described* `clean-dist.yml` ("commit+push, [skip ci]"). GitHub honors that token
+  on `push`/`pull_request` events, and a squash-merge folds every commit message into the squash body,
+  so the token landed on `main` and skipped EVERY workflow for that commit, including `release.yml` on
+  the `v1.2.0` tag (the tag points at the skipped commit). Nothing was wrong with the workflow files or
+  the D-112 Node-24 action bumps (the PR's own `build`/`codeql` passed). **Fixes:** (1) `release.yml` now
+  triggers primarily on `release: published` — the `release` event is NOT subject to skip-ci — plus a
+  `workflow_dispatch` (tag input) manual fallback and a concurrency guard; it builds the tagged ref and
+  attaches the signed APK without regenerating the owner's release notes. (2) RUNBOOK §6 gains a loud
+  "never write `[skip ci]` in a commit message or PR body" warning; the only legitimate use is a
+  workflow's own auto-commit heredoc (`clean-dist.yml`). **Recovery for v1.2.0:** dispatched
+  `release-signing.yml` for the signed APK, and `release.yml` can now be re-run via
+  Actions → Run workflow (tag `v1.2.0`) once merged.
