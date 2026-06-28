@@ -125,7 +125,7 @@ The grant is detected the next time the screen turns on or when the app is opene
 Tideo is local first and has no analytics, ads, or accounts. It makes **one** outbound network
 request, and only as a last resort:
 
-- **IP-geolocation fallback (optional, cleartext).** Circadian scaling needs an approximate location to compute local sunrise/sunset. Tideo tries, in order: a fixed latitude/longitude you pin → the device's
+- **IP-geolocation fallback (optional, requires opt-in, cleartext).** Circadian scaling needs an approximate location to compute local sunrise/sunset. Tideo tries, in order: a fixed latitude/longitude you pin → the device's
   last-known location → a fresh GPS/network fix. Only if *all* of those are unavailable does it fall
   back to a single `GET http://ip-api.com/json` to estimate your city
   from your public IP. This call is **cleartext HTTP** (ip-api.com's free tier has no HTTPS) and is
