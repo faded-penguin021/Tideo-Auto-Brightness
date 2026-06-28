@@ -2017,7 +2017,12 @@ the permanent registry — never compress or remove them.
   fallback); `PanicGate` is now the **re-arm latch** — a window (fired OR timed out) consumes the gesture
   until the phone leaves upside-down and re-enters (the prof769 STATE re-entry, D-021); `AndroidPanicSensorSource`
   arms on sustained-upside-down ∧ display-on ∧ proximity-not-near and runs a `PanicShakeGate(sensitivity())`
-  over a 10 s `TYPE_LINEAR_ACCELERATION` window (fallback high-passed `TYPE_ACCELEROMETER`). `AppModule`
+  over a 10 s `TYPE_LINEAR_ACCELERATION` window (fallback high-passed `TYPE_ACCELEROMETER`). Once armed the
+  window is **not** re-gated on orientation (faithful to the A2 Java's 10 s `blockingGet`): an up-and-down
+  shake while inverted is along the gravity axis and transiently disturbs the gravity-based `isUpsideDown`
+  estimate, so re-checking `armed` mid-window made up-down shakes self-cancel while orthogonal left-right
+  shakes survived (owner: "shake direction wrong"). The shake magnitude is omnidirectional `√(x²+y²+z²)`,
+  so the window is direction-agnostic. `AppModule`
   injects `sensitivity` (via new non-suspend `ContextEngine.effectiveSnapshot`) + proximity-near (live
   `PipelineState.proximityNear`). This structurally retires the S14 grab-to-wake false-fire (PanicGate's
   old screen-on grace + cooldown): a pocketed phone reads proximity-near (not armed) and the shake gate

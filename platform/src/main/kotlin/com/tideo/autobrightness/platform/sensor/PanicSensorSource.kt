@@ -206,10 +206,12 @@ class AndroidPanicSensorSource(
         // gravity-stripped accelerometer residual.
         var shakeMagnitude = 0.0
 
-        fun endWindow(consume: Boolean) {
+        // Both window outcomes — a qualifying shake (fire) and the 10 s timeout (veto) — consume the
+        // gesture: it will not re-arm until the phone is flipped straight and inverted again (D-021).
+        fun endWindow() {
             windowActive = false
             shakeGate = null
-            if (consume) gate.consume()
+            gate.consume()
         }
 
         val accelListener = object : SensorEventListener {
@@ -220,16 +222,19 @@ class AndroidPanicSensorSource(
                 val armed = sustainedUpsideDown && interactive.get() && !isNear()
 
                 if (windowActive) {
+                    // Faithful to the A2 Java: once armed, the 10 s window runs to completion and is NOT
+                    // re-gated on orientation. A vigorous up-and-down shake while inverted is along the
+                    // SAME axis as gravity, so it transiently disturbs the gravity-based `isUpsideDown`
+                    // estimate; abandoning the window on that flicker made up-down shakes self-cancel while
+                    // orthogonal left-right shakes survived (owner: "shake direction wrong"). The shake
+                    // magnitude is omnidirectional, so the window must not depend on shake direction.
                     when {
-                        // Armed condition dropped (flipped straight / covered / screen off) → abandon the
-                        // window WITHOUT consuming: it was interrupted, not a real veto.
-                        !armed -> endWindow(consume = false)
                         // 10 s elapsed with no qualifying shake → veto (consume; needs a re-entry to re-arm).
-                        now >= windowDeadline -> endWindow(consume = true)
+                        now >= windowDeadline -> endWindow()
                         // Feed the shake; a completed gate fires the panic and consumes the gesture.
                         shakeGate?.onSample(shakeMagnitude) == true -> {
                             trySend(Unit)
-                            endWindow(consume = true)
+                            endWindow()
                         }
                     }
                 } else if (gate.canArm(armed, detector.isUpsideDown)) {
