@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.state
 
+import com.tideo.autobrightness.app.runtime.CircadianLocationStatus
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /**
@@ -35,6 +36,10 @@ data class DashboardUiState(
      *  Drives the amber "live data may be stale" banner, shown only while [serviceRunning] (S12.9d). */
     val stale: Boolean = false,
     val health: ServiceHealthUiState = ServiceHealthUiState(),
+    /** D-110: freshness of the location backing the live circadian modifier; null when dynamic scaling
+     *  is off (no hint). When [CircadianLocationStatus.isStale] or no location, the dashboard shows a
+     *  hint to turn Location on briefly so the modifier stops running on a stale/default sun position. */
+    val circadianLocation: CircadianLocationStatus? = null,
 )
 
 data class ServiceHealthUiState(

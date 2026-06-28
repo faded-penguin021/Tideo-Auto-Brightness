@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
+import com.tideo.autobrightness.app.runtime.CircadianLocationStatus
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
@@ -12,6 +13,7 @@ import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.LocationResult
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -35,6 +37,25 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
     /** G3-F12 / D-105: whether the ip-api.com geo-IP fallback may run (privacy opt-IN, default off). */
     val geoIpEnabled: StateFlow<Boolean> = store.geoIpEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /**
+     * D-110: freshness of the location backing the live circadian modifier, for the staleness hint. A
+     * pinned fixed location is never stale; a cached fix from a previous day is stale (with its age in
+     * days); no cached fix at all → the modifier is on the default windows (≈0.85) until a fix lands.
+     * Mirrors [com.tideo.autobrightness.app.runtime.CircadianWindowProvider.current]'s fallback chain so
+     * the UI hint matches what the pipeline actually uses.
+     */
+    val circadianLocationStatus: StateFlow<CircadianLocationStatus> =
+        store.dateLocation.combine(store.cachedSunLocation) { ov, cache ->
+            val today = System.currentTimeMillis() / 1000L / 86_400L
+            when {
+                ov.latitude != null && ov.longitude != null ->
+                    CircadianLocationStatus(ov.latitude, ov.longitude, resolvedForDay = today, today = today, fixed = true)
+                cache != null ->
+                    CircadianLocationStatus(cache.latitude, cache.longitude, resolvedForDay = cache.day, today = today, fixed = false)
+                else -> CircadianLocationStatus(today = today)
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CircadianLocationStatus())
 
     fun setGeoIpEnabled(enabled: Boolean) {
         viewModelScope.launch { store.setGeoIpEnabled(enabled) }

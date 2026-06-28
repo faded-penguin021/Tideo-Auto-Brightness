@@ -267,6 +267,70 @@ class CircadianWindowProviderTest {
         scope.cancel()
     }
 
+    // ----- D-110: stale cached location is a fallback across the day rollover -----
+
+    @Test
+    fun staleCachedLocation_acrossDayRollover_stillComputesTodaysWindows_D110() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val today = midJuneEpochSec() / 86_400L
+        val yesterday = today - 1
+        var refreshed = 0
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(), // no live fix
+            geoIpFallback = { null },        // geo-IP off
+            loadCachedLocation = { CachedSunLocation(lat, lon, yesterday) }, // cache from YESTERDAY
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        provider.onWindowsRefreshed = { refreshed++ }
+        val w = provider.current(transitionFactor)
+        // The day rolled over and no fresh fix exists, but the stale cache must still drive TODAY's
+        // windows instead of returning null → the default-window 0.85 (the owner's report).
+        assertNotNull(w, "a day-old cached location must still produce windows (D-110), not null")
+        assertEquals(CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor), w)
+        // Staleness is surfaced for the UI hint.
+        assertTrue(provider.status.isStale, "a day-old cache is stale")
+        assertEquals(1L, provider.status.ageDays, "cache age is 1 day")
+        assertTrue(refreshed >= 1, "seeding a cached location recomputes (onWindowsRefreshed)")
+        scope.cancel()
+    }
+
+    @Test
+    fun freshFixToday_isNotStale_D110() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(lastKnown = LocationSnapshot(lat, lon)),
+            geoIpFallback = { null },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        provider.current(transitionFactor)
+        assertFalse(provider.status.isStale, "a fix acquired today is fresh")
+        assertEquals(0L, provider.status.ageDays)
+        scope.cancel()
+    }
+
+    @Test
+    fun noLocationEver_statusHasNoLocation_D110() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(),
+            geoIpFallback = { null },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+        assertNull(provider.current(transitionFactor))
+        assertFalse(provider.status.hasLocation, "no fix anywhere → status has no location")
+        assertFalse(provider.status.isStale)
+        scope.cancel()
+    }
+
     // ----- F73: tz offset is taken at the TARGET date instant (DST-aware) -----
 
     @Test

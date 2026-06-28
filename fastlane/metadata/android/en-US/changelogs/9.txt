@@ -1,0 +1,9 @@
+Bug fixes and polish:
+• At service start the correct profile now loads directly — no brief flash of the
+  Battery Saver profile before the real battery level is read.
+• PWM-sensitive software dimming: the brightness read-out now follows the perceived
+  brightness, like Tasker, instead of sticking at the hardware floor.
+• Circadian: with location and IP fallback off, the day's curve now falls back to your
+  last cached sun position instead of a flat default. The Circadian screen and dashboard
+  show when the values are cached (and how old) until you refresh by turning Location on.
+• "Resume context automation" is now a clear gold banner with a play button.

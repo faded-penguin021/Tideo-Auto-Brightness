@@ -41,6 +41,16 @@ truth**; where any doc disagrees with the code, trust the code (and fix the doc)
 
 Each: *when · read first · code to touch · parity obligations · acceptance · record it.*
 
+> **Design coherence — READ FIRST for ANY UI/visual change** (a new screen, but also a banner, card,
+> chip, color, icon, or spacing tweak — playbooks 3 *and* 4/5 when they touch Compose). Read
+> `design/m3_audit.md` before styling and conform to it: the teal+gold palette is **frozen** (never
+> recolor — reach for `MaterialTheme.colorScheme.*`; gold = `secondary` = warnings/emphasis); group
+> content in `AabCard` (medium/large shape, `cardElevation`, `cardPadding`), never a flat list;
+> **colour-semantic banners (stale/override/resume) are tinted `Card`s** (`AabGold`/`AabOnGold` or a
+> `*Container` role), NOT `AabCard`; derived/live numerics use the gold `KeyValueRow` (B4); new strings
+> go through `stringResource` (`HardcodedStringCheckTest` ratchet); use `Dimens.*` tokens, not raw `dp`.
+> When in doubt, mirror the nearest existing component (e.g. the dashboard `StaleBanner`/`OverrideCard`).
+
 ### 1. Tasker profile added / changed / removed (a trigger context or pipeline gate)
 - **Read first:** `extraction/profiles.md` (+ `contexts_spec.md` for context watchers); the
   relevant `DEVIATIONS_LEDGER` rows (profile gating, ConditionList semantics). Re-read the XML

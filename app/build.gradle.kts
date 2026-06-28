@@ -23,11 +23,15 @@ android {
         // fix (DraftApplyBar Apply/Discard + Menu "Recheck Permissions" clipped under a button/3-key
         // nav bar). 1.1.0 (versionCode 7) bumps targetSdk to 36 (Android 16). 1.1.1 (versionCode 8) is a
         // security-hardening patch: notification/widget PendingIntents are made un-missably explicit
-        // (D-107, CodeQL java/android/implicit-pendingintents). RULE: build version must be ≥ the latest
+        // (D-107, CodeQL java/android/implicit-pendingintents). 1.2.0 (versionCode 9) ships runtime
+        // bug fixes + UX: D-108 service-start battery-saver flash, D-109 PWM-sensitive read-out tracks
+        // perceived brightness, D-110 circadian stale-location fallback + staleness hints (new
+        // user-facing surface → minor bump), D-111 golden "resume context automation" banner; plus the
+        // GitHub Actions Node-24 migration (CI only). RULE: build version must be ≥ the latest
         // `v*` tag on main and versionCode strictly greater than every released code — see RUNBOOK
         // "Cutting a release".
-        versionCode = 8
-        versionName = "1.1.1"
+        versionCode = 9
+        versionName = "1.2.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 

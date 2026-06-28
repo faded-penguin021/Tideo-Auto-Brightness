@@ -47,13 +47,26 @@ When in use, track stages here:
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
 > during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-108** (historical high-water mark D-107); never restart at D-001. A deviation, once
+> **D-113** (historical high-water mark D-112); never restart at D-001. A deviation, once
 > numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-28 — 1.2.0 / `versionCode 9`: runtime bug fixes + UX. **D-108** service-start battery-saver
+  flash (battery "unknown" `-1` sentinel; resolver won't match a battery rule until a real reading).
+  **D-109** PWM-sensitive read-out now tracks PERCEIVED brightness (`targetBrightness` = un-floored engine
+  value; `lastAppliedBrightness` stays the floored hardware value for override detection). **D-110**
+  circadian stale-location fallback across the day rollover + recompute-on-resolve (`onWindowsRefreshed`
+  → `reapply`) + staleness hints (`CircadianLocationStatus`) on the Circadian screen + dashboard (gold
+  tinted-`Card`, m3_audit-coherent). **D-111** "Resume context automation" restyled to a gold banner +
+  ▶ play button. **D-112** GitHub Actions Node-20 → Node-24 (all actions bumped to node24 majors;
+  `build.yml` carries a node24 pin policy comment). RUNBOOK gains a "Design coherence — read m3_audit.md
+  for ANY UI change" callout (owner request). Changelog `9.txt`. Owner sideloads `dist/` debug APK,
+  then squash-merges + tags `v1.2.0` (dist/ removed before/at merge). **Open (owner clarification):**
+  the Profiles/Contexts IA part of the same report (load/save modals, non-sticky top controls, built-in
+  profile prominence) is deferred — see D-111 note.
 - 2026-06-28 — 1.1.1 / `versionCode 8`: (D-107) security hardening — notification (`actionIntent`)
   and home-widget (`DashboardWidgetProvider`) PendingIntents made un-missably explicit (separate
   statements + `setPackage`, still `FLAG_IMMUTABLE`) to clear CodeQL `java/android/implicit-pendingintents`

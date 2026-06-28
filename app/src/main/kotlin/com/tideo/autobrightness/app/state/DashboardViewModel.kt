@@ -14,9 +14,12 @@ import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.runtime.BrightnessTileService
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
+import com.tideo.autobrightness.app.runtime.CircadianLocationStatus
 import com.tideo.autobrightness.app.runtime.ServiceHealthStore
 import com.tideo.autobrightness.app.runtime.Staleness
+import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.settings.validate
+import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.serviceHealthDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
@@ -42,6 +45,26 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val serviceEnabledFlow = app.settingsDataStore.data
         .map { it.validate().serviceEnabled }
         .distinctUntilChanged()
+
+    // D-110: circadian location freshness for the dashboard hint. Surfaced only when dynamic scaling is
+    // on (otherwise the location is irrelevant). Mirrors CircadianWindowProvider.current()'s fallback so
+    // the dashboard agrees with the live modifier; null = scaling off → no hint.
+    private val experimentPrefs = ExperimentPrefsStore(application.experimentPrefsDataStore)
+    private val circadianStatusFlow = combine(
+        app.settingsDataStore.data.map { it.validate().scalingEnabled }.distinctUntilChanged(),
+        experimentPrefs.dateLocation,
+        experimentPrefs.cachedSunLocation,
+    ) { scalingOn, ov, cache ->
+        if (!scalingOn) return@combine null
+        val today = System.currentTimeMillis() / 1000L / 86_400L
+        when {
+            ov.latitude != null && ov.longitude != null ->
+                CircadianLocationStatus(ov.latitude, ov.longitude, resolvedForDay = today, today = today, fixed = true)
+            cache != null ->
+                CircadianLocationStatus(cache.latitude, cache.longitude, resolvedForDay = cache.day, today = today, fixed = false)
+            else -> CircadianLocationStatus(today = today)
+        }
+    }
 
     private data class Live(
         val running: Boolean,
@@ -88,7 +111,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         liveFlow,
         privilegeManager.tierFlow(),
         healthFlow,
-    ) { enabled, live, tier, health ->
+        circadianStatusFlow,
+    ) { enabled, live, tier, health, circadian ->
         DashboardUiState(
             serviceEnabled = enabled,
             tier = tier,
@@ -107,6 +131,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             lastSampleMs = live.lastSampleMs,
             stale = live.stale,
             health = health,
+            circadianLocation = circadian,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 

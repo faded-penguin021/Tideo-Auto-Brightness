@@ -73,6 +73,27 @@ class ContextOverrideResolverTest {
     }
 
     @Test
+    fun batteryUnknown_negativePercent_neverMatchesBatteryRule() {
+        // D-108: the service-start seed snapshot reports -1 ("no reading yet"). A max-only saver rule
+        // (battery <= 20, unplugged) must NOT match the sentinel — otherwise the Battery Saver profile
+        // flashes for one cycle before the real reading arrives. A real 0% (dead battery) still matches.
+        val unknown = noon.copy(batteryPercent = -1)
+        val saver = rule("sv", profile = "SAVER", battery = BatteryConstraint(max = 20))
+        assertNull(ContextOverrideResolver.resolve(listOf(saver), unknown, userProfile = "MyProfile").activeContextName)
+        // onPower-only rule is likewise suppressed while the reading is unknown.
+        assertNull(
+            ContextOverrideResolver.resolve(
+                listOf(rule("p", battery = BatteryConstraint(onPower = false))),
+                unknown,
+                userProfile = "MyProfile",
+            ).activeContextName,
+        )
+        // A real reading of 0% (not the sentinel) is a genuine low battery and DOES match the saver.
+        val dead = noon.copy(batteryPercent = 0)
+        assertEquals("SAVER", ContextOverrideResolver.resolve(listOf(saver), dead, userProfile = "MyProfile").targetProfile)
+    }
+
+    @Test
     fun location_insideRadiusMatches_outsideDoesNot() {
         val here = noon.copy(lat = 51.5000, lon = -0.1000)
         val inside = rule("l", location = LocationConstraint(51.5001, -0.1001, 150.0))

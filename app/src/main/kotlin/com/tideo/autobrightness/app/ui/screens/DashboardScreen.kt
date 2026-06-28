@@ -37,6 +37,7 @@ import com.tideo.autobrightness.app.ui.components.AabTopBar
 import com.tideo.autobrightness.app.ui.components.BrightnessInstrument
 import com.tideo.autobrightness.app.ui.theme.AabDataCaption
 import com.tideo.autobrightness.app.ui.theme.AabDataDisplay
+import com.tideo.autobrightness.app.runtime.CircadianLocationStatus
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.app.ui.theme.AabOnGold
 import com.tideo.autobrightness.app.ui.theme.Dimens
@@ -129,6 +130,11 @@ fun DashboardContent(
                 OverrideCard(state.serviceRunning, onResume)
             }
             ReadoutStrip(state)
+            // D-110: dynamic scaling is on but the live modifier is running on a stale (day-old) or
+            // missing location — a quiet hint to turn Location on briefly so circadian tracks the real sun.
+            state.circadianLocation?.let { cl ->
+                if (cl.isStale || !cl.hasLocation) CircadianStaleHint(cl)
+            }
             QuickActionsCard(
                 serviceRunning = state.serviceRunning,
                 canAddTile = canAddTile,
@@ -184,6 +190,23 @@ private fun QuickActionsCard(
                 modifier = Modifier.fillMaxWidth().testTag("dashboard_add_widget"),
             ) { Text(stringResource(R.string.dashboard_add_widget)) }
         }
+    }
+}
+
+/** D-110: amber circadian staleness hint — the live modifier is on a day-old cached or default sun
+ *  position. Same gold convention as [StaleBanner]; tapping the Circadian screen lets the user refresh. */
+@Composable
+private fun CircadianStaleHint(status: CircadianLocationStatus) {
+    val text = if (status.isStale) {
+        stringResource(R.string.dashboard_circadian_stale, status.ageDays ?: 0L)
+    } else {
+        stringResource(R.string.dashboard_circadian_no_location)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("circadian_stale_hint"),
+        colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
+    ) {
+        Text(text, modifier = Modifier.padding(Dimens.cardPadding), style = MaterialTheme.typography.bodyMedium)
     }
 }
 

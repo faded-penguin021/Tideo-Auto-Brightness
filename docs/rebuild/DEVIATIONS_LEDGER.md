@@ -1836,3 +1836,67 @@ the permanent registry — never compress or remove them.
   (same component targeted, still `FLAG_IMMUTABLE`). Ships as 1.1.1 / versionCode 8. **Lesson:** for
   CodeQL-Kotlin, prefer non-chained Intent construction + an explicit `setPackage` on PendingIntents;
   the fluent one-liner reads as implicit even when it is not.
+
+- **D-108: service-start battery-saver flash — battery "unknown" must not match a battery rule
+  (owner-reported, 1.2.0).** On service start at night the system briefly applied the Battery Saver
+  context profile (battery far above the trigger) before switching to the correct night-reading
+  profile. Root cause: the seed `GENERAL` evaluation in `ContextEngine.start()` runs before the
+  battery `callbackFlow` delivers its first (sticky) value, and `SignalSnapshot.batteryPercent`
+  defaulted to **0** — which satisfies a "battery ≤ max" saver rule, so the saver matched for one
+  cycle until the real reading (e.g. 80%) reverted it. **Fix (two parts):** (1) `ContextOverrideResolver`
+  now treats a NEGATIVE `batteryPercent` as "unknown → a battery condition cannot be asserted → the
+  rule does not match" (a real 0% dead battery still matches); (2) `SignalSnapshot.batteryPercent`
+  defaults to **-1** (unknown) until the first real reading, and the BATTERY veto gate always lets the
+  first real reading through (`lastBatt < 0`) so a genuinely low first reading isn't swallowed by the
+  ±5% debounce. The seed eval now picks the correct time-based profile directly. Tests:
+  `ContextOverrideResolverTest.batteryUnknown_*`, `ContextEngineTest.serviceStart_*_D108`.
+
+- **D-109: PWM-sensitive read-out tracks PERCEIVED brightness, not the hardware floor (owner-reported,
+  1.2.0; refines D-050/D-051e).** D-051e correctly floored the *hardware* write to `%AAB_DimmingThreshold`
+  in PWM-sensitive mode, but it also published that floored value to `PipelineState.targetBrightness`,
+  so the hero brightness read-out stuck at the floor instead of following the calculated (perceived)
+  brightness as in Tasker. **Fix:** in `PipelineCycleRunner` keep `lastAppliedBrightness` = the floored
+  HARDWARE value (override-detection baseline + Live Debug "current"), but set `targetBrightness`
+  (read-out / notification / widget) = the engine's UN-floored `output.targetBrightness` (the perceived
+  value the secure/overlay layer darkens the panel down to). This restores the documented field
+  semantics ("targetBrightness = last target the engine produced"). The two coincide unless PWM-sensitive
+  floors the hardware. Test: `BrightnessPipelineControllerTest.pwmSensitive_floorsHardwareButReadoutTracksPerceived`.
+
+- **D-110: circadian falls back on the cached sun location across the day rollover, and surfaces
+  staleness (owner-reported, 1.2.0).** With Location off and the IP fallback off, on the *next day* the
+  circadian modifier showed the flat default scale (≈0.85 at 07:34, NL) while the graph looked correct —
+  the chart reads `lastKnownLocation`/a representative fallback directly, but the pipeline's
+  `CircadianWindowProvider` could leave the live modifier on the `TimeContext` default windows. Two
+  causes addressed: (1) on a cold start in STEADY light the async cache/geo-IP fix landed AFTER the
+  initial brightness was set with the default windows, and prof760 then dropped every steady-light cycle
+  → nothing recomputed. New `onWindowsRefreshed` callback (wired in `AppModule` to `controller.reapply()`)
+  fires when a location resolves (cache seed or async acquire); its setter also fires once immediately if
+  a location already resolved before the callback was wired, so the recompute is never lost to
+  construction-vs-wiring ordering. (2) `current()` now explicitly falls back to the last resolved
+  location even after the day rolls over and no fresh fix is available, computing TODAY's windows with the
+  cached coordinates. Freshness is exposed via `CircadianLocationStatus` (has-location / age-days / stale)
+  and surfaced as a gold staleness banner on the Circadian screen and a gold hint on the dashboard
+  (derived in the view-models from the persisted `cachedSunLocation` flow, mirroring the provider's
+  fallback). Tests: `CircadianWindowProviderTest.*_D110`. Banners follow the m3_audit tinted-`Card`
+  convention (gold `secondary`/emphasis), coherent with the dashboard `StaleBanner`.
+
+- **D-111: "Resume context automation" is a gold banner with a play button (owner-reported, 1.2.0).**
+  The manual-context-lock resume control (`ProfilesScreen` `context_lock_banner`) used a teal
+  `tertiaryContainer` card with a plain outlined text button — the owner wanted the Tasker "golden
+  banner with a play button". Restyled to the gold `secondaryContainer` + a `FilledTonalButton` with a
+  leading ▶ `Icons.Filled.PlayArrow`, coherent with the dashboard `OverrideCard` resume affordance and
+  the m3_audit gold-emphasis role (`secondary`). UI-only; the resume wiring (`resumeContextAutomation`)
+  is unchanged. **Note:** the broader Profiles/Contexts information-architecture ask in the same report
+  (load/save as modals, non-sticky top controls, built-in-profile prominence) is NOT in this change —
+  the current screen already uses a scrolling `SegmentedButton` + per-profile load/save dialogs, so the
+  described layout didn't map cleanly; deferred pending owner clarification.
+
+- **D-112: GitHub Actions Node-20 → Node-24 runtime migration (CI only, 1.2.0).** GitHub deprecated the
+  Node 20 action runtime (runners default to Node 24 from 2026-06-16, Node 20 removed 2026-09-16), so
+  every workflow emitted Node-20 deprecation warnings. Bumped each action to a major that declares
+  `runs.using: node24` (verified against each action's `action.yml`): `actions/cache@v4→v5`,
+  `actions/upload-artifact@v4→v6`, `android-actions/setup-android@v3→v4`, `actions/github-script@v7→v8`
+  (NOT v9, which is ESM-only/breaking), `github/codeql-action/{init,analyze}@v3→v4`,
+  `softprops/action-gh-release@v2→v3`; `actions/checkout@v5` + `actions/setup-java@v5` were already
+  node24. Added a "Node 24 runtime policy" comment block to `build.yml` documenting the pins so they
+  aren't downgraded. No code/behaviour change.

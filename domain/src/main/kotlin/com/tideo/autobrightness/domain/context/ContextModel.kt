@@ -51,6 +51,9 @@ data class ContextSignals(
     val app: String = "",
     val lat: Double = 0.0,
     val lon: Double = 0.0,
+    /** 0..100, or a negative sentinel (e.g. -1) meaning "no battery reading yet" — battery rules then
+     *  cannot match (ContextOverrideResolver), so the service-start placeholder can't trigger a saver
+     *  profile before the first real reading arrives (D-108). */
     val batteryPercent: Int = 0,
     val plugged: Boolean = false,
     /** Calendar.DAY_OF_WEEK 1=Sun..7=Sat. */

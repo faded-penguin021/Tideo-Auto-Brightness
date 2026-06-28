@@ -54,6 +54,12 @@
 
     <!-- Dashboard -->
     <string name="dashboard_stale_banner">Live data may be stale — the monitor may have stopped responding.</string>
+    <string name="dashboard_circadian_stale">Circadian using a sun position cached %1$d day(s) ago — turn on Location briefly to refresh.</string>
+    <string name="dashboard_circadian_no_location">Circadian using default sun times (no location) — turn on Location briefly for accurate sunrise/sunset.</string>
+
+    <!-- Circadian -->
+    <string name="circadian_stale_banner">Showing cached sun events from %1$d day(s) ago. Turn on Location briefly — or enable the IP fallback below — to refresh sunrise/sunset.</string>
+    <string name="circadian_no_location_banner">No location yet, so circadian is using default sun times. Turn on Location briefly — or enable the IP fallback below — for accurate sunrise/sunset.</string>
     <string name="dashboard_tier_none">No write access — tap to set up</string>
     <string name="dashboard_tier_basic">Basic access (Modify system settings)</string>
     <string name="dashboard_tier_elevated">Elevated access (super dimming ready)</string>

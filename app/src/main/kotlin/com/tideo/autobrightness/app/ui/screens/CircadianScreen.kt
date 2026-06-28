@@ -5,7 +5,10 @@ import com.tideo.autobrightness.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,6 +79,7 @@ fun CircadianScreen(
     // F39: the Circadian fixed date/location override + its live-data defaults (today + location).
     val dateLocation by extras.dateLocation.collectAsStateWithLifecycle()
     val geoIpEnabled by extras.geoIpEnabled.collectAsStateWithLifecycle() // G3-F12 / D-105 privacy opt-in
+    val locationStatus by extras.circadianLocationStatus.collectAsStateWithLifecycle() // D-110 staleness hint
     var defaultLatLon by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         defaultLatLon = runCatching { extras.defaultLatLon() }.getOrNull()
@@ -87,6 +91,7 @@ fun CircadianScreen(
         onBack = { navController.popBackStack() },
         criticalError = criticalError,
         live = live,
+        locationStatus = locationStatus,
         dateLocation = dateLocation,
         todayDate = extras.today(),
         defaultLatLon = defaultLatLon,
@@ -129,6 +134,8 @@ fun CircadianContent(
     criticalError: Boolean = false,
     onReset: (() -> Unit)? = null,
     live: PipelineState = PipelineState(),
+    locationStatus: com.tideo.autobrightness.app.runtime.CircadianLocationStatus =
+        com.tideo.autobrightness.app.runtime.CircadianLocationStatus(),
     dateLocation: ExperimentDateLocation = ExperimentDateLocation(),
     todayDate: String = "",
     defaultLatLon: Pair<Double, Double>? = null,
@@ -177,6 +184,13 @@ fun CircadianContent(
                     },
                 ),
             )
+
+            // D-110: when dynamic scaling is on but the live location is stale or missing, the modifier
+            // is running on a day-old cached sun position (or the default windows) — surface that, with
+            // the cache age, and point the user at turning Location on briefly (or the IP fallback below).
+            if (draft.scalingEnabled && (locationStatus.isStale || !locationStatus.hasLocation)) {
+                CircadianStaleBanner(locationStatus)
+            }
 
             // Live glass-box readout: uncompressed vs true (taper-compressed) circadian scale (G2R-F8).
             CircadianDiagnosticCard(
@@ -369,6 +383,33 @@ fun CircadianDateLocationCard(
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
         ) { DatePicker(state = state) }
     }
+    }
+}
+
+/**
+ * D-110: amber hint shown on the Circadian screen when dynamic scaling is active but the location
+ * backing the live modifier is stale (a cached fix from a previous day) or missing (default sun times).
+ *
+ * Coherent with the M3 audit (design/m3_audit.md §3 row 2): colour-semantic banners (stale/override) are
+ * intentionally tinted `Card`s — NOT `AabCard` section containers — using the gold `secondary`-family
+ * accent reserved for warnings/emphasis. Same `AabGold`/`AabOnGold` convention as the dashboard
+ * `StaleBanner`/`CircadianStaleHint`, so the two staleness surfaces read identically.
+ */
+@Composable
+private fun CircadianStaleBanner(status: com.tideo.autobrightness.app.runtime.CircadianLocationStatus) {
+    val text = if (status.isStale) {
+        stringResource(R.string.circadian_stale_banner, status.ageDays ?: 0L)
+    } else {
+        stringResource(R.string.circadian_no_location_banner)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("circadian_stale_banner"),
+        colors = CardDefaults.cardColors(
+            containerColor = com.tideo.autobrightness.app.ui.theme.AabGold,
+            contentColor = com.tideo.autobrightness.app.ui.theme.AabOnGold,
+        ),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(12.dp))
     }
 }
 

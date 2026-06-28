@@ -100,7 +100,12 @@ object ContextOverrideResolver {
 
             if (isMatch && rule.battery != null) {
                 val batt = rule.battery
-                if (batt.min != null && signals.batteryPercent < batt.min) isMatch = false
+                // Battery unknown (no reading yet) → a battery condition cannot be asserted, so the
+                // rule does not match. Guards the service-start flash where the placeholder 0% would
+                // satisfy a "battery <= max" saver rule before the first real reading arrives
+                // (D-108): without this, an unplugged max-only rule would falsely match at percent 0.
+                if (signals.batteryPercent < 0) isMatch = false
+                if (isMatch && batt.min != null && signals.batteryPercent < batt.min) isMatch = false
                 if (isMatch && batt.max != null && signals.batteryPercent > batt.max) isMatch = false
                 if (isMatch && batt.onPower != null && batt.onPower != signals.plugged) isMatch = false
                 specificity++

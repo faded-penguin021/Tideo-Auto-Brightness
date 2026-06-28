@@ -91,7 +91,12 @@ internal class PipelineCycleRunner(
             val output = engine.evaluate(buildInput(rawLux, settings, s))
             val from = brightness.read()
             // task661 act22-26 / task698 step 3: hold the hardware floor in PWM-sensitive mode (D-050).
+            // `target` is the HARDWARE write (floored up to the PWM threshold); `perceived` is the engine's
+            // un-floored brightness — what the user actually sees once the secure/overlay layer darkens
+            // below the floor. The read-out tracks `perceived` (D-109): with PWM-sensitive on, the hero
+            // brightness number must follow the calculated brightness as in Tasker, not stick at the floor.
             val target = applyPwmFloor(output.targetBrightness, settings)
+            val perceived = output.targetBrightness
 
             // %AAB_Debug 3/4: Flash the light-evaluation + dynamic-scale figures (D-023, G2-F15).
             debug.emit(DebugCategory.LIGHT_EVAL, settings.debugLevel) {
@@ -111,7 +116,9 @@ internal class PipelineCycleRunner(
                 // so the Dashboard instrument stayed frozen during the transition and then snapped. With
                 // the target out early the instrument's animateIntAsState rolls toward it DURING the
                 // sweep; the final update below lands lastAppliedBrightness on it (no jump).
-                ctx.update { it.copy(targetBrightness = target) }
+                // Publish the PERCEIVED destination (D-109) so the instrument rolls toward the calculated
+                // brightness, not the PWM hardware floor.
+                ctx.update { it.copy(targetBrightness = perceived) }
                 // %AAB_Debug 1 "Skip Animations": jump straight to the target (Tasker debug mode).
                 if (settings.debugLevel == DebugCategory.SKIP_ANIMATIONS.level) {
                     brightness.write(target)
@@ -170,8 +177,11 @@ internal class PipelineCycleRunner(
                     scaleDynamic = output.scaleDynamic,
                     scaleDynamicCompress = output.scaleDynamicCompress,
                     scalingUse = settings.scalingEnabled,
+                    // lastAppliedBrightness = the actual HARDWARE value (floored) — override-detection
+                    // baseline + Live Debug "current"; targetBrightness = the PERCEIVED engine value the
+                    // read-out follows (D-109). They coincide unless PWM-sensitive floors the hardware.
                     lastAppliedBrightness = target,
-                    targetBrightness = target,
+                    targetBrightness = perceived,
                     dimmingCurrent = dimCurrent,
                     dimmingDS = dimDS,
                     // Live Debug "Performance & Timings" parity (G2R-F29).
@@ -331,6 +341,7 @@ internal class PipelineCycleRunner(
             // previous = null → engine's first-run path maps the reading straight to a target.
             val output = engine.evaluate(buildInput(lux, settings, PipelineState()))
             val target = applyPwmFloor(output.targetBrightness, settings)
+            val perceived = output.targetBrightness
             brightness.forceManualMode()
             brightness.write(target)
             // F65: dimming decides off the un-floored engine target, not the PWM-floored write (above).
@@ -341,8 +352,8 @@ internal class PipelineCycleRunner(
             ctx.armInitialSettle(clock() + INITIAL_SETTLE_MS)
             ctx.update {
                 it.copy(
-                    lastAppliedBrightness = target,
-                    targetBrightness = target,
+                    lastAppliedBrightness = target,    // actual hardware write (floored)
+                    targetBrightness = perceived,      // perceived read-out (D-109)
                     lastAcceptedMs = clock(),
                 )
             }

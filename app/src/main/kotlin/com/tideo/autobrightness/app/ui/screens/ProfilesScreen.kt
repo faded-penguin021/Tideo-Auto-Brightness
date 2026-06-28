@@ -13,12 +13,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -156,19 +158,28 @@ fun ProfilesBody(
             }
         }
     }
-    // G2R-F30: a manual profile load pauses context automation; offer a Resume control.
+    // G2R-F30 / D-111: a manual profile load pauses context automation; offer a Resume control. Styled
+    // as the Tasker "golden banner with a play button" — the gold `secondaryContainer` + leading ▶ icon,
+    // coherent with the dashboard's `OverrideCard` resume affordance and the M3 audit's gold-emphasis
+    // role (design/m3_audit.md §2.4: `secondary`/gold = emphasis/warnings). Was a teal `tertiaryContainer`
+    // card with a plain text button.
     if (contextLocked) {
         Card(
             Modifier.fillMaxWidth().testTag("context_lock_banner"),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     "Context automation is paused after a manual profile load.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
-                OutlinedButton(onClick = onResumeContext, modifier = Modifier.testTag("resume_context")) {
+                FilledTonalButton(onClick = onResumeContext, modifier = Modifier.testTag("resume_context")) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
                     Text("Resume context automation")
                 }
             }

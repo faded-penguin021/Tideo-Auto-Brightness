@@ -266,9 +266,10 @@ class BrightnessPipelineControllerTest {
     }
 
     // G2R-F27/D-050: in PWM-sensitive mode the HARDWARE brightness is floored at the dimming
-    // threshold when the target would fall below it (task698 step 3).
+    // threshold when the target would fall below it (task698 step 3). D-109: the read-out
+    // (targetBrightness) must still track the PERCEIVED (un-floored) brightness, NOT stick at the floor.
     @Test
-    fun pwmSensitive_floorsHardwareAtDimmingThreshold() = runTest {
+    fun pwmSensitive_floorsHardwareButReadoutTracksPerceived() = runTest {
         val sensor = FakeSensor()
         val brightness = FakeBrightness()
         val pwm = settings.copy(minBrightness = 1, pwmSensitive = true, dimmingThreshold = 40)
@@ -280,8 +281,12 @@ class BrightnessPipelineControllerTest {
         controller.start()
         sensor.flow.emit(sample(lux = 1.0)) // maps to ~5, below threshold 40
         advanceUntilIdle()
-        assertEquals(40, controller.state.value.targetBrightness, "PWM floor holds hardware at threshold")
-        assertEquals(40, brightness.writes.last())
+        // Hardware write + lastAppliedBrightness are floored to the threshold (D-050).
+        assertEquals(40, brightness.writes.last(), "PWM floor holds the hardware write at threshold")
+        assertEquals(40, controller.state.value.lastAppliedBrightness, "hardware-applied value is floored")
+        // The read-out tracks the perceived, un-floored calculated brightness (D-109).
+        val perceived = controller.state.value.targetBrightness!!
+        assertTrue(perceived < 40, "read-out follows the perceived (un-floored) brightness, not the floor; was $perceived")
         scope.cancel()
     }
 

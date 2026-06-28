@@ -316,7 +316,11 @@ class ContextEngine(
             }
             ContextCaller.LOCATION -> tokens.usesLocation
             ContextCaller.BATTERY ->
-                tokens.usesBattery && (signals.plugged != (lastPlug == 1) || abs(signals.batteryPercent - lastBatt) >= BATTERY_DELTA_THRESHOLD)
+                // lastBatt < 0 = first real reading after the unknown seed (D-108): always evaluate it
+                // (a low real battery, e.g. 2%, is within BATTERY_DELTA_THRESHOLD of the -1 sentinel and
+                // would otherwise be vetoed, suppressing a legitimate saver match at start-up).
+                tokens.usesBattery && (lastBatt < 0 || signals.plugged != (lastPlug == 1) ||
+                    abs(signals.batteryPercent - lastBatt) >= BATTERY_DELTA_THRESHOLD)
             ContextCaller.WIFI -> tokens.usesWifi && signals.wifi != lastWifi
             ContextCaller.TIME, ContextCaller.GENERAL, ContextCaller.RESUME -> true
         }
@@ -435,7 +439,12 @@ enum class ContextCaller(val cooldownMs: Long) {
  */
 data class SignalSnapshot(
     val app: String = "",
-    val batteryPercent: Int = 0,
+    // -1 = no battery reading yet (D-108). The seed GENERAL evaluation at start() runs before the
+    // battery callbackFlow delivers its first (sticky) value; a 0 placeholder would satisfy a
+    // "battery <= max" saver rule and flash the Battery Saver profile for one cycle before the real
+    // reading (e.g. 80%) reverts it. ContextOverrideResolver treats a negative percent as "unknown →
+    // battery rules don't match", so the seed eval picks the correct (time-based) profile directly.
+    val batteryPercent: Int = -1,
     val plugged: Boolean = false,
     val wifi: String = "",
     val lat: Double = 0.0,
