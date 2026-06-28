@@ -3,12 +3,33 @@ package com.tideo.autobrightness.app.ui.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,7 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -29,12 +54,15 @@ import com.tideo.autobrightness.app.settings.LegacyConfigEntry
 import com.tideo.autobrightness.app.settings.LegacyConfigImporter
 import com.tideo.autobrightness.app.settings.ProfileImportExportManager
 import com.tideo.autobrightness.app.settings.ProfileLoadResult
+import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.state.ContextsViewModel
 import com.tideo.autobrightness.app.state.SettingsViewModel
-import com.tideo.autobrightness.app.ui.components.SettingsColumn
+import com.tideo.autobrightness.app.ui.components.EmptyState
+import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.rememberToaster
+import com.tideo.autobrightness.app.ui.theme.Dimens
 import com.tideo.autobrightness.platform.context.LocationResult
 import com.tideo.autobrightness.platform.context.SsidResult
 import kotlinx.coroutines.launch
@@ -64,6 +92,11 @@ fun ProfilesContextsScreen(
     // --- Profiles side (SettingsViewModel) ---
     val settings by settingsVm.settings.collectAsStateWithLifecycle()
     val profiles by settingsVm.profiles.collectAsStateWithLifecycle()
+    // %AAB_CurrentActiveProfile — highlight the in-force profile in the list (owner: "seeing the active
+    // profile here is useful"), mirroring Tasker's "Active Profile: …" readout.
+    val activeProfile by com.tideo.autobrightness.app.runtime.LiveRuntimeState.activeProfile.collectAsStateWithLifecycle()
+    // %AAB_ActiveContext — the winning rule's name, to emphasise the active rule in the Contexts modal.
+    val activeContext by com.tideo.autobrightness.app.runtime.LiveRuntimeState.activeContext.collectAsStateWithLifecycle()
     val manager = remember { ProfileImportExportManager(context.applicationContext) }
     var status by remember { mutableStateOf<String?>(null) }
     // S12.9c #3: a user-visible error card for an unreadable profile file (ProfileLoadResult.TotalFailure).
@@ -138,67 +171,130 @@ fun ProfilesContextsScreen(
     var solarLabel by remember { mutableStateOf<Pair<String, String>?>(null) }
     LaunchedEffect(Unit) { solarLabel = runCatching { contextsVm.solarTimes() }.getOrNull() }
 
-    // S13c' §07 declutter: the screen stacked a profile library ON TOP of the automation-rules list in
-    // one endless scroll. Split the two jobs behind a SegmentedButton so only one is shown at a time
-    // (half the scroll), while keeping the single destination (a rule targets a profile).
-    var tab by remember { mutableStateOf(0) }
+    // D-111 (owner): the Tasker information architecture — a STICKY Load / Save / Contexts action bar
+    // pinned under the app bar (it stays put while the list scrolls), with the built-in/saved profiles
+    // listed directly below it (no longer hidden behind a tab). Each top action opens its own modal,
+    // the way the rule editor already does. Replaces the scrolling Profiles/Rules SegmentedButton.
+    var showLoad by remember { mutableStateOf(false) }
+    var showSave by remember { mutableStateOf(false) }
+    var showContexts by remember { mutableStateOf(false) }
+    // G2R-F38 "Load Anyway" preview before applying a saved profile from the visible list.
+    var previewProfile by remember { mutableStateOf<SavedProfile?>(null) }
+    var showCurrentSettings by remember { mutableStateOf(false) }
+
+    fun loadLegacy(entry: LegacyConfigEntry) {
+        scope.launch {
+            status = runCatching {
+                handleLoad(manager.importFromDocument(entry.uri), "Loaded ${entry.name}") { imported ->
+                    // G2R-F44: register the legacy profile under its file name so it's selectable as a
+                    // context-rule target without a manual re-save, then apply it live.
+                    val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
+                    settingsVm.saveImportedProfile(profileName, imported)
+                    settingsVm.replaceAll(imported)
+                }
+            }.getOrElse { loadError = it.message; "Load failed: ${it.message}" }
+            status?.let(toast)
+        }
+    }
 
     SettingsScaffold(stringResource(R.string.title_profiles_contexts), { navController.popBackStack() }) { padding ->
-        SettingsColumn(padding) {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = tab == 0,
-                    onClick = { tab = 0 },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    modifier = Modifier.testTag("seg_profiles"),
-                ) { Text(stringResource(R.string.seg_profiles)) }
-                SegmentedButton(
-                    selected = tab == 1,
-                    onClick = { tab = 1 },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    modifier = Modifier.testTag("seg_rules"),
-                ) { Text(stringResource(R.string.seg_rules)) }
-            }
-
-            if (tab == 0) ProfilesBody(
-                profiles = profiles,
-                legacyEntries = legacyEntries,
-                contextLocked = settings.contextOverride,
-                currentSettings = settings,
-                status = status,
-                onApplyProfile = { name -> settingsVm.applyProfile(name); toast("Applied profile: $name") },
-                onOverwriteProfile = { name -> settingsVm.saveCurrentAs(name); toast("Overwrote: $name") },
-                onDeleteProfile = { name -> settingsVm.deleteProfile(name); toast("Deleted: $name") },
-                onSaveCurrentAs = { name -> settingsVm.saveCurrentAs(name); toast("Saved profile: $name") },
-                onRestoreFactory = { settingsVm.restoreFactoryProfiles(); toast("Factory profiles restored") },
-                onResumeContext = { settingsVm.resumeContextAutomation(); toast("Context automation resumed") },
-                onReset = { settingsVm.resetDefaults(); toast("Reset to defaults") },
-                onExport = { exportLauncher.launch("tideo-profile.json") },
-                onImport = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                onChooseLegacyFolder = { folderLauncher.launch(null) },
-                onLoadLegacy = { entry ->
-                    scope.launch {
-                        status = runCatching {
-                            handleLoad(manager.importFromDocument(entry.uri), "Loaded ${entry.name}") { imported ->
-                                // G2R-F44: register the legacy profile under its file name so it's selectable
-                                // as a context-rule target without a manual re-save, then apply it live.
-                                val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
-                                settingsVm.saveImportedProfile(profileName, imported)
-                                settingsVm.replaceAll(imported)
-                            }
-                        }.getOrElse { loadError = it.message; "Load failed: ${it.message}" }
-                        status?.let(toast)
-                    }
-                },
-                loadError = loadError,
-                onDismissLoadError = { loadError = null },
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            // STICKY action bar — pinned outside the scroll so Load/Save/Contexts stay reachable.
+            ProfilesActionBar(
+                onLoad = { showLoad = true },
+                onSave = { showSave = true },
+                onContexts = { showContexts = true },
             )
+            // SCROLLING content: the resume banner + the saved/built-in profiles, directly visible.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Dimens.screenPaddingHorizontal),
+                verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing),
+            ) {
+                if (settings.contextOverride) {
+                    ContextLockBanner { settingsVm.resumeContextAutomation(); toast("Context automation resumed") }
+                }
+                SectionHeader(stringResource(R.string.seg_profiles), divider = true)
+                if (profiles.isEmpty()) EmptyState(stringResource(R.string.profiles_no_saved), testTag = "empty_profiles")
+                profiles.forEach { entry ->
+                    ProfileCard(
+                        entry,
+                        isActive = entry.name == activeProfile,
+                        onApply = { previewProfile = entry },
+                        onOverwrite = { name -> settingsVm.saveCurrentAs(name); toast("Overwrote: $name") },
+                        onDelete = { name -> settingsVm.deleteProfile(name); toast("Deleted: $name") },
+                    )
+                }
+                status?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
+            }
+        }
+    }
 
-            if (tab == 1) ContextRulesSection(
+    // --- Modals (each top action opens its own, like the rule editor) ---
+
+    // Save: name the current settings as a new profile (gold changed-vs-default diff inside).
+    if (showSave) {
+        SaveProfileDialog(
+            currentSettings = settings,
+            onDismiss = { showSave = false },
+            onConfirm = { name -> showSave = false; settingsVm.saveCurrentAs(name); toast("Saved profile: $name") },
+        )
+    }
+
+    // Load & manage: import/legacy/restore/reset/export/view — the "load from elsewhere" + housekeeping.
+    if (showLoad) {
+        LoadManageDialog(
+            legacyEntries = legacyEntries,
+            onImport = { showLoad = false; importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+            onChooseLegacyFolder = { folderLauncher.launch(null) },
+            onLoadLegacy = { entry -> showLoad = false; loadLegacy(entry) },
+            onRestoreFactory = { showLoad = false; settingsVm.restoreFactoryProfiles(); toast("Factory profiles restored") },
+            onReset = { showLoad = false; settingsVm.resetDefaults(); toast("Reset to defaults") },
+            onExport = { showLoad = false; exportLauncher.launch("tideo-profile.json") },
+            onViewCurrent = { showLoad = false; showCurrentSettings = true },
+            onDismiss = { showLoad = false },
+        )
+    }
+
+    // Apply a saved profile picked from the visible list (preview then apply).
+    previewProfile?.let { entry ->
+        LoadProfileDialog(
+            profile = entry,
+            onDismiss = { previewProfile = null },
+            onConfirm = { previewProfile = null; settingsVm.applyProfile(entry.name); toast("Applied profile: ${entry.name}") },
+        )
+    }
+
+    if (showCurrentSettings) {
+        CurrentSettingsDialog(settings = settings, onDismiss = { showCurrentSettings = false })
+    }
+
+    // An unreadable-profile failure (ProfileLoadResult.TotalFailure).
+    loadError?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { loadError = null },
+            title = { Text(stringResource(R.string.profiles_load_failed_title)) },
+            text = { Text(msg) },
+            confirmButton = {
+                TextButton(onClick = { loadError = null }, modifier = Modifier.testTag("dismiss_load_error")) {
+                    Text(stringResource(R.string.profiles_close))
+                }
+            },
+        )
+    }
+
+    // Contexts: the full rule list + editor, in a full-screen modal (like the rule editor already is).
+    if (showContexts) {
+        ContextsModal(onClose = { showContexts = false }) {
+            ContextRulesSection(
                 rules = rules,
                 profileNames = profileNames.ifEmpty { listOf("Default") },
                 apps = apps,
                 solarLabel = solarLabel,
+                activeContext = activeContext,
                 onSave = { toast("Rule saved"); contextsVm.save(it) },
                 onDelete = { contextsVm.delete(it); toast("Rule deleted") },
                 onUseCurrentSsid = { setSsid ->
@@ -237,6 +333,150 @@ fun ProfilesContextsScreen(
                     runCatching { context.startActivity(contextsVm.usageAccessIntent()) }
                 },
             )
+        }
+    }
+}
+
+/**
+ * D-111: the pinned Load / Save / Contexts action bar (m3_audit B5 `ActionButtonBar` pattern), matched
+ * to the Tasker original — each action carries a leading icon and the three are visually distinct:
+ * **Load** filled teal (primary, high-emphasis), **Save** tonal grey, **Contexts** teal-outlined. Sits
+ * outside the scroll so it stays reachable while the profile list scrolls; each opens its own modal.
+ *
+ * The compact `contentPadding` (8 dp vs the M3 default 24 dp) + single-line labels keep "Contexts" on
+ * one line at equal thirds — the default padding squeezed it onto two lines.
+ */
+@Composable
+private fun ProfilesActionBar(onLoad: () -> Unit, onSave: () -> Unit, onContexts: () -> Unit) {
+    val pad = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Dimens.screenPaddingHorizontal, vertical = Dimens.sectionSpacing),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.rowGap),
+    ) {
+        Button(
+            onClick = onLoad,
+            modifier = Modifier.weight(1f).testTag("action_load"),
+            contentPadding = pad,
+        ) { ActionButtonContent(R.drawable.ic_folder, R.string.profiles_action_load) }
+        FilledTonalButton(
+            onClick = onSave,
+            modifier = Modifier.weight(1f).testTag("action_save"),
+            contentPadding = pad,
+        ) { ActionButtonContent(R.drawable.ic_save, R.string.profiles_action_save) }
+        OutlinedButton(
+            onClick = onContexts,
+            modifier = Modifier.weight(1f).testTag("action_contexts"),
+            contentPadding = pad,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        ) { ActionButtonContent(R.drawable.ic_tune, R.string.profiles_action_contexts) }
+    }
+}
+
+/** A leading 18 dp icon + single-line label, shared by the three action-bar buttons. */
+@Composable
+private fun ActionButtonContent(icon: Int, label: Int) {
+    Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
+    Spacer(Modifier.width(6.dp))
+    Text(stringResource(label), maxLines = 1, softWrap = false)
+}
+
+/**
+ * D-111: the "Load & manage" modal opened by the action bar's Load button — import a profile from a
+ * file, (re)link the legacy Tasker folder and load its configs, plus the housekeeping actions
+ * (restore factory / reset / export / view current). Saving lives in its own dialog (the Save button);
+ * applying a saved profile is done from the visible list.
+ */
+@Composable
+private fun LoadManageDialog(
+    legacyEntries: List<LegacyConfigEntry>,
+    onImport: () -> Unit,
+    onChooseLegacyFolder: () -> Unit,
+    onLoadLegacy: (LegacyConfigEntry) -> Unit,
+    onRestoreFactory: () -> Unit,
+    onReset: () -> Unit,
+    onExport: () -> Unit,
+    onViewCurrent: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.profiles_load_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing),
+            ) {
+                Button(onClick = onImport, modifier = Modifier.fillMaxWidth().testTag("import_profile")) {
+                    Text(stringResource(R.string.profiles_import_file))
+                }
+                OutlinedButton(
+                    onClick = onChooseLegacyFolder,
+                    modifier = Modifier.fillMaxWidth().testTag("choose_legacy_folder"),
+                ) {
+                    Text(
+                        stringResource(
+                            if (legacyEntries.isEmpty()) R.string.profiles_link_legacy else R.string.profiles_relink_legacy,
+                        ),
+                    )
+                }
+                legacyEntries.forEach { entry ->
+                    OutlinedButton(
+                        onClick = { onLoadLegacy(entry) },
+                        modifier = Modifier.fillMaxWidth().testTag("load_${entry.name}"),
+                    ) { Text(stringResource(R.string.profiles_load_legacy_entry, entry.name)) }
+                }
+                OutlinedButton(onClick = onRestoreFactory, modifier = Modifier.fillMaxWidth().testTag("restore_factory")) {
+                    Text(stringResource(R.string.profiles_restore_factory))
+                }
+                OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth().testTag("reset_defaults")) {
+                    Text(stringResource(R.string.profiles_reset_defaults))
+                }
+                Button(onClick = onExport, modifier = Modifier.fillMaxWidth().testTag("export_profile")) {
+                    Text(stringResource(R.string.profiles_export))
+                }
+                OutlinedButton(onClick = onViewCurrent, modifier = Modifier.fillMaxWidth().testTag("view_current_settings")) {
+                    Text(stringResource(R.string.profiles_view_current))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.profiles_close)) }
+        },
+    )
+}
+
+/**
+ * D-111: a full-screen modal host for the context-rules editor opened by the action bar's Contexts
+ * button — a top bar (title + close) over the scrolling [ContextRulesSection]. Full-screen because the
+ * rule list + editor is too tall for an AlertDialog.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ContextsModal(onClose: () -> Unit, content: @Composable () -> Unit) {
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.profiles_contexts_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = onClose, modifier = Modifier.testTag("contexts_close")) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.profiles_close))
+                        }
+                    },
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Dimens.screenPaddingHorizontal),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing),
+                ) {
+                    content()
+                }
+            }
         }
     }
 }

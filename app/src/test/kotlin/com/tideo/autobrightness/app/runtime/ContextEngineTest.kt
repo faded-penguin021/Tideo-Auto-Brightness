@@ -83,7 +83,7 @@ class ContextEngineTest {
 
     private fun TestScope.engine(
         rules: List<ContextRule>,
-        signalSource: FakeSignalSource,
+        signalSource: ContextSignalSource,
         baseline: AabSettings = this@ContextEngineTest.baseline,
         clock: () -> Long = { 0L },
         onChanged: () -> Unit = {},
@@ -178,6 +178,71 @@ class ContextEngineTest {
         now = 80_000L
         src.batteryPercent = 15
         src.battery.emit(BatterySignal(15, plugged = false))
+        advanceUntilIdle()
+        assertEquals("Low Battery", engine.activeContext.value)
+        scope.cancel()
+    }
+
+    /** Source that honours the battery percent the engine passes into [assemble] (the live snapshot),
+     *  so the seed-evaluation "no reading yet" path can be exercised. */
+    private class PassThroughBatterySource(
+        var dayOfWeek: Int = 4,
+        var nowSecondsOfDay: Int = 12 * 3600,
+    ) : ContextSignalSource {
+        val battery = MutableSharedFlow<BatterySignal>(extraBufferCapacity = 16)
+        override fun batteryFlow(): Flow<BatterySignal> = battery
+        override fun wifiFlow(): Flow<String?> = MutableSharedFlow()
+        override fun foregroundAppFlow(intervalMs: Long): Flow<String?> = MutableSharedFlow()
+        override fun locationFlow(): Flow<LocationSignal> = MutableSharedFlow()
+        override suspend fun assemble(
+            app: String, batteryPercent: Int, plugged: Boolean, wifi: String, lat: Double, lon: Double,
+        ): ContextSignals = ContextSignals(
+            app = app, lat = lat, lon = lon, batteryPercent = batteryPercent, plugged = plugged,
+            wifi = wifi, dayOfWeek = dayOfWeek, nowSecondsOfDay = nowSecondsOfDay,
+        )
+    }
+
+    @Test
+    fun serviceStart_noBatteryReadingYet_doesNotFlashSaver_D108() = runTest {
+        // D-108: at start() the seed GENERAL eval runs before the battery callbackFlow delivers its
+        // first value. The snapshot reports -1 ("unknown"), so the max=20 saver rule must NOT match —
+        // no Battery Saver flash. Once a real (high) reading arrives the engine stays on the baseline;
+        // a real LOW reading then correctly applies the saver.
+        var now = 0L
+        val src = PassThroughBatterySource()
+        val (engine, scope) = engine(listOf(batterySaverRule), src, clock = { now })
+        engine.start(scope)
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "seed eval with unknown battery must not match the saver")
+
+        // First real reading: 80% (unplugged) → still no saver. (Past the 30s battery cooldown so the
+        // BATTERY caller isn't debounced against the seed eval's lastEvalTime.)
+        now = 35_000L
+        src.battery.emit(BatterySignal(80, plugged = false))
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "80% must not match a max=20 saver rule")
+
+        // Battery later drains to 10% → the saver correctly engages.
+        now = 70_000L
+        src.battery.emit(BatterySignal(10, plugged = false))
+        advanceUntilIdle()
+        assertEquals("Low Battery", engine.activeContext.value, "a real low reading applies the saver")
+        scope.cancel()
+    }
+
+    @Test
+    fun serviceStart_realLowBatteryFirstReading_appliesSaverWithoutVeto_D108() = runTest {
+        // The first real reading transitions lastBatt from the -1 sentinel; even a low value within
+        // BATTERY_DELTA_THRESHOLD of -1 must not be vetoed (D-108).
+        var now = 0L
+        val src = PassThroughBatterySource()
+        val (engine, scope) = engine(listOf(batterySaverRule), src, clock = { now })
+        engine.start(scope)
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value)
+
+        now = 35_000L // past the 30s battery cooldown vs the seed eval
+        src.battery.emit(BatterySignal(3, plugged = false)) // |3 - (-1)| = 4 < 5, must still evaluate
         advanceUntilIdle()
         assertEquals("Low Battery", engine.activeContext.value)
         scope.cancel()

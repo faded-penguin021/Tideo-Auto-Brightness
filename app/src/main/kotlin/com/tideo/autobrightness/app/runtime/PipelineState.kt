@@ -68,9 +68,13 @@ data class PipelineState(
     /** %AAB_DimmingDS — absolute reduce_bright_colors level now (dim_shell, task650 act28); 0 when not
      *  engaged. The "abs" half of the Super Dimming live readout (G2R-F58). */
     val dimmingDS: Double = 0.0,
-    /** Last brightness this pipeline applied (domain 0–255); null before the first write. */
+    /** Last brightness this pipeline wrote to HARDWARE (domain 0–255); null before the first write. In
+     *  PWM-sensitive mode this is the floored value (held at %AAB_DimmingThreshold) — the override-detection
+     *  baseline and the Live Debug "current brightness". Distinct from [targetBrightness] (D-109). */
     val lastAppliedBrightness: Int? = null,
-    /** Last target the engine produced (for the notification "target" readout). */
+    /** Last PERCEIVED brightness the engine produced (un-floored calculated brightness) — the value the
+     *  hero read-out / notification / widget track. Equals [lastAppliedBrightness] unless PWM-sensitive
+     *  floors the hardware above it; then the secure/overlay layer darkens the panel down to this (D-109). */
     val targetBrightness: Int? = null,
     /** Recorded manual-override points (newest first), %AAB_Overrides (cap 50). */
     val overrideHistory: List<Pair<Double, Double>> = emptyList(),

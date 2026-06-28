@@ -1836,3 +1836,146 @@ the permanent registry — never compress or remove them.
   (same component targeted, still `FLAG_IMMUTABLE`). Ships as 1.1.1 / versionCode 8. **Lesson:** for
   CodeQL-Kotlin, prefer non-chained Intent construction + an explicit `setPackage` on PendingIntents;
   the fluent one-liner reads as implicit even when it is not.
+
+- **D-108: service-start battery-saver flash — battery "unknown" must not match a battery rule
+  (owner-reported, 1.2.0).** On service start at night the system briefly applied the Battery Saver
+  context profile (battery far above the trigger) before switching to the correct night-reading
+  profile. Root cause: the seed `GENERAL` evaluation in `ContextEngine.start()` runs before the
+  battery `callbackFlow` delivers its first (sticky) value, and `SignalSnapshot.batteryPercent`
+  defaulted to **0** — which satisfies a "battery ≤ max" saver rule, so the saver matched for one
+  cycle until the real reading (e.g. 80%) reverted it. **Fix (two parts):** (1) `ContextOverrideResolver`
+  now treats a NEGATIVE `batteryPercent` as "unknown → a battery condition cannot be asserted → the
+  rule does not match" (a real 0% dead battery still matches); (2) `SignalSnapshot.batteryPercent`
+  defaults to **-1** (unknown) until the first real reading, and the BATTERY veto gate always lets the
+  first real reading through (`lastBatt < 0`) so a genuinely low first reading isn't swallowed by the
+  ±5% debounce. The seed eval now picks the correct time-based profile directly. Tests:
+  `ContextOverrideResolverTest.batteryUnknown_*`, `ContextEngineTest.serviceStart_*_D108`.
+
+- **D-109: PWM-sensitive read-out tracks PERCEIVED brightness, not the hardware floor (owner-reported,
+  1.2.0; refines D-050/D-051e).** D-051e correctly floored the *hardware* write to `%AAB_DimmingThreshold`
+  in PWM-sensitive mode, but it also published that floored value to `PipelineState.targetBrightness`,
+  so the hero brightness read-out stuck at the floor instead of following the calculated (perceived)
+  brightness as in Tasker. **Fix:** in `PipelineCycleRunner` keep `lastAppliedBrightness` = the floored
+  HARDWARE value (override-detection baseline + Live Debug "current"), but set `targetBrightness`
+  (read-out / notification / widget) = the engine's UN-floored `output.targetBrightness` (the perceived
+  value the secure/overlay layer darkens the panel down to). This restores the documented field
+  semantics ("targetBrightness = last target the engine produced"). The two coincide unless PWM-sensitive
+  floors the hardware. Test: `BrightnessPipelineControllerTest.pwmSensitive_floorsHardwareButReadoutTracksPerceived`.
+
+- **D-110: circadian falls back on the cached sun location across the day rollover, and surfaces
+  staleness (owner-reported, 1.2.0).** With Location off and the IP fallback off, on the *next day* the
+  circadian modifier showed the flat default scale (≈0.85 at 07:34, NL) while the graph looked correct —
+  the chart reads `lastKnownLocation`/a representative fallback directly, but the pipeline's
+  `CircadianWindowProvider` could leave the live modifier on the `TimeContext` default windows. Two
+  causes addressed: (1) on a cold start in STEADY light the async cache/geo-IP fix landed AFTER the
+  initial brightness was set with the default windows, and prof760 then dropped every steady-light cycle
+  → nothing recomputed. New `onWindowsRefreshed` callback (wired in `AppModule` to `controller.reapply()`)
+  fires when a location resolves (cache seed or async acquire); its setter also fires once immediately if
+  a location already resolved before the callback was wired, so the recompute is never lost to
+  construction-vs-wiring ordering. (2) `current()` now explicitly falls back to the last resolved
+  location even after the day rolls over and no fresh fix is available, computing TODAY's windows with the
+  cached coordinates. Freshness is exposed via `CircadianLocationStatus` (has-location / age-days / stale)
+  and surfaced as a gold staleness banner on the Circadian screen and a gold hint on the dashboard
+  (derived in the view-models from the persisted `cachedSunLocation` flow, mirroring the provider's
+  fallback). Tests: `CircadianWindowProviderTest.*_D110`. Banners follow the m3_audit tinted-`Card`
+  convention (gold `secondary`/emphasis), coherent with the dashboard `StaleBanner`.
+
+- **D-111: gold resume banner + Tasker-style Profiles/Contexts IA + icon-vs-glyph consistency
+  (owner-reported, 1.2.0).** Three related UI changes from one owner report:
+  (a) **Resume banner.** The manual-context-lock resume control (`ProfilesScreen` `context_lock_banner`,
+  extracted to the shared `ContextLockBanner`) used a teal `tertiaryContainer` card with a plain
+  outlined text button — the owner wanted the Tasker "golden banner with a play button". Restyled to the
+  gold `secondaryContainer` + a `FilledTonalButton` with a leading `Icons.Filled.PlayArrow`, coherent
+  with the dashboard `OverrideCard` resume affordance and the m3_audit gold-emphasis role (`secondary`).
+  (b) **Profiles/Contexts information architecture (owner picked "Tasker-style sticky action bar").**
+  Replaced the scrolling `Profiles`/`Rules` `SegmentedButton` with a PINNED `Load` / `Save` / `Contexts`
+  action bar (m3_audit B5 `ActionButtonBar`, equal-weight `FilledTonalButton`s) that stays put while the
+  built-in/saved profiles list scrolls directly below it. Each action opens its own modal: **Save** →
+  `SaveProfileDialog`; **Load** → a "Load & manage" `AlertDialog` (import file / (re)link legacy folder +
+  load entries / restore factory / reset / export / view current); **Contexts** → a full-screen `Dialog`
+  hosting the existing `ContextRulesSection`. Applying a saved profile is the per-row Apply → `LoadProfileDialog`
+  preview. The component-level surfaces (`ProfilesBody`/`ProfilesContent`/`ContextRulesSection`) and their
+  tests are unchanged — only the unified host `ProfilesContextsScreen` was rebuilt; `ProfileCard`/`SaveProfileDialog`/`ContextLockBanner`
+  made `internal` for reuse. New strings extracted to `strings.xml` (the Load/manage labels are shared,
+  keeping the `HardcodedStringCheckTest` ratchet at 89 ≤ 92).
+  (c) **Icons, not glyphs (owner: "use icons instead of emoji" + "make it consistent everywhere the
+  same character is abused").** Replacing the `‹ Close` text glyph with `Icons.Filled.Close` triggered an
+  app-wide sweep of the `‹`/`›` characters used as icon stand-ins: the shared back buttons (`SettingsScaffold`,
+  `SettingsControls`) → `IconButton` + `Icons.AutoMirrored.Filled.ArrowBack`; the chart `PagerArrow`
+  (`GraphScaffold`) → `IconButton` + `Icons.AutoMirrored.Filled.KeyboardArrowLeft`/`Right`. All keep their
+  testTags (`back_button`, `chart_pager_prev`/`next`). The `ⓘ` help-reveal and the onboarding `✓` are
+  DIFFERENT glyphs (not the changed character) and were left as-is. **Lesson:** when swapping a Unicode
+  icon-stand-in for a real vector icon, grep the whole UI for that character and convert every abuse in
+  the same change, or the app looks half-migrated.
+  (d) **Visual match to the Tasker original (owner screenshot review, same release).** The first cut of
+  the action bar was three identical flat grey pills with text-only labels, and "Contexts" wrapped onto
+  two lines (the M3 default 24 dp button `contentPadding` squeezed it at equal thirds). Re-matched to
+  Tasker: **Load** filled teal (`Button`/primary), **Save** tonal grey (`FilledTonalButton`), **Contexts**
+  teal-outlined (`OutlinedButton` + `BorderStroke(primary)`), each with a leading vector icon
+  (`ic_folder`/`ic_save`/`ic_tune` — added as `res/drawable` vectors since only `material-icons-core` is a
+  dep and folder/save/tune are extended-only; NO new dependency, m3_audit constraint honoured) and a
+  single-line label via compact 8 dp `contentPadding`. The context-lock resume banner + the dashboard
+  `OverrideCard` were repainted from the muted dark-theme `secondaryContainer` to vivid brand `AabGold`
+  with a high-contrast dark RESUME button (`AabOnGold` container, `AabGold` label + ▶), matching Tasker's
+  "Automation Paused" bar. The active profile (`%AAB_CurrentActiveProfile` via `LiveRuntimeState`) is now
+  highlighted in the list — gold edge + an "Active" tag on its `ProfileCard` — mirroring Tasker's
+  "Active Profile: …" readout (owner request).
+
+- **D-112: GitHub Actions Node-20 → Node-24 runtime migration (CI only, 1.2.0).** GitHub deprecated the
+  Node 20 action runtime (runners default to Node 24 from 2026-06-16, Node 20 removed 2026-09-16), so
+  every workflow emitted Node-20 deprecation warnings. Bumped each action to a major that declares
+  `runs.using: node24` (verified against each action's `action.yml`): `actions/cache@v4→v5`,
+  `actions/upload-artifact@v4→v6`, `android-actions/setup-android@v3→v4`, `actions/github-script@v7→v8`
+  (NOT v9, which is ESM-only/breaking), `github/codeql-action/{init,analyze}@v3→v4`,
+  `softprops/action-gh-release@v2→v3`; `actions/checkout@v5` + `actions/setup-java@v5` were already
+  node24. Added a "Node 24 runtime policy" comment block to `build.yml` documenting the pins so they
+  aren't downgraded. No code/behaviour change.
+  **Follow-up:** `dist/` is now `.gitignore`d (and the once-committed `dist/tideo-1.2.0-debug.apk`
+  untracked via `git rm --cached`) — the debug sideload APK is no longer committed at all; it is sent to
+  the owner via the file tool or pulled from the `build.yml` `app-debug` CI artifact. `clean-dist.yml`
+  stays as a backstop that removes a force-added `dist/` from `main`. RUNBOOK §7 updated to match.
+
+- **D-113: Contexts rule-list/editor polish (owner-reported, 1.2.0).** Three rule-creation refinements:
+  (a) **Emphasise the target profile.** A rule card buried its switch-to profile in grey `→ Profile ·
+  priority N` body text. The profile — the thing the rule loads — is now rendered prominently in gold
+  (`titleSmall`, `AabGold`) behind a "Loads" label, and the rule currently in force (its name ==
+  `%AAB_ActiveContext`, threaded in from `LiveRuntimeState.activeContext`) gets a gold edge + "Active"
+  tag, mirroring the Profiles list (D-111). `ContextRulesSection` gained an optional `activeContext`
+  param (default null → the legacy `ContextsContent` + its tests are unaffected).
+  (b) **Priority is a 1–100 scale, not 0..∞.** The editor field now accepts digits only (max 3), seeds a
+  legacy/unset 0 up to 1, labels itself "Priority (1–100, higher wins)", uses a numeric keyboard, and
+  clamps to `1..100` on save (blank/invalid → 1). This is a UI constraint only — `ContextOverrideResolver`
+  still ranks by raw int (D-014: higher wins), so no golden/resolver change and existing rules keep
+  resolving (a stored 0 simply coerces to 1 on next save).
+  (c) **"Use current Wi-Fi" APPENDS, not replaces (Tasker parity).** The rule editor's button added the
+  current SSID by overwriting the field; it now appends the SSID to the comma-separated list (de-duped),
+  so a rule can match several networks — matching Tasker's behaviour. No new strings beyond the gold
+  "Active" tag (reused `profiles_active_tag`); `HardcodedStringCheckTest` ratchet still ≤ 92.
+  (d) **Follow-ups (owner): editor profile emphasis + legacy-priority safety.** The rule editor's
+  "Switch to profile" selector now renders the chosen profile in gold `titleSmall` + a dropdown caret
+  (matching the rule card's "Loads <profile>"). On the priority migration: a pre-existing rule with a
+  stored priority > 100 is NOT broken — `ContextOverrideResolver` still ranks by the raw stored value
+  (higher wins), so it keeps resolving as before. The editor now seeds the field with the rule's REAL
+  stored value (≥1; legacy/unset 0 → 1) instead of pre-capping it, shows an error hint
+  (`rule_priority_over_max`) when the value exceeds 100, and clamps to 1..100 ONLY on save — so an old
+  150 is shown truthfully and capped to 100 only if/when the user re-saves that rule (relative ordering
+  is preserved until then).
+  (e) **Disconnected dropdown menu fix (owner screenshot).** The rule editor's "Switch to profile"
+  `DropdownMenu` was a bare sibling of its anchor button in the scrolling editor `Column`, so it had no
+  layout anchor and the open menu floated DOWN over the Triggers section ("disconnected" list). Wrapped
+  the button + menu in a `Box` (the canonical Compose pattern, already used by `ProfileCard`'s overflow).
+  Swept the codebase for the same anti-pattern and fixed `LiveDebugScreen.DebugLevelSelector` too;
+  `ProfilesScreen`'s overflow was already boxed. **Lesson:** a `DropdownMenu` must share a `Box` with its
+  anchor — a bare sibling in a Column anchors to the wrong place.
+
+- **D-114: confirmation prompts for destructive profile/rule actions (owner-reported, 1.2.0).** Deleting
+  a context rule, and deleting or overwriting a saved profile, fired immediately with no confirmation —
+  Tasker prompted first. Added a shared `ConfirmDialog` (in `ProfilesScreen`, reused by `ContextsScreen`
+  in the same package): an `AlertDialog` with a red (`error`) confirm action for deletes, a neutral one
+  for overwrite, and a Cancel. The Profiles overflow menu's Delete/Overwrite and the rule card's Delete
+  now stage a confirmation (`confirm_delete_<name>` / `confirm_overwrite_<name>` / `confirm_delete_<ruleId>`)
+  instead of calling the callback directly; the callback fires only on confirm. All strings are resources
+  (ratchet unaffected). Tests: `SettingsScreensTest.profiles_deleteAndOverwrite_requireConfirmation_D114`
+  + `contexts_deleteRule_requiresConfirmation_D114` (assert the callback does NOT fire until the dialog is
+  confirmed). The existing render tests only assert the menu items EXIST (don't click through), so they
+  are unaffected.

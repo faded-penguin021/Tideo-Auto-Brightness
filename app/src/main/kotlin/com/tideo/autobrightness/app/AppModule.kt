@@ -129,6 +129,11 @@ class AppModule(context: Context) {
         )
         // Wire the late-bound hook now that the controller exists (replaces the lateinit cycle).
         controllerHook.hook = controller
+        // D-110: when the circadian location resolves late (cache seed / async geo-IP or GPS fix),
+        // recompute brightness so the modifier updates even in steady light (where prof760 drops cycles
+        // and the initial brightness was set with the default windows). Wired post-construction because
+        // the provider feeds `current` into the controller above.
+        circadianWindows.onWindowsRefreshed = { controller.reapply() }
 
         // prof769/task528 panic: upside-down + shake (display on) → SOS + restore + full stop (F77).
         val panicSensor = AndroidPanicSensorSource(appContext)

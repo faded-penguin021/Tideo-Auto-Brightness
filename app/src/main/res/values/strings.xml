@@ -47,6 +47,35 @@
     <string name="title_profiles_contexts">Profiles &amp; Contexts</string>
     <string name="seg_profiles">Profiles</string>
     <string name="seg_rules">Rules</string>
+    <!-- D-111: Tasker-style sticky Load / Save / Contexts action bar on the Profiles &amp; Contexts screen. -->
+    <string name="profiles_action_load">Load</string>
+    <string name="profiles_action_save">Save</string>
+    <string name="profiles_action_contexts">Contexts</string>
+    <string name="profiles_load_title">Load &amp; manage</string>
+    <string name="profiles_contexts_title">Context rules</string>
+    <string name="profiles_close">Close</string>
+    <string name="profiles_no_saved">No saved profiles yet.</string>
+    <string name="profiles_load_failed_title">Couldn\'t load</string>
+    <string name="profiles_import_file">Import a settings file…</string>
+    <string name="profiles_link_legacy">Link legacy configs folder…</string>
+    <string name="profiles_relink_legacy">Re-link legacy folder…</string>
+    <string name="profiles_load_legacy_entry">Load %1$s</string>
+    <string name="profiles_restore_factory">Restore factory profiles</string>
+    <string name="profiles_reset_defaults">Reset settings to defaults</string>
+    <string name="profiles_export">Export current settings…</string>
+    <string name="profiles_view_current">View current settings…</string>
+    <string name="profiles_active_tag">Active</string>
+    <string name="rule_priority_over_max">Above the 1–100 range — this will be saved as 100.</string>
+    <!-- D-114: Tasker-style confirmations for destructive profile/rule actions. -->
+    <string name="confirm_delete">Delete</string>
+    <string name="confirm_overwrite">Overwrite</string>
+    <string name="confirm_cancel">Cancel</string>
+    <string name="confirm_delete_rule_title">Delete rule?</string>
+    <string name="confirm_delete_rule_msg">Delete “%1$s”? This can\'t be undone.</string>
+    <string name="confirm_delete_profile_title">Delete profile?</string>
+    <string name="confirm_delete_profile_msg">Delete the profile “%1$s”? This can\'t be undone.</string>
+    <string name="confirm_overwrite_profile_title">Overwrite profile?</string>
+    <string name="confirm_overwrite_profile_msg">Replace “%1$s” with your current settings? The saved profile will be overwritten.</string>
     <string name="profile_more_actions">More actions</string>
     <string name="legacy_import_header">Import from Tasker AAB</string>
     <string name="manage_profiles_header">Manage profiles &amp; Export</string>
@@ -54,6 +83,12 @@
 
     <!-- Dashboard -->
     <string name="dashboard_stale_banner">Live data may be stale — the monitor may have stopped responding.</string>
+    <string name="dashboard_circadian_stale">Circadian using a sun position cached %1$d day(s) ago — turn on Location briefly to refresh.</string>
+    <string name="dashboard_circadian_no_location">Circadian using default sun times (no location) — turn on Location briefly for accurate sunrise/sunset.</string>
+
+    <!-- Circadian -->
+    <string name="circadian_stale_banner">Showing cached sun events from %1$d day(s) ago. Turn on Location briefly — or enable the IP fallback below — to refresh sunrise/sunset.</string>
+    <string name="circadian_no_location_banner">No location yet, so circadian is using default sun times. Turn on Location briefly — or enable the IP fallback below — for accurate sunrise/sunset.</string>
     <string name="dashboard_tier_none">No write access — tap to set up</string>
     <string name="dashboard_tier_basic">Basic access (Modify system settings)</string>
     <string name="dashboard_tier_elevated">Elevated access (super dimming ready)</string>

@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.ui.screens
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +22,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,6 +36,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -124,6 +130,8 @@ fun ContextRulesSection(
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
     hasUsageAccess: () -> Boolean = { true },
     onRequestUsageAccess: () -> Unit = {},
+    /** D-113: the winning rule's name (%AAB_ActiveContext) — highlighted in the list. */
+    activeContext: String? = null,
 ) {
     var editing by remember { mutableStateOf<ContextRule?>(null) }
 
@@ -164,7 +172,12 @@ fun ContextRulesSection(
         EmptyState("No rules yet.", testTag = "empty_rules")
     }
     rules.forEach { rule ->
-        RuleCard(rule, onEdit = { editing = rule }, onDelete = { onDelete(rule.id) })
+        RuleCard(
+            rule,
+            onEdit = { editing = rule },
+            onDelete = { onDelete(rule.id) },
+            isActive = rule.name.isNotBlank() && rule.name == activeContext,
+        )
     }
 
     // S12.9f: edit/add opens the per-rule editor in a modal. The editor owns its own scroll; Save/Cancel
@@ -198,19 +211,56 @@ fun ContextRulesSection(
 }
 
 @Composable
-private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit) {
-    // S13c restyle (m3_audit §3 row 10): rule rows are elevated `AabCard`s.
+private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit, isActive: Boolean = false) {
+    // S13c restyle (m3_audit §3 row 10): rule rows are elevated `AabCard`s. D-113: the rule currently
+    // in force gets a gold edge + "Active" tag (mirrors the Profiles list), and the target profile —
+    // the thing the rule switches TO — is rendered prominently in gold rather than buried in grey text.
+    val cardModifier = Modifier.testTag("rule_${rule.id}").let {
+        if (isActive) it.border(1.5.dp, AabGold, MaterialTheme.shapes.medium) else it
+    }
+    // D-114: confirm before deleting a rule (Tasker prompted first).
+    var confirmDelete by remember { mutableStateOf(false) }
     AabCard(
-        Modifier.testTag("rule_${rule.id}"),
+        cardModifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(rule.name.ifBlank { "(unnamed)" }, style = MaterialTheme.typography.titleMedium)
-        Text("→ ${rule.profile}  ·  priority ${rule.priority}", style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(rule.name.ifBlank { "(unnamed)" }, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (isActive) {
+                Text(
+                    stringResource(R.string.profiles_active_tag),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AabGold,
+                    modifier = Modifier.testTag("rule_active_${rule.id}"),
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Loads", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                rule.profile,
+                style = MaterialTheme.typography.titleSmall,
+                color = AabGold,
+                modifier = Modifier.testTag("rule_target_${rule.id}"),
+            )
+            Text("· priority ${rule.priority}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Text(rule.triggers.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit_${rule.id}")) { Text("Edit") }
-            TextButton(onClick = onDelete, modifier = Modifier.testTag("delete_${rule.id}")) { Text("Delete") }
+            TextButton(onClick = { confirmDelete = true }, modifier = Modifier.testTag("delete_${rule.id}")) { Text("Delete") }
         }
+    }
+
+    if (confirmDelete) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_delete_rule_title),
+            message = stringResource(R.string.confirm_delete_rule_msg, rule.name.ifBlank { "(unnamed)" }),
+            confirmLabel = stringResource(R.string.confirm_delete),
+            confirmTag = "confirm_delete_${rule.id}",
+            onConfirm = { confirmDelete = false; onDelete() },
+            onDismiss = { confirmDelete = false },
+        )
     }
 }
 
@@ -244,7 +294,11 @@ private fun RuleEditor(
 ) {
     var name by remember { mutableStateOf(rule.name) }
     var profile by remember { mutableStateOf(rule.profile) }
-    var priorityText by remember { mutableStateOf(rule.priority.toString()) }
+    // D-113: priority is a 1–100 scale (higher wins), not 0..∞. Seed with the rule's REAL stored value
+    // (a legacy/unset 0 shows as 1) so a pre-existing out-of-range value — e.g. an old 150 — is shown
+    // truthfully rather than silently pre-capped; it is clamped to 1..100 only when the user saves.
+    var priorityText by remember { mutableStateOf(rule.priority.takeIf { it >= 1 }?.toString() ?: "1") }
+    val priorityOverMax = (priorityText.trim().toIntOrNull() ?: 0) > 100
     var wifi by remember { mutableStateOf(rule.triggers.wifi?.joinToString(", ") ?: "") }
     var startTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(0) ?: "") }
     var endTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(1) ?: "") }
@@ -310,7 +364,8 @@ private fun RuleEditor(
             rule.copy(
                 name = name,
                 profile = profile,
-                priority = priorityText.trim().toIntOrNull() ?: 0,
+                // D-113: clamp to the 1–100 scale (blank/invalid → 1, the lowest priority).
+                priority = priorityText.trim().toIntOrNull()?.coerceIn(1, 100) ?: 1,
                 triggers = triggers,
             ),
         )
@@ -344,17 +399,41 @@ private fun RuleEditor(
             )
 
             Text("Switch to profile:", style = MaterialTheme.typography.labelMedium)
-            OutlinedButton(onClick = { profileMenu = true }, modifier = Modifier.testTag("rule_profile")) { Text(profile) }
-            DropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
-                profileNames.forEach { p ->
-                    DropdownMenuItem(text = { Text(p) }, onClick = { profile = p; profileMenu = false })
+            // D-114b: emphasise the selected profile — gold + titleSmall (matching the rule card's
+            // "Loads <profile>") with a dropdown caret, so the chosen target stands out in the editor.
+            // The DropdownMenu MUST be wrapped in a Box with its anchor button (like ProfileCard's
+            // overflow): a bare DropdownMenu sibling in the scrolling Column has no anchor and floats
+            // down over the Triggers ("disconnected" menu, owner screenshot).
+            Box {
+                OutlinedButton(onClick = { profileMenu = true }, modifier = Modifier.testTag("rule_profile")) {
+                    Text(profile, style = MaterialTheme.typography.titleSmall, color = AabGold)
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
+                    profileNames.forEach { p ->
+                        DropdownMenuItem(text = { Text(p) }, onClick = { profile = p; profileMenu = false })
+                    }
                 }
             }
 
             OutlinedTextField(
-                value = priorityText, onValueChange = { priorityText = it }, label = { Text("Priority (higher wins)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_priority"),
+                value = priorityText,
+                // 1–100 scale: digits only, max 3 chars; the value is clamped to 1..100 on save.
+                onValueChange = { priorityText = it.filter(Char::isDigit).take(3) },
+                label = { Text("Priority (1–100, higher wins)") },
+                singleLine = true,
+                isError = priorityOverMax,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth().testTag("rule_priority"),
             )
+            if (priorityOverMax) {
+                Text(
+                    stringResource(R.string.rule_priority_over_max),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag("rule_priority_clamp_hint"),
+                )
+            }
 
             SectionHeader("Triggers", divider = true)
             Text(
@@ -370,7 +449,16 @@ private fun RuleEditor(
                     modifier = Modifier.fillMaxWidth().testTag("rule_wifi"),
                 )
                 TextButton(
-                    onClick = { onUseCurrentSsid { ssid -> wifi = ssid } },
+                    // D-113: APPEND the current SSID to the comma-separated list (like Tasker), don't
+                    // replace it — a rule can match several networks. De-duped, case-sensitively.
+                    onClick = {
+                        onUseCurrentSsid { ssid ->
+                            val existing = wifi.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                            if (ssid.isNotBlank() && ssid !in existing) {
+                                wifi = (existing + ssid).joinToString(", ")
+                            }
+                        }
+                    },
                     modifier = Modifier.testTag("use_current_ssid"),
                 ) { Text("Use current Wi-Fi") }
             }

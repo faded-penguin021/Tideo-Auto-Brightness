@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.ui.screens
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -209,18 +210,22 @@ private fun lastSampleLabel(ms: Long?, now: Long = System.currentTimeMillis()): 
 @Composable
 fun DebugLevelSelector(current: Int, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    OutlinedButton(
-        onClick = { expanded = true },
-        modifier = Modifier.fillMaxWidth().testTag("debug_selector"),
-    ) {
-        Text("Debug: ${DEBUG_LABELS.getOrElse(current) { "Off" }}")
-    }
-    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-        DEBUG_LABELS.forEachIndexed { level, label ->
-            DropdownMenuItem(
-                text = { Text(label) },
-                onClick = { onSelect(level); expanded = false },
-            )
+    // Anchor the menu to the button (Box wrapper) — a bare DropdownMenu sibling has no anchor and
+    // floats away from its trigger (D-114b, same fix as the rule-editor profile selector).
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth().testTag("debug_selector"),
+        ) {
+            Text("Debug: ${DEBUG_LABELS.getOrElse(current) { "Off" }}")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DEBUG_LABELS.forEachIndexed { level, label ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = { onSelect(level); expanded = false },
+                )
+            }
         }
     }
 }

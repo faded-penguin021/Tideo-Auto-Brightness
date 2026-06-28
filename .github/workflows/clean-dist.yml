@@ -1,0 +1,52 @@
+name: Clean dist on main
+
+# dist/ holds TEMPORARY debug sideload APKs (RUNBOOK §7) that are meant to be removed before/at merge.
+# If one is forgotten and lands on main, this auto-removes it so the binary never persists in history.
+#
+# How it behaves:
+#  - dist/ empty on main        → no-op.
+#  - dist/ has tracked files    → commit their removal and push back to main (`[skip ci]` so the
+#                                 removal commit does not re-trigger CI). This is the "auto-clean".
+#  - push rejected (main is a    → the job FAILS with a clear message, doubling as a guard so the
+#    protected branch / bot       leftover is surfaced immediately and can be removed by hand. To get
+#    can't push)                  true silent auto-clean, allow github-actions[bot] to bypass the
+#                                 pull-request requirement on main (Settings → Branches → bypass list).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write  # needed to push the removal commit
+
+concurrency:
+  group: clean-dist-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5  # node24 runtime (see build.yml node24 policy)
+        with:
+          fetch-depth: 0
+
+      - name: Remove leftover dist/ sideload artifacts
+        run: |
+          tracked="$(git ls-files dist/)"
+          if [ -z "$tracked" ]; then
+            echo "dist/ is clean on main — nothing to remove."
+            exit 0
+          fi
+          echo "Found committed dist/ sideload artifacts on main:"
+          echo "$tracked"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -r --quiet dist
+          git commit -m "chore: auto-remove leftover dist/ sideload artifacts [skip ci]"
+          if git push; then
+            echo "Auto-removed dist/ from main."
+          else
+            echo "::error::dist/ sideload artifacts are on main but the auto-remove push was rejected (protected branch). Remove them manually: git rm -r dist && commit. Or allow github-actions[bot] to bypass the PR requirement on main for silent auto-clean."
+            exit 1
+          fi

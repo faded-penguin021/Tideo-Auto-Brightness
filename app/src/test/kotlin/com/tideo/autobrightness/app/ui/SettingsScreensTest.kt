@@ -441,6 +441,57 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun profiles_deleteAndOverwrite_requireConfirmation_D114() {
+        // D-114: Tasker prompted before deleting or overwriting a profile — both must confirm first.
+        var deleted: String? = null
+        var overwritten: String? = null
+        val profiles = listOf(com.tideo.autobrightness.app.settings.SavedProfile("Mine", AabSettings()))
+        compose.setContent {
+            MaterialTheme {
+                com.tideo.autobrightness.app.ui.screens.ProfilesContent(
+                    profiles = profiles, legacyEntries = emptyList(), contextLocked = false, status = null,
+                    onBack = {}, onApplyProfile = {}, onOverwriteProfile = { overwritten = it }, onDeleteProfile = { deleted = it },
+                    onSaveCurrentAs = {}, onRestoreFactory = {}, onResumeContext = {}, onReset = {},
+                    onExport = {}, onImport = {}, onChooseLegacyFolder = {}, onLoadLegacy = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("profile_menu_Mine").performScrollTo().performClick()
+        compose.onNodeWithTag("delete_profile_Mine").performClick()
+        assertEquals(null, deleted, "delete must not fire before confirmation")
+        compose.onNodeWithTag("confirm_delete_Mine").performClick()
+        assertEquals("Mine", deleted, "confirming the dialog deletes")
+
+        compose.onNodeWithTag("profile_menu_Mine").performScrollTo().performClick()
+        compose.onNodeWithTag("overwrite_profile_Mine").performClick()
+        assertEquals(null, overwritten, "overwrite must not fire before confirmation")
+        compose.onNodeWithTag("confirm_overwrite_Mine").performClick()
+        assertEquals("Mine", overwritten, "confirming the dialog overwrites")
+    }
+
+    @Test
+    fun contexts_deleteRule_requiresConfirmation_D114() {
+        // D-114: deleting a context rule must confirm first (Tasker prompted).
+        var deleted: String? = null
+        val rule = com.tideo.autobrightness.app.settings.ContextRule(
+            id = "r1", name = "Cinema", profile = "Default",
+            triggers = com.tideo.autobrightness.app.settings.ContextTriggers(),
+        )
+        compose.setContent {
+            MaterialTheme {
+                ContextsContent(
+                    rules = listOf(rule), profileNames = listOf("Default"), apps = emptyList(),
+                    onBack = {}, onSave = {}, onDelete = { deleted = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("delete_r1").performScrollTo().performClick()
+        assertEquals(null, deleted, "delete must not fire before confirmation")
+        compose.onNodeWithTag("confirm_delete_r1").performClick()
+        assertEquals("r1", deleted, "confirming the dialog deletes the rule")
+    }
+
+    @Test
     fun profiles_contextLockBanner_offersResume() {
         // G2R-F30: a manual profile load latches the context lock; the Profiles screen offers Resume.
         var resumed = false

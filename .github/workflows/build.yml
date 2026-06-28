@@ -3,6 +3,12 @@ name: Build
 # Secret-free validation: the full acceptance ladder (all module tests + lint + the debug APK) on every
 # pull request and on pushes to main. release-signing.yml handles the SIGNED release artifact on main;
 # this one needs no secrets, so it gates PRs from any branch.
+#
+# Node 24 runtime policy (all workflows): GitHub deprecated the Node 20 action runtime — runners default
+# to Node 24 from 2026-06-16 and remove Node 20 on 2026-09-16. Every action pinned here is a major that
+# declares `runs.using: node24` (checkout@v5, setup-java@v5, setup-android@v4, cache@v5, upload-artifact@v6;
+# codeql-action@v4, github-script@v8, action-gh-release@v3 in the sibling workflows). Do NOT downgrade any
+# of these to a Node 20 major — it reintroduces the deprecation warning and will hard-break after 2026-09-16.
 on:
   pull_request:
   push:
@@ -32,7 +38,7 @@ jobs:
           java-version: '21'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           # Skip the default `tools platform-tools` install: the obsolete `tools` package drags in the
           # Android Emulator (a large, flaky download — it failed CI with "Error on ZipFile unknown
@@ -42,7 +48,7 @@ jobs:
           packages: ''
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -55,7 +61,7 @@ jobs:
         run: ./gradlew :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk

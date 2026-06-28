@@ -2,19 +2,24 @@ package com.tideo.autobrightness.app.ui.screens
 
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -45,6 +50,8 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsDiffList
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
+import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.app.ui.theme.AabOnGold
 
 /**
  * Profiles & Import/Export content (Tasker AAB Profile — task592/637/622), the saved-profiles surface
@@ -156,24 +163,7 @@ fun ProfilesBody(
             }
         }
     }
-    // G2R-F30: a manual profile load pauses context automation; offer a Resume control.
-    if (contextLocked) {
-        Card(
-            Modifier.fillMaxWidth().testTag("context_lock_banner"),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    "Context automation is paused after a manual profile load.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-                OutlinedButton(onClick = onResumeContext, modifier = Modifier.testTag("resume_context")) {
-                    Text("Resume context automation")
-                }
-            }
-        }
-    }
+    if (contextLocked) ContextLockBanner(onResumeContext)
 
     // S13c restyle (m3_audit §3 row 10): empty hints become `EmptyState`; rows become `AabCard`s.
     SectionHeader("Saved profiles", divider = true)
@@ -281,17 +271,95 @@ fun ProfilesBody(
     }
 }
 
+/**
+ * G2R-F30 / D-111: a manual profile load pauses context automation; offer a Resume control. Styled as
+ * the Tasker "golden banner with a play button" — the gold `secondaryContainer` + leading ▶ icon,
+ * coherent with the dashboard's `OverrideCard` resume affordance and the M3 audit's gold-emphasis role
+ * (design/m3_audit.md §2.4: `secondary`/gold = emphasis/warnings). Shared by [ProfilesBody] and the
+ * unified [ProfilesContextsScreen].
+ */
 @Composable
-private fun ProfileCard(
+internal fun ContextLockBanner(onResumeContext: () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth().testTag("context_lock_banner"),
+        // Vivid brand gold (like the dashboard StaleBanner / Tasker's "Automation Paused" bar), not the
+        // muted dark-theme `secondaryContainer` — the owner wanted the Tasker golden banner.
+        colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Context automation is paused after a manual profile load.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            // High-contrast resume — Tasker's black RESUME on gold: dark container, gold label + ▶ icon.
+            Button(
+                onClick = onResumeContext,
+                colors = ButtonDefaults.buttonColors(containerColor = AabOnGold, contentColor = AabGold),
+                modifier = Modifier.testTag("resume_context"),
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text("Resume context automation")
+            }
+        }
+    }
+}
+
+/**
+ * D-114: a reusable confirmation dialog for destructive profile/rule actions (Tasker prompted before
+ * delete/overwrite). Shared across the Profiles list and the Contexts rule list (same package). The
+ * confirm action is tinted [error] red when [destructive] so a delete reads as dangerous.
+ */
+@Composable
+internal fun ConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    confirmTag: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    destructive: Boolean = true,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag(confirmTag),
+                colors = if (destructive) {
+                    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                } else {
+                    ButtonDefaults.textButtonColors()
+                },
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.confirm_cancel)) }
+        },
+    )
+}
+
+@Composable
+internal fun ProfileCard(
     entry: SavedProfile,
     onApply: () -> Unit,
     onOverwrite: (String) -> Unit,
     onDelete: (String) -> Unit,
+    isActive: Boolean = false,
 ) {
     val changed = entry.settings.changedCount()
     var menu by remember { mutableStateOf(false) }
+    // D-114: confirm before overwriting or deleting a saved profile (Tasker did this).
+    var confirmOverwrite by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    // D-111 (owner): highlight the in-force profile with a gold edge + an "Active" tag, so the list
+    // answers "which profile is loaded right now?" the way Tasker's "Active Profile: …" readout does.
+    val cardModifier = Modifier.testTag("profile_${entry.name}").let {
+        if (isActive) it.border(1.5.dp, AabGold, MaterialTheme.shapes.medium) else it
+    }
     AabCard(
-        Modifier.testTag("profile_${entry.name}"),
+        cardModifier,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         // S13c' §07-B: the row shows the name + the PRIMARY action (Apply); secondary actions
@@ -302,10 +370,21 @@ private fun ProfileCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    entry.name + if (entry.builtIn) "  (built-in)" else "",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        entry.name + if (entry.builtIn) "  (built-in)" else "",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    if (isActive) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.profiles_active_tag),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AabGold,
+                            modifier = Modifier.testTag("profile_active_${entry.name}"),
+                        )
+                    }
+                }
                 Text(
                     if (changed == 0) "Factory defaults" else "$changed changed from default",
                     style = MaterialTheme.typography.bodySmall,
@@ -325,12 +404,12 @@ private fun ProfileCard(
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
                         text = { Text("Overwrite") },
-                        onClick = { menu = false; onOverwrite(entry.name) },
+                        onClick = { menu = false; confirmOverwrite = true },
                         modifier = Modifier.testTag("overwrite_profile_${entry.name}"),
                     )
                     DropdownMenuItem(
                         text = { Text("Delete") },
-                        onClick = { menu = false; onDelete(entry.name) },
+                        onClick = { menu = false; confirmDelete = true },
                         modifier = Modifier.testTag("delete_profile_${entry.name}"),
                     )
                 }
@@ -340,6 +419,28 @@ private fun ProfileCard(
             onClick = onApply,
             modifier = Modifier.fillMaxWidth().testTag("apply_profile_${entry.name}"),
         ) { Text("Apply") }
+    }
+
+    if (confirmOverwrite) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_overwrite_profile_title),
+            message = stringResource(R.string.confirm_overwrite_profile_msg, entry.name),
+            confirmLabel = stringResource(R.string.confirm_overwrite),
+            confirmTag = "confirm_overwrite_${entry.name}",
+            destructive = false,
+            onConfirm = { confirmOverwrite = false; onOverwrite(entry.name) },
+            onDismiss = { confirmOverwrite = false },
+        )
+    }
+    if (confirmDelete) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_delete_profile_title),
+            message = stringResource(R.string.confirm_delete_profile_msg, entry.name),
+            confirmLabel = stringResource(R.string.confirm_delete),
+            confirmTag = "confirm_delete_${entry.name}",
+            onConfirm = { confirmDelete = false; onDelete(entry.name) },
+            onDismiss = { confirmDelete = false },
+        )
     }
 }
 
@@ -375,7 +476,7 @@ private fun ExpandableSection(
 }
 
 @Composable
-private fun SaveProfileDialog(
+internal fun SaveProfileDialog(
     currentSettings: AabSettings,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,

@@ -13,6 +13,10 @@ captures/
 .cxx/
 *.hprof
 
+# Temporary debug sideload APKs (RUNBOOK §7) — never committed. Send the build to the owner via the
+# file tool, or grab the build.yml `app-debug` CI artifact. `clean-dist.yml` is a backstop for a forced add.
+/dist/
+
 # Tasker source project — kept out of the tree (1.6 MB); owner picks LFS-vs-ignore at PR review (S12.9a).
 # Reference recipes live in docs/rebuild/XML_RECIPES.md.
 docs/rebuild/extraction/_source/Advanced_Auto_Brightness_V3.3.prj_9.xml

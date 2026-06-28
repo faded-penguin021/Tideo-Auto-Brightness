@@ -71,12 +71,15 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
      * to the fixed `TimeContext` defaults until the async re-acquire lands. Mirrors Tasker's persisted
      * `%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`. [day] is epoch-days the fix was acquired for.
      */
-    suspend fun readCachedSunLocation(): CachedSunLocation? {
-        val prefs = dataStore.data.first()
-        val lat = prefs[SUN_LAT] ?: return null
-        val lon = prefs[SUN_LON] ?: return null
-        val day = prefs[SUN_DAY] ?: return null
-        return CachedSunLocation(lat, lon, day)
+    suspend fun readCachedSunLocation(): CachedSunLocation? = cachedSunLocation.first()
+
+    /** D-110: the persisted once-a-day location as a reactive flow, so the UI staleness hint (Circadian
+     *  screen + dashboard) updates when a fresh fix is acquired. null when no fix has ever been cached. */
+    val cachedSunLocation: Flow<CachedSunLocation?> = dataStore.data.map { prefs ->
+        val lat = prefs[SUN_LAT]
+        val lon = prefs[SUN_LON]
+        val day = prefs[SUN_DAY]
+        if (lat != null && lon != null && day != null) CachedSunLocation(lat, lon, day) else null
     }
 
     /** Persist the daily-resolved location (D-103). */

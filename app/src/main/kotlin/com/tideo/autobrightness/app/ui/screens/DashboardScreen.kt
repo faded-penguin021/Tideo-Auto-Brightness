@@ -12,7 +12,13 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -37,6 +43,7 @@ import com.tideo.autobrightness.app.ui.components.AabTopBar
 import com.tideo.autobrightness.app.ui.components.BrightnessInstrument
 import com.tideo.autobrightness.app.ui.theme.AabDataCaption
 import com.tideo.autobrightness.app.ui.theme.AabDataDisplay
+import com.tideo.autobrightness.app.runtime.CircadianLocationStatus
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.app.ui.theme.AabOnGold
 import com.tideo.autobrightness.app.ui.theme.Dimens
@@ -129,6 +136,11 @@ fun DashboardContent(
                 OverrideCard(state.serviceRunning, onResume)
             }
             ReadoutStrip(state)
+            // D-110: dynamic scaling is on but the live modifier is running on a stale (day-old) or
+            // missing location — a quiet hint to turn Location on briefly so circadian tracks the real sun.
+            state.circadianLocation?.let { cl ->
+                if (cl.isStale || !cl.hasLocation) CircadianStaleHint(cl)
+            }
             QuickActionsCard(
                 serviceRunning = state.serviceRunning,
                 canAddTile = canAddTile,
@@ -187,6 +199,23 @@ private fun QuickActionsCard(
     }
 }
 
+/** D-110: amber circadian staleness hint — the live modifier is on a day-old cached or default sun
+ *  position. Same gold convention as [StaleBanner]; tapping the Circadian screen lets the user refresh. */
+@Composable
+private fun CircadianStaleHint(status: CircadianLocationStatus) {
+    val text = if (status.isStale) {
+        stringResource(R.string.dashboard_circadian_stale, status.ageDays ?: 0L)
+    } else {
+        stringResource(R.string.dashboard_circadian_no_location)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("circadian_stale_hint"),
+        colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
+    ) {
+        Text(text, modifier = Modifier.padding(Dimens.cardPadding), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
 /** Amber "live data may be stale" banner (S12.9d). */
 @Composable
 private fun StaleBanner() {
@@ -220,12 +249,14 @@ private fun TierBadge(tier: Tier, onClick: () -> Unit) {
     )
 }
 
-/** Shown only while [pausedByOverride]: explains the pause and offers the one Resume control. */
+/** Shown only while [pausedByOverride]: explains the pause and offers the one Resume control. Styled as
+ *  Tasker's gold "Automation Paused" bar — vivid brand gold (not the muted dark `secondaryContainer`)
+ *  with a high-contrast dark RESUME button carrying a ▶ icon (D-111). */
 @Composable
 private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
     Card(
-        modifier = Modifier.testTag("override_card"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.fillMaxWidth().testTag("override_card"),
+        colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
     ) {
         Column(
             Modifier.padding(Dimens.cardPadding),
@@ -236,11 +267,15 @@ private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
                 stringResource(R.string.dashboard_override_explain),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            FilledTonalButton(
+            Button(
                 onClick = onResume,
                 enabled = serviceRunning,
+                colors = ButtonDefaults.buttonColors(containerColor = AabOnGold, contentColor = AabGold),
                 modifier = Modifier.testTag("resume_button"),
-            ) { Text(stringResource(R.string.dashboard_resume_button)) }
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text(stringResource(R.string.dashboard_resume_button))
+            }
         }
     }
 }

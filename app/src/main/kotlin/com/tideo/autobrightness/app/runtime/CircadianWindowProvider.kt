@@ -35,6 +35,29 @@ data class CircadianWindows(
 )
 
 /**
+ * D-110: freshness of the location backing the live circadian modifier, for the UI staleness hint.
+ *
+ * @param latitude/longitude the active location (null = none resolved yet → modifier uses defaults).
+ * @param resolvedForDay epoch-day the active location was acquired for (null when none).
+ * @param today epoch-day "now".
+ * @param fixed true when a manual fixed lat/lon override is pinned (never "stale").
+ */
+data class CircadianLocationStatus(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val resolvedForDay: Long? = null,
+    val today: Long = 0L,
+    val fixed: Boolean = false,
+) {
+    /** A location (fresh or cached) is available — the modifier tracks the real sun, not the defaults. */
+    val hasLocation: Boolean get() = latitude != null && longitude != null
+    /** Whole days between the active location's acquisition day and today (0 = acquired today). */
+    val ageDays: Long? get() = resolvedForDay?.let { (today - it).coerceAtLeast(0L) }
+    /** The cached location is from a previous day and isn't a pinned fixed location → show "stale". */
+    val isStale: Boolean get() = !fixed && hasLocation && (ageDays ?: 0L) > 0L
+}
+
+/**
  * Supplies live [CircadianWindows] to the pipeline (G2R-F73). Before this, the pipeline fed
  * `TimeContext`'s **defaults** (a fixed 6–8am / 18–20pm UTC morning/evening) whenever no location was
  * known — and `lastKnownLocation()` is frequently null on a device that has not actively used GPS, so
@@ -85,6 +108,32 @@ class CircadianWindowProvider(
     @Volatile private var resolvedDay: Long = Long.MIN_VALUE
     private val acquiring = AtomicBoolean(false)
 
+    // D-110: fired when a location resolves AFTER construction (cache seed or a fresh acquire) so the
+    // pipeline recomputes immediately. Without this, a cold start in STABLE light set the initial
+    // brightness with the TimeContext defaults (scaleDynamic ≈ 0.85) BEFORE the async cache/geo-IP fix
+    // landed, and prof760 then dropped every steady-light cycle — so the circadian modifier stayed stuck
+    // at the default all morning while the chart (which reads last-known/representative location directly)
+    // looked correct. AppModule wires this to controller.reapply().
+    //
+    // Settable because the controller is built after this provider (the provider feeds it `current`), so
+    // the wiring is post-construction. The cache-seed launch is async and may resolve BEFORE the callback
+    // is wired; the setter therefore fires once immediately when a location already resolved, so the
+    // recompute is never lost to construction-vs-wiring ordering (either path triggers exactly one
+    // reapply).
+    @Volatile private var _onWindowsRefreshed: () -> Unit = {}
+    var onWindowsRefreshed: () -> Unit
+        get() = _onWindowsRefreshed
+        set(value) {
+            _onWindowsRefreshed = value
+            if (resolvedLoc != null) value()
+        }
+
+    /** D-110: the location backing the live circadian modifier + its freshness, for the UI staleness
+     *  hint. `resolvedForDay` is the epoch-day the active location was acquired for (null = no fix yet);
+     *  compare to today to show "cached N days ago". Updated on every [current] call. */
+    @Volatile var status: CircadianLocationStatus = CircadianLocationStatus()
+        private set
+
     init {
         // F39 override drives the windows; invalidate the cache (and force a re-acquire) when it changes.
         scope.launch {
@@ -104,6 +153,9 @@ class CircadianWindowProvider(
                 resolvedLoc = LocationSnapshot(cached.latitude, cached.longitude)
                 resolvedDay = cached.day
                 cacheKey = null
+                // D-110: recompute now that a (possibly day-old) cached location is available — the
+                // initial brightness may already have been set with the default windows in stable light.
+                onWindowsRefreshed()
             }
         }
     }
@@ -118,13 +170,25 @@ class CircadianWindowProvider(
         val tz = tzOffsetForDate(dateEpochSec)
         val day = dateEpochSec / 86_400L
 
+        val todayDay = nowSec / 86_400L
         val loc: LocationSnapshot = if (ov.latitude != null && ov.longitude != null) {
             // F83: fixed lat/lon → use it directly, skip all acquisition.
+            status = CircadianLocationStatus(ov.latitude, ov.longitude, resolvedForDay = day, today = todayDay, fixed = true)
             LocationSnapshot(ov.latitude!!, ov.longitude!!)
         } else {
             // F83: acquire (once a day, async) when we have no fix or the day rolled over.
             if (resolvedLoc == null || resolvedDay != day) triggerAcquire(day)
-            resolvedLoc ?: return null
+            // D-110: fall back to the last resolved location even when the day has rolled over and no
+            // fresh fix is available (location + geo-IP off) — recompute TODAY's windows with the cached
+            // coordinates instead of returning null → the default-window 0.85. status records the age so
+            // the UI can show "cached N days ago" until the user refreshes the fix.
+            val cachedLoc = resolvedLoc
+            if (cachedLoc == null) {
+                status = CircadianLocationStatus(today = todayDay)
+                return null
+            }
+            status = CircadianLocationStatus(cachedLoc.latitude, cachedLoc.longitude, resolvedForDay = resolvedDay, today = todayDay, fixed = false)
+            cachedLoc
         }
 
         val key = "$day|${round4(loc.latitude)}|${round4(loc.longitude)}|$transitionFactor|$tz"
@@ -149,6 +213,9 @@ class CircadianWindowProvider(
                     cacheKey = null // recompute windows with the freshly acquired location
                     // D-103: persist so the next cold start reuses it before re-acquiring.
                     runCatching { persistLocation(snap.latitude, snap.longitude, day) }
+                    // D-110: a fresh fix landed asynchronously — recompute so the modifier updates even
+                    // if the light is steady (no sensor cycle would otherwise call current() again).
+                    onWindowsRefreshed()
                 }
             } finally {
                 acquiring.set(false)
