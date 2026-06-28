@@ -1745,3 +1745,77 @@ the permanent registry — never compress or remove them.
   device-verified; existing `SettingsScreensTest` (Apply/Discard) and `UiShellTest` (`performScrollTo`
   the recheck row) are the render-regression guard. Ships as 1.0.4 / versionCode 6.
 
+- **D-101: super-dimming/PWM threshold was clamped to 0..100 instead of the 0..255 brightness range
+  (bug fix; app settings).** `%AAB_DimmingThreshold` is a *brightness level* — super dimming engages
+  when `targetBrightness < dimmingThreshold` — so it spans the full 0..255 brightness domain like
+  `min`/`maxBrightness`. The rebuild's `AabSettingsMapper.validate()` clamped it
+  `coerceIn(0, 100)` (and `AabSettingsContract` documented "range 0..100"), an artifact with no Tasker
+  basis: `superdimming_settings.md` elements36 is an **uncapped numeric** EditText. Effect: a user
+  could not set the threshold above 100, so dimming could never be configured to engage in the
+  100–255 band (owner finding). **Fix:** `dimmingThreshold.coerceIn(0, 255)` + rule string
+  "range 0..255". No test pinned 100 (all fixtures ≤40); the `< minBrightness` advisory is unchanged.
+  Ships in 1.1.0. (Affects the Super Dimming threshold row in `PARITY_CHECKLIST.md`.)
+
+- **D-102: curve wizard did not auto-copy %AAB_Test to clipboard, and its "Copy full report" button
+  was off-screen (bug fix; UI only).** Tasker `task38 act13` is code 105 (Set Clipboard,
+  `arg0=%AAB_Test`): every successful wizard run copies the diagnostics to the clipboard. The rebuild
+  only copied on an explicit "Copy full report" button — *and* that button was the third in a fixed
+  `Row`, so on narrower screens it was pushed off-screen (owner saw only Apply + Preview), making the
+  feature look absent. **Fix (`ToolsScreen.kt`):** (1) auto-copy `r.diagnosticsLog` to the clipboard on
+  a successful run with a toast (mirrors act13); (2) switch the action `Row` → `FlowRow` so all three
+  buttons wrap and the copy button is always reachable. Ships in 1.1.0.
+
+- **D-103: circadian once-a-day location is now persisted so a cold start reuses it instead of falling
+  back to defaults (parity fix; runtime).** Tasker persisted the daily-resolved location
+  (`%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`), so a service/process restart reused it until the
+  day rolled over. The 1.0 rebuild held it in `@Volatile` in-memory fields only
+  (`CircadianWindowProvider.resolvedLoc`/`resolvedDay`); on a cold start (process death, service restart
+  after screen-on) it was null, so `current()` returned null and the pipeline fell back to the fixed
+  6–8/18–20 UTC `TimeContext` defaults until the async re-acquire landed — then self-corrected next
+  cycle (owner: scale 1.14 instead of 1.15 at 09:31 CEST on screen-on, fixed on the first significant
+  light reading). **Fix:** persist the resolved location in `ExperimentPrefsStore`
+  (`readCachedSunLocation`/`writeCachedSunLocation` → `CachedSunLocation(lat, lon, day)`); the provider
+  seeds `resolvedLoc`/`resolvedDay` from it in `init` (without clobbering a fresher in-memory fix) and
+  writes back on every successful acquire. `current()` then returns the cached location immediately on
+  cold start and still re-acquires when the day rolls over (it keeps returning the cached value during
+  the async re-acquire) — matching `%AAB_SunLastDate`. New constructor params default to no-op so the
+  existing direct-construction tests are unaffected. Tests: `persistedLocation_isUsedOnColdStart_D103`,
+  `acquiredLocation_isPersisted_D103`. Ships in 1.1.0.
+
+- **D-104: generic chart label-collision staggering (+ landscape height cap, horizontal-only scrub)
+  in the chart engine (UI fix; lifts the S13 build-phase fence).** (1) The five vertical event-line
+  labels in `ChartCanvas` were all parked at the same top position, so close events (dawn↔sunrise,
+  dusk↔sunset) overlapped. **Fix:** when a labelled vertical marker falls within a previous label's
+  rotated footprint, drop it to the next row (offset down the line) — generic, isolated markers stay at
+  row 0. (2) Landscape: a full-height (240 dp) interactive chart filled the short viewport with no room
+  to scroll past it, and its `detectDragGestures` ate the vertical scroll. **Fix:** cap chart height at
+  160 dp in landscape, and switch the scrub to `detectHorizontalDragGestures` so vertical drags scroll
+  the parent while horizontal drags still scrub. The S13 "do not modify `ChartCanvas.kt`" fence is
+  formally **lifted post-1.0 for generic engine improvements** (the keep-it-generic / no-per-chart
+  special-casing rule still binds); doc updated in-file. Ships in 1.1.0.
+
+- **D-105: ip-api.com geo-IP fallback is now opt-IN (default off), was opt-out (default on)
+  (privacy; further deviation from Tasker).** The circadian location chain's last resort is a
+  **cleartext HTTP** request to a third party (ip-api.com, task90 act28). Tasker called it
+  unconditionally; the 1.0 rebuild added a toggle but defaulted it **on** (G3-F12, opt-out). Owner
+  decision: a cleartext third-party network call should not happen unless the user explicitly enables
+  it — flipped the default to **off** (`ExperimentPrefsStore.geoIpEnabled` `?: false`,
+  `CircadianExtrasViewModel` stateIn initial `false`, composable defaults `false`, switch help reworded
+  to opt-in). Runtime gate in `AppModule` (`if (geoIpEnabled.first()) …`) is unchanged — flipping the
+  default is sufficient. Effect on existing installs: anyone who never toggled it (still on the default)
+  stops contacting ip-api.com after update — the safe direction for a privacy change (no surprise data
+  egress; a user who relied on it re-enables it on the Circadian screen). No test pinned the default
+  (provider tests inject `geoIpFallback` directly). Ships in 1.1.0. Aligns with the new CodeQL scan's
+  cleartext-traffic concern.
+
+- **D-106: debug builds use a separate `applicationId` so they coexist with the signed release
+  (standing build preference; build-config).** A debug APK installed for testing would otherwise share
+  the release package — and its data dir — clobbering the owner's configured profiles/context rules.
+  **Preference (now permanent in `app/build.gradle.kts`):** the `debug` build type sets
+  `applicationIdSuffix=".debug"` (+ `versionNameSuffix="-debug"`, label "Tideo AB (Debug)" via the
+  `${appLabel}` manifest placeholder), and the Shizuku provider authority is `${applicationId}.shizuku`
+  so the two packages never collide on install. Debug = `com.tideo.autobrightness.debug` with its own
+  isolated storage; release = `com.tideo.autobrightness` unchanged. This is a kept convention, not a
+  test-round artifact: future debug/sideload builds always carry it. (The temporary `dist/` debug-APK
+  drop used for the 1.1.0 on-device pass was removed before merge; this build-config preference stays.)
+

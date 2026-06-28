@@ -1,7 +1,8 @@
 package com.tideo.autobrightness.app.ui.graph
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextMeasurer
@@ -85,10 +87,11 @@ data class ChartScatter(
  * axis titles, an optional legend, a draggable scrub readout, and tappable scatter points. Pure
  * presentation — series are sampled from domain functions by the caller.
  *
- * **This is THE chart engine S13 builds its six remaining charts on.** Do not special-case any one
- * chart here; keep it generic (S13's hard fence forbids modifying this file). See
- * [BrightnessCurveChart] for the copy-this-pattern template instance. S12.7g extended it with axis
- * labels + the interactive scrub readout + scatter taps (sanctioned engine features per the brief).
+ * **This is THE chart engine every chart builds on.** The rule is unchanged: **keep it generic — do
+ * not special-case any one chart here.** (The S13 build-phase "do not modify" fence is lifted post-1.0
+ * for *generic* engine improvements; D-104 added generic label-collision staggering and a landscape
+ * height cap + horizontal-only scrub so vertical scroll passes through.) See [BrightnessCurveChart] for
+ * the copy-this-pattern template instance.
  */
 @Composable
 fun ChartCanvas(
@@ -117,6 +120,10 @@ fun ChartCanvas(
     val labelStyle = TextStyle(color = labelColor, fontSize = 9.sp)
     val readoutStyle = TextStyle(color = labelColor, fontSize = 10.sp)
     val density = LocalDensity.current
+    // Landscape viewports are short; a full-height chart fills the screen and leaves no room to scroll
+    // past it (owner finding). Cap the height in landscape so the surrounding settings stay reachable.
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val effectiveHeight = if (landscape) height.coerceAtMost(160.dp) else height
     // Extra left/bottom room for the rotated y-title and the x-title when axis labels are present.
     val leftPad = with(density) { (if (yAxisLabel != null) 46.dp else 34.dp).toPx() }
     val bottomPad = with(density) { (if (xAxisLabel != null) 32.dp else 18.dp).toPx() }
@@ -130,10 +137,13 @@ fun ChartCanvas(
     Column(modifier = modifier.fillMaxWidth()) {
         if (showLegend) ChartLegend(series.filter { it.inLegend }, scatter, labelColor)
 
-        var canvasModifier: Modifier = Modifier.fillMaxWidth().height(height)
+        var canvasModifier: Modifier = Modifier.fillMaxWidth().height(effectiveHeight)
         if (interactive) {
             canvasModifier = canvasModifier.pointerInput(Unit) {
-                detectDragGestures(
+                // Horizontal-only: a vertical drag now scrolls the parent instead of being eaten by the
+                // chart (landscape: the tall interactive chart used to swallow the scroll). Horizontal
+                // drags still drive the scrub readout.
+                detectHorizontalDragGestures(
                     onDragEnd = { scrubPx = null },
                     onDragCancel = { scrubPx = null },
                 ) { change, _ -> scrubPx = change.position.x }
@@ -223,6 +233,11 @@ fun ChartCanvas(
             }
 
             // ---- marker / threshold lines ------------------------------------------------------
+            // D-104: stagger labels of vertical markers that sit close in x (e.g. dawn↔sunrise,
+            // dusk↔sunset) so their rotated text doesn't overlap — a too-close label drops to the next
+            // row (offset down the line by its rotated length). Generic: isolated markers stay at row 0.
+            var lastLabelPx = Float.NEGATIVE_INFINITY
+            var labelRow = 0
             markers.forEach { m ->
                 m.x?.let {
                     val mx = toPxX(it)
@@ -230,8 +245,13 @@ fun ChartCanvas(
                     // Vertical event label (e.g. "Sunrise") parked just inside the line near the top.
                     m.label?.let { lbl ->
                         val t = measurer.measure(lbl, TextStyle(color = m.color, fontSize = 8.sp))
-                        rotate(degrees = -90f, pivot = Offset(mx + 4f, plotTop + t.size.width / 2f + 2f)) {
-                            drawText(t, topLeft = Offset(mx + 4f, plotTop + 2f))
+                        // A −90° label's horizontal footprint is its text height; if this marker falls
+                        // within that of the previous label, bump it a row down instead of overlapping.
+                        labelRow = if (abs(mx - lastLabelPx) < t.size.height + 4f) labelRow + 1 else 0
+                        lastLabelPx = mx
+                        val dy = labelRow * (t.size.width + 4f)
+                        rotate(degrees = -90f, pivot = Offset(mx + 4f, plotTop + t.size.width / 2f + 2f + dy)) {
+                            drawText(t, topLeft = Offset(mx + 4f, plotTop + 2f + dy))
                         }
                     }
                 }

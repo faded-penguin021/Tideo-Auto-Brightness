@@ -1,0 +1,4 @@
+Maintenance: the app now targets Android 16 (API 36). No behavior or feature
+changes — this keeps the app current with the latest platform and its updated
+privacy and background-work defaults. Everything works exactly as before on all
+supported versions (Android 12 and newer).

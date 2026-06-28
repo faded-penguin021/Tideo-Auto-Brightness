@@ -47,13 +47,28 @@ When in use, track stages here:
 > Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
 > "Maintenance deviations" section), not here — this slot is only a transient staging note
 > during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-101** (historical high-water mark D-100); never restart at D-001. A deviation, once
+> **D-107** (historical high-water mark D-106); never restart at D-001. A deviation, once
 > numbered, lives in the registry forever — it is never compressed out.
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-26 — 1.1.0 / `versionCode 7`: bumped **targetSdk 35 → 36** (Android 16), `compileSdk`
+  36 in app + platform. Android 16 impact review found zero required platform code changes (edge-to-edge
+  already enforced via D-097/098/100; back via AndroidX `BackHandler`; transitive native libs
+  already 16 KB-aligned; specialUse FGS property already declared; specialUse FGS-from-boot unchanged
+  15→16). Robolectric 4.14.1 → 4.16.1 (needed for SDK 36; runs on JDK 21); CI JDK 17→21; added CodeQL
+  (`codeql.yml`, java-kotlin build-mode none). Debug build type gets `applicationIdSuffix=".debug"`
+  (+ `-debug` versionName, "Tideo AB (Debug)" label, Shizuku authority `${applicationId}.shizuku`) so a
+  debug build coexists with the signed release (D-106). **Owner on-device Pass A/B: all passed.**
+  Bug/parity/privacy fixes folded in: **D-101** PWM/dimming threshold 0..100→0..255; **D-102** curve
+  wizard auto-copies %AAB_Test + FlowRow button wrap; **D-103** circadian once-a-day location persisted
+  across restarts (fixes screen-on default-scale drift); **D-104** generic chart label declutter +
+  landscape height cap/scroll (S13 chart-engine fence lifted for generic changes); **D-105** ip-api.com
+  geo-IP fallback now opt-in (default off). Docs: RUNBOOK §6 semver guidance, §7 "Bumping targetSdk",
+  CI-failure protocol; `changelogs/7.txt`. Temporary `dist/` debug APK used for the on-device pass was
+  removed before merge. Owner squash-merges + tags `v1.1.0`.
 - 2026-06-25 — 1.0.4 / `versionCode 6`: (D-100) main-window bottom controls clipped under the nav bar
   with button/3-key navigation — the draft-settings `DraftApplyBar` (Discard/Apply) and the Menu's
   final "Recheck Permissions" row drew behind the system nav bar (targetSdk 35 enforces edge-to-edge on

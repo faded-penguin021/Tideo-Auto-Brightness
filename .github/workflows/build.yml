@@ -22,11 +22,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up JDK 17
+      # JDK 21: Robolectric 4.16+ requires it to run tests under SDK 36 (Android 16 / targetSdk 36).
+      # The app still compiles to 17 bytecode (sourceCompatibility/jvmTarget = 17) — this is only the
+      # JDK that runs Gradle + the test JVM.
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3

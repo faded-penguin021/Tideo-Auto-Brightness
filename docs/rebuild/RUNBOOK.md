@@ -99,15 +99,66 @@ drifted before (the `v1.0.2` tag was cut while `build.gradle.kts` still said `1.
   ```
 - **Invariant — the build must never ship behind a tag.** Any change destined for a new release
   must set, in `app/build.gradle.kts`:
-  - `versionName` ≥ the latest `v*` tag (use the next patch, e.g. latest tag `v1.0.2` → `1.0.3`);
+  - `versionName` ≥ the latest `v*` tag, bumped by **semantic versioning** — decide the field by the
+    *nature* of the change, do not reflexively bump patch:
+    - **patch** (`x.y.Z`) — bug fixes, doc/packaging, internal refactors; no user-visible behavior
+      or capability change (e.g. D-098 Save/Cancel clip fix → `1.0.3`).
+    - **minor** (`x.Y.0`) — new user-facing feature, a new setting/range, or **observable platform
+      behavior** such as a `targetSdk` bump (e.g. targetSdk 35→36 → `1.1.0`). Reset patch to 0.
+    - **major** (`X.0.0`) — a breaking change: a settings-schema migration that can't round-trip, a
+      dropped feature, a minSdk raise that strands devices, or any change that invalidates a user's
+      existing profiles/config. Reset minor and patch to 0.
+    - When a change spans categories, pick the **highest** that applies.
   - `versionCode` **strictly greater than every released code** (monotonic; F-Droid rejects a
     re-used code). Bump by 1 from the highest code ever shipped, not from the last tag's code if
-    that tag forgot to bump.
+    that tag forgot to bump. (versionCode is always +1 regardless of which semver field moved.)
 - **F-Droid changelog:** add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the
   filename is the **versionCode**, not the name) with a short user-facing note.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
   process, a `DEVIATIONS_LEDGER.md` row.
 - **Tagging stays an owner step** — do not create tags or open releases yourself.
+
+### 7. Bumping `targetSdk` (new Android platform)
+First done 35→36 (Android 16) — see `STATE.md` Changelog and the impact matrix it carried.
+Do it in two reviewable commits; on-device verification is owner-only (no emulator).
+
+- **Read first:** Google's "Behavior changes: Apps targeting Android <N>" + "Behavior
+  changes: all apps" pages. Build an **impact matrix** scoped to *this app's* surfaces only
+  (don't audit the whole OS): specialUse FGS + FGS background-job quotas, ongoing
+  notification + actions, `WRITE_SECURE_SETTINGS`/Settings writes, background location,
+  `PACKAGE_USAGE_STATS`, exported boot receiver, app widget, QS tile, accessibility overlay,
+  edge-to-edge enforcement, predictive back, package visibility `<queries>`, 16 KB page size.
+  Mark each row **no-op / config-only / code change / blocker**; put the matrix in `STATE.md`
+  Active work. Every "code change"/"blocker" row gets a sub-task before flipping targetSdk.
+- **Install the SDK platform** (fresh containers ship only the current one):
+  `sdkmanager "platforms;android-<N>" "build-tools;<N>.0.0"`.
+- **Commit 1 — `compileSdk` only** (keep `targetSdk` one behind). Bump `compileSdk` in
+  `app/build.gradle.kts` **and** `platform/build.gradle.kts`. Run the full ladder. This is
+  forward-compat with no behavior change and is independently shippable if the targetSdk flip
+  later stalls.
+- **Commit 2 — `targetSdk = <N>` + version bump.** Bump `targetSdk` (app only) and the
+  version per §6 (targetSdk is observable behavior → minor bump, e.g. 1.0.x → 1.1.0). Add the
+  `changelogs/<versionCode>.txt`. Address the matrix's code-change rows.
+- **Robolectric tracks the SDK.** Tests have no `@Config(sdk=…)` pins, so they auto-run under
+  the manifest `targetSdk`. Each new platform needs a Robolectric release that supports it
+  (36 → **4.16.1**, which **requires JDK 21** at test runtime — the Gradle JVM, not
+  `sourceCompatibility`). Symptom if too old: `targetSdkVersion=<N> > maxSdkVersion=<N-1>`
+  `IllegalArgumentException` (`initializationError` on every Robolectric class). Bump
+  `robolectric` in `gradle/libs.versions.toml`; the matching `android-all` jar is fetched from
+  Maven on first run.
+- **Native libs / 16 KB page size.** Even with no NDK code, transitive AndroidX libs ship
+  `.so`s (DataStore, graphics-path). Verify 16 KB alignment on the assembled APK:
+  `readelf -lW <lib>.so | grep LOAD` (want `0x4000`) and
+  `build-tools/<N>.0.0/zipalign -c -P 16 -v 4 <apk>`.
+- **Acceptance:** full ladder green, then **owner runs the on-device Pass A (regression) +
+  Pass B (feature-availability) matrices** — the ladder cannot catch "the OS silently stopped
+  delivering us X". Drop a debug APK in `dist/` (temporary, deleted before merge) for sideload.
+  Debug builds carry a separate package (`applicationIdSuffix=".debug"`, label "Tideo AB (Debug)",
+  Shizuku authority `${applicationId}.shizuku`) so a test build coexists with the owner's signed
+  release without sharing data — keep this (D-106); the debug app has its own storage, so ELEVATED
+  needs a separate `pm grant … com.tideo.autobrightness.debug …`.
+- **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
+  If anything here was wrong/stale, fix this section in the same change.
 
 ## Acceptance ladder
 
@@ -120,6 +171,34 @@ Run the relevant subset until green (on-device behavior is owner-verified — no
 ./gradlew :app:assembleDebug      # APK
 ./gradlew :app:lintDebug          # lint vs frozen baseline
 ```
+
+## When CI fails on a PR (workflow vs code)
+
+The local ladder (above) and CI (`.github/workflows/build.yml`) run the *same* Gradle tasks, so a
+green local tree usually means green CI. When CI is red but local is green, the failure is in the
+**environment/workflow**, not your code — diagnose before "fixing tests". Triage in this order:
+
+1. **Read the failing step's log** — distinguish the three kinds:
+   - **Real failure** (a test assertion, a lint finding, a compile error): reproduce locally with the
+     exact failing task and fix the *code* (playbooks 1–5). This is the common case; trust it.
+   - **Toolchain/environment mismatch** (CI runner differs from local): the symptom is a failure that
+     does **not** reproduce locally. Fix the *workflow*, not the code. Known examples:
+     - **JDK version** — Robolectric 4.16+ needs **JDK 21** to run SDK-36 tests; all workflows pin
+       `java-version: '21'`. A `setup-java@v5` with 17 throws `initializationError` /
+       `targetSdkVersion > maxSdkVersion` only in CI. Bump the workflow JDK in lockstep with any
+       Robolectric/targetSdk change (RUNBOOK §7).
+     - **SDK/build-tools** — CI relies on AGP fetching the compile SDK on demand; a new `compileSdk`
+       just works, but a new build-tools requirement may need a `setup-android` tweak.
+   - **Flake** (network blip, cache corruption, runner OOM, `actions/*` outage): non-deterministic,
+     unrelated to the diff. Re-run the job once. If it passes, it was a flake — note it and move on;
+     do **not** "fix" code for a flake. If it recurs, treat it as an environment issue and harden the
+     workflow (pin the action version, add a retry, drop a poisoned cache key).
+2. **Changing a workflow is in scope** when the failure is environmental — workflows are code; fix
+   `.github/workflows/*` in the same PR as the change that needs it (don't disable a check to get
+   green). **Never** weaken a gate (skip tests, drop `abortOnError`, `continue-on-error`) to pass CI.
+3. **If a failure is real but out of scope** (a pre-existing flake in an unrelated suite, an upstream
+   action breakage you can't fix), say so in the PR with the log excerpt and where you're stuck —
+   don't silently retry forever.
 
 ## Self-adaptation — keep this runbook useful
 

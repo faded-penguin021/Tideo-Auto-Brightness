@@ -5,8 +5,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
@@ -36,14 +38,16 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
     }
 
     /**
-     * G3-F12 (Gate 3 — privacy): whether the IP-geolocation fallback (`ip-api.com`, cleartext HTTP) may
+     * G3-F12 / D-105 (privacy): whether the IP-geolocation fallback (`ip-api.com`, cleartext HTTP) may
      * run as the LAST resort when no Android location fix is available and no fixed lat/lon is pinned
-     * (task90 act28). Default **on** (Tasker parity), but a privacy-conscious user can turn it off so
-     * the app never contacts ip-api.com — circadian then simply waits for an on-device fix.
+     * (task90 act28). Default **off — opt-in** (D-105): a cleartext request to a third party is not
+     * made unless the user explicitly enables it. (Tasker called ip-api.com unconditionally; the toggle
+     * itself was already a deviation, G3-F12 — D-105 only flips its default from on to off.) When off,
+     * the app never contacts ip-api.com — circadian simply waits for an on-device fix.
      */
-    val geoIpEnabled: Flow<Boolean> = dataStore.data.map { it[GEO_IP] ?: true }
+    val geoIpEnabled: Flow<Boolean> = dataStore.data.map { it[GEO_IP] ?: false }
 
-    /** Opt out of (or back into) the ip-api.com geo-IP location fallback (G3-F12). */
+    /** Opt in to (or back out of) the ip-api.com geo-IP location fallback (G3-F12 / D-105). */
     suspend fun setGeoIpEnabled(enabled: Boolean) {
         dataStore.edit { it[GEO_IP] = enabled }
     }
@@ -61,6 +65,29 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    /**
+     * D-103: the once-a-day resolved location (Android fix or geo-IP), persisted so a cold start
+     * (process death / service restart after screen-on) reuses it immediately instead of falling back
+     * to the fixed `TimeContext` defaults until the async re-acquire lands. Mirrors Tasker's persisted
+     * `%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`. [day] is epoch-days the fix was acquired for.
+     */
+    suspend fun readCachedSunLocation(): CachedSunLocation? {
+        val prefs = dataStore.data.first()
+        val lat = prefs[SUN_LAT] ?: return null
+        val lon = prefs[SUN_LON] ?: return null
+        val day = prefs[SUN_DAY] ?: return null
+        return CachedSunLocation(lat, lon, day)
+    }
+
+    /** Persist the daily-resolved location (D-103). */
+    suspend fun writeCachedSunLocation(latitude: Double, longitude: Double, day: Long) {
+        dataStore.edit { prefs ->
+            prefs[SUN_LAT] = latitude
+            prefs[SUN_LON] = longitude
+            prefs[SUN_DAY] = day
+        }
+    }
+
     /** Revert to live data (today + current location) — mirrors `_ExperimentClearDate`. */
     suspend fun clear() {
         dataStore.edit { prefs ->
@@ -75,5 +102,12 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         val LAT = doublePreferencesKey("experiment_lat")
         val LON = doublePreferencesKey("experiment_lon")
         val GEO_IP = booleanPreferencesKey("geo_ip_fallback_enabled")
+        // D-103: persisted once-a-day resolved location.
+        val SUN_LAT = doublePreferencesKey("sun_cached_lat")
+        val SUN_LON = doublePreferencesKey("sun_cached_lon")
+        val SUN_DAY = longPreferencesKey("sun_cached_day")
     }
 }
+
+/** D-103: a persisted daily-resolved location (epoch-[day] it was acquired for). */
+data class CachedSunLocation(val latitude: Double, val longitude: Double, val day: Long)

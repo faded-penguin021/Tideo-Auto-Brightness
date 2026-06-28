@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.runtime
 
+import com.tideo.autobrightness.app.settings.CachedSunLocation
 import com.tideo.autobrightness.app.settings.ExperimentDateLocation
 import com.tideo.autobrightness.domain.circadian.SolarCalculator
 import com.tideo.autobrightness.platform.context.LocationReader
@@ -59,6 +60,11 @@ class CircadianWindowProvider(
     private val location: LocationReader,
     // F83: ip-api.com geo-IP fallback (task90 act28), injected as a suspend fn for testability.
     private val geoIpFallback: suspend () -> LocationSnapshot?,
+    // D-103: load/save the once-a-day resolved location across process restarts (default no-op so
+    // existing tests that construct the provider directly keep their in-memory-only behavior).
+    private val loadCachedLocation: suspend () -> CachedSunLocation? = { null },
+    private val persistLocation: suspend (latitude: Double, longitude: Double, day: Long) -> Unit =
+        { _, _, _ -> },
     private val clock: () -> Long = System::currentTimeMillis,
     // F73: offset at the TARGET instant, not "now" — covers DST and fixed dates in another season.
     private val tzOffsetForDate: (dateEpochSec: Long) -> Double = { dateEpochSec ->
@@ -86,6 +92,18 @@ class CircadianWindowProvider(
                 override = it
                 cacheKey = null
                 resolvedDay = Long.MIN_VALUE
+            }
+        }
+        // D-103: seed the in-memory location from the persisted once-a-day fix so a cold start
+        // (process death / service restart after screen-on) returns the cached location immediately
+        // instead of falling back to TimeContext defaults. Don't clobber a fresher in-memory fix that
+        // a concurrent acquire may already have set. current() still re-acquires when the day rolls.
+        scope.launch {
+            val cached = runCatching { loadCachedLocation() }.getOrNull() ?: return@launch
+            if (resolvedLoc == null) {
+                resolvedLoc = LocationSnapshot(cached.latitude, cached.longitude)
+                resolvedDay = cached.day
+                cacheKey = null
             }
         }
     }
@@ -129,6 +147,8 @@ class CircadianWindowProvider(
                     resolvedLoc = snap
                     resolvedDay = day
                     cacheKey = null // recompute windows with the freshly acquired location
+                    // D-103: persist so the next cold start reuses it before re-acquiring.
+                    runCatching { persistLocation(snap.latitude, snap.longitude, day) }
                 }
             } finally {
                 acquiring.set(false)

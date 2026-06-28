@@ -84,7 +84,11 @@ fun AabSettings.validate(): AabSettings {
         form2C = form2C.coerceIn(1, 50),
         dimmingStrength = dimmingStrength.coerceIn(0, 100),
         dimmingExponent = dimmingExponent.coerceIn(0.5f, 5f),
-        dimmingThreshold = dimmingThreshold.coerceIn(0, 100),
+        // The dimming threshold is a BRIGHTNESS level (super-dimming engages when target < threshold),
+        // so it spans the full brightness domain 0..255 like min/maxBrightness — not 0..100. The Tasker
+        // field (superdimming_settings.md elements36) is an uncapped numeric; the old 0..100 clamp was a
+        // rebuild artifact that prevented engaging dimming above brightness 100 (owner finding).
+        dimmingThreshold = dimmingThreshold.coerceIn(0, 255),
         // S12.9c #6: dimSpread is signed (−100..100). The old 1..300 clamp silently turned the S12.9b
         // negative-spread "boost in daylight" path into 1 on every save, making it unreachable.
         dimSpread = dimSpread.coerceIn(-100, 100),

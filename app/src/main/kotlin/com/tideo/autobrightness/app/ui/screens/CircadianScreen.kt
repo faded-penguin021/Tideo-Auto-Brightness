@@ -75,7 +75,7 @@ fun CircadianScreen(
 
     // F39: the Circadian fixed date/location override + its live-data defaults (today + location).
     val dateLocation by extras.dateLocation.collectAsStateWithLifecycle()
-    val geoIpEnabled by extras.geoIpEnabled.collectAsStateWithLifecycle() // G3-F12 privacy opt-out
+    val geoIpEnabled by extras.geoIpEnabled.collectAsStateWithLifecycle() // G3-F12 / D-105 privacy opt-in
     var defaultLatLon by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         defaultLatLon = runCatching { extras.defaultLatLon() }.getOrNull()
@@ -135,7 +135,7 @@ fun CircadianContent(
     onSetDateLocation: (String, Double?, Double?) -> Unit = { _, _, _ -> },
     onUseLiveData: () -> Unit = {},
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
-    geoIpEnabled: Boolean = true,
+    geoIpEnabled: Boolean = false,
     onSetGeoIpEnabled: (Boolean) -> Unit = {},
 ) {
     DraftSettingsScaffold(stringResource(R.string.title_circadian), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
@@ -272,7 +272,7 @@ fun CircadianDateLocationCard(
     onSet: (String, Double?, Double?) -> Unit,
     onUseLiveData: () -> Unit,
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
-    geoIpEnabled: Boolean = true,
+    geoIpEnabled: Boolean = false,
     onSetGeoIpEnabled: (Boolean) -> Unit = {},
 ) {
     // Effective defaults shown when nothing is pinned: today + current location (G2R-F39).
@@ -341,15 +341,15 @@ fun CircadianDateLocationCard(
         }
     }
 
-    // G3-F12 (privacy): the IP-geolocation fallback is the LAST resort in the location chain and uses a
-    // cleartext request to ip-api.com. Surface it as an explicit opt-out so privacy-conscious users can
-    // guarantee the app never contacts that server (circadian then waits for an on-device fix instead).
+    // G3-F12 / D-105 (privacy): the IP-geolocation fallback is the LAST resort in the location chain and
+    // uses a cleartext request to ip-api.com. It is an explicit opt-IN (default OFF) — the app never
+    // contacts that server unless the user turns this on (circadian otherwise waits for an on-device fix).
     SwitchSettingRow(
         label = "IP-based location fallback",
         checked = geoIpEnabled,
         onCheckedChange = onSetGeoIpEnabled,
-        help = "When GPS/network gives no fix and no fixed location is set, look up an approximate " +
-            "location from your public IP via ip-api.com (cleartext HTTP). Turn off to never contact it.",
+        help = "Off by default. When GPS/network gives no fix and no fixed location is set, turn this " +
+            "on to look up an approximate location from your public IP via ip-api.com (cleartext HTTP).",
         testTag = "exp_geoip_toggle",
     )
 

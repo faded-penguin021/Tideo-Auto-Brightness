@@ -92,9 +92,14 @@ class AppModule(context: Context) {
             scope = scope,
             overrideFlow = experimentPrefs.dateLocation,
             location = AndroidLocationReader(appContext),
-            // F83: ip-api.com geo-IP fallback when no Android fix is available (task90 act28). G3-F12
-            // (privacy): gated on the user's opt-out — when disabled the app never contacts ip-api.com.
+            // F83: ip-api.com geo-IP fallback when no Android fix is available (task90 act28). G3-F12 /
+            // D-105 (privacy): gated on the user's opt-IN (default off) — the app contacts ip-api.com
+            // only when the user has explicitly enabled the fallback.
             geoIpFallback = { if (experimentPrefs.geoIpEnabled.first()) geoIpClient.resolve() else null },
+            // D-103: persist/restore the once-a-day resolved location so a cold start reuses it
+            // instead of falling back to TimeContext defaults until re-acquired (Tasker %AAB_SunLat/…).
+            loadCachedLocation = { experimentPrefs.readCachedSunLocation() },
+            persistLocation = { lat, lon, day -> experimentPrefs.writeCachedSunLocation(lat, lon, day) },
         )
 
         val controller = BrightnessPipelineController(
