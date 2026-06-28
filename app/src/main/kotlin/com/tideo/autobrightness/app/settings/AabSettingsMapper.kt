@@ -109,5 +109,6 @@ fun AabSettings.validate(): AabSettings {
         scaleTaperSteepness = scaleTaperSteepness.coerceIn(0.001f, 1f),
         scaleTransitionFactor = scaleTransitionFactor.coerceIn(0f, 1f),
         debugLevel = debugLevel.coerceIn(0, 9),
+        panicSensitivity = panicSensitivity.coerceIn(0, 10),
     )
 }

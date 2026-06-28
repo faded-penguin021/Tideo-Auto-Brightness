@@ -510,8 +510,9 @@ interface ProfileCatalog {
  * curve/min-max/threshold/dimming snapshot keys (contexts_spec §4 enumerates the snapshot), so a
  * context profile swap must not silently turn manual-override detection off (G2-F8).
  *
- * S12.9c #1: these are exactly five of the seven [com.tideo.autobrightness.app.settings.GlobalPrefs]
- * fields. The full `copy(global = baseline.global)` is intentionally NOT used: GlobalPrefs also holds
+ * S12.9c #1: these are six of the eight [com.tideo.autobrightness.app.settings.GlobalPrefs]
+ * fields (panicSensitivity added D-116 — also a global pref, never a task626 snapshot key). The full
+ * `copy(global = baseline.global)` is intentionally NOT used: GlobalPrefs also holds
  * `quickSettingsEnabled`/`notificationsEnabled`, which ARE in task626's per-profile snapshot and so
  * must come from the loaded profile, not the baseline.
  */
@@ -520,6 +521,7 @@ internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSetti
     contextOverride = baseline.contextOverride,
     detectOverrides = baseline.detectOverrides,
     debugLevel = baseline.debugLevel,
+    panicSensitivity = baseline.panicSensitivity,
     setupTitle = baseline.setupTitle,
     schemaVersion = baseline.schemaVersion,
 )

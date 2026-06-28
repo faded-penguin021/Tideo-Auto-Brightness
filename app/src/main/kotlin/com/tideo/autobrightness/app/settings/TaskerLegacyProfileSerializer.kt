@@ -159,6 +159,7 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_QSUse"]?.let { settings = settings.copy(quickSettingsEnabled = it.asBoolean(settings.quickSettingsEnabled)) }
         map["%AAB_NotifyUse"]?.let { settings = settings.copy(notificationsEnabled = it.asBoolean(settings.notificationsEnabled)) }
         map["%AAB_Debug"]?.asRoundedInt()?.let { settings = settings.copy(debugLevel = it) }
+        map["%AAB_PanicSensitivity"]?.asRoundedInt()?.let { settings = settings.copy(panicSensitivity = it) }
         map["%AAB_AnimSteps"]?.asRoundedInt()?.let { settings = settings.copy(animSteps = it) }
         map["%AAB_ThreshMidpoint"]?.toDoubleOrNull()?.let { settings = settings.copy(thresholdMidpoint = it) }
         map["%AAB_ContextOverride"]?.let { settings = settings.copy(contextOverride = it.asBoolean(settings.contextOverride)) }

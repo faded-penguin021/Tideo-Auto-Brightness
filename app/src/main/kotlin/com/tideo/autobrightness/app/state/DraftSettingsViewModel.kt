@@ -80,6 +80,9 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                             // debugLevel is GLOBAL (owned by the Live Debug scene, G2R-F9): track the
                             // committed value so an open draft never re-commits a stale category.
                             debugLevel = c.debugLevel,
+                            // panicSensitivity is likewise GLOBAL (Live Debug slider, D-116) — track it
+                            // so an open settings draft never re-commits a stale sensitivity.
+                            panicSensitivity = c.panicSensitivity,
                         )
                     }
                 }
@@ -137,6 +140,8 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                     contextOverride = current.contextOverride,
                     // debugLevel is owned by the Live Debug scene (G2R-F9), never a parameter screen.
                     debugLevel = current.debugLevel,
+                    // panicSensitivity is likewise owned by the Live Debug slider (D-116).
+                    panicSensitivity = current.panicSensitivity,
                 )
             }
             // UNLIMITED control event — takes effect even with no new sensor reading (G2-F16). Only

@@ -40,14 +40,15 @@ fun AabSettings.changedCount(reference: AabSettings = AabSettings()): Int =
 /**
  * Keys excluded from the changed-vs-default diff (G2R-F84 + modal exclusions). `serviceEnabled` and
  * `contextOverride` are runtime/identity latches (never profile parameters). `debugLevel`,
- * `detectOverrides`, `quickSettingsEnabled` and `notificationsEnabled` are GLOBAL preferences the
- * profile load deliberately preserves (G2-F8/G2R-F9) — listing them in a profile diff is misleading.
- * `thresholdMidpoint` is DERIVED (log10(zone2End), task570 act39), not an independent tuned value.
+ * `detectOverrides`, `quickSettingsEnabled`, `notificationsEnabled` and `panicSensitivity` are GLOBAL
+ * preferences the profile load deliberately preserves (G2-F8/G2R-F9/D-116) — listing them in a profile
+ * diff is misleading. `thresholdMidpoint` is DERIVED (log10(zone2End), task570 act39), not tuned.
  */
 private val EXCLUDED_KEYS = setOf(
     "serviceEnabled",
     "contextOverride",
     "debugLevel",
+    "panicSensitivity",
     "detectOverrides",
     "quickSettingsEnabled",
     "notificationsEnabled",
@@ -138,6 +139,7 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "quickSettingsEnabled" -> quickSettingsEnabled.toString()
     "notificationsEnabled" -> notificationsEnabled.toString()
     "debugLevel" -> debugLevel.toString()
+    "panicSensitivity" -> panicSensitivity.toString()
     "contextOverride" -> contextOverride.toString()
     // S12.9c #2: fail fast on schema drift. Every AabSettingsContract key must be handled above; a
     // silent "" would hide a contract/extractor mismatch. SettingsDisplayContractDriftTest guards this.
