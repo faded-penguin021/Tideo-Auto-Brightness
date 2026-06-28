@@ -1808,3 +1808,14 @@ the permanent registry — never compress or remove them.
   (provider tests inject `geoIpFallback` directly). Ships in 1.1.0. Aligns with the new CodeQL scan's
   cleartext-traffic concern.
 
+- **D-106: debug builds use a separate `applicationId` so they coexist with the signed release
+  (standing build preference; build-config).** A debug APK installed for testing would otherwise share
+  the release package — and its data dir — clobbering the owner's configured profiles/context rules.
+  **Preference (now permanent in `app/build.gradle.kts`):** the `debug` build type sets
+  `applicationIdSuffix=".debug"` (+ `versionNameSuffix="-debug"`, label "Tideo AB (Debug)" via the
+  `${appLabel}` manifest placeholder), and the Shizuku provider authority is `${applicationId}.shizuku`
+  so the two packages never collide on install. Debug = `com.tideo.autobrightness.debug` with its own
+  isolated storage; release = `com.tideo.autobrightness` unchanged. This is a kept convention, not a
+  test-round artifact: future debug/sideload builds always carry it. (The temporary `dist/` debug-APK
+  drop used for the 1.1.0 on-device pass was removed before merge; this build-config preference stays.)
+

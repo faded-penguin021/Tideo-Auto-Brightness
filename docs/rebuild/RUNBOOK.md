@@ -153,6 +153,10 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
 - **Acceptance:** full ladder green, then **owner runs the on-device Pass A (regression) +
   Pass B (feature-availability) matrices** — the ladder cannot catch "the OS silently stopped
   delivering us X". Drop a debug APK in `dist/` (temporary, deleted before merge) for sideload.
+  Debug builds carry a separate package (`applicationIdSuffix=".debug"`, label "Tideo AB (Debug)",
+  Shizuku authority `${applicationId}.shizuku`) so a test build coexists with the owner's signed
+  release without sharing data — keep this (D-106); the debug app has its own storage, so ELEVATED
+  needs a separate `pm grant … com.tideo.autobrightness.debug …`.
 - **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
   If anything here was wrong/stale, fix this section in the same change.
 
