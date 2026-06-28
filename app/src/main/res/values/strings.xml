@@ -64,6 +64,7 @@
     <string name="profiles_reset_defaults">Reset settings to defaults</string>
     <string name="profiles_export">Export current settings…</string>
     <string name="profiles_view_current">View current settings…</string>
+    <string name="profiles_active_tag">Active</string>
     <string name="profile_more_actions">More actions</string>
     <string name="legacy_import_header">Import from Tasker AAB</string>
     <string name="manage_profiles_header">Manage profiles &amp; Export</string>

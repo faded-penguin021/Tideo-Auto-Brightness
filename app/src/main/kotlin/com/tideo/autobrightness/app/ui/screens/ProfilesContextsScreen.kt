@@ -3,12 +3,17 @@ package com.tideo.autobrightness.app.ui.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -35,7 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -85,6 +92,9 @@ fun ProfilesContextsScreen(
     // --- Profiles side (SettingsViewModel) ---
     val settings by settingsVm.settings.collectAsStateWithLifecycle()
     val profiles by settingsVm.profiles.collectAsStateWithLifecycle()
+    // %AAB_CurrentActiveProfile — highlight the in-force profile in the list (owner: "seeing the active
+    // profile here is useful"), mirroring Tasker's "Active Profile: …" readout.
+    val activeProfile by com.tideo.autobrightness.app.runtime.LiveRuntimeState.activeProfile.collectAsStateWithLifecycle()
     val manager = remember { ProfileImportExportManager(context.applicationContext) }
     var status by remember { mutableStateOf<String?>(null) }
     // S12.9c #3: a user-visible error card for an unreadable profile file (ProfileLoadResult.TotalFailure).
@@ -210,6 +220,7 @@ fun ProfilesContextsScreen(
                 profiles.forEach { entry ->
                     ProfileCard(
                         entry,
+                        isActive = entry.name == activeProfile,
                         onApply = { previewProfile = entry },
                         onOverwrite = { name -> settingsVm.saveCurrentAs(name); toast("Overwrote: $name") },
                         onDelete = { name -> settingsVm.deleteProfile(name); toast("Deleted: $name") },
@@ -324,28 +335,48 @@ fun ProfilesContextsScreen(
 }
 
 /**
- * D-111: the pinned Load / Save / Contexts action bar (m3_audit B5 `ActionButtonBar` pattern —
- * equal-weight tonal buttons). Sits outside the scroll so it stays reachable while the profile list
- * scrolls; each button opens its own modal.
+ * D-111: the pinned Load / Save / Contexts action bar (m3_audit B5 `ActionButtonBar` pattern), matched
+ * to the Tasker original — each action carries a leading icon and the three are visually distinct:
+ * **Load** filled teal (primary, high-emphasis), **Save** tonal grey, **Contexts** teal-outlined. Sits
+ * outside the scroll so it stays reachable while the profile list scrolls; each opens its own modal.
+ *
+ * The compact `contentPadding` (8 dp vs the M3 default 24 dp) + single-line labels keep "Contexts" on
+ * one line at equal thirds — the default padding squeezed it onto two lines.
  */
 @Composable
 private fun ProfilesActionBar(onLoad: () -> Unit, onSave: () -> Unit, onContexts: () -> Unit) {
+    val pad = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Dimens.screenPaddingHorizontal, vertical = Dimens.sectionSpacing),
         horizontalArrangement = Arrangement.spacedBy(Dimens.rowGap),
     ) {
-        FilledTonalButton(onClick = onLoad, modifier = Modifier.weight(1f).testTag("action_load")) {
-            Text(stringResource(R.string.profiles_action_load))
-        }
-        FilledTonalButton(onClick = onSave, modifier = Modifier.weight(1f).testTag("action_save")) {
-            Text(stringResource(R.string.profiles_action_save))
-        }
-        FilledTonalButton(onClick = onContexts, modifier = Modifier.weight(1f).testTag("action_contexts")) {
-            Text(stringResource(R.string.profiles_action_contexts))
-        }
+        Button(
+            onClick = onLoad,
+            modifier = Modifier.weight(1f).testTag("action_load"),
+            contentPadding = pad,
+        ) { ActionButtonContent(R.drawable.ic_folder, R.string.profiles_action_load) }
+        FilledTonalButton(
+            onClick = onSave,
+            modifier = Modifier.weight(1f).testTag("action_save"),
+            contentPadding = pad,
+        ) { ActionButtonContent(R.drawable.ic_save, R.string.profiles_action_save) }
+        OutlinedButton(
+            onClick = onContexts,
+            modifier = Modifier.weight(1f).testTag("action_contexts"),
+            contentPadding = pad,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        ) { ActionButtonContent(R.drawable.ic_tune, R.string.profiles_action_contexts) }
     }
+}
+
+/** A leading 18 dp icon + single-line label, shared by the three action-bar buttons. */
+@Composable
+private fun ActionButtonContent(icon: Int, label: Int) {
+    Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
+    Spacer(Modifier.width(6.dp))
+    Text(stringResource(label), maxLines = 1, softWrap = false)
 }
 
 /**

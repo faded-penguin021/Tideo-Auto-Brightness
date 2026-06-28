@@ -2,13 +2,16 @@ package com.tideo.autobrightness.app.ui.screens
 
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -16,11 +19,11 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +50,8 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsDiffList
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
+import com.tideo.autobrightness.app.ui.theme.AabGold
+import com.tideo.autobrightness.app.ui.theme.AabOnGold
 
 /**
  * Profiles & Import/Export content (Tasker AAB Profile — task592/637/622), the saved-profiles surface
@@ -277,15 +282,21 @@ fun ProfilesBody(
 internal fun ContextLockBanner(onResumeContext: () -> Unit) {
     Card(
         Modifier.fillMaxWidth().testTag("context_lock_banner"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        // Vivid brand gold (like the dashboard StaleBanner / Tasker's "Automation Paused" bar), not the
+        // muted dark-theme `secondaryContainer` — the owner wanted the Tasker golden banner.
+        colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 "Context automation is paused after a manual profile load.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
-            FilledTonalButton(onClick = onResumeContext, modifier = Modifier.testTag("resume_context")) {
+            // High-contrast resume — Tasker's black RESUME on gold: dark container, gold label + ▶ icon.
+            Button(
+                onClick = onResumeContext,
+                colors = ButtonDefaults.buttonColors(containerColor = AabOnGold, contentColor = AabGold),
+                modifier = Modifier.testTag("resume_context"),
+            ) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                 Text("Resume context automation")
             }
@@ -299,11 +310,17 @@ internal fun ProfileCard(
     onApply: () -> Unit,
     onOverwrite: (String) -> Unit,
     onDelete: (String) -> Unit,
+    isActive: Boolean = false,
 ) {
     val changed = entry.settings.changedCount()
     var menu by remember { mutableStateOf(false) }
+    // D-111 (owner): highlight the in-force profile with a gold edge + an "Active" tag, so the list
+    // answers "which profile is loaded right now?" the way Tasker's "Active Profile: …" readout does.
+    val cardModifier = Modifier.testTag("profile_${entry.name}").let {
+        if (isActive) it.border(1.5.dp, AabGold, MaterialTheme.shapes.medium) else it
+    }
     AabCard(
-        Modifier.testTag("profile_${entry.name}"),
+        cardModifier,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         // S13c' §07-B: the row shows the name + the PRIMARY action (Apply); secondary actions
@@ -314,10 +331,21 @@ internal fun ProfileCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    entry.name + if (entry.builtIn) "  (built-in)" else "",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        entry.name + if (entry.builtIn) "  (built-in)" else "",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    if (isActive) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.profiles_active_tag),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AabGold,
+                            modifier = Modifier.testTag("profile_active_${entry.name}"),
+                        )
+                    }
+                }
                 Text(
                     if (changed == 0) "Factory defaults" else "$changed changed from default",
                     style = MaterialTheme.typography.bodySmall,

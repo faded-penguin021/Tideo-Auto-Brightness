@@ -12,7 +12,13 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -243,12 +249,14 @@ private fun TierBadge(tier: Tier, onClick: () -> Unit) {
     )
 }
 
-/** Shown only while [pausedByOverride]: explains the pause and offers the one Resume control. */
+/** Shown only while [pausedByOverride]: explains the pause and offers the one Resume control. Styled as
+ *  Tasker's gold "Automation Paused" bar — vivid brand gold (not the muted dark `secondaryContainer`)
+ *  with a high-contrast dark RESUME button carrying a ▶ icon (D-111). */
 @Composable
 private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
     Card(
-        modifier = Modifier.testTag("override_card"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.fillMaxWidth().testTag("override_card"),
+        colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
     ) {
         Column(
             Modifier.padding(Dimens.cardPadding),
@@ -259,11 +267,15 @@ private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
                 stringResource(R.string.dashboard_override_explain),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            FilledTonalButton(
+            Button(
                 onClick = onResume,
                 enabled = serviceRunning,
+                colors = ButtonDefaults.buttonColors(containerColor = AabOnGold, contentColor = AabGold),
                 modifier = Modifier.testTag("resume_button"),
-            ) { Text(stringResource(R.string.dashboard_resume_button)) }
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text(stringResource(R.string.dashboard_resume_button))
+            }
         }
     }
 }

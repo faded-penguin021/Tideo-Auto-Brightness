@@ -1907,6 +1907,19 @@ the permanent registry — never compress or remove them.
   DIFFERENT glyphs (not the changed character) and were left as-is. **Lesson:** when swapping a Unicode
   icon-stand-in for a real vector icon, grep the whole UI for that character and convert every abuse in
   the same change, or the app looks half-migrated.
+  (d) **Visual match to the Tasker original (owner screenshot review, same release).** The first cut of
+  the action bar was three identical flat grey pills with text-only labels, and "Contexts" wrapped onto
+  two lines (the M3 default 24 dp button `contentPadding` squeezed it at equal thirds). Re-matched to
+  Tasker: **Load** filled teal (`Button`/primary), **Save** tonal grey (`FilledTonalButton`), **Contexts**
+  teal-outlined (`OutlinedButton` + `BorderStroke(primary)`), each with a leading vector icon
+  (`ic_folder`/`ic_save`/`ic_tune` — added as `res/drawable` vectors since only `material-icons-core` is a
+  dep and folder/save/tune are extended-only; NO new dependency, m3_audit constraint honoured) and a
+  single-line label via compact 8 dp `contentPadding`. The context-lock resume banner + the dashboard
+  `OverrideCard` were repainted from the muted dark-theme `secondaryContainer` to vivid brand `AabGold`
+  with a high-contrast dark RESUME button (`AabOnGold` container, `AabGold` label + ▶), matching Tasker's
+  "Automation Paused" bar. The active profile (`%AAB_CurrentActiveProfile` via `LiveRuntimeState`) is now
+  highlighted in the list — gold edge + an "Active" tag on its `ProfileCard` — mirroring Tasker's
+  "Active Profile: …" readout (owner request).
 
 - **D-112: GitHub Actions Node-20 → Node-24 runtime migration (CI only, 1.2.0).** GitHub deprecated the
   Node 20 action runtime (runners default to Node 24 from 2026-06-16, Node 20 removed 2026-09-16), so
