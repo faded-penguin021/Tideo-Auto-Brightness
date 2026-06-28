@@ -37,8 +37,13 @@ android {
         //   bug-fix (patch). No settings-schema break (round-trips), so it is not a major. RULE: build
         //   version must be ≥ the latest `v*` tag on main and versionCode strictly greater than every
         //   released code — see RUNBOOK "Cutting a release".
-        versionCode = 9
-        versionName = "1.2.0"
+        // 1.2.1 (versionCode 10) is a PATCH re-cut: the v1.2.0 release workflow was silently skipped (a
+        // stray `[skip ci]` token in the squash-merge commit body suppressed every workflow for that
+        // commit + tag — D-115), so v1.2.0 never published its signed APK. v1.2.1 carries the release.yml
+        // fix (now triggers on `release: published`, immune to skip-ci) and re-cuts the SAME app — no
+        // app/runtime code changed since 1.2.0, so it is a patch.
+        versionCode = 10
+        versionName = "1.2.1"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 

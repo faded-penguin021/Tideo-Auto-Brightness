@@ -54,12 +54,14 @@ When in use, track stages here:
 
 One line per shipped change (newest first). Keep terse.
 
-- 2026-06-28 — CI/release-infra (no app change): **D-115** the v1.2.0 release workflow never ran because
-  the squash-merge commit body carried a stray `[skip ci]` token (leaked from a commit message that
-  described `clean-dist.yml`), which GitHub honored and skipped every workflow for that commit + tag.
-  `release.yml` now triggers on `release: published` (immune to skip-ci) + a `workflow_dispatch` tag
-  fallback; RUNBOOK §6 warns never to write the token in a commit/PR message. Recovery: `release-signing.yml`
-  dispatched for the signed v1.2.0 APK.
+- 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut, no app change): **D-115** the v1.2.0 release
+  workflow never ran — the squash-merge commit body carried a stray `[skip ci]` token (leaked from a
+  commit message that described `clean-dist.yml`), which GitHub honored and skipped every workflow for
+  that commit + tag, so v1.2.0 never published its signed APK. `release.yml` now triggers on
+  `release: published` (immune to skip-ci) + a `workflow_dispatch` tag fallback; RUNBOOK §6 warns never
+  to write the token in a commit/PR message. 1.2.1 re-cuts the SAME app (no runtime change since 1.2.0)
+  so the release publishes cleanly. Changelog `10.txt`. Owner opens a NEW PR (v1.2.0's was merged), then
+  publishes the v1.2.1 release.
 - 2026-06-28 — 1.2.0 / `versionCode 9`: runtime bug fixes + UX. **D-108** service-start battery-saver
   flash (battery "unknown" `-1` sentinel; resolver won't match a battery rule until a real reading).
   **D-109** PWM-sensitive read-out now tracks PERCEIVED brightness (`targetBrightness` = un-floored engine

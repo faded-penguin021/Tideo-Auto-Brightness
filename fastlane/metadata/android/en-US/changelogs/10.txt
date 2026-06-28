@@ -1,0 +1,9 @@
+Maintenance re-release of 1.2.0. The 1.2.0 release build was not published because of a
+continuous-integration misconfiguration; 1.2.1 fixes the release pipeline and ships the same
+app. No changes to how the app looks or behaves since 1.2.0.
+
+(1.2.0 brought: the correct profile loading at service start instead of a brief Battery Saver
+flash; PWM-sensitive brightness read-out tracking perceived brightness; circadian falling back
+to a cached sun position with staleness hints; a redesigned Profiles & Contexts screen with a
+pinned Load / Save / Contexts bar, active-profile highlighting, and confirmation prompts before
+deleting or overwriting.)
