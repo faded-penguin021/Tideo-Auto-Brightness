@@ -10,6 +10,9 @@ name: CodeQL
 # Kotlin: the action silently falls back to autobuild, whose minimal heuristic build compiles no
 # Kotlin, so the extractor sees no source and the job fails ("no source code seen during build").
 # Instead we trace a real Gradle Kotlin compile, reusing build.yml's JDK 21 + Android SDK setup.
+# The traced build MUST run `--no-build-cache --rerun-tasks`: the CodeQL tracer hooks the kotlinc
+# process, but a restored Gradle build cache serves compileKotlin FROM-CACHE (no compiler spawned →
+# "no source code seen"). Forcing real compilation is what makes the extractor see the sources.
 on:
   push:
     branches: [main]
@@ -65,9 +68,11 @@ jobs:
           build-mode: manual
 
       # Compile the production Kotlin under the CodeQL tracer so the extractor sees every module
-      # (assembleDebug compiles :app and its :platform/:domain dependencies).
+      # (assembleDebug compiles :app and its :platform/:domain dependencies). --no-build-cache
+      # --rerun-tasks force the kotlinc processes to actually run instead of resolving FROM-CACHE,
+      # which is what the tracer needs to observe.
       - name: Build (traced for CodeQL)
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: ./gradlew :app:assembleDebug --no-daemon --no-build-cache --rerun-tasks
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
