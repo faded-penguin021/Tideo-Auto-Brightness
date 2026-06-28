@@ -188,11 +188,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the **Bug report** issue template.
 
 ## License
 
-[MIT](LICENSE) © 2026 /u/v_uurtjevragen.
-
-## Status
-
-`1.1.0`: **Updated SDK from 35 to 36. 
+[MIT](LICENSE) © 2026 /u/v_uurtjevragen. 
 
 [aab]: https://github.com/faded-penguin021/AdvancedAutoBrightness
 [releases]: https://github.com/faded-penguin021/tideo-auto-brightness/releases
