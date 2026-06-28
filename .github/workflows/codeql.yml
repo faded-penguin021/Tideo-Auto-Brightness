@@ -6,9 +6,10 @@ name: CodeQL
 # AccessibilityService. CodeQL's java-kotlin queries flag command injection, cleartext traffic,
 # path traversal, and similar — exactly this attack surface.
 #
-# build-mode: none — CodeQL analyses the sources directly (no Gradle/Android build), which avoids the
-# flaky "build an Android app inside CodeQL" autobuild and keeps CI cheap. If deeper dataflow coverage
-# is ever needed, switch to build-mode: manual and run `./gradlew :app:assembleDebug` before analyze.
+# build-mode: manual — this app is ~all Kotlin, and CodeQL's `build-mode: none` does NOT analyse
+# Kotlin: the action silently falls back to autobuild, whose minimal heuristic build compiles no
+# Kotlin, so the extractor sees no source and the job fails ("no source code seen during build").
+# Instead we trace a real Gradle Kotlin compile, reusing build.yml's JDK 21 + Android SDK setup.
 on:
   push:
     branches: [main]
@@ -36,11 +37,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # Match build.yml: JDK 21 (Robolectric/AGP) + Android SDK (AGP fetches the compile SDK on demand).
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: java-kotlin
-          build-mode: none
+          build-mode: manual
+
+      # Compile the production Kotlin under the CodeQL tracer so the extractor sees every module
+      # (assembleDebug compiles :app and its :platform/:domain dependencies).
+      - name: Build (traced for CodeQL)
+        run: ./gradlew :app:assembleDebug --no-daemon
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
