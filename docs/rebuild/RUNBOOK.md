@@ -162,7 +162,10 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   `build-tools/<N>.0.0/zipalign -c -P 16 -v 4 <apk>`.
 - **Acceptance:** full ladder green, then **owner runs the on-device Pass A (regression) +
   Pass B (feature-availability) matrices** — the ladder cannot catch "the OS silently stopped
-  delivering us X". Drop a debug APK in `dist/` (temporary, deleted before merge) for sideload.
+  delivering us X". Build a debug APK for the owner to sideload. **`dist/` is `.gitignore`d (D-112)** —
+  do NOT commit the APK: build it into `dist/` and **send it to the owner via the file tool** (or point
+  them at the `build.yml` `app-debug` CI artifact). `clean-dist.yml` stays as a backstop that removes a
+  force-added `dist/` from `main`.
   Debug builds carry a separate package (`applicationIdSuffix=".debug"`, label "Tideo AB (Debug)",
   Shizuku authority `${applicationId}.shizuku`) so a test build coexists with the owner's signed
   release without sharing data — keep this (D-106); the debug app has its own storage, so ELEVATED

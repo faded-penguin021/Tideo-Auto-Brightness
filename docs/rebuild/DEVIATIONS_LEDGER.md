@@ -1930,6 +1930,10 @@ the permanent registry — never compress or remove them.
   `softprops/action-gh-release@v2→v3`; `actions/checkout@v5` + `actions/setup-java@v5` were already
   node24. Added a "Node 24 runtime policy" comment block to `build.yml` documenting the pins so they
   aren't downgraded. No code/behaviour change.
+  **Follow-up:** `dist/` is now `.gitignore`d (and the once-committed `dist/tideo-1.2.0-debug.apk`
+  untracked via `git rm --cached`) — the debug sideload APK is no longer committed at all; it is sent to
+  the owner via the file tool or pulled from the `build.yml` `app-debug` CI artifact. `clean-dist.yml`
+  stays as a backstop that removes a force-added `dist/` from `main`. RUNBOOK §7 updated to match.
 
 - **D-113: Contexts rule-list/editor polish (owner-reported, 1.2.0).** Three rule-creation refinements:
   (a) **Emphasise the target profile.** A rule card buried its switch-to profile in grey `→ Profile ·
