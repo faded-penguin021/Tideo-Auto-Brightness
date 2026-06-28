@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -34,6 +36,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -291,9 +294,11 @@ private fun RuleEditor(
 ) {
     var name by remember { mutableStateOf(rule.name) }
     var profile by remember { mutableStateOf(rule.profile) }
-    // D-113: priority is a 1–100 scale (higher wins), not 0..∞. Seed from the rule, coercing a legacy/
-    // unset 0 up to 1 so the field always shows a valid value; clamped again on save.
-    var priorityText by remember { mutableStateOf(rule.priority.coerceIn(1, 100).toString()) }
+    // D-113: priority is a 1–100 scale (higher wins), not 0..∞. Seed with the rule's REAL stored value
+    // (a legacy/unset 0 shows as 1) so a pre-existing out-of-range value — e.g. an old 150 — is shown
+    // truthfully rather than silently pre-capped; it is clamped to 1..100 only when the user saves.
+    var priorityText by remember { mutableStateOf(rule.priority.takeIf { it >= 1 }?.toString() ?: "1") }
+    val priorityOverMax = (priorityText.trim().toIntOrNull() ?: 0) > 100
     var wifi by remember { mutableStateOf(rule.triggers.wifi?.joinToString(", ") ?: "") }
     var startTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(0) ?: "") }
     var endTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(1) ?: "") }
@@ -394,7 +399,12 @@ private fun RuleEditor(
             )
 
             Text("Switch to profile:", style = MaterialTheme.typography.labelMedium)
-            OutlinedButton(onClick = { profileMenu = true }, modifier = Modifier.testTag("rule_profile")) { Text(profile) }
+            // D-114b: emphasise the selected profile — gold + titleSmall (matching the rule card's
+            // "Loads <profile>") with a dropdown caret, so the chosen target stands out in the editor.
+            OutlinedButton(onClick = { profileMenu = true }, modifier = Modifier.testTag("rule_profile")) {
+                Text(profile, style = MaterialTheme.typography.titleSmall, color = AabGold)
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
             DropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
                 profileNames.forEach { p ->
                     DropdownMenuItem(text = { Text(p) }, onClick = { profile = p; profileMenu = false })
@@ -407,9 +417,18 @@ private fun RuleEditor(
                 onValueChange = { priorityText = it.filter(Char::isDigit).take(3) },
                 label = { Text("Priority (1–100, higher wins)") },
                 singleLine = true,
+                isError = priorityOverMax,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth().testTag("rule_priority"),
             )
+            if (priorityOverMax) {
+                Text(
+                    stringResource(R.string.rule_priority_over_max),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag("rule_priority_clamp_hint"),
+                )
+            }
 
             SectionHeader("Triggers", divider = true)
             Text(

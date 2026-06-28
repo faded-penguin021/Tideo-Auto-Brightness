@@ -1947,6 +1947,15 @@ the permanent registry — never compress or remove them.
   current SSID by overwriting the field; it now appends the SSID to the comma-separated list (de-duped),
   so a rule can match several networks — matching Tasker's behaviour. No new strings beyond the gold
   "Active" tag (reused `profiles_active_tag`); `HardcodedStringCheckTest` ratchet still ≤ 92.
+  (d) **Follow-ups (owner): editor profile emphasis + legacy-priority safety.** The rule editor's
+  "Switch to profile" selector now renders the chosen profile in gold `titleSmall` + a dropdown caret
+  (matching the rule card's "Loads <profile>"). On the priority migration: a pre-existing rule with a
+  stored priority > 100 is NOT broken — `ContextOverrideResolver` still ranks by the raw stored value
+  (higher wins), so it keeps resolving as before. The editor now seeds the field with the rule's REAL
+  stored value (≥1; legacy/unset 0 → 1) instead of pre-capping it, shows an error hint
+  (`rule_priority_over_max`) when the value exceeds 100, and clamps to 1..100 ONLY on save — so an old
+  150 is shown truthfully and capped to 100 only if/when the user re-saves that rule (relative ordering
+  is preserved until then).
 
 - **D-114: confirmation prompts for destructive profile/rule actions (owner-reported, 1.2.0).** Deleting
   a context rule, and deleting or overwriting a saved profile, fired immediately with no confirmation —

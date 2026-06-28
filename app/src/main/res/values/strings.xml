@@ -65,6 +65,7 @@
     <string name="profiles_export">Export current settings…</string>
     <string name="profiles_view_current">View current settings…</string>
     <string name="profiles_active_tag">Active</string>
+    <string name="rule_priority_over_max">Above the 1–100 range — this will be saved as 100.</string>
     <!-- D-114: Tasker-style confirmations for destructive profile/rule actions. -->
     <string name="confirm_delete">Delete</string>
     <string name="confirm_overwrite">Overwrite</string>
