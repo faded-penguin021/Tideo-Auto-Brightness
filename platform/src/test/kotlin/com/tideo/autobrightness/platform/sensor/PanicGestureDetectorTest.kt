@@ -1,12 +1,15 @@
 package com.tideo.autobrightness.platform.sensor
 
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.Test
 
 /**
- * S12.8a (G2R-F77): prof769 panic gesture = upside-down (gravity.y high) + shake (linear-accel spike).
- * Pure detector tests; the Android source adds the display-on (State 123/1) gate + cooldown.
+ * D-116 (reworked prof769): [PanicGestureDetector] now reports only the **orientation** half of the
+ * panic STATE — sustained upside-down — while the shake is validated separately by PanicShakeGate. Pure
+ * detector tests; the Android source adds the display-on (State 123/1) + proximity-not-near gates and
+ * the 10 s shake window.
  */
 class PanicGestureDetectorTest {
 
@@ -16,53 +19,56 @@ class PanicGestureDetectorTest {
     }
 
     @Test
-    fun upsideDownPlusShake_fires() {
-        val d = PanicGestureDetector()
-        // Held upside down: Android reads gravity toward the bottom of the screen (−y) at rest.
-        d.settle(-9.8f)
-        // A hard shake while inverted: a large y deviation past the shake threshold.
-        assertTrue(d.onAccelerometer(0f, -30f, 0f), "upside-down + shake must trigger the panic gesture")
+    fun heldUpsideDown_reportsSustainedAfterStreak() {
+        val d = PanicGestureDetector(sustainedFrames = 5)
+        d.onAccelerometer(0f, -9.8f, 0f) // seed (does not count toward the streak)
+        repeat(4) { assertFalse(d.onAccelerometer(0f, -9.8f, 0f), "not sustained yet") }
+        assertTrue(d.onAccelerometer(0f, -9.8f, 0f), "sustained upside-down after the streak")
+        assertTrue(d.isUpsideDown, "instantaneous orientation is upside-down")
     }
 
     @Test
-    fun upsideDownButSteady_doesNotFire() {
+    fun heldUpright_neverUpsideDown() {
         val d = PanicGestureDetector()
-        d.settle(-9.8f)
-        // Inverted but no shake (no linear-accel spike) → no panic.
-        assertFalse(d.onAccelerometer(0f, -9.8f, 0f), "no shake → no panic")
+        d.settle(9.8f) // Android reads +9.8 on +y when upright → not inverted
+        assertFalse(d.onAccelerometer(0f, 9.8f, 0f), "upright must never report upside-down")
+        assertFalse(d.isUpsideDown)
     }
 
     @Test
-    fun shakeWhileUpright_doesNotFire() {
+    fun flatFaceUp_neverUpsideDown() {
         val d = PanicGestureDetector()
-        // Upright portrait: Android reads +9.8 on +y (the axis pointing up) → not upside down.
-        d.settle(9.8f)
-        assertFalse(d.onAccelerometer(0f, 30f, 0f), "a shake the right way up must not trigger panic")
+        repeat(20) { d.onAccelerometer(0f, 0f, 9.8f) } // gravity dominated by +z, y ≈ 0
+        assertFalse(d.onAccelerometer(0f, 0f, 9.8f), "lying flat is not upside-down (y not dominant)")
+        assertFalse(d.isUpsideDown)
     }
 
     @Test
     fun firstReading_isSeedOnly() {
         val d = PanicGestureDetector()
-        // The very first reading seeds the gravity filter and never fires (even if extreme).
-        assertFalse(d.onAccelerometer(0f, 30f, 0f), "first reading only seeds gravity")
+        // The very first reading seeds the gravity filter and never reports sustained (even if inverted).
+        assertFalse(d.onAccelerometer(0f, -30f, 0f), "first reading only seeds gravity")
     }
 
     @Test
-    fun shakeWhileFlatFaceUp_doesNotFire() {
+    fun exposesGravityStrippedShakeMagnitude_forFallback() {
         val d = PanicGestureDetector()
-        // Flat on a table: gravity dominated by +z, y ≈ 0 → not upside down.
-        repeat(20) { d.onAccelerometer(0f, 0f, 9.8f) }
-        assertFalse(d.onAccelerometer(0f, 25f, 9.8f), "a shake while lying flat must not trigger panic")
+        d.settle(-9.8f) // gravity converged to (0, −9.8, 0)
+        // A reading at rest (== gravity) leaves ~0 residual; a spike leaves a large residual.
+        d.onAccelerometer(0f, -9.8f, 0f)
+        assertTrue(d.linearMagnitude < 1.0, "at rest the gravity-stripped magnitude is ~0")
+        d.onAccelerometer(0f, -40f, 0f)
+        assertTrue(d.linearMagnitude > 20.0, "a hard shake leaves a large gravity-stripped magnitude")
     }
 
     @Test
-    fun inversionMustBeSustained_beforeAShakeFires() {
-        // G2R-F77: the inversion has to be held for `sustainedFrames` before a shake counts.
-        val d = PanicGestureDetector(sustainedFrames = 5)
-        d.onAccelerometer(0f, -9.8f, 0f) // seed inverted (does not count toward the streak)
-        repeat(4) {
-            assertFalse(d.onAccelerometer(0f, -40f, 0f), "a shake before the inversion is sustained must not fire")
-        }
-        assertTrue(d.onAccelerometer(0f, -40f, 0f), "fires once the inversion has been sustained")
+    fun reset_clearsStreakAndOrientation() {
+        val d = PanicGestureDetector(sustainedFrames = 3)
+        d.settle(-9.8f)
+        assertTrue(d.onAccelerometer(0f, -9.8f, 0f))
+        d.reset()
+        // After reset the next reading is a seed again → not sustained.
+        assertFalse(d.onAccelerometer(0f, -9.8f, 0f), "reset re-seeds; streak starts over")
+        assertEquals(0.0, d.linearMagnitude, 1e-9)
     }
 }

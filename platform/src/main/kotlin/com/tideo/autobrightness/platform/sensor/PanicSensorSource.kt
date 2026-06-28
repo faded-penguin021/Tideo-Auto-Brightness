@@ -9,55 +9,68 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.PowerManager
+import com.tideo.autobrightness.domain.panic.PanicShakeGate
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * Tasker prof769 "Panic (Reset)" gesture detector (D-021 ledger: "upside-down + shake").
+ * Orientation detector for the prof769 "Panic (Reset)" STATE (D-021, D-116).
  *
- * prof769's `<ConditionList>` is `Event 2083 (shake/significant-motion)` ∧ `State 120/3
- * (orientation = upside down)` ∧ `State 123/1 (display on)` → task528 `_PanicButton`. The orientation
- * + shake are both derivable from the accelerometer:
- *  - **Gravity** (a low-pass of the raw accelerometer) gives the device orientation. Android's
- *    accelerometer reads **+9.8 on whichever axis points up** at rest, so held upright (top edge up)
- *    `gravity.y ≈ +9.8`; held **upside down** (top edge down) it points the other way, `gravity.y ≈
- *    −9.8`. So upside-down ≡ `gravity.y < −[upsideDownGravityY]` and y is the dominant axis.
- *  - **Shake** is the residual linear acceleration magnitude (raw − gravity); a spike past
- *    [shakeThreshold] m/s² is a shake (the Tasker "shake" event).
+ * The reworked panic (`tmp/Panic_profile_task.md`) gates on `Orientation [Is:Upside Down] ∧ Display
+ * State [Is:On] ∧ %AAB_Proximity !~ Near` — the old significant-motion EVENT is gone; the shake is now
+ * validated separately by [PanicShakeGate] inside a 10 s window. This class supplies the **upside-down**
+ * half of that state from the accelerometer:
+ *  - **Gravity** (a low-pass of the raw accelerometer) gives the device orientation. Android reads
+ *    **+9.8 on whichever axis points up** at rest, so held upright `gravity.y ≈ +9.8`; held **upside
+ *    down** (top edge down) `gravity.y ≈ −9.8`. Upside-down ≡ `gravity.y < −[upsideDownGravityY]` AND y
+ *    is the dominant axis (|gy| ≥ |gx|, |gz|) — a phone lying flat or in landscape never qualifies.
+ *  - [isUpsideDown] is the instantaneous (filtered) orientation; [onAccelerometer] returns the
+ *    **sustained** orientation (held for [sustainedFrames] readings) so a transient flip during a shake
+ *    the right way up cannot arm the gesture (G2R-F77 / S14: panic must fire ONLY when genuinely inverted).
+ *  - [linearMagnitude] exposes the gravity-stripped acceleration magnitude so the Android source can run
+ *    the shake gate off the bare accelerometer when the device has no `TYPE_LINEAR_ACCELERATION` sensor
+ *    (mirrors the A2 Java high-pass fallback).
  *
- * Pure + frame-by-frame so the timing is unit-testable without a [SensorManager]; the Android source
- * feeds it raw accelerometer triples and gates the result on the display being on (State 123/1).
+ * Pure + frame-by-frame so the orientation timing is unit-testable without a [SensorManager].
  */
 class PanicGestureDetector(
-    // S14 (owner: panic too sensitive): require a more committed inversion. gy < −8.0 ≈ within ~35° of
-    // fully upside down (was −7.0 ≈ 44°), so a phone held at a casual downward angle no longer counts.
+    // S14 (owner: panic too sensitive): require a committed inversion. gy < −8.0 ≈ within ~35° of fully
+    // upside down (was −7.0 ≈ 44°), so a phone held at a casual downward angle does not count.
     private val upsideDownGravityY: Float = 8.0f,
-    private val shakeThreshold: Float = 12.0f,
     // Heavy low-pass so a vigorous shake does NOT drag the gravity estimate across the upside-down
-    // threshold (G2R-F77: panic must fire ONLY when genuinely inverted, never the right way up).
+    // threshold (G2R-F77: orientation must read inverted ONLY when genuinely inverted).
     private val gravityAlpha: Float = 0.9f,
-    // The inversion must be held for this many readings before a shake can fire — a transient flip
-    // during a shake the right way up cannot satisfy it.
+    // The inversion must be held this many readings before the gesture arms — a transient flip cannot.
     private val sustainedFrames: Int = 5,
 ) {
     private val gravity = FloatArray(3)
     private var seeded = false
     private var upsideDownStreak = 0
 
+    /** Instantaneous (filtered) orientation for this reading: true iff the device is upside down now. */
+    var isUpsideDown: Boolean = false
+        private set
+
+    /** Gravity-stripped acceleration magnitude (m/s²) of the last reading — the shake source for the
+     *  accelerometer fallback path (no `TYPE_LINEAR_ACCELERATION`). */
+    var linearMagnitude: Double = 0.0
+        private set
+
     /**
-     * Feed one raw accelerometer reading (m/s², device frame). Returns true on the reading that
-     * completes the panic gesture: the device has been **stably upside down** AND a shake spike is
-     * present. "Upside down" means the gravity vector points toward the **bottom** of the screen
-     * (gravity.y ≈ −9.8) AND y is the dominant axis (|gy| > |gx|, |gz|) — so a phone lying flat / held
-     * upright / in landscape does not qualify even while shaking (G2R-F77).
+     * Feed one raw accelerometer reading (m/s², device frame). Returns true once the device has been
+     * **stably upside down** for [sustainedFrames] readings. Also updates [isUpsideDown] and
+     * [linearMagnitude]. The very first reading only seeds the gravity filter (returns false).
      */
     fun onAccelerometer(x: Float, y: Float, z: Float): Boolean {
         if (!seeded) {
             gravity[0] = x; gravity[1] = y; gravity[2] = z
             seeded = true
+            isUpsideDown = false
+            linearMagnitude = 0.0
             return false
         }
         gravity[0] = gravityAlpha * gravity[0] + (1 - gravityAlpha) * x
@@ -65,106 +78,109 @@ class PanicGestureDetector(
         gravity[2] = gravityAlpha * gravity[2] + (1 - gravityAlpha) * z
 
         val gy = gravity[1]
-        val upsideDown = gy < -upsideDownGravityY &&
-            kotlin.math.abs(gy) >= kotlin.math.abs(gravity[0]) &&
-            kotlin.math.abs(gy) >= kotlin.math.abs(gravity[2])
-        upsideDownStreak = if (upsideDown) upsideDownStreak + 1 else 0
+        isUpsideDown = gy < -upsideDownGravityY &&
+            abs(gy) >= abs(gravity[0]) &&
+            abs(gy) >= abs(gravity[2])
+        upsideDownStreak = if (isUpsideDown) upsideDownStreak + 1 else 0
 
         val lx = x - gravity[0]
         val ly = y - gravity[1]
         val lz = z - gravity[2]
-        val shakeMag = sqrt(lx * lx + ly * ly + lz * lz)
-        return upsideDownStreak >= sustainedFrames && shakeMag > shakeThreshold
+        linearMagnitude = sqrt((lx * lx + ly * ly + lz * lz).toDouble())
+        return upsideDownStreak >= sustainedFrames
     }
 
     fun reset() {
         seeded = false
         upsideDownStreak = 0
         gravity.fill(0f)
+        isUpsideDown = false
+        linearMagnitude = 0.0
     }
 }
 
 /**
- * Lifecycle gate around [PanicGestureDetector] for the Android source (S14, owner: the panic fired
- * when grabbing the phone out of a pocket and turning the screen on). Two protections beyond the
- * detector's orientation/shake test:
+ * Re-arm latch for the panic shake window (task528 `_PanicButton`, D-021 / D-116).
  *
- *  - **Screen-on grace:** waking the phone (grab + press) IS a shake, usually while the device is still
- *    being rotated upright. For [screenOnGraceMs] after the display becomes interactive no panic can
- *    fire, and the caller resets the detector on the wake edge so an inversion+shake streak built up in
- *    the pocket cannot complete the gesture the instant the screen turns on.
- *  - **Cooldown:** a detected gesture fires the panic at most once per [cooldownMs] (debounce).
+ * The prof769 trigger is a STATE (Upside-Down ∧ Display-On ∧ Proximity-not-Near). When it becomes true a
+ * single 10 s [PanicShakeGate] window runs; whether that window fires the panic (a qualifying shake) or
+ * **times out** (no shake), the gesture must NOT start another window until the phone leaves the
+ * upside-down state and returns — exactly as a Tasker STATE only re-fires on re-entry ("the profile
+ * won't trigger again until the phone is flipped straight and then upside-down again", `tmp/Tmp.md`).
  *
- * Pure + clock-injected so the timing is unit-testable without a SensorManager/PowerManager.
+ * Pure state machine, clock-free: the Android source owns the orientation/display/proximity sensing and
+ * the 10 s window; this only decides *whether a new window may start*.
  */
-class PanicGate(
-    private val screenOnGraceMs: Long = 3_000L,
-    private val cooldownMs: Long = 3_000L,
-) {
-    private var wasInteractive = false
-    private var graceUntilMs = 0L
-    // null = never fired. (A sentinel like Long.MIN_VALUE would overflow `now - lastFiredMs`.)
-    private var lastFiredMs: Long? = null
+class PanicGate {
+    // True once a window has run for the current inversion; cleared when the phone is flipped straight.
+    private var consumed = false
 
     /**
-     * Feed the display-interactive state for this reading (call BEFORE the detector). Returns true on
-     * the rising edge (the screen just turned on) so the caller resets the gesture detector and the
-     * [screenOnGraceMs] window opens.
+     * Whether a fresh shake window may start now. [armed] = sustained-upside-down ∧ display-on ∧
+     * proximity-not-near. [upsideDown] is the instantaneous orientation: leaving upside-down clears the
+     * latch so the next inversion can re-arm.
      */
-    fun onScreenState(now: Long, interactive: Boolean): Boolean {
-        val justWoke = interactive && !wasInteractive
-        if (justWoke) graceUntilMs = now + screenOnGraceMs
-        wasInteractive = interactive
-        return justWoke
+    fun canArm(armed: Boolean, upsideDown: Boolean): Boolean {
+        if (!upsideDown) consumed = false
+        return armed && !consumed
     }
 
-    /**
-     * Whether a detector-reported gesture should actually fire now: display on (State 123/1), past the
-     * wake grace, and past the cooldown. Records the fire time when it returns true.
-     */
-    fun shouldFire(now: Long, interactive: Boolean): Boolean {
-        if (!interactive) return false
-        if (now < graceUntilMs) return false
-        val last = lastFiredMs
-        if (last != null && now - last < cooldownMs) return false
-        lastFiredMs = now
-        return true
+    /** Record that a shake window ran (fired OR timed out). Latches until the next upside-down exit. */
+    fun consume() {
+        consumed = true
     }
 }
 
 /**
- * Emits a [Unit] each time the prof769 panic gesture (upside-down + shake, display on) is detected.
- * The runtime maps each emission to the task528 panic (SOS + brightness 255 + full stop).
+ * Emits a [Unit] each time the prof769 panic gesture completes: the device is held upside-down with the
+ * display on and the proximity sensor NOT near, and a qualifying shake (per [PanicShakeGate], scaled by
+ * the user's `%AAB_PanicSensitivity`) occurs within 10 s. The runtime maps each emission to the task528
+ * panic (SOS + brightness 255 + full stop).
  */
 interface PanicSensorSource {
     fun events(): Flow<Unit>
 }
 
 /**
- * Accelerometer-backed [PanicSensorSource] for prof769. Registers TYPE_ACCELEROMETER at the UI delay
- * (fast enough to catch a shake), runs the [PanicGestureDetector], and gates each detection on the
- * display being interactive (State 123/1) plus a short cooldown so one shake fires the panic once.
+ * Accelerometer-backed [PanicSensorSource] for the reworked prof769 (D-116).
+ *
+ * Registers `TYPE_ACCELEROMETER` for orientation (via [PanicGestureDetector]) and, when present,
+ * `TYPE_LINEAR_ACCELERATION` for the shake magnitude (else it high-passes the accelerometer like the A2
+ * Java fallback). When the armed state (sustained upside-down ∧ display-on ∧ proximity-not-near) becomes
+ * true it opens a [windowMs] window driven by a fresh [PanicShakeGate]`(sensitivity())`:
+ *  - sensitivity 0 ⇒ pass-through: fire immediately, no shake required;
+ *  - shake reaches target within the window ⇒ fire;
+ *  - window elapses with no qualifying shake ⇒ veto (no fire).
+ * Either outcome consumes the gesture ([PanicGate]) so it cannot re-fire until the phone is flipped
+ * straight and inverted again. All sensor/screen callbacks are delivered on a single looper, so the
+ * window state is mutated single-threaded (no locks needed).
  */
 class AndroidPanicSensorSource(
     private val context: Context,
+    /** Current `%AAB_PanicSensitivity` (0..10). Read per arming so a slider change takes effect at once. */
+    private val sensitivity: () -> Int,
+    /** Current `%AAB_Proximity ~ Near` — the gesture only arms while NOT near (covered/in-pocket = no panic). */
+    private val isNear: () -> Boolean,
     private val detector: PanicGestureDetector = PanicGestureDetector(),
     private val gate: PanicGate = PanicGate(),
+    private val windowMs: Long = 10_000L,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val newShakeGate: (Int) -> PanicShakeGate = { PanicShakeGate(it) },
 ) : PanicSensorSource {
     override fun events(): Flow<Unit> = callbackFlow {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val linear = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) // may be null
         val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         if (accel == null) {
+            // No accelerometer → cannot detect orientation; complete cleanly (no panic source).
             close()
             return@callbackFlow
         }
-        // Screen-interactive state, kept current WITHOUT a per-event Binder call. Reading
-        // power.isInteractive inside onSensorChanged would be a synchronous IPC to system_server on
-        // every accelerometer sample (SENSOR_DELAY_UI ≈ 16–60 Hz) — heavy lock contention / CPU churn /
-        // battery drain. Instead: seed once, then flip it on the cheap SCREEN_ON/OFF system broadcasts
-        // (a dynamic receiver — those actions are only deliverable to dynamically-registered receivers
-        // anyway), so the sensor callback reads it from local memory for free.
+
+        // Screen-interactive state, kept current WITHOUT a per-event Binder call (reading
+        // power.isInteractive on every sample would be a synchronous IPC to system_server). Seed once,
+        // then flip it on the cheap SCREEN_ON/OFF protected broadcasts.
         val interactive = AtomicBoolean(power.isInteractive)
         val screenReceiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
@@ -174,8 +190,6 @@ class AndroidPanicSensorSource(
                 }
             }
         }
-        // SCREEN_ON/OFF are protected system broadcasts, so no exported flag is needed (mirrors
-        // AmbientMonitoringService's own screen receiver).
         context.registerReceiver(
             screenReceiver,
             IntentFilter().apply {
@@ -183,23 +197,79 @@ class AndroidPanicSensorSource(
                 addAction(Intent.ACTION_SCREEN_OFF)
             },
         )
-        val listener = object : SensorEventListener {
+
+        // --- Window state (mutated only from sensor callbacks, all on one looper → single-threaded) ---
+        var windowActive = false
+        var windowDeadline = 0L
+        var shakeGate: PanicShakeGate? = null
+        // Latest shake magnitude: from the linear-accel sensor when present, else the detector's
+        // gravity-stripped accelerometer residual.
+        var shakeMagnitude = 0.0
+
+        fun endWindow(consume: Boolean) {
+            windowActive = false
+            shakeGate = null
+            if (consume) gate.consume()
+        }
+
+        val accelListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 val now = clock()
-                val isInteractive = interactive.get()
-                // On the screen-on edge, reset the gesture streak so an inversion+shake built up in the
-                // pocket can't complete the instant the display wakes (owner: false-fired on grab-to-wake).
-                if (gate.onScreenState(now, isInteractive)) detector.reset()
-                val fired = detector.onAccelerometer(event.values[0], event.values[1], event.values[2])
-                // Gate on display-on (State 123/1) + the post-wake grace + the one-shot cooldown.
-                if (fired && gate.shouldFire(now, isInteractive)) trySend(Unit)
+                val sustainedUpsideDown = detector.onAccelerometer(event.values[0], event.values[1], event.values[2])
+                if (linear == null) shakeMagnitude = detector.linearMagnitude
+                val armed = sustainedUpsideDown && interactive.get() && !isNear()
+
+                if (windowActive) {
+                    when {
+                        // Armed condition dropped (flipped straight / covered / screen off) → abandon the
+                        // window WITHOUT consuming: it was interrupted, not a real veto.
+                        !armed -> endWindow(consume = false)
+                        // 10 s elapsed with no qualifying shake → veto (consume; needs a re-entry to re-arm).
+                        now >= windowDeadline -> endWindow(consume = true)
+                        // Feed the shake; a completed gate fires the panic and consumes the gesture.
+                        shakeGate?.onSample(shakeMagnitude) == true -> {
+                            trySend(Unit)
+                            endWindow(consume = true)
+                        }
+                    }
+                } else if (gate.canArm(armed, detector.isUpsideDown)) {
+                    val g = newShakeGate(sensitivity())
+                    if (g.isPassThrough) {
+                        // Sensitivity 0: no shake required — fire at once, then require a re-entry.
+                        trySend(Unit)
+                        gate.consume()
+                    } else {
+                        shakeGate = g
+                        windowActive = true
+                        windowDeadline = now + windowMs
+                    }
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
         }
-        sensorManager.registerListener(listener, accel, SensorManager.SENSOR_DELAY_UI)
+
+        // Linear-accel listener (only if the device has the sensor): supplies the gravity-free shake
+        // magnitude directly. Delivered on the same looper as the accel listener → no races on shakeMagnitude.
+        val linearListener = linear?.let {
+            object : SensorEventListener {
+                override fun onSensorChanged(event: SensorEvent) {
+                    val x = event.values[0]; val y = event.values[1]; val z = event.values[2]
+                    shakeMagnitude = sqrt((x * x + y * y + z * z).toDouble())
+                }
+
+                override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+            }
+        }
+
+        // SENSOR_DELAY_GAME (~50 Hz) matches the A2 Java's registration — fast enough to track a shake.
+        sensorManager.registerListener(accelListener, accel, SensorManager.SENSOR_DELAY_GAME)
+        if (linear != null && linearListener != null) {
+            sensorManager.registerListener(linearListener, linear, SensorManager.SENSOR_DELAY_GAME)
+        }
         awaitClose {
-            sensorManager.unregisterListener(listener)
+            sensorManager.unregisterListener(accelListener)
+            if (linearListener != null) sensorManager.unregisterListener(linearListener)
             runCatching { context.unregisterReceiver(screenReceiver) }
         }
     }

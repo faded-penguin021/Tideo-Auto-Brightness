@@ -105,6 +105,14 @@ class ContextEngine(
     suspend fun effectiveSettings(): AabSettings = _effective.value ?: baselineProvider()
 
     /**
+     * Non-suspend snapshot of the last resolved effective settings, or null before the first context
+     * evaluation. Used by the panic source to read the GLOBAL `%AAB_PanicSensitivity` per arming from a
+     * sensor callback (no coroutine, must not block) — the value is identical in baseline and effective
+     * because mergeProfile preserves it (D-116).
+     */
+    val effectiveSnapshot: AabSettings? get() = _effective.value
+
+    /**
      * Re-derive the effective settings from the FRESH baseline now (settings Apply / profile load,
      * G2R-F11/F12). [effectiveSettings] otherwise returns the cached `_effective` snapshot from the
      * last context evaluation, so a manual DataStore edit (e.g. raising %AAB_MinBright) would not take
