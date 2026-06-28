@@ -2,7 +2,7 @@ name: CodeQL
 
 # Static security analysis for the Kotlin/Java sources. Justified by the app's privileged surface:
 # it holds WRITE_SECURE_SETTINGS, executes shell commands through a Shizuku user service
-# (`cmd wifi status`, `pm grant`), makes a cleartext geo-IP HTTP request (ip-api.com), and ships an
+# (`cmd wifi status`, `pm grant`), makes an HTTPS geo-IP request (ipwho.is, D-121), and ships an
 # AccessibilityService. CodeQL's java-kotlin queries flag command injection, cleartext traffic,
 # path traversal, and similar — exactly this attack surface.
 #

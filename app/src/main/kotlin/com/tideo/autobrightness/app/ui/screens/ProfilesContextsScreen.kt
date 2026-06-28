@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -455,9 +457,17 @@ private fun LoadManageDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ContextsModal(onClose: () -> Unit, content: @Composable () -> Unit) {
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // D-118: edge-to-edge so the modal's own insets apply (targetSdk 36 enforces edge-to-edge). The top
+    // is padded via statusBarsPadding() so the app bar clears the status bar; the BOTTOM is handled by a
+    // trailing Spacer at the end of the scroll, NOT a nav-bar inset — like the rule editor (D-098), this
+    // dialog window never delivers a non-zero navigation-bar inset to its content, so the last rule card
+    // used to sit clipped under the gesture pill / 3-button bar.
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
         Surface(modifier = Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 TopAppBar(
                     title = { Text(stringResource(R.string.profiles_contexts_title)) },
                     navigationIcon = {
@@ -475,6 +485,9 @@ private fun ContextsModal(onClose: () -> Unit, content: @Composable () -> Unit) 
                     verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing),
                 ) {
                     content()
+                    // Clearance below the last rule card so it always scrolls past the gesture pill /
+                    // 3-button bar, even though the dialog reports a zero bottom inset here (D-098/D-118).
+                    Spacer(Modifier.height(48.dp))
                 }
             }
         }

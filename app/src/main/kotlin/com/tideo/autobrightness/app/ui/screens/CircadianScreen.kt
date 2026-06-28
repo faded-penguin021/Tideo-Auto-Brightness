@@ -101,7 +101,7 @@ fun CircadianScreen(
             scope.launch {
                 val latLon = runCatching { extras.freshLatLon() }.getOrNull()
                 if (latLon != null) fill(latLon.first, latLon.second)
-                else toast("No location fix yet — grant Location and try again")
+                else toast("Couldn't acquire a location — grant Location, or enable the IP fallback below, then try again")
             }
         },
         geoIpEnabled = geoIpEnabled,
@@ -356,14 +356,15 @@ fun CircadianDateLocationCard(
     }
 
     // G3-F12 / D-105 (privacy): the IP-geolocation fallback is the LAST resort in the location chain and
-    // uses a cleartext request to ip-api.com. It is an explicit opt-IN (default OFF) — the app never
+    // makes an HTTPS request to ipwho.is (D-121). It is an explicit opt-IN (default OFF) — the app never
     // contacts that server unless the user turns this on (circadian otherwise waits for an on-device fix).
     SwitchSettingRow(
         label = "IP-based location fallback",
         checked = geoIpEnabled,
         onCheckedChange = onSetGeoIpEnabled,
         help = "Off by default. When GPS/network gives no fix and no fixed location is set, turn this " +
-            "on to look up an approximate location from your public IP via ip-api.com (cleartext HTTP).",
+            "on to look up an approximate location from your public IP via ipwho.is (HTTPS). This also " +
+            "powers \"Use current location\" below when no on-device fix is available.",
         testTag = "exp_geoip_toggle",
     )
 

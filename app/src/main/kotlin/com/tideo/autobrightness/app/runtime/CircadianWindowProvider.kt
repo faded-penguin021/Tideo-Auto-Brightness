@@ -71,7 +71,7 @@ data class CircadianLocationStatus(
  *    date-only override (e.g. 21 Dec, live location) or a location-only override actually applies.
  *  - **F83** ports task90's once-a-day location acquisition (act5–41): **skip** when a fixed lat/lon
  *    is pinned; otherwise acquire from Android (last-known → fresh fix) and, failing that, fall back
- *    to **ip-api.com** geo-IP (act28). The result is cached per day and re-acquired when the day rolls
+ *    to **ipwho.is** geo-IP (act28, HTTPS D-121). The result is cached per day and re-acquired when the day rolls
  *    over (`%AAB_SunLastDate != %DATE`). Acquisition is async (it can hit the network); `current()`
  *    stays non-blocking and returns the old windows until the first fix lands.
  *
@@ -81,7 +81,7 @@ class CircadianWindowProvider(
     private val scope: CoroutineScope,
     overrideFlow: Flow<ExperimentDateLocation>,
     private val location: LocationReader,
-    // F83: ip-api.com geo-IP fallback (task90 act28), injected as a suspend fn for testability.
+    // F83: ipwho.is geo-IP fallback (task90 act28, HTTPS D-121), injected as a suspend fn for testability.
     private val geoIpFallback: suspend () -> LocationSnapshot?,
     // D-103: load/save the once-a-day resolved location across process restarts (default no-op so
     // existing tests that construct the provider directly keep their in-memory-only behavior).
@@ -199,7 +199,7 @@ class CircadianWindowProvider(
         return windows
     }
 
-    // F83: task90 act5–41 acquisition order, async — Android last-known → fresh fix → ip-api.com.
+    // F83: task90 act5–41 acquisition order, async — Android last-known → fresh fix → ipwho.is.
     private fun triggerAcquire(day: Long) {
         if (!acquiring.compareAndSet(false, true)) return
         scope.launch {

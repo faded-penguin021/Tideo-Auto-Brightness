@@ -1,0 +1,14 @@
+Brightness read-outs, location acquisition, and privacy improvements.
+
+The Curve & Brightness graph's "Now" line and its live brightness card now show the
+PERCEIVED brightness when PWM-sensitive mode is on — matching the Dashboard — instead of
+the floored hardware value, so the number on screen reflects what your eyes actually see.
+
+The Contexts rules list no longer hides its last rule under the navigation bar.
+
+The Circadian "Use current location" button now actively acquires a location: it requests a
+fresh on-device fix and, if none is available (and you've opted in), looks one up over the
+network — rather than just reading whatever fix another app left behind.
+
+The optional IP-based location fallback moved from a cleartext request to a secure HTTPS one
+(ipwho.is). It stays off by default; the app makes no cleartext network traffic at all.

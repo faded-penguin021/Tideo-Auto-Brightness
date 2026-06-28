@@ -219,6 +219,26 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun curveBrightness_liveReadout_showsPerceivedBrightness_whenPwmSensitiveFloors_D117() {
+        // D-117: in PWM-sensitive mode lastAppliedBrightness is the FLOORED hardware value (held at the
+        // dimming threshold) and targetBrightness is the un-floored PERCEIVED value. The live readout — like
+        // the Dashboard hero and the curve graph's "Now" line — must show the perceived value (33), not the
+        // hardware floor (88), so the number on screen matches what the user actually sees.
+        val seeded = PipelineState(smoothedLux = 123.4, lastAppliedBrightness = 88, targetBrightness = 33)
+        compose.setContent {
+            MaterialTheme {
+                CurveBrightnessContent(
+                    AabSettings(minBrightness = 10, maxBrightness = 255), AabSettings(), emptyList(),
+                    epoch = 0, dirty = false, onEdit = {}, onApply = {}, onDiscard = {}, onBack = {},
+                    live = seeded,
+                )
+            }
+        }
+        compose.onNodeWithTag("diag_curve_current_bright").performScrollTo()
+            .assertTextContains("33", substring = true)
+    }
+
+    @Test
     fun curveBrightness_derivedCoefficients_useZoneAlignmentLabels_G2RF61() {
         // G2R-F61: form2A/form3A are labelled as the zone-alignment hinge points, not bare placeholders.
         compose.setContent {

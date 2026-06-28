@@ -23,7 +23,7 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- task528 panic: S.O.S. morse vibration pattern (prof769 → _PanicButton act0, code62). -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- task90 act28: geo-IP location fallback (http://ip-api.com/json) when no Android fix (F83). -->
+    <!-- task90 act28: geo-IP location fallback (HTTPS https://ipwho.is/) when no Android fix (F83/D-121). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- S14: ConnectivityManager (WifiInfoReader SSID NetworkCallback fallback) needs network state.
          A normal permission, auto-granted at install — its absence would SecurityException that path. -->

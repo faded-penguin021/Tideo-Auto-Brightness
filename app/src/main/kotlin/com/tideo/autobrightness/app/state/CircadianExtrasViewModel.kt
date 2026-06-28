@@ -10,6 +10,7 @@ import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
+import com.tideo.autobrightness.platform.context.GeoIpLocationClient
 import com.tideo.autobrightness.platform.context.LocationResult
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,11 +31,13 @@ import java.util.Locale
 class CircadianExtrasViewModel(application: Application) : AndroidViewModel(application) {
     private val store = ExperimentPrefsStore(application.experimentPrefsDataStore)
     private val location = AndroidLocationReader(application)
+    // D-120: the ipwho.is IP lookup (D-121) backs "Use current location" as an active last resort.
+    private val geoIp = GeoIpLocationClient()
 
     val dateLocation: StateFlow<ExperimentDateLocation> = store.dateLocation
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExperimentDateLocation())
 
-    /** G3-F12 / D-105: whether the ip-api.com geo-IP fallback may run (privacy opt-IN, default off). */
+    /** G3-F12 / D-105: whether the ipwho.is geo-IP fallback may run (privacy opt-IN, default off). */
     val geoIpEnabled: StateFlow<Boolean> = store.geoIpEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -68,10 +71,24 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
     fun defaultLatLon(): Pair<Double, Double>? =
         location.lastKnownLocation()?.let { it.latitude to it.longitude }
 
-    /** A fresh fix for the "Use current location" button (recheck grant at call time, cf. F42). */
-    suspend fun freshLatLon(): Pair<Double, Double>? =
-        (location.currentLocation() as? LocationResult.Available)
-            ?.snapshot?.let { it.latitude to it.longitude }
+    /**
+     * Actively acquire a location for the "Use current location" button (G2R-F42 / D-120). Rather than
+     * passively echoing whatever last-known fix another app happened to leave, this requests a CURRENT
+     * on-device fix (recheck grant at call time, cf. F42); and when none is available — no fix, or
+     * Location permission is missing/denied — it falls back to the ipwho.is IP lookup so the button still
+     * resolves an approximate location instead of giving up. The IP fallback runs ONLY when the user has
+     * opted into it (the same default-off privacy gate as the live circadian chain, D-105). Returns null
+     * when every active source is exhausted or declined.
+     */
+    suspend fun freshLatLon(): Pair<Double, Double>? {
+        (location.currentLocation() as? LocationResult.Available)?.snapshot?.let {
+            return it.latitude to it.longitude
+        }
+        if (store.geoIpEnabled.first()) {
+            geoIp.resolve()?.let { return it.latitude to it.longitude }
+        }
+        return null
+    }
 
     /** Pin a fixed date and/or location (G2R-F39); null fields revert to live for that field. The fixed
      *  date/location drive the LIVE circadian scaling (CircadianWindowProvider), not just the preview, so

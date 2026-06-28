@@ -6,14 +6,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * G2R-F83: the ip-api.com geo-IP fallback (task90 act28). The HTTP fetch is injected so the JSON
- * parse and the failure paths are pure-JVM testable. ip-api's free endpoint returns
- * `{"status":"success",...,"lat":...,"lon":...}` (or `{"status":"fail",...}`).
+ * G2R-F83 / D-121: the ipwho.is geo-IP fallback (task90 act28, now HTTPS). The HTTP fetch is injected so
+ * the JSON parse and the failure paths are pure-JVM testable. ipwho.is returns
+ * `{"success":true,...,"latitude":...,"longitude":...}` (or `{"success":false,"message":...}`), using the
+ * full words `latitude`/`longitude` rather than ip-api.com's old `lat`/`lon`.
  */
 class GeoIpLocationClientTest {
 
     private val successBody = """
-        {"status":"success","country":"Netherlands","city":"Utrecht","lat":52.0907,"lon":5.1214,"query":"1.2.3.4"}
+        {"ip":"1.2.3.4","success":true,"country":"Netherlands","city":"Utrecht","latitude":52.0907,"longitude":5.1214}
     """.trimIndent()
 
     @Test
@@ -24,12 +25,12 @@ class GeoIpLocationClientTest {
 
     @Test
     fun returnsNullOnFailStatus() {
-        assertNull(GeoIpLocationClient.parse("""{"status":"fail","message":"private range","query":"10.0.0.1"}"""))
+        assertNull(GeoIpLocationClient.parse("""{"ip":"10.0.0.1","success":false,"message":"Invalid IP address"}"""))
     }
 
     @Test
     fun returnsNullOnNullIslandAndGarbage() {
-        assertNull(GeoIpLocationClient.parse("""{"status":"success","lat":0,"lon":0}"""))
+        assertNull(GeoIpLocationClient.parse("""{"success":true,"latitude":0,"longitude":0}"""))
         assertNull(GeoIpLocationClient.parse("not json at all"))
     }
 

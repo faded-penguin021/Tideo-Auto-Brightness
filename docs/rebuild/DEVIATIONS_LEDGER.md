@@ -2028,3 +2028,56 @@ the permanent registry — never compress or remove them.
   old screen-on grace + cooldown): a pocketed phone reads proximity-near (not armed) and the shake gate
   replaces the single-spike trigger. Ships as **1.3.0 / versionCode 11** (MINOR — new user-facing setting
   + surface; `changelogs/11.txt`).
+
+- **D-117: curve graph + "Live brightness" card show PERCEIVED brightness in PWM-sensitive mode.** D-109
+  made the Dashboard hero track the perceived (un-floored `targetBrightness`) value while
+  `lastAppliedBrightness` stayed the floored hardware value used for override detection — but the
+  Curve & Brightness screen still read `lastAppliedBrightness` in two places, so under PWM-sensitive
+  flooring the graph's "Now" crosshair and the "Live brightness" diagnostic card sat at the hardware
+  floor (e.g. held at the dimming threshold) rather than where the screen actually looks. Fixed by
+  preferring `targetBrightness ?: lastAppliedBrightness` in both spots (`CurveBrightnessScreen`
+  `currentBrightness=`, `DiagnosticCard.CurveBrightnessDiagnosticCardContent`), exactly like the
+  Dashboard's `target ?: applied`. No new flag needed: `targetBrightness == lastAppliedBrightness`
+  whenever PWM-sensitive flooring is off, so the change only diverges (shows perceived) when it should.
+  Test: `SettingsScreensTest.curveBrightness_liveReadout_showsPerceivedBrightness_whenPwmSensitiveFloors_D117`.
+
+- **D-118: Contexts rules modal clipped its last rule under the nav bar (edge-to-edge, targetSdk 36).**
+  The `ProfilesContextsScreen.ContextsModal` full-screen `Dialog` used the default
+  `decorFitsSystemWindows = true` and applied no insets, so under targetSdk-36 edge-to-edge enforcement
+  the bottom of the scrolling rule list drew behind the gesture pill / 3-button bar. Aligned it to the
+  proven rule-editor pattern (D-097/D-098): `decorFitsSystemWindows = false` + `statusBarsPadding()` on
+  the outer column (so the modal's top app bar clears the status bar) + a trailing `Spacer(48.dp)` at the
+  end of the scroll (the dialog window never delivers a non-zero navigation-bar inset to its content, so
+  the bottom is handled by scroll clearance, not an inset). UI-only; bottom-inset behaviour is owner
+  device-verified (not Robolectric-testable).
+
+- **D-119: release workflow auto-generates release notes.** The v1.3.0 release published without an
+  auto-changelog (the owner's hand-written UI body only). `release.yml`'s `action-gh-release` step had
+  `generate_release_notes` intentionally OFF; flipped it ON. The action does NOT overwrite the owner's
+  text — an existing release body is PRE-pended and GitHub's generated "What's Changed" notes (merged
+  PRs + new contributors since the previous tag) are appended below, so both coexist; re-runs stay
+  idempotent. CI-only. NOTE on the workflow audit: `build.yml`/`codeql.yml` correctly run on every
+  push-to-main + PR (verified green on the last main push) and intentionally do NOT re-run on a `v*` tag
+  — the tagged commit was already validated on main, and `release.yml` re-runs the full test+lint ladder
+  before signing, so "only signing runs on tag creation" is by design, not a gap.
+
+- **D-120: Circadian "Use current location" actively acquires instead of echoing another app's fix.**
+  `CircadianExtrasViewModel.freshLatLon()` only called `LocationReader.currentLocation()` (which, on a
+  5 s timeout, falls back to the system last-known fix another app populated) and otherwise gave up. Now
+  it requests a current on-device fix and, when none is available (no fix OR Location permission missing),
+  falls back to the **ipwho.is** IP lookup (`GeoIpLocationClient.resolve()`) so the button still resolves
+  an approximate location — mirroring the live circadian acquisition chain. The IP fallback runs ONLY
+  when the user has opted in (the same default-OFF privacy gate as the runtime chain, D-105), so no new
+  network exposure occurs by default. The failure toast + the IP-fallback help string were updated to
+  reflect the new path.
+
+- **D-121: geo-IP fallback migrated from cleartext ip-api.com to HTTPS ipwho.is.** The Tasker source was
+  updated to query `https://ipwho.is/` instead of `http://ip-api.com/json`, removing the app's only
+  cleartext request. `GeoIpLocationClient` now hits the HTTPS URL, parses the **full-word** `latitude`/
+  `longitude` keys (ipwho.is, vs ip-api.com's `lat`/`lon`), and treats `"success":false` as failure
+  (was `"status":"fail"`). The `ip-api.com` cleartext exception is gone from
+  `res/xml/network_security_config.xml` — it now pins `<base-config cleartextTrafficPermitted="false"/>`
+  (explicit HTTPS-only, satisfies CodeQL's cleartext-traffic query). The fallback stays OPTIONAL and
+  default-off (D-105 unchanged). `GeoIpLocationClientTest` updated to the ipwho.is body shape. Ships with
+  D-117–D-120 as **1.4.0 / versionCode 12** (MINOR — observable user-facing behaviour: new
+  location-acquisition path; `changelogs/12.txt`).
