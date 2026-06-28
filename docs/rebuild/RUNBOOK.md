@@ -95,10 +95,22 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 - **Record:** note the deviation-from-Tasker explicitly in `STATE.md`.
 
 ### 6. Cutting a release / version bump
-The owner publishes releases by pushing a `vX.Y.Z` git tag on `main`; F-Droid then builds that
-tagged commit and reads its metadata. The **in-app version is decoupled from the tag** and has
-drifted before (the `v1.0.2` tag was cut while `build.gradle.kts` still said `1.0.1` / `versionCode
-4` — see D-099), so check it explicitly.
+The owner publishes releases from the GitHub "Draft a new release" UI on `main` (which creates the
+`vX.Y.Z` tag); `release.yml` then builds + signs + attaches the APK, and F-Droid builds that tagged
+commit and reads its metadata. The **in-app version is decoupled from the tag** and has drifted before
+(the `v1.0.2` tag was cut while `build.gradle.kts` still said `1.0.1` / `versionCode 4` — see D-099),
+so check it explicitly.
+
+> **⚠️ NEVER write the literal `[skip ci]` (or `[ci skip]` / `[no ci]` / `***NO_CI***`) in a commit
+> message OR a PR description (D-115).** GitHub honors that token on `push`/`pull_request` events, and a
+> **squash-merge folds every commit message into the squash commit body** — so a stray `[skip ci]`
+> (even as descriptive prose, e.g. documenting `clean-dist.yml`) lands on `main` and **silently skips
+> ALL workflows for that commit**, including `build`/`codeql` on the push AND `release.yml` on the tag
+> that points at it (this is exactly why v1.2.0's release "didn't run"). `release.yml` now primarily
+> triggers on `release: published` (immune to skip-ci) + a `workflow_dispatch` fallback, but the token
+> still skips the main-push `build`/`codeql`. The only legitimate use of the token is inside a
+> workflow's OWN auto-commit heredoc (e.g. `clean-dist.yml`). If a release's workflow was skipped, run
+> **Actions → Release → "Run workflow"** with the tag, or re-publish the release.
 
 - **Check the current release state first** (tags are not always present in a fresh clone):
   ```bash

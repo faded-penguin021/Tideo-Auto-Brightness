@@ -29,8 +29,18 @@ data class LiveDebugUiState(
     val maxBrightness: Int = 255,
     /** The GLOBAL %AAB_Debug category (G2R-F9) — the selector lives here, not on Misc. */
     val debugLevel: Int = 0,
+    /** The GLOBAL %AAB_PanicSensitivity (0..10, D-116) — the slider lives here, like the debug category. */
+    val panicSensitivity: Int = 8,
     /** Whether the opt-in global-flash AccessibilityService is enabled (G2R-F50). */
     val globalToastsEnabled: Boolean = false,
+)
+
+/** The handful of persisted figures the Live Debug scene reads (packed so `combine` stays ≤5 flows). */
+private data class LiveDebugSettings(
+    val minBrightness: Int,
+    val maxBrightness: Int,
+    val debugLevel: Int,
+    val panicSensitivity: Int,
 )
 
 /**
@@ -44,7 +54,7 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
     private val app = application
 
     private val settingsFlow = app.settingsDataStore.data
-        .map { Triple(it.minBrightness, it.maxBrightness, it.debugLevel) }
+        .map { LiveDebugSettings(it.minBrightness, it.maxBrightness, it.debugLevel, it.panicSensitivity) }
 
     // Re-read on demand (the screen pokes this on resume) since enabling the AccessibilityService
     // happens in system Settings, outside any DataStore/flow we observe (G2R-F50).
@@ -61,9 +71,10 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
             pipeline = pipeline,
             serviceRunning = running,
             activeContext = context,
-            minBrightness = settings.first,
-            maxBrightness = settings.second,
-            debugLevel = settings.third,
+            minBrightness = settings.minBrightness,
+            maxBrightness = settings.maxBrightness,
+            debugLevel = settings.debugLevel,
+            panicSensitivity = settings.panicSensitivity,
             globalToastsEnabled = global,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LiveDebugUiState())
@@ -77,6 +88,17 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
             // not take effect until the next reapply — reapply() re-reads the fresh baseline.
             if (level == 0) AabFlash.cancel()
             if (app.settingsDataStore.data.first().serviceEnabled) AutoBrightnessRuntime.reapply(app)
+        }
+    }
+
+    /**
+     * Persist the GLOBAL %AAB_PanicSensitivity (0..10, D-116). Like [setDebugLevel] this writes straight
+     * to the DataStore — the slider is global, never a per-profile/draft value. The panic source reads
+     * the value via ContextEngine.effectiveSnapshot per arming, so no reapply() is needed.
+     */
+    fun setPanicSensitivity(value: Int) {
+        viewModelScope.launch {
+            app.settingsDataStore.updateData { it.copy(panicSensitivity = value.coerceIn(0, 10)) }
         }
     }
 

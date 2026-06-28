@@ -1979,3 +1979,52 @@ the permanent registry — never compress or remove them.
   + `contexts_deleteRule_requiresConfirmation_D114` (assert the callback does NOT fire until the dialog is
   confirmed). The existing render tests only assert the menu items EXIST (don't click through), so they
   are unaffected.
+
+- **D-115: `[skip ci]` in a squash-merged commit silently skipped the v1.2.0 release (owner-reported).**
+  The v1.2.0 GitHub Release "didn't run" — `release.yml` never fired for the tag, and `build`/`codeql`
+  never ran for the merge-to-main commit either. ROOT CAUSE: the squash-merge commit body (PR #77)
+  contained the literal token `[ skip ci ]` (written without the space) — it leaked from a session
+  commit message that *described* `clean-dist.yml` ("commit+push, [skip ci]"). GitHub honors that token
+  on `push`/`pull_request` events, and a squash-merge folds every commit message into the squash body,
+  so the token landed on `main` and skipped EVERY workflow for that commit, including `release.yml` on
+  the `v1.2.0` tag (the tag points at the skipped commit). Nothing was wrong with the workflow files or
+  the D-112 Node-24 action bumps (the PR's own `build`/`codeql` passed). **Fixes:** (1) `release.yml` now
+  triggers primarily on `release: published` — the `release` event is NOT subject to skip-ci — plus a
+  `workflow_dispatch` (tag input) manual fallback and a concurrency guard; it builds the tagged ref and
+  attaches the signed APK without regenerating the owner's release notes. (2) RUNBOOK §6 gains a loud
+  "never write `[skip ci]` in a commit message or PR body" warning; the only legitimate use is a
+  workflow's own auto-commit heredoc (`clean-dist.yml`). **Recovery for v1.2.0:** dispatched
+  `release-signing.yml` for the signed APK, and `release.yml` can now be re-run via
+  Actions → Run workflow (tag `v1.2.0`) once merged.
+
+- **D-116: Panic (Reset) gesture reworked — proximity-armed + sensitivity-gated 10 s shake + re-arm
+  (owner spec, folded-in Tasker source).** The owner updated the Tasker `Panic (Reset)` profile, its
+  `_PanicButton` task and the Debug scene; ported here. THREE changes: **(1) Trigger.** prof769 drops the
+  significant-motion EVENT; the state is now `Orientation [Is:Upside Down] ∧ Display State [Is:On] ∧
+  %AAB_Proximity !~ Near` — the shake is validated separately inside the task. **(2) New global setting.**
+  `%AAB_PanicSensitivity` (0–10, default **8** when unset) → `AabSettings.panicSensitivity` as a GLOBAL
+  pref (like `debugLevel`): contract rule `%AAB_PanicSensitivity`/0..10, sanitize clamp, legacy import,
+  `SettingsDisplay` value + diff-exclusion, preserved across profile load/import/reset/draft and
+  `mergeProfile`. A 0–10 slider lives at the bottom of the **Live Debug** screen (the Tasker Debug scene)
+  → `LiveDebugViewModel.setPanicSensitivity` writes straight to DataStore. **(3) Shake gate.** task528
+  `_PanicButton` A2 Java is a leaky bucket: `targetScore = sens*40`, `threshold = sens*2`; per ~50 Hz
+  linear-accel magnitude `mag`, `mag > threshold ⇒ score = score*0.98 + (mag−threshold)` else
+  `score *= 0.90`; success at `score ≥ targetScore`; **sens 0 = pass-through** (fire immediately);
+  **10 s timeout = veto** (panic does NOT fire). Ported as the pure `:domain` `PanicShakeGate`
+  (`PanicShakeGateTest` contract-tests it against a faithful transcription of the A2 loop across targeted
+  + fuzzed traces). **Platform rework** (`PanicSensorSource.kt`): `PanicGestureDetector` reduced to the
+  orientation half (sustained upside-down + gravity-stripped magnitude for the no-`TYPE_LINEAR_ACCELERATION`
+  fallback); `PanicGate` is now the **re-arm latch** — a window (fired OR timed out) consumes the gesture
+  until the phone leaves upside-down and re-enters (the prof769 STATE re-entry, D-021); `AndroidPanicSensorSource`
+  arms on sustained-upside-down ∧ display-on ∧ proximity-not-near and runs a `PanicShakeGate(sensitivity())`
+  over a 10 s `TYPE_LINEAR_ACCELERATION` window (fallback high-passed `TYPE_ACCELEROMETER`). Once armed the
+  window is **not** re-gated on orientation (faithful to the A2 Java's 10 s `blockingGet`): an up-and-down
+  shake while inverted is along the gravity axis and transiently disturbs the gravity-based `isUpsideDown`
+  estimate, so re-checking `armed` mid-window made up-down shakes self-cancel while orthogonal left-right
+  shakes survived (owner: "shake direction wrong"). The shake magnitude is omnidirectional `√(x²+y²+z²)`,
+  so the window is direction-agnostic. `AppModule`
+  injects `sensitivity` (via new non-suspend `ContextEngine.effectiveSnapshot`) + proximity-near (live
+  `PipelineState.proximityNear`). This structurally retires the S14 grab-to-wake false-fire (PanicGate's
+  old screen-on grace + cooldown): a pocketed phone reads proximity-near (not armed) and the shake gate
+  replaces the single-spike trigger. Ships as **1.3.0 / versionCode 11** (MINOR — new user-facing setting
+  + surface; `changelogs/11.txt`).

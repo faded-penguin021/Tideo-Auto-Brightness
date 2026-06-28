@@ -83,6 +83,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     contextOverride = current.contextOverride,
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
+                    panicSensitivity = current.panicSensitivity,
                 )
             }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
@@ -107,6 +108,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     serviceEnabled = current.serviceEnabled,
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
+                    panicSensitivity = current.panicSensitivity,
                     contextOverride = true, // latch the manual context lock (G2R-F30)
                 )
             }
@@ -128,6 +130,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     serviceEnabled = current.serviceEnabled,
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
+                    panicSensitivity = current.panicSensitivity,
                     contextOverride = true,
                 )
             }

@@ -30,30 +30,30 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 > — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
 > findings are in `../history/STATE_rebuild.md`). Look there.
 
-## Active work
-
-*(none — base state. Populate this section only while a change needs multiple stages; clear it
-to a Changelog line on completion.)*
-
-When in use, track stages here:
-
-| Stage | Date | Status | Notes |
-|---|---|---|---|
-
-**Blockers:** none.
-
-**New deviations (this work):** none.
-
-> Write new deviations straight into the permanent registry `DEVIATIONS_LEDGER.md` (its
-> "Maintenance deviations" section), not here — this slot is only a transient staging note
-> during an in-flight change. Numbering is **one continuous sequence**: next free number is
-> **D-115** (historical high-water mark D-114); never restart at D-001. A deviation, once
-> numbered, lives in the registry forever — it is never compressed out.
-
 ## Changelog
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-28 — 1.3.0 / `versionCode 11` (MINOR — new user-facing setting + surface): **D-116** Panic
+  (Reset) gesture reworked from folded-in Tasker source. Trigger is now Upside-Down ∧ Display-On ∧
+  **Proximity-NOT-Near** (the significant-motion EVENT is gone); the shake is validated by a 10 s
+  sensitivity-gated leaky-bucket (`PanicShakeGate`, pure `:domain`, contract-tested vs the task528 A2
+  Java). New GLOBAL **`%AAB_PanicSensitivity`** (0–10, default 8) with a slider at the bottom of the
+  Live Debug screen (0 = pass-through, 10 = long vigorous shake; 10 s timeout = veto + re-arm only after
+  flipping straight then upside-down again, D-021). Platform: `PanicGestureDetector` → orientation only,
+  `PanicGate` → re-arm latch, `AndroidPanicSensorSource` arms + runs the gate over `TYPE_LINEAR_ACCELERATION`
+  (fallback high-passed accelerometer); `AppModule` injects sensitivity (new `ContextEngine.effectiveSnapshot`)
+  + proximity-near. Structurally retires the S14 grab-to-wake false-fire. Changelog `11.txt`; `tmp/` spec
+  deleted. Owner: when squash-merging, STRIP any `[skip ci]` from the commit body (D-115), merge, then
+  publish the v1.3.0 release from the GitHub UI.
+- 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut, no app change): **D-115** the v1.2.0 release
+  workflow never ran — the squash-merge commit body carried a stray `[skip ci]` token (leaked from a
+  commit message that described `clean-dist.yml`), which GitHub honored and skipped every workflow for
+  that commit + tag, so v1.2.0 never published its signed APK. `release.yml` now triggers on
+  `release: published` (immune to skip-ci) + a `workflow_dispatch` tag fallback; RUNBOOK §6 warns never
+  to write the token in a commit/PR message. 1.2.1 re-cuts the SAME app (no runtime change since 1.2.0)
+  so the release publishes cleanly. Changelog `10.txt`. Owner opens a NEW PR (v1.2.0's was merged), then
+  publishes the v1.2.1 release.
 - 2026-06-28 — 1.2.0 / `versionCode 9`: runtime bug fixes + UX. **D-108** service-start battery-saver
   flash (battery "unknown" `-1` sentinel; resolver won't match a battery rule until a real reading).
   **D-109** PWM-sensitive read-out now tracks PERCEIVED brightness (`targetBrightness` = un-floored engine

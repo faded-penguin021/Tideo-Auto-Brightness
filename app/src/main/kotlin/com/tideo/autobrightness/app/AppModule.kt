@@ -11,6 +11,7 @@ import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.runtime.CircadianWindowProvider
+import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
@@ -135,8 +136,15 @@ class AppModule(context: Context) {
         // the provider feeds `current` into the controller above.
         circadianWindows.onWindowsRefreshed = { controller.reapply() }
 
-        // prof769/task528 panic: upside-down + shake (display on) → SOS + restore + full stop (F77).
-        val panicSensor = AndroidPanicSensorSource(appContext)
+        // prof769/task528 panic (D-116): armed by upside-down + display-on + proximity-NOT-near, then a
+        // %AAB_PanicSensitivity-scaled shake within 10 s → SOS + restore + full stop (F77). Sensitivity
+        // is the global pref (read per arming); proximity-near comes from the live pipeline state (the
+        // same %AAB_Proximity the ×0.1 smoothing damp uses).
+        val panicSensor = AndroidPanicSensorSource(
+            context = appContext,
+            sensitivity = { (contextEngine.effectiveSnapshot ?: AabSettings()).panicSensitivity },
+            isNear = { controller.state.value.proximityNear },
+        )
 
         return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager)
     }

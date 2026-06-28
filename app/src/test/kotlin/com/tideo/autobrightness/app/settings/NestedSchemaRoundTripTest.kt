@@ -44,7 +44,8 @@ class NestedSchemaRoundTripTest {
         assertEquals(AnimationConfig(30, 20, 70, 1400L), s.animation)
         assertEquals(ThresholdConfig(2.0f, 0.07f, 0.35f, 0.22f, 2.2f, 3.8, true), s.thresholds)
         assertEquals(ScalingConfig(true, 20, 7, 200, 0.06f, 0.2f), s.scaling)
-        assertEquals(GlobalPrefs(false, true, 4, true, "X", true, false), s.global)
+        // panicSensitivity omitted from the JSON → falls to its default 8 (D-116).
+        assertEquals(GlobalPrefs(false, true, 4, 8, true, "X", true, false), s.global)
     }
 
     @Test

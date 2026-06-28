@@ -78,9 +78,9 @@ data class ScalingConfig(
 /**
  * App-wide preferences and runtime/identity latches.
  *
- * NOTE on `mergeProfile`: the five fields [serviceEnabled], [detectOverrides], [debugLevel],
- * [contextOverride] and [setupTitle] are preserved across a context profile swap (G2-F8) — they are
- * NOT part of Tasker task626's per-profile snapshot. [quickSettingsEnabled] and [notificationsEnabled]
+ * NOTE on `mergeProfile`: the fields [serviceEnabled], [detectOverrides], [debugLevel],
+ * [panicSensitivity], [contextOverride] and [setupTitle] are preserved across a context profile swap
+ * (G2-F8) — they are NOT part of Tasker task626's per-profile snapshot. [quickSettingsEnabled] and [notificationsEnabled]
  * ARE in task626's snapshot (profile-swapped), so they live in this group for cohesion but are taken
  * from the loaded profile, not the baseline. See [mergeProfile].
  */
@@ -89,6 +89,7 @@ data class GlobalPrefs(
     val serviceEnabled: Boolean,
     val detectOverrides: Boolean,
     val debugLevel: Int,
+    val panicSensitivity: Int,
     val contextOverride: Boolean,
     val setupTitle: String,
     val quickSettingsEnabled: Boolean,
@@ -116,4 +117,4 @@ val AabSettings.scaling: ScalingConfig
     get() = ScalingConfig(scalingEnabled, scaleSpread, scaleSteepness, scaleTaperMidpoint, scaleTaperSteepness, scaleTransitionFactor)
 
 val AabSettings.global: GlobalPrefs
-    get() = GlobalPrefs(serviceEnabled, detectOverrides, debugLevel, contextOverride, setupTitle, quickSettingsEnabled, notificationsEnabled)
+    get() = GlobalPrefs(serviceEnabled, detectOverrides, debugLevel, panicSensitivity, contextOverride, setupTitle, quickSettingsEnabled, notificationsEnabled)

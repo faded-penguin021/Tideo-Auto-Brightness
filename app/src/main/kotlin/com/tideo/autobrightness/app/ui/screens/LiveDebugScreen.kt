@@ -14,13 +14,16 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -76,6 +79,7 @@ fun LiveDebugScreen(navController: NavHostController, vm: LiveDebugViewModel = v
     LiveDebugContent(
         state = state,
         onSelectDebug = vm::setDebugLevel,
+        onSetPanicSensitivity = vm::setPanicSensitivity,
         onEnableGlobalToasts = {
             // Deep-link to the system Accessibility settings so the user can enable the overlay.
             runCatching {
@@ -95,6 +99,7 @@ fun LiveDebugContent(
     state: LiveDebugUiState,
     onSelectDebug: (Int) -> Unit,
     onBack: () -> Unit,
+    onSetPanicSensitivity: (Int) -> Unit = {},
     onEnableGlobalToasts: () -> Unit = {},
 ) {
     val p = state.pipeline
@@ -144,7 +149,46 @@ fun LiveDebugContent(
             DebugLevelSelector(state.debugLevel, onSelectDebug)
 
             GlobalFlashCard(state.globalToastsEnabled, onEnableGlobalToasts)
+
+            // %AAB_PanicSensitivity slider (D-116) — last on the scene, mirroring the Tasker Debug
+            // scene where it sits at the bottom and feeds _SetPanicSensitivity.
+            PanicSensitivityCard(state.panicSensitivity, onSetPanicSensitivity)
         }
+    }
+}
+
+/**
+ * The GLOBAL %AAB_PanicSensitivity slider (D-116), bottom of the Live Debug scene like the Tasker Debug
+ * scene. 0..10 in unit steps; writes straight to the DataStore (a global pref, never a profile/draft).
+ * 0 is pass-through (the panic fires with no shake requirement); higher needs a longer/harder shake.
+ */
+@Composable
+private fun PanicSensitivityCard(current: Int, onSet: (Int) -> Unit) {
+    DiagnosticCard(
+        title = stringResource(R.string.title_panic_sensitivity),
+        testTag = "panic_sensitivity_card",
+    ) {
+        // Local slider position for smooth dragging; commit the rounded integer on change-end.
+        var position by remember(current) { mutableFloatStateOf(current.toFloat()) }
+        val level = position.roundToInt()
+        val valueLabel = if (level == 0) {
+            stringResource(R.string.panic_sensitivity_passthrough)
+        } else {
+            stringResource(R.string.panic_sensitivity_value, level)
+        }
+        DiagnosticLine("panic_sensitivity_value") { append(valueLabel) }
+        Slider(
+            value = position,
+            onValueChange = { position = it },
+            onValueChangeFinished = { onSet(position.roundToInt()) },
+            valueRange = 0f..10f,
+            steps = 9, // 9 interior stops → 11 discrete positions (0..10)
+            modifier = Modifier.fillMaxWidth().testTag("panic_sensitivity_slider"),
+        )
+        Text(
+            stringResource(R.string.panic_sensitivity_help),
+            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+        )
     }
 }
 

@@ -80,6 +80,10 @@
     <string name="legacy_import_header">Import from Tasker AAB</string>
     <string name="manage_profiles_header">Manage profiles &amp; Export</string>
     <string name="title_global_flash">Global flash (system-wide)</string>
+    <string name="title_panic_sensitivity">Panic Sensitivity</string>
+    <string name="panic_sensitivity_value">Level: %1$d / 10</string>
+    <string name="panic_sensitivity_passthrough">Level: 0 (pass-through)</string>
+    <string name="panic_sensitivity_help">Sets the shake intensity/duration to trigger an Emergency UI Reset (hold the phone upside-down, screen on, then shake). 0 = pass-through (disables the shake requirement); 10 = long, vigorous shake.</string>
 
     <!-- Dashboard -->
     <string name="dashboard_stale_banner">Live data may be stale — the monitor may have stopped responding.</string>

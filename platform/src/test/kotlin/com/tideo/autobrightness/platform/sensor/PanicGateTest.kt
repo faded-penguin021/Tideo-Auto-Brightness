@@ -5,50 +5,53 @@ import kotlin.test.assertTrue
 import org.junit.Test
 
 /**
- * S14 (owner: panic too sensitive on grab-to-wake): the [PanicGate] adds a screen-on grace window +
- * cooldown around the pure [PanicGestureDetector]. Pure timing tests with an explicit clock.
+ * D-116 (reworked prof769): [PanicGate] is now the **re-arm latch** for the 10 s shake window. After a
+ * window runs (fired OR timed out) the gesture must not start another until the phone is flipped straight
+ * and inverted again — exactly like a Tasker STATE re-entry (`tmp/Tmp.md`). Pure state-machine tests.
  */
 class PanicGateTest {
 
     @Test
-    fun wakeEdge_isReportedOnce() {
+    fun armsWhenConditionTrue() {
         val gate = PanicGate()
-        // Screen off → on: the rising edge reports true once (caller resets the detector); staying on
-        // does not re-report.
-        assertFalse(gate.onScreenState(now = 0L, interactive = false))
-        assertTrue(gate.onScreenState(now = 100L, interactive = true), "rising edge should report a wake")
-        assertFalse(gate.onScreenState(now = 200L, interactive = true), "staying on is not a new wake")
+        assertTrue(gate.canArm(armed = true, upsideDown = true), "armed condition → may start a window")
     }
 
     @Test
-    fun graceAfterWake_suppressesFire() {
-        val gate = PanicGate(screenOnGraceMs = 3_000L)
-        gate.onScreenState(now = 1_000L, interactive = true) // wake at t=1000 → grace until t=4000
-        // A gesture detected during the grace window must NOT fire (the grab-to-wake shake).
-        assertFalse(gate.shouldFire(now = 1_500L, interactive = true), "within grace → suppressed")
-        assertFalse(gate.shouldFire(now = 3_999L, interactive = true), "still within grace → suppressed")
+    fun doesNotArmWhenNotArmed() {
+        val gate = PanicGate()
+        // e.g. proximity near, or display off, or not yet sustained-upside-down.
+        assertFalse(gate.canArm(armed = false, upsideDown = true), "not-armed → no window")
     }
 
     @Test
-    fun firesAfterGraceElapses() {
-        val gate = PanicGate(screenOnGraceMs = 3_000L)
-        gate.onScreenState(now = 1_000L, interactive = true)
-        assertTrue(gate.shouldFire(now = 4_500L, interactive = true), "past the grace window → fires")
+    fun afterConsume_doesNotReArmWhileStillUpsideDown() {
+        val gate = PanicGate()
+        assertTrue(gate.canArm(armed = true, upsideDown = true))
+        gate.consume() // a window ran (timeout or fire)
+        // Still held upside down (the timeout case): must NOT re-arm even though the condition holds.
+        assertFalse(gate.canArm(armed = true, upsideDown = true), "still inverted → latched, no re-arm")
+        assertFalse(gate.canArm(armed = true, upsideDown = true), "stays latched across readings")
     }
 
     @Test
-    fun cooldown_debouncesRepeatFires() {
-        val gate = PanicGate(screenOnGraceMs = 0L, cooldownMs = 3_000L)
-        gate.onScreenState(now = 0L, interactive = true)
-        assertTrue(gate.shouldFire(now = 10_000L, interactive = true), "first detection fires")
-        assertFalse(gate.shouldFire(now = 11_000L, interactive = true), "within cooldown → suppressed")
-        assertTrue(gate.shouldFire(now = 13_500L, interactive = true), "past cooldown → fires again")
+    fun reArmsOnlyAfterFlippingStraightThenInvertingAgain() {
+        val gate = PanicGate()
+        gate.canArm(armed = true, upsideDown = true)
+        gate.consume()
+        // Flip straight: upside-down exits → latch clears (but not armed in this orientation).
+        assertFalse(gate.canArm(armed = false, upsideDown = false), "flipped straight: not armed yet")
+        // Invert again → the condition re-arms.
+        assertTrue(gate.canArm(armed = true, upsideDown = true), "re-entry re-arms the gesture")
     }
 
     @Test
-    fun notInteractive_neverFires() {
-        val gate = PanicGate(screenOnGraceMs = 0L)
-        // A face-down phone in a pocket: the display is off, so the gesture must never fire.
-        assertFalse(gate.shouldFire(now = 10_000L, interactive = false))
+    fun consumeWithoutFlip_neverReArms_butFlipResets() {
+        val gate = PanicGate()
+        gate.canArm(armed = true, upsideDown = true)
+        gate.consume()
+        repeat(5) { assertFalse(gate.canArm(armed = true, upsideDown = true), "no re-arm while inverted") }
+        gate.canArm(armed = false, upsideDown = false) // flip straight clears the latch
+        assertTrue(gate.canArm(armed = true, upsideDown = true), "after a flip the next inversion arms")
     }
 }
