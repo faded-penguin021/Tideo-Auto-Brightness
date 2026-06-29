@@ -22,9 +22,10 @@ private val engine = BrightnessEngine()
  *   - **Curve** (primary, solid) = the live [curve] = the draft the user is editing — it tracks edits.
  *     When the user previews a wizard suggestion it is loaded INTO that draft (D-125), so this line
  *     also *is* the suggested fit during a preview (no separate auto-drawn line).
- *   - **Reference** (gold, dashed) = the FIXED [referenceCurve] snapshot (the committed/default curve),
- *     so a draft edit — or a previewed suggestion — shows *against* where you started (F69). It does
- *     NOT move with the draft.
+ *   - **Reference** (gold, dashed) = the FIXED [referenceCurve] — the HARDCODED baseline curve (Tasker
+ *     task663 `ref_data`: the AabSettings defaults), so a draft edit — or a previewed suggestion — shows
+ *     *against* the fixed reference, like the Tasker graph (D-125, corrects F69's committed snapshot).
+ *     It does NOT move with the draft or committed.
  *   - **Overrides** = the recorded manual-override points as tappable scatter dots (tap → delete, F36).
  *
  * **S13 / Haiku: copy this pattern exactly for the other six charts.** The recipe is: sample a domain
@@ -56,7 +57,7 @@ fun BrightnessCurveChart(
     // 1. live curve through mapLuxToBrightness, floored at minBrightness (G2-F4).
     val curvePoints = sample(curve)
 
-    // 2. FIXED reference = the committed/default snapshot (dashed gold), never the live draft (F69).
+    // 2. FIXED reference = the hardcoded baseline curve (dashed gold), never the draft/committed (D-125).
     val referencePoints = referenceCurve?.let { sample(it) }
 
     // D-125: there is no separate auto-drawn "Suggested" line. A wizard suggestion is previewed by

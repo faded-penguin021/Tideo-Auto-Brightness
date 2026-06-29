@@ -9,7 +9,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,7 +25,6 @@ import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
-import com.tideo.autobrightness.app.state.CurveSuggestionPreview
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.state.derivedCoefficients
 import com.tideo.autobrightness.app.ui.components.AabCard
@@ -37,7 +35,6 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.graph.BrightnessCurveChart
-import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 
 internal fun List<FieldError>.forField(name: String): String? = firstOrNull { it.field == name }?.message
@@ -59,33 +56,11 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = com.tideo.autobrightness.app.ui.components.rememberToaster()
 
-    // D-125: a wizard suggestion is previewed ONLY when the user ran the wizard and tapped "Preview
-    // graph" (CurveSuggestionPreview.request), matching Tasker's user-driven task38 → preview → task655
-    // flow. Load it ONCE into the editable draft, but only AFTER the VM has seeded from committed
-    // (epoch ≥ 1) so the seed cannot clobber it: the fields then show the suggested values with the
-    // current values in [brackets], and the chart's live "Curve" traces the fit against the dashed
-    // "Reference" (committed). Leaving the screen discards the draft, so the line disappears on close.
-    // There is deliberately NO auto-fit at ≥ 9 override points anymore.
-    val pendingSuggestion by CurveSuggestionPreview.pending.collectAsStateWithLifecycle()
-    LaunchedEffect(epoch, pendingSuggestion) {
-        val result = pendingSuggestion ?: return@LaunchedEffect
-        if (epoch < 1) return@LaunchedEffect
-        vm.seedDraft { s ->
-            // Same mapping as the Tools "Apply suggestion" path: continuous form1A lands exactly; the
-            // remaining Int/Float fields round (task655). form2A/form3A stay derived (task659).
-            val cfg = CurveSuggestionEngine.applyToLiveCurve(result, s.toBrightnessCurveConfig())
-            s.copy(
-                form1A = cfg.form1A,
-                zone1End = Math.round(cfg.zone1End).toInt(),
-                form2B = cfg.form2B.toFloat(),
-                form2C = Math.round(cfg.form2C).toInt(),
-                zone2End = Math.round(cfg.zone2End).toInt(),
-            )
-        }
-        CurveSuggestionPreview.clear()
-        toast("Suggested curve previewed — Apply to keep it")
-    }
-
+    // D-125: a wizard suggestion reaches this screen ONLY when the user ran the Tools wizard and tapped
+    // "Preview graph" — it is applied to this VM's draft during its initial seed (see
+    // DraftSettingsViewModel / CurveSuggestionPreview), so the fields show the suggested values with the
+    // current values in [brackets] and the live "Curve" traces the fit. Leaving discards the draft, so
+    // the line disappears on close. There is deliberately NO auto-fit at ≥ 9 override points anymore.
     CurveBrightnessContent(
         draft, committed, errors, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
@@ -117,7 +92,8 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
  *
  * D-125: this gates only the *wizard run*, never an auto-preview. The Curve & Brightness screen no
  * longer fits/draws a suggested curve just because ≥ 9 points exist — a suggestion appears there only
- * after the user runs the wizard and taps "Preview graph" (see [CurveSuggestionPreview]).
+ * after the user runs the wizard and taps "Preview graph" (see
+ * [com.tideo.autobrightness.app.state.CurveSuggestionPreview]).
  */
 internal const val MIN_FIT_POINTS = 9
 
@@ -141,9 +117,12 @@ fun CurveBrightnessContent(
     DraftSettingsScaffold(stringResource(R.string.title_curve_brightness), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             val curveConfig = draft.toBrightnessCurveConfig()
-            // F69: the dashed gold reference line is the FIXED committed snapshot, not the live draft,
-            // so an edit shows against where it started. The live "Curve" tracks the draft.
-            val referenceConfig = remember(committed) { committed.toBrightnessCurveConfig() }
+            // D-125 / Tasker parity (task663 `ref_data`): the dashed gold reference is the HARDCODED
+            // baseline curve — the AabSettings defaults, i.e. 5·√lux; 29.58 + 8.8·(…); 255 − (2513/lux)·255
+            // — NOT the committed snapshot (corrects F69). So a previewed suggestion (or any edit) shows
+            // against the fixed reference, exactly like the Tasker graph: the live "Curve" (`new_data`,
+            // suggested/current) vs the hardcoded `ref_data`. It never moves with the draft or committed.
+            val referenceConfig = remember { AabSettings().toBrightnessCurveConfig() }
             // Gate-2(5th) obs: a 0-lux override (which can happen) would plot at/below the log x-axis
             // floor (0.1) and be invisible/un-tappable — clamp the DISPLAYED lux up to 0.1 so it draws
             // at the left edge. The recorded value is untouched (deletion matches against the original).

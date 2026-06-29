@@ -86,12 +86,23 @@ fun ToolsScreen(
     ToolsContent(
         recordedPoints = overridePoints,
         onBack = { navController.popBackStack() },
-        // D-125: stash the wizard's fit as a transient preview, then jump to Curve & Brightness — which
-        // loads it into its editable draft (suggested values in the fields, current in [brackets], the
-        // fit traced against the committed curve). User-driven, like Tasker's task38 → preview → task655;
-        // leaving the screen discards it. (Was: auto-draw a fitted line whenever ≥ 9 points existed.)
+        // D-125: stash the wizard's fit as a transient draft transform (curve → suggested), then jump to
+        // Curve & Brightness — whose VM applies it on its initial seed: suggested values in the fields,
+        // current values in [brackets], the fit traced against the hardcoded reference. User-driven, like
+        // Tasker's task38 → preview → task655; leaving the screen discards it. (Was: auto-draw a fitted
+        // line whenever ≥ 9 points existed.) The mapping mirrors "Apply suggestion" (onApplyWizard):
+        // continuous form1A lands exactly, the Int/Float fields round (task655); form2A/3A stay derived.
         onPreviewGraph = { result ->
-            CurveSuggestionPreview.request(result)
+            CurveSuggestionPreview.request { s ->
+                val cfg = CurveSuggestionEngine.applyToLiveCurve(result, s.toBrightnessCurveConfig())
+                s.copy(
+                    form1A = cfg.form1A,
+                    zone1End = Math.round(cfg.zone1End).toInt(),
+                    form2B = cfg.form2B.toFloat(),
+                    form2C = Math.round(cfg.form2C).toInt(),
+                    zone2End = Math.round(cfg.zone2End).toInt(),
+                )
+            }
             navController.navigate(AppRoute.CurveBrightness.route)
         },
         onRunWizard = { overrides, tau ->
@@ -342,7 +353,7 @@ private fun WizardCard(
                         // the manual "Copy full report" button below. Mirror that auto-copy here.
                         if (r != null) {
                             clipboard.setText(AnnotatedString(r.diagnosticsLog.trim()))
-                            toast("Diagnostics copied to clipboard (%AAB_Test)")
+                            toast("Diagnostics copied to clipboard")
                         }
                     }
                 },

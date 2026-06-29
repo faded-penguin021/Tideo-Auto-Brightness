@@ -7,6 +7,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -24,6 +25,10 @@ import kotlin.test.assertTrue
 class DraftSettingsViewModelTest {
 
     private val app = ApplicationProvider.getApplicationContext<Application>()
+
+    // CurveSuggestionPreview is a process-global holder (D-125); clear it so a pending preview from one
+    // test can never leak into another's initial seed.
+    @Before fun clearPreview() = CurveSuggestionPreview.clear()
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
@@ -122,22 +127,35 @@ class DraftSettingsViewModelTest {
     }
 
     @Test
-    fun seedDraft_replacesDraftAndBumpsEpoch_forWizardPreview_D125() {
-        // D-125: loading a wizard suggestion into the draft must (a) update the draft so the curve
-        // previews + dirty/brackets engage, and (b) bump epoch so the seed-once text fields rebind to
-        // the new values (a plain edit() leaves the fields showing the old text). Nothing persists.
+    fun initialSeed_appliesPendingCurveSuggestionPreview_D125() {
+        // D-125: a wizard "Preview graph" request is applied to the draft DURING the initial seed (the
+        // same atomic epoch 0→1 that populates the seed-once fields), so the suggested values show in
+        // the fields with the current values in [brackets], and nothing persists until Apply.
+        CurveSuggestionPreview.clear()
         setBaseline(AabSettings(maxBrightness = 200, zone1End = 35, form2C = 18))
+        CurveSuggestionPreview.request { it.copy(zone1End = 77, form2C = 5) }
+
         val vm = seededVm()
-        val epochBefore = vm.epoch.value
 
-        vm.seedDraft { it.copy(zone1End = 77, form2C = 5) }
-        idle()
-
-        assertEquals(77, vm.draft.value.zone1End, "seedDraft replaces the draft")
+        assertEquals(77, vm.draft.value.zone1End, "the preview transform seeds the draft")
         assertEquals(5, vm.draft.value.form2C)
-        assertTrue(vm.epoch.value > epochBefore, "seedDraft bumps epoch so the seed-once fields rebind")
         assertTrue(vm.dirty.value, "a previewed suggestion makes the draft dirty (Apply/Discard + brackets)")
-        // It is a preview only: the committed value is untouched until Apply.
-        assertEquals(35, committed().zone1End, "seedDraft does not persist (preview, not commit)")
+        assertEquals(35, committed().zone1End, "preview does not persist (preview, not commit)")
+    }
+
+    @Test
+    fun initialSeed_consumesPreviewOnce_soOtherScreensAreUnaffected_D125() {
+        // consume() is one-shot: a second screen's VM seeding after the preview was taken gets the
+        // plain committed values (no leak of the curve preview to e.g. the Misc/Reactivity drafts).
+        CurveSuggestionPreview.clear()
+        setBaseline(AabSettings(zone1End = 35))
+        CurveSuggestionPreview.request { it.copy(zone1End = 77) }
+
+        val first = seededVm()
+        assertEquals(77, first.draft.value.zone1End, "first VM to seed consumes the preview")
+
+        val second = seededVm()
+        assertEquals(35, second.draft.value.zone1End, "preview is one-shot — the next VM seeds plainly")
+        assertFalse(second.dirty.value)
     }
 }
