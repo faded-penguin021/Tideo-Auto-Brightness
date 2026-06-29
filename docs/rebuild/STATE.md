@@ -34,6 +34,36 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-29 — 1.5.0 / `versionCode 13` (MINOR — observable user-facing behaviour): **D-125** the Curve &
+  Brightness screen no longer auto-draws a suggested curve whenever ≥ 9 override points exist. The suggestion
+  is now **user-driven** (Tasker task38→preview→task655 parity): the Tools wizard's "Preview graph" stashes
+  the just-computed fit in a transient process-scoped `CurveSuggestionPreview` holder and navigates to Curve
+  & Brightness, which loads it **once into the editable draft** (new generic `DraftSettingsViewModel.seedDraft`
+  = update draft + bump epoch). Result: the input fields show the suggested values with the **current values
+  in `[brackets]`**, the live "Curve" traces the fit vs the dashed committed "Reference", Apply commits it,
+  and leaving the screen discards the draft so **the suggested line disappears on close**. Removed the
+  `fittedCurve`/"Suggested" series from `BrightnessCurveChart`; `MIN_FIT_POINTS` now gates only the wizard
+  run. Tests: `DraftSettingsViewModelTest.seedDraft_*`, `SettingsScreensTest.toolsWizard_previewGraphButton_passesTheFit_D125`.
+  Engine math + goldens untouched. Changelog `13.txt`. **D-126** (folded into the same release): Resume from the
+  Dashboard override pause no longer loops back to paused — the F64 post-init/resume settle window (Tasker's
+  Set-Initial-Brightness mutex) now also suppresses the `AnimationRunner`'s in-cycle override detection
+  (`runCycle` passes `detectOverrides && !ctx.overrideSuppressed()`), so the first animated cycle after a
+  resume isn't mis-seen as a manual override (its own sweep / the OEM mode-flip settling). Test
+  `BrightnessPipelineControllerTest.cycleDuringSettleWindow_…_D126`; `AnimationRunner` made `open` for the spy.
+- 2026-06-29 — CI-only (no app/version change): **D-124** new `release-preflight.yml` PR gate enforces the
+  RUNBOOK §6 release-prep checklist before merge — version/changelog checks fire only when the PR **ships
+  app code** (docs/workflow/test/metadata-only PRs skip them): on a code PR it requires `versionCode`
+  strictly > the latest `v*` tag, a non-regressed semver `versionName`, and a non-empty
+  `changelogs/<versionCode>.txt`; the `[skip ci]`-class token scan (commit messages + PR title/body, D-115)
+  runs on every PR. Secret-free, `sort -V` numeric compares, first-release path tolerated. RUNBOOK §6
+  updated. Verified locally (docs-only passes, code-without-bump blocked).
+- 2026-06-29 — CI-only (no app/version change): **D-123** `release.yml` now auto-reuses the human-written
+  F-Droid changelog (`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`) as the GitHub Release's
+  "What's new" section — a new step reads the tagged build's versionCode, looks up the matching changelog,
+  and slots it between the owner's UI summary and GitHub's auto "What's Changed" (D-119) via
+  `action-gh-release` `body_path` + `append_body`. Idempotent via a hidden `<!-- fdroid-changelog:<vc> -->`
+  marker (checked against the live release body with `gh release view`); missing changelog → warn + skip,
+  never fails. Owner no longer hand-copies the changelog into the release body. RUNBOOK §6 updated.
 - 2026-06-28 — 1.4.0 / `versionCode 12` (MINOR — observable user-facing behaviour): **D-117** Curve &
   Brightness graph "Now" line + "Live brightness" card now show PERCEIVED brightness in PWM-sensitive
   mode (`targetBrightness ?: lastAppliedBrightness`, like the Dashboard hero), not the floored hardware

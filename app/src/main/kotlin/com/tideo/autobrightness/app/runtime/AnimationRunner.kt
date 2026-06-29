@@ -32,7 +32,9 @@ import kotlinx.coroutines.delay
  * (task696). It is a plain suspend function with no Android dependencies beyond the
  * ScreenBrightnessController interface, so it is unit-testable with a fake controller.
  */
-class AnimationRunner(
+// `open` so a test double can spy the per-call arguments (e.g. the D-126 settle-window
+// `detectOverrides` gating) — the controller injects this collaborator.
+open class AnimationRunner(
     private val controller: ScreenBrightnessController,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) {
@@ -54,7 +56,7 @@ class AnimationRunner(
      * @param detectOverrides %AAB_DetectOverrides — when false, the band checks are skipped.
      * @return COMPLETED, or OVERRIDDEN if an external write was detected mid-animation.
      */
-    suspend fun animate(
+    open suspend fun animate(
         from: Int,
         to: Int,
         steps: Int,

@@ -67,7 +67,13 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
             // this screen's edits even if the service is toggled elsewhere while editing.
             app.settingsDataStore.data.collect { c ->
                 if (!seeded) {
-                    _draft.value = c
+                    // D-125: if the Tools wizard requested a curve-suggestion PREVIEW on the way here,
+                    // apply it to the seed so the suggested values ride the SAME atomic epoch 0→1 that
+                    // populates the seed-once fields — previewing via a later edit raced the field
+                    // re-seed and left them showing the committed values. consume() is one-shot and a
+                    // no-op (returns null) for every screen/visit without a pending preview.
+                    val preview = CurveSuggestionPreview.consume()
+                    _draft.value = preview?.invoke(c) ?: c
                     seeded = true
                     _epoch.update { it + 1 }
                 } else {

@@ -2097,3 +2097,140 @@ the permanent registry — never compress or remove them.
   context rules. Both call sites toast "Acquiring location…" since an active GPS fix can take several
   seconds. On-device behaviour is owner-verified (Robolectric can't exercise a real provider). Folded into
   the unreleased **1.4.0 / versionCode 12** (no tag yet, so no version bump).
+
+- **D-123: release body auto-reuses the F-Droid changelog as "What's new".** Builds on D-119. The
+  human-written `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (maintained for F-Droid,
+  RUNBOOK §6) was duplicated by hand into the GitHub Release body; now `release.yml` pulls it in
+  automatically. A new "Prepare F-Droid changelog for the release body" step reads the **versionCode**
+  from the tagged `app/build.gradle.kts` (F-Droid names changelogs by versionCode, NOT versionName/tag),
+  looks up the matching `changelogs/<versionCode>.txt`, and writes it (under a `## What's new` heading)
+  to a notes file consumed via `action-gh-release`'s `body_path` + `append_body: true`. action-gh-release
+  composes `existing_body + "\n" + body`, then `+ "\n\n" + generated_notes` (verified against the action
+  source), so the final layout is **owner UI summary → F-Droid "What's new" → auto "What's Changed"**;
+  the owner's text is never overwritten. **Idempotent:** the step prepends a hidden
+  `<!-- fdroid-changelog:<versionCode> -->` HTML-comment marker and first checks the existing release body
+  (via `gh release view`) for it — if present (workflow re-run via `workflow_dispatch`, or both `push`+`release`
+  fired), it emits an EMPTY notes file so the append is a no-op and the block is never duplicated. Missing
+  changelog (older tags, or one forgotten) → `::warning::` + empty file: the release still publishes with
+  only the auto "What's Changed", never fails. Works across all three triggers (release:published update,
+  workflow_dispatch recovery, push-tag create). CI-only; no app change.
+
+- **D-124: `release-preflight.yml` enforces the release-prep checklist on PRs.** The RUNBOOK §6 checklist
+  (version bump, F-Droid changelog, no version regression, no skip-ci token) was only enforced by the
+  agent/owner by hand; this adds a secret-free `pull_request` gate so a miss is caught before merge. Key
+  design point (owner-requested): the version/changelog checks are **scoped to PRs that actually ship app
+  code** — a step classifies the PR's changed files (via `gh pr view --json files`) and SKIPS the gate when
+  every file is docs/`.github`/`scripts`/`fastlane`/`*.md`/`src/test`/`androidTest` (so the very PR that
+  added this workflow + D-123 docs passes its own check). When a PR ships code it requires: `versionCode`
+  **strictly greater** than the latest `v*` tag's code (catches a forgotten bump — D-099), `versionName`
+  semver-shaped and not regressed, and a non-empty `fastlane/.../changelogs/<versionCode>.txt` (catches a
+  bump with no changelog — D-123 reads it too). Non-ships PRs only assert no-regression (`>=`) + that the
+  current code's changelog still exists. The **skip-ci token scan runs on every PR** — greps the PR's
+  **commit messages + PR title** (NOT file contents, so the legit token in `clean-dist.yml`'s heredoc and
+  in this doc/RUNBOOK is never matched) for the six GitHub-honored tokens and hard-fails (D-115). Version
+  compares use `sort -V` (numeric: `1.10.0 ≥ 1.9.0`); first-release path (no tags) skips the tag compare.
+  CI-only; no app change. Verified locally: docs/workflow-only → pass, code-PR-without-bump → blocked.
+  **Correction (same branch):** the scan initially also read the free-form **PR body** and immediately
+  false-failed its own PR (#82), whose body legitimately documented the token in the owner-handoff
+  instructions. Narrowed to commit messages + PR title — the text that actually becomes the squash commit
+  (subject = PR title, body = folded commit messages), i.e. the real D-115 vector. The PR body is exempt
+  because GitHub doesn't honor the token in a PR description for the PR's own checks, `pull_request` never
+  re-runs on body `edited` (so a body scan can neither be cleared nor catch a later edit), and a
+  self-documenting repo must be able to *describe* the token in a PR body without breaking CI. The "avoid
+  the literal in commit messages / PR title" rule stays machine-enforced; "avoid it in the PR body" stays
+  a soft human guideline (RUNBOOK §6) since the owner controls the squash body at merge.
+
+- **D-125: curve suggestion on the Curve & Brightness screen is user-driven, not auto-fit; dashed gold
+  reference is the hardcoded baseline.** The screen previously computed `CurveSuggestionEngine.suggest(...)`
+  and drew a blue "Suggested" line **automatically whenever ≥ 9 override points existed** — a deviation
+  from Tasker, where task38 (the wizard) only runs on a USER action, writes transient `%suggestion_*` vars
+  (never the live curve), the Brightness Graph scene (task663) draws from those, and task655 applies them
+  only on a separate user-confirmed step. The auto-fit also ignored the user's chosen τ and never cleared.
+  **Fix (a) — user-driven preview:** removed the `overridePoints.size >= MIN_FIT_POINTS` auto-fit and the
+  `fittedCurve`/"Suggested" series from `BrightnessCurveChart`. A suggestion now reaches the chart ONLY via
+  the Tools wizard: "Preview graph" builds an opaque draft transform (curve → suggested, mirroring "Apply
+  suggestion") into the transient process-scoped `CurveSuggestionPreview` holder (≈ the global
+  `%suggestion_*` vars) and navigates to Curve & Brightness, whose freshly-created `DraftSettingsViewModel`
+  **applies it during its INITIAL seed** (`consume()` inside the `!seeded` branch). Reusing the draft model
+  then gives, for free: the input fields show the suggested values with the **current values in
+  `[brackets]`**; the live "Curve" traces the fit; the preview is **dirty** (Apply commits it = task655;
+  Discard/back drops it); and leaving discards the NavBackStackEntry-scoped draft so the suggested line
+  **disappears on close**. *Why the initial seed, not a later edit:* the first cut applied it via a
+  post-seed `LaunchedEffect`+`seedDraft` (draft + `epoch` bumped as two separate `StateFlow`s); the chart's
+  "Curve" updated but the seed-once text fields (`remember(epoch)`) captured the stale committed value
+  because `epoch` propagated before `draft` — fields showed the committed values. Riding the same atomic
+  `epoch 0→1` that already populates the fields fixes it. `consume()` is one-shot (`AtomicReference.getAndSet`)
+  and the holder is only ever set en route to Curve & Brightness, so its VM is the next to seed (no leak to
+  Misc/Reactivity drafts); the consume is a null no-op for every other screen/visit.
+  **Fix (b) — dashed gold reference = hardcoded baseline (corrects F69):** Tasker's graph plots `new_data`
+  (the live/suggested curve) vs **`ref_data`, a hardcoded baseline** = `5·√lux; 29.58 + 8.8·(…);
+  255 − (2513/lux)·255`, which is exactly the `AabSettings` defaults. F69 had made the dashed line the
+  *committed* snapshot ("show against where you started"); the owner confirmed it must be the hardcoded
+  reference. `referenceConfig` is now `remember { AabSettings().toBrightnessCurveConfig() }` (no longer
+  depends on committed) — so a previewed suggestion (or any edit) shows against the fixed baseline, like
+  Tasker. **Fix (c):** the wizard's clipboard toast dropped the Tasker-only literal `%AAB_Test` ("Diagnostics
+  copied to clipboard"). `MIN_FIT_POINTS` now gates only the wizard run; Tools "Apply suggestion" unchanged.
+  Tests: `DraftSettingsViewModelTest.initialSeed_appliesPendingCurveSuggestionPreview_D125` +
+  `…consumesPreviewOnce…` (one-shot, no leak), `SettingsScreensTest.toolsWizard_previewGraphButton_passesTheFit_D125`.
+  Engine math + goldens untouched. Ships as 1.5.0 / versionCode 13.
+
+- **D-126: Resume-after-override no longer loops back to paused (extend the Set-Initial-Brightness mutex to
+  the in-cycle animation).** Owner report: from the Dashboard gold `OverrideCard`, tapping **Resume**
+  occasionally re-paused on the next light change — a resume→light-change→paused loop. Root cause: the F64
+  post-init/resume **settle window** (`suppressOverrideUntilMs`, the Kotlin port of Tasker's Set Initial
+  Brightness mutex) gated the **ContentObserver** override path (`OverrideMonitor`) but NOT the
+  `AnimationRunner`'s **in-animation** override detection. Resume runs `setInitialBrightness` — an instant,
+  un-smoothed (LuxAlpha=1) **single direct write**, correctly suppressed (self-write marker + settle). But
+  the FIRST animated cycle right after (a real light change) sweeps from that fresh brightness, and the
+  OEM's lingering adaptive/mode-flip adjustment (or round-trip drift) can read out of the animation band →
+  `Result.OVERRIDDEN`. Because `runCycle` returns early on OVERRIDDEN WITHOUT updating `lastAppliedBrightness`,
+  `handleOverride`'s `settled == lastAppliedBrightness` self-write guard (D-049 #1) can't catch it (the
+  screen is mid-sweep, ≠ the stale pre-cycle value) → false pause. **Fix:** `runCycle` now passes
+  `detectOverrides = settings.detectOverrides && !ctx.overrideSuppressed()` to `animationRunner.animate` —
+  i.e. while the settle window is open, the cycle's own transition is not self-detected as an override,
+  exactly as the ContentObserver path already is. New `PipelineRuntimeContext.overrideSuppressed()` =
+  `clock() < suppressOverrideUntilMs`. After the ~1.5 s window, detection resumes normally (the screen is
+  then stable at our value, so a genuine override still pauses). `AnimationRunner` made `open` so a spy can
+  assert the flag; test `BrightnessPipelineControllerTest.cycleDuringSettleWindow_suppressesInAnimationOverrideDetection_D126`
+  (cycle inside the window → `detectOverrides=false` + no pause; after → `true`). Pure runtime fix; engine +
+  goldens untouched. Folded into the unreleased **1.5.0 / versionCode 13** (same branch as D-125; one
+  squash-merged release — no separate bump, and a bug fix is patch-grade under the minor D-125 anyway).
+
+- **D-127: stop keeping a per-version changelog in `build.gradle.kts`.** The `defaultConfig` version
+  comment had accreted into a ~50-line running release log (1.0.0 → 1.5.0, every D-NN), purely by
+  pattern-following each bump — not by any rule. That history is already in FOUR places (`STATE.md`
+  Changelog, this ledger, `fastlane/.../changelogs/*.txt`, git) and grew unboundedly in front of the two
+  lines that matter, i.e. death-by-comments. Trimmed it to a 5-line **invariant** comment (versionName ≥
+  latest tag, versionCode strictly greater than every released code, semver by nature-of-change — now
+  also CI-enforced by `release-preflight.yml`, D-124) + a pointer to where the history lives. RUNBOOK §6
+  now says not to re-add a running log there. Comment-only; no behaviour/version change.
+
+- **D-128: two co-installed app variants both running fight over the global `SCREEN_BRIGHTNESS` (dev-only
+  gotcha, NOT a runtime bug).** Owner observed false "manual override" pauses (resume→light-change→pause
+  loop) while testing the debug build with the release build also installed; uninstalling one fixed it.
+  Root cause: `Settings.System.SCREEN_BRIGHTNESS` is a single device-global value, and the self-write
+  filter (`ScreenBrightnessController.lastSelfWriteDevice`, the prof755/D-034 echo suppressor) is
+  PER-PROCESS — so each running instance sees the OTHER instance's animation/initial writes as an external
+  manual override and pauses; each Resume re-writes and re-trips the other → mutual loop. There is no
+  clean cross-process way to tag "this write was my sibling" (a global setting carries no provenance), so
+  this is **inherent to running two auto-brightness controllers at once, not a fixable controller bug**;
+  from one instance's view the other genuinely IS an external writer. Verified a *fully disabled* instance
+  is inert: the `AndroidBrightnessObserver` ContentObserver is registered only by the running
+  `AmbientMonitoringService` (unregistered in `awaitClose`/`controller.stop()`), all brightness writes
+  come only from the running pipeline/PanicHandler, and Boot/Maintenance both no-op when
+  `serviceEnabled=false` — so disabling tears it fully down (the observed interference means the other
+  instance was actually running at the time). Resolution = run ONE variant's service at a time (the D-106
+  coexistence is for *swapping*, not simultaneous operation); RUNBOOK §7 carries the warning. Separately,
+  D-126 (gate the in-animation override detection during the resume settle) remains a valid SINGLE-app
+  hardening (quirky OEMs can false-fire solo) but does not and should not address the two-instance case.
+  Docs-only; no code change.
+
+- **D-129: minimal PR template (`.github/pull_request_template.md`).** Added a 5-section template — Summary,
+  Release impact, Verification, Repo hygiene, Owner action — tailored to this repo's squash-merge + F-Droid
+  release flow. The load-bearing slots: **Owner action** (the recurring handoff — publish from the "Draft a
+  new release" UI, strip any stray skip-ci token per D-115, on-device Pass A/B gates) and a forcing-function
+  prompt under Release impact to **link the F-Droid `changelogs/<versionCode>.txt`** that ships with a bump
+  (reused as the release "What's new", D-123 — if you can't link it, it doesn't exist yet). **Repo hygiene**
+  gives meta/infra changes (a new GitHub Actions workflow, build config, docs, refactors, tooling) their own
+  slot so they read separately from app changes. Prose prompts, not checkbox theater — kept minimal because
+  agents author these PRs and the owner reads them (anti-bloat: cf. D-127). Repo-hygiene change; no code.

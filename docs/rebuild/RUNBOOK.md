@@ -102,15 +102,18 @@ commit and reads its metadata. The **in-app version is decoupled from the tag** 
 so check it explicitly.
 
 > **⚠️ NEVER write the literal `[skip ci]` (or `[ci skip]` / `[no ci]` / `***NO_CI***`) in a commit
-> message OR a PR description (D-115).** GitHub honors that token on `push`/`pull_request` events, and a
-> **squash-merge folds every commit message into the squash commit body** — so a stray `[skip ci]`
+> message or the PR title (D-115).** GitHub honors that token on `push`/`pull_request` events, and a
+> **squash-merge folds the commit messages + PR title into the squash commit** — so a stray `[skip ci]`
 > (even as descriptive prose, e.g. documenting `clean-dist.yml`) lands on `main` and **silently skips
 > ALL workflows for that commit**, including `build`/`codeql` on the push AND `release.yml` on the tag
 > that points at it (this is exactly why v1.2.0's release "didn't run"). `release.yml` now primarily
 > triggers on `release: published` (immune to skip-ci) + a `workflow_dispatch` fallback, but the token
-> still skips the main-push `build`/`codeql`. The only legitimate use of the token is inside a
-> workflow's OWN auto-commit heredoc (e.g. `clean-dist.yml`). If a release's workflow was skipped, run
-> **Actions → Release → "Run workflow"** with the tag, or re-publish the release.
+> still skips the main-push `build`/`codeql`. `release-preflight.yml` machine-enforces this on commit
+> messages + PR title (D-124). **The PR body may freely *document* the token** (the scan exempts it, so
+> a PR can explain release CI without false-failing) — but if your squash setting uses the PR
+> description, prefer the hyphenated `skip-ci` there too. The only legitimate use of the literal is
+> inside a workflow's OWN auto-commit heredoc (e.g. `clean-dist.yml`). If a release's workflow was
+> skipped, run **Actions → Release → "Run workflow"** with the tag, or re-publish the release.
 
 - **Check the current release state first** (tags are not always present in a fresh clone):
   ```bash
@@ -135,10 +138,28 @@ so check it explicitly.
     re-used code). Bump by 1 from the highest code ever shipped, not from the last tag's code if
     that tag forgot to bump. (versionCode is always +1 regardless of which semver field moved.)
 - **F-Droid changelog:** add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the
-  filename is the **versionCode**, not the name) with a short user-facing note.
+  filename is the **versionCode**, not the name) with a short user-facing note. **`release.yml`
+  auto-reuses this file as the GitHub Release's "What's new" section (D-123)** — it reads the tagged
+  build's `versionCode`, looks up the matching changelog, and slots it between the owner's UI summary
+  and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release
+  body; just keep this file accurate. (If it's missing, the release still publishes with only the auto
+  "What's Changed".)
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
-  process, a `DEVIATIONS_LEDGER.md` row.
+  process, a `DEVIATIONS_LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
+  (D-127): the history lives in `STATE.md`, the ledger, the fastlane changelogs, and git — the gradle
+  file keeps only the bump *invariant* comment, not a running log (it had grown to ~50 lines of
+  redundant narrative).
 - **Tagging stays an owner step** — do not create tags or open releases yourself.
+- **CI guardrail (`release-preflight.yml`, D-124).** A secret-free PR check enforces this checklist so a
+  miss is caught before merge, not after a bad tag. It runs the version/changelog checks **only when the
+  PR ships app code** (any changed file outside `docs/`, `.github/`, `scripts/`, `fastlane/`, `*.md`, or a
+  `src/test`/`androidTest` tree) — a docs/workflow/test-only PR skips them. When it fires it requires:
+  `versionCode` **strictly greater** than the latest `v*` tag's code, `versionName` not regressed below
+  that tag and semver-shaped, and a non-empty `changelogs/<versionCode>.txt`. The **skip-ci token scan**
+  (D-115) runs on *every* PR — it greps the PR's commit messages + title + body (not file contents) for
+  `[skip ci]` / `[ci skip]` / `[no ci]` / `[skip actions]` / `[actions skip]` / `***NO_CI***`. This is a
+  backstop, not a substitute for doing the checklist; if it ever blocks a legitimate change, fix the gate
+  in the same PR (RUNBOOK "When CI fails") rather than working around it.
 
 ### 7. Bumping `targetSdk` (new Android platform)
 First done 35→36 (Android 16) — see `STATE.md` Changelog and the impact matrix it carried.
@@ -182,6 +203,12 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   Shizuku authority `${applicationId}.shizuku`) so a test build coexists with the owner's signed
   release without sharing data — keep this (D-106); the debug app has its own storage, so ELEVATED
   needs a separate `pm grant … com.tideo.autobrightness.debug …`.
+  > **⚠️ Run only ONE variant's service at a time (D-128).** Coexistence is for *swapping* (install both,
+  > enable one). If BOTH the debug and release services run at once they fight over the single global
+  > `Settings.System.SCREEN_BRIGHTNESS`: the self-write marker is per-process, so each instance sees the
+  > OTHER's writes as a manual override and pauses — a mutual resume→light-change→pause loop that looks
+  > like a runtime bug but is just two controllers on one setting. Disable (or uninstall) one; a truly
+  > disabled instance is inert (no observer, no writes). This only bites the developer, never an end user.
 - **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
   If anything here was wrong/stale, fix this section in the same change.
 

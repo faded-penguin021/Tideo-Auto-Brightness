@@ -30,6 +30,9 @@ internal interface PipelineRuntimeContext {
     fun cacheSettings(settings: AabSettings)
     /** Arm the post-init override-suppression window until [untilMs] (orchestrator-owned @Volatile). */
     fun armInitialSettle(untilMs: Long)
+    /** True while the post-init/resume settle window is open (Set Initial Brightness just established
+     *  our own brightness; its transition must not be mis-seen as a manual override — D-126). */
+    fun overrideSuppressed(): Boolean
     /** Post a detected-override event back onto the consumer channel (mid-animation override). */
     fun postOverrideDetected(observed: Int)
 }
@@ -132,7 +135,15 @@ internal class PipelineCycleRunner(
                         to = target,
                         steps = output.animationSteps,
                         waitMs = output.animationWaitMs,
-                        detectOverrides = settings.detectOverrides,
+                        // D-126: while the post-init/resume settle window is open, the pipeline is still
+                        // establishing its OWN brightness — Set Initial Brightness just jumped it (e.g. a
+                        // Resume from the override pause). Suppress in-animation override detection so this
+                        // transition (and the OEM's lingering adaptive/mode-flip adjustment) is not
+                        // mis-seen as a manual override and immediately re-paused. This extends the F64
+                        // settle (which already gates the ContentObserver path) to the animation path —
+                        // the Tasker Set-Initial-Brightness mutex, which held override detection off until
+                        // the initial write had taken hold. After the window, normal detection resumes.
+                        detectOverrides = settings.detectOverrides && !ctx.overrideSuppressed(),
                     )
                     if (result == AnimationRunner.Result.OVERRIDDEN) {
                         ctx.postOverrideDetected(brightness.read())

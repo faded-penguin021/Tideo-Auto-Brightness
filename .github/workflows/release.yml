@@ -96,17 +96,63 @@ jobs:
           "$APKSIGNER" verify --print-certs \
             app/build/outputs/apk/release/app-release.apk
 
+      # Reuse the human-written F-Droid changelog as the release body's "What's new" section (D-123).
+      # F-Droid names changelogs by *versionCode* (not the tag/versionName), so read the versionCode from
+      # the tagged build and look up fastlane/metadata/.../changelogs/<versionCode>.txt. Idempotent: a
+      # hidden HTML-comment marker keyed by versionCode is written into the body; if it's already present
+      # (re-run via workflow_dispatch, or both push+release fired), an EMPTY notes file is emitted so
+      # action-gh-release's append is a no-op and the block is never duplicated. Missing changelog →
+      # warn + empty file (the release still publishes with just the auto "What's Changed").
+      - name: Prepare F-Droid changelog for the release body
+        id: fdroid_notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NOTES="$RUNNER_TEMP/fdroid_notes.md"
+          : > "$NOTES"   # default: empty → append is a no-op
+          echo "path=$NOTES" >> "$GITHUB_OUTPUT"
+
+          VCODE=$(grep -oE 'versionCode[[:space:]]*=[[:space:]]*[0-9]+' app/build.gradle.kts | grep -oE '[0-9]+' | head -1)
+          if [ -z "${VCODE:-}" ]; then
+            echo "::warning::Could not read versionCode from app/build.gradle.kts; skipping F-Droid changelog."
+            exit 0
+          fi
+          CHANGELOG="fastlane/metadata/android/en-US/changelogs/${VCODE}.txt"
+          if [ ! -f "$CHANGELOG" ]; then
+            echo "::warning::No F-Droid changelog at $CHANGELOG (versionCode $VCODE); skipping."
+            exit 0
+          fi
+
+          MARKER="<!-- fdroid-changelog:${VCODE} -->"
+          EXISTING=$(gh release view "$RELEASE_TAG" --json body --jq '.body // ""' 2>/dev/null || true)
+          if printf '%s' "$EXISTING" | grep -qF "$MARKER"; then
+            echo "F-Droid changelog (versionCode $VCODE) already in the release body; leaving it unchanged."
+            exit 0
+          fi
+
+          {
+            echo "$MARKER"
+            echo "## What's new"
+            echo
+            cat "$CHANGELOG"
+          } > "$NOTES"
+          echo "Prepared F-Droid changelog (versionCode $VCODE) for the release body."
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: app/build/outputs/apk/release/app-release.apk
           fail_on_unmatched_files: true
-          # Auto-generate the "What's Changed" notes (merged PRs + new contributors since the previous
-          # tag) so a release always carries them. action-gh-release does NOT overwrite the owner's text:
-          # an existing release body (written in the "Draft a new release" UI) is PRE-pended, then
-          # GitHub's generated notes are appended below it — so the owner's summary and the auto changelog
-          # coexist. Re-running the workflow is idempotent (it doesn't duplicate the generated block).
+          # Body layout (action-gh-release composes existing + "\n" + body, then + "\n\n" + generated notes):
+          #   1. the owner's "Draft a new release" UI summary (existing body, preserved)
+          #   2. the F-Droid "What's new" changelog (D-123, from the step above; empty on re-runs → no-op)
+          #   3. GitHub's auto "What's Changed" (merged PRs + new contributors since the previous tag, D-119)
+          # action-gh-release does NOT overwrite the owner's text. Re-running is idempotent for (2) via the
+          # marker guard above; (3) is GitHub's generated block.
+          body_path: ${{ steps.fdroid_notes.outputs.path }}
+          append_body: true
           generate_release_notes: true
           # Tags with a pre-release suffix (a hyphen, e.g. v0.1.0-rc1) are published as pre-releases.
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}

@@ -35,9 +35,6 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.graph.BrightnessCurveChart
-import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
-import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
-import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 
 internal fun List<FieldError>.forField(name: String): String? = firstOrNull { it.field == name }?.message
@@ -58,6 +55,12 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = com.tideo.autobrightness.app.ui.components.rememberToaster()
+
+    // D-125: a wizard suggestion reaches this screen ONLY when the user ran the Tools wizard and tapped
+    // "Preview graph" — it is applied to this VM's draft during its initial seed (see
+    // DraftSettingsViewModel / CurveSuggestionPreview), so the fields show the suggested values with the
+    // current values in [brackets] and the live "Curve" traces the fit. Leaving discards the draft, so
+    // the line disappears on close. There is deliberately NO auto-fit at ≥ 9 override points anymore.
     CurveBrightnessContent(
         draft, committed, errors, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
@@ -82,10 +85,15 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
 
 /**
  * task38 needs ≥ 9 **real, user-recorded** override points before it fits/suggests a curve. This is
- * the single user-facing gate, shared with the Tools wizard (G2R-F62): the domain engine has its own
- * post-ghost-injection ≥9 check, but ghost/synthetic priors must NOT count toward the gate the user
- * sees — the owner ran the wizard on just 7 real points and it still fired. [OverridePointStore] only
- * holds real points, so gating on its size is correct.
+ * the user-facing gate on the **Tools wizard** (G2R-F62): the domain engine has its own post-
+ * ghost-injection ≥9 check, but ghost/synthetic priors must NOT count toward the gate the user sees —
+ * the owner ran the wizard on just 7 real points and it still fired. [OverridePointStore] only holds
+ * real points, so gating on its size is correct.
+ *
+ * D-125: this gates only the *wizard run*, never an auto-preview. The Curve & Brightness screen no
+ * longer fits/draws a suggested curve just because ≥ 9 points exist — a suggestion appears there only
+ * after the user runs the wizard and taps "Preview graph" (see
+ * [com.tideo.autobrightness.app.state.CurveSuggestionPreview]).
  */
 internal const val MIN_FIT_POINTS = 9
 
@@ -109,23 +117,17 @@ fun CurveBrightnessContent(
     DraftSettingsScaffold(stringResource(R.string.title_curve_brightness), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             val curveConfig = draft.toBrightnessCurveConfig()
-            // F69: the dashed gold reference line is the FIXED committed snapshot, not the live draft,
-            // so an edit shows against where it started. The live "Curve" tracks the draft.
-            val referenceConfig = remember(committed) { committed.toBrightnessCurveConfig() }
+            // D-125 / Tasker parity (task663 `ref_data`): the dashed gold reference is the HARDCODED
+            // baseline curve — the AabSettings defaults, i.e. 5·√lux; 29.58 + 8.8·(…); 255 − (2513/lux)·255
+            // — NOT the committed snapshot (corrects F69). So a previewed suggestion (or any edit) shows
+            // against the fixed reference, exactly like the Tasker graph: the live "Curve" (`new_data`,
+            // suggested/current) vs the hardcoded `ref_data`. It never moves with the draft or committed.
+            val referenceConfig = remember { AabSettings().toBrightnessCurveConfig() }
             // Gate-2(5th) obs: a 0-lux override (which can happen) would plot at/below the log x-axis
             // floor (0.1) and be invisible/un-tappable — clamp the DISPLAYED lux up to 0.1 so it draws
             // at the left edge. The recorded value is untouched (deletion matches against the original).
             val overlay = remember(overridePoints) {
                 overridePoints.map { Offset(it.lux.toFloat().coerceAtLeast(0.1f), it.brightness.toFloat()) }
-            }
-            // The fitted/suggested curve only appears once ≥ 9 points are recorded (task38, G2R-F14).
-            val fittedCurve: BrightnessCurveConfig? = remember(overridePoints, curveConfig) {
-                if (overridePoints.size >= MIN_FIT_POINTS) {
-                    CurveSuggestionEngine.suggest(CurveSuggestionInput(overridePoints, curveConfig))
-                        ?.let { CurveSuggestionEngine.applyToLiveCurve(it, curveConfig) }
-                } else {
-                    null
-                }
             }
             // F36: tapping a recorded override dot raises a confirm dialog before deleting it.
             var pendingDelete by remember { mutableStateOf<OverridePoint?>(null) }
@@ -141,7 +143,6 @@ fun CurveBrightnessContent(
                 currentLux = live.smoothedLux?.takeIf { live.serviceOn },
                 currentBrightness = (live.targetBrightness ?: live.lastAppliedBrightness)?.takeIf { live.serviceOn },
                 overridePoints = overlay,
-                fittedCurve = fittedCurve,
                 referenceCurve = referenceConfig,
                 onDeleteOverridePoint = if (onDeleteOverridePoint == null) {
                     null

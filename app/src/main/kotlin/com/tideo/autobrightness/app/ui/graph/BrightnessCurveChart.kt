@@ -20,9 +20,12 @@ private val engine = BrightnessEngine()
  *
  * Series (S12.7g):
  *   - **Curve** (primary, solid) = the live [curve] = the draft the user is editing — it tracks edits.
- *   - **Reference** (gold, dashed) = the FIXED [referenceCurve] snapshot (the committed/default curve),
- *     so a draft edit shows *against* where you started (F69). It does NOT move with the draft.
- *   - **Suggested** (secondary) = the wizard fit, shown only once ≥ 9 override points exist (F62/G2R-F14).
+ *     When the user previews a wizard suggestion it is loaded INTO that draft (D-125), so this line
+ *     also *is* the suggested fit during a preview (no separate auto-drawn line).
+ *   - **Reference** (gold, dashed) = the FIXED [referenceCurve] — the HARDCODED baseline curve (Tasker
+ *     task663 `ref_data`: the AabSettings defaults), so a draft edit — or a previewed suggestion — shows
+ *     *against* the fixed reference, like the Tasker graph (D-125, corrects F69's committed snapshot).
+ *     It does NOT move with the draft or committed.
  *   - **Overrides** = the recorded manual-override points as tappable scatter dots (tap → delete, F36).
  *
  * **S13 / Haiku: copy this pattern exactly for the other six charts.** The recipe is: sample a domain
@@ -37,7 +40,6 @@ fun BrightnessCurveChart(
     currentLux: Double? = null,
     currentBrightness: Int? = null,
     overridePoints: List<Offset> = emptyList(),
-    fittedCurve: BrightnessCurveConfig? = null,
     referenceCurve: BrightnessCurveConfig? = null,
     onDeleteOverridePoint: ((Offset) -> Unit)? = null,
 ) {
@@ -55,23 +57,15 @@ fun BrightnessCurveChart(
     // 1. live curve through mapLuxToBrightness, floored at minBrightness (G2-F4).
     val curvePoints = sample(curve)
 
-    // 2. FIXED reference = the committed/default snapshot (dashed gold), never the live draft (F69).
+    // 2. FIXED reference = the hardcoded baseline curve (dashed gold), never the draft/committed (D-125).
     val referencePoints = referenceCurve?.let { sample(it) }
 
-    // 3. task38/task663 suggested (fitted) curve, only once ≥ 9 override points exist (G2R-F14/F62).
-    // G3-F16 (Gate 3): once the wizard suggestion is APPLIED, the live curve already IS the fit, so the
-    // blue "Suggested" line just overdraws the teal "Curve" and the owner sees blue where they expect
-    // teal. Suppress it when the sampled fit matches the live curve (≤ 1 brightness level everywhere) —
-    // there is nothing left to preview. A still-pending (un-applied or since-edited) fit still draws.
-    val fittedPoints = fittedCurve?.let { sample(it) }
-        ?.takeUnless { fit -> fit.zip(curvePoints).all { (f, c) -> kotlin.math.abs(f.y - c.y) <= 1f } }
-
+    // D-125: there is no separate auto-drawn "Suggested" line. A wizard suggestion is previewed by
+    // loading it into the draft (the "Curve" line above), so it shows against the dashed "Reference"
+    // (committed) curve — the same two-line comparison, but only when the USER previews it.
     val series = buildList {
         referencePoints?.let { add(ChartSeries("Reference", it, AabGold, strokeWidthPx = 3f, dashed = true)) }
         add(ChartSeries("Curve", curvePoints, MaterialTheme.colorScheme.primary))
-        // Gate-2(5th) obs: Tasker draws the suggested fit + the override scatter in the Chart.js blue
-        // (rgb 54,162,235), not gold/red — restore it for parity.
-        fittedPoints?.let { add(ChartSeries("Suggested", it, AabChartBlue, strokeWidthPx = 2f)) }
     }
 
     val scatter = if (overridePoints.isNotEmpty()) {
