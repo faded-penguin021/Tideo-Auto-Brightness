@@ -52,11 +52,11 @@ About the permissions Tideo requests:
 Privacy:
 
 Tideo is local-first with no analytics, ads, or accounts. It makes one outbound
-network request, and only as a last resort: if you enable circadian scaling and no
-on-device location is available, it falls back to a single cleartext HTTP request
-to ip-api.com to estimate your city from your public IP. This fallback can be
-turned off under Circadian > Date & location, and the cleartext exception is scoped
-to that single host. Everything else runs entirely on-device.
+network request, and only as a last resort: if you opt in and enable circadian
+scaling and no on-device location is available, it falls back to a single HTTPS
+request to ipwho.is to estimate your city from your public IP. This fallback is off
+by default and can be turned off under Circadian > Date & location. Everything else
+runs entirely on-device.
 
 Tideo is a ground-up Kotlin/Compose rebuild of the Advanced Auto Brightness Tasker
 project, ported with exact behavioural parity. It is not affiliated with Tasker.

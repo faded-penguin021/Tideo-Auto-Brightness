@@ -125,12 +125,13 @@ The grant is detected the next time the screen turns on or when the app is opene
 Tideo is local first and has no analytics, ads, or accounts. It makes **one** outbound network
 request, and only as a last resort:
 
-- **IP-geolocation fallback (optional, requires opt-in, cleartext).** Circadian scaling needs an approximate location to compute local sunrise/sunset. Tideo tries, in order: a fixed latitude/longitude you pin → the device's
+- **IP-geolocation fallback (optional, off by default, HTTPS).** Circadian scaling needs an approximate location to compute local sunrise/sunset. Tideo tries, in order: a fixed latitude/longitude you pin → the device's
   last-known location → a fresh GPS/network fix. Only if *all* of those are unavailable does it fall
-  back to a single `GET http://ip-api.com/json` to estimate your city
-  from your public IP. This call is **cleartext HTTP** (ip-api.com's free tier has no HTTPS) and is
-  scoped to that one host in `network_security_config.xml`. **You can turn it off** under
-  **Circadian → Date & location → "IP-based location fallback"**. When it is off, Tideo never contacts ip-api.com.
+  back to a single `GET https://ipwho.is/` (HTTPS) to estimate your city
+  from your public IP. **You can turn it off** under
+  **Circadian → Date & location → "IP-based location fallback"**, and it is **off until you opt in**. When
+  it is off, Tideo never contacts ipwho.is. The same opt-in fallback also backs the Circadian **"Use
+  current location"** button when no on-device fix is available.
 
 Everything else runs entirely on-device.
 

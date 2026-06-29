@@ -11,4 +11,4 @@ fresh on-device fix and, if none is available (and you've opted in), looks one u
 network — rather than just reading whatever fix another app left behind.
 
 The optional IP-based location fallback moved from a cleartext request to a secure HTTPS one
-(ipwho.is). It stays off by default; the app makes no cleartext network traffic at all.
+(ipwho.is). It stays off by default.
