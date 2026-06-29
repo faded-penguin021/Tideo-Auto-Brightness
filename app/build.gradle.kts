@@ -13,59 +13,11 @@ android {
         applicationId = "com.tideo.autobrightness"
         minSdk = 31
         targetSdk = 36
-        // 1.0.0 (versionCode 3) — all three human gates passed on-device (Gate 3 signed off
-        // 2026-06-23); feature-complete, parity-verified release build. 1.0.1 (versionCode 4) is a
-        // packaging-only bump so the release tag carries the fastlane/ metadata F-Droid reads from
-        // the built commit (the 1.0.0 tag predated it); no app behaviour changed.
-        // 1.0.2 (tag v1.0.2) was cut WITHOUT bumping these — the in-app version drifted behind the tag.
-        // 1.0.3 (versionCode 5) realigns the version ahead of the latest tag and ships the D-098
-        // rule-editor Save/Cancel fix. 1.0.4 (versionCode 6) ships the D-100 main-window nav-bar inset
-        // fix (DraftApplyBar Apply/Discard + Menu "Recheck Permissions" clipped under a button/3-key
-        // nav bar). 1.1.0 (versionCode 7) bumps targetSdk to 36 (Android 16). 1.1.1 (versionCode 8) is a
-        // security-hardening patch: notification/widget PendingIntents are made un-missably explicit
-        // (D-107, CodeQL java/android/implicit-pendingintents). 1.2.0 (versionCode 9) ships runtime
-        // bug fixes + UX: D-108 service-start battery-saver flash, D-109 PWM-sensitive read-out tracks
-        // perceived brightness, D-110 circadian stale-location fallback + staleness hints, D-111 golden
-        // "resume context automation" banner + Tasker-style sticky Load/Save/Contexts action bar;
-        // plus the GitHub Actions Node-24 migration (CI only).
-        //   SEMVER — why MINOR (1.1.1 → 1.2.0), not a patch (would have been 1.1.2): the three core
-        //   defect fixes (D-108/109/110a) are patch-grade on their own, BUT the same release ADDS new
-        //   user-facing surfaces — the circadian staleness hints on the Circadian screen + dashboard
-        //   (D-110) and the redesigned Profiles & Contexts screen (sticky action bar + load/save/contexts
-        //   modals, D-111). RUNBOOK §6: a new user-facing feature/surface is a MINOR, and when a release
-        //   spans categories you pick the HIGHEST that applies — so new-surface (minor) wins over
-        //   bug-fix (patch). No settings-schema break (round-trips), so it is not a major. RULE: build
-        //   version must be ≥ the latest `v*` tag on main and versionCode strictly greater than every
-        //   released code — see RUNBOOK "Cutting a release".
-        // 1.2.1 (versionCode 10) is a PATCH re-cut: the v1.2.0 release workflow was silently skipped (a
-        // stray `[skip ci]` token in the squash-merge commit body suppressed every workflow for that
-        // commit + tag — D-115), so v1.2.0 never published its signed APK. v1.2.1 carries the release.yml
-        // fix (now triggers on `release: published`, immune to skip-ci) and re-cuts the SAME app — no
-        // app/runtime code changed since 1.2.0, so it is a patch.
-        // 1.3.0 (versionCode 11) is a MINOR feature release: the reworked Panic (Reset) gesture (D-116)
-        // — armed by upside-down + display-on + proximity-NOT-near, then a 10 s sensitivity-gated shake
-        // — plus a new user-facing global setting (Panic Sensitivity 0–10) with a slider on the Live
-        // Debug screen. A new user-facing surface ⇒ minor (RUNBOOK §6 "highest category wins").
-        // 1.4.0 (versionCode 12) is a MINOR release: D-117 the curve graph "Now" line + the curve "Live
-        // brightness" card now show the PERCEIVED brightness in PWM-sensitive mode (like the Dashboard);
-        // D-118 the Contexts rules modal no longer clips its last rule card under the nav bar (edge-to-edge
-        // targetSdk 36); D-120/D-122 the "Use current location" buttons actively acquire a fresh fix
-        // (sensors on, OS location indicator appears; last-known only as a backup; Circadian also →
-        // ipwho.is IP fallback when opted in) instead of echoing another app's cached fix; D-121 the
-        // geo-IP fallback moves from cleartext ip-api.com to HTTPS ipwho.is (no cleartext traffic).
-        // Observable user-facing behaviour change (new location-acquisition path) ⇒ minor; the release.yml
-        // auto-notes (D-119) are CI-only. RULE: version ≥ latest `v*` tag, versionCode strictly greater
-        // than every released code (RUNBOOK §6).
-        // 1.5.0 (versionCode 13) is a MINOR release: D-125 the Curve & Brightness screen no longer
-        // auto-draws a suggested curve whenever ≥ 9 override points exist — the suggestion is now
-        // user-driven via the Tools wizard's "Preview graph" (loaded into the editable draft: suggested
-        // values in the fields, current values in [brackets]) and disappears when the screen is closed,
-        // matching Tasker's task38→preview→task655 flow. Observable user-facing behaviour change ⇒ minor.
-        // Also folds in D-126 (runtime bug fix, patch-grade under the minor): Resume from the Dashboard
-        // override pause no longer loops back to paused — the post-init/resume settle window now also
-        // gates the in-animation override detection, so the first cycle after a resume isn't mis-seen as
-        // a manual override. (D-123/D-124 release-CI changes on the same branch are CI-only.) RULE:
-        // version ≥ latest `v*` tag, versionCode strictly greater than every released code (RUNBOOK §6).
+        // INVARIANT when bumping these: versionName ≥ the latest `v*` tag, versionCode strictly greater
+        // than every released code (F-Droid rejects a re-used code), bumped by semver per the *nature* of
+        // the change — RUNBOOK §6 "Cutting a release". `release-preflight.yml` (D-124) enforces this on PRs.
+        // Per-version history is NOT kept here — see the STATE.md Changelog, DEVIATIONS_LEDGER, and
+        // fastlane/.../changelogs/<versionCode>.txt.
         versionCode = 13
         versionName = "1.5.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"

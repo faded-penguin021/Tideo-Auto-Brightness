@@ -2186,3 +2186,12 @@ the permanent registry — never compress or remove them.
   (cycle inside the window → `detectOverrides=false` + no pause; after → `true`). Pure runtime fix; engine +
   goldens untouched. Folded into the unreleased **1.5.0 / versionCode 13** (same branch as D-125; one
   squash-merged release — no separate bump, and a bug fix is patch-grade under the minor D-125 anyway).
+
+- **D-127: stop keeping a per-version changelog in `build.gradle.kts`.** The `defaultConfig` version
+  comment had accreted into a ~50-line running release log (1.0.0 → 1.5.0, every D-NN), purely by
+  pattern-following each bump — not by any rule. That history is already in FOUR places (`STATE.md`
+  Changelog, this ledger, `fastlane/.../changelogs/*.txt`, git) and grew unboundedly in front of the two
+  lines that matter, i.e. death-by-comments. Trimmed it to a 5-line **invariant** comment (versionName ≥
+  latest tag, versionCode strictly greater than every released code, semver by nature-of-change — now
+  also CI-enforced by `release-preflight.yml`, D-124) + a pointer to where the history lives. RUNBOOK §6
+  now says not to re-add a running log there. Comment-only; no behaviour/version change.

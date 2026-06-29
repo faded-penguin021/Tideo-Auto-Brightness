@@ -142,7 +142,10 @@ so check it explicitly.
   body; just keep this file accurate. (If it's missing, the release still publishes with only the auto
   "What's Changed".)
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
-  process, a `DEVIATIONS_LEDGER.md` row.
+  process, a `DEVIATIONS_LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
+  (D-127): the history lives in `STATE.md`, the ledger, the fastlane changelogs, and git — the gradle
+  file keeps only the bump *invariant* comment, not a running log (it had grown to ~50 lines of
+  redundant narrative).
 - **Tagging stays an owner step** — do not create tags or open releases yourself.
 - **CI guardrail (`release-preflight.yml`, D-124).** A secret-free PR check enforces this checklist so a
   miss is caught before merge, not after a bad tag. It runs the version/changelog checks **only when the
