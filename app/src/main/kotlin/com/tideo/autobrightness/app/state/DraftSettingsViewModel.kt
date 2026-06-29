@@ -116,6 +116,17 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
     /** Edit the draft only — nothing persists until [apply] (G2-F1 temporary preview). */
     fun edit(transform: (AabSettings) -> AabSettings) = _draft.update(transform)
 
+    /**
+     * Replace the draft wholesale AND rebind the seed-once text fields by bumping [epoch] (G2-F7) — for
+     * loading an EXTERNAL preview into the editable draft (the curve-suggestion wizard's "Preview graph",
+     * D-125). Unlike [edit], it re-seeds the fields so the new values actually show; like [edit] nothing
+     * persists until [apply], and leaving the screen discards it.
+     */
+    fun seedDraft(transform: (AabSettings) -> AabSettings) {
+        _draft.update(transform)
+        _epoch.update { it + 1 }
+    }
+
     /** Delete a recorded override training point (tap-to-delete on the curve chart, S12.7g / F36). */
     fun deleteOverridePoint(point: OverridePoint) {
         viewModelScope.launch { appModule.overridePointStore.delete(point) }

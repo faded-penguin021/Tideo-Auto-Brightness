@@ -56,8 +56,15 @@ android {
         // Observable user-facing behaviour change (new location-acquisition path) ⇒ minor; the release.yml
         // auto-notes (D-119) are CI-only. RULE: version ≥ latest `v*` tag, versionCode strictly greater
         // than every released code (RUNBOOK §6).
-        versionCode = 12
-        versionName = "1.4.0"
+        // 1.5.0 (versionCode 13) is a MINOR release: D-125 the Curve & Brightness screen no longer
+        // auto-draws a suggested curve whenever ≥ 9 override points exist — the suggestion is now
+        // user-driven via the Tools wizard's "Preview graph" (loaded into the editable draft: suggested
+        // values in the fields, current values in [brackets]) and disappears when the screen is closed,
+        // matching Tasker's task38→preview→task655 flow. Observable user-facing behaviour change ⇒ minor.
+        // (D-123/D-124 release-CI changes on the same branch are CI-only.) RULE: version ≥ latest `v*`
+        // tag, versionCode strictly greater than every released code (RUNBOOK §6).
+        versionCode = 13
+        versionName = "1.5.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 

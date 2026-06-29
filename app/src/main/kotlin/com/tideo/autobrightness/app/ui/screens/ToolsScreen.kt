@@ -48,6 +48,7 @@ import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.runtime.PowerDrawCalibrator
 import com.tideo.autobrightness.app.runtime.PowerDrawProgress
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
+import com.tideo.autobrightness.app.state.CurveSuggestionPreview
 import com.tideo.autobrightness.app.state.PowerDrawViewModel
 import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.AabCard
@@ -85,8 +86,14 @@ fun ToolsScreen(
     ToolsContent(
         recordedPoints = overridePoints,
         onBack = { navController.popBackStack() },
-        // Gate-2(5th) obs: jump straight to Curve & Brightness to see the suggested line on the chart.
-        onPreviewGraph = { navController.navigate(AppRoute.CurveBrightness.route) },
+        // D-125: stash the wizard's fit as a transient preview, then jump to Curve & Brightness — which
+        // loads it into its editable draft (suggested values in the fields, current in [brackets], the
+        // fit traced against the committed curve). User-driven, like Tasker's task38 → preview → task655;
+        // leaving the screen discards it. (Was: auto-draw a fitted line whenever ≥ 9 points existed.)
+        onPreviewGraph = { result ->
+            CurveSuggestionPreview.request(result)
+            navController.navigate(AppRoute.CurveBrightness.route)
+        },
         onRunWizard = { overrides, tau ->
             CurveSuggestionEngine.suggest(
                 // G3-F17: τ comes from the wizard control (default 0.001 = follow the recorded points).
@@ -239,7 +246,7 @@ fun ToolsContent(
     onRunWizard: (List<OverridePoint>, tau: Double) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
     recordedPoints: List<OverridePoint> = emptyList(),
-    onPreviewGraph: () -> Unit = {},
+    onPreviewGraph: (CurveSuggestionResult) -> Unit = {},
     powerSamples: List<PowerDrawSample> = emptyList(),
     powerRunning: Boolean = false,
     powerProgress: String? = null,
@@ -286,7 +293,7 @@ private fun WizardCard(
     recorded: List<OverridePoint>,
     onRunWizard: (List<OverridePoint>, tau: Double) -> CurveSuggestionResult?,
     onApplyWizard: (CurveSuggestionResult) -> Unit,
-    onPreviewGraph: () -> Unit = {},
+    onPreviewGraph: (CurveSuggestionResult) -> Unit = {},
 ) {
     // Override points are now captured at runtime + persisted (G2R-F13). The wizard runs against the
     // recorded set; with < 9 it returns null (task38 error path).
@@ -366,10 +373,10 @@ private fun WizardCard(
                         onClick = { onApplyWizard(r); toast("Suggestion applied") },
                         modifier = Modifier.testTag("apply_wizard"),
                     ) { Text("Apply suggestion") }
-                    // Gate-2(5th) obs: jump to the Curve & Brightness chart to see the suggested line
-                    // (the chart draws the fit from the recorded points once ≥ 9 exist).
+                    // D-125: preview THIS fit on the Curve & Brightness chart — it loads the suggestion
+                    // into that screen's draft (user-driven; was an auto-fit whenever ≥ 9 points existed).
                     OutlinedButton(
-                        onClick = onPreviewGraph,
+                        onClick = { onPreviewGraph(r) },
                         modifier = Modifier.testTag("preview_graph"),
                     ) { Text("Preview graph") }
                     // %AAB_Test diagnostics → clipboard (D-025, G2-F15): copy the FULL verbose report.

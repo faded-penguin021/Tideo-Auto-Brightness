@@ -832,10 +832,11 @@ class SettingsScreensTest {
     }
 
     @Test
-    fun toolsWizard_previewGraphButton_navigates() {
-        // Gate-2(5th) obs: the wizard offers a "Preview graph" button (≥9 real points → a result is
-        // shown with the preview action that jumps to the Curve & Brightness chart).
-        var previewed = false
+    fun toolsWizard_previewGraphButton_passesTheFit_D125() {
+        // D-125: "Preview graph" hands the wizard's actual fit to the preview path (which loads it into
+        // the Curve & Brightness draft) — it is no longer an auto-fit that fires merely from ≥ 9 points.
+        // The button only appears after a successful run, so the previewed result must be that fit.
+        var previewed: com.tideo.autobrightness.domain.wizard.CurveSuggestionResult? = null
         val ninePoints = (1..9).map {
             com.tideo.autobrightness.domain.wizard.OverridePoint(it * 10.0, it * 20.0)
         }
@@ -850,13 +851,13 @@ class SettingsScreensTest {
                     onRunWizard = { _, _ -> stubResult },
                     onApplyWizard = {},
                     recordedPoints = ninePoints,
-                    onPreviewGraph = { previewed = true },
+                    onPreviewGraph = { previewed = it },
                 )
             }
         }
         compose.onNodeWithTag("run_wizard").performScrollTo().performClick()
         compose.onNodeWithTag("preview_graph").performScrollTo().performClick()
-        assertTrue(previewed, "Preview graph jumps to the curve chart")
+        assertEquals(stubResult, previewed, "Preview graph forwards the wizard's fit, not an auto-fit")
     }
 
     @Test

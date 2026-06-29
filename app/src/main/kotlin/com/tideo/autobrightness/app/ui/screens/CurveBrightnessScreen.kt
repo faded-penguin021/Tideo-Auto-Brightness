@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
+import com.tideo.autobrightness.app.state.CurveSuggestionPreview
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.state.derivedCoefficients
 import com.tideo.autobrightness.app.ui.components.AabCard
@@ -35,9 +37,7 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.graph.BrightnessCurveChart
-import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
-import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 
 internal fun List<FieldError>.forField(name: String): String? = firstOrNull { it.field == name }?.message
@@ -58,6 +58,34 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = com.tideo.autobrightness.app.ui.components.rememberToaster()
+
+    // D-125: a wizard suggestion is previewed ONLY when the user ran the wizard and tapped "Preview
+    // graph" (CurveSuggestionPreview.request), matching Tasker's user-driven task38 → preview → task655
+    // flow. Load it ONCE into the editable draft, but only AFTER the VM has seeded from committed
+    // (epoch ≥ 1) so the seed cannot clobber it: the fields then show the suggested values with the
+    // current values in [brackets], and the chart's live "Curve" traces the fit against the dashed
+    // "Reference" (committed). Leaving the screen discards the draft, so the line disappears on close.
+    // There is deliberately NO auto-fit at ≥ 9 override points anymore.
+    val pendingSuggestion by CurveSuggestionPreview.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(epoch, pendingSuggestion) {
+        val result = pendingSuggestion ?: return@LaunchedEffect
+        if (epoch < 1) return@LaunchedEffect
+        vm.seedDraft { s ->
+            // Same mapping as the Tools "Apply suggestion" path: continuous form1A lands exactly; the
+            // remaining Int/Float fields round (task655). form2A/form3A stay derived (task659).
+            val cfg = CurveSuggestionEngine.applyToLiveCurve(result, s.toBrightnessCurveConfig())
+            s.copy(
+                form1A = cfg.form1A,
+                zone1End = Math.round(cfg.zone1End).toInt(),
+                form2B = cfg.form2B.toFloat(),
+                form2C = Math.round(cfg.form2C).toInt(),
+                zone2End = Math.round(cfg.zone2End).toInt(),
+            )
+        }
+        CurveSuggestionPreview.clear()
+        toast("Suggested curve previewed — Apply to keep it")
+    }
+
     CurveBrightnessContent(
         draft, committed, errors, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
@@ -82,10 +110,14 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
 
 /**
  * task38 needs ≥ 9 **real, user-recorded** override points before it fits/suggests a curve. This is
- * the single user-facing gate, shared with the Tools wizard (G2R-F62): the domain engine has its own
- * post-ghost-injection ≥9 check, but ghost/synthetic priors must NOT count toward the gate the user
- * sees — the owner ran the wizard on just 7 real points and it still fired. [OverridePointStore] only
- * holds real points, so gating on its size is correct.
+ * the user-facing gate on the **Tools wizard** (G2R-F62): the domain engine has its own post-
+ * ghost-injection ≥9 check, but ghost/synthetic priors must NOT count toward the gate the user sees —
+ * the owner ran the wizard on just 7 real points and it still fired. [OverridePointStore] only holds
+ * real points, so gating on its size is correct.
+ *
+ * D-125: this gates only the *wizard run*, never an auto-preview. The Curve & Brightness screen no
+ * longer fits/draws a suggested curve just because ≥ 9 points exist — a suggestion appears there only
+ * after the user runs the wizard and taps "Preview graph" (see [CurveSuggestionPreview]).
  */
 internal const val MIN_FIT_POINTS = 9
 
@@ -118,15 +150,6 @@ fun CurveBrightnessContent(
             val overlay = remember(overridePoints) {
                 overridePoints.map { Offset(it.lux.toFloat().coerceAtLeast(0.1f), it.brightness.toFloat()) }
             }
-            // The fitted/suggested curve only appears once ≥ 9 points are recorded (task38, G2R-F14).
-            val fittedCurve: BrightnessCurveConfig? = remember(overridePoints, curveConfig) {
-                if (overridePoints.size >= MIN_FIT_POINTS) {
-                    CurveSuggestionEngine.suggest(CurveSuggestionInput(overridePoints, curveConfig))
-                        ?.let { CurveSuggestionEngine.applyToLiveCurve(it, curveConfig) }
-                } else {
-                    null
-                }
-            }
             // F36: tapping a recorded override dot raises a confirm dialog before deleting it.
             var pendingDelete by remember { mutableStateOf<OverridePoint?>(null) }
             BrightnessCurveChart(
@@ -141,7 +164,6 @@ fun CurveBrightnessContent(
                 currentLux = live.smoothedLux?.takeIf { live.serviceOn },
                 currentBrightness = (live.targetBrightness ?: live.lastAppliedBrightness)?.takeIf { live.serviceOn },
                 overridePoints = overlay,
-                fittedCurve = fittedCurve,
                 referenceCurve = referenceConfig,
                 onDeleteOverridePoint = if (onDeleteOverridePoint == null) {
                     null

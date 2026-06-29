@@ -120,4 +120,24 @@ class DraftSettingsViewModelTest {
         assertEquals(7, result.offset)
         assertFalse(result.serviceEnabled, "Apply preserves the committed serviceEnabled flag")
     }
+
+    @Test
+    fun seedDraft_replacesDraftAndBumpsEpoch_forWizardPreview_D125() {
+        // D-125: loading a wizard suggestion into the draft must (a) update the draft so the curve
+        // previews + dirty/brackets engage, and (b) bump epoch so the seed-once text fields rebind to
+        // the new values (a plain edit() leaves the fields showing the old text). Nothing persists.
+        setBaseline(AabSettings(maxBrightness = 200, zone1End = 35, form2C = 18))
+        val vm = seededVm()
+        val epochBefore = vm.epoch.value
+
+        vm.seedDraft { it.copy(zone1End = 77, form2C = 5) }
+        idle()
+
+        assertEquals(77, vm.draft.value.zone1End, "seedDraft replaces the draft")
+        assertEquals(5, vm.draft.value.form2C)
+        assertTrue(vm.epoch.value > epochBefore, "seedDraft bumps epoch so the seed-once fields rebind")
+        assertTrue(vm.dirty.value, "a previewed suggestion makes the draft dirty (Apply/Discard + brackets)")
+        // It is a preview only: the committed value is untouched until Apply.
+        assertEquals(35, committed().zone1End, "seedDraft does not persist (preview, not commit)")
+    }
 }

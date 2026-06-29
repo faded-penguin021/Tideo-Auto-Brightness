@@ -1,0 +1,8 @@
+Curve suggestion is now something you ask for, not something that just happens.
+
+Before, the Curve & Brightness graph would automatically draw a suggested curve as soon as
+you had recorded nine manual brightness overrides. Now the suggestion only appears when you
+run the Curve Suggestion wizard (Tools) and tap "Preview graph" — exactly like the original
+Tasker project. Previewing fills the curve fields with the suggested values (your current
+values are shown in [brackets] for comparison) so you can see and tweak them before applying.
+If you leave the screen without applying, the preview is discarded and your curve is unchanged.

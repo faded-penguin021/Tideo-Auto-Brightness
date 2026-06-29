@@ -34,6 +34,17 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-29 — 1.5.0 / `versionCode 13` (MINOR — observable user-facing behaviour): **D-125** the Curve &
+  Brightness screen no longer auto-draws a suggested curve whenever ≥ 9 override points exist. The suggestion
+  is now **user-driven** (Tasker task38→preview→task655 parity): the Tools wizard's "Preview graph" stashes
+  the just-computed fit in a transient process-scoped `CurveSuggestionPreview` holder and navigates to Curve
+  & Brightness, which loads it **once into the editable draft** (new generic `DraftSettingsViewModel.seedDraft`
+  = update draft + bump epoch). Result: the input fields show the suggested values with the **current values
+  in `[brackets]`**, the live "Curve" traces the fit vs the dashed committed "Reference", Apply commits it,
+  and leaving the screen discards the draft so **the suggested line disappears on close**. Removed the
+  `fittedCurve`/"Suggested" series from `BrightnessCurveChart`; `MIN_FIT_POINTS` now gates only the wizard
+  run. Tests: `DraftSettingsViewModelTest.seedDraft_*`, `SettingsScreensTest.toolsWizard_previewGraphButton_passesTheFit_D125`.
+  Engine math + goldens untouched. Changelog `13.txt`.
 - 2026-06-29 — CI-only (no app/version change): **D-124** new `release-preflight.yml` PR gate enforces the
   RUNBOOK §6 release-prep checklist before merge — version/changelog checks fire only when the PR **ships
   app code** (docs/workflow/test/metadata-only PRs skip them): on a code PR it requires `versionCode`

@@ -2130,3 +2130,26 @@ the permanent registry — never compress or remove them.
   in this doc/RUNBOOK is never matched) for the six GitHub-honored tokens and hard-fails (D-115). Version
   compares use `sort -V` (numeric: `1.10.0 ≥ 1.9.0`); first-release path (no tags) skips the tag compare.
   CI-only; no app change. Verified locally: docs/workflow-only → pass, code-PR-without-bump → blocked.
+
+- **D-125: curve suggestion on the Curve & Brightness screen is user-driven, not auto-fit.** The screen
+  previously computed `CurveSuggestionEngine.suggest(...)` and drew a blue "Suggested" line **automatically
+  whenever ≥ 9 override points existed** — a deviation from Tasker, where task38 (the wizard) only runs on a
+  USER action, writes transient `%suggestion_*` vars (never the live curve), the Brightness Graph scene
+  draws from those, and task655 applies them only on a separate user-confirmed step. The auto-fit also
+  ignored the user's chosen τ (used the live curve's) and never cleared. **Fix:** removed the
+  `overridePoints.size >= MIN_FIT_POINTS` auto-fit and the `fittedCurve`/"Suggested" series from
+  `BrightnessCurveChart` entirely. A suggestion now reaches the chart ONLY via the Tools wizard: "Preview
+  graph" stashes the just-computed `CurveSuggestionResult` in the new process-scoped, transient
+  `CurveSuggestionPreview` holder (mirrors the global `%suggestion_*` vars) and navigates to Curve &
+  Brightness, which **loads it once into the editable draft** via a new generic
+  `DraftSettingsViewModel.seedDraft(transform)` (updates the draft + bumps `epoch` so the seed-once text
+  fields rebind). Consequences, all from reusing the existing draft model: the input fields show the
+  suggested values with the **current values in `[brackets]`** (requirement); the live "Curve" traces the
+  fit against the dashed "Reference" (committed) curve; the preview is **dirty** (Apply commits it =
+  task655; Discard/back drops it); and leaving the screen discards the NavBackStackEntry-scoped draft, so
+  **the suggested line disappears on close**. Consumption is gated on `epoch ≥ 1` (after the VM has seeded
+  from committed) so the seed cannot clobber the preview, and `CurveSuggestionPreview.clear()` makes it
+  one-shot. `MIN_FIT_POINTS` now gates only the wizard run. Tools "Apply suggestion" (direct commit) is
+  unchanged. Tests: `DraftSettingsViewModelTest.seedDraft_*` (draft replaced + epoch bumped + dirty + not
+  persisted) and `SettingsScreensTest.toolsWizard_previewGraphButton_passesTheFit_D125` (the wizard's fit,
+  not an auto-fit, is forwarded). Engine math + goldens untouched.
