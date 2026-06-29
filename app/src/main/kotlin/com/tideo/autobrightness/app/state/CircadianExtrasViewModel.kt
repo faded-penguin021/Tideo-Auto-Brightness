@@ -72,16 +72,17 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
         location.lastKnownLocation()?.let { it.latitude to it.longitude }
 
     /**
-     * Actively acquire a location for the "Use current location" button (G2R-F42 / D-120). Rather than
-     * passively echoing whatever last-known fix another app happened to leave, this requests a CURRENT
-     * on-device fix (recheck grant at call time, cf. F42); and when none is available — no fix, or
-     * Location permission is missing/denied — it falls back to the ipwho.is IP lookup so the button still
-     * resolves an approximate location instead of giving up. The IP fallback runs ONLY when the user has
-     * opted into it (the same default-off privacy gate as the live circadian chain, D-105). Returns null
-     * when every active source is exhausted or declined.
+     * Actively acquire a location for the "Use current location" button (G2R-F42 / D-120 / D-122). Rather
+     * than passively echoing whatever last-known fix another app happened to leave, this ACTIVELY requests
+     * a fresh fix ([LocationReader.activeFix] registers for live provider updates — the OS location
+     * indicator lights up — and waits for a real callback, using last-known only as a backup); and when
+     * none is available — no fix, or Location permission is missing/denied — it falls back to the ipwho.is
+     * IP lookup so the button still resolves an approximate location instead of giving up. The IP fallback
+     * runs ONLY when the user has opted into it (the same default-off privacy gate as the live circadian
+     * chain, D-105). Returns null when every active source is exhausted or declined.
      */
     suspend fun freshLatLon(): Pair<Double, Double>? {
-        (location.currentLocation() as? LocationResult.Available)?.snapshot?.let {
+        (location.activeFix() as? LocationResult.Available)?.snapshot?.let {
             return it.latitude to it.longitude
         }
         if (store.geoIpEnabled.first()) {

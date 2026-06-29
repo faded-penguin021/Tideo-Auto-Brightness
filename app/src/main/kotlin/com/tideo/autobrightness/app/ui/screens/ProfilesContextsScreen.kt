@@ -314,9 +314,11 @@ fun ProfilesContextsScreen(
                     }
                 },
                 onUseCurrentLocation = { setLatLon ->
-                    // G2R-F22/F42: recheck the grant at call time + request a fresh fix; targeted
-                    // message per outcome (no longer wrongly reports "not granted" right after the grant).
+                    // G2R-F22/F42/D-122: recheck the grant at call time + ACTIVELY acquire a fresh fix (the
+                    // OS location indicator appears; can take a few seconds — toast that it's working);
+                    // targeted message per outcome (no longer wrongly reports "not granted" after the grant).
                     scope.launch {
+                        toast("Acquiring location…")
                         when (val result = contextsVm.currentLocation()) {
                             is LocationResult.Available -> {
                                 setLatLon(result.snapshot.latitude, result.snapshot.longitude)

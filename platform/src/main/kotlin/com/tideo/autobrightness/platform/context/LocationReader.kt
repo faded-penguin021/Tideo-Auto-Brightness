@@ -57,9 +57,25 @@ interface LocationReader {
      */
     suspend fun currentLocation(): LocationResult
 
+    /**
+     * ACTIVE one-shot acquisition for the user-initiated "Use current location" buttons (D-122). Unlike
+     * [currentLocation] — which calls `getCurrentLocation`, letting the OS satisfy the request from a
+     * recent cached fix (so the system location indicator never lights up and the value can be one
+     * another app set) — this REGISTERS for live provider updates, powering the GPS/network sensors (the
+     * OS location indicator appears) and waiting for the first genuinely fresh fix. The best last-known
+     * fix is used only as a BACKUP when no fresh fix arrives within [timeoutMs]. Distinguishes
+     * missing-permission from no-fix like [currentLocation].
+     *
+     * Default delegates to [currentLocation] so non-Android fakes need no change.
+     */
+    suspend fun activeFix(timeoutMs: Long = ACTIVE_FIX_TIMEOUT_MS): LocationResult = currentLocation()
+
     companion object {
         const val DEFAULT_MIN_TIME_MS = 30_000L
         const val DEFAULT_MIN_DISTANCE_M = 50f
+        /** GPS can take a while to converge; the active "Use current location" path waits up to this long
+         *  for a fresh fix before falling back to the last-known backup. */
+        const val ACTIVE_FIX_TIMEOUT_MS = 20_000L
     }
 }
 
@@ -130,6 +146,57 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
                 }
             }
         }
+        val snapshot = fresh ?: bestLastKnown(lm)
+        return snapshot?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
+    }
+
+    @SuppressLint("MissingPermission") // guarded by the hasLocationPermission() recheck below + SecurityException catch.
+    override suspend fun activeFix(timeoutMs: Long): LocationResult {
+        // Recheck the grant at call time (G2R-F42), same as currentLocation().
+        if (!hasLocationPermission()) return LocationResult.NeedsPermission
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return LocationResult.Unavailable
+
+        // D-122: actively request a NEW fix from every enabled real provider (GPS for accuracy, network
+        // for speed). requestLocationUpdates powers the sensors — so the OS location indicator appears —
+        // and delivers a freshly computed fix rather than `getCurrentLocation`'s possibly-cached value.
+        val providers = buildList {
+            if (runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false)) {
+                add(LocationManager.GPS_PROVIDER)
+            }
+            if (runCatching { lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)) {
+                add(LocationManager.NETWORK_PROVIDER)
+            }
+        }
+
+        val fresh = if (providers.isEmpty()) {
+            null
+        } else {
+            withTimeoutOrNull(timeoutMs) {
+                suspendCancellableCoroutine<LocationSnapshot?> { cont ->
+                    val listener = object : LocationListener {
+                        override fun onLocationChanged(location: Location) {
+                            val snap = location.toSnapshotOrNull() ?: return // skip null-island, keep listening
+                            if (cont.isActive) {
+                                runCatching { lm.removeUpdates(this) }
+                                cont.resume(snap)
+                            }
+                        }
+                    }
+                    cont.invokeOnCancellation { runCatching { lm.removeUpdates(listener) } }
+                    try {
+                        providers.forEach {
+                            lm.requestLocationUpdates(it, 0L, 0f, listener, Looper.getMainLooper())
+                        }
+                    } catch (_: SecurityException) {
+                        if (cont.isActive) cont.resume(null)
+                    }
+                }
+            }
+        }
+
+        // BACKUP only: a last-known fix (possibly set by another app) is used if the active request
+        // produced nothing within the timeout — fine as a fallback, not the primary mechanism (D-122).
         val snapshot = fresh ?: bestLastKnown(lm)
         return snapshot?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
     }

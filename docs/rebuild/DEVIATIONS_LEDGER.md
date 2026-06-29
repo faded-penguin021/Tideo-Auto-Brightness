@@ -2081,3 +2081,19 @@ the permanent registry — never compress or remove them.
   default-off (D-105 unchanged). `GeoIpLocationClientTest` updated to the ipwho.is body shape. Ships with
   D-117–D-120 as **1.4.0 / versionCode 12** (MINOR — observable user-facing behaviour: new
   location-acquisition path; `changelogs/12.txt`).
+
+- **D-122: "Use current location" actively acquires a fresh fix (sensors on) instead of a cached one.**
+  Follow-up to D-120: the buttons still used `LocationReader.currentLocation()`, which calls
+  `LocationManager.getCurrentLocation()` — the OS is allowed to satisfy that from a recent CACHED fix, so
+  the system location indicator never lit up ("I don't see the location indicator even trying") and the
+  value could be one another app set. Added `LocationReader.activeFix(timeoutMs = 20 s)`: it
+  `requestLocationUpdates` on every enabled real provider (GPS for accuracy + network for speed), powering
+  the sensors (the OS indicator appears) and waiting for the first genuinely fresh callback; the best
+  last-known fix is used only as a BACKUP if nothing arrives in time. The interface method **defaults to
+  delegating to `currentLocation()`** so the non-Android test fakes need no change; `AndroidLocationReader`
+  overrides it. Both "Use current location" buttons now use it — the Circadian one (`CircadianExtrasViewModel.freshLatLon`,
+  then the opt-in ipwho.is fallback) and the Contexts location-rule one (`ContextsViewModel.currentLocation`).
+  Owner note: this matches Tasker, whose active/passive location listener was used precisely for location
+  context rules. Both call sites toast "Acquiring location…" since an active GPS fix can take several
+  seconds. On-device behaviour is owner-verified (Robolectric can't exercise a real provider). Folded into
+  the unreleased **1.4.0 / versionCode 12** (no tag yet, so no version bump).

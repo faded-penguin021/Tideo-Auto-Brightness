@@ -6,9 +6,11 @@ the floored hardware value, so the number on screen reflects what your eyes actu
 
 The Contexts rules list no longer hides its last rule under the navigation bar.
 
-The Circadian "Use current location" button now actively acquires a location: it requests a
-fresh on-device fix and, if none is available (and you've opted in), looks one up over the
-network — rather than just reading whatever fix another app left behind.
+The "Use current location" buttons (Circadian, and context location rules) now actively
+acquire a location — they turn on the GPS/network sensors and wait for a fresh fix (the system
+location indicator appears) instead of reusing whatever cached fix another app left behind. A
+last-known fix is still used as a backup, and the Circadian button can fall back to a network
+IP lookup if you've opted in.
 
 The optional IP-based location fallback moved from a cleartext request to a secure HTTPS one
 (ipwho.is). It stays off by default.

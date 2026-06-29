@@ -99,6 +99,9 @@ fun CircadianScreen(
         onUseLiveData = { extras.useLiveData(); toast("Using live data") },
         onUseCurrentLocation = { fill ->
             scope.launch {
+                // D-122: this now actively acquires a fresh fix (the OS location indicator appears) and can
+                // take a few seconds — tell the user it's working rather than appearing to hang.
+                toast("Acquiring location…")
                 val latLon = runCatching { extras.freshLatLon() }.getOrNull()
                 if (latLon != null) fill(latLon.first, latLon.second)
                 else toast("Couldn't acquire a location — grant Location, or enable the IP fallback below, then try again")

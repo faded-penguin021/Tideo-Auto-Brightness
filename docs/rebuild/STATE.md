@@ -42,9 +42,12 @@ One line per shipped change (newest first). Keep terse.
   mirroring the rule editor (D-097/098). **D-119** `release.yml` `generate_release_notes: true` (auto
   "What's Changed" appended below the owner's UI body; idempotent). Audit note: `build`/`codeql` run on
   push-to-main + PR (green on last main push) and intentionally skip `v*` tags — release.yml re-runs the
-  full ladder before signing, so "only sign on tag" is by design. **D-120** Circadian "Use current
-  location" actively acquires — fresh on-device fix → ipwho.is IP fallback when opted in (default-off
-  privacy gate, D-105) — instead of echoing another app's last-known fix. **D-121** geo-IP fallback moved
+  full ladder before signing, so "only sign on tag" is by design. **D-120/D-122** the "Use current
+  location" buttons (Circadian + Contexts location rule) actively acquire — `LocationReader.activeFix`
+  registers for live provider updates (sensors on → OS location indicator appears) and waits for a fresh
+  fix, last-known only as a backup; Circadian also → ipwho.is IP fallback when opted in (default-off
+  privacy gate, D-105) — instead of echoing another app's cached fix. Parity: Tasker's active/passive
+  listener was used for location context rules. **D-121** geo-IP fallback moved
   from cleartext `ip-api.com` (`lat`/`lon`, `status:fail`) → HTTPS `ipwho.is` (`latitude`/`longitude`,
   `success:false`); network-security-config now pins cleartext OFF (app makes no cleartext traffic);
   fallback stays optional/off. Changelog `12.txt`. Owner squash-merges + publishes the v1.4.0 release.
