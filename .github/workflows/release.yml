@@ -102,8 +102,11 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           files: app/build/outputs/apk/release/app-release.apk
           fail_on_unmatched_files: true
-          # NOTE: generate_release_notes is intentionally OFF — the owner writes the release notes in the
-          # UI before publishing; regenerating them here would overwrite that. This step only attaches
-          # the signed APK to the existing release (idempotent on re-run).
+          # Auto-generate the "What's Changed" notes (merged PRs + new contributors since the previous
+          # tag) so a release always carries them. action-gh-release does NOT overwrite the owner's text:
+          # an existing release body (written in the "Draft a new release" UI) is PRE-pended, then
+          # GitHub's generated notes are appended below it — so the owner's summary and the auto changelog
+          # coexist. Re-running the workflow is idempotent (it doesn't duplicate the generated block).
+          generate_release_notes: true
           # Tags with a pre-release suffix (a hyphen, e.g. v0.1.0-rc1) are published as pre-releases.
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}

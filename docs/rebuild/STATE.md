@@ -34,6 +34,23 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-28 — 1.4.0 / `versionCode 12` (MINOR — observable user-facing behaviour): **D-117** Curve &
+  Brightness graph "Now" line + "Live brightness" card now show PERCEIVED brightness in PWM-sensitive
+  mode (`targetBrightness ?: lastAppliedBrightness`, like the Dashboard hero), not the floored hardware
+  value (+test). **D-118** Contexts rules modal no longer clips its last rule card under the nav bar —
+  edge-to-edge `Dialog` (`decorFitsSystemWindows=false`) + `statusBarsPadding()` + trailing `Spacer(48dp)`,
+  mirroring the rule editor (D-097/098). **D-119** `release.yml` `generate_release_notes: true` (auto
+  "What's Changed" appended below the owner's UI body; idempotent). Audit note: `build`/`codeql` run on
+  push-to-main + PR (green on last main push) and intentionally skip `v*` tags — release.yml re-runs the
+  full ladder before signing, so "only sign on tag" is by design. **D-120/D-122** the "Use current
+  location" buttons (Circadian + Contexts location rule) actively acquire — `LocationReader.activeFix`
+  registers for live provider updates (sensors on → OS location indicator appears) and waits for a fresh
+  fix, last-known only as a backup; Circadian also → ipwho.is IP fallback when opted in (default-off
+  privacy gate, D-105) — instead of echoing another app's cached fix. Parity: Tasker's active/passive
+  listener was used for location context rules. **D-121** geo-IP fallback moved
+  from cleartext `ip-api.com` (`lat`/`lon`, `status:fail`) → HTTPS `ipwho.is` (`latitude`/`longitude`,
+  `success:false`); network-security-config now pins cleartext OFF (app makes no cleartext traffic);
+  fallback stays optional/off. Changelog `12.txt`. Owner squash-merges + publishes the v1.4.0 release.
 - 2026-06-28 — 1.3.0 / `versionCode 11` (MINOR — new user-facing setting + surface): **D-116** Panic
   (Reset) gesture reworked from folded-in Tasker source. Trigger is now Upside-Down ∧ Display-On ∧
   **Proximity-NOT-Near** (the significant-motion EVENT is gone); the shake is validated by a 10 s

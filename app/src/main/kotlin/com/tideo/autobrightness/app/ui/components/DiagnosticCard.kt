@@ -181,7 +181,7 @@ fun CircadianDiagnosticCard(minBrightness: Int, maxBrightness: Int) {
  * Stateless Curve & Brightness live readout (Tasker `current_lux_and_bright`, brightness_settings.md
  * elements22): "Current smoothed lux [%SmoothedLux]" + "Current brightness (%AAB_MinBright–
  * %AAB_MaxBright) [%AAB_CurrentBright]" (G2R-F58). [minBrightness]/[maxBrightness] are the committed
- * range; %AAB_CurrentBright is the last brightness the pipeline applied.
+ * range; the brightness shown is the PERCEIVED value (D-117).
  */
 @Composable
 fun CurveBrightnessDiagnosticCardContent(state: PipelineState, minBrightness: Int, maxBrightness: Int) {
@@ -196,7 +196,11 @@ fun CurveBrightnessDiagnosticCardContent(state: PipelineState, minBrightness: In
             append("–")
             goldValue(maxBrightness.toString())
             append(") ")
-            goldValue(fmtInt(state.lastAppliedBrightness))
+            // D-117: show the PERCEIVED brightness (un-floored targetBrightness) like the Dashboard and
+            // the curve graph's "Now" line. In PWM-sensitive mode lastAppliedBrightness is the floored
+            // hardware value held at the dimming threshold; the perceived value is what the screen looks
+            // like. Falls back to the applied value when equal (PWM-sensitive off → target == applied).
+            goldValue(fmtInt(state.targetBrightness ?: state.lastAppliedBrightness))
         }
     }
 }

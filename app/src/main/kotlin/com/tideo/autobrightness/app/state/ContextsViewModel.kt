@@ -62,11 +62,13 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
     suspend fun currentSsid(): SsidResult = wifi.currentSsid()
 
     /**
-     * The current device location for the "use current location" helper (G2R-F42). Rechecks the
-     * permission grant at call time and requests a fresh fix, so it no longer wrongly reports
-     * "not granted" right after the user grants Location (the propagation-delay bug).
+     * The current device location for the "use current location" helper (G2R-F42 / D-122). Rechecks the
+     * permission grant at call time and ACTIVELY requests a fresh fix ([LocationReader.activeFix] — the OS
+     * location indicator lights up, last-known used only as a backup), matching Tasker, which used its
+     * active/passive location listener precisely for location context rules. Also fixes the old
+     * propagation-delay bug (no longer reports "not granted" right after the user grants Location).
      */
-    suspend fun currentLocation(): LocationResult = location.currentLocation()
+    suspend fun currentLocation(): LocationResult = location.activeFix()
 
     /**
      * Today's resolved sunrise / sunset as "HH:MM" for the SUNRISE/SUNSET token labels (G2R-F68),

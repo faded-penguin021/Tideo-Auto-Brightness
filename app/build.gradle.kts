@@ -46,8 +46,18 @@ android {
         // — armed by upside-down + display-on + proximity-NOT-near, then a 10 s sensitivity-gated shake
         // — plus a new user-facing global setting (Panic Sensitivity 0–10) with a slider on the Live
         // Debug screen. A new user-facing surface ⇒ minor (RUNBOOK §6 "highest category wins").
-        versionCode = 11
-        versionName = "1.3.0"
+        // 1.4.0 (versionCode 12) is a MINOR release: D-117 the curve graph "Now" line + the curve "Live
+        // brightness" card now show the PERCEIVED brightness in PWM-sensitive mode (like the Dashboard);
+        // D-118 the Contexts rules modal no longer clips its last rule card under the nav bar (edge-to-edge
+        // targetSdk 36); D-120/D-122 the "Use current location" buttons actively acquire a fresh fix
+        // (sensors on, OS location indicator appears; last-known only as a backup; Circadian also →
+        // ipwho.is IP fallback when opted in) instead of echoing another app's cached fix; D-121 the
+        // geo-IP fallback moves from cleartext ip-api.com to HTTPS ipwho.is (no cleartext traffic).
+        // Observable user-facing behaviour change (new location-acquisition path) ⇒ minor; the release.yml
+        // auto-notes (D-119) are CI-only. RULE: version ≥ latest `v*` tag, versionCode strictly greater
+        // than every released code (RUNBOOK §6).
+        versionCode = 12
+        versionName = "1.4.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 

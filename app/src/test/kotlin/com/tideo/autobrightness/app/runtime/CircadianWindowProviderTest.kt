@@ -193,7 +193,7 @@ class CircadianWindowProviderTest {
             scope = scope,
             overrideFlow = MutableStateFlow(ExperimentDateLocation()),
             location = loc,
-            geoIpFallback = { LocationSnapshot(lat, lon) }, // ip-api yields Utrecht
+            geoIpFallback = { LocationSnapshot(lat, lon) }, // ipwho.is yields Utrecht
             clock = { midJuneEpochSec() * 1000L },
             tzOffsetForDate = { 2.0 },
         )

@@ -132,10 +132,14 @@ fun CurveBrightnessContent(
             BrightnessCurveChart(
                 curveConfig,
                 modifier = Modifier.testTag("brightness_curve_chart"),
-                // G3-F2: live "Now" cross-hair (current smoothed lux × applied brightness), only while
+                // G3-F2: live "Now" cross-hair (current smoothed lux × current brightness), only while
                 // the service is running. The chart draws both marker lines when BOTH are non-null.
+                // D-117: track the PERCEIVED brightness (targetBrightness, un-floored) like the Dashboard
+                // hero — in PWM-sensitive mode the hardware value is floored above the perceived one, and
+                // the crosshair should sit where the user actually sees the screen, not at the floor.
+                // Falls back to the applied value when they're equal (PWM-sensitive off → target==applied).
                 currentLux = live.smoothedLux?.takeIf { live.serviceOn },
-                currentBrightness = live.lastAppliedBrightness?.takeIf { live.serviceOn },
+                currentBrightness = (live.targetBrightness ?: live.lastAppliedBrightness)?.takeIf { live.serviceOn },
                 overridePoints = overlay,
                 fittedCurve = fittedCurve,
                 referenceCurve = referenceConfig,

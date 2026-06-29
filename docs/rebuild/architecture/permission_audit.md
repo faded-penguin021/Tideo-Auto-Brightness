@@ -17,7 +17,7 @@ decides actual removals / the release-grade permission set.**
 | `ACCESS_FINE_LOCATION` | precise location for the context location gate | Contexts | ✅ yes | ⚠️ yes | **Re-evaluate.** COARSE may suffice for the haversine gate radius; consider dropping FINE at S14 if precision isn't needed. |
 | `ACCESS_BACKGROUND_LOCATION` | location reads from the FGS while UI backgrounded (API 29+) | Contexts + daily sun refresh | ✅ yes | ⚠️ yes | **Re-evaluate.** Heaviest Play-policy item. Confirm it's truly needed vs. foreground-only reads; document justification or drop at S14. |
 | `VIBRATE` | panic S.O.S. morse pattern (task528 / prof769) | Panic button | ✅ yes | ⚠️ optional | **Keep** (cheap, normal permission). |
-| `INTERNET` | geo-IP location fallback (`ip-api.com`) when no Android fix (task90 act28) | Circadian location fallback | ✅ yes | ⚠️ yes | **Keep** (owner-binding cleartext fallback, D-069), but document the cleartext exception clearly for review. |
+| `INTERNET` | geo-IP location fallback (`ipwho.is`, HTTPS — D-121) when no Android fix (task90 act28) | Circadian location fallback + Circadian "Use current location" (D-120) | ✅ yes | ⚠️ yes | **Keep** (owner-binding fallback, D-069). Now **HTTPS** (D-121): the prior `ip-api.com` cleartext exception is removed. The fallback is opt-in/default-off (D-105). |
 | `DUMP` | — (intentionally **NOT** declared) | no-Location SSID `dumpsys wifi` | n/a | n/a | **Leave undeclared.** `signature\|privileged`, ungrantable; the SSID path falls through to the next strategy without it. |
 
 ## Notes
