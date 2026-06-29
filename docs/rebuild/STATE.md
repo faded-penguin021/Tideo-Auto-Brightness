@@ -34,6 +34,13 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-29 — CI-only (no app/version change): **D-124** new `release-preflight.yml` PR gate enforces the
+  RUNBOOK §6 release-prep checklist before merge — version/changelog checks fire only when the PR **ships
+  app code** (docs/workflow/test/metadata-only PRs skip them): on a code PR it requires `versionCode`
+  strictly > the latest `v*` tag, a non-regressed semver `versionName`, and a non-empty
+  `changelogs/<versionCode>.txt`; the `[skip ci]`-class token scan (commit messages + PR title/body, D-115)
+  runs on every PR. Secret-free, `sort -V` numeric compares, first-release path tolerated. RUNBOOK §6
+  updated. Verified locally (docs-only passes, code-without-bump blocked).
 - 2026-06-29 — CI-only (no app/version change): **D-123** `release.yml` now auto-reuses the human-written
   F-Droid changelog (`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`) as the GitHub Release's
   "What's new" section — a new step reads the tagged build's versionCode, looks up the matching changelog,

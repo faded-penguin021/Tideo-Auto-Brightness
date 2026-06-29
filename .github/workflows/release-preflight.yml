@@ -1,0 +1,170 @@
+name: Release preflight
+
+# Secret-free PR guardrail for the release-prep checklist that is otherwise only enforced by the agent /
+# owner by hand (RUNBOOK §6). Catches, BEFORE merge, the mistakes we've actually shipped:
+#  - a code change that forgot to bump `versionCode` (F-Droid rejects a re-used code) — D-099 drift.
+#  - a `versionCode` bump with no matching `fastlane/.../changelogs/<versionCode>.txt` (F-Droid + the
+#    release body, D-123, both read it by versionCode).
+#  - an in-app version that regressed BEHIND the latest released tag.
+#  - a `[skip ci]`-class token in a commit message or the PR body — a squash-merge folds those into the
+#    squash commit body and GitHub then silently skips ALL workflows for that commit + its tag (D-115).
+#
+# Scope gate (per the owner): the version/changelog checks fire ONLY when the PR ships app code. A
+# docs-only / workflow-only / test-only PR (like the one that added this file) SKIPS them. The skip-ci
+# token scan runs on every PR regardless.
+#
+# Node 24 runtime policy (see build.yml): checkout@v5 is a node24 major. Do NOT downgrade.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: release-preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v5
+        with:
+          # Need tag history to compare the PR's version against the latest released tag.
+          fetch-depth: 0
+          fetch-tags: true
+
+      # ---------------------------------------------------------------------------------------------
+      # 1. skip-ci token guard (every PR). The only legitimate use of the token is inside a workflow's
+      #    OWN auto-commit heredoc (clean-dist.yml) — that's FILE content, which this scan never reads.
+      #    We scan only the PR's commit messages + title + body, which is exactly what a squash-merge
+      #    can fold onto main (D-115).
+      # ---------------------------------------------------------------------------------------------
+      - name: Guard against skip-ci tokens (D-115)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh pr view "$PR" --json title,body,commits \
+            --jq '.title, (.body // ""), (.commits[] | .messageHeadline, (.messageBody // ""))' > pr_text.txt
+          # GitHub honors all of these on push/pull_request events.
+          TOKENS=('[skip ci]' '[ci skip]' '[no ci]' '[skip actions]' '[actions skip]' '***NO_CI***')
+          found=0
+          for t in "${TOKENS[@]}"; do
+            if grep -Fq "$t" pr_text.txt; then
+              echo "::error::Forbidden CI-skip token \"$t\" found in a commit message, PR title, or PR body."
+              found=1
+            fi
+          done
+          if [ "$found" -ne 0 ]; then
+            echo "::error::A squash-merge folds these into the squash commit body; GitHub then skips ALL"
+            echo "::error::workflows for that commit and its release tag (D-115). Reword the message(s)."
+            exit 1
+          fi
+          echo "No skip-ci tokens in commit messages / PR title / body. ✓"
+
+      # ---------------------------------------------------------------------------------------------
+      # 2. Does this PR ship app code? If EVERY changed file is docs/workflow/test/metadata, the
+      #    version+changelog gate is skipped. Anything else (main source, build config, manifest, res,
+      #    gradle) counts as shipping.
+      # ---------------------------------------------------------------------------------------------
+      - name: Classify PR (ships app code?)
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if ! FILES=$(gh pr view "$PR" --json files --jq '.files[].path' 2>/dev/null) || [ -z "$FILES" ]; then
+            echo "::warning::Could not list changed files; enforcing the release-prep gate to be safe."
+            echo "ships=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Changed files:"; printf '  %s\n' $FILES
+          ships=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              docs/*|.github/*|scripts/*|*.md) ;;                                   # docs / CI / scripts
+              fastlane/*) ;;                                                        # store metadata, not app code
+              */src/test/*|*/src/testFixtures/*|*/src/androidTest/*|*/src/sharedTest/*) ;;  # tests don't ship
+              .gitignore|.gitattributes|LICENSE|LICENSE.*) ;;
+              *) ships=true; break ;;                                              # main src, build, res, gradle, manifest
+            esac
+          done <<< "$FILES"
+          echo "ships=$ships" >> "$GITHUB_OUTPUT"
+          if [ "$ships" = "true" ]; then
+            echo "PR ships app code → release-prep gate ENABLED."
+          else
+            echo "PR is docs/workflow/test/metadata only → release-prep gate SKIPPED (skip-ci guard still ran)."
+          fi
+
+      # ---------------------------------------------------------------------------------------------
+      # 3. Version + F-Droid changelog checks. Behaviour depends on step 2:
+      #    - ships:      versionCode must be STRICTLY greater than the latest released tag's code
+      #                  (a bump happened); versionName must not regress; changelog for the new code
+      #                  must exist and be non-empty.
+      #    - non-ships:  versionCode/versionName must merely not regress below the latest tag, and the
+      #                  current code's changelog must still exist (cheap insurance against deletion).
+      # ---------------------------------------------------------------------------------------------
+      - name: Version + F-Droid changelog checks (RUNBOOK §6)
+        env:
+          SHIPS: ${{ steps.classify.outputs.ships }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          # max of two version strings via `sort -V`
+          vmax() { printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1; }
+          vge()  { [ "$(vmax "$1" "$2")" = "$1" ]; }   # $1 >= $2
+
+          GRADLE=app/build.gradle.kts
+          CUR_VCODE=$(grep -oE 'versionCode[[:space:]]*=[[:space:]]*[0-9]+' "$GRADLE" | grep -oE '[0-9]+' | head -1)
+          CUR_VNAME=$(grep -oE 'versionName[[:space:]]*=[[:space:]]*"[^"]+"' "$GRADLE" | sed -E 's/.*"([^"]+)".*/\1/' | head -1)
+          [ -n "$CUR_VCODE" ] || fail "Could not read versionCode from $GRADLE."
+          [ -n "$CUR_VNAME" ] || fail "Could not read versionName from $GRADLE."
+          echo "Working tree: versionName=$CUR_VNAME versionCode=$CUR_VCODE (ships=$SHIPS)"
+
+          # versionName must be clean semver X.Y.Z (the -debug suffix is variant-only, not in the base).
+          echo "$CUR_VNAME" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || fail "versionName \"$CUR_VNAME\" is not semantic-versioned X.Y.Z (RUNBOOK §6)."
+
+          # Latest released tag (if any) and its versionCode.
+          LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -1 || true)
+          if [ -n "$LATEST_TAG" ]; then
+            TAG_VNAME=${LATEST_TAG#v}
+            TAG_VCODE=$(git show "${LATEST_TAG}:app/build.gradle.kts" 2>/dev/null \
+              | grep -oE 'versionCode[[:space:]]*=[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1)
+            echo "Latest released tag: $LATEST_TAG (versionName=$TAG_VNAME versionCode=${TAG_VCODE:-?})"
+
+            if [ -n "${TAG_VCODE:-}" ]; then
+              if [ "$SHIPS" = "true" ]; then
+                [ "$CUR_VCODE" -gt "$TAG_VCODE" ] \
+                  || fail "This PR ships app code but versionCode ($CUR_VCODE) is not greater than the released $LATEST_TAG (versionCode $TAG_VCODE). Bump it (RUNBOOK §6)."
+              else
+                [ "$CUR_VCODE" -ge "$TAG_VCODE" ] \
+                  || fail "versionCode ($CUR_VCODE) regressed below the released $LATEST_TAG (versionCode $TAG_VCODE)."
+              fi
+            else
+              echo "::warning::Could not read versionCode from $LATEST_TAG; skipping the versionCode comparison."
+            fi
+
+            vge "$CUR_VNAME" "$TAG_VNAME" \
+              || fail "versionName ($CUR_VNAME) regressed below the released $LATEST_TAG ($TAG_VNAME) (RUNBOOK §6)."
+          else
+            echo "No v* tags yet — skipping the release-tag comparison (first release)."
+          fi
+
+          # F-Droid changelog for the current versionCode must exist and be non-empty (filename = versionCode).
+          CHANGELOG="fastlane/metadata/android/en-US/changelogs/${CUR_VCODE}.txt"
+          if [ ! -s "$CHANGELOG" ]; then
+            if [ "$SHIPS" = "true" ]; then
+              fail "Missing/empty F-Droid changelog $CHANGELOG for versionCode $CUR_VCODE. Add a short user-facing note (RUNBOOK §6)."
+            else
+              fail "Expected F-Droid changelog $CHANGELOG (versionCode $CUR_VCODE) is missing/empty."
+            fi
+          fi
+          echo "F-Droid changelog present: $CHANGELOG ✓"
+          echo "Release preflight passed. ✓"

@@ -144,6 +144,16 @@ so check it explicitly.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
   process, a `DEVIATIONS_LEDGER.md` row.
 - **Tagging stays an owner step** — do not create tags or open releases yourself.
+- **CI guardrail (`release-preflight.yml`, D-124).** A secret-free PR check enforces this checklist so a
+  miss is caught before merge, not after a bad tag. It runs the version/changelog checks **only when the
+  PR ships app code** (any changed file outside `docs/`, `.github/`, `scripts/`, `fastlane/`, `*.md`, or a
+  `src/test`/`androidTest` tree) — a docs/workflow/test-only PR skips them. When it fires it requires:
+  `versionCode` **strictly greater** than the latest `v*` tag's code, `versionName` not regressed below
+  that tag and semver-shaped, and a non-empty `changelogs/<versionCode>.txt`. The **skip-ci token scan**
+  (D-115) runs on *every* PR — it greps the PR's commit messages + title + body (not file contents) for
+  `[skip ci]` / `[ci skip]` / `[no ci]` / `[skip actions]` / `[actions skip]` / `***NO_CI***`. This is a
+  backstop, not a substitute for doing the checklist; if it ever blocks a legitimate change, fix the gate
+  in the same PR (RUNBOOK "When CI fails") rather than working around it.
 
 ### 7. Bumping `targetSdk` (new Android platform)
 First done 35→36 (Android 16) — see `STATE.md` Changelog and the impact matrix it carried.

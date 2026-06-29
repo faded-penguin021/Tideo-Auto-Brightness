@@ -2114,3 +2114,19 @@ the permanent registry — never compress or remove them.
   changelog (older tags, or one forgotten) → `::warning::` + empty file: the release still publishes with
   only the auto "What's Changed", never fails. Works across all three triggers (release:published update,
   workflow_dispatch recovery, push-tag create). CI-only; no app change.
+
+- **D-124: `release-preflight.yml` enforces the release-prep checklist on PRs.** The RUNBOOK §6 checklist
+  (version bump, F-Droid changelog, no version regression, no skip-ci token) was only enforced by the
+  agent/owner by hand; this adds a secret-free `pull_request` gate so a miss is caught before merge. Key
+  design point (owner-requested): the version/changelog checks are **scoped to PRs that actually ship app
+  code** — a step classifies the PR's changed files (via `gh pr view --json files`) and SKIPS the gate when
+  every file is docs/`.github`/`scripts`/`fastlane`/`*.md`/`src/test`/`androidTest` (so the very PR that
+  added this workflow + D-123 docs passes its own check). When a PR ships code it requires: `versionCode`
+  **strictly greater** than the latest `v*` tag's code (catches a forgotten bump — D-099), `versionName`
+  semver-shaped and not regressed, and a non-empty `fastlane/.../changelogs/<versionCode>.txt` (catches a
+  bump with no changelog — D-123 reads it too). Non-ships PRs only assert no-regression (`>=`) + that the
+  current code's changelog still exists. The **skip-ci token scan runs on every PR** — greps the PR's
+  commit messages + title + body (NOT file contents, so the legit token in `clean-dist.yml`'s heredoc and
+  in this doc/RUNBOOK is never matched) for the six GitHub-honored tokens and hard-fails (D-115). Version
+  compares use `sort -V` (numeric: `1.10.0 ≥ 1.9.0`); first-release path (no tags) skips the tag compare.
+  CI-only; no app change. Verified locally: docs/workflow-only → pass, code-PR-without-bump → blocked.
