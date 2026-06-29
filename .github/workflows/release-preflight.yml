@@ -28,6 +28,7 @@ concurrency:
 jobs:
   preflight:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # pure shell + gh, runs in seconds; cap a hung gh call
     steps:
       - name: Checkout (full history + tags)
         uses: actions/checkout@v5

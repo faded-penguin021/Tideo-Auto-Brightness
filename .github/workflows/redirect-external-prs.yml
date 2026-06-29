@@ -24,6 +24,7 @@ jobs:
       github.event.pull_request.user.login != 'faded-penguin021' &&
       github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # single github-script comment + label; cap a hang
     steps:
       - name: Comment and label for triage
         uses: actions/github-script@v8

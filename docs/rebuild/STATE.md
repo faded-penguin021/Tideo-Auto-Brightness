@@ -34,6 +34,11 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-29 — CI-only (no app/version change): workflow hygiene — `timeout-minutes` on every job (caps a
+  hung Gradle daemon / SDK fetch / `gh` call vs GitHub's 360-min default) and `gradle/wrapper/gradle-wrapper.properties`
+  added to the 4 Gradle cache keys (a wrapper bump no longer reuses a stale cache). Prompted by a workflow
+  review; the higher-ceremony suggestions (strict dependency verification, action SHA-pinning, a Gradle
+  task for versionCode) were deliberately declined as wrong cost/benefit for a solo F-Droid app.
 - 2026-06-29 — 1.5.0 / `versionCode 13` (MINOR — observable user-facing behaviour): **D-125** the Curve &
   Brightness screen no longer auto-draws a suggested curve whenever ≥ 9 override points exist. The suggestion
   is now **user-driven** (Tasker task38→preview→task655 parity): the Tools wizard's "Preview graph" stashes

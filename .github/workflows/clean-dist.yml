@@ -25,6 +25,7 @@ concurrency:
 jobs:
   clean:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # quick git op; cap a hang
     steps:
       - name: Checkout
         uses: actions/checkout@v5  # node24 runtime (see build.yml node24 policy)

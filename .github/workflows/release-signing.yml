@@ -14,6 +14,7 @@ permissions:
 jobs:
   build-signed-apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # cap a hung build/sign step (GitHub's default is 360)
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -34,7 +35,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
       # Acceptance ladder (CLAUDE.md) — fail before we sign a broken build.
