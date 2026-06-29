@@ -2097,3 +2097,20 @@ the permanent registry — never compress or remove them.
   context rules. Both call sites toast "Acquiring location…" since an active GPS fix can take several
   seconds. On-device behaviour is owner-verified (Robolectric can't exercise a real provider). Folded into
   the unreleased **1.4.0 / versionCode 12** (no tag yet, so no version bump).
+
+- **D-123: release body auto-reuses the F-Droid changelog as "What's new".** Builds on D-119. The
+  human-written `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (maintained for F-Droid,
+  RUNBOOK §6) was duplicated by hand into the GitHub Release body; now `release.yml` pulls it in
+  automatically. A new "Prepare F-Droid changelog for the release body" step reads the **versionCode**
+  from the tagged `app/build.gradle.kts` (F-Droid names changelogs by versionCode, NOT versionName/tag),
+  looks up the matching `changelogs/<versionCode>.txt`, and writes it (under a `## What's new` heading)
+  to a notes file consumed via `action-gh-release`'s `body_path` + `append_body: true`. action-gh-release
+  composes `existing_body + "\n" + body`, then `+ "\n\n" + generated_notes` (verified against the action
+  source), so the final layout is **owner UI summary → F-Droid "What's new" → auto "What's Changed"**;
+  the owner's text is never overwritten. **Idempotent:** the step prepends a hidden
+  `<!-- fdroid-changelog:<versionCode> -->` HTML-comment marker and first checks the existing release body
+  (via `gh release view`) for it — if present (workflow re-run via `workflow_dispatch`, or both `push`+`release`
+  fired), it emits an EMPTY notes file so the append is a no-op and the block is never duplicated. Missing
+  changelog (older tags, or one forgotten) → `::warning::` + empty file: the release still publishes with
+  only the auto "What's Changed", never fails. Works across all three triggers (release:published update,
+  workflow_dispatch recovery, push-tag create). CI-only; no app change.

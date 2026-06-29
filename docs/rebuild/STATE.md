@@ -34,6 +34,13 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-29 — CI-only (no app/version change): **D-123** `release.yml` now auto-reuses the human-written
+  F-Droid changelog (`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`) as the GitHub Release's
+  "What's new" section — a new step reads the tagged build's versionCode, looks up the matching changelog,
+  and slots it between the owner's UI summary and GitHub's auto "What's Changed" (D-119) via
+  `action-gh-release` `body_path` + `append_body`. Idempotent via a hidden `<!-- fdroid-changelog:<vc> -->`
+  marker (checked against the live release body with `gh release view`); missing changelog → warn + skip,
+  never fails. Owner no longer hand-copies the changelog into the release body. RUNBOOK §6 updated.
 - 2026-06-28 — 1.4.0 / `versionCode 12` (MINOR — observable user-facing behaviour): **D-117** Curve &
   Brightness graph "Now" line + "Live brightness" card now show PERCEIVED brightness in PWM-sensitive
   mode (`targetBrightness ?: lastAppliedBrightness`, like the Dashboard hero), not the floored hardware
