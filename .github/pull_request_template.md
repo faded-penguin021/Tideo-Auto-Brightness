@@ -15,6 +15,11 @@
 <!-- Acceptance ladder (domain/platform/app tests + lint + assembleDebug): green, or which subset ran.
      Call out anything owner-verified-only (on-device behaviour Robolectric / CI can't exercise). -->
 
+## Repo hygiene
+<!-- Meta / infra / process changes NOT tied to app behaviour, so they read separately from the Summary:
+     a new/changed GitHub Actions workflow, build config, docs/RUNBOOK/ledger, refactors, dependency or
+     tooling bumps (e.g. this PR template itself). "None" if this is purely an app change. -->
+
 ## Owner action
 <!-- The handoff: squash-merge (strip any stray skip-ci token from the body, D-115); if this ships a
      release, publish it from the GitHub "Draft a new release" UI; list any on-device Pass A/B gates.

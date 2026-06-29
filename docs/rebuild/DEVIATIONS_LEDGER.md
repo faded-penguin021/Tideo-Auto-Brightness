@@ -2215,3 +2215,13 @@ the permanent registry — never compress or remove them.
   D-126 (gate the in-animation override detection during the resume settle) remains a valid SINGLE-app
   hardening (quirky OEMs can false-fire solo) but does not and should not address the two-instance case.
   Docs-only; no code change.
+
+- **D-129: minimal PR template (`.github/pull_request_template.md`).** Added a 5-section template — Summary,
+  Release impact, Verification, Repo hygiene, Owner action — tailored to this repo's squash-merge + F-Droid
+  release flow. The load-bearing slots: **Owner action** (the recurring handoff — publish from the "Draft a
+  new release" UI, strip any stray skip-ci token per D-115, on-device Pass A/B gates) and a forcing-function
+  prompt under Release impact to **link the F-Droid `changelogs/<versionCode>.txt`** that ships with a bump
+  (reused as the release "What's new", D-123 — if you can't link it, it doesn't exist yet). **Repo hygiene**
+  gives meta/infra changes (a new GitHub Actions workflow, build config, docs, refactors, tooling) their own
+  slot so they read separately from app changes. Prose prompts, not checkbox theater — kept minimal because
+  agents author these PRs and the owner reads them (anti-bloat: cf. D-127). Repo-hygiene change; no code.
