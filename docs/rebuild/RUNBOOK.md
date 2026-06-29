@@ -200,6 +200,12 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   Shizuku authority `${applicationId}.shizuku`) so a test build coexists with the owner's signed
   release without sharing data — keep this (D-106); the debug app has its own storage, so ELEVATED
   needs a separate `pm grant … com.tideo.autobrightness.debug …`.
+  > **⚠️ Run only ONE variant's service at a time (D-128).** Coexistence is for *swapping* (install both,
+  > enable one). If BOTH the debug and release services run at once they fight over the single global
+  > `Settings.System.SCREEN_BRIGHTNESS`: the self-write marker is per-process, so each instance sees the
+  > OTHER's writes as a manual override and pauses — a mutual resume→light-change→pause loop that looks
+  > like a runtime bug but is just two controllers on one setting. Disable (or uninstall) one; a truly
+  > disabled instance is inert (no observer, no writes). This only bites the developer, never an end user.
 - **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
   If anything here was wrong/stale, fix this section in the same change.
 

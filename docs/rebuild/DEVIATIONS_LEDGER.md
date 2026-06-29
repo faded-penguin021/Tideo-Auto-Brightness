@@ -2195,3 +2195,23 @@ the permanent registry — never compress or remove them.
   latest tag, versionCode strictly greater than every released code, semver by nature-of-change — now
   also CI-enforced by `release-preflight.yml`, D-124) + a pointer to where the history lives. RUNBOOK §6
   now says not to re-add a running log there. Comment-only; no behaviour/version change.
+
+- **D-128: two co-installed app variants both running fight over the global `SCREEN_BRIGHTNESS` (dev-only
+  gotcha, NOT a runtime bug).** Owner observed false "manual override" pauses (resume→light-change→pause
+  loop) while testing the debug build with the release build also installed; uninstalling one fixed it.
+  Root cause: `Settings.System.SCREEN_BRIGHTNESS` is a single device-global value, and the self-write
+  filter (`ScreenBrightnessController.lastSelfWriteDevice`, the prof755/D-034 echo suppressor) is
+  PER-PROCESS — so each running instance sees the OTHER instance's animation/initial writes as an external
+  manual override and pauses; each Resume re-writes and re-trips the other → mutual loop. There is no
+  clean cross-process way to tag "this write was my sibling" (a global setting carries no provenance), so
+  this is **inherent to running two auto-brightness controllers at once, not a fixable controller bug**;
+  from one instance's view the other genuinely IS an external writer. Verified a *fully disabled* instance
+  is inert: the `AndroidBrightnessObserver` ContentObserver is registered only by the running
+  `AmbientMonitoringService` (unregistered in `awaitClose`/`controller.stop()`), all brightness writes
+  come only from the running pipeline/PanicHandler, and Boot/Maintenance both no-op when
+  `serviceEnabled=false` — so disabling tears it fully down (the observed interference means the other
+  instance was actually running at the time). Resolution = run ONE variant's service at a time (the D-106
+  coexistence is for *swapping*, not simultaneous operation); RUNBOOK §7 carries the warning. Separately,
+  D-126 (gate the in-animation override detection during the resume settle) remains a valid SINGLE-app
+  hardening (quirky OEMs can false-fire solo) but does not and should not address the two-instance case.
+  Docs-only; no code change.
