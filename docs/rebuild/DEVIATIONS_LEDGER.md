@@ -2164,3 +2164,25 @@ the permanent registry — never compress or remove them.
   Tests: `DraftSettingsViewModelTest.initialSeed_appliesPendingCurveSuggestionPreview_D125` +
   `…consumesPreviewOnce…` (one-shot, no leak), `SettingsScreensTest.toolsWizard_previewGraphButton_passesTheFit_D125`.
   Engine math + goldens untouched. Ships as 1.5.0 / versionCode 13.
+
+- **D-126: Resume-after-override no longer loops back to paused (extend the Set-Initial-Brightness mutex to
+  the in-cycle animation).** Owner report: from the Dashboard gold `OverrideCard`, tapping **Resume**
+  occasionally re-paused on the next light change — a resume→light-change→paused loop. Root cause: the F64
+  post-init/resume **settle window** (`suppressOverrideUntilMs`, the Kotlin port of Tasker's Set Initial
+  Brightness mutex) gated the **ContentObserver** override path (`OverrideMonitor`) but NOT the
+  `AnimationRunner`'s **in-animation** override detection. Resume runs `setInitialBrightness` — an instant,
+  un-smoothed (LuxAlpha=1) **single direct write**, correctly suppressed (self-write marker + settle). But
+  the FIRST animated cycle right after (a real light change) sweeps from that fresh brightness, and the
+  OEM's lingering adaptive/mode-flip adjustment (or round-trip drift) can read out of the animation band →
+  `Result.OVERRIDDEN`. Because `runCycle` returns early on OVERRIDDEN WITHOUT updating `lastAppliedBrightness`,
+  `handleOverride`'s `settled == lastAppliedBrightness` self-write guard (D-049 #1) can't catch it (the
+  screen is mid-sweep, ≠ the stale pre-cycle value) → false pause. **Fix:** `runCycle` now passes
+  `detectOverrides = settings.detectOverrides && !ctx.overrideSuppressed()` to `animationRunner.animate` —
+  i.e. while the settle window is open, the cycle's own transition is not self-detected as an override,
+  exactly as the ContentObserver path already is. New `PipelineRuntimeContext.overrideSuppressed()` =
+  `clock() < suppressOverrideUntilMs`. After the ~1.5 s window, detection resumes normally (the screen is
+  then stable at our value, so a genuine override still pauses). `AnimationRunner` made `open` so a spy can
+  assert the flag; test `BrightnessPipelineControllerTest.cycleDuringSettleWindow_suppressesInAnimationOverrideDetection_D126`
+  (cycle inside the window → `detectOverrides=false` + no pause; after → `true`). Pure runtime fix; engine +
+  goldens untouched. Folded into the unreleased **1.5.0 / versionCode 13** (same branch as D-125; one
+  squash-merged release — no separate bump, and a bug fix is patch-grade under the minor D-125 anyway).

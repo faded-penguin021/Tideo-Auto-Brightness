@@ -44,7 +44,12 @@ One line per shipped change (newest first). Keep terse.
   and leaving the screen discards the draft so **the suggested line disappears on close**. Removed the
   `fittedCurve`/"Suggested" series from `BrightnessCurveChart`; `MIN_FIT_POINTS` now gates only the wizard
   run. Tests: `DraftSettingsViewModelTest.seedDraft_*`, `SettingsScreensTest.toolsWizard_previewGraphButton_passesTheFit_D125`.
-  Engine math + goldens untouched. Changelog `13.txt`.
+  Engine math + goldens untouched. Changelog `13.txt`. **D-126** (folded into the same release): Resume from the
+  Dashboard override pause no longer loops back to paused — the F64 post-init/resume settle window (Tasker's
+  Set-Initial-Brightness mutex) now also suppresses the `AnimationRunner`'s in-cycle override detection
+  (`runCycle` passes `detectOverrides && !ctx.overrideSuppressed()`), so the first animated cycle after a
+  resume isn't mis-seen as a manual override (its own sweep / the OEM mode-flip settling). Test
+  `BrightnessPipelineControllerTest.cycleDuringSettleWindow_…_D126`; `AnimationRunner` made `open` for the spy.
 - 2026-06-29 — CI-only (no app/version change): **D-124** new `release-preflight.yml` PR gate enforces the
   RUNBOOK §6 release-prep checklist before merge — version/changelog checks fire only when the PR **ships
   app code** (docs/workflow/test/metadata-only PRs skip them): on a code PR it requires `versionCode`

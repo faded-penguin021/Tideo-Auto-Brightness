@@ -1,3 +1,10 @@
+Fixes a Resume loop and reworks the curve suggestion preview.
+
+Resuming after a manual brightness override (the gold "Resume" card on the Dashboard) could
+occasionally bounce straight back to the paused state on the next light change. Resuming now
+re-establishes automatic brightness without mistaking its own adjustment for another manual
+override.
+
 Curve suggestion is now something you ask for, not something that just happens.
 
 Before, the Curve & Brightness graph would automatically draw a suggested curve as soon as

@@ -61,8 +61,11 @@ android {
         // user-driven via the Tools wizard's "Preview graph" (loaded into the editable draft: suggested
         // values in the fields, current values in [brackets]) and disappears when the screen is closed,
         // matching Tasker's task38→preview→task655 flow. Observable user-facing behaviour change ⇒ minor.
-        // (D-123/D-124 release-CI changes on the same branch are CI-only.) RULE: version ≥ latest `v*`
-        // tag, versionCode strictly greater than every released code (RUNBOOK §6).
+        // Also folds in D-126 (runtime bug fix, patch-grade under the minor): Resume from the Dashboard
+        // override pause no longer loops back to paused — the post-init/resume settle window now also
+        // gates the in-animation override detection, so the first cycle after a resume isn't mis-seen as
+        // a manual override. (D-123/D-124 release-CI changes on the same branch are CI-only.) RULE:
+        // version ≥ latest `v*` tag, versionCode strictly greater than every released code (RUNBOOK §6).
         versionCode = 13
         versionName = "1.5.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"

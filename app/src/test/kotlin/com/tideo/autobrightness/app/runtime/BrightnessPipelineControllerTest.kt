@@ -510,4 +510,63 @@ class BrightnessPipelineControllerTest {
         assertNull(controller.state.value.threshAbsLow)
         scope.cancel()
     }
+
+    /** Records the [detectOverrides] each animate call received, then lands on the target. */
+    private class SpyAnimationRunner(
+        private val brightness: ScreenBrightnessController,
+    ) : AnimationRunner(brightness) {
+        var lastDetectOverrides: Boolean? = null
+        override suspend fun animate(from: Int, to: Int, steps: Int, waitMs: Long, detectOverrides: Boolean): Result {
+            lastDetectOverrides = detectOverrides
+            brightness.write(to)
+            return Result.COMPLETED
+        }
+    }
+
+    // D-126: the post-init/resume settle window (the Tasker Set-Initial-Brightness mutex) must suppress
+    // the IN-ANIMATION override detection too, not just the ContentObserver echo — otherwise a Resume's
+    // brightness jump followed by a light-change cycle inside the window has its own transition (or the
+    // OEM's lingering mode-flip adjustment) mis-seen as a manual override, re-pausing in a loop.
+    @Test
+    fun cycleDuringSettleWindow_suppressesInAnimationOverrideDetection_D126() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val spy = SpyAnimationRunner(brightness)
+        // Minimal animation → tiny throttle (transitionDurationMs ≈ wait+10), so a second cycle can run
+        // INSIDE the 1500 ms settle window without the throttle gate dropping it.
+        val fast = settings.copy(animSteps = 1, minWaitMs = 1, maxWaitMs = 1)
+        var now = 1000L
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = { fast }, scope = scope, clock = { now }, animationRunner = spy,
+        )
+        controller.start()
+
+        // Seed a cycle (no settle armed yet) → detection is ON. (Rising lux each phase guarantees the
+        // target moves past smoothing inertia, so animate() is actually called every cycle.)
+        sensor.flow.emit(sample(lux = 10.0))
+        advanceUntilIdle()
+        assertEquals(true, spy.lastDetectOverrides, "a normal cycle detects overrides")
+
+        // Resume/context swap re-runs Set Initial Brightness → arms the settle window (1000 → 2500).
+        controller.onContextChanged()
+        advanceUntilIdle()
+
+        // A light-change cycle INSIDE the window: its animation must NOT detect overrides (D-126).
+        spy.lastDetectOverrides = null
+        now = 1100L
+        sensor.flow.emit(sample(lux = 1000.0))
+        advanceUntilIdle()
+        assertEquals(false, spy.lastDetectOverrides, "override detection is suppressed during the settle window")
+        assertTrue(!controller.state.value.paused, "a cycle in the settle window must not re-pause")
+
+        // Past the window: detection resumes for the next cycle.
+        spy.lastDetectOverrides = null
+        now = 10_000L
+        sensor.flow.emit(sample(lux = 100_000.0))
+        advanceUntilIdle()
+        assertEquals(true, spy.lastDetectOverrides, "after the window, override detection resumes")
+        scope.cancel()
+    }
 }

@@ -127,6 +127,7 @@ class BrightnessPipelineController(
     override fun update(transform: (PipelineState) -> PipelineState) = _state.update(transform)
     override fun cacheSettings(settings: AabSettings) { cachedSettings = settings }
     override fun armInitialSettle(untilMs: Long) { suppressOverrideUntilMs = untilMs }
+    override fun overrideSuppressed(): Boolean = clock() < suppressOverrideUntilMs
     override fun postOverrideDetected(observed: Int) { events.trySend(PipelineEvent.OverrideDetected(observed)) }
 
     /** Begin the pipeline: claim foreground state, start the consumer + sensor + observer flows. */
