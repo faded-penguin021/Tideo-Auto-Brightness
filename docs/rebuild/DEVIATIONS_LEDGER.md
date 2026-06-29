@@ -2126,10 +2126,19 @@ the permanent registry — never compress or remove them.
   semver-shaped and not regressed, and a non-empty `fastlane/.../changelogs/<versionCode>.txt` (catches a
   bump with no changelog — D-123 reads it too). Non-ships PRs only assert no-regression (`>=`) + that the
   current code's changelog still exists. The **skip-ci token scan runs on every PR** — greps the PR's
-  commit messages + title + body (NOT file contents, so the legit token in `clean-dist.yml`'s heredoc and
+  **commit messages + PR title** (NOT file contents, so the legit token in `clean-dist.yml`'s heredoc and
   in this doc/RUNBOOK is never matched) for the six GitHub-honored tokens and hard-fails (D-115). Version
   compares use `sort -V` (numeric: `1.10.0 ≥ 1.9.0`); first-release path (no tags) skips the tag compare.
   CI-only; no app change. Verified locally: docs/workflow-only → pass, code-PR-without-bump → blocked.
+  **Correction (same branch):** the scan initially also read the free-form **PR body** and immediately
+  false-failed its own PR (#82), whose body legitimately documented the token in the owner-handoff
+  instructions. Narrowed to commit messages + PR title — the text that actually becomes the squash commit
+  (subject = PR title, body = folded commit messages), i.e. the real D-115 vector. The PR body is exempt
+  because GitHub doesn't honor the token in a PR description for the PR's own checks, `pull_request` never
+  re-runs on body `edited` (so a body scan can neither be cleared nor catch a later edit), and a
+  self-documenting repo must be able to *describe* the token in a PR body without breaking CI. The "avoid
+  the literal in commit messages / PR title" rule stays machine-enforced; "avoid it in the PR body" stays
+  a soft human guideline (RUNBOOK §6) since the owner controls the squash body at merge.
 
 - **D-125: curve suggestion on the Curve & Brightness screen is user-driven, not auto-fit; dashed gold
   reference is the hardcoded baseline.** The screen previously computed `CurveSuggestionEngine.suggest(...)`

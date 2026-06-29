@@ -102,15 +102,18 @@ commit and reads its metadata. The **in-app version is decoupled from the tag** 
 so check it explicitly.
 
 > **⚠️ NEVER write the literal `[skip ci]` (or `[ci skip]` / `[no ci]` / `***NO_CI***`) in a commit
-> message OR a PR description (D-115).** GitHub honors that token on `push`/`pull_request` events, and a
-> **squash-merge folds every commit message into the squash commit body** — so a stray `[skip ci]`
+> message or the PR title (D-115).** GitHub honors that token on `push`/`pull_request` events, and a
+> **squash-merge folds the commit messages + PR title into the squash commit** — so a stray `[skip ci]`
 > (even as descriptive prose, e.g. documenting `clean-dist.yml`) lands on `main` and **silently skips
 > ALL workflows for that commit**, including `build`/`codeql` on the push AND `release.yml` on the tag
 > that points at it (this is exactly why v1.2.0's release "didn't run"). `release.yml` now primarily
 > triggers on `release: published` (immune to skip-ci) + a `workflow_dispatch` fallback, but the token
-> still skips the main-push `build`/`codeql`. The only legitimate use of the token is inside a
-> workflow's OWN auto-commit heredoc (e.g. `clean-dist.yml`). If a release's workflow was skipped, run
-> **Actions → Release → "Run workflow"** with the tag, or re-publish the release.
+> still skips the main-push `build`/`codeql`. `release-preflight.yml` machine-enforces this on commit
+> messages + PR title (D-124). **The PR body may freely *document* the token** (the scan exempts it, so
+> a PR can explain release CI without false-failing) — but if your squash setting uses the PR
+> description, prefer the hyphenated `skip-ci` there too. The only legitimate use of the literal is
+> inside a workflow's OWN auto-commit heredoc (e.g. `clean-dist.yml`). If a release's workflow was
+> skipped, run **Actions → Release → "Run workflow"** with the tag, or re-publish the release.
 
 - **Check the current release state first** (tags are not always present in a fresh clone):
   ```bash

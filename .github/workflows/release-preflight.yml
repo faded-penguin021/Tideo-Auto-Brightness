@@ -37,10 +37,15 @@ jobs:
           fetch-tags: true
 
       # ---------------------------------------------------------------------------------------------
-      # 1. skip-ci token guard (every PR). The only legitimate use of the token is inside a workflow's
-      #    OWN auto-commit heredoc (clean-dist.yml) — that's FILE content, which this scan never reads.
-      #    We scan only the PR's commit messages + title + body, which is exactly what a squash-merge
-      #    can fold onto main (D-115).
+      # 1. skip-ci token guard (every PR). Scans the COMMIT MESSAGES + PR TITLE — the text that actually
+      #    becomes the squash commit (subject = PR title, body = folded commit messages), i.e. the real
+      #    D-115 vector. The free-form PR BODY is deliberately NOT scanned: GitHub does not honor the
+      #    token in a PR description for the PR's own checks, `pull_request` doesn't even re-run on body
+      #    `edited`, and — being a self-documenting repo — a PR legitimately needs to *describe* the token
+      #    (this very check, the RUNBOOK, D-115/D-124) without false-failing. The only other legitimate
+      #    use is inside a workflow's own auto-commit heredoc (clean-dist.yml) — FILE content, never read
+      #    here. (D-124; narrowed from an initial title+body+commits scan that false-failed PR #82, whose
+      #    body legitimately documented the token.)
       # ---------------------------------------------------------------------------------------------
       - name: Guard against skip-ci tokens (D-115)
         env:
@@ -48,23 +53,24 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          gh pr view "$PR" --json title,body,commits \
-            --jq '.title, (.body // ""), (.commits[] | .messageHeadline, (.messageBody // ""))' > pr_text.txt
+          gh pr view "$PR" --json title,commits \
+            --jq '.title, (.commits[] | .messageHeadline, (.messageBody // ""))' > pr_text.txt
           # GitHub honors all of these on push/pull_request events.
           TOKENS=('[skip ci]' '[ci skip]' '[no ci]' '[skip actions]' '[actions skip]' '***NO_CI***')
           found=0
           for t in "${TOKENS[@]}"; do
             if grep -Fq "$t" pr_text.txt; then
-              echo "::error::Forbidden CI-skip token \"$t\" found in a commit message, PR title, or PR body."
+              echo "::error::Forbidden CI-skip token \"$t\" found in a commit message or the PR title."
               found=1
             fi
           done
           if [ "$found" -ne 0 ]; then
-            echo "::error::A squash-merge folds these into the squash commit body; GitHub then skips ALL"
-            echo "::error::workflows for that commit and its release tag (D-115). Reword the message(s)."
+            echo "::error::A squash-merge folds commit messages + the PR title into the squash commit;"
+            echo "::error::GitHub then skips ALL workflows for that commit and its release tag (D-115)."
+            echo "::error::Reword the offending commit message / PR title (use 'skip-ci', not the literal)."
             exit 1
           fi
-          echo "No skip-ci tokens in commit messages / PR title / body. ✓"
+          echo "No skip-ci tokens in commit messages / PR title. ✓"
 
       # ---------------------------------------------------------------------------------------------
       # 2. Does this PR ship app code? If EVERY changed file is docs/workflow/test/metadata, the
