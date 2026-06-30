@@ -136,14 +136,13 @@ fun ContextRulesSection(
     var editing by remember { mutableStateOf<ContextRule?>(null) }
 
     Text(
-        "Switch to a different profile automatically based on the foreground app, " +
-            "Wi-Fi, time of day or charging state.",
+        stringResource(R.string.contexts_intro),
         style = MaterialTheme.typography.bodyMedium,
     )
     Button(
         onClick = { editing = ContextRule(id = UUID.randomUUID().toString(), name = "", profile = profileNames.firstOrNull() ?: "Default") },
         modifier = Modifier.fillMaxWidth().testTag("add_context_rule"),
-    ) { Text("Add rule") }
+    ) { Text(stringResource(R.string.contexts_add_rule)) }
 
     // A saved per-app rule can't trigger without usage access (it has no way to read the foreground
     // app). Surface it on the list too, not only inside the editor, so a rule that silently never
@@ -155,21 +154,20 @@ fun ContextRulesSection(
         ) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "Per-app rules need usage access to detect the foreground app. " +
-                        "Without it they never trigger.",
+                    stringResource(R.string.contexts_usage_warning),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                 )
                 OutlinedButton(
                     onClick = onRequestUsageAccess,
                     modifier = Modifier.testTag("list_grant_usage_access"),
-                ) { Text("Grant usage access") }
+                ) { Text(stringResource(R.string.contexts_grant_usage)) }
             }
         }
     }
 
     if (rules.isEmpty()) {
-        EmptyState("No rules yet.", testTag = "empty_rules")
+        EmptyState(stringResource(R.string.contexts_no_rules), testTag = "empty_rules")
     }
     rules.forEach { rule ->
         RuleCard(
@@ -225,7 +223,7 @@ private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(rule.name.ifBlank { "(unnamed)" }, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(rule.name.ifBlank { stringResource(R.string.contexts_unnamed) }, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             if (isActive) {
                 Text(
                     stringResource(R.string.profiles_active_tag),
@@ -236,26 +234,26 @@ private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Loads", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.contexts_loads), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 rule.profile,
                 style = MaterialTheme.typography.titleSmall,
                 color = AabGold,
                 modifier = Modifier.testTag("rule_target_${rule.id}"),
             )
-            Text("· priority ${rule.priority}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.contexts_priority_suffix, rule.priority), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(rule.triggers.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit_${rule.id}")) { Text("Edit") }
-            TextButton(onClick = { confirmDelete = true }, modifier = Modifier.testTag("delete_${rule.id}")) { Text("Delete") }
+            OutlinedButton(onClick = onEdit, modifier = Modifier.testTag("edit_${rule.id}")) { Text(stringResource(R.string.action_edit)) }
+            TextButton(onClick = { confirmDelete = true }, modifier = Modifier.testTag("delete_${rule.id}")) { Text(stringResource(R.string.confirm_delete)) }
         }
     }
 
     if (confirmDelete) {
         ConfirmDialog(
             title = stringResource(R.string.confirm_delete_rule_title),
-            message = stringResource(R.string.confirm_delete_rule_msg, rule.name.ifBlank { "(unnamed)" }),
+            message = stringResource(R.string.confirm_delete_rule_msg, rule.name.ifBlank { stringResource(R.string.contexts_unnamed) }),
             confirmLabel = stringResource(R.string.confirm_delete),
             confirmTag = "confirm_delete_${rule.id}",
             onConfirm = { confirmDelete = false; onDelete() },
@@ -392,13 +390,13 @@ private fun RuleEditor(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            SectionHeader("Rule", divider = true)
+            SectionHeader(stringResource(R.string.contexts_rule_header), divider = true)
             OutlinedTextField(
-                value = name, onValueChange = { name = it }, label = { Text("Name") },
+                value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.field_name)) },
                 singleLine = true, modifier = Modifier.fillMaxWidth().testTag("rule_name"),
             )
 
-            Text("Switch to profile:", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.contexts_switch_profile), style = MaterialTheme.typography.labelMedium)
             // D-114b: emphasise the selected profile — gold + titleSmall (matching the rule card's
             // "Loads <profile>") with a dropdown caret, so the chosen target stands out in the editor.
             // The DropdownMenu MUST be wrapped in a Box with its anchor button (like ProfileCard's
@@ -420,7 +418,7 @@ private fun RuleEditor(
                 value = priorityText,
                 // 1–100 scale: digits only, max 3 chars; the value is clamped to 1..100 on save.
                 onValueChange = { priorityText = it.filter(Char::isDigit).take(3) },
-                label = { Text("Priority (1–100, higher wins)") },
+                label = { Text(stringResource(R.string.contexts_priority_label)) },
                 singleLine = true,
                 isError = priorityOverMax,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -435,17 +433,16 @@ private fun RuleEditor(
                 )
             }
 
-            SectionHeader("Triggers", divider = true)
+            SectionHeader(stringResource(R.string.contexts_triggers_header), divider = true)
             Text(
-                "Turn on only the conditions this rule should match. The rule loads its profile when " +
-                    "ALL enabled triggers are satisfied.",
+                stringResource(R.string.contexts_triggers_intro),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            TriggerSection("Wi-Fi", wifiEnabled, { wifiEnabled = it }, "wifi") {
+            TriggerSection(stringResource(R.string.contexts_trigger_wifi), wifiEnabled, { wifiEnabled = it }, "wifi") {
                 OutlinedTextField(
-                    value = wifi, onValueChange = { wifi = it }, label = { Text("Wi-Fi SSIDs (comma-separated)") },
+                    value = wifi, onValueChange = { wifi = it }, label = { Text(stringResource(R.string.contexts_wifi_ssids)) },
                     modifier = Modifier.fillMaxWidth().testTag("rule_wifi"),
                 )
                 TextButton(
@@ -460,20 +457,20 @@ private fun RuleEditor(
                         }
                     },
                     modifier = Modifier.testTag("use_current_ssid"),
-                ) { Text("Use current Wi-Fi") }
+                ) { Text(stringResource(R.string.contexts_use_current_wifi)) }
             }
 
-            TriggerSection("Time & day", timeEnabled, { timeEnabled = it }, "time") {
+            TriggerSection(stringResource(R.string.contexts_trigger_time), timeEnabled, { timeEnabled = it }, "time") {
                 // G2R-F28: time inputs open the system TimePicker modal; SUNRISE/SUNSET tokens are kept
                 // as one-tap alternatives (the resolver accepts them, G2-F14).
-                Text("Time window:", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.contexts_time_window), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
-                        TimeField("From", startTime, "start") { startTime = it }
+                        TimeField(stringResource(R.string.contexts_time_from), startTime, "start") { startTime = it }
                         TimeTokenRow("start", solarLabel) { startTime = it }
                     }
                     Column(Modifier.weight(1f)) {
-                        TimeField("To", endTime, "end") { endTime = it }
+                        TimeField(stringResource(R.string.contexts_time_to), endTime, "end") { endTime = it }
                         TimeTokenRow("end", solarLabel) { endTime = it }
                     }
                 }
@@ -482,39 +479,39 @@ private fun RuleEditor(
                     TextButton(
                         onClick = { startTime = ""; endTime = "" },
                         modifier = Modifier.testTag("clear_time"),
-                    ) { Text("Clear time") }
+                    ) { Text(stringResource(R.string.contexts_clear_time)) }
                 }
                 // Day-of-week picker (G2R-F67): overnight windows wrap; the resolver attributes the
                 // post-midnight tail to the previous day's membership (D-014).
-                Text("Days (none = every day):", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.contexts_days), style = MaterialTheme.typography.labelMedium)
                 DayPicker(selectedDays.value) { day ->
                     selectedDays.value = if (day in selectedDays.value) selectedDays.value - day else selectedDays.value + day
                 }
             }
 
-            TriggerSection("Location", locationEnabled, { locationEnabled = it }, "location") {
+            TriggerSection(stringResource(R.string.contexts_trigger_location), locationEnabled, { locationEnabled = it }, "location") {
                 OutlinedButton(
                     onClick = { onUseCurrentLocation { la, lo -> lat = "%.5f".format(la); lon = "%.5f".format(lo) } },
                     modifier = Modifier.testTag("use_current_location"),
-                ) { Text("Use current location") }
+                ) { Text(stringResource(R.string.action_use_current_location)) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = lat, onValueChange = { lat = it }, label = { Text("Latitude") },
+                        value = lat, onValueChange = { lat = it }, label = { Text(stringResource(R.string.field_latitude)) },
                         singleLine = true, modifier = Modifier.weight(1f).testTag("rule_lat"),
                     )
                     OutlinedTextField(
-                        value = lon, onValueChange = { lon = it }, label = { Text("Longitude") },
+                        value = lon, onValueChange = { lon = it }, label = { Text(stringResource(R.string.field_longitude)) },
                         singleLine = true, modifier = Modifier.weight(1f).testTag("rule_lon"),
                     )
                 }
                 OutlinedTextField(
                     value = radius, onValueChange = { radius = it.filter { c -> c.isDigit() || c == '.' } },
-                    label = { Text("Radius (metres)") }, singleLine = true,
+                    label = { Text(stringResource(R.string.contexts_radius)) }, singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("rule_radius"),
                 )
             }
 
-            TriggerSection("Battery", batteryEnabled, { batteryEnabled = it }, "battery") {
+            TriggerSection(stringResource(R.string.contexts_trigger_battery), batteryEnabled, { batteryEnabled = it }, "battery") {
                 // Owner finding: put this toggle on the LEFT (the section-enable switches are on the
                 // right) so it doesn't read as another section toggle.
                 Row(
@@ -527,26 +524,26 @@ private fun RuleEditor(
                         onCheckedChange = { charging = it },
                         modifier = Modifier.testTag("rule_charging"),
                     )
-                    Text("Only while charging", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.contexts_only_charging), style = MaterialTheme.typography.bodyMedium)
                 }
                 // Battery percentage window (G2R-F31). Either bound may be left blank for "any".
-                Text("Battery percentage:", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.contexts_battery_pct), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = battMin, onValueChange = { battMin = it.filter(Char::isDigit) },
-                        label = { Text("From %") }, singleLine = true,
+                        label = { Text(stringResource(R.string.contexts_from_pct)) }, singleLine = true,
                         modifier = Modifier.weight(1f).testTag("rule_batt_min"),
                     )
                     OutlinedTextField(
                         value = battMax, onValueChange = { battMax = it.filter(Char::isDigit) },
-                        label = { Text("To %") }, singleLine = true,
+                        label = { Text(stringResource(R.string.contexts_to_pct)) }, singleLine = true,
                         modifier = Modifier.weight(1f).testTag("rule_batt_max"),
                     )
                 }
             }
 
             if (apps.isNotEmpty()) {
-                TriggerSection("Foreground apps", appsEnabled, { appsEnabled = it }, "apps") {
+                TriggerSection(stringResource(R.string.contexts_trigger_apps), appsEnabled, { appsEnabled = it }, "apps") {
                     // Per-app rules need usage access to read the foreground app (G2-F14): prompt when set.
                     if (selectedApps.value.isNotEmpty() && !hasUsageAccess()) {
                         Card(
@@ -555,12 +552,12 @@ private fun RuleEditor(
                         ) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    "Usage access is required to detect the foreground app.",
+                                    stringResource(R.string.contexts_usage_required),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                 )
                                 OutlinedButton(onClick = onRequestUsageAccess, modifier = Modifier.testTag("grant_usage_access")) {
-                                    Text("Grant usage access")
+                                    Text(stringResource(R.string.contexts_grant_usage))
                                 }
                             }
                         }
@@ -606,11 +603,11 @@ private fun RuleEditor(
                 TextButton(
                     onClick = onCancel,
                     modifier = Modifier.weight(1f).testTag("cancel_rule"),
-                ) { Text("Cancel") }
+                ) { Text(stringResource(R.string.confirm_cancel)) }
                 Button(
                     onClick = { saveRule() },
                     modifier = Modifier.weight(1f).testTag("save_rule"),
-                ) { Text("Save rule") }
+                ) { Text(stringResource(R.string.contexts_save_rule)) }
             }
             // Clearance below the buttons so they always scroll past the gesture pill / 3-button bar,
             // even though the dialog reports a zero bottom inset here (D-098).
@@ -665,7 +662,7 @@ private fun TimeField(label: String, value: String, tag: String, onSet: (String)
     OutlinedButton(
         onClick = { showPicker = true },
         modifier = Modifier.fillMaxWidth().testTag("rule_$tag"),
-    ) { Text("$label: ${value.ifBlank { "—" }}") }
+    ) { Text(stringResource(R.string.contexts_picker_value, label, value.ifBlank { "—" })) }
 
     if (showPicker) {
         val state = rememberTimePickerState(initialHour = initialH, initialMinute = initialM, is24Hour = true)
@@ -675,9 +672,9 @@ private fun TimeField(label: String, value: String, tag: String, onSet: (String)
                 TextButton(
                     onClick = { onSet("%02d:%02d".format(state.hour, state.minute)); showPicker = false },
                     modifier = Modifier.testTag("${tag}_time_ok"),
-                ) { Text("OK") }
+                ) { Text(stringResource(R.string.action_ok)) }
             },
-            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.confirm_cancel)) } },
             text = { TimePicker(state = state) },
         )
     }

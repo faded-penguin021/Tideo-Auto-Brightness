@@ -412,6 +412,21 @@
     <string name="circadian_today_word">today</string>
 
     <!-- Contexts (rule list + editor) -->
+    <string name="contexts_intro">Switch to a different profile automatically based on the foreground app, Wi-Fi, time of day or charging state.</string>
+    <string name="contexts_usage_warning">Per-app rules need usage access to detect the foreground app. Without it they never trigger.</string>
+    <string name="contexts_no_rules">No rules yet.</string>
+    <string name="contexts_unnamed">(unnamed)</string>
+    <string name="contexts_rule_header">Rule</string>
+    <string name="contexts_triggers_header">Triggers</string>
+    <string name="contexts_triggers_intro">Turn on only the conditions this rule should match. The rule loads its profile when ALL enabled triggers are satisfied.</string>
+    <string name="contexts_trigger_wifi">Wi-Fi</string>
+    <string name="contexts_trigger_time">Time &amp; day</string>
+    <string name="contexts_trigger_location">Location</string>
+    <string name="contexts_trigger_battery">Battery</string>
+    <string name="contexts_trigger_apps">Foreground apps</string>
+    <string name="contexts_usage_required">Usage access is required to detect the foreground app.</string>
+    <string name="contexts_time_from">From</string>
+    <string name="contexts_time_to">To</string>
     <string name="contexts_add_rule">Add rule</string>
     <string name="contexts_grant_usage">Grant usage access</string>
     <string name="contexts_loads">Loads</string>
@@ -470,6 +485,16 @@
     <string name="help_taper_steepness">Slope of the dynamic-range compression.</string>
     <string name="help_circadian_ip_fallback">Off by default. When GPS/network gives no fix and no fixed location is set, turn this on to look up an approximate location from your public IP via ipwho.is (HTTPS). This also powers \"Use current location\" below when no on-device fix is available.</string>
 
+    <!-- Profiles import/export status (shown as a toast) -->
+    <string name="toast_exported">Exported.</string>
+    <string name="toast_export_failed">Export failed: %1$s</string>
+    <string name="toast_imported">Imported.</string>
+    <string name="toast_import_failed">Import failed: %1$s</string>
+    <string name="toast_load_failed">Load failed</string>
+    <string name="toast_loaded_entry">Loaded %1$s</string>
+    <string name="toast_load_failed_detail">Load failed: %1$s</string>
+    <string name="profiles_unreadable">Couldn\'t read this profile. It isn\'t a Tideo export or a Tasker AAB config.</string>
+
     <!-- Profiles (body + dialogs) -->
     <string name="profiles_save_as">Save current settings as…</string>
     <string name="profiles_resume_context">Resume context automation</string>
@@ -478,4 +503,11 @@
     <string name="profiles_saving_these">Saving these settings:</string>
     <string name="profiles_load_confirm_title">Load “%1$s”?</string>
     <string name="profiles_current_settings_title">Current settings</string>
+    <string name="profiles_saved_header">Saved profiles</string>
+    <string name="profiles_legacy_hint">Grant the Download/AAB/configs folder once to load profiles saved by the Tasker app.</string>
+    <string name="profiles_context_paused">Context automation is paused after a manual profile load.</string>
+    <string name="profiles_builtin_suffix">"  (built-in)"</string>
+    <string name="profiles_factory_defaults">Factory defaults</string>
+    <string name="profiles_changed_count">%1$d changed from default</string>
+    <string name="profiles_load_replace_warn">These settings will replace your current configuration.</string>
 </resources>
