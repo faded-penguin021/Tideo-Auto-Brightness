@@ -57,6 +57,8 @@ One line per shipped change (newest first). Keep terse.
   immediately (owner report: "Charging" P81 didn't take over from "Low Battery" P80 until the battery rose
   past the rule boundary — an eval-timing lag, not a ranking bug; the resolver is priority-first). Tests:
   `ContextEngineTest.plugChange_…_D132`, `ContextOverrideResolverTest.higherPriorityWins_…`.
+  **Owner on-device pass confirmed** on the 1.6.0 debug APK (SSID/DUMP read + help dialog, charging
+  re-eval, i18n surfaces, Onboarding Language picker). Owner squash-merges + publishes the v1.6.0 release.
 - 2026-06-29 — CI-only (no app/version change): workflow hygiene — `timeout-minutes` on every job (caps a
   hung Gradle daemon / SDK fetch / `gh` call vs GitHub's 360-min default) and `gradle/wrapper/gradle-wrapper.properties`
   added to the 4 Gradle cache keys (a wrapper bump no longer reuses a stale cache). Prompted by a workflow
