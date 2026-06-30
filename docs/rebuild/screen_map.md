@@ -664,29 +664,45 @@ destination. The S12.5a drawer is retired.
 
 ---
 
-## S12 implementation status (2026-06-13)
+## Screen inventory — as shipped (refreshed 2026-06-30)
 
-The consolidation matrix above is now realized in Compose. Mapping of target screens → files:
+> This was first written as a dated **S12 implementation status (2026-06-13)** snapshot; it is
+> refreshed here to the **routed** screens in `navigation/NavGraph.kt` (the source of truth). Several
+> screens were renamed/merged after that snapshot — the stage/deviation tags below preserve the
+> lineage. (Ground truth is code; if this drifts again, trust `NavGraph.kt` + the screen files.)
 
-- **Curve & Brightness** → `ui/screens/CurveBrightnessScreen.kt` (min/max/offset/scale, zones,
-  form1A/2B/2C + live derived form2A/form3A readout + task583/707 validator errors) + the
-  `BrightnessCurveChart` template on the reusable `ui/graph/ChartCanvas.kt` engine.
-- **Reactivity** → `ReactivityScreen.kt` (thresholds + midpoint/steepness/deltaFactor; DetectOverrides
-  + trust-unreliable toggles — surfaces the Gate-1 D-041 F2 toggle). ReactivityChart slot → S13.
-- **Animation & Dimming** → `AnimationDimmingScreen.kt` (animSteps/min/max wait + derived throttle;
-  ELEVATED-gated dimming rows w/ tier hint + onboarding link — surfaces D-041 F5 DimmingEnabled; PWM).
-  Dimming/Circadian charts → S13.
-- **Dynamic Scale** → `DynamicScaleScreen.kt` (scaling enable/spread/steepness/transition + taper
-  midpoint/steepness; task517/674/689 warnings). Experiment/Taper charts → S13.
-- **Contexts** → `ContextsScreen.kt` (rule list CRUD: app picker, Wi-Fi, time window, charging,
-  profile + priority) over `ContextRuleStore` (S10).
-- **Tools** → `ToolsScreen.kt` (curve-wizard runner over `CurveSuggestionEngine` + applyToLiveCurve;
-  10-label debug selector D-023; power-draw calibration entry + PowerDrawChart slot → S13).
-- **Profiles & Import/Export** → `ProfilesScreen.kt` (built-in profile apply, reset, CreateDocument/
-  OpenDocument JSON + legacy-Tasker import-export via `ProfileImportExportManager`).
-- **About & Guide** → still `PlaceholderScreen` (S13).
+Routed screens (`AppRoute` → `ui/screens/*.kt`):
 
-Chart engine (`ChartCanvas.kt`) + the one template instance (`BrightnessCurveChart.kt`) are the
-"copy this pattern" base for S13's remaining six charts. Deferred to S13/later (D-044): the six
-non-template charts' render, on-device power-draw measurement, in-app debug log view, and the
-unprivileged DC-like overlay dimming (task698/653/654).
+- **Menu** → `MenuScreen.kt` — the canonical hub / start destination after onboarding; back-target from
+  every settings/tool screen (S12.6a, G2R-F1/F2).
+- **Dashboard** → `DashboardScreen.kt` — live brightness / lux / profile / context hero, override &
+  resume banners (D-110/D-111/D-126).
+- **Curve & Brightness** → `CurveBrightnessScreen.kt` (+ `BrightnessCurveChart` on the reusable
+  `ui/graph/ChartCanvas.kt` engine) — curve-zone coefficients, draft→Apply; the brightness range
+  (min/max/offset/scale) moved to **Misc** (G2-F2). Suggestion preview seeds the draft (D-125).
+- **Reactivity** → `ReactivityScreen.kt` (+ `ReactivityChart`) — thresholds, midpoint/steepness/
+  deltaFactor, DetectOverrides + trust-unreliable toggles (D-041 F2).
+- **Super Dimming** → `SuperDimmingScreen.kt` (+ `DimmingChart`) — **renamed from "Animation & Dimming"**
+  (S12.6a, G2R-F3): super dimming (ELEVATED) + PWM/software dimming, mutually exclusive (G2-F10); the
+  animation fields moved to **Misc** (G2-F2).
+- **Circadian** → `CircadianScreen.kt` (+ Experiment / Taper graphs) — **renamed from "Dynamic Scale"**
+  (S12.6a, G2R-F4): day/night curve scaling + location staleness hints (D-110).
+- **Misc** → `MiscScreen.kt` — brightness range + animation (both as sliders) + notifications (G2-F2).
+- **Tools** → `ToolsScreen.kt` (+ `PowerDrawChart`) — curve-suggestion wizard (`CurveSuggestionEngine`)
+  + power-draw calibration.
+- **Live Debug** → `LiveDebugScreen.kt` — the 10 named `%AAB_Debug` categories (D-023) + panic
+  sensitivity slider (D-116); the debug-category selector lives here now (S12.6b, G2R-F9).
+- **Profiles & Contexts** → `ProfilesContextsScreen.kt` — **merged Profiles + Contexts** (S12.9f, D-070):
+  saved-profile CRUD / import-export (`ProfilesBody`, housed in `ProfilesScreen.kt`) above a context-rule
+  list/editor (`ContextRulesSection`, housed in `ContextsScreen.kt`) over `ContextRuleStore`. After the
+  merge, `ProfilesScreen.kt` and `ContextsScreen.kt` are **reused component-houses, not routed screens**.
+  The rule editor's "Use current SSID" shows the no-Location SSID-help dialog (Shizuku/root/ADB-DUMP, D-130).
+- **User Guide** → `UserGuideScreen.kt` — static themed HTML in a `WebView` (no JS / no network).
+- **About** → `AboutScreen.kt` — About / MIT-license page (Chart.js acknowledgment dropped — charts are
+  native Compose now).
+
+(Plus the non-`AppRoute` **Onboarding** flow, `ui/onboarding/OnboardingScreen.kt`.)
+
+Charts: all are implemented natively on `ChartCanvas.kt` (`BrightnessCurveChart`, `ReactivityChart`,
+`DimmingChart`, the Circadian Experiment/Taper graphs, `PowerDrawChart`) — the S13 "remaining six charts"
+deferral (D-044) is complete and Chart.js is removed.

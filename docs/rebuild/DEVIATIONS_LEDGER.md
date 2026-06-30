@@ -1043,7 +1043,11 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   SUNSET tokens vertically with `maxLines=1`/`softWrap=false` (no more char-wrap). (5) **F87:** app picker
   `heightIn(max=220→400.dp)`. (6) **F89 permissions audit:** declared `ACCESS_BACKGROUND_LOCATION` (FGS reads
   location while backgrounded); PACKAGE_USAGE_STATS kept (usage-access appop, already wired); DUMP NOT declared
-  (signature-only, the dumpsys SSID path degrades). **Fence honoured: domain/ + golden vectors + ChartCanvas
+  (signature-only, the dumpsys SSID path degrades). [⚠ **STALE — superseded by D-130**: the "DUMP NOT declared"
+  call was wrong. DUMP is `signature|privileged` **and `development`**, so it is user-grantable over ADB
+  (`pm grant … android.permission.DUMP`), exactly like WRITE_SECURE_SETTINGS; it is now declared and the
+  in-process `dumpsys wifi` SSID path is wired up + surfaced. This bracket is an append-only correction — the
+  original wording is preserved per the ledger's never-edit rule.] **Fence honoured: domain/ + golden vectors + ChartCanvas
   untouched.** Affects S12.8b only; **S13 inherits the `ChartSlot`/`ChartPager` contract** for the chart slots.
 
 - **D-069 (S12.9) — engineering-quality & parity-debt remediation stage created (a–f); review verified
