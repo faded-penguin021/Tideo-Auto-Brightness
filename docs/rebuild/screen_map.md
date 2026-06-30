@@ -685,8 +685,9 @@ Routed screens (`AppRoute` → `ui/screens/*.kt`):
 - **Super Dimming** → `SuperDimmingScreen.kt` (+ `DimmingChart`) — **renamed from "Animation & Dimming"**
   (S12.6a, G2R-F3): super dimming (ELEVATED) + PWM/software dimming, mutually exclusive (G2-F10); the
   animation fields moved to **Misc** (G2-F2).
-- **Circadian** → `CircadianScreen.kt` (+ Experiment / Taper graphs) — **renamed from "Dynamic Scale"**
-  (S12.6a, G2R-F4): day/night curve scaling + location staleness hints (D-110).
+- **Circadian** → `CircadianScreen.kt` (+ the **Circadian graph** `CircadianScaleChart` — formerly
+  "Experiment", housed in `graph/ExperimentChart.kt` — and `TaperChart`) — screen **renamed from
+  "Dynamic Scale"** (S12.6a, G2R-F4): day/night curve scaling + location staleness hints (D-110).
 - **Misc** → `MiscScreen.kt` — brightness range + animation (both as sliders) + notifications (G2-F2).
 - **Tools** → `ToolsScreen.kt` (+ `PowerDrawChart`) — curve-suggestion wizard (`CurveSuggestionEngine`)
   + power-draw calibration.
@@ -704,5 +705,5 @@ Routed screens (`AppRoute` → `ui/screens/*.kt`):
 (Plus the non-`AppRoute` **Onboarding** flow, `ui/onboarding/OnboardingScreen.kt`.)
 
 Charts: all are implemented natively on `ChartCanvas.kt` (`BrightnessCurveChart`, `ReactivityChart`,
-`DimmingChart`, the Circadian Experiment/Taper graphs, `PowerDrawChart`) — the S13 "remaining six charts"
-deferral (D-044) is complete and Chart.js is removed.
+`DimmingChart`, the Circadian-screen `CircadianScaleChart` — formerly "Experiment" — and `TaperChart`,
+`PowerDrawChart`) — the S13 "remaining six charts" deferral (D-044) is complete and Chart.js is removed.
