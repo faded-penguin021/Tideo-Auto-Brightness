@@ -278,6 +278,12 @@
     <string name="onboarding_try_root">Try root</string>
 
     <!-- Tools (curve wizard) -->
+    <string name="title_tools">Tools</string>
+    <string name="tools_power_header">Power-draw calibration</string>
+    <string name="tools_wizard_desc">Fits a brightness curve to your recorded manual overrides (needs ≥ 9 points).</string>
+    <string name="tools_inertia">Inertia (τ): %1$s — lower follows your points, higher stays near the current curve</string>
+    <string name="tools_not_enough_points">Not enough recorded override points (need ≥ %1$d real points, have %2$d).</string>
+    <string name="tools_fit_failed">Could not fit a curve to the recorded points.</string>
     <string name="tools_wizard_title">Curve suggestion wizard</string>
     <string name="tools_recorded_points">Recorded points: %1$d</string>
     <string name="tools_run_wizard">Run wizard</string>
@@ -286,8 +292,32 @@
     <string name="tools_copy_full_report">Copy full report</string>
 
     <!-- Curve &amp; Brightness -->
+    <string name="curve_zones_header">Curve zones</string>
+    <string name="curve_form1a">Zone 1 scaling (form1A)</string>
+    <string name="curve_zone1_end">Zone 1 end (lux)</string>
+    <string name="curve_form2b">Zone 2 scaling (form2B)</string>
+    <string name="curve_form2c">Zone 2 offset (form2C)</string>
+    <string name="curve_zone2_end">Zone 2 end (lux)</string>
+    <string name="curve_derived_header">Derived (continuity)</string>
+    <string name="curve_form2a">Zone 2 alignment (form2A)</string>
+    <string name="curve_form3a">Zone 3 alignment (form3A)</string>
     <string name="curve_delete_point_title">Delete override point?</string>
     <string name="curve_delete_point_msg">Lux %1$.1f → brightness %2$d</string>
+
+    <!-- Reactivity -->
+    <string name="react_graph_curve">Reactivity curve</string>
+    <string name="react_graph_alpha">Smoothing α</string>
+    <string name="react_thresholds_header">Reactivity thresholds</string>
+    <string name="react_smoothing_header">Sensor smoothing</string>
+    <string name="react_override_header">Override &amp; trust</string>
+    <string name="react_dark">Dark threshold</string>
+    <string name="react_dim">Dim threshold</string>
+    <string name="react_bright">Bright threshold</string>
+    <string name="react_curve_slope">Curve slope</string>
+    <string name="react_curve_mid">Curve mid (log lux)</string>
+    <string name="react_smoothing_delta">Smoothing Δ</string>
+    <string name="react_use_override">Use override detection</string>
+    <string name="react_trust_sensor">Trust low-accuracy sensor</string>
 
     <!-- Misc -->
     <string name="misc_brightness_range">Brightness range</string>
@@ -308,6 +338,20 @@
 
     <!-- Super Dimming -->
     <string name="superdimming_setup_elevated">Set up elevated access</string>
+    <string name="sd_graph_dimming">Dimming curve</string>
+    <string name="sd_graph_circadian">Circadian Dimming</string>
+    <string name="sd_header_super">Super dimming</string>
+    <string name="sd_header_pwm">PWM (flicker) handling</string>
+    <string name="sd_header_circadian_spread">Circadian dim spread</string>
+    <string name="sd_needs_elevated">Super dimming needs elevated access (WRITE_SECURE_SETTINGS).</string>
+    <string name="sd_use_super">Use super dimming</string>
+    <string name="sd_strength">Strength setpoint</string>
+    <string name="sd_exponent">SD exponent</string>
+    <string name="sd_threshold">Threshold</string>
+    <string name="sd_use_pwm">Use software dimming (PWM-sensitive)</string>
+    <string name="sd_pwm_exponent">Software exponent (PWM)</string>
+    <string name="sd_spread">Spread (circadian)</string>
+    <string name="sd_err_threshold">Dimming threshold is below minimum brightness.</string>
 
     <!-- Live Debug -->
     <string name="livedebug_current">Debug: %1$s</string>
