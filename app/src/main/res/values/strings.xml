@@ -211,4 +211,208 @@
     <string name="power_result_no_sensor">Battery current sensor not available on this device</string>
     <string name="power_result_charging">Please unplug the charger and try again</string>
     <string name="power_result_cancelled">Calibration cancelled</string>
+
+    <!-- ============================================================================================
+         D-131 — i18n completion: the remaining inline UI strings (the S12.9d/D-075 backlog) extracted
+         so the app is fully translatable and HardcodedStringCheckTest can ratchet to 0. Grouped by
+         shared → per-screen. Reuses existing keys where the text already existed.
+         ============================================================================================ -->
+
+    <!-- Shared actions / fields / a11y -->
+    <string name="a11y_back">Back</string>
+    <string name="action_ok">OK</string>
+    <string name="action_apply">Apply</string>
+    <string name="action_applied">Applied</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_discard">Discard</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_keep_editing">Keep editing</string>
+    <string name="action_use_current_location">Use current location</string>
+    <string name="field_name">Name</string>
+    <string name="field_latitude">Latitude</string>
+    <string name="field_longitude">Longitude</string>
+    <!-- The ⓘ info affordance next to a setting label — a glyph, not translatable. -->
+    <string name="info_glyph" translatable="false">ⓘ</string>
+    <string name="chart_overrides_label">"  Overrides"</string>
+
+    <!-- Discard-changes confirmation (SettingsControls draft bar) -->
+    <string name="discard_changes_title">Discard changes?</string>
+    <string name="discard_changes_msg">You have unsaved changes on this screen. Discard them and leave?</string>
+
+    <!-- Toasts / flashes (action confirmations) -->
+    <string name="toast_settings_applied">Settings applied</string>
+    <string name="toast_reset_defaults">Reset to defaults</string>
+    <string name="toast_diagnostics_copied">Diagnostics copied to clipboard</string>
+    <string name="toast_suggestion_applied">Suggestion applied</string>
+    <string name="toast_full_report_copied">Full report copied to clipboard</string>
+    <string name="toast_fixed_datelocation">Fixed date/location set</string>
+    <string name="toast_using_live_data">Using live data</string>
+    <string name="toast_acquiring_location">Acquiring location…</string>
+    <string name="toast_acquire_location_failed">Couldn\'t acquire a location — grant Location, or enable the IP fallback below, then try again</string>
+    <string name="toast_folder_linked">Folder linked</string>
+    <string name="toast_context_resumed">Context automation resumed</string>
+    <string name="toast_overwrote">Overwrote: %1$s</string>
+    <string name="toast_deleted">Deleted: %1$s</string>
+    <string name="toast_saved_profile">Saved profile: %1$s</string>
+    <string name="toast_factory_restored">Factory profiles restored</string>
+    <string name="toast_applied_profile">Applied profile: %1$s</string>
+    <string name="toast_rule_saved">Rule saved</string>
+    <string name="toast_rule_deleted">Rule deleted</string>
+    <string name="toast_wifi_connected">Wi-Fi: %1$s</string>
+    <string name="toast_not_on_wifi">Not connected to Wi-Fi</string>
+    <string name="toast_ssid_unknown">Could not read the current Wi-Fi name</string>
+    <string name="toast_location_fix">Location: %1$.4f, %2$.4f</string>
+    <string name="toast_location_needs_permission">Grant Location permission to use the current location</string>
+    <string name="toast_location_unavailable">No location fix yet — try again in a moment</string>
+    <string name="toast_grant_usage_hint">Grant usage access so per-app rules can detect the foreground app</string>
+
+    <!-- Onboarding / permissions -->
+    <string name="onboarding_title">Setup &amp; Permissions</string>
+    <string name="onboarding_restricted_title">Heads up: restricted settings</string>
+    <string name="onboarding_open_app_info">Open App info</string>
+    <string name="onboarding_granted">Granted ✓</string>
+    <string name="onboarding_elevated_title">3. Elevated access (optional)</string>
+    <string name="onboarding_adb_label">ADB (from a computer):</string>
+    <string name="onboarding_copy_command">Copy command</string>
+    <string name="onboarding_use_shizuku">Use Shizuku</string>
+    <string name="onboarding_try_root">Try root</string>
+
+    <!-- Tools (curve wizard) -->
+    <string name="tools_wizard_title">Curve suggestion wizard</string>
+    <string name="tools_recorded_points">Recorded points: %1$d</string>
+    <string name="tools_run_wizard">Run wizard</string>
+    <string name="tools_apply_suggestion">Apply suggestion</string>
+    <string name="tools_preview_graph">Preview graph</string>
+    <string name="tools_copy_full_report">Copy full report</string>
+
+    <!-- Curve &amp; Brightness -->
+    <string name="curve_delete_point_title">Delete override point?</string>
+    <string name="curve_delete_point_msg">Lux %1$.1f → brightness %2$d</string>
+
+    <!-- Misc -->
+    <string name="misc_brightness_range">Brightness range</string>
+    <string name="misc_animation">Animation</string>
+    <string name="misc_notifications">Notifications</string>
+    <string name="misc_min_brightness">Min brightness</string>
+    <string name="misc_max_brightness">Max brightness</string>
+    <string name="misc_offset">Offset</string>
+    <string name="misc_scale_auto">Scale (auto — dynamic)</string>
+    <string name="misc_scale">Scale</string>
+    <string name="misc_anim_steps">Animation steps</string>
+    <string name="misc_min_wait">Min wait (ms)</string>
+    <string name="misc_max_wait">Max wait (ms)</string>
+    <string name="misc_use_notifications">Use notifications</string>
+    <string name="misc_throttle_derived">Throttle (derived)</string>
+    <string name="misc_err_waits">Minimum wait cannot exceed maximum wait.</string>
+    <string name="unit_ms">ms</string>
+
+    <!-- Super Dimming -->
+    <string name="superdimming_setup_elevated">Set up elevated access</string>
+
+    <!-- Live Debug -->
+    <string name="livedebug_current">Debug: %1$s</string>
+    <string-array name="debug_labels">
+        <item>Off</item>
+        <item>Skip Animations</item>
+        <item>Animation Details</item>
+        <item>Light Eval Thresholds</item>
+        <item>Dynamic Scale Calcs</item>
+        <item>Super Dimming Info</item>
+        <item>Overlay Preview</item>
+        <item>Graph Metrics</item>
+        <item>Context Automation</item>
+        <item>Context Location</item>
+    </string-array>
+
+    <!-- Circadian -->
+    <string name="circadian_date">Date: %1$s</string>
+    <string name="circadian_set_fixed">Set fixed</string>
+    <string name="circadian_use_live_data">Use live data</string>
+    <string name="graph_circadian">Circadian</string>
+    <string name="graph_taper">Taper</string>
+    <string name="circadian_scaling_header">Circadian scaling</string>
+    <string name="circadian_taper_header">Compression taper</string>
+    <string name="circadian_date_location_header">Date &amp; location</string>
+    <string name="circadian_enable_scaling">Enable dynamic scaling</string>
+    <string name="circadian_scale_spread">Scale spread</string>
+    <string name="circadian_scale_steepness">Scale steepness</string>
+    <string name="circadian_transition_factor">Transition factor</string>
+    <string name="circadian_taper_midpoint">Taper midpoint</string>
+    <string name="circadian_taper_steepness">Taper steepness</string>
+    <string name="circadian_ip_fallback_label">IP-based location fallback</string>
+    <string name="circadian_err_transition">Transition factor &gt; 0.5 may produce a non-sensical curve.</string>
+    <string name="circadian_err_taper_midpoint">Taper midpoint cannot exceed maximum brightness.</string>
+    <string name="circadian_status_live">Live data — today + current location.</string>
+    <string name="circadian_status_fixed_date">Fixed date: %1$s (live location)</string>
+    <string name="circadian_status_fixed_full">Fixed: %1$s @ %2$s, %3$s</string>
+    <string name="circadian_live_word">live</string>
+    <string name="circadian_today_word">today</string>
+
+    <!-- Contexts (rule list + editor) -->
+    <string name="contexts_add_rule">Add rule</string>
+    <string name="contexts_grant_usage">Grant usage access</string>
+    <string name="contexts_loads">Loads</string>
+    <string name="contexts_priority_suffix">· priority %1$d</string>
+    <string name="contexts_switch_profile">Switch to profile:</string>
+    <string name="contexts_priority_label">Priority (1–100, higher wins)</string>
+    <string name="contexts_wifi_ssids">Wi-Fi SSIDs (comma-separated)</string>
+    <string name="contexts_use_current_wifi">Use current Wi-Fi</string>
+    <string name="contexts_time_window">Time window:</string>
+    <string name="contexts_clear_time">Clear time</string>
+    <string name="contexts_days">Days (none = every day):</string>
+    <string name="contexts_radius">Radius (metres)</string>
+    <string name="contexts_only_charging">Only while charging</string>
+    <string name="contexts_battery_pct">Battery percentage:</string>
+    <string name="contexts_from_pct" formatted="false">From %</string>
+    <string name="contexts_to_pct" formatted="false">To %</string>
+    <string name="contexts_save_rule">Save rule</string>
+    <string name="contexts_picker_value">%1$s: %2$s</string>
+
+    <!-- Long-press field help (verbatim Tasker Flash text, S12.6e — was TaskerHelp.kt constants; do NOT
+         paraphrase, re-derive from extraction/scenes + the help task id if changing). -->
+    <string name="help_thresh_dark">The reactivity level in complete darkness. A higher value means the brightness is more stable and less \'jumpy\' in very dark rooms.</string>
+    <string name="help_thresh_dim">The baseline reactivity for most situations. A lower value makes the system more responsive to small decreases in light.</string>
+    <string name="help_thresh_bright">The baseline reactivity for bright, outdoor light. A higher value prevents tiny shadows (like your hand) from causing annoying brightness dips.</string>
+    <string name="help_curve_slope">Controls how quickly the reactivity changes as you move from dim to bright light. Higher value = more abrupt transition.</string>
+    <string name="help_curve_mid">The log-transformed lux level where the system is most sensitive to change. Think of it as the \'center point\' of the reactivity curve.</string>
+    <string name="help_trust_unreliable">Enable this ONLY if auto-brightness seems unresponsive on your device. This may cause brightness to become unstable or flicker.</string>
+    <string name="help_detect_overrides">Disable this if you get frequent false positives for the override detection.</string>
+    <string name="help_delta_factor">Controls how much to smooth out sensor readings. Higher values react faster to small light changes, but may increase jitter. Lower values are more stable, but might feel sluggish.</string>
+    <string name="help_min_bright">Sets the lowest brightness level the screen will ever use. Recommended to be &gt; 0 on OLED screens to avoid \'black crush\'.</string>
+    <string name="help_max_bright">Sets the highest brightness level the screen will ever use. Can be used to cap the max brightness to save battery.</string>
+    <string name="help_offset">A simple brightness boost or cut. This value is added to (or subtracted from) the final brightness across all light levels.</string>
+    <string name="help_scale">A global multiplier for the entire brightness curve. Use it to adjust the overall contrast. &gt;1 stretches the curve brighter, &lt;1 compresses it dimmer.</string>
+    <string name="help_anim_steps">The number of steps in a brightness change animation. More steps create a smoother, but slightly slower, transition.</string>
+    <string name="help_max_wait">The longest time (in milliseconds) between animation steps. Controls how slowly small, subtle brightness changes occur.</string>
+    <string name="help_min_wait">The shortest time (in milliseconds) between animation steps. Controls how fast large brightness changes feel.</string>
+    <string name="help_notify_use">Use notifications to keep the service alive and show \'paused\' notifications.</string>
+    <string name="help_form_1a">Controls how quickly brightness rises in dim light. Recommended: 1 to 5</string>
+    <string name="help_zone_1_end">Sets the lux level where \'dim light\' ends and \'indoor light\' begins. Typically for moving from a dark room to a lit one.</string>
+    <string name="help_form_2b">Higher values give a major boost in medium light. Recommended: 3 to 10</string>
+    <string name="help_form_2c">Subtle but powerful \"offset\" for the midrange curve. Lower values make the transition from dark to dim light more gradual and smooth. Recommended: -300 to zone 1 end.</string>
+    <string name="help_zone_2_end">Sets the lux level where \'indoor light\' ends and \'bright outdoor light\' begins. Affects the transition when going outside.</string>
+    <string name="help_dimming_strength">Controls the maximum super dimming strength. Value shows what happens without circadian effects.</string>
+    <string name="help_dim_spread">Controls how wide the scale shifts over the day. Only active when circadian scaling is enabled!</string>
+    <string name="help_dimming_exponent">Controls how gradual the super dimming kicks in and how it behaves as brightness approaches min brightness. &lt;1: hard transition, not recommended. 1: linear transition. &gt;1 soft(er) transition.</string>
+    <string name="help_dimming_threshold">This is the screen brightness below which super dimming kicks in.</string>
+    <string name="help_dimming_enabled">Enables or disables the entire experimental circadian scaling feature. When disabled the strength setpoint is used as a maximum value throughout the day.</string>
+    <string name="help_pwm_exponent">Gamma-like exponent. Controls the shape of the dimming curve. Higher values keep the screen brighter for longer and fade more steeply near the threshold; lower values dim more quickly. Adjusts how brightness transitions, not how much(!)</string>
+    <string name="help_pwm_sensitive">Enables or disables the software dimming feature. When enabled the max hardware brightness is fixated to the PWM threshold.</string>
+    <!-- Inline Circadian field help (was inline literals on CircadianScreen). -->
+    <string name="help_circadian_scaling">Shift the whole curve across the day using sun position.</string>
+    <string name="help_scale_spread" formatted="false">How wide the scale shifts over the day (%, 1–100).</string>
+    <string name="help_scale_steepness">Sharpness of the day/night transition.</string>
+    <string name="help_scale_transition">Duration of the dawn/dusk transition.</string>
+    <string name="help_taper_midpoint">Brightness level where compression centres.</string>
+    <string name="help_taper_steepness">Slope of the dynamic-range compression.</string>
+    <string name="help_circadian_ip_fallback">Off by default. When GPS/network gives no fix and no fixed location is set, turn this on to look up an approximate location from your public IP via ipwho.is (HTTPS). This also powers \"Use current location\" below when no on-device fix is available.</string>
+
+    <!-- Profiles (body + dialogs) -->
+    <string name="profiles_save_as">Save current settings as…</string>
+    <string name="profiles_resume_context">Resume context automation</string>
+    <string name="profiles_save_title">Save profile</string>
+    <string name="profiles_name_label">Profile name</string>
+    <string name="profiles_saving_these">Saving these settings:</string>
+    <string name="profiles_load_confirm_title">Load “%1$s”?</string>
+    <string name="profiles_current_settings_title">Current settings</string>
 </resources>

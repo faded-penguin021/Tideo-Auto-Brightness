@@ -57,7 +57,7 @@ fun AabTopBar(title: String, onBack: (() -> Unit)? = null) {
         navigationIcon = {
             if (onBack != null) {
                 IconButton(onClick = onBack, modifier = Modifier.testTag("back_button")) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.a11y_back))
                 }
             }
         },

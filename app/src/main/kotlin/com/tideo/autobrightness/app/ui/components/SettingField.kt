@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
@@ -15,7 +16,7 @@ import androidx.compose.ui.Modifier
  */
 sealed class SettingFieldSpec {
     abstract val label: String
-    abstract val help: String?
+    @get:StringRes abstract val help: Int?
     abstract val helper: String?
     abstract val enabled: Boolean
     abstract val testTag: String
@@ -29,7 +30,7 @@ sealed class SettingFieldSpec {
         val committed: Number? = null,
         val epoch: Int = 0,
         val error: String? = null,
-        override val help: String? = null,
+        @StringRes override val help: Int? = null,
         override val helper: String? = null,
         override val enabled: Boolean = true,
         override val testTag: String = label,
@@ -42,7 +43,7 @@ sealed class SettingFieldSpec {
         val range: IntRange,
         val onCommit: (Int) -> Unit,
         val committed: Int? = null,
-        override val help: String? = null,
+        @StringRes override val help: Int? = null,
         override val helper: String? = null,
         override val enabled: Boolean = true,
         override val testTag: String = label,
@@ -53,7 +54,7 @@ sealed class SettingFieldSpec {
         override val label: String,
         val checked: Boolean,
         val onCheckedChange: (Boolean) -> Unit,
-        override val help: String? = null,
+        @StringRes override val help: Int? = null,
         override val helper: String? = null,
         override val enabled: Boolean = true,
         override val testTag: String = label,

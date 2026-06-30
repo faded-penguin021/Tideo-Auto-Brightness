@@ -57,7 +57,7 @@ fun MiscScreen(navController: NavHostController, vm: DraftSettingsViewModel = vi
                     notificationsEnabled = d.notificationsEnabled,
                 )
             }
-            toast("Reset to defaults")
+            toast(R.string.toast_reset_defaults)
         },
     )
 }
@@ -87,22 +87,22 @@ fun MiscContent(
             // (S12.6e, G2R-F19/F21). S13c (m3_audit §3 row 7): the bare slider stack is grouped into
             // labelled `AabCard` sections; derived readouts use the gold `KeyValueRow` data-pop (§4 B4).
             AabCard {
-                SectionHeader("Brightness range", divider = true)
+                SectionHeader(stringResource(R.string.misc_brightness_range), divider = true)
                 // Tasker Misc sliders: Min 0–75, Max 150–255 (misc_settings.md elements4/6).
                 IntSliderSettingField(
-                    "Min brightness", draft.minBrightness, 0..75,
+                    stringResource(R.string.misc_min_brightness), draft.minBrightness, 0..75,
                     { onEdit { s -> s.copy(minBrightness = it) } },
                     committed = committed.minBrightness,
                     help = TaskerHelp.MIN_BRIGHT, testTag = "slider_minBrightness",
                 )
                 IntSliderSettingField(
-                    "Max brightness", draft.maxBrightness, 150..255,
+                    stringResource(R.string.misc_max_brightness), draft.maxBrightness, 150..255,
                     { onEdit { s -> s.copy(maxBrightness = it) } },
                     committed = committed.maxBrightness,
                     help = TaskerHelp.MAX_BRIGHT, testTag = "slider_maxBrightness",
                 )
                 NumberSettingField(
-                    "Offset", draft.offset, { onEdit { s -> s.copy(offset = it.toInt()) } },
+                    stringResource(R.string.misc_offset), draft.offset, { onEdit { s -> s.copy(offset = it.toInt()) } },
                     epoch = epoch, committed = committed.offset,
                     help = TaskerHelp.OFFSET, testTag = "field_offset",
                 )
@@ -111,13 +111,13 @@ fun MiscContent(
                 // (%AAB_ScaleDynamicCompress, misc_settings.md scale_dynamic). Otherwise it stays editable.
                 if (draft.scalingEnabled) {
                     KeyValueRow(
-                        "Scale (auto — dynamic)",
+                        stringResource(R.string.misc_scale_auto),
                         String.format("%.3f", live.scaleDynamicCompress),
                         testTag = "derived_scaleDynamic",
                     )
                 } else {
                     NumberSettingField(
-                        "Scale", draft.scale, { onEdit { s -> s.copy(scale = it.toFloat()) } },
+                        stringResource(R.string.misc_scale), draft.scale, { onEdit { s -> s.copy(scale = it.toFloat()) } },
                         epoch = epoch, committed = committed.scale, isInt = false,
                         error = errors.forField("scale"),
                         help = TaskerHelp.SCALE, testTag = "field_scale",
@@ -126,22 +126,22 @@ fun MiscContent(
             }
 
             AabCard {
-                SectionHeader("Animation", divider = true)
+                SectionHeader(stringResource(R.string.misc_animation), divider = true)
                 // Tasker Misc sliders: AnimSteps 0–100, MinWait 1–99, MaxWait 2–100 (elements20/22/23).
                 IntSliderSettingField(
-                    "Animation steps", draft.animSteps, 0..100,
+                    stringResource(R.string.misc_anim_steps), draft.animSteps, 0..100,
                     { onEdit { s -> s.copy(animSteps = it) } },
                     committed = committed.animSteps,
                     help = TaskerHelp.ANIM_STEPS, testTag = "slider_animSteps",
                 )
                 IntSliderSettingField(
-                    "Min wait (ms)", draft.minWaitMs, 1..99,
+                    stringResource(R.string.misc_min_wait), draft.minWaitMs, 1..99,
                     { onEdit { s -> s.copy(minWaitMs = it) } },
                     committed = committed.minWaitMs,
                     help = TaskerHelp.MIN_WAIT, testTag = "slider_minWaitMs",
                 )
                 IntSliderSettingField(
-                    "Max wait (ms)", draft.maxWaitMs, 2..100,
+                    stringResource(R.string.misc_max_wait), draft.maxWaitMs, 2..100,
                     { onEdit { s -> s.copy(maxWaitMs = it) } },
                     committed = committed.maxWaitMs,
                     help = TaskerHelp.MAX_WAIT, testTag = "slider_maxWaitMs",
@@ -149,16 +149,16 @@ fun MiscContent(
                 // task714 throttle derivation: AnimSteps*MaxWait+10 (read-only live readout, elements31).
                 val derivedThrottle = draft.animSteps * draft.maxWaitMs + 10
                 // S13c' §05: the unit is split out so it stays muted (never inherits the gold value).
-                KeyValueRow("Throttle (derived)", "$derivedThrottle", unit = "ms", testTag = "derived_throttle")
+                KeyValueRow(stringResource(R.string.misc_throttle_derived), "$derivedThrottle", unit = stringResource(R.string.unit_ms), testTag = "derived_throttle")
                 if (draft.minWaitMs > draft.maxWaitMs) {
-                    ErrorBanner("Minimum wait cannot exceed maximum wait.", "error_waits")
+                    ErrorBanner(stringResource(R.string.misc_err_waits), "error_waits")
                 }
             }
 
             AabCard {
-                SectionHeader("Notifications", divider = true)
+                SectionHeader(stringResource(R.string.misc_notifications), divider = true)
                 SwitchSettingRow(
-                    "Use notifications", draft.notificationsEnabled,
+                    stringResource(R.string.misc_use_notifications), draft.notificationsEnabled,
                     { onEdit { s -> s.copy(notificationsEnabled = it) } },
                     help = TaskerHelp.NOTIFY_USE,
                     testTag = "switch_notifications",

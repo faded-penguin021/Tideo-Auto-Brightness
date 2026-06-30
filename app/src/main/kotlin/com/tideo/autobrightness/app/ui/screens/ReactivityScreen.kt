@@ -55,7 +55,7 @@ fun ReactivityScreen(navController: NavHostController, vm: DraftSettingsViewMode
                     deltaFactor = d.deltaFactor, trustUnreliableSensor = d.trustUnreliableSensor,
                 )
             }
-            toast("Reset to defaults")
+            toast(R.string.toast_reset_defaults)
         },
     )
 }
