@@ -4,6 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.ui.theme.AabChartBlue
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
@@ -64,8 +66,8 @@ fun BrightnessCurveChart(
     // loading it into the draft (the "Curve" line above), so it shows against the dashed "Reference"
     // (committed) curve — the same two-line comparison, but only when the USER previews it.
     val series = buildList {
-        referencePoints?.let { add(ChartSeries("Reference", it, AabGold, strokeWidthPx = 3f, dashed = true)) }
-        add(ChartSeries("Curve", curvePoints, MaterialTheme.colorScheme.primary))
+        referencePoints?.let { add(ChartSeries(stringResource(R.string.chart_reference), it, AabGold, strokeWidthPx = 3f, dashed = true)) }
+        add(ChartSeries(stringResource(R.string.chart_curve), curvePoints, MaterialTheme.colorScheme.primary))
     }
 
     val scatter = if (overridePoints.isNotEmpty()) {
@@ -92,8 +94,8 @@ fun BrightnessCurveChart(
         xScale = AxisScale.Log10,
         markers = markers,
         scatter = scatter,
-        xAxisLabel = "Lux",
-        yAxisLabel = "Brightness",
+        xAxisLabel = stringResource(R.string.chart_lux),
+        yAxisLabel = stringResource(R.string.chart_brightness),
         showLegend = true,
         interactive = true,
         modifier = modifier,

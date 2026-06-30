@@ -1,156 +1,107 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.annotation.StringRes
+import com.tideo.autobrightness.R
+
 /**
  * Verbatim Tasker long-press help text (S12.6e, G2R-F19/F20/F21).
  *
  * Every AAB settings-scene label carries a `longclick` help task that Flashes (action code 548) an
- * explanatory string. These constants are the decoded, **verbatim** Flash text from those tasks — the
- * single source of truth for the parameter tooltips, surfaced via [com.tideo.autobrightness.app.ui
- * .components.NumberSettingField] `help=`. Do NOT paraphrase; changing a string requires re-deriving
- * it from the XML (extraction/scenes + the help task id noted on each line).
+ * explanatory string. These map each parameter to the **verbatim** Flash text — the single source of
+ * truth for the parameter tooltips — surfaced via the `help=` arg of the settings field primitives.
+ *
+ * D-131 (i18n): the text moved to `strings.xml` (`help_*`) so it is translatable; these constants are
+ * now the matching `@StringRes` ids. Do NOT paraphrase; changing a string requires re-deriving it from
+ * the XML (extraction/scenes + the help task id noted on each line).
  *
  * Provenance: extraction/scenes/{reactivity,brightness,misc,superdimming}_settings.md → longclick task.
  */
 object TaskerHelp {
     // --- Reactivity scene (extraction/scenes/reactivity_settings.md) -----------------------------
     /** task719 — %aab_threshdarkpc. */
-    const val THRESH_DARK =
-        "The reactivity level in complete darkness. A higher value means the brightness is more " +
-            "stable and less 'jumpy' in very dark rooms."
+    @StringRes val THRESH_DARK = R.string.help_thresh_dark
 
     /** task720 — %aab_threshdimpc. */
-    const val THRESH_DIM =
-        "The baseline reactivity for most situations. A lower value makes the system more " +
-            "responsive to small decreases in light."
+    @StringRes val THRESH_DIM = R.string.help_thresh_dim
 
     /** task721 — %aab_threshbrightpc. */
-    const val THRESH_BRIGHT =
-        "The baseline reactivity for bright, outdoor light. A higher value prevents tiny shadows " +
-            "(like your hand) from causing annoying brightness dips."
+    @StringRes val THRESH_BRIGHT = R.string.help_thresh_bright
 
     /** task722 — %AAB_ThreshSteepness. */
-    const val CURVE_SLOPE =
-        "Controls how quickly the reactivity changes as you move from dim to bright light. " +
-            "Higher value = more abrupt transition."
+    @StringRes val CURVE_SLOPE = R.string.help_curve_slope
 
     /** task712 — %AAB_ThreshMidpoint. */
-    const val CURVE_MID =
-        "The log-transformed lux level where the system is most sensitive to change. Think of it " +
-            "as the 'center point' of the reactivity curve."
+    @StringRes val CURVE_MID = R.string.help_curve_mid
 
     /** task729 — %AAB_TrustUnreliable. */
-    const val TRUST_UNRELIABLE =
-        "Enable this ONLY if auto-brightness seems unresponsive on your device. This may cause " +
-            "brightness to become unstable or flicker."
+    @StringRes val TRUST_UNRELIABLE = R.string.help_trust_unreliable
 
     /** task519 — %AAB_DetectOverrides. */
-    const val DETECT_OVERRIDES =
-        "Disable this if you get frequent false positives for the override detection."
+    @StringRes val DETECT_OVERRIDES = R.string.help_detect_overrides
 
     // --- Misc scene (extraction/scenes/misc_settings.md) -----------------------------------------
     /** task740 — %AAB_DeltaFactor ("Smoothing Δ"). The label/help the owner flagged (G2R-F19). */
-    const val DELTA_FACTOR =
-        "Controls how much to smooth out sensor readings. Higher values react faster to small " +
-            "light changes, but may increase jitter. Lower values are more stable, but might feel " +
-            "sluggish."
+    @StringRes val DELTA_FACTOR = R.string.help_delta_factor
 
     /** task723 — %AAB_MinBright. */
-    const val MIN_BRIGHT =
-        "Sets the lowest brightness level the screen will ever use. Recommended to be > 0 on OLED " +
-            "screens to avoid 'black crush'."
+    @StringRes val MIN_BRIGHT = R.string.help_min_bright
 
     /** task536 — %AAB_MaxBright. */
-    const val MAX_BRIGHT =
-        "Sets the highest brightness level the screen will ever use. Can be used to cap the max " +
-            "brightness to save battery."
+    @StringRes val MAX_BRIGHT = R.string.help_max_bright
 
     /** task732 — %AAB_Offset. */
-    const val OFFSET =
-        "A simple brightness boost or cut. This value is added to (or subtracted from) the final " +
-            "brightness across all light levels."
+    @StringRes val OFFSET = R.string.help_offset
 
     /** task730 — %AAB_Scale. */
-    const val SCALE =
-        "A global multiplier for the entire brightness curve. Use it to adjust the overall " +
-            "contrast. >1 stretches the curve brighter, <1 compresses it dimmer."
+    @StringRes val SCALE = R.string.help_scale
 
     /** task726 — %AAB_AnimSteps. */
-    const val ANIM_STEPS =
-        "The number of steps in a brightness change animation. More steps create a smoother, but " +
-            "slightly slower, transition."
+    @StringRes val ANIM_STEPS = R.string.help_anim_steps
 
     /** task728 — %AAB_MaxWait. */
-    const val MAX_WAIT =
-        "The longest time (in milliseconds) between animation steps. Controls how slowly small, " +
-            "subtle brightness changes occur."
+    @StringRes val MAX_WAIT = R.string.help_max_wait
 
     /** task727 — %AAB_MinWait. */
-    const val MIN_WAIT =
-        "The shortest time (in milliseconds) between animation steps. Controls how fast large " +
-            "brightness changes feel."
+    @StringRes val MIN_WAIT = R.string.help_min_wait
 
     /** task682 — %AAB_NotifyUse. */
-    const val NOTIFY_USE =
-        "Use notifications to keep the service alive and show 'paused' notifications."
+    @StringRes val NOTIFY_USE = R.string.help_notify_use
 
     // --- Brightness scene (extraction/scenes/brightness_settings.md) ------------------------------
     /** task725 — %AAB_Form1A ("Zone 1 Scaling"). */
-    const val FORM_1A =
-        "Controls how quickly brightness rises in dim light. Recommended: 1 to 5"
+    @StringRes val FORM_1A = R.string.help_form_1a
 
     /** task747 — %AAB_Zone1End. */
-    const val ZONE_1_END =
-        "Sets the lux level where 'dim light' ends and 'indoor light' begins. Typically for moving " +
-            "from a dark room to a lit one."
+    @StringRes val ZONE_1_END = R.string.help_zone_1_end
 
     /** task737 — %AAB_Form2B ("Zone 2 Scaling"). */
-    const val FORM_2B =
-        "Higher values give a major boost in medium light. Recommended: 3 to 10"
+    @StringRes val FORM_2B = R.string.help_form_2b
 
     /** task741 — %AAB_Form2C ("Zone 2 Offset"). */
-    const val FORM_2C =
-        "Subtle but powerful \"offset\" for the midrange curve. Lower values make the transition " +
-            "from dark to dim light more gradual and smooth. Recommended: -300 to zone 1 end."
+    @StringRes val FORM_2C = R.string.help_form_2c
 
     /** task750 — %AAB_Zone2End. */
-    const val ZONE_2_END =
-        "Sets the lux level where 'indoor light' ends and 'bright outdoor light' begins. Affects " +
-            "the transition when going outside."
+    @StringRes val ZONE_2_END = R.string.help_zone_2_end
 
     // --- Superdimming scene (extraction/scenes/superdimming_settings.md) --------------------------
     /** task465 — %AAB_DimmingStrength. */
-    const val DIMMING_STRENGTH =
-        "Controls the maximum super dimming strength. Value shows what happens without circadian " +
-            "effects."
+    @StringRes val DIMMING_STRENGTH = R.string.help_dimming_strength
 
     /** task505 — %AAB_DimSpread. */
-    const val DIM_SPREAD =
-        "Controls how wide the scale shifts over the day. Only active when circadian scaling is " +
-            "enabled!"
+    @StringRes val DIM_SPREAD = R.string.help_dim_spread
 
     /** task506 — %AAB_DimmingExponent. */
-    const val DIMMING_EXPONENT =
-        "Controls how gradual the super dimming kicks in and how it behaves as brightness " +
-            "approaches min brightness. <1: hard transition, not recommended. 1: linear transition. " +
-            ">1 soft(er) transition."
+    @StringRes val DIMMING_EXPONENT = R.string.help_dimming_exponent
 
     /** task421 — %AAB_DimmingThreshold. */
-    const val DIMMING_THRESHOLD =
-        "This is the screen brightness below which super dimming kicks in."
+    @StringRes val DIMMING_THRESHOLD = R.string.help_dimming_threshold
 
     /** task510 — %AAB_DimmingEnabled. */
-    const val DIMMING_ENABLED =
-        "Enables or disables the entire experimental circadian scaling feature. When disabled the " +
-            "strength setpoint is used as a maximum value throughout the day."
+    @StringRes val DIMMING_ENABLED = R.string.help_dimming_enabled
 
     /** task702 — %AAB_PWMExp ("Software exp."). */
-    const val PWM_EXPONENT =
-        "Gamma-like exponent. Controls the shape of the dimming curve. Higher values keep the " +
-            "screen brighter for longer and fade more steeply near the threshold; lower values dim " +
-            "more quickly. Adjusts how brightness transitions, not how much(!)"
+    @StringRes val PWM_EXPONENT = R.string.help_pwm_exponent
 
     /** task529 — %AAB_PWMSensitive. */
-    const val PWM_SENSITIVE =
-        "Enables or disables the software dimming feature. When enabled the max hardware brightness " +
-            "is fixated to the PWM threshold."
+    @StringRes val PWM_SENSITIVE = R.string.help_pwm_sensitive
 }

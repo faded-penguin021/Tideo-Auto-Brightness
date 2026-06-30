@@ -16,12 +16,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -36,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -200,7 +208,7 @@ fun OnboardingContent(
     onDone: () -> Unit,
 ) {
     Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text("Setup & Permissions") }) },
+        topBar = { CenterAlignedTopAppBar(title = { Text(stringResource(R.string.onboarding_title)) }) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -209,6 +217,9 @@ fun OnboardingContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // D-131: app language picker — first thing in setup since it governs everything shown below.
+            // Not yet functional (English only); see OnboardingLanguageCard.
+            OnboardingLanguageCard()
             // G2R-F33: sideloaded apps may see "Modify system settings" / accessibility toggles greyed
             // out under Android's restricted-settings block; guide the one-time "Allow restricted
             // settings" fix up front, before the grant steps that it gates.
@@ -216,29 +227,28 @@ fun OnboardingContent(
                 RestrictedSettingsCard(onOpenAppInfo)
             }
             StepCard(
-                title = "1. Notifications",
-                body = "Allow notifications so the ongoing brightness controls and status are visible.",
+                title = stringResource(R.string.onboarding_step1_title),
+                body = stringResource(R.string.onboarding_step1_body),
                 done = state.notificationsGranted,
-                actionLabel = "Allow notifications",
+                actionLabel = stringResource(R.string.onboarding_step1_action),
                 onAction = onRequestNotifications,
                 testTag = "step_notifications",
             )
             StepCard(
-                title = "2. Modify system settings (required)",
-                body = "Grants brightness control. Without this the service runs but cannot change brightness.",
+                title = stringResource(R.string.onboarding_step2_title),
+                body = stringResource(R.string.onboarding_step2_body),
                 done = state.canWrite,
-                actionLabel = "Open setting",
+                actionLabel = stringResource(R.string.onboarding_step2_action),
                 onAction = onRequestWriteSettings,
                 testTag = "step_write_settings",
             )
             // G2R-F41 (perm half): Location is needed for the location-based SSID fallback and for
             // location context rules. Optional — the Shizuku/dump SSID path needs no Location at all.
             StepCard(
-                title = "3. Location (optional)",
-                body = "Needed only for location-based context rules and as a fallback for reading " +
-                    "the Wi-Fi name. Wi-Fi rules also work without it via Shizuku / ADB.",
+                title = stringResource(R.string.onboarding_step3_title),
+                body = stringResource(R.string.onboarding_step3_body),
                 done = state.locationGranted,
-                actionLabel = "Grant location",
+                actionLabel = stringResource(R.string.onboarding_step3_action),
                 onAction = onRequestLocation,
                 testTag = "step_location",
             )
@@ -246,24 +256,58 @@ fun OnboardingContent(
             // G2R-F24: usage access is OPTIONAL by default (per D-024/task563) — always shown so it is
             // discoverable, but only flagged as needed once a per-app context rule exists.
             StepCard(
-                title = if (state.needsUsageAccess) "5. Usage access (needed for per-app rules)"
-                else "5. Usage access (optional)",
+                title = if (state.needsUsageAccess) stringResource(R.string.onboarding_usage_title_needed)
+                else stringResource(R.string.onboarding_usage_title_optional),
                 body = if (state.needsUsageAccess) {
-                    "One of your context rules targets specific apps. Grant usage access so the " +
-                        "service can detect the foreground app."
+                    stringResource(R.string.onboarding_usage_body_needed)
                 } else {
-                    "Only needed if you later add a context rule that switches profiles per app. " +
-                        "You can skip this for now and grant it from the Profiles & Contexts screen later."
+                    stringResource(R.string.onboarding_usage_body_optional)
                 },
                 done = state.usageAccessGranted,
-                actionLabel = "Open usage access",
+                actionLabel = stringResource(R.string.onboarding_usage_action),
                 onAction = onRequestUsageAccess,
                 testTag = "step_usage_access",
             )
             Button(
                 onClick = onDone,
                 modifier = Modifier.fillMaxWidth().testTag("onboarding_done"),
-            ) { Text(if (state.canWrite) "Done" else "Skip for now") }
+            ) { Text(if (state.canWrite) stringResource(R.string.onboarding_done) else stringResource(R.string.onboarding_skip)) }
+        }
+    }
+}
+
+/**
+ * App-language picker (D-131), shown at the top of onboarding. Scaffolded but **not yet functional** —
+ * English is the only available language, so the menu lists it alone and selecting it is a no-op. Once
+ * translated `values-<lang>/` resources land (see CONTRIBUTING.md), add their display names here and wire
+ * the choice to `AppCompatDelegate.setApplicationLocales(...)`. The control exists now so the surface is
+ * discoverable (reachable later via Menu → Recheck Permissions) and translators can see where it appears.
+ */
+@Composable
+private fun OnboardingLanguageCard() {
+    var expanded by remember { mutableStateOf(false) }
+    val english = stringResource(R.string.language_english)
+    Card(modifier = Modifier.testTag("language_card")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.misc_language_header), style = MaterialTheme.typography.titleMedium)
+            Box {
+                OutlinedButton(
+                    onClick = { expanded = true },
+                    modifier = Modifier.fillMaxWidth().testTag("language_selector"),
+                ) {
+                    Text(stringResource(R.string.misc_language_label) + ": " + english)
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    // Only English for now; future translated locales are added here.
+                    DropdownMenuItem(text = { Text(english) }, onClick = { expanded = false })
+                }
+            }
+            Text(
+                stringResource(R.string.misc_language_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -272,18 +316,15 @@ fun OnboardingContent(
 private fun RestrictedSettingsCard(onOpenAppInfo: () -> Unit) {
     Card(modifier = Modifier.testTag("restricted_settings_hint")) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Heads up: restricted settings", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.onboarding_restricted_title), style = MaterialTheme.typography.titleMedium)
             Text(
                 // G3-F13: cover Usage access too, and tell the user to tap the greyed toggle anyway
                 // (it still triggers Android's unlock prompt). Kept short — no emoji.
-                "Installed outside the Play Store, Android may block the \"Modify system settings\" " +
-                    "toggle below (and \"Usage access\", for per-app rules) — it looks greyed out or " +
-                    "shows \"Restricted setting\". Tap it anyway; that usually shows the unlock prompt. " +
-                    "If not, open App info → ⋮ menu → \"Allow restricted settings\", then return here.",
+                stringResource(R.string.onboarding_restricted_body),
                 style = MaterialTheme.typography.bodyMedium,
             )
             OutlinedButton(onClick = onOpenAppInfo, modifier = Modifier.testTag("open_app_info")) {
-                Text("Open App info")
+                Text(stringResource(R.string.onboarding_open_app_info))
             }
         }
     }
@@ -303,7 +344,7 @@ private fun StepCard(
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(body, style = MaterialTheme.typography.bodyMedium)
             if (done) {
-                Text("Granted ✓", color = MaterialTheme.colorScheme.tertiary)
+                Text(stringResource(R.string.onboarding_granted), color = MaterialTheme.colorScheme.tertiary)
             } else {
                 Button(onClick = onAction) { Text(actionLabel) }
             }
@@ -320,24 +361,23 @@ private fun ElevatedStepCard(
 ) {
     Card(modifier = Modifier.testTag("step_elevated")) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("3. Elevated access (optional)", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.onboarding_elevated_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Enables super dimming below the dimming threshold. Choose any one channel — it is a " +
-                    "one-time grant of WRITE_SECURE_SETTINGS.",
+                stringResource(R.string.onboarding_elevated_body),
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (state.tier == Tier.ELEVATED) {
-                Text("Granted ✓", color = MaterialTheme.colorScheme.tertiary)
+                Text(stringResource(R.string.onboarding_granted), color = MaterialTheme.colorScheme.tertiary)
             } else {
                 // ADB is ALWAYS offered — it is the channel that needs no companion app (the invariant
                 // the other channels layer on top of).
-                Text("ADB (from a computer):", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.onboarding_adb_label), style = MaterialTheme.typography.labelMedium)
                 Text(state.adbCommand, style = MaterialTheme.typography.bodySmall)
                 // Shizuku, when installed-but-not-running, can't be one-tap-granted: pingBinder() fails
                 // until the user starts the Shizuku app, so prompt for that instead of hiding the path.
                 if (state.shizukuAvailability == ShizukuAvailability.INSTALLED_NOT_RUNNING) {
                     Text(
-                        "Shizuku is installed but not running — start the Shizuku app, then return here.",
+                        stringResource(R.string.onboarding_shizuku_prompt),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.testTag("shizuku_start_prompt"),
@@ -345,15 +385,15 @@ private fun ElevatedStepCard(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onCopyAdb, modifier = Modifier.testTag("copy_adb")) {
-                        Text("Copy command")
+                        Text(stringResource(R.string.onboarding_copy_command))
                     }
                     if (state.shizukuAvailability == ShizukuAvailability.RUNNING) {
                         OutlinedButton(onClick = onRequestShizuku, modifier = Modifier.testTag("grant_shizuku")) {
-                            Text("Use Shizuku")
+                            Text(stringResource(R.string.onboarding_use_shizuku))
                         }
                     }
                     TextButton(onClick = onTryRoot, modifier = Modifier.testTag("grant_root")) {
-                        Text("Try root")
+                        Text(stringResource(R.string.onboarding_try_root))
                     }
                 }
             }

@@ -183,6 +183,38 @@ class ContextEngineTest {
         scope.cancel()
     }
 
+    @Test
+    fun plugChange_bypassesBatteryCooldown_switchesToHigherPriorityChargingRule_D132() = runTest {
+        // Owner report 2026-06-30: plugging in while "Low Battery" (P80) is active should IMMEDIATELY
+        // switch to the higher-priority "Charging" (P81) rule. The plug event was being swallowed by the
+        // 30s battery cooldown, so the switch lagged until the next un-vetoed battery tick (D-132). Both
+        // rules are battery-only (equal specificity), so this also confirms priority — not specificity —
+        // decides among matching rules.
+        val charging = ContextRule(
+            id = "chg", name = "Charging", profile = "Outdoors", priority = 81,
+            triggers = ContextTriggers(battery = BatteryTrigger(onPower = true)),
+        )
+        val lowBattery = ContextRule(
+            id = "low", name = "Low Battery", profile = "Battery Saver", priority = 80,
+            triggers = ContextTriggers(battery = BatteryTrigger(max = 30)),
+        )
+        var now = 0L
+        val src = FakeSignalSource(batteryPercent = 25, plugged = false)
+        val (engine, scope) = engine(listOf(charging, lowBattery), src, clock = { now })
+        engine.start(scope)
+        advanceUntilIdle()
+        assertEquals("Low Battery", engine.activeContext.value) // 25% unplugged → only Low Battery matches.
+
+        // Plug in WITHIN the 30s cooldown (5s after the seed eval). The plug change must bypass the
+        // cooldown and re-evaluate now — Charging (P81) matches and outranks Low Battery (P80).
+        now = 5_000L
+        src.plugged = true
+        src.battery.emit(BatterySignal(25, plugged = true))
+        advanceUntilIdle()
+        assertEquals("Charging", engine.activeContext.value)
+        scope.cancel()
+    }
+
     /** Source that honours the battery percent the engine passes into [assemble] (the live snapshot),
      *  so the seed-evaluation "no reading yet" path can be exercised. */
     private class PassThroughBatterySource(

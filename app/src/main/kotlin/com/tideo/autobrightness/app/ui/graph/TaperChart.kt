@@ -4,6 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.ui.theme.AabChartBlue
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
@@ -53,15 +55,15 @@ fun TaperChart(
 
     // Day = primary teal, Night = blue (gold is reserved for reference lines, Tasker convention).
     val series = listOf(
-        ChartSeries("Night", nightPoints, AabChartBlue, strokeWidthPx = 3f),
-        ChartSeries("Day", dayPoints, MaterialTheme.colorScheme.primary),
+        ChartSeries(stringResource(R.string.chart_night), nightPoints, AabChartBlue, strokeWidthPx = 3f),
+        ChartSeries(stringResource(R.string.chart_day), dayPoints, MaterialTheme.colorScheme.primary),
     )
 
     val markers = buildList {
         add(ChartMarker(color = MaterialTheme.colorScheme.outline, y = 1f)) // the 1.0 no-scale baseline
         // S14: live "Now" line at the current brightness (only supplied while scaling is active).
         currentBrightness?.let {
-            add(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = "Now"))
+            add(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = stringResource(R.string.chart_now)))
         }
     }
 
@@ -70,8 +72,8 @@ fun TaperChart(
         xRange = xStart..xEnd,
         yRange = yMin..yMax,
         markers = markers,
-        xAxisLabel = "Brightness",
-        yAxisLabel = "Scale ×",
+        xAxisLabel = stringResource(R.string.chart_brightness),
+        yAxisLabel = stringResource(R.string.chart_scale_x),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,

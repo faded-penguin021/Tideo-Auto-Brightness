@@ -78,7 +78,7 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
                     form2C = d.form2C, zone2End = d.zone2End,
                 )
             }
-            toast("Reset to defaults")
+            toast(R.string.toast_reset_defaults)
         },
     )
 }
@@ -177,29 +177,29 @@ fun CurveBrightnessContent(
             // S13c restyle (m3_audit §3 row 3): the bare field stack is grouped into an `AabCard`; the
             // derived continuity readout becomes a distinct gold `KeyValueRow` data-pop card (§4 B4).
             AabCard {
-                SectionHeader("Curve zones", divider = true)
+                SectionHeader(stringResource(R.string.curve_zones_header), divider = true)
                 NumberSettingField(
-                    "Zone 1 scaling (form1A)", draft.form1A, { onEdit { s -> s.copy(form1A = it) } },
+                    stringResource(R.string.curve_form1a), draft.form1A, { onEdit { s -> s.copy(form1A = it) } },
                     epoch = epoch, committed = committed.form1A, isInt = false,
                     help = TaskerHelp.FORM_1A, testTag = "field_form1A",
                 )
                 NumberSettingField(
-                    "Zone 1 end (lux)", draft.zone1End, { onEdit { s -> s.copy(zone1End = it.toInt()) } },
+                    stringResource(R.string.curve_zone1_end), draft.zone1End, { onEdit { s -> s.copy(zone1End = it.toInt()) } },
                     epoch = epoch, committed = committed.zone1End,
                     help = TaskerHelp.ZONE_1_END, testTag = "field_zone1End",
                 )
                 NumberSettingField(
-                    "Zone 2 scaling (form2B)", draft.form2B, { onEdit { s -> s.copy(form2B = it.toFloat()) } },
+                    stringResource(R.string.curve_form2b), draft.form2B, { onEdit { s -> s.copy(form2B = it.toFloat()) } },
                     epoch = epoch, committed = committed.form2B, isInt = false,
                     help = TaskerHelp.FORM_2B, testTag = "field_form2B",
                 )
                 NumberSettingField(
-                    "Zone 2 offset (form2C)", draft.form2C, { onEdit { s -> s.copy(form2C = it.toInt()) } },
+                    stringResource(R.string.curve_form2c), draft.form2C, { onEdit { s -> s.copy(form2C = it.toInt()) } },
                     epoch = epoch, committed = committed.form2C, error = errors.forField("form2C"),
                     help = TaskerHelp.FORM_2C, testTag = "field_form2C",
                 )
                 NumberSettingField(
-                    "Zone 2 end (lux)", draft.zone2End, { onEdit { s -> s.copy(zone2End = it.toInt()) } },
+                    stringResource(R.string.curve_zone2_end), draft.zone2End, { onEdit { s -> s.copy(zone2End = it.toInt()) } },
                     epoch = epoch, committed = committed.zone2End, error = errors.forField("zone2End"),
                     help = TaskerHelp.ZONE_2_END, testTag = "field_zone2End",
                 )
@@ -208,10 +208,10 @@ fun CurveBrightnessContent(
             // task659 live-derived continuity coefficients (task613/614/615 _UpdateBrightnessFormulae).
             // G2R-F61: labelled as the zone-alignment hinge points (not bare "form2A/form3A" placeholders).
             AabCard {
-                SectionHeader("Derived (continuity)", divider = true)
+                SectionHeader(stringResource(R.string.curve_derived_header), divider = true)
                 val coeffs = draft.derivedCoefficients()
-                KeyValueRow("Zone 2 alignment (form2A)", coeffs.form2A.fmtCoeff("%.3f"), testTag = "derived_form2A")
-                KeyValueRow("Zone 3 alignment (form3A)", coeffs.form3A.fmtCoeff("%.1f"), testTag = "derived_form3A", showDivider = false)
+                KeyValueRow(stringResource(R.string.curve_form2a), coeffs.form2A.fmtCoeff("%.3f"), testTag = "derived_form2A")
+                KeyValueRow(stringResource(R.string.curve_form3a), coeffs.form3A.fmtCoeff("%.1f"), testTag = "derived_form3A", showDivider = false)
                 errors.forField("form2A")?.let { ErrorBanner(it, "error_form2A") }
                 errors.forField("form3A")?.let { ErrorBanner(it, "error_form3A") }
                 errors.forField("zone2End")?.let { ErrorBanner(it, "error_zone2End") }
@@ -233,17 +233,17 @@ fun OverridePointDeleteDialog(point: OverridePoint, onConfirm: () -> Unit, onDis
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("override_delete_dialog"),
-        title = { Text("Delete override point?") },
+        title = { Text(stringResource(R.string.curve_delete_point_title)) },
         text = {
-            Text("Lux ${"%.1f".format(point.lux)} → brightness ${point.brightness.toInt()}")
+            Text(stringResource(R.string.curve_delete_point_msg, point.lux, point.brightness.toInt()))
         },
         confirmButton = {
             TextButton(onClick = onConfirm, modifier = Modifier.testTag("override_delete_confirm")) {
-                Text("Delete")
+                Text(stringResource(R.string.confirm_delete))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.confirm_cancel)) }
         },
     )
 }

@@ -264,13 +264,13 @@ fun ToolsContent(
     powerHasData: Boolean = false,
     onCalibratePower: () -> Unit = {},
 ) {
-    SettingsScaffold("Tools", onBack) { padding ->
+    SettingsScaffold(stringResource(R.string.title_tools), onBack) { padding ->
         SettingsColumn(padding) {
             WizardCard(recordedPoints, onRunWizard, onApplyWizard, onPreviewGraph)
 
             // S13c restyle (m3_audit §3 row 8): each tool is its own `AabCard` with a clear title.
             AabCard {
-                SectionHeader("Power-draw calibration", divider = true)
+                SectionHeader(stringResource(R.string.tools_power_header), divider = true)
                 Text(
                     stringResource(R.string.power_desc),
                     style = MaterialTheme.typography.bodySmall,
@@ -316,17 +316,18 @@ private fun WizardCard(
     var tau by remember { mutableFloatStateOf(0.001f) }
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
+    val context = LocalContext.current
 
     AabCard(Modifier.testTag("wizard_card")) {
-            Text("Curve suggestion wizard", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.tools_wizard_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Fits a brightness curve to your recorded manual overrides (needs ≥ 9 points).",
+                stringResource(R.string.tools_wizard_desc),
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text("Recorded points: ${recorded.size}", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.tools_recorded_points, recorded.size), style = MaterialTheme.typography.bodyMedium)
             // τ (inertia) control: lower = follow my points, higher = stay near the current curve.
             Text(
-                "Inertia (τ): ${"%.3f".format(tau)} — lower follows your points, higher stays near the current curve",
+                stringResource(R.string.tools_inertia, "%.3f".format(tau)),
                 style = MaterialTheme.typography.bodySmall,
             )
             Slider(
@@ -343,22 +344,22 @@ private fun WizardCard(
                     // before calling the engine so the user-facing contract ("needs ≥ 9") actually holds.
                     if (recorded.size < MIN_FIT_POINTS) {
                         result = null
-                        message = "Not enough recorded override points (need ≥ $MIN_FIT_POINTS real points, have ${recorded.size})."
+                        message = context.getString(R.string.tools_not_enough_points, MIN_FIT_POINTS, recorded.size)
                     } else {
                         val r = onRunWizard(recorded, tau.toDouble())
                         result = r
-                        message = if (r == null) "Could not fit a curve to the recorded points." else null
+                        message = if (r == null) context.getString(R.string.tools_fit_failed) else null
                         // Tasker: task38 "_SuggestCurveParameters" act13 code105 (Set Clipboard, arg0=%AAB_Test)
                         // — every successful run copies the %AAB_Test diagnostics to the clipboard, not just
                         // the manual "Copy full report" button below. Mirror that auto-copy here.
                         if (r != null) {
                             clipboard.setText(AnnotatedString(r.diagnosticsLog.trim()))
-                            toast("Diagnostics copied to clipboard")
+                            toast(R.string.toast_diagnostics_copied)
                         }
                     }
                 },
                 modifier = Modifier.testTag("run_wizard"),
-            ) { Text("Run wizard") }
+            ) { Text(stringResource(R.string.tools_run_wizard)) }
 
             message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
@@ -381,24 +382,24 @@ private fun WizardCard(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedButton(
-                        onClick = { onApplyWizard(r); toast("Suggestion applied") },
+                        onClick = { onApplyWizard(r); toast(R.string.toast_suggestion_applied) },
                         modifier = Modifier.testTag("apply_wizard"),
-                    ) { Text("Apply suggestion") }
+                    ) { Text(stringResource(R.string.tools_apply_suggestion)) }
                     // D-125: preview THIS fit on the Curve & Brightness chart — it loads the suggestion
                     // into that screen's draft (user-driven; was an auto-fit whenever ≥ 9 points existed).
                     OutlinedButton(
                         onClick = { onPreviewGraph(r) },
                         modifier = Modifier.testTag("preview_graph"),
-                    ) { Text("Preview graph") }
+                    ) { Text(stringResource(R.string.tools_preview_graph)) }
                     // %AAB_Test diagnostics → clipboard (D-025, G2-F15): copy the FULL verbose report.
                     // (The wizard also auto-copies on a successful run — task38 act13 code105.)
                     OutlinedButton(
                         onClick = {
                             clipboard.setText(AnnotatedString(r.diagnosticsLog.trim()))
-                            toast("Full report copied to clipboard")
+                            toast(R.string.toast_full_report_copied)
                         },
                         modifier = Modifier.testTag("copy_diagnostics"),
-                    ) { Text("Copy full report") }
+                    ) { Text(stringResource(R.string.tools_copy_full_report)) }
                 }
             }
     }

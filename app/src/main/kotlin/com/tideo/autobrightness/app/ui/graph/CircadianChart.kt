@@ -5,6 +5,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
 import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
 import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
@@ -69,13 +72,17 @@ internal fun circadianCurve(
     return CircadianCurve(points, events)
 }
 
-/** Names for the five sun events, in the order [circadianCurve] returns them. */
-internal val EVENT_LABELS = listOf("Dawn", "Sunrise", "Noon", "Sunset", "Dusk")
+// Names for the five sun events, in the order [circadianCurve] returns them, live in strings.xml as the
+// `circadian_event_labels` string-array (D-131 i18n); the composable passes them into [eventMarkers].
 
 /** Labelled vertical event-line markers for the five sun events (Tasker draws these on the circadian
  *  graphs). ChartCanvas renders the [ChartMarker.label] alongside each line (S13d, fence lifted). */
-internal fun eventMarkers(events: List<Float>, color: androidx.compose.ui.graphics.Color): List<ChartMarker> =
-    events.mapIndexed { i, h -> ChartMarker(color = color, x = h, label = EVENT_LABELS.getOrNull(i)) }
+internal fun eventMarkers(
+    events: List<Float>,
+    color: androidx.compose.ui.graphics.Color,
+    labels: List<String>,
+): List<ChartMarker> =
+    events.mapIndexed { i, h -> ChartMarker(color = color, x = h, label = labels.getOrNull(i)) }
 
 /** Current UTC time-of-day as an hour (0..24) — the Tasker `now_utc` event line position. */
 internal fun nowUtcHour(): Float = (System.currentTimeMillis() / 1000L % 86_400L) / 3600f
@@ -108,16 +115,17 @@ fun CircadianDimmingChart(
     val yMin = curve.points.minOf { it.y } - 0.05f
     val yMax = curve.points.maxOf { it.y } + 0.05f
     val eventColor = MaterialTheme.colorScheme.outline
+    val eventLabels = stringArrayResource(R.array.circadian_event_labels).toList()
 
     ChartCanvas(
-        series = listOf(ChartSeries("Dim ×", curve.points, MaterialTheme.colorScheme.primary)),
+        series = listOf(ChartSeries(stringResource(R.string.chart_dim_x), curve.points, MaterialTheme.colorScheme.primary)),
         xRange = 0f..24f,
         yRange = yMin..yMax,
-        markers = eventMarkers(curve.events, eventColor) +
+        markers = eventMarkers(curve.events, eventColor, eventLabels) +
             ChartMarker(color = MaterialTheme.colorScheme.outlineVariant, y = 1f) +
-            ChartMarker(color = MaterialTheme.colorScheme.error, x = nowUtcHour(), label = "Now"),
-        xAxisLabel = "Time of day (UTC)",
-        yAxisLabel = "Dim ×",
+            ChartMarker(color = MaterialTheme.colorScheme.error, x = nowUtcHour(), label = stringResource(R.string.chart_now)),
+        xAxisLabel = stringResource(R.string.chart_time_utc),
+        yAxisLabel = stringResource(R.string.chart_dim_x),
         xTickFormatter = ::hourToHhmm,
         interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,

@@ -23,8 +23,10 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.navigation.navigateTopLevel
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
@@ -90,23 +92,23 @@ fun MenuContent(
             // Live status — the former start destination, now reached from the hub.
             AabCard {
                 NavRow(
-                    AppRoute.Dashboard.label, { onNavigate(AppRoute.Dashboard) },
+                    stringResource(AppRoute.Dashboard.titleRes), { onNavigate(AppRoute.Dashboard) },
                     icon = Icons.Filled.Home, testTag = "menu_${AppRoute.Dashboard.route}",
                 )
             }
 
-            SectionHeader("Profiles & Contexts", divider = true)
+            SectionHeader(stringResource(R.string.title_profiles_contexts), divider = true)
             // S12.9f (D-070): Profiles and Contexts are one destination now — a single hero card. It
             // still surfaces the live context status. F46 semantics: a manual profile load IS the
             // override (latched %AAB_ContextOverride, cleared by Resume on the merged screen); a
             // context *rule* being active is automation working as intended, NOT an override.
             HeroNavCard(
                 icon = Icons.Filled.Person,
-                title = "Profiles & Contexts",
+                title = stringResource(R.string.title_profiles_contexts),
                 subtitle = when {
-                    manualOverride -> "Manual override active — open to resume"
-                    activeContext != null -> "Context active: $activeContext"
-                    else -> "Save & load profiles · automatic context rules"
+                    manualOverride -> stringResource(R.string.menu_subtitle_override)
+                    activeContext != null -> stringResource(R.string.menu_subtitle_context, activeContext)
+                    else -> stringResource(R.string.menu_subtitle_default)
                 },
                 testTag = "hero_profiles_contexts",
                 onClick = { onNavigate(AppRoute.Profiles) },
@@ -114,7 +116,7 @@ fun MenuContent(
                 prominent = false,
             )
 
-            SectionHeader("Settings", divider = true)
+            SectionHeader(stringResource(R.string.menu_section_settings), divider = true)
             AabCard {
                 // G3-F10: Curve & Brightness had the same gear as Misc; "Create" (edit) reads as
                 // shaping the curve and removes the duplicate. A fuller Material Symbols pass for the
@@ -126,14 +128,14 @@ fun MenuContent(
                 MenuNavRow(AppRoute.Misc, Icons.Filled.Settings, onNavigate)
             }
 
-            SectionHeader("Info & Help", divider = true)
+            SectionHeader(stringResource(R.string.menu_section_info), divider = true)
             AabCard {
                 MenuNavRow(AppRoute.Tools, Icons.Filled.Build, onNavigate)
                 MenuNavRow(AppRoute.LiveDebug, Icons.Filled.Search, onNavigate)
                 MenuNavRow(AppRoute.UserGuide, Icons.AutoMirrored.Filled.List, onNavigate)
                 MenuNavRow(AppRoute.About, Icons.Filled.Info, onNavigate)
                 NavRow(
-                    "Recheck Permissions", onRecheckPermissions,
+                    stringResource(R.string.menu_recheck_permissions), onRecheckPermissions,
                     icon = Icons.Filled.Lock, testTag = "menu_recheck_permissions",
                 )
             }
@@ -148,5 +150,5 @@ private fun MenuNavRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onNavigate: (AppRoute) -> Unit,
 ) {
-    NavRow(route.label, { onNavigate(route) }, icon = icon, testTag = "menu_${route.route}")
+    NavRow(stringResource(route.titleRes), { onNavigate(route) }, icon = icon, testTag = "menu_${route.route}")
 }

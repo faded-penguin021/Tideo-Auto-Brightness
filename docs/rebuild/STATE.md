@@ -34,6 +34,31 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-30 — 1.6.0 / `versionCode 14` (MINOR — new user-facing capability + dialog): **D-130** wired up the
+  no-Location SSID `dumpsys wifi` path. `android.permission.DUMP` is now **declared** (reverses the F89
+  "leave undeclared" call — DUMP is `signature|privileged` *and* `development`, so user-grantable over ADB
+  like WRITE_SECURE_SETTINGS); `DumpsysWifiSsidStrategy` finally works once granted. Strategy order is now
+  Shizuku `cmd wifi status` → **root `su -c 'cmd wifi status'`** (new `RootWifiSsidStrategy`) → DUMP-granted
+  `dumpsys wifi` → Location callback. `parseDumpsysWifi` now mirrors Tasker's exact two-step regex over the
+  `mWifiInfo … COMPLETED` line (quoted `(?s).*?SSID:\s*"([^"]+)".*` first, else unquoted-to-comma
+  `(?s).*?SSID:\s*([^,]+),.*`). "Use current SSID" no longer dead-ends: the two Location-gated misses open an
+  SSID-help dialog explaining the alternatives + a copyable ADB DUMP grant
+  (`PrivilegeManager.dumpGrantInstruction()`), footed with the verbatim "If your SSID contains \"SSID\", this
+  will cause problems. Sorry, not sorry." Tests: `WifiSsidStrategyTest` (+2), `PrivilegeManagerTest` (+1).
+  Changelog `14.txt`. Engine/goldens untouched. **D-131** (folded into the same 1.6.0 release): completed
+  full UI i18n — every user-facing string (~250: labels, section headers, long-press help via `TaskerHelp`
+  → `help_*` resources, toasts, chart axis/series/marker labels, debug + sun-event `<string-array>`s, Menu
+  titles via `AppRoute.titleRes`) extracted to `strings.xml`; `rememberToaster()` gained a `@StringRes`
+  `toast(resId, …)` overload; the `HardcodedStringCheckTest` ratchet now enforces **0** hardcoded
+  user-facing literals (`Text("`/`toast("`/`contentDescription="`, was ≤ 92). Added a non-functional
+  (English-only) Language selector (on the Onboarding screen) + a **human-only** translations section in
+  `CONTRIBUTING.md`/README. Pure presentation refactor — no behaviour change. **D-132** (also folded in): a
+  plug/unplug transition now bypasses the PASS-1 battery cooldown so a charging context switches
+  immediately (owner report: "Charging" P81 didn't take over from "Low Battery" P80 until the battery rose
+  past the rule boundary — an eval-timing lag, not a ranking bug; the resolver is priority-first). Tests:
+  `ContextEngineTest.plugChange_…_D132`, `ContextOverrideResolverTest.higherPriorityWins_…`.
+  **Owner on-device pass confirmed** on the 1.6.0 debug APK (SSID/DUMP read + help dialog, charging
+  re-eval, i18n surfaces, Onboarding Language picker). Owner squash-merges + publishes the v1.6.0 release.
 - 2026-06-29 — CI-only (no app/version change): workflow hygiene — `timeout-minutes` on every job (caps a
   hung Gradle daemon / SDK fetch / `gh` call vs GitHub's 360-min default) and `gradle/wrapper/gradle-wrapper.properties`
   added to the 4 Gradle cache keys (a wrapper bump no longer reuses a stale cache). Prompted by a workflow

@@ -83,7 +83,7 @@ fun SuperDimmingScreen(
                     dimSpread = d.dimSpread, pwmSensitive = d.pwmSensitive, pwmExponent = d.pwmExponent,
                 )
             }
-            toast("Reset to defaults")
+            toast(R.string.toast_reset_defaults)
         },
     )
 }
@@ -115,7 +115,7 @@ fun SuperDimmingContent(
             // Dimming" spread graph (AAB Circadian Dimming Graph, re-homed here per D-026). S13 fills both.
             ChartPager(
                 listOf(
-                    ChartSlot("Dimming curve", "dimming_chart") {
+                    ChartSlot(stringResource(R.string.sd_graph_dimming), "dimming_chart") {
                         DimmingChart(
                             minBrightness = draft.minBrightness,
                             dimmingThreshold = draft.dimmingThreshold,
@@ -127,7 +127,7 @@ fun SuperDimmingContent(
                                 ?.takeIf { live.serviceOn && (live.dimmingDS > 0.0 || live.dimmingCurrent > 0.0) },
                         )
                     },
-                    ChartSlot("Circadian Dimming", "circadian_dimming_chart") {
+                    ChartSlot(stringResource(R.string.sd_graph_circadian), "circadian_dimming_chart") {
                         CircadianDimmingChart(
                             draft.toDynamicScalingConfig(),
                             Modifier.testTag("circadian_dimming_chart"),
@@ -143,60 +143,60 @@ fun SuperDimmingContent(
             SuperDimmingDiagnosticCardContent(live)
 
             // G2R-F82: the super-dimming + PWM controls shape the lux→dim "Dimming curve" graph above.
-            GraphSettingsGroup("Dimming curve") {
-                SectionHeader("Super dimming", divider = true)
+            GraphSettingsGroup(stringResource(R.string.sd_graph_dimming)) {
+                SectionHeader(stringResource(R.string.sd_header_super), divider = true)
                 if (tier != Tier.ELEVATED) {
                     Text(
-                        "Super dimming needs elevated access (WRITE_SECURE_SETTINGS).",
+                        stringResource(R.string.sd_needs_elevated),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(vertical = 2.dp),
                     )
                     TextButton(onClick = onOpenOnboarding, modifier = Modifier.testTag("dimming_grant_link")) {
-                        Text("Set up elevated access")
+                        Text(stringResource(R.string.superdimming_setup_elevated))
                     }
                 }
                 // Labels + verbatim long-press help from extraction/scenes/superdimming_settings.md (S12.6e).
                 // task509/511 _DimmingUIToggle — ELEVATED-gated (secure reduce_bright_colors path, D-040a).
                 // Mutually exclusive with PWM/software dimming (G2-F10): enabling super dimming disables PWM.
                 SwitchSettingRow(
-                    "Use super dimming", draft.dimmingEnabled,
+                    stringResource(R.string.sd_use_super), draft.dimmingEnabled,
                     { on -> onEdit { s -> s.copy(dimmingEnabled = on, pwmSensitive = if (on) false else s.pwmSensitive) } },
                     enabled = dimEnabled,
                     help = TaskerHelp.DIMMING_ENABLED,
                     testTag = "switch_dimmingEnabled",
                 )
                 NumberSettingField(
-                    "Strength setpoint", draft.dimmingStrength, { onEdit { s -> s.copy(dimmingStrength = it.toInt()) } },
+                    stringResource(R.string.sd_strength), draft.dimmingStrength, { onEdit { s -> s.copy(dimmingStrength = it.toInt()) } },
                     epoch = epoch, committed = committed.dimmingStrength, enabled = dimEnabled,
                     help = TaskerHelp.DIMMING_STRENGTH, testTag = "field_dimmingStrength",
                 )
                 NumberSettingField(
-                    "SD exponent", draft.dimmingExponent, { onEdit { s -> s.copy(dimmingExponent = it.toFloat()) } },
+                    stringResource(R.string.sd_exponent), draft.dimmingExponent, { onEdit { s -> s.copy(dimmingExponent = it.toFloat()) } },
                     epoch = epoch, committed = committed.dimmingExponent, isInt = false, enabled = dimEnabled,
                     help = TaskerHelp.DIMMING_EXPONENT, testTag = "field_dimmingExponent",
                 )
                 NumberSettingField(
-                    "Threshold", draft.dimmingThreshold, { onEdit { s -> s.copy(dimmingThreshold = it.toInt()) } },
+                    stringResource(R.string.sd_threshold), draft.dimmingThreshold, { onEdit { s -> s.copy(dimmingThreshold = it.toInt()) } },
                     epoch = epoch, committed = committed.dimmingThreshold, enabled = dimEnabled,
                     help = TaskerHelp.DIMMING_THRESHOLD, testTag = "field_dimmingThreshold",
                 )
                 // task513/610: threshold must not sit below minimum brightness.
                 if (draft.dimmingThreshold < draft.minBrightness) {
-                    ErrorBanner("Dimming threshold is below minimum brightness.", "error_dimmingThreshold")
+                    ErrorBanner(stringResource(R.string.sd_err_threshold), "error_dimmingThreshold")
                 }
 
-                SectionHeader("PWM (flicker) handling", divider = true)
+                SectionHeader(stringResource(R.string.sd_header_pwm), divider = true)
                 // Software dimming / PWM-sensitive — no ELEVATED needed (superdimming_settings.md note);
                 // mutually exclusive with super dimming (G2-F10).
                 SwitchSettingRow(
-                    "Use software dimming (PWM-sensitive)", draft.pwmSensitive,
+                    stringResource(R.string.sd_use_pwm), draft.pwmSensitive,
                     { on -> onEdit { s -> s.copy(pwmSensitive = on, dimmingEnabled = if (on) false else s.dimmingEnabled) } },
                     help = TaskerHelp.PWM_SENSITIVE,
                     testTag = "switch_pwmSensitive",
                 )
                 NumberSettingField(
-                    "Software exponent (PWM)", draft.pwmExponent, { onEdit { s -> s.copy(pwmExponent = it.toFloat()) } },
+                    stringResource(R.string.sd_pwm_exponent), draft.pwmExponent, { onEdit { s -> s.copy(pwmExponent = it.toFloat()) } },
                     epoch = epoch, committed = committed.pwmExponent, isInt = false,
                     help = TaskerHelp.PWM_EXPONENT, testTag = "field_pwmExponent",
                 )
@@ -206,10 +206,10 @@ fun SuperDimmingContent(
             // drives the *Circadian Dimming* graph (how dim strength varies across the day), NOT the
             // lux→dim curve, so it is grouped under that graph (matching Tasker). G2-F11: only effective
             // when circadian scaling is on, so the field stays gated on it.
-            GraphSettingsGroup("Circadian Dimming") {
-                SectionHeader("Circadian dim spread", divider = true)
+            GraphSettingsGroup(stringResource(R.string.sd_graph_circadian)) {
+                SectionHeader(stringResource(R.string.sd_header_circadian_spread), divider = true)
                 NumberSettingField(
-                    "Spread (circadian)", draft.dimSpread, { onEdit { s -> s.copy(dimSpread = it.toInt()) } },
+                    stringResource(R.string.sd_spread), draft.dimSpread, { onEdit { s -> s.copy(dimSpread = it.toInt()) } },
                     epoch = epoch, committed = committed.dimSpread,
                     enabled = dimEnabled && draft.scalingEnabled,
                     help = TaskerHelp.DIM_SPREAD,

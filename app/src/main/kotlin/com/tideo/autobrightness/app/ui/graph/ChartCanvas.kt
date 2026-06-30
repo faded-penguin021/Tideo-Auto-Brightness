@@ -32,6 +32,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tideo.autobrightness.R
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.log10
@@ -334,7 +336,7 @@ private fun ChartLegend(series: List<ChartSeries>, scatter: ChartScatter?, label
                 Canvas(modifier = Modifier.size(10.dp)) {
                     drawCircle(scatter.color, radius = size.minDimension / 2f, center = center)
                 }
-                Text("  Overrides", style = MaterialTheme.typography.labelSmall, color = labelColor)
+                Text(stringResource(R.string.chart_overrides_label), style = MaterialTheme.typography.labelSmall, color = labelColor)
             }
         }
     }

@@ -53,6 +53,15 @@ class PrivilegeManagerTest {
     }
 
     @Test
+    fun dumpGrantInstruction_containsPackageNameAndDumpPermission() {
+        // D-130: the no-Location SSID `dumpsys wifi` path is enabled by an ADB `pm grant` of DUMP.
+        val instruction = manager.dumpGrantInstruction()
+        assertTrue(instruction.contains(context.packageName))
+        assertTrue(instruction.contains("android.permission.DUMP"))
+        assertTrue(instruction.contains("pm grant"))
+    }
+
+    @Test
     fun grantedWriteSecureSettings_detectsElevated() {
         val app = ApplicationProvider.getApplicationContext<android.app.Application>()
         Shadows.shadowOf(app).grantPermissions(Manifest.permission.WRITE_SECURE_SETTINGS)

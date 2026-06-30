@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.ui.components
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,9 +36,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import com.tideo.autobrightness.R
 import kotlin.math.roundToInt
 
 /**
@@ -76,7 +79,7 @@ private fun sameNumber(a: Number, b: Number, isInt: Boolean): Boolean =
 @Composable
 private fun HelpInfoButton(tag: String, onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.testTag("help_$tag")) {
-        Text("ⓘ", color = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.info_glyph), color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -100,7 +103,7 @@ fun NumberSettingField(
     committed: Number? = null,
     error: String? = null,
     helper: String? = null,
-    help: String? = null,
+    @StringRes help: Int? = null,
     enabled: Boolean = true,
     isInt: Boolean = true,
     testTag: String = label,
@@ -126,7 +129,8 @@ fun NumberSettingField(
         },
         supportingText = {
             // Tasker long-press help wins when revealed; validation errors always take priority.
-            val msg = error ?: help?.takeIf { showHelp } ?: helper
+            val helpText = help?.let { stringResource(it) }
+            val msg = error ?: helpText?.takeIf { showHelp } ?: helper
             if (msg != null) Text(msg, modifier = Modifier.testTag("helptext_$testTag"))
         },
         keyboardOptions = KeyboardOptions(
@@ -150,7 +154,7 @@ fun IntSliderSettingField(
     modifier: Modifier = Modifier,
     committed: Int? = null,
     helper: String? = null,
-    help: String? = null,
+    @StringRes help: Int? = null,
     enabled: Boolean = true,
     testTag: String = label,
 ) {
@@ -174,7 +178,7 @@ fun IntSliderSettingField(
             enabled = enabled,
             modifier = modifier.fillMaxWidth().testTag(testTag),
         )
-        val msg = help?.takeIf { showHelp } ?: helper
+        val msg = help?.let { stringResource(it) }?.takeIf { showHelp } ?: helper
         if (msg != null) {
             Text(
                 msg,
@@ -194,7 +198,7 @@ fun SwitchSettingRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     helper: String? = null,
-    help: String? = null,
+    @StringRes help: Int? = null,
     enabled: Boolean = true,
     testTag: String = label,
 ) {
@@ -206,7 +210,7 @@ fun SwitchSettingRow(
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
-            val msg = help?.takeIf { showHelp } ?: helper
+            val msg = help?.let { stringResource(it) }?.takeIf { showHelp } ?: helper
             if (msg != null) {
                 Text(
                     msg,
@@ -271,7 +275,7 @@ fun DraftApplyBar(
         ) {
             if (criticalError) {
                 Text(
-                    "Fix the highlighted curve error before applying.",
+                    stringResource(R.string.settings_fix_error),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(bottom = 6.dp).testTag("apply_blocked_hint"),
@@ -286,12 +290,12 @@ fun DraftApplyBar(
                     onClick = onDiscard,
                     enabled = dirty,
                     modifier = Modifier.weight(1f).testTag("discard_settings"),
-                ) { Text("Discard") }
+                ) { Text(stringResource(R.string.action_discard)) }
                 Button(
-                    onClick = { onApply(); toast("Settings applied") },
+                    onClick = { onApply(); toast(R.string.toast_settings_applied) },
                     enabled = dirty && !criticalError,
                     modifier = Modifier.weight(1f).testTag("apply_settings"),
-                ) { Text(if (dirty) "Apply" else "Applied") }
+                ) { Text(stringResource(if (dirty) R.string.action_apply else R.string.action_applied)) }
             }
         }
     }
@@ -325,7 +329,7 @@ fun DraftSettingsScaffold(
                 title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = attemptBack, modifier = Modifier.testTag("back_button")) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.a11y_back))
                     }
                 },
                 actions = {
@@ -333,7 +337,7 @@ fun DraftSettingsScaffold(
                     // sees the defaults previewed and commits them with Apply.
                     if (onReset != null) {
                         TextButton(onClick = onReset, modifier = Modifier.testTag("reset_screen")) {
-                            Text("Reset")
+                            Text(stringResource(R.string.action_reset))
                         }
                     }
                 },
@@ -346,16 +350,16 @@ fun DraftSettingsScaffold(
     if (showConfirm) {
         AlertDialog(
             onDismissRequest = { showConfirm = false },
-            title = { Text("Discard changes?") },
-            text = { Text("You have unsaved changes on this screen. Discard them and leave?") },
+            title = { Text(stringResource(R.string.discard_changes_title)) },
+            text = { Text(stringResource(R.string.discard_changes_msg)) },
             confirmButton = {
                 TextButton(
                     onClick = { showConfirm = false; onDiscard(); onNavigateBack() },
                     modifier = Modifier.testTag("confirm_discard"),
-                ) { Text("Discard") }
+                ) { Text(stringResource(R.string.action_discard)) }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirm = false }) { Text("Keep editing") }
+                TextButton(onClick = { showConfirm = false }) { Text(stringResource(R.string.action_keep_editing)) }
             },
         )
     }

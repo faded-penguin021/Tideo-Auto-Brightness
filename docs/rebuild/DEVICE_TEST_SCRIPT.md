@@ -84,8 +84,19 @@ optional.
 22. Add a **per-app** rule (grant usage access when prompted) targeting a saved profile; switch to that
     app. **Expected:** the profile loads (a teal context flash); the Dashboard shows the active context.
 23. Add a **charging** rule; plug/unplug. **Expected:** the rule applies on the charging change.
+    - **Prompt switch on plug-in (D-132).** With a higher-priority charging rule and a lower-priority
+      battery rule both matching (e.g. "Charging" P81 on-power vs "Low battery" P80 ≤30%), at low battery
+      plug the charger in (screen can be off). **Expected:** it switches to the charging rule **immediately**,
+      not after the next battery % tick (the plug event bypasses the 30 s battery cooldown).
 24. **[opt]** Add a **Wi-Fi/SSID** or **location** rule. **Expected:** applies on connect / on entering
     the radius (location rules only run when configured — battery gate).
+    - **No-Location SSID read (D-130).** In the rule editor tap **Use current SSID** with Location
+      services **off** and no Shizuku/root grant. **Expected:** the SSID-help dialog appears (explains
+      the Location requirement + the Shizuku/root and ADB-DUMP alternatives; **Copy ADB command** copies
+      `adb shell pm grant <pkg> android.permission.DUMP`). Then grant DUMP (`adb shell pm grant
+      com.tideo.autobrightness[.debug] android.permission.DUMP`), keep Location off, tap **Use current
+      SSID** again. **Expected:** the field fills with the connected network name (resolved via in-process
+      `dumpsys wifi`). With Shizuku or root instead, the same read succeeds via `cmd wifi status`.
 25. Manually load a profile (Profiles). **Expected:** context automation **pauses** (Resume banner);
     screen off→on or Resume re-enables it.
 

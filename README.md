@@ -179,6 +179,8 @@ brightness math and feature direction live.
 
 - **App-layer / Android-Kotlin bug fixes are welcome here** as pull requests, e.g. crashes, OEM
   brightness/secure-key quirks, battery-saver kills, Compose/UI leaks, packaging.
+- **Translations are welcome here** — the UI is fully localizable. **Human translations only** (no
+  machine/AI). See `CONTRIBUTING.md` for how to add a `values-<lang>/strings.xml`.
 - **Features and brightness-logic changes go to AAB**: Please open an issue there first.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the **Bug report** issue template.

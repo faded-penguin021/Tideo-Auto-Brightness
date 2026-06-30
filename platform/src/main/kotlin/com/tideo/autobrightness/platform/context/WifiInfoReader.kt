@@ -32,9 +32,9 @@ interface WifiInfoReader {
      * blanket "Not connected".
      *
      * Resolution order follows Tasker's `_GetWifiNoLocation V3` (S12.7d): the no-Location strategies
-     * (Shizuku `cmd wifi status`, then `dumpsys wifi`) are tried FIRST, and only when neither resolves
-     * does it fall back to the Location-gated `NetworkCallback` path — so most users read the SSID
-     * without ever granting ACCESS_FINE_LOCATION.
+     * (Shizuku `cmd wifi status`, then root `su -c 'cmd wifi status'`, then a DUMP-granted `dumpsys
+     * wifi`) are tried FIRST, and only when none resolves does it fall back to the Location-gated
+     * `NetworkCallback` path — so most users read the SSID without ever granting ACCESS_FINE_LOCATION.
      */
     suspend fun currentSsid(): SsidResult
 }
@@ -58,6 +58,7 @@ class AndroidWifiInfoReader(
     // selection order can be unit-tested with fakes without a real Shizuku binder / dumpsys.
     private val noLocationStrategies: List<WifiSsidStrategy> = listOf(
         ShizukuWifiSsidStrategy(context),
+        RootWifiSsidStrategy(context),
         DumpsysWifiSsidStrategy(context),
     ),
 ) : WifiInfoReader {
@@ -68,8 +69,9 @@ class AndroidWifiInfoReader(
     }
 
     // _GetWifiNoLocation V3 order (S12.7d/G2R-F41): try the no-Location strategies (Shizuku
-    // `cmd wifi status` → `dumpsys wifi`) in priority order; first hit wins. Returns null when none
-    // resolve, so callers fall back to the Location-gated path. Shared by both currentSsid() (rule
+    // `cmd wifi status` → root `su -c` → DUMP-granted `dumpsys wifi`) in priority order; first hit
+    // wins. Returns null when none resolve, so callers fall back to the Location-gated path. Shared by
+    // both currentSsid() (rule
     // editor) and ssidFlow() (runtime context evaluation) so the two paths can't drift again — the
     // earlier drift (flow skipped these strategies) made Wi-Fi rules require Location at eval time.
     private suspend fun resolveNoLocationSsid(): String? {

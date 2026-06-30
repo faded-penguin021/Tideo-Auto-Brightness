@@ -1043,7 +1043,11 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   SUNSET tokens vertically with `maxLines=1`/`softWrap=false` (no more char-wrap). (5) **F87:** app picker
   `heightIn(max=220→400.dp)`. (6) **F89 permissions audit:** declared `ACCESS_BACKGROUND_LOCATION` (FGS reads
   location while backgrounded); PACKAGE_USAGE_STATS kept (usage-access appop, already wired); DUMP NOT declared
-  (signature-only, the dumpsys SSID path degrades). **Fence honoured: domain/ + golden vectors + ChartCanvas
+  (signature-only, the dumpsys SSID path degrades). [⚠ **STALE — superseded by D-130**: the "DUMP NOT declared"
+  call was wrong. DUMP is `signature|privileged` **and `development`**, so it is user-grantable over ADB
+  (`pm grant … android.permission.DUMP`), exactly like WRITE_SECURE_SETTINGS; it is now declared and the
+  in-process `dumpsys wifi` SSID path is wired up + surfaced. This bracket is an append-only correction — the
+  original wording is preserved per the ledger's never-edit rule.] **Fence honoured: domain/ + golden vectors + ChartCanvas
   untouched.** Affects S12.8b only; **S13 inherits the `ChartSlot`/`ChartPager` contract** for the chart slots.
 
 - **D-069 (S12.9) — engineering-quality & parity-debt remediation stage created (a–f); review verified
@@ -2234,3 +2238,73 @@ the permanent registry — never compress or remove them.
   gives meta/infra changes (a new GitHub Actions workflow, build config, docs, refactors, tooling) their own
   slot so they read separately from app changes. Prose prompts, not checkbox theater — kept minimal because
   agents author these PRs and the owner reads them (anti-bloat: cf. D-127). Repo-hygiene change; no code.
+
+- **D-130: the no-Location SSID `dumpsys wifi` path is wired up + surfaced (DUMP grant), and gains a
+  root strategy + the exact two-step Tasker regex.** Reverses the F89 audit's "leave DUMP undeclared"
+  call (permission_audit.md row + AndroidManifest comment): `android.permission.DUMP` is
+  `signature|privileged` **but also `development`**, so — exactly like `WRITE_SECURE_SETTINGS` — a user
+  can grant it once over ADB (`adb shell pm grant <pkg> android.permission.DUMP`) and it sticks. With it
+  declared, `DumpsysWifiSsidStrategy`'s in-process `dumpsys wifi` actually works (it was always
+  permission-denied → dead before). **(a) Strategy order** (WifiInfoReader default list) is now Shizuku
+  `cmd wifi status` → **root `su -c 'cmd wifi status'`** (new `RootWifiSsidStrategy`; task105 detects
+  "Root" as a secondary privilege — answering "cmd wifi status works with root too") → DUMP-granted
+  `dumpsys wifi` → Location `NetworkCallback` last. Shared blocking `execShell` (read stdout to EOF
+  before `waitFor` so large `dumpsys` output can't deadlock a full pipe; mirrors
+  `tryGrantViaRoot`). **(b) `parseDumpsysWifi` now mirrors Tasker's two-step Variable-Search-Replace**
+  over the `mWifiInfo … COMPLETED` line (each step replaces the whole string with `$1`):
+  `(?s).*?SSID:\s*"([^"]+)".*` (quoted) first, then — only when step 1 left the line untouched —
+  `(?s).*?SSID:\s*([^,]+),.*` (unquoted, up to the next comma). Both anchor on the FIRST `SSID:` token,
+  so a network literally named "SSID" mis-anchors; Tasker shipped that caveat and so do we. **(c) UI:**
+  "Use current SSID" no longer dead-ends on a toast when every no-Location strategy missed and the
+  Location read is blocked — `NeedsLocationPermission`/`LocationServicesOff` open an SSID-help
+  `AlertDialog` (ProfilesContextsScreen) explaining the requirement and the no-Location alternatives
+  (Shizuku/root, or the one-time ADB DUMP grant — copyable via `PrivilegeManager.dumpGrantInstruction()`
+  /`ContextsViewModel.dumpGrantCommand()`), footed with the verbatim caveat "If your SSID contains
+  \"SSID\", this will cause problems. Sorry, not sorry." Tests: `WifiSsidStrategyTest` (+two-step quoted
+  comma-in-name, +strict `mWifiInfo` gate), `PrivilegeManagerTest.dumpGrantInstruction_*`. Ships as
+  **1.6.0 / versionCode 14** (MINOR — new user-facing capability + dialog). Changelog `14.txt`.
+
+- **D-131: full UI i18n — every user-facing string extracted to `strings.xml`; the hardcoded-string
+  ratchet now enforces ZERO.** Completes the S14/D-075 backlog (the `HardcodedStringCheckTest` ceiling sat
+  at 92 inline `Text("…")` literals; section headers, per-field labels, long-press help, toasts, and chart
+  labels were deferred). All ~250 user-facing strings — `Text`/`SectionHeader`/`GraphSettingsGroup`/
+  `ChartSlot`/`TriggerSection`/field labels/toasts/`contentDescription`/chart axis+series+marker labels —
+  now resolve via `stringResource` / `stringArrayResource`. Structural pieces: **(a)** `rememberToaster()`
+  returns a `Toaster` class implementing `(String) -> Unit` (back-compat where a toaster is passed as a
+  fn) with an added `@StringRes` invoke overload, so `toast(R.string.x, args)` works from non-composable
+  lambdas (captures `Context` at creation). **(b)** The field primitives' `help:` param
+  (`NumberSettingField`/`IntSliderSettingField`/`SwitchSettingRow` + `SettingFieldSpec.help`) changed
+  `String? → @StringRes Int?`, resolved internally; `TaskerHelp`'s 27 verbatim help constants moved to
+  `strings.xml` (`help_*`) and became `@StringRes` ids, so every `help = TaskerHelp.X` call site is
+  unchanged. **(c)** The `%AAB_Debug` category labels and the circadian sun-event labels became
+  `<string-array>`s (`debug_labels`, `circadian_event_labels`); `eventMarkers` takes the labels as a param.
+  **(d)** `AppRoute` gained `@StringRes titleRes` for the Menu nav rows (its English `label` is kept for
+  tests/logging). **(e)** Non-translatable glyphs/symbols (the `ⓘ` info affordance) are
+  `translatable="false"`. The ratchet (`HardcodedStringCheckTest`) now scans `Text("`, `toast("`, and
+  `contentDescription = "` and asserts **0** (was: count ≤ 92). A **non-functional language selector**
+  (Misc screen, English-only for now) is scaffolded for when translated `values-<lang>/` locales land, and
+  `CONTRIBUTING.md`/README gained a **human-only** (no machine/AI) translations section + how-to. Verbatim
+  Tasker help text and golden vectors unchanged; this is a pure presentation refactor (no behaviour change),
+  folded into the same **1.6.0 / versionCode 14** release as D-130. **(Note:** the Language selector was
+  subsequently moved from Misc to the top of the Onboarding screen per owner preference — same inert,
+  English-only scaffold, different home.)
+
+- **D-132: a plug/unplug transition bypasses the PASS-1 battery cooldown (deviation from Tasker).** Owner
+  report (2026-06-30): with a "Charging" rule (priority 81, on-power + time window) and a "Low Battery" rule
+  (priority 80, battery 0-30%), plugging in while Low Battery was active did **not** switch to the
+  higher-priority Charging context until the battery later rose past 30% (i.e. until Low Battery stopped
+  matching) — and the screen was off through the transition. **Root cause (NOT the ranking):**
+  `ContextOverrideResolver` is already priority-first (specificity is only a same-priority tie-break, and
+  Charging's specificity is higher anyway — proven by `ContextOverrideResolverTest
+  .higherPriorityWins_evenWhenBothMatch_chargingOverLowBattery`, which passes). The lag was **evaluation
+  timing**: Tasker's task43 PASS-1 applies the 30 s "Battery" cooldown to *every* battery caller, plug
+  changes included, so a plug-in within 30 s of the last battery eval was vetoed — and screen-off, the only
+  evals come from sparse battery callbacks, so the next un-vetoed tick didn't land until the level had moved
+  ≥ 5 % (past the rule boundary). **Fix:** in `ContextEngine.evaluate`, a `caller == BATTERY` with
+  `snap.plugged != (lastPlug == 1)` now skips the PASS-1 cooldown (PASS-2's BATTERY gate already treated a
+  plug change as "proceed"). This is a **deliberate deviation** from Tasker's literal debounce — a plug
+  transition is a discrete, significant event, not the % noise the cooldown exists to damp. Test:
+  `ContextEngineTest.plugChange_bypassesBatteryCooldown_switchesToHigherPriorityChargingRule_D132` (plugs in
+  5 s after the seed eval, well inside the 30 s window, and asserts the immediate switch to Charging). No
+  version bump — folds into **1.6.0 / versionCode 14**. Engine concurrency model otherwise unchanged
+  (single eval under `evalMutex`; only the PASS-1 debounce predicate changed).

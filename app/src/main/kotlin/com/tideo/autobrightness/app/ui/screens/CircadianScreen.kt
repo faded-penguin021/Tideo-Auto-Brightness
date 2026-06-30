@@ -95,16 +95,16 @@ fun CircadianScreen(
         dateLocation = dateLocation,
         todayDate = extras.today(),
         defaultLatLon = defaultLatLon,
-        onSetDateLocation = { date, lat, lon -> extras.set(date, lat, lon); toast("Fixed date/location set") },
-        onUseLiveData = { extras.useLiveData(); toast("Using live data") },
+        onSetDateLocation = { date, lat, lon -> extras.set(date, lat, lon); toast(R.string.toast_fixed_datelocation) },
+        onUseLiveData = { extras.useLiveData(); toast(R.string.toast_using_live_data) },
         onUseCurrentLocation = { fill ->
             scope.launch {
                 // D-122: this now actively acquires a fresh fix (the OS location indicator appears) and can
                 // take a few seconds — tell the user it's working rather than appearing to hang.
-                toast("Acquiring location…")
+                toast(R.string.toast_acquiring_location)
                 val latLon = runCatching { extras.freshLatLon() }.getOrNull()
                 if (latLon != null) fill(latLon.first, latLon.second)
-                else toast("Couldn't acquire a location — grant Location, or enable the IP fallback below, then try again")
+                else toast(R.string.toast_acquire_location_failed)
             }
         },
         geoIpEnabled = geoIpEnabled,
@@ -119,7 +119,7 @@ fun CircadianScreen(
                     scaleTaperMidpoint = d.scaleTaperMidpoint, scaleTaperSteepness = d.scaleTaperSteepness,
                 )
             }
-            toast("Reset to defaults")
+            toast(R.string.toast_reset_defaults)
         },
     )
 }
@@ -164,7 +164,7 @@ fun CircadianContent(
             val chartDateSec = chartDateEpochSec(dateLocation.date)
             ChartPager(
                 listOf(
-                    ChartSlot("Circadian", "dynamic_scale_chart") {
+                    ChartSlot(stringResource(R.string.graph_circadian), "dynamic_scale_chart") {
                         CircadianScaleChart(
                             draft.toDynamicScalingConfig(),
                             Modifier.testTag("dynamic_scale_chart"),
@@ -173,7 +173,7 @@ fun CircadianContent(
                             transitionFactor = draft.scaleTransitionFactor.toDouble(),
                         )
                     },
-                    ChartSlot("Taper", "taper_chart") {
+                    ChartSlot(stringResource(R.string.graph_taper), "taper_chart") {
                         TaperChart(
                             draft.toBrightnessCurveConfig(), draft.scaleSpread,
                             Modifier.testTag("taper_chart"),
@@ -202,58 +202,58 @@ fun CircadianContent(
             )
 
             // G2R-F82: scaling fields feed the Circadian graph; taper fields feed the Taper graph.
-            GraphSettingsGroup("Circadian") {
-                SectionHeader("Circadian scaling", divider = true)
+            GraphSettingsGroup(stringResource(R.string.graph_circadian)) {
+                SectionHeader(stringResource(R.string.circadian_scaling_header), divider = true)
                 // S13d owner fix: these used always-visible `helper=` text while every sibling settings
                 // screen surfaces its explanation behind the "ⓘ" reveal (`help=`). Made consistent —
                 // tap ⓘ to view the explanation here too.
                 SwitchSettingRow(
-                    "Enable dynamic scaling", draft.scalingEnabled,
+                    stringResource(R.string.circadian_enable_scaling), draft.scalingEnabled,
                     { onEdit { s -> s.copy(scalingEnabled = it) } },
-                    help = "Shift the whole curve across the day using sun position.",
+                    help = R.string.help_circadian_scaling,
                     testTag = "switch_scalingEnabled",
                 )
                 NumberSettingField(
                     // SAFETY: scale spread stays positive (1..100) — negative inverts the curve and can
                     // push the scale multiplier to ≤0 (black screen). Only the super-dimming circadian
                     // spread may go negative. Clamped on edit so the unsafe value never enters the draft.
-                    "Scale spread", draft.scaleSpread, { onEdit { s -> s.copy(scaleSpread = it.toInt().coerceIn(1, 100)) } },
+                    stringResource(R.string.circadian_scale_spread), draft.scaleSpread, { onEdit { s -> s.copy(scaleSpread = it.toInt().coerceIn(1, 100)) } },
                     epoch = epoch, committed = committed.scaleSpread,
-                    help = "How wide the scale shifts over the day (%, 1–100).", testTag = "field_scaleSpread",
+                    help = R.string.help_scale_spread, testTag = "field_scaleSpread",
                 )
                 NumberSettingField(
-                    "Scale steepness", draft.scaleSteepness, { onEdit { s -> s.copy(scaleSteepness = it.toInt()) } },
+                    stringResource(R.string.circadian_scale_steepness), draft.scaleSteepness, { onEdit { s -> s.copy(scaleSteepness = it.toInt()) } },
                     epoch = epoch, committed = committed.scaleSteepness,
-                    help = "Sharpness of the day/night transition.", testTag = "field_scaleSteepness",
+                    help = R.string.help_scale_steepness, testTag = "field_scaleSteepness",
                 )
                 NumberSettingField(
-                    "Transition factor", draft.scaleTransitionFactor, { onEdit { s -> s.copy(scaleTransitionFactor = it.toFloat()) } },
+                    stringResource(R.string.circadian_transition_factor), draft.scaleTransitionFactor, { onEdit { s -> s.copy(scaleTransitionFactor = it.toFloat()) } },
                     epoch = epoch, committed = committed.scaleTransitionFactor, isInt = false,
-                    help = "Duration of the dawn/dusk transition.", testTag = "field_scaleTransitionFactor",
+                    help = R.string.help_scale_transition, testTag = "field_scaleTransitionFactor",
                 )
                 // task517/674: large transition factors make the graph non-sensical.
                 if (draft.scaleTransitionFactor > 0.5f) {
-                    ErrorBanner("Transition factor > 0.5 may produce a non-sensical curve.", "error_scaleTransitionFactor")
+                    ErrorBanner(stringResource(R.string.circadian_err_transition), "error_scaleTransitionFactor")
                 }
             }
 
-            GraphSettingsGroup("Taper") {
-                SectionHeader("Compression taper", divider = true)
+            GraphSettingsGroup(stringResource(R.string.graph_taper)) {
+                SectionHeader(stringResource(R.string.circadian_taper_header), divider = true)
                 // Tasker Experiment slider: taper midpoint 130–240 (experiment_settings.md elements26, G2-F13).
                 IntSliderSettingField(
-                    "Taper midpoint", draft.scaleTaperMidpoint, 130..240,
+                    stringResource(R.string.circadian_taper_midpoint), draft.scaleTaperMidpoint, 130..240,
                     { onEdit { s -> s.copy(scaleTaperMidpoint = it) } },
                     committed = committed.scaleTaperMidpoint,
-                    help = "Brightness level where compression centres.", testTag = "slider_scaleTaperMidpoint",
+                    help = R.string.help_taper_midpoint, testTag = "slider_scaleTaperMidpoint",
                 )
                 // task689: taper midpoint cannot exceed current maximum brightness.
                 if (draft.scaleTaperMidpoint > draft.maxBrightness) {
-                    ErrorBanner("Taper midpoint cannot exceed maximum brightness.", "error_scaleTaperMidpoint")
+                    ErrorBanner(stringResource(R.string.circadian_err_taper_midpoint), "error_scaleTaperMidpoint")
                 }
                 NumberSettingField(
-                    "Taper steepness", draft.scaleTaperSteepness, { onEdit { s -> s.copy(scaleTaperSteepness = it.toFloat()) } },
+                    stringResource(R.string.circadian_taper_steepness), draft.scaleTaperSteepness, { onEdit { s -> s.copy(scaleTaperSteepness = it.toFloat()) } },
                     epoch = epoch, committed = committed.scaleTaperSteepness, isInt = false,
-                    help = "Slope of the dynamic-range compression.", testTag = "field_scaleTaperSteepness",
+                    help = R.string.help_taper_steepness, testTag = "field_scaleTaperSteepness",
                 )
             }
 
@@ -304,14 +304,18 @@ fun CircadianDateLocationCard(
 
     // S13c restyle (m3_audit §3 row 6): the inline date/location controls are grouped into an `AabCard`.
     AabCard {
-    SectionHeader("Date & location", divider = true)
+    SectionHeader(stringResource(R.string.circadian_date_location_header), divider = true)
     Text(
         when {
-            value.isUnset -> "Live data — today + current location."
+            value.isUnset -> stringResource(R.string.circadian_status_live)
             // F39: date and location pin independently — show whichever is fixed.
             value.latitude == null || value.longitude == null ->
-                "Fixed date: ${value.date ?: "live"} (live location)"
-            else -> "Fixed: ${value.date ?: "today"} @ ${fmtCoord(value.latitude)}, ${fmtCoord(value.longitude)}"
+                stringResource(R.string.circadian_status_fixed_date, value.date ?: stringResource(R.string.circadian_live_word))
+            else -> stringResource(
+                R.string.circadian_status_fixed_full,
+                value.date ?: stringResource(R.string.circadian_today_word),
+                fmtCoord(value.latitude), fmtCoord(value.longitude),
+            )
         },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -320,24 +324,24 @@ fun CircadianDateLocationCard(
     OutlinedButton(
         onClick = { showDatePicker = true },
         modifier = Modifier.fillMaxWidth().testTag("exp_date_value"),
-    ) { Text("Date: $dateText") }
+    ) { Text(stringResource(R.string.circadian_date, dateText)) }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             value = latText, onValueChange = { latText = it.filter { c -> c.isDigit() || c == '.' || c == '-' } },
-            label = { Text("Latitude") }, singleLine = true,
+            label = { Text(stringResource(R.string.field_latitude)) }, singleLine = true,
             modifier = Modifier.weight(1f).testTag("exp_lat"),
         )
         OutlinedTextField(
             value = lonText, onValueChange = { lonText = it.filter { c -> c.isDigit() || c == '.' || c == '-' } },
-            label = { Text("Longitude") }, singleLine = true,
+            label = { Text(stringResource(R.string.field_longitude)) }, singleLine = true,
             modifier = Modifier.weight(1f).testTag("exp_lon"),
         )
     }
     OutlinedButton(
         onClick = { onUseCurrentLocation { la, lo -> latText = "%.5f".format(la); lonText = "%.5f".format(lo) } },
         modifier = Modifier.testTag("exp_use_location"),
-    ) { Text("Use current location") }
+    ) { Text(stringResource(R.string.action_use_current_location)) }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
@@ -352,9 +356,9 @@ fun CircadianDateLocationCard(
                 }
             },
             modifier = Modifier.testTag("exp_set"),
-        ) { Text("Set fixed") }
+        ) { Text(stringResource(R.string.circadian_set_fixed)) }
         TextButton(onClick = onUseLiveData, modifier = Modifier.testTag("exp_use_live")) {
-            Text("Use live data")
+            Text(stringResource(R.string.circadian_use_live_data))
         }
     }
 
@@ -362,12 +366,10 @@ fun CircadianDateLocationCard(
     // makes an HTTPS request to ipwho.is (D-121). It is an explicit opt-IN (default OFF) — the app never
     // contacts that server unless the user turns this on (circadian otherwise waits for an on-device fix).
     SwitchSettingRow(
-        label = "IP-based location fallback",
+        label = stringResource(R.string.circadian_ip_fallback_label),
         checked = geoIpEnabled,
         onCheckedChange = onSetGeoIpEnabled,
-        help = "Off by default. When GPS/network gives no fix and no fixed location is set, turn this " +
-            "on to look up an approximate location from your public IP via ipwho.is (HTTPS). This also " +
-            "powers \"Use current location\" below when no on-device fix is available.",
+        help = R.string.help_circadian_ip_fallback,
         testTag = "exp_geoip_toggle",
     )
 
@@ -382,9 +384,9 @@ fun CircadianDateLocationCard(
                         showDatePicker = false
                     },
                     modifier = Modifier.testTag("exp_date_ok"),
-                ) { Text("OK") }
+                ) { Text(stringResource(R.string.action_ok)) }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.confirm_cancel)) } },
         ) { DatePicker(state = state) }
     }
     }

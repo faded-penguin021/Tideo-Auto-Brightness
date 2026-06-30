@@ -158,7 +158,7 @@ fun ProfilesBody(
                     color = MaterialTheme.colorScheme.onErrorContainer,
                 )
                 TextButton(onClick = onDismissLoadError, modifier = Modifier.testTag("dismiss_load_error")) {
-                    Text("Dismiss")
+                    Text(stringResource(R.string.action_dismiss))
                 }
             }
         }
@@ -166,9 +166,9 @@ fun ProfilesBody(
     if (contextLocked) ContextLockBanner(onResumeContext)
 
     // S13c restyle (m3_audit §3 row 10): empty hints become `EmptyState`; rows become `AabCard`s.
-    SectionHeader("Saved profiles", divider = true)
+    SectionHeader(stringResource(R.string.profiles_saved_header), divider = true)
     if (profiles.isEmpty()) {
-        EmptyState("No saved profiles yet.", testTag = "empty_profiles")
+        EmptyState(stringResource(R.string.profiles_no_saved), testTag = "empty_profiles")
     }
     profiles.forEach { entry ->
         ProfileCard(entry, onApply = { previewProfile = entry }, onOverwriteProfile, onDeleteProfile)
@@ -186,20 +186,20 @@ fun ProfilesBody(
         OutlinedButton(
             onClick = { showCurrentSettings = true },
             modifier = Modifier.fillMaxWidth().testTag("view_current_settings"),
-        ) { Text("View current settings…") }
+        ) { Text(stringResource(R.string.profiles_view_current)) }
         Button(
             onClick = { showSaveDialog = true },
             modifier = Modifier.fillMaxWidth().testTag("save_profile_as"),
-        ) { Text("Save current settings as…") }
+        ) { Text(stringResource(R.string.profiles_save_as)) }
         OutlinedButton(
             onClick = onRestoreFactory,
             modifier = Modifier.fillMaxWidth().testTag("restore_factory"),
-        ) { Text("Restore factory profiles") }
+        ) { Text(stringResource(R.string.profiles_restore_factory)) }
         OutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth().testTag("reset_defaults")) {
-            Text("Reset settings to defaults")
+            Text(stringResource(R.string.profiles_reset_defaults))
         }
         Button(onClick = onExport, modifier = Modifier.fillMaxWidth().testTag("export_profile")) {
-            Text("Export current settings…")
+            Text(stringResource(R.string.profiles_export))
         }
     }
 
@@ -214,15 +214,15 @@ fun ProfilesBody(
         testTag = "legacy_section",
     ) {
         Button(onClick = onImport, modifier = Modifier.fillMaxWidth().testTag("import_profile")) {
-            Text("Import a settings file…")
+            Text(stringResource(R.string.profiles_import_file))
         }
         OutlinedButton(
             onClick = onChooseLegacyFolder,
             modifier = Modifier.fillMaxWidth().testTag("choose_legacy_folder"),
-        ) { Text(if (legacyEntries.isEmpty()) "Link legacy configs folder…" else "Re-link legacy folder…") }
+        ) { Text(stringResource(if (legacyEntries.isEmpty()) R.string.profiles_link_legacy else R.string.profiles_relink_legacy)) }
         if (legacyEntries.isEmpty()) {
             Text(
-                "Grant the Download/AAB/configs folder once to load profiles saved by the Tasker app.",
+                stringResource(R.string.profiles_legacy_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -235,7 +235,7 @@ fun ProfilesBody(
                 ) {
                     Text(entry.name, style = MaterialTheme.typography.bodyMedium)
                     OutlinedButton(onClick = { onLoadLegacy(entry) }, modifier = Modifier.testTag("load_${entry.name}")) {
-                        Text("Load")
+                        Text(stringResource(R.string.profiles_action_load))
                     }
                 }
             }
@@ -288,7 +288,7 @@ internal fun ContextLockBanner(onResumeContext: () -> Unit) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "Context automation is paused after a manual profile load.",
+                stringResource(R.string.profiles_context_paused),
                 style = MaterialTheme.typography.bodyMedium,
             )
             // High-contrast resume — Tasker's black RESUME on gold: dark container, gold label + ▶ icon.
@@ -298,7 +298,7 @@ internal fun ContextLockBanner(onResumeContext: () -> Unit) {
                 modifier = Modifier.testTag("resume_context"),
             ) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("Resume context automation")
+                Text(stringResource(R.string.profiles_resume_context))
             }
         }
     }
@@ -372,7 +372,7 @@ internal fun ProfileCard(
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        entry.name + if (entry.builtIn) "  (built-in)" else "",
+                        entry.name + if (entry.builtIn) stringResource(R.string.profiles_builtin_suffix) else "",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     if (isActive) {
@@ -386,7 +386,8 @@ internal fun ProfileCard(
                     }
                 }
                 Text(
-                    if (changed == 0) "Factory defaults" else "$changed changed from default",
+                    if (changed == 0) stringResource(R.string.profiles_factory_defaults)
+                    else stringResource(R.string.profiles_changed_count, changed),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -403,12 +404,12 @@ internal fun ProfileCard(
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
-                        text = { Text("Overwrite") },
+                        text = { Text(stringResource(R.string.confirm_overwrite)) },
                         onClick = { menu = false; confirmOverwrite = true },
                         modifier = Modifier.testTag("overwrite_profile_${entry.name}"),
                     )
                     DropdownMenuItem(
-                        text = { Text("Delete") },
+                        text = { Text(stringResource(R.string.confirm_delete)) },
                         onClick = { menu = false; confirmDelete = true },
                         modifier = Modifier.testTag("delete_profile_${entry.name}"),
                     )
@@ -418,7 +419,7 @@ internal fun ProfileCard(
         OutlinedButton(
             onClick = onApply,
             modifier = Modifier.fillMaxWidth().testTag("apply_profile_${entry.name}"),
-        ) { Text("Apply") }
+        ) { Text(stringResource(R.string.action_apply)) }
     }
 
     if (confirmOverwrite) {
@@ -484,17 +485,17 @@ internal fun SaveProfileDialog(
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Save profile") },
+        title = { Text(stringResource(R.string.profiles_save_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Profile name") },
+                    label = { Text(stringResource(R.string.profiles_name_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("save_profile_name"),
                 )
-                Text("Saving these settings:", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.profiles_saving_these), style = MaterialTheme.typography.labelMedium)
                 // G2R-F38: show exactly what is being saved, gold-highlighting changed-vs-default.
                 SettingsDiffList(currentSettings, maxHeight = 260)
             }
@@ -503,9 +504,9 @@ internal fun SaveProfileDialog(
             TextButton(
                 onClick = { if (name.isNotBlank()) onConfirm(name) },
                 modifier = Modifier.testTag("confirm_save_profile"),
-            ) { Text("Save") }
+            ) { Text(stringResource(R.string.profiles_action_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.confirm_cancel)) } },
     )
 }
 
@@ -518,11 +519,11 @@ internal fun SaveProfileDialog(
 fun LoadProfileDialog(profile: SavedProfile, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Load “${profile.name}”?") },
+        title = { Text(stringResource(R.string.profiles_load_confirm_title, profile.name)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "These settings will replace your current configuration.",
+                    stringResource(R.string.profiles_load_replace_warn),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 SettingsDiffList(profile.settings)
@@ -530,10 +531,10 @@ fun LoadProfileDialog(profile: SavedProfile, onDismiss: () -> Unit, onConfirm: (
         },
         confirmButton = {
             TextButton(onClick = onConfirm, modifier = Modifier.testTag("confirm_load_profile")) {
-                Text("Apply")
+                Text(stringResource(R.string.action_apply))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.confirm_cancel)) } },
     )
 }
 
@@ -542,11 +543,11 @@ fun LoadProfileDialog(profile: SavedProfile, onDismiss: () -> Unit, onConfirm: (
 fun CurrentSettingsDialog(settings: AabSettings, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Current settings") },
+        title = { Text(stringResource(R.string.profiles_current_settings_title)) },
         text = { SettingsDiffList(settings) },
         confirmButton = {
             TextButton(onClick = onDismiss, modifier = Modifier.testTag("close_current_settings")) {
-                Text("Close")
+                Text(stringResource(R.string.profiles_close))
             }
         },
     )

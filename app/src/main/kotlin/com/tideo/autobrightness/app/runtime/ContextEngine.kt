@@ -280,14 +280,24 @@ class ContextEngine(
     private suspend fun evaluate(caller: ContextCaller) = evalMutex.withLock {
         val rules = rulesProvider()
         val tokens = ContextSignalTokens.from(rules)
+        val snap = signalSnapshot.value
 
-        // PASS 1 — per-caller cooldown debounce.
+        // D-132 (deviation from Tasker): a plug/unplug transition is a discrete, significant event —
+        // it must NOT be swallowed by the PASS-1 battery cooldown (Tasker applies the 30 s cooldown to
+        // every Battery caller, plug changes included). Without this, plugging in while a lower-priority
+        // battery rule (e.g. "Low battery" P80) is active delays the switch to a higher-priority charging
+        // context (e.g. "Charging" P81) — especially screen-off, where evals only arrive from sparse
+        // battery callbacks, so the charging rule wouldn't win until the next un-vetoed battery tick
+        // (owner report 2026-06-30: it only switched once the battery rose past its range). The
+        // PASS-2 BATTERY gate already treats a plug change as "proceed"; this lets it past PASS-1 too.
+        val plugChanged = caller == ContextCaller.BATTERY && lastPlug != -1 && snap.plugged != (lastPlug == 1)
+
+        // PASS 1 — per-caller cooldown debounce (bypassed for a plug-state change, see above).
         val cooldown = caller.cooldownMs
         val now = clock()
         val last = lastEvalTime
-        if (cooldown > 0 && last != null && now - last < cooldown) return@withLock
+        if (!plugChanged && cooldown > 0 && last != null && now - last < cooldown) return@withLock
 
-        val snap = signalSnapshot.value
         val signals = signalSource.assemble(snap.app, snap.batteryPercent, snap.plugged, snap.wifi, snap.lat, snap.lon)
 
         // PASS 2 — veto gates.

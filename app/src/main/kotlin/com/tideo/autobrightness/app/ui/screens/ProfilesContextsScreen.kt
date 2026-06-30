@@ -40,10 +40,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -90,6 +93,10 @@ fun ProfilesContextsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val toast = rememberToaster()
+    val clipboard = LocalClipboardManager.current
+    // D-130: when "Use current SSID" can't read the name without Location, hold the lead sentence here
+    // to drive the help dialog (Shizuku/root/DUMP alternatives). Null = dialog hidden.
+    var ssidHelp by remember { mutableStateOf<String?>(null) }
 
     // --- Profiles side (SettingsViewModel) ---
     val settings by settingsVm.settings.collectAsStateWithLifecycle()
@@ -114,8 +121,8 @@ fun ProfilesContextsScreen(
         is ProfileLoadResult.Success -> { apply(result.settings); loadError = null; okMessage }
         is ProfileLoadResult.LegacyFallback -> { apply(result.settings); loadError = null; okMessage }
         is ProfileLoadResult.TotalFailure -> {
-            loadError = "Couldn't read this profile. It isn't a Tideo export or a Tasker AAB config."
-            "Load failed"
+            loadError = context.getString(R.string.profiles_unreadable)
+            context.getString(R.string.toast_load_failed)
         }
     }
 
@@ -136,8 +143,8 @@ fun ProfilesContextsScreen(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri: Uri? ->
         if (uri != null) scope.launch {
-            status = runCatching { manager.exportToDocument(uri, settings); "Exported." }
-                .getOrElse { "Export failed: ${it.message}" }
+            status = runCatching { manager.exportToDocument(uri, settings); context.getString(R.string.toast_exported) }
+                .getOrElse { context.getString(R.string.toast_export_failed, it.message ?: "") }
             status?.let(toast)
         }
     }
@@ -147,8 +154,8 @@ fun ProfilesContextsScreen(
     ) { uri: Uri? ->
         if (uri != null) scope.launch {
             status = runCatching {
-                handleLoad(manager.importFromDocument(uri), "Imported.") { settingsVm.replaceAll(it) }
-            }.getOrElse { loadError = it.message; "Import failed: ${it.message}" }
+                handleLoad(manager.importFromDocument(uri), context.getString(R.string.toast_imported)) { settingsVm.replaceAll(it) }
+            }.getOrElse { loadError = it.message; context.getString(R.string.toast_import_failed, it.message ?: "") }
             status?.let(toast)
         }
     }
@@ -160,7 +167,7 @@ fun ProfilesContextsScreen(
             LegacyConfigImporter.persistGrant(context, uri)
             legacyTree = uri
             refreshLegacy(uri)
-            toast("Folder linked")
+            toast(R.string.toast_folder_linked)
         }
     }
 
@@ -187,14 +194,14 @@ fun ProfilesContextsScreen(
     fun loadLegacy(entry: LegacyConfigEntry) {
         scope.launch {
             status = runCatching {
-                handleLoad(manager.importFromDocument(entry.uri), "Loaded ${entry.name}") { imported ->
+                handleLoad(manager.importFromDocument(entry.uri), context.getString(R.string.toast_loaded_entry, entry.name)) { imported ->
                     // G2R-F44: register the legacy profile under its file name so it's selectable as a
                     // context-rule target without a manual re-save, then apply it live.
                     val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
                     settingsVm.saveImportedProfile(profileName, imported)
                     settingsVm.replaceAll(imported)
                 }
-            }.getOrElse { loadError = it.message; "Load failed: ${it.message}" }
+            }.getOrElse { loadError = it.message; context.getString(R.string.toast_load_failed_detail, it.message ?: "") }
             status?.let(toast)
         }
     }
@@ -217,7 +224,7 @@ fun ProfilesContextsScreen(
                 verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing),
             ) {
                 if (settings.contextOverride) {
-                    ContextLockBanner { settingsVm.resumeContextAutomation(); toast("Context automation resumed") }
+                    ContextLockBanner { settingsVm.resumeContextAutomation(); toast(R.string.toast_context_resumed) }
                 }
                 SectionHeader(stringResource(R.string.seg_profiles), divider = true)
                 if (profiles.isEmpty()) EmptyState(stringResource(R.string.profiles_no_saved), testTag = "empty_profiles")
@@ -226,8 +233,8 @@ fun ProfilesContextsScreen(
                         entry,
                         isActive = entry.name == activeProfile,
                         onApply = { previewProfile = entry },
-                        onOverwrite = { name -> settingsVm.saveCurrentAs(name); toast("Overwrote: $name") },
-                        onDelete = { name -> settingsVm.deleteProfile(name); toast("Deleted: $name") },
+                        onOverwrite = { name -> settingsVm.saveCurrentAs(name); toast(R.string.toast_overwrote, name) },
+                        onDelete = { name -> settingsVm.deleteProfile(name); toast(R.string.toast_deleted, name) },
                     )
                 }
                 status?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
@@ -242,7 +249,7 @@ fun ProfilesContextsScreen(
         SaveProfileDialog(
             currentSettings = settings,
             onDismiss = { showSave = false },
-            onConfirm = { name -> showSave = false; settingsVm.saveCurrentAs(name); toast("Saved profile: $name") },
+            onConfirm = { name -> showSave = false; settingsVm.saveCurrentAs(name); toast(R.string.toast_saved_profile, name) },
         )
     }
 
@@ -253,8 +260,8 @@ fun ProfilesContextsScreen(
             onImport = { showLoad = false; importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
             onChooseLegacyFolder = { folderLauncher.launch(null) },
             onLoadLegacy = { entry -> showLoad = false; loadLegacy(entry) },
-            onRestoreFactory = { showLoad = false; settingsVm.restoreFactoryProfiles(); toast("Factory profiles restored") },
-            onReset = { showLoad = false; settingsVm.resetDefaults(); toast("Reset to defaults") },
+            onRestoreFactory = { showLoad = false; settingsVm.restoreFactoryProfiles(); toast(R.string.toast_factory_restored) },
+            onReset = { showLoad = false; settingsVm.resetDefaults(); toast(R.string.toast_reset_defaults) },
             onExport = { showLoad = false; exportLauncher.launch("tideo-profile.json") },
             onViewCurrent = { showLoad = false; showCurrentSettings = true },
             onDismiss = { showLoad = false },
@@ -266,7 +273,7 @@ fun ProfilesContextsScreen(
         LoadProfileDialog(
             profile = entry,
             onDismiss = { previewProfile = null },
-            onConfirm = { previewProfile = null; settingsVm.applyProfile(entry.name); toast("Applied profile: ${entry.name}") },
+            onConfirm = { previewProfile = null; settingsVm.applyProfile(entry.name); toast(R.string.toast_applied_profile, entry.name) },
         )
     }
 
@@ -288,6 +295,57 @@ fun ProfilesContextsScreen(
         )
     }
 
+    // D-130: "Use current SSID" couldn't read the name without Location — explain the no-Location
+    // alternatives (Shizuku/root, or a one-time ADB DUMP grant) so Wi-Fi rules aren't a dead end.
+    ssidHelp?.let { lead ->
+        val dumpCmd = remember { contextsVm.dumpGrantCommand() }
+        AlertDialog(
+            onDismissRequest = { ssidHelp = null },
+            title = { Text(stringResource(R.string.ssid_help_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.rowGap)) {
+                    Text(lead)
+                    Text(stringResource(R.string.ssid_help_options))
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Text(
+                            dumpCmd,
+                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(Dimens.rowGap).testTag("ssid_dump_command"),
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.ssid_help_dump_security),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(R.string.ssid_help_regex_caveat),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { ssidHelp = null }) {
+                    Text(stringResource(R.string.profiles_close))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(dumpCmd))
+                        toast(context.getString(R.string.ssid_help_copied))
+                    },
+                    modifier = Modifier.testTag("copy_dump_command"),
+                ) { Text(stringResource(R.string.ssid_help_copy_dump)) }
+            },
+        )
+    }
+
     // Contexts: the full rule list + editor, in a full-screen modal (like the rule editor already is).
     if (showContexts) {
         ContextsModal(onClose = { showContexts = false }) {
@@ -297,19 +355,22 @@ fun ProfilesContextsScreen(
                 apps = apps,
                 solarLabel = solarLabel,
                 activeContext = activeContext,
-                onSave = { toast("Rule saved"); contextsVm.save(it) },
-                onDelete = { contextsVm.delete(it); toast("Rule deleted") },
+                onSave = { toast(R.string.toast_rule_saved); contextsVm.save(it) },
+                onDelete = { contextsVm.delete(it); toast(R.string.toast_rule_deleted) },
                 onUseCurrentSsid = { setSsid ->
                     scope.launch {
                         // G2R-F22: targeted message per failure mode, not a blanket "Not connected".
+                        // D-130: the two Location-gated misses mean every no-Location strategy
+                        // (Shizuku/root/DUMP) also missed, so open the help dialog explaining the
+                        // alternatives instead of a dead-end toast.
                         when (val result = contextsVm.currentSsid()) {
-                            is SsidResult.Connected -> { setSsid(result.ssid); toast("Wi-Fi: ${result.ssid}") }
-                            SsidResult.NotOnWifi -> toast("Not connected to Wi-Fi")
+                            is SsidResult.Connected -> { setSsid(result.ssid); toast(R.string.toast_wifi_connected, result.ssid) }
+                            SsidResult.NotOnWifi -> toast(R.string.toast_not_on_wifi)
                             SsidResult.NeedsLocationPermission ->
-                                toast("Reading the Wi-Fi name needs Location permission (grant it in Setup)")
+                                ssidHelp = context.getString(R.string.ssid_help_lead_permission)
                             SsidResult.LocationServicesOff ->
-                                toast("Turn on Location services to read the Wi-Fi name")
-                            SsidResult.Unknown -> toast("Could not read the current Wi-Fi name")
+                                ssidHelp = context.getString(R.string.ssid_help_lead_services)
+                            SsidResult.Unknown -> toast(R.string.toast_ssid_unknown)
                         }
                     }
                 },
@@ -318,22 +379,22 @@ fun ProfilesContextsScreen(
                     // OS location indicator appears; can take a few seconds — toast that it's working);
                     // targeted message per outcome (no longer wrongly reports "not granted" after the grant).
                     scope.launch {
-                        toast("Acquiring location…")
+                        toast(R.string.toast_acquiring_location)
                         when (val result = contextsVm.currentLocation()) {
                             is LocationResult.Available -> {
                                 setLatLon(result.snapshot.latitude, result.snapshot.longitude)
-                                toast("Location: %.4f, %.4f".format(result.snapshot.latitude, result.snapshot.longitude))
+                                toast(R.string.toast_location_fix, result.snapshot.latitude, result.snapshot.longitude)
                             }
                             LocationResult.NeedsPermission ->
-                                toast("Grant Location permission to use the current location")
+                                toast(R.string.toast_location_needs_permission)
                             LocationResult.Unavailable ->
-                                toast("No location fix yet — try again in a moment")
+                                toast(R.string.toast_location_unavailable)
                         }
                     }
                 },
                 hasUsageAccess = contextsVm::hasUsageAccess,
                 onRequestUsageAccess = {
-                    toast("Grant usage access so per-app rules can detect the foreground app")
+                    toast(R.string.toast_grant_usage_hint)
                     runCatching { context.startActivity(contextsVm.usageAccessIntent()) }
                 },
             )
