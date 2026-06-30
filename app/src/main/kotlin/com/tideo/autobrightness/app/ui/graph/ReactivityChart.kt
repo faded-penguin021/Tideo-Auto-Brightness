@@ -4,6 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.ThresholdConfig
@@ -54,8 +56,8 @@ fun ReactivityChart(
     val curvePoints = sample(threshold)
     val referencePoints = sample(referenceCfg)
     val series = listOf(
-        ChartSeries("Reference", referencePoints, AabGold, strokeWidthPx = 3f, dashed = true),
-        ChartSeries("Curve", curvePoints, MaterialTheme.colorScheme.primary),
+        ChartSeries(stringResource(R.string.chart_reference), referencePoints, AabGold, strokeWidthPx = 3f, dashed = true),
+        ChartSeries(stringResource(R.string.chart_curve), curvePoints, MaterialTheme.colorScheme.primary),
     )
 
     // Dynamic y-axis: reactivity thresholds top out well below 100 % (≈8–35 %), so a fixed 0–100 axis
@@ -64,7 +66,7 @@ fun ReactivityChart(
 
     // S14: live "Now" line at the current smoothed lux (clamped into range so it stays visible).
     val markers = currentLux?.let {
-        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(minLux, maxLux), label = "Now"))
+        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(minLux, maxLux), label = stringResource(R.string.chart_now)))
     } ?: emptyList()
 
     ChartCanvas(
@@ -73,8 +75,8 @@ fun ReactivityChart(
         yRange = 0f..yMax,
         xScale = AxisScale.Log10,
         markers = markers,
-        xAxisLabel = "Lux",
-        yAxisLabel = "Threshold %",
+        xAxisLabel = stringResource(R.string.chart_lux),
+        yAxisLabel = stringResource(R.string.chart_threshold_pct),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,
@@ -119,14 +121,14 @@ fun AlphaResponseChart(
     }
 
     val series = listOf(
-        ChartSeries("Reference", sample(1.8), AabGold, strokeWidthPx = 3f, dashed = true),
-        ChartSeries("Curve", sample(deltaFactor), MaterialTheme.colorScheme.primary),
+        ChartSeries(stringResource(R.string.chart_reference), sample(1.8), AabGold, strokeWidthPx = 3f, dashed = true),
+        ChartSeries(stringResource(R.string.chart_curve), sample(deltaFactor), MaterialTheme.colorScheme.primary),
     )
 
     // Live "Now" smoothing response as a horizontal line at the current alpha (the published curve
     // output; the relative-change x is instantaneous, so the y-value is the stable thing to surface).
     val markers = currentAlpha?.let {
-        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, y = it.toFloat().coerceIn(0f, 1f), label = "Now"))
+        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, y = it.toFloat().coerceIn(0f, 1f), label = stringResource(R.string.chart_now)))
     } ?: emptyList()
 
     ChartCanvas(
@@ -135,8 +137,8 @@ fun AlphaResponseChart(
         yRange = 0f..1f,
         xScale = AxisScale.Log10,
         markers = markers,
-        xAxisLabel = "Relative lux change %",
-        yAxisLabel = "Alpha",
+        xAxisLabel = stringResource(R.string.chart_rel_lux_pct),
+        yAxisLabel = stringResource(R.string.chart_alpha),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,

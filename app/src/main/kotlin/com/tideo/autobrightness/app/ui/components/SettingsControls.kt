@@ -275,7 +275,7 @@ fun DraftApplyBar(
         ) {
             if (criticalError) {
                 Text(
-                    "Fix the highlighted curve error before applying.",
+                    stringResource(R.string.settings_fix_error),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(bottom = 6.dp).testTag("apply_blocked_hint"),

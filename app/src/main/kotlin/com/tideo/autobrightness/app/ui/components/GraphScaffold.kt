@@ -26,6 +26,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -135,7 +137,7 @@ fun GraphSettingsGroup(
     OutlinedCard(modifier.fillMaxWidth().testTag("group_${graph}")) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                "Affects the $graph graph",
+                stringResource(R.string.graph_affects, graph),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )

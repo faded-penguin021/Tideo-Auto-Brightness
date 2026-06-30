@@ -4,6 +4,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
 
 /**
@@ -30,16 +33,17 @@ fun CircadianScaleChart(
     val yMin = curve.points.minOf { it.y } - 0.05f
     val yMax = curve.points.maxOf { it.y } + 0.05f
     val eventColor = MaterialTheme.colorScheme.outline
+    val eventLabels = stringArrayResource(R.array.circadian_event_labels).toList()
 
     ChartCanvas(
-        series = listOf(ChartSeries("Scale ×", curve.points, MaterialTheme.colorScheme.primary)),
+        series = listOf(ChartSeries(stringResource(R.string.chart_scale_x), curve.points, MaterialTheme.colorScheme.primary)),
         xRange = 0f..24f,
         yRange = yMin..yMax,
-        markers = eventMarkers(curve.events, eventColor) +
+        markers = eventMarkers(curve.events, eventColor, eventLabels) +
             ChartMarker(color = MaterialTheme.colorScheme.outlineVariant, y = 1f) +
-            ChartMarker(color = MaterialTheme.colorScheme.error, x = nowUtcHour(), label = "Now"),
-        xAxisLabel = "Time of day (UTC)",
-        yAxisLabel = "Scale ×",
+            ChartMarker(color = MaterialTheme.colorScheme.error, x = nowUtcHour(), label = stringResource(R.string.chart_now)),
+        xAxisLabel = stringResource(R.string.chart_time_utc),
+        yAxisLabel = stringResource(R.string.chart_scale_x),
         xTickFormatter = ::hourToHhmm,
         interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,

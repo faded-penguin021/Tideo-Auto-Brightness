@@ -35,6 +35,13 @@
     <string name="action_disable">Disable</string>
 
     <!-- Screen titles -->
+    <string name="menu_title">Menu</string>
+    <string name="menu_section_settings">Settings</string>
+    <string name="menu_section_info">Info &amp; Help</string>
+    <string name="menu_recheck_permissions">Recheck Permissions</string>
+    <string name="menu_subtitle_override">Manual override active — open to resume</string>
+    <string name="menu_subtitle_context">Context active: %1$s</string>
+    <string name="menu_subtitle_default">Save &amp; load profiles · automatic context rules</string>
     <string name="title_dashboard">Dashboard</string>
     <string name="title_live_debug">Live Debug Info</string>
     <string name="title_reactivity">Reactivity</string>
@@ -218,6 +225,33 @@
          shared → per-screen. Reuses existing keys where the text already existed.
          ============================================================================================ -->
 
+    <!-- Chart axis / series / marker labels (graph/*) -->
+    <string name="chart_reference">Reference</string>
+    <string name="chart_curve">Curve</string>
+    <string name="chart_now">Now</string>
+    <string name="chart_lux">Lux</string>
+    <string name="chart_brightness">Brightness</string>
+    <string name="chart_threshold_pct">Threshold %</string>
+    <string name="chart_alpha">Alpha</string>
+    <string name="chart_rel_lux_pct">Relative lux change %</string>
+    <string name="chart_time_utc">Time of day (UTC)</string>
+    <string name="chart_scale_x">Scale ×</string>
+    <string name="chart_dim_x">Dim ×</string>
+    <string name="chart_dim_pct">Dim %</string>
+    <string name="chart_dim_shell">Dim shell</string>
+    <string name="chart_night">Night</string>
+    <string name="chart_day">Day</string>
+    <string name="chart_power_w">Power (W)</string>
+    <string name="chart_current_ma">Current (mA)</string>
+    <string name="chart_power_empty">No power-draw data yet — run the calibration to measure it.</string>
+    <string-array name="circadian_event_labels">
+        <item>Dawn</item>
+        <item>Sunrise</item>
+        <item>Noon</item>
+        <item>Sunset</item>
+        <item>Dusk</item>
+    </string-array>
+
     <!-- Shared actions / fields / a11y -->
     <string name="a11y_back">Back</string>
     <string name="action_ok">OK</string>
@@ -234,6 +268,10 @@
     <!-- The ⓘ info affordance next to a setting label — a glyph, not translatable. -->
     <string name="info_glyph" translatable="false">ⓘ</string>
     <string name="chart_overrides_label">"  Overrides"</string>
+
+    <string name="settings_fix_error">Fix the highlighted curve error before applying.</string>
+    <string name="graph_affects">Affects the %1$s graph</string>
+    <string name="livedebug_flash_desc">Show debug/context flashes over other apps via an optional Accessibility overlay. It only draws the messages — it never reads screen content.</string>
 
     <!-- Discard-changes confirmation (SettingsControls draft bar) -->
     <string name="discard_changes_title">Discard changes?</string>

@@ -4,6 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.ui.components.EmptyState
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.app.ui.theme.AabTeal
@@ -28,7 +30,7 @@ import com.tideo.autobrightness.domain.power.PowerDrawSample
 fun PowerDrawChart(
     samples: List<PowerDrawSample>,
     modifier: Modifier = Modifier,
-    emptyText: String = "No power-draw data yet — run the calibration to measure it.",
+    emptyText: String = stringResource(R.string.chart_power_empty),
 ) {
     if (samples.isEmpty()) {
         EmptyState(emptyText, modifier = modifier, testTag = "power_draw_empty")
@@ -41,9 +43,9 @@ fun PowerDrawChart(
     val maxCurrent = (currentPoints.maxOf { it.y }).coerceAtLeast(0.001f)
 
     val series = listOf(
-        ChartSeries("Power (W)", powerPoints, AabTeal),
+        ChartSeries(stringResource(R.string.chart_power_w), powerPoints, AabTeal),
         // task524 chart: the Current dataset lives on its own right-hand mA axis (yAxisID 'y1').
-        ChartSeries("Current (mA)", currentPoints, AabGold, strokeWidthPx = 2f, dashed = true, onSecondaryAxis = true),
+        ChartSeries(stringResource(R.string.chart_current_ma), currentPoints, AabGold, strokeWidthPx = 2f, dashed = true, onSecondaryAxis = true),
     )
 
     ChartCanvas(
@@ -51,9 +53,9 @@ fun PowerDrawChart(
         xRange = 0f..255f,
         yRange = 0f..(maxPower * 1.1f),
         secondaryYRange = 0f..(maxCurrent * 1.1f),
-        secondaryYAxisLabel = "Current (mA)",
-        xAxisLabel = "Brightness",
-        yAxisLabel = "Power (W)",
+        secondaryYAxisLabel = stringResource(R.string.chart_current_ma),
+        xAxisLabel = stringResource(R.string.chart_brightness),
+        yAxisLabel = stringResource(R.string.chart_power_w),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,

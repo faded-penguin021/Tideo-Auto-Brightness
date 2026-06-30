@@ -19,7 +19,7 @@ import com.tideo.autobrightness.app.runtime.AabFlash
  * D-131 (i18n): invoke with a **string-resource id** (+ optional format args) so user-facing toasts are
  * translatable. The [Context] is captured once at creation, so the resId overload resolves correctly
  * even when called from a non-composable lambda (onClick, callbacks). The `String` overload remains for
- * already-resolved / runtime text only — `HardcodedStringCheckTest` forbids a literal `toast("…")`.
+ * already-resolved / runtime text only — `HardcodedStringCheckTest` forbids a hardcoded toast string.
  */
 class Toaster internal constructor(private val context: Context) : (String) -> Unit {
     override fun invoke(message: String) = AabFlash.show(context, message)

@@ -207,8 +207,7 @@ private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
             goldValue(if (enabled) "Enabled" else "Off (foreground only)")
         }
         Text(
-            "Show debug/context flashes over other apps via an optional Accessibility overlay. " +
-                "It only draws the messages — it never reads screen content.",
+            stringResource(R.string.livedebug_flash_desc),
             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
         OutlinedButton(

@@ -4,6 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.ui.theme.AabChartBlue
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.domain.brightness.SoftwareDimming
@@ -58,16 +60,16 @@ fun DimmingChart(
     // the gold reference); RIGHT = the dim-shell magnitude (strength × progress, a different unit). The
     // reference is ALWAYS the gold line (Tasker convention, user_guide.md §8).
     val series = listOf(
-        ChartSeries("Reference", referencePoints, AabGold, strokeWidthPx = 3f, dashed = true),
-        ChartSeries("Dim shell", shellPoints, AabChartBlue, strokeWidthPx = 2f, onSecondaryAxis = true),
-        ChartSeries("Dim %", progressPoints, MaterialTheme.colorScheme.primary),
+        ChartSeries(stringResource(R.string.chart_reference), referencePoints, AabGold, strokeWidthPx = 3f, dashed = true),
+        ChartSeries(stringResource(R.string.chart_dim_shell), shellPoints, AabChartBlue, strokeWidthPx = 2f, onSecondaryAxis = true),
+        ChartSeries(stringResource(R.string.chart_dim_pct), progressPoints, MaterialTheme.colorScheme.primary),
     )
     // Right axis spans 0 → dimming strength (the shell's natural range, dim_ds = strength × progress).
     val shellMax = dimmingStrength.toFloat().coerceAtLeast(1f)
 
     // S14: live "Now" line at the current brightness (only supplied while dimming is engaged).
     val markers = currentBrightness?.let {
-        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = "Now"))
+        listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = stringResource(R.string.chart_now)))
     } ?: emptyList()
 
     ChartCanvas(
@@ -75,11 +77,11 @@ fun DimmingChart(
         xRange = xStart..xEnd,
         yRange = 0f..100f,
         secondaryYRange = 0f..shellMax,
-        secondaryYAxisLabel = "Dim shell",
+        secondaryYAxisLabel = stringResource(R.string.chart_dim_shell),
         markers = markers,
         xScale = AxisScale.Linear,
-        xAxisLabel = "Brightness",
-        yAxisLabel = "Dim %",
+        xAxisLabel = stringResource(R.string.chart_brightness),
+        yAxisLabel = stringResource(R.string.chart_dim_pct),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
         modifier = modifier,
