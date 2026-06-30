@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
 import androidx.compose.foundation.layout.Arrangement
@@ -47,12 +48,9 @@ import com.tideo.autobrightness.app.ui.components.fmtAlpha
 import com.tideo.autobrightness.app.ui.components.fmtInt
 import com.tideo.autobrightness.app.ui.components.goldValue
 
-/** %AAB_Debug 10 named categories, verbatim (D-023). Index == debugLevel. Lives on the Live Debug
- *  scene now (G2R-F9), the global home for the debug-category selector. */
-val DEBUG_LABELS = listOf(
-    "Off", "Skip Animations", "Animation Details", "Light Eval Thresholds", "Dynamic Scale Calcs",
-    "Super Dimming Info", "Overlay Preview", "Graph Metrics", "Context Automation", "Context Location",
-)
+// %AAB_Debug 10 named categories, verbatim (D-023). Index == debugLevel. The labels live in
+// strings.xml as the `debug_labels` string-array (D-131 i18n); loaded via stringArrayResource in the
+// selector below.
 
 /**
  * The **Live Debug Info** scene (S12.6b, G2R-F6): the Compose rebuild of the Tasker AAB Debug scene
@@ -254,6 +252,7 @@ private fun lastSampleLabel(ms: Long?, now: Long = System.currentTimeMillis()): 
 @Composable
 fun DebugLevelSelector(current: Int, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val debugLabels = stringArrayResource(R.array.debug_labels)
     // Anchor the menu to the button (Box wrapper) — a bare DropdownMenu sibling has no anchor and
     // floats away from its trigger (D-114b, same fix as the rule-editor profile selector).
     Box {
@@ -261,10 +260,10 @@ fun DebugLevelSelector(current: Int, onSelect: (Int) -> Unit) {
             onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth().testTag("debug_selector"),
         ) {
-            Text("Debug: ${DEBUG_LABELS.getOrElse(current) { "Off" }}")
+            Text(stringResource(R.string.livedebug_current, debugLabels.getOrElse(current) { debugLabels[0] }))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DEBUG_LABELS.forEachIndexed { level, label ->
+            debugLabels.forEachIndexed { level, label ->
                 DropdownMenuItem(
                     text = { Text(label) },
                     onClick = { onSelect(level); expanded = false },

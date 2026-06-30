@@ -268,6 +268,25 @@
 
     <!-- Onboarding / permissions -->
     <string name="onboarding_title">Setup &amp; Permissions</string>
+    <string name="onboarding_step1_title">1. Notifications</string>
+    <string name="onboarding_step1_body">Allow notifications so the ongoing brightness controls and status are visible.</string>
+    <string name="onboarding_step1_action">Allow notifications</string>
+    <string name="onboarding_step2_title">2. Modify system settings (required)</string>
+    <string name="onboarding_step2_body">Grants brightness control. Without this the service runs but cannot change brightness.</string>
+    <string name="onboarding_step2_action">Open setting</string>
+    <string name="onboarding_step3_title">3. Location (optional)</string>
+    <string name="onboarding_step3_body">Needed only for location-based context rules and as a fallback for reading the Wi-Fi name. Wi-Fi rules also work without it via Shizuku / ADB.</string>
+    <string name="onboarding_step3_action">Grant location</string>
+    <string name="onboarding_usage_title_needed">5. Usage access (needed for per-app rules)</string>
+    <string name="onboarding_usage_title_optional">5. Usage access (optional)</string>
+    <string name="onboarding_usage_body_needed">One of your context rules targets specific apps. Grant usage access so the service can detect the foreground app.</string>
+    <string name="onboarding_usage_body_optional">Only needed if you later add a context rule that switches profiles per app. You can skip this for now and grant it from the Profiles &amp; Contexts screen later.</string>
+    <string name="onboarding_usage_action">Open usage access</string>
+    <string name="onboarding_done">Done</string>
+    <string name="onboarding_skip">Skip for now</string>
+    <string name="onboarding_restricted_body">Installed outside the Play Store, Android may block the \"Modify system settings\" toggle below (and \"Usage access\", for per-app rules) — it looks greyed out or shows \"Restricted setting\". Tap it anyway; that usually shows the unlock prompt. If not, open App info → ⋮ menu → \"Allow restricted settings\", then return here.</string>
+    <string name="onboarding_elevated_body">Enables super dimming below the dimming threshold. Choose any one channel — it is a one-time grant of WRITE_SECURE_SETTINGS.</string>
+    <string name="onboarding_shizuku_prompt">Shizuku is installed but not running — start the Shizuku app, then return here.</string>
     <string name="onboarding_restricted_title">Heads up: restricted settings</string>
     <string name="onboarding_open_app_info">Open App info</string>
     <string name="onboarding_granted">Granted ✓</string>
