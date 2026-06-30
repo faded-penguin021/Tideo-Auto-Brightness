@@ -51,8 +51,12 @@ One line per shipped change (newest first). Keep terse.
   titles via `AppRoute.titleRes`) extracted to `strings.xml`; `rememberToaster()` gained a `@StringRes`
   `toast(resId, …)` overload; the `HardcodedStringCheckTest` ratchet now enforces **0** hardcoded
   user-facing literals (`Text("`/`toast("`/`contentDescription="`, was ≤ 92). Added a non-functional
-  (English-only) Language selector on Misc + a **human-only** translations section in `CONTRIBUTING.md`/
-  README. Pure presentation refactor — no behaviour change.
+  (English-only) Language selector (on the Onboarding screen) + a **human-only** translations section in
+  `CONTRIBUTING.md`/README. Pure presentation refactor — no behaviour change. **D-132** (also folded in): a
+  plug/unplug transition now bypasses the PASS-1 battery cooldown so a charging context switches
+  immediately (owner report: "Charging" P81 didn't take over from "Low Battery" P80 until the battery rose
+  past the rule boundary — an eval-timing lag, not a ranking bug; the resolver is priority-first). Tests:
+  `ContextEngineTest.plugChange_…_D132`, `ContextOverrideResolverTest.higherPriorityWins_…`.
 - 2026-06-29 — CI-only (no app/version change): workflow hygiene — `timeout-minutes` on every job (caps a
   hung Gradle daemon / SDK fetch / `gh` call vs GitHub's 360-min default) and `gradle/wrapper/gradle-wrapper.properties`
   added to the 4 Gradle cache keys (a wrapper bump no longer reuses a stale cache). Prompted by a workflow

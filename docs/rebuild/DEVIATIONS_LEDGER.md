@@ -2285,4 +2285,26 @@ the permanent registry — never compress or remove them.
   (Misc screen, English-only for now) is scaffolded for when translated `values-<lang>/` locales land, and
   `CONTRIBUTING.md`/README gained a **human-only** (no machine/AI) translations section + how-to. Verbatim
   Tasker help text and golden vectors unchanged; this is a pure presentation refactor (no behaviour change),
-  folded into the same **1.6.0 / versionCode 14** release as D-130.
+  folded into the same **1.6.0 / versionCode 14** release as D-130. **(Note:** the Language selector was
+  subsequently moved from Misc to the top of the Onboarding screen per owner preference — same inert,
+  English-only scaffold, different home.)
+
+- **D-132: a plug/unplug transition bypasses the PASS-1 battery cooldown (deviation from Tasker).** Owner
+  report (2026-06-30): with a "Charging" rule (priority 81, on-power + time window) and a "Low Battery" rule
+  (priority 80, battery 0-30%), plugging in while Low Battery was active did **not** switch to the
+  higher-priority Charging context until the battery later rose past 30% (i.e. until Low Battery stopped
+  matching) — and the screen was off through the transition. **Root cause (NOT the ranking):**
+  `ContextOverrideResolver` is already priority-first (specificity is only a same-priority tie-break, and
+  Charging's specificity is higher anyway — proven by `ContextOverrideResolverTest
+  .higherPriorityWins_evenWhenBothMatch_chargingOverLowBattery`, which passes). The lag was **evaluation
+  timing**: Tasker's task43 PASS-1 applies the 30 s "Battery" cooldown to *every* battery caller, plug
+  changes included, so a plug-in within 30 s of the last battery eval was vetoed — and screen-off, the only
+  evals come from sparse battery callbacks, so the next un-vetoed tick didn't land until the level had moved
+  ≥ 5 % (past the rule boundary). **Fix:** in `ContextEngine.evaluate`, a `caller == BATTERY` with
+  `snap.plugged != (lastPlug == 1)` now skips the PASS-1 cooldown (PASS-2's BATTERY gate already treated a
+  plug change as "proceed"). This is a **deliberate deviation** from Tasker's literal debounce — a plug
+  transition is a discrete, significant event, not the % noise the cooldown exists to damp. Test:
+  `ContextEngineTest.plugChange_bypassesBatteryCooldown_switchesToHigherPriorityChargingRule_D132` (plugs in
+  5 s after the seed eval, well inside the 30 s window, and asserts the immediate switch to Charging). No
+  version bump — folds into **1.6.0 / versionCode 14**. Engine concurrency model otherwise unchanged
+  (single eval under `evalMutex`; only the PASS-1 debounce predicate changed).
