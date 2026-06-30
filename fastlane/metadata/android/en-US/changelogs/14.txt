@@ -1,0 +1,10 @@
+Makes Wi-Fi context rules work without Location, and explains how when they can't.
+
+Android normally only reveals the connected Wi-Fi network name (SSID) when Location
+permission is granted and Location services are switched on. If you'd rather keep Location
+off, the app can now read the name directly through Shizuku, root, or a one-time ADB grant
+of the DUMP permission ("adb shell pm grant <package> android.permission.DUMP").
+
+When you tap "Use current SSID" and the name can't be read without Location, the app now
+shows a short dialog explaining these options (with a copy button for the ADB command)
+instead of a dead-end message.

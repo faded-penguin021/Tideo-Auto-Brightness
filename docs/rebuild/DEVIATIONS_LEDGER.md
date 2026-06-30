@@ -2234,3 +2234,28 @@ the permanent registry — never compress or remove them.
   gives meta/infra changes (a new GitHub Actions workflow, build config, docs, refactors, tooling) their own
   slot so they read separately from app changes. Prose prompts, not checkbox theater — kept minimal because
   agents author these PRs and the owner reads them (anti-bloat: cf. D-127). Repo-hygiene change; no code.
+
+- **D-130: the no-Location SSID `dumpsys wifi` path is wired up + surfaced (DUMP grant), and gains a
+  root strategy + the exact two-step Tasker regex.** Reverses the F89 audit's "leave DUMP undeclared"
+  call (permission_audit.md row + AndroidManifest comment): `android.permission.DUMP` is
+  `signature|privileged` **but also `development`**, so — exactly like `WRITE_SECURE_SETTINGS` — a user
+  can grant it once over ADB (`adb shell pm grant <pkg> android.permission.DUMP`) and it sticks. With it
+  declared, `DumpsysWifiSsidStrategy`'s in-process `dumpsys wifi` actually works (it was always
+  permission-denied → dead before). **(a) Strategy order** (WifiInfoReader default list) is now Shizuku
+  `cmd wifi status` → **root `su -c 'cmd wifi status'`** (new `RootWifiSsidStrategy`; task105 detects
+  "Root" as a secondary privilege — answering "cmd wifi status works with root too") → DUMP-granted
+  `dumpsys wifi` → Location `NetworkCallback` last. Shared blocking `execShell` (read stdout to EOF
+  before `waitFor` so large `dumpsys` output can't deadlock a full pipe; mirrors
+  `tryGrantViaRoot`). **(b) `parseDumpsysWifi` now mirrors Tasker's two-step Variable-Search-Replace**
+  over the `mWifiInfo … COMPLETED` line (each step replaces the whole string with `$1`):
+  `(?s).*?SSID:\s*"([^"]+)".*` (quoted) first, then — only when step 1 left the line untouched —
+  `(?s).*?SSID:\s*([^,]+),.*` (unquoted, up to the next comma). Both anchor on the FIRST `SSID:` token,
+  so a network literally named "SSID" mis-anchors; Tasker shipped that caveat and so do we. **(c) UI:**
+  "Use current SSID" no longer dead-ends on a toast when every no-Location strategy missed and the
+  Location read is blocked — `NeedsLocationPermission`/`LocationServicesOff` open an SSID-help
+  `AlertDialog` (ProfilesContextsScreen) explaining the requirement and the no-Location alternatives
+  (Shizuku/root, or the one-time ADB DUMP grant — copyable via `PrivilegeManager.dumpGrantInstruction()`
+  /`ContextsViewModel.dumpGrantCommand()`), footed with the verbatim caveat "If your SSID contains
+  \"SSID\", this will cause problems. Sorry, not sorry." Tests: `WifiSsidStrategyTest` (+two-step quoted
+  comma-in-name, +strict `mWifiInfo` gate), `PrivilegeManagerTest.dumpGrantInstruction_*`. Ships as
+  **1.6.0 / versionCode 14** (MINOR — new user-facing capability + dialog). Changelog `14.txt`.

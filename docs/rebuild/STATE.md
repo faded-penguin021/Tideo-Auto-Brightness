@@ -34,6 +34,18 @@ How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migratio
 
 One line per shipped change (newest first). Keep terse.
 
+- 2026-06-30 — 1.6.0 / `versionCode 14` (MINOR — new user-facing capability + dialog): **D-130** wired up the
+  no-Location SSID `dumpsys wifi` path. `android.permission.DUMP` is now **declared** (reverses the F89
+  "leave undeclared" call — DUMP is `signature|privileged` *and* `development`, so user-grantable over ADB
+  like WRITE_SECURE_SETTINGS); `DumpsysWifiSsidStrategy` finally works once granted. Strategy order is now
+  Shizuku `cmd wifi status` → **root `su -c 'cmd wifi status'`** (new `RootWifiSsidStrategy`) → DUMP-granted
+  `dumpsys wifi` → Location callback. `parseDumpsysWifi` now mirrors Tasker's exact two-step regex over the
+  `mWifiInfo … COMPLETED` line (quoted `(?s).*?SSID:\s*"([^"]+)".*` first, else unquoted-to-comma
+  `(?s).*?SSID:\s*([^,]+),.*`). "Use current SSID" no longer dead-ends: the two Location-gated misses open an
+  SSID-help dialog explaining the alternatives + a copyable ADB DUMP grant
+  (`PrivilegeManager.dumpGrantInstruction()`), footed with the verbatim "If your SSID contains \"SSID\", this
+  will cause problems. Sorry, not sorry." Tests: `WifiSsidStrategyTest` (+2), `PrivilegeManagerTest` (+1).
+  Changelog `14.txt`. Engine/goldens untouched.
 - 2026-06-29 — CI-only (no app/version change): workflow hygiene — `timeout-minutes` on every job (caps a
   hung Gradle daemon / SDK fetch / `gh` call vs GitHub's 360-min default) and `gradle/wrapper/gradle-wrapper.properties`
   added to the 4 Gradle cache keys (a wrapper bump no longer reuses a stale cache). Prompted by a workflow

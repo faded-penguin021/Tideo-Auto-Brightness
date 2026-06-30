@@ -21,6 +21,11 @@ interface PrivilegeManager {
     fun refresh()
     /** The ADB `pm grant` command — ALWAYS offered (the no-companion-app grant channel). */
     fun adbGrantInstruction(): String
+    /**
+     * The ADB `pm grant` command for `android.permission.DUMP` (D-130) — enables the no-Location SSID
+     * `dumpsys wifi` path for users without Shizuku/root who keep Location services off.
+     */
+    fun dumpGrantInstruction(): String
     fun tryGrantViaRoot(): Boolean
     /**
      * Three-state Shizuku readiness so the UI can offer the one-tap grant (RUNNING), prompt to start
@@ -61,6 +66,9 @@ class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
 
     override fun adbGrantInstruction(): String =
         "adb shell pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS"
+
+    override fun dumpGrantInstruction(): String =
+        "adb shell pm grant ${context.packageName} android.permission.DUMP"
 
     override fun tryGrantViaRoot(): Boolean = try {
         val process = Runtime.getRuntime().exec(

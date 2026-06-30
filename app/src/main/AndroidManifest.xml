@@ -28,10 +28,14 @@
     <!-- S14: ConnectivityManager (WifiInfoReader SSID NetworkCallback fallback) needs network state.
          A normal permission, auto-granted at install — its absence would SecurityException that path. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- F89 audit — android.permission.DUMP is intentionally NOT declared: it is signature|privileged,
-         so it cannot be granted to a normal app. The no-Location SSID path's in-process `dumpsys wifi`
-         (WifiSsidStrategies) is permission-denied without it and simply falls through to the next
-         strategy (Shizuku `cmd wifi status` → Location callback). Declaring it would have no effect. -->
+    <!-- F89 audit (revisited, D-130): the no-Location SSID path's in-process `dumpsys wifi`
+         (DumpsysWifiSsidStrategy) needs android.permission.DUMP. It is signature|privileged but ALSO
+         carries the `development` protection flag, so — exactly like WRITE_SECURE_SETTINGS above — a
+         user can grant it once over ADB (`adb shell pm grant <pkg> android.permission.DUMP`). Declared
+         so that grant takes effect; ungranted the `dumpsys wifi` exec is permission-denied and the SSID
+         read simply falls through to the next strategy (Shizuku/root `cmd wifi status` → Location). -->
+    <uses-permission android:name="android.permission.DUMP"
+        tools:ignore="ProtectedPermissions" />
 
 
     <!-- Android 11+ package visibility: see launchable apps so the per-app context-rule picker is

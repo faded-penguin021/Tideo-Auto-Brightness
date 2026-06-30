@@ -65,6 +65,15 @@
     <string name="profiles_export">Export current settings…</string>
     <string name="profiles_view_current">View current settings…</string>
     <string name="profiles_active_tag">Active</string>
+    <!-- D-130: "Use current SSID" help — shown when the no-Location strategies (Shizuku/root/DUMP) all
+         miss and the Location-gated read is blocked, so the user knows how to make Wi-Fi rules work. -->
+    <string name="ssid_help_title">Reading the Wi-Fi name</string>
+    <string name="ssid_help_lead_permission">To match Wi-Fi rules the app needs the connected network name (SSID). On Android the normal way to read it requires Location permission AND Location services switched on.</string>
+    <string name="ssid_help_lead_services">To match Wi-Fi rules the app needs the connected network name (SSID). On Android the normal way to read it requires Location services switched on.</string>
+    <string name="ssid_help_options">You can skip the Location requirement if the app can read the name directly:\n\n•  Shizuku or root — the app runs \"cmd wifi status\" (works with root too).\n•  Otherwise, grant DUMP over ADB and the app reads \"dumpsys wifi\":</string>
+    <string name="ssid_help_copy_dump">Copy ADB command</string>
+    <string name="ssid_help_copied">ADB command copied</string>
+    <string name="ssid_help_regex_caveat">If your SSID contains \"SSID\", this will cause problems. Sorry, not sorry.</string>
     <string name="rule_priority_over_max">Above the 1–100 range — this will be saved as 100.</string>
     <!-- D-114: Tasker-style confirmations for destructive profile/rule actions. -->
     <string name="confirm_delete">Delete</string>

@@ -62,6 +62,14 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
     suspend fun currentSsid(): SsidResult = wifi.currentSsid()
 
     /**
+     * The ADB command that grants `android.permission.DUMP` (D-130) so the no-Location SSID path can
+     * read `dumpsys wifi` — surfaced in the SSID-help dialog for users without Shizuku/root who keep
+     * Location services off. The grant sticks (DUMP is a `development` permission), like the elevated
+     * WRITE_SECURE_SETTINGS grant.
+     */
+    fun dumpGrantCommand(): String = appModule.privilegeManager.dumpGrantInstruction()
+
+    /**
      * The current device location for the "use current location" helper (G2R-F42 / D-122). Rechecks the
      * permission grant at call time and ACTIVELY requests a fresh fix ([LocationReader.activeFix] — the OS
      * location indicator lights up, last-known used only as a backup), matching Tasker, which used its

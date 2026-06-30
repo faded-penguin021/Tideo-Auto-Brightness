@@ -139,6 +139,22 @@ class WifiSsidStrategyTest {
     }
 
     @Test
+    fun parseDumpsysWifi_quotedStep1KeepsCommaInName() {
+        // Two-step strategy: step 1 (quoted) must win over step 2 (up-to-comma) so a network whose name
+        // contains a comma is captured whole, not truncated at the first comma.
+        val out = "mWifiInfo SSID: \"Net, Work\", BSSID: aa:bb, Supplicant state: COMPLETED,"
+        assertEquals("Net, Work", parseDumpsysWifi(out))
+    }
+
+    @Test
+    fun parseDumpsysWifi_requiresMWifiInfoLine() {
+        // Tasker's `grep mWifiInfo | grep COMPLETED` — a COMPLETED line without mWifiInfo is not the
+        // connected-network info line and must not be mined for an SSID.
+        val out = "Network 1: SSID: Neighbour, status: COMPLETED, not mine"
+        assertNull(parseDumpsysWifi(out))
+    }
+
+    @Test
     fun normalizeSsid_rejectsRedactedPlaceholders() {
         assertNull(normalizeSsid("<unknown ssid>"))
         assertNull(normalizeSsid("<redacted>"))

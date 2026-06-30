@@ -95,7 +95,7 @@ filled by S1/S2 during extraction.
 
 | Block (task · line) | Extracted (S1/S2) | Reference impl (S4/S6) | Production port | Status |
 |---|---|---|---|---|
-| task105 L8906 · _GetWifiNoLocation | ✓ S1 | | platform/WifiInfoReader: real _GetWifiNoLocation V3 order (S12.7d, G2R-F41) — Shizuku `cmd wifi status` (ShizukuShell.exec) → in-process `dumpsys wifi` → Location NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) last (WifiSsidStrategies.kt) | ported (no-Location SSID order) |
+| task105 L8906 · _GetWifiNoLocation | ✓ S1 | | platform/WifiInfoReader: real _GetWifiNoLocation V3 order (S12.7d, G2R-F41) — Shizuku `cmd wifi status` (ShizukuShell.exec) → root `su -c 'cmd wifi status'` → DUMP-granted in-process `dumpsys wifi` (two-step Tasker regex, D-130) → Location NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) last (WifiSsidStrategies.kt); D-130 declares `android.permission.DUMP` + the SSID-help dialog surfaces the ADB DUMP grant when no strategy resolves and Location is off | ported (no-Location SSID order) |
 | task378 L9468 · _PrivilegeDetection | ✓ S1 | | platform/privilege/AndroidPrivilegeManager.detectTier (S7) — WRITE_SECURE→WRITE_SETTINGS→NONE first-hit probe (D-016/D-024; never reads the adbwp pref) | ported |
 | task38 L9921 · _SuggestCurveParameters | ✓ S1 | ✓ S6 (delegate) | CurveSuggestionEngine.kt (S6) | ported |
 | task43 L12091 · _EvaluateContexts | ✓ S1 | | domain/context/ContextOverrideResolver.kt + app/runtime/ContextEngine.kt (S10) | ported |
