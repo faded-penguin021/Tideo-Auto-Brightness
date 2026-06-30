@@ -45,7 +45,14 @@ One line per shipped change (newest first). Keep terse.
   SSID-help dialog explaining the alternatives + a copyable ADB DUMP grant
   (`PrivilegeManager.dumpGrantInstruction()`), footed with the verbatim "If your SSID contains \"SSID\", this
   will cause problems. Sorry, not sorry." Tests: `WifiSsidStrategyTest` (+2), `PrivilegeManagerTest` (+1).
-  Changelog `14.txt`. Engine/goldens untouched.
+  Changelog `14.txt`. Engine/goldens untouched. **D-131** (folded into the same 1.6.0 release): completed
+  full UI i18n — every user-facing string (~250: labels, section headers, long-press help via `TaskerHelp`
+  → `help_*` resources, toasts, chart axis/series/marker labels, debug + sun-event `<string-array>`s, Menu
+  titles via `AppRoute.titleRes`) extracted to `strings.xml`; `rememberToaster()` gained a `@StringRes`
+  `toast(resId, …)` overload; the `HardcodedStringCheckTest` ratchet now enforces **0** hardcoded
+  user-facing literals (`Text("`/`toast("`/`contentDescription="`, was ≤ 92). Added a non-functional
+  (English-only) Language selector on Misc + a **human-only** translations section in `CONTRIBUTING.md`/
+  README. Pure presentation refactor — no behaviour change.
 - 2026-06-29 — CI-only (no app/version change): workflow hygiene — `timeout-minutes` on every job (caps a
   hung Gradle daemon / SDK fetch / `gh` call vs GitHub's 360-min default) and `gradle/wrapper/gradle-wrapper.properties`
   added to the 4 Gradle cache keys (a wrapper bump no longer reuses a stale cache). Prompted by a workflow

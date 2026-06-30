@@ -2263,3 +2263,26 @@ the permanent registry — never compress or remove them.
   \"SSID\", this will cause problems. Sorry, not sorry." Tests: `WifiSsidStrategyTest` (+two-step quoted
   comma-in-name, +strict `mWifiInfo` gate), `PrivilegeManagerTest.dumpGrantInstruction_*`. Ships as
   **1.6.0 / versionCode 14** (MINOR — new user-facing capability + dialog). Changelog `14.txt`.
+
+- **D-131: full UI i18n — every user-facing string extracted to `strings.xml`; the hardcoded-string
+  ratchet now enforces ZERO.** Completes the S14/D-075 backlog (the `HardcodedStringCheckTest` ceiling sat
+  at 92 inline `Text("…")` literals; section headers, per-field labels, long-press help, toasts, and chart
+  labels were deferred). All ~250 user-facing strings — `Text`/`SectionHeader`/`GraphSettingsGroup`/
+  `ChartSlot`/`TriggerSection`/field labels/toasts/`contentDescription`/chart axis+series+marker labels —
+  now resolve via `stringResource` / `stringArrayResource`. Structural pieces: **(a)** `rememberToaster()`
+  returns a `Toaster` class implementing `(String) -> Unit` (back-compat where a toaster is passed as a
+  fn) with an added `@StringRes` invoke overload, so `toast(R.string.x, args)` works from non-composable
+  lambdas (captures `Context` at creation). **(b)** The field primitives' `help:` param
+  (`NumberSettingField`/`IntSliderSettingField`/`SwitchSettingRow` + `SettingFieldSpec.help`) changed
+  `String? → @StringRes Int?`, resolved internally; `TaskerHelp`'s 27 verbatim help constants moved to
+  `strings.xml` (`help_*`) and became `@StringRes` ids, so every `help = TaskerHelp.X` call site is
+  unchanged. **(c)** The `%AAB_Debug` category labels and the circadian sun-event labels became
+  `<string-array>`s (`debug_labels`, `circadian_event_labels`); `eventMarkers` takes the labels as a param.
+  **(d)** `AppRoute` gained `@StringRes titleRes` for the Menu nav rows (its English `label` is kept for
+  tests/logging). **(e)** Non-translatable glyphs/symbols (the `ⓘ` info affordance) are
+  `translatable="false"`. The ratchet (`HardcodedStringCheckTest`) now scans `Text("`, `toast("`, and
+  `contentDescription = "` and asserts **0** (was: count ≤ 92). A **non-functional language selector**
+  (Misc screen, English-only for now) is scaffolded for when translated `values-<lang>/` locales land, and
+  `CONTRIBUTING.md`/README gained a **human-only** (no machine/AI) translations section + how-to. Verbatim
+  Tasker help text and golden vectors unchanged; this is a pure presentation refactor (no behaviour change),
+  folded into the same **1.6.0 / versionCode 14** release as D-130.

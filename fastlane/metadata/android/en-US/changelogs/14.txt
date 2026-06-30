@@ -8,3 +8,7 @@ of the DUMP permission ("adb shell pm grant <package> android.permission.DUMP").
 When you tap "Use current SSID" and the name can't be read without Location, the app now
 shows a short dialog explaining these options (with a copy button for the ADB command)
 instead of a dead-end message.
+
+Under the hood, the whole interface is now fully translatable — every on-screen text is
+ready for translation. A Language picker has been added (Misc screen); English is the only
+option for now. Human translations are very welcome — see CONTRIBUTING.md.
