@@ -1,24 +1,9 @@
 package com.tideo.autobrightness.app.ui.screens
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -179,42 +164,6 @@ fun MiscContent(
                     testTag = "switch_notifications",
                 )
             }
-
-            AabCard {
-                SectionHeader(stringResource(R.string.misc_language_header), divider = true)
-                LanguageSelector()
-                Text(
-                    stringResource(R.string.misc_language_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-/**
- * App-language selector (D-131). Scaffolded but **not yet functional** — English is the only available
- * language, so the menu lists it alone and selecting it is a no-op. Once translated `values-<lang>/`
- * resources land (see CONTRIBUTING.md), add their display names here and wire the choice to an
- * `AppCompatDelegate.setApplicationLocales(...)` / per-app language preference. The control exists now so
- * the surface is discoverable and translators can see where their work will appear.
- */
-@Composable
-private fun LanguageSelector() {
-    var expanded by remember { mutableStateOf(false) }
-    val english = stringResource(R.string.language_english)
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth().testTag("language_selector"),
-        ) {
-            Text(stringResource(R.string.misc_language_label) + ": " + english)
-            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            // Only English for now; future translated locales are added here.
-            DropdownMenuItem(text = { Text(english) }, onClick = { expanded = false })
         }
     }
 }

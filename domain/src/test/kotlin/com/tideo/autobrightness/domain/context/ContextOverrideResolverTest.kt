@@ -246,6 +246,36 @@ class ContextOverrideResolverTest {
         assertTrue(r.nextContextTime == "02.00" || r.nextContextTime == "03.00")
     }
 
+    // Owner report (2026-06-30): "Charging" (priority 81, time + on-power) vs "Low battery"
+    // (priority 80, battery 0-30%). At 15:17 while charging at 27% BOTH rules match; the higher
+    // priority (Charging, 81) must win regardless of specificity. Verifies priority is the primary
+    // key (specificity is only a same-priority tie-break) — Charging here also has HIGHER specificity
+    // (2 vs 1), so no ordering of priority/specificity could pick Low battery; if it ever loses, the
+    // bug is upstream (evaluation not re-running while both match), not in this resolver.
+    @Test
+    fun higherPriorityWins_evenWhenBothMatch_chargingOverLowBattery() {
+        val signals = noon.copy(
+            batteryPercent = 27,
+            plugged = true,
+            nowSecondsOfDay = 15 * 3600 + 17 * 60,
+        )
+        val charging = rule(
+            "charging", profile = "Outdoors", priority = 81,
+            timeRange = TimeRange("07:00", "21:00"),
+            battery = BatteryConstraint(onPower = true),
+        )
+        val lowBattery = rule(
+            "low_batt", profile = "Battery Saver", priority = 80,
+            battery = BatteryConstraint(min = 0, max = 30),
+        )
+        // Both rule orders must pick Charging (priority decides, not list order or specificity).
+        listOf(listOf(charging, lowBattery), listOf(lowBattery, charging)).forEach { rules ->
+            val r = ContextOverrideResolver.resolve(rules, signals, userProfile = "MyProfile")
+            assertEquals("Outdoors", r.targetProfile)
+            assertEquals("Rule charging", r.activeContextName)
+        }
+    }
+
     private fun resolve(rules: List<ContextRuleSpec>) =
         ContextOverrideResolver.resolve(rules, noon, userProfile = "MyProfile")
 }

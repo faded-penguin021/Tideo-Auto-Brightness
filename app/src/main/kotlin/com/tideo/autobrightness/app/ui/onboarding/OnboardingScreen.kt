@@ -16,12 +16,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -211,6 +217,9 @@ fun OnboardingContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // D-131: app language picker — first thing in setup since it governs everything shown below.
+            // Not yet functional (English only); see OnboardingLanguageCard.
+            OnboardingLanguageCard()
             // G2R-F33: sideloaded apps may see "Modify system settings" / accessibility toggles greyed
             // out under Android's restricted-settings block; guide the one-time "Allow restricted
             // settings" fix up front, before the grant steps that it gates.
@@ -263,6 +272,42 @@ fun OnboardingContent(
                 onClick = onDone,
                 modifier = Modifier.fillMaxWidth().testTag("onboarding_done"),
             ) { Text(if (state.canWrite) stringResource(R.string.onboarding_done) else stringResource(R.string.onboarding_skip)) }
+        }
+    }
+}
+
+/**
+ * App-language picker (D-131), shown at the top of onboarding. Scaffolded but **not yet functional** —
+ * English is the only available language, so the menu lists it alone and selecting it is a no-op. Once
+ * translated `values-<lang>/` resources land (see CONTRIBUTING.md), add their display names here and wire
+ * the choice to `AppCompatDelegate.setApplicationLocales(...)`. The control exists now so the surface is
+ * discoverable (reachable later via Menu → Recheck Permissions) and translators can see where it appears.
+ */
+@Composable
+private fun OnboardingLanguageCard() {
+    var expanded by remember { mutableStateOf(false) }
+    val english = stringResource(R.string.language_english)
+    Card(modifier = Modifier.testTag("language_card")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.misc_language_header), style = MaterialTheme.typography.titleMedium)
+            Box {
+                OutlinedButton(
+                    onClick = { expanded = true },
+                    modifier = Modifier.fillMaxWidth().testTag("language_selector"),
+                ) {
+                    Text(stringResource(R.string.misc_language_label) + ": " + english)
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    // Only English for now; future translated locales are added here.
+                    DropdownMenuItem(text = { Text(english) }, onClick = { expanded = false })
+                }
+            }
+            Text(
+                stringResource(R.string.misc_language_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
