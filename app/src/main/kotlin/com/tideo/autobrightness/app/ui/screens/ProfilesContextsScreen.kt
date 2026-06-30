@@ -318,6 +318,11 @@ fun ProfilesContextsScreen(
                         )
                     }
                     Text(
+                        stringResource(R.string.ssid_help_dump_security),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
                         stringResource(R.string.ssid_help_regex_caveat),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
