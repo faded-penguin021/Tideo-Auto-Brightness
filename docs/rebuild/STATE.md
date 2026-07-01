@@ -18,10 +18,13 @@ Privilege tiers: **BASIC** = user-grantable `WRITE_SETTINGS` (full core pipeline
 
 ## Current state
 
-**Shipped: v1.0.0** (`versionCode 3`), migration complete — all three on-device human gates
-passed (Gate 1 core loop, Gate 2 surfaces & tiers, Gate 3 acceptance soak, signed off
-2026-06-23). `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0.
-No active work in flight.
+**Shipped: v1.6.0** (`versionCode 14`). `PARITY_CHECKLIST.md` is zero-`pending`; golden parity
+tests green; TODO/FIXME = 0; `parity_gaps.md` has 0 open gaps (all 7 closed at S5).
+
+**Active work:** `docs/rebuild/FABLE_HANDOFF.md` — a meta-plan (not a task list) for the next
+Fable session to review project state/deviations and turn a hardening backlog into the real,
+executable plan, written under a token-scarce / no-parallel-subagent / possibly-weaker-model
+constraint. Delete that file once its backlog has a permanent home here or in `RUNBOOK.md`.
 
 How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migration narrative
 (segment briefs, gate findings) is frozen in `../history/`; the deviations registry stays live.
