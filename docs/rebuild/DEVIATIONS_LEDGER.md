@@ -2331,3 +2331,26 @@ the permanent registry — never compress or remove them.
   with zero results; run agents/tool calls sequentially. Non-items were decided with reasons
   (root CHANGELOG.md, speculative dependency bumps, standalone doc-drift audit, SHA-pinning /
   dependency verification per the 2026-06-29 decline) — don't re-litigate without new evidence.
+
+- **D-134: the saved pre-service brightness mode is PERSISTED (SharedPreferences), closing the
+  D-034(c) KNOWN RESIDUAL.** `AndroidScreenBrightnessController.savedMode` was a per-process
+  `private var`: if the process died while the service held manual mode, a restarted instance's
+  first `forceManualMode()` read the CURRENT mode — MANUAL, our own residue — and saved that as
+  "the user's mode", so a later `restoreMode()` (panic path, task528 act6-8) handed the user
+  MANUAL instead of their AUTOMATIC. Fix: the saved mode now lives in a `:platform`-private
+  SharedPreferences file (`screen_brightness_controller` / `saved_brightness_mode`), written with
+  `commit()` (durability against imminent process death is the point; at most two one-int writes
+  per service lifecycle). **Disambiguation rule** in `forceManualMode()`: a current mode of
+  MANUAL is ambiguous (possibly our own crash residue), so an already-persisted mode wins then —
+  this also preserves the D-034(c) idempotency guard; any NON-manual current mode is
+  unambiguously the user's and overwrites a stale persisted value (covers "crash long ago, user
+  changed mode since"). `restoreMode()` restores from and clears the pref. SharedPreferences
+  chosen over DataStore deliberately: `forceManualMode()` is called synchronously inside the
+  pipeline cycle, `:platform` carries no DataStore dependency, and the payload is one int — the
+  STATE backlog's "(DataStore)" suggestion was a sketch, not a binding choice. Tests:
+  `ScreenBrightnessControllerTest` +3 (`*_D134`: new-instance restore, restart-mid-manual keeps
+  persisted AUTOMATIC, fresh-start non-manual overwrites stale). Ships as **1.6.1 /
+  versionCode 15** (PATCH — bug fix, no new capability). Glue-review pass (RUNBOOK protocol, its
+  first application): clean — checked polarity of the `!= MANUAL || == null` persist gate against
+  all four (current, persisted) states, idempotency, SecurityException path unchanged (prefs I/O
+  cannot throw it), and no observer/echo interaction (`lastSelfWriteDevice` untouched).

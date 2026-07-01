@@ -39,12 +39,6 @@ model, the owner alone, or nobody. Execution rules: one unit ≈ one session; ch
 unit fully (ladder green + Changelog line + commit + push) before starting the next; **no
 parallel subagents** (rate-limit burn, see D-133). Priority order:
 
-- **H2 — close the D-034(c) residual** (small code unit, playbook 4).
-  `ScreenBrightnessController.savedMode` is a per-process `private var`: if the process dies
-  while the service holds manual mode, the user's pre-service mode (e.g. AUTOMATIC) is lost and
-  a later stop "restores" MANUAL. Persist the saved mode (DataStore) and restore from it in
-  `restoreMode()`; Robolectric test for die-mid-manual → restart → stop. Patch bump +
-  `changelogs/<vc>.txt` per RUNBOOK §6; ledger row closes the D-034(c) KNOWN RESIDUAL.
 - **H3 — glue-seam test audit** (largest unit; partial delivery is fine). Enumerate the
   `:app`/`:platform` runtime glue (pipeline-controller wiring, service lifecycle + notification
   actions, boot receiver, QS tile, observer/echo path end-to-end) against the existing tests;
@@ -68,15 +62,23 @@ parallel subagents** (rate-limit burn, see D-133). Priority order:
   opportunistically), action SHA-pinning / Gradle dependency verification (declined 2026-06-29
   with reasons).
 
-Done 2026-07-01 (this unit): **H1 — RUNBOOK glue-review protocol** — a mandatory adversarial
-second diff pass for any `:platform`/runtime change, hunting the proven D-030/D-034 bug classes
-(gate polarity/operands, insertion order, observer-echo races, truncation drift, non-idempotent
+Done 2026-07-01: **H1 — RUNBOOK glue-review protocol** — a mandatory adversarial second diff
+pass for any `:platform`/runtime change, hunting the proven D-030/D-034 bug classes (gate
+polarity/operands, insertion order, observer-echo races, truncation drift, non-idempotent
 lifecycle / per-process state, startup sentinels). See RUNBOOK; adoption recorded as D-133.
+Done 2026-07-01: **H2** — shipped as 1.6.1 (D-134, see Changelog).
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-01 — 1.6.1 / `versionCode 15` (PATCH — bug fix, backlog H2): **D-134** the saved
+  pre-service brightness mode is persisted (`:platform` SharedPreferences, `commit()`), closing
+  the D-034(c) residual — after a process death mid-manual, a restarted service no longer
+  re-saves its own MANUAL residue as "the user's mode", so panic/restore hands back the user's
+  real (e.g. AUTOMATIC) mode. Disambiguation: current mode MANUAL → an already-persisted value
+  wins; non-MANUAL → overwrites stale. Tests: `ScreenBrightnessControllerTest` +3 (`*_D134`).
+  Changelog `15.txt`. First application of the RUNBOOK glue-review pass: clean.
 - 2026-07-01 — docs-only: **D-133** post-v1.6.0 hardening adopted — RUNBOOK gains the mandatory
   glue-review protocol (H1); hardening backlog H2–H5 recorded above; `FABLE_HANDOFF.md` deleted
   (its ask fulfilled); STATE compressed to the length-guard target.

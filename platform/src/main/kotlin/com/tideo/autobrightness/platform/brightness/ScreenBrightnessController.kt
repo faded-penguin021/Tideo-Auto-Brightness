@@ -51,10 +51,17 @@ class AndroidScreenBrightnessController(
         }
     }
 
-    // Null until forceManualMode saves the user's mode; null again after restoreMode.
-    // Guarding on null keeps repeated forceManualMode calls from overwriting the saved
-    // AUTOMATIC mode with MANUAL.
-    private var savedMode: Int? = null
+    // The user's pre-service SCREEN_BRIGHTNESS_MODE, PERSISTED so restoreMode() survives
+    // process death (D-134, closes the D-034(c) residual): an in-memory field made a restarted
+    // service re-save our own MANUAL residue as "the user's mode" and a later panic/restore
+    // handed the user MANUAL instead of their AUTOMATIC. Absent (null) until forceManualMode
+    // saves it; cleared again by restoreMode. commit() (not apply()) — durability against an
+    // imminent process death is the whole point, and it's at most two one-int writes per
+    // service lifecycle.
+    private val prefs by lazy { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
+
+    private fun savedMode(): Int? =
+        prefs.getInt(KEY_SAVED_MODE, -1).takeIf { it >= 0 }
 
     @Volatile
     private var lastSelfWriteDevice: Int? = null
@@ -94,11 +101,16 @@ class AndroidScreenBrightnessController(
 
     override fun forceManualMode() {
         runCatching {
-            if (savedMode == null) {
-                savedMode = Settings.System.getInt(
-                    resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
-                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-                )
+            val current = Settings.System.getInt(
+                resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
+                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+            )
+            // A current mode of MANUAL is ambiguous — it may be our own residue from a run
+            // that died mid-manual — so an already-persisted mode wins then (and repeated
+            // forceManualMode calls keep the saved AUTOMATIC, as before). Any non-MANUAL
+            // current mode is unambiguously the user's and overwrites a stale value.
+            if (current != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL || savedMode() == null) {
+                prefs.edit().putInt(KEY_SAVED_MODE, current).commit()
             }
             Settings.System.putInt(
                 resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
@@ -108,12 +120,12 @@ class AndroidScreenBrightnessController(
     }
 
     override fun restoreMode() {
-        savedMode?.let {
+        savedMode()?.let {
             runCatching {
                 Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, it)
             }.exceptionOrNull()?.let { e -> if (e !is SecurityException) throw e }
         }
-        savedMode = null
+        prefs.edit().remove(KEY_SAVED_MODE).commit()
     }
 
     override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastSelfWriteDevice
@@ -125,5 +137,10 @@ class AndroidScreenBrightnessController(
 
     override fun clearSelfWriteMarker() {
         lastSelfWriteDevice = null
+    }
+
+    companion object {
+        internal const val PREFS_NAME = "screen_brightness_controller"
+        internal const val KEY_SAVED_MODE = "saved_brightness_mode"
     }
 }

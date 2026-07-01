@@ -1,0 +1,1 @@
+Bug fix: your original brightness mode (e.g. automatic) is now remembered across an app crash or forced restart, so the panic gesture and mode restore hand back the mode you actually had — not the manual mode the service itself had set.

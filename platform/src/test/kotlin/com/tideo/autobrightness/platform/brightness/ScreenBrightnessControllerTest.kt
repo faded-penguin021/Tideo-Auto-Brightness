@@ -115,6 +115,66 @@ class ScreenBrightnessControllerTest {
     }
 
     @Test
+    fun restoreMode_survivesProcessDeath_restoresAutomatic_D134() {
+        Settings.System.putInt(
+            context.contentResolver,
+            Settings.System.SCREEN_BRIGHTNESS_MODE,
+            Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
+        )
+        controller.forceManualMode()
+        // Process death: a NEW controller instance (fresh in-memory state, same persisted prefs)
+        // must still know the user's pre-service mode.
+        val afterRestart = AndroidScreenBrightnessController(context)
+        afterRestart.restoreMode()
+        val mode = Settings.System.getInt(
+            context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, -1,
+        )
+        assertEquals(Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC, mode)
+    }
+
+    @Test
+    fun forceManualMode_afterProcessDeathMidManual_keepsPersistedAutomatic_D134() {
+        Settings.System.putInt(
+            context.contentResolver,
+            Settings.System.SCREEN_BRIGHTNESS_MODE,
+            Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
+        )
+        controller.forceManualMode() // saves AUTOMATIC, device now MANUAL
+        // Process death + service restart: current mode is MANUAL (our own residue), so the
+        // restarted instance must keep the persisted AUTOMATIC, not re-save MANUAL over it.
+        val afterRestart = AndroidScreenBrightnessController(context)
+        afterRestart.forceManualMode()
+        afterRestart.restoreMode()
+        val mode = Settings.System.getInt(
+            context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, -1,
+        )
+        assertEquals(Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC, mode)
+    }
+
+    @Test
+    fun forceManualMode_freshStartWithNonManualMode_overwritesStalePersistedValue_D134() {
+        // A crash long ago left a stale persisted MANUAL; the user has since put the device in
+        // AUTOMATIC. A non-MANUAL current mode is unambiguously the user's choice and wins.
+        context.getSharedPreferences(
+            AndroidScreenBrightnessController.PREFS_NAME, Context.MODE_PRIVATE,
+        ).edit().putInt(
+            AndroidScreenBrightnessController.KEY_SAVED_MODE,
+            Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+        ).commit()
+        Settings.System.putInt(
+            context.contentResolver,
+            Settings.System.SCREEN_BRIGHTNESS_MODE,
+            Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
+        )
+        controller.forceManualMode()
+        controller.restoreMode()
+        val mode = Settings.System.getInt(
+            context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, -1,
+        )
+        assertEquals(Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC, mode)
+    }
+
+    @Test
     fun oemNormalization_roundTripIsIdentity_for1023Max() {
         val oem = AndroidScreenBrightnessController(context, deviceMaxOverride = 1023)
         for (domain in intArrayOf(0, 1, 99, 100, 128, 254, 255)) {
