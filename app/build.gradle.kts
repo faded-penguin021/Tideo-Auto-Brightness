@@ -59,6 +59,14 @@ android {
         }
     }
 
+    // F-Droid reproducibility (D-137): AGP by default embeds a Google-Play-encrypted dependency
+    // metadata blob in the APK signing block — unreadable by anyone but Play (useless for an
+    // F-Droid app) and the standard obstacle to byte-identical rebuilds. Behavior-neutral.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     buildFeatures {
         compose = true
     }

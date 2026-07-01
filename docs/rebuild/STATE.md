@@ -55,11 +55,19 @@ parallel subagents** (rate-limit burn, see D-133). Priority order:
   `Shizuku*` (binder-dependent, not Robolectric-testable; owner device-verified),
   `ControllerHookHolder`/`ProximityTracker`/`AppProcessScope` (trivial; behavior asserted via
   controller suite).
-- **H5 — F-Droid fit: reproducible-build investigation** (investigate-first; report, not code).
-  Determine whether the release APK builds reproducibly enough for fdroiddata's `reproducible`
-  mode (owner's own signature ships after F-Droid verifies the build). Deliverable = findings +
-  an owner recommendation recorded here; code/build changes only if trivially safe, else a
-  follow-up unit.
+- **H5 — F-Droid reproducible-build investigation** (DONE 2026-07-01, D-137). **Findings: the
+  build is reproducible.** Two clean-room `assembleRelease` builds are **byte-identical
+  (same SHA-256)** after the one standard fix (now applied): `dependenciesInfo { includeInApk =
+  false; includeInBundle = false }` — AGP otherwise embeds a Play-encrypted metadata blob in the
+  APK signing block. Everything else was already right: all 47 dependency versions pinned (no
+  dynamic/SNAPSHOT), AGP/Kotlin pinned, no minification (deterministic plain dex), no NDK,
+  version literals not git-derived, and signing is env-driven so a keystore-less build is
+  unsigned — exactly what F-Droid's verify-then-copy-signature flow (apksigcopier) consumes.
+  **Owner recommendation:** in the fdroiddata metadata set `Binaries:` to the GitHub release APK
+  URL pattern and add `reproducible: yes` to the build recipe (pin the same JDK 21 the CI uses);
+  F-Droid will then build, verify byte-equality, and publish YOUR signed APK — one artifact
+  everywhere, F-Droid-verified. Same-machine determinism is proven here; the cross-machine check
+  happens on F-Droid's verification server on first submission.
 - **Non-items (decided — don't re-litigate without new evidence):** root `CHANGELOG.md`
   (redundant with STATE + fastlane + ledger), speculative dependency-currency bumps (only on a
   security advisory), a standalone doc-drift audit (RUNBOOK self-adaptation covers it
@@ -79,6 +87,10 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-01 — build-config only (folds into pending 1.6.1, backlog H5): **D-137** release APK
+  proven reproducible (two clean builds byte-identical) after disabling AGP's Play-encrypted
+  `dependenciesInfo` blob; owner: submit fdroiddata with `reproducible: yes` + `Binaries:` (see
+  H5 row above).
 - 2026-07-01 — tests + a test-seam (folds into pending 1.6.1, backlog H3): **D-136** glue-seam
   audit — 4 gap-closing suites (`ForegroundAppMonitorTest` incl. the D-034 (f) retention
   regression via a new `clock` ctor seam, `BatteryStateReaderTest`, `AutoBrightnessRuntimeTest`,

@@ -2388,3 +2388,20 @@ the permanent registry — never compress or remove them.
   param defaults to `System::currentTimeMillis`); folds into the pending **1.6.1 /
   versionCode 15**. Remaining seams + skip reasons recorded in the STATE.md H3 row. Glue-review
   pass: clean (the seam is pure indirection; tests-only otherwise).
+
+- **D-137: release APK made reproducible; F-Droid `reproducible` mode recommended (backlog H5).**
+  Investigation (2026-07-01): the build was already almost deterministic — every dependency
+  version pinned in `libs.versions.toml` (no dynamic/SNAPSHOT), AGP 8.7.3/Kotlin 2.0.21 pinned,
+  `isMinifyEnabled` default-false (plain dex, no R8 variance), no NDK (transitive `.so`s come
+  bit-identical from dependency artifacts), versionCode/Name are literals, and release signing is
+  env-driven (keystore-less build → unsigned APK, which is what F-Droid's
+  verify-then-apksigcopier flow consumes). The one standard obstacle was AGP's default
+  `dependenciesInfo` — a Google-Play-encrypted dependency-metadata blob injected into the APK
+  signing block, unreadable by anyone but Play and worthless for an F-Droid app. Fixed with
+  `dependenciesInfo { includeInApk = false; includeInBundle = false }` (behavior-neutral;
+  release-variant packaging only). **Empirical proof:** two `assembleRelease` runs with a
+  `clean` between produced byte-identical APKs (equal SHA-256) on the same machine/JDK 21 —
+  necessary-but-same-machine; the cross-machine check is F-Droid's verification server on first
+  `reproducible: yes` submission (owner step, with the recipe pinning the CI's JDK 21). Folds
+  into the pending **1.6.1 / versionCode 15**. Glue-review: n/a (build-config packaging flag,
+  no runtime path).
