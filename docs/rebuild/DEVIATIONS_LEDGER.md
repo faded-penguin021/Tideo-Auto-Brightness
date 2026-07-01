@@ -2367,3 +2367,24 @@ the permanent registry — never compress or remove them.
   required for effect** (files alone are inert): repo Settings → Code security → enable
   "Dependabot security updates" and "Private vulnerability reporting". If those stay off, the
   files are documentation of intent, not a broken gate.
+
+- **D-136: glue-seam test audit (backlog H3) — audit + first contract-test slice.** Audit
+  conclusion: the migration-era suites cover more glue than filename matching suggests (the
+  17-test `BrightnessPipelineControllerTest` constructs the real controller, so
+  `PipelineCycleRunner`, `PanicHandler`, `PipelineState`, `PipelineDebugEmitter` are exercised
+  end-to-end; tile/boot-receiver/widget/observer/secure-dimming have dedicated suites). Four
+  real gaps closed with new tests: (a) `ForegroundAppMonitorTest` — the **D-034 (f) review fix
+  finally has its regression test** (an app foregrounded past the 3 s UsageEvents window must
+  stay the last-known package, not flip to null and kill every per-app rule); needed a
+  `clock: () -> Long` ctor test-seam on `AndroidForegroundAppMonitor` (same sanctioned pattern
+  as `deviceMaxOverride`, D-034 b — wall-clock is unmockable in Robolectric/virtual time);
+  gotcha: the Robolectric shadow's `queryEvents` EXCLUDES the endTime boundary. (b)
+  `BatteryStateReaderTest` — sticky-broadcast immediate emission, FULL-counts-as-charging
+  polarity, non-100 EXTRA_SCALE percent scaling, zero-scale division guard. (c)
+  `AutoBrightnessRuntimeTest` — the service-action intents (PAUSE/RESUME/REAPPLY/START+reason/
+  stop) that the Dashboard, QS tile, and notification all funnel through. (d)
+  `ServiceHealthStoreTest` — the degraded latch (set on FGS start denial) clears on the next
+  successful apply and NOT on a mere sensor heartbeat. No behavior change anywhere (the clock
+  param defaults to `System::currentTimeMillis`); folds into the pending **1.6.1 /
+  versionCode 15**. Remaining seams + skip reasons recorded in the STATE.md H3 row. Glue-review
+  pass: clean (the seam is pure indirection; tests-only otherwise).

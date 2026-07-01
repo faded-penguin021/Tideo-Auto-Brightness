@@ -39,13 +39,22 @@ model, the owner alone, or nobody. Execution rules: one unit ≈ one session; ch
 unit fully (ladder green + Changelog line + commit + push) before starting the next; **no
 parallel subagents** (rate-limit burn, see D-133). Priority order:
 
-- **H3 — glue-seam test audit** (largest unit; partial delivery is fine). Enumerate the
-  `:app`/`:platform` runtime glue (pipeline-controller wiring, service lifecycle + notification
-  actions, boot receiver, QS tile, observer/echo path end-to-end) against the existing tests;
-  land the gap table HERE first (checkpointable on its own), then add contract tests in
-  D-030/D-034 bug-class order (see RUNBOOK glue-review protocol for the class list). No
-  production change unless a test finds a bug (then playbook 4). Rationale: tests are the only
-  reviewer that never leaves.
+- **H3 — glue-seam test audit** (audit + first slice DONE 2026-07-01, D-136; remaining seams
+  below). Audit result: coverage is broader than filenames suggest — `BrightnessPipelineControllerTest`
+  (17 integration tests) exercises `PipelineCycleRunner`/`PanicHandler`/`PipelineState`/
+  `PipelineDebugEmitter` through the real controller; tile/boot/widget/observer/dimming all have
+  suites. Real gaps found and closed: `ForegroundAppMonitor` (D-034 f retention — regression
+  test via a new clock ctor seam), `BatteryStateReader` (intent→state mapping, scale guard),
+  `AutoBrightnessRuntime` (service-action intent dispatch the notification/tile/UI funnel
+  through), `ServiceHealthStore` (degraded latch clears on apply). **Remaining seams, in value
+  order** (each a small follow-up): `LocationReader.activeFix` (D-120/122, shadow
+  LocationManager), `WifiInfoReader` Location-callback path, `AndroidPanicSensorSource` arming
+  (sensor shadows), `PowerMeter` property mapping, `ExperimentPrefsStore` +
+  `ProfileImportExportManager` round-trips. **Skipped with reason:** `MaintenanceWorker`
+  (6 lines; testing needs the androidx.work-testing artifact — new dep not warranted),
+  `Shizuku*` (binder-dependent, not Robolectric-testable; owner device-verified),
+  `ControllerHookHolder`/`ProximityTracker`/`AppProcessScope` (trivial; behavior asserted via
+  controller suite).
 - **H5 — F-Droid fit: reproducible-build investigation** (investigate-first; report, not code).
   Determine whether the release APK builds reproducibly enough for fdroiddata's `reproducible`
   mode (owner's own signature ships after F-Droid verifies the build). Deliverable = findings +
@@ -70,6 +79,10 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-01 — tests + a test-seam (folds into pending 1.6.1, backlog H3): **D-136** glue-seam
+  audit — 4 gap-closing suites (`ForegroundAppMonitorTest` incl. the D-034 (f) retention
+  regression via a new `clock` ctor seam, `BatteryStateReaderTest`, `AutoBrightnessRuntimeTest`,
+  `ServiceHealthStoreTest`, +14 tests); audit table + remaining seams in the H3 row above.
 - 2026-07-01 — repo-policy only (no app change, backlog H4): **D-135** root `SECURITY.md`
   (latest-release support, private vulnerability reporting, by-design scope notes) +
   `.github/dependabot.yml` security-only (`open-pull-requests-limit: 0` for gradle +
