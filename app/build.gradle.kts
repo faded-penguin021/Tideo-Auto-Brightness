@@ -18,8 +18,8 @@ android {
         // the change — RUNBOOK §6 "Cutting a release". `release-preflight.yml` (D-124) enforces this on PRs.
         // Per-version history is NOT kept here — see the STATE.md Changelog, DEVIATIONS_LEDGER, and
         // fastlane/.../changelogs/<versionCode>.txt.
-        versionCode = 14
-        versionName = "1.6.0"
+        versionCode = 15
+        versionName = "1.6.1"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 
@@ -57,6 +57,14 @@ android {
             versionNameSuffix = "-debug"
             manifestPlaceholders["appLabel"] = "Tideo AB (Debug)"
         }
+    }
+
+    // F-Droid reproducibility (D-137): AGP by default embeds a Google-Play-encrypted dependency
+    // metadata blob in the APK signing block — unreadable by anyone but Play (useless for an
+    // F-Droid app) and the standard obstacle to byte-identical rebuilds. Behavior-neutral.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     buildFeatures {

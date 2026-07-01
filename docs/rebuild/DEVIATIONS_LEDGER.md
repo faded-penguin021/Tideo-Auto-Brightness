@@ -2308,3 +2308,100 @@ the permanent registry — never compress or remove them.
   5 s after the seed eval, well inside the 30 s window, and asserts the immediate switch to Charging). No
   version bump — folds into **1.6.0 / versionCode 14**. Engine concurrency model otherwise unchanged
   (single eval under `evalMutex`; only the PASS-1 debounce predicate changed).
+
+- **D-133: post-v1.6.0 hardening adopted — mandatory RUNBOOK glue-review protocol + a
+  machine-enforced-first hardening backlog (process/docs only, no code change).** Provenance: the
+  2026-07-01 Fable review requested by `FABLE_HANDOFF.md` (now deleted; its ask is fulfilled by
+  this entry + the STATE.md backlog). The review's conclusion re-confirms the D-030/D-034/D-035
+  pattern: every Sonnet migration segment passed its own acceptance gate yet dedicated review
+  found real shipped defects in glue/platform code — golden vectors cannot see that code, and no
+  separate review pass or stronger model can be assumed to exist any more (export-control +
+  usage-cap constraints). Two consequences, both durable: (a) **RUNBOOK gains a "Glue-review
+  protocol"** — an adversarial second diff pass, mandatory for any `:platform`/`:app`-runtime
+  change, hunting the proven bug classes (gate polarity/missing operands D-030 b; insertion order
+  D-030 b; observer/echo races D-034 a; truncation-vs-round drift D-034 b; non-idempotent
+  lifecycle / per-process state D-034 c; startup sentinels D-108) — replacing the reviewer that
+  is no longer there. (b) **STATE.md "Active work" carries the hardening backlog H2–H5**
+  (D-034(c) savedMode persistence — confirmed still per-process at
+  `ScreenBrightnessController.kt`; glue-seam contract-test audit; SECURITY.md + security-only
+  Dependabot; F-Droid reproducible-build investigation), ordered by the principle that
+  **machine-enforced beats model-discipline**: tests and CI gates keep working when the next
+  executor is a weaker model or the owner alone. Execution constraint recorded for future
+  sessions: **no parallel subagents** — a prior fan-out burned a full 5-hour rate-limit window
+  with zero results; run agents/tool calls sequentially. Non-items were decided with reasons
+  (root CHANGELOG.md, speculative dependency bumps, standalone doc-drift audit, SHA-pinning /
+  dependency verification per the 2026-06-29 decline) — don't re-litigate without new evidence.
+
+- **D-134: the saved pre-service brightness mode is PERSISTED (SharedPreferences), closing the
+  D-034(c) KNOWN RESIDUAL.** `AndroidScreenBrightnessController.savedMode` was a per-process
+  `private var`: if the process died while the service held manual mode, a restarted instance's
+  first `forceManualMode()` read the CURRENT mode — MANUAL, our own residue — and saved that as
+  "the user's mode", so a later `restoreMode()` (panic path, task528 act6-8) handed the user
+  MANUAL instead of their AUTOMATIC. Fix: the saved mode now lives in a `:platform`-private
+  SharedPreferences file (`screen_brightness_controller` / `saved_brightness_mode`), written with
+  `commit()` (durability against imminent process death is the point; at most two one-int writes
+  per service lifecycle). **Disambiguation rule** in `forceManualMode()`: a current mode of
+  MANUAL is ambiguous (possibly our own crash residue), so an already-persisted mode wins then —
+  this also preserves the D-034(c) idempotency guard; any NON-manual current mode is
+  unambiguously the user's and overwrites a stale persisted value (covers "crash long ago, user
+  changed mode since"). `restoreMode()` restores from and clears the pref. SharedPreferences
+  chosen over DataStore deliberately: `forceManualMode()` is called synchronously inside the
+  pipeline cycle, `:platform` carries no DataStore dependency, and the payload is one int — the
+  STATE backlog's "(DataStore)" suggestion was a sketch, not a binding choice. Tests:
+  `ScreenBrightnessControllerTest` +3 (`*_D134`: new-instance restore, restart-mid-manual keeps
+  persisted AUTOMATIC, fresh-start non-manual overwrites stale). Ships as **1.6.1 /
+  versionCode 15** (PATCH — bug fix, no new capability). Glue-review pass (RUNBOOK protocol, its
+  first application): clean — checked polarity of the `!= MANUAL || == null` persist gate against
+  all four (current, persisted) states, idempotency, SecurityException path unchanged (prefs I/O
+  cannot throw it), and no observer/echo interaction (`lastSelfWriteDevice` untouched).
+
+- **D-135: SECURITY.md + security-only Dependabot (backlog H4; repo-policy, no app change).**
+  Root `SECURITY.md`: latest release only, report via GitHub private vulnerability reporting,
+  scope notes for the by-design privileged writes (WRITE_SETTINGS / granted
+  WRITE_SECURE_SETTINGS / DUMP) and the no-network posture (only the default-off HTTPS geo-IP
+  fallback). `.github/dependabot.yml` uses the documented "security updates only" pattern —
+  `gradle` + `github-actions` ecosystems with `open-pull-requests-limit: 0`, so Dependabot may
+  open SECURITY PRs but never version-bump PRs. This deliberately does NOT reverse the
+  2026-06-29 decline: that decision rejected pinning/verification/bump *ceremony*; alerting on a
+  real advisory is the opposite trade (near-zero noise, real signal). **Owner-side toggles
+  required for effect** (files alone are inert): repo Settings → Code security → enable
+  "Dependabot security updates" and "Private vulnerability reporting". If those stay off, the
+  files are documentation of intent, not a broken gate.
+
+- **D-136: glue-seam test audit (backlog H3) — audit + first contract-test slice.** Audit
+  conclusion: the migration-era suites cover more glue than filename matching suggests (the
+  17-test `BrightnessPipelineControllerTest` constructs the real controller, so
+  `PipelineCycleRunner`, `PanicHandler`, `PipelineState`, `PipelineDebugEmitter` are exercised
+  end-to-end; tile/boot-receiver/widget/observer/secure-dimming have dedicated suites). Four
+  real gaps closed with new tests: (a) `ForegroundAppMonitorTest` — the **D-034 (f) review fix
+  finally has its regression test** (an app foregrounded past the 3 s UsageEvents window must
+  stay the last-known package, not flip to null and kill every per-app rule); needed a
+  `clock: () -> Long` ctor test-seam on `AndroidForegroundAppMonitor` (same sanctioned pattern
+  as `deviceMaxOverride`, D-034 b — wall-clock is unmockable in Robolectric/virtual time);
+  gotcha: the Robolectric shadow's `queryEvents` EXCLUDES the endTime boundary. (b)
+  `BatteryStateReaderTest` — sticky-broadcast immediate emission, FULL-counts-as-charging
+  polarity, non-100 EXTRA_SCALE percent scaling, zero-scale division guard. (c)
+  `AutoBrightnessRuntimeTest` — the service-action intents (PAUSE/RESUME/REAPPLY/START+reason/
+  stop) that the Dashboard, QS tile, and notification all funnel through. (d)
+  `ServiceHealthStoreTest` — the degraded latch (set on FGS start denial) clears on the next
+  successful apply and NOT on a mere sensor heartbeat. No behavior change anywhere (the clock
+  param defaults to `System::currentTimeMillis`); folds into the pending **1.6.1 /
+  versionCode 15**. Remaining seams + skip reasons recorded in the STATE.md H3 row. Glue-review
+  pass: clean (the seam is pure indirection; tests-only otherwise).
+
+- **D-137: release APK made reproducible; F-Droid `reproducible` mode recommended (backlog H5).**
+  Investigation (2026-07-01): the build was already almost deterministic — every dependency
+  version pinned in `libs.versions.toml` (no dynamic/SNAPSHOT), AGP 8.7.3/Kotlin 2.0.21 pinned,
+  `isMinifyEnabled` default-false (plain dex, no R8 variance), no NDK (transitive `.so`s come
+  bit-identical from dependency artifacts), versionCode/Name are literals, and release signing is
+  env-driven (keystore-less build → unsigned APK, which is what F-Droid's
+  verify-then-apksigcopier flow consumes). The one standard obstacle was AGP's default
+  `dependenciesInfo` — a Google-Play-encrypted dependency-metadata blob injected into the APK
+  signing block, unreadable by anyone but Play and worthless for an F-Droid app. Fixed with
+  `dependenciesInfo { includeInApk = false; includeInBundle = false }` (behavior-neutral;
+  release-variant packaging only). **Empirical proof:** two `assembleRelease` runs with a
+  `clean` between produced byte-identical APKs (equal SHA-256) on the same machine/JDK 21 —
+  necessary-but-same-machine; the cross-machine check is F-Droid's verification server on first
+  `reproducible: yes` submission (owner step, with the recipe pinning the CI's JDK 21). Folds
+  into the pending **1.6.1 / versionCode 15**. Glue-review: n/a (build-config packaging flag,
+  no runtime path).

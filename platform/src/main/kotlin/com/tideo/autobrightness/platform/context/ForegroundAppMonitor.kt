@@ -20,7 +20,14 @@ interface ForegroundAppMonitor {
     fun foregroundPackage(intervalMs: Long = 2000L): Flow<String?>
 }
 
-class AndroidForegroundAppMonitor(private val context: Context) : ForegroundAppMonitor {
+class AndroidForegroundAppMonitor(
+    private val context: Context,
+    // Test seam (same pattern as ScreenBrightnessController's deviceMaxOverride, D-034 b): the
+    // poll window is anchored to wall-clock time, which neither Robolectric's shadow clock nor
+    // coroutine virtual time can move — injecting the clock lets a test age events out of the
+    // window to exercise the D-034 (f) last-known retention.
+    private val clock: () -> Long = System::currentTimeMillis,
+) : ForegroundAppMonitor {
     override fun hasUsageAccessPermission(): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         val mode = appOps.unsafeCheckOpNoThrow(
@@ -48,7 +55,7 @@ class AndroidForegroundAppMonitor(private val context: Context) : ForegroundAppM
     }
 
     private fun queryForeground(usm: UsageStatsManager): String? {
-        val now = System.currentTimeMillis()
+        val now = clock()
         val events = usm.queryEvents(now - 3000L, now)
         val event = UsageEvents.Event()
         var last: String? = null

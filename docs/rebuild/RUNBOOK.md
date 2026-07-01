@@ -59,7 +59,8 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
   ConditionList evaluator exists — gates are explicit Kotlin booleans with a truth-table test).
 - **Parity:** ConditionList semantics — plain And/Or bind tighter than And2/Or2; XML children
   are alphabetical (re-sort numerically). Preserve the single-coroutine, drop-on-reentry model.
-- **Acceptance:** update the gate truth-table test; run the ladder below.
+- **Acceptance:** update the gate truth-table test; run the ladder below; **glue-review
+  protocol** (below) on any `:platform`/runtime part of the diff.
 - **Record:** flip the row in `PARITY_CHECKLIST.md`; note the change in `STATE.md`.
 
 ### 2. Tasker task added / changed / removed (pipeline / curve math)
@@ -87,11 +88,13 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
   `DEVIATIONS_LEDGER` row.
 - **Steps:** reproduce → add/adjust a failing test first → fix so it conforms to the golden
   vectors (never edit a golden vector to pass; changing one needs proof the extraction was
-  wrong + a `STATE.md` entry) → run the ladder.
+  wrong + a `STATE.md` entry) → run the ladder → **glue-review protocol** (below) if the fix
+  touches `:platform`/runtime glue.
 - **Record:** `STATE.md` (and `parity_gaps.md` if it was a parity gap).
 
 ### 5. Tasker-independent feature (rare — no parity source)
 - No golden reference exists; still obey the coding conventions in `CLAUDE.md` and add tests.
+  The **glue-review protocol** (below) applies to any `:platform`/runtime glue it adds.
 - **Record:** note the deviation-from-Tasker explicitly in `STATE.md`.
 
 ### 6. Cutting a release / version bump
@@ -211,6 +214,30 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   > disabled instance is inert (no observer, no writes). This only bites the developer, never an end user.
 - **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
   If anything here was wrong/stale, fix this section in the same change.
+
+## Glue-review protocol (MANDATORY for `:platform` / `:app` runtime changes)
+
+Any change touching a `:platform` adapter or `:app` runtime glue (service, pipeline controller,
+observers, receivers, tile, notification actions) gets a **second, adversarial diff pass before
+commit**: after the ladder is green, re-read the FULL diff fresh — as a hostile reviewer, not the
+author — hunting specifically the ledger's proven bug classes:
+
+- condition/gate **polarity and missing operands** (D-030 b: `scalingUse` dropped from an AND gate);
+- **list/insertion order** — newest-first vs newest-last (D-030 b: Array Push at index 1);
+- **observer/echo races** — token-consumption vs latest-value matching, delayed callbacks,
+  no-op writes that never notify (D-034 a);
+- **int truncation vs `Math.round`** round-trip drift across range normalization (D-034 b);
+- **non-idempotent lifecycle calls** and per-process state that should survive process death
+  (D-034 c — `savedMode` is the standing example);
+- **null/absent sentinel handling** at startup — a reader that hasn't produced a real value yet
+  must not match rules (D-108 battery `-1`).
+
+Rationale (D-030/D-034/D-035): every Sonnet migration segment passed its own acceptance gate,
+yet dedicated review found real shipped bugs in exactly this glue — golden vectors cannot see
+platform/runtime code, so reviewer attention is the only net there. There is no separate
+review pass or stronger model behind you now; this second pass replaces it. If the pass finds
+nothing, say so in the commit/PR body ("glue-review pass: clean"); if it finds something, fix
+it before commit and record anything durable as a `D-NN`.
 
 ## Acceptance ladder
 
