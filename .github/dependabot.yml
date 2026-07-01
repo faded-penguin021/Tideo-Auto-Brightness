@@ -1,0 +1,18 @@
+# SECURITY updates only (D-135). Version-update PRs are deliberately disabled
+# (open-pull-requests-limit: 0 is GitHub's documented "security only" pattern):
+# speculative dependency bumps were declined as wrong cost/benefit for a solo
+# F-Droid app (2026-06-29, STATE.md) — a bump happens on an advisory, not a cadence.
+# The "Dependabot security updates" + "Private vulnerability reporting" toggles
+# live in repo Settings → Code security and are owner-side.
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 0
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 0

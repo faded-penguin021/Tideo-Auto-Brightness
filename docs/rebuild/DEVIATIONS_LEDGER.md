@@ -2354,3 +2354,16 @@ the permanent registry — never compress or remove them.
   first application): clean — checked polarity of the `!= MANUAL || == null` persist gate against
   all four (current, persisted) states, idempotency, SecurityException path unchanged (prefs I/O
   cannot throw it), and no observer/echo interaction (`lastSelfWriteDevice` untouched).
+
+- **D-135: SECURITY.md + security-only Dependabot (backlog H4; repo-policy, no app change).**
+  Root `SECURITY.md`: latest release only, report via GitHub private vulnerability reporting,
+  scope notes for the by-design privileged writes (WRITE_SETTINGS / granted
+  WRITE_SECURE_SETTINGS / DUMP) and the no-network posture (only the default-off HTTPS geo-IP
+  fallback). `.github/dependabot.yml` uses the documented "security updates only" pattern —
+  `gradle` + `github-actions` ecosystems with `open-pull-requests-limit: 0`, so Dependabot may
+  open SECURITY PRs but never version-bump PRs. This deliberately does NOT reverse the
+  2026-06-29 decline: that decision rejected pinning/verification/bump *ceremony*; alerting on a
+  real advisory is the opposite trade (near-zero noise, real signal). **Owner-side toggles
+  required for effect** (files alone are inert): repo Settings → Code security → enable
+  "Dependabot security updates" and "Private vulnerability reporting". If those stay off, the
+  files are documentation of intent, not a broken gate.

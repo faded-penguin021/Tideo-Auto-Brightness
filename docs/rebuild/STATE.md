@@ -46,11 +46,6 @@ parallel subagents** (rate-limit burn, see D-133). Priority order:
   D-030/D-034 bug-class order (see RUNBOOK glue-review protocol for the class list). No
   production change unless a test finds a bug (then playbook 4). Rationale: tests are the only
   reviewer that never leaves.
-- **H4 — SECURITY.md + Dependabot security-only** (small repo-policy unit). ~10-line
-  `SECURITY.md` (supported = latest release; report via GitHub private vulnerability reporting)
-  + `.github/dependabot.yml` limited to **security updates** (no version-bump PR noise). This is
-  consistent with the 2026-06-29 decline — that rejected pinning/verification *ceremony*, not
-  vulnerability *alerting*. Flag to the owner in the PR (repo-policy change).
 - **H5 — F-Droid fit: reproducible-build investigation** (investigate-first; report, not code).
   Determine whether the release APK builds reproducibly enough for fdroiddata's `reproducible`
   mode (owner's own signature ships after F-Droid verifies the build). Deliverable = findings +
@@ -67,11 +62,19 @@ pass for any `:platform`/runtime change, hunting the proven D-030/D-034 bug clas
 polarity/operands, insertion order, observer-echo races, truncation drift, non-idempotent
 lifecycle / per-process state, startup sentinels). See RUNBOOK; adoption recorded as D-133.
 Done 2026-07-01: **H2** — shipped as 1.6.1 (D-134, see Changelog).
+Done 2026-07-01: **H4** — SECURITY.md + security-only Dependabot (D-135, see Changelog).
+⚠️ **Owner action for H4:** repo Settings → Code security → enable "Dependabot security
+updates" + "Private vulnerability reporting" (the committed files are inert without them).
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-01 — repo-policy only (no app change, backlog H4): **D-135** root `SECURITY.md`
+  (latest-release support, private vulnerability reporting, by-design scope notes) +
+  `.github/dependabot.yml` security-only (`open-pull-requests-limit: 0` for gradle +
+  github-actions). Consistent with the 2026-06-29 decline (alerting ≠ bump ceremony). Needs the
+  owner-side Code-security toggles to take effect (see Active work ⚠️).
 - 2026-07-01 — 1.6.1 / `versionCode 15` (PATCH — bug fix, backlog H2): **D-134** the saved
   pre-service brightness mode is persisted (`:platform` SharedPreferences, `commit()`), closing
   the D-034(c) residual — after a process death mid-manual, a restarted service no longer
