@@ -19,191 +19,122 @@ Privilege tiers: **BASIC** = user-grantable `WRITE_SETTINGS` (full core pipeline
 ## Current state
 
 **Shipped: v1.6.0** (`versionCode 14`). `PARITY_CHECKLIST.md` is zero-`pending`; golden parity
-tests green; TODO/FIXME = 0; `parity_gaps.md` has 0 open gaps (all 7 closed at S5).
+tests green; TODO/FIXME = 0; `parity_gaps.md` has 0 open gaps (all 7 closed at S5). Full
+acceptance ladder re-verified green 2026-07-01.
 
-**Active work:** `docs/rebuild/FABLE_HANDOFF.md` — a meta-plan (not a task list) for the next
-Fable session to review project state/deviations and turn a hardening backlog into the real,
-executable plan, written under a token-scarce / no-parallel-subagent / possibly-weaker-model
-constraint. Delete that file once its backlog has a permanent home here or in `RUNBOOK.md`.
-
-How changes are made now: see `RUNBOOK.md` (change-type playbooks). The migration narrative
-(segment briefs, gate findings) is frozen in `../history/`; the deviations registry stays live.
+How changes are made now: see `RUNBOOK.md` (change-type playbooks + the **glue-review
+protocol**, mandatory for `:platform`/runtime diffs). The migration narrative (segment briefs,
+gate findings) is frozen in `../history/`; the deviations registry stays live.
 
 > Code/docs elsewhere cite deviations by number (e.g. `STATE.md D-048`, `F50`). All deviations
 > — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
 > findings are in `../history/STATE_rebuild.md`). Look there.
 
+## Active work — post-v1.6.0 hardening backlog (adopted D-133)
+
+From the 2026-07-01 Fable review (which replaced and deleted `FABLE_HANDOFF.md`). Framing:
+prefer hardening that is **machine-enforced or once-done-done** over anything that relies on a
+capable model executing later — tests and CI gates keep working when the executor is a weaker
+model, the owner alone, or nobody. Execution rules: one unit ≈ one session; checkpoint each
+unit fully (ladder green + Changelog line + commit + push) before starting the next; **no
+parallel subagents** (rate-limit burn, see D-133). Priority order:
+
+- **H2 — close the D-034(c) residual** (small code unit, playbook 4).
+  `ScreenBrightnessController.savedMode` is a per-process `private var`: if the process dies
+  while the service holds manual mode, the user's pre-service mode (e.g. AUTOMATIC) is lost and
+  a later stop "restores" MANUAL. Persist the saved mode (DataStore) and restore from it in
+  `restoreMode()`; Robolectric test for die-mid-manual → restart → stop. Patch bump +
+  `changelogs/<vc>.txt` per RUNBOOK §6; ledger row closes the D-034(c) KNOWN RESIDUAL.
+- **H3 — glue-seam test audit** (largest unit; partial delivery is fine). Enumerate the
+  `:app`/`:platform` runtime glue (pipeline-controller wiring, service lifecycle + notification
+  actions, boot receiver, QS tile, observer/echo path end-to-end) against the existing tests;
+  land the gap table HERE first (checkpointable on its own), then add contract tests in
+  D-030/D-034 bug-class order (see RUNBOOK glue-review protocol for the class list). No
+  production change unless a test finds a bug (then playbook 4). Rationale: tests are the only
+  reviewer that never leaves.
+- **H4 — SECURITY.md + Dependabot security-only** (small repo-policy unit). ~10-line
+  `SECURITY.md` (supported = latest release; report via GitHub private vulnerability reporting)
+  + `.github/dependabot.yml` limited to **security updates** (no version-bump PR noise). This is
+  consistent with the 2026-06-29 decline — that rejected pinning/verification *ceremony*, not
+  vulnerability *alerting*. Flag to the owner in the PR (repo-policy change).
+- **H5 — F-Droid fit: reproducible-build investigation** (investigate-first; report, not code).
+  Determine whether the release APK builds reproducibly enough for fdroiddata's `reproducible`
+  mode (owner's own signature ships after F-Droid verifies the build). Deliverable = findings +
+  an owner recommendation recorded here; code/build changes only if trivially safe, else a
+  follow-up unit.
+- **Non-items (decided — don't re-litigate without new evidence):** root `CHANGELOG.md`
+  (redundant with STATE + fastlane + ledger), speculative dependency-currency bumps (only on a
+  security advisory), a standalone doc-drift audit (RUNBOOK self-adaptation covers it
+  opportunistically), action SHA-pinning / Gradle dependency verification (declined 2026-06-29
+  with reasons).
+
+Done 2026-07-01 (this unit): **H1 — RUNBOOK glue-review protocol** — a mandatory adversarial
+second diff pass for any `:platform`/runtime change, hunting the proven D-030/D-034 bug classes
+(gate polarity/operands, insertion order, observer-echo races, truncation drift, non-idempotent
+lifecycle / per-process state, startup sentinels). See RUNBOOK; adoption recorded as D-133.
+
 ## Changelog
 
-One line per shipped change (newest first). Keep terse.
+One line per shipped change (newest first). Keep terse; details live in the ledger.
 
-- 2026-06-30 — 1.6.0 / `versionCode 14` (MINOR — new user-facing capability + dialog): **D-130** wired up the
-  no-Location SSID `dumpsys wifi` path. `android.permission.DUMP` is now **declared** (reverses the F89
-  "leave undeclared" call — DUMP is `signature|privileged` *and* `development`, so user-grantable over ADB
-  like WRITE_SECURE_SETTINGS); `DumpsysWifiSsidStrategy` finally works once granted. Strategy order is now
-  Shizuku `cmd wifi status` → **root `su -c 'cmd wifi status'`** (new `RootWifiSsidStrategy`) → DUMP-granted
-  `dumpsys wifi` → Location callback. `parseDumpsysWifi` now mirrors Tasker's exact two-step regex over the
-  `mWifiInfo … COMPLETED` line (quoted `(?s).*?SSID:\s*"([^"]+)".*` first, else unquoted-to-comma
-  `(?s).*?SSID:\s*([^,]+),.*`). "Use current SSID" no longer dead-ends: the two Location-gated misses open an
-  SSID-help dialog explaining the alternatives + a copyable ADB DUMP grant
-  (`PrivilegeManager.dumpGrantInstruction()`), footed with the verbatim "If your SSID contains \"SSID\", this
-  will cause problems. Sorry, not sorry." Tests: `WifiSsidStrategyTest` (+2), `PrivilegeManagerTest` (+1).
-  Changelog `14.txt`. Engine/goldens untouched. **D-131** (folded into the same 1.6.0 release): completed
-  full UI i18n — every user-facing string (~250: labels, section headers, long-press help via `TaskerHelp`
-  → `help_*` resources, toasts, chart axis/series/marker labels, debug + sun-event `<string-array>`s, Menu
-  titles via `AppRoute.titleRes`) extracted to `strings.xml`; `rememberToaster()` gained a `@StringRes`
-  `toast(resId, …)` overload; the `HardcodedStringCheckTest` ratchet now enforces **0** hardcoded
-  user-facing literals (`Text("`/`toast("`/`contentDescription="`, was ≤ 92). Added a non-functional
-  (English-only) Language selector (on the Onboarding screen) + a **human-only** translations section in
-  `CONTRIBUTING.md`/README. Pure presentation refactor — no behaviour change. **D-132** (also folded in): a
-  plug/unplug transition now bypasses the PASS-1 battery cooldown so a charging context switches
-  immediately (owner report: "Charging" P81 didn't take over from "Low Battery" P80 until the battery rose
-  past the rule boundary — an eval-timing lag, not a ranking bug; the resolver is priority-first). Tests:
-  `ContextEngineTest.plugChange_…_D132`, `ContextOverrideResolverTest.higherPriorityWins_…`.
-  **Owner on-device pass confirmed** on the 1.6.0 debug APK (SSID/DUMP read + help dialog, charging
-  re-eval, i18n surfaces, Onboarding Language picker). Owner squash-merges + publishes the v1.6.0 release.
-- 2026-06-29 — CI-only (no app/version change): workflow hygiene — `timeout-minutes` on every job (caps a
-  hung Gradle daemon / SDK fetch / `gh` call vs GitHub's 360-min default) and `gradle/wrapper/gradle-wrapper.properties`
-  added to the 4 Gradle cache keys (a wrapper bump no longer reuses a stale cache). Prompted by a workflow
-  review; the higher-ceremony suggestions (strict dependency verification, action SHA-pinning, a Gradle
-  task for versionCode) were deliberately declined as wrong cost/benefit for a solo F-Droid app.
-- 2026-06-29 — 1.5.0 / `versionCode 13` (MINOR — observable user-facing behaviour): **D-125** the Curve &
-  Brightness screen no longer auto-draws a suggested curve whenever ≥ 9 override points exist. The suggestion
-  is now **user-driven** (Tasker task38→preview→task655 parity): the Tools wizard's "Preview graph" stashes
-  the just-computed fit in a transient process-scoped `CurveSuggestionPreview` holder and navigates to Curve
-  & Brightness, which loads it **once into the editable draft** (new generic `DraftSettingsViewModel.seedDraft`
-  = update draft + bump epoch). Result: the input fields show the suggested values with the **current values
-  in `[brackets]`**, the live "Curve" traces the fit vs the dashed committed "Reference", Apply commits it,
-  and leaving the screen discards the draft so **the suggested line disappears on close**. Removed the
-  `fittedCurve`/"Suggested" series from `BrightnessCurveChart`; `MIN_FIT_POINTS` now gates only the wizard
-  run. Tests: `DraftSettingsViewModelTest.seedDraft_*`, `SettingsScreensTest.toolsWizard_previewGraphButton_passesTheFit_D125`.
-  Engine math + goldens untouched. Changelog `13.txt`. **D-126** (folded into the same release): Resume from the
-  Dashboard override pause no longer loops back to paused — the F64 post-init/resume settle window (Tasker's
-  Set-Initial-Brightness mutex) now also suppresses the `AnimationRunner`'s in-cycle override detection
-  (`runCycle` passes `detectOverrides && !ctx.overrideSuppressed()`), so the first animated cycle after a
-  resume isn't mis-seen as a manual override (its own sweep / the OEM mode-flip settling). Test
-  `BrightnessPipelineControllerTest.cycleDuringSettleWindow_…_D126`; `AnimationRunner` made `open` for the spy.
-- 2026-06-29 — CI-only (no app/version change): **D-124** new `release-preflight.yml` PR gate enforces the
-  RUNBOOK §6 release-prep checklist before merge — version/changelog checks fire only when the PR **ships
-  app code** (docs/workflow/test/metadata-only PRs skip them): on a code PR it requires `versionCode`
-  strictly > the latest `v*` tag, a non-regressed semver `versionName`, and a non-empty
-  `changelogs/<versionCode>.txt`; the `[skip ci]`-class token scan (commit messages + PR title/body, D-115)
-  runs on every PR. Secret-free, `sort -V` numeric compares, first-release path tolerated. RUNBOOK §6
-  updated. Verified locally (docs-only passes, code-without-bump blocked).
-- 2026-06-29 — CI-only (no app/version change): **D-123** `release.yml` now auto-reuses the human-written
-  F-Droid changelog (`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`) as the GitHub Release's
-  "What's new" section — a new step reads the tagged build's versionCode, looks up the matching changelog,
-  and slots it between the owner's UI summary and GitHub's auto "What's Changed" (D-119) via
-  `action-gh-release` `body_path` + `append_body`. Idempotent via a hidden `<!-- fdroid-changelog:<vc> -->`
-  marker (checked against the live release body with `gh release view`); missing changelog → warn + skip,
-  never fails. Owner no longer hand-copies the changelog into the release body. RUNBOOK §6 updated.
-- 2026-06-28 — 1.4.0 / `versionCode 12` (MINOR — observable user-facing behaviour): **D-117** Curve &
-  Brightness graph "Now" line + "Live brightness" card now show PERCEIVED brightness in PWM-sensitive
-  mode (`targetBrightness ?: lastAppliedBrightness`, like the Dashboard hero), not the floored hardware
-  value (+test). **D-118** Contexts rules modal no longer clips its last rule card under the nav bar —
-  edge-to-edge `Dialog` (`decorFitsSystemWindows=false`) + `statusBarsPadding()` + trailing `Spacer(48dp)`,
-  mirroring the rule editor (D-097/098). **D-119** `release.yml` `generate_release_notes: true` (auto
-  "What's Changed" appended below the owner's UI body; idempotent). Audit note: `build`/`codeql` run on
-  push-to-main + PR (green on last main push) and intentionally skip `v*` tags — release.yml re-runs the
-  full ladder before signing, so "only sign on tag" is by design. **D-120/D-122** the "Use current
-  location" buttons (Circadian + Contexts location rule) actively acquire — `LocationReader.activeFix`
-  registers for live provider updates (sensors on → OS location indicator appears) and waits for a fresh
-  fix, last-known only as a backup; Circadian also → ipwho.is IP fallback when opted in (default-off
-  privacy gate, D-105) — instead of echoing another app's cached fix. Parity: Tasker's active/passive
-  listener was used for location context rules. **D-121** geo-IP fallback moved
-  from cleartext `ip-api.com` (`lat`/`lon`, `status:fail`) → HTTPS `ipwho.is` (`latitude`/`longitude`,
-  `success:false`); network-security-config now pins cleartext OFF (app makes no cleartext traffic);
-  fallback stays optional/off. Changelog `12.txt`. Owner squash-merges + publishes the v1.4.0 release.
-- 2026-06-28 — 1.3.0 / `versionCode 11` (MINOR — new user-facing setting + surface): **D-116** Panic
-  (Reset) gesture reworked from folded-in Tasker source. Trigger is now Upside-Down ∧ Display-On ∧
-  **Proximity-NOT-Near** (the significant-motion EVENT is gone); the shake is validated by a 10 s
-  sensitivity-gated leaky-bucket (`PanicShakeGate`, pure `:domain`, contract-tested vs the task528 A2
-  Java). New GLOBAL **`%AAB_PanicSensitivity`** (0–10, default 8) with a slider at the bottom of the
-  Live Debug screen (0 = pass-through, 10 = long vigorous shake; 10 s timeout = veto + re-arm only after
-  flipping straight then upside-down again, D-021). Platform: `PanicGestureDetector` → orientation only,
-  `PanicGate` → re-arm latch, `AndroidPanicSensorSource` arms + runs the gate over `TYPE_LINEAR_ACCELERATION`
-  (fallback high-passed accelerometer); `AppModule` injects sensitivity (new `ContextEngine.effectiveSnapshot`)
-  + proximity-near. Structurally retires the S14 grab-to-wake false-fire. Changelog `11.txt`; `tmp/` spec
-  deleted. Owner: when squash-merging, STRIP any `[skip ci]` from the commit body (D-115), merge, then
-  publish the v1.3.0 release from the GitHub UI.
-- 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut, no app change): **D-115** the v1.2.0 release
-  workflow never ran — the squash-merge commit body carried a stray `[skip ci]` token (leaked from a
-  commit message that described `clean-dist.yml`), which GitHub honored and skipped every workflow for
-  that commit + tag, so v1.2.0 never published its signed APK. `release.yml` now triggers on
-  `release: published` (immune to skip-ci) + a `workflow_dispatch` tag fallback; RUNBOOK §6 warns never
-  to write the token in a commit/PR message. 1.2.1 re-cuts the SAME app (no runtime change since 1.2.0)
-  so the release publishes cleanly. Changelog `10.txt`. Owner opens a NEW PR (v1.2.0's was merged), then
-  publishes the v1.2.1 release.
-- 2026-06-28 — 1.2.0 / `versionCode 9`: runtime bug fixes + UX. **D-108** service-start battery-saver
-  flash (battery "unknown" `-1` sentinel; resolver won't match a battery rule until a real reading).
-  **D-109** PWM-sensitive read-out now tracks PERCEIVED brightness (`targetBrightness` = un-floored engine
-  value; `lastAppliedBrightness` stays the floored hardware value for override detection). **D-110**
-  circadian stale-location fallback across the day rollover + recompute-on-resolve (`onWindowsRefreshed`
-  → `reapply`) + staleness hints (`CircadianLocationStatus`) on the Circadian screen + dashboard (gold
-  tinted-`Card`, m3_audit-coherent). **D-111** gold "resume context automation" banner + play icon;
-  Tasker-style Profiles & Contexts IA (pinned Load/Save/Contexts action bar over the visible profile
-  list, each opening its own modal); app-wide icon-vs-glyph consistency (`‹`/`›` back + pager glyphs →
-  Material `IconButton`s). **D-112** GitHub Actions Node-20 → Node-24 (all actions bumped to node24
-  majors; `build.yml` carries a node24 pin policy comment) + `clean-dist.yml` auto-removes a forgotten
-  `dist/` APK from main. **D-113** Contexts rule list/editor: target profile emphasised (gold) +
-  active-rule highlight; priority is a 1–100 scale (was 0..∞); "Use current Wi-Fi" appends to the SSID
-  list (Tasker parity). **D-114** confirmation prompts before deleting a rule and deleting/overwriting a
-  profile (shared `ConfirmDialog`, Tasker parity). RUNBOOK gains a "Design coherence — read m3_audit.md for ANY UI change" callout
-  (owner request). Changelog `9.txt`. Owner sideloads `dist/` debug APK, then squash-merges + tags
-  `v1.2.0` (dist/ auto-cleaned by CI if forgotten). SEMVER: minor — new user-facing surfaces (staleness
-  hints + Profiles redesign) outrank the patch-grade bug fixes (RUNBOOK §6 "highest category wins");
-  rationale block in `app/build.gradle.kts`.
-- 2026-06-28 — 1.1.1 / `versionCode 8`: (D-107) security hardening — notification (`actionIntent`)
-  and home-widget (`DashboardWidgetProvider`) PendingIntents made un-missably explicit (separate
-  statements + `setPackage`, still `FLAG_IMMUTABLE`) to clear CodeQL `java/android/implicit-pendingintents`
-  (High). The first post-1.1.0 CodeQL scan of `main` flagged the chained `Intent(this, X).setAction()`
-  one-liner as implicit (Kotlin dataflow drops the constructor component through `.setAction()`); intents
-  were already explicit + immutable at runtime, so no behaviour change. Added `changelogs/8.txt`. Owner
-  tags `v1.1.1`.
-
-- 2026-06-26 — 1.1.0 / `versionCode 7`: bumped **targetSdk 35 → 36** (Android 16), `compileSdk`
-  36 in app + platform. Android 16 impact review found zero required platform code changes (edge-to-edge
-  already enforced via D-097/098/100; back via AndroidX `BackHandler`; transitive native libs
-  already 16 KB-aligned; specialUse FGS property already declared; specialUse FGS-from-boot unchanged
-  15→16). Robolectric 4.14.1 → 4.16.1 (needed for SDK 36; runs on JDK 21); CI JDK 17→21; added CodeQL
-  (`codeql.yml`, java-kotlin build-mode none). Debug build type gets `applicationIdSuffix=".debug"`
-  (+ `-debug` versionName, "Tideo AB (Debug)" label, Shizuku authority `${applicationId}.shizuku`) so a
-  debug build coexists with the signed release (D-106). **Owner on-device Pass A/B: all passed.**
-  Bug/parity/privacy fixes folded in: **D-101** PWM/dimming threshold 0..100→0..255; **D-102** curve
-  wizard auto-copies %AAB_Test + FlowRow button wrap; **D-103** circadian once-a-day location persisted
-  across restarts (fixes screen-on default-scale drift); **D-104** generic chart label declutter +
-  landscape height cap/scroll (S13 chart-engine fence lifted for generic changes); **D-105** ip-api.com
-  geo-IP fallback now opt-in (default off). Docs: RUNBOOK §6 semver guidance, §7 "Bumping targetSdk",
-  CI-failure protocol; `changelogs/7.txt`. Temporary `dist/` debug APK used for the on-device pass was
-  removed before merge. Owner squash-merges + tags `v1.1.0`.
-- 2026-06-25 — 1.0.4 / `versionCode 6`: (D-100) main-window bottom controls clipped under the nav bar
-  with button/3-key navigation — the draft-settings `DraftApplyBar` (Discard/Apply) and the Menu's
-  final "Recheck Permissions" row drew behind the system nav bar (targetSdk 35 enforces edge-to-edge on
-  Android 15+). Fix: `navigationBarsPadding()` (+`imePadding()` on the bar) on the two spots not covered
-  by an M3 `Scaffold`'s content insets. Unlike D-098's `Dialog` (no bottom inset delivered), these are
-  in the MainActivity window where the inset resolves correctly (0 on pre-15, so no double padding).
-  UI + version only; bottom-inset behavior is owner device-verified (not Robolectric-testable). Added
-  `changelogs/6.txt`. Next free deviation: **D-101**.
-- 2026-06-24 — 1.0.3 / `versionCode 5`: (D-098) rule-editor Save/Cancel STILL clipped after D-097 and a
-  follow-up that drove the dialog `Window` edge-to-edge — this Compose `Dialog` never delivers a bottom
-  (nav-bar/ime) inset to its content, only the top. Stopped fighting insets: dropped the sticky bottom bar,
-  Save/Cancel now ride at the end of the editor's scroll with a trailing `Spacer(48dp)` so they always
-  scroll clear of the gesture pill (top still uses `statusBarsPadding()`; `imePadding()` shrinks the
-  viewport for the keyboard). Tests updated to `performScrollTo()` the Save button. (D-099) in-app version
-  had drifted behind the `v1.0.2` tag (build said 1.0.1/4) — realigned to 1.0.3/5, added `changelogs/5.txt`,
-  and added RUNBOOK §6 "Cutting a release / version bump". UI + version only; bottom-inset behavior is owner
-  device-verified (not Robolectric-testable).
-- 2026-06-24 — Wi-Fi context fixes: (D-096) `WifiInfoReader.ssidFlow()` now runs the no-Location
-  strategies (Shizuku→dumpsys) first like task43's `bypass_ssid`, so Wi-Fi context rules match with
-  Location services OFF (was Location-only at eval time, even though the rule editor already read the
-  SSID via Shizuku). (D-097) per-rule editor `Dialog` made edge-to-edge (`decorFitsSystemWindows =
-  false`) so its status/nav-bar insets apply — the Save/Cancel bar no longer sits clipped under the
-  gesture nav bar. Tests: WifiSsidStrategyTest +1 (flow uses no-Location strategy).
-- 2026-06-24 — F-Droid: bumped to 1.0.1 / `versionCode 4` (packaging only — gives a release tag
-  that contains `fastlane/`, which the 1.0.0 tag predated; F-Droid reads metadata from the built
-  commit). Added `changelogs/4.txt`. No app behaviour change. Owner tags `v1.0.1` after merge.
-- 2026-06-24 — F-Droid prep: added `fastlane/metadata/android/en-US/` (title, short/full
-  description, `changelogs/3.txt`, 4 phoneScreenshots). Repo-side only; submission to fdroiddata
-  + release tag are owner steps. No code/build change.
+- 2026-07-01 — docs-only: **D-133** post-v1.6.0 hardening adopted — RUNBOOK gains the mandatory
+  glue-review protocol (H1); hardening backlog H2–H5 recorded above; `FABLE_HANDOFF.md` deleted
+  (its ask fulfilled); STATE compressed to the length-guard target.
+- 2026-06-30 — 1.6.0 / `versionCode 14` (MINOR): **D-130** no-Location SSID path wired up —
+  `android.permission.DUMP` now declared (user-grantable over ADB, reverses F89), strategy order
+  Shizuku → root `cmd wifi status` → DUMP `dumpsys wifi` (Tasker two-step regex) → Location;
+  SSID-help dialog with copyable ADB grant. **D-131** full UI i18n (~250 strings →
+  `strings.xml`; `HardcodedStringCheckTest` ratchet now 0; English-only Language selector;
+  human-only translations policy in CONTRIBUTING/README). **D-132** plug/unplug bypasses the
+  PASS-1 battery cooldown so a charging context switches immediately. Owner on-device pass
+  confirmed; owner squash-merges + publishes v1.6.0.
+- 2026-06-29 — CI-only: per-job `timeout-minutes` + wrapper properties in Gradle cache keys;
+  stricter supply-chain measures (SHA-pinning, dependency verification, versionCode Gradle task)
+  deliberately declined as wrong cost/benefit for a solo F-Droid app.
+- 2026-06-29 — 1.5.0 / `versionCode 13` (MINOR): **D-125** curve suggestion is now user-driven
+  (wizard "Preview graph" seeds the editable draft via `CurveSuggestionPreview` +
+  `DraftSettingsViewModel.seedDraft`; suggested line disappears on close). **D-126** resume no
+  longer loops back to paused — the F64 settle window also suppresses in-cycle override
+  detection. Changelog `13.txt`; engine/goldens untouched.
+- 2026-06-29 — CI-only: **D-124** `release-preflight.yml` PR gate (versionCode > latest tag,
+  semver versionName, non-empty changelog — only when the PR ships app code; `[skip ci]`-token
+  scan on every PR).
+- 2026-06-29 — CI-only: **D-123** `release.yml` auto-reuses the F-Droid changelog as the GitHub
+  Release "What's new" (idempotent marker; missing changelog → warn + skip).
+- 2026-06-28 — 1.4.0 / `versionCode 12` (MINOR): **D-117** graph "Now"/"Live brightness" show
+  PERCEIVED brightness in PWM mode; **D-118** Contexts rules modal edge-to-edge (no nav-bar
+  clip); **D-119** release notes auto-append; **D-120/D-122** "Use current location" actively
+  acquires a fresh fix; **D-121** geo-IP fallback moved to HTTPS ipwho.is + cleartext pinned
+  OFF. Owner squash-merges + publishes v1.4.0.
+- 2026-06-28 — 1.3.0 / `versionCode 11` (MINOR): **D-116** Panic (Reset) gesture rework —
+  upside-down ∧ display-on ∧ proximity-not-near + 10 s leaky-bucket shake gate (`PanicShakeGate`,
+  contract-tested vs task528 Java); new `%AAB_PanicSensitivity` (0–10) slider on Live Debug.
+  Retires the S14 grab-to-wake false-fire.
+- 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut, no app change): **D-115** a stray
+  `[skip ci]` in the squash body skipped v1.2.0's release workflow; `release.yml` now triggers
+  on `release: published` + `workflow_dispatch` fallback.
+- 2026-06-28 — 1.2.0 / `versionCode 9` (MINOR): **D-108**–**D-114** — battery `-1` sentinel (no
+  saver flash at start), perceived-brightness read-out in PWM mode, circadian stale-location
+  fallback + staleness hints, resume banner + Tasker-style Profiles & Contexts IA, Actions
+  node24, rule/profile delete-overwrite confirmations, priority 1–100. RUNBOOK gains the
+  m3_audit design-coherence callout.
+- 2026-06-28 — 1.1.1 / `versionCode 8` (PATCH): **D-107** notification/widget PendingIntents
+  made un-missably explicit (clears CodeQL `implicit-pendingintents` High).
+- 2026-06-26 — 1.1.0 / `versionCode 7` (MINOR): targetSdk 35→36 + compileSdk 36 (zero required
+  code changes), Robolectric 4.16.1 (JDK 21, CI JDK 17→21), CodeQL workflow added, debug variant
+  gets `.debug` suffix so it coexists with the release (D-106). Folded fixes **D-101**–**D-105**
+  (dimming threshold 0..255, wizard auto-copy + button wrap, circadian location persisted, chart
+  declutter, geo-IP opt-in). Owner Pass A/B on-device: passed.
+- 2026-06-25 — 1.0.4 / `versionCode 6` (PATCH): **D-100** bottom controls (DraftApplyBar, Menu
+  last row) get `navigationBarsPadding()` under 3-key nav.
+- 2026-06-24 — 1.0.3 / `versionCode 5` (PATCH): **D-098** rule-editor Save/Cancel moved into the
+  editor scroll (Compose `Dialog` never delivers a bottom inset); **D-099** in-app version
+  realigned with the tag drift + RUNBOOK §6 release checklist added.
+- 2026-06-24 — Wi-Fi context fixes: **D-096** `ssidFlow()` runs the no-Location strategies first
+  (rules match with Location OFF); **D-097** rule-editor `Dialog` made edge-to-edge.
+- 2026-06-24 — 1.0.1 / `versionCode 4`: packaging-only re-tag so a release tag contains
+  `fastlane/` (F-Droid reads metadata from the built commit).
+- 2026-06-24 — F-Droid prep: `fastlane/metadata/android/en-US/` added (title, descriptions,
+  changelog, 4 screenshots). Submission to fdroiddata + release tag are owner steps.
 - 2026-06-23 — v1.0.0: Tasker→Kotlin rebuild complete; Gate 3 signed off. Full history frozen
   in `../history/`.

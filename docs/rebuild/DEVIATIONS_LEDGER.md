@@ -2308,3 +2308,26 @@ the permanent registry — never compress or remove them.
   5 s after the seed eval, well inside the 30 s window, and asserts the immediate switch to Charging). No
   version bump — folds into **1.6.0 / versionCode 14**. Engine concurrency model otherwise unchanged
   (single eval under `evalMutex`; only the PASS-1 debounce predicate changed).
+
+- **D-133: post-v1.6.0 hardening adopted — mandatory RUNBOOK glue-review protocol + a
+  machine-enforced-first hardening backlog (process/docs only, no code change).** Provenance: the
+  2026-07-01 Fable review requested by `FABLE_HANDOFF.md` (now deleted; its ask is fulfilled by
+  this entry + the STATE.md backlog). The review's conclusion re-confirms the D-030/D-034/D-035
+  pattern: every Sonnet migration segment passed its own acceptance gate yet dedicated review
+  found real shipped defects in glue/platform code — golden vectors cannot see that code, and no
+  separate review pass or stronger model can be assumed to exist any more (export-control +
+  usage-cap constraints). Two consequences, both durable: (a) **RUNBOOK gains a "Glue-review
+  protocol"** — an adversarial second diff pass, mandatory for any `:platform`/`:app`-runtime
+  change, hunting the proven bug classes (gate polarity/missing operands D-030 b; insertion order
+  D-030 b; observer/echo races D-034 a; truncation-vs-round drift D-034 b; non-idempotent
+  lifecycle / per-process state D-034 c; startup sentinels D-108) — replacing the reviewer that
+  is no longer there. (b) **STATE.md "Active work" carries the hardening backlog H2–H5**
+  (D-034(c) savedMode persistence — confirmed still per-process at
+  `ScreenBrightnessController.kt`; glue-seam contract-test audit; SECURITY.md + security-only
+  Dependabot; F-Droid reproducible-build investigation), ordered by the principle that
+  **machine-enforced beats model-discipline**: tests and CI gates keep working when the next
+  executor is a weaker model or the owner alone. Execution constraint recorded for future
+  sessions: **no parallel subagents** — a prior fan-out burned a full 5-hour rate-limit window
+  with zero results; run agents/tool calls sequentially. Non-items were decided with reasons
+  (root CHANGELOG.md, speculative dependency bumps, standalone doc-drift audit, SHA-pinning /
+  dependency verification per the 2026-06-29 decline) — don't re-litigate without new evidence.
