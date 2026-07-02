@@ -2405,3 +2405,67 @@ the permanent registry — never compress or remove them.
   `reproducible: yes` submission (owner step, with the recipe pinning the CI's JDK 21). Folds
   into the pending **1.6.1 / versionCode 15**. Glue-review: n/a (build-config packaging flag,
   no runtime path).
+
+- **D-138: short-term Fable-dependent hardening adopted (F-backlog U1–U6; docs-only at
+  adoption).** The complement of D-133: that backlog deliberately preferred machine-enforced /
+  once-done-done hardening because no capable model can be assumed later; this one is the work
+  that **requires** a capable model, executed now while Fable access lasts (usage capped
+  50 %/week through 2026-07-07, API tier after; the prior Fable stint was cut short by
+  export-control restrictions, so every unit checkpoints independently). Rationale for the
+  unit list: the RUNBOOK glue-review protocol (D-133 a) covers *future diffs only*, while the
+  standing ~5–6 k lines of shipped `:platform`/`:app`-runtime glue — written by Sonnet-tier
+  migration segments whose own gates all passed — is exactly the surface where dedicated
+  adversarial review has repeatedly found real shipped defects (D-030, D-034 a–f, D-035,
+  D-134). Units, value-ordered (full definitions in the STATE.md F-backlog section): U1
+  retroactive adversarial review of pipeline core + brightness writes; U2 context engine +
+  readers; U3 entry points + privilege; U4 security review of parsing/privileged surfaces
+  (folds in the H3 import-export round-trip seam); U5 targeted golden-transcription re-check
+  against the XML (the one failure goldens cannot catch — production conforms to the fixture,
+  so a mistranscription ships green); U6 stretch = remaining H3 seams. Conversion rule: every
+  finding becomes a durable artifact — failing-test-first fix + its own D-NN row — or, if too
+  big, a precise STATE backlog row a weaker executor can implement; a *new* proven bug class
+  is appended to the RUNBOOK glue-review list. UI screens beyond runtime glue, `:domain`
+  beyond U5, and the D-133 non-items stay out of scope. v1.6.1 is tagged, so the first
+  app-code fix bumps 1.6.2 / versionCode 16.
+
+- **D-139: panic effect ordered AFTER the in-flight cycle — `emergencyStop()` now cancel-and-JOINS
+  the consumer (F-backlog U1 finding).** The panic path (prof769/task528, also the notification
+  Reset action) did `consumerJob?.cancel()` (fire-and-forget) and then immediately wrote the panic
+  255. On the real multi-threaded service dispatcher, an animation frame that had already passed
+  its `delay` when the cancel landed could serialize its `Settings.System` write AFTER the panic
+  restore — leaving the screen at a stale mid-animation value on the safety path, un-corrected
+  because panic is terminal (service off). The window is small (~write-IPC-duration per frame
+  wait) but panic fires exactly when a transition is likely in flight (screen stuck dimming).
+  Fix: `emergencyStop()` is now `suspend` and `cancelAndJoin()`s the consumer before
+  `PanicHandler.execute()` — "nothing writes after the panic restore" becomes a guarantee; the
+  only caller (`AmbientMonitoringService.panicAndStop`) was already in a coroutine. A secondary
+  benefit: the terminal `PipelineState(serviceOn=false)` reset can no longer interleave with the
+  dying cycle's `finally` updates. Test:
+  `BrightnessPipelineControllerTest.emergencyStop_joinsInFlightCycle_beforePanicWrite_D139`
+  (StandardTestDispatcher parks the animation in an `awaitCancellation` sleep; pre-fix the
+  unwound-flag assertion fails because plain `cancel()` returns before the frames unwind). Ships
+  in **1.6.2 / versionCode 16**.
+
+- **D-140: control intents to a NOT-running service no longer birth a zombie foreground service
+  (F-backlog U1 finding).** Latent assumption in three places (`AutoBrightnessRuntime`'s
+  `sendServiceAction` catch-comment, the widget `ACTION_RESET` comment, the REAPPLY branch):
+  that a pause/reapply intent "does nothing when the service is not running". In reality
+  `startForegroundService` CREATES the service; the PAUSE branch then queued an event no consumer
+  would ever read, and the REAPPLY branch `ensureRunning()`'d unconditionally — starting the
+  light-sensor collector, context engine, and FGS notification. Concrete repro: home-screen
+  widget "Reset" tapped while the service toggle is OFF → permanent do-nothing foreground service
+  (with sensor registered) against the persisted disable. Fix, service-side (covers every
+  present/future sender): `onStartCommand` gates ACTION_PAUSE and ACTION_REAPPLY on
+  `controller.state.value.serviceOn` (set synchronously by `start()`); a not-running instance
+  stops itself (`stopForeground(REMOVE)` + `stopSelf(startId)` — the startId form so a queued
+  legitimate START still rescues the instance) and returns START_NOT_STICKY. ACTION_RESUME is
+  deliberately NOT gated (F74: resurrect is its contract); ACTION_PANIC is deliberately NOT gated
+  (the restore effect is wanted even with no pipeline). Defense for the adjacent START_STICKY
+  hole (OS sticky restart after the user disabled while the service was dead): the START/null
+  branch now re-checks persisted `serviceEnabled` and `disableAndStop()`s when off. Tests:
+  `AmbientMonitoringServiceTest` +3 (`pause/reapply_whenPipelineNotRunning_stopsSelf…`,
+  `pauseAndReapply_whilePipelineRunning_keepTheServiceUp`); the two notification tests move from
+  ACTION_PAUSE to ACTION_START (a not-running PAUSE now removes the foreground notification, which
+  is the point). Residual (accepted): a control intent on a stopped service still flashes the
+  mandatory foreground notification for an instant before the self-stop. Ships in **1.6.2 /
+  versionCode 16**.

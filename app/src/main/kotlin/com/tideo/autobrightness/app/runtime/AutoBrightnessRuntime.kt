@@ -35,6 +35,8 @@ object AutoBrightnessRuntime {
     /**
      * Force the live pipeline to re-evaluate now (settings Apply / profile load, G2-F16). A no-op
      * when the service is not running — the next start picks up the committed settings anyway.
+     * (The no-op is enforced SERVICE-side, D-140: startForegroundService always CREATES the service,
+     * so the fresh instance detects that no pipeline is running and stops itself.)
      */
     fun reapply(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_REAPPLY)
 
@@ -43,9 +45,12 @@ object AutoBrightnessRuntime {
         val intent = Intent(appContext, AmbientMonitoringService::class.java).setAction(action)
         try {
             // minSdk 31 ≥ O, so startForegroundService is always available (S12.9a dead-branch removal).
+            // NOTE (D-140): this CREATES the service when it is not running — it is never a no-op —
+            // so control actions (pause/reapply) are validated in the service's onStartCommand.
             appContext.startForegroundService(intent)
         } catch (_: IllegalStateException) {
-            // Service not currently running — pause/resume only apply while it is, so ignore.
+            // Background-start restriction (the app is neither foreground nor exempt) — the action
+            // was user-initiated from UI that no longer exists; dropping it is the right outcome.
         }
     }
 

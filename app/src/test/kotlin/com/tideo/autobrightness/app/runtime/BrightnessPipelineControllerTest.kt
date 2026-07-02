@@ -7,10 +7,12 @@ import com.tideo.autobrightness.platform.sensor.LightSample
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -241,6 +243,56 @@ class BrightnessPipelineControllerTest {
         sensor.flow.emit(sample(lux = 5000.0))
         advanceUntilIdle()
         assertEquals(writesAfter, brightness.writes.size, "no writes after emergency stop")
+        scope.cancel()
+    }
+
+    // D-139 (F-backlog U1): the panic effect must be ORDERED AFTER the in-flight cycle. emergencyStop
+    // used to fire-and-forget cancel the consumer and then write the panic 255 immediately — on the
+    // real multi-threaded dispatcher an animation frame already past its delay could serialize AFTER
+    // the panic write, leaving the screen at a stale mid-animation value on the safety path. The fix
+    // JOINS the consumer first; this locks the contract: when emergencyStop() returns, the in-flight
+    // animation has fully unwound and the panic 255 is the final write.
+    @Test
+    fun emergencyStop_joinsInFlightCycle_beforePanicWrite_D139() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        var animationUnwound = false
+        val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
+        // Park the animation mid-flight: the first frame's sleep suspends until cancelled, and the
+        // finally records that the cycle coroutine actually unwound (vs merely being marked cancelled).
+        val runner = AnimationRunner(
+            brightness,
+            sleep = {
+                try {
+                    awaitCancellation()
+                } finally {
+                    animationUnwound = true
+                }
+            },
+        )
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor,
+            brightness = brightness,
+            brightnessObserver = FakeObserver(),
+            settingsProvider = { settings },
+            scope = scope,
+            clock = { 1000L },
+            animationRunner = runner,
+        )
+        controller.start()
+        advanceUntilIdle() // collectors subscribe (Standard dispatcher runs nothing eagerly)
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle() // cycle runs to the first animation frame and parks in sleep()
+        assertTrue(brightness.writes.isNotEmpty(), "cycle should be mid-animation")
+
+        controller.emergencyStop()
+
+        assertTrue(
+            animationUnwound,
+            "emergencyStop must join the in-flight cycle before the panic write (D-139)",
+        )
+        assertEquals(255, brightness.writes.last(), "panic 255 must be the FINAL write — nothing may trail it")
+        assertTrue(!controller.state.value.serviceOn)
         scope.cancel()
     }
 

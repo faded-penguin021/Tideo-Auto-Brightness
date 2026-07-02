@@ -30,6 +30,67 @@ gate findings) is frozen in `../history/`; the deviations registry stays live.
 > — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
 > findings are in `../history/STATE_rebuild.md`). Look there.
 
+## Active work — short-term Fable-dependent hardening (F-backlog, adopted D-138)
+
+Complement of the D-133 backlog: the audits that **require** a capable model, executed now
+while Fable access lasts (capped 50 %/week, ends ~2026-07-07); every finding converted into
+durable artifacts (failing-test-first fix + D-NN row) so nothing depends on Fable afterward.
+Execution: strictly sequential (no parallel subagents, D-133); each unit fully checkpointed
+(ladder green + Changelog line + commit + push) before the next. v1.6.1 is tagged → the first
+unit shipping an app-code fix bumps **1.6.2 / versionCode 16** (+ `changelogs/16.txt`); later
+units fold in. Per-unit protocol: read targets in full + that area's ledger/extraction docs;
+adversarial pass per the RUNBOOK glue-review bug classes **plus** two lenses (single-pipeline
+drop-not-queue concurrency at every entry point; cross-component contract drift —
+units/ranges/sentinels/ordering); finding → failing test → minimal fix; a too-big finding →
+a precise backlog row here (file:line + suggested fix) for a weaker executor. New proven bug
+class → append to the RUNBOOK glue-review list. Mark each unit DONE + date + "clean" or its
+D-NN list as it checkpoints.
+
+- **U1 — pipeline core + brightness writes** (DONE 2026-07-02 → **D-139, D-140**, ships as 1.6.2):
+  full adversarial pass over `BrightnessPipelineController`, `PipelineCycleRunner`, `PanicHandler`,
+  `PipelineState`, `AnimationRunner`, `OverrideMonitor`, `ThrottleController`, `ProfileGates`,
+  `PipelineDebugEmitter`, `LiveRuntimeState`, `AmbientMonitoringService`, `AutoBrightnessRuntime`,
+  `AppModule`/`AppProcessScope`; `:platform` `ScreenBrightnessController`, `SecureDimmingController`,
+  `BrightnessObserver`, `LightSensorSource`. Findings fixed: D-139 (panic write raced by an
+  in-flight animation frame — cancel-and-JOIN), D-140 (control intents to a not-running service
+  birthed a zombie FGS — serviceOn gate + sticky-restart enablement verify). Cleared as
+  NON-issues after checking the Tasker extraction: hibernate clearing `lastRawLux` (task618 polls
+  a FRESH sample on wake — the event-driven equivalent is the first gated tick, so no stale-lux
+  initial write is wanted); the un-mirrored task585 act13 throttle reset (unobservable —
+  `lastAcceptedMs` is cleared, cycle 1 recomputes; `reinit()` doc corrected). RUNBOOK glue-review
+  list gains both new proven bug classes.
+- **U2 — context engine + readers** (IN PROGRESS 2026-07-02; safe to resume): reviewed clean so
+  far: `ContextEngine` (PASS-1/2 gates, D-132 plug bypass, mutex/eval ordering, timeJob wake
+  loop, mergeProfile), `AndroidContextSignalSource`. **One finding recorded, NOT yet fixed —
+  F-U2-1:** `ContextEngine.start()`'s rulesJob reacts to a runtime rule add/edit/delete with
+  `evaluate(ContextCaller.GENERAL)` (`ContextEngine.kt` rulesFlow collect, ~L174), but GENERAL
+  carries a 500 ms PASS-1 cooldown on the shared global `lastEvalTime` — any eval ≤500 ms before
+  the edit silently vetoes it, and the new/edited rule then doesn't apply until the next signal
+  change, defeating the comment's stated "applies immediately" intent. Rebuild-only path (live
+  rulesFlow has no Tasker counterpart), so no parity constraint. Suggested fix: use
+  `ContextCaller.RESUME` (cooldown 0; `shouldProceed` always true) for the rules-changed eval,
+  + a `ContextEngineTest` case (eval at t, rule edit at t+300 ms, assert the matching rule's
+  profile applied immediately). **Remaining U2 files:** `CircadianWindowProvider`,
+  `BatteryStateReader`, `ForegroundAppMonitor`, `LocationReader`, `WifiInfoReader` +
+  `WifiSsidStrategies`, `PowerMeter`, `GeoIpLocationClient`; also check whether `ssidFlow()`
+  POLLS (dumpsys/Shizuku) even when no wifi rule exists — location has the `[LOC]` cost gate,
+  wifi has none (`wifiJob` starts unconditionally). Read first: `extraction/contexts_spec.md`,
+  D-108/D-120/D-122/D-130/D-132.
+- **U3 — entry points + privilege** (pending): QS tile, boot receiver, widget, notification
+  actions, `SuperDimmingCoordinator`, `PrivilegeManager`, `ShizukuGrantGateway`/`ShizukuShell`,
+  `PanicSensorSource` arming.
+- **U4 — security review of parsing + privileged surfaces** (pending): `/security-review` +
+  manual pass on `ProfileImportExportManager`/`TaskerLegacyProfileSerializer`/
+  `LegacyConfigImporter` (adds the H3 import-export round-trip tests), dumpsys-wifi regex,
+  `ShizukuShell` command construction, GeoIp response parsing, exported-component intents,
+  secure-settings write path. By-design findings → `SECURITY.md` scope note, not a "fix".
+- **U5 — parity transcription spot-check** (pending): re-derive from the XML (via
+  `XML_RECIPES.md` ONLY) task661-vs-663 curve math, task535 rounding chain, profile-gate truth
+  tables vs ConditionList (alphabetical-children trap). Disagreement → `parity_gaps.md` row,
+  never a silent fixture edit.
+- **U6 — stretch: remaining H3 seams** (pending): least Fable-dependent, deliberately last; if
+  unreached they simply stay on the H3 row below.
+
 ## Active work — post-v1.6.0 hardening backlog (adopted D-133)
 
 From the 2026-07-01 Fable review (which replaced and deleted `FABLE_HANDOFF.md`). Framing:
@@ -87,6 +148,15 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — 1.6.2 / `versionCode 16` (PATCH — bug fixes, F-backlog U1): **D-139** panic
+  restore can no longer be trampled by an in-flight animation frame (`emergencyStop` now
+  cancel-and-joins the consumer before writing 255); **D-140** pause/reapply intents landing on a
+  not-running service stop it instead of birthing a zombie FGS (widget Reset while disabled
+  started the light-sensor collector), + sticky-restart enablement verify. Tests +4; RUNBOOK
+  glue-review list +2 proven bug classes. Changelog `16.txt`. Glue-review pass: clean.
+- 2026-07-02 — docs-only: **D-138** short-term Fable-dependent hardening adopted (F-backlog
+  U1–U6 above) — retroactive adversarial review of the shipped runtime/platform glue + security
+  and transcription audits, unit-checkpointed while Fable access lasts.
 - 2026-07-01 — build-config only (folds into pending 1.6.1, backlog H5): **D-137** release APK
   proven reproducible (two clean builds byte-identical) after disabling AGP's Play-encrypted
   `dependenciesInfo` blob; owner: submit fdroiddata with `reproducible: yes` + `Binaries:` (see

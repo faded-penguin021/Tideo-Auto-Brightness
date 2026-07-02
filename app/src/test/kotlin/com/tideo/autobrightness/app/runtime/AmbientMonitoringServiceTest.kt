@@ -18,14 +18,18 @@ class AmbientMonitoringServiceTest {
 
     @Test
     fun onStartCommand_postsForegroundNotification() {
+        // ACTION_START: since D-140 a PAUSE on a not-running instance stops the service (removing the
+        // foreground notification), so the notification assertions must ride the real start action.
         val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
-        // ACTION_PAUSE keeps the heavy sensor/observer flows from starting while still exercising
-        // the foreground-notification path (posted unconditionally in onStartCommand).
-        val intent = Intent().setAction(AmbientMonitoringService.ACTION_PAUSE)
-        val service = controller.withIntent(intent).startCommand(0, 0).get()
+        try {
+            val intent = Intent().setAction(AmbientMonitoringService.ACTION_START)
+            val service = controller.withIntent(intent).startCommand(0, 0).get()
 
-        val notification = shadowOf(service).lastForegroundNotification
-        assertNotNull(notification, "service should post a foreground notification")
+            val notification = shadowOf(service).lastForegroundNotification
+            assertNotNull(notification, "service should post a foreground notification")
+        } finally {
+            controller.destroy()
+        }
     }
 
     // S12.7b/G2R-F35/F40: a detected manual override posts a high-priority notification carrying a
@@ -75,16 +79,63 @@ class AmbientMonitoringServiceTest {
     // an override and confused users); Reset + Disable remain.
     @Test
     fun ongoingNotification_hasNoPauseAction() {
+        // ACTION_START for the same D-140 reason as above.
         val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
-        val intent = Intent().setAction(AmbientMonitoringService.ACTION_PAUSE)
-        val service = controller.withIntent(intent).startCommand(0, 0).get()
+        try {
+            val intent = Intent().setAction(AmbientMonitoringService.ACTION_START)
+            val service = controller.withIntent(intent).startCommand(0, 0).get()
 
-        val notification = shadowOf(service).lastForegroundNotification
-        assertNotNull(notification)
-        val actions = notification.actions?.map { it.title.toString() } ?: emptyList()
-        assertTrue(!actions.contains("Pause"), "ongoing notification must not offer Pause (F76)")
-        assertTrue(actions.contains("Reset"), "Reset (panic) is kept")
-        assertTrue(actions.contains("Disable"), "Disable is kept")
+            val notification = shadowOf(service).lastForegroundNotification
+            assertNotNull(notification)
+            val actions = notification.actions?.map { it.title.toString() } ?: emptyList()
+            assertTrue(!actions.contains("Pause"), "ongoing notification must not offer Pause (F76)")
+            assertTrue(actions.contains("Reset"), "Reset (panic) is kept")
+            assertTrue(actions.contains("Disable"), "Disable is kept")
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    // D-140 (F-backlog U1): startForegroundService CREATES the service, so a PAUSE/REAPPLY aimed at
+    // "the running service" can land on a fresh instance whose pipeline was never start()ed (e.g.
+    // the widget's Reset while the service is off — its "no-op when not running" comment assumed
+    // the intent would be dropped). There is nothing to pause or re-apply on such an instance; it
+    // must stop itself instead of idling forever as a foregrounded zombie (REAPPLY previously even
+    // started the light-sensor collector against the persisted disable).
+    @Test
+    fun pause_whenPipelineNotRunning_stopsSelfInsteadOfZombieing() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+
+        val result = service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_PAUSE), 0, 1)
+
+        assertEquals(android.app.Service.START_NOT_STICKY, result, "a not-running PAUSE must not be sticky")
+        assertTrue(shadowOf(service).isStoppedBySelf, "the service must stop itself (D-140)")
+    }
+
+    @Test
+    fun reapply_whenPipelineNotRunning_stopsSelfInsteadOfStartingThePipeline() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+
+        val result = service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_REAPPLY), 0, 1)
+
+        assertEquals(android.app.Service.START_NOT_STICKY, result)
+        assertTrue(shadowOf(service).isStoppedBySelf, "REAPPLY on a not-running service must not start the pipeline (D-140)")
+    }
+
+    // The positive path must survive the D-140 gate: once START has run the pipeline (serviceOn=true,
+    // set synchronously by controller.start()), PAUSE and REAPPLY act on it and keep the service up.
+    @Test
+    fun pauseAndReapply_whilePipelineRunning_keepTheServiceUp() {
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_PAUSE), 0, 2)
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_REAPPLY), 0, 3)
+            assertTrue(!shadowOf(service).isStoppedBySelf, "a running service must not stop on PAUSE/REAPPLY")
+        } finally {
+            controller.destroy()
+        }
     }
 
     @Test
