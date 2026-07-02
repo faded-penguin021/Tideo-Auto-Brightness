@@ -59,9 +59,22 @@ D-NN list as it checkpoints.
   initial write is wanted); the un-mirrored task585 act13 throttle reset (unobservable —
   `lastAcceptedMs` is cleared, cycle 1 recomputes; `reinit()` doc corrected). RUNBOOK glue-review
   list gains both new proven bug classes.
-- **U2 — context engine + readers** (pending): `ContextEngine`, `CircadianWindowProvider`,
-  `ContextOverrideResolver` call-sites; Battery/ForegroundApp/Location/Wifi(+strategies)/
-  PowerMeter/GeoIp readers. Read first: `extraction/contexts_spec.md`,
+- **U2 — context engine + readers** (IN PROGRESS 2026-07-02; safe to resume): reviewed clean so
+  far: `ContextEngine` (PASS-1/2 gates, D-132 plug bypass, mutex/eval ordering, timeJob wake
+  loop, mergeProfile), `AndroidContextSignalSource`. **One finding recorded, NOT yet fixed —
+  F-U2-1:** `ContextEngine.start()`'s rulesJob reacts to a runtime rule add/edit/delete with
+  `evaluate(ContextCaller.GENERAL)` (`ContextEngine.kt` rulesFlow collect, ~L174), but GENERAL
+  carries a 500 ms PASS-1 cooldown on the shared global `lastEvalTime` — any eval ≤500 ms before
+  the edit silently vetoes it, and the new/edited rule then doesn't apply until the next signal
+  change, defeating the comment's stated "applies immediately" intent. Rebuild-only path (live
+  rulesFlow has no Tasker counterpart), so no parity constraint. Suggested fix: use
+  `ContextCaller.RESUME` (cooldown 0; `shouldProceed` always true) for the rules-changed eval,
+  + a `ContextEngineTest` case (eval at t, rule edit at t+300 ms, assert the matching rule's
+  profile applied immediately). **Remaining U2 files:** `CircadianWindowProvider`,
+  `BatteryStateReader`, `ForegroundAppMonitor`, `LocationReader`, `WifiInfoReader` +
+  `WifiSsidStrategies`, `PowerMeter`, `GeoIpLocationClient`; also check whether `ssidFlow()`
+  POLLS (dumpsys/Shizuku) even when no wifi rule exists — location has the `[LOC]` cost gate,
+  wifi has none (`wifiJob` starts unconditionally). Read first: `extraction/contexts_spec.md`,
   D-108/D-120/D-122/D-130/D-132.
 - **U3 — entry points + privilege** (pending): QS tile, boot receiver, widget, notification
   actions, `SuperDimmingCoordinator`, `PrivilegeManager`, `ShizukuGrantGateway`/`ShizukuShell`,
