@@ -35,4 +35,37 @@ class AabSettingsClampTest {
         val once = AabSettings(minBrightness = 0).validate()
         assertTrue(once == once.validate(), "validate() must be a fixed point for an already-valid value")
     }
+
+    @Test
+    fun `NaN numeric fields reset to their defaults instead of poisoning the settings D146`() {
+        // D-146: NaN passes straight through coerceIn (every comparison is false → returns NaN), and
+        // the legacy import parsers accept it ("NaN".toDoubleOrNull() parses) — so a malformed profile
+        // file could persist NaN into the curve math and drive the pipeline output to garbage. validate()
+        // is the shared chokepoint for Apply/import/store, so it must sanitize every non-finite float.
+        val poisoned = AabSettings(
+            scale = Float.NaN,
+            form1A = Double.NaN,
+            form2B = Float.NaN,
+            dimmingExponent = Float.NaN,
+            pwmExponent = Float.NaN,
+            deltaFactor = Float.NaN,
+            thresholdBright = Float.NaN,
+            thresholdDark = Float.NaN,
+            thresholdDim = Float.NaN,
+            thresholdSteepness = Float.NaN,
+            thresholdMidpoint = Double.NaN,
+            scaleTaperSteepness = Float.NaN,
+            scaleTransitionFactor = Float.NaN,
+        ).validate()
+        assertEquals(AabSettings().validate(), poisoned, "every NaN field must fall back to its default")
+    }
+
+    @Test
+    fun `infinities clamp to the range edges D146`() {
+        // ±Infinity needs no special handling — coerceIn's comparisons work for it. Pin that down so a
+        // future refactor of the NaN guard doesn't accidentally regress it.
+        val validated = AabSettings(scale = Float.POSITIVE_INFINITY, thresholdMidpoint = Double.NEGATIVE_INFINITY).validate()
+        assertEquals(10.0f, validated.scale, "+Inf clamps to the scale max")
+        assertEquals(0.0, validated.thresholdMidpoint, "-Inf clamps to the midpoint min")
+    }
 }

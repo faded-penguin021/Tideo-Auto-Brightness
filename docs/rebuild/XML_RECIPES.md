@@ -9,6 +9,20 @@ Every recipe below was executed and verified on 2026-06-11 against this exact fi
 X=docs/rebuild/extraction/_source/Advanced_Auto_Brightness_V3.3.prj_9.xml
 ```
 
+## R0 — Restoring the XML in a fresh clone (`_source/` is gitignored since S12.9a)
+
+A fresh checkout has no `$X` — but the file lives in git HISTORY (it was committed before the
+ignore). Restore it locally (stays untracked) and sanity-check with the R1 censuses:
+
+```bash
+git rev-list --all --objects | grep prj_9   # → blob 17e3ff6ed6ecb4a30636a7fd1712c8be53547a31
+git cat-file blob 17e3ff6ed6ecb4a30636a7fd1712c8be53547a31 > $X
+grep -c '<Profile sr=' $X                   # must print 18
+```
+
+(Verified 2026-07-02, F-backlog U5: restored file passes every R1 census — 41,291 lines,
+18 profiles, 276 tasks, 40 Java blocks.)
+
 ## R1 — Censuses (use these to sanity-check your extraction is complete)
 
 ```bash

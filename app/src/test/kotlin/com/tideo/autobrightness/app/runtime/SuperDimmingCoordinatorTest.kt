@@ -5,7 +5,6 @@ import com.tideo.autobrightness.platform.brightness.SecureDimmingController
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.Test
 
@@ -92,7 +91,7 @@ class SuperDimmingCoordinatorTest {
 
         coordinator.apply(targetBrightness = 100, settings = pwm)
 
-        assertNull(secure.activated, "above the threshold PWM dimming must not engage")
+        assertTrue(secure.activated != true, "above the threshold PWM dimming must not engage")
     }
 
     @Test
@@ -102,8 +101,9 @@ class SuperDimmingCoordinatorTest {
 
         coordinator.apply(targetBrightness = 5, settings = dimmingOn)
 
-        assertNull(secure.activated, "BASIC tier must not engage secure dimming")
-        assertTrue(secure.levels.isEmpty())
+        // D-144: the fresh-process residual clear may write activated=false/level 0 — never an engage.
+        assertTrue(secure.activated != true, "BASIC tier must not engage secure dimming")
+        assertTrue(secure.levels.none { it > 0 })
     }
 
     @Test
@@ -113,8 +113,9 @@ class SuperDimmingCoordinatorTest {
 
         coordinator.apply(targetBrightness = 5, settings = dimmingOn.copy(dimmingEnabled = false))
 
-        assertNull(secure.activated)
-        assertTrue(secure.levels.isEmpty())
+        // D-144: the fresh-process residual clear may write activated=false/level 0 — never an engage.
+        assertTrue(secure.activated != true)
+        assertTrue(secure.levels.none { it > 0 })
     }
 
     @Test
@@ -131,15 +132,39 @@ class SuperDimmingCoordinatorTest {
         assertEquals(0, secure.levels.last(), "disengage writes level 0")
     }
 
+    // D-144: Tasker's %AAB_DimmingStatus latch is a PERSISTED global, so a Tasker restart still ran
+    // the disable path; the rebuild's in-process latch starts "unknown", not "off" — a process death
+    // while Extra Dim was engaged must not leave the secure keys stuck on after the sticky restart.
     @Test
-    fun disengage_whenNeverEngaged_isNoOp() {
+    fun freshProcess_applyAboveThreshold_clearsPreDeathResidual_D144() {
         val secure = FakeSecureDimming()
         val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
 
-        coordinator.disengage()
+        // First cycle after a restart, bright light: the pre-death engagement (if any) must be cleared.
+        coordinator.apply(targetBrightness = 100, settings = dimmingOn)
 
-        assertNull(secure.activated)
-        assertTrue(secure.levels.isEmpty())
+        assertEquals(false, secure.activated, "a fresh process must clear a possible pre-death residual")
+        assertEquals(0, secure.levels.last(), "the residual clear writes level 0")
+
+        // The latch is now known-off: further above-threshold cycles write nothing.
+        val writes = secure.levels.size
+        coordinator.apply(targetBrightness = 100, settings = dimmingOn)
+        assertEquals(writes, secure.levels.size, "known-off latch suppresses repeat clears")
+    }
+
+    @Test
+    fun disengage_whenKnownDisengaged_isNoOp_D144() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+
+        // First disengage in a fresh process: latch unknown → writes the residual clear (D-144).
+        coordinator.disengage()
+        assertEquals(false, secure.activated)
+        assertEquals(listOf(0), secure.levels)
+
+        // Second disengage: latch known-off → true no-op.
+        coordinator.disengage()
+        assertEquals(listOf(0), secure.levels)
     }
 
     @Test
@@ -152,8 +177,8 @@ class SuperDimmingCoordinatorTest {
 
         coordinator.apply(targetBrightness = 5, settings = dimmingOn.copy(debugLevel = 6))
 
-        // No secure write (unprivileged), but the overlay colour is surfaced.
-        assertNull(secure.activated)
+        // No engagement (unprivileged; D-144 allows the residual clear), but the overlay is surfaced.
+        assertTrue(secure.activated != true)
         val overlay = sink.emitted.firstOrNull { it.first == DebugCategory.OVERLAY_PREVIEW }
         assertTrue(overlay != null, "an OVERLAY_PREVIEW flash should be offered")
         assertTrue(
