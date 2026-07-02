@@ -55,7 +55,9 @@ class DashboardWidgetProvider : AppWidgetProvider() {
             }
             ACTION_RESET -> {
                 // Reset = re-apply / snap to auto (owner decision): recompute now, clearing a manual
-                // override pause. No-op if the service is not running; the next start applies anyway.
+                // override pause. No-op if the service is not running (enforced service-side, D-140 —
+                // startForegroundService always creates the service, so the fresh instance stops
+                // itself when no pipeline is running); the next start applies anyway.
                 AutoBrightnessRuntime.reapply(context.applicationContext)
                 refresh(context)
             }

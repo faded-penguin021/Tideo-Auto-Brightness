@@ -61,7 +61,8 @@ class PipelineFileLayoutTest {
         // irreducible orchestration (inject the source, a tracker field, start in startSensor, stop in
         // the 3 teardown paths, the proximityNear reset) — AND its job lifecycle was extracted to its own
         // ProximityTracker (the decomposition this guard encourages), so the cycle math stayed out. 310
-        // is the minimal honest bump for that, still a long way from the monolith.
-        const val ORCHESTRATOR_MAX_LOC = 310
+        // was the minimal honest bump for that. D-139 (emergencyStop cancel-and-join + its race
+        // provenance, one import) adds ~4 comment/wiring lines with zero cycle logic → 315.
+        const val ORCHESTRATOR_MAX_LOC = 315
     }
 }

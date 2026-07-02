@@ -124,19 +124,33 @@ class AmbientMonitoringService : Service() {
         )
 
         when (intent?.action) {
-            ACTION_PAUSE -> controller.pause()
+            ACTION_PAUSE -> {
+                // D-140: startForegroundService CREATES the service, so a PAUSE aimed at "the running
+                // service" can land on a fresh instance whose pipeline was never start()ed. Nothing to
+                // pause → stop instead of idling forever as a foregrounded zombie.
+                if (!controller.state.value.serviceOn) return stopNotRunning(startId)
+                controller.pause()
+            }
             ACTION_RESUME -> {
                 // F74: ensureRunning() FIRST. The override Resume action can be delivered to a freshly
                 // (re)created service whose pipeline consumer was never start()ed (the paused-override
                 // notification persists across a service kill, prof756). Without the running consumer the
                 // Resume event sits unconsumed in the channel → the button looks inert. ensureRunning()
                 // starts the consumer + sensor + notification job before the Resume event is posted.
+                // (Deliberately NOT D-140-gated: Resume is the one action whose contract is resurrect.)
                 ensureRunning()
                 controller.resume()
             }
             ACTION_REAPPLY -> {
+                // D-140: a REAPPLY landing on a not-running instance (widget Reset while the service is
+                // off — startForegroundService creates the service) must not birth the pipeline; the
+                // documented contract is "no-op when the service is not running; the next start picks up
+                // the committed settings" (AutoBrightnessRuntime.reapply). Previously this branch
+                // ensureRunning()'d unconditionally, starting the light-sensor collector + FGS zombie
+                // against the persisted disable.
+                if (!controller.state.value.serviceOn) return stopNotRunning(startId)
                 // Settings Apply / profile load: re-run the pipeline now (G2-F16). ensureRunning()
-                // first so an Apply made while the service is up (but this start re-delivers) is safe.
+                // so an Apply made while the service is up (but this start re-delivers) is safe.
                 ensureRunning()
                 // Refresh the effective settings from the FRESH baseline BEFORE re-applying, so a
                 // manual DataStore edit (e.g. min-brightness) takes effect immediately rather than
@@ -156,9 +170,31 @@ class AmbientMonitoringService : Service() {
                 scope.launch { disableAndStop() }
                 return START_NOT_STICKY
             }
-            else -> ensureRunning()
+            else -> {
+                ensureRunning()
+                // D-140 defense for the START_STICKY hole: an OS sticky restart (null intent) re-runs
+                // the pipeline unconditionally, but the user may have disabled the service while it was
+                // dead (the toggle's stopService is a no-op then) — re-check the persisted flag and tear
+                // down if it says off. All explicit starters already pre-check serviceEnabled, so for
+                // them this read is a cheap no-op.
+                scope.launch {
+                    if (!applicationContext.settingsDataStore.data.first().serviceEnabled) disableAndStop()
+                }
+            }
         }
         return START_STICKY
+    }
+
+    /**
+     * D-140: this instance was created BY a control intent (pause/reapply) while no pipeline was
+     * running — there is nothing to control. Drop the foreground notification and stop; NOT_STICKY so
+     * the OS does not resurrect the zombie. startForeground was already called above (mandatory after
+     * a startForegroundService), so the notification only blips.
+     */
+    private fun stopNotRunning(startId: Int): Int {
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
+        return START_NOT_STICKY
     }
 
     private fun ensureRunning() {

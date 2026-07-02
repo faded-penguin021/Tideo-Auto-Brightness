@@ -2427,3 +2427,45 @@ the permanent registry — never compress or remove them.
   is appended to the RUNBOOK glue-review list. UI screens beyond runtime glue, `:domain`
   beyond U5, and the D-133 non-items stay out of scope. v1.6.1 is tagged, so the first
   app-code fix bumps 1.6.2 / versionCode 16.
+
+- **D-139: panic effect ordered AFTER the in-flight cycle — `emergencyStop()` now cancel-and-JOINS
+  the consumer (F-backlog U1 finding).** The panic path (prof769/task528, also the notification
+  Reset action) did `consumerJob?.cancel()` (fire-and-forget) and then immediately wrote the panic
+  255. On the real multi-threaded service dispatcher, an animation frame that had already passed
+  its `delay` when the cancel landed could serialize its `Settings.System` write AFTER the panic
+  restore — leaving the screen at a stale mid-animation value on the safety path, un-corrected
+  because panic is terminal (service off). The window is small (~write-IPC-duration per frame
+  wait) but panic fires exactly when a transition is likely in flight (screen stuck dimming).
+  Fix: `emergencyStop()` is now `suspend` and `cancelAndJoin()`s the consumer before
+  `PanicHandler.execute()` — "nothing writes after the panic restore" becomes a guarantee; the
+  only caller (`AmbientMonitoringService.panicAndStop`) was already in a coroutine. A secondary
+  benefit: the terminal `PipelineState(serviceOn=false)` reset can no longer interleave with the
+  dying cycle's `finally` updates. Test:
+  `BrightnessPipelineControllerTest.emergencyStop_joinsInFlightCycle_beforePanicWrite_D139`
+  (StandardTestDispatcher parks the animation in an `awaitCancellation` sleep; pre-fix the
+  unwound-flag assertion fails because plain `cancel()` returns before the frames unwind). Ships
+  in **1.6.2 / versionCode 16**.
+
+- **D-140: control intents to a NOT-running service no longer birth a zombie foreground service
+  (F-backlog U1 finding).** Latent assumption in three places (`AutoBrightnessRuntime`'s
+  `sendServiceAction` catch-comment, the widget `ACTION_RESET` comment, the REAPPLY branch):
+  that a pause/reapply intent "does nothing when the service is not running". In reality
+  `startForegroundService` CREATES the service; the PAUSE branch then queued an event no consumer
+  would ever read, and the REAPPLY branch `ensureRunning()`'d unconditionally — starting the
+  light-sensor collector, context engine, and FGS notification. Concrete repro: home-screen
+  widget "Reset" tapped while the service toggle is OFF → permanent do-nothing foreground service
+  (with sensor registered) against the persisted disable. Fix, service-side (covers every
+  present/future sender): `onStartCommand` gates ACTION_PAUSE and ACTION_REAPPLY on
+  `controller.state.value.serviceOn` (set synchronously by `start()`); a not-running instance
+  stops itself (`stopForeground(REMOVE)` + `stopSelf(startId)` — the startId form so a queued
+  legitimate START still rescues the instance) and returns START_NOT_STICKY. ACTION_RESUME is
+  deliberately NOT gated (F74: resurrect is its contract); ACTION_PANIC is deliberately NOT gated
+  (the restore effect is wanted even with no pipeline). Defense for the adjacent START_STICKY
+  hole (OS sticky restart after the user disabled while the service was dead): the START/null
+  branch now re-checks persisted `serviceEnabled` and `disableAndStop()`s when off. Tests:
+  `AmbientMonitoringServiceTest` +3 (`pause/reapply_whenPipelineNotRunning_stopsSelf…`,
+  `pauseAndReapply_whilePipelineRunning_keepTheServiceUp`); the two notification tests move from
+  ACTION_PAUSE to ACTION_START (a not-running PAUSE now removes the foreground notification, which
+  is the point). Residual (accepted): a control intent on a stopped service still flashes the
+  mandatory foreground notification for an instant before the self-stop. Ships in **1.6.2 /
+  versionCode 16**.

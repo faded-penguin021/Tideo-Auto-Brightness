@@ -46,10 +46,19 @@ a precise backlog row here (file:line + suggested fix) for a weaker executor. Ne
 class → append to the RUNBOOK glue-review list. Mark each unit DONE + date + "clean" or its
 D-NN list as it checkpoints.
 
-- **U1 — pipeline core + brightness writes** (in progress): `BrightnessPipelineController`,
-  `PipelineCycleRunner`, `PanicHandler`, `PipelineState`, `AmbientMonitoringService`,
-  `AutoBrightnessRuntime`; `:platform` `ScreenBrightnessController`, `SecureDimmingController`,
-  `BrightnessObserver`. Read first: `extraction/pipeline_spec.md`, D-030/D-034/D-134.
+- **U1 — pipeline core + brightness writes** (DONE 2026-07-02 → **D-139, D-140**, ships as 1.6.2):
+  full adversarial pass over `BrightnessPipelineController`, `PipelineCycleRunner`, `PanicHandler`,
+  `PipelineState`, `AnimationRunner`, `OverrideMonitor`, `ThrottleController`, `ProfileGates`,
+  `PipelineDebugEmitter`, `LiveRuntimeState`, `AmbientMonitoringService`, `AutoBrightnessRuntime`,
+  `AppModule`/`AppProcessScope`; `:platform` `ScreenBrightnessController`, `SecureDimmingController`,
+  `BrightnessObserver`, `LightSensorSource`. Findings fixed: D-139 (panic write raced by an
+  in-flight animation frame — cancel-and-JOIN), D-140 (control intents to a not-running service
+  birthed a zombie FGS — serviceOn gate + sticky-restart enablement verify). Cleared as
+  NON-issues after checking the Tasker extraction: hibernate clearing `lastRawLux` (task618 polls
+  a FRESH sample on wake — the event-driven equivalent is the first gated tick, so no stale-lux
+  initial write is wanted); the un-mirrored task585 act13 throttle reset (unobservable —
+  `lastAcceptedMs` is cleared, cycle 1 recomputes; `reinit()` doc corrected). RUNBOOK glue-review
+  list gains both new proven bug classes.
 - **U2 — context engine + readers** (pending): `ContextEngine`, `CircadianWindowProvider`,
   `ContextOverrideResolver` call-sites; Battery/ForegroundApp/Location/Wifi(+strategies)/
   PowerMeter/GeoIp readers. Read first: `extraction/contexts_spec.md`,
@@ -126,6 +135,12 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — 1.6.2 / `versionCode 16` (PATCH — bug fixes, F-backlog U1): **D-139** panic
+  restore can no longer be trampled by an in-flight animation frame (`emergencyStop` now
+  cancel-and-joins the consumer before writing 255); **D-140** pause/reapply intents landing on a
+  not-running service stop it instead of birthing a zombie FGS (widget Reset while disabled
+  started the light-sensor collector), + sticky-restart enablement verify. Tests +4; RUNBOOK
+  glue-review list +2 proven bug classes. Changelog `16.txt`. Glue-review pass: clean.
 - 2026-07-02 — docs-only: **D-138** short-term Fable-dependent hardening adopted (F-backlog
   U1–U6 above) — retroactive adversarial review of the shipped runtime/platform glue + security
   and transcription audits, unit-checkpointed while Fable access lasts.

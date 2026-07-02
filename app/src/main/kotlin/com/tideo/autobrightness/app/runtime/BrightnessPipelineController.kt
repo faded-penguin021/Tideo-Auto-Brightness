@@ -8,6 +8,7 @@ import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -177,14 +178,15 @@ class BrightnessPipelineController(
 
     /**
      * prof769/task528 panic: restore a sane brightness, drop super dimming, and FULL STOP
-     * (%AAB_Service=Off — task528 act1-2 toggles the service off). This is terminal, not a
-     * pausable state (Gate 1 G1-F4): it is invoked synchronously and tears all jobs down, so the
-     * service can persist serviceEnabled=false and stop right after.
+     * (%AAB_Service=Off, task528 act1-2); terminal, not pausable (G1-F4) — the service persists
+     * serviceEnabled=false and stops right after. D-139: the consumer is cancel-and-JOINED before
+     * the panic effect — a fire-and-forget cancel let an in-flight animation frame serialize its
+     * write AFTER the panic 255 (ledger row has the race anatomy).
      */
-    fun emergencyStop() {
+    suspend fun emergencyStop() {
         sensorJob?.cancel(); sensorJob = null
         overrideJob?.cancel(); overrideJob = null
-        consumerJob?.cancel(); consumerJob = null
+        consumerJob?.cancelAndJoin(); consumerJob = null
         proximityTracker.stop()
         inCycle.set(false)
         panicHandler.execute() // task528 act6-8: restore 255 + drop dimming
@@ -266,7 +268,9 @@ class BrightnessPipelineController(
         _state.update { it.copy(paused = true, pausedByOverride = false) }
     }
 
-    /** prof761/task618 wake reinit: throttle resets to default (it is the setting), set initial brightness. */
+    /** prof761/task618 wake reinit. Post-hibernate the smoothing state is cleared, so setInitial
+     *  no-ops until the first fresh reading — task618 itself polls a FRESH sample on wake (act7-13);
+     *  task585 act13's throttle reset is unobservable here (lastAcceptedMs cleared), not mirrored. */
     private suspend fun reinit() {
         val settings = settingsProvider().also { cachedSettings = it }
         startSensor()

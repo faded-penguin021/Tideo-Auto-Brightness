@@ -230,7 +230,13 @@ author — hunting specifically the ledger's proven bug classes:
 - **non-idempotent lifecycle calls** and per-process state that should survive process death
   (D-034 c — `savedMode` is the standing example);
 - **null/absent sentinel handling** at startup — a reader that hasn't produced a real value yet
-  must not match rules (D-108 battery `-1`).
+  must not match rules (D-108 battery `-1`);
+- **fire-and-forget cancellation ordered before a compensating write** — `cancel()` without
+  `join()` lets the dying coroutine's last write serialize AFTER the "restore" write (D-139:
+  panic 255 vs an in-flight animation frame);
+- **"send-to-running-service" assumptions** — `startForegroundService` CREATES the service, never
+  a no-op; control actions (pause/reapply) must be validated in `onStartCommand` or they birth a
+  zombie FGS (D-140: widget Reset while disabled started the sensor collector).
 
 Rationale (D-030/D-034/D-035): every Sonnet migration segment passed its own acceptance gate,
 yet dedicated review found real shipped bugs in exactly this glue — golden vectors cannot see
