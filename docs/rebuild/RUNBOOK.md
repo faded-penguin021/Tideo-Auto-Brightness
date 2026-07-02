@@ -237,6 +237,15 @@ author — hunting specifically the ledger's proven bug classes:
 - **"send-to-running-service" assumptions** — `startForegroundService` CREATES the service, never
   a no-op; control actions (pause/reapply) must be validated in `onStartCommand` or they birth a
   zombie FGS (D-140: widget Reset while disabled started the sensor collector).
+- **asymmetric sibling gates** — a cost/enable gate applied to one of several parallel signal
+  paths but not its siblings (D-142: the location listener had the `[LOC]` gate and the app poll
+  its rule gate, but the wifi listener ran ungated — shell-spawning SSID strategies with zero
+  wifi rules). When reviewing a gate, enumerate the sibling paths and check each.
+- **stale async completion published over newer state** — an async resolve/fetch launched by an
+  event can complete AFTER the state it described changed; without a still-current check its
+  result overwrites the newer truth, sometimes latching (D-143: an in-flight SSID resolve landing
+  after `onLost` resurrected a "connected" state; a late failed resolve wiped a confirmed SSID
+  and the resolved-network skip then blocked recovery until reconnect).
 
 Rationale (D-030/D-034/D-035): every Sonnet migration segment passed its own acceptance gate,
 yet dedicated review found real shipped bugs in exactly this glue — golden vectors cannot see

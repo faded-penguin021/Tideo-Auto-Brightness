@@ -152,17 +152,12 @@ class ContextEngine(
                 evaluate(ContextCaller.BATTERY)
             }
         }
-        wifiJob = scope.launch {
-            signalSource.wifiFlow().collect { ssid ->
-                signalSnapshot.update { it.copy(wifi = ssid ?: "") }
-                evaluate(ContextCaller.WIFI)
-            }
-        }
         scope.launch {
             // Seed the effective settings + active profile from a first general evaluation.
             evaluate(ContextCaller.GENERAL)
             startAppPollIfNeeded()
             startLocationListenerIfNeeded()
+            startWifiListenerIfNeeded()
         }
         // React to rule add/edit/delete at runtime: (re)start or stop the foreground-app / location
         // listeners as the rule set gains or loses app/location triggers, then re-resolve so a rule
@@ -216,6 +211,7 @@ class ContextEngine(
         val tokens = ContextSignalTokens.from(rulesProvider())
         if (tokens.usesApps) startAppPollIfNeeded() else { appJob?.cancel(); appJob = null }
         if (tokens.usesLocation) startLocationListenerIfNeeded() else { locationJob?.cancel(); locationJob = null }
+        if (tokens.usesWifi) startWifiListenerIfNeeded() else stopWifiListener()
     }
 
     /** Screen ON (prof761 reinit): resume foreground-app polling + re-evaluate time windows. */
@@ -224,6 +220,7 @@ class ContextEngine(
         scope?.launch {
             startAppPollIfNeeded()
             startLocationListenerIfNeeded()
+            startWifiListenerIfNeeded()
             evaluate(ContextCaller.TIME)
         }
     }
@@ -250,6 +247,37 @@ class ContextEngine(
                 evaluate(ContextCaller.APP_CHANGED)
             }
         }
+    }
+
+    /**
+     * Start the SSID listener (prof768) only when a rule actually uses wifi — Tasker gates the wifi
+     * watcher on `%AAB_ContextCache` containing `[WIFI]` (contexts_spec §1.1), the same cost gate as
+     * `[LOC]`. Without it, every NetworkCapabilities callback re-runs the no-Location SSID strategies
+     * (Shizuku binder, `su -c`, `dumpsys` — process spawns, and on rooted devices possible su prompts)
+     * even when no wifi rule exists (D-142). Kept alive across screen-off like the location listener
+     * (a "home wifi" context should hold while the display is off).
+     */
+    private suspend fun startWifiListenerIfNeeded() {
+        if (wifiJob?.isActive == true) return
+        val tokens = ContextSignalTokens.from(rulesProvider())
+        if (!tokens.usesWifi) return // [WIFI] gate — no SSID acquisition without a wifi rule
+        wifiJob = scope?.launch {
+            signalSource.wifiFlow().collect { ssid ->
+                signalSnapshot.update { it.copy(wifi = ssid ?: "") }
+                evaluate(ContextCaller.WIFI)
+            }
+        }
+    }
+
+    /**
+     * Stop the SSID listener AND clear the wifi snapshot: with the listener gone no onLost/onChanged
+     * arrives, so a kept SSID would go stale unobserved — a wifi rule re-added later must only match a
+     * FRESH emission, not the network the device was on when the last wifi rule was deleted (D-142).
+     */
+    private fun stopWifiListener() {
+        if (wifiJob == null) return
+        wifiJob?.cancel(); wifiJob = null
+        signalSnapshot.update { it.copy(wifi = "") }
     }
 
     /**

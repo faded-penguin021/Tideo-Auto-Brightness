@@ -2482,3 +2482,44 @@ the permanent registry — never compress or remove them.
   `ContextEngineTest.ruleEditWithinGeneralCooldown_appliesImmediately_D141` (seed eval at t=0,
   matching battery rule created at t+300 ms, asserts the profile applies immediately; failed
   with `null` pre-fix). Ships in **1.6.2 / versionCode 16**.
+
+- **D-142: the wifi SSID listener gains the missing `[WIFI]` cost gate (F-backlog U2 finding,
+  F-U2-2).** `ContextEngine.start()` collected `ssidFlow()` unconditionally, unlike the
+  `[LOC]`-gated location listener and the rule-gated foreground-app poll — yet Tasker gates the
+  whole wifi watcher (prof768) on `%AAB_ContextCache` containing `[WIFI]` (contexts_spec §1.1).
+  `ssidFlow()` is event-driven (NetworkCallback, no timer), but until an SSID resolves for the
+  current network EVERY capabilities callback (RSSI churn included) re-runs the no-Location
+  strategies — a Shizuku binder call, a `su -c 'cmd wifi status'` (possible superuser prompts on
+  rooted devices), and a `dumpsys wifi` process spawn — with zero wifi rules configured. The
+  PASS-2 veto already required `usesWifi`, so decisions never changed; the cost did. Fix:
+  `startWifiListenerIfNeeded()` (idempotent, `[WIFI]`-gated on `ContextSignalTokens.usesWifi`)
+  wired into the start() seed, `refreshSignalListeners()` (rule add/edit/delete), and
+  `onScreenOn()` — mirroring the location listener exactly, kept alive across screen-off.
+  `stopWifiListener()` also CLEARS the wifi snapshot: with the listener gone no onLost arrives,
+  so a wifi rule re-added later must only match a FRESH emission, not the network the device was
+  on when the last wifi rule was deleted (the clear lands before the rules-changed RESUME eval
+  records `lastWifi`, so the change-detection anchor stays consistent). Battery stays ungated
+  deliberately: its acquisition is a sticky-broadcast receiver (effectively free, no shell
+  spawns), and the plug signal feeds D-132. Tests:
+  `ContextEngineTest.wifiListener_gatedOnWifiRules_D142` (subscriptionCount 0 → 1 → 0 across
+  rule add/remove) and `wifiListenerStop_clearsStaleSsid_D142` (stale pre-stop SSID must not
+  match a re-added rule; a fresh emission must). Folds into **1.6.2 / versionCode 16**.
+
+- **D-143: an in-flight SSID resolve can no longer publish over newer network state (F-backlog
+  U2 finding).** `ssidFlow()`'s per-callback `launch { resolveNoLocationSsid() … trySend }` is
+  async, so its result could land after the state it described changed — two concrete races:
+  (a) a resolve completing after `onLost` already sent null re-published a stale "connected"
+  SSID, keeping a wifi rule active though disconnected until the next network change; (b) with
+  two resolves racing the same un-resolved network (capability churn), a slow FAILED resolve
+  completing after a fast successful one wiped the confirmed SSID with null — and because the
+  fast one had marked the network resolved, the skip-re-resolve guard then blocked recovery
+  until reconnect. Fix: track the live network (`liveNetwork`, set on every capabilities
+  callback, CAS-cleared on `onLost`); after resolving, drop the result if the network is no
+  longer live, and drop a null result if a parallel resolve already confirmed this network.
+  The normal redacted-read path (single resolve → null, network NOT marked resolved, later
+  callbacks re-try) is unchanged. Tests: new `WifiInfoReaderTest` (first coverage of the
+  `ssidFlow` NetworkCallback seam, H3): `inFlightResolve_completingAfterOnLost_isDropped_D143`,
+  `slowFailedResolve_completingAfterFastSuccess_isDropped_D143`, + a regression guard that a
+  resolved network skips re-resolves (drives the real flow via Robolectric shadow
+  ConnectivityManager callbacks and a park-until-released fake strategy). Folds into **1.6.2 /
+  versionCode 16**.

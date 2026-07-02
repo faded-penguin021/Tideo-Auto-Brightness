@@ -460,6 +460,109 @@ class ContextEngineTest {
         scope.cancel()
     }
 
+    private val wifiHomeRule = ContextRule(
+        id = "wif",
+        name = "Home Wifi",
+        profile = "Battery Saver",
+        priority = 7,
+        triggers = ContextTriggers(wifi = listOf("HomeNet")),
+    )
+
+    @Test
+    fun wifiListener_gatedOnWifiRules_D142() = runTest {
+        // F-U2-2 / D-142: Tasker gates the wifi watcher on the `[WIFI]` cache token (prof768,
+        // contexts_spec §1.1) — the SSID acquisition (Shizuku/root/dumpsys shell strategies) must not
+        // run when no rule uses wifi. The engine previously collected ssidFlow() unconditionally,
+        // unlike the [LOC]-gated location listener and the app-rule-gated foreground poll.
+        val rulesFlow = MutableStateFlow<List<ContextRule>>(emptyList())
+        val src = FakeSignalSource()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { rulesFlow.value },
+            rulesFlow = rulesFlow,
+            baselineProvider = { baseline },
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { 0L },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+        assertEquals(0, src.wifi_.subscriptionCount.value, "no wifi rule → ssidFlow must not be collected")
+
+        rulesFlow.value = listOf(wifiHomeRule)
+        advanceUntilIdle()
+        assertEquals(1, src.wifi_.subscriptionCount.value, "a wifi rule starts the listener")
+
+        rulesFlow.value = emptyList()
+        advanceUntilIdle()
+        assertEquals(0, src.wifi_.subscriptionCount.value, "deleting the last wifi rule stops the listener")
+        scope.cancel()
+    }
+
+    /** Source whose [assemble] honours the wifi the engine passes in (the live snapshot), so the
+     *  stale-snapshot clearing on wifi-listener stop can be exercised. */
+    private class PassThroughWifiSource : ContextSignalSource {
+        val wifi_ = MutableSharedFlow<String?>(extraBufferCapacity = 16)
+        override fun batteryFlow(): Flow<BatterySignal> = MutableSharedFlow()
+        override fun wifiFlow(): Flow<String?> = wifi_
+        override fun foregroundAppFlow(intervalMs: Long): Flow<String?> = MutableSharedFlow()
+        override fun locationFlow(): Flow<LocationSignal> = MutableSharedFlow()
+        override suspend fun assemble(
+            app: String, batteryPercent: Int, plugged: Boolean, wifi: String, lat: Double, lon: Double,
+        ): ContextSignals = ContextSignals(
+            app = app, lat = lat, lon = lon, batteryPercent = batteryPercent, plugged = plugged,
+            wifi = wifi, dayOfWeek = 4, nowSecondsOfDay = 12 * 3600,
+        )
+    }
+
+    @Test
+    fun wifiListenerStop_clearsStaleSsid_D142() = runTest {
+        // F-U2-2 / D-142 companion: stopping the gated listener must clear the wifi snapshot —
+        // otherwise deleting the last wifi rule and re-adding one later would match the STALE SSID
+        // captured before the stop (the device may have left that network unobserved, since onLost
+        // callbacks stopped with the listener).
+        var now = 0L
+        val rulesFlow = MutableStateFlow<List<ContextRule>>(listOf(wifiHomeRule))
+        val src = PassThroughWifiSource()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { rulesFlow.value },
+            rulesFlow = rulesFlow,
+            baselineProvider = { baseline },
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { now },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+
+        now = 10_000L
+        src.wifi_.emit("HomeNet")
+        advanceUntilIdle()
+        assertEquals("Home Wifi", engine.activeContext.value, "connected SSID matches the rule")
+
+        // Delete the only wifi rule: listener stops, baseline restored.
+        now = 20_000L
+        rulesFlow.value = emptyList()
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "no rules → baseline")
+
+        // Re-add the rule. The snapshot must NOT still hold the pre-stop "HomeNet" — the device may
+        // have left that network while unobserved. Only a fresh emission may match.
+        now = 30_000L
+        rulesFlow.value = listOf(wifiHomeRule)
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "stale pre-stop SSID must not match the re-added rule")
+
+        now = 40_000L
+        src.wifi_.emit("HomeNet")
+        advanceUntilIdle()
+        assertEquals("Home Wifi", engine.activeContext.value, "a fresh emission matches again")
+        scope.cancel()
+    }
+
     @Test
     fun ruleEditWithinGeneralCooldown_appliesImmediately_D141() = runTest {
         // F-U2-1 / D-141: the rules-changed eval ran as GENERAL (500 ms PASS-1 cooldown on the shared

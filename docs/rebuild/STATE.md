@@ -59,18 +59,21 @@ D-NN list as it checkpoints.
   initial write is wanted); the un-mirrored task585 act13 throttle reset (unobservable —
   `lastAcceptedMs` is cleared, cycle 1 recomputes; `reinit()` doc corrected). RUNBOOK glue-review
   list gains both new proven bug classes.
-- **U2 — context engine + readers** (IN PROGRESS 2026-07-02; safe to resume): reviewed clean so
-  far: `ContextEngine` (PASS-1/2 gates, D-132 plug bypass, mutex/eval ordering, timeJob wake
-  loop, mergeProfile), `AndroidContextSignalSource`. **F-U2-1 FIXED → D-141** (rules-changed
-  eval now runs as `ContextCaller.RESUME`, not GENERAL, so a rule add/edit/delete ≤500 ms after
-  any eval is no longer vetoed by the PASS-1 cooldown; failing-test-first,
-  `ContextEngineTest.ruleEditWithinGeneralCooldown_appliesImmediately_D141`; folds into pending
-  1.6.2). **Remaining U2 files:** `CircadianWindowProvider`,
+- **U2 — context engine + readers** (DONE 2026-07-02 → **D-141, D-142, D-143**, fold into 1.6.2):
+  full pass over `ContextEngine`, `AndroidContextSignalSource`, `CircadianWindowProvider`,
   `BatteryStateReader`, `ForegroundAppMonitor`, `LocationReader`, `WifiInfoReader` +
-  `WifiSsidStrategies`, `PowerMeter`, `GeoIpLocationClient`; also check whether `ssidFlow()`
-  POLLS (dumpsys/Shizuku) even when no wifi rule exists — location has the `[LOC]` cost gate,
-  wifi has none (`wifiJob` starts unconditionally). Read first: `extraction/contexts_spec.md`,
-  D-108/D-120/D-122/D-130/D-132.
+  `WifiSsidStrategies`, `PowerMeter`, `GeoIpLocationClient`. Findings fixed: D-141 (rule
+  add/edit/delete ≤500 ms after any eval was vetoed by the GENERAL PASS-1 cooldown — rules-changed
+  eval now RESUME), D-142 (wifi listener gains the missing `[WIFI]` cost gate + stale-snapshot
+  clear on stop; the flagged "does ssidFlow poll?" question answered: event-driven but ungated,
+  shell strategies re-ran per capabilities callback), D-143 (in-flight SSID resolve racing
+  onLost/a faster resolve could publish stale state and stick — live-network guards; new
+  `WifiInfoReaderTest` covers the ssidFlow callback seam, closing part of that H3 row). Cleared
+  as NON-issues vs the extraction: `plugged` derived from STATUS charging/full matches task43's
+  own Java (L146-147); battery acquisition stays ungated deliberately (sticky receiver ≈ free,
+  feeds D-132); the onLost-during-roam transient null is parity-consistent (prof768 evaluates on
+  both edges). RUNBOOK glue-review list +2 proven bug classes (asymmetric sibling gates; stale
+  async completion).
 - **U3 — entry points + privilege** (pending): QS tile, boot receiver, widget, notification
   actions, `SuperDimmingCoordinator`, `PrivilegeManager`, `ShizukuGrantGateway`/`ShizukuShell`,
   `PanicSensorSource` arming.
@@ -104,9 +107,9 @@ parallel subagents** (rate-limit burn, see D-133). Priority order:
   `AutoBrightnessRuntime` (service-action intent dispatch the notification/tile/UI funnel
   through), `ServiceHealthStore` (degraded latch clears on apply). **Remaining seams, in value
   order** (each a small follow-up): `LocationReader.activeFix` (D-120/122, shadow
-  LocationManager), `WifiInfoReader` Location-callback path, `AndroidPanicSensorSource` arming
-  (sensor shadows), `PowerMeter` property mapping, `ExperimentPrefsStore` +
-  `ProfileImportExportManager` round-trips. **Skipped with reason:** `MaintenanceWorker`
+  LocationManager), `AndroidPanicSensorSource` arming (sensor shadows), `PowerMeter` property
+  mapping, `ExperimentPrefsStore` + `ProfileImportExportManager` round-trips. (`WifiInfoReader`
+  callback path: covered 2026-07-02 by `WifiInfoReaderTest`, D-143.) **Skipped with reason:** `MaintenanceWorker`
   (6 lines; testing needs the androidx.work-testing artifact — new dep not warranted),
   `Shizuku*` (binder-dependent, not Robolectric-testable; owner device-verified),
   `ControllerHookHolder`/`ProximityTracker`/`AppProcessScope` (trivial; behavior asserted via
@@ -143,6 +146,13 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — folds into pending 1.6.2 (F-backlog U2 complete): **D-142** the wifi SSID
+  listener is now `[WIFI]`-gated like Tasker's prof768 (no shell-strategy SSID probing — or su
+  prompts — without a wifi rule) and clears its snapshot on stop so a re-added rule can't match
+  a stale SSID; **D-143** `ssidFlow()` drops in-flight resolves that outlived their network
+  state (stale SSID after disconnect / stale null over a confirmed SSID could stick). Tests +5
+  (incl. new `WifiInfoReaderTest`, first ssidFlow-callback coverage). RUNBOOK glue-review list
+  +2 proven bug classes. Glue-review pass: clean.
 - 2026-07-02 — folds into pending 1.6.2 (F-backlog U2, first slice): **D-141** a context rule
   add/edit/delete within 500 ms of any evaluation now applies immediately (rules-changed eval
   runs as RESUME, bypassing the GENERAL PASS-1 cooldown veto). Test +1. Glue-review pass: clean.
