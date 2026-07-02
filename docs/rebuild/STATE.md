@@ -32,89 +32,19 @@ gate findings) is frozen in `../history/`; the deviations registry stays live.
 
 ## Active work — short-term Fable-dependent hardening (F-backlog, adopted D-138)
 
-Complement of the D-133 backlog: the audits that **require** a capable model, executed now
-while Fable access lasts (capped 50 %/week, ends ~2026-07-07); every finding converted into
-durable artifacts (failing-test-first fix + D-NN row) so nothing depends on Fable afterward.
-Execution: strictly sequential (no parallel subagents, D-133); each unit fully checkpointed
-(ladder green + Changelog line + commit + push) before the next. v1.6.1 is tagged → the first
-unit shipping an app-code fix bumps **1.6.2 / versionCode 16** (+ `changelogs/16.txt`); later
-units fold in. Per-unit protocol: read targets in full + that area's ledger/extraction docs;
-adversarial pass per the RUNBOOK glue-review bug classes **plus** two lenses (single-pipeline
-drop-not-queue concurrency at every entry point; cross-component contract drift —
-units/ranges/sentinels/ordering); finding → failing test → minimal fix; a too-big finding →
-a precise backlog row here (file:line + suggested fix) for a weaker executor. New proven bug
-class → append to the RUNBOOK glue-review list. Mark each unit DONE + date + "clean" or its
-D-NN list as it checkpoints.
-
-- **U1 — pipeline core + brightness writes** (DONE 2026-07-02 → **D-139, D-140**, ships as 1.6.2):
-  full adversarial pass over `BrightnessPipelineController`, `PipelineCycleRunner`, `PanicHandler`,
-  `PipelineState`, `AnimationRunner`, `OverrideMonitor`, `ThrottleController`, `ProfileGates`,
-  `PipelineDebugEmitter`, `LiveRuntimeState`, `AmbientMonitoringService`, `AutoBrightnessRuntime`,
-  `AppModule`/`AppProcessScope`; `:platform` `ScreenBrightnessController`, `SecureDimmingController`,
-  `BrightnessObserver`, `LightSensorSource`. Findings fixed: D-139 (panic write raced by an
-  in-flight animation frame — cancel-and-JOIN), D-140 (control intents to a not-running service
-  birthed a zombie FGS — serviceOn gate + sticky-restart enablement verify). Cleared as
-  NON-issues after checking the Tasker extraction: hibernate clearing `lastRawLux` (task618 polls
-  a FRESH sample on wake — the event-driven equivalent is the first gated tick, so no stale-lux
-  initial write is wanted); the un-mirrored task585 act13 throttle reset (unobservable —
-  `lastAcceptedMs` is cleared, cycle 1 recomputes; `reinit()` doc corrected). RUNBOOK glue-review
-  list gains both new proven bug classes.
-- **U2 — context engine + readers** (DONE 2026-07-02 → **D-141, D-142, D-143**, fold into 1.6.2):
-  full pass over `ContextEngine`, `AndroidContextSignalSource`, `CircadianWindowProvider`,
-  `BatteryStateReader`, `ForegroundAppMonitor`, `LocationReader`, `WifiInfoReader` +
-  `WifiSsidStrategies`, `PowerMeter`, `GeoIpLocationClient`. Findings fixed: D-141 (rule
-  add/edit/delete ≤500 ms after any eval was vetoed by the GENERAL PASS-1 cooldown — rules-changed
-  eval now RESUME), D-142 (wifi listener gains the missing `[WIFI]` cost gate + stale-snapshot
-  clear on stop; the flagged "does ssidFlow poll?" question answered: event-driven but ungated,
-  shell strategies re-ran per capabilities callback), D-143 (in-flight SSID resolve racing
-  onLost/a faster resolve could publish stale state and stick — live-network guards; new
-  `WifiInfoReaderTest` covers the ssidFlow callback seam, closing part of that H3 row). Cleared
-  as NON-issues vs the extraction: `plugged` derived from STATUS charging/full matches task43's
-  own Java (L146-147); battery acquisition stays ungated deliberately (sticky receiver ≈ free,
-  feeds D-132); the onLost-during-roam transient null is parity-consistent (prof768 evaluates on
-  both edges). RUNBOOK glue-review list +2 proven bug classes (asymmetric sibling gates; stale
-  async completion).
-- **U3 — entry points + privilege** (DONE 2026-07-02 → **D-144, D-145**, fold into 1.6.2): full
-  pass over `BrightnessTileService`, `BootCompletedReceiver` (+ the `goAsync` ext),
-  `DashboardWidgetProvider`, `SuperDimmingCoordinator`, `PrivilegeManager`,
-  `ShizukuGrantGateway`/`ShizukuShell`/`ShizukuUserService`, `AndroidPanicSensorSource` +
-  `PanicGestureDetector`/`PanicGate`. Findings fixed: D-144 (per-process dimming `engaged` latch
-  vs Tasker's persisted `%AAB_DimmingStatus` — post-death restart left Extra Dim stuck on; latch
-  now tri-state with UNKNOWN at process start), D-145 (ShizukuShell bind-timeout leak —
-  `invokeOnCancellation` unbind; binder-untestable, argued + owner-verifiable). Accepted
-  residual recorded in D-145: `ShizukuGrantGateway.requestGrant` has no bind timeout (hung
-  Shizuku → no `onResult`; rare, user-retriable). Notification-action senders were already
-  covered by U1 (D-140 service-side gates). RUNBOOK D-034 c bug class gains the D-144 example.
-- **U4 — security review of parsing + privileged surfaces** (DONE 2026-07-02 → **D-146, D-147**,
-  fold into 1.6.2): `/security-review` on the branch diff (clean) + manual pass on
-  `ProfileImportExportManager`/`TaskerLegacyProfileSerializer`/`LegacyConfigImporter`,
-  dumpsys-wifi regex, `ShizukuShell`/`ShizukuUserService` command construction, GeoIp parsing,
-  the manifest's exported components, secure-settings write path. Findings fixed: D-146 (NaN
-  passes `coerceIn` and both import parsers accept it — `validate()` now resets non-finite
-  floats to defaults; ±Inf clamps fine, regression-pinned), D-147 (the exported widget provider
-  also handled the custom TOGGLE/RESET actions → any co-installed app could flip the service;
-  actions moved to a non-exported `WidgetActionReceiver`, + first tests for that seam).
-  Reviewed clean: filename sanitizer (no traversal), SAF importer (read-only, .json filter),
-  GeoIp regex parse (0,0 reject, HTTPS, opt-in), BOOT_COMPLETED (protected broadcast + action
-  check), tile (bind-permission), secure writes (tier-gated `Result`, constant keys, clamped
-  values). By-design notes added to `SECURITY.md` (Shizuku user-service scope, import clamping,
-  dumpsys SSID-anchor quirk). H3 round-trip-test seam: already covered by the existing
-  `ProfileLoadResultTest`/`LegacyImportRoundTripTest`/`NestedSchemaRoundTripTest` suites — the
-  real gap was NaN, closed above; `ExperimentPrefsStore` round-trip stays on the H3 row.
-- **U5 — parity transcription spot-check** (DONE 2026-07-02, **clean — zero disagreements, no
-  `parity_gaps.md` rows**): re-derived from the XML (restored from the git-history blob, new
-  recipe R0; R1 censuses pass). (a) Profile gates: all 18 profiles' ConditionLists re-extracted
-  numerically sorted — prof760 `[Or2,And,And2,Or,And2]`, prof758's 13-clause wrap-window chain,
-  prof755's five And-clauses all match `ProfileGates.kt` verbatim incl. operator directions;
-  context-watcher gates confirm contexts_spec §1.1 (and D-142's `[WIFI]` token) against source.
-  (b) task535: fresh XML decode is byte-identical to the committed reference txt; domain
-  `smoothLux` chain (round3 = Math.round ties-toward-+∞, exact-binary `BigDecimal(v).setScale(2|0,
-  HALF_UP)` split on zone1End, unclamped alpha, unrounded EMA) faithful. (c) task661 vs task663:
-  3-zone formulas agree three ways (661 Variable-Set maths ≡ 663 plot Java ≡ domain
-  `mapLuxToBrightness`) — strict `<` bounds, literal `^0.33`, Form2D≡Zone1End derivation,
-  scaling branch + post-scale clamps (act10-21) match `calculatedBrightness`.
-- **U6 — stretch: remaining H3 seams** (pending): least Fable-dependent, deliberately last; if
-  unreached they simply stay on the H3 row below.
+**COMPLETE 2026-07-02 — all six units done, checkpointed U-by-U on the session branches**
+(D-133 sequential execution honored; every finding is a durable failing-test-first fix + ledger
+row, nothing left depends on Fable). Full detail lives in the ledger: **D-139–D-148** + the
+per-unit Changelog lines below. Summary: U1 pipeline core (D-139 panic-vs-animation join, D-140
+zombie-FGS gates); U2 context engine + readers (D-141 rule-edit cooldown veto, D-142 wifi
+`[WIFI]` cost gate + stale-snapshot clear, D-143 ssidFlow stale-resolve guards); U3 entry
+points + privilege (D-144 post-death Extra-Dim residual, D-145 Shizuku bind-timeout unbind);
+U4 security review (D-146 NaN import guard, D-147 widget actions off the exported provider,
+`/security-review` clean, SECURITY.md scope notes); U5 parity transcription spot-check (clean,
+zero disagreements — profile gates, task535 rounding, task661/663 curve; XML_RECIPES gains R0);
+U6 H3 seams (D-148 — H3 test audit fully closed, +19 tests). RUNBOOK glue-review list grew by
+4 proven bug classes (D-139/D-140/D-142/D-143) + the D-144 example. All app-code fixes fold
+into the pending, untagged **1.6.2 / versionCode 16** (`changelogs/16.txt`); owner tags/releases.
 
 ## Active work — post-v1.6.0 hardening backlog (adopted D-133)
 
@@ -132,11 +62,11 @@ parallel subagents** (rate-limit burn, see D-133). Priority order:
   suites. Real gaps found and closed: `ForegroundAppMonitor` (D-034 f retention — regression
   test via a new clock ctor seam), `BatteryStateReader` (intent→state mapping, scale guard),
   `AutoBrightnessRuntime` (service-action intent dispatch the notification/tile/UI funnel
-  through), `ServiceHealthStore` (degraded latch clears on apply). **Remaining seams, in value
-  order** (each a small follow-up): `LocationReader.activeFix` (D-120/122, shadow
-  LocationManager), `AndroidPanicSensorSource` arming (sensor shadows), `PowerMeter` property
-  mapping, `ExperimentPrefsStore` + `ProfileImportExportManager` round-trips. (`WifiInfoReader`
-  callback path: covered 2026-07-02 by `WifiInfoReaderTest`, D-143.) **Skipped with reason:** `MaintenanceWorker`
+  through), `ServiceHealthStore` (degraded latch clears on apply). **Remaining seams: NONE —
+  audit CLOSED 2026-07-02 (D-148, F-backlog U6):** `LocationReader.activeFix`,
+  `AndroidPanicSensorSource` arming, `PowerMeter`, `ExperimentPrefsStore` all covered (+19
+  tests); `WifiInfoReader` ssidFlow callback path covered by `WifiInfoReaderTest` (D-143);
+  import/export round-trips confirmed already covered + the NaN gap closed (D-146). **Skipped with reason:** `MaintenanceWorker`
   (6 lines; testing needs the androidx.work-testing artifact — new dep not warranted),
   `Shizuku*` (binder-dependent, not Robolectric-testable; owner device-verified),
   `ControllerHookHolder`/`ProximityTracker`/`AppProcessScope` (trivial; behavior asserted via
@@ -173,6 +103,10 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — tests-only (F-backlog U6 complete → F-backlog CLOSED): **D-148** the H3
+  glue-seam audit's last four seams covered — `LocationReaderTest` (activeFix D-120/122),
+  `PanicSensorSourceTest` (prof769 arming/veto/consume), `PowerMeterTest` (task524 mapping),
+  `ExperimentPrefsStoreTest` (G2R-F39/D-103/D-105 round-trips). +19 tests, no production change.
 - 2026-07-02 — docs-only (F-backlog U5 complete): parity transcription spot-check re-derived
   profile gates, task535 rounding chain, and task661/663 curve math from the XML — **clean, zero
   disagreements** (details in the U5 row above). `XML_RECIPES.md` gains R0 (restore the

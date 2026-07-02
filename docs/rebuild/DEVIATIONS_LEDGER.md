@@ -2587,3 +2587,20 @@ the permanent registry — never compress or remove them.
   worker and WorkManager can't run under Robolectric without the declined work-testing artifact
   (the H3 MaintenanceWorker rationale) — the body is the QS tile's shipped pattern, moved
   verbatim. Folds into **1.6.2 / versionCode 16**.
+
+- **D-148: the H3 glue-seam test audit is COMPLETE — every remaining seam covered (F-backlog U6,
+  tests-only).** Four new suites close the last rows of the D-136 audit table: (1)
+  `LocationReaderTest` — `activeFix` (D-120/D-122): fresh provider fix delivered, null-island
+  (0,0) reads skipped while continuing to listen, last-known used only as the BACKUP on timeout,
+  call-time permission recheck, no-providers → Unavailable (shadow LocationManager +
+  `simulateLocation`, virtual-clock timeout). (2) `PanicSensorSourceTest` — prof769/D-116 arming
+  glue: sustained-inversion (5-frame streak) + pass-through sensitivity fires exactly once and
+  stays consumed until the phone leaves upside-down and re-enters; a transient flip never arms;
+  a 10 s window with no qualifying shake vetoes and stays consumed; proximity-near blocks arming
+  (shadow SensorManager events, injected clock). (3) `PowerMeterTest` — task524 property mapping:
+  CURRENT_NOW with 0→CURRENT_AVERAGE fallback, Long.MIN_VALUE = unsupported, charging/full abort,
+  EXTRA_VOLTAGE mV→V. (4) `ExperimentPrefsStoreTest` — G2R-F39 date/location independence,
+  clear-to-live, D-103 cached-sun-location round-trip, D-105 geo-IP default-OFF opt-in
+  (real Preferences DataStore on a temp file). +19 tests; no production code changed. With this,
+  the H3 backlog row has NO remaining seams (Shizuku*/MaintenanceWorker skips stand, documented
+  in the D-136 row).
