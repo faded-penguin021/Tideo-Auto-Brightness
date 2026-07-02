@@ -2469,3 +2469,16 @@ the permanent registry — never compress or remove them.
   is the point). Residual (accepted): a control intent on a stopped service still flashes the
   mandatory foreground notification for an instant before the self-stop. Ships in **1.6.2 /
   versionCode 16**.
+
+- **D-141: a context-rule add/edit/delete ≤500 ms after any evaluation is no longer silently
+  vetoed (F-backlog U2 finding, F-U2-1).** `ContextEngine.start()`'s rulesJob reacted to a
+  runtime rule change with `evaluate(ContextCaller.GENERAL)`, but GENERAL carries a 500 ms
+  PASS-1 cooldown on the shared global `lastEvalTime` — any eval ≤500 ms before the edit vetoed
+  the re-resolve, so the new/edited rule sat inert until the next signal change, defeating the
+  code comment's stated "applies immediately" intent. Rebuild-only path (the live rulesFlow has
+  no Tasker counterpart), so no parity constraint. Fix: the rules-changed eval runs as
+  `ContextCaller.RESUME` (cooldown 0; `shouldProceed` unconditionally true — the same "user
+  acted, resolve NOW" semantics as resume-from-pause). Test:
+  `ContextEngineTest.ruleEditWithinGeneralCooldown_appliesImmediately_D141` (seed eval at t=0,
+  matching battery rule created at t+300 ms, asserts the profile applies immediately; failed
+  with `null` pre-fix). Ships in **1.6.2 / versionCode 16**.

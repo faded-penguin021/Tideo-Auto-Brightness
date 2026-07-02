@@ -61,16 +61,11 @@ D-NN list as it checkpoints.
   list gains both new proven bug classes.
 - **U2 — context engine + readers** (IN PROGRESS 2026-07-02; safe to resume): reviewed clean so
   far: `ContextEngine` (PASS-1/2 gates, D-132 plug bypass, mutex/eval ordering, timeJob wake
-  loop, mergeProfile), `AndroidContextSignalSource`. **One finding recorded, NOT yet fixed —
-  F-U2-1:** `ContextEngine.start()`'s rulesJob reacts to a runtime rule add/edit/delete with
-  `evaluate(ContextCaller.GENERAL)` (`ContextEngine.kt` rulesFlow collect, ~L174), but GENERAL
-  carries a 500 ms PASS-1 cooldown on the shared global `lastEvalTime` — any eval ≤500 ms before
-  the edit silently vetoes it, and the new/edited rule then doesn't apply until the next signal
-  change, defeating the comment's stated "applies immediately" intent. Rebuild-only path (live
-  rulesFlow has no Tasker counterpart), so no parity constraint. Suggested fix: use
-  `ContextCaller.RESUME` (cooldown 0; `shouldProceed` always true) for the rules-changed eval,
-  + a `ContextEngineTest` case (eval at t, rule edit at t+300 ms, assert the matching rule's
-  profile applied immediately). **Remaining U2 files:** `CircadianWindowProvider`,
+  loop, mergeProfile), `AndroidContextSignalSource`. **F-U2-1 FIXED → D-141** (rules-changed
+  eval now runs as `ContextCaller.RESUME`, not GENERAL, so a rule add/edit/delete ≤500 ms after
+  any eval is no longer vetoed by the PASS-1 cooldown; failing-test-first,
+  `ContextEngineTest.ruleEditWithinGeneralCooldown_appliesImmediately_D141`; folds into pending
+  1.6.2). **Remaining U2 files:** `CircadianWindowProvider`,
   `BatteryStateReader`, `ForegroundAppMonitor`, `LocationReader`, `WifiInfoReader` +
   `WifiSsidStrategies`, `PowerMeter`, `GeoIpLocationClient`; also check whether `ssidFlow()`
   POLLS (dumpsys/Shizuku) even when no wifi rule exists — location has the `[LOC]` cost gate,
@@ -148,6 +143,9 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — folds into pending 1.6.2 (F-backlog U2, first slice): **D-141** a context rule
+  add/edit/delete within 500 ms of any evaluation now applies immediately (rules-changed eval
+  runs as RESUME, bypassing the GENERAL PASS-1 cooldown veto). Test +1. Glue-review pass: clean.
 - 2026-07-02 — 1.6.2 / `versionCode 16` (PATCH — bug fixes, F-backlog U1): **D-139** panic
   restore can no longer be trampled by an in-flight animation frame (`emergencyStop` now
   cancel-and-joins the consumer before writing 255); **D-140** pause/reapply intents landing on a

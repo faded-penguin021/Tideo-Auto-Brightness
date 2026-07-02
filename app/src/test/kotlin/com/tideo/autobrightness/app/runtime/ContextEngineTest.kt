@@ -461,6 +461,38 @@ class ContextEngineTest {
     }
 
     @Test
+    fun ruleEditWithinGeneralCooldown_appliesImmediately_D141() = runTest {
+        // F-U2-1 / D-141: the rules-changed eval ran as GENERAL (500 ms PASS-1 cooldown on the shared
+        // global lastEvalTime), so a rule add/edit/delete ≤500 ms after ANY evaluation was silently
+        // vetoed — the new rule then didn't apply until the next signal change, defeating the
+        // "applies immediately" intent. The rules-changed eval must run as RESUME (cooldown 0, no veto).
+        var now = 0L
+        val rulesFlow = MutableStateFlow<List<ContextRule>>(emptyList())
+        val src = FakeSignalSource(batteryPercent = 10)
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { rulesFlow.value },
+            rulesFlow = rulesFlow,
+            baselineProvider = { baseline },
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { now },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "no rules yet → baseline")
+
+        // Create a rule that ALREADY matches (battery 10% ≤ max 20) only 300 ms after the seed eval —
+        // inside the GENERAL cooldown window. It must apply immediately, not wait for a signal change.
+        now = 300L
+        rulesFlow.value = listOf(batterySaverRule)
+        advanceUntilIdle()
+        assertEquals("Low Battery", engine.activeContext.value, "rule created mid-cooldown applies immediately")
+        scope.cancel()
+    }
+
+    @Test
     fun mergeProfile_preservesDetectOverrides_G2F8() {
         // detectOverrides is a global reactivity preference, NOT a task626 snapshot key: a context
         // profile swap must keep the user's manual-override detection setting (G2-F8).

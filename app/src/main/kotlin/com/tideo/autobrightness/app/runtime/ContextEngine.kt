@@ -168,10 +168,13 @@ class ContextEngine(
         // listeners as the rule set gains or loses app/location triggers, then re-resolve so a rule
         // that already matches the current state applies immediately. Without this, a rule created
         // while the service is running never starts its poller until the next screen-on / reboot.
+        // RESUME, not GENERAL (D-141): GENERAL's 500 ms PASS-1 cooldown on the shared lastEvalTime
+        // silently vetoed any rule edit ≤500 ms after an eval — the edit then sat inert until the
+        // next signal change. A user edit must always re-resolve now (cooldown 0, no PASS-2 veto).
         rulesJob = scope.launch {
             rulesFlow.collect {
                 refreshSignalListeners()
-                evaluate(ContextCaller.GENERAL)
+                evaluate(ContextCaller.RESUME)
             }
         }
         // prof764 self-scheduling Time context (contexts_spec): wake EXACTLY at the next time boundary
