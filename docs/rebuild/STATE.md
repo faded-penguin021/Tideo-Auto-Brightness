@@ -30,6 +30,45 @@ gate findings) is frozen in `../history/`; the deviations registry stays live.
 > — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
 > findings are in `../history/STATE_rebuild.md`). Look there.
 
+## Active work — short-term Fable-dependent hardening (F-backlog, adopted D-138)
+
+Complement of the D-133 backlog: the audits that **require** a capable model, executed now
+while Fable access lasts (capped 50 %/week, ends ~2026-07-07); every finding converted into
+durable artifacts (failing-test-first fix + D-NN row) so nothing depends on Fable afterward.
+Execution: strictly sequential (no parallel subagents, D-133); each unit fully checkpointed
+(ladder green + Changelog line + commit + push) before the next. v1.6.1 is tagged → the first
+unit shipping an app-code fix bumps **1.6.2 / versionCode 16** (+ `changelogs/16.txt`); later
+units fold in. Per-unit protocol: read targets in full + that area's ledger/extraction docs;
+adversarial pass per the RUNBOOK glue-review bug classes **plus** two lenses (single-pipeline
+drop-not-queue concurrency at every entry point; cross-component contract drift —
+units/ranges/sentinels/ordering); finding → failing test → minimal fix; a too-big finding →
+a precise backlog row here (file:line + suggested fix) for a weaker executor. New proven bug
+class → append to the RUNBOOK glue-review list. Mark each unit DONE + date + "clean" or its
+D-NN list as it checkpoints.
+
+- **U1 — pipeline core + brightness writes** (in progress): `BrightnessPipelineController`,
+  `PipelineCycleRunner`, `PanicHandler`, `PipelineState`, `AmbientMonitoringService`,
+  `AutoBrightnessRuntime`; `:platform` `ScreenBrightnessController`, `SecureDimmingController`,
+  `BrightnessObserver`. Read first: `extraction/pipeline_spec.md`, D-030/D-034/D-134.
+- **U2 — context engine + readers** (pending): `ContextEngine`, `CircadianWindowProvider`,
+  `ContextOverrideResolver` call-sites; Battery/ForegroundApp/Location/Wifi(+strategies)/
+  PowerMeter/GeoIp readers. Read first: `extraction/contexts_spec.md`,
+  D-108/D-120/D-122/D-130/D-132.
+- **U3 — entry points + privilege** (pending): QS tile, boot receiver, widget, notification
+  actions, `SuperDimmingCoordinator`, `PrivilegeManager`, `ShizukuGrantGateway`/`ShizukuShell`,
+  `PanicSensorSource` arming.
+- **U4 — security review of parsing + privileged surfaces** (pending): `/security-review` +
+  manual pass on `ProfileImportExportManager`/`TaskerLegacyProfileSerializer`/
+  `LegacyConfigImporter` (adds the H3 import-export round-trip tests), dumpsys-wifi regex,
+  `ShizukuShell` command construction, GeoIp response parsing, exported-component intents,
+  secure-settings write path. By-design findings → `SECURITY.md` scope note, not a "fix".
+- **U5 — parity transcription spot-check** (pending): re-derive from the XML (via
+  `XML_RECIPES.md` ONLY) task661-vs-663 curve math, task535 rounding chain, profile-gate truth
+  tables vs ConditionList (alphabetical-children trap). Disagreement → `parity_gaps.md` row,
+  never a silent fixture edit.
+- **U6 — stretch: remaining H3 seams** (pending): least Fable-dependent, deliberately last; if
+  unreached they simply stay on the H3 row below.
+
 ## Active work — post-v1.6.0 hardening backlog (adopted D-133)
 
 From the 2026-07-01 Fable review (which replaced and deleted `FABLE_HANDOFF.md`). Framing:
@@ -87,6 +126,9 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — docs-only: **D-138** short-term Fable-dependent hardening adopted (F-backlog
+  U1–U6 above) — retroactive adversarial review of the shipped runtime/platform glue + security
+  and transcription audits, unit-checkpointed while Fable access lasts.
 - 2026-07-01 — build-config only (folds into pending 1.6.1, backlog H5): **D-137** release APK
   proven reproducible (two clean builds byte-identical) after disabling AGP's Play-encrypted
   `dependenciesInfo` blob; owner: submit fdroiddata with `reproducible: yes` + `Binaries:` (see

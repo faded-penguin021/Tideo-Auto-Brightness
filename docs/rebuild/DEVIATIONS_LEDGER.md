@@ -2405,3 +2405,25 @@ the permanent registry — never compress or remove them.
   `reproducible: yes` submission (owner step, with the recipe pinning the CI's JDK 21). Folds
   into the pending **1.6.1 / versionCode 15**. Glue-review: n/a (build-config packaging flag,
   no runtime path).
+
+- **D-138: short-term Fable-dependent hardening adopted (F-backlog U1–U6; docs-only at
+  adoption).** The complement of D-133: that backlog deliberately preferred machine-enforced /
+  once-done-done hardening because no capable model can be assumed later; this one is the work
+  that **requires** a capable model, executed now while Fable access lasts (usage capped
+  50 %/week through 2026-07-07, API tier after; the prior Fable stint was cut short by
+  export-control restrictions, so every unit checkpoints independently). Rationale for the
+  unit list: the RUNBOOK glue-review protocol (D-133 a) covers *future diffs only*, while the
+  standing ~5–6 k lines of shipped `:platform`/`:app`-runtime glue — written by Sonnet-tier
+  migration segments whose own gates all passed — is exactly the surface where dedicated
+  adversarial review has repeatedly found real shipped defects (D-030, D-034 a–f, D-035,
+  D-134). Units, value-ordered (full definitions in the STATE.md F-backlog section): U1
+  retroactive adversarial review of pipeline core + brightness writes; U2 context engine +
+  readers; U3 entry points + privilege; U4 security review of parsing/privileged surfaces
+  (folds in the H3 import-export round-trip seam); U5 targeted golden-transcription re-check
+  against the XML (the one failure goldens cannot catch — production conforms to the fixture,
+  so a mistranscription ships green); U6 stretch = remaining H3 seams. Conversion rule: every
+  finding becomes a durable artifact — failing-test-first fix + its own D-NN row — or, if too
+  big, a precise STATE backlog row a weaker executor can implement; a *new* proven bug class
+  is appended to the RUNBOOK glue-review list. UI screens beyond runtime glue, `:domain`
+  beyond U5, and the D-133 non-items stay out of scope. v1.6.1 is tagged, so the first
+  app-code fix bumps 1.6.2 / versionCode 16.
