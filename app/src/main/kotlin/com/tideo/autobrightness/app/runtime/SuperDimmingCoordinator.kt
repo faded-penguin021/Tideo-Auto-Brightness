@@ -73,8 +73,13 @@ class SuperDimmingCoordinator(
     private val tierProvider: () -> Tier,
 ) : DimmingCoordinator {
 
-    // %AAB_DimmingStatus — 1 while reduce_bright_colors is engaged, else 0.
-    private var engaged = false
+    // %AAB_DimmingStatus — true while reduce_bright_colors is engaged, false when known-off.
+    // D-144: null = UNKNOWN, the fresh-process state. Tasker's %AAB_DimmingStatus is a PERSISTED
+    // global, so after a Tasker restart the disable path still wrote the secure keys; an in-process
+    // `false` start would instead early-return the first disengage and leave a pre-death engagement
+    // (Extra Dim) stuck on after the sticky restart. From UNKNOWN, the first disengage writes the
+    // clears (idempotent if already off) and the first engage writes activated=1.
+    private var engaged: Boolean? = null
 
     /**
      * task646 act0/act1: engage the Android "Extra Dim" (reduce_bright_colors) secure layer when the
@@ -164,7 +169,7 @@ class SuperDimmingCoordinator(
         // renamed/relocated key (or require the accessibility feature pre-enabled); if engagement
         // logs "ON" here (debug 5) but the screen does not visibly dim on a given device, that is OEM
         // secure-key variance, not a logic bug — see SecureDimmingController + STATE.md D-048.
-        if (!engaged) {
+        if (engaged != true) {
             secureDimming.setActivated(true)
             engaged = true
         }
@@ -199,9 +204,10 @@ class SuperDimmingCoordinator(
         }
     }
 
-    /** task645: level→0 then activated→0; %AAB_DimmingStatus=0. */
+    /** task645: level→0 then activated→0; %AAB_DimmingStatus=0. Runs from engaged OR unknown (D-144):
+     *  only a known-off latch skips the writes, so a fresh process clears any pre-death residual. */
     override fun disengage() {
-        if (!engaged) return
+        if (engaged == false) return
         secureDimming.setLevel(0)
         secureDimming.setActivated(false)
         engaged = false

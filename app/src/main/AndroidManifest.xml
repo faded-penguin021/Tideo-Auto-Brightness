@@ -98,8 +98,9 @@
 
         <!-- Home-screen dashboard widget (Brightness / lux / profile / context + service toggle &
              reset). updatePeriodMillis=0: never polled — repainted event-driven from the running
-             service's publish path. The custom TOGGLE/RESET actions are delivered via explicit
-             PendingIntents from the widget's own buttons. -->
+             service's publish path. Exported ONLY for the system's APPWIDGET_UPDATE; the custom
+             TOGGLE/RESET button actions live in the non-exported WidgetActionReceiver below (D-147:
+             hosting them here let any co-installed app toggle the service via an explicit intent). -->
         <receiver
             android:name=".app.widget.DashboardWidgetProvider"
             android:enabled="true"
@@ -107,13 +108,17 @@
             android:label="@string/widget_title">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.tideo.autobrightness.widget.action.TOGGLE" />
-                <action android:name="com.tideo.autobrightness.widget.action.RESET" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/dashboard_widget_info" />
         </receiver>
+
+        <!-- The widget buttons' broadcast target (D-147): NOT exported — reachable only via the
+             app's own explicit PendingIntents, never by a third-party app. -->
+        <receiver
+            android:name=".app.widget.WidgetActionReceiver"
+            android:exported="false" />
 
 
         <!-- Opt-in global flash overlay (S12.7e, G2R-F50): draws the AAB debug/context flash

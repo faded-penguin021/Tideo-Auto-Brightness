@@ -2469,3 +2469,138 @@ the permanent registry — never compress or remove them.
   is the point). Residual (accepted): a control intent on a stopped service still flashes the
   mandatory foreground notification for an instant before the self-stop. Ships in **1.6.2 /
   versionCode 16**.
+
+- **D-141: a context-rule add/edit/delete ≤500 ms after any evaluation is no longer silently
+  vetoed (F-backlog U2 finding, F-U2-1).** `ContextEngine.start()`'s rulesJob reacted to a
+  runtime rule change with `evaluate(ContextCaller.GENERAL)`, but GENERAL carries a 500 ms
+  PASS-1 cooldown on the shared global `lastEvalTime` — any eval ≤500 ms before the edit vetoed
+  the re-resolve, so the new/edited rule sat inert until the next signal change, defeating the
+  code comment's stated "applies immediately" intent. Rebuild-only path (the live rulesFlow has
+  no Tasker counterpart), so no parity constraint. Fix: the rules-changed eval runs as
+  `ContextCaller.RESUME` (cooldown 0; `shouldProceed` unconditionally true — the same "user
+  acted, resolve NOW" semantics as resume-from-pause). Test:
+  `ContextEngineTest.ruleEditWithinGeneralCooldown_appliesImmediately_D141` (seed eval at t=0,
+  matching battery rule created at t+300 ms, asserts the profile applies immediately; failed
+  with `null` pre-fix). Ships in **1.6.2 / versionCode 16**.
+
+- **D-142: the wifi SSID listener gains the missing `[WIFI]` cost gate (F-backlog U2 finding,
+  F-U2-2).** `ContextEngine.start()` collected `ssidFlow()` unconditionally, unlike the
+  `[LOC]`-gated location listener and the rule-gated foreground-app poll — yet Tasker gates the
+  whole wifi watcher (prof768) on `%AAB_ContextCache` containing `[WIFI]` (contexts_spec §1.1).
+  `ssidFlow()` is event-driven (NetworkCallback, no timer), but until an SSID resolves for the
+  current network EVERY capabilities callback (RSSI churn included) re-runs the no-Location
+  strategies — a Shizuku binder call, a `su -c 'cmd wifi status'` (possible superuser prompts on
+  rooted devices), and a `dumpsys wifi` process spawn — with zero wifi rules configured. The
+  PASS-2 veto already required `usesWifi`, so decisions never changed; the cost did. Fix:
+  `startWifiListenerIfNeeded()` (idempotent, `[WIFI]`-gated on `ContextSignalTokens.usesWifi`)
+  wired into the start() seed, `refreshSignalListeners()` (rule add/edit/delete), and
+  `onScreenOn()` — mirroring the location listener exactly, kept alive across screen-off.
+  `stopWifiListener()` also CLEARS the wifi snapshot: with the listener gone no onLost arrives,
+  so a wifi rule re-added later must only match a FRESH emission, not the network the device was
+  on when the last wifi rule was deleted (the clear lands before the rules-changed RESUME eval
+  records `lastWifi`, so the change-detection anchor stays consistent). Battery stays ungated
+  deliberately: its acquisition is a sticky-broadcast receiver (effectively free, no shell
+  spawns), and the plug signal feeds D-132. Tests:
+  `ContextEngineTest.wifiListener_gatedOnWifiRules_D142` (subscriptionCount 0 → 1 → 0 across
+  rule add/remove) and `wifiListenerStop_clearsStaleSsid_D142` (stale pre-stop SSID must not
+  match a re-added rule; a fresh emission must). Folds into **1.6.2 / versionCode 16**.
+
+- **D-143: an in-flight SSID resolve can no longer publish over newer network state (F-backlog
+  U2 finding).** `ssidFlow()`'s per-callback `launch { resolveNoLocationSsid() … trySend }` is
+  async, so its result could land after the state it described changed — two concrete races:
+  (a) a resolve completing after `onLost` already sent null re-published a stale "connected"
+  SSID, keeping a wifi rule active though disconnected until the next network change; (b) with
+  two resolves racing the same un-resolved network (capability churn), a slow FAILED resolve
+  completing after a fast successful one wiped the confirmed SSID with null — and because the
+  fast one had marked the network resolved, the skip-re-resolve guard then blocked recovery
+  until reconnect. Fix: track the live network (`liveNetwork`, set on every capabilities
+  callback, CAS-cleared on `onLost`); after resolving, drop the result if the network is no
+  longer live, and drop a null result if a parallel resolve already confirmed this network.
+  The normal redacted-read path (single resolve → null, network NOT marked resolved, later
+  callbacks re-try) is unchanged. Tests: new `WifiInfoReaderTest` (first coverage of the
+  `ssidFlow` NetworkCallback seam, H3): `inFlightResolve_completingAfterOnLost_isDropped_D143`,
+  `slowFailedResolve_completingAfterFastSuccess_isDropped_D143`, + a regression guard that a
+  resolved network skips re-resolves (drives the real flow via Robolectric shadow
+  ConnectivityManager callbacks and a park-until-released fake strategy). Folds into **1.6.2 /
+  versionCode 16**.
+
+- **D-144: a process death while Extra Dim was engaged no longer leaves it stuck on after the
+  restart (F-backlog U3 finding).** `SuperDimmingCoordinator.engaged` was an in-process `false`-
+  initialized boolean, but Tasker's `%AAB_DimmingStatus` is a PERSISTED global — after a Tasker
+  restart the above-threshold path still ran `_DisableSuperDimming` and wrote the secure keys.
+  The rebuild's fresh process instead hit `disengage()`'s `if (!engaged) return` early-out, so an
+  OOM-kill while dimmed + a sticky restart in bright light left `reduce_bright_colors` activated
+  at the last-written level all day (the D-034 c bug class: per-process state that should survive
+  process death). Fix: the latch is tri-state (`Boolean?`, null = UNKNOWN at process start) —
+  from UNKNOWN the first `disengage()` writes the clears (idempotent when already off; the
+  `SecureDimmingController` returns failed `Result`s tier-gated, so BASIC/NONE processes stay
+  silent) and the first engage writes `activated=1` (covers a death-while-NOT-engaged restart
+  straight into dimming). Persistence à la D-134 was considered and rejected: one idempotent
+  clear per process start achieves the same end state without a cross-module storage seam. Tests:
+  `SuperDimmingCoordinatorTest.freshProcess_applyAboveThreshold_clearsPreDeathResidual_D144`,
+  `disengage_whenKnownDisengaged_isNoOp_D144`; four existing "never engaged → zero writes"
+  assertions relaxed to "no engagement writes" (`activated != true`, no positive level) since the
+  one-time residual clear is now expected. Folds into **1.6.2 / versionCode 16**.
+
+- **D-145: `ShizukuShell.exec` unbinds the user service on its own bind timeout (F-backlog U3
+  finding).** The 4 s `withTimeoutOrNull` cancelled the `suspendCancellableCoroutine` without an
+  `invokeOnCancellation`, so a `bindUserService` that never connected (Shizuku hung/dying) stayed
+  registered forever — a slow leak on the no-Location SSID path. Fix: `invokeOnCancellation`
+  unbinds (idempotent vs the `onServiceConnected` finally-unbind, both `runCatching`). NOT
+  unit-tested: the Shizuku binder cannot be exercised under Robolectric (the standing H3 skip
+  rationale, owner device-verified surface); the fix is argued safe — `invokeOnCancellation`
+  fires only on cancellation, never on a normal resume. **Accepted residual, recorded not
+  fixed:** `ShizukuGrantGateway.requestGrant`'s bind has NO timeout, so a hung Shizuku means
+  `onResult` never fires ("invoked exactly once" unfulfilled) — user-interactive retryable
+  onboarding path, rare, and a timeout there needs coroutine plumbing through a callback API;
+  revisit only on an owner report. Folds into **1.6.2 / versionCode 16**.
+
+- **D-146: NaN can no longer poison the settings through a profile import (F-backlog U4
+  finding).** `AabSettings.validate()` clamps every numeric with `coerceIn`, but NaN passes
+  straight through it (every comparison is false → `coerceIn` returns its receiver), and both
+  legacy-import parsers accept it (`"NaN".toDoubleOrNull()` parses — Java `parseDouble` accepts
+  `NaN`/`Infinity`; the nested-JSON path via `doubleOrNull` likewise). A malformed or hostile
+  profile file (`%AAB_Scale=NaN`, or `"scale":"NaN"` in the nested Tasker JSON) would therefore
+  persist NaN into the curve math and drive the pipeline output to garbage until the user reset
+  the field. Fix in the shared chokepoint `validate()` (covers Apply, both import formats, and
+  any store corruption): each of the 13 Float/Double fields resets to its `AabSettings()` default
+  when NaN, BEFORE the clamp. ±Infinity deliberately needs no guard — `coerceIn`'s comparisons
+  clamp it to the range edge (pinned by a regression test so a refactor can't break it). Tests:
+  `AabSettingsClampTest` +2 (`NaN numeric fields reset…`, `infinities clamp…`),
+  `LegacyImportRoundTripTest` +1 (NaN/±Infinity in a key=value import come out finite). Folds
+  into **1.6.2 / versionCode 16**.
+
+- **D-147: the widget's toggle/reset actions move to a non-exported receiver (F-backlog U4
+  finding).** `DashboardWidgetProvider` must be exported for the system's `APPWIDGET_UPDATE`
+  broadcasts, and it also handled the custom `…widget.action.TOGGLE`/`RESET` actions — so any
+  co-installed app could start/stop the brightness service or force a reapply with a plain
+  explicit intent, no permission needed (local-only, no data exposure; still an unnecessary
+  state-changing surface). Fix: the two actions (and their constants) move to a new
+  `WidgetActionReceiver` registered `exported="false"` — the buttons' `PendingIntent`s are
+  created by this app with an explicit component, and a PendingIntent may target a non-exported
+  component of its own package, so the widget behaves identically while foreign explicit intents
+  no longer reach the actions. The provider's intent-filter drops the two custom actions;
+  `pushUpdate`/`buildModel` become `internal` for the receiver. Tests: new
+  `WidgetActionReceiverTest` — `exportedProvider_ignoresForeignResetAction_D147` (the security
+  property; failed pre-fix by dispatching REAPPLY) + reset-routing coverage (previously untested
+  seams). The moved `toggle` itself stays untested: its enable path schedules the maintenance
+  worker and WorkManager can't run under Robolectric without the declined work-testing artifact
+  (the H3 MaintenanceWorker rationale) — the body is the QS tile's shipped pattern, moved
+  verbatim. Folds into **1.6.2 / versionCode 16**.
+
+- **D-148: the H3 glue-seam test audit is COMPLETE — every remaining seam covered (F-backlog U6,
+  tests-only).** Four new suites close the last rows of the D-136 audit table: (1)
+  `LocationReaderTest` — `activeFix` (D-120/D-122): fresh provider fix delivered, null-island
+  (0,0) reads skipped while continuing to listen, last-known used only as the BACKUP on timeout,
+  call-time permission recheck, no-providers → Unavailable (shadow LocationManager +
+  `simulateLocation`, virtual-clock timeout). (2) `PanicSensorSourceTest` — prof769/D-116 arming
+  glue: sustained-inversion (5-frame streak) + pass-through sensitivity fires exactly once and
+  stays consumed until the phone leaves upside-down and re-enters; a transient flip never arms;
+  a 10 s window with no qualifying shake vetoes and stays consumed; proximity-near blocks arming
+  (shadow SensorManager events, injected clock). (3) `PowerMeterTest` — task524 property mapping:
+  CURRENT_NOW with 0→CURRENT_AVERAGE fallback, Long.MIN_VALUE = unsupported, charging/full abort,
+  EXTRA_VOLTAGE mV→V. (4) `ExperimentPrefsStoreTest` — G2R-F39 date/location independence,
+  clear-to-live, D-103 cached-sun-location round-trip, D-105 geo-IP default-OFF opt-in
+  (real Preferences DataStore on a temp file). +19 tests; no production code changed. With this,
+  the H3 backlog row has NO remaining seams (Shizuku*/MaintenanceWorker skips stand, documented
+  in the D-136 row).

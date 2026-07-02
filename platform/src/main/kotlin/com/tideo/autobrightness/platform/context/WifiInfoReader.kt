@@ -135,20 +135,29 @@ class AndroidWifiInfoReader(
         // Skip the (costly) re-resolve once we hold a confirmed SSID for the current network; reset it
         // on a new network / loss so a real SSID is still picked up if the first read came back redacted.
         val resolvedNetwork = java.util.concurrent.atomic.AtomicReference<Network?>(null)
+        // D-143: the resolve is async, so its result can land AFTER the network state moved on. Track
+        // the live network so a resolve that outlived its network is dropped (onLost's null stands),
+        // and a late FAILED resolve can't wipe an SSID a faster parallel resolve already confirmed
+        // (which would stick: the resolved-network skip above stops any re-resolve until reconnect).
+        val liveNetwork = java.util.concurrent.atomic.AtomicReference<Network?>(null)
 
         val callback = object : ConnectivityManager.NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) {
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                liveNetwork.set(network)
                 if (network == resolvedNetwork.get()) return
                 launch {
                     // Android wraps the framework SSID in quotes and redacts it without Location;
                     // normalizeSsid strips quotes and rejects the <unknown ssid>/<redacted> placeholders.
                     val ssid = resolveNoLocationSsid() ?: normalizeSsid((caps.transportInfo as? WifiInfo)?.ssid)
+                    if (liveNetwork.get() != network) return@launch // network gone/changed mid-resolve (D-143)
+                    if (ssid == null && resolvedNetwork.get() == network) return@launch // lost to a faster resolve (D-143)
                     if (ssid != null) resolvedNetwork.set(network)
                     trySend(ssid)
                 }
             }
 
             override fun onLost(network: Network) {
+                liveNetwork.compareAndSet(network, null)
                 resolvedNetwork.compareAndSet(network, null)
                 trySend(null)
             }
