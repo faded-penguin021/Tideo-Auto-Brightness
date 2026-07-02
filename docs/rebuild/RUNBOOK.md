@@ -228,7 +228,9 @@ author — hunting specifically the ledger's proven bug classes:
   no-op writes that never notify (D-034 a);
 - **int truncation vs `Math.round`** round-trip drift across range normalization (D-034 b);
 - **non-idempotent lifecycle calls** and per-process state that should survive process death
-  (D-034 c — `savedMode` is the standing example);
+  (D-034 c — `savedMode` is the standing example; D-144 — the dimming `engaged` latch: a
+  Tasker-persisted global rebuilt as an in-process field must treat process start as UNKNOWN,
+  not "off");
 - **null/absent sentinel handling** at startup — a reader that hasn't produced a real value yet
   must not match rules (D-108 battery `-1`);
 - **fire-and-forget cancellation ordered before a compensating write** — `cancel()` without

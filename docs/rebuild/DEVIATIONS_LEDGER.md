@@ -2523,3 +2523,34 @@ the permanent registry — never compress or remove them.
   resolved network skips re-resolves (drives the real flow via Robolectric shadow
   ConnectivityManager callbacks and a park-until-released fake strategy). Folds into **1.6.2 /
   versionCode 16**.
+
+- **D-144: a process death while Extra Dim was engaged no longer leaves it stuck on after the
+  restart (F-backlog U3 finding).** `SuperDimmingCoordinator.engaged` was an in-process `false`-
+  initialized boolean, but Tasker's `%AAB_DimmingStatus` is a PERSISTED global — after a Tasker
+  restart the above-threshold path still ran `_DisableSuperDimming` and wrote the secure keys.
+  The rebuild's fresh process instead hit `disengage()`'s `if (!engaged) return` early-out, so an
+  OOM-kill while dimmed + a sticky restart in bright light left `reduce_bright_colors` activated
+  at the last-written level all day (the D-034 c bug class: per-process state that should survive
+  process death). Fix: the latch is tri-state (`Boolean?`, null = UNKNOWN at process start) —
+  from UNKNOWN the first `disengage()` writes the clears (idempotent when already off; the
+  `SecureDimmingController` returns failed `Result`s tier-gated, so BASIC/NONE processes stay
+  silent) and the first engage writes `activated=1` (covers a death-while-NOT-engaged restart
+  straight into dimming). Persistence à la D-134 was considered and rejected: one idempotent
+  clear per process start achieves the same end state without a cross-module storage seam. Tests:
+  `SuperDimmingCoordinatorTest.freshProcess_applyAboveThreshold_clearsPreDeathResidual_D144`,
+  `disengage_whenKnownDisengaged_isNoOp_D144`; four existing "never engaged → zero writes"
+  assertions relaxed to "no engagement writes" (`activated != true`, no positive level) since the
+  one-time residual clear is now expected. Folds into **1.6.2 / versionCode 16**.
+
+- **D-145: `ShizukuShell.exec` unbinds the user service on its own bind timeout (F-backlog U3
+  finding).** The 4 s `withTimeoutOrNull` cancelled the `suspendCancellableCoroutine` without an
+  `invokeOnCancellation`, so a `bindUserService` that never connected (Shizuku hung/dying) stayed
+  registered forever — a slow leak on the no-Location SSID path. Fix: `invokeOnCancellation`
+  unbinds (idempotent vs the `onServiceConnected` finally-unbind, both `runCatching`). NOT
+  unit-tested: the Shizuku binder cannot be exercised under Robolectric (the standing H3 skip
+  rationale, owner device-verified surface); the fix is argued safe — `invokeOnCancellation`
+  fires only on cancellation, never on a normal resume. **Accepted residual, recorded not
+  fixed:** `ShizukuGrantGateway.requestGrant`'s bind has NO timeout, so a hung Shizuku means
+  `onResult` never fires ("invoked exactly once" unfulfilled) — user-interactive retryable
+  onboarding path, rare, and a timeout there needs coroutine plumbing through a callback API;
+  revisit only on an owner report. Folds into **1.6.2 / versionCode 16**.

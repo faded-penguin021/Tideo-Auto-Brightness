@@ -66,6 +66,9 @@ object ShizukuShell {
 
                     override fun onServiceDisconnected(name: ComponentName?) {}
                 }
+                // Unbind on the 4 s timeout too (D-145): a bind that never connects would otherwise stay
+                // registered forever. Idempotent vs the onServiceConnected finally-unbind (runCatching).
+                cont.invokeOnCancellation { runCatching { Shizuku.unbindUserService(args, connection, true) } }
                 try {
                     Shizuku.bindUserService(args, connection)
                 } catch (_: Throwable) {

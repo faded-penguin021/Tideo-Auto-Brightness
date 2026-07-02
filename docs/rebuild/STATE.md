@@ -74,9 +74,17 @@ D-NN list as it checkpoints.
   feeds D-132); the onLost-during-roam transient null is parity-consistent (prof768 evaluates on
   both edges). RUNBOOK glue-review list +2 proven bug classes (asymmetric sibling gates; stale
   async completion).
-- **U3 — entry points + privilege** (pending): QS tile, boot receiver, widget, notification
-  actions, `SuperDimmingCoordinator`, `PrivilegeManager`, `ShizukuGrantGateway`/`ShizukuShell`,
-  `PanicSensorSource` arming.
+- **U3 — entry points + privilege** (DONE 2026-07-02 → **D-144, D-145**, fold into 1.6.2): full
+  pass over `BrightnessTileService`, `BootCompletedReceiver` (+ the `goAsync` ext),
+  `DashboardWidgetProvider`, `SuperDimmingCoordinator`, `PrivilegeManager`,
+  `ShizukuGrantGateway`/`ShizukuShell`/`ShizukuUserService`, `AndroidPanicSensorSource` +
+  `PanicGestureDetector`/`PanicGate`. Findings fixed: D-144 (per-process dimming `engaged` latch
+  vs Tasker's persisted `%AAB_DimmingStatus` — post-death restart left Extra Dim stuck on; latch
+  now tri-state with UNKNOWN at process start), D-145 (ShizukuShell bind-timeout leak —
+  `invokeOnCancellation` unbind; binder-untestable, argued + owner-verifiable). Accepted
+  residual recorded in D-145: `ShizukuGrantGateway.requestGrant` has no bind timeout (hung
+  Shizuku → no `onResult`; rare, user-retriable). Notification-action senders were already
+  covered by U1 (D-140 service-side gates). RUNBOOK D-034 c bug class gains the D-144 example.
 - **U4 — security review of parsing + privileged surfaces** (pending): `/security-review` +
   manual pass on `ProfileImportExportManager`/`TaskerLegacyProfileSerializer`/
   `LegacyConfigImporter` (adds the H3 import-export round-trip tests), dumpsys-wifi regex,
@@ -146,6 +154,11 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — folds into pending 1.6.2 (F-backlog U3 complete): **D-144** a process death while
+  Extra Dim was engaged no longer leaves it stuck on after the sticky restart (dimming latch
+  tri-state, UNKNOWN at process start → first disengage clears the residual); **D-145**
+  `ShizukuShell` unbinds on bind timeout (leak; binder-untestable, argued). Tests +2, 4
+  assertions modernized. Glue-review pass: clean.
 - 2026-07-02 — folds into pending 1.6.2 (F-backlog U2 complete): **D-142** the wifi SSID
   listener is now `[WIFI]`-gated like Tasker's prof768 (no shell-strategy SSID probing — or su
   prompts — without a wifi rule) and clears its snapshot on stop so a re-added rule can't match
