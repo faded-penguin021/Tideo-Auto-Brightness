@@ -10,7 +10,6 @@ import android.widget.RemoteViews
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.MainActivity
 import com.tideo.autobrightness.app.runtime.AppProcessScope
-import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.settings.SettingsStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -37,38 +36,11 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         refresh(context)
     }
 
-    override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            ACTION_TOGGLE -> {
-                val pending = goAsync()
-                AppProcessScope.launch {
-                    try {
-                        val newEnabled = context.applicationContext.settingsDataStore.updateData {
-                            it.copy(serviceEnabled = !it.serviceEnabled)
-                        }.serviceEnabled
-                        AutoBrightnessRuntime.onSettingChanged(context.applicationContext, newEnabled)
-                        pushUpdate(context.applicationContext, buildModel(newEnabled))
-                    } finally {
-                        pending.finish()
-                    }
-                }
-            }
-            ACTION_RESET -> {
-                // Reset = re-apply / snap to auto (owner decision): recompute now, clearing a manual
-                // override pause. No-op if the service is not running (enforced service-side, D-140 —
-                // startForegroundService always creates the service, so the fresh instance stops
-                // itself when no pipeline is running); the next start applies anyway.
-                AutoBrightnessRuntime.reapply(context.applicationContext)
-                refresh(context)
-            }
-            else -> super.onReceive(context, intent)
-        }
-    }
+    // NB (D-147): this receiver is exported (the system's APPWIDGET_UPDATE requires it), so it must
+    // carry NO custom state-changing actions — any co-installed app can send it explicit intents.
+    // The toggle/reset button actions live in the non-exported [WidgetActionReceiver].
 
     companion object {
-        const val ACTION_TOGGLE = "com.tideo.autobrightness.widget.action.TOGGLE"
-        const val ACTION_RESET = "com.tideo.autobrightness.widget.action.RESET"
-
         private const val REQ_OPEN = 0
         private const val REQ_TOGGLE = 1
         private const val REQ_RESET = 2
@@ -101,7 +73,7 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         }
 
         /** Snapshot the live runtime into a [WidgetModel]; [enabled] is the persisted master flag. */
-        private fun buildModel(enabled: Boolean): WidgetModel {
+        internal fun buildModel(enabled: Boolean): WidgetModel {
             val p = LiveRuntimeState.pipeline.value
             return WidgetModel(
                 enabled = enabled,
@@ -114,7 +86,7 @@ class DashboardWidgetProvider : AppWidgetProvider() {
             )
         }
 
-        private fun pushUpdate(context: Context, model: WidgetModel) {
+        internal fun pushUpdate(context: Context, model: WidgetModel) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = runCatching { manager.getAppWidgetIds(provider(context)) }.getOrDefault(IntArray(0))
             if (ids.isEmpty()) return
@@ -134,10 +106,10 @@ class DashboardWidgetProvider : AppWidgetProvider() {
                 context.getString(if (model.enabled) R.string.widget_turn_off else R.string.widget_turn_on),
             )
 
-            // Body → open the app; buttons → broadcast back to this provider.
+            // Body → open the app; buttons → broadcast to the non-exported action receiver (D-147).
             views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(context))
-            views.setOnClickPendingIntent(R.id.widget_toggle, broadcast(context, ACTION_TOGGLE, REQ_TOGGLE))
-            views.setOnClickPendingIntent(R.id.widget_reset, broadcast(context, ACTION_RESET, REQ_RESET))
+            views.setOnClickPendingIntent(R.id.widget_toggle, broadcast(context, WidgetActionReceiver.ACTION_TOGGLE, REQ_TOGGLE))
+            views.setOnClickPendingIntent(R.id.widget_reset, broadcast(context, WidgetActionReceiver.ACTION_RESET, REQ_RESET))
             return views
         }
 
@@ -154,7 +126,9 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         }
 
         private fun broadcast(context: Context, action: String, requestCode: Int): PendingIntent {
-            val intent = Intent(context, DashboardWidgetProvider::class.java)
+            // Explicit component: a PendingIntent from this app may target its own NON-exported
+            // receiver, which is exactly why the state-changing actions can live there (D-147).
+            val intent = Intent(context, WidgetActionReceiver::class.java)
             intent.setPackage(context.packageName)
             intent.action = action
             return PendingIntent.getBroadcast(

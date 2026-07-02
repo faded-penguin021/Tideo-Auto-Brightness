@@ -2554,3 +2554,36 @@ the permanent registry — never compress or remove them.
   `onResult` never fires ("invoked exactly once" unfulfilled) — user-interactive retryable
   onboarding path, rare, and a timeout there needs coroutine plumbing through a callback API;
   revisit only on an owner report. Folds into **1.6.2 / versionCode 16**.
+
+- **D-146: NaN can no longer poison the settings through a profile import (F-backlog U4
+  finding).** `AabSettings.validate()` clamps every numeric with `coerceIn`, but NaN passes
+  straight through it (every comparison is false → `coerceIn` returns its receiver), and both
+  legacy-import parsers accept it (`"NaN".toDoubleOrNull()` parses — Java `parseDouble` accepts
+  `NaN`/`Infinity`; the nested-JSON path via `doubleOrNull` likewise). A malformed or hostile
+  profile file (`%AAB_Scale=NaN`, or `"scale":"NaN"` in the nested Tasker JSON) would therefore
+  persist NaN into the curve math and drive the pipeline output to garbage until the user reset
+  the field. Fix in the shared chokepoint `validate()` (covers Apply, both import formats, and
+  any store corruption): each of the 13 Float/Double fields resets to its `AabSettings()` default
+  when NaN, BEFORE the clamp. ±Infinity deliberately needs no guard — `coerceIn`'s comparisons
+  clamp it to the range edge (pinned by a regression test so a refactor can't break it). Tests:
+  `AabSettingsClampTest` +2 (`NaN numeric fields reset…`, `infinities clamp…`),
+  `LegacyImportRoundTripTest` +1 (NaN/±Infinity in a key=value import come out finite). Folds
+  into **1.6.2 / versionCode 16**.
+
+- **D-147: the widget's toggle/reset actions move to a non-exported receiver (F-backlog U4
+  finding).** `DashboardWidgetProvider` must be exported for the system's `APPWIDGET_UPDATE`
+  broadcasts, and it also handled the custom `…widget.action.TOGGLE`/`RESET` actions — so any
+  co-installed app could start/stop the brightness service or force a reapply with a plain
+  explicit intent, no permission needed (local-only, no data exposure; still an unnecessary
+  state-changing surface). Fix: the two actions (and their constants) move to a new
+  `WidgetActionReceiver` registered `exported="false"` — the buttons' `PendingIntent`s are
+  created by this app with an explicit component, and a PendingIntent may target a non-exported
+  component of its own package, so the widget behaves identically while foreign explicit intents
+  no longer reach the actions. The provider's intent-filter drops the two custom actions;
+  `pushUpdate`/`buildModel` become `internal` for the receiver. Tests: new
+  `WidgetActionReceiverTest` — `exportedProvider_ignoresForeignResetAction_D147` (the security
+  property; failed pre-fix by dispatching REAPPLY) + reset-routing coverage (previously untested
+  seams). The moved `toggle` itself stays untested: its enable path schedules the maintenance
+  worker and WorkManager can't run under Robolectric without the declined work-testing artifact
+  (the H3 MaintenanceWorker rationale) — the body is the QS tile's shipped pattern, moved
+  verbatim. Folds into **1.6.2 / versionCode 16**.

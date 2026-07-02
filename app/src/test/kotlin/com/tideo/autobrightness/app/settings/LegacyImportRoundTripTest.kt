@@ -262,4 +262,23 @@ class LegacyImportRoundTripTest {
         val s = TaskerLegacyProfileSerializer.deserialize(raw)
         assertEquals(20, s.minBrightness)
     }
+
+    @Test
+    fun `NaN values in an imported profile cannot poison the settings D146`() {
+        // "NaN".toDoubleOrNull() parses (Java Double.parseDouble accepts NaN/Infinity), and NaN slips
+        // through every coerceIn — so a malformed or hostile profile file could persist NaN into the
+        // brightness math. The parse must come out finite (the field default).
+        val raw = """
+            %AAB_Scale = NaN
+            %AAB_Form1A = NaN
+            %AAB_DeltaFactor = Infinity
+            %AAB_ThreshMidpoint = -Infinity
+        """.trimIndent()
+        val s = TaskerLegacyProfileSerializer.deserialize(raw)
+        assertTrue(s.scale.isFinite(), "NaN scale must not survive the import")
+        assertEquals(AabSettings().scale, s.scale, 0.001f)
+        assertTrue(s.form1A.isFinite(), "NaN form1A must not survive the import")
+        assertEquals(10.0f, s.deltaFactor, 0.001f, "+Infinity clamps to the deltaFactor max")
+        assertEquals(0.0, s.thresholdMidpoint, "-Infinity clamps to the midpoint min")
+    }
 }

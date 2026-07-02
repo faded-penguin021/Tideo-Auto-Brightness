@@ -85,11 +85,22 @@ D-NN list as it checkpoints.
   residual recorded in D-145: `ShizukuGrantGateway.requestGrant` has no bind timeout (hung
   Shizuku → no `onResult`; rare, user-retriable). Notification-action senders were already
   covered by U1 (D-140 service-side gates). RUNBOOK D-034 c bug class gains the D-144 example.
-- **U4 — security review of parsing + privileged surfaces** (pending): `/security-review` +
-  manual pass on `ProfileImportExportManager`/`TaskerLegacyProfileSerializer`/
-  `LegacyConfigImporter` (adds the H3 import-export round-trip tests), dumpsys-wifi regex,
-  `ShizukuShell` command construction, GeoIp response parsing, exported-component intents,
-  secure-settings write path. By-design findings → `SECURITY.md` scope note, not a "fix".
+- **U4 — security review of parsing + privileged surfaces** (DONE 2026-07-02 → **D-146, D-147**,
+  fold into 1.6.2): `/security-review` on the branch diff (clean) + manual pass on
+  `ProfileImportExportManager`/`TaskerLegacyProfileSerializer`/`LegacyConfigImporter`,
+  dumpsys-wifi regex, `ShizukuShell`/`ShizukuUserService` command construction, GeoIp parsing,
+  the manifest's exported components, secure-settings write path. Findings fixed: D-146 (NaN
+  passes `coerceIn` and both import parsers accept it — `validate()` now resets non-finite
+  floats to defaults; ±Inf clamps fine, regression-pinned), D-147 (the exported widget provider
+  also handled the custom TOGGLE/RESET actions → any co-installed app could flip the service;
+  actions moved to a non-exported `WidgetActionReceiver`, + first tests for that seam).
+  Reviewed clean: filename sanitizer (no traversal), SAF importer (read-only, .json filter),
+  GeoIp regex parse (0,0 reject, HTTPS, opt-in), BOOT_COMPLETED (protected broadcast + action
+  check), tile (bind-permission), secure writes (tier-gated `Result`, constant keys, clamped
+  values). By-design notes added to `SECURITY.md` (Shizuku user-service scope, import clamping,
+  dumpsys SSID-anchor quirk). H3 round-trip-test seam: already covered by the existing
+  `ProfileLoadResultTest`/`LegacyImportRoundTripTest`/`NestedSchemaRoundTripTest` suites — the
+  real gap was NaN, closed above; `ExperimentPrefsStore` round-trip stays on the H3 row.
 - **U5 — parity transcription spot-check** (pending): re-derive from the XML (via
   `XML_RECIPES.md` ONLY) task661-vs-663 curve math, task535 rounding chain, profile-gate truth
   tables vs ConditionList (alphabetical-children trap). Disagreement → `parity_gaps.md` row,
@@ -154,6 +165,13 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — folds into pending 1.6.2 (F-backlog U4 complete): **D-146** a malformed profile
+  import can no longer poison the settings with NaN (`validate()` resets non-finite floats to
+  defaults — NaN slips through `coerceIn` and the import parsers accept it); **D-147** the
+  widget's TOGGLE/RESET actions move off the exported provider to a non-exported
+  `WidgetActionReceiver` (co-installed apps could flip the service with an explicit intent).
+  `/security-review` diff pass: clean; `SECURITY.md` +3 by-design scope notes. Tests +5.
+  Glue-review pass: clean.
 - 2026-07-02 — folds into pending 1.6.2 (F-backlog U3 complete): **D-144** a process death while
   Extra Dim was engaged no longer leaves it stuck on after the sticky restart (dimming latch
   tri-state, UNKNOWN at process start → first disengage clears the residual); **D-145**
