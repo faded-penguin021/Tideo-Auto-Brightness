@@ -101,10 +101,18 @@ D-NN list as it checkpoints.
   dumpsys SSID-anchor quirk). H3 round-trip-test seam: already covered by the existing
   `ProfileLoadResultTest`/`LegacyImportRoundTripTest`/`NestedSchemaRoundTripTest` suites — the
   real gap was NaN, closed above; `ExperimentPrefsStore` round-trip stays on the H3 row.
-- **U5 — parity transcription spot-check** (pending): re-derive from the XML (via
-  `XML_RECIPES.md` ONLY) task661-vs-663 curve math, task535 rounding chain, profile-gate truth
-  tables vs ConditionList (alphabetical-children trap). Disagreement → `parity_gaps.md` row,
-  never a silent fixture edit.
+- **U5 — parity transcription spot-check** (DONE 2026-07-02, **clean — zero disagreements, no
+  `parity_gaps.md` rows**): re-derived from the XML (restored from the git-history blob, new
+  recipe R0; R1 censuses pass). (a) Profile gates: all 18 profiles' ConditionLists re-extracted
+  numerically sorted — prof760 `[Or2,And,And2,Or,And2]`, prof758's 13-clause wrap-window chain,
+  prof755's five And-clauses all match `ProfileGates.kt` verbatim incl. operator directions;
+  context-watcher gates confirm contexts_spec §1.1 (and D-142's `[WIFI]` token) against source.
+  (b) task535: fresh XML decode is byte-identical to the committed reference txt; domain
+  `smoothLux` chain (round3 = Math.round ties-toward-+∞, exact-binary `BigDecimal(v).setScale(2|0,
+  HALF_UP)` split on zone1End, unclamped alpha, unrounded EMA) faithful. (c) task661 vs task663:
+  3-zone formulas agree three ways (661 Variable-Set maths ≡ 663 plot Java ≡ domain
+  `mapLuxToBrightness`) — strict `<` bounds, literal `^0.33`, Form2D≡Zone1End derivation,
+  scaling branch + post-scale clamps (act10-21) match `calculatedBrightness`.
 - **U6 — stretch: remaining H3 seams** (pending): least Fable-dependent, deliberately last; if
   unreached they simply stay on the H3 row below.
 
@@ -165,6 +173,10 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-02 — docs-only (F-backlog U5 complete): parity transcription spot-check re-derived
+  profile gates, task535 rounding chain, and task661/663 curve math from the XML — **clean, zero
+  disagreements** (details in the U5 row above). `XML_RECIPES.md` gains R0 (restore the
+  gitignored XML from the git-history blob in a fresh clone).
 - 2026-07-02 — folds into pending 1.6.2 (F-backlog U4 complete): **D-146** a malformed profile
   import can no longer poison the settings with NaN (`validate()` resets non-finite floats to
   defaults — NaN slips through `coerceIn` and the import parsers accept it); **D-147** the
