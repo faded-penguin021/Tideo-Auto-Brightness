@@ -40,8 +40,8 @@ excluded (pipeline-owned, D-144). Vanilla-AOSP keys only; OEM variance documente
 branched. **Full plan: `plans/privileged-display.md`** (delete at Segment 5). Execution:
 sequential, one segment per checkpoint (ladder green + Changelog + push), D-133 honored.
 
-- [x] Segment 0 — plan persisted (this commit)
-- [ ] Segment 1 — `:platform` SecureDisplayController + 1.7.0/vc17 bump
+- [x] Segment 0 — plan persisted
+- [x] Segment 1 — `:platform` SecureDisplayController + 1.7.0/vc17 bump (D-149)
 - [ ] Segment 2 — Privileged Display screen (manual toggles; core ask)
 - [ ] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
 - [ ] Segment 4 — scheduling runtime + storage + rules UI
@@ -120,6 +120,13 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-03 — 1.7.0 / `versionCode 17` (MINOR, Privileged Display Segment 1 of 5): **D-149**
+  new `:platform` `SecureDisplayController` — Night Light (+temperature), daltonizer
+  (grayscale + 3 corrections), inversion, AOD, stay-awake-charging, experimental Android-14+
+  force-SDR; AOSP-universal keys only, Extra Dim excluded (pipeline-owned), reads unprivileged /
+  writes ELEVATED-gated. +12 Robolectric tests. Changelog `17.txt`. Glue-review pass: one
+  finding (HDR OFF resets a pre-existing partial disable list) accepted + documented. UI lands
+  in Segment 2 (see Active work).
 - 2026-07-02 — tests-only (F-backlog U6 complete → F-backlog CLOSED): **D-148** the H3
   glue-seam audit's last four seams covered — `LocationReaderTest` (activeFix D-120/122),
   `PanicSensorSourceTest` (prof769 arming/veto/consume), `PowerMeterTest` (task524 mapping),

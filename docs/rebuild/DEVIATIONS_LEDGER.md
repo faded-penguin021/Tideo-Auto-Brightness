@@ -2604,3 +2604,21 @@ the permanent registry — never compress or remove them.
   (real Preferences DataStore on a temp file). +19 tests; no production code changed. With this,
   the H3 backlog row has NO remaining seams (Shizuku*/MaintenanceWorker skips stand, documented
   in the D-136 row).
+
+- **D-149: Privileged Display Control adopted (rebuild-only feature, no Tasker source — RUNBOOK
+  playbook 5; plan: `plans/privileged-display.md`).** New `:platform`
+  `SecureDisplayController` exposes the AOSP display toggles WRITE_SECURE_SETTINGS unlocks:
+  Night Light (`night_display_activated` / `night_display_color_temperature`, auto-mode
+  read-only), daltonizer (`accessibility_display_daltonizer[_enabled]`, grayscale=0 + the three
+  correction matrices; OFF preserves the mode value like system Settings), inversion
+  (`accessibility_display_inversion_enabled`), AOD (`doze_always_on`), stay-awake-while-charging
+  (`Settings.Global.STAY_ON_WHILE_PLUGGED_IN`, AC|USB|wireless), and experimental Android-14+
+  force-SDR (`user_disabled_hdr_formats`="1,2,3,4" + `are_user_disabled_hdr_formats_allowed`=0 —
+  the public `HDR_TYPE_*` ids; community-verified adb recipe). Policy decisions: vanilla-AOSP
+  keys with ONE code path — OEM variance is documented, never branched (D-048 policy); Extra Dim
+  (`reduce_bright_colors_*`) deliberately NOT exposed — pipeline-owned (D-144); reads are
+  unprivileged, writes ELEVATED-gated `Result`s; daltonizer writes value BEFORE enabled (no
+  one-frame flash of the previous matrix); HDR enable writes the list before enforcement (never
+  enforce an empty list) and the OFF path resets any pre-existing partial disable list
+  (documented v1 scope). "Privileged" = the existing ELEVATED tier — adb/Shizuku/root are grant
+  channels only (D-016), no runtime-binder write fallback. Ships in **1.7.0 / versionCode 17**.
