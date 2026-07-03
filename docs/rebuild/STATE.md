@@ -30,6 +30,23 @@ gate findings) is frozen in `../history/`; the deviations registry stays live.
 > — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
 > findings are in `../history/STATE_rebuild.md`). Look there.
 
+## Active work — Privileged Display Control (feature, adopted 2026-07-03)
+
+New ELEVATED-only settings page (invisible below ELEVATED; "privileged" = WRITE_SECURE_SETTINGS
+via adb/Shizuku/root grant channels, D-016) exposing AOSP-universal display toggles — Night
+Light, daltonizer (incl. grayscale), inversion, AOD, stay-awake-charging, HDR force-SDR
+(experimental) — plus schedule rules ("apps → grayscale on weekdays 22:00–06:00"). Extra Dim
+excluded (pipeline-owned, D-144). Vanilla-AOSP keys only; OEM variance documented, never
+branched. **Full plan: `plans/privileged-display.md`** (delete at Segment 5). Execution:
+sequential, one segment per checkpoint (ladder green + Changelog + push), D-133 honored.
+
+- [x] Segment 0 — plan persisted (this commit)
+- [ ] Segment 1 — `:platform` SecureDisplayController + 1.7.0/vc17 bump
+- [ ] Segment 2 — Privileged Display screen (manual toggles; core ask)
+- [ ] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
+- [ ] Segment 4 — scheduling runtime + storage + rules UI
+- [ ] Segment 5 — polish, owner verification checklist, plan-doc cleanup
+
 ## Active work — short-term Fable-dependent hardening (F-backlog, adopted D-138)
 
 **COMPLETE 2026-07-02 — all six units done, checkpointed U-by-U on the session branches**
