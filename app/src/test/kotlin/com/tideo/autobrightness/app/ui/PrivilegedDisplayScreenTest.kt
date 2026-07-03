@@ -8,8 +8,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import com.tideo.autobrightness.app.settings.DisplayRule
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
 import com.tideo.autobrightness.app.ui.screens.PrivilegedDisplayContent
+import com.tideo.autobrightness.domain.display.DisplayAction
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
 import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
@@ -19,6 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -188,6 +191,95 @@ class PrivilegedDisplayScreenTest {
         // Shizuku not installed → neither the one-tap button nor the start prompt.
         compose.onNodeWithTag("pd_grant_shizuku").assertDoesNotExist()
         compose.onNodeWithTag("pd_shizuku_start_prompt").assertDoesNotExist()
+    }
+
+    // --- Schedules section (D-150, Segment 4) ---------------------------------------------------
+
+    @Test
+    fun elevated_schedules_addOpensEditor_saveProducesRuleWithPickedAction() {
+        var saved: DisplayRule? = null
+        compose.setContent {
+            MaterialTheme {
+                PrivilegedDisplayContent(state = elevated, onBack = {}, onSaveRule = { saved = it })
+            }
+        }
+        compose.onNodeWithTag("add_display_rule").performScrollTo().performClick()
+        compose.onNodeWithTag("display_rule_editor").assertExists()
+        compose.onNodeWithTag("display_action_inversion").performScrollTo().performClick()
+        compose.onNodeWithTag("save_display_rule").performScrollTo().performClick()
+        assertEquals(DisplayAction.INVERSION.name, saved?.action)
+        assertEquals(true, saved?.enabled)
+        assertTrue(!saved?.id.isNullOrBlank(), "a new rule must get a stable id")
+        // Saving closes the modal.
+        compose.onNodeWithTag("display_rule_editor").assertDoesNotExist()
+    }
+
+    @Test
+    fun elevated_scheduleEditor_daysFlowIntoTriggers() {
+        var saved: DisplayRule? = null
+        compose.setContent {
+            MaterialTheme {
+                PrivilegedDisplayContent(state = elevated, onBack = {}, onSaveRule = { saved = it })
+            }
+        }
+        compose.onNodeWithTag("add_display_rule").performScrollTo().performClick()
+        compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
+        compose.onNodeWithTag("day_2").performScrollTo().performClick() // Monday
+        compose.onNodeWithTag("day_6").performScrollTo().performClick() // Friday
+        compose.onNodeWithTag("save_display_rule").performScrollTo().performClick()
+        assertEquals(listOf(2, 6), saved?.triggers?.days)
+    }
+
+    @Test
+    fun elevated_scheduleCard_enabledSwitchTogglesViaSave() {
+        val rule = DisplayRule(id = "r1", name = "Weeknights", action = DisplayAction.GRAYSCALE.name)
+        var saved: DisplayRule? = null
+        compose.setContent {
+            MaterialTheme {
+                PrivilegedDisplayContent(
+                    state = elevated, onBack = {},
+                    scheduleRules = listOf(rule), onSaveRule = { saved = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("display_rule_enabled_r1").performScrollTo().performClick()
+        assertEquals(false, saved?.enabled, "the card switch must save the toggled enabled flag")
+        assertEquals("r1", saved?.id)
+    }
+
+    @Test
+    fun elevated_scheduleDelete_requiresConfirmation() {
+        val rule = DisplayRule(id = "r1", name = "Weeknights", action = DisplayAction.GRAYSCALE.name)
+        var deleted: String? = null
+        compose.setContent {
+            MaterialTheme {
+                PrivilegedDisplayContent(
+                    state = elevated, onBack = {},
+                    scheduleRules = listOf(rule), onDeleteRule = { deleted = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("delete_display_rule_r1").performScrollTo().performClick()
+        assertNull(deleted, "delete must not fire before the confirmation (D-114 pattern)")
+        compose.onNodeWithTag("confirm_delete_display_rule_r1").performClick()
+        assertEquals("r1", deleted)
+    }
+
+    @Test
+    fun basic_hidesSchedulesSection() {
+        compose.setContent {
+            MaterialTheme {
+                PrivilegedDisplayContent(
+                    state = PrivilegedDisplayUiState(tier = Tier.BASIC),
+                    onBack = {},
+                    scheduleRules = listOf(
+                        DisplayRule(id = "r1", name = "X", action = DisplayAction.GRAYSCALE.name),
+                    ),
+                )
+            }
+        }
+        compose.onNodeWithTag("add_display_rule").assertDoesNotExist()
+        compose.onNodeWithTag("display_rule_r1").assertDoesNotExist()
     }
 
     @Test

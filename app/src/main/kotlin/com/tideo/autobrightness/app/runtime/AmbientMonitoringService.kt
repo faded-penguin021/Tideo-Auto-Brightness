@@ -47,6 +47,7 @@ class AmbientMonitoringService : Service() {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private lateinit var controller: BrightnessPipelineController
     private lateinit var contextEngine: ContextEngine
+    private lateinit var displayRules: DisplayRulesCoordinator
     private lateinit var panicSensor: com.tideo.autobrightness.platform.sensor.PanicSensorSource
     // Shared tier cache. Refreshed only at resume points (start + screen-on) so the dimming
     // coordinator can read the cached tier per cycle instead of re-checking the permission (G1-F5).
@@ -63,7 +64,9 @@ class AmbientMonitoringService : Service() {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent?) {
             when (intent?.action) {
-                Intent.ACTION_SCREEN_OFF -> { controller.onScreenOff(); contextEngine.onScreenOff() }
+                Intent.ACTION_SCREEN_OFF -> {
+                    controller.onScreenOff(); contextEngine.onScreenOff(); displayRules.onScreenOff()
+                }
                 Intent.ACTION_SCREEN_ON -> onScreenOn()
             }
         }
@@ -88,6 +91,7 @@ class AmbientMonitoringService : Service() {
             }
             contextEngine.onScreenOn()
         }
+        displayRules.onScreenOn()
     }
 
     override fun onCreate() {
@@ -103,6 +107,7 @@ class AmbientMonitoringService : Service() {
         val runtime = AppModule(applicationContext).createRuntime(scope)
         controller = runtime.controller
         contextEngine = runtime.contextEngine
+        displayRules = runtime.displayRules
         panicSensor = runtime.panicSensor
         privilegeManager = runtime.privilegeManager
 
@@ -204,6 +209,7 @@ class AmbientMonitoringService : Service() {
         privilegeManager.refresh()
         controller.start()
         contextEngine.start(scope)
+        displayRules.start(scope)
         startPanicDetector()
         if (notificationJob?.isActive == true) return
         val manualOverrideFlow = applicationContext.settingsDataStore.data
@@ -439,6 +445,10 @@ class AmbientMonitoringService : Service() {
         panicJob?.cancel(); panicJob = null
         contextEngine.stop()
         controller.stop()
+        // Restore any schedule-engaged display toggle (D-150): a schedule must not outlive the
+        // service that maintains it. Before scope.cancel() so the coordinator can serialize
+        // against an in-flight evaluation.
+        displayRules.stop()
         // Watchdog instead of an immediate reset (S12.9d): if the OS restarts the FGS and it
         // republishes within the grace window, the live data survives; otherwise it is cleared so the
         // Dashboard does not show a stale "live" snapshot for a dead loop. A genuine user-driven stop

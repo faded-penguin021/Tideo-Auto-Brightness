@@ -2622,3 +2622,36 @@ the permanent registry — never compress or remove them.
   enforce an empty list) and the OFF path resets any pre-existing partial disable list
   (documented v1 scope). "Privileged" = the existing ELEVATED tier — adb/Shizuku/root are grant
   channels only (D-016), no runtime-binder write fallback. Ships in **1.7.0 / versionCode 17**.
+
+- **D-150: Privileged Display schedule rules — the apply/restore semantics (Segment 4 of the
+  D-149 feature; storage + runtime + UI).** A `DisplayRule` set (separate `aab_display_rules.json`
+  DataStore — NOT in `AabSettings`/contexts.json: no migration or import/export coupling; the
+  action is stored as a STRING enum name so an unknown value from a newer schema leaves that one
+  rule inert instead of failing the file) is evaluated by an app-side `DisplayRulesCoordinator`
+  running its OWN coroutines in the service scope — never inside the pipeline cycle (the
+  single-coroutine drop-on-reentry model stays BINDING). Apply/restore is **edge-triggered with a
+  death-safe latch** (`:platform` `SharedPrefsDisplayRestoreLatch`, SharedPreferences `commit()`,
+  the D-134/D-144 pattern; a present key IS the engaged truth): the engage edge persists the
+  pre-engage device state BEFORE writing the toggle ON (dying between the two restores a no-op);
+  while a rule holds, nothing is re-asserted — **manual changes during a window stick until the
+  window ends** (stated in the UI), and the release edge restores the LATCHED pre-engage state.
+  Failure semantics: a failed engage clears the latch (a later evaluation retries); a failed
+  restore KEEPS it (the obligation survives a revoked grant until the next evaluation / service
+  stop / startup sweep). The first evaluation at service start doubles as the residual sweep — a
+  latch left by a dead process restores when no rule matches, and is adopted (original pre-state
+  preserved) when one still does; service stop restores every engaged action under the eval
+  mutex AFTER `scope = null` (an in-flight evaluation serializes before the restore and a queued
+  one no-ops — the D-139 class); below ELEVATED the coordinator is fully inert (no writes, no
+  latch churn — obligations wait for the grant to return). Cost gates mirror the context engine:
+  foreground-app poll only while ≥1 ENABLED rule uses apps and the screen is on (a second 2.5 s
+  poll may coexist with the context engine's — accepted v1 cost; the app snapshot clears on
+  gate-off, D-142), time boundaries self-schedule via the shared `millisUntilNextContextWake`
+  **+1 s margin** (glue-review finding: the shared window match is end-inclusive and an on-time
+  wake at a window END would still match, hold, and re-arm for tomorrow — the context engine is
+  rescued by pipeline ticks, this coordinator has none); battery/wifi/location listeners are
+  deliberately absent in v1 (the editor exposes action + days/time/apps; those model dimensions
+  stay on the D-108 unknown-sentinel semantics and never match). UI: "Schedules" on the
+  Privileged Display screen (ELEVATED-only, like the toggles); the Contexts trigger composables
+  moved verbatim to shared `ui/components/TriggerEditors.kt` (behavior + test tags identical —
+  the untouched ContextsScreen suites are the proof). Tests: +16 coordinator, +7 store/serializer,
+  +3 latch, +5 screen. Folds into **1.7.0 / versionCode 17**.

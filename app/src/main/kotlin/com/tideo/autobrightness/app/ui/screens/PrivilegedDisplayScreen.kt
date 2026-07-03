@@ -16,12 +16,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -32,6 +34,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.R
+import com.tideo.autobrightness.app.settings.DisplayRule
+import com.tideo.autobrightness.app.state.AppEntry
+import com.tideo.autobrightness.app.state.ContextsViewModel
 import com.tideo.autobrightness.app.state.DisplayTogglesViewModel
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
 import com.tideo.autobrightness.app.ui.components.AabCard
@@ -59,10 +64,24 @@ import kotlin.math.roundToInt
 fun PrivilegedDisplayScreen(
     navController: NavHostController,
     vm: DisplayTogglesViewModel = viewModel(),
+    // Reused for the schedule editor's app picker + usage-access plumbing (same VM the Contexts
+    // rule editor uses — the installed-apps query and grant intent are identical needs).
+    contextsVm: ContextsViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val scheduleRules by vm.scheduleRules.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
+    val context = LocalContext.current
+
+    // Launchable apps for the schedule editor's optional app trigger; only worth querying once
+    // the toggles (and thus the Schedules section) can actually render.
+    var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
+    LaunchedEffect(state.tier) {
+        if (state.tier == Tier.ELEVATED && apps.isEmpty()) {
+            apps = runCatching { contextsVm.installedApps() }.getOrDefault(emptyList())
+        }
+    }
 
     // Re-probe on every return to the foreground: an adb grant, a Shizuku grant, or a change made
     // in the system Settings app must all show up without leaving the screen (read-back display).
@@ -91,6 +110,15 @@ fun PrivilegedDisplayScreen(
         onSetAlwaysOn = vm::setAlwaysOnDisplay,
         onSetStayAwake = vm::setStayAwakePlugged,
         onSetHdrForceSdr = vm::setHdrForceSdr,
+        scheduleRules = scheduleRules,
+        scheduleApps = apps,
+        onSaveRule = { vm.saveRule(it); toast(R.string.toast_rule_saved) },
+        onDeleteRule = { vm.deleteRule(it); toast(R.string.toast_rule_deleted) },
+        hasUsageAccess = contextsVm::hasUsageAccess,
+        onRequestUsageAccess = {
+            toast(R.string.toast_grant_usage_hint)
+            runCatching { context.startActivity(contextsVm.usageAccessIntent()) }
+        },
     )
 }
 
@@ -108,6 +136,12 @@ fun PrivilegedDisplayContent(
     onSetAlwaysOn: (Boolean) -> Unit = {},
     onSetStayAwake: (Boolean) -> Unit = {},
     onSetHdrForceSdr: (Boolean) -> Unit = {},
+    scheduleRules: List<DisplayRule> = emptyList(),
+    scheduleApps: List<AppEntry> = emptyList(),
+    onSaveRule: (DisplayRule) -> Unit = {},
+    onDeleteRule: (String) -> Unit = {},
+    hasUsageAccess: () -> Boolean = { true },
+    onRequestUsageAccess: () -> Unit = {},
 ) {
     SettingsScaffold(stringResource(R.string.title_privileged_display), onBack) { padding ->
         SettingsColumn(padding) {
@@ -170,6 +204,18 @@ fun PrivilegedDisplayContent(
                         )
                     }
                 }
+
+                // Schedule rules (D-150, Segment 4): ELEVATED-only like the toggles — the runtime
+                // coordinator is inert below ELEVATED, so offering the editor there would be a lie.
+                SectionHeader(stringResource(R.string.pd_section_schedules), divider = true)
+                DisplaySchedulesSection(
+                    rules = scheduleRules,
+                    apps = scheduleApps,
+                    onSave = onSaveRule,
+                    onDelete = onDeleteRule,
+                    hasUsageAccess = hasUsageAccess,
+                    onRequestUsageAccess = onRequestUsageAccess,
+                )
             }
 
             // Info card (always shown): what these toggles write + the OEM-variance caveat (D-048

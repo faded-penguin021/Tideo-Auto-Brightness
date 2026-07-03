@@ -589,4 +589,14 @@
     <string name="pd_hdr_force_sdr">Force SDR (disable HDR formats)</string>
     <string name="pd_hdr_help">Blocks all HDR output formats system-wide (Android 14+) — for users sensitive to HDR brightness/dithering. Some devices need the screen to re-initialise (or a reboot) to fully apply. Turning it off re-allows all HDR formats.</string>
     <string name="pd_info_body">These toggles write the standard AOSP settings keys directly — the same keys the system Settings app uses. On heavily skinned devices a key may be ignored or relocated; if a toggle does nothing there, that feature isn\'t controllable on this device. Changes stick like system-settings changes: they stay until changed again.</string>
+    <!-- Privileged Display schedules (D-150, Segment 4). -->
+    <string name="pd_section_schedules">Schedules</string>
+    <string name="pd_schedules_intro">Turn a toggle on automatically while a schedule matches — for example, grayscale for social apps on weekday nights. When a schedule ends (or the service stops), the previous state is restored. Anything you change manually during a schedule sticks until the schedule ends. Schedules run while the brightness service is on.</string>
+    <string name="pd_add_schedule">Add schedule</string>
+    <string name="pd_no_schedules">No schedules yet.</string>
+    <string name="pd_schedule_editor_header">Schedule</string>
+    <string name="pd_schedule_action_label">Turns on</string>
+    <string name="pd_action_grayscale">Grayscale</string>
+    <string name="pd_action_night_light">Night Light</string>
+    <string name="pd_action_inversion">Color inversion</string>
 </resources>

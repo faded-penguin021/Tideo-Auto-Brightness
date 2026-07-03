@@ -44,7 +44,7 @@ sequential, one segment per checkpoint (ladder green + Changelog + push), D-133 
 - [x] Segment 1 — `:platform` SecureDisplayController + 1.7.0/vc17 bump (D-149)
 - [x] Segment 2 — Privileged Display screen (manual toggles; core ask)
 - [x] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
-- [ ] Segment 4 — scheduling runtime + storage + rules UI
+- [x] Segment 4 — scheduling runtime + storage + rules UI (D-150)
 - [ ] Segment 5 — polish, owner verification checklist, plan-doc cleanup
 
 ## Active work — short-term Fable-dependent hardening (F-backlog, adopted D-138)
@@ -120,6 +120,19 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 4 of 5): **D-150** display
+  schedules ship end-to-end — `DisplayRule` storage (own `aab_display_rules.json` DataStore +
+  `DisplayRulesStore`, action as string so unknown values stay inert), the `DisplayRulesCoordinator`
+  runtime (own service-scope coroutines — pipeline single-coroutine model untouched; edge-triggered
+  apply/restore with the death-safe `:platform` SharedPrefs `commit()` latch: pre-state latched
+  before the engage write, hold never re-asserts so manual changes stick, release restores the
+  latched pre-state, startup residual sweep + restore-on-stop, inert below ELEVATED; ContextEngine
+  cost gates incl. the D-142 snapshot clear), and the "Schedules" section on the Privileged Display
+  screen (rule list + modal editor: action + days/time incl. overnight + optional apps; the Contexts
+  trigger composables extracted verbatim to shared `ui/components/TriggerEditors.kt`, ContextsScreen
+  suites untouched and green). Glue-review pass: one finding fixed (+1 s time-boundary wake margin —
+  the end-inclusive window match would otherwise hold at a window END and re-arm for tomorrow;
+  no pipeline-tick rescue here). Full semantics in the D-150 ledger row. Tests +31; `17.txt` final.
 - 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 3 of 5, `:domain`-only): the
   **display-rule resolver** lands — shared per-dimension trigger matching extracted from
   `ContextOverrideResolver` into internal `ContextMatching` (time/day window incl. the overnight

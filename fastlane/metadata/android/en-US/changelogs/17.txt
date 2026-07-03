@@ -1,1 +1,3 @@
 New: Privileged Display page (needs the one-time WRITE_SECURE_SETTINGS grant) — toggle Night Light (with temperature), grayscale/color correction, color inversion, always-on display, keep-awake while charging, and experimental force-SDR (Android 14+), all via standard AOSP settings keys.
+
+New: display schedules — turn grayscale, Night Light or color inversion on automatically while your conditions match (days of week, time window incl. overnight and sunrise/sunset, optionally only in chosen apps). When a schedule ends (or the service stops), the previous state is restored; anything you change manually during a schedule sticks until it ends.
