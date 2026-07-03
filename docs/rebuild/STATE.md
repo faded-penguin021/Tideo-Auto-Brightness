@@ -120,6 +120,10 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-03 — repo-tooling only: `setup-android-sdk.sh` now seeds the Gradle wrapper dist
+  cache from the container's pre-installed `/opt/gradle-<version>` (cloud-session egress proxy
+  403s the wrapper's github-redirected download; without the seed every fresh session's ladder
+  is dead on arrival). Idempotent, no-ops off-container.
 - 2026-07-03 — 1.7.0 / `versionCode 17` (MINOR, Privileged Display Segment 1 of 5): **D-149**
   new `:platform` `SecureDisplayController` — Night Light (+temperature), daltonizer
   (grayscale + 3 corrections), inversion, AOD, stay-awake-charging, experimental Android-14+
