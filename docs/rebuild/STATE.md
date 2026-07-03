@@ -43,7 +43,7 @@ sequential, one segment per checkpoint (ladder green + Changelog + push), D-133 
 - [x] Segment 0 — plan persisted
 - [x] Segment 1 — `:platform` SecureDisplayController + 1.7.0/vc17 bump (D-149)
 - [x] Segment 2 — Privileged Display screen (manual toggles; core ask)
-- [ ] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
+- [x] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
 - [ ] Segment 4 — scheduling runtime + storage + rules UI
 - [ ] Segment 5 — polish, owner verification checklist, plan-doc cleanup
 
@@ -120,6 +120,17 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 3 of 5, `:domain`-only): the
+  **display-rule resolver** lands — shared per-dimension trigger matching extracted from
+  `ContextOverrideResolver` into internal `ContextMatching` (time/day window incl. the overnight
+  prev-day rule, SUNRISE/SUNSET tokens, D-108 battery sentinel, haversine location, wifi trim,
+  `nextWakeTime`; behavior-preserving — golden `ContextOverrideResolverTest` untouched and
+  green); new `domain/display` `DisplayRuleSpec`/`DisplayAction` (GRAYSCALE / NIGHT_LIGHT /
+  INVERSION) + `DisplayRulesResolver` — all matching enabled rules apply, per-action OR, null =
+  no opinion → restore, disabled rules fully inert (no match, no scheduling), `nextBoundary` in
+  the same "HH.MM" wake format as `nextContextTime`. Tests +17 truth-table (incl. Mon–Fri
+  22:00–06:00 app-scoped → Sat 01:00 matches via Friday's tail / Sun 23:00 doesn't). Runtime
+  wiring + storage + rules UI land in Segment 4.
 - 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 2 of 5 — the core ask): the
   **Privileged Display screen** ships — route `privileged_display` (always registered), Menu
   "Privileged" group (lock icon) rendered only at ELEVATED off the live `tierFlow()` + resume
