@@ -21,15 +21,23 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.R
+import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.navigation.navigateTopLevel
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
+import com.tideo.autobrightness.platform.privilege.Tier
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.AabMenuBanner
 import com.tideo.autobrightness.app.ui.components.HeroNavCard
@@ -54,9 +62,24 @@ import com.tideo.autobrightness.app.ui.theme.Dimens
 fun MenuScreen(navController: NavHostController) {
     val activeContext by LiveRuntimeState.activeContext.collectAsStateWithLifecycle()
     val manualOverride by LiveRuntimeState.manualOverride.collectAsStateWithLifecycle()
+    // D-149: the "Privileged" group is tier-gated, driven by the live tierFlow() (not a one-shot
+    // probe) and re-probed on resume, so an adb/Shizuku grant made while this screen was backgrounded
+    // surfaces the row on return without an app restart (same reprobe pattern as Onboarding).
+    val context = LocalContext.current
+    val privilegeManager = remember { AppModule(context.applicationContext).privilegeManager }
+    val tier by privilegeManager.tierFlow().collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) privilegeManager.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     MenuContent(
         activeContext = activeContext,
         manualOverride = manualOverride,
+        tier = tier,
         onNavigate = { route -> navController.navigateTopLevel(route) },
         onRecheckPermissions = { navController.navigateTopLevel(AppRoute.Onboarding) },
     )
@@ -66,6 +89,7 @@ fun MenuScreen(navController: NavHostController) {
 fun MenuContent(
     activeContext: String?,
     manualOverride: Boolean = false,
+    tier: Tier = Tier.NONE,
     onNavigate: (AppRoute) -> Unit,
     onRecheckPermissions: () -> Unit,
 ) {
@@ -126,6 +150,17 @@ fun MenuContent(
                 MenuNavRow(AppRoute.SuperDimming, Icons.Filled.PlayArrow, onNavigate)
                 MenuNavRow(AppRoute.Circadian, Icons.Filled.DateRange, onNavigate)
                 MenuNavRow(AppRoute.Misc, Icons.Filled.Settings, onNavigate)
+            }
+
+            // D-149: ELEVATED-only group — hidden entirely below ELEVATED (the destinations are
+            // unusable without WRITE_SECURE_SETTINGS; the screen itself still self-guards).
+            if (tier == Tier.ELEVATED) {
+                SectionHeader(stringResource(R.string.menu_section_privileged), divider = true)
+                AabCard {
+                    AppRoute.privilegedDestinations.forEach { route ->
+                        MenuNavRow(route, Icons.Filled.Lock, onNavigate)
+                    }
+                }
             }
 
             SectionHeader(stringResource(R.string.menu_section_info), divider = true)

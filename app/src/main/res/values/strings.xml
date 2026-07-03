@@ -552,4 +552,41 @@
     <string name="profiles_factory_defaults">Factory defaults</string>
     <string name="profiles_changed_count">%1$d changed from default</string>
     <string name="profiles_load_replace_warn">These settings will replace your current configuration.</string>
+
+    <!-- Privileged Display Control (rebuild-only feature, D-149; plans/privileged-display.md) -->
+    <string name="title_privileged_display">Privileged Display</string>
+    <string name="menu_section_privileged">Privileged</string>
+    <string name="pd_write_error">The last change could not be written — the WRITE_SECURE_SETTINGS grant may have been revoked. Re-grant elevated access and try again.</string>
+    <string name="pd_grant_title">Elevated access required</string>
+    <string name="pd_grant_body">These display toggles write secure system settings, which needs the one-time WRITE_SECURE_SETTINGS grant (the same grant super dimming uses). Choose any one channel below.</string>
+    <string name="pd_grant_requesting">Requesting Shizuku grant…</string>
+    <string name="pd_grant_shizuku_ok">Granted via Shizuku ✓</string>
+    <string name="pd_grant_shizuku_unavailable">Shizuku is not running.</string>
+    <string name="pd_grant_shizuku_denied">Shizuku permission denied.</string>
+    <string name="pd_grant_shizuku_failed">Shizuku grant failed: %1$s</string>
+    <string name="pd_grant_root_ok">Granted via root.</string>
+    <string name="pd_grant_root_failed">Root grant failed or unavailable.</string>
+    <string name="pd_adb_copied">ADB command copied</string>
+    <string name="pd_section_night_light">Night Light</string>
+    <string name="pd_night_light_switch">Night Light</string>
+    <string name="pd_night_light_temp_label">Temperature: %1$d K</string>
+    <string name="pd_night_light_temp_default">Temperature: device default</string>
+    <string name="pd_night_light_temp_hint">Lower = warmer (stronger filter). Standard Android range 2596–4082 K.</string>
+    <string name="pd_night_light_schedule_caveat">A Night Light schedule is set in system settings — the system may flip this switch back on its own.</string>
+    <string name="pd_section_color">Color</string>
+    <string name="pd_daltonizer_label">Color correction</string>
+    <string name="pd_daltonizer_off">Off</string>
+    <string name="pd_daltonizer_grayscale">Grayscale</string>
+    <string name="pd_daltonizer_protan">Protanomaly (red–green)</string>
+    <string name="pd_daltonizer_deutan">Deuteranomaly (red–green)</string>
+    <string name="pd_daltonizer_tritan">Tritanomaly (blue–yellow)</string>
+    <string name="pd_inversion">Color inversion</string>
+    <string name="pd_section_screen">Screen</string>
+    <string name="pd_always_on">Always-on display</string>
+    <string name="pd_stay_awake">Stay awake while charging</string>
+    <string name="pd_stay_awake_help">Keeps the screen on whenever a charger (AC, USB or wireless) is connected.</string>
+    <string name="pd_section_experimental">Experimental</string>
+    <string name="pd_hdr_force_sdr">Force SDR (disable HDR formats)</string>
+    <string name="pd_hdr_help">Blocks all HDR output formats system-wide (Android 14+) — for users sensitive to HDR brightness/dithering. Some devices need the screen to re-initialise (or a reboot) to fully apply. Turning it off re-allows all HDR formats.</string>
+    <string name="pd_info_body">These toggles write the standard AOSP settings keys directly — the same keys the system Settings app uses. On heavily skinned devices a key may be ignored or relocated; if a toggle does nothing there, that feature isn\'t controllable on this device. Changes stick like system-settings changes: they stay until changed again.</string>
 </resources>

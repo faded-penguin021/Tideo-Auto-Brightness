@@ -42,7 +42,7 @@ sequential, one segment per checkpoint (ladder green + Changelog + push), D-133 
 
 - [x] Segment 0 — plan persisted
 - [x] Segment 1 — `:platform` SecureDisplayController + 1.7.0/vc17 bump (D-149)
-- [ ] Segment 2 — Privileged Display screen (manual toggles; core ask)
+- [x] Segment 2 — Privileged Display screen (manual toggles; core ask)
 - [ ] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
 - [ ] Segment 4 — scheduling runtime + storage + rules UI
 - [ ] Segment 5 — polish, owner verification checklist, plan-doc cleanup
@@ -120,6 +120,18 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 2 of 5 — the core ask): the
+  **Privileged Display screen** ships — route `privileged_display` (always registered), Menu
+  "Privileged" group (lock icon) rendered only at ELEVATED off the live `tierFlow()` + resume
+  reprobe; below ELEVATED the screen self-guards with a 3-channel grant card (adb copy / Shizuku
+  one-tap tri-state / root, mirroring Onboarding); at ELEVATED: Night Light switch + Kelvin
+  slider (AOSP bounds 2596–4082/default 2850 verified in frameworks/base; commit-on-drag-end) +
+  schedule caveat, daltonizer chips, inversion, AOD, stay-awake-charging, HDR force-SDR
+  (hidden < API 34), AOSP-keys/OEM-variance info card. `DisplayTogglesViewModel`: read-back
+  display (never optimistic — every write re-reads), refresh on resume, write failures surface +
+  clear on resume. Tests +16 (screen ELEVATED/BASIC, VM glue via real controller, Menu tier
+  visibility). Glue-review pass: one finding fixed (parallel write/read-back races serialized
+  behind a Mutex — D-143 stale-completion class). `screen_map.md` +1 row.
 - 2026-07-03 — repo-tooling only: `setup-android-sdk.sh` now seeds the Gradle wrapper dist
   cache from the container's pre-installed `/opt/gradle-<version>` (cloud-session egress proxy
   403s the wrapper's github-redirected download; without the seed every fresh session's ladder

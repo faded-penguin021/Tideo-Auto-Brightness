@@ -44,12 +44,14 @@ class UiShellTest {
     @Test
     fun menuContent_rendersHeroCardsAndNavigatesEveryDestination() {
         // S12.9f (D-070): Profiles + Contexts are one merged hero card on the Menu hub.
+        // D-149: at ELEVATED the tier-gated "Privileged" group renders too — covered here.
         var navigated: AppRoute? = null
         var recheck = false
         compose.setContent {
             MaterialTheme {
                 MenuContent(
                     activeContext = null,
+                    tier = Tier.ELEVATED,
                     onNavigate = { navigated = it },
                     onRecheckPermissions = { recheck = true },
                 )
@@ -59,8 +61,8 @@ class UiShellTest {
         compose.onNodeWithTag("hero_profiles_contexts").performScrollTo().performClick()
         assertEquals(AppRoute.Profiles, navigated)
 
-        // Every plain nav row (Dashboard + Settings + Info & Help groups) navigates.
-        AppRoute.menuNavDestinations.forEach { route ->
+        // Every plain nav row (Dashboard + Settings + Privileged + Info & Help groups) navigates.
+        (AppRoute.menuNavDestinations + AppRoute.privilegedDestinations).forEach { route ->
             compose.onNodeWithTag("menu_${route.route}").performScrollTo()
                 .performSemanticsAction(SemanticsActions.OnClick)
             assertEquals(route, navigated)
@@ -68,6 +70,20 @@ class UiShellTest {
         compose.onNodeWithTag("menu_recheck_permissions").performScrollTo()
             .performSemanticsAction(SemanticsActions.OnClick)
         assertTrue(recheck)
+    }
+
+    @Test
+    fun menuContent_privilegedGroupHiddenBelowElevated_D149() {
+        // D-149: the "Privileged" group renders only at Tier.ELEVATED — a BASIC (or NONE) user never
+        // sees a row whose destination they cannot use (the screen itself still self-guards).
+        compose.setContent {
+            MaterialTheme {
+                MenuContent(activeContext = null, tier = Tier.BASIC, onNavigate = {}, onRecheckPermissions = {})
+            }
+        }
+        AppRoute.privilegedDestinations.forEach { route ->
+            compose.onNodeWithTag("menu_${route.route}").assertDoesNotExist()
+        }
     }
 
     @Test
