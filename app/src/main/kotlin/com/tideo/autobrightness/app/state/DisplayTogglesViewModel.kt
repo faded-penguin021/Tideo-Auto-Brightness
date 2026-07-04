@@ -5,8 +5,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
-import com.tideo.autobrightness.app.settings.DisplayRule
-import com.tideo.autobrightness.app.settings.DisplayRulesStore
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
@@ -18,10 +16,8 @@ import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -64,21 +60,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     private val display: SecureDisplayController =
         AndroidSecureDisplayController(application, privilegeManager),
     private val io: CoroutineDispatcher = Dispatchers.IO,
-    private val rulesStore: DisplayRulesStore = AppModule(application).displayRulesStore,
 ) : AndroidViewModel(application) {
-
-    /** Schedule rules for the screen's Schedules section (D-150). The runtime coordinator reacts
-     *  to the same DataStore flow, so a save/delete here re-evaluates immediately (D-141 spirit). */
-    val scheduleRules: StateFlow<List<DisplayRule>> = rulesStore.rulesFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    fun saveRule(rule: DisplayRule) {
-        viewModelScope.launch { rulesStore.save(rule) }
-    }
-
-    fun deleteRule(id: String) {
-        viewModelScope.launch { rulesStore.delete(id) }
-    }
 
     private val _state = MutableStateFlow(
         PrivilegedDisplayUiState(

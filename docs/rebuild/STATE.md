@@ -35,16 +35,21 @@ gate findings) is frozen in `../history/`; the deviations registry stays live.
 New ELEVATED-only settings page (invisible below ELEVATED; "privileged" = WRITE_SECURE_SETTINGS
 via adb/Shizuku/root grant channels, D-016) exposing AOSP-universal display toggles — Night
 Light, daltonizer (incl. grayscale), inversion, AOD, stay-awake-charging, HDR force-SDR
-(experimental) — plus schedule rules ("apps → grayscale on weekdays 22:00–06:00"). Extra Dim
-excluded (pipeline-owned, D-144). Vanilla-AOSP keys only; OEM variance documented, never
-branched. **Full plan: `plans/privileged-display.md`** (delete at Segment 5). Execution:
-sequential, one segment per checkpoint (ladder green + Changelog + push), D-133 honored.
+(experimental). Extra Dim excluded (pipeline-owned, D-144). Vanilla-AOSP keys only; OEM variance
+documented, never branched. **Full plan: `plans/privileged-display.md`** (delete at Segment 5;
+its Segment 4 is OBSOLETE — superseded by the owner-instructed Segment 4.5 pivot, D-151).
+Execution: sequential, one segment per checkpoint (ladder green + Changelog + push), D-133 honored.
 
 - [x] Segment 0 — plan persisted
 - [x] Segment 1 — `:platform` SecureDisplayController + 1.7.0/vc17 bump (D-149)
 - [x] Segment 2 — Privileged Display screen (manual toggles; core ask)
 - [x] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
-- [x] Segment 4 — scheduling runtime + storage + rules UI (D-150)
+- [x] Segment 4 — scheduling runtime + storage + rules UI (D-150) — **removed again by 4.5**
+- [x] Segment 4.5 — **owner-instructed deviation from the plan (D-151):** display toggles are
+  PROFILE settings (Night Light + temperature, daltonizer, inversion in `AabSettings`, applied
+  on profile change by `DisplayTogglesCoordinator`, the super-dimming model); the D-150
+  separate schedule system deleted (`ContextMatching`, `SecureDisplayController` and the manual
+  toggles screen kept). Scheduling = a Contexts rule loading a profile with display fields.
 - [ ] Segment 5 — polish, owner verification checklist, plan-doc cleanup
 
 ## Active work — short-term Fable-dependent hardening (F-backlog, adopted D-138)
@@ -120,6 +125,24 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-04 — folds into 1.7.0/vc17 (Privileged Display **Segment 4.5 — owner-instructed
+  deviation from the plan**): **D-151** display toggles become PROFILE settings and the D-150
+  schedule system is removed. `AabSettings` gains `nightLightEnabled` / `nightLightTemperature`
+  (nullable = "device default", never written) / `daltonizerMode` (string; unknown → OFF on
+  validate) / `inversionEnabled`, fanned out to `mergeProfile` (profile-swapped like the dimming
+  fields), `validate()` + `SettingsValidator`, contract/diff display (invented `%AAB_*` names,
+  D-116 precedent), import/export round-trip, `DefaultProfiles` (inherit "leave-alone" defaults),
+  and a draft-edited profile section on the Privileged Display screen (which keeps its manual
+  toggles + grant card, loses Schedules). Apply path mirrors super dimming:
+  `DisplayTogglesCoordinator` collects the context engine's new `effectiveFlow` (service scope,
+  never the pipeline coroutine), ELEVATED-gated, **idempotent only-on-change** (seed adopts the
+  baseline without writing; equal swaps write nothing so manual/system changes stick); resting
+  state = the baseline's values re-applied on service stop — no latch, no residual sweep.
+  Deleted: `DisplayRulesCoordinator`/`DisplayRule*`/`displayRulesDataStore`/`DisplayRestoreLatch`/
+  `DisplaySchedulesSection`/domain `DisplayRules(+Resolver)` + suites; kept `ContextMatching`
+  (context-resolver goldens untouched and green) + `SecureDisplayController`. Tests: +10
+  coordinator/drift, schema/validator/merge/round-trip +8, screen tests reworked. Glue-review
+  pass: clean. `17.txt` rewritten (D-150 never shipped); version stays 1.7.0/vc17.
 - 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 4 of 5): **D-150** display
   schedules ship end-to-end — `DisplayRule` storage (own `aab_display_rules.json` DataStore +
   `DisplayRulesStore`, action as string so unknown values stay inert), the `DisplayRulesCoordinator`

@@ -66,6 +66,13 @@ class ContextEngine(
     // baseline itself when no override is active. Null until the first evaluation seeds it.
     private val _effective = MutableStateFlow<AabSettings?>(null)
 
+    /**
+     * The resolved effective settings as an observable state (null until the first evaluation).
+     * Consumed by [DisplayTogglesCoordinator]: every profile swap / settings Apply publishes here,
+     * which IS the "existing context/profile-load path" the display-toggle fields ride (D-151).
+     */
+    val effectiveFlow: StateFlow<AabSettings?> = _effective.asStateFlow()
+
     private val evalMutex = Mutex()
 
     // PASS 1: global last-eval clock (task43 %AAB_LastEvalTime). null until the first eval runs, so a
@@ -550,10 +557,12 @@ interface ProfileCatalog {
 }
 
 /**
- * Overlay a context profile's parameter set onto the baseline. The fields swapped are exactly Tasker
- * task626 `_ContextResume`'s 39-key snapshot (the LOAD_FILE parameter set); fields outside it
- * (service enable, manual context lock, debug level, setup title, schema version, and
- * `detectOverrides`) are preserved from the baseline.
+ * Overlay a context profile's parameter set onto the baseline. The fields swapped are Tasker
+ * task626 `_ContextResume`'s 39-key snapshot (the LOAD_FILE parameter set) **plus the rebuild-only
+ * display-toggle fields (D-151: `nightLightEnabled`/`nightLightTemperature`/`daltonizerMode`/
+ * `inversionEnabled` — per-profile screen state, taken from the loaded profile like the dimming
+ * fields)**; fields outside it (service enable, manual context lock, debug level, setup title,
+ * schema version, and `detectOverrides`) are preserved from the baseline.
  *
  * `detectOverrides` (%AAB_DetectOverrides) is a GLOBAL reactivity preference, NOT one of task626's
  * curve/min-max/threshold/dimming snapshot keys (contexts_spec §4 enumerates the snapshot), so a

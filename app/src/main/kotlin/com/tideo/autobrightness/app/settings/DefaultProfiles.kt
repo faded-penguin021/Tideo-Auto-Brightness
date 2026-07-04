@@ -10,7 +10,10 @@ package com.tideo.autobrightness.app.settings
  */
 object DefaultProfiles {
 
-    // task592 getBaseProfile() — note: animation defaults differ from task570 init values
+    // task592 getBaseProfile() — note: animation defaults differ from task570 init values.
+    // The D-151 display-toggle fields (nightLightEnabled/…/inversionEnabled) stay at their
+    // AabSettings defaults in every built-in: task592 predates them and the defaults are the
+    // "leave the device alone" values, so built-in profile swaps never write a display toggle.
     val Default = AabSettings(
         animSteps = 50,            // task592: anim_steps 50 (task570 default is 20)
         minWaitMs = 5,             // task592: min_wait 5 (task570 default is 25)

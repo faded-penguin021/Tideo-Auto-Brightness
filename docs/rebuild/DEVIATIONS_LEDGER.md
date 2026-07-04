@@ -2655,3 +2655,37 @@ the permanent registry — never compress or remove them.
   moved verbatim to shared `ui/components/TriggerEditors.kt` (behavior + test tags identical —
   the untouched ContextsScreen suites are the proof). Tests: +16 coordinator, +7 store/serializer,
   +3 latch, +5 screen. Folds into **1.7.0 / versionCode 17**.
+
+- **D-151: Display toggles moved into the profile schema (owner-instructed Segment 4.5 pivot —
+  NOT in the approved `plans/privileged-display.md`; its Segment 4 is obsolete); the D-150
+  separate schedule system removed.** Night Light (+ temperature), daltonizer mode and inversion
+  are now `AabSettings` PROFILE fields (`nightLightEnabled`, `nightLightTemperature` — nullable,
+  null = "no temperature opinion, leave the device's persistent preference alone",
+  `daltonizerMode` — string enum name, unknown values validate back to OFF (D-146 spirit),
+  `inversionEnabled`), fanned out to `mergeProfile` (in the swapped snapshot like the dimming
+  fields, NOT baseline-preserved), `validate()`/`SettingsValidator`, the contract + diff display
+  (invented `%AAB_NightLight`/`%AAB_NightLightTemp`/`%AAB_Daltonizer`/`%AAB_Inversion` names, the
+  D-116 precedent), import/export, and a draft-edited profile section on the Privileged Display
+  screen. Apply path mirrors super dimming: `DisplayTogglesCoordinator` collects the context
+  engine's new `effectiveFlow` in the service scope (never the pipeline coroutine) and is
+  ELEVATED-gated via `SecureDisplayController` — **idempotent, only-on-change**: a write happens
+  only for a field whose value differs from the last-applied state, the seed ADOPTS the baseline
+  without writing (service start is not a profile change — an all-defaults profile chain never
+  touches the device, so the system's own Night Light schedule keeps working), manual/system
+  changes between swaps stick, and a mid-session grant asserts only from the next change.
+  **Resting state = the baseline profile's values**: service stop re-applies the live baseline
+  (only-on-change); there is NO death-safe latch and NO residual sweep (that was D-150
+  machinery) — a process death mid-override leaves the profile's toggles on the device until the
+  next differing swap or service stop self-heals it (accepted trade). What this trades away:
+  D-150's schedules were ORTHOGONAL to profiles (a grayscale window co-existed with any active
+  profile) and restored device pre-state; the profile model is winner-takes-all — scheduling is
+  now "a Contexts rule loads a profile carrying display fields", and restore-to-baseline replaces
+  restore-to-pre-state. Removed wholesale: `DisplayRulesCoordinator`, `DisplayRule`/
+  `DisplayRuleSet`/`DisplayRulesStore`/`DisplayRulesSerializer` + `displayRulesDataStore`
+  (`aab_display_rules.json` — never shipped, no migration owed), `:platform`
+  `DisplayRestoreLatch`, the `DisplaySchedulesSection` UI, and `:domain` `DisplayRules`/
+  `DisplayRulesResolver` (+ suites). KEPT: `ContextMatching` (the context resolver's extraction
+  home — golden tests untouched and green), `SecureDisplayController`, and the manual Privileged
+  Display toggles screen (immediate control + grant card, minus its Schedules section). D-150
+  stays in this ledger as history. Folds into the unreleased **1.7.0 / versionCode 17**
+  (`changelogs/17.txt` rewritten — D-150 was never released, no user-facing deprecation).

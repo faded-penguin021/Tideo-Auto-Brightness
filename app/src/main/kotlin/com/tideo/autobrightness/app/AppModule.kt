@@ -7,19 +7,17 @@ import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
 import com.tideo.autobrightness.app.runtime.ContextEngine
 import com.tideo.autobrightness.app.runtime.ControllerHookHolder
 import com.tideo.autobrightness.app.runtime.DebugSink
-import com.tideo.autobrightness.app.runtime.DisplayRulesCoordinator
+import com.tideo.autobrightness.app.runtime.DisplayTogglesCoordinator
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.runtime.CircadianWindowProvider
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ContextRuleStore
-import com.tideo.autobrightness.app.settings.DisplayRulesStore
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
 import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.storage.contextRulesDataStore
-import com.tideo.autobrightness.app.storage.displayRulesDataStore
 import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -29,7 +27,6 @@ import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingControll
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.GeoIpLocationClient
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
-import com.tideo.autobrightness.platform.display.SharedPrefsDisplayRestoreLatch
 import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
@@ -53,10 +50,6 @@ class AppModule(context: Context) {
 
     /** Persistence + CRUD for context rules (exposed for the S12 rule-editing UI). */
     val contextRuleStore: ContextRuleStore = ContextRuleStore(appContext.contextRulesDataStore)
-
-    /** Persistence + CRUD for the Privileged Display schedule rules (D-150, exposed for the
-     *  Privileged Display screen's Schedules section). */
-    val displayRulesStore: DisplayRulesStore = DisplayRulesStore(appContext.displayRulesDataStore)
 
     /** Recorded manual-override training points — captured by the pipeline, read by the wizard +
      *  curve overlay (G2R-F13/F14). */
@@ -155,20 +148,17 @@ class AppModule(context: Context) {
             isNear = { controller.state.value.proximityNear },
         )
 
-        // Privileged Display schedule rules (D-150): its OWN coroutines in the service scope,
-        // never inside the pipeline cycle (the single-coroutine drop-on-reentry model is BINDING).
-        // Deliberately a second AndroidContextSignalSource instance — the coordinator's app poll
-        // gates on ITS rule set, independent of the context engine's (accepted v1 cost, plan §4).
-        val displayRules = DisplayRulesCoordinator(
-            rulesProvider = { displayRulesStore.rules() },
-            rulesFlow = displayRulesStore.rulesFlow(),
-            signalSource = AndroidContextSignalSource(appContext),
+        // Display-toggle profile fields (D-151): applied on profile change through the context
+        // engine's effective-settings flow — its OWN collector in the service scope, never inside
+        // the pipeline cycle (the single-coroutine drop-on-reentry model is BINDING).
+        val displayToggles = DisplayTogglesCoordinator(
+            effectiveFlow = contextEngine.effectiveFlow,
+            baselineFlow = appContext.settingsDataStore.data,
             display = AndroidSecureDisplayController(appContext, privilegeManager),
-            restoreLatch = SharedPrefsDisplayRestoreLatch(appContext),
             tierProvider = { privilegeManager.currentTier() },
         )
 
-        return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager, displayRules)
+        return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager, displayToggles)
     }
 }
 
@@ -184,8 +174,8 @@ class RuntimeGraph(
     /** Shared tier source. The service [refresh][PrivilegeManager.refresh]es it at resume points so a
      *  post-start ADB/Shizuku grant is seen without re-checking the permission on every dimming cycle. */
     val privilegeManager: PrivilegeManager,
-    /** Privileged Display schedule rules (D-150); the service drives its lifecycle + screen hooks. */
-    val displayRules: DisplayRulesCoordinator,
+    /** Display-toggle profile fields (D-151); the service drives its start/stop lifecycle. */
+    val displayToggles: DisplayTogglesCoordinator,
 ) {
     val activeContext: StateFlow<String?> = contextEngine.activeContext
 }

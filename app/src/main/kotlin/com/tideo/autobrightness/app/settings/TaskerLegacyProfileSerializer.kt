@@ -164,6 +164,12 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_ThreshMidpoint"]?.toDoubleOrNull()?.let { settings = settings.copy(thresholdMidpoint = it) }
         map["%AAB_ContextOverride"]?.let { settings = settings.copy(contextOverride = it.asBoolean(settings.contextOverride)) }
         map["%AAB_SetupTitle"]?.let { settings = settings.copy(setupTitle = it) }
+        // Rebuild-only display-toggle fields (D-151) — invented %AAB_ names (the D-116 precedent);
+        // no Tasker export ever carried them, but a hand-written key=value file may.
+        map["%AAB_NightLight"]?.let { settings = settings.copy(nightLightEnabled = it.asBoolean(settings.nightLightEnabled)) }
+        map["%AAB_NightLightTemp"]?.asRoundedInt()?.let { settings = settings.copy(nightLightTemperature = it) }
+        map["%AAB_Daltonizer"]?.let { settings = settings.copy(daltonizerMode = it.trim().uppercase()) }
+        map["%AAB_Inversion"]?.let { settings = settings.copy(inversionEnabled = it.asBoolean(settings.inversionEnabled)) }
 
         return settings.validate()
     }

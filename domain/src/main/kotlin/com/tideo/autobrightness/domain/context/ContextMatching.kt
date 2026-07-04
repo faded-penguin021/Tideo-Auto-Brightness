@@ -6,9 +6,9 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Shared per-dimension trigger matching, extracted verbatim from [ContextOverrideResolver] so the
- * display-rules resolver (`domain/display/DisplayRulesResolver`) evaluates the SAME trigger
- * semantics without duplicating them. Extraction is behavior-preserving — the golden
+ * Shared per-dimension trigger matching, extracted verbatim from [ContextOverrideResolver] (at
+ * the time for the D-150 display-rules resolver, since removed by D-151; the extraction stays —
+ * it is where these semantics live now). Extraction is behavior-preserving — the golden
  * `ContextOverrideResolverTest` matrix is the proof; the Tasker provenance below moved here with
  * the code.
  *
@@ -16,8 +16,7 @@ import kotlin.math.sqrt
  * semantics in `extraction/contexts_spec.md` §4.
  *
  * What is deliberately NOT here: precedence (priority/specificity/array-order — override-resolver
- * policy) and the display resolver's per-action OR — each caller owns its own merge policy on top
- * of these single-dimension verdicts.
+ * policy) — each caller owns its own merge policy on top of these single-dimension verdicts.
  */
 internal object ContextMatching {
 

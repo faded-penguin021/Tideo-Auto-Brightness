@@ -93,6 +93,10 @@ private val FRIENDLY_LABELS: Map<String, String> = mapOf(
     "scaleTaperSteepness" to "Taper steepness",
     "scaleTransitionFactor" to "Scale transition",
     "trustUnreliableSensor" to "Trust low-accuracy sensor",
+    "nightLightEnabled" to "Night Light",
+    "nightLightTemperature" to "Night Light temperature",
+    "daltonizerMode" to "Color correction",
+    "inversionEnabled" to "Color inversion",
 )
 
 internal fun friendlyLabel(key: String, taskerVariable: String): String =
@@ -141,6 +145,11 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "debugLevel" -> debugLevel.toString()
     "panicSensitivity" -> panicSensitivity.toString()
     "contextOverride" -> contextOverride.toString()
+    // D-151 display-toggle profile fields; a null temperature means "device default" (never written).
+    "nightLightEnabled" -> nightLightEnabled.toString()
+    "nightLightTemperature" -> nightLightTemperature?.toString() ?: "device default"
+    "daltonizerMode" -> daltonizerMode
+    "inversionEnabled" -> inversionEnabled.toString()
     // S12.9c #2: fail fast on schema drift. Every AabSettingsContract key must be handled above; a
     // silent "" would hide a contract/extractor mismatch. SettingsDisplayContractDriftTest guards this.
     else -> throw IllegalArgumentException("Unknown AabSettings key: '$key' (not in valueFor's when)")

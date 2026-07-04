@@ -3,7 +3,9 @@ package com.tideo.autobrightness.app.settings
 import kotlinx.serialization.Serializable
 
 /**
- * Nested decomposition of the 41 flat [AabSettings] fields into seven cohesive records (S12.9c #1).
+ * Nested decomposition of the flat [AabSettings] fields into seven cohesive records (S12.9c #1).
+ * (Not exhaustive: later rebuild-only additions — e.g. the D-151 display-toggle fields — stay flat
+ * without a group view until a caller needs one.)
  *
  * **Wire compatibility is binding.** These records are NOT the on-disk schema — [AabSettings] stays a
  * flat `@Serializable` data class so the existing flat v3 JSON (`aab_settings.json`) loads and saves

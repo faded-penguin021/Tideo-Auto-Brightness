@@ -16,14 +16,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -34,12 +32,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.R
-import com.tideo.autobrightness.app.settings.DisplayRule
-import com.tideo.autobrightness.app.state.AppEntry
-import com.tideo.autobrightness.app.state.ContextsViewModel
+import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.DALTONIZER_OFF
 import com.tideo.autobrightness.app.state.DisplayTogglesViewModel
+import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
 import com.tideo.autobrightness.app.ui.components.AabCard
+import com.tideo.autobrightness.app.ui.components.DraftApplyBar
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
@@ -59,29 +58,24 @@ import kotlin.math.roundToInt
  * Menu's tier-gated "Privileged" group; the route itself is always registered, so the screen
  * self-guards: below ELEVATED it renders a grant card offering all three grant channels (adb copy /
  * Shizuku one-tap / root), mirroring Onboarding's ELEVATED step.
+ *
+ * Below the manual toggles sits the **profile section (D-151)**: Night Light (+ temperature),
+ * color correction and inversion as draft-edited PROFILE fields — part of `AabSettings` like the
+ * super-dimming fields, applied on profile change by the runtime `DisplayTogglesCoordinator`
+ * (replaces the D-150 Schedules section; use a Contexts rule + profile for scheduling).
  */
 @Composable
 fun PrivilegedDisplayScreen(
     navController: NavHostController,
     vm: DisplayTogglesViewModel = viewModel(),
-    // Reused for the schedule editor's app picker + usage-access plumbing (same VM the Contexts
-    // rule editor uses — the installed-apps query and grant intent are identical needs).
-    contextsVm: ContextsViewModel = viewModel(),
+    // The standard per-screen draft editor (G2-F1 preview→Apply) for the D-151 profile fields.
+    draftVm: DraftSettingsViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val scheduleRules by vm.scheduleRules.collectAsStateWithLifecycle()
+    val draft by draftVm.draft.collectAsStateWithLifecycle()
+    val dirty by draftVm.dirty.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
-    val context = LocalContext.current
-
-    // Launchable apps for the schedule editor's optional app trigger; only worth querying once
-    // the toggles (and thus the Schedules section) can actually render.
-    var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
-    LaunchedEffect(state.tier) {
-        if (state.tier == Tier.ELEVATED && apps.isEmpty()) {
-            apps = runCatching { contextsVm.installedApps() }.getOrDefault(emptyList())
-        }
-    }
 
     // Re-probe on every return to the foreground: an adb grant, a Shizuku grant, or a change made
     // in the system Settings app must all show up without leaving the screen (read-back display).
@@ -110,15 +104,11 @@ fun PrivilegedDisplayScreen(
         onSetAlwaysOn = vm::setAlwaysOnDisplay,
         onSetStayAwake = vm::setStayAwakePlugged,
         onSetHdrForceSdr = vm::setHdrForceSdr,
-        scheduleRules = scheduleRules,
-        scheduleApps = apps,
-        onSaveRule = { vm.saveRule(it); toast(R.string.toast_rule_saved) },
-        onDeleteRule = { vm.deleteRule(it); toast(R.string.toast_rule_deleted) },
-        hasUsageAccess = contextsVm::hasUsageAccess,
-        onRequestUsageAccess = {
-            toast(R.string.toast_grant_usage_hint)
-            runCatching { context.startActivity(contextsVm.usageAccessIntent()) }
-        },
+        draft = draft,
+        draftDirty = dirty,
+        onEditDraft = draftVm::edit,
+        onApplyDraft = draftVm::apply,
+        onDiscardDraft = draftVm::discard,
     )
 }
 
@@ -136,12 +126,11 @@ fun PrivilegedDisplayContent(
     onSetAlwaysOn: (Boolean) -> Unit = {},
     onSetStayAwake: (Boolean) -> Unit = {},
     onSetHdrForceSdr: (Boolean) -> Unit = {},
-    scheduleRules: List<DisplayRule> = emptyList(),
-    scheduleApps: List<AppEntry> = emptyList(),
-    onSaveRule: (DisplayRule) -> Unit = {},
-    onDeleteRule: (String) -> Unit = {},
-    hasUsageAccess: () -> Boolean = { true },
-    onRequestUsageAccess: () -> Unit = {},
+    draft: AabSettings = AabSettings(),
+    draftDirty: Boolean = false,
+    onEditDraft: ((AabSettings) -> AabSettings) -> Unit = {},
+    onApplyDraft: () -> Unit = {},
+    onDiscardDraft: () -> Unit = {},
 ) {
     SettingsScaffold(stringResource(R.string.title_privileged_display), onBack) { padding ->
         SettingsColumn(padding) {
@@ -171,7 +160,10 @@ fun PrivilegedDisplayContent(
                             modifier = Modifier.testTag("pd_schedule_caveat"),
                         )
                     }
-                    NightLightTemperatureSlider(state.nightLightTemperature, onSetNightLightTemperature)
+                    NightLightTemperatureSlider(
+                        kelvin = state.nightLightTemperature,
+                        onCommit = onSetNightLightTemperature,
+                    )
                 }
 
                 SectionHeader(stringResource(R.string.pd_section_color), divider = true)
@@ -205,16 +197,16 @@ fun PrivilegedDisplayContent(
                     }
                 }
 
-                // Schedule rules (D-150, Segment 4): ELEVATED-only like the toggles — the runtime
-                // coordinator is inert below ELEVATED, so offering the editor there would be a lie.
-                SectionHeader(stringResource(R.string.pd_section_schedules), divider = true)
-                DisplaySchedulesSection(
-                    rules = scheduleRules,
-                    apps = scheduleApps,
-                    onSave = onSaveRule,
-                    onDelete = onDeleteRule,
-                    hasUsageAccess = hasUsageAccess,
-                    onRequestUsageAccess = onRequestUsageAccess,
+                // D-151: the display-toggle PROFILE fields (replaces the D-150 Schedules section).
+                // ELEVATED-only, like the manual toggles — the runtime coordinator is a no-op below
+                // ELEVATED, so offering the editor there would be a lie.
+                SectionHeader(stringResource(R.string.pd_section_profile), divider = true)
+                ProfileDisplaySection(
+                    draft = draft,
+                    dirty = draftDirty,
+                    onEdit = onEditDraft,
+                    onApply = onApplyDraft,
+                    onDiscard = onDiscardDraft,
                 )
             }
 
@@ -229,6 +221,59 @@ fun PrivilegedDisplayContent(
             }
             Spacer(Modifier.height(Dimens.sectionSpacing))
         }
+    }
+}
+
+/**
+ * The D-151 profile section: Night Light (+ temperature), color correction and inversion as
+ * draft-edited PROFILE fields (the G2-F1 preview→Apply model, same as the super-dimming fields on
+ * their screen). Applied by the runtime coordinator when a profile loads — a context rule that
+ * swaps profiles is the scheduling story now; manual/system changes between swaps stick.
+ */
+@Composable
+private fun ProfileDisplaySection(
+    draft: AabSettings,
+    dirty: Boolean,
+    onEdit: ((AabSettings) -> AabSettings) -> Unit,
+    onApply: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    AabCard(modifier = Modifier.testTag("pd_profile_card")) {
+        Text(
+            stringResource(R.string.pd_profile_intro),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SwitchSettingRow(
+            stringResource(R.string.pd_night_light_switch), draft.nightLightEnabled,
+            { on -> onEdit { it.copy(nightLightEnabled = on) } },
+            testTag = "switch_profile_nightLight",
+        )
+        NightLightTemperatureSlider(
+            kelvin = draft.nightLightTemperature,
+            onCommit = { k -> onEdit { it.copy(nightLightTemperature = k) } },
+            testTag = "slider_profile_nightLightTemp",
+        )
+        if (draft.nightLightTemperature != null) {
+            TextButton(
+                onClick = { onEdit { it.copy(nightLightTemperature = null) } },
+                modifier = Modifier.testTag("pd_profile_temp_clear"),
+            ) { Text(stringResource(R.string.pd_profile_temp_clear)) }
+        }
+        DaltonizerPicker(
+            selected = DaltonizerMode.entries.firstOrNull { it.name == draft.daltonizerMode }
+                ?: DaltonizerMode.OFF,
+            onSelect = { mode ->
+                onEdit { it.copy(daltonizerMode = if (mode == DaltonizerMode.OFF) DALTONIZER_OFF else mode.name) }
+            },
+            tagPrefix = "profile_daltonizer",
+        )
+        SwitchSettingRow(
+            stringResource(R.string.pd_inversion), draft.inversionEnabled,
+            { on -> onEdit { it.copy(inversionEnabled = on) } },
+            testTag = "switch_profile_inversion",
+        )
+        DraftApplyBar(dirty = dirty, onApply = onApply, onDiscard = onDiscard)
     }
 }
 
@@ -284,7 +329,11 @@ private fun GrantChannelsCard(
  * set → the label says "device default" and the thumb parks at the AOSP default until first commit.
  */
 @Composable
-private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
+private fun NightLightTemperatureSlider(
+    kelvin: Int?,
+    onCommit: (Int) -> Unit,
+    testTag: String = "slider_nightLightTemp",
+) {
     var drag by remember { mutableStateOf<Float?>(null) }
     val shown = drag?.roundToInt() ?: kelvin
     Column {
@@ -301,7 +350,7 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
                 drag = null
             },
             valueRange = AOSP_NIGHT_LIGHT_MIN_K.toFloat()..AOSP_NIGHT_LIGHT_MAX_K.toFloat(),
-            modifier = Modifier.fillMaxWidth().testTag("slider_nightLightTemp"),
+            modifier = Modifier.fillMaxWidth().testTag(testTag),
         )
         Text(
             stringResource(R.string.pd_night_light_temp_hint),
@@ -314,7 +363,11 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
 /** One chip per daltonizer mode (5 incl. Off — a FlowRow so they wrap on narrow screens). */
 @OptIn(ExperimentalLayoutApi::class) // FlowRow (chip row that wraps on narrow screens)
 @Composable
-private fun DaltonizerPicker(selected: DaltonizerMode, onSelect: (DaltonizerMode) -> Unit) {
+private fun DaltonizerPicker(
+    selected: DaltonizerMode,
+    onSelect: (DaltonizerMode) -> Unit,
+    tagPrefix: String = "daltonizer",
+) {
     Column {
         Text(stringResource(R.string.pd_daltonizer_label), style = MaterialTheme.typography.bodyLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimens.space2)) {
@@ -323,7 +376,7 @@ private fun DaltonizerPicker(selected: DaltonizerMode, onSelect: (DaltonizerMode
                     selected = selected == mode,
                     onClick = { onSelect(mode) },
                     label = { Text(stringResource(mode.labelRes())) },
-                    modifier = Modifier.testTag("daltonizer_${mode.name.lowercase()}"),
+                    modifier = Modifier.testTag("${tagPrefix}_${mode.name.lowercase()}"),
                 )
             }
         }

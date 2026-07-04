@@ -43,7 +43,7 @@ rects and `PropertiesElement` scene-chrome are dropped (replaced by the M3 Scaff
 | **Tools** | Debug Scene power-draw calibration, Power Draw Graph, (wizard from Brightness Graph 'Suggest', calibration from task524) | PowerDrawChart |
 | **Profiles & Import/Export** | AAB Profile (profile manager + context-rule editor) | — |
 | **About+Guide+Onboarding** | AAB About, AAB User Guide, privilege onboarding | — |
-| **Privileged Display** (`privileged_display`) | — rebuild-only feature, **no Tasker source** (D-149, `plans/privileged-display.md`): AOSP display toggles behind WRITE_SECURE_SETTINGS (Night Light + Kelvin, daltonizer/inversion, AOD, stay-awake-charging, experimental HDR force-SDR). Menu row only at ELEVATED (own "Privileged" group); the screen self-guards below ELEVATED with a 3-channel grant card | — |
+| **Privileged Display** (`privileged_display`) | — rebuild-only feature, **no Tasker source** (D-149, `plans/privileged-display.md`): AOSP display toggles behind WRITE_SECURE_SETTINGS (Night Light + Kelvin, daltonizer/inversion, AOD, stay-awake-charging, experimental HDR force-SDR). Menu row only at ELEVATED (own "Privileged" group); the screen self-guards below ELEVATED with a 3-channel grant card. Also hosts the D-151 **profile section**: Night Light (+ temperature), color correction and inversion as draft-edited `AabSettings` profile fields, applied on profile change by `DisplayTogglesCoordinator` | — |
 | _(dropped)_ | AAB Chart.Js License (Chart.js removed) | — |
 
 Every Chart.js WebElement maps to a named Compose-Canvas chart (built S12/S13). Mapping:

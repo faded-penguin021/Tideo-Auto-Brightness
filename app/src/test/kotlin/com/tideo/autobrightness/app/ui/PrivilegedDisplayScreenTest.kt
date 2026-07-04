@@ -3,15 +3,16 @@ package com.tideo.autobrightness.app.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
-import com.tideo.autobrightness.app.settings.DisplayRule
+import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
 import com.tideo.autobrightness.app.ui.screens.PrivilegedDisplayContent
-import com.tideo.autobrightness.domain.display.DisplayAction
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
 import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
@@ -25,9 +26,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Privileged Display screen (D-149, Segment 2): at ELEVATED the manual toggles render and route
- * through their callbacks; below ELEVATED the screen self-guards with the grant card offering all
- * three grant channels (adb always; Shizuku one-tap only with a live binder; root). Drives the
+ * Privileged Display screen (D-149, Segment 2; D-151 profile section): at ELEVATED the manual
+ * toggles render and route through their callbacks, and the profile section edits the D-151
+ * display-toggle draft fields; below ELEVATED the screen self-guards with the grant card offering
+ * all three grant channels (adb always; Shizuku one-tap only with a live binder; root). Drives the
  * stateless [PrivilegedDisplayContent] directly (no ViewModel / real settings needed).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -144,8 +146,9 @@ class PrivilegedDisplayScreenTest {
                 )
             }
         }
-        // Never-set temperature reads as the device default, not a fabricated number.
-        compose.onNodeWithText("Temperature: device default").performScrollTo().assertExists()
+        // Never-set temperature reads as the device default, not a fabricated number (the manual
+        // slider AND the D-151 profile slider both park there for an unset value).
+        compose.onAllNodesWithText("Temperature: device default").onFirst().assertExists()
         // The M3 slider's SetProgress semantics invoke onValueChange + onValueChangeFinished —
         // the commit-on-drag-END contract (one settings write per gesture).
         compose.onNodeWithTag("slider_nightLightTemp").performScrollTo()
@@ -193,93 +196,77 @@ class PrivilegedDisplayScreenTest {
         compose.onNodeWithTag("pd_shizuku_start_prompt").assertDoesNotExist()
     }
 
-    // --- Schedules section (D-150, Segment 4) ---------------------------------------------------
+    // --- Profile section (D-151, replaces the D-150 Schedules section) --------------------------
 
     @Test
-    fun elevated_schedules_addOpensEditor_saveProducesRuleWithPickedAction() {
-        var saved: DisplayRule? = null
-        compose.setContent {
-            MaterialTheme {
-                PrivilegedDisplayContent(state = elevated, onBack = {}, onSaveRule = { saved = it })
-            }
-        }
-        compose.onNodeWithTag("add_display_rule").performScrollTo().performClick()
-        compose.onNodeWithTag("display_rule_editor").assertExists()
-        compose.onNodeWithTag("display_action_inversion").performScrollTo().performClick()
-        compose.onNodeWithTag("save_display_rule").performScrollTo().performClick()
-        assertEquals(DisplayAction.INVERSION.name, saved?.action)
-        assertEquals(true, saved?.enabled)
-        assertTrue(!saved?.id.isNullOrBlank(), "a new rule must get a stable id")
-        // Saving closes the modal.
-        compose.onNodeWithTag("display_rule_editor").assertDoesNotExist()
-    }
-
-    @Test
-    fun elevated_scheduleEditor_daysFlowIntoTriggers() {
-        var saved: DisplayRule? = null
-        compose.setContent {
-            MaterialTheme {
-                PrivilegedDisplayContent(state = elevated, onBack = {}, onSaveRule = { saved = it })
-            }
-        }
-        compose.onNodeWithTag("add_display_rule").performScrollTo().performClick()
-        compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
-        compose.onNodeWithTag("day_2").performScrollTo().performClick() // Monday
-        compose.onNodeWithTag("day_6").performScrollTo().performClick() // Friday
-        compose.onNodeWithTag("save_display_rule").performScrollTo().performClick()
-        assertEquals(listOf(2, 6), saved?.triggers?.days)
-    }
-
-    @Test
-    fun elevated_scheduleCard_enabledSwitchTogglesViaSave() {
-        val rule = DisplayRule(id = "r1", name = "Weeknights", action = DisplayAction.GRAYSCALE.name)
-        var saved: DisplayRule? = null
+    fun elevated_profileSection_editsFlowIntoDraft() {
+        var draft = AabSettings()
         compose.setContent {
             MaterialTheme {
                 PrivilegedDisplayContent(
                     state = elevated, onBack = {},
-                    scheduleRules = listOf(rule), onSaveRule = { saved = it },
+                    draft = draft,
+                    onEditDraft = { transform -> draft = transform(draft) },
                 )
             }
         }
-        compose.onNodeWithTag("display_rule_enabled_r1").performScrollTo().performClick()
-        assertEquals(false, saved?.enabled, "the card switch must save the toggled enabled flag")
-        assertEquals("r1", saved?.id)
+        compose.onNodeWithTag("pd_profile_card").performScrollTo().assertExists()
+        compose.onNodeWithTag("switch_profile_nightLight").performScrollTo().performClick()
+        assertEquals(true, draft.nightLightEnabled)
+        compose.onNodeWithTag("profile_daltonizer_grayscale").performScrollTo().performClick()
+        assertEquals("GRAYSCALE", draft.daltonizerMode)
+        compose.onNodeWithTag("switch_profile_inversion").performScrollTo().performClick()
+        assertEquals(true, draft.inversionEnabled)
     }
 
     @Test
-    fun elevated_scheduleDelete_requiresConfirmation() {
-        val rule = DisplayRule(id = "r1", name = "Weeknights", action = DisplayAction.GRAYSCALE.name)
-        var deleted: String? = null
+    fun elevated_profileTemperature_commitsToDraft_andClearButtonResetsToDeviceDefault() {
+        var draft = AabSettings(nightLightTemperature = 3000)
         compose.setContent {
             MaterialTheme {
                 PrivilegedDisplayContent(
                     state = elevated, onBack = {},
-                    scheduleRules = listOf(rule), onDeleteRule = { deleted = it },
+                    draft = draft,
+                    onEditDraft = { transform -> draft = transform(draft) },
                 )
             }
         }
-        compose.onNodeWithTag("delete_display_rule_r1").performScrollTo().performClick()
-        assertNull(deleted, "delete must not fire before the confirmation (D-114 pattern)")
-        compose.onNodeWithTag("confirm_delete_display_rule_r1").performClick()
-        assertEquals("r1", deleted)
+        compose.onNodeWithTag("slider_profile_nightLightTemp").performScrollTo()
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(3300f) }
+        assertEquals(3300, draft.nightLightTemperature)
+        // A set temperature offers the "use device temperature" clear back to null (= no opinion).
+        compose.onNodeWithTag("pd_profile_temp_clear").performScrollTo().performClick()
+        assertNull(draft.nightLightTemperature)
     }
 
     @Test
-    fun basic_hidesSchedulesSection() {
+    fun elevated_profileApplyBar_firesApply_onlyWhenDirty() {
+        var applied = false
+        compose.setContent {
+            MaterialTheme {
+                PrivilegedDisplayContent(
+                    state = elevated, onBack = {},
+                    draftDirty = true,
+                    onApplyDraft = { applied = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("apply_settings").performScrollTo().performClick()
+        assertTrue(applied)
+    }
+
+    @Test
+    fun basic_hidesProfileSection() {
         compose.setContent {
             MaterialTheme {
                 PrivilegedDisplayContent(
                     state = PrivilegedDisplayUiState(tier = Tier.BASIC),
                     onBack = {},
-                    scheduleRules = listOf(
-                        DisplayRule(id = "r1", name = "X", action = DisplayAction.GRAYSCALE.name),
-                    ),
                 )
             }
         }
-        compose.onNodeWithTag("add_display_rule").assertDoesNotExist()
-        compose.onNodeWithTag("display_rule_r1").assertDoesNotExist()
+        compose.onNodeWithTag("pd_profile_card").assertDoesNotExist()
+        compose.onNodeWithTag("switch_profile_nightLight").assertDoesNotExist()
     }
 
     @Test

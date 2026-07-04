@@ -134,6 +134,12 @@ mapping against AOSP source at execution (WebFetch/WebSearch); if unverifiable, 
    line. Commit, push.
 
 ### Segment 4 — scheduling runtime + storage + rules UI
+
+> **OBSOLETE (2026-07-04, Segment 4.5 / D-151).** Shipped as D-150, then removed by the
+> owner-instructed Segment 4.5 pivot: the display toggles are PROFILE settings (`AabSettings`
+> fields applied on profile change by `DisplayTogglesCoordinator`, the super-dimming model), not
+> a separate schedule system. Kept here unedited only as the record of what D-150 was; this whole
+> file is deleted at Segment 5.
 1. Storage: `DisplayRuleSet` + `DisplayRulesSerializer` + `Context.displayRulesDataStore`
    ("aab_display_rules.json") + `DisplayRulesStore` (clone ContextRuleStore pattern).
    Deliberately outside `AabSettings` (no migration/import-export coupling — future work).

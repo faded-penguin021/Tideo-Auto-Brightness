@@ -8,8 +8,6 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.AabSettingsSerializer
 import com.tideo.autobrightness.app.settings.ContextOverrideConfig
 import com.tideo.autobrightness.app.settings.ContextRulesSerializer
-import com.tideo.autobrightness.app.settings.DisplayRuleSet
-import com.tideo.autobrightness.app.settings.DisplayRulesSerializer
 import com.tideo.autobrightness.app.settings.OverridePoints
 import com.tideo.autobrightness.app.settings.OverridePointsSerializer
 import com.tideo.autobrightness.app.settings.SavedProfiles
@@ -33,14 +31,6 @@ val Context.powerDrawDataStore by preferencesDataStore(name = "power_draw")
 val Context.contextRulesDataStore: DataStore<ContextOverrideConfig> by dataStore(
     fileName = "aab_context_rules.json",
     serializer = ContextRulesSerializer,
-)
-
-// Privileged Display schedule rules (D-150): a separate store from the context rules — display rules
-// are all-matching per-action toggles; keeping them out of AabSettings/contexts.json leaves the
-// Tasker-interop format and the import/export surface untouched (plans/privileged-display.md §Segment 4).
-val Context.displayRulesDataStore: DataStore<DisplayRuleSet> by dataStore(
-    fileName = "aab_display_rules.json",
-    serializer = DisplayRulesSerializer,
 )
 
 // Recorded manual-override training points (%AAB_Overrides): captured at runtime by the pipeline so
