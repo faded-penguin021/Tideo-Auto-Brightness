@@ -53,19 +53,15 @@ registry stays live.
   doc-drift audit (RUNBOOK self-adaptation covers it); action SHA-pinning / Gradle dependency
   verification (declined 2026-06-29 as wrong cost/benefit for a solo F-Droid app).
 - **Privileged Display (decided at Segments 4.5–5, D-150–D-152):**
-  - **Per-toggle orthogonal scheduling** — the D-150 separate schedule system was built, then
-    removed by the owner-instructed D-151 pivot. Scheduling IS "a Contexts rule loads a profile
-    carrying display fields", winner-takes-all with the rest of the profile.
-  - **A persisted last-applied seed** for `DisplayTogglesCoordinator` — considered and deferred
-    at 4.5: it would shrink the accepted D-151 process-death residual at the cost of
-    re-introducing exactly the latch-like persistence the pivot removed. Revisit only on
-    real-world reports.
-  - **QS tile / notification action for grayscale** (or any display toggle) — not planned;
+  - **Per-toggle orthogonal scheduling** — D-150 built it, the D-151 pivot removed it.
+    Scheduling IS "a Contexts rule loads a profile carrying display fields", winner-takes-all.
+  - **A persisted last-applied seed** for `DisplayTogglesCoordinator` — deferred at 4.5: it
+    would shrink the D-151 process-death residual by re-introducing exactly the latch-like
+    persistence the pivot removed. Revisit only on real-world reports.
+  - **QS tile / notification action for grayscale** (or any display toggle) —
     profiles/Contexts are the switching surface.
-  - **Refresh-rate forcing** and any OEM-specific alternate settings keys — rejected as
-    OEM-fragmented (vanilla-AOSP-only policy, D-048/D-149).
-  - **A manual Extra-Dim toggle** on the Privileged Display screen — Extra Dim is
-    pipeline-owned (D-144/D-149).
+  - **Refresh-rate forcing** / OEM-specific alternate keys — OEM-fragmented (D-048/D-149).
+  - **A manual Extra-Dim toggle** — Extra Dim is pipeline-owned (D-144/D-149).
 
 ## Changelog
 
@@ -90,15 +86,14 @@ One line per shipped change (newest first). Keep terse; details live in the ledg
   the AOSP-keys/OEM note moved off an always-on footer card to a top-bar **ⓘ → dialog**
   (`SettingsScaffold` gains an `actions` slot); i18n ratchet 0.
 - 2026-07-05 — folds into 1.7.0/vc17 (4.5 follow-up, owner findings): **D-152** profile port
-  complete — AOD / stay-awake / HDR join `AabSettings` (7 display fields total); the screen
-  de-duplicates to ONE draft-edited profile surface + grant card; `applyNow` writes the device
-  directly exactly when the service is off (Apply is never a silent no-op). Glue-review: clean.
+  complete — AOD / stay-awake / HDR join `AabSettings` (7 display fields); ONE draft-edited
+  profile surface + grant card; `applyNow` writes the device directly exactly when the service
+  is off (Apply is never a silent no-op). Glue-review: clean.
 - 2026-07-04 — folds into 1.7.0/vc17 (**Segment 4.5 — owner-instructed pivot**): **D-151**
   display toggles become PROFILE settings applied on profile change by
-  `DisplayTogglesCoordinator` (service scope; idempotent only-on-change; seed adopts the
-  baseline without writing; resting state = baseline; NO latch/sweep — accepted process-death
-  residual). The D-150 schedule system removed wholesale; `ContextMatching` +
-  `SecureDisplayController` kept; `17.txt` rewritten. Glue-review: clean.
+  `DisplayTogglesCoordinator` (idempotent only-on-change; seed adopts; resting = baseline; NO
+  latch/sweep — accepted process-death residual). D-150 schedule system removed wholesale;
+  `ContextMatching` + `SecureDisplayController` kept. Glue-review: clean.
 - 2026-07-03 — folds into 1.7.0/vc17 (Segment 4): **D-150** display schedules end-to-end (own
   DataStore, edge-triggered coordinator with death-safe latch + restore, rules UI, shared
   `TriggerEditors.kt` extraction; glue-review: +1 s boundary-wake fix) — **removed again by
