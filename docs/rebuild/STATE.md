@@ -98,16 +98,14 @@ One line per shipped change (newest first). Keep terse; details live in the ledg
   DataStore, edge-triggered coordinator with death-safe latch + restore, rules UI, shared
   `TriggerEditors.kt` extraction; glue-review: +1 s boundary-wake fix) — **removed again by
   4.5**; the ledger row is the record.
-- 2026-07-03 — folds into 1.7.0/vc17 (Segment 3, `:domain`-only): display-rule resolver +
-  truth-table tests, and the behavior-preserving **`ContextMatching` extraction** from
-  `ContextOverrideResolver` (goldens untouched and green). The resolver died with 4.5;
-  `ContextMatching` stays live.
+- 2026-07-03 — folds into 1.7.0/vc17 (Segment 3, `:domain`-only): display-rule resolver + the
+  behavior-preserving **`ContextMatching` extraction** (goldens untouched and green). The
+  resolver died with 4.5; `ContextMatching` stays live.
 - 2026-07-03 — folds into 1.7.0/vc17 (Segment 2 — the core ask): the **Privileged Display
-  screen** (route always registered; Menu "Privileged" group only at ELEVATED off live
-  `tierFlow()`; self-guarding 3-channel grant card; read-back VM; AOSP Kelvin bounds
-  2596–4082/default 2850 verified). Glue-review: one Mutex finding fixed.
-- 2026-07-03 — repo-tooling only: `setup-android-sdk.sh` seeds the Gradle wrapper dist cache
-  from the container's `/opt` (the cloud egress proxy 403s the wrapper download).
+  screen** (route always registered; Menu row only at ELEVATED off live `tierFlow()`;
+  self-guarding 3-channel grant card; read-back VM). Glue-review: one Mutex finding fixed.
+- 2026-07-03 — repo-tooling only: `setup-android-sdk.sh` seeds the Gradle wrapper cache from
+  `/opt` (the cloud egress proxy 403s the wrapper download).
 - 2026-07-03 — 1.7.0 / `versionCode 17` (MINOR, Segment 1): **D-149** `:platform`
   `SecureDisplayController` — Night Light (+temperature), daltonizer, inversion, AOD,
   stay-awake-charging, Android-14+ force-SDR; AOSP-universal keys only; Extra Dim excluded
