@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
+import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
@@ -23,36 +24,28 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Everything the Privileged Display screen renders (D-149). */
+/** Everything the Privileged Display screen renders besides the draft fields (D-149/D-152). */
 data class PrivilegedDisplayUiState(
     val tier: Tier = Tier.NONE,
-    val nightLight: Boolean = false,
-    /** null = the device default is in effect (`night_display_color_temperature` never set). */
-    val nightLightTemperature: Int? = null,
+    /** Device Night Light schedule mode — non-MANUAL shows the "system may re-flip this" caveat. */
     val nightLightAutoMode: NightLightAutoMode = NightLightAutoMode.MANUAL,
-    val daltonizer: DaltonizerMode = DaltonizerMode.OFF,
-    val inversion: Boolean = false,
-    val alwaysOnDisplay: Boolean = false,
-    val stayAwakePlugged: Boolean = false,
     /** HDR force-SDR needs Android 14+; the Experimental section is hidden when false. */
     val hdrAvailable: Boolean = false,
-    val hdrForceSdr: Boolean = false,
     /** Grant-card affordances (mirrors Onboarding's ELEVATED step, shown below ELEVATED). */
     val adbCommand: String = "",
     val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
     /** Already-resolved Shizuku/root grant feedback (built from string resources in the VM). */
     val grantMessage: String? = null,
-    /** The last write returned failure (revoked/stale grant) — surfaced as an error banner; the
-     *  unconditional read-back below already snapped the control to the device's real value. */
+    /** The last direct apply had a failed write (revoked/stale grant) — error banner. */
     val writeFailed: Boolean = false,
 )
 
 /**
- * Drives the Privileged Display screen (D-149, `plans/privileged-display.md` Segment 2). All toggle
- * state is **read back from the device** (never cached optimistically): every write is followed by a
- * full re-read on [io], so the UI always shows what the device actually has — a failed or
- * OEM-ignored write snaps the control back instead of lying. `refresh()` re-probes on resume, so
- * changes made in the system Settings app (or an adb grant) surface on return.
+ * Drives the Privileged Display screen (D-149; reworked by D-152). The toggles themselves are
+ * PROFILE fields edited through the shared [DraftSettingsViewModel] — this VM only supplies the
+ * grant card, the tier, the device's Night Light auto-mode caveat, the HDR availability gate, and
+ * [applyNow]: the direct device write used when the auto-brightness service is NOT running (with
+ * it running, an Apply flows through the runtime `DisplayTogglesCoordinator` instead).
  */
 class DisplayTogglesViewModel @JvmOverloads constructor(
     application: Application,
@@ -71,9 +64,8 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     )
     val state: StateFlow<PrivilegedDisplayUiState> = _state.asStateFlow()
 
-    /** Serializes write→read-back→publish. [io] is a thread POOL: two rapid toggles would otherwise
-     *  run concurrently and the loser's stale `writeFailed` could overwrite the newer result
-     *  (glue-review, D-143 bug class: stale async completion published over newer state). */
+    /** Serializes device access. [io] is a thread POOL: a refresh racing an [applyNow] would
+     *  otherwise interleave (the D-143 stale-completion class). */
     private val deviceLock = Mutex()
 
     init {
@@ -85,24 +77,52 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
         refresh()
     }
 
-    /** Re-probe the tier + re-read every toggle (call on resume and after grants). Also clears a
-     *  lingering write-failure banner: it describes "the last change", which is stale news once the
-     *  user has left and returned (the read-back below shows the current device truth anyway). */
+    /** Re-probe the tier + the device facts the screen still reads (auto-mode caveat, HDR gate).
+     *  Also clears a lingering write-failure banner — stale news once the user left and returned. */
     fun refresh() {
         privilegeManager.refresh()
         _state.update { it.copy(shizukuAvailability = privilegeManager.shizukuAvailability()) }
         viewModelScope.launch(io) {
-            deviceLock.withLock { _state.update { readBack(it).copy(writeFailed = false) } }
+            deviceLock.withLock {
+                _state.update {
+                    it.copy(
+                        nightLightAutoMode = display.readNightLightAutoMode(),
+                        hdrAvailable = display.hdrForceSdrAvailable,
+                        writeFailed = false,
+                    )
+                }
+            }
         }
     }
 
-    fun setNightLight(on: Boolean) = write { display.setNightLight(on) }
-    fun setNightLightTemperature(kelvin: Int) = write { display.setNightLightTemperature(kelvin) }
-    fun setDaltonizer(mode: DaltonizerMode) = write { display.setDaltonizer(mode) }
-    fun setInversion(on: Boolean) = write { display.setInversion(on) }
-    fun setAlwaysOnDisplay(on: Boolean) = write { display.setAlwaysOnDisplay(on) }
-    fun setStayAwakePlugged(on: Boolean) = write { display.setStayAwakePlugged(on) }
-    fun setHdrForceSdr(on: Boolean) = write { display.setHdrForceSdr(on) }
+    /**
+     * Direct device write of [settings]' display-toggle fields (D-152) — the service-OFF path:
+     * with no runtime coordinator alive, an Apply on the profile section would otherwise change
+     * nothing until the service next starts (whose seed deliberately adopts without writing).
+     * Writes every field unconditionally (idempotent); a null temperature and an unavailable HDR
+     * stay untouched, matching the coordinator's semantics.
+     */
+    fun applyNow(settings: AabSettings) {
+        viewModelScope.launch(io) {
+            deviceLock.withLock {
+                val results = buildList {
+                    add(display.setNightLight(settings.nightLightEnabled))
+                    settings.nightLightTemperature?.let { add(display.setNightLightTemperature(it)) }
+                    add(
+                        display.setDaltonizer(
+                            DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
+                                ?: DaltonizerMode.OFF,
+                        ),
+                    )
+                    add(display.setInversion(settings.inversionEnabled))
+                    add(display.setAlwaysOnDisplay(settings.alwaysOnDisplayEnabled))
+                    add(display.setStayAwakePlugged(settings.stayAwakeChargingEnabled))
+                    if (display.hdrForceSdrAvailable) add(display.setHdrForceSdr(settings.hdrForceSdrEnabled))
+                }
+                _state.update { it.copy(writeFailed = results.any { r -> r.isFailure }) }
+            }
+        }
+    }
 
     /** One-tap Shizuku grant (needs a running Shizuku); tier refresh happens inside the manager. */
     fun requestShizukuGrant() {
@@ -131,27 +151,6 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             if (granted) refresh()
         }
     }
-
-    private fun write(op: () -> Result<Unit>) {
-        viewModelScope.launch(io) {
-            deviceLock.withLock {
-                val result = op()
-                _state.update { readBack(it).copy(writeFailed = result.isFailure) }
-            }
-        }
-    }
-
-    private fun readBack(current: PrivilegedDisplayUiState): PrivilegedDisplayUiState = current.copy(
-        nightLight = display.readNightLight(),
-        nightLightTemperature = display.readNightLightTemperature(),
-        nightLightAutoMode = display.readNightLightAutoMode(),
-        daltonizer = display.readDaltonizer(),
-        inversion = display.readInversion(),
-        alwaysOnDisplay = display.readAlwaysOnDisplay(),
-        stayAwakePlugged = display.readStayAwakePlugged(),
-        hdrAvailable = display.hdrForceSdrAvailable,
-        hdrForceSdr = display.readHdrForceSdr(),
-    )
 
     private fun ShizukuGrantGateway.Result.toMessage(app: Application): String = when (this) {
         ShizukuGrantGateway.Result.Success -> app.getString(R.string.pd_grant_shizuku_ok)

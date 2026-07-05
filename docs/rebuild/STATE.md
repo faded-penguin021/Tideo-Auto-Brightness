@@ -45,11 +45,14 @@ Execution: sequential, one segment per checkpoint (ladder green + Changelog + pu
 - [x] Segment 2 — Privileged Display screen (manual toggles; core ask)
 - [x] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
 - [x] Segment 4 — scheduling runtime + storage + rules UI (D-150) — **removed again by 4.5**
-- [x] Segment 4.5 — **owner-instructed deviation from the plan (D-151):** display toggles are
-  PROFILE settings (Night Light + temperature, daltonizer, inversion in `AabSettings`, applied
-  on profile change by `DisplayTogglesCoordinator`, the super-dimming model); the D-150
-  separate schedule system deleted (`ContextMatching`, `SecureDisplayController` and the manual
-  toggles screen kept). Scheduling = a Contexts rule loading a profile with display fields.
+- [x] Segment 4.5 — **owner-instructed deviation from the plan (D-151 + D-152):** ALL display
+  toggles are PROFILE settings (Night Light + temperature, daltonizer, inversion, AOD,
+  stay-awake-charging, HDR force-SDR in `AabSettings`, applied on profile change by
+  `DisplayTogglesCoordinator`, the super-dimming model); the D-150 separate schedule system
+  deleted (`ContextMatching` and `SecureDisplayController` kept). The Privileged Display screen
+  is ONE draft-edited profile surface (no duplicated "device now" toggles, D-152) + grant card;
+  Apply writes the device directly when the service is off. Scheduling = a Contexts rule
+  loading a profile with display fields.
 - [ ] Segment 5 — polish, owner verification checklist, plan-doc cleanup
 
 ## Active work — short-term Fable-dependent hardening (F-backlog, adopted D-138)
@@ -125,6 +128,14 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-05 — folds into 1.7.0/vc17 (Segment 4.5 follow-up, owner findings): **D-152** the
+  profile port is COMPLETE — `alwaysOnDisplayEnabled`/`stayAwakeChargingEnabled`/
+  `hdrForceSdrEnabled` join `AabSettings` (same D-151 fan-out; HDR inert below Android 14) and
+  the Privileged Display screen de-duplicates to ONE draft-edited profile surface (the manual
+  "device now" toggles are gone; `DisplayTogglesViewModel` slims to grants/tier/auto-mode
+  caveat/HDR gate + `applyNow`, the direct device write used only while the service is off so
+  Apply is never a silent no-op). Profile-semantics UI copy cut to one line (owner). Tests
+  reworked (+2 coordinator, VM suite rewritten for applyNow). Glue-review pass: clean.
 - 2026-07-04 — folds into 1.7.0/vc17 (Privileged Display **Segment 4.5 — owner-instructed
   deviation from the plan**): **D-151** display toggles become PROFILE settings and the D-150
   schedule system is removed. `AabSettings` gains `nightLightEnabled` / `nightLightTemperature`

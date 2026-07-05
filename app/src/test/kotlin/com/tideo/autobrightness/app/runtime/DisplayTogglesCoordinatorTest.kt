@@ -45,7 +45,7 @@ class DisplayTogglesCoordinatorTest {
         override fun setAlwaysOnDisplay(on: Boolean) = write("aod=$on")
         override fun readStayAwakePlugged() = false
         override fun setStayAwakePlugged(on: Boolean) = write("stayAwake=$on")
-        override val hdrForceSdrAvailable = false
+        override var hdrForceSdrAvailable = true
         override fun readHdrForceSdr() = false
         override fun setHdrForceSdr(on: Boolean) = write("hdr=$on")
     }
@@ -175,6 +175,31 @@ class DisplayTogglesCoordinatorTest {
         // The resting state followed the baseline edit: stop() has nothing to undo.
         h.coordinator.stop()
         assertTrue(h.display.writes.isEmpty(), "resting state must track the live baseline")
+    }
+
+    @Test
+    fun screenFields_aodStayAwakeHdr_writeOnDiff_D152() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = baseline.copy(
+            alwaysOnDisplayEnabled = true,
+            stayAwakeChargingEnabled = true,
+            hdrForceSdrEnabled = true,
+        )
+        runCurrent()
+        assertEquals(listOf("aod=true", "stayAwake=true", "hdr=true"), h.display.writes)
+    }
+
+    @Test
+    fun hdrField_isInert_whenTheDeviceLacksHdrControl_D152() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.hdrForceSdrAvailable = false // pre-Android-14 device
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = baseline.copy(hdrForceSdrEnabled = true)
+        runCurrent()
+        assertTrue(h.display.writes.isEmpty(), "hdr must not be written when unavailable: ${h.display.writes}")
     }
 
     @Test

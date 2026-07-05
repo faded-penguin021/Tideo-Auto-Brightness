@@ -4,7 +4,8 @@ import android.Manifest
 import android.app.Application
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
-import com.tideo.autobrightness.platform.display.DaltonizerMode
+import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.platform.display.NightLightAutoMode
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,10 +23,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * DisplayTogglesViewModel glue (D-149, Segment 2) through the REAL AndroidPrivilegeManager +
- * AndroidSecureDisplayController under Robolectric: the tier gate surfaces write failures without
- * writing, an elevated write round-trips through the read-back, and refresh() picks up changes made
- * outside the app (system Settings / adb).
+ * DisplayTogglesViewModel glue (D-149; reworked by D-152) through the REAL
+ * AndroidPrivilegeManager + AndroidSecureDisplayController under Robolectric: [applyNow] (the
+ * service-off direct write) is tier-gated and writes the profile fields to the device; refresh()
+ * re-probes the tier and the device facts the screen still reads (Night Light auto-mode caveat).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -53,15 +54,13 @@ class DisplayTogglesViewModelTest {
     }
 
     @Test
-    fun writeBelowElevated_surfacesFailure_andWritesNothing() {
+    fun applyNowBelowElevated_surfacesFailure_andWritesNothing() {
         val vm = vm()
         assertTrue(vm.state.value.tier < Tier.ELEVATED)
 
-        vm.setNightLight(true)
+        vm.applyNow(AabSettings(nightLightEnabled = true))
 
         assertTrue(vm.state.value.writeFailed, "a tier-gated write must surface as writeFailed")
-        // Read-back kept the truth: nothing was written.
-        assertFalse(vm.state.value.nightLight)
         assertEquals(
             -999,
             Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999),
@@ -69,47 +68,58 @@ class DisplayTogglesViewModelTest {
     }
 
     @Test
-    fun writeAtElevated_appliesAndReadsBack() {
+    fun applyNowAtElevated_writesTheProfileFields_butNeverANullTemperature() {
         grantElevated()
         val vm = vm()
         assertEquals(Tier.ELEVATED, vm.state.value.tier)
 
-        vm.setNightLight(true)
-        assertTrue(vm.state.value.nightLight)
-        assertFalse(vm.state.value.writeFailed)
+        vm.applyNow(
+            AabSettings(
+                nightLightEnabled = true,
+                daltonizerMode = "GRAYSCALE",
+                inversionEnabled = true,
+                alwaysOnDisplayEnabled = true,
+            ),
+        )
 
-        vm.setDaltonizer(DaltonizerMode.GRAYSCALE)
-        assertEquals(DaltonizerMode.GRAYSCALE, vm.state.value.daltonizer)
-
-        // A subsequent successful write clears a stale failure flag by construction (readBack copy).
-        vm.setInversion(true)
-        assertTrue(vm.state.value.inversion)
         assertFalse(vm.state.value.writeFailed)
+        val resolver = app.contentResolver
+        assertEquals(1, Settings.Secure.getInt(resolver, "night_display_activated", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999))
+        assertEquals(0, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "accessibility_display_inversion_enabled", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "doze_always_on", -999))
+        // null temperature = "device default": the key must stay unset.
+        assertEquals(-999, Settings.Secure.getInt(resolver, "night_display_color_temperature", -999))
     }
 
     @Test
     fun refresh_clearsStaleWriteFailureBanner() {
         val vm = vm()
-        vm.setNightLight(true) // below ELEVATED → fails and raises the banner
+        vm.applyNow(AabSettings(nightLightEnabled = true)) // below ELEVATED → fails, banner up
         assertTrue(vm.state.value.writeFailed)
 
-        vm.refresh() // leaving + returning re-reads the truth; "the last change failed" is stale news
+        vm.refresh() // leaving + returning; "the last change failed" is stale news
         assertFalse(vm.state.value.writeFailed)
     }
 
     @Test
-    fun refresh_picksUpExternalChangesAndAGrant() {
+    fun refresh_picksUpAGrantAndTheNightLightAutoMode() {
         val vm = vm()
         assertTrue(vm.state.value.tier < Tier.ELEVATED)
-        assertFalse(vm.state.value.nightLight)
+        assertEquals(NightLightAutoMode.MANUAL, vm.state.value.nightLightAutoMode)
 
-        // Simulate an adb grant + a change made in the system Settings app while backgrounded.
+        // Simulate an adb grant + a schedule set in the system Settings app while backgrounded.
         grantElevated()
-        Settings.Secure.putInt(app.contentResolver, "night_display_activated", 1)
+        Settings.Secure.putInt(app.contentResolver, "night_display_auto_mode", 2)
 
         vm.refresh()
 
         assertEquals(Tier.ELEVATED, vm.state.value.tier, "refresh must re-probe the tier")
-        assertTrue(vm.state.value.nightLight, "refresh must re-read the device state")
+        assertEquals(
+            NightLightAutoMode.TWILIGHT,
+            vm.state.value.nightLightAutoMode,
+            "refresh must re-read the auto-mode caveat input",
+        )
     }
 }

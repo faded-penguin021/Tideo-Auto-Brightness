@@ -2689,3 +2689,22 @@ the permanent registry — never compress or remove them.
   Display toggles screen (immediate control + grant card, minus its Schedules section). D-150
   stays in this ledger as history. Folds into the unreleased **1.7.0 / versionCode 17**
   (`changelogs/17.txt` rewritten — D-150 was never released, no user-facing deprecation).
+
+- **D-152: D-151 completed — ALL Privileged Display toggles are profile fields; the duplicated
+  manual section removed (owner finding: half the toggles existed only as device-immediate
+  controls, and the ported ones appeared twice).** `AabSettings` gains `alwaysOnDisplayEnabled`,
+  `stayAwakeChargingEnabled`, `hdrForceSdrEnabled` (booleans, "leave-alone" false defaults; HDR
+  inert below Android 14 via the controller's availability gate), same fan-out as D-151
+  (mergeProfile snapshot, contract `%AAB_AlwaysOnDisplay`/`%AAB_StayAwakeCharging`/
+  `%AAB_HdrForceSdr`, diff display, import/export, legacy key=value arms).
+  `DisplayTogglesCoordinator` diff-writes all seven fields. The Privileged Display screen now has
+  ONE set of controls — the draft-edited profile fields (G2-F1 preview→Apply) — plus the grant
+  card and info card; the "device now" read-back toggles are gone. `DisplayTogglesViewModel`
+  slims to tier/grant affordances, the Night Light auto-mode caveat, the HDR availability gate,
+  and **`applyNow`**: because the coordinator's seed deliberately adopts without writing
+  (D-151), an Apply with the auto-brightness service OFF would otherwise be a silent no-op
+  forever — so the screen writes the device directly exactly when `serviceEnabled` is false
+  (with the service on, Apply flows through reapply → the coordinator, keeping the runtime
+  single-writer and winner-takes-all: an active context profile is not stomped by a baseline
+  edit). Per owner: the profile-semantics UI copy shrank to one line ("if you need that many
+  words the UI/UX is wrong"). Folds into the unreleased 1.7.0 / versionCode 17.

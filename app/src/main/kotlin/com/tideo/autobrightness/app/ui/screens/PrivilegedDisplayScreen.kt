@@ -33,7 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.settings.AabSettings
-import com.tideo.autobrightness.app.settings.DALTONIZER_OFF
+import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.state.DisplayTogglesViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
@@ -52,33 +52,34 @@ import com.tideo.autobrightness.platform.privilege.Tier
 import kotlin.math.roundToInt
 
 /**
- * Privileged Display (rebuild-only feature, D-149 — `plans/privileged-display.md` Segment 2): manual
- * toggles for the AOSP display settings that `WRITE_SECURE_SETTINGS` unlocks (Night Light,
- * daltonizer/inversion, AOD, stay-awake-charging, experimental HDR force-SDR). Reached from the
- * Menu's tier-gated "Privileged" group; the route itself is always registered, so the screen
- * self-guards: below ELEVATED it renders a grant card offering all three grant channels (adb copy /
- * Shizuku one-tap / root), mirroring Onboarding's ELEVATED step.
+ * Privileged Display (rebuild-only feature, D-149; reworked by D-151/D-152 — `plans/
+ * privileged-display.md`): the AOSP display settings that `WRITE_SECURE_SETTINGS` unlocks
+ * (Night Light + temperature, daltonizer/inversion, AOD, stay-awake-charging, experimental HDR
+ * force-SDR), **all as PROFILE fields** edited draft→Apply like every other parameter screen —
+ * one set of controls, no separate "device now" duplicates. Applying with the service running
+ * flows through the runtime `DisplayTogglesCoordinator`; with it stopped, the VM writes the
+ * device directly ([DisplayTogglesViewModel.applyNow]) so Apply is never a silent no-op.
  *
- * Below the manual toggles sits the **profile section (D-151)**: Night Light (+ temperature),
- * color correction and inversion as draft-edited PROFILE fields — part of `AabSettings` like the
- * super-dimming fields, applied on profile change by the runtime `DisplayTogglesCoordinator`
- * (replaces the D-150 Schedules section; use a Contexts rule + profile for scheduling).
+ * Reached from the Menu's tier-gated "Privileged" group; the route itself is always registered,
+ * so the screen self-guards: below ELEVATED it renders a grant card offering all three grant
+ * channels (adb copy / Shizuku one-tap / root), mirroring Onboarding's ELEVATED step.
  */
 @Composable
 fun PrivilegedDisplayScreen(
     navController: NavHostController,
     vm: DisplayTogglesViewModel = viewModel(),
-    // The standard per-screen draft editor (G2-F1 preview→Apply) for the D-151 profile fields.
+    // The standard per-screen draft editor (G2-F1 preview→Apply) for the profile fields.
     draftVm: DraftSettingsViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val draft by draftVm.draft.collectAsStateWithLifecycle()
     val dirty by draftVm.dirty.collectAsStateWithLifecycle()
+    val committed by draftVm.committed.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
 
-    // Re-probe on every return to the foreground: an adb grant, a Shizuku grant, or a change made
-    // in the system Settings app must all show up without leaving the screen (read-back display).
+    // Re-probe on every return to the foreground: an adb grant, a Shizuku grant, or a Night Light
+    // schedule change made in the system Settings app must all show up without leaving the screen.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -97,17 +98,15 @@ fun PrivilegedDisplayScreen(
         },
         onRequestShizuku = vm::requestShizukuGrant,
         onTryRoot = vm::tryRootGrant,
-        onSetNightLight = vm::setNightLight,
-        onSetNightLightTemperature = vm::setNightLightTemperature,
-        onSetDaltonizer = vm::setDaltonizer,
-        onSetInversion = vm::setInversion,
-        onSetAlwaysOn = vm::setAlwaysOnDisplay,
-        onSetStayAwake = vm::setStayAwakePlugged,
-        onSetHdrForceSdr = vm::setHdrForceSdr,
         draft = draft,
         draftDirty = dirty,
         onEditDraft = draftVm::edit,
-        onApplyDraft = draftVm::apply,
+        onApplyDraft = {
+            // With the service running the commit reaches the device via reapply → the runtime
+            // coordinator; with it stopped there is no coordinator, so write directly (D-152).
+            if (!committed.serviceEnabled) vm.applyNow(draft.validate())
+            draftVm.apply()
+        },
         onDiscardDraft = draftVm::discard,
     )
 }
@@ -119,13 +118,6 @@ fun PrivilegedDisplayContent(
     onCopyAdb: () -> Unit = {},
     onRequestShizuku: () -> Unit = {},
     onTryRoot: () -> Unit = {},
-    onSetNightLight: (Boolean) -> Unit = {},
-    onSetNightLightTemperature: (Int) -> Unit = {},
-    onSetDaltonizer: (DaltonizerMode) -> Unit = {},
-    onSetInversion: (Boolean) -> Unit = {},
-    onSetAlwaysOn: (Boolean) -> Unit = {},
-    onSetStayAwake: (Boolean) -> Unit = {},
-    onSetHdrForceSdr: (Boolean) -> Unit = {},
     draft: AabSettings = AabSettings(),
     draftDirty: Boolean = false,
     onEditDraft: ((AabSettings) -> AabSettings) -> Unit = {},
@@ -145,12 +137,19 @@ fun PrivilegedDisplayContent(
                         modifier = Modifier.testTag("pd_write_error"),
                     )
                 }
+                Text(
+                    stringResource(R.string.pd_profile_intro),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("pd_profile_intro"),
+                )
 
                 SectionHeader(stringResource(R.string.pd_section_night_light), divider = true)
                 AabCard {
                     SwitchSettingRow(
-                        stringResource(R.string.pd_night_light_switch), state.nightLight,
-                        onSetNightLight, testTag = "switch_nightLight",
+                        stringResource(R.string.pd_night_light_switch), draft.nightLightEnabled,
+                        { on -> onEditDraft { it.copy(nightLightEnabled = on) } },
+                        testTag = "switch_nightLight",
                     )
                     if (state.nightLightAutoMode != NightLightAutoMode.MANUAL) {
                         Text(
@@ -161,29 +160,42 @@ fun PrivilegedDisplayContent(
                         )
                     }
                     NightLightTemperatureSlider(
-                        kelvin = state.nightLightTemperature,
-                        onCommit = onSetNightLightTemperature,
+                        kelvin = draft.nightLightTemperature,
+                        onCommit = { k -> onEditDraft { it.copy(nightLightTemperature = k) } },
                     )
+                    if (draft.nightLightTemperature != null) {
+                        TextButton(
+                            onClick = { onEditDraft { it.copy(nightLightTemperature = null) } },
+                            modifier = Modifier.testTag("pd_temp_clear"),
+                        ) { Text(stringResource(R.string.pd_profile_temp_clear)) }
+                    }
                 }
 
                 SectionHeader(stringResource(R.string.pd_section_color), divider = true)
                 AabCard {
-                    DaltonizerPicker(state.daltonizer, onSetDaltonizer)
+                    DaltonizerPicker(
+                        selected = DaltonizerMode.entries.firstOrNull { it.name == draft.daltonizerMode }
+                            ?: DaltonizerMode.OFF,
+                        onSelect = { mode -> onEditDraft { it.copy(daltonizerMode = mode.name) } },
+                    )
                     SwitchSettingRow(
-                        stringResource(R.string.pd_inversion), state.inversion,
-                        onSetInversion, testTag = "switch_inversion",
+                        stringResource(R.string.pd_inversion), draft.inversionEnabled,
+                        { on -> onEditDraft { it.copy(inversionEnabled = on) } },
+                        testTag = "switch_inversion",
                     )
                 }
 
                 SectionHeader(stringResource(R.string.pd_section_screen), divider = true)
                 AabCard {
                     SwitchSettingRow(
-                        stringResource(R.string.pd_always_on), state.alwaysOnDisplay,
-                        onSetAlwaysOn, testTag = "switch_alwaysOn",
+                        stringResource(R.string.pd_always_on), draft.alwaysOnDisplayEnabled,
+                        { on -> onEditDraft { it.copy(alwaysOnDisplayEnabled = on) } },
+                        testTag = "switch_alwaysOn",
                     )
                     SwitchSettingRow(
-                        stringResource(R.string.pd_stay_awake), state.stayAwakePlugged,
-                        onSetStayAwake, help = R.string.pd_stay_awake_help, testTag = "switch_stayAwake",
+                        stringResource(R.string.pd_stay_awake), draft.stayAwakeChargingEnabled,
+                        { on -> onEditDraft { it.copy(stayAwakeChargingEnabled = on) } },
+                        help = R.string.pd_stay_awake_help, testTag = "switch_stayAwake",
                     )
                 }
 
@@ -191,23 +203,14 @@ fun PrivilegedDisplayContent(
                     SectionHeader(stringResource(R.string.pd_section_experimental), divider = true)
                     AabCard {
                         SwitchSettingRow(
-                            stringResource(R.string.pd_hdr_force_sdr), state.hdrForceSdr,
-                            onSetHdrForceSdr, help = R.string.pd_hdr_help, testTag = "switch_hdrForceSdr",
+                            stringResource(R.string.pd_hdr_force_sdr), draft.hdrForceSdrEnabled,
+                            { on -> onEditDraft { it.copy(hdrForceSdrEnabled = on) } },
+                            help = R.string.pd_hdr_help, testTag = "switch_hdrForceSdr",
                         )
                     }
                 }
 
-                // D-151: the display-toggle PROFILE fields (replaces the D-150 Schedules section).
-                // ELEVATED-only, like the manual toggles — the runtime coordinator is a no-op below
-                // ELEVATED, so offering the editor there would be a lie.
-                SectionHeader(stringResource(R.string.pd_section_profile), divider = true)
-                ProfileDisplaySection(
-                    draft = draft,
-                    dirty = draftDirty,
-                    onEdit = onEditDraft,
-                    onApply = onApplyDraft,
-                    onDiscard = onDiscardDraft,
-                )
+                DraftApplyBar(dirty = draftDirty, onApply = onApplyDraft, onDiscard = onDiscardDraft)
             }
 
             // Info card (always shown): what these toggles write + the OEM-variance caveat (D-048
@@ -221,59 +224,6 @@ fun PrivilegedDisplayContent(
             }
             Spacer(Modifier.height(Dimens.sectionSpacing))
         }
-    }
-}
-
-/**
- * The D-151 profile section: Night Light (+ temperature), color correction and inversion as
- * draft-edited PROFILE fields (the G2-F1 preview→Apply model, same as the super-dimming fields on
- * their screen). Applied by the runtime coordinator when a profile loads — a context rule that
- * swaps profiles is the scheduling story now; manual/system changes between swaps stick.
- */
-@Composable
-private fun ProfileDisplaySection(
-    draft: AabSettings,
-    dirty: Boolean,
-    onEdit: ((AabSettings) -> AabSettings) -> Unit,
-    onApply: () -> Unit,
-    onDiscard: () -> Unit,
-) {
-    AabCard(modifier = Modifier.testTag("pd_profile_card")) {
-        Text(
-            stringResource(R.string.pd_profile_intro),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SwitchSettingRow(
-            stringResource(R.string.pd_night_light_switch), draft.nightLightEnabled,
-            { on -> onEdit { it.copy(nightLightEnabled = on) } },
-            testTag = "switch_profile_nightLight",
-        )
-        NightLightTemperatureSlider(
-            kelvin = draft.nightLightTemperature,
-            onCommit = { k -> onEdit { it.copy(nightLightTemperature = k) } },
-            testTag = "slider_profile_nightLightTemp",
-        )
-        if (draft.nightLightTemperature != null) {
-            TextButton(
-                onClick = { onEdit { it.copy(nightLightTemperature = null) } },
-                modifier = Modifier.testTag("pd_profile_temp_clear"),
-            ) { Text(stringResource(R.string.pd_profile_temp_clear)) }
-        }
-        DaltonizerPicker(
-            selected = DaltonizerMode.entries.firstOrNull { it.name == draft.daltonizerMode }
-                ?: DaltonizerMode.OFF,
-            onSelect = { mode ->
-                onEdit { it.copy(daltonizerMode = if (mode == DaltonizerMode.OFF) DALTONIZER_OFF else mode.name) }
-            },
-            tagPrefix = "profile_daltonizer",
-        )
-        SwitchSettingRow(
-            stringResource(R.string.pd_inversion), draft.inversionEnabled,
-            { on -> onEdit { it.copy(inversionEnabled = on) } },
-            testTag = "switch_profile_inversion",
-        )
-        DraftApplyBar(dirty = dirty, onApply = onApply, onDiscard = onDiscard)
     }
 }
 
@@ -325,15 +275,11 @@ private fun GrantChannelsCard(
  * Kelvin slider for `night_display_color_temperature`. AOSP bounds/default verified 2026-07-03
  * (frameworks/base config.xml): min 2596, max 4082, default 2850 — OEMs may narrow/widen their real
  * range in their framework config (ColorDisplayService clamps what it applies; documented variance,
- * not branched). Commits on drag END (one settings write per gesture, not per pixel); null = never
- * set → the label says "device default" and the thumb parks at the AOSP default until first commit.
+ * not branched). Commits on drag END; null = no profile opinion → the label says "device default"
+ * and the thumb parks at the AOSP default until the first commit.
  */
 @Composable
-private fun NightLightTemperatureSlider(
-    kelvin: Int?,
-    onCommit: (Int) -> Unit,
-    testTag: String = "slider_nightLightTemp",
-) {
+private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
     var drag by remember { mutableStateOf<Float?>(null) }
     val shown = drag?.roundToInt() ?: kelvin
     Column {
@@ -350,7 +296,7 @@ private fun NightLightTemperatureSlider(
                 drag = null
             },
             valueRange = AOSP_NIGHT_LIGHT_MIN_K.toFloat()..AOSP_NIGHT_LIGHT_MAX_K.toFloat(),
-            modifier = Modifier.fillMaxWidth().testTag(testTag),
+            modifier = Modifier.fillMaxWidth().testTag("slider_nightLightTemp"),
         )
         Text(
             stringResource(R.string.pd_night_light_temp_hint),
@@ -363,11 +309,7 @@ private fun NightLightTemperatureSlider(
 /** One chip per daltonizer mode (5 incl. Off — a FlowRow so they wrap on narrow screens). */
 @OptIn(ExperimentalLayoutApi::class) // FlowRow (chip row that wraps on narrow screens)
 @Composable
-private fun DaltonizerPicker(
-    selected: DaltonizerMode,
-    onSelect: (DaltonizerMode) -> Unit,
-    tagPrefix: String = "daltonizer",
-) {
+private fun DaltonizerPicker(selected: DaltonizerMode, onSelect: (DaltonizerMode) -> Unit) {
     Column {
         Text(stringResource(R.string.pd_daltonizer_label), style = MaterialTheme.typography.bodyLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimens.space2)) {
@@ -376,7 +318,7 @@ private fun DaltonizerPicker(
                     selected = selected == mode,
                     onClick = { onSelect(mode) },
                     label = { Text(stringResource(mode.labelRes())) },
-                    modifier = Modifier.testTag("${tagPrefix}_${mode.name.lowercase()}"),
+                    modifier = Modifier.testTag("daltonizer_${mode.name.lowercase()}"),
                 )
             }
         }

@@ -66,10 +66,11 @@ data class AabSettings(
     val contextOverride: Boolean = false,
     // Tasker: %AAB_SetupTitle; onboarding dialog title (D-008)
     val setupTitle: String = "Advanced Auto Brightness Setup",
-    // --- Privileged display toggles (rebuild-only, no Tasker source — D-151). Per-profile screen
-    // state applied on profile change by DisplayTogglesCoordinator (ELEVATED-gated, no-op below;
-    // the super-dimming precedent: profile fields drive a secure feature). Defaults are the
-    // "leave the device alone" values: a profile chain that never edits them never writes.
+    // --- Privileged display toggles (rebuild-only, no Tasker source — D-151/D-152). ALL of the
+    // Privileged Display toggles are per-profile screen state, applied on profile change by
+    // DisplayTogglesCoordinator (ELEVATED-gated, no-op below; the super-dimming precedent:
+    // profile fields drive a secure feature). Defaults are the "leave the device alone" values:
+    // a profile chain that never edits them never writes.
     val nightLightEnabled: Boolean = false,
     // Night Light intensity in Kelvin; null = this profile has no temperature opinion (the device
     // value — a persistent system preference — is left untouched). Written only when non-null.
@@ -79,6 +80,11 @@ data class AabSettings(
     // schema validates back to "OFF" instead of failing the whole settings file.
     val daltonizerMode: String = DALTONIZER_OFF,
     val inversionEnabled: Boolean = false,
+    val alwaysOnDisplayEnabled: Boolean = false,
+    val stayAwakeChargingEnabled: Boolean = false,
+    // Android-14+ force-SDR (experimental). On older devices the field is inert: the coordinator
+    // checks the controller's availability gate and never writes it.
+    val hdrForceSdrEnabled: Boolean = false,
 )
 
 /** [AabSettings.daltonizerMode] value for "color correction off". */
@@ -159,11 +165,14 @@ object AabSettingsContract {
         AabSettingRule("%AAB_Debug", "debugLevel", AabValueType.Int, "0", "range 0..9"),
         AabSettingRule("%AAB_PanicSensitivity", "panicSensitivity", AabValueType.Int, "8", "range 0..10"),
         AabSettingRule("%AAB_ContextOverride", "contextOverride", AabValueType.Boolean, "false", "must be true|false"),
-        // Rebuild-only display-toggle profile fields (D-151) — invented %AAB_ names, the D-116
-        // panicSensitivity precedent (no Tasker source; the name exists for diff/export display).
+        // Rebuild-only display-toggle profile fields (D-151/D-152) — invented %AAB_ names, the
+        // D-116 panicSensitivity precedent (no Tasker source; the name exists for diff/export display).
         AabSettingRule("%AAB_NightLight", "nightLightEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_NightLightTemp", "nightLightTemperature", AabValueType.Int, "device default", "range 1000..10000, or unset = device default"),
         AabSettingRule("%AAB_Daltonizer", "daltonizerMode", AabValueType.String, DALTONIZER_OFF, "one of OFF|GRAYSCALE|PROTANOMALY|DEUTERANOMALY|TRITANOMALY"),
         AabSettingRule("%AAB_Inversion", "inversionEnabled", AabValueType.Boolean, "false", "must be true|false"),
+        AabSettingRule("%AAB_AlwaysOnDisplay", "alwaysOnDisplayEnabled", AabValueType.Boolean, "false", "must be true|false"),
+        AabSettingRule("%AAB_StayAwakeCharging", "stayAwakeChargingEnabled", AabValueType.Boolean, "false", "must be true|false"),
+        AabSettingRule("%AAB_HdrForceSdr", "hdrForceSdrEnabled", AabValueType.Boolean, "false", "must be true|false (inert below Android 14)"),
     )
 }

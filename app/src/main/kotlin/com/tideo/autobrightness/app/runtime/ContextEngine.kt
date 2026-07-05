@@ -558,11 +558,12 @@ interface ProfileCatalog {
 
 /**
  * Overlay a context profile's parameter set onto the baseline. The fields swapped are Tasker
- * task626 `_ContextResume`'s 39-key snapshot (the LOAD_FILE parameter set) **plus the rebuild-only
- * display-toggle fields (D-151: `nightLightEnabled`/`nightLightTemperature`/`daltonizerMode`/
- * `inversionEnabled` — per-profile screen state, taken from the loaded profile like the dimming
- * fields)**; fields outside it (service enable, manual context lock, debug level, setup title,
- * schema version, and `detectOverrides`) are preserved from the baseline.
+ * task626 `_ContextResume`'s 39-key snapshot (the LOAD_FILE parameter set) **plus ALL the
+ * rebuild-only display-toggle fields (D-151/D-152: Night Light + temperature, daltonizer mode,
+ * inversion, AOD, stay-awake-charging, HDR force-SDR — per-profile screen state, taken from the
+ * loaded profile like the dimming fields)**; fields outside it (service enable, manual context
+ * lock, debug level, setup title, schema version, and `detectOverrides`) are preserved from the
+ * baseline.
  *
  * `detectOverrides` (%AAB_DetectOverrides) is a GLOBAL reactivity preference, NOT one of task626's
  * curve/min-max/threshold/dimming snapshot keys (contexts_spec §4 enumerates the snapshot), so a

@@ -619,19 +619,26 @@ class ContextEngineTest {
 
     @Test
     fun mergeProfile_swapsDisplayToggleFields_D151() {
-        // The D-151 display-toggle fields are PER-PROFILE screen state (the dimming-fields
-        // precedent) — a context profile swap takes them from the loaded profile, not the baseline.
+        // The D-151/D-152 display-toggle fields are PER-PROFILE screen state (the dimming-fields
+        // precedent) — a context profile swap takes ALL of them from the loaded profile, not the
+        // baseline.
         val base = AabSettings()
         val profile = AabSettings(
             nightLightEnabled = true,
             nightLightTemperature = 2_700,
             daltonizerMode = "GRAYSCALE",
             inversionEnabled = true,
+            alwaysOnDisplayEnabled = true,
+            stayAwakeChargingEnabled = true,
+            hdrForceSdrEnabled = true,
         )
         val merged = mergeProfile(base, profile)
         assertEquals(true, merged.nightLightEnabled, "nightLightEnabled comes from the profile")
         assertEquals(2_700, merged.nightLightTemperature, "nightLightTemperature comes from the profile")
         assertEquals("GRAYSCALE", merged.daltonizerMode, "daltonizerMode comes from the profile")
         assertEquals(true, merged.inversionEnabled, "inversionEnabled comes from the profile")
+        assertEquals(true, merged.alwaysOnDisplayEnabled, "alwaysOnDisplayEnabled comes from the profile")
+        assertEquals(true, merged.stayAwakeChargingEnabled, "stayAwakeChargingEnabled comes from the profile")
+        assertEquals(true, merged.hdrForceSdrEnabled, "hdrForceSdrEnabled comes from the profile")
     }
 }

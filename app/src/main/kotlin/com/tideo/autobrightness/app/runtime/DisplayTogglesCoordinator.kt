@@ -15,10 +15,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Applies the display-toggle PROFILE fields (D-151, rebuild-only: `nightLightEnabled`,
- * `nightLightTemperature`, `daltonizerMode`, `inversionEnabled`) to the device through the
- * ELEVATED-gated [SecureDisplayController] — the super-dimming precedent: profile fields drive a
- * secure feature, applied via the existing context/profile-load path, no-op below ELEVATED.
+ * Applies the display-toggle PROFILE fields (D-151/D-152, rebuild-only: Night Light +
+ * temperature, daltonizer mode, inversion, always-on display, stay-awake-charging, HDR
+ * force-SDR) to the device through the ELEVATED-gated [SecureDisplayController] — the
+ * super-dimming precedent: profile fields drive a secure feature, applied via the existing
+ * context/profile-load path, no-op below ELEVATED.
  *
  * Apply contract (idempotent, only-on-change — D-151 replaces the D-150 schedule system):
  *  - The coordinator collects [ContextEngine.effectiveFlow]; a write happens only for a field whose
@@ -111,14 +112,23 @@ class DisplayTogglesCoordinator(
         }
         if (desired.daltonizer != last.daltonizer) display.setDaltonizer(desired.daltonizer)
         if (desired.inversion != last.inversion) display.setInversion(desired.inversion)
+        if (desired.alwaysOn != last.alwaysOn) display.setAlwaysOnDisplay(desired.alwaysOn)
+        if (desired.stayAwake != last.stayAwake) display.setStayAwakePlugged(desired.stayAwake)
+        // The HDR field is inert below Android 14 (the controller's availability gate).
+        if (desired.hdrForceSdr != last.hdrForceSdr && display.hdrForceSdrAvailable) {
+            display.setHdrForceSdr(desired.hdrForceSdr)
+        }
     }
 
-    /** The four profile fields, normalized (string mode → enum) so comparisons are value-typed. */
+    /** The profile fields, normalized (string mode → enum) so comparisons are value-typed. */
     private data class DisplayToggleState(
         val nightLight: Boolean,
         val temperatureK: Int?,
         val daltonizer: DaltonizerMode,
         val inversion: Boolean,
+        val alwaysOn: Boolean,
+        val stayAwake: Boolean,
+        val hdrForceSdr: Boolean,
     ) {
         companion object {
             fun of(settings: AabSettings) = DisplayToggleState(
@@ -128,6 +138,9 @@ class DisplayTogglesCoordinator(
                 daltonizer = DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
                     ?: DaltonizerMode.OFF,
                 inversion = settings.inversionEnabled,
+                alwaysOn = settings.alwaysOnDisplayEnabled,
+                stayAwake = settings.stayAwakeChargingEnabled,
+                hdrForceSdr = settings.hdrForceSdrEnabled,
             )
         }
     }

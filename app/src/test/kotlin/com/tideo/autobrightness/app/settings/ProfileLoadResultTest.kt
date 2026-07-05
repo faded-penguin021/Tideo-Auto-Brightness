@@ -59,18 +59,24 @@ class ProfileLoadResultTest {
         val withOpinion = """
             { "schemaVersion": 3, "settings": {
                 "nightLightEnabled": true, "nightLightTemperature": 2700,
-                "daltonizerMode": "GRAYSCALE", "inversionEnabled": true } }
+                "daltonizerMode": "GRAYSCALE", "inversionEnabled": true,
+                "alwaysOnDisplayEnabled": true, "stayAwakeChargingEnabled": true,
+                "hdrForceSdrEnabled": true } }
         """.trimIndent()
         val loaded = (manager.decodePayload(withOpinion) as ProfileLoadResult.Success).settings
         assertEquals(true, loaded.nightLightEnabled)
         assertEquals(2_700, loaded.nightLightTemperature)
         assertEquals("GRAYSCALE", loaded.daltonizerMode)
         assertEquals(true, loaded.inversionEnabled)
+        assertEquals(true, loaded.alwaysOnDisplayEnabled)
+        assertEquals(true, loaded.stayAwakeChargingEnabled)
+        assertEquals(true, loaded.hdrForceSdrEnabled)
 
         val withoutOpinion = """{ "schemaVersion": 3, "settings": { "minBrightness": 7 } }"""
         val defaults = (manager.decodePayload(withoutOpinion) as ProfileLoadResult.Success).settings
         assertEquals(null, defaults.nightLightTemperature, "absent temperature stays 'device default'")
         assertEquals(DALTONIZER_OFF, defaults.daltonizerMode)
+        assertEquals(false, defaults.alwaysOnDisplayEnabled)
     }
 
     @Test
