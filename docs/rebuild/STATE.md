@@ -72,27 +72,20 @@ registry stays live.
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
 - 2026-07-05 — folds into 1.7.0/vc17 (owner-requested): **D-154** circadian Night Light
-  temperature — new profile field `nightLightCircadianEnabled` (full D-151 fan-out); the
-  temperature rides the task90 tanh modifier (night anchor = the profile temperature/AOSP
-  default → 4082 K by day) via a 60 s only-on-change ticker in `DisplayTogglesCoordinator`
-  (own computation through `CircadianWindowProvider` — pipeline cycles starve in steady light,
-  D-110). Manual temperature changes don't stick while tracking (consented; all other fields
-  keep D-151 manual-stick). Tests +6 (+1 domain suite). `17.txt` +1. Glue-review: one finding
-  fixed pre-commit (the below-ELEVATED static-temp comparator would have replayed a skipped
-  swap after a grant — caught by the existing D-151 suite).
+  temperature — profile toggle `nightLightCircadianEnabled` (full D-151 fan-out); the
+  temperature rides the task90 tanh modifier (profile temp/AOSP-default at night → 4082 K by
+  day) via a 60 s only-on-change ticker in `DisplayTogglesCoordinator` (own computation —
+  pipeline cycles starve in steady light, D-110). Manual temp changes don't stick while
+  tracking (consented). Tests +7. Glue-review: one comparator-replay finding fixed pre-commit.
 - 2026-07-05 — docs/process only (owner-instructed): **D-153** deviations-ledger file cap —
-  200 rows per file, rollover to `DEVIATIONS_LEDGER_A.md`/DA-001 then `_B.md`/DB-001, …;
-  summarizing rejected (rows are cited by number, stay verbatim). Pointers updated in the
-  ledger header, CLAUDE.md, RUNBOOK.
+  200 rows per file, rollover `DA-001`/`DB-001`…; summarizing rejected (rows are cited by
+  number, stay verbatim). Pointers updated in the ledger header, CLAUDE.md, RUNBOOK.
 - 2026-07-05 — docs-only (Privileged Display **Segment 5 — feature COMPLETE**): README +
   `screen_map.md` finalized (toggles = ELEVATED **profile settings** applied by
-  profiles/Contexts rules — no standalone scheduler); owner on-device checklist added as
-  **`DEVICE_TEST_SCRIPT.md` §11** (7-toggle read-back incl. HDR-over-adb, context-rule
-  engage/baseline-restore, service-off applyNow, manual-changes-stick, below-ELEVATED no-op,
-  the D-151 residual); `plans/privileged-display.md` deleted (content lives in D-149–D-152);
-  RUNBOOK playbook 5 gains the multi-session persisted-plan pattern; architecture docs synced
-  (48-field `AabSettings`, ELEVATED capability row); non-items recorded above; STATE
-  recompressed.
+  profiles/Contexts — no standalone scheduler); owner checklist = **`DEVICE_TEST_SCRIPT.md`
+  §11**; `plans/privileged-display.md` deleted (content in D-149–D-152); RUNBOOK playbook 5
+  gains the multi-session persisted-plan pattern; architecture docs synced; non-items
+  recorded above; STATE recompressed.
 - 2026-07-05 — folds into 1.7.0/vc17 (UI polish, owner finding; refines D-152, no ledger row):
   the AOSP-keys/OEM note moved off an always-on footer card to a top-bar **ⓘ → dialog**
   (`SettingsScaffold` gains an `actions` slot); i18n ratchet 0.
