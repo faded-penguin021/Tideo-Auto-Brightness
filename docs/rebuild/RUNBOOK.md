@@ -152,7 +152,9 @@ so check it explicitly.
     re-used code). Bump by 1 from the highest code ever shipped, not from the last tag's code if
     that tag forgot to bump. (versionCode is always +1 regardless of which semver field moved.)
 - **F-Droid changelog:** add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the
-  filename is the **versionCode**, not the name) with a short user-facing note. **`release.yml`
+  filename is the **versionCode**, not the name) with a short user-facing note. **Keep it under 500
+  characters** (whole file incl. the trailing newline — aim ≤ 480 for margin): F-Droid's code-quality
+  scan flags a longer `whatsNew` as a Minor finding (`wc -c` the file before committing). **`release.yml`
   auto-reuses this file as the GitHub Release's "What's new" section (D-123)** — it reads the tagged
   build's `versionCode`, looks up the matching changelog, and slots it between the owner's UI summary
   and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release
