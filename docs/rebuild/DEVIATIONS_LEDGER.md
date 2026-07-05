@@ -1,4 +1,4 @@
-# DEVIATIONS & DISCOVERIES LEDGER — permanent registry (D-001…)
+# DEVIATIONS & DISCOVERIES LEDGER — permanent registry (D-001…D-200)
 
 > **Append-only registry — NEVER archived, compressed, or truncated.** This is the canonical,
 > permanent home for every numbered deviation/discovery. Code comments and docs cite entries as
@@ -8,6 +8,15 @@
 > sequence, never restart numbering. The highest-value "don't repeat these mistakes" reference.
 > Code + golden vectors are ground truth; if an entry conflicts with current code, trust the
 > code and correct the entry (don't delete it).
+>
+> **File cap & rollover (D-153, owner-instructed).** THIS FILE holds at most **200 rows**
+> (D-001…D-200). When a 201st deviation is needed, do NOT add it here — create
+> **`DEVIATIONS_LEDGER_A.md`** with this same header discipline and start numbering at
+> **DA-001**; that file caps at DA-200, then `DEVIATIONS_LEDGER_B.md` starts **DB-001**, and so
+> on. Existing rows are never moved, renumbered, or summarized — the cap bounds *file size* (an
+> unbounded single file is a read/context hazard for agentic maintenance flows), not history.
+> A citation's prefix names its file: `D-…` → this file, `DA-…` → ledger A, `DB-…` → ledger B.
+> Cites stay bare (`DA-017`) everywhere, exactly like `D-017` today.
 
 ## Deviations & discoveries ledger
 
@@ -2708,3 +2717,15 @@ the permanent registry — never compress or remove them.
   single-writer and winner-takes-all: an active context profile is not stomped by a baseline
   edit). Per owner: the profile-semantics UI copy shrank to one line ("if you need that many
   words the UI/UX is wrong"). Folds into the unreleased 1.7.0 / versionCode 17.
+
+- **D-153: Ledger file cap + rollover (owner-instructed, docs/process only).** The registry
+  stays permanent and append-only, but each ledger FILE caps at **200 rows**: D-001…D-200 live
+  here; the 201st deviation opens `DEVIATIONS_LEDGER_A.md` starting **DA-001**, which caps at
+  DA-200 and hands over to `DEVIATIONS_LEDGER_B.md`/**DB-001**, and so on. Rationale: an
+  unbounded single file is a growing read/context hazard for agentic maintenance flows, and
+  summarizing was rejected outright — rows are cited by number from code and must stay
+  verbatim forever. The prefix routes a cite to its file (D-/DA-/DB-…); cites stay bare.
+  Numbering never restarts inside a file and rows are never moved between files. Pointers
+  updated in the ledger header, `CLAUDE.md`, and `RUNBOOK.md` ("append in the LIVE ledger file
+  per the rollover rule"). At adoption the tail is D-153 → 47 slots remain before the first
+  rollover.

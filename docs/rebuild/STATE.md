@@ -33,8 +33,9 @@ persisted-plan pattern). The migration narrative is frozen in `../history/`; the
 registry stays live.
 
 > Code/docs elsewhere cite deviations by number (e.g. `STATE.md D-048`, `F50`). All deviations
-> — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
-> findings are in `../history/STATE_rebuild.md`). Look there.
+> — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (200 rows per
+> file, then `_A.md`/DA-…, `_B.md`/DB-… — D-153; gate findings are in
+> `../history/STATE_rebuild.md`). Look there.
 
 **Owner actions pending:**
 
@@ -70,6 +71,10 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-05 — docs/process only (owner-instructed): **D-153** deviations-ledger file cap —
+  200 rows per file, rollover to `DEVIATIONS_LEDGER_A.md`/DA-001 then `_B.md`/DB-001, …;
+  summarizing rejected (rows are cited by number, stay verbatim). Pointers updated in the
+  ledger header, CLAUDE.md, RUNBOOK.
 - 2026-07-05 — docs-only (Privileged Display **Segment 5 — feature COMPLETE**): README +
   `screen_map.md` finalized (toggles = ELEVATED **profile settings** applied by
   profiles/Contexts rules — no standalone scheduler); owner on-device checklist added as

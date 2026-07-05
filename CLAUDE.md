@@ -8,7 +8,8 @@ The original Tasker XML lives in `docs/rebuild/extraction/_source/` (gitignored,
 **never read it wholesale; use `docs/rebuild/XML_RECIPES.md`**). The migration narrative
 (segment briefs, gate findings) is frozen in `docs/history/`. The numbered deviations live in
 `docs/rebuild/DEVIATIONS_LEDGER.md` — a **permanent, append-only registry** (code cites bare
-`D-NN`; never compress or delete entries; append new ones as D-096+).
+`D-NN`; never compress or delete entries; append the next number in the LIVE ledger file —
+each file caps at 200 rows and rolls over `D-… → DA-…` (`_A.md`) `→ DB-…` (`_B.md`), D-153).
 
 > **Ground truth:** code + golden test vectors. The docs under `docs/rebuild/` and
 > `docs/history/` describe the app as-built and may drift — when a doc conflicts with the code,

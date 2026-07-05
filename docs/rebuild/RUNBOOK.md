@@ -6,8 +6,9 @@ playbook that matches your task, read the reference docs it names, then do the w
 
 The migration narrative (segment briefs, gate findings) is frozen in `../history/` — consult it,
 don't extend it. The numbered deviations live in `DEVIATIONS_LEDGER.md`, a permanent append-only
-registry (record new ones as D-096+; never compress it). **Code + golden vectors are ground
-truth**; where any doc disagrees with the code, trust the code (and fix the doc).
+registry (never compress it; append the next number in the LIVE ledger file — 200 rows per file,
+then it rolls over to `DEVIATIONS_LEDGER_A.md`/DA-001, `_B.md`/DB-001, …; D-153). **Code + golden
+vectors are ground truth**; where any doc disagrees with the code, trust the code (and fix the doc).
 
 ## Where logic lives
 
@@ -35,7 +36,7 @@ truth**; where any doc disagrees with the code, trust the code (and fix the doc)
 | Known parity deviations / open gaps | `parity_gaps.md` |
 | Privilege tiers / permissions / DataStore schema | `architecture/*` |
 | Material 3 audit | `design/m3_audit.md` |
-| Numbered deviations — solved mistakes + ongoing (⭐, append D-096+) | `DEVIATIONS_LEDGER.md` |
+| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
 ## Change-type playbooks
 
@@ -312,8 +313,8 @@ If this runbook lacks what you need for the task in front of you:
 1. Consult the live reference docs above (esp. `DEVIATIONS_LEDGER.md`) and the frozen
    `../history/` narrative.
 2. If you learn a durable fact future sessions need, record it as a new numbered deviation
-   (D-096+) in `DEVIATIONS_LEDGER.md` and/or correct the relevant reference doc —
-   provenance-stamped, terse.
+   in the live ledger file (200-row cap + rollover, D-153) and/or correct the relevant
+   reference doc — provenance-stamped, terse.
 3. If a playbook here is wrong, stale, or missing a case you just handled, **fix this RUNBOOK in
    the same change.** Treat the runbook as code: it should always reflect how changes are
    actually made now.
