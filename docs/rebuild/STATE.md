@@ -67,10 +67,11 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
-- 2026-07-05 — docs/metadata only (F-Droid code-quality scan): `changelogs/17.txt` trimmed
-  972→472 chars (F-Droid flags `whatsNew` ≥ 500 as Minor). RUNBOOK F-Droid-changelog bullet gains
-  the <500-char rule. No fdroiddata change needed — the `whatsNew` is read from the app repo's
-  fastlane tree at the pinned build commit.
+- 2026-07-05 — docs-only (F-Droid code-quality scan): RUNBOOK F-Droid-changelog bullet gains the
+  <500-char `whatsNew` rule (F-Droid flags ≥ 500 as Minor). `changelogs/17.txt` left at 972 chars —
+  vc17 is already tagged, so the fix would need a release re-cut for a cosmetic Minor; the rule
+  keeps vc18+ within the limit. No fdroiddata change needed (whatsNew is read from the app repo's
+  fastlane tree at the pinned build commit).
 - 2026-07-05 — folds into 1.7.0/vc17 (owner on-device finding): **D-155** panic (Reset) now
   returns ALL privileged display toggles to DEFAULTS (unconditional writes — not the baseline,
   which may itself impair the screen; temperature untouched) via
