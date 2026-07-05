@@ -16,6 +16,7 @@ import com.tideo.autobrightness.app.ui.screens.DashboardScreen
 import com.tideo.autobrightness.app.ui.screens.LiveDebugScreen
 import com.tideo.autobrightness.app.ui.screens.MenuScreen
 import com.tideo.autobrightness.app.ui.screens.MiscScreen
+import com.tideo.autobrightness.app.ui.screens.PrivilegedDisplayScreen
 import com.tideo.autobrightness.app.ui.screens.ProfilesContextsScreen
 import com.tideo.autobrightness.app.ui.screens.ReactivityScreen
 import com.tideo.autobrightness.app.ui.screens.SuperDimmingScreen
@@ -55,6 +56,8 @@ fun AppNavGraph(
         composable(AppRoute.LiveDebug.route) { LiveDebugScreen(navController) }
         // S12.9f (D-070): Profiles + Contexts merged into one destination.
         composable(AppRoute.Profiles.route) { ProfilesContextsScreen(navController) }
+        // D-149: always registered; the screen self-guards below ELEVATED (grant card).
+        composable(AppRoute.PrivilegedDisplay.route) { PrivilegedDisplayScreen(navController) }
         // S13d: real static reference screens (charts + About/Guide replace the placeholders).
         composable(AppRoute.UserGuide.route) { UserGuideScreen(navController) }
         composable(AppRoute.About.route) { AboutScreen(navController) }

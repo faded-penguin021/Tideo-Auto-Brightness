@@ -47,6 +47,7 @@ class AmbientMonitoringService : Service() {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private lateinit var controller: BrightnessPipelineController
     private lateinit var contextEngine: ContextEngine
+    private lateinit var displayToggles: DisplayTogglesCoordinator
     private lateinit var panicSensor: com.tideo.autobrightness.platform.sensor.PanicSensorSource
     // Shared tier cache. Refreshed only at resume points (start + screen-on) so the dimming
     // coordinator can read the cached tier per cycle instead of re-checking the permission (G1-F5).
@@ -63,7 +64,9 @@ class AmbientMonitoringService : Service() {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent?) {
             when (intent?.action) {
-                Intent.ACTION_SCREEN_OFF -> { controller.onScreenOff(); contextEngine.onScreenOff() }
+                Intent.ACTION_SCREEN_OFF -> {
+                    controller.onScreenOff(); contextEngine.onScreenOff()
+                }
                 Intent.ACTION_SCREEN_ON -> onScreenOn()
             }
         }
@@ -103,6 +106,7 @@ class AmbientMonitoringService : Service() {
         val runtime = AppModule(applicationContext).createRuntime(scope)
         controller = runtime.controller
         contextEngine = runtime.contextEngine
+        displayToggles = runtime.displayToggles
         panicSensor = runtime.panicSensor
         privilegeManager = runtime.privilegeManager
 
@@ -204,6 +208,7 @@ class AmbientMonitoringService : Service() {
         privilegeManager.refresh()
         controller.start()
         contextEngine.start(scope)
+        displayToggles.start(scope)
         startPanicDetector()
         if (notificationJob?.isActive == true) return
         val manualOverrideFlow = applicationContext.settingsDataStore.data
@@ -284,6 +289,11 @@ class AmbientMonitoringService : Service() {
 
     private suspend fun panicAndStop() {
         controller.emergencyStop() // restore 255 + drop dimming + cancel jobs (task528)
+        // D-155: panic also returns the privileged display toggles to their DEFAULTS (not the
+        // baseline — it may itself carry grayscale/inversion/Night Light). Must run before the
+        // teardown reaches onDestroy's displayToggles.stop(), which would re-apply the baseline;
+        // panicReset() tears the coordinator down so that stop() finds it already stopped.
+        displayToggles.panicReset()
         tearDownDisabled()
     }
 
@@ -439,6 +449,10 @@ class AmbientMonitoringService : Service() {
         panicJob?.cancel(); panicJob = null
         contextEngine.stop()
         controller.stop()
+        // Return the display toggles to the baseline profile's values (D-151 resting state): a
+        // context-profile override must not outlive the runtime that applies it. Before
+        // scope.cancel() so the coordinator can serialize against an in-flight apply.
+        displayToggles.stop()
         // Watchdog instead of an immediate reset (S12.9d): if the OS restarts the FGS and it
         // republishes within the grace window, the live data survives; otherwise it is cleared so the
         // Dashboard does not show a stale "live" snapshot for a dead loop. A genuine user-driven stop

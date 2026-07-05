@@ -13,6 +13,34 @@ write_local_properties() {
     printf 'sdk.dir=%s\n' "$SDK_ROOT" > "$REPO_DIR/local.properties"
 }
 
+# The wrapper's distribution download is blocked in Claude Code cloud sessions
+# (services.gradle.org redirects to github releases, which the egress proxy denies with 403),
+# but the container image pre-installs the exact pinned Gradle at /opt/gradle-<version>.
+# Seed the wrapper dist cache from it so the documented `./gradlew` commands work. Idempotent;
+# silently no-ops on machines without /opt/gradle-<version> (e.g. a dev laptop with network).
+seed_gradle_wrapper() {
+    local props="$REPO_DIR/gradle/wrapper/gradle-wrapper.properties"
+    [ -f "$props" ] || return 0
+    local version
+    version="$(sed -n 's/^distributionUrl=.*gradle-\(.*\)-bin\.zip$/\1/p' "$props")"
+    { [ -n "$version" ] && [ -d "/opt/gradle-$version" ]; } || return 0
+    local base="$HOME/.gradle/wrapper/dists/gradle-$version-bin"
+    if find "$base" -maxdepth 2 -name '*.zip.ok' 2>/dev/null | grep -q .; then return 0; fi
+    # Let the wrapper create its URL-hash directory (its download attempt fails — expected).
+    (cd "$REPO_DIR" && timeout 90 ./gradlew --version >/dev/null 2>&1) || true
+    local hashdir
+    hashdir="$(find "$base" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)"
+    [ -n "$hashdir" ] || return 0
+    if [ ! -d "$hashdir/gradle-$version" ]; then
+        cp -al "/opt/gradle-$version" "$hashdir/gradle-$version" 2>/dev/null ||
+            cp -a "/opt/gradle-$version" "$hashdir/gradle-$version"
+    fi
+    touch "$hashdir/gradle-$version-bin.zip.ok"
+    echo "[setup-android-sdk] gradle wrapper cache seeded from /opt/gradle-$version"
+}
+
+seed_gradle_wrapper
+
 if [ -d "$SDK_ROOT/platforms/android-35" ] && [ -x "$SDK_ROOT/platform-tools/adb" ]; then
     write_local_properties
     echo "[setup-android-sdk] SDK already present at $SDK_ROOT; local.properties refreshed."

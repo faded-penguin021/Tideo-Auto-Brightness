@@ -50,4 +50,43 @@ class ProfileLoadResultTest {
         assertTrue(result.jsonError.isNotEmpty())
         assertTrue(result.legacyError.isNotEmpty())
     }
+
+    @Test
+    fun `display toggle fields round-trip through the export format D151`() {
+        // The D-151 profile fields ride the same AabSettings serializer as everything else —
+        // including the nullable temperature (null = "device default" must survive a round-trip
+        // as null, and a set value as itself).
+        val withOpinion = """
+            { "schemaVersion": 3, "settings": {
+                "nightLightEnabled": true, "nightLightTemperature": 2700,
+                "nightLightCircadianEnabled": true,
+                "daltonizerMode": "GRAYSCALE", "inversionEnabled": true,
+                "alwaysOnDisplayEnabled": true, "stayAwakeChargingEnabled": true,
+                "hdrForceSdrEnabled": true } }
+        """.trimIndent()
+        val loaded = (manager.decodePayload(withOpinion) as ProfileLoadResult.Success).settings
+        assertEquals(true, loaded.nightLightEnabled)
+        assertEquals(2_700, loaded.nightLightTemperature)
+        assertEquals(true, loaded.nightLightCircadianEnabled)
+        assertEquals("GRAYSCALE", loaded.daltonizerMode)
+        assertEquals(true, loaded.inversionEnabled)
+        assertEquals(true, loaded.alwaysOnDisplayEnabled)
+        assertEquals(true, loaded.stayAwakeChargingEnabled)
+        assertEquals(true, loaded.hdrForceSdrEnabled)
+
+        val withoutOpinion = """{ "schemaVersion": 3, "settings": { "minBrightness": 7 } }"""
+        val defaults = (manager.decodePayload(withoutOpinion) as ProfileLoadResult.Success).settings
+        assertEquals(null, defaults.nightLightTemperature, "absent temperature stays 'device default'")
+        assertEquals(DALTONIZER_OFF, defaults.daltonizerMode)
+        assertEquals(false, defaults.alwaysOnDisplayEnabled)
+    }
+
+    @Test
+    fun `imported daltonizer garbage validates back to OFF D151`() {
+        // decodePayload runs validate() — an unknown mode string from a newer schema or a
+        // hand-edited file must not poison the profile (the D-146 spirit for strings).
+        val payload = """{ "schemaVersion": 3, "settings": { "daltonizerMode": "SEPIA" } }"""
+        val loaded = (manager.decodePayload(payload) as ProfileLoadResult.Success).settings
+        assertEquals(DALTONIZER_OFF, loaded.daltonizerMode)
+    }
 }

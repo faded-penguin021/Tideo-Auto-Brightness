@@ -68,4 +68,23 @@ class AabSettingsClampTest {
         assertEquals(10.0f, validated.scale, "+Inf clamps to the scale max")
         assertEquals(0.0, validated.thresholdMidpoint, "-Inf clamps to the midpoint min")
     }
+
+    // --- D-151 display-toggle profile fields -----------------------------------------------------
+
+    @Test
+    fun `night light temperature clamps into the sanity band but null stays null D151`() {
+        assertEquals(1_000, AabSettings(nightLightTemperature = 5).validate().nightLightTemperature)
+        assertEquals(10_000, AabSettings(nightLightTemperature = 99_999).validate().nightLightTemperature)
+        assertEquals(2_700, AabSettings(nightLightTemperature = 2_700).validate().nightLightTemperature)
+        // null = "no temperature opinion / device default" — validate() must not invent a value.
+        assertEquals(null, AabSettings().validate().nightLightTemperature)
+    }
+
+    @Test
+    fun `unknown daltonizer mode resets to OFF instead of poisoning the profile D151`() {
+        // The D-146 spirit for the string field: a newer-schema / hand-edited import cannot persist
+        // a value the coordinator and the mode picker cannot represent.
+        assertEquals(DALTONIZER_OFF, AabSettings(daltonizerMode = "sepia").validate().daltonizerMode)
+        assertEquals("GRAYSCALE", AabSettings(daltonizerMode = "GRAYSCALE").validate().daltonizerMode)
+    }
 }

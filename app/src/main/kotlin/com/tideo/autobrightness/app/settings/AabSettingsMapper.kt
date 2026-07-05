@@ -118,5 +118,11 @@ fun AabSettings.validate(): AabSettings {
         scaleTransitionFactor = scaleTransitionFactor.nanTo(d.scaleTransitionFactor).coerceIn(0f, 1f),
         debugLevel = debugLevel.coerceIn(0, 9),
         panicSensitivity = panicSensitivity.coerceIn(0, 10),
+        // D-151 display-toggle profile fields: the temperature keeps its "unset = device default"
+        // null; a set value is clamped to the SecureDisplayController sanity band. An unknown
+        // daltonizer string (newer schema / hand-edited import) resets to OFF so one bad value
+        // cannot poison the profile (the D-146 spirit).
+        nightLightTemperature = nightLightTemperature?.coerceIn(1_000, 10_000),
+        daltonizerMode = if (daltonizerMode in DALTONIZER_MODES) daltonizerMode else DALTONIZER_OFF,
     )
 }

@@ -7,7 +7,7 @@ schema-drifted file in one never takes down the others. They are declared in
 
 | # | Store (extension) | File | Type | Payload | Schema ver | Serializer | Why independent |
 |---|---|---|---|---|---|---|---|
-| 1 | `settingsDataStore` | `aab_settings.json` | typed JSON | `AabSettings` (flat, 41 fields) | **3** (`CURRENT_SCHEMA_VERSION`) | `AabSettingsSerializer` | The core tuned curve/threshold/dimming parameters; versioned + migrated (v1→v2→v3). High read frequency (every pipeline reapply). |
+| 1 | `settingsDataStore` | `aab_settings.json` | typed JSON | `AabSettings` (flat, 48 fields) | **3** (`CURRENT_SCHEMA_VERSION`) | `AabSettingsSerializer` | The core tuned curve/threshold/dimming parameters; versioned + migrated (v1→v2→v3; the 7 D-151/D-152 display-toggle fields joined additively at v3). High read frequency (every pipeline reapply). |
 | 2 | `serviceHealthDataStore` | `service_health` | Preferences | heartbeat/telemetry key-values | n/a (schema-less) | — (Preferences) | Volatile runtime health written by `MaintenanceWorker`; losing it is harmless, so it stays a cheap key/value store with no schema. |
 | 3 | `experimentPrefsDataStore` | `experiment_prefs` | Preferences | fixed date + lat/lon override | n/a (schema-less) | — (Preferences) | Circadian "Experiment" overrides (`%AAB_Date`/`Latitude`/`Longitude`); rarely set, optional, key/value. |
 | 4 | `contextRulesDataStore` | `aab_context_rules.json` | typed JSON | `ContextOverrideConfig` (rule list) | **1** (`ContextOverrideConfig.SCHEMA_VERSION`) | `ContextRulesSerializer` | The context-override rule set; edited from the Contexts UI, read by `ContextEngine`. Tasker-JSON interop lives here, separate from settings. |

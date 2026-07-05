@@ -39,6 +39,10 @@ enum class AppRoute(
     // S12.9f (D-070): Profiles + Contexts folded into one destination — saved profiles + their
     // context rules (rule editing in a modal). Replaces the separate Profiles and Contexts screens.
     Profiles("profiles", "Profiles & Contexts", R.string.title_profiles_contexts, "S12.9f"),
+    // D-149 (rebuild-only; profile fields D-151/D-152): ELEVATED-only display toggles behind the
+    // WRITE_SECURE_SETTINGS grant. The route is ALWAYS registered; the Menu shows its row only at
+    // Tier.ELEVATED and the screen itself renders a grant card below ELEVATED.
+    PrivilegedDisplay("privileged_display", "Privileged Display", R.string.title_privileged_display, "D-149"),
     // S13d: the static reference screens (extraction/scenes/about.md + user_guide.md). The User Guide
     // is also the post-onboarding first-run destination (G2R-F80).
     UserGuide("user_guide", "User Guide", R.string.title_user_guide, "S13d"),
@@ -57,8 +61,16 @@ enum class AppRoute(
         val infoDestinations: List<AppRoute> = listOf(Tools, LiveDebug, UserGuide, About)
 
         /**
-         * Every destination surfaced as a plain navigation ROW in the Menu (the hero cards render
-         * separately). Drives the menu list + the navigation smoke tests.
+         * ELEVATED-gated destinations — the Menu's "Privileged" group, rendered only while
+         * `tierFlow()` reads [com.tideo.autobrightness.platform.privilege.Tier.ELEVATED] (D-149).
+         * Kept out of [menuNavDestinations] because those rows are unconditional.
+         */
+        val privilegedDestinations: List<AppRoute> = listOf(PrivilegedDisplay)
+
+        /**
+         * Every destination surfaced as an UNCONDITIONAL plain navigation ROW in the Menu (the hero
+         * cards and the tier-gated [privilegedDestinations] render separately). Drives the menu
+         * list + the navigation smoke tests.
          */
         val menuNavDestinations: List<AppRoute> =
             listOf(Dashboard) + settingsDestinations + infoDestinations

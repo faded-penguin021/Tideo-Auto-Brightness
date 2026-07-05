@@ -7,6 +7,7 @@ import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
 import com.tideo.autobrightness.app.runtime.ContextEngine
 import com.tideo.autobrightness.app.runtime.ControllerHookHolder
 import com.tideo.autobrightness.app.runtime.DebugSink
+import com.tideo.autobrightness.app.runtime.DisplayTogglesCoordinator
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
@@ -21,10 +22,16 @@ import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.storage.userProfilesDataStore
+import com.tideo.autobrightness.domain.brightness.TimeContext
+import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
+import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
+import com.tideo.autobrightness.domain.circadian.NightLightTemperatureRamp
 import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.GeoIpLocationClient
+import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
+import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
@@ -146,7 +153,46 @@ class AppModule(context: Context) {
             isNear = { controller.state.value.proximityNear },
         )
 
-        return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager)
+        // Display-toggle profile fields (D-151): applied on profile change through the context
+        // engine's effective-settings flow — its OWN collector in the service scope, never inside
+        // the pipeline cycle (the single-coroutine drop-on-reentry model is BINDING).
+        val displayToggles = DisplayTogglesCoordinator(
+            effectiveFlow = contextEngine.effectiveFlow,
+            baselineFlow = appContext.settingsDataStore.data,
+            display = AndroidSecureDisplayController(appContext, privilegeManager),
+            tierProvider = { privilegeManager.currentTier() },
+            // D-154: the current circadian-ramp Kelvin — the same task90 tanh modifier that drives
+            // %AAB_ScaleDynamic, computed independently of pipeline cycles (steady light starves
+            // them, the D-110 lesson) with the pipeline's exact fallback: real solar windows when
+            // known, else the fixed TimeContext defaults (F73). Night anchor = the profile's
+            // temperature (or the AOSP default); day endpoint = the AOSP max (weakest filter).
+            circadianTemperature = { s ->
+                val nowSecOfDay = ((System.currentTimeMillis() / 1000L) % 86_400L).toDouble()
+                val w = circadianWindows.current(s.scaleTransitionFactor.toDouble())
+                val defaults = TimeContext(secondsOfDay = nowSecOfDay)
+                val modifier = DynamicScaleEngine.compute(
+                    DynamicScaleInput(
+                        nowSecOfDay = nowSecOfDay,
+                        morningStart = w?.morningStart ?: defaults.morningStart,
+                        morningEnd = w?.morningEnd ?: defaults.morningEnd,
+                        eveningStart = w?.eveningStart ?: defaults.eveningStart,
+                        eveningEnd = w?.eveningEnd ?: defaults.eveningEnd,
+                        sunlightDurationMinutes = w?.sunlightDurationMinutes
+                            ?: defaults.sunlightDurationMinutes,
+                        isPolar = w?.isPolar ?: false,
+                        steepness = s.scaleSteepness.toDouble(),
+                    ),
+                ).modifier
+                NightLightTemperatureRamp.temperature(
+                    modifier = modifier,
+                    nightKelvin = s.nightLightTemperature
+                        ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K,
+                    dayKelvin = SecureDisplayController.NIGHT_LIGHT_MAX_K,
+                )
+            },
+        )
+
+        return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager, displayToggles)
     }
 }
 
@@ -162,6 +208,8 @@ class RuntimeGraph(
     /** Shared tier source. The service [refresh][PrivilegeManager.refresh]es it at resume points so a
      *  post-start ADB/Shizuku grant is seen without re-checking the permission on every dimming cycle. */
     val privilegeManager: PrivilegeManager,
+    /** Display-toggle profile fields (D-151); the service drives its start/stop lifecycle. */
+    val displayToggles: DisplayTogglesCoordinator,
 ) {
     val activeContext: StateFlow<String?> = contextEngine.activeContext
 }

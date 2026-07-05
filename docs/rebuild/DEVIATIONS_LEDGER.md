@@ -1,4 +1,4 @@
-# DEVIATIONS & DISCOVERIES LEDGER — permanent registry (D-001…)
+# DEVIATIONS & DISCOVERIES LEDGER — permanent registry (D-001…D-200)
 
 > **Append-only registry — NEVER archived, compressed, or truncated.** This is the canonical,
 > permanent home for every numbered deviation/discovery. Code comments and docs cite entries as
@@ -8,6 +8,15 @@
 > sequence, never restart numbering. The highest-value "don't repeat these mistakes" reference.
 > Code + golden vectors are ground truth; if an entry conflicts with current code, trust the
 > code and correct the entry (don't delete it).
+>
+> **File cap & rollover (D-153, owner-instructed).** THIS FILE holds at most **200 rows**
+> (D-001…D-200). When a 201st deviation is needed, do NOT add it here — create
+> **`DEVIATIONS_LEDGER_A.md`** with this same header discipline and start numbering at
+> **DA-001**; that file caps at DA-200, then `DEVIATIONS_LEDGER_B.md` starts **DB-001**, and so
+> on. Existing rows are never moved, renumbered, or summarized — the cap bounds *file size* (an
+> unbounded single file is a read/context hazard for agentic maintenance flows), not history.
+> A citation's prefix names its file: `D-…` → this file, `DA-…` → ledger A, `DB-…` → ledger B.
+> Cites stay bare (`DA-017`) everywhere, exactly like `D-017` today.
 
 ## Deviations & discoveries ledger
 
@@ -2604,3 +2613,163 @@ the permanent registry — never compress or remove them.
   (real Preferences DataStore on a temp file). +19 tests; no production code changed. With this,
   the H3 backlog row has NO remaining seams (Shizuku*/MaintenanceWorker skips stand, documented
   in the D-136 row).
+
+- **D-149: Privileged Display Control adopted (rebuild-only feature, no Tasker source — RUNBOOK
+  playbook 5; plan: `plans/privileged-display.md`).** New `:platform`
+  `SecureDisplayController` exposes the AOSP display toggles WRITE_SECURE_SETTINGS unlocks:
+  Night Light (`night_display_activated` / `night_display_color_temperature`, auto-mode
+  read-only), daltonizer (`accessibility_display_daltonizer[_enabled]`, grayscale=0 + the three
+  correction matrices; OFF preserves the mode value like system Settings), inversion
+  (`accessibility_display_inversion_enabled`), AOD (`doze_always_on`), stay-awake-while-charging
+  (`Settings.Global.STAY_ON_WHILE_PLUGGED_IN`, AC|USB|wireless), and experimental Android-14+
+  force-SDR (`user_disabled_hdr_formats`="1,2,3,4" + `are_user_disabled_hdr_formats_allowed`=0 —
+  the public `HDR_TYPE_*` ids; community-verified adb recipe). Policy decisions: vanilla-AOSP
+  keys with ONE code path — OEM variance is documented, never branched (D-048 policy); Extra Dim
+  (`reduce_bright_colors_*`) deliberately NOT exposed — pipeline-owned (D-144); reads are
+  unprivileged, writes ELEVATED-gated `Result`s; daltonizer writes value BEFORE enabled (no
+  one-frame flash of the previous matrix); HDR enable writes the list before enforcement (never
+  enforce an empty list) and the OFF path resets any pre-existing partial disable list
+  (documented v1 scope). "Privileged" = the existing ELEVATED tier — adb/Shizuku/root are grant
+  channels only (D-016), no runtime-binder write fallback. Ships in **1.7.0 / versionCode 17**.
+
+- **D-150: Privileged Display schedule rules — the apply/restore semantics (Segment 4 of the
+  D-149 feature; storage + runtime + UI).** A `DisplayRule` set (separate `aab_display_rules.json`
+  DataStore — NOT in `AabSettings`/contexts.json: no migration or import/export coupling; the
+  action is stored as a STRING enum name so an unknown value from a newer schema leaves that one
+  rule inert instead of failing the file) is evaluated by an app-side `DisplayRulesCoordinator`
+  running its OWN coroutines in the service scope — never inside the pipeline cycle (the
+  single-coroutine drop-on-reentry model stays BINDING). Apply/restore is **edge-triggered with a
+  death-safe latch** (`:platform` `SharedPrefsDisplayRestoreLatch`, SharedPreferences `commit()`,
+  the D-134/D-144 pattern; a present key IS the engaged truth): the engage edge persists the
+  pre-engage device state BEFORE writing the toggle ON (dying between the two restores a no-op);
+  while a rule holds, nothing is re-asserted — **manual changes during a window stick until the
+  window ends** (stated in the UI), and the release edge restores the LATCHED pre-engage state.
+  Failure semantics: a failed engage clears the latch (a later evaluation retries); a failed
+  restore KEEPS it (the obligation survives a revoked grant until the next evaluation / service
+  stop / startup sweep). The first evaluation at service start doubles as the residual sweep — a
+  latch left by a dead process restores when no rule matches, and is adopted (original pre-state
+  preserved) when one still does; service stop restores every engaged action under the eval
+  mutex AFTER `scope = null` (an in-flight evaluation serializes before the restore and a queued
+  one no-ops — the D-139 class); below ELEVATED the coordinator is fully inert (no writes, no
+  latch churn — obligations wait for the grant to return). Cost gates mirror the context engine:
+  foreground-app poll only while ≥1 ENABLED rule uses apps and the screen is on (a second 2.5 s
+  poll may coexist with the context engine's — accepted v1 cost; the app snapshot clears on
+  gate-off, D-142), time boundaries self-schedule via the shared `millisUntilNextContextWake`
+  **+1 s margin** (glue-review finding: the shared window match is end-inclusive and an on-time
+  wake at a window END would still match, hold, and re-arm for tomorrow — the context engine is
+  rescued by pipeline ticks, this coordinator has none); battery/wifi/location listeners are
+  deliberately absent in v1 (the editor exposes action + days/time/apps; those model dimensions
+  stay on the D-108 unknown-sentinel semantics and never match). UI: "Schedules" on the
+  Privileged Display screen (ELEVATED-only, like the toggles); the Contexts trigger composables
+  moved verbatim to shared `ui/components/TriggerEditors.kt` (behavior + test tags identical —
+  the untouched ContextsScreen suites are the proof). Tests: +16 coordinator, +7 store/serializer,
+  +3 latch, +5 screen. Folds into **1.7.0 / versionCode 17**.
+
+- **D-151: Display toggles moved into the profile schema (owner-instructed Segment 4.5 pivot —
+  NOT in the approved `plans/privileged-display.md`; its Segment 4 is obsolete); the D-150
+  separate schedule system removed.** Night Light (+ temperature), daltonizer mode and inversion
+  are now `AabSettings` PROFILE fields (`nightLightEnabled`, `nightLightTemperature` — nullable,
+  null = "no temperature opinion, leave the device's persistent preference alone",
+  `daltonizerMode` — string enum name, unknown values validate back to OFF (D-146 spirit),
+  `inversionEnabled`), fanned out to `mergeProfile` (in the swapped snapshot like the dimming
+  fields, NOT baseline-preserved), `validate()`/`SettingsValidator`, the contract + diff display
+  (invented `%AAB_NightLight`/`%AAB_NightLightTemp`/`%AAB_Daltonizer`/`%AAB_Inversion` names, the
+  D-116 precedent), import/export, and a draft-edited profile section on the Privileged Display
+  screen. Apply path mirrors super dimming: `DisplayTogglesCoordinator` collects the context
+  engine's new `effectiveFlow` in the service scope (never the pipeline coroutine) and is
+  ELEVATED-gated via `SecureDisplayController` — **idempotent, only-on-change**: a write happens
+  only for a field whose value differs from the last-applied state, the seed ADOPTS the baseline
+  without writing (service start is not a profile change — an all-defaults profile chain never
+  touches the device, so the system's own Night Light schedule keeps working), manual/system
+  changes between swaps stick, and a mid-session grant asserts only from the next change.
+  **Resting state = the baseline profile's values**: service stop re-applies the live baseline
+  (only-on-change); there is NO death-safe latch and NO residual sweep (that was D-150
+  machinery) — a process death mid-override leaves the profile's toggles on the device until the
+  next differing swap or service stop self-heals it (accepted trade). What this trades away:
+  D-150's schedules were ORTHOGONAL to profiles (a grayscale window co-existed with any active
+  profile) and restored device pre-state; the profile model is winner-takes-all — scheduling is
+  now "a Contexts rule loads a profile carrying display fields", and restore-to-baseline replaces
+  restore-to-pre-state. Removed wholesale: `DisplayRulesCoordinator`, `DisplayRule`/
+  `DisplayRuleSet`/`DisplayRulesStore`/`DisplayRulesSerializer` + `displayRulesDataStore`
+  (`aab_display_rules.json` — never shipped, no migration owed), `:platform`
+  `DisplayRestoreLatch`, the `DisplaySchedulesSection` UI, and `:domain` `DisplayRules`/
+  `DisplayRulesResolver` (+ suites). KEPT: `ContextMatching` (the context resolver's extraction
+  home — golden tests untouched and green), `SecureDisplayController`, and the manual Privileged
+  Display toggles screen (immediate control + grant card, minus its Schedules section). D-150
+  stays in this ledger as history. Folds into the unreleased **1.7.0 / versionCode 17**
+  (`changelogs/17.txt` rewritten — D-150 was never released, no user-facing deprecation).
+
+- **D-152: D-151 completed — ALL Privileged Display toggles are profile fields; the duplicated
+  manual section removed (owner finding: half the toggles existed only as device-immediate
+  controls, and the ported ones appeared twice).** `AabSettings` gains `alwaysOnDisplayEnabled`,
+  `stayAwakeChargingEnabled`, `hdrForceSdrEnabled` (booleans, "leave-alone" false defaults; HDR
+  inert below Android 14 via the controller's availability gate), same fan-out as D-151
+  (mergeProfile snapshot, contract `%AAB_AlwaysOnDisplay`/`%AAB_StayAwakeCharging`/
+  `%AAB_HdrForceSdr`, diff display, import/export, legacy key=value arms).
+  `DisplayTogglesCoordinator` diff-writes all seven fields. The Privileged Display screen now has
+  ONE set of controls — the draft-edited profile fields (G2-F1 preview→Apply) — plus the grant
+  card and info card; the "device now" read-back toggles are gone. `DisplayTogglesViewModel`
+  slims to tier/grant affordances, the Night Light auto-mode caveat, the HDR availability gate,
+  and **`applyNow`**: because the coordinator's seed deliberately adopts without writing
+  (D-151), an Apply with the auto-brightness service OFF would otherwise be a silent no-op
+  forever — so the screen writes the device directly exactly when `serviceEnabled` is false
+  (with the service on, Apply flows through reapply → the coordinator, keeping the runtime
+  single-writer and winner-takes-all: an active context profile is not stomped by a baseline
+  edit). Per owner: the profile-semantics UI copy shrank to one line ("if you need that many
+  words the UI/UX is wrong"). Folds into the unreleased 1.7.0 / versionCode 17.
+
+- **D-153: Ledger file cap + rollover (owner-instructed, docs/process only).** The registry
+  stays permanent and append-only, but each ledger FILE caps at **200 rows**: D-001…D-200 live
+  here; the 201st deviation opens `DEVIATIONS_LEDGER_A.md` starting **DA-001**, which caps at
+  DA-200 and hands over to `DEVIATIONS_LEDGER_B.md`/**DB-001**, and so on. Rationale: an
+  unbounded single file is a growing read/context hazard for agentic maintenance flows, and
+  summarizing was rejected outright — rows are cited by number from code and must stay
+  verbatim forever. The prefix routes a cite to its file (D-/DA-/DB-…); cites stay bare.
+  Numbering never restarts inside a file and rows are never moved between files. Pointers
+  updated in the ledger header, `CLAUDE.md`, and `RUNBOOK.md` ("append in the LIVE ledger file
+  per the rollover rule"). At adoption the tail is D-153 → 47 slots remain before the first
+  rollover.
+
+- **D-154: Circadian Night Light temperature (owner-requested; rebuild-only, extends
+  D-149/D-151/D-152).** New profile field `nightLightCircadianEnabled` ("Follow circadian
+  scaling", full D-151 fan-out: contract `%AAB_NightLightCircadian`, mergeProfile snapshot, diff
+  display, import/export + legacy arm, default false). While the EFFECTIVE profile has it on,
+  the Night Light temperature follows the task90 tanh `modifier` — the same value that drives
+  `%AAB_ScaleDynamic` — via pure `domain/circadian/NightLightTemperatureRamp` (linear Kelvin
+  blend, modifier −1 → night anchor = the profile's `nightLightTemperature` ?: AOSP default
+  2850, +1 → AOSP max 4082 = weakest filter; anchors now shared constants on
+  `SecureDisplayController`). The ramp is computed INDEPENDENTLY of pipeline cycles (steady
+  light starves them — the D-110 lesson): a 60 s ticker inside `DisplayTogglesCoordinator`
+  (same service-scope coroutine family, same apply mutex, ELEVATED-gated, **only-on-change** —
+  an unchanged sun writes nothing) re-derives the modifier through `CircadianWindowProvider`
+  with the pipeline's exact TimeContext-defaults fallback and the profile's
+  steepness/transition factor; `scalingEnabled` is deliberately NOT required (temperature
+  tracking works without brightness scaling). Semantics decided: **manual temperature changes
+  do NOT stick while tracking is on** (the toggle is the consent; every other display field
+  keeps the D-151 manual-stick rule); the temperature comparator (`deviceTempK`) tracks the
+  profile's static OPINION incl. null in static mode (the D-151 comparator, also below
+  ELEVATED so a post-grant swap never replays) but the last WRITTEN ramp value in circadian
+  mode — leaving a tracking profile re-asserts a static anchor even when numerically equal to
+  the tracking profile's anchor, and a null-opinion hand-off leaves the last ramp value (null
+  never writes, D-151). First assert after service start lands on the first tick (≤ 60 s) or
+  first differing swap — the seed still adopts without writing. `applyNow` (service off) stays
+  static-only: tracking is a runtime feature (stated in the help text). Folds into the
+  unreleased 1.7.0/vc17 (`17.txt` +1 line); DEVICE_TEST_SCRIPT §11 step 38.
+
+- **D-155: Panic (Reset) also returns the privileged display toggles to their DEFAULTS (owner
+  on-device finding on the 1.7.0 branch build: panic persisted the privileged keys).** The
+  task528 gesture is the "give me a usable screen back" escape hatch, and the baseline itself
+  may carry the impairing values (grayscale/inversion/Night Light) — so the reset target is the
+  schema DEFAULTS, not the D-151 resting state. `DisplayTogglesCoordinator.panicReset()`
+  (called from `panicAndStop()` between `emergencyStop()` and the teardown): writes ALL fields
+  to defaults **unconditionally — no only-on-change diff** (panic must clear residuals the
+  process can't know about, e.g. a post-death D-151 leftover); the temperature is NOT written
+  (default = null opinion; Night Light is off after the reset); HDR skipped when unavailable;
+  below ELEVATED nothing is written (couldn't anyway). It tears the coordinator down itself, so
+  onDestroy's `stop()` finds it stopped and cannot resurrect the baseline; `lastApplied` stays
+  at the defaults, so a same-process service restart re-asserts the baseline on the first
+  effective emission (an escape hatch, not a permanent opt-out; cross-death restart = the
+  standard D-151 seed/residual trade). Tests +5. — Same owner pass, documented device variance
+  (D-048 policy, no code): **OxygenOS ignores `night_display_color_temperature`** (the tint is
+  fixed regardless of the Kelvin value), so the temperature slider and the D-154 circadian
+  tracking are visually inert on OnePlus devices; noted in DEVICE_TEST_SCRIPT §11 + README.

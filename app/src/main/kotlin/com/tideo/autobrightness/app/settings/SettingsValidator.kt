@@ -118,6 +118,16 @@ object SettingsValidator {
             )
         }
 
+        // D-151 (display-toggle profile fields): a set Night Light temperature outside the
+        // SecureDisplayController sanity band is clamped on save — surface the clamp like dimSpread.
+        val nightLightTemperature = settings.nightLightTemperature
+        if (nightLightTemperature != null && (nightLightTemperature < 1_000 || nightLightTemperature > 10_000)) {
+            errors += FieldError(
+                "nightLightTemperature",
+                "Night Light temperature ($nightLightTemperature K) must be between 1000 and 10000 K.",
+            )
+        }
+
         // task403/714/715 (animation cross-field guard): min step wait must not exceed max step wait.
         if (settings.minWaitMs > settings.maxWaitMs) {
             errors += FieldError(

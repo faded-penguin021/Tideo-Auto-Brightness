@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +33,9 @@ import com.tideo.autobrightness.app.ui.theme.Dimens
 fun SettingsScaffold(
     title: String,
     onBack: () -> Unit,
+    // Optional top-bar actions (right of the title). Defaults to none, so existing call sites are
+    // unchanged; screens with a screen-wide affordance (e.g. an ⓘ "about these settings") add one.
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
@@ -43,6 +47,7 @@ fun SettingsScaffold(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.a11y_back))
                     }
                 },
+                actions = actions,
             )
         },
         content = content,

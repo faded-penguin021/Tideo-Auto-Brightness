@@ -8,7 +8,8 @@ The original Tasker XML lives in `docs/rebuild/extraction/_source/` (gitignored,
 **never read it wholesale; use `docs/rebuild/XML_RECIPES.md`**). The migration narrative
 (segment briefs, gate findings) is frozen in `docs/history/`. The numbered deviations live in
 `docs/rebuild/DEVIATIONS_LEDGER.md` — a **permanent, append-only registry** (code cites bare
-`D-NN`; never compress or delete entries; append new ones as D-096+).
+`D-NN`; never compress or delete entries; append the next number in the LIVE ledger file —
+each file caps at 200 rows and rolls over `D-… → DA-…` (`_A.md`) `→ DB-…` (`_B.md`), D-153).
 
 > **Ground truth:** code + golden test vectors. The docs under `docs/rebuild/` and
 > `docs/history/` describe the app as-built and may drift — when a doc conflicts with the code,
@@ -50,8 +51,9 @@ owner-verified.
   runtime (`specialUse` type), QS tile, boot receiver, notification with actions.
 
 Privilege tiers: **BASIC** = user-grantable `WRITE_SETTINGS` → full core pipeline. **ELEVATED**
-= `WRITE_SECURE_SETTINGS` via one-time `pm grant` (adb / Shizuku / root) → super dimming. After
-the grant the dimming path writes `Settings.Secure` directly (no binder). Shizuku is a genuine
+= `WRITE_SECURE_SETTINGS` via one-time `pm grant` (adb / Shizuku / root) → super dimming + the
+Privileged Display profile toggles (D-149/D-151/D-152). After the grant, secure writes go via
+`Settings.Secure`/`Global` directly (no binder). Shizuku is a genuine
 **optional runtime** dependency in exactly one place: the no-Location Wi-Fi SSID strategy
 (`ShizukuWifiSsidStrategy` → `cmd wifi status` via `ShizukuShell`) — not "grant-only".
 
@@ -64,7 +66,7 @@ the grant the dimming path writes `Settings.Secure` directly (no binder). Shizuk
 - Golden vectors and the reference implementations are immutable test fixtures: production code
   conforms to THEM. Changing one requires proof the extraction was wrong + a `STATE.md` entry.
 - No new dependencies unless the change clearly warrants it.
-- minSdk 31, target/compile 35. No legacy API branches below 31.
+- minSdk 31, target/compile 36. No legacy API branches below 31.
 - Kotlin official code style; match existing file/package layout.
 
 ## Invariants that still bind (full catalog: `docs/rebuild/DEVIATIONS_LEDGER.md`)

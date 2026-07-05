@@ -121,6 +121,79 @@ optional.
     survives doze (service not killed — exempt from battery optimization if needed, see dontkillmyapp),
     acceptable battery drain, **no ANRs/crashes**, brightness stays sensible.
 
+## 11. Privileged Display toggles [ELEVATED] (D-149–D-152) — NEW 1.7.0
+
+The toggles are `AabSettings` **profile fields** applied on profile change by
+`DisplayTogglesCoordinator` (super-dimming model, idempotent only-on-change); with the service OFF,
+Apply writes the device directly (`applyNow`). Debug builds need their own grant
+(`… com.tideo.autobrightness.debug …`, D-106).
+
+32. **Each toggle writes + reads back.** Service **OFF** (exercises the direct-write path), on
+    **Menu → Privileged → Privileged Display** change one field at a time and **Apply**; confirm the
+    device reacts AND the system Settings UI agrees (a wrong key would be silently *created*, not
+    rejected — visible agreement is the test):
+    - **Night Light** on, temperature slider near 2596 K. **Expected:** screen visibly warms;
+      Settings → Display → Night Light shows ON with matching intensity. "Use device temperature"
+      (unset) leaves the system's own preference untouched. ⚠️ **Known variance (2026-07-05,
+      owner's OnePlus):** OxygenOS ignores `night_display_color_temperature` — the tint is the
+      same regardless of the Kelvin value (the switch itself works). The slider and step 38's
+      circadian tracking are then visually inert on that device (D-048: documented, not branched;
+      the write still lands in the settings table — verify over adb if desired).
+    - **Color correction:** Grayscale, then Protanomaly/Deuteranomaly/Tritanomaly. **Expected:** the
+      filter matches; Settings → Accessibility → Color correction shows the same mode.
+    - **Color inversion** on/off. **Expected:** inverts; the Accessibility toggle agrees.
+    - **Always-on display** on/off. **Expected:** AOD appears/disappears on the lock screen.
+    - **Stay awake while charging** on, short screen timeout, charger in. **Expected:** the screen
+      never sleeps while plugged (AC/USB/wireless); off + unplugged, normal timeout returns.
+    - **Force SDR** (visible only on Android 14+) on → **read back over adb:**
+      `adb shell settings get global user_disabled_hdr_formats` → `1,2,3,4` and
+      `adb shell settings get global are_user_disabled_hdr_formats_allowed` → `0`; an HDR video
+      plays without the HDR brightness boost. Off → allowed returns `1` and HDR plays again.
+33. **Profile carried by a context rule — engage AND baseline restore.** Keep the baseline's display
+    fields all off/default. Set grayscale (+ Night Light) on Privileged Display, **save as a
+    profile**, then restore your baseline values. Add a Contexts rule loading that profile (a time
+    window a few minutes out, or a per-app rule); service ON. **Expected:** rule matches → grayscale
+    + Night Light engage (context flash, Dashboard shows the context); rule ends → the **baseline
+    profile's values** return (restore-to-baseline, not a remembered device pre-state — D-151).
+34. **Apply with the service OFF hits the device (applyNow).** Master switch OFF; change any display
+    field; Apply. **Expected:** the device changes immediately. Then start the service.
+    **Expected:** nothing reverts — the coordinator's seed *adopts* the baseline without writing.
+35. **Manual/system changes between swaps stick (only-on-change).** Service ON, no display-carrying
+    context active, Tideo's display fields at defaults. Toggle Night Light by hand in the system QS;
+    let context swaps happen whose profiles don't differ in display fields. **Expected:** your
+    manual state survives — equal swaps write nothing, and the system's own Night Light schedule
+    keeps working while Tideo's fields stay default.
+36. **No-op below ELEVATED.** Revoke:
+    `adb shell pm revoke com.tideo.autobrightness android.permission.WRITE_SECURE_SETTINGS`.
+    **Expected:** the Menu's "Privileged" row disappears on the next resume; the screen (if open)
+    falls back to the 3-channel grant card; a context swap carrying display fields writes
+    **nothing** (device toggles untouched; super dimming also inert — same grant). Re-grant →
+    toggles assert again from the next change, no restart needed.
+37. **D-151 accepted residual (process death mid-override).** With a context-loaded profile holding
+    grayscale ON, kill the process: `adb shell am force-stop com.tideo.autobrightness`; let the rule's
+    window lapse while the app is dead. **Expected:** grayscale REMAINS on the device — there is
+    deliberately no latch or residual sweep (D-151 trade). Start the service again. **Expected:** the
+    seed adopts silently (grayscale still on); the next **differing** profile swap or a service stop
+    returns the device to the baseline's values. Verify the self-heal happens then — this residual is
+    as-designed, not a bug.
+38. **Circadian temperature tracking (D-154).** On Privileged Display enable Night Light + **Follow
+    circadian scaling**, Apply (baseline), service ON, ideally within ~1 h of local sunset/sunrise.
+    **Expected:** within a minute the temperature starts moving with the sun —
+    `adb shell settings get secure night_display_color_temperature` drifts toward your slider value
+    (warmer) as the evening ramp progresses, and toward 4082 in daylight; in stable indoor light too
+    (the ticker is independent of brightness cycles). Change the temperature by hand in system
+    settings. **Expected:** it is re-overridden within ~1 min — documented behavior while tracking is
+    on (every other display field keeps manual changes). Turn the switch off + Apply. **Expected:**
+    the ticker stops and the temperature returns to the profile's static value (the slider; with the
+    slider unset it simply stays where the ramp left it); manual changes stick again.
+39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
+    Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
+    **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to
+    **defaults** (color back, inversion off, Night Light off, AOD/stay-awake off, HDR re-allowed)
+    — including a pre-existing residual (repeat after a force-stop mid-override: panic still
+    clears it). Re-enable the service. **Expected:** the baseline's display fields re-assert on
+    start — panic is an escape hatch, not a permanent opt-out.
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures
