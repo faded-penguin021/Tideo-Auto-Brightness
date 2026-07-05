@@ -138,6 +138,35 @@ class DisplayTogglesCoordinator(
         }
     }
 
+    /**
+     * task528 panic (D-155): the Reset gesture is the "give me a usable screen back" escape
+     * hatch, so it returns ALL display toggles to their defaults — not to the baseline, which
+     * may itself carry the impairing values (grayscale/inversion/Night Light). Writes are
+     * UNCONDITIONAL (no diff): panic must also clear residuals this process can't know about
+     * (e.g. a post-death D-151 leftover). The temperature is deliberately not written (default
+     * = null opinion; Night Light is off after this anyway). Tears the coordinator down like
+     * [stop] — the service teardown that follows finds it stopped and re-applies nothing, so
+     * the baseline cannot resurrect what panic just cleared. [lastApplied] stays at the
+     * defaults: a same-process service restart then re-asserts the baseline on the first
+     * effective emission (a cross-death restart is the standard D-151 seed/residual trade).
+     */
+    suspend fun panicReset() {
+        scope = null
+        job?.cancel(); job = null
+        applyMutex.withLock {
+            lastApplied = DisplayToggleState.of(AabSettings())
+            deviceTempK = null
+            latestEffective = null
+            if (tierProvider() < Tier.ELEVATED) return // nothing we could write (or clear)
+            display.setNightLight(false)
+            display.setDaltonizer(DaltonizerMode.OFF)
+            display.setInversion(false)
+            display.setAlwaysOnDisplay(false)
+            display.setStayAwakePlugged(false)
+            if (display.hdrForceSdrAvailable) display.setHdrForceSdr(false)
+        }
+    }
+
     /** Diff-write [desired] against [lastApplied]. Caller holds [applyMutex]. */
     private fun applyLocked(desired: DisplayToggleState, settings: AabSettings) {
         val last = lastApplied

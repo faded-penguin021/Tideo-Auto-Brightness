@@ -2755,3 +2755,21 @@ the permanent registry — never compress or remove them.
   first differing swap — the seed still adopts without writing. `applyNow` (service off) stays
   static-only: tracking is a runtime feature (stated in the help text). Folds into the
   unreleased 1.7.0/vc17 (`17.txt` +1 line); DEVICE_TEST_SCRIPT §11 step 38.
+
+- **D-155: Panic (Reset) also returns the privileged display toggles to their DEFAULTS (owner
+  on-device finding on the 1.7.0 branch build: panic persisted the privileged keys).** The
+  task528 gesture is the "give me a usable screen back" escape hatch, and the baseline itself
+  may carry the impairing values (grayscale/inversion/Night Light) — so the reset target is the
+  schema DEFAULTS, not the D-151 resting state. `DisplayTogglesCoordinator.panicReset()`
+  (called from `panicAndStop()` between `emergencyStop()` and the teardown): writes ALL fields
+  to defaults **unconditionally — no only-on-change diff** (panic must clear residuals the
+  process can't know about, e.g. a post-death D-151 leftover); the temperature is NOT written
+  (default = null opinion; Night Light is off after the reset); HDR skipped when unavailable;
+  below ELEVATED nothing is written (couldn't anyway). It tears the coordinator down itself, so
+  onDestroy's `stop()` finds it stopped and cannot resurrect the baseline; `lastApplied` stays
+  at the defaults, so a same-process service restart re-asserts the baseline on the first
+  effective emission (an escape hatch, not a permanent opt-out; cross-death restart = the
+  standard D-151 seed/residual trade). Tests +5. — Same owner pass, documented device variance
+  (D-048 policy, no code): **OxygenOS ignores `night_display_color_temperature`** (the tint is
+  fixed regardless of the Kelvin value), so the temperature slider and the D-154 circadian
+  tracking are visually inert on OnePlus devices; noted in DEVICE_TEST_SCRIPT §11 + README.

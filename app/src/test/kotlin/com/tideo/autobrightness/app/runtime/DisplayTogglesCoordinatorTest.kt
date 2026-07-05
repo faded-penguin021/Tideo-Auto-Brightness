@@ -319,6 +319,79 @@ class DisplayTogglesCoordinatorTest {
         assertEquals(listOf("nightLight=false"), h.display.writes)
     }
 
+    // --- D-155: panic resets the privileged display keys to DEFAULTS ---
+
+    @Test
+    fun panicReset_writesAllDefaults_unconditionally_D155() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        runCurrent()
+        // Even though tracking believes everything already IS default (post-death residuals are
+        // invisible to this process), panic writes every field — no diff, no temperature.
+        h.coordinator.panicReset()
+        assertEquals(
+            listOf(
+                "nightLight=false", "daltonizer=OFF", "inversion=false",
+                "aod=false", "stayAwake=false", "hdr=false",
+            ),
+            h.display.writes,
+        )
+    }
+
+    @Test
+    fun panicReset_thenServiceStop_doesNotResurrectTheBaseline_D155() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(baseline = nightProfile)
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        h.display.writes.clear()
+        h.coordinator.panicReset()
+        h.display.writes.clear()
+        // onDestroy's stop() follows the panic teardown — it must find the coordinator stopped
+        // and write NOTHING (the baseline carries the values panic just cleared).
+        h.coordinator.stop()
+        assertTrue(h.display.writes.isEmpty(), "stop after panic must not re-apply the baseline: ${h.display.writes}")
+    }
+
+    @Test
+    fun restartAfterPanic_reassertsTheBaseline_onTheFirstEffectiveEmission_D155() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(baseline = nightProfile)
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        h.coordinator.panicReset()
+        h.display.writes.clear()
+        // Same-process re-enable: lastApplied stayed at DEFAULTS, so the restart's first
+        // effective emission (the baseline) DIFFERS and re-asserts the user's configuration —
+        // the panic is an escape hatch, not a permanent opt-out.
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        assertEquals(listOf("nightLight=true", "temp=2700", "daltonizer=GRAYSCALE"), h.display.writes)
+    }
+
+    @Test
+    fun panicReset_belowElevated_writesNothing_D155() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(tier = Tier.BASIC)
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        runCurrent()
+        h.coordinator.panicReset()
+        assertTrue(h.display.writes.isEmpty(), "below ELEVATED panic has nothing it could write: ${h.display.writes}")
+    }
+
+    @Test
+    fun panicReset_skipsHdr_whenUnavailable_D155() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.hdrForceSdrAvailable = false // pre-Android-14 device
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        runCurrent()
+        h.coordinator.panicReset()
+        assertTrue(h.display.writes.none { it.startsWith("hdr") }, "hdr must be skipped: ${h.display.writes}")
+    }
+
     @Test
     fun daltonizerModeStrings_mirrorThePlatformEnum() {
         // Drift guard: AabSettings.DALTONIZER_MODES is the platform-import-free mirror of

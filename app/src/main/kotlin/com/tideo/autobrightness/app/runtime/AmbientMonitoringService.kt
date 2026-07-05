@@ -289,6 +289,11 @@ class AmbientMonitoringService : Service() {
 
     private suspend fun panicAndStop() {
         controller.emergencyStop() // restore 255 + drop dimming + cancel jobs (task528)
+        // D-155: panic also returns the privileged display toggles to their DEFAULTS (not the
+        // baseline — it may itself carry grayscale/inversion/Night Light). Must run before the
+        // teardown reaches onDestroy's displayToggles.stop(), which would re-apply the baseline;
+        // panicReset() tears the coordinator down so that stop() finds it already stopped.
+        displayToggles.panicReset()
         tearDownDisabled()
     }
 

@@ -134,7 +134,11 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     rejected — visible agreement is the test):
     - **Night Light** on, temperature slider near 2596 K. **Expected:** screen visibly warms;
       Settings → Display → Night Light shows ON with matching intensity. "Use device temperature"
-      (unset) leaves the system's own preference untouched.
+      (unset) leaves the system's own preference untouched. ⚠️ **Known variance (2026-07-05,
+      owner's OnePlus):** OxygenOS ignores `night_display_color_temperature` — the tint is the
+      same regardless of the Kelvin value (the switch itself works). The slider and step 38's
+      circadian tracking are then visually inert on that device (D-048: documented, not branched;
+      the write still lands in the settings table — verify over adb if desired).
     - **Color correction:** Grayscale, then Protanomaly/Deuteranomaly/Tritanomaly. **Expected:** the
       filter matches; Settings → Accessibility → Color correction shows the same mode.
     - **Color inversion** on/off. **Expected:** inverts; the Accessibility toggle agrees.
@@ -182,6 +186,13 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     on (every other display field keeps manual changes). Turn the switch off + Apply. **Expected:**
     the ticker stops and the temperature returns to the profile's static value (the slider; with the
     slider unset it simply stays where the ramp left it); manual changes stick again.
+39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
+    Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
+    **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to
+    **defaults** (color back, inversion off, Night Light off, AOD/stay-awake off, HDR re-allowed)
+    — including a pre-existing residual (repeat after a force-stop mid-override: panic still
+    clears it). Re-enable the service. **Expected:** the baseline's display fields re-assert on
+    start — panic is an escape hatch, not a permanent opt-out.
 
 ---
 

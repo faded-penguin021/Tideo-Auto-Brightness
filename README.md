@@ -39,7 +39,7 @@ decision logic are golden-tested against a transcription of the original Tasker 
 - **Context automation** can automatically load profiles based on: foreground app, time window, location,
   charging state, Wi-Fi SSID, or day of week, with priority-based conflict resolution.
 - **Live Debug scene**: a glass-box that shows relevant inputs and outputs.
-- **Emergency recovery**, a safety feature for when the screen is too dark, flip the phone upside-down and shake to force brightness to maximum.
+- **Emergency recovery**, a safety feature for when the screen is too dark, flip the phone upside-down and shake to force brightness to maximum. It also resets all privileged display toggles (grayscale, inversion, Night Light, …) to their defaults.
 
 
 <p align="center">
@@ -114,7 +114,7 @@ The grant is detected the next time the screen turns on or when the app is opene
 
 ## Troubleshooting
 
-- **Stuck on a black/too-dark screen?** Flip the phone upside-down (charging port up) and shake it. The phone will emit an SOS vibration and forces brightness to maximum.
+- **Stuck on a black/too-dark screen?** Flip the phone upside-down (charging port up) and shake it. The phone will emit an SOS vibration, force brightness to maximum, and reset the privileged display toggles (grayscale, inversion, Night Light, …) to defaults.
 - **Service stops adapting after a while.** Aggressive OEM battery management may kill the foreground
   service. Exempt Tideo from battery optimization. Please see [dontkillmyapp.com][dkma] for device-specific
   steps.
@@ -122,7 +122,8 @@ The grant is detected the next time the screen turns on or when the app is opene
   *Live Debug* (debug level: Super Dimming Info) to see when it's on.
 - **A Privileged Display toggle does nothing** on some OEM skins. The toggles write the standard
   AOSP settings keys (the same ones the stock Settings app uses); on some OEMs these toggles might fail silently. The AOSP feature simply isn't
-  controllable on your device.
+  controllable on your device. Known example: OxygenOS ignores the Night Light *temperature* key
+  (the switch works, the tint never changes — circadian temperature tracking is visually inert there too).
 - **Brightness range looks off.** Tideo normalizes the device's brightness range to a 0–255 scale. Some OEMs use different scales. The mapping is detected from `config_screenBrightnessSettingMaximum`.
 - **Context rules not firing.** For per-app rules, grant Usage Access when prompted; for location/Wi-Fi
   rules, grant and enable Location (unless you run Shizuku). Live Debug (set to Context Automation) shows the active context and any priority conflicts. Please note that this requires the Global Flashes to be enabled. 

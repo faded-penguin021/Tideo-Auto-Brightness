@@ -67,6 +67,12 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-05 — folds into 1.7.0/vc17 (owner on-device finding): **D-155** panic (Reset) now
+  returns ALL privileged display toggles to DEFAULTS (unconditional writes — not the baseline,
+  which may itself impair the screen; temperature untouched) via
+  `DisplayTogglesCoordinator.panicReset()`; same-process restart re-asserts the baseline.
+  Tests +5. Also documented (D-048, no code): OxygenOS ignores the Night Light Kelvin key —
+  temperature slider + D-154 tracking visually inert on OnePlus.
 - 2026-07-05 — folds into 1.7.0/vc17 (owner-requested): **D-154** circadian Night Light
   temperature — profile toggle `nightLightCircadianEnabled` (full D-151 fan-out); the
   temperature rides the task90 tanh modifier (profile temp/AOSP-default at night → 4082 K by
@@ -110,34 +116,30 @@ One line per shipped change (newest first). Keep terse; details live in the ledg
   `SecureDisplayController` — Night Light (+temperature), daltonizer, inversion, AOD,
   stay-awake-charging, Android-14+ force-SDR; AOSP-universal keys only; Extra Dim excluded
   (pipeline-owned). Changelog `17.txt`. Glue-review: one accepted finding documented.
-- 2026-07-02 — tests-only (F-backlog U6 → **F-backlog CLOSED**): **D-148** the H3 glue-seam
-  audit's last four seams covered (+19 tests; Shizuku*/MaintenanceWorker skips argued in-row).
+- 2026-07-02 — tests-only (U6 → **F-backlog CLOSED**): **D-148** H3 glue-seam audit's last four
+  seams covered (+19 tests).
 - 2026-07-02 — docs-only (U5): parity transcription spot-check — **clean, zero disagreements**;
-  `XML_RECIPES.md` gains R0 (restore the gitignored XML in a fresh clone).
+  `XML_RECIPES.md` gains R0.
 - 2026-07-02 — 1.6.2/vc16 (U4): **D-146** NaN import guard; **D-147** widget actions off the
-  exported provider. `/security-review` clean; `SECURITY.md` +3 scope notes.
-- 2026-07-02 — 1.6.2/vc16 (U3): **D-144** post-death Extra-Dim residual cleared (tri-state
-  latch); **D-145** `ShizukuShell` unbinds on bind timeout.
-- 2026-07-02 — 1.6.2/vc16 (U2): **D-141** rule edits bypass the PASS-1 cooldown; **D-142** wifi
-  SSID listener `[WIFI]`-gated + snapshot clear; **D-143** stale ssidFlow resolves dropped.
-- 2026-07-02 — 1.6.2 / `versionCode 16` (PATCH, U1): **D-139** panic restore cancel-and-joins
-  the animation consumer; **D-140** zombie-FGS gates on control intents. Changelog `16.txt`.
-- 2026-07-02 — docs-only: **D-138** F-backlog adopted (U1–U6, retroactive adversarial review
-  of the shipped glue + security & transcription audits).
+  exported provider; `/security-review` clean.
+- 2026-07-02 — 1.6.2/vc16 (U3): **D-144** post-death Extra-Dim residual; **D-145** ShizukuShell
+  bind-timeout unbind.
+- 2026-07-02 — 1.6.2/vc16 (U2): **D-141** rule-edit cooldown bypass; **D-142** wifi `[WIFI]`
+  gate + snapshot clear; **D-143** stale ssidFlow resolves dropped.
+- 2026-07-02 — 1.6.2 / `versionCode 16` (PATCH, U1): **D-139** panic cancel-and-joins the
+  animation consumer; **D-140** zombie-FGS gates. Changelog `16.txt`.
+- 2026-07-02 — docs-only: **D-138** F-backlog adopted (U1–U6).
 - 2026-07-01 — build-config only (H5): **D-137** release APK **proven reproducible**; owner
   fdroiddata steps under "Owner actions pending".
-- 2026-07-01 — tests + a test-seam (H3): **D-136** glue-seam audit + 4 gap-closing suites
-  (+14 tests).
+- 2026-07-01 — tests (H3): **D-136** glue-seam audit + 4 gap-closing suites (+14 tests).
 - 2026-07-01 — repo-policy only (H4): **D-135** `SECURITY.md` + security-only Dependabot
   (needs the owner-side Code-security toggles).
 - 2026-07-01 — 1.6.1 / `versionCode 15` (PATCH, H2): **D-134** saved pre-service brightness
   mode persisted across process death.
 - 2026-07-01 — docs-only: **D-133** hardening backlog adopted; RUNBOOK gains the mandatory
-  **glue-review protocol** (H1); `FABLE_HANDOFF.md` deleted; STATE compressed.
-- 2026-06-30 — 1.6.0 / `versionCode 14` (MINOR): **D-130** no-Location SSID path (DUMP grant,
-  strategy order Shizuku → root → DUMP → Location); **D-131** full UI i18n (~250 strings,
-  ratchet 0, human-only translations policy); **D-132** plug/unplug bypasses the battery
-  cooldown. Owner on-device pass confirmed.
+  **glue-review protocol** (H1); `FABLE_HANDOFF.md` deleted.
+- 2026-06-30 — 1.6.0 / `versionCode 14` (MINOR): **D-130** no-Location SSID path (DUMP);
+  **D-131** full UI i18n (ratchet 0); **D-132** plug/unplug bypasses the battery cooldown.
 - 2026-06-29 — CI-only: per-job `timeout-minutes` + wrapper properties in Gradle cache keys;
   stricter supply-chain measures declined with reasons.
 - 2026-06-29 — 1.5.0 / `versionCode 13` (MINOR): **D-125** wizard curve suggestion is
@@ -151,8 +153,8 @@ One line per shipped change (newest first). Keep terse; details live in the ledg
   graph, edge-to-edge modal, release-notes auto-append, fresh location fix, HTTPS geo-IP).
 - 2026-06-28 — 1.3.0 / `versionCode 11` (MINOR): **D-116** Panic gesture rework +
   `%AAB_PanicSensitivity`.
-- 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut): **D-115** skip-ci token skipped
-  v1.2.0's release; `release.yml` triggers on `release: published`.
+- 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut): **D-115** skip-ci token; `release.yml`
+  triggers on `release: published`.
 - 2026-06-28 — 1.2.0 / `versionCode 9` (MINOR): **D-108**–**D-114** (battery sentinel, IA
   rework, confirmations, priority 1–100).
 - 2026-06-28 — 1.1.1 / `versionCode 8` (PATCH): **D-107** explicit PendingIntents.
