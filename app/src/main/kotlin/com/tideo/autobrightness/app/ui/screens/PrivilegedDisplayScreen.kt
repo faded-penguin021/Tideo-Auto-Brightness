@@ -8,7 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -124,7 +129,21 @@ fun PrivilegedDisplayContent(
     onApplyDraft: () -> Unit = {},
     onDiscardDraft: () -> Unit = {},
 ) {
-    SettingsScaffold(stringResource(R.string.title_privileged_display), onBack) { padding ->
+    // The AOSP-keys / OEM-variance note lives behind an ⓘ in the top bar (always reachable,
+    // regardless of scroll) instead of a wall of text at the foot of the screen.
+    var showInfo by remember { mutableStateOf(false) }
+    SettingsScaffold(
+        title = stringResource(R.string.title_privileged_display),
+        onBack = onBack,
+        actions = {
+            IconButton(
+                onClick = { showInfo = true },
+                modifier = Modifier.testTag("pd_info_action"),
+            ) {
+                Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.pd_info_title))
+            }
+        },
+    ) { padding ->
         SettingsColumn(padding) {
             if (state.tier != Tier.ELEVATED) {
                 GrantChannelsCard(state, onCopyAdb, onRequestShizuku, onTryRoot)
@@ -212,18 +231,30 @@ fun PrivilegedDisplayContent(
 
                 DraftApplyBar(dirty = draftDirty, onApply = onApplyDraft, onDiscard = onDiscardDraft)
             }
-
-            // Info card (always shown): what these toggles write + the OEM-variance caveat (D-048
-            // policy: variance is documented for the user, never branched in code).
-            AabCard(modifier = Modifier.testTag("pd_info_card")) {
-                Text(
-                    stringResource(R.string.pd_info_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             Spacer(Modifier.height(Dimens.sectionSpacing))
         }
+    }
+
+    // What these toggles write + the OEM-variance caveat (D-048 policy: documented for the user,
+    // never branched in code) — surfaced from the top-bar ⓘ instead of a footer card.
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            title = { Text(stringResource(R.string.pd_info_title)) },
+            text = {
+                Text(
+                    stringResource(R.string.pd_info_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showInfo = false },
+                    modifier = Modifier.testTag("pd_info_dismiss"),
+                ) { Text(stringResource(R.string.action_ok)) }
+            },
+            modifier = Modifier.testTag("pd_info_dialog"),
+        )
     }
 }
 

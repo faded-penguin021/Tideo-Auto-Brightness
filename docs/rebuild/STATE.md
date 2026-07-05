@@ -128,6 +128,13 @@ updates" + "Private vulnerability reporting" (the committed files are inert with
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-05 — folds into 1.7.0/vc17 (Privileged Display UI polish, owner finding; refines
+  D-152, no new ledger row — UI placement, no durable decision): the AOSP-keys/OEM-variance
+  note moved from an always-on footer card to a top-bar **ⓘ → `AlertDialog`** (`SettingsScaffold`
+  gained an optional `actions` slot; `Icons.Filled.Info`, default app-bar content color, themed
+  `large`-shape dialog — M3 `m3_audit` §2.2/§2.5 conformant). Reachable at every tier incl. the
+  grant card. Screen ends at the Apply bar; no wall of text. Tests: `pd_info_card` assertion
+  swapped for the ⓘ-opens/dismisses-dialog pair. i18n ratchet 0 (+1 string `pd_info_title`).
 - 2026-07-05 — folds into 1.7.0/vc17 (Segment 4.5 follow-up, owner findings): **D-152** the
   profile port is COMPLETE — `alwaysOnDisplayEnabled`/`stayAwakeChargingEnabled`/
   `hdrForceSdrEnabled` join `AabSettings` (same D-151 fan-out; HDR inert below Android 14) and

@@ -588,6 +588,7 @@
     <string name="pd_section_experimental">Experimental</string>
     <string name="pd_hdr_force_sdr">Force SDR (disable HDR formats)</string>
     <string name="pd_hdr_help">Blocks all HDR output formats system-wide (Android 14+) — for users sensitive to HDR brightness/dithering. Some devices need the screen to re-initialise (or a reboot) to fully apply. Turning it off re-allows all HDR formats.</string>
+    <string name="pd_info_title">About these settings</string>
     <string name="pd_info_body">These toggles write the standard AOSP settings keys directly — the same keys the system Settings app uses. On heavily skinned devices a key may be ignored or relocated; if a toggle does nothing there, that feature isn\'t controllable on this device. Changes stick like system-settings changes: they stay until changed again.</string>
     <!-- Privileged Display profile fields (D-151/D-152, replaces the D-150 Schedules section). -->
     <string name="pd_profile_intro">Saved with your brightness profile — profiles and Contexts rules apply these too.</string>

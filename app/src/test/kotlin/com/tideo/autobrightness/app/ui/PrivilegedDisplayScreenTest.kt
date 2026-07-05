@@ -79,8 +79,29 @@ class PrivilegedDisplayScreenTest {
         assertEquals(true, draft().alwaysOnDisplayEnabled)
         compose.onNodeWithTag("switch_stayAwake").performScrollTo().performClick()
         assertEquals(true, draft().stayAwakeChargingEnabled)
-        // The AOSP-keys / OEM-variance info card is always present.
-        compose.onNodeWithTag("pd_info_card").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun infoAction_opensDialogWithTheAospKeysNote_andDismisses() {
+        setDraftContent()
+        // The AOSP-keys / OEM-variance note is behind the top-bar ⓘ, not an inline footer.
+        compose.onNodeWithTag("pd_info_dialog").assertDoesNotExist()
+        compose.onNodeWithTag("pd_info_action").performClick()
+        compose.onNodeWithTag("pd_info_dialog").assertExists()
+        compose.onNodeWithTag("pd_info_dismiss").performClick()
+        compose.onNodeWithTag("pd_info_dialog").assertDoesNotExist()
+    }
+
+    @Test
+    fun infoAction_isAvailableBelowElevatedToo() {
+        // The note explains what the toggles do; it must be reachable even from the grant card.
+        compose.setContent {
+            MaterialTheme {
+                PrivilegedDisplayContent(state = PrivilegedDisplayUiState(tier = Tier.BASIC), onBack = {})
+            }
+        }
+        compose.onNodeWithTag("pd_info_action").performClick()
+        compose.onNodeWithTag("pd_info_dialog").assertExists()
     }
 
     @Test
