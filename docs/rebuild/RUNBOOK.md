@@ -95,6 +95,16 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 ### 5. Tasker-independent feature (rare — no parity source)
 - No golden reference exists; still obey the coding conventions in `CLAUDE.md` and add tests.
   The **glue-review protocol** (below) applies to any `:platform`/runtime glue it adds.
+- **Multi-session features** (pattern proven by Privileged Display, D-149–D-152): persist an
+  owner-approved execution plan as `docs/rebuild/plans/<name>.md` and mirror a segment checklist
+  in `STATE.md` Active work. Segments run **sequentially** (D-133) and each ends SHIPPABLE:
+  ladder green → STATE Changelog line → commit → push. A follow-up session bases its branch on
+  the unmerged predecessor (`git checkout -B <new> origin/<old>`), else latest main. Treat the
+  plan as provisional — the owner may pivot it mid-feature (D-151 replaced an entire
+  already-on-branch segment; per-segment checkpoints are what made that removal cheap). At the
+  final segment **delete the plan file**: its durable content must by then live in `STATE.md`
+  Changelog lines + ledger rows. Code comments cite `D-NN`, never the plan file (it dies; the
+  ledger doesn't).
 - **Record:** note the deviation-from-Tasker explicitly in `STATE.md`.
 
 ### 6. Cutting a release / version bump

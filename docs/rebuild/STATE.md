@@ -14,317 +14,156 @@ Native **Kotlin/Compose** Android app that is a feature-parity rebuild of the Ta
 golden-tested), **`:platform`** (Android system adapters behind small interfaces), **`:app`**
 (Compose M3 UI, DataStore `AabSettings`, foreground-service runtime, QS tile, boot receiver).
 Privilege tiers: **BASIC** = user-grantable `WRITE_SETTINGS` (full core pipeline); **ELEVATED**
-= `WRITE_SECURE_SETTINGS` via one-time `pm grant` (super dimming). minSdk 31, target/compile 35.
+= `WRITE_SECURE_SETTINGS` via one-time `pm grant` (super dimming + Privileged Display toggles).
+minSdk 31, target/compile 36.
 
 ## Current state
 
-**Shipped: v1.6.0** (`versionCode 14`). `PARITY_CHECKLIST.md` is zero-`pending`; golden parity
-tests green; TODO/FIXME = 0; `parity_gaps.md` has 0 open gaps (all 7 closed at S5). Full
-acceptance ladder re-verified green 2026-07-01.
+**Shipped: v1.6.2** (`versionCode 16`). **Pending release: 1.7.0 / `versionCode 17`** — the
+Privileged Display Control feature, COMPLETE incl. Segment-5 polish (D-149–D-152;
+`changelogs/17.txt` final). Owner squash-merges the session branch, runs
+`DEVICE_TEST_SCRIPT.md` §11 on-device, then tags/releases 1.7.0.
 
-How changes are made now: see `RUNBOOK.md` (change-type playbooks + the **glue-review
-protocol**, mandatory for `:platform`/runtime diffs). The migration narrative (segment briefs,
-gate findings) is frozen in `../history/`; the deviations registry stays live.
+`PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
+`parity_gaps.md` has 0 open gaps. Full acceptance ladder green 2026-07-05.
+
+How changes are made now: see `RUNBOOK.md` (change-type playbooks; the **glue-review protocol**
+is mandatory for `:platform`/runtime diffs; multi-session features follow the playbook-5
+persisted-plan pattern). The migration narrative is frozen in `../history/`; the deviations
+registry stays live.
 
 > Code/docs elsewhere cite deviations by number (e.g. `STATE.md D-048`, `F50`). All deviations
 > — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (gate
 > findings are in `../history/STATE_rebuild.md`). Look there.
 
-## Active work — Privileged Display Control (feature, adopted 2026-07-03)
+**Owner actions pending:**
 
-New ELEVATED-only settings page (invisible below ELEVATED; "privileged" = WRITE_SECURE_SETTINGS
-via adb/Shizuku/root grant channels, D-016) exposing AOSP-universal display toggles — Night
-Light, daltonizer (incl. grayscale), inversion, AOD, stay-awake-charging, HDR force-SDR
-(experimental). Extra Dim excluded (pipeline-owned, D-144). Vanilla-AOSP keys only; OEM variance
-documented, never branched. **Full plan: `plans/privileged-display.md`** (delete at Segment 5;
-its Segment 4 is OBSOLETE — superseded by the owner-instructed Segment 4.5 pivot, D-151).
-Execution: sequential, one segment per checkpoint (ladder green + Changelog + push), D-133 honored.
+- **H4 (D-135):** repo Settings → Code security → enable "Dependabot security updates" +
+  "Private vulnerability reporting" (the committed files are inert without them).
+- **H5 (D-137):** in the fdroiddata submission set `Binaries:` to the release-APK URL pattern
+  and `reproducible: yes` (pin the CI's JDK 21) so F-Droid publishes the signed APK.
+- **1.7.0:** on-device pass of `DEVICE_TEST_SCRIPT.md` §11 (Privileged Display), then
+  tag/release after squash-merge.
 
-- [x] Segment 0 — plan persisted
-- [x] Segment 1 — `:platform` SecureDisplayController + 1.7.0/vc17 bump (D-149)
-- [x] Segment 2 — Privileged Display screen (manual toggles; core ask)
-- [x] Segment 3 — `:domain` DisplayRulesResolver (+ shared trigger-matcher extraction)
-- [x] Segment 4 — scheduling runtime + storage + rules UI (D-150) — **removed again by 4.5**
-- [x] Segment 4.5 — **owner-instructed deviation from the plan (D-151 + D-152):** ALL display
-  toggles are PROFILE settings (Night Light + temperature, daltonizer, inversion, AOD,
-  stay-awake-charging, HDR force-SDR in `AabSettings`, applied on profile change by
-  `DisplayTogglesCoordinator`, the super-dimming model); the D-150 separate schedule system
-  deleted (`ContextMatching` and `SecureDisplayController` kept). The Privileged Display screen
-  is ONE draft-edited profile surface (no duplicated "device now" toggles, D-152) + grant card;
-  Apply writes the device directly when the service is off. Scheduling = a Contexts rule
-  loading a profile with display fields.
-- [ ] Segment 5 — polish, owner verification checklist, plan-doc cleanup
+## Decided non-items (don't re-litigate without new evidence)
 
-## Active work — short-term Fable-dependent hardening (F-backlog, adopted D-138)
-
-**COMPLETE 2026-07-02 — all six units done, checkpointed U-by-U on the session branches**
-(D-133 sequential execution honored; every finding is a durable failing-test-first fix + ledger
-row, nothing left depends on Fable). Full detail lives in the ledger: **D-139–D-148** + the
-per-unit Changelog lines below. Summary: U1 pipeline core (D-139 panic-vs-animation join, D-140
-zombie-FGS gates); U2 context engine + readers (D-141 rule-edit cooldown veto, D-142 wifi
-`[WIFI]` cost gate + stale-snapshot clear, D-143 ssidFlow stale-resolve guards); U3 entry
-points + privilege (D-144 post-death Extra-Dim residual, D-145 Shizuku bind-timeout unbind);
-U4 security review (D-146 NaN import guard, D-147 widget actions off the exported provider,
-`/security-review` clean, SECURITY.md scope notes); U5 parity transcription spot-check (clean,
-zero disagreements — profile gates, task535 rounding, task661/663 curve; XML_RECIPES gains R0);
-U6 H3 seams (D-148 — H3 test audit fully closed, +19 tests). RUNBOOK glue-review list grew by
-4 proven bug classes (D-139/D-140/D-142/D-143) + the D-144 example. All app-code fixes fold
-into the pending, untagged **1.6.2 / versionCode 16** (`changelogs/16.txt`); owner tags/releases.
-
-## Active work — post-v1.6.0 hardening backlog (adopted D-133)
-
-From the 2026-07-01 Fable review (which replaced and deleted `FABLE_HANDOFF.md`). Framing:
-prefer hardening that is **machine-enforced or once-done-done** over anything that relies on a
-capable model executing later — tests and CI gates keep working when the executor is a weaker
-model, the owner alone, or nobody. Execution rules: one unit ≈ one session; checkpoint each
-unit fully (ladder green + Changelog line + commit + push) before starting the next; **no
-parallel subagents** (rate-limit burn, see D-133). Priority order:
-
-- **H3 — glue-seam test audit** (audit + first slice DONE 2026-07-01, D-136; remaining seams
-  below). Audit result: coverage is broader than filenames suggest — `BrightnessPipelineControllerTest`
-  (17 integration tests) exercises `PipelineCycleRunner`/`PanicHandler`/`PipelineState`/
-  `PipelineDebugEmitter` through the real controller; tile/boot/widget/observer/dimming all have
-  suites. Real gaps found and closed: `ForegroundAppMonitor` (D-034 f retention — regression
-  test via a new clock ctor seam), `BatteryStateReader` (intent→state mapping, scale guard),
-  `AutoBrightnessRuntime` (service-action intent dispatch the notification/tile/UI funnel
-  through), `ServiceHealthStore` (degraded latch clears on apply). **Remaining seams: NONE —
-  audit CLOSED 2026-07-02 (D-148, F-backlog U6):** `LocationReader.activeFix`,
-  `AndroidPanicSensorSource` arming, `PowerMeter`, `ExperimentPrefsStore` all covered (+19
-  tests); `WifiInfoReader` ssidFlow callback path covered by `WifiInfoReaderTest` (D-143);
-  import/export round-trips confirmed already covered + the NaN gap closed (D-146). **Skipped with reason:** `MaintenanceWorker`
-  (6 lines; testing needs the androidx.work-testing artifact — new dep not warranted),
-  `Shizuku*` (binder-dependent, not Robolectric-testable; owner device-verified),
-  `ControllerHookHolder`/`ProximityTracker`/`AppProcessScope` (trivial; behavior asserted via
-  controller suite).
-- **H5 — F-Droid reproducible-build investigation** (DONE 2026-07-01, D-137). **Findings: the
-  build is reproducible.** Two clean-room `assembleRelease` builds are **byte-identical
-  (same SHA-256)** after the one standard fix (now applied): `dependenciesInfo { includeInApk =
-  false; includeInBundle = false }` — AGP otherwise embeds a Play-encrypted metadata blob in the
-  APK signing block. Everything else was already right: all 47 dependency versions pinned (no
-  dynamic/SNAPSHOT), AGP/Kotlin pinned, no minification (deterministic plain dex), no NDK,
-  version literals not git-derived, and signing is env-driven so a keystore-less build is
-  unsigned — exactly what F-Droid's verify-then-copy-signature flow (apksigcopier) consumes.
-  **Owner recommendation:** in the fdroiddata metadata set `Binaries:` to the GitHub release APK
-  URL pattern and add `reproducible: yes` to the build recipe (pin the same JDK 21 the CI uses);
-  F-Droid will then build, verify byte-equality, and publish YOUR signed APK — one artifact
-  everywhere, F-Droid-verified. Same-machine determinism is proven here; the cross-machine check
-  happens on F-Droid's verification server on first submission.
-- **Non-items (decided — don't re-litigate without new evidence):** root `CHANGELOG.md`
-  (redundant with STATE + fastlane + ledger), speculative dependency-currency bumps (only on a
-  security advisory), a standalone doc-drift audit (RUNBOOK self-adaptation covers it
-  opportunistically), action SHA-pinning / Gradle dependency verification (declined 2026-06-29
-  with reasons).
-
-Done 2026-07-01: **H1 — RUNBOOK glue-review protocol** — a mandatory adversarial second diff
-pass for any `:platform`/runtime change, hunting the proven D-030/D-034 bug classes (gate
-polarity/operands, insertion order, observer-echo races, truncation drift, non-idempotent
-lifecycle / per-process state, startup sentinels). See RUNBOOK; adoption recorded as D-133.
-Done 2026-07-01: **H2** — shipped as 1.6.1 (D-134, see Changelog).
-Done 2026-07-01: **H4** — SECURITY.md + security-only Dependabot (D-135, see Changelog).
-⚠️ **Owner action for H4:** repo Settings → Code security → enable "Dependabot security
-updates" + "Private vulnerability reporting" (the committed files are inert without them).
+- **Repo/process (2026-06/07):** root `CHANGELOG.md` (redundant with STATE + fastlane + the
+  ledger); speculative dependency-currency bumps (only on a security advisory); a standalone
+  doc-drift audit (RUNBOOK self-adaptation covers it); action SHA-pinning / Gradle dependency
+  verification (declined 2026-06-29 as wrong cost/benefit for a solo F-Droid app).
+- **Privileged Display (decided at Segments 4.5–5, D-150–D-152):**
+  - **Per-toggle orthogonal scheduling** — the D-150 separate schedule system was built, then
+    removed by the owner-instructed D-151 pivot. Scheduling IS "a Contexts rule loads a profile
+    carrying display fields", winner-takes-all with the rest of the profile.
+  - **A persisted last-applied seed** for `DisplayTogglesCoordinator` — considered and deferred
+    at 4.5: it would shrink the accepted D-151 process-death residual at the cost of
+    re-introducing exactly the latch-like persistence the pivot removed. Revisit only on
+    real-world reports.
+  - **QS tile / notification action for grayscale** (or any display toggle) — not planned;
+    profiles/Contexts are the switching surface.
+  - **Refresh-rate forcing** and any OEM-specific alternate settings keys — rejected as
+    OEM-fragmented (vanilla-AOSP-only policy, D-048/D-149).
+  - **A manual Extra-Dim toggle** on the Privileged Display screen — Extra Dim is
+    pipeline-owned (D-144/D-149).
 
 ## Changelog
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
-- 2026-07-05 — folds into 1.7.0/vc17 (Privileged Display UI polish, owner finding; refines
-  D-152, no new ledger row — UI placement, no durable decision): the AOSP-keys/OEM-variance
-  note moved from an always-on footer card to a top-bar **ⓘ → `AlertDialog`** (`SettingsScaffold`
-  gained an optional `actions` slot; `Icons.Filled.Info`, default app-bar content color, themed
-  `large`-shape dialog — M3 `m3_audit` §2.2/§2.5 conformant). Reachable at every tier incl. the
-  grant card. Screen ends at the Apply bar; no wall of text. Tests: `pd_info_card` assertion
-  swapped for the ⓘ-opens/dismisses-dialog pair. i18n ratchet 0 (+1 string `pd_info_title`).
-- 2026-07-05 — folds into 1.7.0/vc17 (Segment 4.5 follow-up, owner findings): **D-152** the
-  profile port is COMPLETE — `alwaysOnDisplayEnabled`/`stayAwakeChargingEnabled`/
-  `hdrForceSdrEnabled` join `AabSettings` (same D-151 fan-out; HDR inert below Android 14) and
-  the Privileged Display screen de-duplicates to ONE draft-edited profile surface (the manual
-  "device now" toggles are gone; `DisplayTogglesViewModel` slims to grants/tier/auto-mode
-  caveat/HDR gate + `applyNow`, the direct device write used only while the service is off so
-  Apply is never a silent no-op). Profile-semantics UI copy cut to one line (owner). Tests
-  reworked (+2 coordinator, VM suite rewritten for applyNow). Glue-review pass: clean.
-- 2026-07-04 — folds into 1.7.0/vc17 (Privileged Display **Segment 4.5 — owner-instructed
-  deviation from the plan**): **D-151** display toggles become PROFILE settings and the D-150
-  schedule system is removed. `AabSettings` gains `nightLightEnabled` / `nightLightTemperature`
-  (nullable = "device default", never written) / `daltonizerMode` (string; unknown → OFF on
-  validate) / `inversionEnabled`, fanned out to `mergeProfile` (profile-swapped like the dimming
-  fields), `validate()` + `SettingsValidator`, contract/diff display (invented `%AAB_*` names,
-  D-116 precedent), import/export round-trip, `DefaultProfiles` (inherit "leave-alone" defaults),
-  and a draft-edited profile section on the Privileged Display screen (which keeps its manual
-  toggles + grant card, loses Schedules). Apply path mirrors super dimming:
-  `DisplayTogglesCoordinator` collects the context engine's new `effectiveFlow` (service scope,
-  never the pipeline coroutine), ELEVATED-gated, **idempotent only-on-change** (seed adopts the
-  baseline without writing; equal swaps write nothing so manual/system changes stick); resting
-  state = the baseline's values re-applied on service stop — no latch, no residual sweep.
-  Deleted: `DisplayRulesCoordinator`/`DisplayRule*`/`displayRulesDataStore`/`DisplayRestoreLatch`/
-  `DisplaySchedulesSection`/domain `DisplayRules(+Resolver)` + suites; kept `ContextMatching`
-  (context-resolver goldens untouched and green) + `SecureDisplayController`. Tests: +10
-  coordinator/drift, schema/validator/merge/round-trip +8, screen tests reworked. Glue-review
-  pass: clean. `17.txt` rewritten (D-150 never shipped); version stays 1.7.0/vc17.
-- 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 4 of 5): **D-150** display
-  schedules ship end-to-end — `DisplayRule` storage (own `aab_display_rules.json` DataStore +
-  `DisplayRulesStore`, action as string so unknown values stay inert), the `DisplayRulesCoordinator`
-  runtime (own service-scope coroutines — pipeline single-coroutine model untouched; edge-triggered
-  apply/restore with the death-safe `:platform` SharedPrefs `commit()` latch: pre-state latched
-  before the engage write, hold never re-asserts so manual changes stick, release restores the
-  latched pre-state, startup residual sweep + restore-on-stop, inert below ELEVATED; ContextEngine
-  cost gates incl. the D-142 snapshot clear), and the "Schedules" section on the Privileged Display
-  screen (rule list + modal editor: action + days/time incl. overnight + optional apps; the Contexts
-  trigger composables extracted verbatim to shared `ui/components/TriggerEditors.kt`, ContextsScreen
-  suites untouched and green). Glue-review pass: one finding fixed (+1 s time-boundary wake margin —
-  the end-inclusive window match would otherwise hold at a window END and re-arm for tomorrow;
-  no pipeline-tick rescue here). Full semantics in the D-150 ledger row. Tests +31; `17.txt` final.
-- 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 3 of 5, `:domain`-only): the
-  **display-rule resolver** lands — shared per-dimension trigger matching extracted from
-  `ContextOverrideResolver` into internal `ContextMatching` (time/day window incl. the overnight
-  prev-day rule, SUNRISE/SUNSET tokens, D-108 battery sentinel, haversine location, wifi trim,
-  `nextWakeTime`; behavior-preserving — golden `ContextOverrideResolverTest` untouched and
-  green); new `domain/display` `DisplayRuleSpec`/`DisplayAction` (GRAYSCALE / NIGHT_LIGHT /
-  INVERSION) + `DisplayRulesResolver` — all matching enabled rules apply, per-action OR, null =
-  no opinion → restore, disabled rules fully inert (no match, no scheduling), `nextBoundary` in
-  the same "HH.MM" wake format as `nextContextTime`. Tests +17 truth-table (incl. Mon–Fri
-  22:00–06:00 app-scoped → Sat 01:00 matches via Friday's tail / Sun 23:00 doesn't). Runtime
-  wiring + storage + rules UI land in Segment 4.
-- 2026-07-03 — folds into 1.7.0/vc17 (Privileged Display Segment 2 of 5 — the core ask): the
-  **Privileged Display screen** ships — route `privileged_display` (always registered), Menu
-  "Privileged" group (lock icon) rendered only at ELEVATED off the live `tierFlow()` + resume
-  reprobe; below ELEVATED the screen self-guards with a 3-channel grant card (adb copy / Shizuku
-  one-tap tri-state / root, mirroring Onboarding); at ELEVATED: Night Light switch + Kelvin
-  slider (AOSP bounds 2596–4082/default 2850 verified in frameworks/base; commit-on-drag-end) +
-  schedule caveat, daltonizer chips, inversion, AOD, stay-awake-charging, HDR force-SDR
-  (hidden < API 34), AOSP-keys/OEM-variance info card. `DisplayTogglesViewModel`: read-back
-  display (never optimistic — every write re-reads), refresh on resume, write failures surface +
-  clear on resume. Tests +16 (screen ELEVATED/BASIC, VM glue via real controller, Menu tier
-  visibility). Glue-review pass: one finding fixed (parallel write/read-back races serialized
-  behind a Mutex — D-143 stale-completion class). `screen_map.md` +1 row.
-- 2026-07-03 — repo-tooling only: `setup-android-sdk.sh` now seeds the Gradle wrapper dist
-  cache from the container's pre-installed `/opt/gradle-<version>` (cloud-session egress proxy
-  403s the wrapper's github-redirected download; without the seed every fresh session's ladder
-  is dead on arrival). Idempotent, no-ops off-container.
-- 2026-07-03 — 1.7.0 / `versionCode 17` (MINOR, Privileged Display Segment 1 of 5): **D-149**
-  new `:platform` `SecureDisplayController` — Night Light (+temperature), daltonizer
-  (grayscale + 3 corrections), inversion, AOD, stay-awake-charging, experimental Android-14+
-  force-SDR; AOSP-universal keys only, Extra Dim excluded (pipeline-owned), reads unprivileged /
-  writes ELEVATED-gated. +12 Robolectric tests. Changelog `17.txt`. Glue-review pass: one
-  finding (HDR OFF resets a pre-existing partial disable list) accepted + documented. UI lands
-  in Segment 2 (see Active work).
-- 2026-07-02 — tests-only (F-backlog U6 complete → F-backlog CLOSED): **D-148** the H3
-  glue-seam audit's last four seams covered — `LocationReaderTest` (activeFix D-120/122),
-  `PanicSensorSourceTest` (prof769 arming/veto/consume), `PowerMeterTest` (task524 mapping),
-  `ExperimentPrefsStoreTest` (G2R-F39/D-103/D-105 round-trips). +19 tests, no production change.
-- 2026-07-02 — docs-only (F-backlog U5 complete): parity transcription spot-check re-derived
-  profile gates, task535 rounding chain, and task661/663 curve math from the XML — **clean, zero
-  disagreements** (details in the U5 row above). `XML_RECIPES.md` gains R0 (restore the
-  gitignored XML from the git-history blob in a fresh clone).
-- 2026-07-02 — folds into pending 1.6.2 (F-backlog U4 complete): **D-146** a malformed profile
-  import can no longer poison the settings with NaN (`validate()` resets non-finite floats to
-  defaults — NaN slips through `coerceIn` and the import parsers accept it); **D-147** the
-  widget's TOGGLE/RESET actions move off the exported provider to a non-exported
-  `WidgetActionReceiver` (co-installed apps could flip the service with an explicit intent).
-  `/security-review` diff pass: clean; `SECURITY.md` +3 by-design scope notes. Tests +5.
-  Glue-review pass: clean.
-- 2026-07-02 — folds into pending 1.6.2 (F-backlog U3 complete): **D-144** a process death while
-  Extra Dim was engaged no longer leaves it stuck on after the sticky restart (dimming latch
-  tri-state, UNKNOWN at process start → first disengage clears the residual); **D-145**
-  `ShizukuShell` unbinds on bind timeout (leak; binder-untestable, argued). Tests +2, 4
-  assertions modernized. Glue-review pass: clean.
-- 2026-07-02 — folds into pending 1.6.2 (F-backlog U2 complete): **D-142** the wifi SSID
-  listener is now `[WIFI]`-gated like Tasker's prof768 (no shell-strategy SSID probing — or su
-  prompts — without a wifi rule) and clears its snapshot on stop so a re-added rule can't match
-  a stale SSID; **D-143** `ssidFlow()` drops in-flight resolves that outlived their network
-  state (stale SSID after disconnect / stale null over a confirmed SSID could stick). Tests +5
-  (incl. new `WifiInfoReaderTest`, first ssidFlow-callback coverage). RUNBOOK glue-review list
-  +2 proven bug classes. Glue-review pass: clean.
-- 2026-07-02 — folds into pending 1.6.2 (F-backlog U2, first slice): **D-141** a context rule
-  add/edit/delete within 500 ms of any evaluation now applies immediately (rules-changed eval
-  runs as RESUME, bypassing the GENERAL PASS-1 cooldown veto). Test +1. Glue-review pass: clean.
-- 2026-07-02 — 1.6.2 / `versionCode 16` (PATCH — bug fixes, F-backlog U1): **D-139** panic
-  restore can no longer be trampled by an in-flight animation frame (`emergencyStop` now
-  cancel-and-joins the consumer before writing 255); **D-140** pause/reapply intents landing on a
-  not-running service stop it instead of birthing a zombie FGS (widget Reset while disabled
-  started the light-sensor collector), + sticky-restart enablement verify. Tests +4; RUNBOOK
-  glue-review list +2 proven bug classes. Changelog `16.txt`. Glue-review pass: clean.
-- 2026-07-02 — docs-only: **D-138** short-term Fable-dependent hardening adopted (F-backlog
-  U1–U6 above) — retroactive adversarial review of the shipped runtime/platform glue + security
-  and transcription audits, unit-checkpointed while Fable access lasts.
-- 2026-07-01 — build-config only (folds into pending 1.6.1, backlog H5): **D-137** release APK
-  proven reproducible (two clean builds byte-identical) after disabling AGP's Play-encrypted
-  `dependenciesInfo` blob; owner: submit fdroiddata with `reproducible: yes` + `Binaries:` (see
-  H5 row above).
-- 2026-07-01 — tests + a test-seam (folds into pending 1.6.1, backlog H3): **D-136** glue-seam
-  audit — 4 gap-closing suites (`ForegroundAppMonitorTest` incl. the D-034 (f) retention
-  regression via a new `clock` ctor seam, `BatteryStateReaderTest`, `AutoBrightnessRuntimeTest`,
-  `ServiceHealthStoreTest`, +14 tests); audit table + remaining seams in the H3 row above.
-- 2026-07-01 — repo-policy only (no app change, backlog H4): **D-135** root `SECURITY.md`
-  (latest-release support, private vulnerability reporting, by-design scope notes) +
-  `.github/dependabot.yml` security-only (`open-pull-requests-limit: 0` for gradle +
-  github-actions). Consistent with the 2026-06-29 decline (alerting ≠ bump ceremony). Needs the
-  owner-side Code-security toggles to take effect (see Active work ⚠️).
-- 2026-07-01 — 1.6.1 / `versionCode 15` (PATCH — bug fix, backlog H2): **D-134** the saved
-  pre-service brightness mode is persisted (`:platform` SharedPreferences, `commit()`), closing
-  the D-034(c) residual — after a process death mid-manual, a restarted service no longer
-  re-saves its own MANUAL residue as "the user's mode", so panic/restore hands back the user's
-  real (e.g. AUTOMATIC) mode. Disambiguation: current mode MANUAL → an already-persisted value
-  wins; non-MANUAL → overwrites stale. Tests: `ScreenBrightnessControllerTest` +3 (`*_D134`).
-  Changelog `15.txt`. First application of the RUNBOOK glue-review pass: clean.
-- 2026-07-01 — docs-only: **D-133** post-v1.6.0 hardening adopted — RUNBOOK gains the mandatory
-  glue-review protocol (H1); hardening backlog H2–H5 recorded above; `FABLE_HANDOFF.md` deleted
-  (its ask fulfilled); STATE compressed to the length-guard target.
-- 2026-06-30 — 1.6.0 / `versionCode 14` (MINOR): **D-130** no-Location SSID path wired up —
-  `android.permission.DUMP` now declared (user-grantable over ADB, reverses F89), strategy order
-  Shizuku → root `cmd wifi status` → DUMP `dumpsys wifi` (Tasker two-step regex) → Location;
-  SSID-help dialog with copyable ADB grant. **D-131** full UI i18n (~250 strings →
-  `strings.xml`; `HardcodedStringCheckTest` ratchet now 0; English-only Language selector;
-  human-only translations policy in CONTRIBUTING/README). **D-132** plug/unplug bypasses the
-  PASS-1 battery cooldown so a charging context switches immediately. Owner on-device pass
-  confirmed; owner squash-merges + publishes v1.6.0.
+- 2026-07-05 — docs-only (Privileged Display **Segment 5 — feature COMPLETE**): README +
+  `screen_map.md` finalized (toggles = ELEVATED **profile settings** applied by
+  profiles/Contexts rules — no standalone scheduler); owner on-device checklist added as
+  **`DEVICE_TEST_SCRIPT.md` §11** (7-toggle read-back incl. HDR-over-adb, context-rule
+  engage/baseline-restore, service-off applyNow, manual-changes-stick, below-ELEVATED no-op,
+  the D-151 residual); `plans/privileged-display.md` deleted (content lives in D-149–D-152);
+  RUNBOOK playbook 5 gains the multi-session persisted-plan pattern; architecture docs synced
+  (48-field `AabSettings`, ELEVATED capability row); non-items recorded above; STATE
+  recompressed.
+- 2026-07-05 — folds into 1.7.0/vc17 (UI polish, owner finding; refines D-152, no ledger row):
+  the AOSP-keys/OEM note moved off an always-on footer card to a top-bar **ⓘ → dialog**
+  (`SettingsScaffold` gains an `actions` slot); i18n ratchet 0.
+- 2026-07-05 — folds into 1.7.0/vc17 (4.5 follow-up, owner findings): **D-152** profile port
+  complete — AOD / stay-awake / HDR join `AabSettings` (7 display fields total); the screen
+  de-duplicates to ONE draft-edited profile surface + grant card; `applyNow` writes the device
+  directly exactly when the service is off (Apply is never a silent no-op). Glue-review: clean.
+- 2026-07-04 — folds into 1.7.0/vc17 (**Segment 4.5 — owner-instructed pivot**): **D-151**
+  display toggles become PROFILE settings applied on profile change by
+  `DisplayTogglesCoordinator` (service scope; idempotent only-on-change; seed adopts the
+  baseline without writing; resting state = baseline; NO latch/sweep — accepted process-death
+  residual). The D-150 schedule system removed wholesale; `ContextMatching` +
+  `SecureDisplayController` kept; `17.txt` rewritten. Glue-review: clean.
+- 2026-07-03 — folds into 1.7.0/vc17 (Segment 4): **D-150** display schedules end-to-end (own
+  DataStore, edge-triggered coordinator with death-safe latch + restore, rules UI, shared
+  `TriggerEditors.kt` extraction; glue-review: +1 s boundary-wake fix) — **removed again by
+  4.5**; the ledger row is the record.
+- 2026-07-03 — folds into 1.7.0/vc17 (Segment 3, `:domain`-only): display-rule resolver +
+  truth-table tests, and the behavior-preserving **`ContextMatching` extraction** from
+  `ContextOverrideResolver` (goldens untouched and green). The resolver died with 4.5;
+  `ContextMatching` stays live.
+- 2026-07-03 — folds into 1.7.0/vc17 (Segment 2 — the core ask): the **Privileged Display
+  screen** (route always registered; Menu "Privileged" group only at ELEVATED off live
+  `tierFlow()`; self-guarding 3-channel grant card; read-back VM; AOSP Kelvin bounds
+  2596–4082/default 2850 verified). Glue-review: one Mutex finding fixed.
+- 2026-07-03 — repo-tooling only: `setup-android-sdk.sh` seeds the Gradle wrapper dist cache
+  from the container's `/opt` (the cloud egress proxy 403s the wrapper download).
+- 2026-07-03 — 1.7.0 / `versionCode 17` (MINOR, Segment 1): **D-149** `:platform`
+  `SecureDisplayController` — Night Light (+temperature), daltonizer, inversion, AOD,
+  stay-awake-charging, Android-14+ force-SDR; AOSP-universal keys only; Extra Dim excluded
+  (pipeline-owned). Changelog `17.txt`. Glue-review: one accepted finding documented.
+- 2026-07-02 — tests-only (F-backlog U6 → **F-backlog CLOSED**): **D-148** the H3 glue-seam
+  audit's last four seams covered (+19 tests; Shizuku*/MaintenanceWorker skips argued in-row).
+- 2026-07-02 — docs-only (U5): parity transcription spot-check — **clean, zero disagreements**;
+  `XML_RECIPES.md` gains R0 (restore the gitignored XML in a fresh clone).
+- 2026-07-02 — 1.6.2/vc16 (U4): **D-146** NaN import guard; **D-147** widget actions off the
+  exported provider. `/security-review` clean; `SECURITY.md` +3 scope notes.
+- 2026-07-02 — 1.6.2/vc16 (U3): **D-144** post-death Extra-Dim residual cleared (tri-state
+  latch); **D-145** `ShizukuShell` unbinds on bind timeout.
+- 2026-07-02 — 1.6.2/vc16 (U2): **D-141** rule edits bypass the PASS-1 cooldown; **D-142** wifi
+  SSID listener `[WIFI]`-gated + snapshot clear; **D-143** stale ssidFlow resolves dropped.
+- 2026-07-02 — 1.6.2 / `versionCode 16` (PATCH, U1): **D-139** panic restore cancel-and-joins
+  the animation consumer; **D-140** zombie-FGS gates on control intents. Changelog `16.txt`.
+- 2026-07-02 — docs-only: **D-138** F-backlog adopted (U1–U6, retroactive adversarial review
+  of the shipped glue + security & transcription audits).
+- 2026-07-01 — build-config only (H5): **D-137** release APK **proven reproducible**; owner
+  fdroiddata steps under "Owner actions pending".
+- 2026-07-01 — tests + a test-seam (H3): **D-136** glue-seam audit + 4 gap-closing suites
+  (+14 tests).
+- 2026-07-01 — repo-policy only (H4): **D-135** `SECURITY.md` + security-only Dependabot
+  (needs the owner-side Code-security toggles).
+- 2026-07-01 — 1.6.1 / `versionCode 15` (PATCH, H2): **D-134** saved pre-service brightness
+  mode persisted across process death.
+- 2026-07-01 — docs-only: **D-133** hardening backlog adopted; RUNBOOK gains the mandatory
+  **glue-review protocol** (H1); `FABLE_HANDOFF.md` deleted; STATE compressed.
+- 2026-06-30 — 1.6.0 / `versionCode 14` (MINOR): **D-130** no-Location SSID path (DUMP grant,
+  strategy order Shizuku → root → DUMP → Location); **D-131** full UI i18n (~250 strings,
+  ratchet 0, human-only translations policy); **D-132** plug/unplug bypasses the battery
+  cooldown. Owner on-device pass confirmed.
 - 2026-06-29 — CI-only: per-job `timeout-minutes` + wrapper properties in Gradle cache keys;
-  stricter supply-chain measures (SHA-pinning, dependency verification, versionCode Gradle task)
-  deliberately declined as wrong cost/benefit for a solo F-Droid app.
-- 2026-06-29 — 1.5.0 / `versionCode 13` (MINOR): **D-125** curve suggestion is now user-driven
-  (wizard "Preview graph" seeds the editable draft via `CurveSuggestionPreview` +
-  `DraftSettingsViewModel.seedDraft`; suggested line disappears on close). **D-126** resume no
-  longer loops back to paused — the F64 settle window also suppresses in-cycle override
-  detection. Changelog `13.txt`; engine/goldens untouched.
-- 2026-06-29 — CI-only: **D-124** `release-preflight.yml` PR gate (versionCode > latest tag,
-  semver versionName, non-empty changelog — only when the PR ships app code; `[skip ci]`-token
-  scan on every PR).
-- 2026-06-29 — CI-only: **D-123** `release.yml` auto-reuses the F-Droid changelog as the GitHub
-  Release "What's new" (idempotent marker; missing changelog → warn + skip).
-- 2026-06-28 — 1.4.0 / `versionCode 12` (MINOR): **D-117** graph "Now"/"Live brightness" show
-  PERCEIVED brightness in PWM mode; **D-118** Contexts rules modal edge-to-edge (no nav-bar
-  clip); **D-119** release notes auto-append; **D-120/D-122** "Use current location" actively
-  acquires a fresh fix; **D-121** geo-IP fallback moved to HTTPS ipwho.is + cleartext pinned
-  OFF. Owner squash-merges + publishes v1.4.0.
-- 2026-06-28 — 1.3.0 / `versionCode 11` (MINOR): **D-116** Panic (Reset) gesture rework —
-  upside-down ∧ display-on ∧ proximity-not-near + 10 s leaky-bucket shake gate (`PanicShakeGate`,
-  contract-tested vs task528 Java); new `%AAB_PanicSensitivity` (0–10) slider on Live Debug.
-  Retires the S14 grab-to-wake false-fire.
-- 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut, no app change): **D-115** a stray
-  `[skip ci]` in the squash body skipped v1.2.0's release workflow; `release.yml` now triggers
-  on `release: published` + `workflow_dispatch` fallback.
-- 2026-06-28 — 1.2.0 / `versionCode 9` (MINOR): **D-108**–**D-114** — battery `-1` sentinel (no
-  saver flash at start), perceived-brightness read-out in PWM mode, circadian stale-location
-  fallback + staleness hints, resume banner + Tasker-style Profiles & Contexts IA, Actions
-  node24, rule/profile delete-overwrite confirmations, priority 1–100. RUNBOOK gains the
-  m3_audit design-coherence callout.
-- 2026-06-28 — 1.1.1 / `versionCode 8` (PATCH): **D-107** notification/widget PendingIntents
-  made un-missably explicit (clears CodeQL `implicit-pendingintents` High).
-- 2026-06-26 — 1.1.0 / `versionCode 7` (MINOR): targetSdk 35→36 + compileSdk 36 (zero required
-  code changes), Robolectric 4.16.1 (JDK 21, CI JDK 17→21), CodeQL workflow added, debug variant
-  gets `.debug` suffix so it coexists with the release (D-106). Folded fixes **D-101**–**D-105**
-  (dimming threshold 0..255, wizard auto-copy + button wrap, circadian location persisted, chart
-  declutter, geo-IP opt-in). Owner Pass A/B on-device: passed.
-- 2026-06-25 — 1.0.4 / `versionCode 6` (PATCH): **D-100** bottom controls (DraftApplyBar, Menu
-  last row) get `navigationBarsPadding()` under 3-key nav.
-- 2026-06-24 — 1.0.3 / `versionCode 5` (PATCH): **D-098** rule-editor Save/Cancel moved into the
-  editor scroll (Compose `Dialog` never delivers a bottom inset); **D-099** in-app version
-  realigned with the tag drift + RUNBOOK §6 release checklist added.
-- 2026-06-24 — Wi-Fi context fixes: **D-096** `ssidFlow()` runs the no-Location strategies first
-  (rules match with Location OFF); **D-097** rule-editor `Dialog` made edge-to-edge.
-- 2026-06-24 — 1.0.1 / `versionCode 4`: packaging-only re-tag so a release tag contains
-  `fastlane/` (F-Droid reads metadata from the built commit).
-- 2026-06-24 — F-Droid prep: `fastlane/metadata/android/en-US/` added (title, descriptions,
-  changelog, 4 screenshots). Submission to fdroiddata + release tag are owner steps.
+  stricter supply-chain measures declined with reasons.
+- 2026-06-29 — 1.5.0 / `versionCode 13` (MINOR): **D-125** wizard curve suggestion is
+  user-driven (preview seeds the draft); **D-126** resume no longer loops back to paused (F64
+  settle window also suppresses in-cycle override detection).
+- 2026-06-29 — CI-only: **D-124** `release-preflight.yml` PR gate (versionCode/semver/changelog
+  when the PR ships app code; skip-ci token scan on every PR).
+- 2026-06-29 — CI-only: **D-123** `release.yml` reuses the F-Droid changelog as the GitHub
+  Release "What's new".
+- 2026-06-28 — 1.4.0 / `versionCode 12` (MINOR): **D-117**–**D-122** (PWM perceived-brightness
+  graph, edge-to-edge modal, release-notes auto-append, fresh location fix, HTTPS geo-IP).
+- 2026-06-28 — 1.3.0 / `versionCode 11` (MINOR): **D-116** Panic gesture rework +
+  `%AAB_PanicSensitivity`.
+- 2026-06-28 — 1.2.1 / `versionCode 10` (PATCH re-cut): **D-115** skip-ci token skipped
+  v1.2.0's release; `release.yml` triggers on `release: published`.
+- 2026-06-28 — 1.2.0 / `versionCode 9` (MINOR): **D-108**–**D-114** (battery sentinel, IA
+  rework, confirmations, priority 1–100).
+- 2026-06-28 — 1.1.1 / `versionCode 8` (PATCH): **D-107** explicit PendingIntents.
+- 2026-06-26 — 1.1.0 / `versionCode 7` (MINOR): targetSdk/compileSdk 36, Robolectric 4.16.1
+  (JDK 21), CodeQL, `.debug` suffix (D-106); folded **D-101**–**D-105**. Owner Pass A/B passed.
+- 2026-06-25 — 1.0.4 / `versionCode 6` (PATCH): **D-100** nav-bar padding on bottom controls.
+- 2026-06-24 — 1.0.3 / `versionCode 5` (PATCH): **D-098** dialog Save/Cancel clip; **D-099**
+  version/tag realignment + RUNBOOK §6 release checklist.
+- 2026-06-24 — Wi-Fi context fixes: **D-096** no-Location SSID strategies first; **D-097**
+  rule-editor edge-to-edge.
+- 2026-06-24 — 1.0.1 / `versionCode 4`: re-tag so the release tag contains `fastlane/`.
+- 2026-06-24 — F-Droid prep: fastlane metadata added; submission + tag are owner steps.
 - 2026-06-23 — v1.0.0: Tasker→Kotlin rebuild complete; Gate 3 signed off. Full history frozen
   in `../history/`.

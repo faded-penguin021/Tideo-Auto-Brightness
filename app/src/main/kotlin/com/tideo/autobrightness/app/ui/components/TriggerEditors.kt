@@ -44,9 +44,10 @@ import com.tideo.autobrightness.app.ui.theme.AabGold
 
 /**
  * Shared trigger-editor building blocks, extracted verbatim from `ContextsScreen`'s private
- * composables (D-150, `plans/privileged-display.md` Segment 4) so the Privileged Display schedule
- * editor reuses the exact same time/day/app affordances. Behavior and test tags are unchanged —
- * the ContextsScreen suites are the proof.
+ * composables (D-150, for the since-removed display-schedule editor; D-151 deleted that second
+ * consumer, so ContextsScreen is again the sole user — the extraction stays as the shared home
+ * for any future rule editor). Behavior and test tags are unchanged — the ContextsScreen suites
+ * are the proof.
  */
 
 /** Calendar.DAY_OF_WEEK index (1=Sun..7=Sat) → short label; the day picker maps positions to these. */

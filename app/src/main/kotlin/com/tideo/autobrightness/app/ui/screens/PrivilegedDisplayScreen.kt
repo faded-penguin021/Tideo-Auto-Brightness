@@ -57,8 +57,8 @@ import com.tideo.autobrightness.platform.privilege.Tier
 import kotlin.math.roundToInt
 
 /**
- * Privileged Display (rebuild-only feature, D-149; reworked by D-151/D-152 — `plans/
- * privileged-display.md`): the AOSP display settings that `WRITE_SECURE_SETTINGS` unlocks
+ * Privileged Display (rebuild-only feature, D-149; reworked by D-151/D-152): the AOSP
+ * display settings that `WRITE_SECURE_SETTINGS` unlocks
  * (Night Light + temperature, daltonizer/inversion, AOD, stay-awake-charging, experimental HDR
  * force-SDR), **all as PROFILE fields** edited draft→Apply like every other parameter screen —
  * one set of controls, no separate "device now" duplicates. Applying with the service running

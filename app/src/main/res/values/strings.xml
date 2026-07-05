@@ -553,7 +553,7 @@
     <string name="profiles_changed_count">%1$d changed from default</string>
     <string name="profiles_load_replace_warn">These settings will replace your current configuration.</string>
 
-    <!-- Privileged Display Control (rebuild-only feature, D-149; plans/privileged-display.md) -->
+    <!-- Privileged Display Control (rebuild-only feature, D-149; profile fields D-151/D-152) -->
     <string name="title_privileged_display">Privileged Display</string>
     <string name="menu_section_privileged">Privileged</string>
     <string name="pd_write_error">The last change could not be written — the WRITE_SECURE_SETTINGS grant may have been revoked. Re-grant elevated access and try again.</string>

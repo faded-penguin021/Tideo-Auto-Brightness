@@ -9,8 +9,8 @@ import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /**
- * Privileged Display Control (rebuild-only feature, no Tasker source — see
- * `docs/rebuild/plans/privileged-display.md`): read/write the AOSP display toggles that
+ * Privileged Display Control (rebuild-only feature, no Tasker source — D-149, reworked into
+ * profile fields by D-151/D-152): read/write the AOSP display toggles that
  * `WRITE_SECURE_SETTINGS` unlocks. All keys are the stock AOSP ones, observed live by their
  * framework services (ColorDisplayService watches the night-display and accessibility keys);
  * OEM skins that relocate a key simply see a no-op write — documented device variance, never
