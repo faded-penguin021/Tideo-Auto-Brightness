@@ -22,11 +22,16 @@ import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.storage.userProfilesDataStore
+import com.tideo.autobrightness.domain.brightness.TimeContext
+import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
+import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
+import com.tideo.autobrightness.domain.circadian.NightLightTemperatureRamp
 import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.GeoIpLocationClient
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
+import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
@@ -156,6 +161,35 @@ class AppModule(context: Context) {
             baselineFlow = appContext.settingsDataStore.data,
             display = AndroidSecureDisplayController(appContext, privilegeManager),
             tierProvider = { privilegeManager.currentTier() },
+            // D-154: the current circadian-ramp Kelvin — the same task90 tanh modifier that drives
+            // %AAB_ScaleDynamic, computed independently of pipeline cycles (steady light starves
+            // them, the D-110 lesson) with the pipeline's exact fallback: real solar windows when
+            // known, else the fixed TimeContext defaults (F73). Night anchor = the profile's
+            // temperature (or the AOSP default); day endpoint = the AOSP max (weakest filter).
+            circadianTemperature = { s ->
+                val nowSecOfDay = ((System.currentTimeMillis() / 1000L) % 86_400L).toDouble()
+                val w = circadianWindows.current(s.scaleTransitionFactor.toDouble())
+                val defaults = TimeContext(secondsOfDay = nowSecOfDay)
+                val modifier = DynamicScaleEngine.compute(
+                    DynamicScaleInput(
+                        nowSecOfDay = nowSecOfDay,
+                        morningStart = w?.morningStart ?: defaults.morningStart,
+                        morningEnd = w?.morningEnd ?: defaults.morningEnd,
+                        eveningStart = w?.eveningStart ?: defaults.eveningStart,
+                        eveningEnd = w?.eveningEnd ?: defaults.eveningEnd,
+                        sunlightDurationMinutes = w?.sunlightDurationMinutes
+                            ?: defaults.sunlightDurationMinutes,
+                        isPolar = w?.isPolar ?: false,
+                        steepness = s.scaleSteepness.toDouble(),
+                    ),
+                ).modifier
+                NightLightTemperatureRamp.temperature(
+                    modifier = modifier,
+                    nightKelvin = s.nightLightTemperature
+                        ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K,
+                    dayKelvin = SecureDisplayController.NIGHT_LIGHT_MAX_K,
+                )
+            },
         )
 
         return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager, displayToggles)

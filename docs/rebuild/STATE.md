@@ -71,6 +71,15 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-05 — folds into 1.7.0/vc17 (owner-requested): **D-154** circadian Night Light
+  temperature — new profile field `nightLightCircadianEnabled` (full D-151 fan-out); the
+  temperature rides the task90 tanh modifier (night anchor = the profile temperature/AOSP
+  default → 4082 K by day) via a 60 s only-on-change ticker in `DisplayTogglesCoordinator`
+  (own computation through `CircadianWindowProvider` — pipeline cycles starve in steady light,
+  D-110). Manual temperature changes don't stick while tracking (consented; all other fields
+  keep D-151 manual-stick). Tests +6 (+1 domain suite). `17.txt` +1. Glue-review: one finding
+  fixed pre-commit (the below-ELEVATED static-temp comparator would have replayed a skipped
+  swap after a grant — caught by the existing D-151 suite).
 - 2026-07-05 — docs/process only (owner-instructed): **D-153** deviations-ledger file cap —
   200 rows per file, rollover to `DEVIATIONS_LEDGER_A.md`/DA-001 then `_B.md`/DB-001, …;
   summarizing rejected (rows are cited by number, stay verbatim). Pointers updated in the

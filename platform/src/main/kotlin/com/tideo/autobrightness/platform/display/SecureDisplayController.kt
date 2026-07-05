@@ -58,6 +58,15 @@ interface SecureDisplayController {
     val hdrForceSdrAvailable: Boolean
     fun readHdrForceSdr(): Boolean
     fun setHdrForceSdr(on: Boolean): Result<Unit>
+
+    companion object {
+        /** AOSP Night Light Kelvin bounds/default (frameworks/base config.xml, verified at
+         *  Segment 2 — D-149); OEMs may narrow/widen their real range. Shared by the slider UI
+         *  and the D-154 circadian temperature ramp (night anchor default / day endpoint). */
+        const val NIGHT_LIGHT_MIN_K = 2596
+        const val NIGHT_LIGHT_MAX_K = 4082
+        const val NIGHT_LIGHT_DEFAULT_K = 2850
+    }
 }
 
 /** `night_display_auto_mode` values (AOSP ColorDisplayService). */

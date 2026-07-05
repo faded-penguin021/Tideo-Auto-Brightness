@@ -127,6 +127,13 @@ class PrivilegedDisplayScreenTest {
     }
 
     @Test
+    fun elevated_circadianTrackingSwitch_editsTheDraft_D154() {
+        val draft = setDraftContent()
+        compose.onNodeWithTag("switch_nightLightCircadian").performScrollTo().performClick()
+        assertEquals(true, draft().nightLightCircadianEnabled)
+    }
+
+    @Test
     fun elevated_scheduleCaveat_onlyWhenNightLightAutoModeActive() {
         setDraftContent(state = elevated.copy(nightLightAutoMode = NightLightAutoMode.CUSTOM_SCHEDULE))
         compose.onNodeWithTag("pd_schedule_caveat").performScrollTo().assertExists()

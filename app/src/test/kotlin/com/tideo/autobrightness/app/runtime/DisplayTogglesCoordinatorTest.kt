@@ -9,6 +9,7 @@ import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -58,9 +59,15 @@ class DisplayTogglesCoordinatorTest {
         inversionEnabled = false,
     )
 
-    private class Harness(tier: Tier = Tier.ELEVATED, baseline: AabSettings = AabSettings()) {
+    private class Harness(
+        tier: Tier = Tier.ELEVATED,
+        baseline: AabSettings = AabSettings(),
+        tickIntervalMs: Long = 60_000L,
+    ) {
         val display = FakeSecureDisplay()
         var tier = tier
+        /** The D-154 ramp Kelvin the fake "sun" currently yields; null = ramp not computable. */
+        var rampKelvin: Int? = null
         val baselineFlow = MutableStateFlow(baseline)
         val effectiveFlow = MutableStateFlow<AabSettings?>(null)
         val coordinator = DisplayTogglesCoordinator(
@@ -68,6 +75,8 @@ class DisplayTogglesCoordinatorTest {
             baselineFlow = baselineFlow,
             display = display,
             tierProvider = { this.tier },
+            circadianTemperature = { this.rampKelvin },
+            tickIntervalMs = tickIntervalMs,
         )
     }
 
@@ -213,6 +222,101 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = nightProfile.copy(daltonizerMode = "SEPIA_FROM_THE_FUTURE")
         runCurrent()
         assertEquals(listOf("daltonizer=OFF"), h.display.writes)
+    }
+
+    // --- D-154: circadian Night Light temperature ---
+
+    private val circadianProfile = AabSettings(
+        nightLightEnabled = true,
+        nightLightTemperature = 2_700, // the night anchor while tracking
+        nightLightCircadianEnabled = true,
+    )
+
+    @Test
+    fun circadianSwapIn_writesTheCurrentRampValue_notTheStaticAnchor_D154() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        assertEquals(listOf("nightLight=true", "temp=3400"), h.display.writes)
+    }
+
+    @Test
+    fun ticker_movesTheTemperature_onlyOnChange_D154() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        h.display.writes.clear()
+        // Sun unchanged → the tick must be silent (no per-minute settings churn).
+        advanceTimeBy(61_000); runCurrent()
+        assertTrue(h.display.writes.isEmpty(), "unchanged ramp must not rewrite: ${h.display.writes}")
+        // Sun moved → exactly one write per changed value.
+        h.rampKelvin = 3_300
+        advanceTimeBy(60_000); runCurrent()
+        advanceTimeBy(60_000); runCurrent()
+        assertEquals(listOf("temp=3300"), h.display.writes)
+    }
+
+    @Test
+    fun ticker_isInert_whenTrackingIsOff_orBelowElevated_orRampUnavailable_D154() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = nightProfile // static temperature profile — ticker not in play
+        runCurrent()
+        h.display.writes.clear()
+        advanceTimeBy(61_000); runCurrent()
+        assertTrue(h.display.writes.isEmpty(), "static profile must not tick: ${h.display.writes}")
+
+        // Tracking on but below ELEVATED → inert (the D-151 tier-gate semantics).
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        h.display.writes.clear()
+        h.tier = Tier.BASIC
+        h.rampKelvin = 3_200
+        advanceTimeBy(60_000); runCurrent()
+        assertTrue(h.display.writes.isEmpty(), "below ELEVATED the tick must not write: ${h.display.writes}")
+
+        // Ramp not computable (null) → skip, no crash, no write.
+        h.tier = Tier.ELEVATED
+        h.rampKelvin = null
+        advanceTimeBy(60_000); runCurrent()
+        assertTrue(h.display.writes.isEmpty(), "a null ramp must be skipped: ${h.display.writes}")
+    }
+
+    @Test
+    fun leavingCircadian_forAStaticProfile_reassertsTheStaticAnchor_D154() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        h.display.writes.clear()
+        // The static profile's 2700 equals the circadian profile's recorded anchor, but the DEVICE
+        // sits at the last ramp write (3400) — the diff must compare against what was written, not
+        // the profile-field history, or the temperature would stick at the ramp value forever.
+        h.effectiveFlow.value = circadianProfile.copy(nightLightCircadianEnabled = false)
+        runCurrent()
+        assertEquals(listOf("temp=2700"), h.display.writes)
+    }
+
+    @Test
+    fun leavingCircadian_forANoOpinionProfile_leavesTheTemperatureAlone_D154() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        h.display.writes.clear()
+        // Baseline has a null temperature = "no opinion": per D-151 it never writes, so the last
+        // ramp value stays (a persistent system preference, like any other null-temp hand-off).
+        h.effectiveFlow.value = baseline
+        runCurrent()
+        assertEquals(listOf("nightLight=false"), h.display.writes)
     }
 
     @Test

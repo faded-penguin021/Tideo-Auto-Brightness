@@ -572,6 +572,8 @@
     <string name="pd_night_light_temp_label">Temperature: %1$d K</string>
     <string name="pd_night_light_temp_default">Temperature: device default</string>
     <string name="pd_night_light_temp_hint">Lower = warmer (stronger filter). Standard Android range 2596–4082 K.</string>
+    <string name="pd_night_light_circadian">Follow circadian scaling</string>
+    <string name="pd_night_light_circadian_help">While the service runs, the temperature follows your circadian curve — warmest at night, relaxing to the weakest filter (4082 K) in daylight. The slider above sets the night-time temperature (device default 2850 K when unset). Manual temperature changes are overridden while this is on. Uses the same sun schedule and steepness as circadian scaling (Circadian screen).</string>
     <string name="pd_night_light_schedule_caveat">A Night Light schedule is set in system settings — the system may flip this switch back on its own.</string>
     <string name="pd_section_color">Color</string>
     <string name="pd_daltonizer_label">Color correction</string>

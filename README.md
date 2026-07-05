@@ -37,6 +37,8 @@ decision logic are golden-tested against a transcription of the original Tasker 
   **profile settings**: loading a profile — manually or through a Contexts rule — applies them, and
   returning to your baseline restores its values. So "grayscale on weekday nights" is just a
   Contexts rule loading a profile with grayscale on; there is no separate scheduler to maintain.
+  The Night Light temperature can optionally **follow your circadian curve** — warmest at night,
+  relaxing to the weakest filter in daylight, on the same sun schedule as the brightness scaling.
 - **Profiles** are stored settings. Tideo ships with five built-in presets.
 - **Context automation** can automatically load profiles based on: foreground app, time window, location,
   charging state, Wi-Fi SSID, or day of week, with priority-based conflict resolution.

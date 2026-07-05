@@ -6,6 +6,7 @@ import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -40,6 +41,17 @@ import kotlinx.coroutines.sync.withLock
  *  - **Inert below ELEVATED:** desired state is tracked but nothing is written; after a mid-session
  *    grant the toggles assert on the next change (like the dimming coordinator's tier gate).
  *
+ * Circadian temperature (D-154): while the EFFECTIVE profile has `nightLightCircadianEnabled`,
+ * the temperature field is owned by a slow ticker instead of the swap diff — every
+ * [tickIntervalMs] it asks [circadianTemperature] for the current ramp Kelvin (the same tanh
+ * modifier that drives `%AAB_ScaleDynamic`; an independent computation because the pipeline's
+ * value goes stale in steady light, the D-110 lesson) and writes only on change. Consequences,
+ * by design: manual temperature changes do NOT stick while tracking is on (the toggle is the
+ * consent — every OTHER field keeps the manual-changes-stick rule); [deviceTempK] remembers what
+ * was last actually written (ramp or static) so leaving a tracking profile for a static one
+ * re-asserts the static anchor even when the anchors are numerically equal. The first assert
+ * after service start lands on the first tick (≤ one interval) or the first differing swap.
+ *
  * Concurrency: its OWN collector coroutine in the service scope — never inside the pipeline cycle
  * (the single-coroutine drop-on-reentry model is BINDING). Every apply serializes under
  * [applyMutex]; [stop] cancels the collector first, then takes the mutex, so an in-flight apply
@@ -50,15 +62,28 @@ class DisplayTogglesCoordinator(
     private val baselineFlow: Flow<AabSettings>,
     private val display: SecureDisplayController,
     private val tierProvider: () -> Tier,
+    // D-154: the current circadian-ramp Kelvin for the given settings (night anchor + steepness +
+    // transition factor come from them), or null when no ramp is computable. Pure and
+    // non-blocking; called under [applyMutex].
+    private val circadianTemperature: (AabSettings) -> Int? = { null },
+    private val tickIntervalMs: Long = 60_000L,
 ) {
     private val applyMutex = Mutex()
 
     // What the coordinator last asserted (or adopted at seed). Guarded by [applyMutex].
     private var lastApplied: DisplayToggleState? = null
 
-    // The baseline's display fields — the resting state [stop] returns to. Kept fresh by its own
+    // The Kelvin value last actually WRITTEN (static anchor or circadian tick), or adopted at
+    // seed; the temperature diff compares against this, not lastApplied.temperatureK, so the
+    // ticker and the swap path can't fight (D-154). Guarded by [applyMutex].
+    private var deviceTempK: Int? = null
+
+    // The latest effective settings the collector saw — the tick's input. Guarded by [applyMutex].
+    private var latestEffective: AabSettings? = null
+
+    // The baseline's settings — the resting state [stop] returns to. Kept fresh by its own
     // collector so stop() never blocks on a DataStore read. Single-writer volatile (the collector).
-    @Volatile private var resting: DisplayToggleState? = null
+    @Volatile private var resting: AabSettings? = null
 
     private var scope: CoroutineScope? = null
     private var job: Job? = null
@@ -70,13 +95,29 @@ class DisplayTogglesCoordinator(
             // Seed BEFORE collecting: the resting/last-applied state is the baseline's values, so
             // the first effective emission is a real only-on-change comparison, not a blind write.
             applyMutex.withLock {
-                val seed = DisplayToggleState.of(baselineFlow.first())
-                resting = seed
-                if (lastApplied == null) lastApplied = seed
+                val seedSettings = baselineFlow.first()
+                resting = seedSettings
+                if (lastApplied == null) {
+                    val seed = DisplayToggleState.of(seedSettings)
+                    lastApplied = seed
+                    deviceTempK = seed.temperatureK
+                }
             }
-            launch { baselineFlow.collect { resting = DisplayToggleState.of(it) } }
+            launch { baselineFlow.collect { resting = it } }
+            // D-154 ticker: circadian temperature follows the sun even when no profile swap and
+            // no pipeline cycle happens (steady light). Delay-first: the swap path already covers
+            // "now"; the tick is pure math + at most one settings put per interval.
+            launch {
+                while (true) {
+                    delay(tickIntervalMs)
+                    applyMutex.withLock { tickLocked() }
+                }
+            }
             effectiveFlow.filterNotNull().collect { effective ->
-                applyMutex.withLock { applyLocked(DisplayToggleState.of(effective)) }
+                applyMutex.withLock {
+                    latestEffective = effective
+                    applyLocked(DisplayToggleState.of(effective), effective)
+                }
             }
         }
     }
@@ -91,24 +132,47 @@ class DisplayTogglesCoordinator(
         scope = null
         job?.cancel(); job = null
         runBlocking {
-            applyMutex.withLock { resting?.let { applyLocked(it) } }
+            applyMutex.withLock {
+                resting?.let { applyLocked(DisplayToggleState.of(it), it) }
+            }
         }
     }
 
     /** Diff-write [desired] against [lastApplied]. Caller holds [applyMutex]. */
-    private fun applyLocked(desired: DisplayToggleState) {
+    private fun applyLocked(desired: DisplayToggleState, settings: AabSettings) {
         val last = lastApplied
         lastApplied = desired
         if (last == null || desired == last) return
         // No-op below ELEVATED — but keep tracking, so a post-grant session behaves like any other
-        // (asserts on the next CHANGE; it never retroactively replays what it skipped).
-        if (tierProvider() < Tier.ELEVATED) return
+        // (asserts on the next CHANGE; it never retroactively replays what it skipped). The static
+        // temperature opinion must track here too — incl. null — exactly like every other field,
+        // or a post-grant swap that doesn't touch the temperature would replay it. Circadian mode
+        // deliberately does NOT track: the ramp value was never written, and the first post-grant
+        // tick asserting it is the feature working, not a replay.
+        if (tierProvider() < Tier.ELEVATED) {
+            if (!desired.circadianTemp) deviceTempK = desired.temperatureK
+            return
+        }
         // Write failures (revoked/stale grant race) are intentionally not retried: the tier gate
         // above is the real guard, and the next differing swap re-writes the field anyway.
         if (desired.nightLight != last.nightLight) display.setNightLight(desired.nightLight)
-        val temperature = desired.temperatureK
-        if (temperature != null && temperature != last.temperatureK) {
-            display.setNightLightTemperature(temperature)
+        // Temperature (D-154): a circadian-tracking profile writes the current ramp value on the
+        // swap edge (the ticker keeps it moving after); a static profile writes its non-null
+        // anchor. Both diff against deviceTempK, which then tracks the profile's OPINION in static
+        // mode (incl. null — the D-151 comparator semantics) and the last RAMP value in circadian
+        // mode — so ownership hand-offs between ticker and swaps stay only-on-change without
+        // sticking at a stale ramp temperature.
+        if (desired.circadianTemp) {
+            circadianTemperature(settings)?.let { kelvin ->
+                if (kelvin != deviceTempK) display.setNightLightTemperature(kelvin)
+                deviceTempK = kelvin
+            }
+        } else {
+            val temperature = desired.temperatureK
+            if (temperature != null && temperature != deviceTempK) {
+                display.setNightLightTemperature(temperature)
+            }
+            deviceTempK = temperature
         }
         if (desired.daltonizer != last.daltonizer) display.setDaltonizer(desired.daltonizer)
         if (desired.inversion != last.inversion) display.setInversion(desired.inversion)
@@ -120,10 +184,23 @@ class DisplayTogglesCoordinator(
         }
     }
 
+    /** One circadian temperature tick (D-154). Caller holds [applyMutex]. */
+    private fun tickLocked() {
+        val settings = latestEffective ?: return
+        if (!settings.nightLightCircadianEnabled) return
+        if (tierProvider() < Tier.ELEVATED) return
+        val kelvin = circadianTemperature(settings) ?: return
+        if (kelvin != deviceTempK) {
+            display.setNightLightTemperature(kelvin)
+            deviceTempK = kelvin
+        }
+    }
+
     /** The profile fields, normalized (string mode → enum) so comparisons are value-typed. */
     private data class DisplayToggleState(
         val nightLight: Boolean,
         val temperatureK: Int?,
+        val circadianTemp: Boolean,
         val daltonizer: DaltonizerMode,
         val inversion: Boolean,
         val alwaysOn: Boolean,
@@ -134,6 +211,7 @@ class DisplayTogglesCoordinator(
             fun of(settings: AabSettings) = DisplayToggleState(
                 nightLight = settings.nightLightEnabled,
                 temperatureK = settings.nightLightTemperature,
+                circadianTemp = settings.nightLightCircadianEnabled,
                 // Validation resets unknown strings to OFF; this fallback covers un-validated input.
                 daltonizer = DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
                     ?: DaltonizerMode.OFF,

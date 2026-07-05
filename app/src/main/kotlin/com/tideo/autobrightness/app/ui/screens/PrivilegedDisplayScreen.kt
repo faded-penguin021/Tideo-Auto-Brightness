@@ -52,6 +52,7 @@ import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.theme.Dimens
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
+import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlin.math.roundToInt
@@ -188,6 +189,12 @@ fun PrivilegedDisplayContent(
                             modifier = Modifier.testTag("pd_temp_clear"),
                         ) { Text(stringResource(R.string.pd_profile_temp_clear)) }
                     }
+                    SwitchSettingRow(
+                        stringResource(R.string.pd_night_light_circadian), draft.nightLightCircadianEnabled,
+                        { on -> onEditDraft { it.copy(nightLightCircadianEnabled = on) } },
+                        help = R.string.pd_night_light_circadian_help,
+                        testTag = "switch_nightLightCircadian",
+                    )
                 }
 
                 SectionHeader(stringResource(R.string.pd_section_color), divider = true)
@@ -364,7 +371,8 @@ private fun DaltonizerMode.labelRes(): Int = when (this) {
     DaltonizerMode.TRITANOMALY -> R.string.pd_daltonizer_tritan
 }
 
-// AOSP frameworks/base config_nightDisplayColorTemperature{Min,Default,Max} (verified 2026-07-03).
-private const val AOSP_NIGHT_LIGHT_MIN_K = 2596
-private const val AOSP_NIGHT_LIGHT_MAX_K = 4082
-private const val AOSP_NIGHT_LIGHT_DEFAULT_K = 2850
+// AOSP frameworks/base config_nightDisplayColorTemperature{Min,Default,Max} — shared with the
+// D-154 circadian temperature ramp via the SecureDisplayController companion.
+private const val AOSP_NIGHT_LIGHT_MIN_K = SecureDisplayController.NIGHT_LIGHT_MIN_K
+private const val AOSP_NIGHT_LIGHT_MAX_K = SecureDisplayController.NIGHT_LIGHT_MAX_K
+private const val AOSP_NIGHT_LIGHT_DEFAULT_K = SecureDisplayController.NIGHT_LIGHT_DEFAULT_K

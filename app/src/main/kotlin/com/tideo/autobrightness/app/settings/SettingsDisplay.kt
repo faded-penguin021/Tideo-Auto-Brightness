@@ -95,6 +95,7 @@ private val FRIENDLY_LABELS: Map<String, String> = mapOf(
     "trustUnreliableSensor" to "Trust low-accuracy sensor",
     "nightLightEnabled" to "Night Light",
     "nightLightTemperature" to "Night Light temperature",
+    "nightLightCircadianEnabled" to "Night Light circadian tracking",
     "daltonizerMode" to "Color correction",
     "inversionEnabled" to "Color inversion",
     "alwaysOnDisplayEnabled" to "Always-on display",
@@ -152,6 +153,7 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     // (never written).
     "nightLightEnabled" -> nightLightEnabled.toString()
     "nightLightTemperature" -> nightLightTemperature?.toString() ?: "device default"
+    "nightLightCircadianEnabled" -> nightLightCircadianEnabled.toString()
     "daltonizerMode" -> daltonizerMode
     "inversionEnabled" -> inversionEnabled.toString()
     "alwaysOnDisplayEnabled" -> alwaysOnDisplayEnabled.toString()

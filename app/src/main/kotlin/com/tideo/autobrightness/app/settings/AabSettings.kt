@@ -75,6 +75,11 @@ data class AabSettings(
     // Night Light intensity in Kelvin; null = this profile has no temperature opinion (the device
     // value — a persistent system preference — is left untouched). Written only when non-null.
     val nightLightTemperature: Int? = null,
+    // D-154: the temperature follows the circadian tanh modifier while the service runs (warmest
+    // at night — anchored on nightLightTemperature, or the AOSP default when null — relaxing to
+    // the AOSP max/weakest filter in daylight). While on, the ticker owns the temperature and
+    // manual temperature changes do NOT stick (unlike every other display field).
+    val nightLightCircadianEnabled: Boolean = false,
     // Color-correction mode: one of [DALTONIZER_MODES] ("OFF", "GRAYSCALE", or a correction
     // matrix). Stored as a STRING enum name (the D-150 lesson): an unknown value from a newer
     // schema validates back to "OFF" instead of failing the whole settings file.
@@ -169,6 +174,7 @@ object AabSettingsContract {
         // D-116 panicSensitivity precedent (no Tasker source; the name exists for diff/export display).
         AabSettingRule("%AAB_NightLight", "nightLightEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_NightLightTemp", "nightLightTemperature", AabValueType.Int, "device default", "range 1000..10000, or unset = device default"),
+        AabSettingRule("%AAB_NightLightCircadian", "nightLightCircadianEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_Daltonizer", "daltonizerMode", AabValueType.String, DALTONIZER_OFF, "one of OFF|GRAYSCALE|PROTANOMALY|DEUTERANOMALY|TRITANOMALY"),
         AabSettingRule("%AAB_Inversion", "inversionEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_AlwaysOnDisplay", "alwaysOnDisplayEnabled", AabValueType.Boolean, "false", "must be true|false"),

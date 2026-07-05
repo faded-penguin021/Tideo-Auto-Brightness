@@ -59,6 +59,7 @@ class ProfileLoadResultTest {
         val withOpinion = """
             { "schemaVersion": 3, "settings": {
                 "nightLightEnabled": true, "nightLightTemperature": 2700,
+                "nightLightCircadianEnabled": true,
                 "daltonizerMode": "GRAYSCALE", "inversionEnabled": true,
                 "alwaysOnDisplayEnabled": true, "stayAwakeChargingEnabled": true,
                 "hdrForceSdrEnabled": true } }
@@ -66,6 +67,7 @@ class ProfileLoadResultTest {
         val loaded = (manager.decodePayload(withOpinion) as ProfileLoadResult.Success).settings
         assertEquals(true, loaded.nightLightEnabled)
         assertEquals(2_700, loaded.nightLightTemperature)
+        assertEquals(true, loaded.nightLightCircadianEnabled)
         assertEquals("GRAYSCALE", loaded.daltonizerMode)
         assertEquals(true, loaded.inversionEnabled)
         assertEquals(true, loaded.alwaysOnDisplayEnabled)

@@ -172,6 +172,16 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     seed adopts silently (grayscale still on); the next **differing** profile swap or a service stop
     returns the device to the baseline's values. Verify the self-heal happens then — this residual is
     as-designed, not a bug.
+38. **Circadian temperature tracking (D-154).** On Privileged Display enable Night Light + **Follow
+    circadian scaling**, Apply (baseline), service ON, ideally within ~1 h of local sunset/sunrise.
+    **Expected:** within a minute the temperature starts moving with the sun —
+    `adb shell settings get secure night_display_color_temperature` drifts toward your slider value
+    (warmer) as the evening ramp progresses, and toward 4082 in daylight; in stable indoor light too
+    (the ticker is independent of brightness cycles). Change the temperature by hand in system
+    settings. **Expected:** it is re-overridden within ~1 min — documented behavior while tracking is
+    on (every other display field keeps manual changes). Turn the switch off + Apply. **Expected:**
+    the ticker stops and the temperature returns to the profile's static value (the slider; with the
+    slider unset it simply stays where the ramp left it); manual changes stick again.
 
 ---
 

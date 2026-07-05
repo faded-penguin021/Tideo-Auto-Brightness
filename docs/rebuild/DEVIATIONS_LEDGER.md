@@ -2729,3 +2729,29 @@ the permanent registry — never compress or remove them.
   updated in the ledger header, `CLAUDE.md`, and `RUNBOOK.md` ("append in the LIVE ledger file
   per the rollover rule"). At adoption the tail is D-153 → 47 slots remain before the first
   rollover.
+
+- **D-154: Circadian Night Light temperature (owner-requested; rebuild-only, extends
+  D-149/D-151/D-152).** New profile field `nightLightCircadianEnabled` ("Follow circadian
+  scaling", full D-151 fan-out: contract `%AAB_NightLightCircadian`, mergeProfile snapshot, diff
+  display, import/export + legacy arm, default false). While the EFFECTIVE profile has it on,
+  the Night Light temperature follows the task90 tanh `modifier` — the same value that drives
+  `%AAB_ScaleDynamic` — via pure `domain/circadian/NightLightTemperatureRamp` (linear Kelvin
+  blend, modifier −1 → night anchor = the profile's `nightLightTemperature` ?: AOSP default
+  2850, +1 → AOSP max 4082 = weakest filter; anchors now shared constants on
+  `SecureDisplayController`). The ramp is computed INDEPENDENTLY of pipeline cycles (steady
+  light starves them — the D-110 lesson): a 60 s ticker inside `DisplayTogglesCoordinator`
+  (same service-scope coroutine family, same apply mutex, ELEVATED-gated, **only-on-change** —
+  an unchanged sun writes nothing) re-derives the modifier through `CircadianWindowProvider`
+  with the pipeline's exact TimeContext-defaults fallback and the profile's
+  steepness/transition factor; `scalingEnabled` is deliberately NOT required (temperature
+  tracking works without brightness scaling). Semantics decided: **manual temperature changes
+  do NOT stick while tracking is on** (the toggle is the consent; every other display field
+  keeps the D-151 manual-stick rule); the temperature comparator (`deviceTempK`) tracks the
+  profile's static OPINION incl. null in static mode (the D-151 comparator, also below
+  ELEVATED so a post-grant swap never replays) but the last WRITTEN ramp value in circadian
+  mode — leaving a tracking profile re-asserts a static anchor even when numerically equal to
+  the tracking profile's anchor, and a null-opinion hand-off leaves the last ramp value (null
+  never writes, D-151). First assert after service start lands on the first tick (≤ 60 s) or
+  first differing swap — the seed still adopts without writing. `applyNow` (service off) stays
+  static-only: tracking is a runtime feature (stated in the help text). Folds into the
+  unreleased 1.7.0/vc17 (`17.txt` +1 line); DEVICE_TEST_SCRIPT §11 step 38.
