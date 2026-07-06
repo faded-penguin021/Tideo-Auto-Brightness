@@ -2773,3 +2773,23 @@ the permanent registry — never compress or remove them.
   (D-048 policy, no code): **OxygenOS ignores `night_display_color_temperature`** (the tint is
   fixed regardless of the Kelvin value), so the temperature slider and the D-154 circadian
   tracking are visually inert on OnePlus devices; noted in DEVICE_TEST_SCRIPT §11 + README.
+
+- **D-156: A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
+  (A0; plan `plans/a11y-diagnostics.md`, owner-approved 2026-07-06; opens 1.8.0/vc18).**
+  Conventions BINDING for all backlog units: (a) **the gate** — every unit renders its surface
+  in a Robolectric compose test and calls `SemanticsAudit.assertAllInteractiveNodesAreLabeled()`
+  (merged-tree walk, i.e. what TalkBack traverses; interactive = OnClick/SetProgress/
+  ToggleableState; a usable label needs a letter-or-digit, so symbol-only text like the ⓘ glyph
+  does NOT count); template = `SettingsControlsA11yTest`, written failing against the pre-fix
+  components. (b) **Label association never changes interaction** —
+  `Modifier.semantics { contentDescription = label }` on the control node; no toggleable-row
+  conversions (they'd change tap behavior and break the tests that click the control's
+  `testTag`); testTags stay stable. (c) Labels go through `strings.xml` `a11y_*` keys — the
+  D-131 i18n ratchet counts literal `contentDescription = "…"` and stays at 0. (d)
+  **Semantics/strings-only** — no visual/layout/color change (A7 touch-target dp via `Dimens.*`
+  excepted). A0 fixed the S12.5b primitives (`SettingsControls.kt`): `HelpInfoButton` gets
+  `a11y_help_for` ("Help: %1$s") with the glyph `clearAndSetSemantics`-hidden, Slider/Switch
+  announce their sibling label, `SectionHeader` is a `heading()`, `DerivedReadout` merges
+  label+value. Remaining units (A1 components, A2 graph text-alternatives, A3–A6 screens, A7
+  touch targets + owner TalkBack checklist, C1 crash-log capture = the only glue unit) live in
+  the plan file until executed; the last unit deletes it.

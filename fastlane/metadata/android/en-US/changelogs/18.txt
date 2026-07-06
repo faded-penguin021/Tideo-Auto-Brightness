@@ -1,0 +1,1 @@
+Accessibility (TalkBack) improvements, part 1: sliders and switches now announce their labels, the per-field help buttons are properly named instead of reading a bare symbol, section headers are navigable as headings, and read-only value rows are read as one item. Further screens get the same treatment throughout this release.

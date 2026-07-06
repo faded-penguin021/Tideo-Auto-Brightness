@@ -40,6 +40,23 @@ registry stays live.
 > file, then `_A.md`/DA-…, `_B.md`/DB-… — D-153; gate findings are in
 > `../history/STATE_rebuild.md`). Look there.
 
+## Active work — A11y (TalkBack) backlog + crash-log capture
+
+Plan: `plans/a11y-diagnostics.md` (owner-approved 2026-07-06; playbook-5 pattern; **strictly
+sequential units, each checkpointed** ladder-green → STATE line → commit → push; conventions =
+**D-156**; opens **1.8.0 / vc18**). Designed for lesser-model execution: per-unit file
+allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
+
+- [x] **A0** — settings primitives + `SemanticsAudit` gate + version bump (D-156)
+- [ ] **A1** — remaining shared components
+- [ ] **A2** — canvas graphs get text alternatives
+- [ ] **A3** — Dashboard, Menu, Onboarding (+ banner liveRegions)
+- [ ] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming)
+- [ ] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug)
+- [ ] **A6** — profiles/contexts + info screens (+ rule-editor dialogs)
+- [ ] **A7** — touch targets + DEVICE_TEST_SCRIPT owner TalkBack checklist
+- [ ] **C1** — local crash-log capture (optional; the ONLY glue unit — glue-review mandatory)
+
 **Owner actions pending:**
 
 - **H4 (D-135):** repo Settings → Code security → enable "Dependabot security updates" +
@@ -56,7 +73,8 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 - [x] **U0** — sync branch onto `origin/main`; persist plan; STATE Active-work + "Current state" fix.
 - [ ] **U1** — vc18 / 1.8.0 bump + `changelogs/18.txt`; `ControlPrefsStore` (opt-in flag, default off).
-- [ ] **U2** — exported `ControlReceiver` + 7 core verbs; `AutoBrightnessRuntime.panic`; ledger D-156.
+- [ ] **U2** — exported `ControlReceiver` + 7 core verbs; `AutoBrightnessRuntime.panic`; ledger D-157
+  (D-156 is taken by a11y A0; append the next free row).
 - [ ] **U3** — `ProfileApplier` extraction (SettingsViewModelTest unchanged) + profile verbs.
 - [ ] **U4** — Tools "Automation control" toggle + actions-help dialog.
 - [ ] **U5** — outbound `STATE_CHANGED` events (optional, droppable).
@@ -83,10 +101,15 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-06 — folds into **1.8.0 / vc18** (A11y backlog **A0**, plan `plans/a11y-diagnostics.md`;
+  stacked on the intent-control branch — both features share 1.8.0/vc18):
+  **D-156** TalkBack semantics for the S12.5b settings primitives (help-ⓘ named per field,
+  slider/switch announce their labels, section headers are headings, readouts merged) + the
+  `SemanticsAudit` per-unit test gate (tests +5, written failing-first). Glue-review: N/A
+  (UI/semantics only).
 - 2026-07-06 — docs/process only (intent-control **U0**): branch synced onto `main` (v1.7.0 tagged);
   persisted plan `plans/intent-control.md` added; STATE gains the 1.8.0 Active-work checklist and
   the "Current state" line now reflects 1.7.0 as shipped. No code.
-
 - 2026-07-05 — docs-only (F-Droid code-quality scan): RUNBOOK F-Droid-changelog bullet gains the
   <500-char `whatsNew` rule (F-Droid flags ≥ 500 as Minor). `changelogs/17.txt` left at 972 chars —
   vc17 is already tagged, so the fix would need a release re-cut for a cosmetic Minor; the rule

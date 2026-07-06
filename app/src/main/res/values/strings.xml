@@ -254,6 +254,8 @@
 
     <!-- Shared actions / fields / a11y -->
     <string name="a11y_back">Back</string>
+    <!-- D-156: TalkBack label for the per-field ⓘ help button; %1$s is the field's label. -->
+    <string name="a11y_help_for">Help: %1$s</string>
     <string name="action_ok">OK</string>
     <string name="action_apply">Apply</string>
     <string name="action_applied">Applied</string>

@@ -37,6 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
@@ -54,7 +58,8 @@ fun SectionHeader(text: String, divider: Boolean = false) {
         text,
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp),
+        // D-156: headings let TalkBack users jump section-to-section instead of row-by-row.
+        modifier = Modifier.padding(top = 8.dp).semantics { heading() },
     )
     if (divider) {
         HorizontalDivider(
@@ -75,11 +80,23 @@ private fun sameNumber(a: Number, b: Number, isInt: Boolean): Boolean =
  * Tasker scenes each parameter label carries a `longclick` help task that Flashes an explanatory
  * string; we port that verbatim and surface it on tap (the modern equivalent of Tasker's long-tap),
  * keeping the help text out of the way until requested. [tag] keys the button so a test can reveal it.
+ *
+ * D-156: the visible content is a bare glyph, so the button carries a per-field contentDescription
+ * ("Help: <label>") and the glyph Text is cleared from semantics — TalkBack announces the label,
+ * not the symbol.
  */
 @Composable
-private fun HelpInfoButton(tag: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.testTag("help_$tag")) {
-        Text(stringResource(R.string.info_glyph), color = MaterialTheme.colorScheme.primary)
+private fun HelpInfoButton(tag: String, label: String, onClick: () -> Unit) {
+    val description = stringResource(R.string.a11y_help_for, label)
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.testTag("help_$tag").semantics { contentDescription = description },
+    ) {
+        Text(
+            stringResource(R.string.info_glyph),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
     }
 }
 
@@ -123,7 +140,7 @@ fun NumberSettingField(
         isError = error != null,
         singleLine = true,
         trailingIcon = if (help != null) {
-            { HelpInfoButton(testTag) { showHelp = !showHelp } }
+            { HelpInfoButton(testTag, label) { showHelp = !showHelp } }
         } else {
             null
         },
@@ -168,7 +185,7 @@ fun IntSliderSettingField(
                 color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
-            if (help != null) HelpInfoButton(testTag) { showHelp = !showHelp }
+            if (help != null) HelpInfoButton(testTag, label) { showHelp = !showHelp }
         }
         Slider(
             value = value.coerceIn(range).toFloat(),
@@ -176,7 +193,9 @@ fun IntSliderSettingField(
             valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = (range.last - range.first - 1).coerceAtLeast(0),
             enabled = enabled,
-            modifier = modifier.fillMaxWidth().testTag(testTag),
+            // D-156: the label Text above is a separate node — name the slider itself so TalkBack
+            // announces "<label>, slider" instead of an anonymous percentage.
+            modifier = modifier.fillMaxWidth().testTag(testTag).semantics { contentDescription = label },
         )
         val msg = help?.let { stringResource(it) }?.takeIf { showHelp } ?: helper
         if (msg != null) {
@@ -220,21 +239,27 @@ fun SwitchSettingRow(
                 )
             }
         }
-        if (help != null) HelpInfoButton(testTag) { showHelp = !showHelp }
+        if (help != null) HelpInfoButton(testTag, label) { showHelp = !showHelp }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,
-            modifier = Modifier.testTag(testTag),
+            // D-156: label the switch node itself (its label Text is a sibling). Deliberately NOT a
+            // toggleable row — that would change tap behavior and the testTag the existing tests click.
+            modifier = Modifier.testTag(testTag).semantics { contentDescription = label },
         )
     }
 }
 
-/** A read-only derived value (e.g. live form2A/form3A, derived throttle) shown beneath its inputs. */
+/**
+ * A read-only derived value (e.g. live form2A/form3A, derived throttle) shown beneath its inputs.
+ * D-156: label + value merge into one semantics node so TalkBack reads them as a single row.
+ */
 @Composable
 fun DerivedReadout(label: String, value: String, testTag: String = label) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).testTag(testTag),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).testTag(testTag)
+            .semantics(mergeDescendants = true) {},
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
