@@ -19,10 +19,13 @@ minSdk 31, target/compile 36.
 
 ## Current state
 
-**Shipped: v1.6.2** (`versionCode 16`). **Pending release: 1.7.0 / `versionCode 17`** — the
-Privileged Display Control feature, COMPLETE incl. Segment-5 polish (D-149–D-152;
-`changelogs/17.txt` final). Owner squash-merges the session branch, runs
-`DEVICE_TEST_SCRIPT.md` §11 on-device, then tags/releases 1.7.0.
+**Shipped: v1.7.0** (`versionCode 17`, tagged on `main`) — the Privileged Display Control feature
+(D-149–D-155).
+
+**Active work: 1.8.0 / `versionCode 18`** — **intent control for automation frameworks** (Tasker /
+MacroDroid): an opt-in exported broadcast surface for the existing control verbs + profile load,
+plus outbound state-change events. Multi-unit, persisted plan `plans/intent-control.md`; segment
+checklist below. Branch `claude/tideo-brightness-intent-control-2rkhx3`.
 
 `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
 `parity_gaps.md` has 0 open gaps. Full acceptance ladder green 2026-07-05.
@@ -43,8 +46,21 @@ registry stays live.
   "Private vulnerability reporting" (the committed files are inert without them).
 - **H5 (D-137):** in the fdroiddata submission set `Binaries:` to the release-APK URL pattern
   and `reproducible: yes` (pin the CI's JDK 21) so F-Droid publishes the signed APK.
-- **1.7.0:** on-device pass of `DEVICE_TEST_SCRIPT.md` §11 (Privileged Display), then
-  tag/release after squash-merge.
+
+## Active work — 1.8.0 intent control (plan: `plans/intent-control.md`)
+
+Opt-in exported broadcast surface (default OFF, D-105 pattern) for the existing control verbs +
+`LOAD_PROFILE`/`CONTEXTS_RESUME`, plus outbound `STATE_CHANGED` events — so Tasker/MacroDroid can
+both command and observe the app. `:app`-only; **`:domain`/`:platform`/goldens untouched.** Each unit
+ends shippable: ladder green → this checklist ticked → commit → push (glue-review on U2/U3/U5).
+
+- [x] **U0** — sync branch onto `origin/main`; persist plan; STATE Active-work + "Current state" fix.
+- [ ] **U1** — vc18 / 1.8.0 bump + `changelogs/18.txt`; `ControlPrefsStore` (opt-in flag, default off).
+- [ ] **U2** — exported `ControlReceiver` + 7 core verbs; `AutoBrightnessRuntime.panic`; ledger D-156.
+- [ ] **U3** — `ProfileApplier` extraction (SettingsViewModelTest unchanged) + profile verbs.
+- [ ] **U4** — Tools "Automation control" toggle + actions-help dialog.
+- [ ] **U5** — outbound `STATE_CHANGED` events (optional, droppable).
+- [ ] **U6** — README/DEVICE_TEST §12/datastore_map docs; delete plan file; final STATE compression.
 
 ## Decided non-items (don't re-litigate without new evidence)
 
@@ -66,6 +82,10 @@ registry stays live.
 ## Changelog
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
+
+- 2026-07-06 — docs/process only (intent-control **U0**): branch synced onto `main` (v1.7.0 tagged);
+  persisted plan `plans/intent-control.md` added; STATE gains the 1.8.0 Active-work checklist and
+  the "Current state" line now reflects 1.7.0 as shipped. No code.
 
 - 2026-07-05 — docs-only (F-Droid code-quality scan): RUNBOOK F-Droid-changelog bullet gains the
   <500-char `whatsNew` rule (F-Droid flags ≥ 500 as Minor). `changelogs/17.txt` left at 972 chars —
