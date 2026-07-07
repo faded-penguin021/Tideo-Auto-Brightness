@@ -40,6 +40,14 @@ object AutoBrightnessRuntime {
      */
     fun reapply(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_REAPPLY)
 
+    /**
+     * D-157: full-stop panic from an external command (mirrors the notification's Reset button, which
+     * sends the same [AmbientMonitoringService.ACTION_PANIC]): restore brightness, drop dimming, tear
+     * the service down. Safe when not running — startForegroundService creates the instance, it panics
+     * and self-terminates (NOT_STICKY), exactly as the notification Reset does.
+     */
+    fun panic(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_PANIC)
+
     private fun sendServiceAction(context: Context, action: String) {
         val appContext = context.applicationContext
         val intent = Intent(appContext, AmbientMonitoringService::class.java).setAction(action)

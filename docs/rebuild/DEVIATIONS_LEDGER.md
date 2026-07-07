@@ -2794,6 +2794,38 @@ the permanent registry — never compress or remove them.
   touch targets + owner TalkBack checklist, C1 crash-log capture = the only glue unit) live in
   the plan file until executed; the last unit deletes it.
 
+- **D-157: intent control for automation frameworks (Tasker / MacroDroid) — an opt-in exported
+  broadcast surface.** Tasker-independent feature (no parity source): the app's control verbs were
+  reachable only from its own UI (QS tile, widget, notification); this adds a deliberate external
+  entry point. **Public action namespace** `com.tideo.autobrightness.control.*`, distinct from the
+  internal `…runtime.action.*` (internals stay free to change): `SERVICE_ON`/`SERVICE_OFF`/
+  `SERVICE_TOGGLE`, `PAUSE`/`RESUME`/`REAPPLY`/`PANIC` (U2 core verbs), plus `LOAD_PROFILE` (String
+  extra `name`) + `CONTEXTS_RESUME` (U3) and outbound `event.STATE_CHANGED` (U5, droppable).
+  **Security posture — this re-opens the surface class D-147 closed**, made safe NOT by a permission
+  or shared secret but by an **opt-in runtime gate**: `ControlPrefsStore.externalControlEnabled`
+  (its OWN `control_prefs` DataStore, default OFF — the D-105 opt-in pattern — deliberately NOT an
+  `AabSettings` field so profile apply/import chokepoints can never flip it, U1) is the exported
+  `ControlReceiver`'s **FIRST** check; while off, every action is dropped before it touches settings
+  or the service. A D-147-style negative test (`controlDisabled_ignoresAllActions_D157`) pins the
+  OFF-ignores-everything property. No token: the exposed verbs are exactly what the notification/
+  tile/widget already give the user and no data leaves the app. **Every verb reuses an already-
+  hardened path** — SERVICE_* copy the `WidgetActionReceiver.toggle` DataStore+`onSettingChanged`+
+  widget-repaint dance parameterized by target state (copied, not shared — tile/widget untouched);
+  PAUSE/RESUME/REAPPLY delegate to `AutoBrightnessRuntime` (service-side D-140 zombie gates handle
+  "sent while not running"); PANIC is a new 1-line `AutoBrightnessRuntime.panic` sending the existing
+  `AmbientMonitoringService.ACTION_PANIC` (same intent as the notification Reset). **Platform caveat:**
+  SERVICE_ON while background-restricted may throw `ForegroundServiceStartNotAllowedException` (API
+  31+ FGS rules) — `startMonitoring` already catches it → `markDegraded` (Dashboard); help text (U4)
+  tells users to exempt Tideo from battery optimization. All other verbs are safe then (FGS running =
+  not background, or D-140 no-ops). **`:app`-only** — the golden-tested `:domain` engine and
+  `:platform` adapters are untouched by every unit; no numeric-setter verbs (those would open a
+  validation surface onto the curve math, the D-146 NaN class — profiles carry parameter sets safely);
+  no new manifest permission. Folds into **1.8.0 / vc18**. Multi-unit (plan `plans/intent-control.md`,
+  playbook-5 persisted pattern): U1 pref store + `ControlPrefsStoreTest`; U2 `ControlReceiver` + 7
+  core verbs + `panic`, manifest `exported="true"` intent-filter, `ControlReceiverTest` (gate + per-
+  verb routing + unknown-action), glue-review; U3 `ProfileApplier` extraction + profile verbs; U4
+  Tools toggle + actions-help dialog; U5 outbound events; U6 docs + plan retirement.
+
 - **D-158: local crash-log capture (a11y-diagnostics unit C1 — the last unit; deletes the plan
   file. `D-157` reserved by the parallel intent-control branch, so C1 minted the next free row).**
   Tasker-independent diagnostic (no parity source): a new `AabApplication` (`<application

@@ -62,8 +62,8 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 - [x] **U0** — sync branch onto `origin/main`; persist plan; STATE Active-work + "Current state" fix.
 - [x] **U1** — vc18 / 1.8.0 + `changelogs/18.txt` already in place (shared with a11y); `ControlPrefsStore`
   (`externalControlEnabled`, default off) + `controlPrefsDataStore`; `ControlPrefsStoreTest` (+2).
-- [ ] **U2** — exported `ControlReceiver` + 7 core verbs; `AutoBrightnessRuntime.panic`; ledger D-157
-  (D-156 is taken by a11y A0; append the next free row).
+- [x] **U2** — exported `ControlReceiver` (gate = FIRST check) + 7 core verbs; `AutoBrightnessRuntime.panic`;
+  manifest `exported="true"` intent-filter; ledger **D-157**; `ControlReceiverTest` (+6). Glue-review clean.
 - [ ] **U3** — `ProfileApplier` extraction (SettingsViewModelTest unchanged) + profile verbs.
 - [ ] **U4** — Tools "Automation control" toggle + actions-help dialog.
 - [ ] **U5** — outbound `STATE_CHANGED` events (optional, droppable).
@@ -90,6 +90,18 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U2**; D-157): the exported `ControlReceiver`
+  + 7 core verbs. The opt-in gate (`externalControlEnabled`) is the receiver's FIRST check via `goAsync`
+  → `handle` → `route`; while off, every action is dropped before it touches settings/service — pinned by
+  `controlDisabled_ignoresAllActions_D157` (D-147-style negative test). SERVICE_ON/OFF/TOGGLE reuse the
+  `WidgetActionReceiver.toggle` dance parameterized by target state (copied, not shared); PAUSE/RESUME/
+  REAPPLY delegate to `AutoBrightnessRuntime`; new 1-line `AutoBrightnessRuntime.panic` sends the existing
+  `ACTION_PANIC` (same intent as the notification Reset). Manifest registers it `exported="true"` with a
+  7-action intent-filter, no new permission. `ControlReceiverTest` (+6: gate security property, per-verb
+  routing for PAUSE/RESUME/REAPPLY/PANIC, unknown-action no-op; SERVICE_* routing carved out like the
+  widget toggle — WorkManager/DataStore-singleton). Ledger **D-157**. `:app`-only; domain/platform
+  untouched. **Glue-review clean** (mandatory U2 unit): gate-first + genuine, exported exposure gated by
+  default-OFF flag, verbs reuse hardened paths, atomic `updateData`, `goAsync` finishes in `finally`.
 - 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U1**; D-157): the opt-in gate storage for the
   external intent-control surface. New `control/ControlPrefsStore` (`externalControlEnabled`, default OFF —
   D-105 opt-in pattern) + `controlPrefsDataStore` (own prefs store, NOT an `AabSettings` field so profile

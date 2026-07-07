@@ -121,6 +121,25 @@
             android:name=".app.widget.WidgetActionReceiver"
             android:exported="false" />
 
+        <!-- D-157: the external intent-control surface for automation frameworks (Tasker / MacroDroid).
+             Deliberately EXPORTED (this is the whole point — third-party automation apps send these),
+             re-opening the class D-147 closed. Made safe NOT by a permission/secret but by an opt-in
+             runtime gate (ControlPrefsStore.externalControlEnabled, default OFF, the receiver's first
+             check): while off, ControlReceiver ignores every action. No new manifest permission. -->
+        <receiver
+            android:name=".app.control.ControlReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.tideo.autobrightness.control.SERVICE_ON" />
+                <action android:name="com.tideo.autobrightness.control.SERVICE_OFF" />
+                <action android:name="com.tideo.autobrightness.control.SERVICE_TOGGLE" />
+                <action android:name="com.tideo.autobrightness.control.PAUSE" />
+                <action android:name="com.tideo.autobrightness.control.RESUME" />
+                <action android:name="com.tideo.autobrightness.control.REAPPLY" />
+                <action android:name="com.tideo.autobrightness.control.PANIC" />
+            </intent-filter>
+        </receiver>
+
 
         <!-- Opt-in global flash overlay (S12.7e, G2R-F50): draws the AAB debug/context flash
              messages system-wide via an accessibility overlay. Presentation only — no event
