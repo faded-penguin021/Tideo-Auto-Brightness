@@ -23,6 +23,10 @@ val Context.serviceHealthDataStore by preferencesDataStore(name = "service_healt
 // %AAB_Latitude / %AAB_Longitude). Unset = live data (today + current location). S12.7h / G2R-F39.
 val Context.experimentPrefsDataStore by preferencesDataStore(name = "experiment_prefs")
 
+// D-157: opt-in gate for the external intent-control surface (Tasker / MacroDroid). Its OWN store,
+// not an AabSettings field, so profile apply/import chokepoints can never flip it. Default off.
+val Context.controlPrefsDataStore by preferencesDataStore(name = "control_prefs")
+
 // Measured power-draw dataset (task524 _CalibratePowerDraw, %AAB_HTML_Graph8 / %data). Persisted so the
 // Tools PowerDrawChart survives restarts; overwritten on recalibration. S14.
 val Context.powerDrawDataStore by preferencesDataStore(name = "power_draw")

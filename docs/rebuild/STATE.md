@@ -60,7 +60,8 @@ both command and observe the app. `:app`-only; **`:domain`/`:platform`/goldens u
 ends shippable: ladder green → this checklist ticked → commit → push (glue-review on U2/U3/U5).
 
 - [x] **U0** — sync branch onto `origin/main`; persist plan; STATE Active-work + "Current state" fix.
-- [ ] **U1** — vc18 / 1.8.0 bump + `changelogs/18.txt`; `ControlPrefsStore` (opt-in flag, default off).
+- [x] **U1** — vc18 / 1.8.0 + `changelogs/18.txt` already in place (shared with a11y); `ControlPrefsStore`
+  (`externalControlEnabled`, default off) + `controlPrefsDataStore`; `ControlPrefsStoreTest` (+2).
 - [ ] **U2** — exported `ControlReceiver` + 7 core verbs; `AutoBrightnessRuntime.panic`; ledger D-157
   (D-156 is taken by a11y A0; append the next free row).
 - [ ] **U3** — `ProfileApplier` extraction (SettingsViewModelTest unchanged) + profile verbs.
@@ -89,6 +90,12 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U1**; D-157): the opt-in gate storage for the
+  external intent-control surface. New `control/ControlPrefsStore` (`externalControlEnabled`, default OFF —
+  D-105 opt-in pattern) + `controlPrefsDataStore` (own prefs store, NOT an `AabSettings` field so profile
+  apply/import can never flip it). vc18/1.8.0 + `18.txt` already in place from the shared a11y work (both
+  fold into this release), so no bump needed. `ControlPrefsStoreTest` (+2: `defaultsToDisabled`,
+  `enableRoundTrips`). No receiver yet (U2). `:app`-only; domain/platform untouched. Glue-review: N/A (U1).
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **C1** — last unit, closes the plan; **D-158**):
   local crash-log capture. New `AabApplication` installs a default uncaught-exception handler that writes
   a timestamped trace to `filesDir/crash` (5-newest ring) then **always delegates** to the previous
