@@ -51,7 +51,7 @@ allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
 - [x] **A1** — remaining shared components (toggleables labeled; KeyValueRow merged; flash liveRegion)
 - [x] **A2** — canvas graphs get text alternatives (8 graphs get a11y_graph_* CDs; pager arrows/dots labeled)
 - [x] **A3** — Dashboard, Menu, Onboarding (audit already green via shared components; banner liveRegions added)
-- [ ] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming)
+- [x] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming; audit green via A0 primitives; section headings)
 - [ ] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug)
 - [ ] **A6** — profiles/contexts + info screens (+ rule-editor dialogs)
 - [ ] **A7** — touch targets + DEVICE_TEST_SCRIPT owner TalkBack checklist
@@ -101,6 +101,13 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A4**, D-156): the group-1 settings screens
+  (Curve & Brightness / Reactivity / Circadian / Super Dimming) rendered under the `SemanticsAudit`
+  gate — audit already green (every control is an A0-labeled slider/switch or a text-carrying button:
+  Apply/Discard/Reset bar, the back arrow's `a11y_back` CD, grant link, date/location buttons), so no
+  screen-local label fixes were needed. `SettingsScreensA11yTest` (+8: per-screen audit incl. Super
+  Dimming at BASIC and ELEVATED tier, + section-header `heading()` assertions per screen). No prod-code
+  change; no new `18.txt` note (A0's "part 1 … further screens" covers it). Glue-review: N/A (test-only).
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A3**, D-156): Dashboard/Menu/Onboarding
   rendered under the `SemanticsAudit` gate — audit already green (every interactive node inherits a
   text label from the A0/A1 shared components: labeled switches, text-carrying nav rows/cards/buttons,
