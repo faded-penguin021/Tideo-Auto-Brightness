@@ -29,6 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -209,7 +212,9 @@ private fun CircadianStaleHint(status: CircadianLocationStatus) {
         stringResource(R.string.dashboard_circadian_no_location)
     }
     Card(
-        modifier = Modifier.fillMaxWidth().testTag("circadian_stale_hint"),
+        // D-156 (A3): dynamic banner — a polite liveRegion so TalkBack announces it when it appears/changes.
+        modifier = Modifier.fillMaxWidth().testTag("circadian_stale_hint")
+            .semantics { liveRegion = LiveRegionMode.Polite },
         colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
     ) {
         Text(text, modifier = Modifier.padding(Dimens.cardPadding), style = MaterialTheme.typography.bodyMedium)
@@ -220,7 +225,9 @@ private fun CircadianStaleHint(status: CircadianLocationStatus) {
 @Composable
 private fun StaleBanner() {
     Card(
-        modifier = Modifier.fillMaxWidth().testTag("stale_banner"),
+        // D-156 (A3): dynamic banner — a polite liveRegion so TalkBack announces it when it appears/changes.
+        modifier = Modifier.fillMaxWidth().testTag("stale_banner")
+            .semantics { liveRegion = LiveRegionMode.Polite },
         colors = CardDefaults.cardColors(
             containerColor = AabGold,
             contentColor = AabOnGold,
@@ -255,7 +262,10 @@ private fun TierBadge(tier: Tier, onClick: () -> Unit) {
 @Composable
 private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().testTag("override_card"),
+        // D-156 (A3): dynamic Resume-after-override banner — a polite liveRegion so TalkBack announces
+        // it when the engine pauses itself and the Resume affordance appears.
+        modifier = Modifier.fillMaxWidth().testTag("override_card")
+            .semantics { liveRegion = LiveRegionMode.Polite },
         colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
     ) {
         Column(

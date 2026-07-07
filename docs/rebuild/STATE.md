@@ -50,7 +50,7 @@ allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
 - [x] **A0** — settings primitives + `SemanticsAudit` gate + version bump (D-156)
 - [x] **A1** — remaining shared components (toggleables labeled; KeyValueRow merged; flash liveRegion)
 - [x] **A2** — canvas graphs get text alternatives (8 graphs get a11y_graph_* CDs; pager arrows/dots labeled)
-- [ ] **A3** — Dashboard, Menu, Onboarding (+ banner liveRegions)
+- [x] **A3** — Dashboard, Menu, Onboarding (audit already green via shared components; banner liveRegions added)
 - [ ] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming)
 - [ ] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug)
 - [ ] **A6** — profiles/contexts + info screens (+ rule-editor dialogs)
@@ -101,6 +101,14 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A3**, D-156): Dashboard/Menu/Onboarding
+  rendered under the `SemanticsAudit` gate — audit already green (every interactive node inherits a
+  text label from the A0/A1 shared components: labeled switches, text-carrying nav rows/cards/buttons,
+  heading section headers), so no label fixes were needed. Dashboard's three dynamic amber banners
+  (`StaleBanner`/`OverrideCard`/`CircadianStaleHint`) gain `liveRegion = LiveRegionMode.Polite` on the
+  banner container so TalkBack announces them when they appear/change. `ScreensA11yTest` (+8: per-screen
+  audit — each screen seeded so every conditional surface renders — + the 3 banner liveRegion assertions).
+  No new `18.txt` note (A0's "part 1 … further screens" covers it). Glue-review: N/A (UI/semantics only).
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A2**, D-156): text alternatives for the
   Canvas graphs (invisible to TalkBack). `ChartCanvas` gains a generic `contentDescription` param
   applied to the Canvas draw node; all eight graphs (brightness curve, dimming, reactivity, alpha,
