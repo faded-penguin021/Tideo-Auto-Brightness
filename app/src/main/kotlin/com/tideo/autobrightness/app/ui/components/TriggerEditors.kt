@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.settings.ContextTriggers
@@ -76,7 +78,11 @@ fun TriggerSection(
             Switch(
                 checked = enabled,
                 onCheckedChange = onEnabledChange,
-                modifier = Modifier.testTag("trigger_toggle_$key"),
+                // D-156: the trigger [title] is a sibling Text, so the switch node itself announces
+                // nothing to TalkBack — label it. Deliberately NOT a toggleable row (that would move
+                // the tap target and break the `trigger_toggle_$key` performClick contract).
+                modifier = Modifier.testTag("trigger_toggle_$key")
+                    .semantics { contentDescription = title },
             )
         }
         if (enabled) {
@@ -227,7 +233,10 @@ fun AppPickerList(
                 Checkbox(
                     checked = entry.packageName in selected,
                     onCheckedChange = { checked -> onToggle(entry.packageName, checked) },
-                    modifier = Modifier.testTag("app_check_${entry.packageName}"),
+                    // D-156: the app [label] is a sibling Text — name the checkbox so TalkBack reads
+                    // "<app>, checkbox" instead of an anonymous checkbox.
+                    modifier = Modifier.testTag("app_check_${entry.packageName}")
+                        .semantics { contentDescription = entry.label },
                 )
                 Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
                     entry.icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(28.dp)) }

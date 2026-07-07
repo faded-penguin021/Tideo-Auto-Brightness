@@ -256,6 +256,8 @@
     <string name="a11y_back">Back</string>
     <!-- D-156: TalkBack label for the per-field ⓘ help button; %1$s is the field's label. -->
     <string name="a11y_help_for">Help: %1$s</string>
+    <!-- D-156: TalkBack label for the Dashboard master service on/off switch (no adjacent text). -->
+    <string name="a11y_service_toggle">Auto brightness service</string>
     <string name="action_ok">OK</string>
     <string name="action_apply">Apply</string>
     <string name="action_applied">Applied</string>

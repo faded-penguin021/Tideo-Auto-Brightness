@@ -48,7 +48,7 @@ sequential units, each checkpointed** ladder-green → STATE line → commit →
 allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
 
 - [x] **A0** — settings primitives + `SemanticsAudit` gate + version bump (D-156)
-- [ ] **A1** — remaining shared components
+- [x] **A1** — remaining shared components (toggleables labeled; KeyValueRow merged; flash liveRegion)
 - [ ] **A2** — canvas graphs get text alternatives
 - [ ] **A3** — Dashboard, Menu, Onboarding (+ banner liveRegions)
 - [ ] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming)
@@ -101,6 +101,13 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A1**, D-156): TalkBack labels for the
+  remaining shared components — the three flagged icon-only toggleables (Dashboard master
+  `service_switch`, `TriggerSection` switch, `AppPickerList` checkboxes) now announce their names;
+  `KeyValueRow` merges key+value into one announcement; the in-app flash pill is a polite liveRegion.
+  Clickable nav rows/cards/buttons already merged their text (audit-verified). `ComponentsA11yTest`
+  (+6, audit gate + per-fix assertions). No new `18.txt` note (A0's "part 1 … further screens" covers
+  it). Glue-review: N/A (UI/semantics only).
 - 2026-07-06 — folds into **1.8.0 / vc18** (A11y backlog **A0**, plan `plans/a11y-diagnostics.md`;
   stacked on the intent-control branch — both features share 1.8.0/vc18):
   **D-156** TalkBack semantics for the S12.5b settings primitives (help-ⓘ named per field,

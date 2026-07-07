@@ -62,7 +62,9 @@ class ComponentLibraryTest {
             }
         }
         compose.onNodeWithTag("kv_lux").assertIsDisplayed()
-        compose.onNodeWithTag("value_kv_lux").assertIsDisplayed()
+        // D-156: KeyValueRow now merges its descendants (label+value = one TalkBack announcement), so
+        // the inner value node is only addressable via the unmerged tree.
+        compose.onNodeWithTag("value_kv_lux", useUnmergedTree = true).assertIsDisplayed()
         // S13c' §05: the key is rendered as a tracked-uppercase instrument caption.
         compose.onNodeWithText("CURRENT LUX").assertExists()
         compose.onNodeWithText("1234").assertExists()

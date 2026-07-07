@@ -18,6 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.app.runtime.AabFlash
 import com.tideo.autobrightness.app.ui.theme.AabTeal
@@ -75,6 +78,10 @@ fun FlashPill(text: String, onDismiss: () -> Unit) {
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 80.dp, start = 24.dp, end = 24.dp)
                 .clickable { onDismiss() }
+                // D-156: the pill is an in-composition overlay (not a system Toast), so mark it a polite
+                // live region — TalkBack announces confirmations ("Applied") when it appears without
+                // stealing focus from the user's current control.
+                .semantics { liveRegion = LiveRegionMode.Polite }
                 .testTag("aab_flash"),
         ) {
             Text(text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
