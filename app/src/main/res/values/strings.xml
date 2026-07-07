@@ -378,6 +378,14 @@
     <string name="tools_diagnostics_desc">If Tideo has crashed, its most recent error report is kept on this device. Copy it to include when reporting a problem — it never leaves your phone on its own.</string>
     <string name="tools_copy_crash_log">Copy latest crash log</string>
     <string name="tools_no_crash_log">No crash reports recorded.</string>
+    <!-- D-157 (U4): the opt-in external intent-control surface (Tasker / MacroDroid). -->
+    <string name="tools_automation_header">Automation control</string>
+    <string name="tools_automation_desc">Let automation apps such as Tasker or MacroDroid turn Tideo on/off, pause, resume, re-apply, reset, or load a profile by sending a broadcast. Off by default — the exposed actions are the same ones your tile, widget, and notification already offer, and nothing leaves the app.</string>
+    <string name="tools_automation_toggle_label">Allow external control</string>
+    <string name="help_tools_automation">When off, Tideo ignores every automation broadcast. Turn it on only if you use Tasker/MacroDroid to control the service. There is no password — any app on the device can send these actions while this is on.</string>
+    <string name="tools_automation_show_actions">Show actions</string>
+    <string name="tools_automation_actions_title">Automation actions</string>
+    <string name="tools_automation_actions_body">Send these broadcast actions (all under com.tideo.autobrightness.control):\n\n• SERVICE_ON / SERVICE_OFF / SERVICE_TOGGLE — start, stop, or flip the service\n• PAUSE / RESUME — hold or release automatic control\n• REAPPLY — recompute brightness now\n• PANIC — reset (same as the notification Reset)\n• LOAD_PROFILE — load a saved profile; pass its name in a string extra called \"name\"\n• CONTEXTS_RESUME — clear a manually loaded profile and hand control back to context rules\n\nExample (adb):\nadb shell am broadcast -a com.tideo.autobrightness.control.LOAD_PROFILE --es name \"Night\" -n com.tideo.autobrightness/.app.control.ControlReceiver\n\nDebug builds use the com.tideo.autobrightness.debug package in the -n component.\n\nFor SERVICE_ON to work reliably when Tideo isn\'t already running, exempt it from battery optimization — Android may otherwise block the service from starting in the background.</string>
 
     <!-- Curve &amp; Brightness -->
     <string name="curve_zones_header">Curve zones</string>

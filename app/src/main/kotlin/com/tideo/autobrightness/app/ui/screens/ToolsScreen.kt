@@ -51,12 +51,14 @@ import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.runtime.PowerDrawCalibrator
 import com.tideo.autobrightness.app.runtime.PowerDrawProgress
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
+import com.tideo.autobrightness.app.state.ControlPrefsViewModel
 import com.tideo.autobrightness.app.state.CurveSuggestionPreview
 import com.tideo.autobrightness.app.state.PowerDrawViewModel
 import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
+import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.graph.PowerDrawChart
@@ -75,8 +77,10 @@ fun ToolsScreen(
     navController: NavHostController,
     vm: SettingsViewModel = viewModel(),
     powerVm: PowerDrawViewModel = viewModel(),
+    controlVm: ControlPrefsViewModel = viewModel(),
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val externalControlEnabled by controlVm.externalControlEnabled.collectAsStateWithLifecycle()
     val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
     val powerSamples by powerVm.samples.collectAsStateWithLifecycle()
     val powerRunning by powerVm.running.collectAsStateWithLifecycle()
@@ -139,6 +143,8 @@ fun ToolsScreen(
         powerProgress = powerProgress?.let { "${it.message} (${it.step}/${it.total})" },
         powerHasData = powerHasData,
         onCalibratePower = { showPrep = true },
+        externalControlEnabled = externalControlEnabled,
+        onSetExternalControlEnabled = controlVm::setExternalControlEnabled,
     )
 
     // task524 entry: the prep dialog (Airplane Mode / close apps / don't touch / unplug) → Start shows
@@ -273,6 +279,8 @@ fun ToolsContent(
     powerHasData: Boolean = false,
     onCalibratePower: () -> Unit = {},
     latestCrashLog: String? = null,
+    externalControlEnabled: Boolean = false,
+    onSetExternalControlEnabled: (Boolean) -> Unit = {},
 ) {
     SettingsScaffold(stringResource(R.string.title_tools), onBack) { padding ->
         SettingsColumn(padding) {
@@ -306,7 +314,60 @@ fun ToolsContent(
             }
 
             DiagnosticsCard(latestCrashLog)
+
+            AutomationControlCard(externalControlEnabled, onSetExternalControlEnabled)
         }
+    }
+}
+
+/**
+ * D-157 (U4): the opt-in external intent-control surface (Tasker / MacroDroid). A Switch bound to
+ * [ControlPrefsStore][com.tideo.autobrightness.app.control.ControlPrefsStore].externalControlEnabled
+ * (default OFF, the D-105 pattern) — while off the exported `ControlReceiver` ignores every action —
+ * plus a "Show actions" dialog listing the public verbs, the `name` extra, an `adb` example, and the
+ * battery-optimization caveat for SERVICE_ON. The verbs reuse the same hardened paths the tile/widget
+ * drive; no data leaves the app.
+ */
+@Composable
+private fun AutomationControlCard(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
+    var showActions by remember { mutableStateOf(false) }
+    AabCard(Modifier.testTag("automation_card")) {
+        SectionHeader(stringResource(R.string.tools_automation_header), divider = true)
+        Text(
+            stringResource(R.string.tools_automation_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SwitchSettingRow(
+            label = stringResource(R.string.tools_automation_toggle_label),
+            checked = enabled,
+            onCheckedChange = onSetEnabled,
+            help = R.string.help_tools_automation,
+            testTag = "automation_toggle",
+        )
+        OutlinedButton(
+            onClick = { showActions = true },
+            modifier = Modifier.fillMaxWidth().testTag("automation_show_actions"),
+        ) { Text(stringResource(R.string.tools_automation_show_actions)) }
+    }
+    if (showActions) {
+        AlertDialog(
+            onDismissRequest = { showActions = false },
+            title = { Text(stringResource(R.string.tools_automation_actions_title)) },
+            text = {
+                Text(
+                    stringResource(R.string.tools_automation_actions_body),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showActions = false },
+                    modifier = Modifier.testTag("automation_actions_close"),
+                ) { Text(stringResource(R.string.action_ok)) }
+            },
+            modifier = Modifier.testTag("automation_actions_dialog"),
+        )
     }
 }
 

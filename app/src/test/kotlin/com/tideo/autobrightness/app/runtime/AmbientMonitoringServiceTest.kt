@@ -1,8 +1,12 @@
 package com.tideo.autobrightness.app.runtime
 
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.os.Looper
+import androidx.test.core.app.ApplicationProvider
+import com.tideo.autobrightness.app.storage.settingsDataStore
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -124,8 +128,17 @@ class AmbientMonitoringServiceTest {
 
     // The positive path must survive the D-140 gate: once START has run the pipeline (serviceOn=true,
     // set synchronously by controller.start()), PAUSE and REAPPLY act on it and keep the service up.
+    //
+    // ACTION_START falls into the service's `else` branch, whose D-140 START_STICKY defense fires a
+    // `scope.launch { if (!serviceEnabled) disableAndStop() }` on Dispatchers.Default (a background
+    // thread). With the DataStore left at its default `serviceEnabled=false` that guard could tear the
+    // service down mid-test, nondeterministically — a real race, not a test artifact. Seed
+    // `serviceEnabled=true` first (exactly what every explicit starter does in production, per the
+    // branch's own comment) so the guard is a no-op regardless of thread timing.
     @Test
     fun pauseAndReapply_whilePipelineRunning_keepTheServiceUp() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
         val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
         try {
             val service = controller.get()

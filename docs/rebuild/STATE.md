@@ -66,9 +66,12 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
   manifest `exported="true"` intent-filter; ledger **D-157**; `ControlReceiverTest` (+6). Glue-review clean.
 - [x] **U3** — VM-free `ProfileApplier` (bodies moved verbatim; `SettingsViewModelTest` UNMODIFIED, green) +
   receiver `LOAD_PROFILE`/`CONTEXTS_RESUME`; `ProfileApplierTest` (+3), receiver profile cases (+3). Glue-review clean.
-- [ ] **U4** — Tools "Automation control" toggle + actions-help dialog.
+- [x] **U4** — Tools "Automation control" card: opt-in `ControlPrefsViewModel` toggle (wired like geo-IP)
+  + "Show actions" verb-list dialog; all strings in `strings.xml` (ratchet 0); `ToolsAutomationControlTest`
+  (+4); `screen_map.md` updated.
 - [ ] **U5** — outbound `STATE_CHANGED` events (optional, droppable).
-- [ ] **U6** — README/DEVICE_TEST §12/datastore_map docs; delete plan file; final STATE compression.
+- [ ] **U6** — `docs/AUTOMATION.md` ref doc (exposed action surface) **linked from `README.md`** (owner ask,
+  U4 session — plan amended); DEVICE_TEST §12/datastore_map docs; delete plan file; final STATE compression.
 
 ## Decided non-items (don't re-litigate without new evidence)
 
@@ -91,6 +94,24 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — test-only (owner-flagged flake, U4 session): `AmbientMonitoringServiceTest`.`pauseAndReapply_
+  whilePipelineRunning_keepTheServiceUp` was nondeterministic — `ACTION_START` takes the `else` branch whose
+  D-140 START_STICKY defense fires `scope.launch { if (!serviceEnabled) disableAndStop() }` on
+  `Dispatchers.Default`, and the DataStore's default `serviceEnabled=false` let that background guard tear the
+  service down mid-test. Seed `serviceEnabled=true` before START (what every explicit starter does in
+  production) so the guard is a no-op regardless of thread timing. Verified green ×3 `--rerun-tasks`. No prod
+  code change.
+- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U4**; D-157): the Tools "Automation control"
+  card — the opt-in external-control surface's UI. New `state/ControlPrefsViewModel` (mirrors the geo-IP
+  `CircadianExtrasViewModel` wiring: `StateFlow` + `viewModelScope` setter over `ControlPrefsStore`,
+  default OFF) drives a `SwitchSettingRow` (help text warns "no password — any app can send these while
+  on") plus a "Show actions" `AlertDialog` listing every `com.tideo.autobrightness.control.*` verb, the
+  `name` extra, an `adb` example, and the SERVICE_ON battery-optimization caveat. All strings via
+  `strings.xml` (`HardcodedStringCheckTest` ratchet stays 0). `ToolsAutomationControlTest` (+4: switch
+  reflects/drives the store, dialog open/close, a11y-labeled). `screen_map.md` Tools row updated.
+  `:app`-only; domain/platform untouched. Owner asks this session (deferred to U6, plan+ledger amended):
+  a `docs/AUTOMATION.md` reference doc for the exposed action surface, linked from `README.md`.
+  Plan-file `D-156`→`D-157` typo corrected. Glue-review: N/A (UI/VM only; no runtime glue).
 - 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U3**; D-157): VM-free `settings/ProfileApplier`
   with the `applyProfile`/`resumeContextAutomation` bodies moved out of `SettingsViewModel` verbatim (the VM
   now delegates via `viewModelScope.launch`); `SettingsViewModelTest` passes **UNMODIFIED** — the equivalence

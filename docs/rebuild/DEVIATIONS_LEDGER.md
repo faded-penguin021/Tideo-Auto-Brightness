@@ -2824,7 +2824,10 @@ the permanent registry — never compress or remove them.
   playbook-5 persisted pattern): U1 pref store + `ControlPrefsStoreTest`; U2 `ControlReceiver` + 7
   core verbs + `panic`, manifest `exported="true"` intent-filter, `ControlReceiverTest` (gate + per-
   verb routing + unknown-action), glue-review; U3 `ProfileApplier` extraction + profile verbs; U4
-  Tools toggle + actions-help dialog; U5 outbound events; U6 docs + plan retirement.
+  Tools "Automation control" card — opt-in `ControlPrefsViewModel` toggle + a "Show actions" verb-list
+  help dialog (all strings via `strings.xml`, ratchet 0); U5 outbound events; U6 docs (a dedicated
+  user-facing `docs/AUTOMATION.md` reference for the exposed action surface, linked from `README.md`)
+  + plan retirement.
 
 - **D-158: local crash-log capture (a11y-diagnostics unit C1 — the last unit; deletes the plan
   file. `D-157` reserved by the parallel intent-control branch, so C1 minted the next free row).**

@@ -691,7 +691,9 @@ Routed screens (`AppRoute` → `ui/screens/*.kt`):
   "Dynamic Scale"** (S12.6a, G2R-F4): day/night curve scaling + location staleness hints (D-110).
 - **Misc** → `MiscScreen.kt` — brightness range + animation (both as sliders) + notifications (G2-F2).
 - **Tools** → `ToolsScreen.kt` (+ `PowerDrawChart`) — curve-suggestion wizard (`CurveSuggestionEngine`)
-  + power-draw calibration.
+  + power-draw calibration + Diagnostics (D-158 crash-log copy) + **Automation control** (D-157 U4:
+  opt-in `ControlPrefsViewModel` toggle for the exported `ControlReceiver` + a "Show actions" verb-list
+  dialog — Tasker/MacroDroid intent surface, default OFF).
 - **Live Debug** → `LiveDebugScreen.kt` — the 10 named `%AAB_Debug` categories (D-023) + panic
   sensitivity slider (D-116); the debug-category selector lives here now (S12.6b, G2R-F9).
 - **Profiles & Contexts** → `ProfilesContextsScreen.kt` — **merged Profiles + Contexts** (S12.9f, D-070):
