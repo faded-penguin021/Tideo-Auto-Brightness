@@ -46,6 +46,7 @@ fun CircadianScaleChart(
         yAxisLabel = stringResource(R.string.chart_scale_x),
         xTickFormatter = ::hourToHhmm,
         interactive = true, // scrub readout (owner: charts must stay interactive)
+        contentDescription = stringResource(R.string.a11y_graph_circadian_scale),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

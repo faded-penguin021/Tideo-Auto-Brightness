@@ -49,7 +49,7 @@ allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
 
 - [x] **A0** — settings primitives + `SemanticsAudit` gate + version bump (D-156)
 - [x] **A1** — remaining shared components (toggleables labeled; KeyValueRow merged; flash liveRegion)
-- [ ] **A2** — canvas graphs get text alternatives
+- [x] **A2** — canvas graphs get text alternatives (8 graphs get a11y_graph_* CDs; pager arrows/dots labeled)
 - [ ] **A3** — Dashboard, Menu, Onboarding (+ banner liveRegions)
 - [ ] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming)
 - [ ] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug)
@@ -101,6 +101,14 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A2**, D-156): text alternatives for the
+  Canvas graphs (invisible to TalkBack). `ChartCanvas` gains a generic `contentDescription` param
+  applied to the Canvas draw node; all eight graphs (brightness curve, dimming, reactivity, alpha,
+  circadian dimming/scaling, taper, power draw) pass a one-sentence `a11y_graph_*` summary naming the
+  graph + key params. The audit gate also flagged `GraphScaffold`'s pager page-dots as unlabeled
+  clickables — fixed ("Go to chart N"), and the ‹ › arrow labels moved off hardcoded English to
+  `a11y_chart_prev`/`_next`. `GraphsA11yTest` (+9: per-graph CD assertion + pager arrows/dots + audit).
+  No new `18.txt` note (A0's "part 1 … further screens" covers it). Glue-review: N/A (UI/semantics only).
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A1**, D-156): TalkBack labels for the
   remaining shared components — the three flagged icon-only toggleables (Dashboard master
   `service_switch`, `TriggerSection` switch, `AppPickerList` checkboxes) now announce their names;

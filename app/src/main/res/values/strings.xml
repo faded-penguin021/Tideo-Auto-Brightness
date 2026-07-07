@@ -244,6 +244,22 @@
     <string name="chart_power_w">Power (W)</string>
     <string name="chart_current_ma">Current (mA)</string>
     <string name="chart_power_empty">No power-draw data yet — run the calibration to measure it.</string>
+    <!-- A2 (D-156): TalkBack text alternatives for the Canvas graphs (invisible to TalkBack). One
+         sentence naming the graph + its key parameters; the numbers already shown in the screen's
+         fields are not repeated. -->
+    <string name="a11y_graph_brightness_curve">Brightness curve graph: maps ambient light to screen brightness from %1$d to %2$d.</string>
+    <string name="a11y_graph_dimming">Super dimming graph: dimming ramps up as brightness falls below %1$d, reaching %2$d percent strength.</string>
+    <string name="a11y_graph_reactivity">Reactivity graph: the light-change percentage needed to trigger a brightness update, across the light range.</string>
+    <string name="a11y_graph_alpha">Smoothing response graph: how strongly brightness reacts to a relative change in light.</string>
+    <string name="a11y_graph_circadian_dimming">Circadian dimming graph: the night-time dimming multiplier across the day, peaking overnight.</string>
+    <string name="a11y_graph_circadian_scale">Circadian scaling graph: the daytime brightness-boost multiplier across the day, peaking around midday.</string>
+    <string name="a11y_graph_taper">Taper graph: how the day and night scaling taper toward no change at the brightness extremes.</string>
+    <string name="a11y_graph_power">Power draw graph: measured screen power and current across brightness levels.</string>
+    <!-- A2 (D-156): TalkBack labels for the chart pager's tap-to-step arrows (GraphScaffold). -->
+    <string name="a11y_chart_prev">Previous chart</string>
+    <string name="a11y_chart_next">Next chart</string>
+    <!-- A2 (D-156): TalkBack label for a chart-pager page dot; %1$d is the 1-based chart number. -->
+    <string name="a11y_chart_go_to">Go to chart %1$d</string>
     <string-array name="circadian_event_labels">
         <item>Dawn</item>
         <item>Sunrise</item>

@@ -58,6 +58,7 @@ fun PowerDrawChart(
         yAxisLabel = stringResource(R.string.chart_power_w),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
+        contentDescription = stringResource(R.string.a11y_graph_power),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

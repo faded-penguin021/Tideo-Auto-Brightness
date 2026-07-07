@@ -84,6 +84,7 @@ fun DimmingChart(
         yAxisLabel = stringResource(R.string.chart_dim_pct),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
+        contentDescription = stringResource(R.string.a11y_graph_dimming, dimmingThreshold, dimmingStrength),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

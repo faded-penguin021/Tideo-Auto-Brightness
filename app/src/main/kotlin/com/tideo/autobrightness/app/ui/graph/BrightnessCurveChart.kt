@@ -98,6 +98,7 @@ fun BrightnessCurveChart(
         yAxisLabel = stringResource(R.string.chart_brightness),
         showLegend = true,
         interactive = true,
+        contentDescription = stringResource(R.string.a11y_graph_brightness_curve, curve.minBrightness, curve.maxBrightness),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

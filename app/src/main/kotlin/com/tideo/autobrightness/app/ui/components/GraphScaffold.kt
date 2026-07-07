@@ -29,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import com.tideo.autobrightness.R
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -67,7 +69,7 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (multi) {
-                PagerArrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous chart", "chart_pager_prev") {
+                PagerArrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(R.string.a11y_chart_prev), "chart_pager_prev") {
                     val target = (pagerState.currentPage - 1 + slots.size) % slots.size
                     scope.launch { pagerState.animateScrollToPage(target) }
                 }
@@ -80,7 +82,7 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
                 textAlign = TextAlign.Center,
             )
             if (multi) {
-                PagerArrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next chart", "chart_pager_next") {
+                PagerArrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(R.string.a11y_chart_next), "chart_pager_next") {
                     val target = (pagerState.currentPage + 1) % slots.size
                     scope.launch { pagerState.animateScrollToPage(target) }
                 }
@@ -98,6 +100,9 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
             ) {
                 slots.indices.forEach { i ->
                     val selected = i == pagerState.currentPage
+                    // A2 (D-156): the page dots are clickable but glyph-less — label each so TalkBack
+                    // announces which chart it jumps to (the audit gate flags an unlabeled clickable).
+                    val dotLabel = stringResource(R.string.a11y_chart_go_to, i + 1)
                     Surface(
                         shape = CircleShape,
                         color = if (selected) MaterialTheme.colorScheme.primary
@@ -106,6 +111,7 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
                             .padding(horizontal = 3.dp)
                             .size(if (selected) 10.dp else 8.dp)
                             .clickable { scope.launch { pagerState.animateScrollToPage(i) } }
+                            .semantics { contentDescription = dotLabel }
                             .testTag("chart_pager_dot_$i"),
                     ) {}
                 }

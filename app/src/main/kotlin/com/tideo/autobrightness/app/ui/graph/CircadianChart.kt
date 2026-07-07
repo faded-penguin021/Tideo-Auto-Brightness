@@ -128,6 +128,7 @@ fun CircadianDimmingChart(
         yAxisLabel = stringResource(R.string.chart_dim_x),
         xTickFormatter = ::hourToHhmm,
         interactive = true, // scrub readout (owner: charts must stay interactive)
+        contentDescription = stringResource(R.string.a11y_graph_circadian_dimming),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
