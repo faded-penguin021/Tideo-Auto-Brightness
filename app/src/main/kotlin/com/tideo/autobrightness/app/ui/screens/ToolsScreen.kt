@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -330,11 +332,14 @@ private fun WizardCard(
                 stringResource(R.string.tools_inertia, "%.3f".format(tau)),
                 style = MaterialTheme.typography.bodySmall,
             )
+            // D-156: the τ label above is a sibling Text, so it does not merge onto the Slider node;
+            // give the slider its own contentDescription for TalkBack.
+            val tauLabel = stringResource(R.string.a11y_wizard_tau)
             Slider(
                 value = tau,
                 onValueChange = { tau = it },
                 valueRange = 0.001f..5f,
-                modifier = Modifier.testTag("wizard_tau"),
+                modifier = Modifier.testTag("wizard_tau").semantics { contentDescription = tauLabel },
             )
             OutlinedButton(
                 onClick = {

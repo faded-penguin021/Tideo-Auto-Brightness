@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -326,6 +328,9 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
             else stringResource(R.string.pd_night_light_temp_default),
             style = MaterialTheme.typography.bodyLarge,
         )
+        // D-156: the Kelvin label above is a sibling Text (does not merge onto the Slider node), so
+        // the slider carries its own contentDescription for TalkBack.
+        val tempLabel = stringResource(R.string.a11y_night_light_temp)
         Slider(
             value = drag ?: (kelvin ?: AOSP_NIGHT_LIGHT_DEFAULT_K).toFloat(),
             onValueChange = { drag = it },
@@ -334,7 +339,8 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
                 drag = null
             },
             valueRange = AOSP_NIGHT_LIGHT_MIN_K.toFloat()..AOSP_NIGHT_LIGHT_MAX_K.toFloat(),
-            modifier = Modifier.fillMaxWidth().testTag("slider_nightLightTemp"),
+            modifier = Modifier.fillMaxWidth().testTag("slider_nightLightTemp")
+                .semantics { contentDescription = tempLabel },
         )
         Text(
             stringResource(R.string.pd_night_light_temp_hint),

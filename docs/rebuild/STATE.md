@@ -52,7 +52,7 @@ allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
 - [x] **A2** — canvas graphs get text alternatives (8 graphs get a11y_graph_* CDs; pager arrows/dots labeled)
 - [x] **A3** — Dashboard, Menu, Onboarding (audit already green via shared components; banner liveRegions added)
 - [x] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming; audit green via A0 primitives; section headings)
-- [ ] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug)
+- [x] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug; 3 raw-Slider CDs added)
 - [ ] **A6** — profiles/contexts + info screens (+ rule-editor dialogs)
 - [ ] **A7** — touch targets + DEVICE_TEST_SCRIPT owner TalkBack checklist
 - [ ] **C1** — local crash-log capture (optional; the ONLY glue unit — glue-review mandatory)
@@ -101,6 +101,15 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A5**, D-156): the group-2 settings screens
+  (Misc / Tools / Privileged Display / Live Debug) rendered under the `SemanticsAudit` gate. The audit
+  flagged one RAW M3 `Slider` on each of Tools (wizard τ), Privileged Display (night-light temperature)
+  and Live Debug (panic sensitivity) — their visible label is a sibling `Text` that never merges onto
+  the slider node — so each got its own `a11y_*` contentDescription (3 new strings; Misc uses only A0
+  primitives, clean). `SettingsScreensGroup2A11yTest` (+11: per-screen audit incl. Privileged Display
+  at BASIC grant-card and ELEVATED+HDR, section-header `heading()` assertions, targeted CD assertions
+  for the three sliders). No `18.txt` change (A0's blanket a11y note covers it). Glue-review: N/A (UI
+  semantics-only; no runtime glue).
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A4**, D-156): the group-1 settings screens
   (Curve & Brightness / Reactivity / Circadian / Super Dimming) rendered under the `SemanticsAudit`
   gate — audit already green (every control is an A0-labeled slider/switch or a text-carrying button:

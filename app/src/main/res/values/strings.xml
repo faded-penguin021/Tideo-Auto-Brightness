@@ -274,6 +274,12 @@
     <string name="a11y_help_for">Help: %1$s</string>
     <!-- D-156: TalkBack label for the Dashboard master service on/off switch (no adjacent text). -->
     <string name="a11y_service_toggle">Auto brightness service</string>
+    <!-- A5 (D-156): TalkBack labels for the group-2 screens' raw M3 sliders (Tools wizard τ, the
+         Privileged-Display night-light temperature, the Live-Debug panic sensitivity) — each has a
+         visible label Text that is a sibling and so does not merge onto the Slider node. -->
+    <string name="a11y_wizard_tau">Curve fit inertia</string>
+    <string name="a11y_night_light_temp">Night light color temperature</string>
+    <string name="a11y_panic_sensitivity">Panic gesture sensitivity</string>
     <string name="action_ok">OK</string>
     <string name="action_apply">Apply</string>
     <string name="action_applied">Applied</string>
