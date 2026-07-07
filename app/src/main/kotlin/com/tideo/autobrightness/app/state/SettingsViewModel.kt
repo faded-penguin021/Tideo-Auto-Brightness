@@ -5,10 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
-import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.FieldError
+import com.tideo.autobrightness.app.settings.ProfileApplier
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.settings.UserProfileStore
@@ -38,6 +38,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val appModule = AppModule(application)
     private val privilegeManager: PrivilegeManager = appModule.privilegeManager
     private val userProfiles: UserProfileStore = appModule.userProfileStore
+
+    /** VM-free profile-load/context-resume logic, shared verbatim with the external control receiver
+     *  (D-157 U3). The ViewModel just wraps these in [viewModelScope]. */
+    private val profileApplier = ProfileApplier(application, userProfiles)
 
     init {
         // Seed the five built-in profiles once so the Profiles screen + context catalog see them.
@@ -90,34 +94,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * Apply a saved named profile (the [UserProfileStore] set; built-ins are seeded into it). The live
-     * service-enabled flag plus the GLOBAL preferences `detectOverrides` and `debugLevel` are preserved:
-     * neither is part of the task626 profile snapshot, so loading a profile must not turn manual-override
-     * detection off (G2-F8) nor change the selected debug category (G2R-F9).
-     *
-     * A manual profile load also latches the **manual context lock** `%AAB_ContextOverride=true`
-     * (G2R-F30, D-014/D-038a) so the context watchers stop overriding the user's deliberate choice; the
-     * Profiles screen surfaces a "Resume" affordance ([resumeContextAutomation]) to clear it.
-     */
+    /** Apply a saved named profile — delegates to [ProfileApplier.applyProfile] (D-157 U3), the same
+     *  path the external control receiver's `LOAD_PROFILE` drives. */
     fun applyProfile(name: String) {
-        viewModelScope.launch {
-            val profile = userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return@launch
-            val updated = app.settingsDataStore.updateData { current ->
-                profile.copy(
-                    serviceEnabled = current.serviceEnabled,
-                    detectOverrides = current.detectOverrides,
-                    debugLevel = current.debugLevel,
-                    panicSensitivity = current.panicSensitivity,
-                    contextOverride = true, // latch the manual context lock (G2R-F30)
-                )
-            }
-            // Surface the loaded profile on the Dashboard (LiveRuntimeState, in-memory bridge).
-            LiveRuntimeState.setActiveProfile(name)
-            // task592/626 apply re-runs Advanced Auto Brightness so the new curve takes effect
-            // immediately, not at the next sensor tick (G2-F16).
-            if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
-        }
+        viewModelScope.launch { profileApplier.applyProfile(name) }
     }
 
     fun replaceAll(newSettings: AabSettings) {
@@ -170,15 +150,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { userProfiles.restoreFactory() }
     }
 
-    /**
-     * Clear the manual context lock latched by [applyProfile] and re-evaluate so the context watchers
-     * resume overriding (G2R-F30). Mirrors Tasker clearing %AAB_ContextOverride.
-     */
+    /** Clear the manual context lock latched by [applyProfile] — delegates to
+     *  [ProfileApplier.resumeContextAutomation] (D-157 U3), shared with the receiver's `CONTEXTS_RESUME`. */
     fun resumeContextAutomation() {
-        viewModelScope.launch {
-            val updated = app.settingsDataStore.updateData { it.copy(contextOverride = false) }
-            if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
-        }
+        viewModelScope.launch { profileApplier.resumeContextAutomation() }
     }
 }
 

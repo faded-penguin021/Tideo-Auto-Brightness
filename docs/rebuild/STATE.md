@@ -64,7 +64,8 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
   (`externalControlEnabled`, default off) + `controlPrefsDataStore`; `ControlPrefsStoreTest` (+2).
 - [x] **U2** — exported `ControlReceiver` (gate = FIRST check) + 7 core verbs; `AutoBrightnessRuntime.panic`;
   manifest `exported="true"` intent-filter; ledger **D-157**; `ControlReceiverTest` (+6). Glue-review clean.
-- [ ] **U3** — `ProfileApplier` extraction (SettingsViewModelTest unchanged) + profile verbs.
+- [x] **U3** — VM-free `ProfileApplier` (bodies moved verbatim; `SettingsViewModelTest` UNMODIFIED, green) +
+  receiver `LOAD_PROFILE`/`CONTEXTS_RESUME`; `ProfileApplierTest` (+3), receiver profile cases (+3). Glue-review clean.
 - [ ] **U4** — Tools "Automation control" toggle + actions-help dialog.
 - [ ] **U5** — outbound `STATE_CHANGED` events (optional, droppable).
 - [ ] **U6** — README/DEVICE_TEST §12/datastore_map docs; delete plan file; final STATE compression.
@@ -90,6 +91,16 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U3**; D-157): VM-free `settings/ProfileApplier`
+  with the `applyProfile`/`resumeContextAutomation` bodies moved out of `SettingsViewModel` verbatim (the VM
+  now delegates via `viewModelScope.launch`); `SettingsViewModelTest` passes **UNMODIFIED** — the equivalence
+  check. `ControlReceiver` gains `LOAD_PROFILE` (String extra `name`, read in `onReceive`; missing name is a
+  double-guarded no-op) + `CONTEXTS_RESUME`, both driving the shared applier built from the same
+  `AppModule.userProfileStore` the UI uses (no duplicated logic). Manifest filter +2 actions. `ProfileApplierTest`
+  (+3: apply-latches-lock-preserving-globals, unknown-name no-op, resume-clears-lock) and receiver profile cases
+  (+3, incl. no-name no-op; disabled-loop now covers the 2 new verbs). Removed the VM's now-unused `LiveRuntimeState`
+  import. `:app`-only; domain/platform untouched. **Glue-review clean**: verbatim extraction, app-context parity,
+  gate-still-first, single wiring source.
 - 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U2**; D-157): the exported `ControlReceiver`
   + 7 core verbs. The opt-in gate (`externalControlEnabled`) is the receiver's FIRST check via `goAsync`
   → `handle` → `route`; while off, every action is dropped before it touches settings/service — pinned by

@@ -3,8 +3,10 @@ package com.tideo.autobrightness.app.control
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.runtime.goAsync
+import com.tideo.autobrightness.app.settings.ProfileApplier
 import com.tideo.autobrightness.app.storage.controlPrefsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
@@ -32,22 +34,25 @@ class ControlReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        // Read the LOAD_PROFILE extra here (the intent is not passed further); a missing/blank name
+        // makes LOAD_PROFILE a no-op (ProfileApplier ignores an unknown name anyway).
+        val profileName = intent.getStringExtra(EXTRA_PROFILE_NAME)
         // goAsync: the gate read is a DataStore lookup; keep the broadcast alive off the main thread.
-        goAsync { handle(context.applicationContext, action) }
+        goAsync { handle(context.applicationContext, action, profileName) }
     }
 
     /**
      * The gate is the FIRST check (D-157 security property): read the opt-in flag and drop everything
      * when it is off, BEFORE any verb touches settings or the service.
      */
-    internal suspend fun handle(appContext: Context, action: String) {
+    internal suspend fun handle(appContext: Context, action: String, profileName: String? = null) {
         val enabled = ControlPrefsStore(appContext.controlPrefsDataStore).externalControlEnabled.first()
         if (!enabled) return
-        route(appContext, action)
+        route(appContext, action, profileName)
     }
 
     /** Dispatch a verb onto its existing, already-hardened runtime path. Unknown actions are ignored. */
-    internal suspend fun route(appContext: Context, action: String) {
+    internal suspend fun route(appContext: Context, action: String, profileName: String? = null) {
         when (action) {
             ACTION_SERVICE_ON -> setServiceEnabled(appContext) { true }
             ACTION_SERVICE_OFF -> setServiceEnabled(appContext) { false }
@@ -56,9 +61,17 @@ class ControlReceiver : BroadcastReceiver() {
             ACTION_RESUME -> AutoBrightnessRuntime.resume(appContext)
             ACTION_REAPPLY -> AutoBrightnessRuntime.reapply(appContext)
             ACTION_PANIC -> AutoBrightnessRuntime.panic(appContext)
-            else -> Unit // unknown action ignored (U3 adds LOAD_PROFILE / CONTEXTS_RESUME)
+            // Profile verbs reuse the exact ProfileApplier path the Profiles UI drives (D-157 U3):
+            // LOAD_PROFILE latches the manual context lock; CONTEXTS_RESUME clears it.
+            ACTION_LOAD_PROFILE -> profileName?.let { profileApplier(appContext).applyProfile(it) }
+            ACTION_CONTEXTS_RESUME -> profileApplier(appContext).resumeContextAutomation()
+            else -> Unit // unknown action ignored
         }
     }
+
+    /** The shared VM-free profile logic (built off the same [AppModule.userProfileStore] the UI uses). */
+    private fun profileApplier(appContext: Context) =
+        ProfileApplier(appContext, AppModule(appContext).userProfileStore)
 
     /**
      * Set `serviceEnabled` to `target(current)`, drive the runtime and repaint the widget — the
@@ -83,5 +96,10 @@ class ControlReceiver : BroadcastReceiver() {
         const val ACTION_RESUME = "$NS.RESUME"
         const val ACTION_REAPPLY = "$NS.REAPPLY"
         const val ACTION_PANIC = "$NS.PANIC"
+        const val ACTION_LOAD_PROFILE = "$NS.LOAD_PROFILE"
+        const val ACTION_CONTEXTS_RESUME = "$NS.CONTEXTS_RESUME"
+
+        /** String extra on [ACTION_LOAD_PROFILE]: the saved/built-in profile name to load. */
+        const val EXTRA_PROFILE_NAME = "name"
     }
 }

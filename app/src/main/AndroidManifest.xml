@@ -137,6 +137,8 @@
                 <action android:name="com.tideo.autobrightness.control.RESUME" />
                 <action android:name="com.tideo.autobrightness.control.REAPPLY" />
                 <action android:name="com.tideo.autobrightness.control.PANIC" />
+                <action android:name="com.tideo.autobrightness.control.LOAD_PROFILE" />
+                <action android:name="com.tideo.autobrightness.control.CONTEXTS_RESUME" />
             </intent-filter>
         </receiver>
 
