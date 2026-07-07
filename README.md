@@ -40,6 +40,9 @@ decision logic are golden-tested against a transcription of the original Tasker 
   charging state, Wi-Fi SSID, or day of week, with priority-based conflict resolution.
 - **Live Debug scene**: a glass-box that shows relevant inputs and outputs.
 - **Emergency recovery**, a safety feature for when the screen is too dark, flip the phone upside-down and shake to force brightness to maximum. It also resets all privileged display toggles (grayscale, inversion, Night Light, …) to their defaults.
+- **Automation control (optional, off by default)**: an opt-in broadcast surface so apps like Tasker
+  or MacroDroid can turn Tideo on/off, pause, reset, or load a profile, and react to its state
+  changes. See **[Automation](docs/AUTOMATION.md)**.
 
 
 <p align="center">
@@ -143,6 +146,16 @@ request, and only as a last resort:
 
 Everything else runs entirely on-device.
 
+## Automation (Tasker / MacroDroid)
+
+Tideo can be driven by automation apps through an **opt-in** broadcast surface: commands to turn the
+service on/off, pause/resume, reapply, reset, or load a profile, plus outbound state-change events so
+your macros can *react* to Tideo. It is **off until you enable it** under
+**Tools → Automation control** (there is no password, so any app can send commands while it is on).
+
+**See [`docs/AUTOMATION.md`](docs/AUTOMATION.md)** for the full list of actions, the profile-name
+extra, the outbound `STATE_CHANGED` event, and `adb`/Tasker/MacroDroid examples.
+
 ## Module layout
 
 A 3-module Gradle build:
@@ -178,6 +191,7 @@ The rebuild is complete. Maintenance is driven by documents under `docs/rebuild/
   registry of numbered deviations (D-001…); consult to avoid repeating solved mistakes.
 - [`docs/rebuild/DEVICE_TEST_SCRIPT.md`](docs/rebuild/DEVICE_TEST_SCRIPT.md) — the on-device acceptance
   script.
+- [`docs/AUTOMATION.md`](docs/AUTOMATION.md) — the external automation (Tasker / MacroDroid) reference.
 - [`docs/history/`](docs/history/) — frozen record of the migration (segment briefs, gate findings).
 
 ## Contributing

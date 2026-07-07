@@ -1,3 +1,5 @@
-Accessibility (TalkBack) improvements, part 1: sliders and switches now announce their labels, the per-field help buttons are properly named instead of reading a bare symbol, section headers are navigable as headings, and read-only value rows are read as one item. Further screens get the same treatment throughout this release.
+Automation (Tasker/MacroDroid): control Tideo — on/off, pause, reapply, reset, load a profile — via broadcast intents, and receive state-change events back. Off by default; enable under Tools (see docs/AUTOMATION.md).
 
-Diagnostics: Tools now keeps the app's most recent crash report on-device so you can copy it when reporting a problem. Nothing is sent anywhere.
+Accessibility (TalkBack): sliders, switches, help buttons, headings and value rows now announce properly across the app.
+
+Diagnostics: Tools keeps your latest crash report on-device to copy when reporting a bug — nothing is sent.

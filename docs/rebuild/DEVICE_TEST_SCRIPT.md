@@ -220,6 +220,34 @@ double-tap to activate.
     (~8–10 dp) *indicators*, not a primary control — page with the 48 dp arrows or a horizontal swipe
     instead (they are excluded from the automated floor by design — `TouchTargetsA11yTest`).
 
+## 13. Automation control — intent surface (D-157) — NEW 1.8.0
+
+Opt-in external control (Tasker / MacroDroid). CI covers the gate + verb routing + the outbound event
+contract (`ControlReceiverTest`, `AmbientMonitoringServiceTest`), but end-to-end delivery from a real
+automation app and the `SERVICE_ON` background-start behavior are **owner-verified on-device**. Full
+reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation app needed) unless noted.
+
+42. **Off by default ⇒ commands ignored.** With **Tools → Automation control** OFF, send
+    `adb shell am broadcast -a com.tideo.autobrightness.control.SERVICE_ON -n com.tideo.autobrightness/.app.control.ControlReceiver`.
+    **Expected:** nothing happens (service stays off). Turn the toggle ON, resend. **Expected:** the
+    service starts (Dashboard shows it running).
+43. **Core verbs route.** With the toggle ON and the service running, send `PAUSE`, then `RESUME`, then
+    `REAPPLY`, then `PANIC` (same action namespace/component). **Expected:** pause holds brightness,
+    resume re-adapts, reapply recomputes now, panic restores brightness + stops (like the notification
+    **Reset**). `SERVICE_TOGGLE`/`SERVICE_OFF` flip/stop the service.
+44. **`LOAD_PROFILE` + resume.** Send `LOAD_PROFILE` with `--es name "Night"` (a real saved profile).
+    **Expected:** that profile loads and the manual lock latches (Dashboard shows the profile);
+    `CONTEXTS_RESUME` clears it and hands control back to context rules. An unknown `name` is a no-op.
+45. **`SERVICE_ON` while not running.** With the service OFF (but the toggle ON), send `SERVICE_ON`.
+    **Expected:** it starts. If the device is aggressive about background starts and it does **not**
+    start (Dashboard shows *degraded*), exempt Tideo from battery optimization and retry — it should
+    then start (documented caveat).
+46. **Outbound `STATE_CHANGED` events.** Register for `com.tideo.autobrightness.event.STATE_CHANGED`
+    (Tasker *Intent Received*, or `adb shell dumpsys` / a logging receiver). Toggle the service, pause,
+    resume, load a profile. **Expected:** an event fires on each change carrying
+    `enabled`/`running`/`paused`/`profile`; a final `enabled=false` event fires when the service stops.
+    With the Automation-control toggle OFF, **no** events are emitted.
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

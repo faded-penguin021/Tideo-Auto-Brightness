@@ -22,13 +22,16 @@ minSdk 31, target/compile 36.
 **Shipped: v1.7.0** (`versionCode 17`, tagged on `main`) — the Privileged Display Control feature
 (D-149–D-155).
 
-**Active work: 1.8.0 / `versionCode 18`** — **intent control for automation frameworks** (Tasker /
-MacroDroid): an opt-in exported broadcast surface for the existing control verbs + profile load,
-plus outbound state-change events. Multi-unit, persisted plan `plans/intent-control.md`; segment
-checklist below. Branch `claude/tideo-brightness-intent-control-2rkhx3`.
+**Code-complete, awaiting owner release cut: 1.8.0 / `versionCode 18`** — two features folded together:
+(a) **intent control for automation frameworks** (Tasker / MacroDroid, **D-157**) — an opt-in exported
+broadcast surface for the control verbs + `LOAD_PROFILE`/`CONTEXTS_RESUME`, plus outbound
+`event.STATE_CHANGED` events; `:app`-only, `:domain`/`:platform`/goldens untouched; user reference in
+`docs/AUTOMATION.md`. All units U0–U6 shipped (see Changelog). (b) the **A11y (TalkBack) backlog +
+crash-log capture** (units A0–A7 + C1) — conventions **D-156**, crash capture **D-158**. `changelogs/18.txt`
+final (455 chars). No active multi-unit work; both persisted plan files deleted at their final units.
 
 `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
-`parity_gaps.md` has 0 open gaps. Full acceptance ladder green 2026-07-05.
+`parity_gaps.md` has 0 open gaps. **Owner actions pending: none** (H4/D-135 + H5/D-137 done 2026-07-07).
 
 How changes are made now: see `RUNBOOK.md` (change-type playbooks; the **glue-review protocol**
 is mandatory for `:platform`/runtime diffs; multi-session features follow the playbook-5
@@ -39,38 +42,6 @@ registry stays live.
 > — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (200 rows per
 > file, then `_A.md`/DA-…, `_B.md`/DB-… — D-153; gate findings are in
 > `../history/STATE_rebuild.md`). Look there.
-
-## A11y (TalkBack) backlog + crash-log capture — COMPLETE (folds into 1.8.0/vc18)
-
-All units A0–A7 + C1 shipped (see Changelog); conventions = **D-156**, crash-log capture = **D-158**.
-`plans/a11y-diagnostics.md` deleted at the last unit (durable content → those two ledger rows).
-
-**Owner actions pending:** none — H4 (D-135, Dependabot/private vuln reporting) and H5 (D-137,
-fdroiddata `Binaries:`/`reproducible: yes`) both completed by the owner (2026-07-07).
-
-## Active work — 1.8.0 intent control (plan: `plans/intent-control.md`)
-
-Opt-in exported broadcast surface (default OFF, D-105 pattern) for the existing control verbs +
-`LOAD_PROFILE`/`CONTEXTS_RESUME`, plus outbound `STATE_CHANGED` events — so Tasker/MacroDroid can
-both command and observe the app. `:app`-only; **`:domain`/`:platform`/goldens untouched.** Each unit
-ends shippable: ladder green → this checklist ticked → commit → push (glue-review on U2/U3/U5).
-
-- [x] **U0** — sync branch onto `origin/main`; persist plan; STATE Active-work + "Current state" fix.
-- [x] **U1** — vc18 / 1.8.0 + `changelogs/18.txt` already in place (shared with a11y); `ControlPrefsStore`
-  (`externalControlEnabled`, default off) + `controlPrefsDataStore`; `ControlPrefsStoreTest` (+2).
-- [x] **U2** — exported `ControlReceiver` (gate = FIRST check) + 7 core verbs; `AutoBrightnessRuntime.panic`;
-  manifest `exported="true"` intent-filter; ledger **D-157**; `ControlReceiverTest` (+6). Glue-review clean.
-- [x] **U3** — VM-free `ProfileApplier` (bodies moved verbatim; `SettingsViewModelTest` UNMODIFIED, green) +
-  receiver `LOAD_PROFILE`/`CONTEXTS_RESUME`; `ProfileApplierTest` (+3), receiver profile cases (+3). Glue-review clean.
-- [x] **U4** — Tools "Automation control" card: opt-in `ControlPrefsViewModel` toggle (wired like geo-IP)
-  + "Show actions" verb-list dialog; all strings in `strings.xml` (ratchet 0); `ToolsAutomationControlTest`
-  (+4); `screen_map.md` updated.
-- [x] **U5** — outbound `event.STATE_CHANGED` (enabled/running/paused/profile): a publisher started from
-  `ensureRunning()`, gated by `externalControlEnabled`, distinct-until-changed; `onDestroy` emits the single
-  authoritative OFF event before `scope.cancel()` (covers SERVICE_OFF/Disable/Panic uniformly). Pure
-  `outboundSnapshot`/`buildStateChangedIntent` extracted for deterministic tests (+5). Glue-review clean.
-- [ ] **U6** — `docs/AUTOMATION.md` ref doc (exposed action surface) **linked from `README.md`** (owner ask,
-  U4 session — plan amended); DEVICE_TEST §12/datastore_map docs; delete plan file; final STATE compression.
 
 ## Decided non-items (don't re-litigate without new evidence)
 
@@ -93,68 +64,24 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
-- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U5**; D-157): outbound `event.STATE_CHANGED`
-  broadcasts so automation can *react* to Tideo, not just command it. A publisher job started from
-  `ensureRunning()` combines the opt-in `externalControlEnabled` flow, `controller.state`, and
-  `LiveRuntimeState.activeProfile`; while opted in AND running it distinct-until-changed-broadcasts extras
-  `enabled`/`running`(=on&&!paused)/`paused`/`profile`. Global (no `setPackage`, no new permission) so a
-  third-party receiver can pick it up — low-sensitivity liveness, emitted ONLY on opt-in. `onDestroy` emits
-  the single authoritative OFF event BEFORE `scope.cancel()` (D-139-class ordering), gated by a `@Volatile`
-  cache of the flag — deliberately in `onDestroy` (the one exit common to SERVICE_OFF-toggle/Disable/Panic),
-  a superset of the plan's "disable/panic teardown" wording that the collector alone would race. Pure
-  `outboundSnapshot`/`buildStateChangedIntent` extracted so the contract is deterministically tested without
-  driving the Dispatchers.Default collector; `AmbientMonitoringServiceTest` +5. `:app`-only; domain/platform
-  untouched. **Glue-review clean**: opt-in gate genuine (off ⇒ silent, pinned), teardown ordering, single-off
-  (collector never emits off), best-effort cache documented, global-broadcast posture documented.
+- 2026-07-07 — **1.8.0 / vc18 — intent control for automation frameworks (Tasker / MacroDroid), COMPLETE**
+  (**D-157**; `:app`-only, `:domain`/`:platform`/goldens untouched; full detail in the ledger row). Opt-in
+  exported broadcast surface, default OFF (D-105 pattern). **U1** `ControlPrefsStore`/`controlPrefsDataStore`
+  opt-in gate (its own prefs store, never an `AabSettings` field). **U2** exported `ControlReceiver` + 7 core
+  verbs (gate = FIRST check, pinned by `controlDisabled_ignoresAllActions_D157`) + 1-line
+  `AutoBrightnessRuntime.panic`, manifest `exported="true"` intent-filter, no new permission. **U3** VM-free
+  `ProfileApplier` (bodies moved verbatim — `SettingsViewModelTest` passes UNMODIFIED) + `LOAD_PROFILE`(extra
+  `name`)/`CONTEXTS_RESUME`. **U4** Tools "Automation control" card — `ControlPrefsViewModel` toggle + "Show
+  actions" dialog (strings ratchet 0). **U5** outbound `event.STATE_CHANGED` (extras
+  enabled/running/paused/profile) — publisher gated by the flag; `onDestroy` emits the single authoritative
+  OFF before `scope.cancel()` (covers SERVICE_OFF/Disable/Panic). **U6** `docs/AUTOMATION.md` + README link +
+  `DEVICE_TEST_SCRIPT.md` §13 + `datastore_map.md` `control_prefs`/`power_draw` rows; plan file deleted.
+  Tests +20 across `ControlPrefsStoreTest`/`ControlReceiverTest`/`ProfileApplierTest`/`ToolsAutomationControlTest`/`AmbientMonitoringServiceTest`.
+  Glue-review clean on U2/U3/U5. Also fixed a pre-existing `AmbientMonitoringServiceTest` flake (seed
+  `serviceEnabled=true` before `ACTION_START` so the D-140 background guard can't race the assertion).
 - 2026-07-07 — owner-completed (no code): **H4** (D-135) Dependabot security updates + private vulnerability
-  reporting, and **H5** (D-137) fdroiddata `Binaries:`/`reproducible: yes`, both enabled owner-side — the
-  "Owner actions pending" block is now empty.
-- 2026-07-07 — test-only (owner-flagged flake, U4 session): `AmbientMonitoringServiceTest`.`pauseAndReapply_
-  whilePipelineRunning_keepTheServiceUp` was nondeterministic — `ACTION_START` takes the `else` branch whose
-  D-140 START_STICKY defense fires `scope.launch { if (!serviceEnabled) disableAndStop() }` on
-  `Dispatchers.Default`, and the DataStore's default `serviceEnabled=false` let that background guard tear the
-  service down mid-test. Seed `serviceEnabled=true` before START (what every explicit starter does in
-  production) so the guard is a no-op regardless of thread timing. Verified green ×3 `--rerun-tasks`. No prod
-  code change.
-- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U4**; D-157): the Tools "Automation control"
-  card — the opt-in external-control surface's UI. New `state/ControlPrefsViewModel` (mirrors the geo-IP
-  `CircadianExtrasViewModel` wiring: `StateFlow` + `viewModelScope` setter over `ControlPrefsStore`,
-  default OFF) drives a `SwitchSettingRow` (help text warns "no password — any app can send these while
-  on") plus a "Show actions" `AlertDialog` listing every `com.tideo.autobrightness.control.*` verb, the
-  `name` extra, an `adb` example, and the SERVICE_ON battery-optimization caveat. All strings via
-  `strings.xml` (`HardcodedStringCheckTest` ratchet stays 0). `ToolsAutomationControlTest` (+4: switch
-  reflects/drives the store, dialog open/close, a11y-labeled). `screen_map.md` Tools row updated.
-  `:app`-only; domain/platform untouched. Owner asks this session (deferred to U6, plan+ledger amended):
-  a `docs/AUTOMATION.md` reference doc for the exposed action surface, linked from `README.md`.
-  Plan-file `D-156`→`D-157` typo corrected. Glue-review: N/A (UI/VM only; no runtime glue).
-- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U3**; D-157): VM-free `settings/ProfileApplier`
-  with the `applyProfile`/`resumeContextAutomation` bodies moved out of `SettingsViewModel` verbatim (the VM
-  now delegates via `viewModelScope.launch`); `SettingsViewModelTest` passes **UNMODIFIED** — the equivalence
-  check. `ControlReceiver` gains `LOAD_PROFILE` (String extra `name`, read in `onReceive`; missing name is a
-  double-guarded no-op) + `CONTEXTS_RESUME`, both driving the shared applier built from the same
-  `AppModule.userProfileStore` the UI uses (no duplicated logic). Manifest filter +2 actions. `ProfileApplierTest`
-  (+3: apply-latches-lock-preserving-globals, unknown-name no-op, resume-clears-lock) and receiver profile cases
-  (+3, incl. no-name no-op; disabled-loop now covers the 2 new verbs). Removed the VM's now-unused `LiveRuntimeState`
-  import. `:app`-only; domain/platform untouched. **Glue-review clean**: verbatim extraction, app-context parity,
-  gate-still-first, single wiring source.
-- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U2**; D-157): the exported `ControlReceiver`
-  + 7 core verbs. The opt-in gate (`externalControlEnabled`) is the receiver's FIRST check via `goAsync`
-  → `handle` → `route`; while off, every action is dropped before it touches settings/service — pinned by
-  `controlDisabled_ignoresAllActions_D157` (D-147-style negative test). SERVICE_ON/OFF/TOGGLE reuse the
-  `WidgetActionReceiver.toggle` dance parameterized by target state (copied, not shared); PAUSE/RESUME/
-  REAPPLY delegate to `AutoBrightnessRuntime`; new 1-line `AutoBrightnessRuntime.panic` sends the existing
-  `ACTION_PANIC` (same intent as the notification Reset). Manifest registers it `exported="true"` with a
-  7-action intent-filter, no new permission. `ControlReceiverTest` (+6: gate security property, per-verb
-  routing for PAUSE/RESUME/REAPPLY/PANIC, unknown-action no-op; SERVICE_* routing carved out like the
-  widget toggle — WorkManager/DataStore-singleton). Ledger **D-157**. `:app`-only; domain/platform
-  untouched. **Glue-review clean** (mandatory U2 unit): gate-first + genuine, exported exposure gated by
-  default-OFF flag, verbs reuse hardened paths, atomic `updateData`, `goAsync` finishes in `finally`.
-- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U1**; D-157): the opt-in gate storage for the
-  external intent-control surface. New `control/ControlPrefsStore` (`externalControlEnabled`, default OFF —
-  D-105 opt-in pattern) + `controlPrefsDataStore` (own prefs store, NOT an `AabSettings` field so profile
-  apply/import can never flip it). vc18/1.8.0 + `18.txt` already in place from the shared a11y work (both
-  fold into this release), so no bump needed. `ControlPrefsStoreTest` (+2: `defaultsToDisabled`,
-  `enableRoundTrips`). No receiver yet (U2). `:app`-only; domain/platform untouched. Glue-review: N/A (U1).
+  reporting, and **H5** (D-137) fdroiddata `Binaries:`/`reproducible: yes` — the "Owner actions pending"
+  block is now empty.
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **C1** — last unit, closes the plan; **D-158**):
   local crash-log capture. New `AabApplication` installs a default uncaught-exception handler that writes
   a timestamped trace to `filesDir/crash` (5-newest ring) then **always delegates** to the previous
@@ -229,9 +156,6 @@ One line per shipped change (newest first). Keep terse; details live in the ledg
   slider/switch announce their labels, section headers are headings, readouts merged) + the
   `SemanticsAudit` per-unit test gate (tests +5, written failing-first). Glue-review: N/A
   (UI/semantics only).
-- 2026-07-06 — docs/process only (intent-control **U0**): branch synced onto `main` (v1.7.0 tagged);
-  persisted plan `plans/intent-control.md` added; STATE gains the 1.8.0 Active-work checklist and
-  the "Current state" line now reflects 1.7.0 as shipped. No code.
 - 2026-07-05 — docs-only (F-Droid code-quality scan): RUNBOOK F-Droid-changelog bullet gains the
   <500-char `whatsNew` rule (F-Droid flags ≥ 500 as Minor). `changelogs/17.txt` left at 972 chars —
   vc17 is already tagged, so the fix would need a release re-cut for a cosmetic Minor; the rule

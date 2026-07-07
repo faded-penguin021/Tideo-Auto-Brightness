@@ -2820,8 +2820,9 @@ the permanent registry — never compress or remove them.
   not background, or D-140 no-ops). **`:app`-only** — the golden-tested `:domain` engine and
   `:platform` adapters are untouched by every unit; no numeric-setter verbs (those would open a
   validation surface onto the curve math, the D-146 NaN class — profiles carry parameter sets safely);
-  no new manifest permission. Folds into **1.8.0 / vc18**. Multi-unit (plan `plans/intent-control.md`,
-  playbook-5 persisted pattern): U1 pref store + `ControlPrefsStoreTest`; U2 `ControlReceiver` + 7
+  no new manifest permission. Folds into **1.8.0 / vc18**. Multi-unit (playbook-5 persisted pattern;
+  plan `plans/intent-control.md` retired at U6 — its durable content is this row + the STATE Changelog
+  line + `docs/AUTOMATION.md`): U1 pref store + `ControlPrefsStoreTest`; U2 `ControlReceiver` + 7
   core verbs + `panic`, manifest `exported="true"` intent-filter, `ControlReceiverTest` (gate + per-
   verb routing + unknown-action), glue-review; U3 `ProfileApplier` extraction + profile verbs; U4
   Tools "Automation control" card — opt-in `ControlPrefsViewModel` toggle + a "Show actions" verb-list
