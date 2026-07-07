@@ -105,15 +105,26 @@ Slider/Switch labeled; `SectionHeader` → `heading()`; `DerivedReadout` merged)
   UserGuideScreen,TaskerHelp}.kt` (+ rule-editor dialogs via `TriggerEditors` call sites),
   `strings.xml`, tests. Same recipe; rule-editor dialogs rendered and audited too.
 
-### A7 — touch targets + owner TalkBack checklist (final a11y unit)
+### A7 — touch targets + owner TalkBack checklist (final a11y unit) ✅ DONE (folds under D-156)
 - **Files:** component/screen files only where a target is under-size, `Dimens.kt` if a token is
   needed, `docs/rebuild/DEVICE_TEST_SCRIPT.md`, tests.
-- **Work:** compose-ui-test `assertTouchWidthIsAtLeast(48.dp)`/`assertTouchHeightIsAtLeast(48.dp)`
-  over the interactive nodes of the A0–A6 test surfaces (M3 components mostly guarantee this via
-  minimum-interactive-size — expect few fixes; guardrail 2's dp exception applies). Add a short
-  owner TalkBack section to `DEVICE_TEST_SCRIPT.md` (§12): semantics tests approximate TalkBack;
-  on-device is owner-verified (no emulator/KVM). Ledger row for anything durable found.
-- If the owner opts out of C1, this unit deletes this plan file.
+- **Work:** a touch-target floor over the interactive nodes of the A0–A6 test surfaces (M3 components
+  mostly guarantee this via minimum-interactive-size — expect few fixes; guardrail 2's dp exception
+  applies). Add a short owner TalkBack section to `DEVICE_TEST_SCRIPT.md` (§12): semantics tests
+  approximate TalkBack; on-device is owner-verified (no emulator/KVM). Ledger row for anything durable.
+- **As-built (guardrail-9 corrections):** the plan named `assertTouchWidthIsAtLeast(48.dp)` — that
+  overload is **not in this compose-ui-test BOM (2024.12.01)** (only `…IsEqualTo`). `TouchTargetsA11yTest`
+  reads `SemanticsNode.touchBoundsInRoot` directly instead. Second surprise: Compose's runtime
+  `minimumInteractiveComponentSize()` expansion for the stock M3 form controls (`Slider`/`Switch`/
+  `Checkbox`) is **not reflected in Robolectric's `touchBoundsInRoot`** (they report drawn size:
+  slider 44, switch 52×32, checkbox …×22 dp), so a strict in-test floor false-flags every unmodified
+  Material control. Resolution: the gate floors all **hand-authored clickables** (all pass, unmodified —
+  **zero production fixes**) and **carves out** (a) the M3 form primitives (pinned as Role-tagged
+  standard controls by `m3FormPrimitivesAreStandardMaterialControls`; real tap area owner-verified via
+  §12) and (b) the ~8–10 dp `ChartPager` position **dots** (redundant with the 48 dp ‹ › arrows + swipe).
+  Both carve-outs are in DEVICE_TEST_SCRIPT §12. **No new ledger row** — folds under D-156 (matches the
+  A1–A6 pattern; leaves D-157 free for the parallel intent-control branch, which reserves it).
+- If the owner opts out of C1, this unit deletes this plan file. (C1 still pending → file kept.)
 
 ### C1 — local crash-log capture (OPTIONAL, last; **the only glue unit — glue-review MANDATORY**)
 - **Files:** new `app/src/main/kotlin/com/tideo/autobrightness/app/AabApplication.kt`,

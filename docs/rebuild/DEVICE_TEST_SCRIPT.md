@@ -194,6 +194,32 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     clears it). Re-enable the service. **Expected:** the baseline's display fields re-assert on
     start — panic is an escape hatch, not a permanent opt-out.
 
+## 12. Accessibility — TalkBack & touch targets (D-156) — NEW 1.8.0
+
+The a11y backlog (`plans/a11y-diagnostics.md`, units A0–A7) is verified in CI by the `SemanticsAudit`
+gate + the `TouchTargetsA11yTest` floor, but semantics tests only *approximate* TalkBack, and Compose's
+runtime `minimumInteractiveComponentSize()` expansion is **not observable in Robolectric** — so the two
+checks below are **owner-verified on-device** (no emulator/KVM). Turn TalkBack on:
+Settings → Accessibility → TalkBack → On (or hold both volume keys). Swipe right/left to move the focus,
+double-tap to activate.
+
+40. **Every control announces a meaningful name (TalkBack).** Swipe through, in turn: the Dashboard
+    (master switch says "Auto brightness service, switch"; the amber Stale / Override / resume banners
+    are **announced automatically** when they appear — don't have to be focused), the Menu rows, and a
+    representative settings screen of each kind — a slider screen (Curve/Reactivity), a switch-heavy
+    screen (Misc/Super Dimming), Tools, Privileged Display (at ELEVATED), and the Contexts rule editor.
+    **Expected:** no control focuses as "unlabeled", "button", or a bare symbol; each slider/switch reads
+    its field name; the ⓘ help buttons read "Help: <field>"; section headers are reachable via TalkBack's
+    heading navigation (swipe up/down with the rotor on "Headings"); the app-picker checkboxes read their
+    app name. The chart screens' graphs read a one-sentence summary (e.g. "Brightness curve graph, …");
+    the pager ‹ › read "Previous/Next chart".
+41. **Touch targets are reachable (Switch Access / large-finger).** Enable Settings → Accessibility →
+    Switch Access (or just verify by touch): the primary tap affordances — nav rows, cards, the ‹ › chart
+    arrows, Apply/Discard, the back arrow, and the M3 sliders/switches/checkboxes — are each **≥ 48 dp**
+    and comfortably hittable. **Known/accepted residual:** the chart **pager position dots** are small
+    (~8–10 dp) *indicators*, not a primary control — page with the 48 dp arrows or a horizontal swipe
+    instead (they are excluded from the automated floor by design — `TouchTargetsA11yTest`).
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

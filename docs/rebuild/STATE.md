@@ -54,7 +54,7 @@ allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
 - [x] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming; audit green via A0 primitives; section headings)
 - [x] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug; 3 raw-Slider CDs added)
 - [x] **A6** — profiles/contexts + info screens (About/UserGuide/Profiles/Contexts + rule editor; 1 raw charging-Switch CD added)
-- [ ] **A7** — touch targets + DEVICE_TEST_SCRIPT owner TalkBack checklist
+- [x] **A7** — touch targets floor + DEVICE_TEST_SCRIPT §12 owner TalkBack checklist (0 prod fixes; 2 carve-outs)
 - [ ] **C1** — local crash-log capture (optional; the ONLY glue unit — glue-review mandatory)
 
 **Owner actions pending:**
@@ -101,6 +101,17 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A7** — final a11y unit, D-156): the 48 dp
+  motor-accessibility touch-target floor over the A0–A6 interactive primitive surfaces + DEVICE_TEST §12
+  owner TalkBack/Switch-Access checklist. **Zero production fixes** — every hand-authored clickable
+  already meets 48 dp. Two guardrail-9 corrections: the plan's `assertTouchWidthIsAtLeast` overload isn't
+  in this compose BOM (read `touchBoundsInRoot` directly), and Robolectric doesn't surface Material's
+  runtime `minimumInteractiveComponentSize()` for the stock `Slider`/`Switch`/`Checkbox` — so the gate
+  floors hand-authored clickables and carves out (a) those Role-tagged M3 form primitives (pinned by a
+  test; real tap area owner-verified via §12) and (b) the ~8–10 dp `ChartPager` position dots (redundant
+  with the 48 dp ‹ › arrows + swipe). `TouchTargetsA11yTest` (+4). No `18.txt` change (A0's blanket a11y
+  note covers it); **no new ledger row** (folds under D-156, leaving D-157 free for intent-control).
+  Glue-review: N/A (UI/test semantics-only; no runtime glue).
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A6**, D-156): the profiles/contexts + info
   surfaces rendered under the `SemanticsAudit` gate — About, User Guide, standalone Profiles (its
   collapsible manage/legacy sections expanded), the Contexts rule list, and the full rule editor with
