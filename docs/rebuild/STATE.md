@@ -45,12 +45,8 @@ registry stays live.
 All units A0–A7 + C1 shipped (see Changelog); conventions = **D-156**, crash-log capture = **D-158**.
 `plans/a11y-diagnostics.md` deleted at the last unit (durable content → those two ledger rows).
 
-**Owner actions pending:**
-
-- **H4 (D-135):** repo Settings → Code security → enable "Dependabot security updates" +
-  "Private vulnerability reporting" (the committed files are inert without them).
-- **H5 (D-137):** in the fdroiddata submission set `Binaries:` to the release-APK URL pattern
-  and `reproducible: yes` (pin the CI's JDK 21) so F-Droid publishes the signed APK.
+**Owner actions pending:** none — H4 (D-135, Dependabot/private vuln reporting) and H5 (D-137,
+fdroiddata `Binaries:`/`reproducible: yes`) both completed by the owner (2026-07-07).
 
 ## Active work — 1.8.0 intent control (plan: `plans/intent-control.md`)
 
@@ -69,7 +65,10 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 - [x] **U4** — Tools "Automation control" card: opt-in `ControlPrefsViewModel` toggle (wired like geo-IP)
   + "Show actions" verb-list dialog; all strings in `strings.xml` (ratchet 0); `ToolsAutomationControlTest`
   (+4); `screen_map.md` updated.
-- [ ] **U5** — outbound `STATE_CHANGED` events (optional, droppable).
+- [x] **U5** — outbound `event.STATE_CHANGED` (enabled/running/paused/profile): a publisher started from
+  `ensureRunning()`, gated by `externalControlEnabled`, distinct-until-changed; `onDestroy` emits the single
+  authoritative OFF event before `scope.cancel()` (covers SERVICE_OFF/Disable/Panic uniformly). Pure
+  `outboundSnapshot`/`buildStateChangedIntent` extracted for deterministic tests (+5). Glue-review clean.
 - [ ] **U6** — `docs/AUTOMATION.md` ref doc (exposed action surface) **linked from `README.md`** (owner ask,
   U4 session — plan amended); DEVICE_TEST §12/datastore_map docs; delete plan file; final STATE compression.
 
@@ -94,6 +93,22 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (intent-control **U5**; D-157): outbound `event.STATE_CHANGED`
+  broadcasts so automation can *react* to Tideo, not just command it. A publisher job started from
+  `ensureRunning()` combines the opt-in `externalControlEnabled` flow, `controller.state`, and
+  `LiveRuntimeState.activeProfile`; while opted in AND running it distinct-until-changed-broadcasts extras
+  `enabled`/`running`(=on&&!paused)/`paused`/`profile`. Global (no `setPackage`, no new permission) so a
+  third-party receiver can pick it up — low-sensitivity liveness, emitted ONLY on opt-in. `onDestroy` emits
+  the single authoritative OFF event BEFORE `scope.cancel()` (D-139-class ordering), gated by a `@Volatile`
+  cache of the flag — deliberately in `onDestroy` (the one exit common to SERVICE_OFF-toggle/Disable/Panic),
+  a superset of the plan's "disable/panic teardown" wording that the collector alone would race. Pure
+  `outboundSnapshot`/`buildStateChangedIntent` extracted so the contract is deterministically tested without
+  driving the Dispatchers.Default collector; `AmbientMonitoringServiceTest` +5. `:app`-only; domain/platform
+  untouched. **Glue-review clean**: opt-in gate genuine (off ⇒ silent, pinned), teardown ordering, single-off
+  (collector never emits off), best-effort cache documented, global-broadcast posture documented.
+- 2026-07-07 — owner-completed (no code): **H4** (D-135) Dependabot security updates + private vulnerability
+  reporting, and **H5** (D-137) fdroiddata `Binaries:`/`reproducible: yes`, both enabled owner-side — the
+  "Owner actions pending" block is now empty.
 - 2026-07-07 — test-only (owner-flagged flake, U4 session): `AmbientMonitoringServiceTest`.`pauseAndReapply_
   whilePipelineRunning_keepTheServiceUp` was nondeterministic — `ACTION_START` takes the `else` branch whose
   D-140 START_STICKY defense fires `scope.launch { if (!serviceEnabled) disableAndStop() }` on

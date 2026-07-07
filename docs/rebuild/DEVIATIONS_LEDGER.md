@@ -2825,9 +2825,22 @@ the permanent registry — never compress or remove them.
   core verbs + `panic`, manifest `exported="true"` intent-filter, `ControlReceiverTest` (gate + per-
   verb routing + unknown-action), glue-review; U3 `ProfileApplier` extraction + profile verbs; U4
   Tools "Automation control" card — opt-in `ControlPrefsViewModel` toggle + a "Show actions" verb-list
-  help dialog (all strings via `strings.xml`, ratchet 0); U5 outbound events; U6 docs (a dedicated
-  user-facing `docs/AUTOMATION.md` reference for the exposed action surface, linked from `README.md`)
-  + plan retirement.
+  help dialog (all strings via `strings.xml`, ratchet 0); U5 outbound `event.STATE_CHANGED`; U6 docs (a
+  dedicated user-facing `docs/AUTOMATION.md` reference for the exposed action surface, linked from
+  `README.md`) + plan retirement.
+  **U5 outbound events (delivered):** `AmbientMonitoringService` publishes `com.tideo.autobrightness.event.
+  STATE_CHANGED` (extras `enabled`/`running`=on&&!paused/`paused` Boolean, `profile` String?) so automation
+  can *react* to Tideo. A publisher job from `ensureRunning()` combines the SAME opt-in
+  `externalControlEnabled` flow + `controller.state` + `LiveRuntimeState.activeProfile`; distinct-until-
+  changed, running-only. `onDestroy` emits the single authoritative OFF event BEFORE `scope.cancel()`
+  (D-139-class ordering), gated by a `@Volatile` cache of the flag — placed in `onDestroy` (the one exit
+  common to SERVICE_OFF-toggle/Disable/Panic), a deliberate superset of the plan's narrower "disable/panic
+  teardown" wording that the collector alone would race; the collector never emits OFF, so there is exactly
+  one off event. **Outbound security posture:** the event is a GLOBAL broadcast (no `setPackage`, no new
+  permission) — any app can receive it — but it carries only low-sensitivity liveness flags and is emitted
+  ONLY while the user has opted in (same gate as inbound); a system-driven kill+restart shows a brief off→on
+  that self-corrects (the `LiveRuntimeState` staleness watchdog already assumes onDestroy fires on system
+  teardowns). Pure `outboundSnapshot`/`buildStateChangedIntent` are extracted for deterministic tests.
 
 - **D-158: local crash-log capture (a11y-diagnostics unit C1 — the last unit; deletes the plan
   file. `D-157` reserved by the parallel intent-control branch, so C1 minted the next free row).**

@@ -89,15 +89,16 @@ Each unit ends at the checkpoint (Execution protocol below).
   `ControlPrefsStore` (wire like geo-IP, `CircadianExtrasViewModel`), + "Show actions" dialog (verb
   strings, `name` extra, one `adb shell am broadcast` example, battery-optimization note). All strings
   in `strings.xml` (`HardcodedStringCheckTest` ratchet 0). Update `screen_map.md`.
-- **U5 — outbound state events (optional, droppable; glue-review).** Service collector job from
+- **U5 — outbound state events (optional, droppable; glue-review). DONE.** Publisher job from
   `ensureRunning()`, gated by `externalControlEnabled`, distinct-until-changed `sendBroadcast` of
-  `event.STATE_CHANGED`; disable/panic teardown emits a final off-state event BEFORE `stopSelf`
-  (D-139-class ordering). Tests in `AmbientMonitoringServiceTest`.
+  `event.STATE_CHANGED` (extras `enabled`/`running`/`paused`/`profile`). Landed the final off-state in
+  `onDestroy` (BEFORE `scope.cancel()`, D-139-class ordering) rather than only disable/panic teardown —
+  it is the single exit common to SERVICE_OFF-toggle/Disable/Panic. `AmbientMonitoringServiceTest` +5.
 - **U6 — docs, release polish, plan retirement.** A **new user-facing reference doc**
   `docs/AUTOMATION.md` (the single source of truth for the exposed surface: the opt-in toggle, every
-  `com.tideo.autobrightness.control.*` action, the `name` extra, `adb`/Tasker/MacroDroid usage
-  examples, the SERVICE_ON battery-optimization caveat — same content as the in-app "Show actions"
-  dialog, expanded) + a **link to it from `README.md`** under an "Automation (Tasker / MacroDroid)"
+  `com.tideo.autobrightness.control.*` action, the `name` extra, **the outbound `event.STATE_CHANGED`
+  event and its extras (U5)**, `adb`/Tasker/MacroDroid usage examples, the SERVICE_ON battery-optimization
+  caveat — a superset of the in-app "Show actions" dialog, which lists only the inbound verbs) + a **link to it from `README.md`** under an "Automation (Tasker / MacroDroid)"
   heading (owner ask: README must link out to a doc explaining what intents are exposed and how to use
   them — the README itself stays a pointer, not the recipe list); `DEVICE_TEST_SCRIPT.md` §12 owner
   matrix; finalize `changelogs/18.txt`; `datastore_map.md` `control_prefs` row. **Delete this file.**
