@@ -53,7 +53,7 @@ allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
 - [x] **A3** — Dashboard, Menu, Onboarding (audit already green via shared components; banner liveRegions added)
 - [x] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming; audit green via A0 primitives; section headings)
 - [x] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug; 3 raw-Slider CDs added)
-- [ ] **A6** — profiles/contexts + info screens (+ rule-editor dialogs)
+- [x] **A6** — profiles/contexts + info screens (About/UserGuide/Profiles/Contexts + rule editor; 1 raw charging-Switch CD added)
 - [ ] **A7** — touch targets + DEVICE_TEST_SCRIPT owner TalkBack checklist
 - [ ] **C1** — local crash-log capture (optional; the ONLY glue unit — glue-review mandatory)
 
@@ -101,6 +101,17 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A6**, D-156): the profiles/contexts + info
+  surfaces rendered under the `SemanticsAudit` gate — About, User Guide, standalone Profiles (its
+  collapsible manage/legacy sections expanded), the Contexts rule list, and the full rule editor with
+  every trigger section open. All already green via the A0/A1 primitives except the battery section's
+  RAW `Switch` ("only while charging"), whose label is a sibling `Text` that never merges onto the
+  switch node — gave it its own contentDescription (D-156 pattern, like `TriggerSection`). `RuleEditor`
+  `private`→`internal` so the audit renders it directly (it lives in a second `Dialog` window that
+  `onRoot()` can't reach). `TaskerHelp.kt` is a `@StringRes` registry, not a composable — nothing to
+  render. `ScreensInfoA11yTest` (+10: per-surface audit, section-header `heading()` assertions, one
+  targeted charging-switch CD assertion). No `18.txt` change (A0's blanket a11y note covers it).
+  Glue-review: N/A (UI semantics-only; no runtime glue).
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A5**, D-156): the group-2 settings screens
   (Misc / Tools / Privileged Display / Live Debug) rendered under the `SemanticsAudit` gate. The audit
   flagged one RAW M3 `Slider` on each of Tools (wizard τ), Privileged Display (night-light temperature)

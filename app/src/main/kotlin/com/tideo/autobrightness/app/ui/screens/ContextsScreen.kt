@@ -1,6 +1,8 @@
 package com.tideo.autobrightness.app.ui.screens
 
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.tideo.autobrightness.R
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -244,8 +246,11 @@ private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit
     }
 }
 
+// D-156: `internal` (not `private`) so the A6 a11y audit can render the rule editor directly — it
+// lives inside a full-screen `Dialog` (a second window), which `assertAllInteractiveNodesAreLabeled`'s
+// single-root walk can't reach. Behavior/test-tags unchanged.
 @Composable
-private fun RuleEditor(
+internal fun RuleEditor(
     rule: ContextRule,
     profileNames: List<String>,
     apps: List<AppEntry>,
@@ -486,12 +491,17 @@ private fun RuleEditor(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    // D-156: the "only while charging" label is a sibling Text, so the switch node
+                    // announces nothing to TalkBack — name it (mirrors TriggerSection's toggle). NOT a
+                    // toggleable row: that would move the tap target and break the `rule_charging` click.
+                    val onlyChargingLabel = stringResource(R.string.contexts_only_charging)
                     Switch(
                         checked = charging,
                         onCheckedChange = { charging = it },
-                        modifier = Modifier.testTag("rule_charging"),
+                        modifier = Modifier.testTag("rule_charging")
+                            .semantics { contentDescription = onlyChargingLabel },
                     )
-                    Text(stringResource(R.string.contexts_only_charging), style = MaterialTheme.typography.bodyMedium)
+                    Text(onlyChargingLabel, style = MaterialTheme.typography.bodyMedium)
                 }
                 // Battery percentage window (G2R-F31). Either bound may be left blank for "any".
                 Text(stringResource(R.string.contexts_battery_pct), style = MaterialTheme.typography.labelMedium)
