@@ -2793,3 +2793,24 @@ the permanent registry — never compress or remove them.
   label+value. Remaining units (A1 components, A2 graph text-alternatives, A3–A6 screens, A7
   touch targets + owner TalkBack checklist, C1 crash-log capture = the only glue unit) live in
   the plan file until executed; the last unit deletes it.
+
+- **D-158: local crash-log capture (a11y-diagnostics unit C1 — the last unit; deletes the plan
+  file. `D-157` reserved by the parallel intent-control branch, so C1 minted the next free row).**
+  Tasker-independent diagnostic (no parity source): a new `AabApplication` (`<application
+  android:name>`) installs a process-wide `Thread.setDefaultUncaughtExceptionHandler` on
+  `onCreate` that writes a timestamped stack trace to `filesDir/crash/` (ring of the **5 newest**,
+  older pruned per write) and then **always delegates to the previous handler** — the process must
+  still die; a swallowing handler would wedge it. **No telemetry, no network, no FileProvider** —
+  traces are app-private and never leave the device. Tools → Diagnostics gains a "Copy latest crash
+  log" row (the existing `%AAB_Test` clipboard pattern — clipboard, NOT a share intent; shows a
+  "none recorded" state until the first crash). Glue-review (MANDATORY — C1 is the only glue unit)
+  clean, checked against the named classes: **install idempotent** (skips re-wrap when the current
+  default is already a `CrashLogHandler`; a fresh post-crash process wraps the platform killer
+  once); **delegation ordering** (record in `try`, delegate in `finally` — so the handoff runs even
+  if the write throws; `CrashLogStore.record` also `runCatching`-guards its own I/O so a full
+  disk/revoked dir can't mask the crash); **no per-process state survives death** (all state is the
+  on-disk dir — the dying process writes it, the fresh one reads it back); **list order** (`latest()`
+  = newest-first via a descending lexical sort on fixed-width `crash-<epochMillis>.txt`; `prune()`
+  drops all but the 5 newest). Tests +11 (`CrashLogStoreTest` rotation/read + handler
+  delegate/idempotency, `ToolsDiagnosticsTest` copy/empty + a11y gate, `AabApplicationTest` manifest
+  wiring). Folds into 1.8.0/vc18 (`18.txt` +1 line). Closes the a11y-diagnostics plan.

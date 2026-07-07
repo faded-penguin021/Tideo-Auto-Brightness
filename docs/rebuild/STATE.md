@@ -40,22 +40,10 @@ registry stays live.
 > file, then `_A.md`/DA-…, `_B.md`/DB-… — D-153; gate findings are in
 > `../history/STATE_rebuild.md`). Look there.
 
-## Active work — A11y (TalkBack) backlog + crash-log capture
+## A11y (TalkBack) backlog + crash-log capture — COMPLETE (folds into 1.8.0/vc18)
 
-Plan: `plans/a11y-diagnostics.md` (owner-approved 2026-07-06; playbook-5 pattern; **strictly
-sequential units, each checkpointed** ladder-green → STATE line → commit → push; conventions =
-**D-156**; opens **1.8.0 / vc18**). Designed for lesser-model execution: per-unit file
-allowlists, `SemanticsAudit` behavioral gate, never `:domain`/goldens.
-
-- [x] **A0** — settings primitives + `SemanticsAudit` gate + version bump (D-156)
-- [x] **A1** — remaining shared components (toggleables labeled; KeyValueRow merged; flash liveRegion)
-- [x] **A2** — canvas graphs get text alternatives (8 graphs get a11y_graph_* CDs; pager arrows/dots labeled)
-- [x] **A3** — Dashboard, Menu, Onboarding (audit already green via shared components; banner liveRegions added)
-- [x] **A4** — settings screens 1 (Curve/Reactivity/Circadian/SuperDimming; audit green via A0 primitives; section headings)
-- [x] **A5** — settings screens 2 (Misc/Tools/PrivilegedDisplay/LiveDebug; 3 raw-Slider CDs added)
-- [x] **A6** — profiles/contexts + info screens (About/UserGuide/Profiles/Contexts + rule editor; 1 raw charging-Switch CD added)
-- [x] **A7** — touch targets floor + DEVICE_TEST_SCRIPT §12 owner TalkBack checklist (0 prod fixes; 2 carve-outs)
-- [ ] **C1** — local crash-log capture (optional; the ONLY glue unit — glue-review mandatory)
+All units A0–A7 + C1 shipped (see Changelog); conventions = **D-156**, crash-log capture = **D-158**.
+`plans/a11y-diagnostics.md` deleted at the last unit (durable content → those two ledger rows).
 
 **Owner actions pending:**
 
@@ -101,6 +89,13 @@ ends shippable: ladder green → this checklist ticked → commit → push (glue
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **C1** — last unit, closes the plan; **D-158**):
+  local crash-log capture. New `AabApplication` installs a default uncaught-exception handler that writes
+  a timestamped trace to `filesDir/crash` (5-newest ring) then **always delegates** to the previous
+  handler (process still dies); no telemetry/network/FileProvider. Tools → Diagnostics gains a "Copy
+  latest crash log" row (clipboard, "none recorded" state). **Glue-review clean** (C1 is the only glue
+  unit): install idempotent, write-then-delegate-in-`finally`, disk-only state, newest-first rotation.
+  Tests +11. `18.txt` +1 line. `plans/a11y-diagnostics.md` **deleted** — a11y backlog COMPLETE.
 - 2026-07-07 — folds into **1.8.0 / vc18** (A11y backlog **A7** — final a11y unit, D-156): the 48 dp
   motor-accessibility touch-target floor over the A0–A6 interactive primitive surfaces + DEVICE_TEST §12
   owner TalkBack/Switch-Access checklist. **Zero production fixes** — every hand-authored clickable

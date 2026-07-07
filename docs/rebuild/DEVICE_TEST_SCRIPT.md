@@ -196,7 +196,7 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
 
 ## 12. Accessibility — TalkBack & touch targets (D-156) — NEW 1.8.0
 
-The a11y backlog (`plans/a11y-diagnostics.md`, units A0–A7) is verified in CI by the `SemanticsAudit`
+The a11y backlog (D-156, units A0–A7) is verified in CI by the `SemanticsAudit`
 gate + the `TouchTargetsA11yTest` floor, but semantics tests only *approximate* TalkBack, and Compose's
 runtime `minimumInteractiveComponentSize()` expansion is **not observable in Robolectric** — so the two
 checks below are **owner-verified on-device** (no emulator/KVM). Turn TalkBack on:

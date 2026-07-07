@@ -309,6 +309,7 @@
     <string name="toast_diagnostics_copied">Diagnostics copied to clipboard</string>
     <string name="toast_suggestion_applied">Suggestion applied</string>
     <string name="toast_full_report_copied">Full report copied to clipboard</string>
+    <string name="toast_crash_log_copied">Crash log copied to clipboard</string>
     <string name="toast_fixed_datelocation">Fixed date/location set</string>
     <string name="toast_using_live_data">Using live data</string>
     <string name="toast_acquiring_location">Acquiring location…</string>
@@ -373,6 +374,10 @@
     <string name="tools_apply_suggestion">Apply suggestion</string>
     <string name="tools_preview_graph">Preview graph</string>
     <string name="tools_copy_full_report">Copy full report</string>
+    <string name="tools_diagnostics_header">Diagnostics</string>
+    <string name="tools_diagnostics_desc">If Tideo has crashed, its most recent error report is kept on this device. Copy it to include when reporting a problem — it never leaves your phone on its own.</string>
+    <string name="tools_copy_crash_log">Copy latest crash log</string>
+    <string name="tools_no_crash_log">No crash reports recorded.</string>
 
     <!-- Curve &amp; Brightness -->
     <string name="curve_zones_header">Curve zones</string>

@@ -46,6 +46,7 @@ import com.tideo.autobrightness.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.CrashLogStore
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.runtime.PowerDrawCalibrator
 import com.tideo.autobrightness.app.runtime.PowerDrawProgress
@@ -85,8 +86,14 @@ fun ToolsScreen(
     val toast = rememberToaster()
     var showPrep by remember { mutableStateOf(false) }
 
+    // D-158: the latest locally-captured crash trace, if any. Read once on entry — the app restarts
+    // after a crash, so re-opening Tools always re-reads the newest file from disk.
+    val crashStore = remember(context) { CrashLogStore.of(context) }
+    val latestCrashLog = remember(crashStore) { crashStore.latest() }
+
     ToolsContent(
         recordedPoints = overridePoints,
+        latestCrashLog = latestCrashLog,
         onBack = { navController.popBackStack() },
         // D-125: stash the wizard's fit as a transient draft transform (curve → suggested), then jump to
         // Curve & Brightness — whose VM applies it on its initial seed: suggested values in the fields,
@@ -265,6 +272,7 @@ fun ToolsContent(
     powerProgress: String? = null,
     powerHasData: Boolean = false,
     onCalibratePower: () -> Unit = {},
+    latestCrashLog: String? = null,
 ) {
     SettingsScaffold(stringResource(R.string.title_tools), onBack) { padding ->
         SettingsColumn(padding) {
@@ -296,6 +304,43 @@ fun ToolsContent(
                     }
                 }
             }
+
+            DiagnosticsCard(latestCrashLog)
+        }
+    }
+}
+
+/**
+ * D-158: local crash-log capture. [AabApplication][com.tideo.autobrightness.app.AabApplication]
+ * writes the last few uncaught-exception traces under `filesDir/crash`; this row lets the owner copy
+ * the most recent one to the clipboard (the existing `%AAB_Test` copy pattern — clipboard, never a
+ * share intent/FileProvider). Shows a "none recorded" state until the first crash.
+ */
+@Composable
+private fun DiagnosticsCard(latestCrashLog: String?) {
+    val clipboard = LocalClipboardManager.current
+    val toast = rememberToaster()
+    AabCard(Modifier.testTag("diagnostics_card")) {
+        SectionHeader(stringResource(R.string.tools_diagnostics_header), divider = true)
+        Text(
+            stringResource(R.string.tools_diagnostics_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (latestCrashLog != null) {
+            OutlinedButton(
+                onClick = {
+                    clipboard.setText(AnnotatedString(latestCrashLog))
+                    toast(R.string.toast_crash_log_copied)
+                },
+                modifier = Modifier.fillMaxWidth().testTag("copy_crash_log"),
+            ) { Text(stringResource(R.string.tools_copy_crash_log)) }
+        } else {
+            Text(
+                stringResource(R.string.tools_no_crash_log),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.testTag("no_crash_log"),
+            )
         }
     }
 }
