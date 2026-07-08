@@ -64,6 +64,13 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-08 — docs/copy-only (user-guide accuracy audit): corrected `guide_s5_body` (Profile Management).
+  It claimed "the default profile is modifiable but not deletable" and named only Battery Saver + Outdoors as
+  presets — both stale. Reality (owner-decision 3, S12.6d/G2R-F15): all FIVE built-ins (Default, Battery Saver,
+  Video Streaming, Outdoors, Night Reading) are editable AND deletable, with "Restore factory profiles" to
+  re-seed — a deliberate deviation from Tasker's delete-guard. Guide corrected to shipped behavior (not the
+  code); owner picked doc-fix over restoring the guard. Other 8 guide sections spot-audited against code —
+  all accurate. No test/i18n change (single `values/strings.xml`; no test pins the copy).
 - 2026-07-07 — **1.8.0 / vc18 — intent control for automation frameworks (Tasker / MacroDroid), COMPLETE**
   (**D-157**; `:app`-only, `:domain`/`:platform`/goldens untouched; full detail in the ledger row). Opt-in
   exported broadcast surface, default OFF (D-105 pattern). **U1** `ControlPrefsStore`/`controlPrefsDataStore`
