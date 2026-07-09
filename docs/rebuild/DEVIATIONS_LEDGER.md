@@ -2891,3 +2891,26 @@ the permanent registry — never compress or remove them.
   `SettingsControls`); `:domain`/`:platform`/goldens untouched. `enableEdgeToEdge` also aligns API 31–34
   (every screen already consumes its own system-bar insets, so no new clipping); no Android-15 drawing
   change. On-device visual re-check is an owner step (no emulator in CI). Folds into 1.8.0/vc18.
+
+- **D-160: external `RESUME` could resurrect a user-disabled service (D-140 zombie class via the D-157
+  surface).** Found by a pre-release audit of the 1.8.0 branch (Fable, 2026-07-09). The service-side
+  `ACTION_RESUME` is **deliberately** not D-140-gated: F74 made its contract "resurrect" —
+  `ensureRunning()` first — because its only trigger was the paused-override notification, which
+  persists across a service kill (prof756) and can only exist while the user has the service
+  **enabled**. The exported `ControlReceiver` (D-157) mapped its external `RESUME` verb onto that same
+  action, silently removing the precondition: with automation control opted in, a third-party `RESUME`
+  sent while `serviceEnabled=false` would `startForegroundService` → CREATE the service →
+  `ensureRunning()` → pipeline running against the persisted disable (Dashboard master switch OFF, FGS
+  notification up) — exactly the D-140 zombie class, reachable only from this surface. **Fix at the
+  surface, not the service:** `ControlReceiver.route(ACTION_RESUME)` first reads
+  `settingsDataStore … serviceEnabled` and drops the verb when false; the notification path keeps its
+  F74 resurrect contract untouched. Pinned by `resume_whileServiceDisabled_isDropped_D160` (+ the
+  positive route test now seeds `serviceEnabled=true` explicitly — the shared settings singleton may
+  carry `false` from sibling tests). Docs truth pass in the same change: `AUTOMATION.md` + the receiver
+  KDoc had claimed "`PAUSE`/`RESUME`/`REAPPLY`/`PANIC` while not running are safe no-ops" — false for
+  RESUME (resurrected) and imprecise for PANIC (always restores brightness + display defaults then
+  stops, by design, D-155); both now state the per-verb semantics, and `DEVICE_TEST_SCRIPT.md` §13
+  item 43 gains the RESUME-while-disabled expectation. Review lesson (glue-review catalog candidate):
+  a verb/action REUSED by a new entry surface inherits gates it never had — when exposing an existing
+  action externally, re-derive each implicit precondition of its old triggers ("asymmetric sibling
+  gates", D-142 family). `:app`-only; `:domain`/`:platform`/goldens untouched. Folds into 1.8.0/vc18.

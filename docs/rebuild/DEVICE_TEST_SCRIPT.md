@@ -234,7 +234,9 @@ reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation ap
 43. **Core verbs route.** With the toggle ON and the service running, send `PAUSE`, then `RESUME`, then
     `REAPPLY`, then `PANIC` (same action namespace/component). **Expected:** pause holds brightness,
     resume re-adapts, reapply recomputes now, panic restores brightness + stops (like the notification
-    **Reset**). `SERVICE_TOGGLE`/`SERVICE_OFF` flip/stop the service.
+    **Reset**). `SERVICE_TOGGLE`/`SERVICE_OFF` flip/stop the service. Then, with the service turned
+    **off** (master switch off, automation toggle still ON), send `RESUME`. **Expected:** nothing
+    happens — an external RESUME never overrides the master switch (D-160).
 44. **`LOAD_PROFILE` + resume.** Send `LOAD_PROFILE` with `--es name "Night"` (a real saved profile).
     **Expected:** that profile loads and the manual lock latches (Dashboard shows the profile);
     `CONTEXTS_RESUME` clears it and hands control back to context rules. An unknown `name` is a no-op.

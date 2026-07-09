@@ -22,8 +22,11 @@ import kotlinx.coroutines.flow.first
  * the exposed verbs are exactly what the notification / QS tile / widget already give the user, and no
  * data leaves the app, so a token would be pure friction in the Tasker/MacroDroid UIs (plan decision 1).
  *
- * Every verb maps onto an already-hardened path — the service-side D-140 zombie gates already handle
- * "sent while not running", so all verbs except [ACTION_SERVICE_ON] are safe no-ops then.
+ * Every verb maps onto an already-hardened path, with per-verb semantics while the service is not
+ * running: [ACTION_PAUSE]/[ACTION_REAPPLY] are validated no-ops (the service-side D-140 zombie gates);
+ * [ACTION_RESUME] is dropped HERE while `serviceEnabled=false` (D-160 — the service side is
+ * deliberately ungated, F74) and otherwise resumes, restarting a system-killed service; [ACTION_PANIC]
+ * always executes — it restores brightness + display defaults and stops (that is its purpose, D-155).
  *
  * Platform caveat: [ACTION_SERVICE_ON] arriving while the app is background-restricted may throw
  * `ForegroundServiceStartNotAllowedException` (API 31+ FGS launch rules); [AutoBrightnessRuntime.startMonitoring]
@@ -58,7 +61,16 @@ class ControlReceiver : BroadcastReceiver() {
             ACTION_SERVICE_OFF -> setServiceEnabled(appContext) { false }
             ACTION_SERVICE_TOGGLE -> setServiceEnabled(appContext) { current -> !current }
             ACTION_PAUSE -> AutoBrightnessRuntime.pause(appContext)
-            ACTION_RESUME -> AutoBrightnessRuntime.resume(appContext)
+            // D-160: an external RESUME must not resurrect a user-disabled service. The service-side
+            // ACTION_RESUME is deliberately NOT D-140-gated (F74: the notification Resume's contract is
+            // resurrect — its trigger, the paused-override notification, exists only while the service
+            // is enabled). This exported surface has no such precondition, so the same verb sent while
+            // `serviceEnabled=false` would start the pipeline against the persisted disable — the D-140
+            // zombie class. Gate at the surface; the notification path stays untouched.
+            ACTION_RESUME ->
+                if (appContext.settingsDataStore.data.first().serviceEnabled) {
+                    AutoBrightnessRuntime.resume(appContext)
+                }
             ACTION_REAPPLY -> AutoBrightnessRuntime.reapply(appContext)
             ACTION_PANIC -> AutoBrightnessRuntime.panic(appContext)
             // Profile verbs reuse the exact ProfileApplier path the Profiles UI drives (D-157 U3):

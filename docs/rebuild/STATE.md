@@ -64,6 +64,13 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-09 — folds into 1.8.0/vc18 (pre-release audit finding): **D-160** external `RESUME`
+  (D-157 surface) could resurrect a user-disabled service — the F74 "resurrect" contract's implicit
+  precondition (paused-override notification ⇒ serviceEnabled) didn't survive the verb's re-exposure.
+  Gated at `ControlReceiver.route` (`serviceEnabled=false` → drop; notification path untouched);
+  pinned by `resume_whileServiceDisabled_isDropped_D160`; AUTOMATION.md/KDoc no-op claims corrected to
+  per-verb truth; DEVICE_TEST §13.43 gains the expectation. `:app`-only. Glue-review of the audit fix:
+  see commit body.
 - 2026-07-08 — folds into 1.8.0/vc18 (owner on-device bug): **D-159** keyboard-tall dead gap at the end
   of the draft-settings screens. `DraftApplyBar` carried `imePadding()` inside the Scaffold `bottomBar`,
   so an open keyboard inflated the bar's height and Scaffold reserved that as content bottom-padding — a

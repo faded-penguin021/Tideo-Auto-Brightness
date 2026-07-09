@@ -57,8 +57,29 @@ class ControlReceiverTest {
     @Test
     fun pause_routesToPauseAction() = assertRoutes(ControlReceiver.ACTION_PAUSE, AmbientMonitoringService.ACTION_PAUSE)
 
+    /** Explicitly seeded enabled (not the default): the shared settings singleton may carry
+     *  `serviceEnabled=false` from a sibling test, and D-160 gates RESUME on it. */
     @Test
-    fun resume_routesToResumeAction() = assertRoutes(ControlReceiver.ACTION_RESUME, AmbientMonitoringService.ACTION_RESUME)
+    fun resume_routesToResumeAction() {
+        seed(AabSettings(serviceEnabled = true))
+        assertRoutes(ControlReceiver.ACTION_RESUME, AmbientMonitoringService.ACTION_RESUME)
+    }
+
+    /**
+     * D-160: the F74 resurrect contract must not leak onto the external surface. RESUME while the user
+     * has the service disabled is dropped at the receiver — otherwise `startForegroundService` CREATES
+     * the service and the deliberately ungated service-side ACTION_RESUME (`ensureRunning()`) starts the
+     * pipeline against the persisted disable, the D-140 zombie class.
+     */
+    @Test
+    fun resume_whileServiceDisabled_isDropped_D160() {
+        seed(AabSettings(serviceEnabled = false))
+        runBlocking { receiver.route(application, ControlReceiver.ACTION_RESUME) }
+        assertNull(
+            shadowOf(application).nextStartedService,
+            "external RESUME while the service is disabled must not reach the service",
+        )
+    }
 
     @Test
     fun reapply_routesToReapplyAction() = assertRoutes(ControlReceiver.ACTION_REAPPLY, AmbientMonitoringService.ACTION_REAPPLY)

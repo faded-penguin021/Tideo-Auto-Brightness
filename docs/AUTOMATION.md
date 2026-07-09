@@ -31,8 +31,11 @@ Send these as broadcasts. All actions share the namespace `com.tideo.autobrightn
 | `LOAD_PROFILE` | Load a saved profile — pass its name in a **string extra** named `name` |
 | `CONTEXTS_RESUME` | Clear a manually loaded profile and hand control back to context rules |
 
-`LOAD_PROFILE` with an unknown or missing `name` is a no-op. `PAUSE`/`RESUME`/`REAPPLY`/`PANIC` sent
-while the service is not running are safe no-ops.
+`LOAD_PROFILE` with an unknown or missing `name` is a no-op. While the service is not running,
+each verb behaves as follows: `PAUSE` and `REAPPLY` are safe no-ops; `RESUME` is ignored while you
+have the service turned **off** (it only resumes a paused service, or restarts one Android killed —
+it never overrides your master switch); `PANIC` always works — it restores brightness and display
+settings to safe values and then stops, which is exactly what a panic is for.
 
 ### `adb` examples
 
