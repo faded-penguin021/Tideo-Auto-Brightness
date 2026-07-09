@@ -64,6 +64,13 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-08 — folds into 1.8.0/vc18 (owner on-device bug): **D-159** doubled IME padding on the
+  draft-settings screens. `MainActivity` never opted into edge-to-edge, so targetSdk-36/Android-15 drew
+  the window edge-to-edge while leaving the IME in `ADJUST_RESIZE` — a focused numeric field lifted the
+  sticky Apply bar TWICE (window resize + `imePadding()`), leaving a keyboard-tall gap. Fix: one line —
+  `enableEdgeToEdge()` in `onCreate`, making `imePadding()` authoritative. `:app`-only; no
+  `:domain`/`:platform`/goldens touched. Ladder green (assembleDebug + testDebugUnitTest + lintDebug).
+  Pre-15 on-device visual re-check is an owner step.
 - 2026-07-08 — docs/copy-only (user-guide accuracy audit): corrected `guide_s5_body` (Profile Management).
   It claimed "the default profile is modifiable but not deletable" and named only Battery Saver + Outdoors as
   presets — both stale. Reality (owner-decision 3, S12.6d/G2R-F15): all FIVE built-ins (Default, Battery Saver,

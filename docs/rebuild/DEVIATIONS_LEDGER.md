@@ -2863,3 +2863,21 @@ the permanent registry — never compress or remove them.
   drops all but the 5 newest). Tests +11 (`CrashLogStoreTest` rotation/read + handler
   delegate/idempotency, `ToolsDiagnosticsTest` copy/empty + a11y gate, `AabApplicationTest` manifest
   wiring). Folds into 1.8.0/vc18 (`18.txt` +1 line). Closes the a11y-diagnostics plan.
+
+- **D-159: `enableEdgeToEdge()` fixes the doubled IME padding on the draft-settings screens.**
+  Bug (owner on-device, Super Dimming "Circadian dim spread" field): tapping any numeric field on a
+  draft-settings screen (`DraftSettingsScaffold` — Curve & Brightness / Reactivity / Circadian / Super
+  Dimming) left a keyboard-tall empty gap between the sticky Discard/Apply bar and the keyboard. Root
+  cause: `MainActivity` never called `enableEdgeToEdge()`
+  (`WindowCompat.setDecorFitsSystemWindows(window, false)`), yet the inset design already assumes
+  edge-to-edge — M3 `Scaffold`/`TopAppBar` consume the status-bar inset and `DraftApplyBar` lifts over
+  the keyboard with `navigationBarsPadding().imePadding()`. With targetSdk 36 on Android 15+ the window
+  is drawn edge-to-edge **but the IME stays in the legacy `ADJUST_RESIZE` mode**, so a focused field
+  BOTH shrinks the window (moving the bottom bar up to the keyboard top) AND applies `imePadding()`
+  (another keyboard height) → lifted twice. Fix: one line — `enableEdgeToEdge()` in
+  `MainActivity.onCreate` before `setContent`. Switches the IME to the inset-dispatch model (no window
+  resize), making `imePadding()` the single source of truth; also makes API 31–34 behave identically
+  (previously non-edge-to-edge — every screen already consumes its own system-bar insets, so no new
+  clipping). No Android-15 drawing change (already forced edge-to-edge there); the only visible delta on
+  the affected device is the removed gap. `:app`-only, one call site; `:domain`/`:platform`/goldens
+  untouched. Pre-15 on-device visual re-check is an owner step (no emulator in CI). Folds into 1.8.0/vc18.
