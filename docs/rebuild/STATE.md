@@ -30,8 +30,29 @@ broadcast surface for the control verbs + `LOAD_PROFILE`/`CONTEXTS_RESUME`, plus
 crash-log capture** (units A0–A7 + C1) — conventions **D-156**, crash capture **D-158**. `changelogs/18.txt`
 final (455 chars). No active multi-unit work; both persisted plan files deleted at their final units.
 
+**Pre-release audit passed (2026-07-09, Fable):** the 1.8.0 branch was audited end-to-end — D-157
+design/tests/docs validated; one real finding fixed (**D-160**, external RESUME zombie gate) and
+`DEVICE_TEST_SCRIPT.md` **§14** (edge-to-edge/IME sweep) added; the branch sits directly on main
+HEAD (no rebase needed; `claude/intent-control-u4-i2i7e1` is fully subsumed — 0 unique commits —
+delete both branches after merge). **Full 5-rung ladder green in-session 2026-07-09.**
+
 `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
-`parity_gaps.md` has 0 open gaps. **Owner actions pending: none** (H4/D-135 + H5/D-137 done 2026-07-07).
+`parity_gaps.md` has 0 open gaps. H4/D-135 + H5/D-137 done 2026-07-07.
+
+**Owner actions pending (the 1.8.0 release path):**
+
+1. **PR is deliberately deferred until the F-Droid review completes** (owner decision 2026-07-09) —
+   CI (build/CodeQL/release-preflight) first runs there; the local ladder above is the equivalent
+   build.yml task set. When ready, open it from `claude/user-guide-accuracy-check-i5fxex` → `main`.
+   Ready-made draft (no `[skip ci]`-class tokens, D-115):
+   - *Title:* `1.8.0: intent control (D-157), TalkBack a11y (D-156/D-158), IME fix (D-159), RESUME gate (D-160)`
+   - *Body bullets:* opt-in automation surface (verbs + LOAD_PROFILE/CONTEXTS_RESUME + outbound
+     STATE_CHANGED; docs/AUTOMATION.md) · TalkBack backlog A0–A7 + crash-log capture C1 · D-159
+     three-part IME fix · D-160 audit fix (glue-review verdicts in the U2/U5/38c66cd commit bodies) ·
+     owner on-device checklist = DEVICE_TEST §§12–14 · vc18/1.8.0, changelog 455 chars.
+2. After CI green: on-device pass of `DEVICE_TEST_SCRIPT.md` **§12 (TalkBack), §13 (automation), §14
+   (insets)**; findings → "Gate findings" here.
+3. Squash-merge, cut **v1.8.0 / vc18** from `main` via the Release UI, then delete both work branches.
 
 How changes are made now: see `RUNBOOK.md` (change-type playbooks; the **glue-review protocol**
 is mandatory for `:platform`/runtime diffs; multi-session features follow the playbook-5
@@ -64,6 +85,10 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-09 — no-code (pre-release audit close-out): full 5-rung ladder green on the 1.8.0 branch
+  in-session (goldens incl.); `changelogs/18.txt` re-verified 455 chars; Current-state rewritten with
+  the owner release path (PR deferred until F-Droid review — owner decision — with a ready-made PR
+  draft above); branch topology verified (based on main HEAD; `intent-control-u4` subsumed, 0 unique).
 - 2026-07-09 — docs-only (pre-release audit): `DEVICE_TEST_SCRIPT.md` gains **§14 edge-to-edge +
   keyboard insets** (items 47–50) — the D-159 `enableEdgeToEdge()` change is app-wide and invisible
   to CI, but had no on-device checklist entry; §14 covers the draft-screen keyboard lift (the
