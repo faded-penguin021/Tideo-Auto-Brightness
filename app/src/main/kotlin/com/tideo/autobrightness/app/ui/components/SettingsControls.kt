@@ -289,13 +289,16 @@ fun DraftApplyBar(
         // the nav bar (worst with 3-button navigation, which is taller than the gesture pill). Unlike
         // the per-rule editor Dialog (D-098, where the nav-bar inset is never delivered to the dialog
         // window), this bar lives in the MainActivity window, so navigationBarsPadding() resolves
-        // correctly; it reads 0 on pre-15 non-edge-to-edge windows, so no double padding. imePadding()
-        // lifts the bar above the keyboard while a field is being edited.
+        // correctly; it reads 0 on pre-15 non-edge-to-edge windows, so no double padding.
+        // D-159: the keyboard lift is applied at the *Scaffold* level (DraftSettingsScaffold), NOT here.
+        // imePadding() on this bottom-bar Column inflated the bar's measured height by a whole keyboard,
+        // which Scaffold then reserved as content bottom-padding — a keyboard-tall dead gap at the end of
+        // the scroll, visible whenever the bottommost field was focused. Scaffold-level imePadding lifts
+        // the whole scaffold (bar included) above the keyboard with no dead space.
         Column(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .imePadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             if (criticalError) {
@@ -348,7 +351,13 @@ fun DraftSettingsScaffold(
     val attemptBack: () -> Unit = { if (dirty) showConfirm = true else onNavigateBack() }
     BackHandler(enabled = true) { attemptBack() }
 
+    // D-159: imePadding() at the Scaffold level shrinks the whole scaffold above the keyboard, so the
+    // sticky [DraftApplyBar] sits just over it and the scroll's content-padding reserves only the bar's
+    // own height (no keyboard-tall dead zone at the end of the list). Relies on the edge-to-edge
+    // inset-dispatch model (MainActivity.enableEdgeToEdge, D-159) so the IME arrives as an inset here
+    // rather than resizing the window.
     Scaffold(
+        modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 title = { Text(title) },

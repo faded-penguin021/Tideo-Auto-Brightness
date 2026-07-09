@@ -2864,20 +2864,26 @@ the permanent registry — never compress or remove them.
   delegate/idempotency, `ToolsDiagnosticsTest` copy/empty + a11y gate, `AabApplicationTest` manifest
   wiring). Folds into 1.8.0/vc18 (`18.txt` +1 line). Closes the a11y-diagnostics plan.
 
-- **D-159: `enableEdgeToEdge()` fixes the doubled IME padding on the draft-settings screens.**
-  Bug (owner on-device, Super Dimming "Circadian dim spread" field): tapping any numeric field on a
-  draft-settings screen (`DraftSettingsScaffold` — Curve & Brightness / Reactivity / Circadian / Super
-  Dimming) left a keyboard-tall empty gap between the sticky Discard/Apply bar and the keyboard. Root
-  cause: `MainActivity` never called `enableEdgeToEdge()`
-  (`WindowCompat.setDecorFitsSystemWindows(window, false)`), yet the inset design already assumes
-  edge-to-edge — M3 `Scaffold`/`TopAppBar` consume the status-bar inset and `DraftApplyBar` lifts over
-  the keyboard with `navigationBarsPadding().imePadding()`. With targetSdk 36 on Android 15+ the window
-  is drawn edge-to-edge **but the IME stays in the legacy `ADJUST_RESIZE` mode**, so a focused field
-  BOTH shrinks the window (moving the bottom bar up to the keyboard top) AND applies `imePadding()`
-  (another keyboard height) → lifted twice. Fix: one line — `enableEdgeToEdge()` in
-  `MainActivity.onCreate` before `setContent`. Switches the IME to the inset-dispatch model (no window
-  resize), making `imePadding()` the single source of truth; also makes API 31–34 behave identically
-  (previously non-edge-to-edge — every screen already consumes its own system-bar insets, so no new
-  clipping). No Android-15 drawing change (already forced edge-to-edge there); the only visible delta on
-  the affected device is the removed gap. `:app`-only, one call site; `:domain`/`:platform`/goldens
-  untouched. Pre-15 on-device visual re-check is an owner step (no emulator in CI). Folds into 1.8.0/vc18.
+- **D-159: keyboard-tall dead gap at the end of the draft-settings screens (IME padding on the sticky
+  Apply bar).** Bug (owner on-device, Super Dimming "Circadian dim spread" field): focusing the
+  **bottommost** field of a `DraftSettingsScaffold` screen (Curve & Brightness / Reactivity / Circadian
+  / Super Dimming) opened a keyboard-tall empty gap between the last field / sticky Discard-Apply bar and
+  the keyboard. **Field-specific by symptom, not by cause:** the dead zone exists on every one of these
+  screens, but it lives at the very END of the scroll, so it is only on-screen when the last field is
+  focused (higher fields keep it scrolled off the bottom). Root cause: `DraftApplyBar` carried
+  `Modifier.imePadding()` **inside** the `Scaffold`'s `bottomBar`. When the IME opens, that inflates the
+  bar's measured height by a whole keyboard, and `Scaffold` feeds that height back as the content's
+  bottom `PaddingValues` → the scroll reserves a keyboard-tall strip at its end. **Two-part fix:**
+  (1) `MainActivity.onCreate` now calls `enableEdgeToEdge()`
+  (`WindowCompat.setDecorFitsSystemWindows(window,false)`) so the IME is dispatched as an inset instead
+  of the legacy `ADJUST_RESIZE` window resize (targetSdk 36 on Android 15+ draws edge-to-edge but, absent
+  this call, left the IME resizing — a prerequisite for any Compose ime-inset handling to be correct);
+  (2) the keyboard lift moves from the bottom bar to the **Scaffold** — `DraftSettingsScaffold`'s
+  `Scaffold(modifier = Modifier.imePadding())`, and `DraftApplyBar` drops its own `imePadding()` (keeps
+  `navigationBarsPadding()`). Scaffold-level imePadding shrinks the whole scaffold above the keyboard, so
+  the bar sits just over it and content-padding reserves only the bar's own height — no dead zone.
+  `DraftApplyBar` is also placed **inline** (not as a bottomBar) on `PrivilegedDisplayScreen`, which has
+  no text fields, so dropping its imePadding is inert there. `:app`-only (`MainActivity` +
+  `SettingsControls`); `:domain`/`:platform`/goldens untouched. `enableEdgeToEdge` also aligns API 31–34
+  (every screen already consumes its own system-bar insets, so no new clipping); no Android-15 drawing
+  change. On-device visual re-check is an owner step (no emulator in CI). Folds into 1.8.0/vc18.
