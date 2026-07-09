@@ -73,8 +73,10 @@ One line per shipped change (newest first). Keep terse; details live in the ledg
   `Scaffold(Modifier.imePadding())`, `DraftApplyBar` drops its own imePadding (keeps
   navigationBarsPadding). `:app`-only (MainActivity + SettingsControls); no `:domain`/`:platform`/goldens
   touched. Ladder green (assembleDebug + testDebugUnitTest + lintDebug). On-device visual re-check is an
-  owner step. NOTE: an earlier commit this branch shipped only part (1) and did NOT fix it — part (2) is
-  the actual fix.
+  owner step. NOTE: the fix is the full 3-part edge-to-edge keyboard recipe —
+  (1) `enableEdgeToEdge()`, (2) manifest `android:windowSoftInputMode="adjustResize"`, (3) Scaffold-level
+  `imePadding()`. Earlier branch commits shipped (1) then (3) but omitted (2), and the gap survived;
+  all three are required.
 - 2026-07-08 — docs/copy-only (user-guide accuracy audit): corrected `guide_s5_body` (Profile Management).
   It claimed "the default profile is modifiable but not deletable" and named only Battery Saver + Outdoors as
   presets — both stale. Reality (owner-decision 3, S12.6d/G2R-F15): all FIVE built-ins (Default, Battery Saver,

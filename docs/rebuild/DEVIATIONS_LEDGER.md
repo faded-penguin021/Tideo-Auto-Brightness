@@ -2873,15 +2873,19 @@ the permanent registry — never compress or remove them.
   focused (higher fields keep it scrolled off the bottom). Root cause: `DraftApplyBar` carried
   `Modifier.imePadding()` **inside** the `Scaffold`'s `bottomBar`. When the IME opens, that inflates the
   bar's measured height by a whole keyboard, and `Scaffold` feeds that height back as the content's
-  bottom `PaddingValues` → the scroll reserves a keyboard-tall strip at its end. **Two-part fix:**
-  (1) `MainActivity.onCreate` now calls `enableEdgeToEdge()`
-  (`WindowCompat.setDecorFitsSystemWindows(window,false)`) so the IME is dispatched as an inset instead
-  of the legacy `ADJUST_RESIZE` window resize (targetSdk 36 on Android 15+ draws edge-to-edge but, absent
-  this call, left the IME resizing — a prerequisite for any Compose ime-inset handling to be correct);
-  (2) the keyboard lift moves from the bottom bar to the **Scaffold** — `DraftSettingsScaffold`'s
+  bottom `PaddingValues` → the scroll reserves a keyboard-tall strip at its end. The full edge-to-edge
+  keyboard recipe has **three** parts and only one had been in place; **fix supplies all three:**
+  (1) `MainActivity.onCreate` calls `enableEdgeToEdge()` (`WindowCompat.setDecorFitsSystemWindows(window,
+  false)`) so the framework stops auto-resizing the content view for the IME; (2) the activity declares
+  `android:windowSoftInputMode="adjustResize"` in the manifest (was unset → the system could `ADJUST_PAN`
+  the window, which slides content up and defeats `imePadding()`; with decorFitsSystemWindows=false this
+  flag switches the IME to **inset dispatch** without a physical resize, so `WindowInsets.ime` is
+  reported); (3) the keyboard lift moves from the bottom bar to the **Scaffold** — `DraftSettingsScaffold`'s
   `Scaffold(modifier = Modifier.imePadding())`, and `DraftApplyBar` drops its own `imePadding()` (keeps
   `navigationBarsPadding()`). Scaffold-level imePadding shrinks the whole scaffold above the keyboard, so
-  the bar sits just over it and content-padding reserves only the bar's own height — no dead zone.
+  the bar sits just over it and content-padding reserves only the bar's own height — no dead zone. (First
+  two branch commits shipped parts (1) then (3) but omitted (2) — the manifest flag; without it the IME
+  still panned/resized and the gap survived. All three together are the fix.)
   `DraftApplyBar` is also placed **inline** (not as a bottomBar) on `PrivilegedDisplayScreen`, which has
   no text fields, so dropping its imePadding is inert there. `:app`-only (`MainActivity` +
   `SettingsControls`); `:domain`/`:platform`/goldens untouched. `enableEdgeToEdge` also aligns API 31–34
