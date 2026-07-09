@@ -250,6 +250,29 @@ reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation ap
     `enabled`/`running`/`paused`/`profile`; a final `enabled=false` event fires when the service stops.
     With the Automation-control toggle OFF, **no** events are emitted.
 
+## 14. Edge-to-edge + keyboard insets (D-159) — NEW 1.8.0
+
+`MainActivity` now calls `enableEdgeToEdge()` **app-wide** (plus manifest `adjustResize` and the
+Scaffold-level `imePadding()`), which changed how EVERY screen receives system-bar and keyboard
+insets on API 31–36. CI cannot see insets — this sweep is the only real gate. Test with **gesture
+navigation** first, then repeat the marked items with **3-button navigation** (taller nav bar).
+
+47. **Draft-screen keyboard lift (the D-159 bug itself).** On Curve & Brightness, focus the LAST
+    field of the scroll and type. **Expected:** the keyboard opens, the sticky Discard/Apply bar sits
+    directly ON TOP of the keyboard (lifted once, not twice), and there is NO keyboard-tall empty gap
+    between the last field / bar and the keyboard. Scroll the list while the keyboard is open — the
+    content ends at the bar, no dead zone. Repeat on Super Dimming ("Circadian dim spread", the
+    original repro field). *(both nav modes)*
+48. **Dialog editors unaffected.** Open a Contexts rule editor (Dialog window, D-098) and focus a
+    text field. **Expected:** Save/Cancel stay visible above the keyboard exactly as in 1.7.0 —
+    the activity-level edge-to-edge change must not alter Dialog insets.
+49. **All-screens insets spot-sweep.** Visit Dashboard → Menu → each settings screen → Tools →
+    Profiles → About/Guide. **Expected:** no content under the status bar, no bottom controls clipped
+    by the nav bar (D-100 class), no newly doubled top/bottom padding anywhere. *(both nav modes)*
+50. **Keyboard on non-draft surfaces.** Profiles screen → "Save current as…" name field; Contexts
+    SSID field. **Expected:** the focused field stays visible above the keyboard; no pan-jump of the
+    whole window (adjustResize + inset dispatch, not legacy ADJUST_PAN).
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

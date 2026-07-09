@@ -64,6 +64,11 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-09 — docs-only (pre-release audit): `DEVICE_TEST_SCRIPT.md` gains **§14 edge-to-edge +
+  keyboard insets** (items 47–50) — the D-159 `enableEdgeToEdge()` change is app-wide and invisible
+  to CI, but had no on-device checklist entry; §14 covers the draft-screen keyboard lift (the
+  original bug), Dialog-editor isolation (D-098), an all-screens insets sweep (D-100 class), and
+  non-draft keyboard surfaces, each under gesture AND 3-button nav.
 - 2026-07-09 — folds into 1.8.0/vc18 (pre-release audit finding): **D-160** external `RESUME`
   (D-157 surface) could resurrect a user-disabled service — the F74 "resurrect" contract's implicit
   precondition (paused-override notification ⇒ serviceEnabled) didn't survive the verb's re-exposure.
