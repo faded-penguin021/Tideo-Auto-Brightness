@@ -87,17 +87,19 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-10 — build-config only (D-161 backlog U4): `org.gradle.parallel=true` +
+  `org.gradle.configuration-cache=true`. Measured: session-first build 376 s (pre-flag);
+  post-`clean` 5 s (entry stored), warm no-op ladder 1 s (entry reused), forced Robolectric
+  re-run green under config cache. CI unchanged.
 - 2026-07-10 — docs/process: **D-161** session discipline — new RUNBOOK section (sequential
   execution, ≤ 1 h shippable units, binary acceptance, checkpoint invariant, glue-review at
-  every tier) replaces the retired D-035 model-tier policy; CLAUDE.md protocol points at it;
-  CI on session-branch pushes declined (non-item).
+  every tier) replaces the retired D-035 model-tier policy; CLAUDE.md protocol points at it.
 - 2026-07-10 — docs-only: STATE.md compressed to its length-guard target (per-stage entries
-  collapsed per-feature; details live in the cited D-rows); owner merge-order step added to the
-  release path.
+  collapsed per-feature; details live in the cited D-rows); owner merge-order step added.
 - 2026-07-10 — repo-tooling only: **`scripts/ladder.sh`** — one-command acceptance ladder
   (build.yml task set) + pre-flight guards (STATE length rule; D-115 skip-ci scan pre-push);
-  `--guards-only` for docs-only units. RUNBOOK/CLAUDE.md point at it; their stale
-  "lint vs frozen baseline" comments corrected (no-baseline hard gate since S12.9a).
+  `--guards-only` for docs-only units. RUNBOOK/CLAUDE.md point at it (stale lint-baseline
+  comments fixed).
 - 2026-07-09 — no-code: 1.8.0 pre-release audit close-out — ladder green in-session, owner
   release path rewritten, branch topology verified; DEVICE_TEST §14 added (the D-159 insets
   sweep CI can't see).
