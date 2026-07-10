@@ -85,6 +85,12 @@ registry stays live.
 
 One line per shipped change (newest first). Keep terse; details live in the ledger.
 
+- 2026-07-10 — repo-tooling only: **`scripts/ladder.sh`** — one-command acceptance ladder (the exact
+  `build.yml` task set) behind fast pre-flight guards: the STATE.md length rule (warn >12 KB, fail
+  >32 KB) and the D-115 skip-ci token scan over unmerged commit messages (force-push is forbidden,
+  so a poisoned message must be caught pre-push); `--guards-only` for docs-only units. Allowlisted in
+  `.claude/settings.json`; RUNBOOK/CLAUDE.md ladder sections point at it, and their stale "lint vs
+  frozen baseline" comments corrected (lint is a no-baseline hard gate since S12.9a).
 - 2026-07-09 — no-code (pre-release audit close-out): full 5-rung ladder green on the 1.8.0 branch
   in-session (goldens incl.); `changelogs/18.txt` re-verified 455 chars; Current-state rewritten with
   the owner release path (PR deferred until F-Droid review — owner decision — with a ready-made PR

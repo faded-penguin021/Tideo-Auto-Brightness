@@ -17,7 +17,13 @@
       "Bash(/opt/gradle/bin/gradle:*)",
       "Bash(scripts/setup-android-sdk.sh)",
       "Bash(./scripts/setup-android-sdk.sh)",
-      "Bash(bash scripts/setup-android-sdk.sh)"
+      "Bash(bash scripts/setup-android-sdk.sh)",
+      "Bash(scripts/ladder.sh)",
+      "Bash(scripts/ladder.sh:*)",
+      "Bash(./scripts/ladder.sh)",
+      "Bash(./scripts/ladder.sh:*)",
+      "Bash(bash scripts/ladder.sh)",
+      "Bash(bash scripts/ladder.sh:*)"
     ]
   }
 }

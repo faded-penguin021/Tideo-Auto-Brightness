@@ -30,11 +30,13 @@ each file caps at 200 rows and rolls over `D-… → DA-…` (`_A.md`) `→ DB-�
 ## Build commands
 
 ```bash
+scripts/ladder.sh                 # ALL rungs below in one command, after fast local guards
+                                  # (STATE.md length; D-115 skip-ci scan); --guards-only for docs-only work
 ./gradlew :domain:test            # pure-JVM engine + golden parity tests
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests
 ./gradlew :app:assembleDebug      # APK at app/build/outputs/apk/debug/
-./gradlew :app:lintDebug          # lint vs frozen baseline
+./gradlew :app:lintDebug          # lint (hard gate — no baseline; suppressions in app/lint.xml)
 ```
 
 No KVM → no emulator. Verification = compile + JVM/Robolectric tests; on-device behavior is

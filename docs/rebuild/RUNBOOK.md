@@ -271,14 +271,21 @@ it before commit and record anything durable as a `D-NN`.
 
 ## Acceptance ladder
 
-Run the relevant subset until green (on-device behavior is owner-verified — no emulator, no KVM):
+**One command: `scripts/ladder.sh`** — fast pre-flight guards (the STATE.md length rule;
+the D-115 skip-ci token scan over unmerged commit messages — catch it BEFORE push, since
+force-push is forbidden), then all five rungs in a single Gradle invocation using the exact
+`build.yml` task set (keep script and workflow in lockstep). `scripts/ladder.sh --guards-only`
+covers docs-only changes in seconds; extra args are forwarded to Gradle.
+
+The rungs individually (run the relevant subset until green; on-device behavior is
+owner-verified — no emulator, no KVM):
 
 ```bash
 ./gradlew :domain:test            # pure-JVM engine + golden parity tests
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests
 ./gradlew :app:assembleDebug      # APK
-./gradlew :app:lintDebug          # lint vs frozen baseline
+./gradlew :app:lintDebug          # lint (hard gate — no baseline; targeted suppressions in app/lint.xml)
 ```
 
 ## When CI fails on a PR (workflow vs code)
