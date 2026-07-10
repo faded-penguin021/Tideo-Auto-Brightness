@@ -248,6 +248,11 @@ any moment (rate limit, window end, compaction).
    tier; there is no stronger pass behind you.
 5. **Multi-unit work** uses the playbook-5 persisted-plan pattern (plan file + STATE checklist)
    so any session can resume the backlog mid-stream.
+6. **Recovery.** If the unit in flight has gone wrong, do not flail forward: reset the working
+   tree to the last green checkpoint (`git status` first, then `git reset --hard HEAD` and a
+   careful `git clean` of files you created), re-run `scripts/ladder.sh` to confirm green, then
+   re-attempt smaller. If the dead end taught a durable lesson, record it (STATE line or D-row)
+   before retrying. Pushed checkpoints are immutable — recovery never rewrites pushed history.
 
 ## Glue-review protocol (MANDATORY for `:platform` / `:app` runtime changes)
 

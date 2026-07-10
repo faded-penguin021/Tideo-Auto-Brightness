@@ -13,8 +13,9 @@
 #
 # Guards (fail fast, before any build):
 #   1. STATE.md length rule (mirrors STATE.md's own preamble): warn over the 12 KB
-#      steady-state target, FAIL over the 32 KB hard cap.
-#      (LADDER_STATE_FILE overrides the path — used only by the guard's own tests.)
+#      steady-state target, FAIL over the 32 KB hard cap. 1b: required sections present
+#      (over-compression tripwire). 1c: deviations-ledger rollover reminder (D-153).
+#      (LADDER_STATE_FILE / LADDER_LEDGER_FILE override the paths — guard self-tests only.)
 #   2. D-115 skip-ci token scan over unmerged commit messages (origin/main..HEAD) — the
 #      same fixed-string token set release-preflight.yml enforces at PR time. Catching a
 #      token BEFORE push matters here: force-push is forbidden (CLAUDE.md git rules), so a
@@ -44,6 +45,37 @@ elif [ "$state_bytes" -gt 12288 ]; then
   echo "LADDER WARN: $STATE_FILE is ${state_bytes} B (steady-state target is <= 12 KB — compress soon)"
 else
   echo "LADDER: STATE.md size OK (${state_bytes} B)"
+fi
+
+# --- guard 1b: STATE.md required structure (over-compression tripwire) ---
+# The length-guard preamble says Project + Current state must survive any compression; Decided
+# non-items and the Changelog are the other two load-bearing sections. Losing one = data loss.
+for h in '## Project' '## Current state' '## Decided non-items' '## Changelog'; do
+  grep -qF "$h" "$STATE_FILE" \
+    || fail "$STATE_FILE is missing required section \"$h\" — over-compressed? Restore it (see the length-guard preamble)"
+done
+echo "LADDER: STATE.md required sections present"
+
+# --- guard 1c: deviations-ledger rollover reminder (D-153: 200 rows per file, then _A/_B…) ---
+# (LADDER_LEDGER_FILE overrides the path — used only by the guard's own tests.)
+LEDGER_FILE="${LADDER_LEDGER_FILE:-}"
+if [ -z "$LEDGER_FILE" ]; then
+  LEDGER_FILE=docs/rebuild/DEVIATIONS_LEDGER.md
+  for f in docs/rebuild/DEVIATIONS_LEDGER_B.md docs/rebuild/DEVIATIONS_LEDGER_A.md; do
+    if [ -f "$f" ]; then LEDGER_FILE="$f"; break; fi
+  done
+fi
+if [ -f "$LEDGER_FILE" ]; then
+  ledger_rows=$(grep -cE '^- (\*\*)?D[AB]?-[0-9]' "$LEDGER_FILE" || true)
+  if [ "$ledger_rows" -gt 200 ]; then
+    fail "live ledger $LEDGER_FILE has ${ledger_rows} rows (> 200) — roll over to the next file (D-153)"
+  elif [ "$ledger_rows" -ge 190 ]; then
+    echo "LADDER WARN: live ledger $LEDGER_FILE at ${ledger_rows}/200 rows — rollover soon (D-153)"
+  else
+    echo "LADDER: live ledger OK (${ledger_rows}/200 rows in $LEDGER_FILE)"
+  fi
+else
+  fail "live ledger $LEDGER_FILE not found"
 fi
 
 # --- guard 2: D-115 skip-ci tokens in unmerged commit messages ---

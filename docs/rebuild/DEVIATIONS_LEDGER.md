@@ -2931,3 +2931,24 @@ the permanent registry — never compress or remove them.
   stays mandatory at every tier — the session is its own last reviewer. Declined in the same
   decision (STATE "Decided non-items"): widening build.yml to `claude/**` push events — PR-time CI
   plus the local ladder suffice.
+
+- **D-162: external AI-review triage (Deepseek, 2026-07-10) — accepted the machine-checkable,
+  rejected the cosmetic.** Accepted: (a) ladder guard 1b — STATE.md required-sections tripwire
+  (Project / Current state / Decided non-items / Changelog must survive any compression);
+  (b) guard 1c — live-ledger row counter (warn ≥ 190, fail > 200) so the D-153 rollover is
+  machine-flagged (156/200 when added; live file = highest suffix, `_B` > `_A` > base);
+  (c) RUNBOOK Session-discipline rule 6 "Recovery" — reset to the last green checkpoint, re-run
+  the ladder, re-attempt smaller; never rewrite pushed history; (d) `release-preflight.yml`
+  golden-fixture gate — a PR touching `domain/src/test/resources/golden/` or
+  `domain/src/test/kotlin/.../domain/reference/` must also touch `docs/rebuild/STATE.md`
+  (machine-checks the checkable half of the CLAUDE.md immutability rule; the reviewer still
+  judges the justification). Rejected, with reasons (do not re-litigate without new evidence):
+  structured checkbox output for glue-review (a ticked checklist is exactly as fakeable as the
+  prose verdict it would replace; the protocol's value is the bug-class catalog + the commit-body
+  verdict, and D-161 rule 4 already assumes no stronger reviewer follows); a
+  `.claude/current-ledger` symlink/marker (a second source of truth that can drift — the
+  live-file rule + guard 1c suffice); a session-start "what changed" delta generator (the
+  compressed STATE.md IS that summary — D-161 backlog U2 made it cheap); "contract tests for
+  platform interfaces" (stale premise — 16 Robolectric suites exist and the D-136/D-148
+  glue-seam audit closed exactly that gap); tracking-id branch naming (solo repo; branch names
+  are session-assigned by the harness).

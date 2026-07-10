@@ -70,6 +70,9 @@ registry stays live.
   verification (declined 2026-06-29 as wrong cost/benefit for a solo F-Droid app); widening
   build.yml to `claude/**` push events (declined 2026-07-10 — PR-time CI + the local ladder
   suffice, D-161).
+- **External AI-review suggestions (declined 2026-07-10, reasons in D-162):** glue-review
+  checkbox output; ledger active-file symlink/marker; session-start delta generator; platform
+  contract tests (already exist — D-136/D-148); tracking-id branch names.
 - **Privileged Display (decided at Segments 4.5–5, D-150–D-152):**
   - **Per-toggle orthogonal scheduling** — D-150 built it, the D-151 pivot removed it.
     Scheduling IS "a Contexts rule loads a profile carrying display fields", winner-takes-all.
@@ -86,19 +89,14 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-10 — build-config only (D-161 backlog U4): `org.gradle.parallel=true` +
-  `org.gradle.configuration-cache=true`. Measured: session-first build 376 s (pre-flag);
-  post-`clean` 5 s (entry stored), warm no-op ladder 1 s (entry reused), forced Robolectric
-  re-run green under config cache. CI unchanged.
-- 2026-07-10 — docs/process: **D-161** session discipline — new RUNBOOK section (sequential
-  execution, ≤ 1 h shippable units, binary acceptance, checkpoint invariant, glue-review at
-  every tier) replaces the retired D-035 model-tier policy; CLAUDE.md protocol points at it.
-- 2026-07-10 — docs-only: STATE.md compressed to its length-guard target (per-stage entries
-  collapsed per-feature; details live in the cited D-rows); owner merge-order step added.
-- 2026-07-10 — repo-tooling only: **`scripts/ladder.sh`** — one-command acceptance ladder
-  (build.yml task set) + pre-flight guards (STATE length rule; D-115 skip-ci scan pre-push);
-  `--guards-only` for docs-only units. RUNBOOK/CLAUDE.md point at it (stale lint-baseline
-  comments fixed).
+- 2026-07-10 — repo-tooling/CI/docs (**D-162** external-review triage): ladder guards 1b
+  (STATE structure tripwire) + 1c (ledger rollover counter, 157/200); RUNBOOK recovery rule
+  (Session discipline 6); release-preflight golden-fixture gate (goldens/reference change ⇒
+  STATE.md entry). Declined suggestions recorded in the row + non-items.
+- 2026-07-10 — **D-161 repo-hardening backlog U1–U4** (ships in the single 1.8.0 squash per
+  owner): `scripts/ladder.sh` one-command ladder + machine guards; STATE.md compressed
+  27.6→12 KB; RUNBOOK **Session discipline** (structure replaces the D-035 tier policy);
+  Gradle parallel + config cache (session-first build 376 s; warm re-verify 5 s / 1 s).
 - 2026-07-09 — no-code: 1.8.0 pre-release audit close-out — ladder green in-session, owner
   release path rewritten, branch topology verified; DEVICE_TEST §14 added (the D-159 insets
   sweep CI can't see).

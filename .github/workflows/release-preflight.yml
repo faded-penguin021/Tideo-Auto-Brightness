@@ -74,6 +74,43 @@ jobs:
           echo "No skip-ci tokens in commit messages / PR title. ✓"
 
       # ---------------------------------------------------------------------------------------------
+      # 1b. Golden-fixture immutability gate (D-162). The golden vectors and the transcribed Tasker
+      #     reference implementations are immutable test fixtures (CLAUDE.md): production code
+      #     conforms to THEM, and changing one requires proof the extraction was wrong plus a
+      #     STATE.md entry. This machine-checks the checkable half: a PR that touches a golden
+      #     fixture must also touch docs/rebuild/STATE.md (the justification entry).
+      # ---------------------------------------------------------------------------------------------
+      - name: Golden fixtures immutable unless STATE.md justifies (D-162)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if ! FILES=$(gh pr view "$PR" --json files --jq '.files[].path' 2>/dev/null) || [ -z "$FILES" ]; then
+            echo "::warning::Could not list changed files; skipping the golden-fixture gate."
+            exit 0
+          fi
+          golden=false state=false
+          while IFS= read -r f; do
+            case "$f" in
+              domain/src/test/resources/golden/*) golden=true ;;
+              domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/*) golden=true ;;
+              docs/rebuild/STATE.md) state=true ;;
+            esac
+          done <<< "$FILES"
+          if [ "$golden" = "true" ] && [ "$state" = "false" ]; then
+            echo "::error::This PR changes golden vectors / reference implementations without touching docs/rebuild/STATE.md."
+            echo "::error::They are immutable fixtures (CLAUDE.md): production code conforms to THEM. Changing one"
+            echo "::error::requires proof the extraction was wrong, recorded as a STATE.md entry (D-162)."
+            exit 1
+          fi
+          if [ "$golden" = "true" ]; then
+            echo "Golden fixtures changed WITH a STATE.md entry — reviewer judges the justification. ✓"
+          else
+            echo "No golden-fixture changes. ✓"
+          fi
+
+      # ---------------------------------------------------------------------------------------------
       # 2. Does this PR ship app code? If EVERY changed file is docs/workflow/test/metadata, the
       #    version+changelog gate is skipped. Anything else (main source, build config, manifest, res,
       #    gradle) counts as shipping.
