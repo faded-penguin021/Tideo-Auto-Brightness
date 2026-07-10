@@ -2914,3 +2914,20 @@ the permanent registry — never compress or remove them.
   a verb/action REUSED by a new entry surface inherits gates it never had — when exposing an existing
   action externally, re-derive each implicit precondition of its old triggers ("asymmetric sibling
   gates", D-142 family). `:app`-only; `:domain`/`:platform`/goldens untouched. Folds into 1.8.0/vc18.
+
+- **D-161: session discipline — the model-tier review policy is retired and replaced by structure.**
+  Owner instruction (2026-07-10; budget context: the strongest-model window is closing and later
+  maintenance sessions may run on lesser models, strictly one tool call at a time). D-035's answer
+  to the D-030/D-034 class — Sonnet segments passed their own acceptance gates, review still found
+  shipped glue bugs, so code segments went Opus-only — is no longer reliably affordable, and tier
+  policy never fixed the underlying gap anyway: self-acceptance is blind to what it doesn't test.
+  The replacement is RUNBOOK **"Session discipline"** (binding for every session, any model):
+  (1) strictly sequential — no parallel subagents, one unit at a time (generalizes D-133's
+  sequential-segments rule to all work; the owner reports a prior parallel-subagent session burned
+  a full 5-hour usage window); (2) units ≤ ~1 focused hour, independently shippable; (3) hard
+  BINARY acceptance per unit (tests / `scripts/ladder.sh` / scripted checks — never "looks right");
+  (4) checkpoint invariant: acceptance green → STATE Changelog line → commit → push, so an
+  interrupted session loses at most the unit in flight; (5) the glue-review protocol (D-133/H1)
+  stays mandatory at every tier — the session is its own last reviewer. Declined in the same
+  decision (STATE "Decided non-items"): widening build.yml to `claude/**` push events — PR-time CI
+  plus the local ladder suffice.

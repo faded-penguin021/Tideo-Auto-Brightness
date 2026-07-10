@@ -68,7 +68,9 @@ registry stays live.
 - **Repo/process (2026-06/07):** root `CHANGELOG.md` (redundant with STATE + fastlane + the
   ledger); speculative dependency-currency bumps (only on a security advisory); a standalone
   doc-drift audit (RUNBOOK self-adaptation covers it); action SHA-pinning / Gradle dependency
-  verification (declined 2026-06-29 as wrong cost/benefit for a solo F-Droid app).
+  verification (declined 2026-06-29 as wrong cost/benefit for a solo F-Droid app); widening
+  build.yml to `claude/**` push events (declined 2026-07-10 — PR-time CI + the local ladder
+  suffice, D-161).
 - **Privileged Display (decided at Segments 4.5–5, D-150–D-152):**
   - **Per-toggle orthogonal scheduling** — D-150 built it, the D-151 pivot removed it.
     Scheduling IS "a Contexts rule loads a profile carrying display fields", winner-takes-all.
@@ -85,6 +87,10 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-10 — docs/process: **D-161** session discipline — new RUNBOOK section (sequential
+  execution, ≤ 1 h shippable units, binary acceptance, checkpoint invariant, glue-review at
+  every tier) replaces the retired D-035 model-tier policy; CLAUDE.md protocol points at it;
+  CI on session-branch pushes declined (non-item).
 - 2026-07-10 — docs-only: STATE.md compressed to its length-guard target (per-stage entries
   collapsed per-feature; details live in the cited D-rows); owner merge-order step added to the
   release path.

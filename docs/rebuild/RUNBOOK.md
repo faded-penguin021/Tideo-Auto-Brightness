@@ -228,6 +228,27 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
 - **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
   If anything here was wrong/stale, fix this section in the same change.
 
+## Session discipline (BINDING for every maintenance session — D-161)
+
+Structural rules replacing the retired model-tier policy: D-035 moved code segments to Opus after
+D-030/D-034 (segments passed their own gates; review still found shipped bugs), but a top-tier
+model is no longer a given — assume this session may run on a lesser model and may be cut off at
+any moment (rate limit, window end, compaction).
+
+1. **Strictly sequential.** No parallel subagents; one unit of work at a time (the D-133
+   sequential-segments rule, generalized to all work). Parallel agent fan-out has burned an
+   entire usage window before; it is never the cheap path here.
+2. **Small, shippable units.** ≤ ~1 focused hour each, independently shippable, with a hard
+   **binary** acceptance check (tests / `scripts/ladder.sh` / a scripted comparison — never
+   "looks right"). Prefer mechanical steps with hard gates over judgment calls.
+3. **Checkpoint invariant.** Every unit ends: acceptance green → STATE.md Changelog line →
+   commit → push. Never start a second unit on top of an uncommitted first — an interrupted
+   session must lose at most the unit in flight.
+4. **You are the last reviewer.** The glue-review protocol (below) is mandatory at every model
+   tier; there is no stronger pass behind you.
+5. **Multi-unit work** uses the playbook-5 persisted-plan pattern (plan file + STATE checklist)
+   so any session can resume the backlog mid-stream.
+
 ## Glue-review protocol (MANDATORY for `:platform` / `:app` runtime changes)
 
 Any change touching a `:platform` adapter or `:app` runtime glue (service, pipeline controller,
