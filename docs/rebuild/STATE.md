@@ -37,21 +37,20 @@ No active multi-unit work; all persisted plan files deleted.
 
 1. **PR is deliberately deferred until the F-Droid review completes** (owner decision
    2026-07-09) — CI (build/CodeQL/release-preflight) first runs there; the local ladder is the
-   equivalent build.yml task set. When ready, open it from
-   `claude/user-guide-accuracy-check-i5fxex` → `main`. Ready-made draft (no `[skip ci]`-class
-   tokens, D-115):
-   - *Title:* `1.8.0: intent control (D-157), TalkBack a11y (D-156/D-158), IME fix (D-159), RESUME gate (D-160)`
+   equivalent build.yml task set. **ONE PR** (owner decision 2026-07-10): open it from
+   `claude/fable-model-improvements-3r07qs` → `main` — it supersets the 1.8.0 branch, so
+   `user-guide-accuracy-check-i5fxex` and `intent-control-u4-i2i7e1` are **deleted unmerged**
+   (both fully contained, 0 unique commits). Ready-made draft (no `[skip ci]`-class tokens, D-115):
+   - *Title:* `1.8.0: intent control (D-157), a11y (D-156/D-158), IME fix (D-159), RESUME gate (D-160) + repo hardening (D-161)`
    - *Body bullets:* opt-in automation surface (verbs + LOAD_PROFILE/CONTEXTS_RESUME + outbound
      STATE_CHANGED; docs/AUTOMATION.md) · TalkBack backlog A0–A7 + crash-log capture C1 · D-159
      three-part IME fix · D-160 audit fix (glue-review verdicts in the U2/U5/38c66cd commit
-     bodies) · owner on-device checklist = DEVICE_TEST §§12–14 · vc18/1.8.0, changelog 455 chars.
-2. **Merge order:** the repo-hardening branch `claude/fable-model-improvements-3r07qs` **stacks
-   on** the 1.8.0 branch — squash-merge `claude/user-guide-accuracy-check-i5fxex` **first**, then
-   open/merge the fable branch's PR (it will then diff only the hardening units). After both:
-   delete all session branches (`intent-control-u4-i2i7e1` is fully subsumed — 0 unique commits).
-3. After CI green: on-device pass of `DEVICE_TEST_SCRIPT.md` **§12 (TalkBack), §13 (automation),
+     bodies) · repo hardening (ladder.sh guards, STATE compression, D-161 session discipline,
+     Gradle parallel/config-cache) · owner on-device checklist = DEVICE_TEST §§12–14 ·
+     vc18/1.8.0, changelog 455 chars.
+2. After CI green: on-device pass of `DEVICE_TEST_SCRIPT.md` **§12 (TalkBack), §13 (automation),
    §14 (insets)**; findings → "Gate findings" here.
-4. Cut **v1.8.0 / vc18** from `main` via the Release UI.
+3. Cut **v1.8.0 / vc18** from `main` via the Release UI.
 
 How changes are made now: see `RUNBOOK.md` (change-type playbooks; the **glue-review protocol**
 is mandatory for `:platform`/runtime diffs; multi-session features follow the playbook-5
