@@ -28,7 +28,9 @@ for automation frameworks** (Tasker / MacroDroid, **D-157**; user reference `doc
 and (b) the **A11y (TalkBack) backlog + crash-log capture** (**D-156**, **D-158**), plus the
 **D-159** IME fix and the **D-160** audit fix. `changelogs/18.txt` final (455 chars). Pre-release
 audit passed 2026-07-09 (Fable): full 5-rung ladder green in-session; branch topology verified.
-No active multi-unit work; all persisted plan files deleted.
+**Active work:** final pre-merge adversarial audit pass — see `plans/final-audit-pass.md`
+(baseline ladder green at `53a37e6`; coordinator review clean; 3 audit-agent reports being
+collected → next session triages + fixes per the plan's resume protocol).
 
 `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
 `parity_gaps.md` has 0 open gaps.
