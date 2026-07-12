@@ -61,7 +61,7 @@
   sliders, Tasker ranges disjoint 0..75/150..255 — and `zone2End≥zone1End` via text fields)
   need the mechanism fix: **apply() snaps the draft to the validated copy it commits** (+ epoch
   bump so seed-once fields rebind).
-- **B1 — VERIFIED REAL (fix unit 3).** `PanicGate.canArm` clears `consumed` on a single
+- **B1 — FIXED (unit 3, D-165; ladder green, glue-review clean).** `PanicGate.canArm` clears `consumed` on a single
   instantaneous `!upsideDown` sample; the window comment (PanicSensorSource.kt ~224-230) itself
   documents that same-axis shakes flicker exactly that signal. Fix note: α=0.9 low-pass means one
   strong spike keeps `isUpsideDown` false ~5-6 frames at rest — a 5-frame debounce is NOT enough;

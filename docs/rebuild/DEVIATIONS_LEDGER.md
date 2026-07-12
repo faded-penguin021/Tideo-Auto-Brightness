@@ -2985,3 +2985,21 @@ the permanent registry — never compress or remove them.
   so a double Apply is a no-op. Test: `apply_snapsDraftToValidatedCommit_soDirtyClears_D164`.
   Rule going forward: any path that persists a TRANSFORMED copy of visible edit state must write
   the transform back to that visible state in the same action.
+
+- **D-165: the panic re-arm latch cleared on a single non-inverted reading — shake flicker could
+  re-open a consumed window (2026-07-12 final-audit pass, finding B1).** `PanicGate.canArm`
+  cleared `consumed` on any instantaneous `!upsideDown` sample, but that signal flickers during a
+  vigorous same-axis shake — the exact artifact the 10 s window was already made immune to
+  (D-116 "shake direction wrong" fix) — and the α=0.9 gravity low-pass keeps it false ~5-6
+  readings after ONE strong spike even held stably inverted. Net effect: timed-out window → keep
+  holding inverted → shake hard = a fresh window opens and a real panic fires (SOS + 255 + full
+  stop) without any flip straight, breaking the Tasker STATE re-entry contract ("won't trigger
+  again until flipped straight and inverted again"). Fix: the latch now clears only after a
+  SUSTAINED straight spell — `PanicGate(rearmFrames = 25)` consecutive non-inverted readings
+  (≈0.5 s at SENSOR_DELAY_GAME ~50 Hz; unreachable by spike/oscillation artifacts, trivial for a
+  genuine flip; sizing note: 5 frames would NOT suffice — single-spike filter recovery alone is
+  ~5-6). All three orientation consumers are now debounced symmetrically (arming
+  `sustainedFrames=5`, the window's run-to-completion, the latch's re-arm spell). Trade: a
+  deliberate flip-straight+re-invert faster than 0.5 s of total straight time no longer re-arms —
+  humanly implausible (arming itself needs 5 sustained inverted frames). Tests: PanicGateTest
+  re-arm spells + `shakeFlickerWhileInverted_doesNotClearTheLatch_D165`.
