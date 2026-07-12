@@ -28,10 +28,12 @@ for automation frameworks** (Tasker / MacroDroid, **D-157**; user reference `doc
 and (b) the **A11y (TalkBack) backlog + crash-log capture** (**D-156**, **D-158**), plus the
 **D-159** IME fix and the **D-160** audit fix. `changelogs/18.txt` final (455 chars). Pre-release
 audit passed 2026-07-09 (Fable): full 5-rung ladder green in-session; branch topology verified.
-No active multi-unit work; all persisted plan files deleted. Residual from the 2026-07-12
-final-audit pass (D-163–D-165, all fixed): the settings/persistence/UI-wiring/domain-boundary
-audit scope never got a full agent pass (its one recovered lead became D-164) — an optional
-follow-up, not a known defect.
+No active multi-unit work; all persisted plan files deleted. The 2026-07-12 final-audit pass is
+fully closed: all three agent scopes audited (D-163–D-165 fixed; the deferred
+settings/persistence/UI-wiring scope re-ran clean in two scoped passes — locale/backup/export
+mechanics, field parsing, wizard boundaries, display-VM applyNow, time-wake edges — with the
+wizard's never-non-finite reliance on the raw `SettingsViewModel.update` path now pinned by
+`WizardDegenerateInputTest`).
 
 `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
 `parity_gaps.md` has 0 open gaps.
@@ -92,12 +94,14 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-12 — final adversarial audit pass (3 agent scopes + coordinator review; everything
-  else audited clean), fixes fold into 1.8.0/vc18: **D-163** rule-removal clears the
+- 2026-07-12 — final adversarial audit pass, CLOSED (all 3 agent scopes + coordinator review;
+  everything else clean), fixes fold into 1.8.0/vc18: **D-163** rule-removal clears the
   location/app signal snapshots + debounce anchor (D-142 siblings); **D-164** draft Apply snaps
-  the draft to the validated copy it commits (fixed point — ends the perpetual-dirty screen from
-  cross-field coercions); **D-165** panic re-arm needs a sustained straight spell (shake flicker
-  can't re-open a consumed window). +4 tests, 2 updated.
+  the draft to the validated copy it commits (ends the perpetual-dirty screen); **D-165** panic
+  re-arm needs a sustained straight spell (shake flicker can't re-open a consumed window). The
+  deferred settings/UI/domain scope re-ran clean (two scoped passes + probe); the wizard
+  abort-or-finite invariant guarding the validate()-free apply path is pinned by
+  `WizardDegenerateInputTest`. +6 tests, 2 updated; no goldens touched.
 
 - 2026-07-10 — repo-tooling/CI/docs (**D-162** external-review triage): ladder guards 1b
   (STATE structure tripwire) + 1c (ledger rollover counter, 157/200); RUNBOOK recovery rule
