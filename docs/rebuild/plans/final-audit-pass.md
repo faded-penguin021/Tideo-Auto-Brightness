@@ -38,6 +38,41 @@
 4. At audit close: delete this plan file (its durable content moves to STATE.md Changelog +
    D-rows), remove the STATE.md Active-work pointer, final ladder, push.
 
+## Triage verdicts (coordinator-verified against code, 2026-07-12)
+
+- **A1 — VERIFIED REAL (fix unit 1).** Confirmed at `ContextEngine.kt`: `refreshSignalListeners`
+  cancels the location/app jobs bare while the wifi branch calls `stopWifiListener()` (cancel +
+  snapshot clear, D-142); the rules collector then fires `evaluate(RESUME)`, which bypasses every
+  PASS-2 veto (`shouldProceed` returns true for RESUME) and matches the stale snapshot.
+  `locationMatches` (domain `ContextMatching.kt:77`) has NO no-fix guard — (0,0) only behaves as
+  "no match" by distance, which is exactly why clearing lat/lon→0.0 is the right mirror of the
+  wifi `""` clear ("report the (0,0) so the gate stays off", `AndroidContextSignalSource`).
+  Also null `lastLocEvalLat/Lon` so the first fresh fix always evaluates (the ≥100 m debounce
+  would otherwise swallow it near the stale anchor). `onScreenOff`'s app-job cancel must NOT
+  clear (holding across screen-off is intentional, like wifi/location riding screen-off).
+  Mirror test `wifiListenerStop_clearsStaleSsid_D142` (ContextEngineTest.kt:520) for both.
+- **C1 — VERIFIED REAL (fix unit 2; this WAS agent C's "draft-apply bug").** `AabSettings.validate()`
+  (`AabSettingsMapper.kt:105-106`) coerces `maxWaitMs` up to `clampedMinWait` cross-field;
+  `DraftSettingsViewModel.apply()` commits the coerced copy but leaves `_draft` raw → draft ≠
+  committed forever (perpetual dirty, slider shows a value that silently didn't persist).
+  Reachable: Misc wait sliders span 1..99 / 2..100 (min=99, max=2 allowed; `minWaitMs>maxWaitMs`
+  is ADVISORY so Apply stays enabled). Same class the G3-F3 clamp-floor fix addressed for
+  per-field ranges — cross-field pairs (also `maxBrightness≥minBrightness` — unreachable via
+  sliders, Tasker ranges disjoint 0..75/150..255 — and `zone2End≥zone1End` via text fields)
+  need the mechanism fix: **apply() snaps the draft to the validated copy it commits** (+ epoch
+  bump so seed-once fields rebind).
+- **B1 — VERIFIED REAL (fix unit 3).** `PanicGate.canArm` clears `consumed` on a single
+  instantaneous `!upsideDown` sample; the window comment (PanicSensorSource.kt ~224-230) itself
+  documents that same-axis shakes flicker exactly that signal. Fix note: α=0.9 low-pass means one
+  strong spike keeps `isUpsideDown` false ~5-6 frames at rest — a 5-frame debounce is NOT enough;
+  use ~25 consecutive non-inverted frames (≈0.5 s at SENSOR_DELAY_GAME) counted inside `PanicGate`
+  (pure, clock-free), `consume()` resets the streak. Update `PanicGateTest` truth table + add a
+  flicker case; PanicSensorSource passes `detector.isUpsideDown` unchanged.
+- **B2/B3/A-obs — NO ACTION.** B2 is the accepted D-145 residual (recorded); B3 is theoretical
+  (EXTRA_TEMPERATURE always present in practice; no reported symptom); A-obs is an OS-constraint
+  behavior with a deliberate design rationale in `sendServiceAction` — candidates for a future
+  backlog, not this pass.
+
 ## Audit-agent findings (raw, UNTRIAGED — leads, not verdicts)
 
 **Agent A (`:app` runtime glue) — delivered.** One ranked finding + one declined observation;
