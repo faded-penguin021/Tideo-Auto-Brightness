@@ -139,6 +139,15 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
         // draft Apply used to bypass it and write the raw draft straight to DataStore. Critical errors
         // (form coefficients) still block Apply earlier via hasCriticalError.
         val toCommit = _draft.value.validate()
+        // D-164: validate() may REWRITE the draft (NaN resets, per-field clamps, cross-field
+        // coercions like maxWaitMs ≥ minWaitMs — reachable from the Misc wait sliders). Snap the
+        // draft to the exact copy being committed so Apply is a FIXED POINT: dirty converges to
+        // false and every control shows the value that actually persisted, instead of a
+        // perpetually-dirty screen whose slider silently disagrees with the DataStore (the G3-F3
+        // failure class, which range-alignment alone cannot fix for cross-field rules). The epoch
+        // bump rebinds seed-once text fields to the snapped values (same contract as discard()).
+        _draft.value = toCommit
+        _epoch.update { it + 1 }
         viewModelScope.launch {
             val committedNow = app.settingsDataStore.updateData { current ->
                 toCommit.copy(

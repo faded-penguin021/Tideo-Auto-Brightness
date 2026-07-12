@@ -2969,3 +2969,19 @@ the permanent registry — never compress or remove them.
   `appPollStop_clearsStaleForegroundApp_D163`. Lesson (extends D-142): when a cleanup/gate rule
   lands on one signal path, enumerate and fix ALL sibling paths in the same change — this
   asymmetry survived three later audits because each verified the wifi fix, not its siblings.
+
+- **D-164: draft Apply was not a fixed point — validate()'s commit-time rewrites left the screen
+  perpetually dirty (2026-07-12 final-audit pass, finding C1).** `AabSettings.validate()` rewrites
+  a committing draft (NaN resets D-146, per-field clamps D-085, and the cross-field coercions
+  `maxWaitMs ≥ minWaitMs` / `maxBrightness ≥ minBrightness` / `zone2End ≥ zone1End`), but
+  `DraftSettingsViewModel.apply()` committed the rewritten copy while leaving `_draft` raw — so
+  draft ≠ committed forever: Apply/Discard bar stuck up, a control showing a value that silently
+  never persisted, repeated Apply never converging. Reachable from the Misc wait sliders (1..99 /
+  2..100 overlap; `minWaitMs > maxWaitMs` is ADVISORY so Apply stays enabled) and from the zone
+  text fields. This is the G3-F3 failure class (committed(1) ≠ draft(0) perpetual-dirty), which
+  G3-F3 fixed by aligning ranges — impossible for cross-field rules. Fix: `apply()` snaps
+  `_draft` to the exact validated copy it commits + bumps `epoch` so seed-once fields rebind
+  (same contract as `discard()`; `remember(epoch)` in SettingsControls). validate() is idempotent,
+  so a double Apply is a no-op. Test: `apply_snapsDraftToValidatedCommit_soDirtyClears_D164`.
+  Rule going forward: any path that persists a TRANSFORMED copy of visible edit state must write
+  the transform back to that visible state in the same action.

@@ -51,7 +51,7 @@
   would otherwise swallow it near the stale anchor). `onScreenOff`'s app-job cancel must NOT
   clear (holding across screen-off is intentional, like wifi/location riding screen-off).
   Mirror test `wifiListenerStop_clearsStaleSsid_D142` (ContextEngineTest.kt:520) for both.
-- **C1 — VERIFIED REAL (fix unit 2; this WAS agent C's "draft-apply bug").** `AabSettings.validate()`
+- **C1 — FIXED (unit 2, D-164; ladder green, glue-review clean; this WAS agent C's "draft-apply bug").** `AabSettings.validate()`
   (`AabSettingsMapper.kt:105-106`) coerces `maxWaitMs` up to `clampedMinWait` cross-field;
   `DraftSettingsViewModel.apply()` commits the coerced copy but leaves `_draft` raw → draft ≠
   committed forever (perpetual dirty, slider shows a value that silently didn't persist).

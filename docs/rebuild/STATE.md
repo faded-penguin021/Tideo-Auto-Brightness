@@ -91,6 +91,9 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-12 — final-audit fix 2/3, folds into 1.8.0/vc18 (**D-164**): draft Apply is now a
+  fixed point — the draft snaps to the validated copy it commits (+epoch rebind), ending the
+  perpetually-dirty screen when validate() rewrites a cross-field pair (Misc wait sliders); +1 test.
 - 2026-07-12 — final-audit fix 1/3, folds into 1.8.0/vc18 (**D-163**): rule-removal now clears
   the location/app signal snapshots + location debounce anchor (the D-142 clear applied to its
   sibling paths); +2 engine tests.

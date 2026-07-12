@@ -113,6 +113,30 @@ class DraftSettingsViewModelTest {
     }
 
     @Test
+    fun apply_snapsDraftToValidatedCommit_soDirtyClears_D164() {
+        // D-164 (audit finding C1): validate() rewrites cross-field pairs on commit — maxWaitMs is
+        // coerced up to minWaitMs — and the Misc wait sliders (1..99 / 2..100) can produce
+        // min=99/max=2 with only an ADVISORY banner. Apply used to commit (99,99) while the draft
+        // kept (99,2): draft ≠ committed forever (perpetually dirty, a slider showing a value that
+        // silently didn't persist — the G3-F3 class, cross-field edition, unfixable by aligning
+        // ranges). apply() must be a FIXED POINT: the draft snaps to the exact validated copy it
+        // commits, dirty converges to false, and the epoch bump rebinds seed-once fields.
+        setBaseline(AabSettings(minWaitMs = 10, maxWaitMs = 50))
+        val vm = seededVm()
+        val epochAtSeed = vm.epoch.value
+        vm.edit { it.copy(minWaitMs = 99, maxWaitMs = 2) }
+        idle()
+        vm.apply()
+
+        val result = awaitCommitted { it.minWaitMs == 99 }
+        assertEquals(99, result.maxWaitMs, "validate() coerces maxWaitMs up to minWaitMs on commit")
+        assertEquals(99, vm.draft.value.maxWaitMs, "the draft snaps to the validated copy Apply committed")
+        assertTrue(vm.epoch.value > epochAtSeed, "Apply bumps the epoch so seed-once fields rebind")
+        idle()
+        assertFalse(vm.dirty.value, "Apply must converge: draft == committed after the snap")
+    }
+
+    @Test
     fun apply_preservesServiceEnabledFromCommitted() {
         // serviceEnabled is a runtime/identity field — Apply must not flip the master switch.
         setBaseline(AabSettings(serviceEnabled = false, offset = 0))
