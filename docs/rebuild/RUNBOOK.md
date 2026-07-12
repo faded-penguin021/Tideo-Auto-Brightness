@@ -287,6 +287,12 @@ author — hunting specifically the ledger's proven bug classes:
   result overwrites the newer truth, sometimes latching (D-143: an in-flight SSID resolve landing
   after `onLost` resurrected a "connected" state; a late failed resolve wiped a confirmed SSID
   and the resolved-network skip then blocked recovery until reconnect).
+- **persisting a TRANSFORMED copy of visible edit state without writing the transform back** —
+  any commit path that validates/clamps/coerces on the way to disk must snap the visible state
+  (draft, field, slider) to the exact persisted copy, or the UI diverges permanently from the
+  store (D-164: draft Apply committed `validate()`'s cross-field-coerced copy while the draft
+  kept the raw pair — perpetually dirty screen, a slider showing a value that never persisted;
+  the G3-F3 class, which range-alignment alone cannot fix for cross-field rules).
 
 Rationale (D-030/D-034/D-035): every Sonnet migration segment passed its own acceptance gate,
 yet dedicated review found real shipped bugs in exactly this glue — golden vectors cannot see

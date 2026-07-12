@@ -28,9 +28,10 @@ for automation frameworks** (Tasker / MacroDroid, **D-157**; user reference `doc
 and (b) the **A11y (TalkBack) backlog + crash-log capture** (**D-156**, **D-158**), plus the
 **D-159** IME fix and the **D-160** audit fix. `changelogs/18.txt` final (455 chars). Pre-release
 audit passed 2026-07-09 (Fable): full 5-rung ladder green in-session; branch topology verified.
-**Active work:** final pre-merge adversarial audit pass — see `plans/final-audit-pass.md`
-(baseline ladder green at `53a37e6`; coordinator review clean; 3 audit-agent reports being
-collected → next session triages + fixes per the plan's resume protocol).
+No active multi-unit work; all persisted plan files deleted. Residual from the 2026-07-12
+final-audit pass (D-163–D-165, all fixed): the settings/persistence/UI-wiring/domain-boundary
+audit scope never got a full agent pass (its one recovered lead became D-164) — an optional
+follow-up, not a known defect.
 
 `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
 `parity_gaps.md` has 0 open gaps.
@@ -91,15 +92,12 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-12 — final-audit fix 3/3, folds into 1.8.0/vc18 (**D-165**): the panic re-arm latch
-  now needs a sustained straight spell (25 readings) — shake flicker can no longer re-open a
-  consumed window and fire a panic without a genuine flip; +1 gate test, 2 updated.
-- 2026-07-12 — final-audit fix 2/3, folds into 1.8.0/vc18 (**D-164**): draft Apply is now a
-  fixed point — the draft snaps to the validated copy it commits (+epoch rebind), ending the
-  perpetually-dirty screen when validate() rewrites a cross-field pair (Misc wait sliders); +1 test.
-- 2026-07-12 — final-audit fix 1/3, folds into 1.8.0/vc18 (**D-163**): rule-removal now clears
-  the location/app signal snapshots + location debounce anchor (the D-142 clear applied to its
-  sibling paths); +2 engine tests.
+- 2026-07-12 — final adversarial audit pass (3 agent scopes + coordinator review; everything
+  else audited clean), fixes fold into 1.8.0/vc18: **D-163** rule-removal clears the
+  location/app signal snapshots + debounce anchor (D-142 siblings); **D-164** draft Apply snaps
+  the draft to the validated copy it commits (fixed point — ends the perpetual-dirty screen from
+  cross-field coercions); **D-165** panic re-arm needs a sustained straight spell (shake flicker
+  can't re-open a consumed window). +4 tests, 2 updated.
 
 - 2026-07-10 — repo-tooling/CI/docs (**D-162** external-review triage): ladder guards 1b
   (STATE structure tripwire) + 1c (ledger rollover counter, 157/200); RUNBOOK recovery rule
