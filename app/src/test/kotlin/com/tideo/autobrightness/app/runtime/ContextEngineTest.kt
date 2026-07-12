@@ -500,13 +500,14 @@ class ContextEngineTest {
         scope.cancel()
     }
 
-    /** Source whose [assemble] honours the wifi the engine passes in (the live snapshot), so the
-     *  stale-snapshot clearing on wifi-listener stop can be exercised. */
-    private class PassThroughWifiSource : ContextSignalSource {
+    /** Source whose [assemble] honours the app/wifi the engine passes in (the live snapshot), so
+     *  the stale-snapshot clearing on listener stop can be exercised (D-142 / D-163). */
+    private class PassThroughSource : ContextSignalSource {
         val wifi_ = MutableSharedFlow<String?>(extraBufferCapacity = 16)
+        val appFlow = MutableSharedFlow<String?>(extraBufferCapacity = 16)
         override fun batteryFlow(): Flow<BatterySignal> = MutableSharedFlow()
         override fun wifiFlow(): Flow<String?> = wifi_
-        override fun foregroundAppFlow(intervalMs: Long): Flow<String?> = MutableSharedFlow()
+        override fun foregroundAppFlow(intervalMs: Long): Flow<String?> = appFlow
         override fun locationFlow(): Flow<LocationSignal> = MutableSharedFlow()
         override suspend fun assemble(
             app: String, batteryPercent: Int, plugged: Boolean, wifi: String, lat: Double, lon: Double,
@@ -524,7 +525,7 @@ class ContextEngineTest {
         // callbacks stopped with the listener).
         var now = 0L
         val rulesFlow = MutableStateFlow<List<ContextRule>>(listOf(wifiHomeRule))
-        val src = PassThroughWifiSource()
+        val src = PassThroughSource()
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val engine = ContextEngine(
             rulesProvider = { rulesFlow.value },
@@ -560,6 +561,109 @@ class ContextEngineTest {
         src.wifi_.emit("HomeNet")
         advanceUntilIdle()
         assertEquals("Home Wifi", engine.activeContext.value, "a fresh emission matches again")
+        scope.cancel()
+    }
+
+    @Test
+    fun locationListenerStop_clearsStaleFixAndDebounceAnchor_D163() = runTest {
+        // D-163 (the D-142 asymmetric sibling): stopping the [LOC]-gated listener must clear the
+        // location snapshot — otherwise deleting the last location rule and re-adding one later
+        // (rulesFlow → evaluate(RESUME), which bypasses every PASS-2 veto) matches the STALE fix
+        // captured before the stop, applying e.g. the Home profile at Work until a fresh fix lands.
+        var now = 0L
+        val locRule = ContextRule(
+            id = "loc", name = "AtHome", profile = "Battery Saver", priority = 10,
+            triggers = ContextTriggers(location = LocationTrigger(lat = 10.0, lon = 10.0, radius = 200.0)),
+        )
+        val rulesFlow = MutableStateFlow<List<ContextRule>>(listOf(locRule))
+        val src = FakeSignalSource()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { rulesFlow.value },
+            rulesFlow = rulesFlow,
+            baselineProvider = { baseline },
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { now },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+
+        now = 10_000L
+        src.locations.emit(LocationSignal(10.0, 10.0))
+        advanceUntilIdle()
+        assertEquals("AtHome", engine.activeContext.value, "a fix inside the radius matches the rule")
+
+        // Delete the only location rule: listener stops, baseline restored.
+        now = 20_000L
+        rulesFlow.value = emptyList()
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "no rules → baseline")
+        assertEquals(0, src.locations.subscriptionCount.value, "deleting the last location rule stops the listener")
+
+        // Re-add the rule. The snapshot must NOT still hold the pre-stop fix — the device may have
+        // moved while unobserved (no listener → no updates). Only a fresh fix may match.
+        now = 30_000L
+        rulesFlow.value = listOf(locRule)
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "stale pre-stop fix must not match the re-added rule")
+
+        // A fresh fix inside the radius matches again. This also pins the debounce-anchor reset:
+        // the fresh fix is <100 m from the stale anchor, so a kept lastLocEval* would swallow the
+        // LOCATION evaluation entirely and leave the re-added rule unresolved.
+        now = 40_000L
+        src.locations.emit(LocationSignal(10.0, 10.0))
+        advanceUntilIdle()
+        assertEquals("AtHome", engine.activeContext.value, "a fresh fix matches again")
+        scope.cancel()
+    }
+
+    @Test
+    fun appPollStop_clearsStaleForegroundApp_D163() = runTest {
+        // D-163 (the D-142 asymmetric sibling, app path): stopping the rule-gated foreground poll
+        // must clear the app snapshot — otherwise deleting the last app rule and re-adding one later
+        // matches the STALE package captured before the stop (the user may have left that app while
+        // unobserved). NB the screen-off pause deliberately KEEPS the snapshot (context holds).
+        var now = 0L
+        val rulesFlow = MutableStateFlow<List<ContextRule>>(listOf(videoStreamingRule))
+        val src = PassThroughSource()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { rulesFlow.value },
+            rulesFlow = rulesFlow,
+            baselineProvider = { baseline },
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { now },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+
+        now = 10_000L
+        src.appFlow.emit("com.netflix.mediaclient")
+        advanceUntilIdle()
+        assertEquals("Cinema", engine.activeContext.value, "foreground app matches the rule")
+
+        // Delete the only app rule: poll stops, baseline restored.
+        now = 20_000L
+        rulesFlow.value = emptyList()
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "no rules → baseline")
+        assertEquals(0, src.appFlow.subscriptionCount.value, "deleting the last app rule stops the poll")
+
+        // Re-add the rule. The snapshot must NOT still hold the pre-stop package.
+        now = 30_000L
+        rulesFlow.value = listOf(videoStreamingRule)
+        advanceUntilIdle()
+        assertNull(engine.activeContext.value, "stale pre-stop foreground app must not match the re-added rule")
+
+        // A fresh emission matches again.
+        now = 40_000L
+        src.appFlow.emit("com.netflix.mediaclient")
+        advanceUntilIdle()
+        assertEquals("Cinema", engine.activeContext.value, "a fresh emission matches again")
         scope.cancel()
     }
 

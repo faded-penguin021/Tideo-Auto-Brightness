@@ -2952,3 +2952,20 @@ the permanent registry — never compress or remove them.
   platform interfaces" (stale premise — 16 Robolectric suites exist and the D-136/D-148
   glue-seam audit closed exactly that gap); tracking-id branch naming (solo repo; branch names
   are session-assigned by the harness).
+
+- **D-163: rule-removal left stale location/app signal snapshots — the D-142 clear was applied
+  asymmetrically (2026-07-12 final-audit pass, finding A1).** `ContextEngine.refreshSignalListeners`
+  cancelled the location/app jobs bare while the wifi branch cleared its snapshot (D-142); the
+  rules collector then runs `evaluate(RESUME)` (D-141: cooldown 0, no PASS-2 veto), so deleting a
+  location rule, moving while unobserved (no listener → no updates), and re-adding one matched the
+  STALE pre-stop fix — e.g. the Home profile applied at Work until the next fresh fix, which the
+  kept `lastLocEvalLat/Lon` anchor could itself swallow (a re-add near the old position debounces
+  the first fresh fix as a <100 m move). Same class for the foreground-app poll. Fix:
+  `stopLocationListener()` / `stopAppPoll()` mirror `stopWifiListener` — cancel + clear
+  (lat/lon → (0,0), the AndroidContextSignalSource "no fix" sentinel; app → "") + null the
+  debounce anchors. The screen-off pause deliberately still KEEPS the app snapshot (a context
+  holding across screen-off is intended; only the rule-gated stop clears). Tests:
+  `locationListenerStop_clearsStaleFixAndDebounceAnchor_D163`,
+  `appPollStop_clearsStaleForegroundApp_D163`. Lesson (extends D-142): when a cleanup/gate rule
+  lands on one signal path, enumerate and fix ALL sibling paths in the same change — this
+  asymmetry survived three later audits because each verified the wifi fix, not its siblings.

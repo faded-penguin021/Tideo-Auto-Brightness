@@ -216,9 +216,39 @@ class ContextEngine(
      */
     private suspend fun refreshSignalListeners() {
         val tokens = ContextSignalTokens.from(rulesProvider())
-        if (tokens.usesApps) startAppPollIfNeeded() else { appJob?.cancel(); appJob = null }
-        if (tokens.usesLocation) startLocationListenerIfNeeded() else { locationJob?.cancel(); locationJob = null }
+        if (tokens.usesApps) startAppPollIfNeeded() else stopAppPoll()
+        if (tokens.usesLocation) startLocationListenerIfNeeded() else stopLocationListener()
         if (tokens.usesWifi) startWifiListenerIfNeeded() else stopWifiListener()
+    }
+
+    /**
+     * Stop the rule-gated foreground-app poll AND clear the app snapshot (D-163, the D-142 rule
+     * applied to its sibling path): with the poll gone no fresh package arrives, so a kept value
+     * would go stale unobserved — an app rule re-added later (rulesFlow → evaluate(RESUME), which
+     * bypasses every PASS-2 veto) must only match a FRESH emission. The screen-off pause
+     * ([onScreenOff]) deliberately does NOT clear: the last foreground app legitimately holds while
+     * the display is off, exactly like the wifi/location listeners riding across screen-off.
+     */
+    private fun stopAppPoll() {
+        if (appJob == null) return
+        appJob?.cancel(); appJob = null
+        signalSnapshot.update { it.copy(app = "") }
+    }
+
+    /**
+     * Stop the [LOC]-gated location listener AND clear the location snapshot + debounce anchor
+     * (D-163, the D-142 rule applied to its sibling path). (0.0, 0.0) is the "no fix yet" sentinel
+     * ([AndroidContextSignalSource]): no real-world rule radius reaches null island, so a location
+     * rule re-added later can only match a FRESH fix. The anchor reset makes that first fresh fix
+     * always evaluate — anchored at the stale fix, a re-add near the old position would be swallowed
+     * by the ≥100 m debounce and leave the rule unresolved until the next >100 m move.
+     */
+    private fun stopLocationListener() {
+        if (locationJob == null) return
+        locationJob?.cancel(); locationJob = null
+        signalSnapshot.update { it.copy(lat = 0.0, lon = 0.0) }
+        lastLocEvalLat = null
+        lastLocEvalLon = null
     }
 
     /** Screen ON (prof761 reinit): resume foreground-app polling + re-evaluate time windows. */

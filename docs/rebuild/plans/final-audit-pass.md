@@ -40,7 +40,7 @@
 
 ## Triage verdicts (coordinator-verified against code, 2026-07-12)
 
-- **A1 — VERIFIED REAL (fix unit 1).** Confirmed at `ContextEngine.kt`: `refreshSignalListeners`
+- **A1 — FIXED (unit 1, D-163; ladder green, glue-review clean).** Confirmed at `ContextEngine.kt`: `refreshSignalListeners`
   cancels the location/app jobs bare while the wifi branch calls `stopWifiListener()` (cancel +
   snapshot clear, D-142); the rules collector then fires `evaluate(RESUME)`, which bypasses every
   PASS-2 veto (`shouldProceed` returns true for RESUME) and matches the stale snapshot.

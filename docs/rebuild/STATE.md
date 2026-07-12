@@ -91,6 +91,10 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-12 — final-audit fix 1/3, folds into 1.8.0/vc18 (**D-163**): rule-removal now clears
+  the location/app signal snapshots + location debounce anchor (the D-142 clear applied to its
+  sibling paths); +2 engine tests.
+
 - 2026-07-10 — repo-tooling/CI/docs (**D-162** external-review triage): ladder guards 1b
   (STATE structure tripwire) + 1c (ledger rollover counter, 157/200); RUNBOOK recovery rule
   (Session discipline 6); release-preflight golden-fixture gate (goldens/reference change ⇒
