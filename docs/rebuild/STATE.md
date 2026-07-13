@@ -94,6 +94,14 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-13 — repo-hardening (**D-166** external-review triage, no app code): four prose
+  invariants → mechanism. `build.yml` now invokes `scripts/ladder.sh` (CI/ladder lockstep is
+  structural, not a comment); ladder guards 3 (checkpoint STATE-line tripwire) + 4 (behind-main
+  tripwire), both WARN-only and CI-skipped; `settings.json` deny rules for force-push / push-main;
+  session-start hook prints the STATE pointer + a branch check unconditionally (local sessions no
+  longer go silent). Docs synced. Review item 5 (STATE protected-structure + ask-don't-assume
+  owner protocol + on-device findings intake) deliberately NOT taken — owner-tier process, queued
+  for owner decision.
 - 2026-07-12 — final adversarial audit pass, CLOSED (all 3 agent scopes + coordinator review;
   everything else clean), fixes fold into 1.8.0/vc18: **D-163** rule-removal clears the
   location/app signal snapshots + debounce anchor (D-142 siblings); **D-164** draft Apply snaps

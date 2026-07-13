@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ladder.sh — one-command local acceptance ladder + pre-flight guards.
 #
-# The Gradle task set MUST stay in lockstep with the "Test + lint + assemble" step in
-# .github/workflows/build.yml — RUNBOOK "When CI fails" relies on the local ladder and CI
-# running the SAME tasks. (CLAUDE.md "Build commands" / RUNBOOK "Acceptance ladder" list
-# the same five rungs individually; they remain the ground truth.)
+# build.yml's "Acceptance ladder" step invokes THIS script directly (D-166), so the Gradle
+# task set is shared by construction — there is no hand-maintained lockstep between the two.
+# (CLAUDE.md "Build commands" / RUNBOOK "Acceptance ladder" still list the same five rungs
+# individually; they remain the human-readable ground truth.)
 #
 # Usage:
 #   scripts/ladder.sh                    guards, then the full 5-rung ladder
@@ -23,6 +23,11 @@
 #      squash commit on main, where GitHub silently skips ALL workflows (the v1.2.0
 #      incident). This file's own token list is inert: GitHub and the PR scan read commit
 #      messages/titles, never file contents.
+#   3/4. Local human-in-the-loop advisories (WARN-only; skipped under GITHUB_ACTIONS so they
+#      never add CI noise, D-166): 3 = checkpoint tripwire (code/config changed vs main but
+#      STATE.md carries no matching entry — RUNBOOK Session discipline 3); 4 = stale-branch
+#      tripwire (HEAD behind origin/main invites a squash-merge conflict the green ladder
+#      can't see).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -91,8 +96,28 @@ if git rev-parse --verify -q origin/main >/dev/null; then
     fi
   done
   echo "LADDER: no skip-ci tokens in origin/main..HEAD commit messages"
+
+  # --- guards 3 & 4: local human-in-the-loop advisories (WARN-only; D-166) ---
+  # Skipped under GITHUB_ACTIONS: these target the interactive session workflow, not the CI
+  # gate (CI keeps guards 1/1b/1c/2 above). Both only ever WARN, so they never fail a build.
+  if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
+    # guard 3: checkpoint tripwire (RUNBOOK Session discipline 3). If any non-doc code/config
+    # changed relative to main (committed + working tree) but STATE.md is not in that diff, the
+    # checkpoint invariant's STATE Changelog line is probably still missing.
+    changed=$( { git diff --name-only origin/main..HEAD; git status --porcelain | sed 's/^...//'; } | sort -u )
+    code_changed=$(printf '%s\n' "$changed" | grep -vE '^$|^docs/|(^|/)[^/]*\.md$' || true)
+    if [ -n "$code_changed" ] && ! printf '%s\n' "$changed" | grep -qx 'docs/rebuild/STATE.md'; then
+      echo "LADDER WARN: code/config changed but docs/rebuild/STATE.md is not in the diff — the checkpoint invariant wants a STATE Changelog line before commit (RUNBOOK Session discipline 3)."
+    fi
+    # guard 4: stale-branch tripwire. Behind origin/main invites a squash-merge conflict the
+    # agent's own green ladder can't see; rebase onto main.
+    behind=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
+    if [ "$behind" -gt 0 ]; then
+      echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main — rebase onto main before push to avoid a squash-merge conflict."
+    fi
+  fi
 else
-  echo "LADDER WARN: origin/main unavailable (offline?) — D-115 token scan skipped"
+  echo "LADDER WARN: origin/main unavailable (offline?) — D-115 token scan + branch advisories skipped"
 fi
 
 if [ "$guards_only" -eq 1 ]; then

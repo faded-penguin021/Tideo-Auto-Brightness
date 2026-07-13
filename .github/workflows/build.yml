@@ -57,9 +57,14 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      # The CLAUDE.md acceptance ladder: domain + platform + app tests, lint (hard gate), debug APK.
-      - name: Test + lint + assemble
-        run: ./gradlew :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
+      # The CLAUDE.md acceptance ladder, invoked through the same script the local session runs
+      # (scripts/ladder.sh) so CI and local share ONE task-set definition (D-166) rather than a
+      # hand-maintained copy. The script runs its pre-flight guards (STATE length/structure, ledger
+      # rollover, D-115 skip-ci token scan) and then the five rungs: domain + platform + app tests,
+      # lint (hard gate), debug APK. --no-daemon is forwarded to Gradle. The local-only advisory
+      # guards (checkpoint/stale-branch) self-skip under GITHUB_ACTIONS.
+      - name: Acceptance ladder (scripts/ladder.sh)
+        run: scripts/ladder.sh --no-daemon
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v6

@@ -22,7 +22,9 @@ each file caps at 200 rows and rolls over `D-… → DA-…` (`_A.md`) `→ DB-�
 3. Open the matching change-type playbook in `docs/rebuild/RUNBOOK.md`; read the reference docs
    it names before touching code.
 4. Do the work under RUNBOOK **Session discipline** (D-161: sequential, small checkpointed
-   units, binary acceptance). Consult/flip the rows you affect in `docs/rebuild/PARITY_CHECKLIST.md`.
+   units, binary acceptance). Consult/flip the rows you affect in `docs/rebuild/PARITY_CHECKLIST.md`
+   (only when the change touches a Tasker artifact — most maintenance now doesn't; the checklist is
+   zero-`pending` and recent work is Tasker-independent).
 5. Run the acceptance ladder (below) until green. **Never leave the branch red.**
 6. Update `docs/rebuild/STATE.md` (honor its length guard) and, if the runbook itself was
    insufficient, fix the runbook in the same change.

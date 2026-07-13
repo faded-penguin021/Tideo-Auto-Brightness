@@ -24,6 +24,14 @@
       "Bash(./scripts/ladder.sh:*)",
       "Bash(bash scripts/ladder.sh)",
       "Bash(bash scripts/ladder.sh:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin main)",
+      "Bash(git push -u origin main:*)",
+      "Bash(git push -u origin main)"
     ]
   }
 }

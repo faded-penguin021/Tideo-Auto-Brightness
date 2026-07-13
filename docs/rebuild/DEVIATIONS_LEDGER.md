@@ -3003,3 +3003,32 @@ the permanent registry — never compress or remove them.
   deliberate flip-straight+re-invert faster than 0.5 s of total straight time no longer re-arms —
   humanly implausible (arming itself needs 5 sustained inverted frames). Tests: PanicGateTest
   re-arm spells + `shakeFlickerWhileInverted_doesNotClearTheLatch_D165`.
+
+- **D-166: repo-hardening backlog — turn four load-bearing prose invariants into mechanism
+  (2026-07-13, external-review triage; declined items → non-items).** Each sub-item replaces an
+  instruction-following contract with a structural check, the pattern this repo already trusts
+  (D-115 token scan, guard 1b). **U1 — CI/ladder lockstep is now structural:** `build.yml`'s
+  acceptance step invokes `scripts/ladder.sh --no-daemon` instead of duplicating the five-task
+  Gradle line, so the two can no longer drift (the old "MUST stay in lockstep" comment was the
+  exact kind of prose invariant that rots). This is NOT the declined "widen build.yml to
+  `claude/**` pushes" (non-items 2026-07-10) — same triggers, one source of truth for the task
+  set. CI keeps the length/section/ledger/skip-ci guards for free. **U2 — checkpoint tripwire
+  (ladder guard 3):** WARN when non-doc code/config changed vs `origin/main` (committed + working
+  tree) but `docs/rebuild/STATE.md` is absent from that diff — mechanizes the weakest link of the
+  checkpoint invariant (RUNBOOK Session discipline 3), the most likely single-step omission for a
+  lesser model or a session about to be cut. **U3 — stale-branch tripwire (ladder guard 4):** WARN
+  when HEAD is behind `origin/main` (a stale branch is invisible to a green ladder but becomes the
+  owner's squash-merge conflict). U2/U3 are WARN-only and self-skip under `GITHUB_ACTIONS` (they
+  target the interactive session, not the CI gate — no CI noise). **U4 — git prohibitions as
+  `settings.json` deny rules:** `git push --force`/`-f` and `git push [-u] origin main` are
+  denied, a belt-and-suspenders tripwire behind CLAUDE.md's "never force-push / never push to
+  main" (force-pushing a session branch would destroy the immutable-checkpoint property recovery
+  rule 6 depends on). Prefix-matched, so imperfect (force in a trailing position slips through) —
+  a tripwire, not a guarantee. **U5 — session-start hook no longer goes silent locally:** the SDK
+  bootstrap stays gated on `CLAUDE_CODE_REMOTE`, but the STATE pointer now prints unconditionally
+  and a branch check WARNs on `main`/detached HEAD, closing the window where the first commit of a
+  local/CLI session lands somewhere wrong. Docs synced in the same change (ladder.sh header,
+  RUNBOOK "Acceptance ladder" + "When CI fails", CLAUDE.md PARITY step now parenthesized "only
+  when the change touches a Tasker artifact"). Item 5 of the review (STATE protected-structure +
+  an "ask-don't-assume" owner protocol + findings-intake) was NOT taken here — it reshapes
+  owner-facing process and is an owner-tier call, left queued for the owner to decide.

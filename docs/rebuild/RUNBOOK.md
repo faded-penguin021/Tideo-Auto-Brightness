@@ -305,9 +305,11 @@ it before commit and record anything durable as a `D-NN`.
 
 **One command: `scripts/ladder.sh`** — fast pre-flight guards (the STATE.md length rule;
 the D-115 skip-ci token scan over unmerged commit messages — catch it BEFORE push, since
-force-push is forbidden), then all five rungs in a single Gradle invocation using the exact
-`build.yml` task set (keep script and workflow in lockstep). `scripts/ladder.sh --guards-only`
-covers docs-only changes in seconds; extra args are forwarded to Gradle.
+force-push is forbidden; plus WARN-only checkpoint/stale-branch advisories that self-skip in
+CI), then all five rungs in a single Gradle invocation. **`build.yml`'s "Acceptance ladder"
+step invokes this same script (D-166)**, so CI and local share one task-set definition — there
+is no hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
+seconds; extra args are forwarded to Gradle.
 
 The rungs individually (run the relevant subset until green; on-device behavior is
 owner-verified — no emulator, no KVM):
@@ -322,9 +324,10 @@ owner-verified — no emulator, no KVM):
 
 ## When CI fails on a PR (workflow vs code)
 
-The local ladder (above) and CI (`.github/workflows/build.yml`) run the *same* Gradle tasks, so a
-green local tree usually means green CI. When CI is red but local is green, the failure is in the
-**environment/workflow**, not your code — diagnose before "fixing tests". Triage in this order:
+The local ladder (above) and CI (`.github/workflows/build.yml`) run the *same* script —
+`build.yml` invokes `scripts/ladder.sh` (D-166) — so a green local tree usually means green CI.
+When CI is red but local is green, the failure is in the **environment/workflow**, not your code
+— diagnose before "fixing tests". Triage in this order:
 
 1. **Read the failing step's log** — distinguish the three kinds:
    - **Real failure** (a test assertion, a lint finding, a compile error): reproduce locally with the
