@@ -59,6 +59,11 @@ for h in '## Project' '## Current state' '## Decided non-items' '## Changelog'; 
   grep -qF "$h" "$STATE_FILE" \
     || fail "$STATE_FILE is missing required section \"$h\" — over-compressed? Restore it (see the length-guard preamble)"
 done
+# Owner queue (D-167) is WARN-level: losing it is data loss for the OWNER's pending
+# actions/questions/findings, but shouldn't hard-block an unrelated build — restore it from
+# git history, never let the warning stand.
+grep -qF '## Owner queue' "$STATE_FILE" \
+  || echo "LADDER WARN: $STATE_FILE is missing '## Owner queue' (D-167) — a compression pass ate the owner's pending actions/questions/findings; restore it from git history."
 echo "LADDER: STATE.md required sections present"
 
 # --- guard 1c: deviations-ledger rollover reminder (D-153: 200 rows per file, then _A/_B…) ---

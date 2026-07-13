@@ -253,6 +253,20 @@ any moment (rate limit, window end, compaction).
    careful `git clean` of files you created), re-run `scripts/ladder.sh` to confirm green, then
    re-attempt smaller. If the dead end taught a durable lesson, record it (STATE line or D-row)
    before retrying. Pushed checkpoints are immutable — recovery never rewrites pushed history.
+7. **Ask, don't assume (owner-judgment forks — D-167).** Some decisions are the owner's, and a
+   plausible guess is worse than a pause: the owner has pivoted mid-feature before (D-151
+   removed an entire already-on-branch segment). When a unit hits a fork that is (a)
+   **irreversible or expensive to unwind** (schema migration, deleting a feature, renaming a
+   public surface), (b) **user-visible behavior with no parity source** (no Tasker artifact or
+   golden vector says which way), (c) **semver-ambiguous** (could be read as minor vs major), or
+   (d) **process/policy reshaping** (changing how the owner works, not just the code): do NOT
+   resolve it by picking. Stop at the last green checkpoint, record the question under
+   `STATE.md ## Owner queue` → **Open questions** — the fork, the options, and your
+   recommendation with reasons — then end the unit and move to independent work (or end the
+   session). A session's **final chat message restates the Owner queue** so the owner sees
+   pending items without opening STATE. Routine engineering judgment inside a unit's stated
+   scope is NOT a fork — this rule is for decisions the owner would want to make, not cover for
+   avoiding decisions the agent should make.
 
 ## Glue-review protocol (MANDATORY for `:platform` / `:app` runtime changes)
 

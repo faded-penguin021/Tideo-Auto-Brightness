@@ -3047,3 +3047,25 @@ the permanent registry — never compress or remove them.
   unit's forgotten Changelog line will not warn. Its silence is not confirmation; the checkpoint
   invariant itself still binds every unit (a per-unit check would need a durable last-checkpoint
   marker — declined for now as more state than the WARN is worth).
+
+- **D-167: the human-in-the-loop gap gets structure — Owner queue, ask-don't-assume, findings
+  intake (2026-07-13, external-review item 5, taken on explicit owner approval).** Three gaps,
+  one root cause: owner-facing state had no protected home. (1) **`STATE.md ## Owner queue`** —
+  a guarded section holding *Pending owner actions*, *Open questions* (owner-judgment forks),
+  and *Incoming findings* (on-device test results intake). Previously the 1.8.0 release path
+  lived as prose inside `## Current state` — exactly the section the compression rule tells a
+  future agent to aggressively rewrite, with no guard-1b protection; and the on-device findings
+  pointer targeted a "Gate findings" section that did not exist. Guard 1b now WARNs (not fails)
+  when the header is missing: losing it is owner data loss, but shouldn't hard-block an
+  unrelated build — the warning must never be left standing (restore from git history). The
+  STATE compression preamble names Owner queue as must-survive; open items are never dropped by
+  compression, only closed by the owner. (2) **RUNBOOK Session discipline 7 — ask, don't
+  assume:** at an owner-judgment fork (irreversible/expensive-to-unwind; user-visible with no
+  parity source; semver-ambiguous; process/policy reshaping) the session stops at the last green
+  checkpoint, records the fork + options + recommendation under Open questions, and ends the
+  unit — never resolves owner-tier ambiguity by picking (D-151 is the standing proof the owner's
+  judgment is not predictable from the repo). Bounded explicitly: routine engineering judgment
+  inside a unit's scope is not a fork. (3) A session's final chat message restates the Owner
+  queue, so pending owner items surface without opening STATE. Intake decision: a guarded STATE
+  section was chosen over a dedicated issue template because protocol step 2 guarantees STATE is
+  read every session; an issue template guarantees nothing reads it.

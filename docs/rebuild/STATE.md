@@ -4,8 +4,9 @@
 > 32 KB, aggressively compress before committing:** collapse each completed *Active work* stage
 > into one Changelog line, move any durable gotcha into `DEVIATIONS_LEDGER.md` (the permanent,
 > append-only registry — never compressed), and delete narrative/punch-list prose. The
-> **Project** and **Current state** sections must always survive compression. The full migration
-> narrative is already frozen in `../history/` — do not re-accumulate it here.
+> **Project**, **Current state**, and **Owner queue** sections must always survive compression
+> (Owner queue items are the owner's to close — compress their prose, never drop an open item).
+> The full migration narrative is already frozen in `../history/` — do not re-accumulate it here.
 > (`scripts/ladder.sh` machine-checks this rule: warn > 12 KB, fail > 32 KB.)
 
 ## Project
@@ -27,18 +28,38 @@ minSdk 31, target/compile 36.
 for automation frameworks** (Tasker / MacroDroid, **D-157**; user reference `docs/AUTOMATION.md`)
 and (b) the **A11y (TalkBack) backlog + crash-log capture** (**D-156**, **D-158**), plus the
 **D-159** IME fix and the **D-160** audit fix. `changelogs/18.txt` final (455 chars). Pre-release
-audit passed 2026-07-09 (Fable): full 5-rung ladder green in-session; branch topology verified.
-No active multi-unit work; all persisted plan files deleted. The 2026-07-12 final-audit pass is
-fully closed: all three agent scopes audited (D-163–D-165 fixed; the deferred
-settings/persistence/UI-wiring scope re-ran clean in two scoped passes — locale/backup/export
-mechanics, field parsing, wizard boundaries, display-VM applyNow, time-wake edges — with the
-wizard's never-non-finite reliance on the raw `SettingsViewModel.update` path now pinned by
-`WizardDegenerateInputTest`).
+audit passed 2026-07-09; the 2026-07-12 final adversarial audit is fully closed (all scopes
+clean, D-163–D-165 fixed — see the Changelog + D-rows). No active multi-unit work; all persisted
+plan files deleted.
 
 `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
 `parity_gaps.md` has 0 open gaps.
 
-**Owner actions pending (the 1.8.0 release path):**
+Owner-pending actions live in **`## Owner queue`** below (guarded section — see its preamble).
+
+How changes are made now: see `RUNBOOK.md` (change-type playbooks; the **glue-review protocol**
+is mandatory for `:platform`/runtime diffs; multi-session features follow the playbook-5
+persisted-plan pattern). The migration narrative is frozen in `../history/`; the deviations
+registry stays live.
+
+> Code/docs elsewhere cite deviations by number (e.g. `STATE.md D-048`, `F50`). All deviations
+> — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (200 rows per
+> file, then `_A.md`/DA-…, `_B.md`/DB-… — D-153; gate findings are in
+> `../history/STATE_rebuild.md`). Look there.
+
+## Owner queue
+
+> **Protected section (D-167).** Never delete this section or silently drop its items during a
+> compression pass — `scripts/ladder.sh` guard 1b warns if the header vanishes. Two kinds of
+> items live here, both owner-facing: **Pending owner actions** (things only the owner can do)
+> and **Open questions** (owner-judgment forks a session stopped at instead of guessing —
+> RUNBOOK Session discipline 7, each with options + the session's recommendation). **Incoming
+> findings** is the intake for the owner's on-device test results — the next session's protocol
+> step 2 reads this file, so findings recorded here are guaranteed to be seen. Items leave the
+> queue only when done/answered/triaged (then: delete, and record the outcome as a Changelog
+> line or D-row). A session's final chat message should restate this queue.
+
+**Pending owner actions (the 1.8.0 release path):**
 
 1. **PR is deliberately deferred until the F-Droid review completes** (owner decision
    2026-07-09) — CI (build/CodeQL/release-preflight) first runs there; the local ladder is the
@@ -54,18 +75,14 @@ wizard's never-non-finite reliance on the raw `SettingsViewModel.update` path no
      Gradle parallel/config-cache) · owner on-device checklist = DEVICE_TEST §§12–14 ·
      vc18/1.8.0, changelog 455 chars.
 2. After CI green: on-device pass of `DEVICE_TEST_SCRIPT.md` **§12 (TalkBack), §13 (automation),
-   §14 (insets)**; findings → "Gate findings" here.
+   §14 (insets)**; findings → **Incoming findings** below.
 3. Cut **v1.8.0 / vc18** from `main` via the Release UI.
+4. When merging session branches, note `claude/ladder-checkpoint-improvements-dm4ewz` (D-166/167
+   repo hardening) is independent of the 1.8.0 PR branch — separate squash-merge.
 
-How changes are made now: see `RUNBOOK.md` (change-type playbooks; the **glue-review protocol**
-is mandatory for `:platform`/runtime diffs; multi-session features follow the playbook-5
-persisted-plan pattern). The migration narrative is frozen in `../history/`; the deviations
-registry stays live.
+**Open questions:** (none)
 
-> Code/docs elsewhere cite deviations by number (e.g. `STATE.md D-048`, `F50`). All deviations
-> — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (200 rows per
-> file, then `_A.md`/DA-…, `_B.md`/DB-… — D-153; gate findings are in
-> `../history/STATE_rebuild.md`). Look there.
+**Incoming findings:** (none — on-device results from DEVICE_TEST passes land here)
 
 ## Decided non-items (don't re-litigate without new evidence)
 
@@ -102,100 +119,49 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-13 — **D-166 addendum** (review round 2): guard-4 advice de-contradicted (merge, not
-  rebase — rebasing pushed checkpoints needs a forbidden force-push); `build.yml` `fetch-depth: 0`
-  so guard 2's token scan genuinely runs in CI (it silently self-skipped on the depth-1 checkout);
-  deny rules close the `+refspec`-force and `HEAD:main` bypasses; guard 3's per-branch (not
-  per-unit) residual documented in-script — its silence is not confirmation.
-- 2026-07-13 — repo-hardening (**D-166** external-review triage, no app code): four prose
-  invariants → mechanism. `build.yml` now invokes `scripts/ladder.sh` (CI/ladder lockstep is
-  structural, not a comment); ladder guards 3 (checkpoint STATE-line tripwire) + 4 (behind-main
-  tripwire), both WARN-only and CI-skipped; `settings.json` deny rules for force-push / push-main;
-  session-start hook prints the STATE pointer + a branch check unconditionally (local sessions no
-  longer go silent). Docs synced. Review item 5 (STATE protected-structure + ask-don't-assume
-  owner protocol + on-device findings intake) deliberately NOT taken — owner-tier process, queued
-  for owner decision.
-- 2026-07-12 — final adversarial audit pass, CLOSED (all 3 agent scopes + coordinator review;
-  everything else clean), fixes fold into 1.8.0/vc18: **D-163** rule-removal clears the
-  location/app signal snapshots + debounce anchor (D-142 siblings); **D-164** draft Apply snaps
-  the draft to the validated copy it commits (ends the perpetual-dirty screen); **D-165** panic
-  re-arm needs a sustained straight spell (shake flicker can't re-open a consumed window). The
-  deferred settings/UI/domain scope re-ran clean (two scoped passes + probe); the wizard
-  abort-or-finite invariant guarding the validate()-free apply path is pinned by
-  `WizardDegenerateInputTest`. +6 tests, 2 updated; no goldens touched.
-
-- 2026-07-10 — repo-tooling/CI/docs (**D-162** external-review triage): ladder guards 1b
-  (STATE structure tripwire) + 1c (ledger rollover counter, 157/200); RUNBOOK recovery rule
-  (Session discipline 6); release-preflight golden-fixture gate (goldens/reference change ⇒
-  STATE.md entry). Declined suggestions recorded in the row + non-items.
-- 2026-07-10 — **D-161 repo-hardening backlog U1–U4** (ships in the single 1.8.0 squash per
-  owner): `scripts/ladder.sh` one-command ladder + machine guards; STATE.md compressed
-  27.6→12 KB; RUNBOOK **Session discipline** (structure replaces the D-035 tier policy);
-  Gradle parallel + config cache (session-first build 376 s; warm re-verify 5 s / 1 s).
-- 2026-07-09 — no-code: 1.8.0 pre-release audit close-out — ladder green in-session, owner
-  release path rewritten, branch topology verified; DEVICE_TEST §14 added (the D-159 insets
-  sweep CI can't see).
-- 2026-07-09 — folds into 1.8.0/vc18 (audit finding): **D-160** external `RESUME` could
-  resurrect a user-disabled service — gated at `ControlReceiver.route`; AUTOMATION.md/KDoc
-  corrected to per-verb truth; DEVICE_TEST §13.43.
-- 2026-07-08 — folds into 1.8.0/vc18 (owner on-device bug): **D-159** draft-screen IME dead gap
-  — the 3-part edge-to-edge recipe (all three parts required; the row has it).
-- 2026-07-08 — docs/copy-only: user-guide S5 corrected to shipped profile behavior (all five
-  built-ins editable AND deletable + factory restore); other 8 sections audited accurate.
-- 2026-07-06/07 — 1.8.0/vc18 feature (a): **D-157 intent control** for automation frameworks
-  (`:app`-only) — opt-in exported broadcast surface, default OFF: 7 verbs +
-  `LOAD_PROFILE`/`CONTEXTS_RESUME`, outbound `event.STATE_CHANGED`, Tools card, VM-free
-  `ProfileApplier`, `docs/AUTOMATION.md`, DEVICE_TEST §13. Tests +20; a pre-existing
-  `AmbientMonitoringServiceTest` flake fixed.
-- 2026-07-06/07 — 1.8.0/vc18 feature (b): **D-156 a11y backlog A0–A7** (per-unit
-  `SemanticsAudit` gate; labeled primitives/toggleables/sliders, graph text alternatives,
-  banner liveRegions, 48 dp floor, DEVICE_TEST §12) + **D-158 crash-log capture C1**
-  (`filesDir/crash` 5-ring, always delegates; Tools copy row). Tests +72.
-- 2026-07-07 — owner-completed (no code): H4 (D-135) Dependabot security updates + private
-  vulnerability reporting; H5 (D-137) fdroiddata `Binaries:`/`reproducible: yes`.
-- 2026-07-05 — docs/process: **D-153** ledger 200-row file cap + rollover (summarizing
-  rejected); RUNBOOK <500-char F-Droid `whatsNew` rule (`17.txt` left as-is — vc17 already
-  tagged).
-- 2026-07-03..05 — **1.7.0 / vc17 (MINOR): Privileged Display Control, Segments 1–5** —
-  **D-149** `:platform` `SecureDisplayController` (AOSP-universal keys; Extra Dim excluded);
-  the Privileged Display screen (3-channel grant card, read-back VM); `:domain`
-  `ContextMatching` extraction (goldens untouched); **D-150** display schedules built, then
-  removed by the **D-151** owner pivot (toggles = PROFILE settings via the idempotent
-  `DisplayTogglesCoordinator`); **D-152** profile port (7 `AabSettings` fields, one draft
-  surface, `applyNow` direct-write when the service is off); **D-154** circadian Night Light
-  temperature (task90 tanh, 60 s only-on-change ticker); **D-155** panic resets display toggles
-  to DEFAULTS; OEM ⓘ-dialog polish; OxygenOS Kelvin quirk noted (D-048). Owner checklist
-  DEVICE_TEST §11; plan file deleted at Segment 5 (playbook-5 pattern added to RUNBOOK).
-- 2026-07-03 — repo-tooling only: `setup-android-sdk.sh` seeds the Gradle wrapper cache from
-  `/opt` (the cloud egress proxy 403s the wrapper download).
-- 2026-07-02 — **1.6.2 / vc16 (PATCH): F-backlog U1–U6 CLOSED (D-138–D-148)** — **D-139** panic
-  cancel-and-joins the animation consumer; **D-140** zombie-FGS gates; **D-141** rule-edit
-  cooldown bypass; **D-142** wifi `[WIFI]` gate; **D-143** stale ssidFlow resolves dropped;
-  **D-144** post-death Extra-Dim residual; **D-145** ShizukuShell bind-timeout unbind;
-  **D-146** NaN import guard; **D-147** widget actions off the exported provider; **D-148**
-  last four glue seams (+19 tests); parity transcription spot-check clean (`XML_RECIPES.md`
-  R0); `/security-review` clean.
-- 2026-07-01 — **hardening backlog H1–H5 (D-133–D-137)** — RUNBOOK gains the mandatory
-  **glue-review protocol** (H1); 1.6.1 / vc15 (PATCH) **D-134** saved pre-service brightness
-  mode persisted across process death; **D-136** glue-seam audit + 4 suites (+14 tests);
-  **D-135** `SECURITY.md` + security-only Dependabot; **D-137** release APK proven
-  reproducible. `FABLE_HANDOFF.md` deleted.
-- 2026-06-30 — 1.6.0 / vc14 (MINOR): **D-130** no-Location SSID path (DUMP); **D-131** full UI
-  i18n (ratchet 0); **D-132** plug/unplug bypasses the battery cooldown.
-- 2026-06-29 — CI-only: **D-124** `release-preflight.yml` PR gate; **D-123** `release.yml`
-  reuses the F-Droid changelog as the Release "What's new"; per-job timeouts + wrapper
-  properties in cache keys; stricter supply-chain measures declined with reasons.
-- 2026-06-29 — 1.5.0 / vc13 (MINOR): **D-125** wizard curve suggestion is user-driven;
-  **D-126** resume no longer loops back to paused (F64 settle window).
-- 2026-06-28 — 1.4.0 / vc12 (MINOR): **D-117**–**D-122** (PWM graph, edge-to-edge modal,
-  release-notes auto-append, fresh location, HTTPS geo-IP); 1.3.0 / vc11 (MINOR): **D-116**
-  panic gesture rework; 1.2.1 / vc10 (PATCH re-cut): **D-115** skip-ci token; 1.2.0 / vc9
-  (MINOR): **D-108**–**D-114**; 1.1.1 / vc8 (PATCH): **D-107** explicit PendingIntents.
-- 2026-06-26 — 1.1.0 / vc7 (MINOR): targetSdk/compileSdk 36, Robolectric 4.16.1 (JDK 21),
-  CodeQL, `.debug` suffix (D-106); folded **D-101**–**D-105**. Owner Pass A/B passed.
-- 2026-06-24/25 — early PATCHes: 1.0.4/vc6 **D-100** nav-bar padding; 1.0.3/vc5 **D-098**
-  dialog clip + **D-099** version/tag realignment (RUNBOOK §6 release checklist);
-  **D-096**/**D-097** Wi-Fi context fixes; 1.0.1/vc4 re-tag with `fastlane/`; F-Droid
-  metadata prep.
-- 2026-06-23 — v1.0.0: Tasker→Kotlin rebuild complete; Gate 3 signed off. Full history frozen
-  in `../history/`.
+- 2026-07-13 — **D-167** (owner-approved review item 5): guarded `## Owner queue` STATE section
+  (pending actions / open questions / incoming-findings intake; guard 1b WARN; the 1.8.0 release
+  path moved there from unprotected prose); RUNBOOK Session discipline 7 "ask, don't assume"
+  (owner-judgment forks are queued with options + recommendation, never resolved by picking);
+  sessions restate the queue in their final message.
+- 2026-07-13 — **D-166 (+ addendum)** repo-hardening (external-review triage, no app code): four
+  prose invariants → mechanism. `build.yml` invokes `scripts/ladder.sh` with `fetch-depth: 0`
+  (structural CI/local lockstep; the D-115 token scan genuinely runs in CI); ladder guards 3
+  (checkpoint STATE-line tripwire; per-branch residual documented) + 4 (behind-main → merge, not
+  rebase), WARN-only, CI-skipped; `settings.json` deny rules for force-push / push-main /
+  `+refspec` / `HEAD:main`; session-start hook prints branch check + STATE pointer unconditionally.
+- 2026-07-12 — final adversarial audit CLOSED (all scopes; fixes fold into 1.8.0/vc18):
+  **D-163** rule-removal clears signal snapshots; **D-164** draft Apply snaps to the validated
+  commit; **D-165** panic re-arm needs a sustained straight spell. Deferred settings/UI/domain
+  scope re-ran clean; `WizardDegenerateInputTest` pins the wizard invariant. +6 tests, no goldens.
+- 2026-07-10 — **D-161** repo-hardening U1–U4 (`scripts/ladder.sh`, STATE compressed 27.6→12 KB,
+  RUNBOOK **Session discipline**, Gradle parallel/config-cache — warm re-verify ~1 s) +
+  **D-162** external-review triage (guards 1b/1c, recovery rule, release-preflight
+  golden-fixture gate; declines in the row + non-items).
+- 2026-07-08/09 — 1.8.0 fixes + close-out: **D-159** draft-screen IME dead gap (3-part
+  edge-to-edge recipe); **D-160** external `RESUME` gated at `ControlReceiver.route`
+  (DEVICE_TEST §13.43); pre-release audit green, DEVICE_TEST §14 added; user-guide S5 corrected.
+- 2026-07-06/07 — 1.8.0/vc18 features: **D-157 intent control** (opt-in exported broadcast
+  surface, default OFF — 7 verbs + LOAD_PROFILE/CONTEXTS_RESUME, outbound STATE_CHANGED,
+  `docs/AUTOMATION.md`, DEVICE_TEST §13, +20 tests) + **D-156 a11y A0–A7** / **D-158 crash-log
+  capture C1** (SemanticsAudit gate, DEVICE_TEST §12, +72 tests). Owner completed H4/H5
+  (D-135/D-137 fdroiddata).
+- 2026-07-05 — docs/process: **D-153** ledger 200-row cap + rollover; RUNBOOK <500-char
+  F-Droid `whatsNew` rule.
+- 2026-07-03..05 — **1.7.0 / vc17 (MINOR): Privileged Display Control** (**D-149**–**D-155** +
+  D-048 OEM quirk): `SecureDisplayController`, Privileged Display screen, `ContextMatching`
+  extraction (goldens untouched), D-150 schedules removed by the D-151 owner pivot (toggles =
+  PROFILE settings, `DisplayTogglesCoordinator`), D-152 profile port, D-154 circadian Night
+  Light (task90 tanh), D-155 panic resets toggles. DEVICE_TEST §11; playbook-5 pattern added.
+  Also repo-tooling: `setup-android-sdk.sh` seeds the Gradle wrapper cache from `/opt`.
+- 2026-07-01/02 — 1.6.1 / vc15 + 1.6.2 / vc16 (PATCHes): hardening H1–H5 (**D-133**–**D-137**,
+  RUNBOOK gains the mandatory **glue-review protocol**; reproducible release APK) and F-backlog
+  U1–U6 closed (**D-138**–**D-148**, +19 tests; parity spot-check + `/security-review` clean).
+- 2026-06-26..30 — 1.1.0→1.6.0 (vc7→vc14, MINORs + PATCHes): targetSdk/compileSdk 36 +
+  Robolectric 4.16.1/JDK 21 + CodeQL + `.debug` suffix (**D-101**–**D-106**, owner Pass A/B
+  passed); **D-107**–**D-122** (incl. D-115 skip-ci token, D-116 panic rework); CI
+  release-preflight/release.yml (**D-123**–**D-124**); wizard/resume (**D-125**–**D-126**);
+  no-Location SSID, full i18n, plug/unplug cooldown bypass (**D-130**–**D-132**).
+- 2026-06-23..25 — **v1.0.0: Tasker→Kotlin rebuild complete** (Gate 3 signed off; history frozen
+  in `../history/`); early PATCHes 1.0.1–1.0.4 (**D-096**–**D-100**, F-Droid metadata, RUNBOOK
+  §6 release checklist).
