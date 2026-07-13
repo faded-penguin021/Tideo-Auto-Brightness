@@ -78,6 +78,14 @@ registry stays live.
 - **External AI-review suggestions (declined 2026-07-10, reasons in D-162):** glue-review
   checkbox output; ledger active-file symlink/marker; session-start delta generator; platform
   contract tests (already exist — D-136/D-148); tracking-id branch names.
+- **YAML codification of RUNBOOK/state (declined 2026-07-13):** checkpoint manifest
+  (`checkpoint.yaml`), glue-review YAML pass/fail block, per-playbook test matrices. Re-litigates
+  the D-162 checkbox decline; self-reported flags/attestations can't enforce reviewer attention
+  (Goodhart — the paperwork becomes the target) and duplicate state that git/STATE/the ledger
+  already own; scoped test matrices save nothing when the full ladder re-verifies warm in ~1 s.
+  Enforcement here derives from artifacts the agent produces anyway (diffs, commit messages,
+  file sizes — the D-115/guard-1b/guard-3 pattern), never from artifacts produced to pass the
+  check.
 - **Privileged Display (decided at Segments 4.5–5, D-150–D-152):**
   - **Per-toggle orthogonal scheduling** — D-150 built it, the D-151 pivot removed it.
     Scheduling IS "a Contexts rule loads a profile carrying display fields", winner-takes-all.
