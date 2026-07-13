@@ -102,6 +102,11 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-13 — **D-166 addendum** (review round 2): guard-4 advice de-contradicted (merge, not
+  rebase — rebasing pushed checkpoints needs a forbidden force-push); `build.yml` `fetch-depth: 0`
+  so guard 2's token scan genuinely runs in CI (it silently self-skipped on the depth-1 checkout);
+  deny rules close the `+refspec`-force and `HEAD:main` bypasses; guard 3's per-branch (not
+  per-unit) residual documented in-script — its silence is not confirmation.
 - 2026-07-13 — repo-hardening (**D-166** external-review triage, no app code): four prose
   invariants → mechanism. `build.yml` now invokes `scripts/ladder.sh` (CI/ladder lockstep is
   structural, not a comment); ladder guards 3 (checkpoint STATE-line tripwire) + 4 (behind-main

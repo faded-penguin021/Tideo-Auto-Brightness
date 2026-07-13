@@ -104,16 +104,22 @@ if git rev-parse --verify -q origin/main >/dev/null; then
     # guard 3: checkpoint tripwire (RUNBOOK Session discipline 3). If any non-doc code/config
     # changed relative to main (committed + working tree) but STATE.md is not in that diff, the
     # checkpoint invariant's STATE Changelog line is probably still missing.
+    # Residual (known): the diff base is origin/main, so this is per-BRANCH, not per-unit —
+    # once any earlier unit on the branch touched STATE.md, a later unit that forgets its
+    # Changelog line will NOT warn. Silence here is not confirmation; the invariant itself
+    # (RUNBOOK Session discipline 3) still binds every unit.
     changed=$( { git diff --name-only origin/main..HEAD; git status --porcelain | sed 's/^...//'; } | sort -u )
     code_changed=$(printf '%s\n' "$changed" | grep -vE '^$|^docs/|(^|/)[^/]*\.md$' || true)
     if [ -n "$code_changed" ] && ! printf '%s\n' "$changed" | grep -qx 'docs/rebuild/STATE.md'; then
       echo "LADDER WARN: code/config changed but docs/rebuild/STATE.md is not in the diff — the checkpoint invariant wants a STATE Changelog line before commit (RUNBOOK Session discipline 3)."
     fi
     # guard 4: stale-branch tripwire. Behind origin/main invites a squash-merge conflict the
-    # agent's own green ladder can't see; rebase onto main.
+    # agent's own green ladder can't see. Advice must stay force-push-free: rebasing pushed
+    # checkpoints would need a force-push, which the git rules forbid — merge instead (the
+    # merge commit vanishes at squash-merge anyway).
     behind=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
     if [ "$behind" -gt 0 ]; then
-      echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main — rebase onto main before push to avoid a squash-merge conflict."
+      echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main — 'git merge origin/main' before push to avoid a squash-merge conflict (rebase ONLY if nothing is pushed yet; pushed checkpoints are immutable, never force-push)."
     fi
   fi
 else

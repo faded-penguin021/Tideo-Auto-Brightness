@@ -28,6 +28,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # Full history + all branches (cheap on this repo) so origin/main resolves and
+          # ladder.sh's guard 2 (D-115 token scan over origin/main..HEAD) genuinely runs in CI
+          # with a correct merge base. The default depth-1 single-ref checkout makes the guard
+          # silently self-skip ("origin/main unavailable"). Guards 3/4 self-skip in CI by design.
+          fetch-depth: 0
 
       # JDK 21: Robolectric 4.16+ requires it to run tests under SDK 36 (Android 16 / targetSdk 36).
       # The app still compiles to 17 bytecode (sourceCompatibility/jvmTarget = 17) — this is only the

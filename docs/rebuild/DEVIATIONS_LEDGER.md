@@ -3032,3 +3032,18 @@ the permanent registry — never compress or remove them.
   when the change touches a Tasker artifact"). Item 5 of the review (STATE protected-structure +
   an "ask-don't-assume" owner protocol + findings-intake) was NOT taken here — it reshapes
   owner-facing process and is an owner-tier call, left queued for the owner to decide.
+  **Addendum (2026-07-13, review round 2 — four findings, three fixed):** (1) guard 4's advice
+  said "rebase onto main", which for already-pushed checkpoints requires the force-push the git
+  rules (and U4's own deny rules) forbid — an agent following it literally would wedge; the WARN
+  now says merge `origin/main` (the merge commit vanishes at squash-merge) and rebase only when
+  nothing is pushed. (2) The "CI keeps the skip-ci guard for free" claim above was FALSE as first
+  shipped: checkout@v5's depth-1 single-ref checkout never resolves `origin/main`, so guard 2
+  silently self-skipped in CI (release-preflight's PR-time API scan was the only token gate);
+  `build.yml` now checks out with `fetch-depth: 0`, making the claim true with a correct merge
+  base. (3) U4 deny rules gain the refspec-force (`git push origin +…` — which also bypassed the
+  force-push denial for the session branch itself) and `HEAD:main` patterns; still a tripwire,
+  not a guarantee. (4) Known residual, documented not fixed: guard 3 diffs against `origin/main`,
+  so it is per-BRANCH, not per-unit — after any unit on the branch touches STATE.md, a later
+  unit's forgotten Changelog line will not warn. Its silence is not confirmation; the checkpoint
+  invariant itself still binds every unit (a per-unit check would need a durable last-checkpoint
+  marker — declined for now as more state than the WARN is worth).
