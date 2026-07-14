@@ -557,7 +557,7 @@
     <string name="help_dimming_exponent">Controls how gradual the super dimming kicks in and how it behaves as brightness approaches min brightness. &lt;1: hard transition, not recommended. 1: linear transition. &gt;1 soft(er) transition.</string>
     <string name="help_dimming_threshold">This is the screen brightness below which super dimming kicks in.</string>
     <string name="help_pwm_threshold">This is the lowest hardware screen brightness. Software dimming is applied below this point.</string>
-    <string name="help_dimming_enabled">Enables or disables super dimming. When on, the screen is darkened below its hardware minimum (using Android\'s Extra Dim layer) once brightness drops below the SD threshold — letting the display go darker than it normally allows. Requires elevated (secure settings) privilege.</string>
+    <string name="help_dimming_enabled">Enables or disables super dimming. When on, the screen is darkened below its hardware minimum (using Android\'s Extra Dim layer) once brightness drops below the SD threshold. Requires elevated (secure settings) privilege.</string>
     <string name="help_pwm_exponent">Gamma-like exponent. Controls the shape of the dimming curve. Higher values keep the screen brighter for longer and fade more steeply near the threshold; lower values dim more quickly. Adjusts how brightness transitions, not how much(!)</string>
     <string name="help_pwm_sensitive">Enables or disables the software dimming feature. When enabled the max hardware brightness is fixated to the PWM threshold.</string>
     <!-- Inline Circadian field help (was inline literals on CircadianScreen). -->

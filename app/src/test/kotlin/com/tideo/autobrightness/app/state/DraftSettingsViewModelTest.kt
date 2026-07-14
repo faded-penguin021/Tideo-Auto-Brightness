@@ -110,12 +110,30 @@ class DraftSettingsViewModelTest {
         val vm = seededVm()
         vm.edit { it.copy(maxBrightness = 150) }
         idle()
-        vm.apply()
+        // The Misc screen opts in (Tasker _SaveButtonMisc); the Curve screen does not.
+        vm.apply(raiseMaxBrightForCurve = true)
 
         val result = awaitCommitted { it.maxBrightness == 253 }
         assertEquals(253, result.maxBrightness, "Apply raises MaxBright to the curve's Zone 2 End value")
         // The draft snaps to the committed value (D-164 fixed-point) so the screen is not left dirty.
         assertEquals(253, vm.draft.value.maxBrightness, "the draft reflects the auto-raised value")
+    }
+
+    @Test
+    fun apply_curveScreen_doesNotRaiseMaxBright_D169() {
+        // D-169: a plain apply() (the Curve/other screens) must NOT touch MaxBright — Tasker only
+        // auto-raises on the Misc scene save. The too-low value commits as-is; form3A just warns.
+        val steep = AabSettings(
+            form1A = 5.0, zone1End = 35, form2B = 20f, form2C = 10, zone2End = 3000, maxBrightness = 200,
+        )
+        setBaseline(steep)
+        val vm = seededVm()
+        vm.edit { it.copy(maxBrightness = 150) }
+        idle()
+        vm.apply()
+
+        val result = awaitCommitted { it.maxBrightness == 150 }
+        assertEquals(150, result.maxBrightness, "the Curve/other-screen Apply leaves MaxBright untouched")
     }
 
     @Test

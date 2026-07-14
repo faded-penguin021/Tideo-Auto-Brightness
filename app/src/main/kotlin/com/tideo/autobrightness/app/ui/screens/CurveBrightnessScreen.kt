@@ -56,11 +56,9 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = com.tideo.autobrightness.app.ui.components.rememberToaster()
 
-    // D-169: Apply may auto-raise MaxBright to fit the curve (_SaveButtonMisc A9) — flash the
-    // Tasker-style "adjusted to N" confirmation when it does.
-    androidx.compose.runtime.LaunchedEffect(vm) {
-        vm.maxBrightnessRaised.collect { toast(R.string.toast_max_bright_raised, it) }
-    }
+    // D-169: the Curve screen does NOT auto-raise MaxBright — like Tasker's curve scene it only reddens
+    // form3A (the ErrorBanner below). The MaxBright auto-raise + "adjusted to N" flash is Misc-only
+    // (Tasker _SaveButtonMisc), so no maxBrightnessRaised collector here.
 
     // D-125: a wizard suggestion reaches this screen ONLY when the user ran the Tools wizard and tapped
     // "Preview graph" — it is applied to this VM's draft during its initial seed (see

@@ -47,7 +47,8 @@ fun MiscScreen(navController: NavHostController, vm: DraftSettingsViewModel = vi
     }
     MiscContent(
         draft, committed, errors, epoch, dirty,
-        onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
+        // D-169: only the Misc save auto-raises MaxBright to fit the curve (Tasker _SaveButtonMisc).
+        onEdit = vm::edit, onApply = { vm.apply(raiseMaxBrightForCurve = true) }, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         criticalError = criticalError,
         live = live,

@@ -3098,10 +3098,12 @@ the permanent registry — never compress or remove them.
   "form3A < 0, adjust curve parameters" message — the owner-reported gap. Fixed: (1) new domain
   `BrightnessFormulae.zone2EndBrightness(...)` (the un-ceiled A8 term, MaxBright-independent); (2)
   app-state `AabSettings.minRequiredMaxBrightness()` (=`ceil`) + `raiseMaxBrightnessForCurve()`
-  (the A5 `<255` gate + A7 `form3A<0` + A9 raise, only ever raising); (3) `DraftSettingsViewModel.apply()`
+  (the A5 `<255` gate + A7 `form3A<0` + A9 raise, only ever raising); (3) `DraftSettingsViewModel.apply(raiseMaxBrightForCurve)`
   runs the fix on the draft **before** `validate()`, snaps the draft to the committed copy (the D-164
-  fixed-point), and emits `maxBrightnessRaised` — a replay-0 one-shot `SharedFlow` the Curve &
-  Brightness and Misc screens flash via `toast_max_bright_raised`; (4) `SettingsValidator` form3A is
+  fixed-point), and emits `maxBrightnessRaised` — a replay-0 one-shot `SharedFlow` the **Misc** screen
+  flashes via `toast_max_bright_raised`. The raise is **Misc-only** (Tasker runs it in `_SaveButtonMisc`,
+  the Misc scene save): the Curve & Brightness screen passes the default `false` and, like Tasker's curve
+  scene, only reddens form3A (advisory) — it never touches MaxBright. (4) `SettingsValidator` form3A is
   now **ADVISORY** (was CRITICAL) with a message that states the fix (or, at MaxBright 255 where A5
   blocks the raise, points at Zone 2 scaling/end). **D-052 still binds for the other two form errors**
   (form2A<0, form2C>zone1End) — those remain CRITICAL Apply-blockers; only the form3A case, which

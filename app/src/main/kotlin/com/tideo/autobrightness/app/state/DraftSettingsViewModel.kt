@@ -142,7 +142,7 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
      * service/identity fields are preserved from the live committed value (never edited here), so an
      * Apply cannot flip the master switch or the context lock.
      */
-    fun apply() {
+    fun apply(raiseMaxBrightForCurve: Boolean = false) {
         // D-085 (S14 carry-forward): clamp out-of-range fields on commit so a parameter screen can
         // never persist an unsafe value (e.g. maxBrightness 999, scale 0). This is the same per-field
         // clamp every other persistence path already runs (SettingsStore, import/export, legacy); the
@@ -153,7 +153,9 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
         // Tasker force-fixes and flashes "adjusted to N" rather than blocking the save. form3A is now
         // an ADVISORY (SettingsValidator), so it no longer trips hasCriticalError; the two remaining
         // form errors (form2A<0, form2C>zone1End) still block Apply (D-052 stands for those).
-        val fix = _draft.value.raiseMaxBrightnessForCurve()
+        // Only the MISC screen opts in — Tasker runs this in `_SaveButtonMisc` (the Misc scene save);
+        // the Curve scene save just reddens form3A (task583 advisory), never touching MaxBright.
+        val fix = if (raiseMaxBrightForCurve) _draft.value.raiseMaxBrightnessForCurve() else MaxBrightnessFix(_draft.value, null)
         val toCommit = fix.settings.validate()
         // D-164: validate() may REWRITE the draft (NaN resets, per-field clamps, cross-field
         // coercions like maxWaitMs ≥ minWaitMs — reachable from the Misc wait sliders). Snap the

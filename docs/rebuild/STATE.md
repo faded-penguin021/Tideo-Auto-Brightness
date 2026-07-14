@@ -119,12 +119,12 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-14 — **D-169** (owner-reported parity gap): MaxBright auto-raise on Apply. When a curve
-  leaves no zone-3 headroom (form3A < 0) and MaxBright < 255, Apply now RAISES MaxBright to the
-  curve's Zone 2 End value + flashes "adjusted to N" (Tasker `_SaveButtonMisc` A5–A18), instead of
-  the D-052 CRITICAL block with an opaque form3A message. **Narrows D-052** — form2A<0 / form2C>zone1End
-  still block Apply; only the form3A case (which Tasker itself auto-fixes) reverted. Curve math/goldens
-  untouched.
+- 2026-07-14 — **D-169** (owner-reported parity gap): MaxBright auto-raise on the **Misc** save. When a
+  curve leaves no zone-3 headroom (form3A < 0) and MaxBright < 255, the Misc-screen Apply now RAISES
+  MaxBright to the curve's Zone 2 End value + flashes "adjusted to N" (Tasker `_SaveButtonMisc` A5–A18),
+  instead of the D-052 CRITICAL block with an opaque form3A message. The Curve screen only reddens
+  form3A (advisory), never touching MaxBright (matches Tasker's curve scene). **Narrows D-052** —
+  form2A<0 / form2C>zone1End still block Apply. Curve math/goldens untouched.
 - 2026-07-14 — **D-168** (owner-reported parity gap; owner syncs Tasker to match): fixed the
   "Use super dimming" toggle help (was task510's verbatim text describing *circadian scaling* —
   wrong control) and made the shared dimming-threshold field relabel "SD threshold"→"PWM
