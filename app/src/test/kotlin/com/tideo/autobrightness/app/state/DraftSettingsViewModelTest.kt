@@ -99,6 +99,26 @@ class DraftSettingsViewModelTest {
     }
 
     @Test
+    fun apply_raisesMaxBrightToFitCurve_D169() {
+        // D-169 (_SaveButtonMisc A5–A11): a steep curve whose value at Zone 2 End (~252) exceeds a low
+        // MaxBright (150) leaves form3A < 0. Apply must RAISE MaxBright to the curve minimum (253) and
+        // announce it, instead of blocking the save.
+        val steep = AabSettings(
+            form1A = 5.0, zone1End = 35, form2B = 20f, form2C = 10, zone2End = 3000, maxBrightness = 200,
+        )
+        setBaseline(steep)
+        val vm = seededVm()
+        vm.edit { it.copy(maxBrightness = 150) }
+        idle()
+        vm.apply()
+
+        val result = awaitCommitted { it.maxBrightness == 253 }
+        assertEquals(253, result.maxBrightness, "Apply raises MaxBright to the curve's Zone 2 End value")
+        // The draft snaps to the committed value (D-164 fixed-point) so the screen is not left dirty.
+        assertEquals(253, vm.draft.value.maxBrightness, "the draft reflects the auto-raised value")
+    }
+
+    @Test
     fun apply_clampsOutOfRangeValues() {
         // D-085 (S14): a parameter screen must never persist an unsafe value. An out-of-range draft
         // (maxBrightness 999) is clamped on Apply (→ 255) rather than written raw to the engine.

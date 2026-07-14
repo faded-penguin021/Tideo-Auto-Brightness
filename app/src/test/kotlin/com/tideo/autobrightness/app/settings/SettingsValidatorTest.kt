@@ -163,13 +163,14 @@ class SettingsValidatorTest {
     }
 
     @Test
-    fun `the three form errors are CRITICAL and the rest are advisory`() {
-        // S12.6d/G2R-F18/D-052: form2A/form3A/form2C are CRITICAL (block Apply); safety/range warn only.
+    fun `form2A and form2C errors are CRITICAL and the rest are advisory`() {
+        // S12.6d/G2R-F18/D-052: form2A<0 and form2C>zone1End are CRITICAL (block Apply). form3A<0 was
+        // dropped to ADVISORY in D-169 (Apply auto-raises MaxBright instead of blocking). Safety/range warn.
         val critical = SettingsValidator.validate(AabSettings(form1A = -1.0, form2C = 50, zone1End = 35))
         assertTrue(
-            critical.filter { it.field in setOf("form2A", "form3A", "form2C") }
+            critical.filter { it.field in setOf("form2A", "form2C") }
                 .all { it.severity == Severity.CRITICAL },
-            "form-coefficient errors must be CRITICAL; got: $critical",
+            "form2A/form2C errors must be CRITICAL; got: $critical",
         )
 
         // A dim-but-valid curve (no form errors) only raises an ADVISORY safety warning.
@@ -177,6 +178,19 @@ class SettingsValidatorTest {
             AabSettings(zone1End = 10, zone2End = 2000, form1A = 1.0, form2B = 0.1f, form2C = 5),
         )
         assertTrue(advisory.isNotEmpty() && advisory.none { it.severity == Severity.CRITICAL })
+    }
+
+    @Test
+    fun `form3A below zero is ADVISORY (auto-raise on Apply, not a block) D169`() {
+        // A steep zone-2 curve whose value at Zone 2 End exceeds a low MaxBright → form3A < 0. Since
+        // D-169, Apply raises MaxBright to fit rather than blocking, so the warning is ADVISORY only.
+        val s = AabSettings(
+            form1A = 5.0, zone1End = 35, form2B = 20f, form2C = 10, zone2End = 3000, maxBrightness = 150,
+        )
+        val err = SettingsValidator.validate(s).firstOrNull { it.field == "form3A" }
+        assertTrue(err != null, "expected a form3A advisory for a too-low MaxBright; got none")
+        assertEquals(Severity.ADVISORY, err.severity, "form3A no longer blocks Apply (D-169)")
+        assertTrue(err.message.isNotEmpty())
     }
 
     @Test

@@ -40,6 +40,11 @@ fun MiscScreen(navController: NavHostController, vm: DraftSettingsViewModel = vi
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = rememberToaster()
+    // D-169: Apply may auto-raise MaxBright to fit the curve (_SaveButtonMisc A9) — flash the
+    // Tasker-style "adjusted to N" confirmation when it does.
+    androidx.compose.runtime.LaunchedEffect(vm) {
+        vm.maxBrightnessRaised.collect { toast(R.string.toast_max_bright_raised, it) }
+    }
     MiscContent(
         draft, committed, errors, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,

@@ -3069,3 +3069,43 @@ the permanent registry — never compress or remove them.
   queue, so pending owner items surface without opening STATE. Intake decision: a guarded STATE
   section was chosen over a dedicated issue template because protocol step 2 guarantees STATE is
   read every session; an issue template guarantees nothing reads it.
+
+- **D-168: super-dimming toggle help corrected + shared threshold field relabels for PWM
+  (2026-07-14, owner-reported parity gap; owner will sync the Tasker source to match — a
+  sanctioned reverse of the usual "Tasker wins" direction, like a golden-fixture correction).**
+  Two fixes on the Super Dimming screen: (1) `help_dimming_enabled` (the "Use super dimming"
+  toggle, Tasker task510) previously carried task510's verbatim text, which literally described
+  the **circadian scaling** feature ("Enables or disables the entire experimental circadian
+  scaling feature…") — wrong control (D-053 had flagged the string as verbatim-but-odd and
+  waved it through). Rewritten to describe super dimming: it darkens the screen below the
+  hardware minimum via Android's Extra Dim layer once brightness drops below the SD threshold,
+  ELEVATED-gated. (2) The single `%aab_dimmingthreshold` field is SHARED by super dimming and
+  software dimming (PWM); Tasker relabels it **"SD Thresh" → "PWM Thresh"** and swaps its flash
+  when software dimming is on (there it is the hardware brightness floor, not the super-dimming
+  activation point). Ported: `sd_threshold` "Threshold"→"SD threshold", new `sd_pwm_threshold`
+  "PWM threshold", new `help_pwm_threshold` (verbatim from the owner's Tasker screenshot: "This
+  is the lowest hardware screen brightness. Software dimming is applied below this point."); the
+  SD-mode flash was already correct (`help_dimming_threshold` == Tasker's SD flash verbatim).
+  `SuperDimmingScreen` picks label+help by `draft.pwmSensitive`. UI-string-only; no domain/math,
+  no golden vectors, `enabled` gating unchanged.
+
+- **D-169: MaxBright auto-raise on Apply revises the D-052 form3A block (2026-07-14, owner-reported
+  parity gap).** Tasker `_SaveButtonMisc` A5–A18: when MaxBright < 255 and the curve leaves no
+  zone-3 headroom (form3A < 0), Tasker **RAISES** MaxBright to `min_req_bright = ceil(form2A +
+  form2B·((zone2End−form2C)^0.33 − (zone1End−form2C)^0.33))` — the brightness the curve reaches at
+  Zone 2 End — and flashes "Max Brightness too low for current curve! Adjusted to N (value at Zone 2
+  End)". The rebuild had instead made form3A<0 a **CRITICAL** Apply-blocker (D-052) with an opaque
+  "form3A < 0, adjust curve parameters" message — the owner-reported gap. Fixed: (1) new domain
+  `BrightnessFormulae.zone2EndBrightness(...)` (the un-ceiled A8 term, MaxBright-independent); (2)
+  app-state `AabSettings.minRequiredMaxBrightness()` (=`ceil`) + `raiseMaxBrightnessForCurve()`
+  (the A5 `<255` gate + A7 `form3A<0` + A9 raise, only ever raising); (3) `DraftSettingsViewModel.apply()`
+  runs the fix on the draft **before** `validate()`, snaps the draft to the committed copy (the D-164
+  fixed-point), and emits `maxBrightnessRaised` — a replay-0 one-shot `SharedFlow` the Curve &
+  Brightness and Misc screens flash via `toast_max_bright_raised`; (4) `SettingsValidator` form3A is
+  now **ADVISORY** (was CRITICAL) with a message that states the fix (or, at MaxBright 255 where A5
+  blocks the raise, points at Zone 2 scaling/end). **D-052 still binds for the other two form errors**
+  (form2A<0, form2C>zone1End) — those remain CRITICAL Apply-blockers; only the form3A case, which
+  Tasker itself auto-fixes, was reverted to the Tasker behavior. This is a sanctioned narrowing of
+  D-052, not its removal. UI-flash + commit-path change; the curve MATH and all golden vectors are
+  untouched. Tests: `MaxBrightnessFixTest` (policy), `SettingsValidatorTest` form3A-advisory,
+  `DraftSettingsViewModelTest.apply_raisesMaxBrightToFitCurve_D169`.

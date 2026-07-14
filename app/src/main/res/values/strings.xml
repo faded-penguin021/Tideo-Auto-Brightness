@@ -306,6 +306,7 @@
     <!-- Toasts / flashes (action confirmations) -->
     <string name="toast_settings_applied">Settings applied</string>
     <string name="toast_reset_defaults">Reset to defaults</string>
+    <string name="toast_max_bright_raised">Max brightness too low for this curve — raised to %1$d (value at Zone 2 End).</string>
     <string name="toast_diagnostics_copied">Diagnostics copied to clipboard</string>
     <string name="toast_suggestion_applied">Suggestion applied</string>
     <string name="toast_full_report_copied">Full report copied to clipboard</string>
@@ -447,7 +448,8 @@
     <string name="sd_use_super">Use super dimming</string>
     <string name="sd_strength">Strength setpoint</string>
     <string name="sd_exponent">SD exponent</string>
-    <string name="sd_threshold">Threshold</string>
+    <string name="sd_threshold">SD threshold</string>
+    <string name="sd_pwm_threshold">PWM threshold</string>
     <string name="sd_use_pwm">Use software dimming (PWM-sensitive)</string>
     <string name="sd_pwm_exponent">Software exponent (PWM)</string>
     <string name="sd_spread">Spread (circadian)</string>
@@ -554,7 +556,8 @@
     <string name="help_dim_spread">Controls how wide the scale shifts over the day. Only active when circadian scaling is enabled!</string>
     <string name="help_dimming_exponent">Controls how gradual the super dimming kicks in and how it behaves as brightness approaches min brightness. &lt;1: hard transition, not recommended. 1: linear transition. &gt;1 soft(er) transition.</string>
     <string name="help_dimming_threshold">This is the screen brightness below which super dimming kicks in.</string>
-    <string name="help_dimming_enabled">Enables or disables the entire experimental circadian scaling feature. When disabled the strength setpoint is used as a maximum value throughout the day.</string>
+    <string name="help_pwm_threshold">This is the lowest hardware screen brightness. Software dimming is applied below this point.</string>
+    <string name="help_dimming_enabled">Enables or disables super dimming. When on, the screen is darkened below its hardware minimum (using Android\'s Extra Dim layer) once brightness drops below the SD threshold — letting the display go darker than it normally allows. Requires elevated (secure settings) privilege.</string>
     <string name="help_pwm_exponent">Gamma-like exponent. Controls the shape of the dimming curve. Higher values keep the screen brighter for longer and fade more steeply near the threshold; lower values dim more quickly. Adjusts how brightness transitions, not how much(!)</string>
     <string name="help_pwm_sensitive">Enables or disables the software dimming feature. When enabled the max hardware brightness is fixated to the PWM threshold.</string>
     <!-- Inline Circadian field help (was inline literals on CircadianScreen). -->

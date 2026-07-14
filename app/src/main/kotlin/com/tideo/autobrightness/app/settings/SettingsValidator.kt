@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.settings
 
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
+import kotlin.math.ceil
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -52,9 +53,24 @@ object SettingsValidator {
             errors += FieldError("form2A", "%.3f (automatic) — form2A < 0, adjust form1A or zone1End".format(coeffs.form2A), Severity.CRITICAL)
         }
 
-        // task583 rule 2: form3A < 0 → CRITICAL (blocks Apply, G2R-F18/D-052)
+        // task583 rule 2 / _SaveButtonMisc: form3A < 0 means MaxBright is too low for the curve (zone 3
+        // has no headroom). No longer blocks Apply (D-169, owner-approved revision of D-052 for this
+        // case) — Apply auto-raises MaxBright to the value the curve needs (min_req_bright). Kept as an
+        // ADVISORY so the derived readout reddens live like Tasker task583; the message states the fix.
         if (coeffs.form3A < 0.0) {
-            errors += FieldError("form3A", "%.0f (auto) — form3A < 0, adjust curve parameters".format(coeffs.form3A), Severity.CRITICAL)
+            val minReq = BrightnessFormulae.zone2EndBrightness(
+                form1A = settings.form1A.toDouble(),
+                form2B = settings.form2B.toDouble(),
+                form2C = settings.form2C.toDouble(),
+                zone1End = settings.zone1End.toDouble(),
+                zone2End = settings.zone2End.toDouble(),
+            ).let { ceil(it).toInt() }
+            val message = if (settings.maxBrightness < 255 && minReq <= 255) {
+                "Max brightness (${settings.maxBrightness}) is too low for this curve — Apply will raise it to $minReq (value at Zone 2 End)."
+            } else {
+                "This curve needs more brightness than the maximum (255) — lower Zone 2 scaling or Zone 2 end."
+            }
+            errors += FieldError("form3A", message, Severity.ADVISORY)
         }
 
         // task583 rule 3: form2C > zone1End → CRITICAL (blocks Apply, G2R-F18/D-052)

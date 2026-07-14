@@ -37,4 +37,26 @@ object BrightnessFormulae {
         val form3A = zone2End * inner / maxBrightness
         return ContinuityCoefficients(form2A, form3A)
     }
+
+    /**
+     * The brightness the curve reaches at Zone 2 End (the zone2→zone3 hinge) — i.e. the MINIMUM
+     * MaxBright the curve needs. When MaxBright is set below this the zone-3 headroom (form3A) goes
+     * negative. Independent of MaxBright.
+     *
+     * Tasker: `_SaveButtonMisc` A8 `min_req_bright = ceil(form2A + form2B*((zone2End-form2C)^0.33 -
+     * (zone1End-form2C)^0.33))` with `form2A = form1A*sqrt(zone1End)` (act0). Returns the un-ceiled
+     * value; callers `ceil` it to the whole-brightness minimum (D-169).
+     */
+    fun zone2EndBrightness(
+        form1A: Double,
+        form2B: Double,
+        form2C: Double,
+        zone1End: Double,
+        zone2End: Double,
+    ): Double {
+        val form2A = form1A * sqrt(zone1End)
+        val a = (zone2End - form2C).pow(0.33)
+        val b = (zone1End - form2C).pow(0.33)
+        return form2A + form2B * (a - b)
+    }
 }

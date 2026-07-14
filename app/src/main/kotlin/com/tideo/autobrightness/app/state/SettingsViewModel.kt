@@ -17,6 +17,7 @@ import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
+import kotlin.math.ceil
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -167,3 +168,39 @@ fun AabSettings.derivedCoefficients(): BrightnessFormulae.ContinuityCoefficients
         zone2End = zone2End.toDouble(),
         maxBrightness = maxBrightness.toDouble(),
     )
+
+/**
+ * The minimum MaxBright the current curve needs — `ceil` of the brightness the curve reaches at
+ * Zone 2 End. Below it, the zone-3 headroom coefficient form3A is negative.
+ * Tasker: `_SaveButtonMisc` A8 `min_req_bright` (D-169).
+ */
+fun AabSettings.minRequiredMaxBrightness(): Int =
+    ceil(
+        BrightnessFormulae.zone2EndBrightness(
+            form1A = form1A.toDouble(),
+            form2B = form2B.toDouble(),
+            form2C = form2C.toDouble(),
+            zone1End = zone1End.toDouble(),
+            zone2End = zone2End.toDouble(),
+        ),
+    ).toInt()
+
+/** Result of [raiseMaxBrightnessForCurve]: the (possibly) adjusted settings + the new value if raised. */
+data class MaxBrightnessFix(val settings: AabSettings, val raisedTo: Int?)
+
+/**
+ * Tasker `_SaveButtonMisc` A5–A11: when MaxBright < 255 and the curve leaves no zone-3 headroom
+ * (form3A < 0), Tasker RAISES MaxBright to the minimum the curve needs (`min_req_bright`) instead of
+ * refusing the save. Ported here (D-169, an owner-approved revision of the D-052 form3A block): Apply
+ * force-fixes MaxBright and tells the user, rather than blocking with an opaque form3A warning.
+ *
+ * The A5 gate (`< 255`) is preserved — a curve that overflows even at full brightness is left for the
+ * form3A advisory, matching Tasker (which only reddens the field there). Only ever RAISES MaxBright.
+ */
+fun AabSettings.raiseMaxBrightnessForCurve(): MaxBrightnessFix {
+    if (maxBrightness >= 255) return MaxBrightnessFix(this, null) // A5 gate
+    if (derivedCoefficients().form3A >= 0.0) return MaxBrightnessFix(this, null) // A7
+    val minReq = minRequiredMaxBrightness() // A8
+    if (minReq <= maxBrightness) return MaxBrightnessFix(this, null) // never lower
+    return MaxBrightnessFix(copy(maxBrightness = minReq), minReq) // A9
+}
