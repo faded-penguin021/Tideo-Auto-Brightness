@@ -119,38 +119,30 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-14 — **D-169** (owner-reported parity gap): MaxBright auto-raise on the **Misc** save. When a
-  curve leaves no zone-3 headroom (form3A < 0) and MaxBright < 255, the Misc-screen Apply now RAISES
-  MaxBright to the curve's Zone 2 End value + flashes "adjusted to N" (Tasker `_SaveButtonMisc` A5–A18),
-  instead of the D-052 CRITICAL block with an opaque form3A message. The Curve screen only reddens
-  form3A (advisory), never touching MaxBright (matches Tasker's curve scene). **Narrows D-052** —
-  form2A<0 / form2C>zone1End still block Apply. Curve math/goldens untouched.
-- 2026-07-14 — **D-168** (owner-reported parity gap; owner syncs Tasker to match): fixed the
-  "Use super dimming" toggle help (was task510's verbatim text describing *circadian scaling* —
-  wrong control) and made the shared dimming-threshold field relabel "SD threshold"→"PWM
-  threshold" + swap its flash when software dimming (PWM) is on. UI strings only; no domain/math.
+- 2026-07-14 — **D-169** (owner-reported parity gap): the **Misc** save now RAISES MaxBright to the
+  curve's Zone 2 End value + flashes "adjusted to N" (Tasker `_SaveButtonMisc`) when form3A < 0 and
+  MaxBright < 255, instead of the D-052 CRITICAL block. Curve screen only reddens form3A (advisory).
+  **Narrows D-052** (form2A/form2C still block); math/goldens untouched. Detail in the D-169 row.
+- 2026-07-14 — **D-168** (owner-reported parity gap; owner syncs Tasker): fixed the "Use super dimming"
+  toggle help (was task510 text describing *circadian scaling* — wrong control) + shared threshold field
+  relabels "SD threshold"→"PWM threshold" with its own flash when software dimming is on. UI strings only.
 - 2026-07-13 — **D-167** (owner-approved review item 5): guarded `## Owner queue` STATE section
-  (pending actions / open questions / incoming-findings intake; guard 1b WARN; the 1.8.0 release
-  path moved there from unprotected prose); RUNBOOK Session discipline 7 "ask, don't assume"
-  (owner-judgment forks are queued with options + recommendation, never resolved by picking);
-  sessions restate the queue in their final message.
-- 2026-07-13 — **D-166 (+ addendum)** repo-hardening (external-review triage, no app code): four
-  prose invariants → mechanism. `build.yml` invokes `scripts/ladder.sh` with `fetch-depth: 0`
-  (structural CI/local lockstep; the D-115 token scan genuinely runs in CI); ladder guards 3
-  (checkpoint STATE-line tripwire; per-branch residual documented) + 4 (behind-main → merge, not
-  rebase), WARN-only, CI-skipped; `settings.json` deny rules for force-push / push-main /
-  `+refspec` / `HEAD:main`; session-start hook prints branch check + STATE pointer unconditionally.
-- 2026-07-12 — final adversarial audit CLOSED (all scopes; fixes fold into 1.8.0/vc18):
-  **D-163** rule-removal clears signal snapshots; **D-164** draft Apply snaps to the validated
-  commit; **D-165** panic re-arm needs a sustained straight spell. Deferred settings/UI/domain
-  scope re-ran clean; `WizardDegenerateInputTest` pins the wizard invariant. +6 tests, no goldens.
+  (pending actions / open questions / findings intake; guard 1b WARN) + RUNBOOK Session discipline 7
+  "ask, don't assume" (owner-judgment forks queued, not guessed). Detail in the D-167 row.
+- 2026-07-13 — **D-166 (+ addendum)** repo-hardening (external-review triage, no app code): four prose
+  invariants → mechanism — `build.yml` runs `scripts/ladder.sh` (`fetch-depth: 0`, CI/local lockstep),
+  ladder guards 3/4, `settings.json` push deny rules, session-start branch/STATE print. Detail in the
+  D-166 row.
+- 2026-07-12 — final adversarial audit CLOSED (fixes fold into 1.8.0/vc18): **D-163** rule-removal
+  clears signal snapshots; **D-164** draft Apply snaps to the validated commit; **D-165** panic re-arm
+  needs a sustained straight spell. `WizardDegenerateInputTest` pins the wizard invariant. +6 tests.
 - 2026-07-10 — **D-161** repo-hardening U1–U4 (`scripts/ladder.sh`, STATE compressed 27.6→12 KB,
   RUNBOOK **Session discipline**, Gradle parallel/config-cache — warm re-verify ~1 s) +
   **D-162** external-review triage (guards 1b/1c, recovery rule, release-preflight
   golden-fixture gate; declines in the row + non-items).
-- 2026-07-08/09 — 1.8.0 fixes + close-out: **D-159** draft-screen IME dead gap (3-part
-  edge-to-edge recipe); **D-160** external `RESUME` gated at `ControlReceiver.route`
-  (DEVICE_TEST §13.43); pre-release audit green, DEVICE_TEST §14 added; user-guide S5 corrected.
+- 2026-07-08/09 — 1.8.0 close-out: **D-159** draft-screen IME dead gap (3-part edge-to-edge
+  recipe); **D-160** external `RESUME` gated at `ControlReceiver.route`; pre-release audit green,
+  DEVICE_TEST §14 added; user-guide S5 corrected.
 - 2026-07-06/07 — 1.8.0/vc18 features: **D-157 intent control** (opt-in exported broadcast
   surface, default OFF — 7 verbs + LOAD_PROFILE/CONTEXTS_RESUME, outbound STATE_CHANGED,
   `docs/AUTOMATION.md`, DEVICE_TEST §13, +20 tests) + **D-156 a11y A0–A7** / **D-158 crash-log

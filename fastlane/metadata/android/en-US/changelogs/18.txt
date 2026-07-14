@@ -3,3 +3,5 @@ Automation (Tasker/MacroDroid): control Tideo — on/off, pause, reapply, reset,
 Accessibility (TalkBack): sliders, switches, help buttons, headings and value rows now announce properly across the app.
 
 Diagnostics: Tools keeps your latest crash report on-device to copy when reporting a bug — nothing is sent.
+
+Plus assorted fixes.
