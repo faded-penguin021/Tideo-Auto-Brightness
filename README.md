@@ -1,5 +1,7 @@
 # Tideo Auto Brightness
 
+![Tideo Auto Brightness — the auto-brightness that shows its work](docs/banner.png)
+
 [![Build](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml/badge.svg)](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/faded-penguin021/tideo-auto-brightness?display_name=tag&sort=semver)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
 [![Downloads](https://img.shields.io/github/downloads/faded-penguin021/tideo-auto-brightness/total?logo=github)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
