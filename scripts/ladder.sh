@@ -13,7 +13,7 @@
 #
 # Guards (fail fast, before any build):
 #   1. STATE.md length rule (mirrors STATE.md's own preamble): warn over the 12 KB
-#      steady-state target, FAIL over the 32 KB hard cap. 1b: required sections present
+#      steady-state target, FAIL over the 16 KB hard cap. 1b: required sections present
 #      (over-compression tripwire). 1c: deviations-ledger rollover reminder (D-153).
 #      (LADDER_STATE_FILE / LADDER_LEDGER_FILE override the paths — guard self-tests only.)
 #   2. D-115 skip-ci token scan over unmerged commit messages (origin/main..HEAD) — the
@@ -44,8 +44,8 @@ fail() { echo "LADDER FAIL: $1" >&2; exit 1; }
 # --- guard 1: STATE.md length rule ---
 [ -f "$STATE_FILE" ] || fail "$STATE_FILE not found (run from the repo, or fix LADDER_STATE_FILE)"
 state_bytes=$(wc -c < "$STATE_FILE" | tr -d '[:space:]')
-if [ "$state_bytes" -gt 32768 ]; then
-  fail "$STATE_FILE is ${state_bytes} B — over the 32 KB hard cap; compress it before committing (see its length-guard preamble)"
+if [ "$state_bytes" -gt 16384 ]; then
+  fail "$STATE_FILE is ${state_bytes} B — over the 16 KB hard cap; compress it before committing (see its length-guard preamble)"
 elif [ "$state_bytes" -gt 12288 ]; then
   echo "LADDER WARN: $STATE_FILE is ${state_bytes} B (steady-state target is <= 12 KB — compress soon)"
 else

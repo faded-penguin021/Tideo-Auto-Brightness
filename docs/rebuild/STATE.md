@@ -1,13 +1,13 @@
 # STATE — project state & session memory
 
 > **Length guard (read before editing).** Steady-state target ≤ 12 KB. **If this file exceeds
-> 32 KB, aggressively compress before committing:** collapse each completed *Active work* stage
+> 16 KB, aggressively compress before committing:** collapse each completed *Active work* stage
 > into one Changelog line, move any durable gotcha into `DEVIATIONS_LEDGER.md` (the permanent,
 > append-only registry — never compressed), and delete narrative/punch-list prose. The
 > **Project**, **Current state**, and **Owner queue** sections must always survive compression
 > (Owner queue items are the owner's to close — compress their prose, never drop an open item).
 > The full migration narrative is already frozen in `../history/` — do not re-accumulate it here.
-> (`scripts/ladder.sh` machine-checks this rule: warn > 12 KB, fail > 32 KB.)
+> (`scripts/ladder.sh` machine-checks this rule: warn > 12 KB, fail > 16 KB.)
 
 ## Project
 
@@ -119,6 +119,8 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-14 — STATE length-guard hard cap lowered 32 KB → **16 KB** (owner: 32 KB is excessive and
+  eats the context window); 12 KB WARN unchanged. `scripts/ladder.sh` guard 1 + this preamble updated.
 - 2026-07-14 — **D-169** (owner-reported parity gap): the **Misc** save now RAISES MaxBright to the
   curve's Zone 2 End value + flashes "adjusted to N" (Tasker `_SaveButtonMisc`) when form3A < 0 and
   MaxBright < 255, instead of the D-052 CRITICAL block. Curve screen only reddens form3A (advisory).
@@ -143,19 +145,16 @@ the cited D-rows and git history.
 - 2026-07-08/09 — 1.8.0 close-out: **D-159** draft-screen IME dead gap (3-part edge-to-edge
   recipe); **D-160** external `RESUME` gated at `ControlReceiver.route`; pre-release audit green,
   DEVICE_TEST §14 added; user-guide S5 corrected.
-- 2026-07-06/07 — 1.8.0/vc18 features: **D-157 intent control** (opt-in exported broadcast
-  surface, default OFF — 7 verbs + LOAD_PROFILE/CONTEXTS_RESUME, outbound STATE_CHANGED,
-  `docs/AUTOMATION.md`, DEVICE_TEST §13, +20 tests) + **D-156 a11y A0–A7** / **D-158 crash-log
-  capture C1** (SemanticsAudit gate, DEVICE_TEST §12, +72 tests). Owner completed H4/H5
-  (D-135/D-137 fdroiddata).
+- 2026-07-06/07 — 1.8.0/vc18 features: **D-157 intent control** (opt-in exported broadcast surface,
+  default OFF — 7 verbs + LOAD_PROFILE/CONTEXTS_RESUME, outbound STATE_CHANGED, `docs/AUTOMATION.md`,
+  +20 tests) + **D-156 a11y A0–A7** / **D-158 crash-log capture C1** (SemanticsAudit gate, +72 tests).
+  Owner completed H4/H5 (D-135/D-137 fdroiddata).
 - 2026-07-05 — docs/process: **D-153** ledger 200-row cap + rollover; RUNBOOK <500-char
   F-Droid `whatsNew` rule.
-- 2026-07-03..05 — **1.7.0 / vc17 (MINOR): Privileged Display Control** (**D-149**–**D-155** +
-  D-048 OEM quirk): `SecureDisplayController`, Privileged Display screen, `ContextMatching`
-  extraction (goldens untouched), D-150 schedules removed by the D-151 owner pivot (toggles =
-  PROFILE settings, `DisplayTogglesCoordinator`), D-152 profile port, D-154 circadian Night
-  Light (task90 tanh), D-155 panic resets toggles. DEVICE_TEST §11; playbook-5 pattern added.
-  Also repo-tooling: `setup-android-sdk.sh` seeds the Gradle wrapper cache from `/opt`.
+- 2026-07-03..05 — **1.7.0 / vc17 (MINOR): Privileged Display Control** (**D-149**–**D-155** + D-048
+  OEM quirk): `SecureDisplayController`, Privileged Display screen, `ContextMatching` extraction, D-150
+  schedules removed by the D-151 owner pivot (toggles = PROFILE settings), D-152 profile port, D-154
+  circadian Night Light (task90 tanh), D-155 panic resets toggles. playbook-5 added.
 - 2026-07-01/02 — 1.6.1 / vc15 + 1.6.2 / vc16 (PATCHes): hardening H1–H5 (**D-133**–**D-137**,
   RUNBOOK gains the mandatory **glue-review protocol**; reproducible release APK) and F-backlog
   U1–U6 closed (**D-138**–**D-148**, +19 tests; parity spot-check + `/security-review` clean).
