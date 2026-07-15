@@ -80,25 +80,7 @@ registry stays live.
 4. When merging session branches, note `claude/ladder-checkpoint-improvements-dm4ewz` (D-166/167
    repo hardening) is independent of the 1.8.0 PR branch — separate squash-merge.
 
-**Open questions:**
-
-1. **Stale parameter screens during a context-rule profile load** (owner report 2026-07-15;
-   session `claude/stale-settings-profile-load-27vdl8`, diagnosis-only). Structural, not a race —
-   applies to EVERY automated rule load (battery/time/wifi/app/location): a context load merges
-   the profile **in-memory** (`ContextEngine` `_effective`, the D-038(ii) baseline-overlay
-   design); DataStore = the editable user baseline and is untouched, and the parameter screens
-   (Curve, Reactivity, Animation & Dimming, Circadian, Misc, Privileged Display) read DataStore —
-   so they show baseline values while the pipeline runs the loaded profile. Dashboard / menu
-   subtitle / Profiles highlight are correct (they read `LiveRuntimeState`). The manual-load
-   "remedy" works because `ProfileApplier` writes DataStore — but it ALSO latches the manual
-   context lock (`contextOverride`, G2R-F30), silently suppressing all rule switching until
-   Resume. Options: **(a) recommended** — advisory tinted-Card banner on the parameter screens
-   when a rule is active (existing stale/override banner pattern) naming rule + loaded profile
-   and clarifying the values below are the editable baseline; small single unit, reversible.
-   (b) Tasker-parity write-through (context load writes DataStore + persisted task626-style
-   baseline snapshot/restore) — heavy, schema change, re-opens the declined "persisted
-   last-applied seed" non-item and muddies edit-durability (Tasker discarded mid-override edits).
-   (c) Parameter screens render effective values — conflicts with edits targeting the baseline.
+**Open questions:** (none)
 
 **Incoming findings:** (none — on-device results from DEVICE_TEST passes land here)
 
@@ -137,6 +119,13 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-15 — **D-170** (owner-reported "stale settings screens after a context load"; owner chose
+  Tasker parity over an advisory banner): context-rule profile loads now **write through** to the
+  live settings DataStore (`LOAD_FILE` semantics — screens show the loaded values), with the
+  pre-override baseline persisted to the new `aab_context_baseline.json` (task626 `_ContextResume`)
+  and restored on the no-match revert. act17 skip preserved (same-profile evals don't stomp
+  mid-override edits; revert discards them, globals survive). Manual load / Resume / import clear
+  the snapshot. Supersedes the D-038(ii) in-memory overlay. +8 tests. Detail in the D-170 row.
 - 2026-07-14 — STATE length-guard hard cap lowered 32 KB → **16 KB** (owner: 32 KB is excessive and
   eats the context window); 12 KB WARN unchanged. `scripts/ladder.sh` guard 1 + this preamble updated.
 - 2026-07-14 — **D-169** (owner-reported parity gap): the **Misc** save now RAISES MaxBright to the

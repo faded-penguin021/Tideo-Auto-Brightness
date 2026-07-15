@@ -14,9 +14,11 @@ import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.runtime.CircadianWindowProvider
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ContextRuleStore
+import com.tideo.autobrightness.app.settings.DataStoreContextBaselineStore
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
 import com.tideo.autobrightness.app.settings.UserProfileStore
+import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.contextRulesDataStore
 import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
@@ -83,7 +85,12 @@ class AppModule(context: Context) {
             // React to rule add/edit/delete at runtime (a new app/location rule starts its listener
             // immediately, not only at next screen-on/reboot).
             rulesFlow = contextRuleStore.rulesFlow(),
-            baselineProvider = { appContext.settingsDataStore.data.first() },
+            settingsProvider = { appContext.settingsDataStore.data.first() },
+            // D-170 write-through: a context load writes the profile INTO the live settings store
+            // (Tasker LOAD_FILE parity — every screen shows the loaded values); the pre-override
+            // baseline is snapshotted to its own store and restored on the no-match revert.
+            settingsWriter = { transform -> appContext.settingsDataStore.updateData(transform) },
+            baselineStore = DataStoreContextBaselineStore(appContext.contextBaselineDataStore),
             profileCatalog = AppProfileCatalog(userProfileStore),
             signalSource = AndroidContextSignalSource(appContext),
             onProfileChanged = { controllerHook.fire() },
@@ -114,7 +121,7 @@ class AppModule(context: Context) {
             lightSensor = AndroidLightSensorSource(appContext),
             brightness = brightness,
             brightnessObserver = AndroidBrightnessObserver(appContext, brightness),
-            // Effective settings = active context profile merged over the baseline, or the baseline.
+            // Effective settings = the live store (context loads write through to it, D-170).
             settingsProvider = { contextEngine.effectiveSettings() },
             scope = scope,
             circadianWindowsProvider = circadianWindows::current,

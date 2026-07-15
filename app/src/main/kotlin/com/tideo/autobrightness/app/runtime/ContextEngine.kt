@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.ContextBaselineStore
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextSignalTokens
 import com.tideo.autobrightness.app.settings.toSpec
@@ -35,12 +36,26 @@ import kotlin.math.abs
  *  - applying the resolved override by swapping the **entire active profile** (contexts_spec §4 —
  *    NOT a scale/min/max tweak) and re-running Set Initial Brightness ([onProfileChanged]).
  *
+ * Profile application WRITES THROUGH to the live settings store (D-170, replacing the in-memory
+ * overlay): Tasker's `_ProfileManager LOAD_FILE` repopulates the live `%AAB_*` variables, so after
+ * a context load every settings screen shows the loaded values. Before the FIRST override the
+ * current settings are snapshotted to [baselineStore] (task626 `_ContextResume` / the
+ * `%AAB_ProfileUser` revert file); the PASS 4 no-match revert restores that snapshot and clears it.
+ * Rule→rule switches keep the original snapshot. Like Tasker's act17 skip, an evaluation that
+ * resolves to the ALREADY-ACTIVE profile writes nothing — edits made while an override is active
+ * live in the override set and are discarded by the revert (Tasker parity, accepted with D-170).
+ *
  * Concurrency: every evaluation runs under [evalMutex] so the veto state and active-profile latch
  * stay consistent across the battery/wifi/app/time signal sources.
  */
 class ContextEngine(
     private val rulesProvider: suspend () -> List<ContextRule>,
-    private val baselineProvider: suspend () -> AabSettings,
+    /** Read the LIVE settings (the DataStore — post-D-170 they are baseline and effective at once). */
+    private val settingsProvider: suspend () -> AabSettings,
+    /** Transactionally transform the live settings store; returns the updated value (D-170). */
+    private val settingsWriter: suspend (transform: (AabSettings) -> AabSettings) -> AabSettings,
+    /** The persisted pre-override baseline snapshot (task626 `_ContextResume`, D-170). */
+    private val baselineStore: ContextBaselineStore,
     // Live rule set: the engine reacts to rule add/edit/delete so a newly-created app or location rule
     // starts its foreground/location listener immediately, instead of only at start()/screen-on (the
     // "a new app rule does nothing until you toggle the screen / reboot" bug). emptyFlow() = no live
@@ -62,8 +77,8 @@ class ContextEngine(
     /** `%AAB_NextContextTime` (HH.MM) — nearest future time endpoint, drives time re-eval scheduling. */
     val nextContextTime: StateFlow<String?> = _nextContextTime.asStateFlow()
 
-    // Effective settings the pipeline consumes: the active profile merged over the baseline, or the
-    // baseline itself when no override is active. Null until the first evaluation seeds it.
+    // Observable mirror of the live settings store, republished after every evaluation / profile
+    // write (D-170: the store itself is now the effective truth). Null until the first evaluation.
     private val _effective = MutableStateFlow<AabSettings?>(null)
 
     /**
@@ -108,8 +123,8 @@ class ContextEngine(
     // per transition, so a plain volatile read is sufficient (no compound invariant to protect).
     @Volatile private var screenOn = true
 
-    /** Effective settings for the pipeline's settingsProvider: active profile override or baseline. */
-    suspend fun effectiveSettings(): AabSettings = _effective.value ?: baselineProvider()
+    /** Effective settings for the pipeline: a fresh read of the live store (write-through, D-170). */
+    suspend fun effectiveSettings(): AabSettings = settingsProvider()
 
     /**
      * Non-suspend snapshot of the last resolved effective settings, or null before the first context
@@ -120,34 +135,21 @@ class ContextEngine(
     val effectiveSnapshot: AabSettings? get() = _effective.value
 
     /**
-     * Re-derive the effective settings from the FRESH baseline now (settings Apply / profile load,
-     * G2R-F11/F12). [effectiveSettings] otherwise returns the cached `_effective` snapshot from the
-     * last context evaluation, so a manual DataStore edit (e.g. raising %AAB_MinBright) would not take
-     * effect until the next watcher eval — leaving the runtime on stale settings ("stuck at 10").
-     *
-     * This keeps the currently-resolved active context/profile (it does NOT re-run the watcher
-     * resolution, so it can't spuriously switch contexts) but re-reads the baseline and re-merges, so
-     * a global/baseline edit flows through immediately while any active override stays in effect.
-     * The service calls this before [BrightnessPipelineController.reapply].
+     * Republish the live settings and honor the manual context lock (settings Apply / profile load,
+     * G2R-F11/F12). Post-D-170 the live store IS the effective settings, so an edit needs no re-merge
+     * — this refreshes [effectiveFlow] for its collectors (DisplayTogglesCoordinator, panic) and,
+     * when `%AAB_ContextOverride` is latched (a manual profile load, G2R-F30, D-014/D-038a), drops
+     * any still-active context: the user's choice is authoritative and the watchers stay suppressed
+     * until a "Resume" clears the latch. The service calls this before
+     * [BrightnessPipelineController.reapply].
      */
     suspend fun reevaluate() = evalMutex.withLock {
-        val baseline = baselineProvider()
-        // Manual context lock (%AAB_ContextOverride): a manual profile load latches it (G2R-F30,
-        // D-014/D-038a). When set, the user's choice IS the baseline and all watcher overrides are
-        // suppressed (the resolver already skips switching) — so drop any still-active context and run
-        // the bare baseline. A "Resume" clears the latch and lets the next eval re-resolve contexts.
-        if (baseline.contextOverride) {
+        val current = settingsProvider()
+        if (current.contextOverride) {
             _activeContext.value = null
             currentProfileName = userProfileName
-            _effective.value = baseline
-            return@withLock
         }
-        val active = currentProfileName
-        _effective.value = if (_activeContext.value != null && active != null) {
-            profileCatalog.profile(active)?.let { mergeProfile(baseline, it) } ?: baseline
-        } else {
-            baseline
-        }
+        _effective.value = current
     }
 
     fun start(scope: CoroutineScope) {
@@ -374,20 +376,20 @@ class ContextEngine(
         recordState(signals)
 
         // PASS 3/4 — pure decision.
-        val baseline = baselineProvider()
+        val current = settingsProvider()
         // %AAB_Debug 9 "Context Location" (D-023, G2-F15): Flash the signals feeding this evaluation.
-        debugSink.emit(DebugCategory.CONTEXT_LOCATION, baseline.debugLevel) {
+        debugSink.emit(DebugCategory.CONTEXT_LOCATION, current.debugLevel) {
             "app ${signals.app.ifEmpty { "—" }} · loc ${signals.lat},${signals.lon} · wifi ${signals.wifi.ifEmpty { "—" }}"
         }
         val knownProfiles = profileCatalog.names()
         val resolution = ContextOverrideResolver.resolve(
             rules = rules.map { it.toSpec() },
             signals = signals,
-            overrideActive = baseline.contextOverride,
+            overrideActive = current.contextOverride,
             userProfile = userProfileName,
             profileExists = { knownProfiles.contains(it) },
         )
-        apply(resolution, baseline, rules, caller)
+        apply(resolution, current, rules, caller)
     }
 
     private fun shouldProceed(caller: ContextCaller, signals: ContextSignals, tokens: ContextSignalTokens): Boolean {
@@ -422,7 +424,7 @@ class ContextEngine(
 
     private suspend fun apply(
         resolution: ContextResolution,
-        baseline: AabSettings,
+        current: AabSettings,
         rules: List<ContextRule>,
         caller: ContextCaller,
     ) {
@@ -438,12 +440,44 @@ class ContextEngine(
         // under the manual lock this code returned early above, so it never clobbers a manual choice).
         LiveRuntimeState.setActiveProfile(target)
 
+        // D-170 write-through. INVARIANT: a snapshot exists ⟺ a context override is active.
         _effective.value = if (resolution.activeContextName != null) {
-            // A rule won — swap the entire active profile (load-current-file, D-038(ii) simplification).
-            profileCatalog.profile(target)?.let { mergeProfile(baseline, it) } ?: baseline
+            if (!changed) {
+                // Tasker act17: the target equals %AAB_CurrentActiveProfile — skip the apply, so a
+                // same-profile re-evaluation never stomps edits the user made mid-override.
+                current
+            } else {
+                // A rule won — swap the entire active profile INTO the live store (act19 LOAD_FILE).
+                // Snapshot the pre-override settings once, on the baseline→override transition
+                // (task626 _ContextResume); a rule→rule switch keeps the original snapshot. Snapshot
+                // FIRST: a death between the two writes leaves the live store still on the baseline,
+                // and the next no-match evaluation heals either way.
+                val profile = profileCatalog.profile(target)
+                if (profile != null) {
+                    if (baselineStore.snapshot() == null) baselineStore.save(current)
+                    settingsWriter { mergeProfile(it, profile) }
+                } else {
+                    current
+                }
+            }
         } else {
-            // No match → revert to the user baseline profile.
-            baseline
+            // No rule active → any snapshot must be restored into the live store and cleared (the
+            // invariant above): the normal PASS 4 revert to %AAB_ProfileUser, but ALSO a snapshot
+            // lingering from a process death between paired writes — deliberately NOT gated on
+            // `changed`, because after reevaluate()'s lock branch (screen-on resume) the first
+            // no-match eval arrives with target == currentProfileName and a stale snapshot would
+            // otherwise survive to poison a later revert. Restore via mergeProfile so the GLOBAL
+            // prefs (debugLevel, detectOverrides, panic sensitivity…) keep their CURRENT values —
+            // they are not part of the task626 39-key set (G2-F8/G2R-F9). No snapshot (the steady
+            // state) → the live settings already are the baseline.
+            val snapshot = baselineStore.snapshot()
+            if (snapshot != null) {
+                val restored = settingsWriter { mergeProfile(it, snapshot) }
+                baselineStore.clear()
+                restored
+            } else {
+                current
+            }
         }
 
         // task43 act21: re-run Set Initial Brightness when the profile actually changed.
@@ -451,7 +485,7 @@ class ContextEngine(
             // %AAB_Debug 8 "Context Automation" (D-023, G2-F15, enriched for G2R-F47): Flash the
             // trigger, context, profile, and winning rule (with its priority) on every auto-load.
             val winner = rules.firstOrNull { it.id == resolution.matchedRuleId }
-            debugSink.emit(DebugCategory.CONTEXT_AUTOMATION, baseline.debugLevel) {
+            debugSink.emit(DebugCategory.CONTEXT_AUTOMATION, current.debugLevel) {
                 buildString {
                     append("trigger ${caller.name.lowercase()}")
                     append(" · context ${resolution.activeContextName ?: "(none)"}")

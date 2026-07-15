@@ -1,6 +1,6 @@
 # DataStore map (S12.9c #5)
 
-The rebuild deliberately uses **eight independent DataStores** instead of one mega-store. Each owns a
+The rebuild deliberately uses **nine independent DataStores** instead of one mega-store. Each owns a
 single cohesive concern with its own lifetime, write cadence and failure mode, so a corrupt or
 schema-drifted file in one never takes down the others. They are declared in
 `app/.../storage/AppDataStores.kt`.
@@ -15,6 +15,7 @@ schema-drifted file in one never takes down the others. They are declared in
 | 6 | `userProfilesDataStore` | `aab_user_profiles.json` | typed JSON | `SavedProfiles` (named profiles) | **1** (`SavedProfiles.SCHEMA_VERSION`) | `SavedProfilesSerializer` | User-editable named profiles (built-ins seeded once). Context rules target these by name; kept apart so a profile-store problem can't corrupt the live settings. |
 | 7 | `powerDrawDataStore` | `power_draw` | Preferences | measured OLED power-draw dataset (task524) | n/a (schema-less) | — (Preferences) | The Tools power-draw calibration samples; overwritten on recalibration, disposable, key/value. Distinct lifetime from settings (S14). |
 | 8 | `controlPrefsDataStore` | `control_prefs` | Preferences | `external_control_enabled` (opt-in gate) | n/a (schema-less) | — (Preferences) | **D-157**: the opt-in flag for the external intent-control surface. Its OWN store — deliberately **not** an `AabSettings` field — so profile apply/import chokepoints (`applyProfile`/`replaceAll`/`resetDefaults`/legacy import) can never flip it. Single Boolean, key/value. |
+| 9 | `contextBaselineDataStore` | `aab_context_baseline.json` | typed JSON | `ContextBaseline` (nullable `AabSettings` snapshot) | **1** (`ContextBaseline.SCHEMA_VERSION`) | `ContextBaselineSerializer` | **D-170**: the pre-override baseline snapshot (Tasker task626 `_ContextResume` / `%AAB_ProfileUser` revert file). Context-rule loads write through to store 1; this holds what the no-match revert restores. Kept apart so the snapshot/clear cadence and a corrupt snapshot (degrades to "no revert reference") never touch the live settings file. |
 
 ## Versioning policy
 

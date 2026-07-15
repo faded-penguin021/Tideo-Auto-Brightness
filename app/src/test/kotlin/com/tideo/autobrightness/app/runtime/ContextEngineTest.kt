@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.BatteryTrigger
+import com.tideo.autobrightness.app.settings.ContextBaselineStore
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextTriggers
 import com.tideo.autobrightness.app.settings.DefaultProfiles
@@ -81,23 +82,51 @@ class ContextEngineTest {
         }
     }
 
+    /** In-memory live settings store (D-170 write-through): the DataStore stand-in the engine
+     *  reads AND writes; tests inspect/mutate [value] like the UI edits the real store. */
+    private class FakeSettingsStore(var value: AabSettings) {
+        val provider: suspend () -> AabSettings = { value }
+        val writer: suspend (transform: (AabSettings) -> AabSettings) -> AabSettings = { transform ->
+            value = transform(value)
+            value
+        }
+    }
+
+    /** In-memory pre-override baseline snapshot (task626 `_ContextResume`, D-170). */
+    private class FakeBaselineStore(var stored: AabSettings? = null) : ContextBaselineStore {
+        override suspend fun snapshot(): AabSettings? = stored
+        override suspend fun save(baseline: AabSettings) { stored = baseline }
+        override suspend fun clear() { stored = null }
+    }
+
+    private data class EngineHarness(
+        val engine: ContextEngine,
+        val scope: CoroutineScope,
+        val settings: FakeSettingsStore,
+        val baselineStore: FakeBaselineStore,
+    )
+
     private fun TestScope.engine(
         rules: List<ContextRule>,
         signalSource: ContextSignalSource,
         baseline: AabSettings = this@ContextEngineTest.baseline,
         clock: () -> Long = { 0L },
         onChanged: () -> Unit = {},
-    ): Pair<ContextEngine, CoroutineScope> {
+        baselineStore: FakeBaselineStore = FakeBaselineStore(),
+    ): EngineHarness {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val settings = FakeSettingsStore(baseline)
         val engine = ContextEngine(
             rulesProvider = { rules },
-            baselineProvider = { baseline },
+            settingsProvider = settings.provider,
+            settingsWriter = settings.writer,
+            baselineStore = baselineStore,
             profileCatalog = catalog,
             signalSource = signalSource,
             onProfileChanged = onChanged,
             clock = clock,
         )
-        return engine to scope
+        return EngineHarness(engine, scope, settings, baselineStore)
     }
 
     @Test
@@ -123,11 +152,13 @@ class ContextEngineTest {
     fun reevaluate_withContextLock_dropsActiveContextAndRunsBaseline() = runTest {
         // G2R-F30: a manual profile load latches %AAB_ContextOverride=true. reevaluate() must drop any
         // active context and run the (now manually-chosen) baseline, so watchers stop overriding.
-        var live = baseline
+        val live = FakeSettingsStore(baseline)
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val engine = ContextEngine(
             rulesProvider = { listOf(videoStreamingRule) },
-            baselineProvider = { live },
+            settingsProvider = live.provider,
+            settingsWriter = live.writer,
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = FakeSignalSource(app = "com.netflix.mediaclient"),
             onProfileChanged = {},
@@ -137,8 +168,8 @@ class ContextEngineTest {
         advanceUntilIdle()
         assertEquals("Cinema", engine.activeContext.value, "a rule is active before the lock")
 
-        // Manual profile load: baseline becomes a chosen profile WITH the context lock latched.
-        live = baseline.copy(contextOverride = true, minBrightness = 42)
+        // Manual profile load: the live store becomes a chosen profile WITH the context lock latched.
+        live.value = baseline.copy(contextOverride = true, minBrightness = 42)
         engine.reevaluate()
         advanceUntilIdle()
 
@@ -309,12 +340,14 @@ class ContextEngineTest {
         // G2R-F11/F12: a manual settings Apply edits the DataStore baseline but fires no context
         // signal. effectiveSettings() otherwise serves the cached snapshot (stale "stuck at 10");
         // reevaluate() must re-read the fresh baseline so the change takes effect immediately.
-        var base = baseline.copy(minBrightness = 10)
+        val store = FakeSettingsStore(baseline.copy(minBrightness = 10))
         val src = FakeSignalSource(app = "com.other.app") // no rule matches → baseline path
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val engine = ContextEngine(
             rulesProvider = { listOf(videoStreamingRule) },
-            baselineProvider = { base },
+            settingsProvider = store.provider,
+            settingsWriter = store.writer,
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = src,
             onProfileChanged = {},
@@ -324,7 +357,7 @@ class ContextEngineTest {
         advanceUntilIdle()
         assertEquals(10, engine.effectiveSettings().minBrightness)
 
-        base = base.copy(minBrightness = 90)
+        store.value = store.value.copy(minBrightness = 90)
         engine.reevaluate()
         assertEquals(90, engine.effectiveSettings().minBrightness, "reevaluate re-reads the fresh baseline")
         scope.cancel()
@@ -338,7 +371,9 @@ class ContextEngineTest {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val engine = ContextEngine(
             rulesProvider = { listOf(videoStreamingRule) },
-            baselineProvider = { baseline },
+            settingsProvider = { baseline },
+            settingsWriter = { it(baseline) },
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = FakeSignalSource(app = "com.netflix.mediaclient"),
             onProfileChanged = {},
@@ -397,9 +432,12 @@ class ContextEngineTest {
             if (category == DebugCategory.CONTEXT_AUTOMATION && activeLevel == category.level) messages += message()
         }
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val debugBaseline = baseline.copy(debugLevel = DebugCategory.CONTEXT_AUTOMATION.level)
         val engine = ContextEngine(
             rulesProvider = { listOf(videoStreamingRule) },
-            baselineProvider = { baseline.copy(debugLevel = DebugCategory.CONTEXT_AUTOMATION.level) },
+            settingsProvider = { debugBaseline },
+            settingsWriter = { it(debugBaseline) },
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = FakeSignalSource(app = "com.netflix.mediaclient"),
             onProfileChanged = {},
@@ -427,7 +465,10 @@ class ContextEngineTest {
         val engine = ContextEngine(
             rulesProvider = { rulesFlow.value },
             rulesFlow = rulesFlow,
-            baselineProvider = { baseline },
+            // Static store: these tests exercise listener gating/vetoes, not profile writes (D-170).
+            settingsProvider = { baseline },
+            settingsWriter = { it(baseline) },
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = src,
             onProfileChanged = {},
@@ -480,7 +521,10 @@ class ContextEngineTest {
         val engine = ContextEngine(
             rulesProvider = { rulesFlow.value },
             rulesFlow = rulesFlow,
-            baselineProvider = { baseline },
+            // Static store: these tests exercise listener gating/vetoes, not profile writes (D-170).
+            settingsProvider = { baseline },
+            settingsWriter = { it(baseline) },
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = src,
             onProfileChanged = {},
@@ -530,7 +574,10 @@ class ContextEngineTest {
         val engine = ContextEngine(
             rulesProvider = { rulesFlow.value },
             rulesFlow = rulesFlow,
-            baselineProvider = { baseline },
+            // Static store: these tests exercise listener gating/vetoes, not profile writes (D-170).
+            settingsProvider = { baseline },
+            settingsWriter = { it(baseline) },
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = src,
             onProfileChanged = {},
@@ -581,7 +628,10 @@ class ContextEngineTest {
         val engine = ContextEngine(
             rulesProvider = { rulesFlow.value },
             rulesFlow = rulesFlow,
-            baselineProvider = { baseline },
+            // Static store: these tests exercise listener gating/vetoes, not profile writes (D-170).
+            settingsProvider = { baseline },
+            settingsWriter = { it(baseline) },
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = src,
             onProfileChanged = {},
@@ -632,7 +682,10 @@ class ContextEngineTest {
         val engine = ContextEngine(
             rulesProvider = { rulesFlow.value },
             rulesFlow = rulesFlow,
-            baselineProvider = { baseline },
+            // Static store: these tests exercise listener gating/vetoes, not profile writes (D-170).
+            settingsProvider = { baseline },
+            settingsWriter = { it(baseline) },
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = src,
             onProfileChanged = {},
@@ -680,7 +733,10 @@ class ContextEngineTest {
         val engine = ContextEngine(
             rulesProvider = { rulesFlow.value },
             rulesFlow = rulesFlow,
-            baselineProvider = { baseline },
+            // Static store: these tests exercise listener gating/vetoes, not profile writes (D-170).
+            settingsProvider = { baseline },
+            settingsWriter = { it(baseline) },
+            baselineStore = FakeBaselineStore(),
             profileCatalog = catalog,
             signalSource = src,
             onProfileChanged = {},
@@ -697,6 +753,155 @@ class ContextEngineTest {
         advanceUntilIdle()
         assertEquals("Low Battery", engine.activeContext.value, "rule created mid-cooldown applies immediately")
         scope.cancel()
+    }
+
+    // --- D-170: write-through profile application + persisted baseline snapshot (task626) ---
+
+    @Test
+    fun contextLoad_writesThroughAndSnapshotsBaseline_thenRevertRestores_D170() = runTest {
+        var now = 0L
+        val src = FakeSignalSource(batteryPercent = 10)
+        val h = engine(listOf(batterySaverRule), src, clock = { now })
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertEquals("Low Battery", h.engine.activeContext.value)
+        // Write-through (Tasker LOAD_FILE parity): the LIVE store holds the loaded profile — the
+        // settings screens read this store, so they show the loaded values, not the old baseline.
+        val saver = DefaultProfiles.all.getValue("Battery Saver")
+        assertEquals(mergeProfile(baseline, saver), h.settings.value, "the live store holds the loaded profile")
+        // The pre-override settings were snapshotted (task626 _ContextResume).
+        assertEquals(baseline, h.baselineStore.stored, "the baseline is snapshotted before the first override")
+
+        // Battery recovers → no rule matches → the snapshot is restored into the live store and cleared.
+        now = 40_000L
+        src.batteryPercent = 90
+        src.battery.emit(BatterySignal(90, plugged = false))
+        advanceUntilIdle()
+        assertNull(h.engine.activeContext.value)
+        assertEquals(baseline, h.settings.value, "the revert restores the snapshotted baseline")
+        assertNull(h.baselineStore.stored, "the snapshot is cleared after the revert")
+        h.scope.cancel()
+    }
+
+    @Test
+    fun midOverrideEdits_sameProfileEvalKeepsThem_revertDiscardsProfileKeysKeepsGlobals_D170() = runTest {
+        var now = 0L
+        val src = FakeSignalSource(batteryPercent = 10)
+        val h = engine(listOf(batterySaverRule), src, clock = { now })
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertEquals("Low Battery", h.engine.activeContext.value)
+
+        // The user edits the LIVE (override) settings: a profile key and a global pref.
+        h.settings.value = h.settings.value.copy(minBrightness = 77, debugLevel = 6)
+
+        // The same rule re-resolves (act17: target equals the current active profile → nothing is
+        // rewritten, so the edits survive the re-evaluation).
+        now = 40_000L
+        src.batteryPercent = 4
+        src.battery.emit(BatterySignal(4, plugged = false))
+        advanceUntilIdle()
+        assertEquals(77, h.settings.value.minBrightness, "a same-profile re-evaluation must not stomp edits (act17)")
+
+        // Battery recovers → revert: profile keys restore from the snapshot (Tasker parity —
+        // mid-override edits to the task626 39-key set are discarded), while GLOBAL prefs keep
+        // their current values (the G2-F8/G2R-F9 class; not part of the snapshot key set).
+        now = 80_000L
+        src.batteryPercent = 90
+        src.battery.emit(BatterySignal(90, plugged = false))
+        advanceUntilIdle()
+        assertEquals(baseline.minBrightness, h.settings.value.minBrightness, "profile keys revert to the snapshot")
+        assertEquals(6, h.settings.value.debugLevel, "global prefs keep their live values across the revert")
+        h.scope.cancel()
+    }
+
+    @Test
+    fun ruleToRuleSwitch_keepsOriginalBaselineSnapshot_D170() = runTest {
+        var now = 0L
+        val src = FakeSignalSource(batteryPercent = 10)
+        val h = engine(listOf(batterySaverRule, videoStreamingRule), src, clock = { now })
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertEquals("Low Battery", h.engine.activeContext.value)
+        assertEquals(baseline, h.baselineStore.stored)
+
+        // A higher-priority app rule takes over: the ORIGINAL snapshot must survive the switch.
+        now = 40_000L
+        src.app = "com.netflix.mediaclient"
+        src.appFlow.emit("com.netflix.mediaclient")
+        advanceUntilIdle()
+        assertEquals("Cinema", h.engine.activeContext.value)
+        assertEquals(baseline, h.baselineStore.stored, "a rule→rule switch keeps the pre-override snapshot")
+
+        // Everything stops matching → revert to the ORIGINAL baseline, not to Battery Saver.
+        now = 80_000L
+        src.app = "com.other.app"
+        src.batteryPercent = 90
+        src.appFlow.emit("com.other.app")
+        advanceUntilIdle()
+        assertNull(h.engine.activeContext.value)
+        assertEquals(baseline, h.settings.value, "the revert restores the original baseline")
+        assertNull(h.baselineStore.stored)
+        h.scope.cancel()
+    }
+
+    @Test
+    fun staleSnapshotAtStart_isRestoredBySeedEval_D170() = runTest {
+        // A process death mid-override (or between the revert's restore write and the snapshot
+        // clear) leaves a lingering snapshot with the live store still holding the override. When
+        // the rule no longer matches, the seed evaluation must restore + clear it — otherwise a
+        // later override would skip its snapshot and a still-later revert would resurrect stale
+        // settings over the user's.
+        val src = FakeSignalSource(batteryPercent = 90) // no rule matches at start
+        val stale = FakeBaselineStore(stored = baseline.copy(minBrightness = 3))
+        val h = engine(
+            listOf(batterySaverRule),
+            src,
+            baseline = baseline.copy(minBrightness = 200), // the dead session's override residue
+            baselineStore = stale,
+        )
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertNull(h.engine.activeContext.value)
+        assertEquals(3, h.settings.value.minBrightness, "the lingering snapshot is restored at the seed eval")
+        assertNull(stale.stored, "and the snapshot is cleared")
+        h.scope.cancel()
+    }
+
+    @Test
+    fun staleSnapshotAfterLockResume_isHealedByUnchangedNoMatchEval_D170() = runTest {
+        // The glue-review hole: after reevaluate()'s lock branch sets currentProfileName to the
+        // user profile, the first no-match eval arrives with target == currentProfileName
+        // (changed = false). A snapshot lingering from a death between a manual load's paired
+        // writes must STILL be restored + cleared there — the restore is deliberately not gated
+        // on `changed` (snapshot exists ⟺ override active).
+        var now = 0L
+        val src = FakeSignalSource(batteryPercent = 90) // never matches the saver rule
+        val stale = FakeBaselineStore(stored = baseline.copy(minBrightness = 3))
+        val h = engine(
+            listOf(batterySaverRule),
+            src,
+            baseline = baseline.copy(contextOverride = true, minBrightness = 200),
+            clock = { now },
+            baselineStore = stale,
+        )
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertEquals(3, stale.stored?.minBrightness, "lock latched → seed eval skips the switch, snapshot survives")
+
+        // The manual-load reapply path: reevaluate() under the latched lock sets currentProfileName
+        // to the user profile. The screen-on resume then clears the lock, and the next no-match
+        // eval resolves target == currentProfileName (changed = false).
+        h.engine.reevaluate()
+        h.settings.value = h.settings.value.copy(contextOverride = false)
+
+        now = 40_000L
+        src.batteryPercent = 80 // Δ ≥ 5 vs the seed reading so the BATTERY veto lets the eval run
+        src.battery.emit(BatterySignal(80, plugged = false))
+        advanceUntilIdle()
+        assertEquals(3, h.settings.value.minBrightness, "the unchanged no-match eval restores the stale snapshot")
+        assertNull(stale.stored, "and clears it")
+        h.scope.cancel()
     }
 
     @Test

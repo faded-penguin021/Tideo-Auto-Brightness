@@ -6,6 +6,8 @@ import androidx.datastore.dataStore
 import androidx.datastore.preferences.preferencesDataStore
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.AabSettingsSerializer
+import com.tideo.autobrightness.app.settings.ContextBaseline
+import com.tideo.autobrightness.app.settings.ContextBaselineSerializer
 import com.tideo.autobrightness.app.settings.ContextOverrideConfig
 import com.tideo.autobrightness.app.settings.ContextRulesSerializer
 import com.tideo.autobrightness.app.settings.OverridePoints
@@ -30,6 +32,13 @@ val Context.controlPrefsDataStore by preferencesDataStore(name = "control_prefs"
 // Measured power-draw dataset (task524 _CalibratePowerDraw, %AAB_HTML_Graph8 / %data). Persisted so the
 // Tools PowerDrawChart survives restarts; overwritten on recalibration. S14.
 val Context.powerDrawDataStore by preferencesDataStore(name = "power_draw")
+
+// D-170: the pre-override baseline snapshot (Tasker task626 _ContextResume / %AAB_ProfileUser).
+// Context-rule loads write through to settingsDataStore; this holds what the no-match revert restores.
+val Context.contextBaselineDataStore: DataStore<ContextBaseline> by dataStore(
+    fileName = "aab_context_baseline.json",
+    serializer = ContextBaselineSerializer,
+)
 
 // Context-override rules (S10): the rebuild's store for the rule set (Tasker contexts.json + caches).
 val Context.contextRulesDataStore: DataStore<ContextOverrideConfig> by dataStore(

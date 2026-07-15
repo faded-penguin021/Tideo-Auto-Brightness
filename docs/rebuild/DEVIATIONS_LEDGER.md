@@ -3111,3 +3111,39 @@ the permanent registry — never compress or remove them.
   D-052, not its removal. UI-flash + commit-path change; the curve MATH and all golden vectors are
   untouched. Tests: `MaxBrightnessFixTest` (policy), `SettingsValidatorTest` form3A-advisory,
   `DraftSettingsViewModelTest.apply_raisesMaxBrightToFitCurve_D169`.
+
+- **D-170: context-rule profile loads WRITE THROUGH to the live settings store, with a persisted
+  pre-override baseline snapshot (2026-07-15, owner-reported bug + owner decision "B — parity").**
+  Owner report: after an automated context load (e.g. low battery → Battery Saver) the toast fired
+  and the pipeline ran the profile, but the parameter screens showed the previous values —
+  structural under the old design, which merged the profile **in-memory only**
+  (`ContextEngine._effective`, the D-038(ii) overlay) while every screen reads the settings
+  DataStore. Replaced with Tasker parity: `_ProfileManager LOAD_FILE` repopulates the live
+  `%AAB_*` variables, so the engine now (a) snapshots the current settings to the new
+  `aab_context_baseline.json` store (`ContextBaselineStore`, task626 `_ContextResume` / the
+  `%AAB_ProfileUser` revert file) on the baseline→override transition ONLY (rule→rule switches
+  keep the original snapshot), then (b) writes `mergeProfile(current, profile)` INTO
+  `settingsDataStore`; the PASS 4 no-match revert writes `mergeProfile(current, snapshot)` back
+  and clears the snapshot (globals — debugLevel/detectOverrides/panic — stay live: they are not
+  task626 39-key members, G2-F8/G2R-F9). Override writes are gated on the profile CHANGING (Tasker
+  act17 skip), so a same-profile re-evaluation never stomps edits made mid-override; those edits
+  are discarded by the revert (Tasker parity, accepted). **INVARIANT: snapshot exists ⟺ override
+  active** — any no-rule-active evaluation restores + clears a present snapshot, deliberately NOT
+  gated on `changed` (glue-review finding: after `reevaluate()`'s lock branch sets
+  currentProfileName to the user profile, the post-resume no-match eval arrives unchanged and a
+  death-lingering snapshot would otherwise survive to poison a later revert). Snapshot-first
+  ordering on entry + that heal cover deaths between paired writes. Manual "authoritative
+  settings" moments clear the snapshot (task626 re-snapshot semantics), clear-FIRST so a death
+  mid-pair means "the load didn't take" rather than a stale revert reference:
+  `ProfileApplier.applyProfile` / `resumeContextAutomation` and `SettingsViewModel.replaceAll`
+  (import). `resetDefaults` deliberately does NOT clear (no lock latch — it is an edit of the
+  live set, discarded on revert like any mid-override edit). `effectiveSettings()` is
+  now a fresh store read; `effectiveFlow` remains the observable bridge (DisplayTogglesCoordinator
+  unchanged — diff-based, idempotent). Consequences accepted with the pivot: a service stop /
+  manual-lock latch mid-override leaves the override in the live store (Tasker: live vars keep
+  whatever was loaded); the settings screens now always show what the pipeline runs. Supersedes
+  the D-038(ii) overlay reading; closes the 2026-07-15 Owner-queue question (option b chosen over
+  the advisory-banner option a). Tests: `ContextEngineTest` ×5 `_D170` (write-through+snapshot+
+  revert, act17 edit survival + revert semantics, rule→rule snapshot retention, stale-snapshot
+  heal), `ProfileApplierTest` ×2 `_D170` (manual load / resume clear the snapshot),
+  `DataStoreSchemaVersionTest` context-baseline row.

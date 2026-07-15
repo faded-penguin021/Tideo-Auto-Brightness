@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.settings
 import android.content.Context
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
+import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 
 /**
@@ -20,6 +21,10 @@ class ProfileApplier(
     private val userProfiles: UserProfileStore,
 ) {
     private val appContext = context.applicationContext
+    // D-170: manual loads make the CURRENT settings authoritative — the pre-override baseline
+    // snapshot (task626 _ContextResume) is stale the moment the user picks a profile by hand, so
+    // both entry points below clear it (Tasker re-snapshots the live var set at Resume).
+    private val baselineStore = DataStoreContextBaselineStore(appContext.contextBaselineDataStore)
 
     /**
      * Apply a saved named profile (the [UserProfileStore] set; built-ins are seeded into it). The live
@@ -34,6 +39,11 @@ class ProfileApplier(
      */
     suspend fun applyProfile(name: String) {
         val profile = userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return
+        // The manual choice becomes the new baseline — drop any pre-override snapshot (D-170).
+        // Clear BEFORE the settings write: a death in between means the load simply didn't take
+        // (benign), whereas write-then-clear could leave a stale snapshot that a later revert
+        // would restore over the user's deliberate choice.
+        baselineStore.clear()
         val updated = appContext.settingsDataStore.updateData { current ->
             profile.copy(
                 serviceEnabled = current.serviceEnabled,
@@ -55,6 +65,9 @@ class ProfileApplier(
      * resume overriding (G2R-F30). Mirrors Tasker clearing %AAB_ContextOverride.
      */
     suspend fun resumeContextAutomation() {
+        // Resume = the current settings become the baseline the next override snapshots (task626
+        // re-snapshot semantics, D-170); clear any residual pre-lock snapshot first.
+        baselineStore.clear()
         val updated = appContext.settingsDataStore.updateData { it.copy(contextOverride = false) }
         if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(appContext)
     }

@@ -6,12 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.DataStoreContextBaselineStore
 import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.FieldError
 import com.tideo.autobrightness.app.settings.ProfileApplier
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.settings.UserProfileStore
+import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.wizard.OverridePoint
@@ -103,6 +105,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun replaceAll(newSettings: AabSettings) {
         viewModelScope.launch {
+            // An import is a manual "these settings are authoritative" moment like applyProfile —
+            // drop any pre-override baseline snapshot or a later revert would resurrect it (D-170;
+            // clear-first for the same benign-death ordering as ProfileApplier.applyProfile).
+            DataStoreContextBaselineStore(app.contextBaselineDataStore).clear()
             val updated = app.settingsDataStore.updateData { current ->
                 // Preserve the live service flag + the global DetectOverrides (G2-F8) and debugLevel
                 // (G2R-F9) preferences — neither belongs to an imported profile's parameter set. An
