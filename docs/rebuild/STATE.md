@@ -43,7 +43,7 @@ persisted-plan pattern). The migration narrative is frozen in `../history/`; the
 registry stays live.
 
 > Code/docs elsewhere cite deviations by number (e.g. `STATE.md D-048`, `F50`). All deviations
-> — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (200 rows per
+> — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (184 rows per
 > file, then `_A.md`/DA-…, `_B.md`/DB-… — D-153; gate findings are in
 > `../history/STATE_rebuild.md`). Look there.
 
@@ -119,6 +119,10 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-15 — **D-171** (owner-instructed, docs/process): ledger file cap lowered 200 → **184
+  rows** (rollover mechanism unchanged); header/preamble, D-153 + guard-1c historical rows
+  (superseded-by pointers), `CLAUDE.md`, `RUNBOOK.md`, and `ladder.sh` guard 1c (fail > 184,
+  warn ≥ 174) updated in lockstep. Detail in the D-171 row.
 - 2026-07-15 — **D-170** (owner-reported "stale settings screens after a context load"; owner chose
   Tasker parity over an advisory banner): context-rule profile loads now **write through** to the
   live settings DataStore (`LOAD_FILE` semantics — screens show the loaded values), with the

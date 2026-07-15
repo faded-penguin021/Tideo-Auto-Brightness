@@ -66,7 +66,7 @@ grep -qF '## Owner queue' "$STATE_FILE" \
   || echo "LADDER WARN: $STATE_FILE is missing '## Owner queue' (D-167) — a compression pass ate the owner's pending actions/questions/findings; restore it from git history."
 echo "LADDER: STATE.md required sections present"
 
-# --- guard 1c: deviations-ledger rollover reminder (D-153: 200 rows per file, then _A/_B…) ---
+# --- guard 1c: deviations-ledger rollover reminder (D-153/D-171: 184 rows per file, then _A/_B…) ---
 # (LADDER_LEDGER_FILE overrides the path — used only by the guard's own tests.)
 LEDGER_FILE="${LADDER_LEDGER_FILE:-}"
 if [ -z "$LEDGER_FILE" ]; then
@@ -77,12 +77,12 @@ if [ -z "$LEDGER_FILE" ]; then
 fi
 if [ -f "$LEDGER_FILE" ]; then
   ledger_rows=$(grep -cE '^- (\*\*)?D[AB]?-[0-9]' "$LEDGER_FILE" || true)
-  if [ "$ledger_rows" -gt 200 ]; then
-    fail "live ledger $LEDGER_FILE has ${ledger_rows} rows (> 200) — roll over to the next file (D-153)"
-  elif [ "$ledger_rows" -ge 190 ]; then
-    echo "LADDER WARN: live ledger $LEDGER_FILE at ${ledger_rows}/200 rows — rollover soon (D-153)"
+  if [ "$ledger_rows" -gt 184 ]; then
+    fail "live ledger $LEDGER_FILE has ${ledger_rows} rows (> 184) — roll over to the next file (D-153/D-171)"
+  elif [ "$ledger_rows" -ge 174 ]; then
+    echo "LADDER WARN: live ledger $LEDGER_FILE at ${ledger_rows}/184 rows — rollover soon (D-153/D-171)"
   else
-    echo "LADDER: live ledger OK (${ledger_rows}/200 rows in $LEDGER_FILE)"
+    echo "LADDER: live ledger OK (${ledger_rows}/184 rows in $LEDGER_FILE)"
   fi
 else
   fail "live ledger $LEDGER_FILE not found"
