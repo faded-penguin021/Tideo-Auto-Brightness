@@ -80,7 +80,25 @@ registry stays live.
 4. When merging session branches, note `claude/ladder-checkpoint-improvements-dm4ewz` (D-166/167
    repo hardening) is independent of the 1.8.0 PR branch — separate squash-merge.
 
-**Open questions:** (none)
+**Open questions:**
+
+1. **Stale parameter screens during a context-rule profile load** (owner report 2026-07-15;
+   session `claude/stale-settings-profile-load-27vdl8`, diagnosis-only). Structural, not a race —
+   applies to EVERY automated rule load (battery/time/wifi/app/location): a context load merges
+   the profile **in-memory** (`ContextEngine` `_effective`, the D-038(ii) baseline-overlay
+   design); DataStore = the editable user baseline and is untouched, and the parameter screens
+   (Curve, Reactivity, Animation & Dimming, Circadian, Misc, Privileged Display) read DataStore —
+   so they show baseline values while the pipeline runs the loaded profile. Dashboard / menu
+   subtitle / Profiles highlight are correct (they read `LiveRuntimeState`). The manual-load
+   "remedy" works because `ProfileApplier` writes DataStore — but it ALSO latches the manual
+   context lock (`contextOverride`, G2R-F30), silently suppressing all rule switching until
+   Resume. Options: **(a) recommended** — advisory tinted-Card banner on the parameter screens
+   when a rule is active (existing stale/override banner pattern) naming rule + loaded profile
+   and clarifying the values below are the editable baseline; small single unit, reversible.
+   (b) Tasker-parity write-through (context load writes DataStore + persisted task626-style
+   baseline snapshot/restore) — heavy, schema change, re-opens the declined "persisted
+   last-applied seed" non-item and muddies edit-durability (Tasker discarded mid-override edits).
+   (c) Parameter screens render effective values — conflicts with edits targeting the baseline.
 
 **Incoming findings:** (none — on-device results from DEVICE_TEST passes land here)
 
