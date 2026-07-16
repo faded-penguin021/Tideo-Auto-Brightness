@@ -17,6 +17,11 @@
 > unbounded single file is a read/context hazard for agentic maintenance flows), not history.
 > A citation's prefix names its file: `D-…` → this file, `DA-…` → ledger A, `DB-…` → ledger B.
 > Cites stay bare (`DA-017`) everywhere, exactly like `D-017` today.
+> "Same header discipline" means: carry over the *structural* header content (the append-only
+> warning, this cap-&-rollover paragraph with the prefixes/filenames advanced, the
+> citation-routing sentence, the ground-truth rule) but NOT the base-file-specific lines —
+> the "D-001…D-095 frozen migration block" sentence and the "Seeded by the S0 audit" lead-in
+> stay unique to THIS file.
 
 ## Deviations & discoveries ledger
 

@@ -119,6 +119,10 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-16 — docs/process: ledger preamble now spells out which header content is structural
+  (copy into `_A.md`/`_B.md` at rollover, prefixes advanced) vs base-file-specific (frozen-block
+  + S0-seed lines stay here) — removes the one ambiguity in the D-153/D-171 rollover mechanism
+  before the cap (166/184) is hit. Mechanism, thresholds, and existing rows unchanged; no D-row.
 - 2026-07-15 — **D-171** (owner-instructed, docs/process): ledger file cap lowered 200 → **184
   rows** (rollover mechanism unchanged); header/preamble, D-153 + guard-1c historical rows
   (superseded-by pointers), `CLAUDE.md`, `RUNBOOK.md`, and `ladder.sh` guard 1c (fail > 184,
