@@ -119,6 +119,11 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-16 — docs (doc-to-code correction, CLAUDE.md ground-truth rule): retired the 8 stale
+  `deferred-S13` tags in `extraction/tasks/anonymous_handlers.md` (RUNBOOK playbook-2 reading
+  material) — chart renders + About/Guide shipped in S13d (`ui/graph/`, `AboutScreen`/
+  `UserGuideScreen`); tags now cite the shipped components, matching PARITY_CHECKLIST. Bucket
+  dispositions untouched.
 - 2026-07-16 — docs/process: ledger preamble now spells out which header content is structural
   (copy into `_A.md`/`_B.md` at rollover, prefixes advanced) vs base-file-specific (frozen-block
   + S0-seed lines stay here) — removes the one ambiguity in the D-153/D-171 rollover mechanism

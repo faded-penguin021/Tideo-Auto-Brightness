@@ -200,16 +200,18 @@ replace Tasker scene nav and longclick help toasts); **(b) settings-mutation** �
 `dropped(absorbed-by-compose-state)` (a Compose field/toggle bound to `AabSettings` with a
 debounced persist + `SettingsValidator` covers it); **(c) complex** → the explicit 1:1 port list
 below (multi-action / branching / cross-field / side-effecting). Chart *generation* rows keep
-their **logic** in S12 (warnings, guards, apply) but their **render** is `deferred-S13`.
+their **logic** in S12 (warnings, guards, apply); their **render** shipped in S13d
+(`app/…/ui/graph/` — `ChartCanvas` + the chart composables; PARITY_CHECKLIST "ported (chart
+render S13d)" rows).
 
 ### (a) Trivial scene-chrome — DROPPED (shared reason)
 
 - **`props·key` back-key handlers** (scene show/destroy nav): task550, 568, 590, 591, 593, 594,
   597, 598, 599, 600, 602, 603, 605, 606, 632 → dropped(M3 nav back). About/Guide/License
-  keys task595, 596, 604 → `deferred-S13` (S13 owns those screens).
+  keys task595, 596, 604 → shipped S13d (`AboutScreen`/`UserGuideScreen`; M3 nav back).
 - **Exit/close/scene-nav clicks** (`_ExitButton`, Show/Destroy Scene): task391, 411, 417, 462,
   481, 490, 516, 521, 532, 537, 538, 666, 667, 671, 680, 748 → dropped(M3 nav). About/Guide
-  task685, 717, 718 → `deferred-S13`.
+  task685, 717, 718 → shipped S13d (`AboutScreen`/`UserGuideScreen`; M3 nav).
 - **Longclick help tooltips** (single `Flash(...)`, ± a throwaway var set): task383, 405, 421,
   465, 493, 505, 506, 510, 514, 519, 527, 529, 536, 658, 662, 670, 672, 678, 682, 684, 687,
   688, 690, 694, 702, 711, 712, 719, 720, 721, 722, 723, 725, 726, 727, 728, 729, 730, 732,
@@ -237,12 +239,13 @@ their **logic** in S12 (warnings, guards, apply) but their **render** is `deferr
 | task613, 614, 615, 616, 617 | focuschange → `_UpdateBrightnessFormulae` + `_RedInvalidFormulae` (+ zone2End≥zone1End, form2C≤zone1End guards) | Curve & Brightness: LIVE derived form2A/form3A readout + per-field validator errors |
 | task403, 714, 715, 716 | min/max wait + animSteps cross-field guards; throttle = animSteps·maxWait+10 derivation | Animation & Dimming: derived throttle readout + cross-field validation |
 | task509, 511, 523, 607, 609, 610, 611, 612 | dimming/exponent/threshold/spread/strength focuschange validators + unprivileged-tier warning | Animation & Dimming: field error states + ELEVATED-gated rows with tier hint |
-| task513 | dimming threshold<minBright guard (+ dimming graph gen) | Animation & Dimming: threshold validation; chart render `deferred-S13` |
-| task517, 674 | `scaleTransitionFactor>0.5` "graph may be non-sensical" warning (+ circadian/experiment graph gen) | Dynamic Scale / Animation & Dimming: warning surfaced; chart render `deferred-S13` |
+| task513 | dimming threshold<minBright guard (+ dimming graph gen) | Animation & Dimming: threshold validation; chart render shipped S13d (`DimmingChart`) |
+| task517, 674 | `scaleTransitionFactor>0.5` "graph may be non-sensical" warning (+ circadian/experiment graph gen) | Dynamic Scale / Animation & Dimming: warning surfaced; chart render shipped S13d (`ExperimentChart`/`CircadianChart`) |
 | task665, 689 | "values not set" / taper midpoint ≤ maxBright guards | Dynamic Scale: field validation |
 | task651, 412, 621, 724 | run `_SuggestCurveParameters`; apply (`%suggest=true`) vs discard; refresh curve | Tools: wizard runner over `CurveSuggestionEngine` + `applyToLiveCurve` |
-| task411, 473, 686, 743 | generate Reactivity/Compression/Alpha graphs (Java) | chart render `deferred-S13` (Reactivity/Dynamic Scale/Tools host slots left by S12) |
+| task411, 473, 686, 743 | generate Reactivity/Compression/Alpha graphs (Java) | chart render shipped S13d (`ReactivityChart` incl. `AlphaResponseChart`, `TaperChart`) |
 
 **Net:** ~46 (a) + ~58 (b) dropped with shared reasons; ~30 distinct (c) behaviors ported into the
-seven S12 screens; chart-generation/render rows `deferred-S13`. S13 resumes from the
-`deferred-S13` tags here.
+seven S12 screens; chart-generation/render rows' renders shipped in S13d (all former
+`deferred-S13` tags here are closed — see the matching PARITY_CHECKLIST "ported (chart render
+S13d)" rows and `app/…/ui/graph/`).
