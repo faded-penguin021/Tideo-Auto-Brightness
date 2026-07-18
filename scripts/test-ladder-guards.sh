@@ -125,7 +125,14 @@ rm "$SANDBOX/docs/rebuild/ledger_full.md"
 # --- guard 5: D-citation integrity ----------------------------------------------------------
 
 printf '// cited: D-002\n' > "$SANDBOX/app/Cited.kt"
-check "guard 5: resolving citation passes" 0 "D-citations OK (1 distinct"
+sed -i 's/^- D-002:/- D-002 [cited]:/' "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md"
+check "guard 5: cited + marked row passes" 0 "1 distinct, all resolve; [cited] markers in sync"
+write_ledger 10
+check "guard 5: cited row missing its [cited] marker fails" 1 "missing the [cited] marker"
+rm "$SANDBOX/app/Cited.kt"
+sed -i 's/^- D-004:/- D-004 [cited]:/' "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md"
+check "guard 5: stale [cited] marker fails" 1 "no longer cited anywhere in scope"
+write_ledger 10
 printf '// cited: D-999\n' > "$SANDBOX/app/Cited.kt"
 check "guard 5: dangling citation fails" 1 "dangling deviation citation D-999"
 printf '// cited: DA-001\n' > "$SANDBOX/app/Cited.kt"

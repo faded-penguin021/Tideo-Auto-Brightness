@@ -36,7 +36,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | Known parity deviations / open gaps | `parity_gaps.md` |
 | Privilege tiers / permissions / DataStore schema | `architecture/*` |
 | Material 3 audit | `design/m3_audit.md` |
-| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
+| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
 ## Change-type playbooks
 
@@ -320,7 +320,8 @@ it before commit and record anything durable as a `D-NN`.
 
 **One command: `scripts/ladder.sh`** — fast pre-flight guards (the STATE.md length rule;
 the D-115 skip-ci token scan over unmerged commit messages — catch it BEFORE push, since
-force-push is forbidden; the D-173 D-citation-integrity and F-Droid-changelog-cap checks;
+force-push is forbidden; the D-173 D-citation-integrity check with its D-174 `[cited]`-marker sync, and the F-Droid
+changelog cap;
 plus WARN-only checkpoint/stale-branch advisories that self-skip in CI), then all five rungs
 in a single Gradle invocation. The guards themselves are regression-tested by
 `scripts/test-ladder-guards.sh` (sandbox-repo fixtures, seconds; also a `build.yml` step —

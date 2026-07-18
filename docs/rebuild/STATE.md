@@ -115,6 +115,8 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-18 — **D-174** (owner-requested): machine-synced `[cited]` ledger marker — guard 5
+  enforces it both directions; 93 rows retrofitted. Detail in the D-174 row.
 - 2026-07-18 — **D-173** harness hardening: ladder guards 5 (D-citation
   integrity) + 6 (F-Droid changelog cap); `test-ladder-guards.sh` regression suite (18 cases,
   + build.yml step); release-preflight classifies `.claude/*` non-shipping; session-start
@@ -142,9 +144,8 @@ the cited D-rows and git history.
   Session discipline 7 "ask, don't assume".
 - 2026-07-13 — **D-166 (+ addendum)** repo-hardening: `build.yml` runs `scripts/ladder.sh`,
   ladder guards 3/4, `settings.json` push deny rules, session-start branch/STATE print.
-- 2026-07-12 — final adversarial audit CLOSED: **D-163** rule-removal clears signal snapshots;
-  **D-164** draft Apply snaps to the validated commit; **D-165** panic re-arm sustained spell;
-  `WizardDegenerateInputTest`. +6 tests.
+- 2026-07-12 — final adversarial audit CLOSED: **D-163**–**D-165** fixes +
+  `WizardDegenerateInputTest`; +6 tests.
 - 2026-07-10 — **D-161** repo-hardening U1–U4 (ladder.sh, STATE 27.6→12 KB, Session discipline,
   Gradle parallel/config-cache) + **D-162** external-review triage (guards 1b/1c, recovery rule,
   golden-fixture gate; declines in the row + non-items).

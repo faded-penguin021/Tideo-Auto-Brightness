@@ -19,7 +19,8 @@
 #      scripts/test-ladder-guards.sh, the guards' own test suite.)
 #   5. D-citation integrity (D-173): every D-/DA-/DB-NNN cited in app/ domain/ platform/
 #      .github/ sources must resolve to a row in its ledger file; ledger row numbers must be
-#      unique. 6. F-Droid changelog cap (D-173): the CURRENT versionCode's
+#      unique; the rows' [cited] markers must match the citation set both ways (D-174).
+#      6. F-Droid changelog cap (D-173): the CURRENT versionCode's
 #      fastlane changelog must be <= 500 bytes (RUNBOOK §6; F-Droid flags longer whatsNew).
 #   2. D-115 skip-ci token scan over unmerged commit messages (origin/main..HEAD) — the
 #      same fixed-string token set release-preflight.yml enforces at PR time. Catching a
@@ -121,7 +122,18 @@ for lf in docs/rebuild/DEVIATIONS_LEDGER.md docs/rebuild/DEVIATIONS_LEDGER_A.md 
   dupes=$(grep -oE '^- (\*\*)?D[AB]?-[0-9]{3}' "$lf" | grep -oE 'D[AB]?-[0-9]{3}' | sort | uniq -d || true)
   [ -z "$dupes" ] || fail "duplicate deviation row number(s) in $lf: $(echo $dupes) — renumber the newest append (D-173)"
 done
-echo "LADDER: D-citations OK ($(echo "$cited" | grep -c . || true) distinct, all resolve; no duplicate ledger rows)"
+
+# [cited] marker sync (D-174): a row cited from the scan scope above carries " [cited]"
+# directly after its number; guard both directions so the marker is verified derived state
+# (grep '\[cited\]' on a ledger file = every code-anchored row, no tree cross-reference).
+marked=$(grep -hoE '^- (\*\*)?D[AB]?-[0-9]{3} \[cited\]' \
+    docs/rebuild/DEVIATIONS_LEDGER.md docs/rebuild/DEVIATIONS_LEDGER_A.md \
+    docs/rebuild/DEVIATIONS_LEDGER_B.md 2>/dev/null | grep -oE 'D[AB]?-[0-9]{3}' | sort -u || true)
+unmarked=$(comm -23 <(printf '%s\n' $cited | grep . | sort -u) <(printf '%s\n' $marked | grep .) || true)
+stale=$(comm -13 <(printf '%s\n' $cited | grep . | sort -u) <(printf '%s\n' $marked | grep .) || true)
+[ -z "$unmarked" ] || fail "ledger row(s) cited from code but missing the [cited] marker: $(echo $unmarked) — insert \" [cited]\" directly after the row number (D-174)"
+[ -z "$stale" ] || fail "ledger row(s) marked [cited] but no longer cited anywhere in scope: $(echo $stale) — remove the marker, or restore the lost citation (D-174)"
+echo "LADDER: D-citations OK ($(echo "$cited" | grep -c . || true) distinct, all resolve; [cited] markers in sync; no duplicate ledger rows)"
 
 # --- guard 6: F-Droid changelog cap (D-173) ---
 # RUNBOOK §6: changelogs/<versionCode>.txt must stay under 500 characters (whole file, wc -c)

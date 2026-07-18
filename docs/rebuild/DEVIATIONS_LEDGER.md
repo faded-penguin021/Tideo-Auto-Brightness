@@ -19,31 +19,44 @@
 > Cites stay bare (`DA-017`) everywhere, exactly like `D-017` today.
 > "Same header discipline" means: carry over the *structural* header content (the append-only
 > warning, this cap-&-rollover paragraph with the prefixes/filenames advanced, the
-> citation-routing sentence, the ground-truth rule) but NOT the base-file-specific lines —
-> the "D-001…D-095 frozen migration block" sentence and the "Seeded by the S0 audit" lead-in
-> stay unique to THIS file.
+> citation-routing sentence, the ground-truth rule, the `[cited]`-marker paragraph below) but
+> NOT the base-file-specific lines — the "D-001…D-095 frozen migration block" sentence and the
+> "Seeded by the S0 audit" lead-in stay unique to THIS file.
+>
+> **`[cited]` marker (D-174 — machine-managed, owner-requested).** A row whose number is cited
+> from the guard-5 scan scope (`app/ domain/ platform/ .github/` sources — see
+> `scripts/ladder.sh`) carries ` [cited]` directly after its number (`- **D-172 [cited]: …`,
+> `- **D-061 [cited] (S12.7i) — …`). Ladder guard 5 syncs it in BOTH directions — a cited row
+> missing the marker and a marked row no longer cited both fail — so the marker is verified
+> derived state, never hand-tracked: `grep '\[cited\]'` on a ledger file lists every
+> code-anchored row without cross-referencing the tree, and the marker on a row warns that a
+> code/workflow comment resolves here before you lean on or reword it. Adding/removing this
+> marker is mechanical metadata maintenance, NOT a content edit — it is the one change
+> permitted even inside the frozen D-001…D-095 block. When appending a new row for work that
+> cites it (the usual case for code changes), include the marker up front; the guard catches a
+> miss either way.
 
 ## Deviations & discoveries ledger
 
 Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
 
 - D-001: Java blocks are action code 474 (40), not 598. (Affects S1.)
-- D-002: task661 has no Java; curve math is in Variable Set expressions. task663's Java is a
+- D-002 [cited]: task661 has no Java; curve math is in Variable Set expressions. task663's Java is a
   plot-side copy for cross-validation only. (Affects S1, S4.)
 - D-003: Profile-level ConditionLists carry pipeline gating (prof760: absolute thresholds,
   sensor-accuracy trust, %AAB_MainLoop). (Affects S1, S9.)
-- D-004: AabSettings schema gaps: %AAB_AnimSteps, %AAB_MaxSteps, %AAB_ThreshMidpoint;
+- D-004 [cited]: AabSettings schema gaps: %AAB_AnimSteps, %AAB_MaxSteps, %AAB_ThreshMidpoint;
   AnimationConfig defaults conflict with AabSettings. (Affects S1 defaults_audit, S8.)
 - D-005: :platform is currently kotlin("jvm"); becomes com.android.library in S3.
 - D-006: 125 distinct %AAB_* variables (not 122 as older docs say).
-- D-007: settings.gradle.kts has NO pluginManagement block → AGP unresolvable → gradle
+- D-007 [cited]: settings.gradle.kts has NO pluginManagement block → AGP unresolvable → gradle
   CONFIGURATION fails for every target, even pure-JVM `:domain:test` (verified 2026-06-11 with
   Gradle 8.14.3: "Plugin com.android.application 8.5.2 was not found"). The Codex build was
   never runnable. S3 must add `pluginManagement { repositories { google(); mavenCentral();
   gradlePluginPortal() } }` (or migrate plugin decls accordingly). Until S3: no gradle target
   works at all. (Affects S3; S4 is safe — it depends on S3.)
 
-- D-008: D-004 RESOLVED (S1 `defaults_audit.md`). Canonical from task570: `AAB_AnimSteps=20`,
+- D-008 [cited]: D-004 RESOLVED (S1 `defaults_audit.md`). Canonical from task570: `AAB_AnimSteps=20`,
   `MinWait=25`, `MaxWait=65`, `Throttle=AnimSteps*MaxWait+10=1310`, `ThreshMidpoint=log10(Zone2End)=4`.
   `AAB_MaxSteps` is in the 125-var census but NEVER assigned a default → legacy/unused, do not invent
   one. The salvaged `AnimationConfig` defaults (50/5/30) are WRONG; use 20/25/65. Settings missing from
@@ -53,7 +66,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   parenthesization (and polarity of `%AAB_MainLoop != On`) is UNRESOLVED — literal sequences captured
   in `extraction/profiles.md`, best-effort reading flagged. Validate against runtime in S9. `ThreshAbsLow/High`
   (prof760 abs gate) are written by task546 _Set Thresholds_, NOT task570. (Affects S9; informs S4.)
-- D-010: Engine vs Tasker micro-divergences found in S1 spot-check (code left untouched, for S4/S5):
+- D-010 [cited]: Engine vs Tasker micro-divergences found in S1 spot-check (code left untouched, for S4/S5):
   (a) `BrightnessEngine.luxSmoothing` clamps `luxAlpha.coerceIn(0,1)` — task535 does NOT clamp;
   (b) `mapLuxToBrightness` wraps `^0.33` bases in `.coerceAtLeast(0.0)` — task661 does NOT. Dynamic-threshold
   sigmoid+dark branch is an EXACT match. (Affects S4 golden boundary rows, S5.)
@@ -72,7 +85,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   `AAB_SunStatus="polar"`, `ss_sunlight_duration=1440` (midnight sun, `-2.0` marker) else `0`. Normal:
   `durationMins=(set-rise)/60`, `+1440` if negative. **S6 must port a NOAA solar calculator**, not call
   any platform sunrise API; golden-test vs NOAA tables incl. polar. (Affects S6.)
-- D-014: CONTEXT PRECEDENCE is NOT profile `<pri>` (prof762–768 are all pri 0). Real precedence = the
+- D-014 [cited]: CONTEXT PRECEDENCE is NOT profile `<pri>` (prof762–768 are all pri 0). Real precedence = the
   per-rule integer `priority` inside `contexts.json`, resolved in task43 PASS 3: highest priority wins,
   ties → specificity (# matched trigger dimensions), final ties → array order. An override swaps the
   ENTIRE active profile via `_ProfileManager LOAD_FILE` (39-key snapshot) + re-runs Set Initial
@@ -85,13 +98,13 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   no abort): `form2A<0`, `form3A<0`, `form2C>zone1End`. task707 `_ValidateBrightnessParams` (2 safety):
   predicts brightness at 1000 lux via the zone formula that 1000 lux falls in; if `<25` → warning toast +
   `%is_safe=no`; `%AAB_MaxBright` defaults 255 when unset. (Affects S8 `validate()`, S12 red-invalid UI.)
-- D-016: PRIVILEGE DETECTION (task378) is a first-hit probe: Root(`su -c id`→uid0) → WriteSecure
+- D-016 [cited]: PRIVILEGE DETECTION (task378) is a first-hit probe: Root(`su -c id`→uid0) → WriteSecure
   (`checkPermission`) → Shizuku(`getShizukuService`) → ADB-WiFi(TCP 127.0.0.1:5555) → None. ALL positive
   results map to ELEVATED; None = unprivileged overlay. BASIC (WRITE_SETTINGS) is a SEPARATE gate in
   task563 step 1. `%AAB_Privilege` cached unless caller forces re-detect; `%AAB_PermGranted="3"`=all 8
   runtime perms granted. task643 only TEACHES the `pm grant WRITE_SECURE_SETTINGS` adb command (clipboard
   dialog), never grants. (Affects S7 PrivilegeManager, S11 onboarding.)
-- D-017: `%AAB_AnimSteps` HAS a user-facing slider (Misc Settings, range 0–100) and `%AAB_ScaleTaperMidpoint`
+- D-017 [cited]: `%AAB_AnimSteps` HAS a user-facing slider (Misc Settings, range 0–100) and `%AAB_ScaleTaperMidpoint`
   a slider (Experiment Settings, 130–240) — confirms both are real settings (reinforces D-008: add AnimSteps
   to AabSettings). All numeric inputs in settings scenes are `EditTextElement` (no SliderElement in
   brightness/reactivity/superdimming); toggles render as overlaid Switch PAIRS (on+off overlay) → collapse
@@ -121,7 +134,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
 - D-020: BRANCH POLICY RESOLVED (closes D-011, D-012). Per-session `claude/*` branches are BY DESIGN:
   the owner merges each segment to main via PR after stage completion; sessions start from fresh main.
   CLAUDE.md rewritten accordingly. Future sessions: do NOT log or reconcile branch-name differences.
-- D-021: ConditionList semantics VALIDATED (owner-confirmed prof760 staging incl. `%AAB_MainLoop != On`
+- D-021 [cited]: ConditionList semantics VALIDATED (owner-confirmed prof760 staging incl. `%AAB_MainLoop != On`
   mutex polarity; cross-checked on prof758): plain `And`/`Or` bind tighter (inner groups, `And` > `Or`);
   `And2`/`Or2` join those groups left-to-right. Resolves D-009 + INDEX unresolved #1; S9 runtime
   validation downgraded to a Gate-1 sanity check. DISCOVERY: ConditionList children are stored
@@ -133,22 +146,22 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   off, `%AAB_Service=Off`. prof759/task545 "Detect Proximity" (L16424, new doc
   tasks/task545_detect-proximity.md) sets `%AAB_Proximity` near/far; damps LuxAlpha ×0.1 in task544 —
   it never pauses the pipeline. (Affects S9.)
-- D-023: `%AAB_Debug` = 10 named info categories from the Debug-scene selector (XML L2773–2782): Off /
+- D-023 [cited]: `%AAB_Debug` = 10 named info categories from the Debug-scene selector (XML L2773–2782): Off /
   Skip Animations / Animation Details / Light Eval Thresholds / Dynamic Scale Calcs / Super Dimming
   Info / Overlay Preview / Graph Metrics / Context Automation / Context Location. S1's inferred glosses
   for 7/8/9 were wrong; features_spec corrected. (Affects S12 debug UI.)
-- D-024: SANCTIONED DEVIATIONS (owner): (a) privilege detection must NOT read Tasker pref `adbwp`
+- D-024 [cited]: SANCTIONED DEVIATIONS (owner): (a) privilege detection must NOT read Tasker pref `adbwp`
   (drop ADB-WiFi probing; elevated truth = checkPermission(WRITE_SECURE_SETTINGS); ADB/Shizuku/root are
   grant channels only — matches existing S7/S11 design); (b) task563's polling-dialog onboarding flow is
   NOT the parity contract — only its 8 gates + order are; S11 keeps its ActivityResultContracts design.
   (Affects S7, S11.)
-- D-025: `%AAB_Test` = curve-wizard diagnostics report (R²/nRMSE/bias; task38 logBuffer), copied to
+- D-025 [cited]: `%AAB_Test` = curve-wizard diagnostics report (R²/nRMSE/bias; task38 logBuffer), copied to
   clipboard via the single code-105 action (L9864), documented to users (guide L8715) — surface in the
   rebuilt wizard UI (S6/S12). INDEX action codes fixed: 590 = Variable Split (was mislabeled "Array
   Push"), 105 = Set Clipboard. defaults_audit: added the 4 non-AAB capital-letter globals
   (%SmoothedLux 15× / %AutoBrightRunning 13× / %LastAAB 10× / %LuxAlpha 9×); `%AAB_MaxSteps`
   owner-confirmed legacy (abandoned predecessor of AnimSteps — do not port). (Affects S4, S6, S8, S12.)
-- D-026: ANONYMOUS TASKS: 168 of 276 tasks are unnamed scene-element handlers; ALL are wired from
+- D-026 [cited]: ANONYMOUS TASKS: 168 of 276 tasks are unnamed scene-element handlers; ALL are wired from
   scenes (none dead); 34 are `keyTask` = per-scene back/hardware-key behavior that S2 dropped as scene
   chrome. Census: extraction/tasks/anonymous_handlers.md — S12/S13 precondition (every row ported or
   dropped(reason)). Circadian Dimming Graph re-homed Dynamic Scale → Animation & Dimming (owner; opened
@@ -156,7 +169,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   superdimming_settings gloss fixed — old `_CalibratePowerDraw` gloss was wrong; _disp_group4 already
   agreed). (Affects S12, S13.)
 
-- D-027: S3.6 PLAN HARDENING from external LLM peer review of the S0–S3.5 approach. Adopted:
+- D-027 [cited]: S3.6 PLAN HARDENING from external LLM peer review of the S0–S3.5 approach. Adopted:
   (a) S8 preconditions now include S2 (its inputs always listed S2's features_spec.md; the DAG
   just never enforced it — no schedule impact, S2 already DONE). (b) S4 brief gains an explicit
   transcription protocol for code-547 maths expressions (verbatim → parse-tree note in provenance
@@ -182,7 +195,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   and (b)'s 661-vs-663 cross-validation is the actual safeguard). (Affects S4, S8, S9a, S9b,
   S10, S11, S12.)
 
-- D-028: S4 PARITY GAPS CHARACTERIZED (full detail in `parity_gaps.md`). The Tasker reference
+- D-028 [cited]: S4 PARITY GAPS CHARACTERIZED (full detail in `parity_gaps.md`). The Tasker reference
   oracle + 8 golden CSVs are committed and immutable. The current `BrightnessEngine` diverges from
   Tasker in 7 enumerated gaps, all from two systemic causes: **R1** rounding-tie semantics — engine
   uses `kotlin.math.round` (ties-to-even) where Tasker uses Java `Math.round` (ties-toward-+∞) and
@@ -201,7 +214,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   production/behavior impact. Golden regen command: `./gradlew :domain:test -DregenGolden=1
   --tests "*GoldenVectorGeneratorTest*"`.
 
-- D-030: S5 follow-on corrections from owner PR review (F1–F5, committed on `claude/youthful-newton-nosjpo`):
+- D-030 [cited]: S5 follow-on corrections from owner PR review (F1–F5, committed on `claude/youthful-newton-nosjpo`):
   (a) **S4 oracle gap**: task700/646/647 were never added to `TaskerReference.kt` in S4 — added in S5
   follow-on as `finalDimLevel()` and `dimProgressAndShell()`. `superdimming.csv` (2016 rows) generated
   and committed; `CorePipelineParityTest` gains `softwareDimming_finalDimLevel_matchesOracle` and
@@ -236,7 +249,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   the rounding change. (Affects BrightnessEngine.kt; new CircadianParityTest golden-tests the correct
   BigDecimal behavior.)
 
-- D-032: S7 SHIZUKU LIMITATION. `ShizukuGrantGateway` lands binder availability check
+- D-032 [cited]: S7 SHIZUKU LIMITATION. `ShizukuGrantGateway` lands binder availability check
   (`Shizuku.pingBinder()`) and permission request (`Shizuku.requestPermission()`), but the
   actual `pm grant WRITE_SECURE_SETTINGS` exec via `Shizuku.newProcess` or a bound user-service
   requires a registered user-service component — deferred to S11 as agreed in the S7 brief's
@@ -257,7 +270,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (f) `thresholdMidpoint` in DefaultProfiles.Default is 3.0 (from task592), not 4.0 (task570).
   Both values are correct in their respective contexts. (Affects S9a mapper usage, S12 UI.)
 
-- D-034: S8.5 REVIEW FIXES (S7 surface). (a) **Suppress-echo redesigned**: the S7 token-set
+- D-034 [cited]: S8.5 REVIEW FIXES (S7 surface). (a) **Suppress-echo redesigned**: the S7 token-set
   scheme (registerExpectedWrite/consume-on-match) had four defects under S9a's N-frame
   animation: ContentObserver re-reads the CURRENT value so a delayed callback for frame N
   consumes frame N+1's token (false manual-override pause), CopyOnWriteArraySet collapsed
@@ -288,7 +301,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   coverage, is the safety net. Compaction events must now be recorded in segment-log rows.
   (Affects S9a…S12 session directives.)
 
-- D-036: S8.5 REVIEW FIXES (S4/S5 domain). Two CRITICAL parity holes found (both invisible to
+- D-036 [cited]: S8.5 REVIEW FIXES (S4/S5 domain). Two CRITICAL parity holes found (both invisible to
   the prior golden vectors because no CSV exercised the path) and fixed against the EXISTING
   reference oracle (no oracle/vector edits — the 8 prior CSVs are byte-identical after regen):
   (a) **task661 ScalingUse=false branch + %AAB_Scale were missing.** `BrightnessEngine.evaluate`
@@ -320,7 +333,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   from the single `scalingEnabled` setting — confirm against profiles/contexts extraction whether
   Tasker can run circadian (task90) independently of %AAB_ScalingUse. (Affects S9a, S9b, S14.)
 
-- D-037: S8.5 REVIEW (S6 circadian + wizard). Math verified faithful to task90 Java blocks
+- D-037 [cited]: S8.5 REVIEW (S6 circadian + wizard). Math verified faithful to task90 Java blocks
   line-by-line (NOAA constants, tanh ramp, polar sentinels, schedule windows) and task38/task655
   (fitting constants, R²/penalties, form output) — no parity bug in the port. BUT one
   methodological hole fixed: **the circadian/wizard "reference" delegates to production**
@@ -345,7 +358,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   %AAB_DimSpread and consume dimDynamic — do NOT route it through BrightnessEngine.computeDynamicScale.
   (Affects S9a, S9b, S12, S14.)
 
-- D-038: S8.5 REVIEW (S8 settings/validator/contexts). One CRITICAL default fixed + two
+- D-038 [cited]: S8.5 REVIEW (S8 settings/validator/contexts). One CRITICAL default fixed + two
   safety-validator test-vacuity fixes; model verified otherwise correct.
   (a) **CRITICAL — `contextOverride` defaulted `true`.** `%AAB_ContextOverride` is the runtime
   "manual context lock" latch: the watcher gate (contexts_spec §1.1) fires ONLY when
@@ -408,7 +421,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   already guarantees no animation is mid-flight when an OverrideDetected event is dequeued. (Affects
   S9b, S10, S12, S14.)
 
-- D-040: S9b RUNTIME FEATURES + RIP-OUT decisions (sanctioned by the S9b brief; flagged for S12/S14).
+- D-040 [cited]: S9b RUNTIME FEATURES + RIP-OUT decisions (sanctioned by the S9b brief; flagged for S12/S14).
   (a) **Super dimming = ELEVATED secure path only.** SuperDimmingCoordinator wires the privileged
   reduce_bright_colors layer (task646 `dimShell` math → AndroidSecureDimmingController, disengage =
   task645) and runs it from the pipeline coroutine (post-animation in runCycle, plus setInitialBrightness;
@@ -664,7 +677,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   ranges asserted via ProgressBarRangeInfo, Apply/Discard wiring, Misc debug label).
   (Affects S12.5c, S13, Gate 2.)
 
-- D-048: S12.5c FEATURE & BEHAVIOUR FIDELITY (UI/app/platform-glue salvage; sanctioned by the S12.5c
+- D-048 [cited]: S12.5c FEATURE & BEHAVIOUR FIDELITY (UI/app/platform-glue salvage; sanctioned by the S12.5c
   brief; addresses Gate-2 G2-F8/F9/F12/F14/F15/F17). HARD FENCE honoured: domain/, golden vectors and
   the `ChartCanvas` public API untouched.
   (a) **G2-F8 — profile load no longer disables override detection.** Root cause: `detectOverrides`
@@ -713,7 +726,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (D-044c) — the wizard still runs against an empty recorded set; S13/S14 should add runtime capture.
   (Affects S13, S14, Gate 2.)
 
-- D-049: OVERRIDE-DETECTION FALSE POSITIVES ON RAPID LIGHT CHANGES (owner-reported 2026-06-14, G2R-F26).
+- D-049 [cited]: OVERRIDE-DETECTION FALSE POSITIVES ON RAPID LIGHT CHANGES (owner-reported 2026-06-14, G2R-F26).
   **DEFERRED to S12.6c — not yet fixed.** Symptom: a fast lux swing makes the pipeline pause as a "manual
   override" although nothing external wrote the brightness. Code-grounded analysis (S12.6a investigated,
   did not change source — HARD FENCE: this is `app/runtime` + `platform` glue, NOT domain/):
@@ -747,7 +760,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   from→to with an interleaved self-write sequence must NOT yield `OverrideDetected`; and a real external
   write after settling MUST. Keep it inside the single-pipeline-coroutine model (D-027). (Affects S12.6c.)
 
-- D-050: PWM-SENSITIVE MODE DOES NOT LOCK THE HARDWARE BRIGHTNESS FLOOR (owner-reported 2026-06-14, G2R-F27).
+- D-050 [cited]: PWM-SENSITIVE MODE DOES NOT LOCK THE HARDWARE BRIGHTNESS FLOOR (owner-reported 2026-06-14, G2R-F27).
   **DEFERRED to S12.6c — not yet fixed.** Symptom: with "Use software dimming (PWM-sensitive)" on, the
   hardware screen brightness is NOT held at the `%AAB_DimmingThreshold` floor when the calculated target
   drops below it (the floor is what keeps the panel above its low-brightness PWM-flicker band; further
@@ -823,7 +836,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (D-040); the hardware floor is independent. Regression test asserts the applied value == threshold.
   (Affects S12.6d/e, S13, Gate 2.)
 
-- D-052: S12.6d BLOCK-APPLY ON CRITICAL VALIDATION ERRORS (owner-decision 2, G2R-F18). A SANCTIONED
+- D-052 [cited]: S12.6d BLOCK-APPLY ON CRITICAL VALIDATION ERRORS (owner-decision 2, G2R-F18). A SANCTIONED
   deviation from CLAUDE.md's "Tasker semantics win" rule: Tasker's task583 `_RedInvalidFormulae` is
   advisory-only (it reddens the field but still applies). The owner overrode this for the rebuild — the
   three form-coefficient errors (form2A<0, form3A<0, form2C>zone1End) now carry `Severity.CRITICAL` and
@@ -954,7 +967,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   this segment supplies the data + editor only. (Affects S12.7h; S13 reads `ExperimentPrefsStore` when it
   renders the circadian/experiment chart.)
 
-- **D-061 (S12.7i) — F73 circadian scale was an app-layer wiring gap, NOT a domain bug; the domain fence
+- **D-061 [cited] (S12.7i) — F73 circadian scale was an app-layer wiring gap, NOT a domain bug; the domain fence
   held.** The dynamic-scale + solar math (`DynamicScaleEngine`, `SolarCalculator`, `buildScheduleWindows`)
   is correct and golden-tested; the pipeline simply never fed it real windows (`buildInput` used
   `TimeContext`'s 6–8am-UTC defaults — the never-completed D-039d "circadian wired in S9b/S12"). New
@@ -1010,7 +1023,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   internal ≥9-after-ghost-injection check is unchanged; the user-facing gate is now app-layer.
   **Fence honoured: domain/ + golden vectors + ChartCanvas untouched (called only).** Affects S12.8c only.
 
-- **D-065 (S12.8d) — circadian time/location; F73's "DST bug" was a location-null fallback, NOT a frame bug.**
+- **D-065 [cited] (S12.8d) — circadian time/location; F73's "DST bug" was a location-null fallback, NOT a frame bug.**
   Three findings (F39/F73/F83):
   (1) **F73 — the UTC frame already matched Tasker; do not "fix" the golden math.** task90 act0 sets
   `%AAB_NowSS = %TIMES % 86400` and act59 builds the windows from `%ss_* % 86400` — BOTH UTC-seconds-of-day.
@@ -1090,7 +1103,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   `AmbientMonitoringService:44`) + three extra volatile clusters (`CircadianWindowProvider`/`ThrottleController`/
   `AabFlash`) → S12.9e; the no-error-state-UI gap on the profile-load path → S12.9c. Affects S12.9a–e.
 
-- **D-070 (S12.9f → S13) — Profiles/Contexts IA merge split; S13 promoted to Opus/high with a Material 3 redesign.**
+- **D-070 [cited] (S12.9f → S13) — Profiles/Contexts IA merge split; S13 promoted to Opus/high with a Material 3 redesign.**
   Per owner: fold the two top-level Profiles + Contexts destinations into ONE screen with context rules edited
   in a modal (Tasker-style — a profile owns its rules; a rule targets a profile). The **plumbing** (single
   destination, rule-editor modal, shared VM state, preserved triggers + context-lock) lands in **S12.9f**
@@ -1146,7 +1159,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   for the specialUse constant if zero-warning lint is wanted.
   Affects S12.9a (closed); informs S14 (LFS decision, zero-warning lint).
 
-- **D-072 (S12.9b) — circadian dimming wired (G2R-F90, closes D-040); override-flash + Shizuku-UX refined.**
+- **D-072 [cited] (S12.9b) — circadian dimming wired (G2R-F90, closes D-040); override-flash + Shizuku-UX refined.**
   App-layer only; domain/ + golden `superdimming.csv` + ChartCanvas untouched. Investigation-first findings
   and design decisions:
   (1) **"Spread (Circadian)" = `%AAB_DimSpread`, default 100 (confirmed, not guessed).** `AabSettings.dimSpread`
@@ -1181,7 +1194,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Affects S12.9b (closed); the override string is picked up by S12.9d's string extraction; the `dimSpread`
   −100..100 validator is S12.9c's deliverable #6 (the coordinator math already handles negatives).
 
-- **D-073 (S12.9c) — schema ergonomics, validation & error handling landed; key decisions/deviations.**
+- **D-073 [cited] (S12.9c) — schema ergonomics, validation & error handling landed; key decisions/deviations.**
   App-layer + docs only; domain/ + golden vectors + ChartCanvas untouched.
   (1) **AabSettings decomposed via computed group VIEWS, not a nested source-of-truth.** The brief said
   "AabSettings becomes their composite". A literal nested-constructor refactor would rewrite ~395 flat
@@ -1236,7 +1249,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Domain/ + golden + ChartCanvas untouched. Full ladder green. Affects the context system (S10/S12.7c);
   no schema change.
 
-- **D-075 (S12.9d) — i18n capability, runtime test backfill, and the LiveRuntimeState staleness gate.**
+- **D-075 [cited] (S12.9d) — i18n capability, runtime test backfill, and the LiveRuntimeState staleness gate.**
   App-layer only; domain/ + golden + ChartCanvas untouched.
   - **i18n is a capability, not translations.** `strings.xml` grew 2→47 entries covering the brief's
     priority surfaces (notification strings → screen titles → button labels → the override flash →
@@ -1511,7 +1524,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (Tasker `now_utc`) — a red vertical marker at the current UTC time-of-day, alongside the five labelled sun
   events. Full ladder green. (Affects S14.)
 
-- **D-085 (S13d — owner review batch 3).** (1) **Import placement:** the single-file "Import a settings
+- **D-085 [cited] (S13d — owner review batch 3).** (1) **Import placement:** the single-file "Import a settings
   file" picker moved from a top-level button into the collapsed **"Import from Tasker AAB"** expandable on
   Profiles & Contexts (it loads Tideo exports AND legacy Tasker configs), grouped with the folder-link
   import; the standalone section is now just "Export". (2) **User Guide design language:** the WebView HTML
@@ -1688,7 +1701,7 @@ Append new deviations here as `D-096`, `D-097`, … (continue the sequence; neve
 terse, provenance-stamped format as above; note which area/change they affect. These are part of
 the permanent registry — never compress or remove them.
 
-- **D-096: Wi-Fi context evaluation used Location-only SSID read (bug fix; platform/app-glue, domain
+- **D-096 [cited]: Wi-Fi context evaluation used Location-only SSID read (bug fix; platform/app-glue, domain
   fenced).** `task43` (_EvaluateContexts V2, L154-181) reads the connected SSID via the no-Location
   bypass FIRST (`bypass_ssid` = `_GetWifiNoLocation V3` output), only then the framework `WifiManager`
   read. The 1.0 port honoured this for the **rule editor** (`WifiInfoReader.currentSsid`, D-057) but the
@@ -1715,7 +1728,7 @@ the permanent registry — never compress or remove them.
   false)` — the dialog now draws edge-to-edge and the existing inset paddings position content correctly.
   Buttons kept at the bottom (owner: do not move to top). No new layout, no test change.
 
-- **D-098: rule-editor Save/Cancel clipped by the gesture nav bar — stop fighting insets, scroll instead
+- **D-098 [cited]: rule-editor Save/Cancel clipped by the gesture nav bar — stop fighting insets, scroll instead
   (bug fix; UI only).** The per-rule editor `Dialog` (`ContextsScreen.kt`) kept its Save/Cancel in a
   *sticky bottom bar* and padded it with the navigation-bar inset. That inset is **never delivered** to
   this dialog window's content: the host activity (`MainActivity`) isn't edge-to-edge, and neither D-097's
@@ -1733,7 +1746,7 @@ the permanent registry — never compress or remove them.
   isn't exercisable under Robolectric → owner device-verified; `SettingsScreensTest` rule-editor cases
   (render + Save) are the regression guard, updated to `performScrollTo()` the now-scrollable Save button.
 
-- **D-099: in-app version drifted behind the release tag; codified release/version rules (process;
+- **D-099 [cited]: in-app version drifted behind the release tag; codified release/version rules (process;
   build-config + docs).** The `v1.0.2` git tag on `main` was cut while `app/build.gradle.kts` still read
   `versionName "1.0.1"` / `versionCode 4` — the in-app About screen reported a version *behind* the latest
   release tag, and the tag's `versionCode` was never bumped past `1.0.1`'s. **Fix:** realigned to
@@ -1783,7 +1796,7 @@ the permanent registry — never compress or remove them.
   a successful run with a toast (mirrors act13); (2) switch the action `Row` → `FlowRow` so all three
   buttons wrap and the copy button is always reachable. Ships in 1.1.0.
 
-- **D-103: circadian once-a-day location is now persisted so a cold start reuses it instead of falling
+- **D-103 [cited]: circadian once-a-day location is now persisted so a cold start reuses it instead of falling
   back to defaults (parity fix; runtime).** Tasker persisted the daily-resolved location
   (`%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`), so a service/process restart reused it until the
   day rolled over. The 1.0 rebuild held it in `@Volatile` in-memory fields only
@@ -1800,7 +1813,7 @@ the permanent registry — never compress or remove them.
   existing direct-construction tests are unaffected. Tests: `persistedLocation_isUsedOnColdStart_D103`,
   `acquiredLocation_isPersisted_D103`. Ships in 1.1.0.
 
-- **D-104: generic chart label-collision staggering (+ landscape height cap, horizontal-only scrub)
+- **D-104 [cited]: generic chart label-collision staggering (+ landscape height cap, horizontal-only scrub)
   in the chart engine (UI fix; lifts the S13 build-phase fence).** (1) The five vertical event-line
   labels in `ChartCanvas` were all parked at the same top position, so close events (dawn↔sunrise,
   dusk↔sunset) overlapped. **Fix:** when a labelled vertical marker falls within a previous label's
@@ -1812,7 +1825,7 @@ the permanent registry — never compress or remove them.
   formally **lifted post-1.0 for generic engine improvements** (the keep-it-generic / no-per-chart
   special-casing rule still binds); doc updated in-file. Ships in 1.1.0.
 
-- **D-105: ip-api.com geo-IP fallback is now opt-IN (default off), was opt-out (default on)
+- **D-105 [cited]: ip-api.com geo-IP fallback is now opt-IN (default off), was opt-out (default on)
   (privacy; further deviation from Tasker).** The circadian location chain's last resort is a
   **cleartext HTTP** request to a third party (ip-api.com, task90 act28). Tasker called it
   unconditionally; the 1.0 rebuild added a toggle but defaulted it **on** (G3-F12, opt-out). Owner
@@ -1855,7 +1868,7 @@ the permanent registry — never compress or remove them.
   CodeQL-Kotlin, prefer non-chained Intent construction + an explicit `setPackage` on PendingIntents;
   the fluent one-liner reads as implicit even when it is not.
 
-- **D-108: service-start battery-saver flash — battery "unknown" must not match a battery rule
+- **D-108 [cited]: service-start battery-saver flash — battery "unknown" must not match a battery rule
   (owner-reported, 1.2.0).** On service start at night the system briefly applied the Battery Saver
   context profile (battery far above the trigger) before switching to the correct night-reading
   profile. Root cause: the seed `GENERAL` evaluation in `ContextEngine.start()` runs before the
@@ -1869,7 +1882,7 @@ the permanent registry — never compress or remove them.
   ±5% debounce. The seed eval now picks the correct time-based profile directly. Tests:
   `ContextOverrideResolverTest.batteryUnknown_*`, `ContextEngineTest.serviceStart_*_D108`.
 
-- **D-109: PWM-sensitive read-out tracks PERCEIVED brightness, not the hardware floor (owner-reported,
+- **D-109 [cited]: PWM-sensitive read-out tracks PERCEIVED brightness, not the hardware floor (owner-reported,
   1.2.0; refines D-050/D-051e).** D-051e correctly floored the *hardware* write to `%AAB_DimmingThreshold`
   in PWM-sensitive mode, but it also published that floored value to `PipelineState.targetBrightness`,
   so the hero brightness read-out stuck at the floor instead of following the calculated (perceived)
@@ -1880,7 +1893,7 @@ the permanent registry — never compress or remove them.
   semantics ("targetBrightness = last target the engine produced"). The two coincide unless PWM-sensitive
   floors the hardware. Test: `BrightnessPipelineControllerTest.pwmSensitive_floorsHardwareButReadoutTracksPerceived`.
 
-- **D-110: circadian falls back on the cached sun location across the day rollover, and surfaces
+- **D-110 [cited]: circadian falls back on the cached sun location across the day rollover, and surfaces
   staleness (owner-reported, 1.2.0).** With Location off and the IP fallback off, on the *next day* the
   circadian modifier showed the flat default scale (≈0.85 at 07:34, NL) while the graph looked correct —
   the chart reads `lastKnownLocation`/a representative fallback directly, but the pipeline's
@@ -1898,7 +1911,7 @@ the permanent registry — never compress or remove them.
   fallback). Tests: `CircadianWindowProviderTest.*_D110`. Banners follow the m3_audit tinted-`Card`
   convention (gold `secondary`/emphasis), coherent with the dashboard `StaleBanner`.
 
-- **D-111: gold resume banner + Tasker-style Profiles/Contexts IA + icon-vs-glyph consistency
+- **D-111 [cited]: gold resume banner + Tasker-style Profiles/Contexts IA + icon-vs-glyph consistency
   (owner-reported, 1.2.0).** Three related UI changes from one owner report:
   (a) **Resume banner.** The manual-context-lock resume control (`ProfilesScreen` `context_lock_banner`,
   extracted to the shared `ContextLockBanner`) used a teal `tertiaryContainer` card with a plain
@@ -1953,7 +1966,7 @@ the permanent registry — never compress or remove them.
   the owner via the file tool or pulled from the `build.yml` `app-debug` CI artifact. `clean-dist.yml`
   stays as a backstop that removes a force-added `dist/` from `main`. RUNBOOK §7 updated to match.
 
-- **D-113: Contexts rule-list/editor polish (owner-reported, 1.2.0).** Three rule-creation refinements:
+- **D-113 [cited]: Contexts rule-list/editor polish (owner-reported, 1.2.0).** Three rule-creation refinements:
   (a) **Emphasise the target profile.** A rule card buried its switch-to profile in grey `→ Profile ·
   priority N` body text. The profile — the thing the rule loads — is now rendered prominently in gold
   (`titleSmall`, `AabGold`) behind a "Loads" label, and the rule currently in force (its name ==
@@ -1986,7 +1999,7 @@ the permanent registry — never compress or remove them.
   `ProfilesScreen`'s overflow was already boxed. **Lesson:** a `DropdownMenu` must share a `Box` with its
   anchor — a bare sibling in a Column anchors to the wrong place.
 
-- **D-114: confirmation prompts for destructive profile/rule actions (owner-reported, 1.2.0).** Deleting
+- **D-114 [cited]: confirmation prompts for destructive profile/rule actions (owner-reported, 1.2.0).** Deleting
   a context rule, and deleting or overwriting a saved profile, fired immediately with no confirmation —
   Tasker prompted first. Added a shared `ConfirmDialog` (in `ProfilesScreen`, reused by `ContextsScreen`
   in the same package): an `AlertDialog` with a red (`error`) confirm action for deletes, a neutral one
@@ -1998,7 +2011,7 @@ the permanent registry — never compress or remove them.
   confirmed). The existing render tests only assert the menu items EXIST (don't click through), so they
   are unaffected.
 
-- **D-115: `[skip ci]` in a squash-merged commit silently skipped the v1.2.0 release (owner-reported).**
+- **D-115 [cited]: `[skip ci]` in a squash-merged commit silently skipped the v1.2.0 release (owner-reported).**
   The v1.2.0 GitHub Release "didn't run" — `release.yml` never fired for the tag, and `build`/`codeql`
   never ran for the merge-to-main commit either. ROOT CAUSE: the squash-merge commit body (PR #77)
   contained the literal token `[ skip ci ]` (written without the space) — it leaked from a session
@@ -2015,7 +2028,7 @@ the permanent registry — never compress or remove them.
   `release-signing.yml` for the signed APK, and `release.yml` can now be re-run via
   Actions → Run workflow (tag `v1.2.0`) once merged.
 
-- **D-116: Panic (Reset) gesture reworked — proximity-armed + sensitivity-gated 10 s shake + re-arm
+- **D-116 [cited]: Panic (Reset) gesture reworked — proximity-armed + sensitivity-gated 10 s shake + re-arm
   (owner spec, folded-in Tasker source).** The owner updated the Tasker `Panic (Reset)` profile, its
   `_PanicButton` task and the Debug scene; ported here. THREE changes: **(1) Trigger.** prof769 drops the
   significant-motion EVENT; the state is now `Orientation [Is:Upside Down] ∧ Display State [Is:On] ∧
@@ -2047,7 +2060,7 @@ the permanent registry — never compress or remove them.
   replaces the single-spike trigger. Ships as **1.3.0 / versionCode 11** (MINOR — new user-facing setting
   + surface; `changelogs/11.txt`).
 
-- **D-117: curve graph + "Live brightness" card show PERCEIVED brightness in PWM-sensitive mode.** D-109
+- **D-117 [cited]: curve graph + "Live brightness" card show PERCEIVED brightness in PWM-sensitive mode.** D-109
   made the Dashboard hero track the perceived (un-floored `targetBrightness`) value while
   `lastAppliedBrightness` stayed the floored hardware value used for override detection — but the
   Curve & Brightness screen still read `lastAppliedBrightness` in two places, so under PWM-sensitive
@@ -2059,7 +2072,7 @@ the permanent registry — never compress or remove them.
   whenever PWM-sensitive flooring is off, so the change only diverges (shows perceived) when it should.
   Test: `SettingsScreensTest.curveBrightness_liveReadout_showsPerceivedBrightness_whenPwmSensitiveFloors_D117`.
 
-- **D-118: Contexts rules modal clipped its last rule under the nav bar (edge-to-edge, targetSdk 36).**
+- **D-118 [cited]: Contexts rules modal clipped its last rule under the nav bar (edge-to-edge, targetSdk 36).**
   The `ProfilesContextsScreen.ContextsModal` full-screen `Dialog` used the default
   `decorFitsSystemWindows = true` and applied no insets, so under targetSdk-36 edge-to-edge enforcement
   the bottom of the scrolling rule list drew behind the gesture pill / 3-button bar. Aligned it to the
@@ -2069,7 +2082,7 @@ the permanent registry — never compress or remove them.
   the bottom is handled by scroll clearance, not an inset). UI-only; bottom-inset behaviour is owner
   device-verified (not Robolectric-testable).
 
-- **D-119: release workflow auto-generates release notes.** The v1.3.0 release published without an
+- **D-119 [cited]: release workflow auto-generates release notes.** The v1.3.0 release published without an
   auto-changelog (the owner's hand-written UI body only). `release.yml`'s `action-gh-release` step had
   `generate_release_notes` intentionally OFF; flipped it ON. The action does NOT overwrite the owner's
   text — an existing release body is PRE-pended and GitHub's generated "What's Changed" notes (merged
@@ -2079,7 +2092,7 @@ the permanent registry — never compress or remove them.
   — the tagged commit was already validated on main, and `release.yml` re-runs the full test+lint ladder
   before signing, so "only signing runs on tag creation" is by design, not a gap.
 
-- **D-120: Circadian "Use current location" actively acquires instead of echoing another app's fix.**
+- **D-120 [cited]: Circadian "Use current location" actively acquires instead of echoing another app's fix.**
   `CircadianExtrasViewModel.freshLatLon()` only called `LocationReader.currentLocation()` (which, on a
   5 s timeout, falls back to the system last-known fix another app populated) and otherwise gave up. Now
   it requests a current on-device fix and, when none is available (no fix OR Location permission missing),
@@ -2089,7 +2102,7 @@ the permanent registry — never compress or remove them.
   network exposure occurs by default. The failure toast + the IP-fallback help string were updated to
   reflect the new path.
 
-- **D-121: geo-IP fallback migrated from cleartext ip-api.com to HTTPS ipwho.is.** The Tasker source was
+- **D-121 [cited]: geo-IP fallback migrated from cleartext ip-api.com to HTTPS ipwho.is.** The Tasker source was
   updated to query `https://ipwho.is/` instead of `http://ip-api.com/json`, removing the app's only
   cleartext request. `GeoIpLocationClient` now hits the HTTPS URL, parses the **full-word** `latitude`/
   `longitude` keys (ipwho.is, vs ip-api.com's `lat`/`lon`), and treats `"success":false` as failure
@@ -2100,7 +2113,7 @@ the permanent registry — never compress or remove them.
   D-117–D-120 as **1.4.0 / versionCode 12** (MINOR — observable user-facing behaviour: new
   location-acquisition path; `changelogs/12.txt`).
 
-- **D-122: "Use current location" actively acquires a fresh fix (sensors on) instead of a cached one.**
+- **D-122 [cited]: "Use current location" actively acquires a fresh fix (sensors on) instead of a cached one.**
   Follow-up to D-120: the buttons still used `LocationReader.currentLocation()`, which calls
   `LocationManager.getCurrentLocation()` — the OS is allowed to satisfy that from a recent CACHED fix, so
   the system location indicator never lit up ("I don't see the location indicator even trying") and the
@@ -2116,7 +2129,7 @@ the permanent registry — never compress or remove them.
   seconds. On-device behaviour is owner-verified (Robolectric can't exercise a real provider). Folded into
   the unreleased **1.4.0 / versionCode 12** (no tag yet, so no version bump).
 
-- **D-123: release body auto-reuses the F-Droid changelog as "What's new".** Builds on D-119. The
+- **D-123 [cited]: release body auto-reuses the F-Droid changelog as "What's new".** Builds on D-119. The
   human-written `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (maintained for F-Droid,
   RUNBOOK §6) was duplicated by hand into the GitHub Release body; now `release.yml` pulls it in
   automatically. A new "Prepare F-Droid changelog for the release body" step reads the **versionCode**
@@ -2133,7 +2146,7 @@ the permanent registry — never compress or remove them.
   only the auto "What's Changed", never fails. Works across all three triggers (release:published update,
   workflow_dispatch recovery, push-tag create). CI-only; no app change.
 
-- **D-124: `release-preflight.yml` enforces the release-prep checklist on PRs.** The RUNBOOK §6 checklist
+- **D-124 [cited]: `release-preflight.yml` enforces the release-prep checklist on PRs.** The RUNBOOK §6 checklist
   (version bump, F-Droid changelog, no version regression, no skip-ci token) was only enforced by the
   agent/owner by hand; this adds a secret-free `pull_request` gate so a miss is caught before merge. Key
   design point (owner-requested): the version/changelog checks are **scoped to PRs that actually ship app
@@ -2158,7 +2171,7 @@ the permanent registry — never compress or remove them.
   the literal in commit messages / PR title" rule stays machine-enforced; "avoid it in the PR body" stays
   a soft human guideline (RUNBOOK §6) since the owner controls the squash body at merge.
 
-- **D-125: curve suggestion on the Curve & Brightness screen is user-driven, not auto-fit; dashed gold
+- **D-125 [cited]: curve suggestion on the Curve & Brightness screen is user-driven, not auto-fit; dashed gold
   reference is the hardcoded baseline.** The screen previously computed `CurveSuggestionEngine.suggest(...)`
   and drew a blue "Suggested" line **automatically whenever ≥ 9 override points existed** — a deviation
   from Tasker, where task38 (the wizard) only runs on a USER action, writes transient `%suggestion_*` vars
@@ -2192,7 +2205,7 @@ the permanent registry — never compress or remove them.
   `…consumesPreviewOnce…` (one-shot, no leak), `SettingsScreensTest.toolsWizard_previewGraphButton_passesTheFit_D125`.
   Engine math + goldens untouched. Ships as 1.5.0 / versionCode 13.
 
-- **D-126: Resume-after-override no longer loops back to paused (extend the Set-Initial-Brightness mutex to
+- **D-126 [cited]: Resume-after-override no longer loops back to paused (extend the Set-Initial-Brightness mutex to
   the in-cycle animation).** Owner report: from the Dashboard gold `OverrideCard`, tapping **Resume**
   occasionally re-paused on the next light change — a resume→light-change→paused loop. Root cause: the F64
   post-init/resume **settle window** (`suppressOverrideUntilMs`, the Kotlin port of Tasker's Set Initial
@@ -2253,7 +2266,7 @@ the permanent registry — never compress or remove them.
   slot so they read separately from app changes. Prose prompts, not checkbox theater — kept minimal because
   agents author these PRs and the owner reads them (anti-bloat: cf. D-127). Repo-hygiene change; no code.
 
-- **D-130: the no-Location SSID `dumpsys wifi` path is wired up + surfaced (DUMP grant), and gains a
+- **D-130 [cited]: the no-Location SSID `dumpsys wifi` path is wired up + surfaced (DUMP grant), and gains a
   root strategy + the exact two-step Tasker regex.** Reverses the F89 audit's "leave DUMP undeclared"
   call (permission_audit.md row + AndroidManifest comment): `android.permission.DUMP` is
   `signature|privileged` **but also `development`**, so — exactly like `WRITE_SECURE_SETTINGS` — a user
@@ -2278,7 +2291,7 @@ the permanent registry — never compress or remove them.
   comma-in-name, +strict `mWifiInfo` gate), `PrivilegeManagerTest.dumpGrantInstruction_*`. Ships as
   **1.6.0 / versionCode 14** (MINOR — new user-facing capability + dialog). Changelog `14.txt`.
 
-- **D-131: full UI i18n — every user-facing string extracted to `strings.xml`; the hardcoded-string
+- **D-131 [cited]: full UI i18n — every user-facing string extracted to `strings.xml`; the hardcoded-string
   ratchet now enforces ZERO.** Completes the S14/D-075 backlog (the `HardcodedStringCheckTest` ceiling sat
   at 92 inline `Text("…")` literals; section headers, per-field labels, long-press help, toasts, and chart
   labels were deferred). All ~250 user-facing strings — `Text`/`SectionHeader`/`GraphSettingsGroup`/
@@ -2303,7 +2316,7 @@ the permanent registry — never compress or remove them.
   subsequently moved from Misc to the top of the Onboarding screen per owner preference — same inert,
   English-only scaffold, different home.)
 
-- **D-132: a plug/unplug transition bypasses the PASS-1 battery cooldown (deviation from Tasker).** Owner
+- **D-132 [cited]: a plug/unplug transition bypasses the PASS-1 battery cooldown (deviation from Tasker).** Owner
   report (2026-06-30): with a "Charging" rule (priority 81, on-power + time window) and a "Low Battery" rule
   (priority 80, battery 0-30%), plugging in while Low Battery was active did **not** switch to the
   higher-priority Charging context until the battery later rose past 30% (i.e. until Low Battery stopped
@@ -2346,7 +2359,7 @@ the permanent registry — never compress or remove them.
   (root CHANGELOG.md, speculative dependency bumps, standalone doc-drift audit, SHA-pinning /
   dependency verification per the 2026-06-29 decline) — don't re-litigate without new evidence.
 
-- **D-134: the saved pre-service brightness mode is PERSISTED (SharedPreferences), closing the
+- **D-134 [cited]: the saved pre-service brightness mode is PERSISTED (SharedPreferences), closing the
   D-034(c) KNOWN RESIDUAL.** `AndroidScreenBrightnessController.savedMode` was a per-process
   `private var`: if the process died while the service held manual mode, a restarted instance's
   first `forceManualMode()` read the CURRENT mode — MANUAL, our own residue — and saved that as
@@ -2369,7 +2382,7 @@ the permanent registry — never compress or remove them.
   all four (current, persisted) states, idempotency, SecurityException path unchanged (prefs I/O
   cannot throw it), and no observer/echo interaction (`lastSelfWriteDevice` untouched).
 
-- **D-135: SECURITY.md + security-only Dependabot (backlog H4; repo-policy, no app change).**
+- **D-135 [cited]: SECURITY.md + security-only Dependabot (backlog H4; repo-policy, no app change).**
   Root `SECURITY.md`: latest release only, report via GitHub private vulnerability reporting,
   scope notes for the by-design privileged writes (WRITE_SETTINGS / granted
   WRITE_SECURE_SETTINGS / DUMP) and the no-network posture (only the default-off HTTPS geo-IP
@@ -2403,7 +2416,7 @@ the permanent registry — never compress or remove them.
   versionCode 15**. Remaining seams + skip reasons recorded in the STATE.md H3 row. Glue-review
   pass: clean (the seam is pure indirection; tests-only otherwise).
 
-- **D-137: release APK made reproducible; F-Droid `reproducible` mode recommended (backlog H5).**
+- **D-137 [cited]: release APK made reproducible; F-Droid `reproducible` mode recommended (backlog H5).**
   Investigation (2026-07-01): the build was already almost deterministic — every dependency
   version pinned in `libs.versions.toml` (no dynamic/SNAPSHOT), AGP 8.7.3/Kotlin 2.0.21 pinned,
   `isMinifyEnabled` default-false (plain dex, no R8 variance), no NDK (transitive `.so`s come
@@ -2442,7 +2455,7 @@ the permanent registry — never compress or remove them.
   beyond U5, and the D-133 non-items stay out of scope. v1.6.1 is tagged, so the first
   app-code fix bumps 1.6.2 / versionCode 16.
 
-- **D-139: panic effect ordered AFTER the in-flight cycle — `emergencyStop()` now cancel-and-JOINS
+- **D-139 [cited]: panic effect ordered AFTER the in-flight cycle — `emergencyStop()` now cancel-and-JOINS
   the consumer (F-backlog U1 finding).** The panic path (prof769/task528, also the notification
   Reset action) did `consumerJob?.cancel()` (fire-and-forget) and then immediately wrote the panic
   255. On the real multi-threaded service dispatcher, an animation frame that had already passed
@@ -2460,7 +2473,7 @@ the permanent registry — never compress or remove them.
   unwound-flag assertion fails because plain `cancel()` returns before the frames unwind). Ships
   in **1.6.2 / versionCode 16**.
 
-- **D-140: control intents to a NOT-running service no longer birth a zombie foreground service
+- **D-140 [cited]: control intents to a NOT-running service no longer birth a zombie foreground service
   (F-backlog U1 finding).** Latent assumption in three places (`AutoBrightnessRuntime`'s
   `sendServiceAction` catch-comment, the widget `ACTION_RESET` comment, the REAPPLY branch):
   that a pause/reapply intent "does nothing when the service is not running". In reality
@@ -2484,7 +2497,7 @@ the permanent registry — never compress or remove them.
   mandatory foreground notification for an instant before the self-stop. Ships in **1.6.2 /
   versionCode 16**.
 
-- **D-141: a context-rule add/edit/delete ≤500 ms after any evaluation is no longer silently
+- **D-141 [cited]: a context-rule add/edit/delete ≤500 ms after any evaluation is no longer silently
   vetoed (F-backlog U2 finding, F-U2-1).** `ContextEngine.start()`'s rulesJob reacted to a
   runtime rule change with `evaluate(ContextCaller.GENERAL)`, but GENERAL carries a 500 ms
   PASS-1 cooldown on the shared global `lastEvalTime` — any eval ≤500 ms before the edit vetoed
@@ -2497,7 +2510,7 @@ the permanent registry — never compress or remove them.
   matching battery rule created at t+300 ms, asserts the profile applies immediately; failed
   with `null` pre-fix). Ships in **1.6.2 / versionCode 16**.
 
-- **D-142: the wifi SSID listener gains the missing `[WIFI]` cost gate (F-backlog U2 finding,
+- **D-142 [cited]: the wifi SSID listener gains the missing `[WIFI]` cost gate (F-backlog U2 finding,
   F-U2-2).** `ContextEngine.start()` collected `ssidFlow()` unconditionally, unlike the
   `[LOC]`-gated location listener and the rule-gated foreground-app poll — yet Tasker gates the
   whole wifi watcher (prof768) on `%AAB_ContextCache` containing `[WIFI]` (contexts_spec §1.1).
@@ -2519,7 +2532,7 @@ the permanent registry — never compress or remove them.
   rule add/remove) and `wifiListenerStop_clearsStaleSsid_D142` (stale pre-stop SSID must not
   match a re-added rule; a fresh emission must). Folds into **1.6.2 / versionCode 16**.
 
-- **D-143: an in-flight SSID resolve can no longer publish over newer network state (F-backlog
+- **D-143 [cited]: an in-flight SSID resolve can no longer publish over newer network state (F-backlog
   U2 finding).** `ssidFlow()`'s per-callback `launch { resolveNoLocationSsid() … trySend }` is
   async, so its result could land after the state it described changed — two concrete races:
   (a) a resolve completing after `onLost` already sent null re-published a stale "connected"
@@ -2538,7 +2551,7 @@ the permanent registry — never compress or remove them.
   ConnectivityManager callbacks and a park-until-released fake strategy). Folds into **1.6.2 /
   versionCode 16**.
 
-- **D-144: a process death while Extra Dim was engaged no longer leaves it stuck on after the
+- **D-144 [cited]: a process death while Extra Dim was engaged no longer leaves it stuck on after the
   restart (F-backlog U3 finding).** `SuperDimmingCoordinator.engaged` was an in-process `false`-
   initialized boolean, but Tasker's `%AAB_DimmingStatus` is a PERSISTED global — after a Tasker
   restart the above-threshold path still ran `_DisableSuperDimming` and wrote the secure keys.
@@ -2556,7 +2569,7 @@ the permanent registry — never compress or remove them.
   assertions relaxed to "no engagement writes" (`activated != true`, no positive level) since the
   one-time residual clear is now expected. Folds into **1.6.2 / versionCode 16**.
 
-- **D-145: `ShizukuShell.exec` unbinds the user service on its own bind timeout (F-backlog U3
+- **D-145 [cited]: `ShizukuShell.exec` unbinds the user service on its own bind timeout (F-backlog U3
   finding).** The 4 s `withTimeoutOrNull` cancelled the `suspendCancellableCoroutine` without an
   `invokeOnCancellation`, so a `bindUserService` that never connected (Shizuku hung/dying) stayed
   registered forever — a slow leak on the no-Location SSID path. Fix: `invokeOnCancellation`
@@ -2569,7 +2582,7 @@ the permanent registry — never compress or remove them.
   onboarding path, rare, and a timeout there needs coroutine plumbing through a callback API;
   revisit only on an owner report. Folds into **1.6.2 / versionCode 16**.
 
-- **D-146: NaN can no longer poison the settings through a profile import (F-backlog U4
+- **D-146 [cited]: NaN can no longer poison the settings through a profile import (F-backlog U4
   finding).** `AabSettings.validate()` clamps every numeric with `coerceIn`, but NaN passes
   straight through it (every comparison is false → `coerceIn` returns its receiver), and both
   legacy-import parsers accept it (`"NaN".toDoubleOrNull()` parses — Java `parseDouble` accepts
@@ -2584,7 +2597,7 @@ the permanent registry — never compress or remove them.
   `LegacyImportRoundTripTest` +1 (NaN/±Infinity in a key=value import come out finite). Folds
   into **1.6.2 / versionCode 16**.
 
-- **D-147: the widget's toggle/reset actions move to a non-exported receiver (F-backlog U4
+- **D-147 [cited]: the widget's toggle/reset actions move to a non-exported receiver (F-backlog U4
   finding).** `DashboardWidgetProvider` must be exported for the system's `APPWIDGET_UPDATE`
   broadcasts, and it also handled the custom `…widget.action.TOGGLE`/`RESET` actions — so any
   co-installed app could start/stop the brightness service or force a reapply with a plain
@@ -2619,7 +2632,7 @@ the permanent registry — never compress or remove them.
   the H3 backlog row has NO remaining seams (Shizuku*/MaintenanceWorker skips stand, documented
   in the D-136 row).
 
-- **D-149: Privileged Display Control adopted (rebuild-only feature, no Tasker source — RUNBOOK
+- **D-149 [cited]: Privileged Display Control adopted (rebuild-only feature, no Tasker source — RUNBOOK
   playbook 5; plan: `plans/privileged-display.md`).** New `:platform`
   `SecureDisplayController` exposes the AOSP display toggles WRITE_SECURE_SETTINGS unlocks:
   Night Light (`night_display_activated` / `night_display_color_temperature`, auto-mode
@@ -2637,7 +2650,7 @@ the permanent registry — never compress or remove them.
   (documented v1 scope). "Privileged" = the existing ELEVATED tier — adb/Shizuku/root are grant
   channels only (D-016), no runtime-binder write fallback. Ships in **1.7.0 / versionCode 17**.
 
-- **D-150: Privileged Display schedule rules — the apply/restore semantics (Segment 4 of the
+- **D-150 [cited]: Privileged Display schedule rules — the apply/restore semantics (Segment 4 of the
   D-149 feature; storage + runtime + UI).** A `DisplayRule` set (separate `aab_display_rules.json`
   DataStore — NOT in `AabSettings`/contexts.json: no migration or import/export coupling; the
   action is stored as a STRING enum name so an unknown value from a newer schema leaves that one
@@ -2670,7 +2683,7 @@ the permanent registry — never compress or remove them.
   the untouched ContextsScreen suites are the proof). Tests: +16 coordinator, +7 store/serializer,
   +3 latch, +5 screen. Folds into **1.7.0 / versionCode 17**.
 
-- **D-151: Display toggles moved into the profile schema (owner-instructed Segment 4.5 pivot —
+- **D-151 [cited]: Display toggles moved into the profile schema (owner-instructed Segment 4.5 pivot —
   NOT in the approved `plans/privileged-display.md`; its Segment 4 is obsolete); the D-150
   separate schedule system removed.** Night Light (+ temperature), daltonizer mode and inversion
   are now `AabSettings` PROFILE fields (`nightLightEnabled`, `nightLightTemperature` — nullable,
@@ -2704,7 +2717,7 @@ the permanent registry — never compress or remove them.
   stays in this ledger as history. Folds into the unreleased **1.7.0 / versionCode 17**
   (`changelogs/17.txt` rewritten — D-150 was never released, no user-facing deprecation).
 
-- **D-152: D-151 completed — ALL Privileged Display toggles are profile fields; the duplicated
+- **D-152 [cited]: D-151 completed — ALL Privileged Display toggles are profile fields; the duplicated
   manual section removed (owner finding: half the toggles existed only as device-immediate
   controls, and the ported ones appeared twice).** `AabSettings` gains `alwaysOnDisplayEnabled`,
   `stayAwakeChargingEnabled`, `hdrForceSdrEnabled` (booleans, "leave-alone" false defaults; HDR
@@ -2738,7 +2751,7 @@ the permanent registry — never compress or remove them.
   per the rollover rule"). At adoption the tail is D-153 → 47 slots remain before the first
   rollover.
 
-- **D-154: Circadian Night Light temperature (owner-requested; rebuild-only, extends
+- **D-154 [cited]: Circadian Night Light temperature (owner-requested; rebuild-only, extends
   D-149/D-151/D-152).** New profile field `nightLightCircadianEnabled` ("Follow circadian
   scaling", full D-151 fan-out: contract `%AAB_NightLightCircadian`, mergeProfile snapshot, diff
   display, import/export + legacy arm, default false). While the EFFECTIVE profile has it on,
@@ -2764,7 +2777,7 @@ the permanent registry — never compress or remove them.
   static-only: tracking is a runtime feature (stated in the help text). Folds into the
   unreleased 1.7.0/vc17 (`17.txt` +1 line); DEVICE_TEST_SCRIPT §11 step 38.
 
-- **D-155: Panic (Reset) also returns the privileged display toggles to their DEFAULTS (owner
+- **D-155 [cited]: Panic (Reset) also returns the privileged display toggles to their DEFAULTS (owner
   on-device finding on the 1.7.0 branch build: panic persisted the privileged keys).** The
   task528 gesture is the "give me a usable screen back" escape hatch, and the baseline itself
   may carry the impairing values (grayscale/inversion/Night Light) — so the reset target is the
@@ -2782,7 +2795,7 @@ the permanent registry — never compress or remove them.
   fixed regardless of the Kelvin value), so the temperature slider and the D-154 circadian
   tracking are visually inert on OnePlus devices; noted in DEVICE_TEST_SCRIPT §11 + README.
 
-- **D-156: A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
+- **D-156 [cited]: A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
   (A0; plan `plans/a11y-diagnostics.md`, owner-approved 2026-07-06; opens 1.8.0/vc18).**
   Conventions BINDING for all backlog units: (a) **the gate** — every unit renders its surface
   in a Robolectric compose test and calls `SemanticsAudit.assertAllInteractiveNodesAreLabeled()`
@@ -2802,7 +2815,7 @@ the permanent registry — never compress or remove them.
   touch targets + owner TalkBack checklist, C1 crash-log capture = the only glue unit) live in
   the plan file until executed; the last unit deletes it.
 
-- **D-157: intent control for automation frameworks (Tasker / MacroDroid) — an opt-in exported
+- **D-157 [cited]: intent control for automation frameworks (Tasker / MacroDroid) — an opt-in exported
   broadcast surface.** Tasker-independent feature (no parity source): the app's control verbs were
   reachable only from its own UI (QS tile, widget, notification); this adds a deliberate external
   entry point. **Public action namespace** `com.tideo.autobrightness.control.*`, distinct from the
@@ -2851,7 +2864,7 @@ the permanent registry — never compress or remove them.
   that self-corrects (the `LiveRuntimeState` staleness watchdog already assumes onDestroy fires on system
   teardowns). Pure `outboundSnapshot`/`buildStateChangedIntent` are extracted for deterministic tests.
 
-- **D-158: local crash-log capture (a11y-diagnostics unit C1 — the last unit; deletes the plan
+- **D-158 [cited]: local crash-log capture (a11y-diagnostics unit C1 — the last unit; deletes the plan
   file. `D-157` reserved by the parallel intent-control branch, so C1 minted the next free row).**
   Tasker-independent diagnostic (no parity source): a new `AabApplication` (`<application
   android:name>`) installs a process-wide `Thread.setDefaultUncaughtExceptionHandler` on
@@ -2872,7 +2885,7 @@ the permanent registry — never compress or remove them.
   delegate/idempotency, `ToolsDiagnosticsTest` copy/empty + a11y gate, `AabApplicationTest` manifest
   wiring). Folds into 1.8.0/vc18 (`18.txt` +1 line). Closes the a11y-diagnostics plan.
 
-- **D-159: keyboard-tall dead gap at the end of the draft-settings screens (IME padding on the sticky
+- **D-159 [cited]: keyboard-tall dead gap at the end of the draft-settings screens (IME padding on the sticky
   Apply bar).** Bug (owner on-device, Super Dimming "Circadian dim spread" field): focusing the
   **bottommost** field of a `DraftSettingsScaffold` screen (Curve & Brightness / Reactivity / Circadian
   / Super Dimming) opened a keyboard-tall empty gap between the last field / sticky Discard-Apply bar and
@@ -2900,7 +2913,7 @@ the permanent registry — never compress or remove them.
   (every screen already consumes its own system-bar insets, so no new clipping); no Android-15 drawing
   change. On-device visual re-check is an owner step (no emulator in CI). Folds into 1.8.0/vc18.
 
-- **D-160: external `RESUME` could resurrect a user-disabled service (D-140 zombie class via the D-157
+- **D-160 [cited]: external `RESUME` could resurrect a user-disabled service (D-140 zombie class via the D-157
   surface).** Found by a pre-release audit of the 1.8.0 branch (Fable, 2026-07-09). The service-side
   `ACTION_RESUME` is **deliberately** not D-140-gated: F74 made its contract "resurrect" —
   `ensureRunning()` first — because its only trigger was the paused-override notification, which
@@ -2940,7 +2953,7 @@ the permanent registry — never compress or remove them.
   decision (STATE "Decided non-items"): widening build.yml to `claude/**` push events — PR-time CI
   plus the local ladder suffice.
 
-- **D-162: external AI-review triage (Deepseek, 2026-07-10) — accepted the machine-checkable,
+- **D-162 [cited]: external AI-review triage (Deepseek, 2026-07-10) — accepted the machine-checkable,
   rejected the cosmetic.** Accepted: (a) ladder guard 1b — STATE.md required-sections tripwire
   (Project / Current state / Decided non-items / Changelog must survive any compression);
   (b) guard 1c — live-ledger row counter (warn ≥ 190, fail > 200 — thresholds later lowered to
@@ -2962,7 +2975,7 @@ the permanent registry — never compress or remove them.
   glue-seam audit closed exactly that gap); tracking-id branch naming (solo repo; branch names
   are session-assigned by the harness).
 
-- **D-163: rule-removal left stale location/app signal snapshots — the D-142 clear was applied
+- **D-163 [cited]: rule-removal left stale location/app signal snapshots — the D-142 clear was applied
   asymmetrically (2026-07-12 final-audit pass, finding A1).** `ContextEngine.refreshSignalListeners`
   cancelled the location/app jobs bare while the wifi branch cleared its snapshot (D-142); the
   rules collector then runs `evaluate(RESUME)` (D-141: cooldown 0, no PASS-2 veto), so deleting a
@@ -2979,7 +2992,7 @@ the permanent registry — never compress or remove them.
   lands on one signal path, enumerate and fix ALL sibling paths in the same change — this
   asymmetry survived three later audits because each verified the wifi fix, not its siblings.
 
-- **D-164: draft Apply was not a fixed point — validate()'s commit-time rewrites left the screen
+- **D-164 [cited]: draft Apply was not a fixed point — validate()'s commit-time rewrites left the screen
   perpetually dirty (2026-07-12 final-audit pass, finding C1).** `AabSettings.validate()` rewrites
   a committing draft (NaN resets D-146, per-field clamps D-085, and the cross-field coercions
   `maxWaitMs ≥ minWaitMs` / `maxBrightness ≥ minBrightness` / `zone2End ≥ zone1End`), but
@@ -2995,7 +3008,7 @@ the permanent registry — never compress or remove them.
   Rule going forward: any path that persists a TRANSFORMED copy of visible edit state must write
   the transform back to that visible state in the same action.
 
-- **D-165: the panic re-arm latch cleared on a single non-inverted reading — shake flicker could
+- **D-165 [cited]: the panic re-arm latch cleared on a single non-inverted reading — shake flicker could
   re-open a consumed window (2026-07-12 final-audit pass, finding B1).** `PanicGate.canArm`
   cleared `consumed` on any instantaneous `!upsideDown` sample, but that signal flickers during a
   vigorous same-axis shake — the exact artifact the 10 s window was already made immune to
@@ -3013,7 +3026,7 @@ the permanent registry — never compress or remove them.
   humanly implausible (arming itself needs 5 sustained inverted frames). Tests: PanicGateTest
   re-arm spells + `shakeFlickerWhileInverted_doesNotClearTheLatch_D165`.
 
-- **D-166: repo-hardening backlog — turn four load-bearing prose invariants into mechanism
+- **D-166 [cited]: repo-hardening backlog — turn four load-bearing prose invariants into mechanism
   (2026-07-13, external-review triage; declined items → non-items).** Each sub-item replaces an
   instruction-following contract with a structural check, the pattern this repo already trusts
   (D-115 token scan, guard 1b). **U1 — CI/ladder lockstep is now structural:** `build.yml`'s
@@ -3079,7 +3092,7 @@ the permanent registry — never compress or remove them.
   section was chosen over a dedicated issue template because protocol step 2 guarantees STATE is
   read every session; an issue template guarantees nothing reads it.
 
-- **D-168: super-dimming toggle help corrected + shared threshold field relabels for PWM
+- **D-168 [cited]: super-dimming toggle help corrected + shared threshold field relabels for PWM
   (2026-07-14, owner-reported parity gap; owner will sync the Tasker source to match — a
   sanctioned reverse of the usual "Tasker wins" direction, like a golden-fixture correction).**
   Two fixes on the Super Dimming screen: (1) `help_dimming_enabled` (the "Use super dimming"
@@ -3098,7 +3111,7 @@ the permanent registry — never compress or remove them.
   `SuperDimmingScreen` picks label+help by `draft.pwmSensitive`. UI-string-only; no domain/math,
   no golden vectors, `enabled` gating unchanged.
 
-- **D-169: MaxBright auto-raise on Apply revises the D-052 form3A block (2026-07-14, owner-reported
+- **D-169 [cited]: MaxBright auto-raise on Apply revises the D-052 form3A block (2026-07-14, owner-reported
   parity gap).** Tasker `_SaveButtonMisc` A5–A18: when MaxBright < 255 and the curve leaves no
   zone-3 headroom (form3A < 0), Tasker **RAISES** MaxBright to `min_req_bright = ceil(form2A +
   form2B·((zone2End−form2C)^0.33 − (zone1End−form2C)^0.33))` — the brightness the curve reaches at
@@ -3121,7 +3134,7 @@ the permanent registry — never compress or remove them.
   untouched. Tests: `MaxBrightnessFixTest` (policy), `SettingsValidatorTest` form3A-advisory,
   `DraftSettingsViewModelTest.apply_raisesMaxBrightToFitCurve_D169`.
 
-- **D-170: context-rule profile loads WRITE THROUGH to the live settings store, with a persisted
+- **D-170 [cited]: context-rule profile loads WRITE THROUGH to the live settings store, with a persisted
   pre-override baseline snapshot (2026-07-15, owner-reported bug + owner decision "B — parity").**
   Owner report: after an automated context load (e.g. low battery → Battery Saver) the toast fired
   and the pipeline ran the profile, but the parameter screens showed the previous values —
@@ -3168,7 +3181,7 @@ the permanent registry — never compress or remove them.
   (fail > 184, warn ≥ 174 — the original 10-row warn lead preserved). At adoption the tail is
   D-171 at 166 rows → 18 slots remain before the first rollover. No app code; guards-only ladder.
 
-- **D-172: Force dark via Shizuku — global `debug.hwui.force_dark` toggle (owner-requested,
+- **D-172 [cited]: Force dark via Shizuku — global `debug.hwui.force_dark` toggle (owner-requested,
   Tasker-independent, folded into the unreleased 1.8.0/vc18).** The DarQ-class override that
   dark-renders apps with no dark theme. Why this channel: the forum-circulating commands do
   nothing — `settings put secure ui_night_mode` is only read by `UiModeManagerService` at
@@ -3201,7 +3214,7 @@ the permanent registry — never compress or remove them.
   alike. Tests: `ForceDarkControllerTest` (parse + null-degrade ×3), `ControlPrefsStoreTest`
   ×2, `ToolsForceDarkTest` ×6 (incl. a11y gate); owner on-device = DEVICE_TEST §15 (51–55).
 
-- **D-173: maintenance-harness hardening (owner-requested harness session, 2026-07-18) — the
+- **D-173 [cited]: maintenance-harness hardening (owner-requested harness session, 2026-07-18) — the
   guards get guards of their own.** **(a)** ladder guard 5 — D-citation integrity: every
   `D-/DA-/DB-NNN` cited in `app/ domain/ platform/ .github/` sources must resolve to a row in
   its ledger file (prefix routes the file, D-153) and ledger row numbers must be unique;
@@ -3227,3 +3240,16 @@ the permanent registry — never compress or remove them.
   overlap safe (worst case = today's cold cost); the script self-skips when any Gradle process
   exists (container already warm) and honors `AAB_SKIP_WARMUP=1`; failures only mark the log —
   `scripts/ladder.sh` stays the reporting authority.
+
+- **D-174: ledger rows gain a machine-synced `[cited]` marker (owner-requested, 2026-07-18).**
+  A row cited from the guard-5 scan scope (`app/ domain/ platform/ .github/`) carries
+  ` [cited]` directly after its number; guard 5 enforces it BOTH ways (cited-but-unmarked and
+  marked-but-no-longer-cited each fail the ladder), so the marker is verified derived state —
+  inside the D-162 decline's rationale, never self-reported paperwork — and `grep '\[cited\]'`
+  on a ledger file lists every code-anchored row with no tree cross-reference, while the
+  marker on a single row warns "a code/workflow comment resolves here" before you reword or
+  lean on it. Retrofitted mechanically to the 93 rows cited at introduction; marker add/remove
+  is exempt from frozen-block immutability (preamble amended — the marker is metadata, not
+  content). Owner suggested a "code comment" annotation; sharpened to `[cited]` at row start
+  for a stable grep anchor and a checkable semantic (workflow cites count too). +2 guard
+  self-test cases (20 total).
