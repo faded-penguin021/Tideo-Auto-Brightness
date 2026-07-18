@@ -115,7 +115,7 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-18 — **D-173** harness hardening (owner-requested): ladder guards 5 (D-citation
+- 2026-07-18 — **D-173** harness hardening: ladder guards 5 (D-citation
   integrity) + 6 (F-Droid changelog cap); `test-ladder-guards.sh` regression suite (18 cases,
   + build.yml step); release-preflight classifies `.claude/*` non-shipping; session-start
   background Gradle warm-up; STATE recompressed 15.3 → 12 KB. Detail in the D-173 row.
