@@ -42,7 +42,8 @@ in the file every session reads first.
 **P3. Machine-check everything checkable — but only over artifacts the work produces anyway.**
 Guards verify diffs, file sizes, commit messages, citation cross-references — things that exist
 as a side effect of doing the work. Never invent self-reported attestations (checkboxes,
-"I reviewed this" YAML): an agent can emit those without doing the work (Goodhart). If a rule
+"I reviewed this" YAML, per-checklist-item line quotes): an agent can emit those without doing
+the work (Goodhart) — external reviewers re-propose these regularly; keep declining. If a rule
 can't be derived from a real artifact, it stays a prose rule plus reviewer attention.
 
 **P4. One verification entrypoint, shared by CI and local *by construction*.** A single
@@ -104,8 +105,10 @@ code (in this repo: platform/runtime "glue" invisible to golden vectors). For di
 those areas, mandate a second, *hostile* read of the full diff after tests pass — hunting a
 concrete checklist of bug classes, each one a real shipped bug from the ledger (gate polarity,
 insertion order, observer echo races, non-idempotent lifecycle, stale async completions, …).
-The ledger feeds the checklist: every new shipped bug class gets appended. Verdict goes in the
-commit body ("glue-review pass: clean"); findings get fixed pre-commit and ledgered if durable.
+The ledger feeds the checklist: every new shipped bug class gets appended; when a class turns
+out to be mechanically testable, encode it as a regression test and retire it from the
+checklist — the pass holds only what tests *cannot* see. Verdict goes in the commit body
+("glue-review pass: clean"); findings get fixed pre-commit and ledgered if durable.
 
 **P13. Hard rails in the permission layer; discipline in prose.** Denials that must never be
 crossed (force-push, pushing to the default branch) live in tool-permission deny rules —
@@ -302,11 +305,16 @@ bump (two reviewable commits: forward-compat first, behavior flip second), relea
 6. **Recovery.** If the unit in flight has gone wrong, reset to the last green checkpoint,
    re-run the ladder to confirm green, re-attempt smaller. Record durable lessons first.
    Pushed checkpoints are immutable — never rewrite pushed history.
-7. **Ask, don't assume.** Forks that are (a) irreversible/expensive to unwind, (b)
-   user-visible with no spec to appeal to, (c) version-semantics ambiguous, or (d)
-   process-reshaping are the OWNER's: stop at the last green checkpoint, record the fork +
-   options + your recommendation under STATE → Owner queue → Open questions, move to
-   independent work. Final chat message restates the Owner queue.
+7. **Ask, don't assume.** Forks that are (a) irreversible/expensive to unwind (schema
+   migration, deleting a feature, renaming a public surface), (b) user-visible behavior with
+   no spec to appeal to, (c) version-semantics ambiguous (readable as minor vs major), or
+   (d) process-reshaping (changes how the owner works, not just the code) are the OWNER's:
+   stop at the last green checkpoint, record the fork + options + your recommendation under
+   STATE → Owner queue → Open questions, move to independent work. Genuinely unsure whether
+   something is a fork? Treat it as one — the queue entry already carries your recommended
+   resolution, so escalation costs the owner one read, while a wrong guess can cost a
+   segment. Routine engineering judgment inside a unit's stated scope is NOT a fork. Final
+   chat message restates the Owner queue.
 
 ## Adversarial review protocol (MANDATORY for {{UNTESTED_GLUE_AREAS}} diffs)
 After the ladder is green, re-read the FULL diff fresh — as a hostile reviewer, not the
@@ -379,7 +387,10 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
      pushed mistake is permanent until merge.
    - *Local-only advisories (WARN, skipped in CI):* checkpoint tripwire (code changed vs
      default branch but STATE.md not in the diff → the changelog line is probably missing);
-     stale-branch tripwire (behind the default branch → merge, never rebase pushed history).
+     stale-branch tripwire (behind the default branch → merge, never rebase pushed history);
+     plan-orphan tripwire (a file under `docs/plans/` not referenced from STATE.md's active
+     work → a finished or pivoted plan missed its deletion step; plans must die — code cites
+     ledger rows, never plans).
    - {{DOMAIN_GUARDS: any repo-specific machine-checkable release rule — e.g. a changelog
      length cap, a version-monotonicity check.}}
 2. **`--guards-only` exits here** (docs-only work).
@@ -397,6 +408,8 @@ and whenever a guard changes.
 #    build-system warm-up in the BACKGROUND so the first ladder run is cheap.
 # 2. Branch check: warn loudly on the default branch or detached HEAD.
 # 3. Print the protocol pointer: "read docs/STATE.md first, then the RUNBOOK playbook."
+# 4. Print STATE.md's size vs its soft cap — if it's already near the cap, the session
+#    knows to compress BEFORE writing, not after a failed commit-time guard.
 ```
 
 **Tool permissions** (`.claude/settings.json` or equivalent):
@@ -410,8 +423,15 @@ and whenever a guard changes.
 ## Adaptation notes
 
 - **Smallest useful subset** (a repo with light AI maintenance): the Part-2 prompt + STATE.md
-  with the Owner queue + a single verification command. Add the ledger the first time you
-  catch yourself re-explaining a past mistake; add guards the first time a rule is violated.
+  with the Owner queue + a single verification command. For small repos, fold the RUNBOOK into
+  CLAUDE.md — fewer files to keep straight; split only when the playbooks multiply. Add the
+  ledger the first time you catch yourself re-explaining a past mistake; add guards the first
+  time a rule is violated.
+- **Bootstrap `ladder.sh` as nothing but the verification commands.** Guards accrete one at a
+  time, each earning its place after a real violation, and each landing with a fixture test in
+  the guard test suite (a botched guard that false-passes is worse than no guard). Treat the
+  first few sessions as a shakedown: watch adherence, and when a rule proves ambiguous, the
+  fix is a clarified RUNBOOK/prompt in the same change — not more rules.
 - **The ledger earns its cost** once ≥2 distinct sessions (or agents) touch the repo — it's
   the only channel through which session N's shipped bug teaches session N+9's review pass.
 - **Human effort budget:** the owner's recurring touchpoints are exactly three — merge squash
