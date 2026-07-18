@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# test-ladder-guards.sh — regression tests for scripts/ladder.sh's pre-flight guards (D-173).
+#
+# The guards are load-bearing: build.yml runs ladder.sh directly (D-166), so a silently broken
+# guard weakens both local sessions AND CI. This suite exercises every guard against a
+# throwaway sandbox repo built in mktemp: fixture STATE/ledger/gradle/changelog files, the
+# REAL scripts/ladder.sh copied in unmodified, and a fake origin/main ref (git update-ref) so
+# guard 2's token scan genuinely runs. Everything is --guards-only — no Gradle, runs in
+# seconds. build.yml runs this as its own step before the acceptance ladder.
+#
+# Fixture D-numbers below are synthetic. This file lives in scripts/ precisely so ladder.sh's
+# guard 5 (which skips scripts/) never mistakes them for real citations.
+#
+# Usage: bash scripts/test-ladder-guards.sh
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SANDBOX="$(mktemp -d)"
+trap 'rm -rf "$SANDBOX"' EXIT
+
+pass=0
+declare -a failures=()
+
+# --- sandbox construction -------------------------------------------------------------------
+
+CHANGELOG_DIR=fastlane/metadata/android/en-US/changelogs
+
+write_state() {  # $1 = approx extra bytes of filler (0 = minimal)
+  {
+    printf '# STATE fixture\n\n## Project\np\n\n## Current state\nc\n\n## Owner queue\nq\n\n'
+    printf '## Decided non-items\nn\n\n## Changelog\n- line\n'
+    if [ "${1:-0}" -gt 0 ]; then
+      head -c "$1" /dev/zero | tr '\0' 'x'
+      printf '\n'
+    fi
+  } > "$SANDBOX/docs/rebuild/STATE.md"
+}
+
+write_ledger() {  # $1 = row count, $2 = target file (default base ledger)
+  local n="$1" f="${2:-$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md}" i
+  { printf '# ledger fixture\n\n'
+    for i in $(seq 1 "$n"); do printf -- '- D-%03d: fixture row\n' "$i"; done
+  } > "$f"
+}
+
+write_gradle() {  # $1 = versionCode
+  printf 'android { defaultConfig { versionCode = %s\nversionName = "1.0.0" } }\n' "$1" \
+    > "$SANDBOX/app/build.gradle.kts"
+}
+
+git_q() { git -C "$SANDBOX" -c user.email=t@t -c user.name=t "$@"; }
+
+mkdir -p "$SANDBOX/docs/rebuild" "$SANDBOX/scripts" "$SANDBOX/app" "$SANDBOX/$CHANGELOG_DIR"
+cp "$REPO_ROOT/scripts/ladder.sh" "$SANDBOX/scripts/ladder.sh"
+write_state 0
+write_ledger 10
+write_gradle 7
+printf 'Short changelog.\n' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
+git_q init -q
+git_q add -A
+git_q commit -qm baseline
+git_q update-ref refs/remotes/origin/main HEAD
+BASELINE_SHA="$(git_q rev-parse HEAD)"
+
+# --- assertion helper -----------------------------------------------------------------------
+
+check() {  # $1 = case name, $2 = expected rc (0/1), $3 = required output substring
+  local name="$1" want_rc="$2" want_out="$3" out rc=0
+  out="$(cd "$SANDBOX" && bash scripts/ladder.sh --guards-only 2>&1)" || rc=$?
+  if [ "$rc" -ne "$want_rc" ] || ! grep -qF "$want_out" <<< "$out"; then
+    failures+=("$name (rc=$rc, wanted rc=$want_rc + \"$want_out\")")
+    printf '=== FAIL: %s ===\n%s\n' "$name" "$out" >&2
+  else
+    pass=$((pass + 1))
+  fi
+}
+
+# --- guard 1: STATE length ------------------------------------------------------------------
+
+check "baseline is green" 0 "LADDER PASS (guards only)"
+
+write_state 17000
+check "guard 1: STATE > 16 KB fails" 1 "over the 16 KB hard cap"
+write_state 13000
+check "guard 1: STATE > 12 KB warns" 0 "steady-state target is <= 12 KB"
+write_state 0
+
+# LADDER_STATE_FILE override (the documented test-suite hook).
+head -c 17000 /dev/zero | tr '\0' 'x' > "$SANDBOX/docs/rebuild/state_big.md"
+out_rc=0
+(cd "$SANDBOX" && LADDER_STATE_FILE=docs/rebuild/state_big.md bash scripts/ladder.sh --guards-only >/dev/null 2>&1) || out_rc=$?
+if [ "$out_rc" -eq 1 ]; then pass=$((pass + 1)); else failures+=("LADDER_STATE_FILE override honored"); fi
+rm "$SANDBOX/docs/rebuild/state_big.md"
+
+# --- guard 1b: required sections ------------------------------------------------------------
+
+sed -i '/## Changelog/d' "$SANDBOX/docs/rebuild/STATE.md"
+check "guard 1b: missing required section fails" 1 'missing required section "## Changelog"'
+write_state 0
+sed -i '/## Owner queue/d' "$SANDBOX/docs/rebuild/STATE.md"
+check "guard 1b: missing Owner queue only warns" 0 "missing '## Owner queue' (D-167)"
+write_state 0
+
+# --- guard 1c: ledger rollover --------------------------------------------------------------
+
+write_ledger 185
+check "guard 1c: > 184 rows fails" 1 "roll over to the next file"
+write_ledger 174
+check "guard 1c: >= 174 rows warns" 0 "rollover soon"
+write_ledger 10
+
+# _A.md presence redirects the live-file pick (and DA- citation routing further down).
+write_ledger 150 "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
+sed -i 's/- D-/- DA-/' "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
+check "guard 1c: _A.md becomes the live file" 0 "150/184 rows in docs/rebuild/DEVIATIONS_LEDGER_A.md"
+rm "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
+
+# LADDER_LEDGER_FILE override (the documented test-suite hook).
+write_ledger 185 "$SANDBOX/docs/rebuild/ledger_full.md"
+out_rc=0
+(cd "$SANDBOX" && LADDER_LEDGER_FILE=docs/rebuild/ledger_full.md bash scripts/ladder.sh --guards-only >/dev/null 2>&1) || out_rc=$?
+if [ "$out_rc" -eq 1 ]; then pass=$((pass + 1)); else failures+=("LADDER_LEDGER_FILE override honored"); fi
+rm "$SANDBOX/docs/rebuild/ledger_full.md"
+
+# --- guard 5: D-citation integrity ----------------------------------------------------------
+
+printf '// cited: D-002\n' > "$SANDBOX/app/Cited.kt"
+check "guard 5: resolving citation passes" 0 "D-citations OK (1 distinct"
+printf '// cited: D-999\n' > "$SANDBOX/app/Cited.kt"
+check "guard 5: dangling citation fails" 1 "dangling deviation citation D-999"
+printf '// cited: DA-001\n' > "$SANDBOX/app/Cited.kt"
+check "guard 5: DA- cite without ledger A fails" 1 "DEVIATIONS_LEDGER_A.md not found"
+rm "$SANDBOX/app/Cited.kt"
+
+printf -- '- D-005: duplicate\n' >> "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md"
+check "guard 5: duplicate ledger row fails" 1 "duplicate deviation row number"
+write_ledger 10
+
+# --- guard 6: F-Droid changelog cap ---------------------------------------------------------
+
+head -c 501 /dev/zero | tr '\0' 'x' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
+check "guard 6: 501-byte changelog fails" 1 "over the 500-char F-Droid whatsNew cap"
+head -c 500 /dev/zero | tr '\0' 'x' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
+check "guard 6: 500-byte changelog passes" 0 "F-Droid changelog OK"
+printf 'Short changelog.\n' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
+
+# --- guard 2: D-115 skip-ci tokens ----------------------------------------------------------
+
+git_q commit -q --allow-empty -m 'document the [skip ci] literal'
+check "guard 2: skip-ci token in unmerged commit fails" 1 "forbidden CI-skip token"
+git_q reset -q --hard "$BASELINE_SHA"
+git_q commit -q --allow-empty -m 'harmless commit saying skip-ci (hyphenated)'
+check "guard 2: hyphenated skip-ci is allowed" 0 "no skip-ci tokens"
+git_q reset -q --hard "$BASELINE_SHA"
+
+# --- summary --------------------------------------------------------------------------------
+
+if [ "${#failures[@]}" -gt 0 ]; then
+  printf 'GUARD TESTS FAIL (%d passed, %d failed):\n' "$pass" "${#failures[@]}" >&2
+  printf '  - %s\n' "${failures[@]}" >&2
+  exit 1
+fi
+echo "GUARD TESTS PASS ($pass cases)"

@@ -116,7 +116,8 @@ One line per shipped change or completed backlog (newest first). Keep terse; det
 the cited D-rows and git history.
 
 - 2026-07-18 — **D-173** maintenance-harness hardening (owner-requested): ladder guard 5
-  (D-citation integrity) + guard 6 (500-char F-Droid changelog cap, current vc only); docs in
+  (D-citation integrity) + guard 6 (500-char F-Droid changelog cap, current vc only);
+  `scripts/test-ladder-guards.sh` guard regression suite (18 cases, + build.yml step); docs in
   lockstep. Detail in the D-173 row.
 - 2026-07-18 — STATE recompressed 15.3 → 12 KB per the length-guard preamble (Owner queue
   items untouched).

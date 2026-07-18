@@ -322,7 +322,9 @@ it before commit and record anything durable as a `D-NN`.
 the D-115 skip-ci token scan over unmerged commit messages — catch it BEFORE push, since
 force-push is forbidden; the D-173 D-citation-integrity and F-Droid-changelog-cap checks;
 plus WARN-only checkpoint/stale-branch advisories that self-skip in CI), then all five rungs
-in a single Gradle invocation. **`build.yml`'s "Acceptance ladder"
+in a single Gradle invocation. The guards themselves are regression-tested by
+`scripts/test-ladder-guards.sh` (sandbox-repo fixtures, seconds; also a `build.yml` step —
+run it whenever you change a guard, D-173). **`build.yml`'s "Acceptance ladder"
 step invokes this same script (D-166)**, so CI and local share one task-set definition — there
 is no hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
 seconds; extra args are forwarded to Gradle.

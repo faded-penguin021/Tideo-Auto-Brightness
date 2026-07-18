@@ -23,7 +23,10 @@
       "Bash(./scripts/ladder.sh)",
       "Bash(./scripts/ladder.sh:*)",
       "Bash(bash scripts/ladder.sh)",
-      "Bash(bash scripts/ladder.sh:*)"
+      "Bash(bash scripts/ladder.sh:*)",
+      "Bash(scripts/test-ladder-guards.sh)",
+      "Bash(./scripts/test-ladder-guards.sh)",
+      "Bash(bash scripts/test-ladder-guards.sh)"
     ],
     "deny": [
       "Bash(git push --force:*)",

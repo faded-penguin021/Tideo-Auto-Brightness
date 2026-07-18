@@ -3212,3 +3212,8 @@ the permanent registry — never compress or remove them.
   `whatsNew` rule is machine-checked for the CURRENT versionCode's changelog only (the shipped
   `9.txt` is 1,158 B — a real pre-rule miss; historical files are shipped facts, not
   actionable; existence stays release-preflight's job, which knows whether a PR ships code).
+  **(c)** `scripts/test-ladder-guards.sh` — regression tests for guards 1/1b/1c/2/5/6 (18
+  cases: sandbox fixture repo in mktemp, the real `ladder.sh` copied in, fake `origin/main`
+  via `git update-ref`; the `LADDER_*` overrides ladder.sh always attributed to "the guard's
+  own tests" now really have a test suite); also a fail-fast `build.yml` step, since a
+  silently broken guard weakens local sessions AND CI (D-166 shares the script).

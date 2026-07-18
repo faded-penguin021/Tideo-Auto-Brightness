@@ -35,6 +35,12 @@ jobs:
           # silently self-skip ("origin/main unavailable"). Guards 3/4 self-skip in CI by design.
           fetch-depth: 0
 
+      # Regression tests for ladder.sh's own pre-flight guards (D-173): pure shell against a
+      # sandbox fixture repo, runs in seconds. Placed before the toolchain setup so a broken
+      # guard fails fast — the guards are load-bearing for the Acceptance-ladder step below.
+      - name: Ladder guard self-tests
+        run: bash scripts/test-ladder-guards.sh
+
       # JDK 21: Robolectric 4.16+ requires it to run tests under SDK 36 (Android 16 / targetSdk 36).
       # The app still compiles to 17 bytecode (sourceCompatibility/jvmTarget = 17) — this is only the
       # JDK that runs Gradle + the test JVM.
