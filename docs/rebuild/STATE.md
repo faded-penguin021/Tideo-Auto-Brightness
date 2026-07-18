@@ -24,15 +24,13 @@ minSdk 31, target/compile 36.
 **Shipped: v1.7.0** (`versionCode 17`, tagged on `main`) — Privileged Display Control
 (D-149–D-155).
 
-**Code-complete, awaiting owner release cut: 1.8.0 / `versionCode 18`** — (a) **intent control
-for automation frameworks** (Tasker / MacroDroid, **D-157**; user reference `docs/AUTOMATION.md`),
-(b) the **A11y (TalkBack) backlog + crash-log capture** (**D-156**, **D-158**), plus the
-**D-159** IME fix and the **D-160** audit fix, and (c) **force dark via Shizuku/root** (**D-172**,
-owner-folded into vc18 on 2026-07-17 — on branch `claude/shizuku-dark-mode-adb-66oqmz` until
-merged). `changelogs/18.txt` rewritten for D-172 (486 chars). Pre-release
-audit passed 2026-07-09; the 2026-07-12 final adversarial audit is fully closed (all scopes
-clean, D-163–D-165 fixed — see the Changelog + D-rows). No active multi-unit work; all persisted
-plan files deleted.
+**Code-complete, awaiting owner release cut: 1.8.0 / `versionCode 18`** — intent control for
+automation frameworks (**D-157**, user reference `docs/AUTOMATION.md`), the A11y backlog +
+crash-log capture (**D-156**/**D-158**), the **D-159** IME fix, the **D-160** audit fix, and
+force dark via Shizuku/root (**D-172**, owner-folded into vc18 2026-07-17; on branch
+`claude/shizuku-dark-mode-adb-66oqmz` until merged; `changelogs/18.txt` 486 chars). Pre-release
+audit passed 2026-07-09; the 2026-07-12 final adversarial audit fully closed (D-163–D-165
+fixed). No active multi-unit work; no persisted plan files.
 
 `PARITY_CHECKLIST.md` is zero-`pending`; golden parity tests green; TODO/FIXME = 0;
 `parity_gaps.md` has 0 open gaps.
@@ -41,13 +39,9 @@ Owner-pending actions live in **`## Owner queue`** below (guarded section — se
 
 How changes are made now: see `RUNBOOK.md` (change-type playbooks; the **glue-review protocol**
 is mandatory for `:platform`/runtime diffs; multi-session features follow the playbook-5
-persisted-plan pattern). The migration narrative is frozen in `../history/`; the deviations
-registry stays live.
-
-> Code/docs elsewhere cite deviations by number (e.g. `STATE.md D-048`, `F50`). All deviations
-> — migration and ongoing — live in the permanent registry `DEVIATIONS_LEDGER.md` (184 rows per
-> file, then `_A.md`/DA-…, `_B.md`/DB-… — D-153; gate findings are in
-> `../history/STATE_rebuild.md`). Look there.
+persisted-plan pattern). The migration narrative is frozen in `../history/`; all numbered
+deviations live in the permanent registry `DEVIATIONS_LEDGER.md` (D-153 rollover; gate findings
+in `../history/STATE_rebuild.md`).
 
 ## Owner queue
 
@@ -123,65 +117,42 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-18 — copy trim (Tasker-independent, no D-row — wording only): shortened
-  `tools_force_dark_desc` and `help_tools_force_dark` in `strings.xml`, dropping the
-  reboot-reapply and per-app-timing filler sentences per owner screenshot markup.
-- 2026-07-17 — **D-172** (owner-requested, Tasker-independent; folded into the unreleased
-  1.8.0/vc18): **Force dark via Shizuku/root** — Tools card toggling `debug.hwui.force_dark`
-  (`ForceDarkController`, Shizuku → root; live status line; applies-on-app-restart ⓘ disclaimer),
-  opt-in in `ControlPrefsStore`, service re-asserts TRUE at start (prop resets on reboot). Per-app
-  DarQ-style flipping declined: a lost race vs the renderer's prop read. `changelogs/18.txt`
-  rewritten (486 chars); DEVICE_TEST §15 added; +11 tests. Detail in the D-172 row.
-- 2026-07-16 — docs (doc-to-code correction, CLAUDE.md ground-truth rule): retired the 8 stale
-  `deferred-S13` tags in `extraction/tasks/anonymous_handlers.md` (RUNBOOK playbook-2 reading
-  material) — chart renders + About/Guide shipped in S13d (`ui/graph/`, `AboutScreen`/
-  `UserGuideScreen`); tags now cite the shipped components, matching PARITY_CHECKLIST. Bucket
-  dispositions untouched.
-- 2026-07-16 — docs/process: ledger preamble now spells out which header content is structural
-  (copy into `_A.md`/`_B.md` at rollover, prefixes advanced) vs base-file-specific (frozen-block
-  + S0-seed lines stay here) — removes the one ambiguity in the D-153/D-171 rollover mechanism
-  before the cap (166/184) is hit. Mechanism, thresholds, and existing rows unchanged; no D-row.
-- 2026-07-15 — **D-171** (owner-instructed, docs/process): ledger file cap lowered 200 → **184
-  rows** (rollover mechanism unchanged); header/preamble, D-153 + guard-1c historical rows
-  (superseded-by pointers), `CLAUDE.md`, `RUNBOOK.md`, and `ladder.sh` guard 1c (fail > 184,
-  warn ≥ 174) updated in lockstep. Detail in the D-171 row.
-- 2026-07-15 — **D-170** (owner-reported "stale settings screens after a context load"; owner chose
-  Tasker parity over an advisory banner): context-rule profile loads now **write through** to the
-  live settings DataStore (`LOAD_FILE` semantics — screens show the loaded values), with the
-  pre-override baseline persisted to the new `aab_context_baseline.json` (task626 `_ContextResume`)
-  and restored on the no-match revert. act17 skip preserved (same-profile evals don't stomp
-  mid-override edits; revert discards them, globals survive). Manual load / Resume / import clear
-  the snapshot. Supersedes the D-038(ii) in-memory overlay. +8 tests. Detail in the D-170 row.
-- 2026-07-14 — STATE length-guard hard cap lowered 32 KB → **16 KB** (owner: 32 KB is excessive and
-  eats the context window); 12 KB WARN unchanged. `scripts/ladder.sh` guard 1 + this preamble updated.
-- 2026-07-14 — **D-169** (owner-reported parity gap): the **Misc** save now RAISES MaxBright to the
-  curve's Zone 2 End value + flashes "adjusted to N" (Tasker `_SaveButtonMisc`) when form3A < 0 and
-  MaxBright < 255, instead of the D-052 CRITICAL block. Curve screen only reddens form3A (advisory).
-  **Narrows D-052** (form2A/form2C still block); math/goldens untouched. Detail in the D-169 row.
-- 2026-07-14 — **D-168** (owner-reported parity gap; owner syncs Tasker): fixed the "Use super dimming"
-  toggle help (was task510 text describing *circadian scaling* — wrong control) + shared threshold field
-  relabels "SD threshold"→"PWM threshold" with its own flash when software dimming is on. UI strings only.
-- 2026-07-13 — **D-167** (owner-approved review item 5): guarded `## Owner queue` STATE section
-  (pending actions / open questions / findings intake; guard 1b WARN) + RUNBOOK Session discipline 7
-  "ask, don't assume" (owner-judgment forks queued, not guessed). Detail in the D-167 row.
-- 2026-07-13 — **D-166 (+ addendum)** repo-hardening (external-review triage, no app code): four prose
-  invariants → mechanism — `build.yml` runs `scripts/ladder.sh` (`fetch-depth: 0`, CI/local lockstep),
-  ladder guards 3/4, `settings.json` push deny rules, session-start branch/STATE print. Detail in the
-  D-166 row.
-- 2026-07-12 — final adversarial audit CLOSED (fixes fold into 1.8.0/vc18): **D-163** rule-removal
-  clears signal snapshots; **D-164** draft Apply snaps to the validated commit; **D-165** panic re-arm
-  needs a sustained straight spell. `WizardDegenerateInputTest` pins the wizard invariant. +6 tests.
-- 2026-07-10 — **D-161** repo-hardening U1–U4 (`scripts/ladder.sh`, STATE compressed 27.6→12 KB,
-  RUNBOOK **Session discipline**, Gradle parallel/config-cache — warm re-verify ~1 s) +
-  **D-162** external-review triage (guards 1b/1c, recovery rule, release-preflight
+- 2026-07-18 — STATE recompressed 15.3 → 12.2 KB per the length-guard preamble (Owner queue +
+  Decided non-items untouched; details live in the cited D-rows and git history).
+- 2026-07-18 — copy trim (wording only, no D-row): shortened `tools_force_dark_desc` +
+  `help_tools_force_dark` in `strings.xml` per owner screenshot markup.
+- 2026-07-17 — **D-172** (owner-requested; folded into unreleased 1.8.0/vc18): force dark via
+  Shizuku/root — Tools card toggling `debug.hwui.force_dark` (`ForceDarkController`), opt-in,
+  service re-asserts at start; per-app flipping declined. `changelogs/18.txt` rewritten
+  (486 chars); DEVICE_TEST §15; +11 tests.
+- 2026-07-16 — docs: retired the 8 stale `deferred-S13` tags in
+  `extraction/tasks/anonymous_handlers.md` (chart renders + About/Guide shipped in S13d); ledger
+  preamble now separates structural vs base-file-specific header content for the D-153 rollover.
+- 2026-07-15 — **D-171** (owner-instructed): ledger file cap 200 → **184 rows**; guard 1c +
+  docs updated in lockstep.
+- 2026-07-15 — **D-170** (owner-reported): context-rule profile loads write through to the live
+  settings DataStore (`LOAD_FILE` semantics), pre-override baseline in
+  `aab_context_baseline.json`, restored on no-match revert; supersedes D-038(ii). +8 tests.
+- 2026-07-14 — STATE length-guard hard cap 32 KB → **16 KB** (owner); guard 1 + preamble updated.
+- 2026-07-14 — **D-169** (owner-reported parity gap): Misc save raises MaxBright to Zone 2 End +
+  flash (Tasker `_SaveButtonMisc`) instead of the D-052 block; narrows D-052.
+- 2026-07-14 — **D-168** (owner-reported parity gap): super-dimming toggle help fix + "PWM
+  threshold" relabel. UI strings only.
+- 2026-07-13 — **D-167**: guarded `## Owner queue` STATE section (guard 1b WARN) + RUNBOOK
+  Session discipline 7 "ask, don't assume".
+- 2026-07-13 — **D-166 (+ addendum)** repo-hardening: `build.yml` runs `scripts/ladder.sh`,
+  ladder guards 3/4, `settings.json` push deny rules, session-start branch/STATE print.
+- 2026-07-12 — final adversarial audit CLOSED: **D-163** rule-removal clears signal snapshots;
+  **D-164** draft Apply snaps to the validated commit; **D-165** panic re-arm sustained spell;
+  `WizardDegenerateInputTest`. +6 tests.
+- 2026-07-10 — **D-161** repo-hardening U1–U4 (ladder.sh, STATE 27.6→12 KB, Session discipline,
+  Gradle parallel/config-cache) + **D-162** external-review triage (guards 1b/1c, recovery rule,
   golden-fixture gate; declines in the row + non-items).
-- 2026-07-08/09 — 1.8.0 close-out: **D-159** draft-screen IME dead gap (3-part edge-to-edge
-  recipe); **D-160** external `RESUME` gated at `ControlReceiver.route`; pre-release audit green,
-  DEVICE_TEST §14 added; user-guide S5 corrected.
-- 2026-07-06/07 — 1.8.0/vc18 features: **D-157 intent control** (opt-in exported broadcast surface,
-  default OFF — 7 verbs + LOAD_PROFILE/CONTEXTS_RESUME, outbound STATE_CHANGED, `docs/AUTOMATION.md`,
-  +20 tests) + **D-156 a11y A0–A7** / **D-158 crash-log capture C1** (SemanticsAudit gate, +72 tests).
-  Owner completed H4/H5 (D-135/D-137 fdroiddata).
+- 2026-07-08/09 — 1.8.0 close-out: **D-159** IME dead gap; **D-160** external `RESUME` gate;
+  pre-release audit green; DEVICE_TEST §14.
+- 2026-07-06/07 — 1.8.0/vc18 features: **D-157** intent control (opt-in broadcast surface,
+  `docs/AUTOMATION.md`, +20 tests) + **D-156** a11y A0–A7 / **D-158** crash-log capture
+  (+72 tests). Owner completed H4/H5.
 - 2026-07-05 — docs/process: **D-153** ledger 200-row cap + rollover; RUNBOOK <500-char
   F-Droid `whatsNew` rule.
 - 2026-07-03..05 — **1.7.0 / vc17 (MINOR): Privileged Display Control** (**D-149**–**D-155** + D-048
