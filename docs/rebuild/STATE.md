@@ -116,7 +116,7 @@ One line per shipped change or completed backlog (newest first). Keep terse; det
 the cited D-rows and git history.
 
 - 2026-07-18 — **D-174** (owner-requested): machine-synced `[cited]` ledger marker — guard 5
-  enforces it both directions; 93 rows retrofitted. Detail in the D-174 row.
+  enforces both directions; 93 rows retrofitted. Detail in the D-174 row.
 - 2026-07-18 — **D-173** harness hardening: ladder guards 5 (D-citation
   integrity) + 6 (F-Droid changelog cap); `test-ladder-guards.sh` regression suite (18 cases,
   + build.yml step); release-preflight classifies `.claude/*` non-shipping; session-start
