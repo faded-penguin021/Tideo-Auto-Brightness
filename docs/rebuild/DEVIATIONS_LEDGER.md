@@ -3220,4 +3220,10 @@ the permanent registry — never compress or remove them.
   `release-preflight.yml` classifier: `.claude/*` (settings, hooks) joined the non-shipping
   patterns — it is agent-harness config, not app code, and a harness-only PR (e.g. the pending
   D-166 branch, which touches `.claude/` with no version bump) was one classifier miss away
-  from a false "bump versionCode" failure.
+  from a false "bump versionCode" failure. **(e)** `scripts/warm-gradle.sh` + session-start
+  hook: remote containers launch a detached, `nice`d run of the five ladder rungs at session
+  start, so the cold-container dependency+compile+test cost overlaps the doc-reading phase
+  instead of serializing before the first real ladder run. Gradle's own locking makes the
+  overlap safe (worst case = today's cold cost); the script self-skips when any Gradle process
+  exists (container already warm) and honors `AAB_SKIP_WARMUP=1`; failures only mark the log —
+  `scripts/ladder.sh` stays the reporting authority.

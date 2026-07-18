@@ -118,8 +118,8 @@ the cited D-rows and git history.
 - 2026-07-18 — **D-173** maintenance-harness hardening (owner-requested): ladder guard 5
   (D-citation integrity) + guard 6 (500-char F-Droid changelog cap, current vc only);
   `scripts/test-ladder-guards.sh` guard regression suite (18 cases, + build.yml step);
-  release-preflight classifier treats `.claude/*` as non-shipping; docs in lockstep. Detail in
-  the D-173 row.
+  release-preflight classifier treats `.claude/*` as non-shipping; session-start background
+  Gradle warm-up (`scripts/warm-gradle.sh`); docs in lockstep. Detail in the D-173 row.
 - 2026-07-18 — STATE recompressed 15.3 → 12 KB per the length-guard preamble (Owner queue
   items untouched).
 - 2026-07-18 — copy trim (wording only, no D-row): shortened `tools_force_dark_desc` +

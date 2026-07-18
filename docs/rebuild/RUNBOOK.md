@@ -324,7 +324,10 @@ force-push is forbidden; the D-173 D-citation-integrity and F-Droid-changelog-ca
 plus WARN-only checkpoint/stale-branch advisories that self-skip in CI), then all five rungs
 in a single Gradle invocation. The guards themselves are regression-tested by
 `scripts/test-ladder-guards.sh` (sandbox-repo fixtures, seconds; also a `build.yml` step —
-run it whenever you change a guard, D-173). **`build.yml`'s "Acceptance ladder"
+run it whenever you change a guard, D-173). On remote containers the session-start hook
+launches `scripts/warm-gradle.sh` in the background (D-173), so by the time you first run the
+ladder the cold dependency/compile cost has usually already been paid; `~/.gradle-warmup.log`
+shows its progress, `AAB_SKIP_WARMUP=1` disables it. **`build.yml`'s "Acceptance ladder"
 step invokes this same script (D-166)**, so CI and local share one task-set definition — there
 is no hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
 seconds; extra args are forwarded to Gradle.

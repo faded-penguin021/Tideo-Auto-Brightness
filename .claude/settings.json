@@ -26,7 +26,10 @@
       "Bash(bash scripts/ladder.sh:*)",
       "Bash(scripts/test-ladder-guards.sh)",
       "Bash(./scripts/test-ladder-guards.sh)",
-      "Bash(bash scripts/test-ladder-guards.sh)"
+      "Bash(bash scripts/test-ladder-guards.sh)",
+      "Bash(scripts/warm-gradle.sh)",
+      "Bash(./scripts/warm-gradle.sh)",
+      "Bash(bash scripts/warm-gradle.sh)"
     ],
     "deny": [
       "Bash(git push --force:*)",

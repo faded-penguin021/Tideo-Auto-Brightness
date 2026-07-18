@@ -9,6 +9,15 @@ set -euo pipefail
 if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
   "$CLAUDE_PROJECT_DIR/scripts/setup-android-sdk.sh"
   echo "Android SDK ready; local.properties written."
+
+  # D-173: warm Gradle in the background while the session reads the maintenance docs — a
+  # fresh container's first ladder run otherwise pays the full dependency+compile+test cost
+  # serially. Gradle's own locking serializes it against any build the session starts; the
+  # script self-skips when a Gradle process already exists (container already warm).
+  if [ "${AAB_SKIP_WARMUP:-}" != "1" ]; then
+    nohup "$CLAUDE_PROJECT_DIR/scripts/warm-gradle.sh" >/dev/null 2>&1 &
+    echo "Gradle warm-up launched in background (log: ~/.gradle-warmup.log; AAB_SKIP_WARMUP=1 disables)."
+  fi
 fi
 
 # Branch check (every session): work happens on the assigned claude/* session branch, never
