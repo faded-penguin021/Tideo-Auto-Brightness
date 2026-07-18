@@ -3216,4 +3216,8 @@ the permanent registry — never compress or remove them.
   cases: sandbox fixture repo in mktemp, the real `ladder.sh` copied in, fake `origin/main`
   via `git update-ref`; the `LADDER_*` overrides ladder.sh always attributed to "the guard's
   own tests" now really have a test suite); also a fail-fast `build.yml` step, since a
-  silently broken guard weakens local sessions AND CI (D-166 shares the script).
+  silently broken guard weakens local sessions AND CI (D-166 shares the script). **(d)**
+  `release-preflight.yml` classifier: `.claude/*` (settings, hooks) joined the non-shipping
+  patterns — it is agent-harness config, not app code, and a harness-only PR (e.g. the pending
+  D-166 branch, which touches `.claude/` with no version bump) was one classifier miss away
+  from a false "bump versionCode" failure.

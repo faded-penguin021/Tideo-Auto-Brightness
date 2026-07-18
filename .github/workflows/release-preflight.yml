@@ -132,7 +132,7 @@ jobs:
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
-              docs/*|.github/*|scripts/*|*.md) ;;                                   # docs / CI / scripts
+              docs/*|.github/*|.claude/*|scripts/*|*.md) ;;                         # docs / CI / agent-harness config / scripts (D-173)
               fastlane/*) ;;                                                        # store metadata, not app code
               */src/test/*|*/src/testFixtures/*|*/src/androidTest/*|*/src/sharedTest/*) ;;  # tests don't ship
               .gitignore|.gitattributes|LICENSE|LICENSE.*) ;;
