@@ -140,8 +140,8 @@ the cited D-rows and git history.
   flash (Tasker `_SaveButtonMisc`) instead of the D-052 block; narrows D-052.
 - 2026-07-14 — **D-168** (owner-reported parity gap): super-dimming toggle help fix + "PWM
   threshold" relabel. UI strings only.
-- 2026-07-13 — **D-167**: guarded `## Owner queue` STATE section (guard 1b WARN) + RUNBOOK
-  Session discipline 7 "ask, don't assume".
+- 2026-07-13 — **D-167**: guarded `## Owner queue` section + RUNBOOK discipline 7 "ask,
+  don't assume".
 - 2026-07-13 — **D-166 (+ addendum)** repo-hardening: `build.yml` runs `scripts/ladder.sh`,
   ladder guards 3/4, `settings.json` push deny rules, session-start branch/STATE print.
 - 2026-07-12 — final adversarial audit CLOSED: **D-163**–**D-165** fixes +
@@ -151,9 +151,9 @@ the cited D-rows and git history.
   golden-fixture gate; declines in the row + non-items).
 - 2026-07-08/09 — 1.8.0 close-out: **D-159** IME dead gap; **D-160** external `RESUME` gate;
   pre-release audit green; DEVICE_TEST §14.
-- 2026-07-06/07 — 1.8.0/vc18 features: **D-157** intent control (opt-in broadcast surface,
-  `docs/AUTOMATION.md`, +20 tests) + **D-156** a11y A0–A7 / **D-158** crash-log capture
-  (+72 tests). Owner completed H4/H5.
+- 2026-07-06/07 — 1.8.0/vc18 features: **D-157** intent control (`docs/AUTOMATION.md`,
+  +20 tests) + **D-156** a11y A0–A7 / **D-158** crash-log capture (+72 tests). Owner
+  completed H4/H5.
 - 2026-07-05 — docs/process: **D-153** ledger 200-row cap + rollover; RUNBOOK <500-char
   F-Droid `whatsNew` rule.
 - 2026-07-03..05 — **1.7.0 / vc17 (MINOR): Privileged Display Control** (**D-149**–**D-155** + D-048
