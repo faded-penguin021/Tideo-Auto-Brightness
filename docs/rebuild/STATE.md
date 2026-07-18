@@ -115,21 +115,21 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-18 — docs (owner-requested, no D-row): `docs/AGENTIC_HARNESS_PROMPT.md` — the
+  harness generalized into a reusable prompt.
 - 2026-07-18 — **D-174** (owner-requested): machine-synced `[cited]` ledger marker — guard 5
   enforces both directions; 93 rows retrofitted. Detail in the D-174 row.
 - 2026-07-18 — **D-173** harness hardening: ladder guards 5 (D-citation
   integrity) + 6 (F-Droid changelog cap); `test-ladder-guards.sh` regression suite (18 cases,
   + build.yml step); release-preflight classifies `.claude/*` non-shipping; session-start
   background Gradle warm-up; STATE recompressed 15.3 → 12 KB. Detail in the D-173 row.
-- 2026-07-18 — copy trim (wording only, no D-row): shortened `tools_force_dark_desc` +
-  `help_tools_force_dark` in `strings.xml` per owner screenshot markup.
+- 2026-07-18 — copy trim (wording only, no D-row): shortened the two force-dark strings in
+  `strings.xml` per owner screenshot markup.
 - 2026-07-17 — **D-172** (owner-requested; folded into unreleased 1.8.0/vc18): force dark via
   Shizuku/root — Tools card toggling `debug.hwui.force_dark` (`ForceDarkController`), opt-in,
-  service re-asserts at start; per-app flipping declined. `changelogs/18.txt` rewritten
-  (486 chars); DEVICE_TEST §15; +11 tests.
-- 2026-07-16 — docs: retired the 8 stale `deferred-S13` tags in
-  `extraction/tasks/anonymous_handlers.md` (chart renders + About/Guide shipped in S13d); ledger
-  preamble now separates structural vs base-file-specific header content for the D-153 rollover.
+  service re-asserts at start; per-app flipping declined. DEVICE_TEST §15; +11 tests.
+- 2026-07-16 — docs: retired 8 stale `deferred-S13` tags in `anonymous_handlers.md` (shipped in
+  S13d); ledger preamble separates structural vs base-file header content (D-153 rollover).
 - 2026-07-15 — **D-171** (owner-instructed): ledger file cap 200 → **184 rows**; guard 1c +
   docs updated in lockstep.
 - 2026-07-15 — **D-170** (owner-reported): context-rule profile loads write through to the live
