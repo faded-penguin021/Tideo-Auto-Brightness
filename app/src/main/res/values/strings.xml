@@ -385,9 +385,9 @@
     <string name="tools_automation_toggle_label">Allow external control</string>
     <string name="help_tools_automation">When off, Tideo ignores every automation broadcast. Turn it on only if you use Tasker/MacroDroid to control the service. There is no password — any app on the device can send these actions while this is on.</string>
     <string name="tools_force_dark_header">Force dark (Shizuku/root)</string>
-    <string name="tools_force_dark_desc">Force dark rendering on apps that have no dark theme of their own (the developer option debug.hwui.force_dark), written through Shizuku or a root shell. The setting resets when the phone reboots — while this switch is on, Tideo re-applies it whenever its service starts once Shizuku or root is available.</string>
+    <string name="tools_force_dark_desc">Force dark rendering on apps that have no dark theme of their own (the developer option debug.hwui.force_dark), written through Shizuku or a root shell. The setting resets when the phone reboots.</string>
     <string name="tools_force_dark_toggle_label">Force dark rendering</string>
-    <string name="help_tools_force_dark">Only takes effect when an app starts: apps already running keep their current rendering until you fully close and re-open them. For the same reason, per-app rules are not possible — Android reads this option only as an app starts, so switching it per app would always come too late. Needs Shizuku running and authorized, or root. Some apps render poorly when force-darkened — turn this off (and re-open the app) to undo. While the switch is off, Tideo never touches the property.</string>
+    <string name="help_tools_force_dark">Only takes effect when an app starts: apps already running keep their current rendering until you fully close and re-open them. For the same reason, per-app rules are not possible.</string>
     <string name="tools_force_dark_state_on">Currently active on this device.</string>
     <string name="tools_force_dark_state_off">Currently inactive on this device.</string>
     <string name="tools_force_dark_unreachable">Neither Shizuku nor root is available — the switch saves your choice, and it is applied at the next service start once one of them is.</string>

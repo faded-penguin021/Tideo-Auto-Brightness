@@ -123,6 +123,9 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-18 — copy trim (Tasker-independent, no D-row — wording only): shortened
+  `tools_force_dark_desc` and `help_tools_force_dark` in `strings.xml`, dropping the
+  reboot-reapply and per-app-timing filler sentences per owner screenshot markup.
 - 2026-07-17 — **D-172** (owner-requested, Tasker-independent; folded into the unreleased
   1.8.0/vc18): **Force dark via Shizuku/root** — Tools card toggling `debug.hwui.force_dark`
   (`ForceDarkController`, Shizuku → root; live status line; applies-on-app-restart ⓘ disclaimer),
