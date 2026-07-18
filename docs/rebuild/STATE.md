@@ -93,14 +93,12 @@ in `../history/STATE_rebuild.md`).
 - **External AI-review suggestions (declined 2026-07-10, reasons in D-162):** glue-review
   checkbox output; ledger active-file symlink/marker; session-start delta generator; platform
   contract tests (already exist — D-136/D-148); tracking-id branch names.
-- **YAML codification of RUNBOOK/state (declined 2026-07-13):** checkpoint manifest
-  (`checkpoint.yaml`), glue-review YAML pass/fail block, per-playbook test matrices. Re-litigates
-  the D-162 checkbox decline; self-reported flags/attestations can't enforce reviewer attention
-  (Goodhart — the paperwork becomes the target) and duplicate state that git/STATE/the ledger
-  already own; scoped test matrices save nothing when the full ladder re-verifies warm in ~1 s.
-  Enforcement here derives from artifacts the agent produces anyway (diffs, commit messages,
-  file sizes — the D-115/guard-1b/guard-3 pattern), never from artifacts produced to pass the
-  check.
+- **YAML codification of RUNBOOK/state (declined 2026-07-13):** checkpoint manifest, glue-review
+  YAML pass/fail block, per-playbook test matrices. Re-litigates the D-162 checkbox decline:
+  self-reported attestations can't enforce reviewer attention (Goodhart) and duplicate state
+  git/STATE/the ledger already own. Enforcement here derives from artifacts the agent produces
+  anyway (diffs, commit messages, file sizes — the D-115/guard-1b/guard-3 pattern), never from
+  artifacts produced to pass the check.
 - **Privileged Display (decided at Segments 4.5–5, D-150–D-152):**
   - **Per-toggle orthogonal scheduling** — D-150 built it, the D-151 pivot removed it.
     Scheduling IS "a Contexts rule loads a profile carrying display fields", winner-takes-all.
@@ -117,8 +115,11 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-18 — STATE recompressed 15.3 → 12.2 KB per the length-guard preamble (Owner queue +
-  Decided non-items untouched; details live in the cited D-rows and git history).
+- 2026-07-18 — **D-173** maintenance-harness hardening (owner-requested): ladder guard 5
+  (D-citation integrity) + guard 6 (500-char F-Droid changelog cap, current vc only); docs in
+  lockstep. Detail in the D-173 row.
+- 2026-07-18 — STATE recompressed 15.3 → 12 KB per the length-guard preamble (Owner queue
+  items untouched).
 - 2026-07-18 — copy trim (wording only, no D-row): shortened `tools_force_dark_desc` +
   `help_tools_force_dark` in `strings.xml` per owner screenshot markup.
 - 2026-07-17 — **D-172** (owner-requested; folded into unreleased 1.8.0/vc18): force dark via
@@ -162,11 +163,10 @@ the cited D-rows and git history.
 - 2026-07-01/02 — 1.6.1 / vc15 + 1.6.2 / vc16 (PATCHes): hardening H1–H5 (**D-133**–**D-137**,
   RUNBOOK gains the mandatory **glue-review protocol**; reproducible release APK) and F-backlog
   U1–U6 closed (**D-138**–**D-148**, +19 tests; parity spot-check + `/security-review` clean).
-- 2026-06-26..30 — 1.1.0→1.6.0 (vc7→vc14, MINORs + PATCHes): targetSdk/compileSdk 36 +
-  Robolectric 4.16.1/JDK 21 + CodeQL + `.debug` suffix (**D-101**–**D-106**, owner Pass A/B
-  passed); **D-107**–**D-122** (incl. D-115 skip-ci token, D-116 panic rework); CI
-  release-preflight/release.yml (**D-123**–**D-124**); wizard/resume (**D-125**–**D-126**);
-  no-Location SSID, full i18n, plug/unplug cooldown bypass (**D-130**–**D-132**).
+- 2026-06-26..30 — 1.1.0→1.6.0 (vc7→vc14): SDK 36 + Robolectric 4.16.1/JDK 21 + CodeQL +
+  `.debug` suffix (**D-101**–**D-106**); **D-107**–**D-122** (D-115 skip-ci, D-116 panic);
+  release CI (**D-123**–**D-124**); wizard/resume (**D-125**–**D-126**); SSID/i18n/cooldown
+  (**D-130**–**D-132**).
 - 2026-06-23..25 — **v1.0.0: Tasker→Kotlin rebuild complete** (Gate 3 signed off; history frozen
   in `../history/`); early PATCHes 1.0.1–1.0.4 (**D-096**–**D-100**, F-Droid metadata, RUNBOOK
   §6 release checklist).

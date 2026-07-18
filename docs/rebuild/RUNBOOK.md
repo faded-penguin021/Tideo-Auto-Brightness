@@ -154,7 +154,8 @@ so check it explicitly.
 - **F-Droid changelog:** add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the
   filename is the **versionCode**, not the name) with a short user-facing note. **Keep it under 500
   characters** (whole file incl. the trailing newline — aim ≤ 480 for margin): F-Droid's code-quality
-  scan flags a longer `whatsNew` as a Minor finding (`wc -c` the file before committing). **`release.yml`
+  scan flags a longer `whatsNew` as a Minor finding (`wc -c` the file before committing — and ladder
+  guard 6 machine-fails the current versionCode's file over 500 B, D-173). **`release.yml`
   auto-reuses this file as the GitHub Release's "What's new" section (D-123)** — it reads the tagged
   build's `versionCode`, looks up the matching changelog, and slots it between the owner's UI summary
   and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release
@@ -319,8 +320,9 @@ it before commit and record anything durable as a `D-NN`.
 
 **One command: `scripts/ladder.sh`** — fast pre-flight guards (the STATE.md length rule;
 the D-115 skip-ci token scan over unmerged commit messages — catch it BEFORE push, since
-force-push is forbidden; plus WARN-only checkpoint/stale-branch advisories that self-skip in
-CI), then all five rungs in a single Gradle invocation. **`build.yml`'s "Acceptance ladder"
+force-push is forbidden; the D-173 D-citation-integrity and F-Droid-changelog-cap checks;
+plus WARN-only checkpoint/stale-branch advisories that self-skip in CI), then all five rungs
+in a single Gradle invocation. **`build.yml`'s "Acceptance ladder"
 step invokes this same script (D-166)**, so CI and local share one task-set definition — there
 is no hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
 seconds; extra args are forwarded to Gradle.

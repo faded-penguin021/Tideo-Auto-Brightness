@@ -3200,3 +3200,15 @@ the permanent registry — never compress or remove them.
   (FIFO) `Mutex`, so last-submitted-wins holds for the Tools card and the service re-assert
   alike. Tests: `ForceDarkControllerTest` (parse + null-degrade ×3), `ControlPrefsStoreTest`
   ×2, `ToolsForceDarkTest` ×6 (incl. a11y gate); owner on-device = DEVICE_TEST §15 (51–55).
+
+- **D-173: maintenance-harness hardening (owner-requested harness session, 2026-07-18) — the
+  guards get guards of their own.** **(a)** ladder guard 5 — D-citation integrity: every
+  `D-/DA-/DB-NNN` cited in `app/ domain/ platform/ .github/` sources must resolve to a row in
+  its ledger file (prefix routes the file, D-153) and ledger row numbers must be unique;
+  catches citation typos, a comment merged before its row was appended, and a mis-numbered
+  append. Baseline was verified clean (92 distinct citations). `scripts/` is unscanned (the
+  guard self-tests synthesize fixture ledgers there), as is doc prose (range/cap notation like
+  "D-001…D-184" names no real row). **(b)** guard 6 — the RUNBOOK §6 500-char F-Droid
+  `whatsNew` rule is machine-checked for the CURRENT versionCode's changelog only (the shipped
+  `9.txt` is 1,158 B — a real pre-rule miss; historical files are shipped facts, not
+  actionable; existence stays release-preflight's job, which knows whether a PR ships code).

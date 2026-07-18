@@ -15,7 +15,12 @@
 #   1. STATE.md length rule (mirrors STATE.md's own preamble): warn over the 12 KB
 #      steady-state target, FAIL over the 16 KB hard cap. 1b: required sections present
 #      (over-compression tripwire). 1c: deviations-ledger rollover reminder (D-153).
-#      (LADDER_STATE_FILE / LADDER_LEDGER_FILE override the paths — guard self-tests only.)
+#      (LADDER_STATE_FILE / LADDER_LEDGER_FILE override the paths — used only by
+#      scripts/test-ladder-guards.sh, the guards' own test suite.)
+#   5. D-citation integrity (D-173): every D-/DA-/DB-NNN cited in app/ domain/ platform/
+#      .github/ sources must resolve to a row in its ledger file; ledger row numbers must be
+#      unique. 6. F-Droid changelog cap (D-173): the CURRENT versionCode's
+#      fastlane changelog must be <= 500 bytes (RUNBOOK §6; F-Droid flags longer whatsNew).
 #   2. D-115 skip-ci token scan over unmerged commit messages (origin/main..HEAD) — the
 #      same fixed-string token set release-preflight.yml enforces at PR time. Catching a
 #      token BEFORE push matters here: force-push is forbidden (CLAUDE.md git rules), so a
@@ -86,6 +91,53 @@ if [ -f "$LEDGER_FILE" ]; then
   fi
 else
   fail "live ledger $LEDGER_FILE not found"
+fi
+
+# --- guard 5: D-citation integrity (D-173; numbered after the pre-existing guards 1-4,
+# whose numbers are cited by immutable ledger rows and never change) ---
+# Code and workflows cite deviations as bare D-NN, and the ledger preamble's contract is that
+# every citation "must always resolve" to a row. Machine-check the checkable half over the
+# artifacts the work produces anyway: every D-/DA-/DB-NNN in app/ domain/ platform/ .github/
+# sources must match a row in its ledger file (prefix names the file, D-153), and no ledger
+# file may carry a duplicate row number. Catches citation typos, a code comment merged before
+# its ledger row was appended, and a mis-numbered append. scripts/ is deliberately NOT
+# scanned (scripts/test-ladder-guards.sh synthesizes fixture ledgers/citations), nor is doc
+# prose (it legitimately uses range/cap notation like "D-001…D-184" that names no real row).
+cited=$(grep -rhoE '\bD[AB]?-[0-9]{3}\b' \
+  --include='*.kt' --include='*.kts' --include='*.xml' --include='*.yml' --include='*.yaml' \
+  app domain platform .github 2>/dev/null | sort -u || true)
+for id in $cited; do
+  case "$id" in
+    DA-*) lf=docs/rebuild/DEVIATIONS_LEDGER_A.md ;;
+    DB-*) lf=docs/rebuild/DEVIATIONS_LEDGER_B.md ;;
+    *)    lf=docs/rebuild/DEVIATIONS_LEDGER.md ;;
+  esac
+  [ -f "$lf" ] || fail "citation $id cannot resolve: ledger file $lf not found (D-173)"
+  grep -qE "^- (\*\*)?${id}\b" "$lf" \
+    || fail "dangling deviation citation $id — no such row in $lf. Fix the typo or append the missing ledger row (D-173)."
+done
+for lf in docs/rebuild/DEVIATIONS_LEDGER.md docs/rebuild/DEVIATIONS_LEDGER_A.md docs/rebuild/DEVIATIONS_LEDGER_B.md; do
+  [ -f "$lf" ] || continue
+  dupes=$(grep -oE '^- (\*\*)?D[AB]?-[0-9]{3}' "$lf" | grep -oE 'D[AB]?-[0-9]{3}' | sort | uniq -d || true)
+  [ -z "$dupes" ] || fail "duplicate deviation row number(s) in $lf: $(echo $dupes) — renumber the newest append (D-173)"
+done
+echo "LADDER: D-citations OK ($(echo "$cited" | grep -c . || true) distinct, all resolve; no duplicate ledger rows)"
+
+# --- guard 6: F-Droid changelog cap (D-173) ---
+# RUNBOOK §6: changelogs/<versionCode>.txt must stay under 500 characters (whole file, wc -c)
+# or F-Droid's code-quality scan flags the whatsNew. Only the CURRENT versionCode's file is
+# checked — it is the one the next tag ships; historical files (e.g. the pre-rule 9.txt,
+# 1158 B) are shipped facts, not actionable. Existence is release-preflight.yml's job (it
+# knows whether the PR ships app code); this guard only rejects an oversize file.
+vc=$(grep -oE 'versionCode[[:space:]]*=[[:space:]]*[0-9]+' app/build.gradle.kts 2>/dev/null \
+  | grep -oE '[0-9]+' | head -1 || true)
+if [ -n "$vc" ] && [ -f "fastlane/metadata/android/en-US/changelogs/${vc}.txt" ]; then
+  cl="fastlane/metadata/android/en-US/changelogs/${vc}.txt"
+  cl_bytes=$(wc -c < "$cl" | tr -d '[:space:]')
+  if [ "$cl_bytes" -gt 500 ]; then
+    fail "$cl is ${cl_bytes} B — over the 500-char F-Droid whatsNew cap (RUNBOOK §6). Shorten it."
+  fi
+  echo "LADDER: F-Droid changelog OK ($cl, ${cl_bytes} B <= 500)"
 fi
 
 # --- guard 2: D-115 skip-ci tokens in unmerged commit messages ---

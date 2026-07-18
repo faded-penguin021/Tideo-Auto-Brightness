@@ -34,7 +34,8 @@ each file caps at 184 rows and rolls over `D-… → DA-…` (`_A.md`) `→ DB-�
 
 ```bash
 scripts/ladder.sh                 # ALL rungs below in one command, after fast local guards
-                                  # (STATE.md length; D-115 skip-ci scan); --guards-only for docs-only work
+                                  # (STATE.md length; D-115 skip-ci scan; D-173 citation +
+                                  # changelog-cap checks); --guards-only for docs-only work
 ./gradlew :domain:test            # pure-JVM engine + golden parity tests
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests
