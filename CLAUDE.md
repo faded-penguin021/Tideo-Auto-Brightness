@@ -96,6 +96,15 @@ fallback, D-172) — not "grant-only".
 - Action codes: 474 = embedded Java, 547 = Variable Set, 590 = Variable Split, 105 = Set
   Clipboard. **Never read Tasker prefs (adbwp) in the app.**
 
+## Secret hygiene (D-175)
+
+- The app ships no secrets, but the **session environment carries credentials** (GitHub, proxy).
+  Never dump environments (`env`, `printenv`, `.env`-style files, container/service inspect
+  output) and never print a credential's value, prefix, suffix, length, or hash — report only
+  whether a key is set. `settings.json` denies the dump commands.
+- A diagnostic that seems to need raw secret material becomes a STATE.md **Owner queue** open
+  question (ask for a narrower evidence contract) — never raw output.
+
 ## Git rules
 
 - Develop and push **only** on your session's assigned `claude/<codename>` branch (named in the

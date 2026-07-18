@@ -136,6 +136,18 @@ are what make removal of an entire segment cheap. At the final segment **delete 
 file**: by then its durable content must live in changelog lines + ledger rows (P11: code
 never cites the plan — it dies; the ledger doesn't).
 
+**P17. Secrets are write-only to the agent.** Session environments carry credentials (VCS
+tokens, proxy auth, deploy keys) even when the codebase ships none. Never dump environments
+(`env`, `printenv`, `.env` files, container/service inspect output, unredacted config dumps);
+never print a credential's value, prefix, suffix, length, or hash — report only fixed-key
+presence ("`DATABASE_URL` is set") and bounded counts, and redact subprocess/exception/API
+output before reasoning over it. If a diagnostic can't be done through a redacted path, stop
+and request a narrower evidence contract via the Owner queue (P8 applied to secrets) — never
+default to raw output. Credential rotation and auth-config changes are always Owner-queue
+items with explicit approval and a rollback plan. Split per P13: the dump commands go in the
+permission deny rails; the redaction discipline stays prose. (Adapted from an external
+agent-safety protocol — `odysseus-fuzzy`'s AGENTS.md.)
+
 ---
 
 ## Part 2 — The prompt (drop-in `CLAUDE.md` template)
@@ -183,7 +195,9 @@ scripts/ladder.sh                # ALL verification in one command, after fast l
 ```
 
 {{VERIFICATION_LIMITS, e.g. "No emulator here — verification = compile + unit tests;
-on-device behavior is owner-verified via the Owner queue."}}
+on-device behavior is owner-verified via the Owner queue."}} Every commit body states what
+was actually verified and names what could NOT be verified locally — disclosure of real
+actions, never implied coverage.
 
 ## Architecture
 
@@ -205,6 +219,15 @@ protects it, e.g. "`:domain` — pure logic, no framework imports, ever; golden-
 
 {{THE_SHORTLIST: 3–8 bullets of the invariants agents are most likely to violate —
 concurrency model, protected data flows, forbidden shortcuts. Each cites its ledger row.}}
+
+## Secret hygiene
+
+- The session environment carries credentials even though the codebase may ship none. Never
+  dump environments (`env`, `printenv`, `.env` files, inspect output); never print a
+  credential's value, prefix, suffix, length, or hash — report key presence only. The
+  permission rails deny the dump commands.
+- A diagnostic that seems to need raw secret material becomes an Owner-queue open question
+  (ask for a narrower evidence contract) — never raw output.
 
 ## Git rules
 
@@ -315,6 +338,9 @@ bump (two reviewable commits: forward-compat first, behavior flip second), relea
    resolution, so escalation costs the owner one read, while a wrong guess can cost a
    segment. Routine engineering judgment inside a unit's stated scope is NOT a fork. Final
    chat message restates the Owner queue.
+8. **Verification disclosure.** Every commit body states what was actually verified (which
+   ladder rungs/tests ran) and names what could NOT be verified locally — disclosure of
+   real actions, not an attestation gate.
 
 ## Adversarial review protocol (MANDATORY for {{UNTESTED_GLUE_AREAS}} diffs)
 After the ladder is green, re-read the FULL diff fresh — as a hostile reviewer, not the
@@ -416,7 +442,8 @@ and whenever a guard changes.
 - **Allow:** the ladder, the setup/warm-up scripts, the build tool — verification must never
   stall on a permission prompt.
 - **Deny (hard rails):** `git push --force` in all spellings; any push targeting
-  `{{DEFAULT_BRANCH}}` directly. Prose forbids it; the permission layer *enforces* it.
+  `{{DEFAULT_BRANCH}}` directly; environment/secret dumps (`env`, `printenv`, reads of
+  `.env`-style files — P17). Prose forbids it; the permission layer *enforces* it.
 
 ---
 

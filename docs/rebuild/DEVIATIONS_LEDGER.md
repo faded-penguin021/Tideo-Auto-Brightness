@@ -3253,3 +3253,20 @@ the permanent registry — never compress or remove them.
   content). Owner suggested a "code comment" annotation; sharpened to `[cited]` at row start
   for a stable grep anchor and a checkable semantic (workflow cites count too). +2 guard
   self-test cases (20 total).
+
+- **D-175: secret hygiene + verification disclosure (owner-requested, 2026-07-18).** Adapted
+  from triaging `fuzzy123-ai/odysseus-fuzzy` (its AGENTS.md secret-safe-diagnostics protocol
+  and CONTRIBUTING.md "say what you ran" rule) for the generalized harness prompt; owner asked
+  for it in this repo too. **(i) Secrets are write-only to the agent.** The app ships no
+  secrets, but sessions carry credentials in the environment (GitHub, proxy). Never dump
+  environments (`env`, `printenv`, `.env`-style files, container/service inspect output);
+  never print a credential's value, prefix, suffix, length, or hash — report fixed-key
+  presence only. If a diagnostic seems to need raw secret material, stop and record the
+  narrower evidence request in the STATE Owner queue instead of defaulting to raw output.
+  `.claude/settings.json` denies the dump commands (`env`, `printenv`) — the machine-checkable
+  half, per the P13/D-166 split; the redaction discipline stays prose (CLAUDE.md "Secret
+  hygiene"). **(ii) Verification disclosure** (RUNBOOK Session discipline 8): every commit
+  body states what was actually verified (which ladder rungs ran) and names what could NOT be
+  verified locally — on-device behavior stays owner-verified; a green ladder must never be
+  implied to cover it. Disclosure of real actions, not attestation-as-gate, so it stays
+  outside the D-162 decline.

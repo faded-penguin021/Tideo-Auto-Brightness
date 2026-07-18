@@ -32,6 +32,9 @@
       "Bash(bash scripts/warm-gradle.sh)"
     ],
     "deny": [
+      "Bash(env)",
+      "Bash(printenv)",
+      "Bash(printenv:*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git push origin main:*)",

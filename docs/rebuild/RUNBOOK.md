@@ -268,6 +268,11 @@ any moment (rate limit, window end, compaction).
    pending items without opening STATE. Routine engineering judgment inside a unit's stated
    scope is NOT a fork — this rule is for decisions the owner would want to make, not cover for
    avoiding decisions the agent should make.
+8. **Verification disclosure (D-175).** Every commit body states what was actually verified
+   (which ladder rungs/tests ran — for docs-only units, `--guards-only`) and names what could
+   NOT be verified locally. On-device behavior stays owner-verified (`DEVICE_TEST_SCRIPT.md`);
+   never imply a green ladder covers it. This is disclosure of real actions, not an
+   attestation gate (the D-162 line holds).
 
 ## Glue-review protocol (MANDATORY for `:platform` / `:app` runtime changes)
 

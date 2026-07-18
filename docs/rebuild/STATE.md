@@ -87,18 +87,16 @@ in `../history/STATE_rebuild.md`).
 - **Repo/process (2026-06/07):** root `CHANGELOG.md` (redundant with STATE + fastlane + the
   ledger); speculative dependency-currency bumps (only on a security advisory); a standalone
   doc-drift audit (RUNBOOK self-adaptation covers it); action SHA-pinning / Gradle dependency
-  verification (declined 2026-06-29 as wrong cost/benefit for a solo F-Droid app); widening
+  verification (declined 2026-06-29, wrong cost/benefit solo); widening
   build.yml to `claude/**` push events (declined 2026-07-10 — PR-time CI + the local ladder
   suffice, D-161).
 - **External AI-review suggestions (declined 2026-07-10, reasons in D-162):** glue-review
   checkbox output; ledger active-file symlink/marker; session-start delta generator; platform
   contract tests (already exist — D-136/D-148); tracking-id branch names.
 - **YAML codification of RUNBOOK/state (declined 2026-07-13):** checkpoint manifest, glue-review
-  YAML pass/fail block, per-playbook test matrices. Re-litigates the D-162 checkbox decline:
-  self-reported attestations can't enforce reviewer attention (Goodhart) and duplicate state
-  git/STATE/the ledger already own. Enforcement here derives from artifacts the agent produces
-  anyway (diffs, commit messages, file sizes — the D-115/guard-1b/guard-3 pattern), never from
-  artifacts produced to pass the check.
+  YAML pass/fail block, per-playbook test matrices. Re-litigates the D-162 checkbox decline
+  (Goodhart; duplicates state git/STATE/the ledger own). Enforcement derives from artifacts
+  produced anyway, never from artifacts produced to pass the check.
 - **Privileged Display (decided at Segments 4.5–5, D-150–D-152):**
   - **Per-toggle orthogonal scheduling** — D-150 built it, the D-151 pivot removed it.
     Scheduling IS "a Contexts rule loads a profile carrying display fields", winner-takes-all.
@@ -115,6 +113,8 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-18 — **D-175** (owner-requested): secret hygiene (env-dump denies in settings.json,
+  presence-only reporting) + commit-body verification disclosure (RUNBOOK discipline 8).
 - 2026-07-18 — docs (owner-requested, no D-row): `docs/AGENTIC_HARNESS_PROMPT.md` — the
   harness generalized into a reusable prompt.
 - 2026-07-18 — **D-174** (owner-requested): machine-synced `[cited]` ledger marker — guard 5
