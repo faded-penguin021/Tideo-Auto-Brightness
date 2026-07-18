@@ -59,8 +59,10 @@ Privilege tiers: **BASIC** = user-grantable `WRITE_SETTINGS` → full core pipel
 = `WRITE_SECURE_SETTINGS` via one-time `pm grant` (adb / Shizuku / root) → super dimming + the
 Privileged Display profile toggles (D-149/D-151/D-152). After the grant, secure writes go via
 `Settings.Secure`/`Global` directly (no binder). Shizuku is a genuine
-**optional runtime** dependency in exactly one place: the no-Location Wi-Fi SSID strategy
-(`ShizukuWifiSsidStrategy` → `cmd wifi status` via `ShizukuShell`) — not "grant-only".
+**optional runtime** dependency in exactly two places: the no-Location Wi-Fi SSID strategy
+(`ShizukuWifiSsidStrategy` → `cmd wifi status` via `ShizukuShell`) and the global force-dark
+toggle (`ForceDarkController` → `setprop debug.hwui.force_dark` via `ShizukuShell`, root
+fallback, D-172) — not "grant-only".
 
 ## Coding conventions
 

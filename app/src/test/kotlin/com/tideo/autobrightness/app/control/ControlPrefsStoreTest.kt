@@ -43,4 +43,19 @@ class ControlPrefsStoreTest {
         store.setExternalControlEnabled(false)
         assertFalse(store.externalControlEnabled.first(), "opt-out must revert to disabled")
     }
+
+    // D-172: the force-dark opt-in shares the store and the same default-OFF/round-trip contract.
+
+    @Test
+    fun forceDarkDefaultsToDisabled() = withStore { store ->
+        assertFalse(store.forceDarkEnabled.first(), "force dark must default OFF (opt-in)")
+    }
+
+    @Test
+    fun forceDarkRoundTrips() = withStore { store ->
+        store.setForceDarkEnabled(true)
+        assertTrue(store.forceDarkEnabled.first())
+        store.setForceDarkEnabled(false)
+        assertFalse(store.forceDarkEnabled.first(), "opt-out must revert to disabled")
+    }
 }

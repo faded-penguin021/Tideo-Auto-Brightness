@@ -25,9 +25,11 @@ minSdk 31, target/compile 36.
 (D-149–D-155).
 
 **Code-complete, awaiting owner release cut: 1.8.0 / `versionCode 18`** — (a) **intent control
-for automation frameworks** (Tasker / MacroDroid, **D-157**; user reference `docs/AUTOMATION.md`)
-and (b) the **A11y (TalkBack) backlog + crash-log capture** (**D-156**, **D-158**), plus the
-**D-159** IME fix and the **D-160** audit fix. `changelogs/18.txt` final (455 chars). Pre-release
+for automation frameworks** (Tasker / MacroDroid, **D-157**; user reference `docs/AUTOMATION.md`),
+(b) the **A11y (TalkBack) backlog + crash-log capture** (**D-156**, **D-158**), plus the
+**D-159** IME fix and the **D-160** audit fix, and (c) **force dark via Shizuku/root** (**D-172**,
+owner-folded into vc18 on 2026-07-17 — on branch `claude/shizuku-dark-mode-adb-66oqmz` until
+merged). `changelogs/18.txt` rewritten for D-172 (486 chars). Pre-release
 audit passed 2026-07-09; the 2026-07-12 final adversarial audit is fully closed (all scopes
 clean, D-163–D-165 fixed — see the Changelog + D-rows). No active multi-unit work; all persisted
 plan files deleted.
@@ -75,8 +77,10 @@ registry stays live.
      Gradle parallel/config-cache) · owner on-device checklist = DEVICE_TEST §§12–14 ·
      vc18/1.8.0, changelog 455 chars.
 2. After CI green: on-device pass of `DEVICE_TEST_SCRIPT.md` **§12 (TalkBack), §13 (automation),
-   §14 (insets)**; findings → **Incoming findings** below.
-3. Cut **v1.8.0 / vc18** from `main` via the Release UI.
+   §14 (insets), §15 (force dark, D-172)**; findings → **Incoming findings** below.
+3. Merge `claude/shizuku-dark-mode-adb-66oqmz` (D-172 force dark; part of the vc18 payload —
+   rewrites `changelogs/18.txt`) into the release train **before tagging**; separate squash-merge.
+4. Cut **v1.8.0 / vc18** from `main` via the Release UI.
 4. When merging session branches, note `claude/ladder-checkpoint-improvements-dm4ewz` (D-166/167
    repo hardening) is independent of the 1.8.0 PR branch — separate squash-merge.
 
@@ -119,6 +123,12 @@ registry stays live.
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-17 — **D-172** (owner-requested, Tasker-independent; folded into the unreleased
+  1.8.0/vc18): **Force dark via Shizuku/root** — Tools card toggling `debug.hwui.force_dark`
+  (`ForceDarkController`, Shizuku → root; live status line; applies-on-app-restart ⓘ disclaimer),
+  opt-in in `ControlPrefsStore`, service re-asserts TRUE at start (prop resets on reboot). Per-app
+  DarQ-style flipping declined: a lost race vs the renderer's prop read. `changelogs/18.txt`
+  rewritten (486 chars); DEVICE_TEST §15 added; +11 tests. Detail in the D-172 row.
 - 2026-07-16 — docs (doc-to-code correction, CLAUDE.md ground-truth rule): retired the 8 stale
   `deferred-S13` tags in `extraction/tasks/anonymous_handlers.md` (RUNBOOK playbook-2 reading
   material) — chart renders + About/Guide shipped in S13d (`ui/graph/`, `AboutScreen`/

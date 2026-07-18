@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +68,9 @@ import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionResult
 import com.tideo.autobrightness.domain.wizard.OverridePoint
+import com.tideo.autobrightness.platform.display.ForceDarkController
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Tools: curve wizard + power-draw calibration (Tasker Debug Scene + wizard). The debug-category
@@ -88,7 +91,20 @@ fun ToolsScreen(
     val powerHasData by powerVm.hasData.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val toast = rememberToaster()
+    val scope = rememberCoroutineScope()
     var showPrep by remember { mutableStateOf(false) }
+
+    // D-172: the force-dark card's LIVE prop state (`getprop debug.hwui.force_dark` via Shizuku,
+    // root fallback), probed once on entry and refreshed after each toggle. `probed=false` hides
+    // the status line until the first probe returns (the Shizuku bind can take up to 4 s), so
+    // "not reachable" is never shown while the probe is still in flight.
+    val forceDarkEnabled by controlVm.forceDarkEnabled.collectAsStateWithLifecycle()
+    var forceDarkLive by remember { mutableStateOf<Boolean?>(null) }
+    var forceDarkProbed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        forceDarkLive = ForceDarkController.read(context)
+        forceDarkProbed = true
+    }
 
     // D-158: the latest locally-captured crash trace, if any. Read once on entry — the app restarts
     // after a crash, so re-opening Tools always re-reads the newest file from disk.
@@ -145,6 +161,27 @@ fun ToolsScreen(
         onCalibratePower = { showPrep = true },
         externalControlEnabled = externalControlEnabled,
         onSetExternalControlEnabled = controlVm::setExternalControlEnabled,
+        forceDarkEnabled = forceDarkEnabled,
+        forceDarkLiveState = forceDarkLive,
+        forceDarkProbed = forceDarkProbed,
+        // D-172: persist the choice FIRST (so a Shizuku outage can't lose it — the service re-assert
+        // reads the store), then apply live and reflect the verified result in the status line.
+        onSetForceDarkEnabled = { enabled ->
+            controlVm.setForceDarkEnabled(enabled)
+            scope.launch {
+                val result = ForceDarkController.apply(context, enabled)
+                forceDarkLive = result
+                forceDarkProbed = true
+                toast(
+                    when {
+                        result == enabled -> R.string.toast_force_dark_applied
+                        result == null && enabled -> R.string.toast_force_dark_pending
+                        result == null -> R.string.toast_force_dark_unreachable_off
+                        else -> R.string.toast_force_dark_failed
+                    },
+                )
+            }
+        },
     )
 
     // task524 entry: the prep dialog (Airplane Mode / close apps / don't touch / unplug) → Start shows
@@ -281,6 +318,10 @@ fun ToolsContent(
     latestCrashLog: String? = null,
     externalControlEnabled: Boolean = false,
     onSetExternalControlEnabled: (Boolean) -> Unit = {},
+    forceDarkEnabled: Boolean = false,
+    forceDarkLiveState: Boolean? = null,
+    forceDarkProbed: Boolean = false,
+    onSetForceDarkEnabled: (Boolean) -> Unit = {},
 ) {
     SettingsScaffold(stringResource(R.string.title_tools), onBack) { padding ->
         SettingsColumn(padding) {
@@ -313,9 +354,62 @@ fun ToolsContent(
                 }
             }
 
+            ForceDarkCard(forceDarkEnabled, forceDarkLiveState, forceDarkProbed, onSetForceDarkEnabled)
+
             DiagnosticsCard(latestCrashLog)
 
             AutomationControlCard(externalControlEnabled, onSetExternalControlEnabled)
+        }
+    }
+}
+
+/**
+ * D-172: the global force-dark override (`debug.hwui.force_dark` via Shizuku with a root fallback —
+ * the DarQ mechanism, global-only: per-app flipping is a lost race, the renderer reads the prop
+ * before any foreground detection can land). The Switch is the PERSISTED opt-in
+ * ([ControlPrefsStore.forceDarkEnabled][com.tideo.autobrightness.app.control.ControlPrefsStore]);
+ * the status line below it is the live prop truth — probed on entry, refreshed after each toggle —
+ * so a privileged-shell outage shows as "saved but not applied" instead of silently lying. The ⓘ
+ * help leads with the applies-on-app-start disclaimer (owner-requested).
+ */
+@Composable
+private fun ForceDarkCard(
+    enabled: Boolean,
+    liveState: Boolean?,
+    probed: Boolean,
+    onSetEnabled: (Boolean) -> Unit,
+) {
+    AabCard(Modifier.testTag("force_dark_card")) {
+        SectionHeader(stringResource(R.string.tools_force_dark_header), divider = true)
+        Text(
+            stringResource(R.string.tools_force_dark_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SwitchSettingRow(
+            label = stringResource(R.string.tools_force_dark_toggle_label),
+            checked = enabled,
+            onCheckedChange = onSetEnabled,
+            help = R.string.help_tools_force_dark,
+            testTag = "force_dark_toggle",
+        )
+        if (probed) {
+            // Gold (= secondary, the m3_audit warning/emphasis role) for the unreachable warning;
+            // the plain on/off state stays in the muted variant color.
+            Text(
+                when (liveState) {
+                    null -> stringResource(R.string.tools_force_dark_unreachable)
+                    true -> stringResource(R.string.tools_force_dark_state_on)
+                    false -> stringResource(R.string.tools_force_dark_state_off)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (liveState == null) {
+                    MaterialTheme.colorScheme.secondary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.testTag("force_dark_status"),
+            )
         }
     }
 }

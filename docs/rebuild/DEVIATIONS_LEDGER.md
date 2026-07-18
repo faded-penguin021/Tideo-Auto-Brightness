@@ -3167,3 +3167,36 @@ the permanent registry — never compress or remove them.
   respected), `CLAUDE.md`, `STATE.md`, `RUNBOOK.md` (×2), and `scripts/ladder.sh` guard 1c
   (fail > 184, warn ≥ 174 — the original 10-row warn lead preserved). At adoption the tail is
   D-171 at 166 rows → 18 slots remain before the first rollover. No app code; guards-only ladder.
+
+- **D-172: Force dark via Shizuku — global `debug.hwui.force_dark` toggle (owner-requested,
+  Tasker-independent, folded into the unreleased 1.8.0/vc18).** The DarQ-class override that
+  dark-renders apps with no dark theme. Why this channel: the forum-circulating commands do
+  nothing — `settings put secure ui_night_mode` is only read by `UiModeManagerService` at
+  boot/user-switch (a persistence store, not a live switch; the live channel would be
+  `cmd uimode night`, not built) and `global force_dark_mode_enabled` is not an AOSP setting.
+  The real developer option is the shell-writable sysprop, so `ForceDarkController`
+  (`:platform` display) runs `setprop`/`getprop` through the existing `ShizukuShell` user
+  service — **Shizuku's second genuine-runtime call site** after the no-Location SSID strategy
+  (`CLAUDE.md` updated from "exactly one place") — falling back to a root shell (`su -c`,
+  mirroring `RootWifiSsidStrategy`'s task105 privilege order; exit-0-gated so a missing/denied
+  `su` reads as unavailable-null, never as prop-off). Decisions: **(a) global-only** — per-app
+  DarQ-style flipping via `ForegroundAppMonitor` is a *lost race* (owner's finding 2026-07-17):
+  HWUI reads the prop when the app's renderer starts, always before any foreground detection
+  lands, so a change only shows once the target app is fully re-opened (the ⓘ help leads with
+  this disclaimer). **(b)** Opt-in lives in `ControlPrefsStore` (default OFF), never
+  `AabSettings` — profile apply/import/reset must not flip it. **(c)** The prop resets on
+  reboot: `AmbientMonitoringService.startForceDarkReapply()` re-asserts **true only**, once per
+  service instance (job handle kept non-null after completion so resume/reapply re-entries
+  never re-bind Shizuku); opt-in OFF means "never touch the property" (the user may drive it
+  via developer options), and an unreachable Shizuku is a silent no-op retried at the next
+  service start. **(d)** UI = Tools "Force dark (Shizuku/root)" card: the Switch is the
+  persisted opt-in; a live status line (probed on entry, refreshed per toggle, hidden until the
+  ≤4 s probe returns) shows the verified prop truth or a gold "Neither Shizuku nor root…"
+  warning — saved-but-not-applied is surfaced, never silent. **(e)** Parse mirrors libbase `ParseBool`
+  (lowercase `1|y|yes|on|true`); `apply()` returns the re-read value, `null` = unknown ≠ off.
+  Glue-review finding (fixed pre-commit, D-143 class): rapid toggles launched independent
+  applies whose Shizuku binds / `su` spawns could land out of order (prop opposite to the
+  switch + stale status publish) — all controller shell calls now serialize behind a fair
+  (FIFO) `Mutex`, so last-submitted-wins holds for the Tools card and the service re-assert
+  alike. Tests: `ForceDarkControllerTest` (parse + null-degrade ×3), `ControlPrefsStoreTest`
+  ×2, `ToolsForceDarkTest` ×6 (incl. a11y gate); owner on-device = DEVICE_TEST §15 (51–55).

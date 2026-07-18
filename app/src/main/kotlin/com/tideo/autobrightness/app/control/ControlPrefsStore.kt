@@ -27,7 +27,21 @@ class ControlPrefsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[EXTERNAL_CONTROL] = enabled }
     }
 
+    /**
+     * D-172: the force-dark opt-in (`debug.hwui.force_dark` via Shizuku/root). Default OFF. Lives here —
+     * not in `AabSettings` — for the same reason as [externalControlEnabled]: it is a device-level
+     * app opt-in that profile apply/import/reset must never flip. While ON, the service re-asserts
+     * the property at start (it resets on reboot); while OFF the app never touches the property.
+     */
+    val forceDarkEnabled: Flow<Boolean> = dataStore.data.map { it[FORCE_DARK] ?: false }
+
+    /** Opt in to (or back out of) the Shizuku force-dark override. */
+    suspend fun setForceDarkEnabled(enabled: Boolean) {
+        dataStore.edit { it[FORCE_DARK] = enabled }
+    }
+
     private companion object {
         val EXTERNAL_CONTROL = booleanPreferencesKey("external_control_enabled")
+        val FORCE_DARK = booleanPreferencesKey("force_dark_enabled")
     }
 }

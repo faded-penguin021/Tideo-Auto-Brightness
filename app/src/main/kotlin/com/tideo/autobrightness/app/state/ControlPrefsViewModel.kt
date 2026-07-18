@@ -26,4 +26,12 @@ class ControlPrefsViewModel(application: Application) : AndroidViewModel(applica
     fun setExternalControlEnabled(enabled: Boolean) {
         viewModelScope.launch { store.setExternalControlEnabled(enabled) }
     }
+
+    // D-172: the Tools → "Force dark (Shizuku/root)" opt-in, same store + same wiring pattern.
+    val forceDarkEnabled: StateFlow<Boolean> = store.forceDarkEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setForceDarkEnabled(enabled: Boolean) {
+        viewModelScope.launch { store.setForceDarkEnabled(enabled) }
+    }
 }

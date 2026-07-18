@@ -273,6 +273,30 @@ navigation** first, then repeat the marked items with **3-button navigation** (t
     SSID field. **Expected:** the focused field stays visible above the keyboard; no pan-jump of the
     whole window (adjustResize + inset dispatch, not legacy ADJUST_PAN).
 
+## 15. Force dark via Shizuku/root (D-172) — NEW 1.8.0
+
+Global `debug.hwui.force_dark` toggle in Tools. Live paths try Shizuku (**running and
+authorized**) first, then a root shell; the switch itself always persists.
+
+51. **Toggle applies.** Shizuku running → Tools → "Force dark (Shizuku/root)" → switch ON.
+    **Expected:** toast "Applied — fully re-open an app to see it"; status line flips to
+    "Currently active on this device."; a fully re-opened light-theme-only app (e.g. Bandcamp)
+    renders dark. An app that was already running stays light until swipe-killed and re-opened.
+    On a rooted device, repeat with Shizuku stopped — the root fallback (one `su` prompt on
+    first use) must behave identically.
+52. **Toggle reverts.** Switch OFF, swipe-kill + re-open the same app. **Expected:** light again;
+    status "Currently inactive on this device."
+53. **No privileged shell** (unrooted, or root denied). Stop Shizuku, re-enter Tools.
+    **Expected:** after the probe (~4 s max) the gold "Neither Shizuku nor root is available…"
+    line shows; flipping the switch still persists and toasts "Saved — will apply once Shizuku
+    or root is available". No crash, no hang.
+54. **Reboot re-assert.** Switch ON → reboot → start Shizuku → start the Tideo service (or toggle
+    it off/on). **Expected:** `adb shell getprop debug.hwui.force_dark` reads `true` again without
+    touching the Tools switch; a re-opened target app is dark.
+55. **Opt-out leaves the prop alone.** Switch OFF (opt-out), set the prop by hand
+    (`adb shell setprop debug.hwui.force_dark true`), restart the service. **Expected:** the prop
+    stays `true` — Tideo never writes it while the opt-in is off.
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

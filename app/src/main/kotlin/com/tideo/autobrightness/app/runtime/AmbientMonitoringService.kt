@@ -23,6 +23,7 @@ import com.tideo.autobrightness.app.control.ControlPrefsStore
 import com.tideo.autobrightness.app.storage.controlPrefsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
+import com.tideo.autobrightness.platform.display.ForceDarkController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,6 +65,9 @@ class AmbientMonitoringService : Service() {
     // internal (not private) so the onDestroy final-off-event test can set the cache deterministically
     // without driving the Dispatchers.Default publisher.
     @Volatile internal var externalControlEnabled = false
+    // D-172: one-shot per service instance (kept non-null after completion so ensureRunning's
+    // re-entries — resume/reapply — never re-bind Shizuku).
+    private var forceDarkJob: Job? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // Rising-edge latch so the high-priority override alert + toast fire ONCE per override, not on
@@ -221,6 +225,7 @@ class AmbientMonitoringService : Service() {
         displayToggles.start(scope)
         startPanicDetector()
         startStateEventPublisher()
+        startForceDarkReapply()
         if (notificationJob?.isActive == true) return
         val manualOverrideFlow = applicationContext.settingsDataStore.data
             .map { it.contextOverride }
@@ -265,6 +270,25 @@ class AmbientMonitoringService : Service() {
                     DashboardWidgetProvider.refresh(applicationContext)
                     alertedOverride = model.pausedByOverride
                 }
+        }
+    }
+
+    /**
+     * D-172: re-assert the force-dark prop (`debug.hwui.force_dark`) once per service instance —
+     * the prop resets on every reboot, so the boot-started service restores the user's saved choice.
+     * Gated on the persisted opt-in FIRST (while off this is a cheap DataStore read — no Shizuku
+     * bind, no su spawn, the app never touches the property). Only TRUE is ever asserted: an off
+     * opt-in means "leave the property alone", not "force it off" — the user may drive it via
+     * developer options. Fire-and-forget: with no privileged shell yet (Shizuku typically isn't up
+     * right after boot; the root fallback usually is) apply() returns null and the next service
+     * start retries; the Tools card shows the live truth meanwhile.
+     */
+    private fun startForceDarkReapply() {
+        if (forceDarkJob != null) return
+        forceDarkJob = scope.launch {
+            if (ControlPrefsStore(applicationContext.controlPrefsDataStore).forceDarkEnabled.first()) {
+                ForceDarkController.apply(applicationContext, enabled = true)
+            }
         }
     }
 
