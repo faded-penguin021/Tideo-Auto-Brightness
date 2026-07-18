@@ -115,13 +115,10 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-18 — **D-173** maintenance-harness hardening (owner-requested): ladder guard 5
-  (D-citation integrity) + guard 6 (500-char F-Droid changelog cap, current vc only);
-  `scripts/test-ladder-guards.sh` guard regression suite (18 cases, + build.yml step);
-  release-preflight classifier treats `.claude/*` as non-shipping; session-start background
-  Gradle warm-up (`scripts/warm-gradle.sh`); docs in lockstep. Detail in the D-173 row.
-- 2026-07-18 — STATE recompressed 15.3 → 12 KB per the length-guard preamble (Owner queue
-  items untouched).
+- 2026-07-18 — **D-173** harness hardening (owner-requested): ladder guards 5 (D-citation
+  integrity) + 6 (F-Droid changelog cap); `test-ladder-guards.sh` regression suite (18 cases,
+  + build.yml step); release-preflight classifies `.claude/*` non-shipping; session-start
+  background Gradle warm-up; STATE recompressed 15.3 → 12 KB. Detail in the D-173 row.
 - 2026-07-18 — copy trim (wording only, no D-row): shortened `tools_force_dark_desc` +
   `help_tools_force_dark` in `strings.xml` per owner screenshot markup.
 - 2026-07-17 — **D-172** (owner-requested; folded into unreleased 1.8.0/vc18): force dark via
