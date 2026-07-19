@@ -152,8 +152,7 @@ the cited D-rows and git history.
   auto-raise parity (narrows D-052) · **D-168** super-dimming help/PWM relabel (strings only).
 - 2026-07-13 — **D-167** guarded Owner queue + "ask, don't assume" · **D-166 (+ addendum)**
   repo-hardening: build.yml runs the ladder, guards 3/4, push deny rules.
-- 2026-07-12 — final adversarial audit CLOSED: **D-163**–**D-165** fixes +
-  `WizardDegenerateInputTest`; +6 tests.
+- 2026-07-12 — final adversarial audit CLOSED: **D-163**–**D-165** fixes; +6 tests.
 - 2026-07-10 — **D-161** repo-hardening U1–U4 (ladder.sh, STATE 27.6→12 KB, Session discipline,
   Gradle parallel/config-cache) + **D-162** external-review triage (guards 1b/1c, recovery rule,
   golden-fixture gate; declines in the row + non-items).
