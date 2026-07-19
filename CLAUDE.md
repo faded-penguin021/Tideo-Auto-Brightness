@@ -10,7 +10,8 @@ The original Tasker XML lives in `docs/rebuild/extraction/_source/` (gitignored,
 `docs/rebuild/DEVIATIONS_LEDGER.md` — a **permanent, append-only registry** (code cites bare
 `D-NN`; code-cited rows carry a guard-synced `[cited]` marker, D-174; never compress or delete
 entries; append the next number in the LIVE ledger file —
-each file caps at 184 rows and rolls over `D-… → DA-…` (`_A.md`) `→ DB-…` (`_B.md`), D-153/D-171).
+the base file is closed at D-176; from `_A.md` on each file caps at **1000 lines** — the final
+row may overflow the cap, the next row opens the next file (`DA-…` → `DB-…`, D-153/DA-001).
 
 > **Ground truth:** code + golden test vectors. The docs under `docs/rebuild/` and
 > `docs/history/` describe the app as-built and may drift — when a doc conflicts with the code,

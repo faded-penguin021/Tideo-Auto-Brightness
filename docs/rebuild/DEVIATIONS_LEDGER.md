@@ -17,6 +17,10 @@
 > unbounded single file is a read/context hazard for agentic maintenance flows), not history.
 > A citation's prefix names its file: `D-…` → this file, `DA-…` → ledger A, `DB-…` → ledger B.
 > Cites stay bare (`DA-017`) everywhere, exactly like `D-017` today.
+> **CLOSED (DA-001, owner-instructed 2026-07-19): D-176 is this file's final row.** The
+> rollover unit changed from rows to LINES (1000/file, final row may overflow) and this file
+> was already past the line cap, so rows **D-177…D-184 are never assigned** — any such
+> citation is a typo. The live ledger is `DEVIATIONS_LEDGER_A.md` (DA-001…); append there.
 > "Same header discipline" means: carry over the *structural* header content (the append-only
 > warning, this cap-&-rollover paragraph with the prefixes/filenames advanced, the
 > citation-routing sentence, the ground-truth rule, the `[cited]`-marker paragraph below) but

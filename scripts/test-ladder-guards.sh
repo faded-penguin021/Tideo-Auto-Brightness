@@ -43,6 +43,16 @@ write_ledger() {  # $1 = row count, $2 = target file (default base ledger)
   } > "$f"
 }
 
+write_ledger_padded() {  # $1 = filler lines BEFORE the final row, $2 = trailing continuation
+  local pad="$1" tail="${2:-0}" f="${3:-$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md}"
+  { printf '# ledger fixture\n\n'
+    [ "$pad" -gt 0 ] && seq 1 "$pad" | sed 's/.*/  filler prose line/'
+    printf -- '- D-001: fixture row\n'
+    [ "$tail" -gt 0 ] && seq 1 "$tail" | sed 's/.*/  row continuation line/'
+    true
+  } > "$f"
+}
+
 write_gradle() {  # $1 = versionCode
   printf 'android { defaultConfig { versionCode = %s\nversionName = "1.0.0" } }\n' "$1" \
     > "$SANDBOX/app/build.gradle.kts"
@@ -101,22 +111,24 @@ sed -i '/## Owner queue/d' "$SANDBOX/docs/rebuild/STATE.md"
 check "guard 1b: missing Owner queue only warns" 0 "missing '## Owner queue' (D-167)"
 write_state 0
 
-# --- guard 1c: ledger rollover --------------------------------------------------------------
+# --- guard 1c: ledger rollover (line-based, DA-001) -----------------------------------------
 
-write_ledger 185
-check "guard 1c: > 184 rows fails" 1 "roll over to the next file"
-write_ledger 174
-check "guard 1c: >= 174 rows warns" 0 "rollover soon"
+write_ledger_padded 1005
+check "guard 1c: row starting past the 1000-line cap fails" 1 "belongs in the next ledger file"
+write_ledger_padded 900 200
+check "guard 1c: final row may overflow the cap (warn only)" 0 "the NEXT deviation opens the next ledger file"
+write_ledger_padded 950
+check "guard 1c: >= 900 lines warns" 0 "rollover soon"
 write_ledger 10
 
 # _A.md presence redirects the live-file pick (and DA- citation routing further down).
 write_ledger 150 "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
 sed -i 's/- D-/- DA-/' "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
-check "guard 1c: _A.md becomes the live file" 0 "150/184 rows in docs/rebuild/DEVIATIONS_LEDGER_A.md"
+check "guard 1c: _A.md becomes the live file" 0 "lines in docs/rebuild/DEVIATIONS_LEDGER_A.md"
 rm "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
 
 # LADDER_LEDGER_FILE override (the documented test-suite hook).
-write_ledger 185 "$SANDBOX/docs/rebuild/ledger_full.md"
+write_ledger_padded 1005 0 "$SANDBOX/docs/rebuild/ledger_full.md"
 out_rc=0
 (cd "$SANDBOX" && LADDER_LEDGER_FILE=docs/rebuild/ledger_full.md bash scripts/ladder.sh --guards-only >/dev/null 2>&1) || out_rc=$?
 if [ "$out_rc" -eq 1 ]; then pass=$((pass + 1)); else failures+=("LADDER_LEDGER_FILE override honored"); fi

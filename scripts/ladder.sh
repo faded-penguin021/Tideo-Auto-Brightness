@@ -72,8 +72,12 @@ grep -qF '## Owner queue' "$STATE_FILE" \
   || echo "LADDER WARN: $STATE_FILE is missing '## Owner queue' (D-167) — a compression pass ate the owner's pending actions/questions/findings; restore it from git history."
 echo "LADDER: STATE.md required sections present"
 
-# --- guard 1c: deviations-ledger rollover reminder (D-153/D-171: 184 rows per file, then _A/_B…) ---
+# --- guard 1c: deviations-ledger rollover (D-153 mechanism; DA-001: LINE-based cap from
+# ledger A on — the base ledger closed at D-176). The final row of a file may FINISH past the
+# cap, but no row may START past it: a row starting beyond the cap belonged in the next file.
 # (LADDER_LEDGER_FILE overrides the path — used only by the guard's own tests.)
+LEDGER_CAP_LINES=1000   # owner-tunable (DA-001); warn lead below mirrors the old 10-row lead
+LEDGER_WARN_LINES=$((LEDGER_CAP_LINES - 100))
 LEDGER_FILE="${LADDER_LEDGER_FILE:-}"
 if [ -z "$LEDGER_FILE" ]; then
   LEDGER_FILE=docs/rebuild/DEVIATIONS_LEDGER.md
@@ -82,13 +86,16 @@ if [ -z "$LEDGER_FILE" ]; then
   done
 fi
 if [ -f "$LEDGER_FILE" ]; then
-  ledger_rows=$(grep -cE '^- (\*\*)?D[AB]?-[0-9]' "$LEDGER_FILE" || true)
-  if [ "$ledger_rows" -gt 184 ]; then
-    fail "live ledger $LEDGER_FILE has ${ledger_rows} rows (> 184) — roll over to the next file (D-153/D-171)"
-  elif [ "$ledger_rows" -ge 174 ]; then
-    echo "LADDER WARN: live ledger $LEDGER_FILE at ${ledger_rows}/184 rows — rollover soon (D-153/D-171)"
+  ledger_lines=$(wc -l < "$LEDGER_FILE" | tr -d '[:space:]')
+  last_row_start=$(grep -nE '^- (\*\*)?D[AB]?-[0-9]' "$LEDGER_FILE" | tail -1 | cut -d: -f1 || true)
+  if [ -n "$last_row_start" ] && [ "$last_row_start" -gt "$LEDGER_CAP_LINES" ]; then
+    fail "live ledger $LEDGER_FILE: last row starts at line ${last_row_start} (> ${LEDGER_CAP_LINES}) — that row belongs in the next ledger file; roll over (D-153/DA-001)"
+  elif [ "$ledger_lines" -gt "$LEDGER_CAP_LINES" ]; then
+    echo "LADDER WARN: live ledger $LEDGER_FILE at ${ledger_lines} lines (> ${LEDGER_CAP_LINES}) — the NEXT deviation opens the next ledger file (D-153/DA-001)"
+  elif [ "$ledger_lines" -ge "$LEDGER_WARN_LINES" ]; then
+    echo "LADDER WARN: live ledger $LEDGER_FILE at ${ledger_lines}/${LEDGER_CAP_LINES} lines — rollover soon (D-153/DA-001)"
   else
-    echo "LADDER: live ledger OK (${ledger_rows}/184 rows in $LEDGER_FILE)"
+    echo "LADDER: live ledger OK (${ledger_lines}/${LEDGER_CAP_LINES} lines in $LEDGER_FILE)"
   fi
 else
   fail "live ledger $LEDGER_FILE not found"

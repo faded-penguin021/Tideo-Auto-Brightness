@@ -6,8 +6,9 @@ playbook that matches your task, read the reference docs it names, then do the w
 
 The migration narrative (segment briefs, gate findings) is frozen in `../history/` — consult it,
 don't extend it. The numbered deviations live in `DEVIATIONS_LEDGER.md`, a permanent append-only
-registry (never compress it; append the next number in the LIVE ledger file — 184 rows per file,
-then it rolls over to `DEVIATIONS_LEDGER_A.md`/DA-001, `_B.md`/DB-001, …; D-153). **Code + golden
+registry (never compress it; append the next number in the LIVE ledger file — base file closed
+at D-176; from `DEVIATIONS_LEDGER_A.md`/DA-001 on, 1000 lines per file, final row may overflow,
+next row opens `_B.md`/DB-001, …; D-153/DA-001). **Code + golden
 vectors are ground truth**; where any doc disagrees with the code, trust the code (and fix the doc).
 
 ## Where logic lives
@@ -384,7 +385,7 @@ If this runbook lacks what you need for the task in front of you:
 1. Consult the live reference docs above (esp. `DEVIATIONS_LEDGER.md`) and the frozen
    `../history/` narrative.
 2. If you learn a durable fact future sessions need, record it as a new numbered deviation
-   in the live ledger file (184-row cap + rollover, D-153/D-171) and/or correct the relevant
+   in the live ledger file (1000-line cap + rollover, D-153/DA-001) and/or correct the relevant
    reference doc — provenance-stamped, terse.
 3. If a playbook here is wrong, stale, or missing a case you just handled, **fix this RUNBOOK in
    the same change.** Treat the runbook as code: it should always reflect how changes are
