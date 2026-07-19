@@ -27,8 +27,10 @@ minSdk 31, target/compile 36.
 **Code-complete, awaiting owner release cut: 1.8.0 / `versionCode 18`** — intent control for
 automation frameworks (**D-157**, user reference `docs/AUTOMATION.md`), the A11y backlog +
 crash-log capture (**D-156**/**D-158**), the **D-159** IME fix, the **D-160** audit fix, and
-force dark via Shizuku/root (**D-172**, owner-folded into vc18 2026-07-17; on branch
-`claude/shizuku-dark-mode-adb-66oqmz` until merged; `changelogs/18.txt` 486 chars). Pre-release
+force dark via Shizuku/root (**D-172**, owner-folded into vc18 2026-07-17;
+`changelogs/18.txt` 488 B). The whole train now lives on ONE branch —
+`claude/agent-agnostic-harness-fmb35b` (all other session branches deleted, commits
+contained; 2026-07-19 audit). Pre-release
 audit passed 2026-07-09; the 2026-07-12 final adversarial audit fully closed (D-163–D-165
 fixed). No active multi-unit work; no persisted plan files.
 
@@ -60,37 +62,36 @@ in `../history/STATE_rebuild.md`).
 1. **PR is deliberately deferred until the F-Droid review completes** (owner decision
    2026-07-09) — CI (build/CodeQL/release-preflight) first runs there; the local ladder is the
    equivalent build.yml task set. **ONE PR** (owner decision 2026-07-10): open it from
-   `claude/fable-model-improvements-3r07qs` → `main` — it supersets the 1.8.0 branch, so
-   `user-guide-accuracy-check-i5fxex` and `intent-control-u4-i2i7e1` are **deleted unmerged**
-   (both fully contained, 0 unique commits). Ready-made draft (no `[skip ci]`-class tokens, D-115):
-   - *Title:* `1.8.0: intent control (D-157), a11y (D-156/D-158), IME fix (D-159), RESUME gate (D-160) + repo hardening (D-161)`
-   - *Body bullets:* opt-in automation surface (verbs + LOAD_PROFILE/CONTEXTS_RESUME + outbound
-     STATE_CHANGED; docs/AUTOMATION.md) · TalkBack backlog A0–A7 + crash-log capture C1 · D-159
-     three-part IME fix · D-160 audit fix (glue-review verdicts in the U2/U5/38c66cd commit
-     bodies) · repo hardening (ladder.sh guards, STATE compression, D-161 session discipline,
-     Gradle parallel/config-cache) · owner on-device checklist = DEVICE_TEST §§12–14 ·
-     vc18/1.8.0, changelog 455 chars.
+   **`claude/agent-agnostic-harness-fmb35b`** → `main` — the only session branch left on the
+   remote (2026-07-19 audit); it supersets the whole train: the former fable/user-guide/
+   intent-control/shizuku/ladder-checkpoint branches are deleted, their commits contained
+   here. The squash commit takes the PR title+body, so use this draft describing the FULL
+   55-commit / 97-file / +6344/−427 payload vs `main` (no `[skip ci]`-class tokens, D-115):
+   - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit
+     fixes, force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176,
+     DA-001)`
+   - *Body:*
+     **Features (1.8.0/vc18):** opt-in automation intent surface — verbs,
+     LOAD_PROFILE/CONTEXTS_RESUME, outbound STATE_CHANGED; `docs/AUTOMATION.md` (D-157) ·
+     TalkBack backlog A0–A7 + crash-log capture (D-156/D-158) · force dark via Shizuku/root,
+     new `ForceDarkController` + Tools toggle (D-172) · context-rule profile loads write
+     through to live settings with baseline revert (D-170).
+     **Fixes:** three-part IME dead-gap fix (D-159) · external RESUME gated on user-disabled
+     service (D-160) · adversarial-audit closes: stale signal snapshots, draft-Apply snap,
+     panic re-arm flicker (D-163–D-165) · super-dimming help/PWM relabel + Misc MaxBright
+     auto-raise parity (D-168/D-169) · stale User Guide copy.
+     **Repo hardening:** `scripts/ladder.sh` one-command acceptance + guards (STATE caps,
+     ledger rollover, citation integrity + `[cited]` sync, skip-ci scan, changelog cap) with
+     its own 21-case regression suite, run by CI (D-161/D-166/D-173/D-174) · Owner queue +
+     ask-don't-assume (D-167) · secret hygiene (D-175) · Gradle parallel/config-cache.
+     **Agent-agnostic harness (D-176/DA-001):** adds `AGENTS.md` pointer stub + neutral
+     `scripts/session-start.sh`; removes `.claude/hooks/session-start.sh` (`.claude/` = thin
+     adapter); ledger rollover now 1000 lines/file — base ledger closed at D-176,
+     `DEVIATIONS_LEDGER_A.md` live.
+     **Release:** vc18 / 1.8.0, changelog 488 B · on-device checklist = DEVICE_TEST §§12–15.
 2. After CI green: on-device pass of `DEVICE_TEST_SCRIPT.md` **§12 (TalkBack), §13 (automation),
    §14 (insets), §15 (force dark, D-172)**; findings → **Incoming findings** below.
-3. Merge `claude/shizuku-dark-mode-adb-66oqmz` (D-172 force dark; part of the vc18 payload —
-   rewrites `changelogs/18.txt`) into the release train **before tagging**; separate squash-merge.
-4. Cut **v1.8.0 / vc18** from `main` via the Release UI.
-4. When merging session branches, note `claude/ladder-checkpoint-improvements-dm4ewz` (D-166/167
-   repo hardening) is independent of the 1.8.0 PR branch — separate squash-merge.
-5. `claude/agent-agnostic-harness-fmb35b` (D-176/DA-001, 4 commits, docs+scripts only) is also
-   independent — separate squash-merge. Ready-made PR draft (squash commit takes title+body;
-   no D-115-class tokens):
-   - *Title:* `Agent-agnostic harness (D-176) + line-based ledger rollover (DA-001)`
-   - *Body bullets:* **Adds** `AGENTS.md` (cross-agent pointer stub — CLAUDE.md stays the
-     canonical constitution), agent-neutral `scripts/session-start.sh` bootstrap
-     (`AAB_REMOTE=1`, `CLAUDE_CODE_REMOTE` back-compat), `DEVIATIONS_LEDGER_A.md` (new live
-     ledger, opens at DA-001) · **Removes** `.claude/hooks/session-start.sh` — `.claude/` is
-     now a thin settings.json adapter invoking the neutral script · **Changes** ledger
-     rollover unit rows → 1000 lines, base ledger closed at D-176 (D-177…D-184 never
-     assigned; guard 1c + fixtures rewritten, 21 cases) · CLAUDE.md gains "Agent harness"
-     adapter-wiring section; branch/secret-hygiene wording generalized ·
-     `AGENTIC_HARNESS_PROMPT.md` made agent-agnostic + synced to the line cap · README stale
-     CLAUDE.md link fixed · net 13 files +267/−93, no Kotlin touched.
+3. Cut **v1.8.0 / vc18** from `main` via the Release UI.
 
 **Open questions:** (none)
 
