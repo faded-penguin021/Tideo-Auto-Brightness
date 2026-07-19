@@ -239,7 +239,8 @@ any moment (rate limit, window end, compaction).
 
 1. **Strictly sequential.** No parallel subagents; one unit of work at a time (the D-133
    sequential-segments rule, generalized to all work). Parallel agent fan-out has burned an
-   entire usage window before; it is never the cheap path here.
+   entire usage window before; it is never the cheap path here. (A single BLOCKING
+   glue-review subagent inside a unit is sequential work, not fan-out — DA-003.)
 2. **Small, shippable units.** ≤ ~1 focused hour each, independently shippable, with a hard
    **binary** acceptance check (tests / `scripts/ladder.sh` / a scripted comparison — never
    "looks right"). Prefer mechanical steps with hard gates over judgment calls.
@@ -247,7 +248,9 @@ any moment (rate limit, window end, compaction).
    commit → push. Never start a second unit on top of an uncommitted first — an interrupted
    session must lose at most the unit in flight.
 4. **You are the last reviewer.** The glue-review protocol (below) is mandatory at every model
-   tier; there is no stronger pass behind you.
+   tier; there is no stronger pass behind you. Delegate the pass itself to a fresh-context
+   subagent where the harness supports one (DA-003) — accountability for triaging its
+   findings stays with the session.
 5. **Multi-unit work** uses the playbook-5 persisted-plan pattern (plan file + STATE checklist)
    so any session can resume the backlog mid-stream.
 6. **Recovery.** If the unit in flight has gone wrong, do not flail forward: reset the working
@@ -279,8 +282,21 @@ any moment (rate limit, window end, compaction).
 
 Any change touching a `:platform` adapter or `:app` runtime glue (service, pipeline controller,
 observers, receivers, tile, notification actions) gets a **second, adversarial diff pass before
-commit**: after the ladder is green, re-read the FULL diff fresh — as a hostile reviewer, not the
-author — hunting specifically the ledger's proven bug classes:
+commit**, after the ladder is green.
+
+**Who performs the pass (DA-003): a fresh-context reviewer, not the authoring context.** The
+context that wrote a diff is anchored on its own reasoning and predisposed to accept it. Run
+the pass in a review subagent (or your harness's equivalent clean invocation) that receives:
+the full diff, the bug-class checklist below, and read access to the tree — and does NOT
+receive the author's rationale or chat history. Scale the reviewer to the diff: a small
+mechanical diff may use a light model tier; a large or glue-heavy diff gets the strongest
+tier available. This is the one sanctioned subagent (a single, BLOCKING review inside the
+unit — Session discipline 1's fan-out ban is about parallel *work*). The session stays
+accountable: triage every finding (fix it, or record why not) — a clean report is read, not
+rubber-stamped. Only if the harness cannot spawn any fresh context, fall back to the
+in-context pass: re-read the FULL diff fresh — as a hostile reviewer, not the author.
+
+Either way, the pass hunts specifically the ledger's proven bug classes:
 
 - condition/gate **polarity and missing operands** (D-030 b: `scalingUse` dropped from an AND gate);
 - **list/insertion order** — newest-first vs newest-last (D-030 b: Array Push at index 1);

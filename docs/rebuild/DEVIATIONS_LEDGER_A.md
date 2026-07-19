@@ -65,3 +65,17 @@
   carries work the train lacks); harness prompt P13/3.4 generalized. Standing agent duties:
   compute PR drafts from `origin/main..HEAD`; `git ls-remote --heads origin` before citing
   session branches in docs.
+
+- **DA-003: glue review moves to a fresh-context subagent (owner-requested, 2026-07-19).**
+  The RUNBOOK glue-review pass had the authoring context review its own diff — anchored on
+  its own reasoning, predisposed to accept it (the exact failure D-030/D-034 recorded:
+  segments passed their own gates, independent review still found shipped bugs). Now the
+  pass runs in a fresh-context reviewer — a subagent or the harness's equivalent clean
+  invocation — given the diff, the bug-class checklist, and tree access, but NOT the
+  author's rationale/chat. Reviewer model tier scales with the diff (small mechanical →
+  light tier; large/glue-heavy → strongest available). Carve-out: this single BLOCKING
+  review subagent is sequential work inside the unit, not the D-161 parallel fan-out the
+  discipline bans. The session remains accountable — every finding is triaged (fixed or
+  declined with a reason); a clean report is read, not rubber-stamped. In-context
+  self-review survives only as the fallback where the harness cannot spawn a fresh context.
+  RUNBOOK protocol + discipline rules 1/4 and harness prompt P12/3.2 updated.

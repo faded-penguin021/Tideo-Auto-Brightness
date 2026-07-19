@@ -129,49 +129,29 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
-- 2026-07-19 — **DA-002** (owner-requested): branch-train workflow codified — sessions stack,
-  superseded branches deleted, ONE final-branch squash PR describing `origin/main..HEAD`;
-  CLAUDE.md Git rules + guard-4 wording + harness prompt P13/3.4.
-- 2026-07-19 — docs (owner-requested, no D-row): `AGENTIC_HARNESS_PROMPT.md` made
-  agent-agnostic (pointer-file pattern, neutral bootstrap/adapters per D-176) + synced to the
-  DA-001 line-based ledger cap.
-- 2026-07-19 — **DA-001** (owner-instructed): ledger rollover unit rows → **1000 lines** (final
-  row may overflow; the next opens the next file); base ledger CLOSED at D-176 (D-177…D-184
-  never assigned), `DEVIATIONS_LEDGER_A.md` is live; guard 1c + test fixtures rewritten.
-- 2026-07-19 — **D-176** (owner-requested): agent-agnostic harness — AGENTS.md pointer stub,
-  neutral `scripts/session-start.sh` bootstrap (`AAB_REMOTE=1`), `.claude/` reduced to a thin
-  settings.json adapter; CLAUDE.md stays canonical.
-- 2026-07-18 — **D-175** (owner-requested): secret hygiene (env-dump denies in settings.json,
-  presence-only reporting) + commit-body verification disclosure (RUNBOOK discipline 8).
-- 2026-07-18 — docs (owner-requested, no D-row): `docs/AGENTIC_HARNESS_PROMPT.md` — the
-  harness generalized into a reusable prompt.
-- 2026-07-18 — **D-174** (owner-requested): machine-synced `[cited]` ledger marker — guard 5
-  enforces both directions; 93 rows retrofitted. Detail in the D-174 row.
-- 2026-07-18 — **D-173** harness hardening: ladder guards 5 (D-citation
-  integrity) + 6 (F-Droid changelog cap); `test-ladder-guards.sh` regression suite (18 cases,
-  + build.yml step); release-preflight classifies `.claude/*` non-shipping; session-start
-  background Gradle warm-up; STATE recompressed 15.3 → 12 KB. Detail in the D-173 row.
-- 2026-07-18 — copy trim (wording only, no D-row): shortened the two force-dark strings in
-  `strings.xml` per owner screenshot markup.
+- 2026-07-19 — **D-176 + DA-001/DA-002/DA-003** (owner-requested/-instructed): agent-agnostic
+  harness (AGENTS.md pointer stub, neutral `scripts/session-start.sh`, `.claude/` = thin
+  adapter; CLAUDE.md canonical; `AGENTIC_HARNESS_PROMPT.md` generalized to match) · ledger
+  rollover rows → **1000 lines**, base ledger CLOSED at D-176, `_A.md` live · branch-train
+  workflow codified (ONE final-branch squash PR drafted from `origin/main..HEAD`) ·
+  glue review delegated to a fresh-context subagent, tier scaled to the diff. Details in the
+  D-176/DA rows.
+- 2026-07-18 — **D-173/D-174/D-175** harness hardening + docs: ladder guards 5/6 +
+  `test-ladder-guards.sh` suite; machine-synced `[cited]` marker (93 rows retrofitted);
+  secret hygiene + verification disclosure; harness generalized into
+  `AGENTIC_HARNESS_PROMPT.md`; force-dark string trim (no D-row). Details in the rows.
 - 2026-07-17 — **D-172** (owner-requested; folded into unreleased 1.8.0/vc18): force dark via
-  Shizuku/root — Tools card toggling `debug.hwui.force_dark` (`ForceDarkController`), opt-in,
-  service re-asserts at start; per-app flipping declined. DEVICE_TEST §15; +11 tests.
-- 2026-07-16 — docs: retired 8 stale `deferred-S13` tags in `anonymous_handlers.md` (shipped in
-  S13d); ledger preamble separates structural vs base-file header content (D-153 rollover).
-- 2026-07-15 — **D-171** (owner-instructed): ledger file cap 200 → **184 rows**; guard 1c +
-  docs updated in lockstep.
-- 2026-07-15 — **D-170** (owner-reported): context-rule profile loads write through to the live
-  settings DataStore (`LOAD_FILE` semantics), pre-override baseline in
-  `aab_context_baseline.json`, restored on no-match revert; supersedes D-038(ii). +8 tests.
-- 2026-07-14 — STATE length-guard hard cap 32 KB → **16 KB** (owner); guard 1 + preamble updated.
-- 2026-07-14 — **D-169** (owner-reported parity gap): Misc save raises MaxBright to Zone 2 End +
-  flash (Tasker `_SaveButtonMisc`) instead of the D-052 block; narrows D-052.
-- 2026-07-14 — **D-168** (owner-reported parity gap): super-dimming toggle help fix + "PWM
-  threshold" relabel. UI strings only.
-- 2026-07-13 — **D-167**: guarded `## Owner queue` section + RUNBOOK discipline 7 "ask,
-  don't assume".
-- 2026-07-13 — **D-166 (+ addendum)** repo-hardening: `build.yml` runs `scripts/ladder.sh`,
-  ladder guards 3/4, `settings.json` push deny rules, session-start branch/STATE print.
+  Shizuku/root (`ForceDarkController`, opt-in, service re-asserts); per-app flipping
+  declined. DEVICE_TEST §15; +11 tests.
+- 2026-07-15/16 — docs: stale `deferred-S13` tags retired; **D-171** ledger cap 200 → 184
+  rows (superseded by DA-001's line cap).
+- 2026-07-15 — **D-170** (owner-reported): context loads write through to live settings
+  (`LOAD_FILE` semantics) with `aab_context_baseline.json` revert; supersedes D-038(ii).
+  +8 tests.
+- 2026-07-14 — STATE hard cap 32 → **16 KB** (owner) · **D-169** Misc-save MaxBright
+  auto-raise parity (narrows D-052) · **D-168** super-dimming help/PWM relabel (strings only).
+- 2026-07-13 — **D-167** guarded Owner queue + "ask, don't assume" · **D-166 (+ addendum)**
+  repo-hardening: build.yml runs the ladder, guards 3/4, push deny rules.
 - 2026-07-12 — final adversarial audit CLOSED: **D-163**–**D-165** fixes +
   `WizardDegenerateInputTest`; +6 tests.
 - 2026-07-10 — **D-161** repo-hardening U1–U4 (ladder.sh, STATE 27.6→12 KB, Session discipline,
@@ -184,13 +164,12 @@ the cited D-rows and git history.
   completed H4/H5.
 - 2026-07-05 — docs/process: **D-153** ledger 200-row cap + rollover; RUNBOOK <500-char
   F-Droid `whatsNew` rule.
-- 2026-07-03..05 — **1.7.0 / vc17 (MINOR): Privileged Display Control** (**D-149**–**D-155** + D-048
-  OEM quirk): `SecureDisplayController`, Privileged Display screen, `ContextMatching` extraction, D-150
-  schedules removed by the D-151 owner pivot (toggles = PROFILE settings), D-152 profile port, D-154
-  circadian Night Light (task90 tanh), D-155 panic resets toggles. playbook-5 added.
-- 2026-07-01/02 — 1.6.1 / vc15 + 1.6.2 / vc16 (PATCHes): hardening H1–H5 (**D-133**–**D-137**,
-  RUNBOOK gains the mandatory **glue-review protocol**; reproducible release APK) and F-backlog
-  U1–U6 closed (**D-138**–**D-148**, +19 tests; parity spot-check + `/security-review` clean).
+- 2026-07-03..05 — **1.7.0 / vc17 (MINOR): Privileged Display Control** (**D-149**–**D-155**
+  + D-048): `SecureDisplayController`, Privileged Display screen, D-151 pivot (toggles =
+  PROFILE settings), D-154 circadian Night Light, D-155 panic reset. playbook-5 added.
+- 2026-07-01/02 — 1.6.1/vc15 + 1.6.2/vc16 (PATCHes): hardening H1–H5 (**D-133**–**D-137**,
+  mandatory **glue-review protocol**; reproducible release APK); F-backlog U1–U6
+  (**D-138**–**D-148**, +19 tests).
 - 2026-06-26..30 — 1.1.0→1.6.0 (vc7→vc14): SDK 36 + Robolectric 4.16.1/JDK 21 + CodeQL +
   `.debug` suffix (**D-101**–**D-106**); **D-107**–**D-122** (D-115 skip-ci, D-116 panic);
   release CI (**D-123**–**D-124**); wizard/resume (**D-125**–**D-126**); SSID/i18n/cooldown

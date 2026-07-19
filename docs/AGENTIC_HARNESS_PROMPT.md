@@ -101,11 +101,19 @@ load-bearing before rewording them). Where code ports behavior from a reference 
 **provenance comments** naming the exact source artifact and location. Never cite ephemeral
 artifacts (plan files, chat) from code — cite only artifacts guaranteed to outlive the change.
 
-**P12. Adversarial self-review, seeded by your own bug history.** Test suites can't see all
-code (in this repo: platform/runtime "glue" invisible to golden vectors). For diffs touching
-those areas, mandate a second, *hostile* read of the full diff after tests pass — hunting a
-concrete checklist of bug classes, each one a real shipped bug from the ledger (gate polarity,
-insertion order, observer echo races, non-idempotent lifecycle, stale async completions, …).
+**P12. Adversarial review, seeded by your own bug history — in a fresh context.** Test suites
+can't see all code (in this repo: platform/runtime "glue" invisible to golden vectors). For
+diffs touching those areas, mandate a second, *hostile* read of the full diff after tests
+pass — hunting a concrete checklist of bug classes, each one a real shipped bug from the
+ledger (gate polarity, insertion order, observer echo races, non-idempotent lifecycle, stale
+async completions, …). Run the pass in a **fresh-context reviewer** (a subagent or clean
+agent invocation) given the diff + the checklist + tree access but NOT the author's
+reasoning — the context that wrote a diff is anchored on its own rationale and predisposed to
+accept it; self-review is the fallback only where the harness can't spawn one. Scale the
+reviewer's model tier to the diff (small mechanical change → light tier; large or glue-heavy
+→ strongest available). One blocking review subagent is compatible with the P5
+no-parallel-agents rule — it's sequential work inside the unit, not fan-out; the session
+still triages every finding itself.
 The ledger feeds the checklist: every new shipped bug class gets appended; when a class turns
 out to be mechanically testable, encode it as a regression test and retire it from the
 checklist — the pass holds only what tests *cannot* see. Verdict goes in the commit body
@@ -380,9 +388,11 @@ bump (two reviewable commits: forward-compat first, behavior flip second), relea
    real actions, not an attestation gate.
 
 ## Adversarial review protocol (MANDATORY for {{UNTESTED_GLUE_AREAS}} diffs)
-After the ladder is green, re-read the FULL diff fresh — as a hostile reviewer, not the
-author — hunting specifically these proven bug classes (each from a real shipped bug; append
-new classes as the ledger grows):
+After the ladder is green, hand the FULL diff to a fresh-context reviewer (subagent/clean
+invocation — P12; model tier scaled to the diff; give it the diff + this checklist + tree
+access, never the authoring context; self-review only if no fresh context is possible) —
+a hostile reviewer, not the author — hunting specifically these proven bug classes (each
+from a real shipped bug; append new classes as the ledger grows):
 - {{BUG_CLASS + its ledger citation}} …
 If the pass finds nothing, say so in the commit body ("adversarial pass: clean"); if it finds
 something, fix before commit and ledger anything durable.
