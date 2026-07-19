@@ -101,15 +101,30 @@ fallback, D-172) — not "grant-only".
 - The app ships no secrets, but the **session environment carries credentials** (GitHub, proxy).
   Never dump environments (`env`, `printenv`, `.env`-style files, container/service inspect
   output) and never print a credential's value, prefix, suffix, length, or hash — report only
-  whether a key is set. `settings.json` denies the dump commands.
+  whether a key is set. The agent adapter config (`.claude/settings.json` for Claude Code)
+  denies the dump commands where the agent supports permission rules; the policy binds
+  regardless.
 - A diagnostic that seems to need raw secret material becomes a STATE.md **Owner queue** open
   question (ask for a narrower evidence contract) — never raw output.
 
 ## Git rules
 
-- Develop and push **only** on your session's assigned `claude/<codename>` branch (named in the
-  session directive). Push with `git push -u origin <your-session-branch>` (retry up to 4× with
+- Develop and push **only** on your session's assigned branch (named in the session directive —
+  `claude/<codename>` for Claude Code sessions). Push with `git push -u origin <your-session-branch>` (retry up to 4× with
   backoff 2s/4s/8s/16s on network errors only). **Never force-push. Never push to `main`.**
 - The owner merges session branches to `main` via PR — **squash-merge** (one commit per branch on
   `main`; keeps intra-branch churn and any temporary artifacts out of history). Do not open a PR unless
   asked.
+
+## Agent harness (D-176)
+
+- This file is the constitution for **any** coding agent — the name is historical, kept so
+  existing citations stay valid. `AGENTS.md` is the cross-agent pointer here; it must only
+  point, never diverge.
+- Session bootstrap is agent-neutral: `scripts/session-start.sh` (remote SDK setup gated on
+  `AAB_REMOTE=1`, or `CLAUDE_CODE_REMOTE=true` for back-compat; branch check; maintenance
+  pointer).
+- Per-agent adapters live in dot-dirs; today only `.claude/settings.json` exists. A new
+  agent's adapter must: run `scripts/session-start.sh` at session start, mirror the deny
+  rules (env dumps, force-push, push-to-main) if the agent supports permission rules, and
+  honor the session-branch rule above.

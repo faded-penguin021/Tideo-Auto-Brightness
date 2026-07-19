@@ -3270,3 +3270,20 @@ the permanent registry — never compress or remove them.
   verified locally — on-device behavior stays owner-verified; a green ladder must never be
   implied to cover it. Disclosure of real actions, not attestation-as-gate, so it stays
   outside the D-162 decline.
+
+- **D-176: agent-agnostic harness (owner-requested, 2026-07-19).** The harness no longer
+  assumes Claude Code as the only agent. `AGENTS.md` (new, repo root) is a pointer stub so
+  AGENTS.md-reading agents (Codex family etc.) pick up the rules natively — all instructions
+  stay in `CLAUDE.md`, which remains the canonical constitution (no rename: live docs, frozen
+  history, and this ledger cite it ~50×). Session-start logic moved from
+  `.claude/hooks/session-start.sh` to agent-neutral `scripts/session-start.sh`: repo root
+  derived from the script's own path (not `$CLAUDE_PROJECT_DIR`), remote SDK bootstrap gated
+  on the neutral `AAB_REMOTE=1` with `CLAUDE_CODE_REMOTE=true` honored for back-compat
+  (never implicit on a developer machine — no "missing local.properties" heuristic), branch
+  warning generalized to "your assigned session branch". `.claude/` is now a thin adapter —
+  `settings.json` alone, its hook invoking the neutral script directly, plus the allow/deny
+  rules. Wiring requirements for any future agent adapter (run the bootstrap at session
+  start, mirror the denies, honor the session-branch rule) live in CLAUDE.md "Agent
+  harness". A stub file (not a symlink) was chosen for AGENTS.md: symlinks degrade on
+  `core.symlinks=false` Windows checkouts and inconsistent API/sandbox FS layers, and the
+  stub carries the "run the bootstrap yourself" line hook-less agents need.
