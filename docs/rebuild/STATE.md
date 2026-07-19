@@ -131,6 +131,9 @@ in `../history/STATE_rebuild.md`).
 
 One line per shipped change (newest first); details live in the D-rows and git history.
 
+- 2026-07-19 — docs (owner-suggested, no D-row): harness-prompt 3.2 RUNBOOK template now
+  inlines the rule-review checklist concretely (was a by-name P12 reference instantiated
+  repos would never ship).
 - 2026-07-19 — **DA-005** (owner-requested): rule-review — binding-rule/guard diffs get the
   DA-003 fresh-context pass with a rule checklist, strongest tier regardless of size;
   routine STATE edits exempt; one level of meta only.

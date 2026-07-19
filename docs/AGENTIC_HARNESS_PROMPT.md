@@ -414,9 +414,28 @@ from a real shipped bug; append new classes as the ledger grows):
 If the pass finds nothing, say so in the commit body ("adversarial pass: clean"); if it finds
 something, fix before commit and ledger anything durable.
 
-Binding-rule/guard diffs (this runbook, the constitution, guard semantics, permission rails)
-get the same fresh-context pass with the P12 rule checklist instead — strongest tier,
-size-independent; routine state-file edits exempt.
+## Rule-review protocol (MANDATORY for binding-rule / guard diffs)
+Diffs changing the harness's legislation — the constitution, this runbook's protocols,
+guard semantics AND their fixture suite, the session bootstrap, ledger preambles, adapter
+permission rails — get the same fresh-context pass (strongest tier regardless of diff size;
+NO self-review fallback: a session that cannot spawn a fresh context parks the rule change
+for the human). Routine state-file edits are exempt, EXCEPT the state file's rule-bearing
+sections (length-guard preamble, decided non-items). The reviewer hunts these RULE bug
+classes concretely (seed the parenthetical exemplars from your own ledger as they occur):
+- **rule contradiction** — the new rule vs an existing binding rule ({{your first
+  rule-collision entry}});
+- **prose/guard lockstep drift** — a number/behavior stated in prose diverging from the
+  guard constant or logic that enforces it;
+- **Goodhart-ability** — the rule can be satisfied while defeating its intent ({{your first
+  gamed-rule entry}});
+- **enforcement asymmetry** — prose implies a check no guard performs (say "prose-only", or
+  add the check);
+- **citation validity** — cited ledger entries exist AND actually support the claim (the
+  citation guard scans code, not doc prose — this is checked here);
+- **agent-agnosticism regression** — the rule silently assumes one agent's machinery,
+  filenames, or env vars.
+Verdict in the commit body; prose-only by design (reviewer attention is the enforcement);
+one level of meta only — nobody reviews the reviewer.
 
 ## Acceptance ladder
 **One command: `scripts/ladder.sh`** — fast pre-flight guards, then the full task set in one
