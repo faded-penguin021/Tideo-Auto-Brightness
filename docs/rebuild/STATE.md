@@ -77,6 +77,20 @@ in `../history/STATE_rebuild.md`).
 4. Cut **v1.8.0 / vc18** from `main` via the Release UI.
 4. When merging session branches, note `claude/ladder-checkpoint-improvements-dm4ewz` (D-166/167
    repo hardening) is independent of the 1.8.0 PR branch — separate squash-merge.
+5. `claude/agent-agnostic-harness-fmb35b` (D-176/DA-001, 4 commits, docs+scripts only) is also
+   independent — separate squash-merge. Ready-made PR draft (squash commit takes title+body;
+   no D-115-class tokens):
+   - *Title:* `Agent-agnostic harness (D-176) + line-based ledger rollover (DA-001)`
+   - *Body bullets:* **Adds** `AGENTS.md` (cross-agent pointer stub — CLAUDE.md stays the
+     canonical constitution), agent-neutral `scripts/session-start.sh` bootstrap
+     (`AAB_REMOTE=1`, `CLAUDE_CODE_REMOTE` back-compat), `DEVIATIONS_LEDGER_A.md` (new live
+     ledger, opens at DA-001) · **Removes** `.claude/hooks/session-start.sh` — `.claude/` is
+     now a thin settings.json adapter invoking the neutral script · **Changes** ledger
+     rollover unit rows → 1000 lines, base ledger closed at D-176 (D-177…D-184 never
+     assigned; guard 1c + fixtures rewritten, 21 cases) · CLAUDE.md gains "Agent harness"
+     adapter-wiring section; branch/secret-hygiene wording generalized ·
+     `AGENTIC_HARNESS_PROMPT.md` made agent-agnostic + synced to the line cap · README stale
+     CLAUDE.md link fixed · net 13 files +267/−93, no Kotlin touched.
 
 **Open questions:** (none)
 
