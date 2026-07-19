@@ -113,9 +113,15 @@ fallback, D-172) — not "grant-only".
 - Develop and push **only** on your session's assigned branch (named in the session directive —
   `claude/<codename>` for Claude Code sessions). Push with `git push -u origin <your-session-branch>` (retry up to 4× with
   backoff 2s/4s/8s/16s on network errors only). **Never force-push. Never push to `main`.**
-- The owner merges session branches to `main` via PR — **squash-merge** (one commit per branch on
-  `main`; keeps intra-branch churn and any temporary artifacts out of history). Do not open a PR unless
-  asked.
+- **Branch-train model (DA-002).** The owner works across many sessions: a new session branch
+  is typically cut from the newest session branch (the "train"), NOT from `main`; superseded
+  branches are **deleted unmerged** (their commits contained downstream); only the **final
+  superset branch** is squash-merged to `main` via **ONE PR** — the squash commit takes the
+  PR title/body, so a staged PR draft must describe the net `origin/main..HEAD` diff (the
+  whole train), never just the last session's commits. Consequences: the ladder's
+  behind-`origin/main` WARN is usually structural (don't merge `main` in without a concrete
+  reason); before citing another session branch in docs, verify it still exists
+  (`git ls-remote --heads origin`). Do not open a PR unless asked.
 
 ## Agent harness (D-176)
 

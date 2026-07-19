@@ -115,9 +115,18 @@ checklist — the pass holds only what tests *cannot* see. Verdict goes in the c
 crossed (force-push, pushing to the default branch) live in tool-permission deny rules —
 enforced even if the prose is forgotten. Pre-allow the verification commands so the agent
 never stalls on a permission prompt for the ladder. One session = one dedicated branch; the
-human merges via squash (one commit per branch on the default branch keeps intra-branch churn
-out of history — and makes mid-feature pivots cheap, because abandoning a checkpointed segment
-costs nothing on `main`).
+human merges via squash (keeps intra-branch churn out of history — and makes mid-feature
+pivots cheap, because abandoning a checkpointed segment costs nothing on `main`). Two merge
+modes exist; state which one the repo uses: **(a) branch-per-change** — each session branch
+squash-merges separately (one commit per branch); or **(b) branch-train** — each new session
+branch is cut from the newest session branch, not the default branch; the human deletes
+superseded branches once their commits are contained downstream, and only the FINAL superset
+branch merges, in ONE squash PR. Under (b): the squash commit inherits the PR title/body, so
+any staged PR draft must describe the net `origin/{{DEFAULT_BRANCH}}..HEAD` diff (the whole
+train, its adds and removes), never just the last session's commits; behind-default-branch
+warnings are usually structural (the default branch advances by squash commits of the very
+train); and agents verify a branch still exists (`git ls-remote --heads origin`) before
+citing it in docs — the human prunes without notice.
 
 **P14. Initialization is one agent-neutral script, idempotent, with background warm-up.** A
 single `scripts/session-start.sh` that any agent's hook mechanism invokes (and that an agent
@@ -246,9 +255,13 @@ concurrency model, protected data flows, forbidden shortcuts. Each cites its led
 - Develop and push **only** on your session's assigned `{{BRANCH_PREFIX}}/<codename>` branch.
   Push with `git push -u origin <branch>` (retry with backoff on network errors only).
   **Never force-push. Never push to `{{DEFAULT_BRANCH}}`.**
-- The owner merges session branches via **squash-merge** PRs (one commit per branch on
-  `{{DEFAULT_BRANCH}}`). Do not open a PR unless asked. {{TAGGING_RULE: "Tagging/releasing
-  stays an owner step."}}
+- The owner merges via **squash-merge** PRs. {{MERGE_MODE — pick one (P13): "Each session
+  branch merges separately (one commit per branch)." OR "Branch-train: new session branches
+  cut from the newest session branch; superseded branches are deleted once contained; only
+  the final superset branch merges, in ONE PR whose title/body — inherited by the squash
+  commit — describes the net `origin/{{DEFAULT_BRANCH}}..HEAD` diff. Verify a branch exists
+  (`git ls-remote`) before citing it; behind-default warnings are usually structural."}}
+  Do not open a PR unless asked. {{TAGGING_RULE: "Tagging/releasing stays an owner step."}}
 
 ## Agent harness
 
@@ -441,7 +454,9 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
      pushed mistake is permanent until merge.
    - *Local-only advisories (WARN, skipped in CI):* checkpoint tripwire (code changed vs
      default branch but STATE.md not in the diff → the changelog line is probably missing);
-     stale-branch tripwire (behind the default branch → merge, never rebase pushed history);
+     stale-branch tripwire (behind the default branch — a real conflict risk in
+     branch-per-change mode, usually structural in branch-train mode (P13); either way merge,
+     never rebase pushed history);
      plan-orphan tripwire (a file under `docs/plans/` not referenced from STATE.md's active
      work → a finished or pivoted plan missed its deletion step; plans must die — code cites
      ledger rows, never plans).

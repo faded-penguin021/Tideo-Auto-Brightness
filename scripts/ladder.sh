@@ -32,8 +32,8 @@
 #   3/4. Local human-in-the-loop advisories (WARN-only; skipped under GITHUB_ACTIONS so they
 #      never add CI noise, D-166): 3 = checkpoint tripwire (code/config changed vs main but
 #      STATE.md carries no matching entry — RUNBOOK Session discipline 3); 4 = stale-branch
-#      tripwire (HEAD behind origin/main invites a squash-merge conflict the green ladder
-#      can't see).
+#      tripwire (HEAD behind origin/main CAN invite a squash-merge conflict — but under the
+#      DA-002 branch-train model behind-main is usually structural, so it stays advisory).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -195,7 +195,7 @@ if git rev-parse --verify -q origin/main >/dev/null; then
     # merge commit vanishes at squash-merge anyway).
     behind=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
     if [ "$behind" -gt 0 ]; then
-      echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main — 'git merge origin/main' before push to avoid a squash-merge conflict (rebase ONLY if nothing is pushed yet; pushed checkpoints are immutable, never force-push)."
+      echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main. In the DA-002 branch-train model this is usually STRUCTURAL (main advances by squash commits of this very train) — reconcile only if main carries work this branch genuinely lacks: 'git merge origin/main' (rebase ONLY if nothing is pushed yet; pushed checkpoints are immutable, never force-push)."
     fi
   fi
 else

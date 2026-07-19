@@ -51,3 +51,17 @@
   last-row-start check); `test-ladder-guards.sh` guard-1c fixtures rewritten to match;
   CLAUDE.md/RUNBOOK cap wording updated. Numbering within a file is open-ended (no fixed
   DA-184 ceiling — the line cap decides when a file ends).
+
+- **DA-002: branch-train workflow codified (owner-requested, 2026-07-19).** The docs assumed
+  "one branch per session, each squash-merged separately"; the owner's real workflow is a
+  branch TRAIN: each new session branch is cut from the newest session branch (not `main`),
+  superseded branches are deleted unmerged once contained, and only the final superset
+  branch lands on `main` — ONE squash PR whose title/body (which the squash commit inherits)
+  must describe the net `origin/main..HEAD` diff, not the last session's commits.
+  Discovered the hard way: a 2026-07-19 remote audit found five queue-cited branches deleted
+  and this session's branch carrying the whole 55-commit 1.8.0 train, while the staged PR
+  draft covered only 4 commits. Codified in CLAUDE.md Git rules; ladder guard 4's
+  behind-main WARN reworded (structural under this model — reconcile only when `main`
+  carries work the train lacks); harness prompt P13/3.4 generalized. Standing agent duties:
+  compute PR drafts from `origin/main..HEAD`; `git ls-remote --heads origin` before citing
+  session branches in docs.

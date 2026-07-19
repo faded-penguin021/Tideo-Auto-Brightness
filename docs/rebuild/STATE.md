@@ -128,6 +128,9 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-19 — **DA-002** (owner-requested): branch-train workflow codified — sessions stack,
+  superseded branches deleted, ONE final-branch squash PR describing `origin/main..HEAD`;
+  CLAUDE.md Git rules + guard-4 wording + harness prompt P13/3.4.
 - 2026-07-19 — docs (owner-requested, no D-row): `AGENTIC_HARNESS_PROMPT.md` made
   agent-agnostic (pointer-file pattern, neutral bootstrap/adapters per D-176) + synced to the
   DA-001 line-based ledger cap.
