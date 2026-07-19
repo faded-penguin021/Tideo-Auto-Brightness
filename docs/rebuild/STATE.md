@@ -69,7 +69,7 @@ in `../history/STATE_rebuild.md`).
    55-commit / 97-file / +6344/−427 payload vs `main` (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit
      fixes, force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176,
-     DA-001)`
+     DA-001/DA-002)`
    - *Body:*
      **Features (1.8.0/vc18):** opt-in automation intent surface — verbs,
      LOAD_PROFILE/CONTEXTS_RESUME, outbound STATE_CHANGED; `docs/AUTOMATION.md` (D-157) ·
@@ -84,7 +84,8 @@ in `../history/STATE_rebuild.md`).
      ledger rollover, citation integrity + `[cited]` sync, skip-ci scan, changelog cap) with
      its own 21-case regression suite, run by CI (D-161/D-166/D-173/D-174) · Owner queue +
      ask-don't-assume (D-167) · secret hygiene (D-175) · Gradle parallel/config-cache.
-     **Agent-agnostic harness (D-176/DA-001):** adds `AGENTS.md` pointer stub + neutral
+     **Agent-agnostic harness (D-176/DA-001/DA-002):** adds `AGENTS.md` pointer stub +
+     neutral
      `scripts/session-start.sh`; removes `.claude/hooks/session-start.sh` (`.claude/` = thin
      adapter); ledger rollover now 1000 lines/file — base ledger closed at D-176,
      `DEVIATIONS_LEDGER_A.md` live.
