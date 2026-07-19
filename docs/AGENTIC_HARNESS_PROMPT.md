@@ -1,14 +1,15 @@
 # The Agentic Maintenance Harness — a generalized, reusable prompt
 
-This document generalizes the maintenance harness used in this repository (CLAUDE.md +
-STATE.md + RUNBOOK.md + DEVIATIONS_LEDGER + `scripts/ladder.sh` + hooks) into a prompt you can
-apply to **any** repository maintained by agentic AI sessions with strong human-in-the-loop
-feedback. It has three parts:
+This document generalizes the maintenance harness used in this repository (the constitution
+file + STATE.md + RUNBOOK.md + DEVIATIONS_LEDGER + `scripts/ladder.sh` + session bootstrap)
+into a prompt you can apply to **any** repository maintained by agentic AI sessions — any
+agent, any model vendor — with strong human-in-the-loop feedback. It has three parts:
 
 - **Part 1 — Design principles.** The extracted logic: *why* each mechanism exists. Read this
   to adapt the harness intelligently rather than cargo-culting it.
 - **Part 2 — The prompt.** A drop-in, placeholder-parameterized operating prompt (the target
-  repo's `CLAUDE.md` / system prompt). This is what the agent reads every session.
+  repo's always-loaded agent-instructions file — `AGENTS.md`, `CLAUDE.md`, or your agent's
+  equivalent). This is what the agent reads every session.
 - **Part 3 — Scaffold templates.** The supporting artifacts the prompt refers to: STATE file,
   RUNBOOK, append-only ledger, guard script spec, session hook, and permission rails.
 
@@ -30,9 +31,9 @@ Long-context repos die by unbounded accumulation. Split memory into four tiers:
 
 | Tier | Artifact | Mutability | Size discipline |
 |---|---|---|---|
-| Constitution | `CLAUDE.md` (the Part-2 prompt) | Stable; edited rarely, deliberately | Small by construction |
+| Constitution | The agent-instructions file (the Part-2 prompt) | Stable; edited rarely, deliberately | Small by construction |
 | Working memory | `STATE.md` | Rewritten freely | **Machine-enforced cap** (warn/fail), compression protocol, protected sections |
-| Permanent memory | Numbered append-only ledger | Append-only, never compressed | Per-file row cap + rollover to sibling files |
+| Permanent memory | Numbered append-only ledger | Append-only, never compressed | Per-file line cap + rollover to sibling files |
 | Archive | `docs/history/` | Frozen; consult, never extend | Unbounded but never on the hot path |
 
 The key move: history that must never be lost goes to the *ledger* (append-only, citable);
@@ -118,12 +119,16 @@ human merges via squash (one commit per branch on the default branch keeps intra
 out of history — and makes mid-feature pivots cheap, because abandoning a checkpointed segment
 costs nothing on `main`).
 
-**P14. Initialization is a hook, idempotent, with background warm-up.** A SessionStart hook:
-(a) bootstraps the toolchain idempotently (instant when cached); (b) launches build-system
-warm-up in the background so the first ladder run doesn't pay the cold cost serially while the
-agent reads docs; (c) verifies the checked-out branch and warns on `main`/detached HEAD (the
-first misplaced commit is the expensive one); (d) prints the protocol pointer ("read STATE
-first, then the RUNBOOK playbook").
+**P14. Initialization is one agent-neutral script, idempotent, with background warm-up.** A
+single `scripts/session-start.sh` that any agent's hook mechanism invokes (and that an agent
+with no hook support runs manually — say so in the instructions file): (a) bootstraps the
+toolchain idempotently (instant when cached), gated on an explicit remote-environment flag —
+never a heuristic that could surprise a developer machine; (b) launches build-system warm-up
+in the background so the first ladder run doesn't pay the cold cost serially while the agent
+reads docs; (c) verifies the checked-out branch and warns on `main`/detached HEAD (the first
+misplaced commit is the expensive one); (d) prints the protocol pointer ("read STATE first,
+then the RUNBOOK playbook"). The script self-locates its repo root — it must not depend on
+any one agent's environment variables.
 
 **P15. Process docs are code — self-adapting, in the same change.** If the RUNBOOK is wrong,
 stale, or missing the case just handled, fixing it is part of the change, not a follow-up. The
@@ -150,10 +155,16 @@ agent-safety protocol — `odysseus-fuzzy`'s AGENTS.md.)
 
 ---
 
-## Part 2 — The prompt (drop-in `CLAUDE.md` template)
+## Part 2 — The prompt (drop-in constitution template)
 
-> Instantiate the placeholders, then place this at the repo root as `CLAUDE.md` (or the
-> equivalent always-loaded agent instructions file).
+> Instantiate the placeholders, then place this at the repo root as the always-loaded agent
+> instructions file. **One file is canonical; every other agent's expected filename is a
+> pointer to it, and pointers only point — they never diverge.** `AGENTS.md` is the emerging
+> cross-agent default; agents that read a different filename (Claude Code reads `CLAUDE.md`)
+> get a short stub referring to the canonical file ("read it in full; if your harness has no
+> session-start hook, run `scripts/session-start.sh` yourself"). Which file is canonical
+> matters less than the single-source rule — an established repo whose citations all name one
+> file keeps that file canonical and points the others at it.
 
 ```markdown
 # {{PROJECT_NAME}} — maintenance guide
@@ -171,7 +182,8 @@ to read them (an index/recipes doc), if reading them wholesale is a context haza
 Long-term memory: numbered deviations/discoveries live in `docs/LEDGER.md` — a **permanent,
 append-only registry** (code cites bare `D-NN`; code-cited rows carry a machine-synced
 `[cited]` marker; never compress or delete entries; append the next number in the LIVE ledger
-file — each file caps at {{ROW_CAP}} rows and rolls over `D-… → DA-…` (`_A.md`) `→ DB-…`).
+file — each file caps at {{LINE_CAP}} lines: the final row may overflow the cap, the next row
+opens the next file, `D-… → DA-…` (`_A.md`) `→ DB-…`).
 
 ## Maintenance protocol (every session)
 
@@ -237,6 +249,18 @@ concurrency model, protected data flows, forbidden shortcuts. Each cites its led
 - The owner merges session branches via **squash-merge** PRs (one commit per branch on
   `{{DEFAULT_BRANCH}}`). Do not open a PR unless asked. {{TAGGING_RULE: "Tagging/releasing
   stays an owner step."}}
+
+## Agent harness
+
+- This file is the constitution for **any** coding agent; the other agent-instruction
+  filenames in this repo are pointers here and must only point, never diverge.
+- Session bootstrap is agent-neutral: `scripts/session-start.sh` (remote toolchain setup
+  gated on `{{REMOTE_FLAG}}=1`; branch check; protocol pointer). If your harness has no
+  session-start hook, run it yourself first.
+- Per-agent adapters live in dot-dirs and contain wiring only. A new agent's adapter must:
+  run the bootstrap at session start, mirror the permission deny rails (env dumps,
+  force-push, push to `{{DEFAULT_BRANCH}}`) if the agent supports permission rules, and
+  honor the one-session-one-branch rule above.
 ```
 
 ---
@@ -292,7 +316,7 @@ docs it names, then do the work. **Code + {{FIXTURES}} are ground truth**; where
 disagrees with the code, trust the code (and fix the doc).
 
 ## Where logic lives
-{{MODULE_MAP — same shape as CLAUDE.md's, one level more detail.}}
+{{MODULE_MAP — same shape as the constitution's, one level more detail.}}
 
 ## Reference-doc index
 | Question | Doc |
@@ -370,7 +394,7 @@ this RUNBOOK in the same change.** Treat it as code.
 ### 3.3 `docs/LEDGER.md` — permanent memory (append-only, rolling files)
 
 ```markdown
-# DEVIATIONS & DISCOVERIES LEDGER — permanent registry (D-001…D-{{ROW_CAP}})
+# DEVIATIONS & DISCOVERIES LEDGER — permanent registry (D-001…)
 
 > **Append-only registry — NEVER archived, compressed, or truncated.** Canonical, permanent
 > home for every numbered deviation/discovery. Code and docs cite entries as bare `D-NNN`
@@ -378,11 +402,14 @@ this RUNBOOK in the same change.** Treat it as code.
 > entries at the bottom, one continuous sequence. Code + fixtures are ground truth; if an
 > entry conflicts with current code, trust the code and correct the entry (don't delete it).
 >
-> **File cap & rollover.** THIS FILE holds at most **{{ROW_CAP}}** rows. When row
-> {{ROW_CAP}}+1 is needed, create `LEDGER_A.md` with this same header discipline, numbering
-> from **DA-001** (then `_B.md`/DB-001, …). Existing rows are never moved or renumbered —
-> the cap bounds *file size* (an unbounded file is a context hazard for agents), not
-> history. A citation's prefix names its file.
+> **File cap & rollover.** THIS FILE holds at most **{{LINE_CAP}}** lines (cap the LINES,
+> not the row count — rows vary in length, and it's the read/context cost you're bounding;
+> keep the number in lockstep with the ladder guard's constant). The final row may FINISH
+> past the cap, but no row may ever START past it: when the file stands over the cap, create
+> `LEDGER_A.md` with this same header discipline, numbering from **DA-001** (then
+> `_B.md`/DB-001, …). Existing rows are never moved or renumbered — the cap bounds *file
+> size* (an unbounded file is a context hazard for agents), not history. A citation's prefix
+> names its file.
 >
 > **`[cited]` marker (machine-managed).** A row cited from the guard's scan scope carries
 > ` [cited]` after its number. The ladder guard syncs it BOTH directions (cited-but-unmarked
@@ -402,7 +429,8 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
    - *State length:* warn over soft cap, **fail** over hard cap.
    - *State structure:* fail if a required section header is missing (over-compression
      tripwire); warn if the Owner-queue header vanished (data loss for the human).
-   - *Ledger rollover:* warn approaching the row cap, fail over it.
+   - *Ledger rollover:* warn approaching the line cap; fail when the live file's LAST row
+     *starts* past the cap (the final row may overflow; the next belongs in the next file).
    - *Citation integrity:* grep source trees (code + workflows, NOT docs or the guard's own
      test fixtures) for `D[AB]?-\d+`; every citation must resolve to a row in the file its
      prefix names; no duplicate row numbers; `[cited]` markers must match the citation set
@@ -426,9 +454,11 @@ Plus `scripts/test-ladder-guards.sh`: a fixture-based regression suite for the g
 themselves (synthesizes tiny repos/ledgers, asserts each guard's pass/warn/fail), run in CI
 and whenever a guard changes.
 
-### 3.5 Session hook + permission rails
+### 3.5 Session bootstrap + permission rails (the per-agent adapter layer)
 
-**SessionStart hook** (idempotent):
+**Session bootstrap — one agent-neutral `scripts/session-start.sh`** (idempotent; P14). It
+self-locates the repo root from its own path and keys remote-only steps off an explicit
+neutral flag (e.g. `{{REMOTE_FLAG}}=1`) — never any one agent's environment variables:
 ```bash
 # 1. Bootstrap toolchain if needed (instant when cached); on remote containers, launch
 #    build-system warm-up in the BACKGROUND so the first ladder run is cheap.
@@ -437,13 +467,21 @@ and whenever a guard changes.
 # 4. Print STATE.md's size vs its soft cap — if it's already near the cap, the session
 #    knows to compress BEFORE writing, not after a failed commit-time guard.
 ```
+Each agent's adapter lives in its own dot-dir and stays THIN — wiring only, no logic. A new
+agent's adapter must: invoke the bootstrap at session start (via its hook mechanism, or the
+instructions file tells hook-less agents to run it manually), mirror the deny rails below if
+the agent supports permission rules, and honor the one-session-one-branch rule. Everything
+behavioral stays in the shared constitution + scripts, so switching agents rewrites nothing.
 
-**Tool permissions** (`.claude/settings.json` or equivalent):
-- **Allow:** the ladder, the setup/warm-up scripts, the build tool — verification must never
-  stall on a permission prompt.
+**Tool permissions** (the adapter's config — `.claude/settings.json` for Claude Code, or
+your agent's equivalent):
+- **Allow:** the ladder, the setup/warm-up/bootstrap scripts, the build tool — verification
+  must never stall on a permission prompt.
 - **Deny (hard rails):** `git push --force` in all spellings; any push targeting
   `{{DEFAULT_BRANCH}}` directly; environment/secret dumps (`env`, `printenv`, reads of
-  `.env`-style files — P17). Prose forbids it; the permission layer *enforces* it.
+  `.env`-style files — P17). Prose forbids it; the permission layer *enforces* it. An agent
+  without permission-rule support still inherits the prose rule — the rails are
+  defense-in-depth, not the only copy of the policy.
 
 ---
 
@@ -451,7 +489,7 @@ and whenever a guard changes.
 
 - **Smallest useful subset** (a repo with light AI maintenance): the Part-2 prompt + STATE.md
   with the Owner queue + a single verification command. For small repos, fold the RUNBOOK into
-  CLAUDE.md — fewer files to keep straight; split only when the playbooks multiply. Add the
+  the constitution — fewer files to keep straight; split only when the playbooks multiply. Add the
   ledger the first time you catch yourself re-explaining a past mistake; add guards the first
   time a rule is violated.
 - **Bootstrap `ladder.sh` as nothing but the verification commands.** Guards accrete one at a

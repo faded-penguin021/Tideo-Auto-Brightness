@@ -113,6 +113,9 @@ in `../history/STATE_rebuild.md`).
 One line per shipped change or completed backlog (newest first). Keep terse; details live in
 the cited D-rows and git history.
 
+- 2026-07-19 — docs (owner-requested, no D-row): `AGENTIC_HARNESS_PROMPT.md` made
+  agent-agnostic (pointer-file pattern, neutral bootstrap/adapters per D-176) + synced to the
+  DA-001 line-based ledger cap.
 - 2026-07-19 — **DA-001** (owner-instructed): ledger rollover unit rows → **1000 lines** (final
   row may overflow; the next opens the next file); base ledger CLOSED at D-176 (D-177…D-184
   never assigned), `DEVIATIONS_LEDGER_A.md` is live; guard 1c + test fixtures rewritten.
