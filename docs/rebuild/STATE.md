@@ -131,6 +131,9 @@ in `../history/STATE_rebuild.md`).
 
 One line per shipped change (newest first); details live in the D-rows and git history.
 
+- 2026-07-19 — **DA-005** (owner-requested): rule-review — binding-rule/guard diffs get the
+  DA-003 fresh-context pass with a rule checklist, strongest tier regardless of size;
+  routine STATE edits exempt; one level of meta only.
 - 2026-07-19 — **DA-004** (owner-requested): STATE length guard hysteresis — grow freely to
   14 KB, then ONE deep compress to ≤ 9 KB; fail 16 KB unchanged; micro-trim named as
   anti-pattern. Guard 1 + fixtures + preamble + prompt.

@@ -92,3 +92,21 @@
   a threshold is now named as the anti-pattern in the guard message and the STATE preamble.
   Guard 1 + its test fixtures (22 cases) + STATE preamble + harness prompt 3.1/3.4 updated
   in lockstep.
+
+- **DA-005: rule-review — harness legislation gets the fresh-context pass too
+  (owner-requested, 2026-07-19).** Rule changes had no review at all: guard LOGIC has a test
+  suite, but the prose rules (CLAUDE.md, RUNBOOK protocols, ledger preambles, permission
+  rails) had none, and a bad rule compounds — it manufactures defects in every future
+  session that obeys it, while the authoring context is maximally anchored on a rule it just
+  designed (evidence in git: pushed commits 6ae163a/55522d6 mis-claimed a cleared warn; the
+  DA-003/D-161 collision needed an explicit carve-out). New RUNBOOK "Rule-review protocol":
+  binding-rule/guard diffs — including the guard FIXTURE suite and the session bootstrap,
+  and STATE's two legislative sections (length-guard preamble, Decided non-items) — get the
+  DA-003 fresh-context reviewer with a RULE checklist: contradiction, prose/guard lockstep
+  drift, Goodhart-ability, enforcement asymmetry, citation validity (guard 5 skips docs),
+  agent-agnosticism regression. **Strongest tier regardless of diff size** (size is a bad
+  proxy for rule diffs; refines DA-003's scaling), and NO self-review fallback — a session
+  that can't spawn a fresh context parks the rule change in the Owner queue instead. Routine
+  STATE edits exempt (working memory). Prose-only by design (D-162: no attestation gates);
+  verdict disclosed in the commit body. One level of meta only: nobody reviews the reviewer;
+  the owner arbitrates via the queue.

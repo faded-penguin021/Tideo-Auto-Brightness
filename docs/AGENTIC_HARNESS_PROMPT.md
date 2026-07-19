@@ -113,7 +113,20 @@ accept it; self-review is the fallback only where the harness can't spawn one. S
 reviewer's model tier to the diff (small mechanical change → light tier; large or glue-heavy
 → strongest available). One blocking review subagent is compatible with the P5
 no-parallel-agents rule — it's sequential work inside the unit, not fan-out; the session
-still triages every finding itself.
+still triages every finding itself. Apply the same fresh-context review to changes of the
+harness's own binding rules (the constitution, runbook protocols, guard semantics,
+permission rails) — a bad rule manufactures defects in every future session that obeys it,
+and the authoring context is maximally anchored on a rule it just designed. Rule diffs get a
+rule-specific checklist (contradiction with an existing binding rule, prose/guard lockstep
+drift, Goodhart-ability, enforcement asymmetry, citation validity — the cited entry exists
+AND actually supports the claim, the half no guard can check — and agent-agnosticism
+regressions) and the strongest tier regardless of diff size (a three-line rule edit can
+carry a semantic bomb). No self-review fallback for rule diffs: a harness that cannot spawn
+a fresh context parks the rule change for the human instead of reviewing its own
+legislation. Routine state-file edits are exempt — working memory, not legislation — but the
+state file's rule-bearing sections (its length-guard preamble, its decided-non-items) count
+as legislation. One level of meta only: the reviewer reports, the session triages, the human
+arbitrates — nobody reviews the reviewer.
 The ledger feeds the checklist: every new shipped bug class gets appended; when a class turns
 out to be mechanically testable, encode it as a regression test and retire it from the
 checklist — the pass holds only what tests *cannot* see. Verdict goes in the commit body
@@ -400,6 +413,10 @@ from a real shipped bug; append new classes as the ledger grows):
 - {{BUG_CLASS + its ledger citation}} …
 If the pass finds nothing, say so in the commit body ("adversarial pass: clean"); if it finds
 something, fix before commit and ledger anything durable.
+
+Binding-rule/guard diffs (this runbook, the constitution, guard semantics, permission rails)
+get the same fresh-context pass with the P12 rule checklist instead — strongest tier,
+size-independent; routine state-file edits exempt.
 
 ## Acceptance ladder
 **One command: `scripts/ladder.sh`** — fast pre-flight guards, then the full task set in one

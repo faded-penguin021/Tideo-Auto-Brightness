@@ -248,9 +248,9 @@ any moment (rate limit, window end, compaction).
    commit → push. Never start a second unit on top of an uncommitted first — an interrupted
    session must lose at most the unit in flight.
 4. **You are the last reviewer.** The glue-review protocol (below) is mandatory at every model
-   tier; there is no stronger pass behind you. Delegate the pass itself to a fresh-context
-   subagent where the harness supports one (DA-003) — accountability for triaging its
-   findings stays with the session.
+   tier — and the rule-review protocol for harness legislation (DA-005); there is no stronger
+   pass behind you. Delegate the pass itself to a fresh-context subagent where the harness
+   supports one (DA-003) — accountability for triaging its findings stays with the session.
 5. **Multi-unit work** uses the playbook-5 persisted-plan pattern (plan file + STATE checklist)
    so any session can resume the backlog mid-stream.
 6. **Recovery.** If the unit in flight has gone wrong, do not flail forward: reset the working
@@ -337,6 +337,43 @@ platform/runtime code, so reviewer attention is the only net there. There is no 
 review pass or stronger model behind you now; this second pass replaces it. If the pass finds
 nothing, say so in the commit/PR body ("glue-review pass: clean"); if it finds something, fix
 it before commit and record anything durable as a `D-NN`.
+
+## Rule-review protocol (MANDATORY for binding-rule / guard changes — DA-005)
+
+Any diff that changes the harness's LEGISLATION — CLAUDE.md, this runbook's protocols or
+Session discipline, `scripts/ladder.sh` guard semantics **and their fixture suite
+`scripts/test-ladder-guards.sh`** (a weakened fixture softens the net every later guard
+change is tested against), `scripts/session-start.sh`, ledger preambles, adapter permission
+rules (e.g. `.claude/settings.json` allow/deny), `AGENTS.md` — gets the same fresh-context
+review as glue (DA-003 mechanics: the reviewer receives the diff, this checklist, and tree
+access — never the author's rationale), with three differences: the reviewer defaults to the
+**strongest available tier regardless of diff size** (a three-line rule edit can carry a
+semantic bomb; size is a bad proxy for rule diffs); there is **NO self-review fallback** for
+rule diffs — a session that cannot spawn a fresh context parks the rule change in the Owner
+queue (discipline 7(d)) for a session that can, instead of reviewing its own legislation;
+and it hunts RULE bug classes, each from this repo's history:
+
+- **rule contradiction** — the new rule vs an existing binding rule (the DA-003 carve-out
+  from the D-161 fan-out ban exists precisely because the two rules collide);
+- **prose/guard lockstep drift** — a number or behavior stated in prose diverging from the
+  guard constant/logic enforcing it (the DA-001/DA-004 lockstep obligations);
+- **Goodhart-ability** — the rule can be satisfied without its intent (trimming to just
+  under 12 KB satisfied the old length guard while defeating it — DA-004);
+- **enforcement asymmetry** — prose implies a protection no guard or permission rail
+  actually checks (either say it's prose-only, or add the check);
+- **citation validity** — guard 5 deliberately does not scan docs, so D-row cites in rule
+  prose are checked HERE: the row exists and actually says what the rule claims;
+- **agent-agnosticism regression** — the rule silently assumes one agent's machinery,
+  filenames, or env vars (D-176).
+
+Out of scope: routine STATE.md edits (changelog lines, queue items, Current state) —
+working memory, not legislation. Two STATE sections ARE legislation and stay in scope: the
+**length-guard preamble** (guard-lockstep thresholds) and **Decided non-items** (binding
+declines). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
+their triage). This protocol is itself prose-only — no guard detects a legislation diff;
+reviewer attention is the enforcement (the D-162 no-attestation-gates line holds). **One
+level of meta only:** the reviewer reports, the session triages, the owner arbitrates via
+the Owner queue — nobody reviews the reviewer.
 
 ## Acceptance ladder
 
