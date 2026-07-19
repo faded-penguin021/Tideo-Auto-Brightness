@@ -293,13 +293,17 @@ concurrency model, protected data flows, forbidden shortcuts. Each cites its led
 ```markdown
 # STATE — project state & session memory
 
-> **Length guard (read before editing).** Steady-state target ≤ {{SOFT_KB}} KB. **If this
-> file exceeds {{HARD_KB}} KB, aggressively compress before committing:** collapse each
-> completed work stage into one Changelog line, move any durable gotcha into the append-only
-> ledger, delete narrative prose. The **Project**, **Current state**, and **Owner queue**
-> sections must always survive compression (Owner queue items are the owner's to close —
-> compress their prose, never drop an open item). (`scripts/ladder.sh` machine-checks this:
-> warn > {{SOFT_KB}} KB, fail > {{HARD_KB}} KB.)
+> **Length guard (read before editing — hysteresis).** Grow freely to **{{WARN_KB}} KB**; no
+> trimming below that line. When the guard warns, run ONE deep compression pass to
+> **≤ {{COMPRESS_TO_KB}} KB** — never trim to just under a threshold (micro-trims re-arm the
+> warn a session later; the wide band IS the debounce, statelessly). Fail > {{HARD_KB}} KB.
+> Compression means: collapse each completed work stage into one Changelog line, fold
+> changelog clusters, move any durable gotcha into the append-only ledger, delete narrative
+> prose. The **Project**, **Current state**, and **Owner queue** sections must always survive
+> compression (Owner queue items are the owner's to close — compress their prose, never drop
+> an open item). (`scripts/ladder.sh` machine-checks: warn > {{WARN_KB}} KB, fail >
+> {{HARD_KB}} KB. Pick the numbers so warn−compress-to spans many sessions of growth and
+> hard−warn leaves one long session of margin — e.g. 9/14/16.)
 
 ## Project
 {{FIVE_LINE_SUMMARY — enough that a fresh session needs no other orientation doc.}}
@@ -449,7 +453,9 @@ this RUNBOOK in the same change.** Treat it as code.
 One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
 
 1. **Guards first (seconds, no build):**
-   - *State length:* warn over soft cap, **fail** over hard cap.
+   - *State length (hysteresis):* quiet below the warn line; over it, warn with the deep
+     compress-to target in the message; **fail** over the hard cap. Never make the warn line
+     the compression target — the gap between them is the debounce.
    - *State structure:* fail if a required section header is missing (over-compression
      tripwire); warn if the Owner-queue header vanished (data loss for the human).
    - *Ledger rollover:* warn approaching the line cap; fail when the live file's LAST row

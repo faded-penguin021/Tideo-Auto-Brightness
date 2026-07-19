@@ -79,3 +79,16 @@
   declined with a reason); a clean report is read, not rubber-stamped. In-context
   self-review survives only as the fallback where the harness cannot spawn a fresh context.
   RUNBOOK protocol + discipline rules 1/4 and harness prompt P12/3.2 updated.
+
+- **DA-004: STATE length guard gains hysteresis (owner-requested, 2026-07-19).** The old
+  scheme (warn > 12 KB, fail > 16 KB, "steady-state target 12 KB") produced exactly the
+  byte-trim anti-pattern an external review flagged: sessions trimmed to just under 12 KB,
+  the next session's lines re-armed the warn, and the log filled with micro-commits ("three
+  fewer bytes") — two of which even mis-reported their own result. New scheme, stateless
+  hysteresis instead of pass-counting (no persistent debounce state to maintain or corrupt):
+  **grow freely to 14 KB; when the warn fires, ONE deep compression pass to ≤ 9 KB; fail
+  > 16 KB (unchanged).** The 9→14 KB band (~5 KB ≈ 15–25 changelog lines) is the debounce;
+  the 14→16 KB gap keeps 2 KB of emergency margin for a long session. Trimming to just under
+  a threshold is now named as the anti-pattern in the guard message and the STATE preamble.
+  Guard 1 + its test fixtures (22 cases) + STATE preamble + harness prompt 3.1/3.4 updated
+  in lockstep.

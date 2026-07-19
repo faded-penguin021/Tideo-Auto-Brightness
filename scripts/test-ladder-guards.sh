@@ -91,8 +91,10 @@ check "baseline is green" 0 "LADDER PASS (guards only)"
 
 write_state 17000
 check "guard 1: STATE > 16 KB fails" 1 "over the 16 KB hard cap"
+write_state 15000
+check "guard 1: STATE > 14 KB warns deep-compress" 0 "compress DEEP to <= 9 KB"
 write_state 13000
-check "guard 1: STATE > 12 KB warns" 0 "steady-state target is <= 12 KB"
+check "guard 1: 12-14 KB band is quiet (DA-004 hysteresis)" 0 "STATE.md size OK"
 write_state 0
 
 # LADDER_STATE_FILE override (the documented test-suite hook).

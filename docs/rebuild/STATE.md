@@ -1,13 +1,16 @@
 # STATE — project state & session memory
 
-> **Length guard (read before editing).** Steady-state target ≤ 12 KB. **If this file exceeds
-> 16 KB, aggressively compress before committing:** collapse each completed *Active work* stage
-> into one Changelog line, move any durable gotcha into `DEVIATIONS_LEDGER.md` (the permanent,
-> append-only registry — never compressed), and delete narrative/punch-list prose. The
-> **Project**, **Current state**, and **Owner queue** sections must always survive compression
-> (Owner queue items are the owner's to close — compress their prose, never drop an open item).
-> The full migration narrative is already frozen in `../history/` — do not re-accumulate it here.
-> (`scripts/ladder.sh` machine-checks this rule: warn > 12 KB, fail > 16 KB.)
+> **Length guard (read before editing — DA-004 hysteresis).** Grow freely to **14 KB**; no
+> trimming below that line. When the ladder warns (> 14 KB), run ONE deep compression pass
+> to **≤ 9 KB** — never trim to just under a threshold (micro-trims re-arm the warn a session
+> later; the 9→14 KB band is the debounce). Fail > 16 KB. Compression means: collapse each
+> completed *Active work* stage into one Changelog line, fold changelog clusters, move any
+> durable gotcha into the ledger (permanent, append-only — never compressed), delete
+> narrative/punch-list prose. The **Project**, **Current state**, and **Owner queue** sections
+> must always survive compression (Owner queue items are the owner's to close — compress their
+> prose, never drop an open item). The migration narrative is frozen in `../history/` — do not
+> re-accumulate it here. (`scripts/ladder.sh` guard 1 machine-checks: warn > 14 KB, fail
+> > 16 KB.)
 
 ## Project
 
@@ -128,6 +131,9 @@ in `../history/STATE_rebuild.md`).
 
 One line per shipped change (newest first); details live in the D-rows and git history.
 
+- 2026-07-19 — **DA-004** (owner-requested): STATE length guard hysteresis — grow freely to
+  14 KB, then ONE deep compress to ≤ 9 KB; fail 16 KB unchanged; micro-trim named as
+  anti-pattern. Guard 1 + fixtures + preamble + prompt.
 - 2026-07-19 — **D-176 + DA-001/DA-002/DA-003** (owner-requested/-instructed): agent-agnostic
   harness (AGENTS.md pointer stub, neutral `scripts/session-start.sh`, `.claude/` = thin
   adapter; CLAUDE.md canonical; `AGENTIC_HARNESS_PROMPT.md` generalized to match) · ledger

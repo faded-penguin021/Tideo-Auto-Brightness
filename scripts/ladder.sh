@@ -47,15 +47,17 @@ fi
 
 fail() { echo "LADDER FAIL: $1" >&2; exit 1; }
 
-# --- guard 1: STATE.md length rule ---
+# --- guard 1: STATE.md length rule (DA-004 hysteresis: grow freely to 14 KB; when the warn
+# fires, compress DEEP to <= 9 KB in one pass — never trim to just under a threshold, that
+# only re-arms the warn a session later; fail > 16 KB) ---
 [ -f "$STATE_FILE" ] || fail "$STATE_FILE not found (run from the repo, or fix LADDER_STATE_FILE)"
 state_bytes=$(wc -c < "$STATE_FILE" | tr -d '[:space:]')
 if [ "$state_bytes" -gt 16384 ]; then
-  fail "$STATE_FILE is ${state_bytes} B — over the 16 KB hard cap; compress it before committing (see its length-guard preamble)"
-elif [ "$state_bytes" -gt 12288 ]; then
-  echo "LADDER WARN: $STATE_FILE is ${state_bytes} B (steady-state target is <= 12 KB — compress soon)"
+  fail "$STATE_FILE is ${state_bytes} B — over the 16 KB hard cap; compress DEEP to <= 9 KB before committing (DA-004; see its length-guard preamble)"
+elif [ "$state_bytes" -gt 14336 ]; then
+  echo "LADDER WARN: $STATE_FILE is ${state_bytes} B (> 14 KB) — compression pass due: compress DEEP to <= 9 KB in ONE pass, not to just under a line (DA-004)"
 else
-  echo "LADDER: STATE.md size OK (${state_bytes} B)"
+  echo "LADDER: STATE.md size OK (${state_bytes} B / 14 KB warn line)"
 fi
 
 # --- guard 1b: STATE.md required structure (over-compression tripwire) ---
