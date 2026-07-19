@@ -126,8 +126,7 @@ in `../history/STATE_rebuild.md`).
 
 ## Changelog
 
-One line per shipped change or completed backlog (newest first). Keep terse; details live in
-the cited D-rows and git history.
+One line per shipped change (newest first); details live in the D-rows and git history.
 
 - 2026-07-19 — **D-176 + DA-001/DA-002/DA-003** (owner-requested/-instructed): agent-agnostic
   harness (AGENTS.md pointer stub, neutral `scripts/session-start.sh`, `.claude/` = thin
@@ -156,8 +155,8 @@ the cited D-rows and git history.
 - 2026-07-10 — **D-161** repo-hardening U1–U4 (ladder.sh, STATE 27.6→12 KB, Session discipline,
   Gradle parallel/config-cache) + **D-162** external-review triage (guards 1b/1c, recovery rule,
   golden-fixture gate; declines in the row + non-items).
-- 2026-07-08/09 — 1.8.0 close-out: **D-159** IME dead gap; **D-160** external `RESUME` gate;
-  pre-release audit green; DEVICE_TEST §14.
+- 2026-07-08/09 — 1.8.0 close-out: **D-159** IME dead gap; **D-160** `RESUME` gate; audit
+  green; DEVICE_TEST §14.
 - 2026-07-06/07 — 1.8.0/vc18 features: **D-157** intent control (`docs/AUTOMATION.md`,
   +20 tests) + **D-156** a11y A0–A7 / **D-158** crash-log capture (+72 tests). Owner
   completed H4/H5.
