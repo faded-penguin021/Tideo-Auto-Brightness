@@ -41,6 +41,11 @@
 #      print a reminder that the DA-005 rule-review protocol applies before commit.
 #   8. redact.sh self-test (DA-007): the secret-redaction filter is a rail — a silent regex
 #      regression must fail the ladder, not pass quietly.
+#   9. Secret-shape tree scan (DA-008): FAIL if redacting any tracked/untracked text file
+#      would change it — the scan IS the DA-007 filter, so the two cannot drift. Catches a
+#      secret BEFORE commit (server push protection only fires at push, when the secret is
+#      already in history and only the owner-executed rewrite path remains, DA-006).
+#      Fixture tokens must be runtime-generated so the tree stays inert.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -200,6 +205,18 @@ if [ -x scripts/redact.sh ]; then
   echo "LADDER: redact.sh self-test OK"
 else
   fail "scripts/redact.sh missing or not executable — the DA-007 redaction rail is gone"
+fi
+
+# --- guard 9: secret-shape tree scan (DA-008; see header) ---
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  # NUL-separated list + xargs -0: filenames with spaces/non-ASCII must be SCANNED, not
+  # silently skipped — a word-split list was this guard's original blocker-class bug.
+  git ls-files -z -co --exclude-standard | xargs -0 scripts/redact.sh --scan \
+    || fail "secret-shaped content in the tree (files above, value-free positions) — never commit credentials; a FIXTURE token must be runtime-generated, never a stored literal (DA-008)"
+  # The worktree scan alone misses a staged-then-reverted secret: also scan staged blobs.
+  scripts/redact.sh --scan-staged \
+    || fail "secret-shaped content in a STAGED blob (above) — unstage and purge it before committing; the index is what a commit records (DA-008)"
+  echo "LADDER: secret-shape scan OK (worktree + staged)"
 fi
 
 # --- guard 2: D-115 skip-ci tokens in unmerged commit messages ---

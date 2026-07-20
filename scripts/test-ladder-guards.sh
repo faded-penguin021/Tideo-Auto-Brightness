@@ -179,6 +179,29 @@ rm "$SANDBOX/scripts/redact.sh"
 check "guard 8: missing redact.sh fails" 1 "redaction rail is gone"
 cp "$REPO_ROOT/scripts/redact.sh" "$SANDBOX/scripts/redact.sh"
 
+# --- guard 9: secret-shape tree scan --------------------------------------------------------
+
+g9_tok="ghp_$(head -c 36 /dev/zero | tr '\0' a)"
+printf 'debug log: %s\n' "$g9_tok" > "$SANDBOX/app/leak b.log"   # space in name: must be
+check "guard 9: secret-shaped file (space in name) fails" 1 "secret-shaped content in the tree"
+# Value-free property (D-175): the failing guard's output must never contain the raw token.
+g9_out=$(cd "$SANDBOX" && bash scripts/ladder.sh --guards-only 2>&1) || true
+if grep -qF "$g9_tok" <<<"$g9_out"; then
+  failures+=("guard 9 printed the secret value (D-175 violation)")
+  printf '=== FAIL: guard 9 value leak ===\n' >&2
+else
+  pass=$((pass + 1))
+fi
+rm "$SANDBOX/app/leak b.log"
+# Staged-blob gap: secret staged, worktree copy cleaned -> must still fail.
+printf 'staged %s\n' "$g9_tok" > "$SANDBOX/app/staged.txt"
+git_q add app/staged.txt
+printf 'clean now\n' > "$SANDBOX/app/staged.txt"
+check "guard 9: staged-then-reverted secret fails" 1 "STAGED blob"
+git_q reset -q -- app/staged.txt
+rm "$SANDBOX/app/staged.txt"
+check "guard 9: clean tree passes" 0 "secret-shape scan OK (worktree + staged)"
+
 # --- guard 2: D-115 skip-ci tokens ----------------------------------------------------------
 
 git_q commit -q --allow-empty -m 'document the [skip ci] literal'

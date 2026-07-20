@@ -574,6 +574,15 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
      tokens that a squash-merge would fold onto the default branch), scanned over
      `origin/{{DEFAULT_BRANCH}}..HEAD` **before push** — because force-push is forbidden, a
      pushed mistake is permanent until merge.
+   - *Secret-shape tree scan (P17):* FAIL if redacting any tracked/untracked text file OR
+     staged blob with the `redact.sh` filter would change it — the scan IS the filter,
+     drift-free by construction; value-free reporting (file + positions, never the match —
+     and TEST that property: a diagnostic that regresses to printing the line defeats the
+     point). Pass the file list NUL-separated (a word-split list silently skips
+     space/non-ASCII names — a blocker-class hole). Text files only; binaries ride on the
+     server-side push-protection layer, which fires at push — this guard is the earlier,
+     commit-time net. Consequence: any fixture token in the tree must be runtime-generated,
+     never a stored literal.
    - *Local-only advisories (WARN, skipped in CI):* checkpoint tripwire (code changed vs
      default branch but STATE.md not in the diff → the changelog line is probably missing);
      stale-branch tripwire (behind the default branch — a real conflict risk in

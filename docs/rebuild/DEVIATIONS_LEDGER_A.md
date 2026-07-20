@@ -171,3 +171,32 @@
   canonical input per pattern let a demonstrated case-flag weakening false-pass; a GNU-only
   sed flag broke the agent-neutral billing on BSD). Guard 8 + the adversarial cases are the
   fixes.
+
+- **DA-008: secret-shape commit guard — ladder guard 9 (owner-reopened, 2026-07-20).**
+  Supersedes the triage-#2 decline of a "local secret-pattern diff guard" (STATE Decided
+  non-items, declined 2026-07-20 in favor of server-side push protection): the owner
+  reopened it the same day, and the calculus HAD changed — (a) push protection fires at
+  PUSH, when the secret is already in commits and only the DA-006 owner-executed rewrite
+  path remains; a commit-time guard prevents the incident instead of detecting it; (b) the
+  pattern set now lives in-repo (`redact.sh`, DA-007), so the scan is drift-free BY
+  CONSTRUCTION — guard 9 defines "secret-shaped" as "redacting it would change it"
+  (`redact.sh --scan`: per-file redact + cmp; value-free output, file + diff positions
+  only, never the match, per D-175 — and the self-test asserts the value-free property).
+  Scans all tracked + untracked-unignored text files, NUL-separated (`ls-files -z` +
+  `xargs -0` — a word-split list silently skipped space/non-ASCII names), PLUS staged
+  blobs differing from HEAD (`--scan-staged`: the index is what a commit records; a
+  worktree-only scan passed a staged-then-reverted secret). ~5 s. Honest limits: TEXT
+  files only (a NUL byte defeats a sed scan — binaries ride on the push-protection
+  layer; a same-pattern `grep -a` pass over binaries was DECLINED: it would duplicate
+  the pattern list and reintroduce exactly the drift this design eliminates); gitignored
+  files unscanned (`git add -f` can still commit them — push-protection layer again);
+  BSD sed may false-positive a text file lacking a trailing newline (safe direction).
+  Building the guard immediately caught two of DA-007's own self-test fixtures (the AKIA
+  and xoxb literals were format-valid IN SOURCE — exactly what push protection would have
+  tripped on); all fixtures are now runtime-assembled; self-test 19 cases, suite 32.
+  Layered result: guard 9 (pre-commit) → GitHub push protection (pre-push, owner queue) →
+  DA-006 incident protocol (post-leak). The unit's DA-005 rule-review pass: 1 BLOCKER
+  (the word-split skip, reproduced by the reviewer), 4 should-fix, 3 nits — all adopted
+  (staged-blob scan, value-free test assertions, temp-file traps, limitation honesty,
+  PR-draft refresh, guard summaries de-enumerated to the ladder.sh header as single
+  source) except the binary grep pass, declined as above.

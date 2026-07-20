@@ -54,7 +54,7 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
    draft for the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit
      fixes, force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176,
-     DA-001…DA-006)`
+     DA-001…DA-008)`
    - *Body:*
      **Features (1.8.0/vc18):** opt-in automation intent surface — verbs, LOAD_PROFILE/
      CONTEXTS_RESUME, outbound STATE_CHANGED; `docs/AUTOMATION.md` (D-157) · TalkBack
@@ -65,10 +65,11 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
      relabel + MaxBright auto-raise parity (D-168/D-169) · stale User Guide copy.
      **Repo hardening:** `scripts/ladder.sh` one-command acceptance + guards (STATE caps,
      ledger rollover, citation integrity + `[cited]` sync, skip-ci scan, changelog cap,
-     rule-review tripwire) with its own regression suite, run by CI (D-161/D-166/D-173/
-     D-174/DA-006) · Owner queue + ask-don't-assume (D-167) · secret hygiene, leak-response
-     protocol, instruction hierarchy (D-175/DA-006) · Gradle parallel/config-cache.
-     **Agent-agnostic harness (D-176/DA-001…DA-006):** `AGENTS.md` pointer stub + neutral
+     rule-review tripwire, redaction self-test, secret-shape commit scan) with its own
+     regression suite, run by CI (D-161/D-166/D-173/D-174/DA-006–DA-008) · Owner queue +
+     ask-don't-assume (D-167) · secret hygiene: prose + `redact.sh` filter + leak-response
+     protocol + instruction hierarchy (D-175/DA-006/DA-007) · Gradle parallel/config-cache.
+     **Agent-agnostic harness (D-176/DA-001…DA-008):** `AGENTS.md` pointer stub + neutral
      `scripts/session-start.sh`; `.claude/` = thin adapter; ledger 1000-line rollover (base
      closed at D-176, `_A.md` live); branch-train codified; fresh-context glue/rule review.
      **Release:** vc18 / 1.8.0; changelog 488 B.
@@ -103,8 +104,8 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
   metrics dashboard (owner-effort budget); dependency SHA-pinning playbook (re-litigates
   2026-06-29); harness scaffold CLI / profiles / example repo (owner call if
   ever published standalone); ledger `Status:` retrofit (row-prose supersession notes,
-  now codified); local secret-pattern diff guard (server-side push protection preferred —
-  queue item 4); Owner-queue aging guard (date-stamps suffice).
+  now codified); Owner-queue aging guard (date-stamps suffice). (The local secret-pattern
+  guard decline was owner-reopened same day → ladder guard 9, DA-008.)
 - **Privileged Display (decided at Segments 4.5–5, D-150–D-152):** per-toggle orthogonal
   scheduling (removed by the D-151 pivot — scheduling IS "a Contexts rule loads a profile
   carrying display fields", winner-takes-all); persisted last-applied seed for
@@ -117,6 +118,11 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-20 — **DA-008** (owner-reopened): secret-shape commit guard — ladder guard 9
+  scans worktree (NUL-safe list) + staged blobs via `redact.sh --scan`/`--scan-staged`
+  (scan = filter, drift-free; value-free output, now test-asserted); found + fixed two
+  format-valid fixture literals in DA-007's own self-test; supersedes the triage-#2
+  decline. Rule-review: 1 blocker (word-split file skip) + 7 more, all adopted.
 - 2026-07-20 — **DA-007** (owner-requested): mechanical secret redaction —
   `scripts/redact.sh` (known token shapes → `[REDACTED:<class>]`; 16-case self-test run by
   new **ladder guard 8**; joins guard 7 + rule-review scope); adapters pipe output through

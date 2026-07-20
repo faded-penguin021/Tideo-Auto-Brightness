@@ -401,12 +401,12 @@ output: stop normal work — **containment outranks the checkpoint invariant.**
 
 ## Acceptance ladder
 
-**One command: `scripts/ladder.sh`** — fast pre-flight guards (the STATE.md length rule;
-the D-115 skip-ci token scan over unmerged commit messages — catch it BEFORE push, since
-force-push is forbidden; the D-173 D-citation-integrity check with its D-174 `[cited]`-marker sync, and the F-Droid
-changelog cap;
-plus WARN-only checkpoint/stale-branch/rule-review-tripwire advisories that self-skip in CI), then all five rungs
-in a single Gradle invocation. The guards themselves are regression-tested by
+**One command: `scripts/ladder.sh`** — fast pre-flight guards, then all five rungs in a
+single Gradle invocation. The guards are enumerated ONLY in the `ladder.sh` header comment
+(single source — prose re-enumerations here and in CLAUDE.md kept drifting as guards were
+added, DA-008 F8): failing checks for STATE length/structure, ledger rollover, citation
+integrity, changelog cap, skip-ci tokens, redaction self-test, and secret shapes, plus
+WARN-only advisories that self-skip in CI. The guards themselves are regression-tested by
 `scripts/test-ladder-guards.sh` (sandbox-repo fixtures, seconds; also a `build.yml` step —
 run it whenever you change a guard, D-173). On remote containers the session-start hook
 launches `scripts/warm-gradle.sh` in the background (D-173), so by the time you first run the

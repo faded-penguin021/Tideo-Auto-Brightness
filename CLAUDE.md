@@ -36,8 +36,9 @@ row may overflow the cap, the next row opens the next file (`DA-…` → `DB-…
 
 ```bash
 scripts/ladder.sh                 # ALL rungs below in one command, after fast local guards
-                                  # (STATE.md length; D-115 skip-ci scan; D-173 citation +
-                                  # changelog-cap checks); --guards-only for docs-only work
+                                  # (guards 1-9: state/ledger/citation/changelog/skip-ci/
+                                  # secret-shape checks + advisories — enumerated in the
+                                  # ladder.sh header); --guards-only for docs-only work
 ./gradlew :domain:test            # pure-JVM engine + golden parity tests
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests
@@ -109,8 +110,11 @@ fallback, D-172) — not "grant-only".
   token shapes with `[REDACTED:<class>]`. An adapter pipes tool/terminal output through it
   wherever its agent supports an output-filter hook, so tokens are scrubbed before the
   context window sees them; the Claude Code adapter currently cannot rewrite tool output, so
-  there it is manual-pipe only. A regex catches only known shapes — the prose rule above
-  still binds for everything else.
+  there it is manual-pipe only. Ladder guard 9 (DA-008) scans worktree files AND staged
+  blobs pre-commit with the SAME filter ("secret-shaped" = redacting it would change it —
+  drift-free by construction); fixture tokens must be runtime-generated, never stored
+  literals. Text files only (binaries ride on the push-protection layer), and a regex
+  catches only known shapes — the prose rule above still binds for everything else.
 - A diagnostic that seems to need raw secret material becomes a STATE.md **Owner queue** open
   question (ask for a narrower evidence contract) — never raw output.
 - A **leaked** secret (commit, push, log): follow RUNBOOK "Incident: leaked credential"
