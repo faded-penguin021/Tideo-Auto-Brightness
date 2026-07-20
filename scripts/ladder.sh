@@ -34,6 +34,10 @@
 #      STATE.md carries no matching entry — RUNBOOK Session discipline 3); 4 = stale-branch
 #      tripwire (HEAD behind origin/main CAN invite a squash-merge conflict — but under the
 #      DA-002 branch-train model behind-main is usually structural, so it stays advisory).
+#   7. Rule-review tripwire (DA-006; WARN-only, skipped under GITHUB_ACTIONS): uncommitted
+#      changes touching harness-legislation files (constitution + its AGENTS.md pointer,
+#      RUNBOOK, this script + its test suite, session bootstrap, adapter permission config)
+#      print a reminder that the DA-005 rule-review protocol applies before commit.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -159,6 +163,29 @@ if [ -n "$vc" ] && [ -f "fastlane/metadata/android/en-US/changelogs/${vc}.txt" ]
     fail "$cl is ${cl_bytes} B — over the 500-char F-Droid whatsNew cap (RUNBOOK §6). Shorten it."
   fi
   echo "LADDER: F-Droid changelog OK ($cl, ${cl_bytes} B <= 500)"
+fi
+
+# --- guard 7: rule-review tripwire (DA-006; WARN-only, local-only — skipped under
+# GITHUB_ACTIONS like guards 3/4, numbered after the pre-existing guards whose numbers are
+# cited by immutable ledger rows). The DA-005 rule-review protocol binds any diff to harness
+# legislation; no guard can perform that review — this tripwire only SURFACES the obligation,
+# by scanning the UNCOMMITTED changes (staged/unstaged/untracked; per-unit, unlike guard 3's
+# per-branch diff base, so it stops warning once the reviewed unit is committed). STATE.md
+# and the ledger files are deliberately NOT in the list: they change in nearly every unit
+# (changelog/queue/row appends) and warning every unit is warn fatigue — their legislative
+# sections (preambles, Decided non-items) stay prose-covered (RUNBOOK Rule-review protocol).
+if [ "${GITHUB_ACTIONS:-}" != "true" ] && git rev-parse --git-dir >/dev/null 2>&1; then
+  legislation_touched=""
+  # A new agent adapter's permission-config file joins this list (CLAUDE.md Agent harness).
+  for f in CLAUDE.md AGENTS.md docs/rebuild/RUNBOOK.md scripts/ladder.sh \
+           scripts/test-ladder-guards.sh scripts/session-start.sh .claude/settings.json; do
+    if git status --porcelain -- "$f" 2>/dev/null | grep -q .; then
+      legislation_touched="$legislation_touched $f"
+    fi
+  done
+  if [ -n "$legislation_touched" ]; then
+    echo "LADDER WARN: uncommitted changes touch harness legislation:${legislation_touched} — the rule-review protocol applies before commit (fresh-context reviewer, strongest tier; RUNBOOK Rule-review, DA-005/DA-006)."
+  fi
 fi
 
 # --- guard 2: D-115 skip-ci tokens in unmerged commit messages ---

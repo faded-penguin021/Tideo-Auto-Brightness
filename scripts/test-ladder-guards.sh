@@ -75,8 +75,11 @@ BASELINE_SHA="$(git_q rev-parse HEAD)"
 # --- assertion helper -----------------------------------------------------------------------
 
 check() {  # $1 = case name, $2 = expected rc (0/1), $3 = required output substring
+  # GITHUB_ACTIONS is cleared so the suite exercises the LOCAL guard set deterministically —
+  # CI exports it for every step, which would silently skip guard 7's positive cases
+  # (DA-006 rule-review finding). The CI-skip behavior is asserted explicitly below.
   local name="$1" want_rc="$2" want_out="$3" out rc=0
-  out="$(cd "$SANDBOX" && bash scripts/ladder.sh --guards-only 2>&1)" || rc=$?
+  out="$(cd "$SANDBOX" && GITHUB_ACTIONS= bash scripts/ladder.sh --guards-only 2>&1)" || rc=$?
   if [ "$rc" -ne "$want_rc" ] || ! grep -qF "$want_out" <<< "$out"; then
     failures+=("$name (rc=$rc, wanted rc=$want_rc + \"$want_out\")")
     printf '=== FAIL: %s ===\n%s\n' "$name" "$out" >&2
@@ -173,6 +176,34 @@ git_q reset -q --hard "$BASELINE_SHA"
 git_q commit -q --allow-empty -m 'harmless commit saying skip-ci (hyphenated)'
 check "guard 2: hyphenated skip-ci is allowed" 0 "no skip-ci tokens"
 git_q reset -q --hard "$BASELINE_SHA"
+
+# --- guard 7: rule-review tripwire (DA-006) --------------------------------------------------
+
+printf '# fixture legislation file\n' > "$SANDBOX/CLAUDE.md"
+check "guard 7: untracked legislation file warns rule-review" 0 "rule-review protocol applies"
+rm "$SANDBOX/CLAUDE.md"
+
+printf '\n# fixture appended comment\n' >> "$SANDBOX/scripts/ladder.sh"
+check "guard 7: modified guard script warns rule-review" 0 "rule-review protocol applies"
+git_q checkout -q -- scripts/ladder.sh
+
+# Negative cases need absence assertions, so they bypass check()'s substring-required form.
+out_rc=0
+out="$(cd "$SANDBOX" && GITHUB_ACTIONS= bash scripts/ladder.sh --guards-only 2>&1)" || out_rc=$?
+if [ "$out_rc" -eq 0 ] && ! grep -qF "rule-review protocol applies" <<< "$out"; then
+  pass=$((pass + 1))
+else
+  failures+=("guard 7: clean legislation files stay quiet")
+fi
+printf '# fixture legislation file\n' > "$SANDBOX/CLAUDE.md"
+out_rc=0
+out="$(cd "$SANDBOX" && GITHUB_ACTIONS=true bash scripts/ladder.sh --guards-only 2>&1)" || out_rc=$?
+if [ "$out_rc" -eq 0 ] && ! grep -qF "rule-review protocol applies" <<< "$out"; then
+  pass=$((pass + 1))
+else
+  failures+=("guard 7: tripwire skipped under GITHUB_ACTIONS")
+fi
+rm "$SANDBOX/CLAUDE.md"
 
 # --- summary --------------------------------------------------------------------------------
 

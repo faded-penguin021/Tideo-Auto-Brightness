@@ -266,7 +266,8 @@ any moment (rate limit, window end, compaction).
    golden vector says which way), (c) **semver-ambiguous** (could be read as minor vs major), or
    (d) **process/policy reshaping** (changing how the owner works, not just the code): do NOT
    resolve it by picking. Stop at the last green checkpoint, record the question under
-   `STATE.md ## Owner queue` → **Open questions** — the fork, the options, and your
+   `STATE.md ## Owner queue` → **Open questions** — date-stamped `[YYYY-MM-DD]` (age is the
+   owner's triage cue, DA-006), the fork, the options, and your
    recommendation with reasons — then end the unit and move to independent work (or end the
    session). A session's **final chat message restates the Owner queue** so the owner sees
    pending items without opening STATE. Routine engineering judgment inside a unit's stated
@@ -370,10 +371,32 @@ Out of scope: routine STATE.md edits (changelog lines, queue items, Current stat
 working memory, not legislation. Two STATE sections ARE legislation and stay in scope: the
 **length-guard preamble** (guard-lockstep thresholds) and **Decided non-items** (binding
 declines). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
-their triage). This protocol is itself prose-only — no guard detects a legislation diff;
-reviewer attention is the enforcement (the D-162 no-attestation-gates line holds). **One
-level of meta only:** the reviewer reports, the session triages, the owner arbitrates via
-the Owner queue — nobody reviews the reviewer.
+their triage). Ladder guard 7 (DA-006) WARNs when the *uncommitted* diff touches a
+legislation file — that tripwire only *surfaces* the obligation, it never certifies the
+pass; the review itself stays prose-enforced (the D-162 no-attestation-gates line holds).
+STATE.md and the ledger files are deliberately outside the tripwire (they change in nearly
+every unit — warn fatigue kills tripwires), so their legislative sections stay wholly
+prose-covered. **One level of meta only:** the reviewer reports, the session triages, the
+owner arbitrates via the Owner queue — nobody reviews the reviewer.
+
+## Incident: leaked credential (DA-006)
+
+If a secret (token, key, password) has reached a commit, a pushed branch, a log, or any other
+output: stop normal work — **containment outranks the checkpoint invariant.**
+
+1. **Never repeat the value again** — not in STATE, the ledger, chat, an issue, or a
+   "look what leaked" diff. Refer to it by key name only (D-175 discipline).
+2. **Owner queue, immediately** (Pending owner actions): the key name, where it landed
+   (commit SHA / file / log), and the exposure window. Push nothing new containing it.
+3. **The owner rotates the credential FIRST** — rotation, not history cleanup, is what ends
+   the exposure; treat the value as burned even after cleanup.
+4. **History rewrite is the ONE sanctioned exception** to "never rewrite pushed history" and
+   the force-push rail: owner-decided AND owner-executed — an agent never runs the rewrite
+   (the deny rail stays for agents; the owner lifts it for themselves). Scoped to removing
+   the secret (e.g. `git filter-repo`), coordinated with the remote. Never as part of normal
+   engineering.
+5. Afterward: ledger row for the incident; if a guard or deny rule could have caught it, add
+   it with a fixture test.
 
 ## Acceptance ladder
 
@@ -381,7 +404,7 @@ the Owner queue — nobody reviews the reviewer.
 the D-115 skip-ci token scan over unmerged commit messages — catch it BEFORE push, since
 force-push is forbidden; the D-173 D-citation-integrity check with its D-174 `[cited]`-marker sync, and the F-Droid
 changelog cap;
-plus WARN-only checkpoint/stale-branch advisories that self-skip in CI), then all five rungs
+plus WARN-only checkpoint/stale-branch/rule-review-tripwire advisories that self-skip in CI), then all five rungs
 in a single Gradle invocation. The guards themselves are regression-tested by
 `scripts/test-ladder-guards.sh` (sandbox-repo fixtures, seconds; also a `build.yml` step —
 run it whenever you change a guard, D-173). On remote containers the session-start hook
@@ -443,3 +466,9 @@ If this runbook lacks what you need for the task in front of you:
 3. If a playbook here is wrong, stale, or missing a case you just handled, **fix this RUNBOOK in
    the same change.** Treat the runbook as code: it should always reflect how changes are
    actually made now.
+
+Boundary (DA-006): self-adaptation covers *operational* content — playbooks, the doc index,
+module maps, commands, stale paths. *Binding* rules (Session discipline, the review
+protocols, guard semantics, git/permission policy) are never self-adaptation: they go
+through the rule-review protocol (DA-005), and process-reshaping changes through the Owner
+queue (Session discipline 7(d)).
