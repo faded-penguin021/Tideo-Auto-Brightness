@@ -62,6 +62,7 @@ git_q() { git -C "$SANDBOX" -c user.email=t@t -c user.name=t "$@"; }
 
 mkdir -p "$SANDBOX/docs/rebuild" "$SANDBOX/scripts" "$SANDBOX/app" "$SANDBOX/$CHANGELOG_DIR"
 cp "$REPO_ROOT/scripts/ladder.sh" "$SANDBOX/scripts/ladder.sh"
+cp "$REPO_ROOT/scripts/redact.sh" "$SANDBOX/scripts/redact.sh"   # guard 8 runs its self-test
 write_state 0
 write_ledger 10
 write_gradle 7
@@ -167,6 +168,16 @@ check "guard 6: 501-byte changelog fails" 1 "over the 500-char F-Droid whatsNew 
 head -c 500 /dev/zero | tr '\0' 'x' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
 check "guard 6: 500-byte changelog passes" 0 "F-Droid changelog OK"
 printf 'Short changelog.\n' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
+
+# --- guard 8: redact.sh self-test -----------------------------------------------------------
+
+# A weakened filter (here: a stub whose self-test fails) must fail the whole ladder.
+printf '#!/bin/bash\n[ "${1:-}" = "--self-test" ] && exit 1\ncat\n' > "$SANDBOX/scripts/redact.sh"
+chmod +x "$SANDBOX/scripts/redact.sh"
+check "guard 8: broken redact.sh self-test fails" 1 "redaction pattern regressed"
+rm "$SANDBOX/scripts/redact.sh"
+check "guard 8: missing redact.sh fails" 1 "redaction rail is gone"
+cp "$REPO_ROOT/scripts/redact.sh" "$SANDBOX/scripts/redact.sh"
 
 # --- guard 2: D-115 skip-ci tokens ----------------------------------------------------------
 

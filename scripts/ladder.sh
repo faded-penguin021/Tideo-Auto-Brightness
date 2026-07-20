@@ -12,8 +12,9 @@
 #   scripts/ladder.sh <gradle args...>   extra args forwarded to Gradle (e.g. --no-daemon)
 #
 # Guards (fail fast, before any build):
-#   1. STATE.md length rule (mirrors STATE.md's own preamble): warn over the 12 KB
-#      steady-state target, FAIL over the 16 KB hard cap. 1b: required sections present
+#   1. STATE.md length rule (mirrors STATE.md's own preamble, DA-004 hysteresis): quiet to
+#      14 KB, then warn to deep-compress to <= 9 KB; FAIL over the 16 KB hard cap.
+#      1b: required sections present
 #      (over-compression tripwire). 1c: deviations-ledger rollover reminder (D-153).
 #      (LADDER_STATE_FILE / LADDER_LEDGER_FILE override the paths — used only by
 #      scripts/test-ladder-guards.sh, the guards' own test suite.)
@@ -38,6 +39,8 @@
 #      changes touching harness-legislation files (constitution + its AGENTS.md pointer,
 #      RUNBOOK, this script + its test suite, session bootstrap, adapter permission config)
 #      print a reminder that the DA-005 rule-review protocol applies before commit.
+#   8. redact.sh self-test (DA-007): the secret-redaction filter is a rail — a silent regex
+#      regression must fail the ladder, not pass quietly.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -178,7 +181,8 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ] && git rev-parse --git-dir >/dev/null 2>&
   legislation_touched=""
   # A new agent adapter's permission-config file joins this list (CLAUDE.md Agent harness).
   for f in CLAUDE.md AGENTS.md docs/rebuild/RUNBOOK.md scripts/ladder.sh \
-           scripts/test-ladder-guards.sh scripts/session-start.sh .claude/settings.json; do
+           scripts/test-ladder-guards.sh scripts/session-start.sh scripts/redact.sh \
+           .claude/settings.json; do
     if git status --porcelain -- "$f" 2>/dev/null | grep -q .; then
       legislation_touched="$legislation_touched $f"
     fi
@@ -186,6 +190,16 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ] && git rev-parse --git-dir >/dev/null 2>&
   if [ -n "$legislation_touched" ]; then
     echo "LADDER WARN: uncommitted changes touch harness legislation:${legislation_touched} — the rule-review protocol applies before commit (fresh-context reviewer, strongest tier; RUNBOOK Rule-review, DA-005/DA-006)."
   fi
+fi
+
+# --- guard 8: redact.sh self-test (DA-007) — the redaction filter is a rail; a silently
+# broken pattern must fail the ladder. Milliseconds; fake tokens generated at runtime. ---
+if [ -x scripts/redact.sh ]; then
+  scripts/redact.sh --self-test >/dev/null \
+    || fail "scripts/redact.sh --self-test FAILED — a redaction pattern regressed; fix the filter before committing (DA-007)"
+  echo "LADDER: redact.sh self-test OK"
+else
+  fail "scripts/redact.sh missing or not executable — the DA-007 redaction rail is gone"
 fi
 
 # --- guard 2: D-115 skip-ci tokens in unmerged commit messages ---

@@ -105,6 +105,12 @@ fallback, D-172) — not "grant-only".
   whether a key is set. The agent adapter config (`.claude/settings.json` for Claude Code)
   denies the dump commands where the agent supports permission rules; the policy binds
   regardless.
+- Defense-in-depth (DA-007): `scripts/redact.sh` (stdin→stdout) replaces known credential
+  token shapes with `[REDACTED:<class>]`. An adapter pipes tool/terminal output through it
+  wherever its agent supports an output-filter hook, so tokens are scrubbed before the
+  context window sees them; the Claude Code adapter currently cannot rewrite tool output, so
+  there it is manual-pipe only. A regex catches only known shapes — the prose rule above
+  still binds for everything else.
 - A diagnostic that seems to need raw secret material becomes a STATE.md **Owner queue** open
   question (ask for a narrower evidence contract) — never raw output.
 - A **leaked** secret (commit, push, log): follow RUNBOOK "Incident: leaked credential"

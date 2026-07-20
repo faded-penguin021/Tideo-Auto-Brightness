@@ -147,3 +147,27 @@
   exported `GITHUB_ACTIONS=true` (suite now clears it and asserts the skip explicitly), and
   the rewrite exception initially allowed an "owner-approved" agent-executed rewrite
   (tightened to owner-executed only).
+
+- **DA-007: mechanical secret redaction at the adapter boundary (owner-requested,
+  2026-07-20).** D-175/P17 secret hygiene relied on prose discipline + dump-command deny
+  rails; neither scrubs a token that lands in ordinary tool output (a build log echoing a
+  header, a verbose curl). New `scripts/redact.sh` (agent-neutral, stdin→stdout): replaces
+  prefix-anchored KNOWN token shapes — GitHub/GitLab/Slack/AWS/Anthropic/OpenAI/Google/npm
+  tokens, JWTs, Bearer headers (case classes, no GNU-only sed flags — BSD-safe), PEM
+  private-key blocks (unterminated block → redact to EOF, fail-closed by design) — with
+  `[REDACTED:<class>]`; deliberately no generic entropy matching (false positives mangle
+  build output). Runtime `--self-test` (16 cases: full-redaction asserts — a raw fragment
+  surviving fails; lowercase-bearer variant; near-miss negative controls) generates
+  format-valid FAKE tokens — never stored in the repo, where they would trip push-protection
+  scanners — and **ladder guard 8 runs it every invocation**: the filter is a rail, so a
+  silent regex regression fails the build. Adapters pipe tool/terminal output through it
+  wherever the agent exposes an output-filter hook; capability honesty is part of the rule:
+  Claude Code today cannot rewrite tool output before the context sees it, so the Claude
+  adapter stays prose + deny rails, filter available for manual piping. `redact.sh` joins
+  guard 7's legislation list and the DA-005 rule-review scope (a silently weakened filter is
+  a weakened rail). The regex layer narrows the window; it never replaces the D-175 prose
+  rule (unknown-shape secrets). The unit's DA-005 rule-review pass returned 6 findings, all
+  adopted pre-commit — the theme: the self-test was decorative (nothing ran it; one
+  canonical input per pattern let a demonstrated case-flag weakening false-pass; a GNU-only
+  sed flag broke the agent-neutral billing on BSD). Guard 8 + the adversarial cases are the
+  fixes.

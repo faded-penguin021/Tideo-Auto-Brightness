@@ -190,8 +190,15 @@ output before reasoning over it. If a diagnostic can't be done through a redacte
 and request a narrower evidence contract via the Owner queue (P8 applied to secrets) — never
 default to raw output. Credential rotation and auth-config changes are always Owner-queue
 items with explicit approval and a rollback plan. Split per P13: the dump commands go in the
-permission deny rails; the redaction discipline stays prose. (Adapted from an external
-agent-safety protocol — `odysseus-fuzzy`'s AGENTS.md.)
+permission deny rails; the redaction discipline stays prose. Add a third, mechanical layer
+where the harness allows it: a `scripts/redact.sh` filter (stdin→stdout, prefix-anchored
+token shapes → `[REDACTED:<class>]`, never generic entropy matching — that mangles build
+output) that adapters pipe tool/terminal output through BEFORE the context window sees it,
+via an output-filter hook if the agent has one. Be honest per adapter about capability: an
+agent without output rewriting keeps prose + deny rails only, and the filter stays available
+for manual piping. The regex layer catches known shapes only — it narrows the window, it
+never replaces the prose rule. (Adapted from an external agent-safety protocol —
+`odysseus-fuzzy`'s AGENTS.md.)
 **Leak response is a protocol, not improvisation.** If a secret has already escaped (into a
 commit, a pushed branch, a log): stop normal work — containment outranks the checkpoint
 invariant. Never repeat the value again anywhere — not in state files, the ledger, chat, or a
@@ -619,6 +626,10 @@ your agent's equivalent):
   `.env`-style files — P17). Prose forbids it; the permission layer *enforces* it. An agent
   without permission-rule support still inherits the prose rule — the rails are
   defense-in-depth, not the only copy of the policy.
+- **Output redaction (P17, where supported):** if the agent exposes an output-filter hook,
+  pipe tool/terminal output through `scripts/redact.sh` so known token shapes are scrubbed
+  before they reach the context window. State explicitly in the adapter which layers it
+  actually provides — rails, redaction, or prose-only.
 - **Server-side (P13):** the owner mirrors the hardest rails at the host — branch protection
   on `{{DEFAULT_BRANCH}}` (PRs required; force-push/deletion blocked), secret-scanning push
   protection. The adapter's deny rules bind only agents that load them; the server binds

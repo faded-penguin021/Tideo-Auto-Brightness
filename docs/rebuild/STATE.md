@@ -117,6 +117,10 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-20 — **DA-007** (owner-requested): mechanical secret redaction —
+  `scripts/redact.sh` (known token shapes → `[REDACTED:<class>]`; 16-case self-test run by
+  new **ladder guard 8**; joins guard 7 + rule-review scope); adapters pipe output through
+  it where an output-filter hook exists (Claude Code today: manual-pipe only).
 - 2026-07-20 — **DA-006** (owner-approved) external-review triage #2: instruction
   hierarchy, leaked-credential incident protocol (the ONE history-rewrite exception),
   server-side-rails owner item, ladder guard 7 rule-review tripwire, self-adaptation
