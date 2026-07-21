@@ -280,3 +280,29 @@
   honesty in this row and STATE) + nits (CLAUDE.md consequence sentence updated; pgrep
   substring match accepted for an informational line) — all adopted except history
   deepening, declined as above.
+- DA-011: external-review triage #4 (owner-relayed, 2026-07-21) — two suggestions for the
+  agentic harness; one declined, one parked. **DECLINED (1): prompt-cache doc-ordering** —
+  the idea to document that the constitution/RUNBOOK/ledger load at the context-window START
+  (a static prefix → provider cache hits) while STATE + active diffs go at the END. Three
+  reasons: (a) non-actionable in an agent-agnostic prompt (D-176) — the agent does not control
+  how its host assembles the context window, so "load these first" is neither directable nor
+  enforceable, and cache mechanics are vendor- and time-specific, so they don't belong in a
+  vendor-neutral operating prompt; (b) it contradicts the ledger's design — the ledger is
+  consulted/grepped on demand, never loaded every session (the protocol reads STATE first, not
+  the ledger), and at 3.5k+ lines a cached-prefix strategy would force reading it wholesale each
+  session, the exact context hazard P2's per-file line-cap + rollover exists to bound; (c) to the
+  extent "stable-early / volatile-late" holds it is already the emergent architecture (the
+  constitution loads first by construction; STATE is read via a tool call afterward) and P2
+  already tiers memory by mutability — nothing to add. **PARKED (2): the "unstick"/anti-thrash
+  protocol** — stop, git reset, Owner-queue, and pause after repeatedly failing ladder guards
+  rather than burning the usage window fighting a script. Real kernel: Session discipline 6
+  (Recovery) names no *termination* condition, so a weaker agent can loop reset→retry-smaller→
+  fail indefinitely — the P6 weakest-agent failure mode (verified: no existing anti-thrash rule).
+  But it is a binding Session-discipline change → DA-005 rule-review (no self-review fallback) +
+  process-shaping → 7(d) owner fork; with no fresh-context reviewer available this session, the
+  DA-005 fallback is to PARK it. Recorded as an Owner-queue Open question with a draft clause and
+  a recommendation to adopt the kernel (a minimal stop-and-escalate clause) but NOT the literal
+  3-strike-counter + git-reset form (git reset is already in 6; a magic count is Goodhart-brittle
+  per P3/P10; the "formatting/markdown" framing doesn't match this repo's semantic guards). No
+  code, no rule, and no harness-prompt change this unit (both items decline/park) — harness stays
+  v1.3.
