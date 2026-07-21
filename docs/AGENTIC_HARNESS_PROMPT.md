@@ -1,6 +1,6 @@
 # The Agentic Maintenance Harness — a generalized, reusable prompt
 
-**Harness version 1.3 (2026-07-21).** Instantiating repos may note the version they adopted
+**Harness version 1.4 (2026-07-21).** Instantiating repos may note the version they adopted
 (e.g. "AMH v1.1") in their constitution, so process drift is diagnosable as the harness evolves.
 
 This document generalizes the maintenance harness used in this repository (the constitution
@@ -67,11 +67,19 @@ give each a **binary** acceptance check — tests or a scripted comparison, neve
 model and is cut off mid-task. Prefer mechanical steps with hard gates over judgment calls.
 Tell the agent explicitly: *you are the last reviewer; there is no stronger pass behind you.*
 
-**P7. Recovery is a protocol, not improvisation.** When a unit goes wrong, don't flail
-forward: reset to the last green checkpoint (`git reset --hard HEAD` + careful clean), re-run
-the ladder to confirm green, re-attempt smaller. If the dead end taught a durable lesson,
-record it *before* retrying. Pushed checkpoints are immutable — recovery never rewrites pushed
-history (and force-push is denied at the permission layer, not just in prose — see P13). The
+**P7. Recovery is a protocol, not improvisation — and it is bounded.** When a unit goes wrong,
+don't flail forward: reset to the last green checkpoint (`git reset --hard HEAD` + careful
+clean), re-run the ladder to confirm green, re-attempt smaller. If the dead end taught a
+durable lesson, record it *before* retrying. But recovery is not infinite: if the same blocker
+survives a second reset-and-retry cycle with no real progress, stop — reset once more to green
+(never end a unit red), record the blocker in the Owner queue, persist that record (commit/push)
+so it survives session death, and end the unit rather than thrashing. A gate that won't go green
+is either a real fix the agent is missing (diagnose it, don't just re-run it) or an owner fork
+(P8) — neither is solved by burning the usage window re-running a script (the P6 weakest-agent
+failure mode; the stop is what keeps a lesser model from spending a whole window fighting a
+guard). The stop is for a genuinely stuck blocker, not cover for abandoning a failure the agent
+could diagnose. Pushed checkpoints are immutable — recovery never rewrites pushed history (and
+force-push is denied at the permission layer, not just in prose — see P13). The
 single sanctioned exception is a security incident — a leaked credential may require an
 owner-scoped history rewrite (P17), executed by the owner, never by an agent; never as part
 of normal engineering.
@@ -471,9 +479,14 @@ bump (two reviewable commits: forward-compat first, behavior flip second), relea
 5. **Multi-unit work** persists an owner-approved plan file + STATE checklist; segments run
    sequentially and each ends shippable; delete the plan at the end (durable content must by
    then live in Changelog lines + ledger rows; code cites ledger rows, never the plan file).
-6. **Recovery.** If the unit in flight has gone wrong, reset to the last green checkpoint,
-   re-run the ladder to confirm green, re-attempt smaller. Record durable lessons first.
-   Pushed checkpoints are immutable — never rewrite pushed history.
+6. **Recovery (bounded).** If the unit in flight has gone wrong, reset to the last green
+   checkpoint, re-run the ladder to confirm green, re-attempt smaller; record durable lessons
+   first. But recovery is not infinite: if the SAME blocker survives a second reset-and-retry
+   cycle with no real progress, stop — reset once more to green (never end a unit red), record
+   the blocker in the Owner queue, persist it (commit/push), and end the unit (a gate that won't
+   go green is a real fix you're missing or an owner fork, not something to thrash — and the stop
+   is for a genuinely stuck blocker, not cover for abandoning work you could diagnose). Pushed
+   checkpoints are immutable — never rewrite pushed history.
 7. **Ask, don't assume.** Forks that are (a) irreversible/expensive to unwind (schema
    migration, deleting a feature, renaming a public surface), (b) user-visible behavior with
    no spec to appeal to, (c) version-semantics ambiguous (readable as minor vs major), or

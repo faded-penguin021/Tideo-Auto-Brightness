@@ -44,36 +44,26 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
    `main` (only session branch; supersets the train). Squash commit takes the PR title+body —
    draft = the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit fixes,
-     force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176, DA-001…DA-011)`
+     force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176, DA-001…DA-012)`
    - *Body:* **Features (1.8.0/vc18):** automation intent surface (D-157, `docs/AUTOMATION.md`) ·
      TalkBack A0–A7 + crash-log capture (D-156/D-158) · force dark via Shizuku/root (D-172) ·
      context write-through + baseline revert (D-170). **Fixes:** IME dead-gap (D-159) · RESUME
      gate (D-160) · audit closes (D-163–D-165) · super-dimming relabel + MaxBright auto-raise
      (D-168/D-169) · stale User Guide. **Repo hardening:** `ladder.sh` acceptance + 10 guards +
-     command guard, CI-run, own regression suite (D-161/D-166/D-173/D-174/DA-006–DA-011) · guarded
+     command guard, CI-run, own regression suite (D-161/D-166/D-173/D-174/DA-006–DA-012) · guarded
      Owner queue + ask-don't-assume (D-167) · secret hygiene (`redact.sh` + leak protocol +
      instruction
      hierarchy, D-175/DA-006/DA-007) · Gradle parallel/config-cache. **Harness (D-176/DA-001…
-     DA-011):** `AGENTS.md` stub + neutral `session-start.sh`; thin `.claude/` adapter; ledger
-     1000-line rollover; branch-train; fresh-context glue/rule review. **Release:** vc18 / 1.8.0.
+     DA-012, prompt v1.4):** `AGENTS.md` stub + neutral `session-start.sh`; thin `.claude/`
+     adapter; ledger 1000-line rollover; branch-train; fresh-context glue/rule review;
+     bounded-recovery stop condition (DA-012). **Release:** vc18 / 1.8.0.
 2. After CI green: on-device `DEVICE_TEST_SCRIPT.md` **§§12–15**; findings → **Incoming
    findings**.
 3. Cut **v1.8.0 / vc18** from `main` via the Release UI.
 4. **Server-side rails (DA-006):** enable on GitHub — `main` branch protection (PRs required;
    force-push + deletion blocked) + secret-scanning push protection.
 
-**Open questions:**
-
-1. **[2026-07-21] Anti-thrash stop-condition in Session discipline 6 (Recovery)?** (Triage #4
-   item 2 — the "unstick" idea; DA-011.) Recovery says reset → re-attempt smaller but names no
-   *termination*, so a weak agent can loop reset→retry→fail, burning the window (the P6 mode; no
-   such rule today). Binding change → DA-005 + 7(d) owner fork, so parked. *Options:* (a) minimal
-   stop-and-escalate clause in 6; (b) leave as-is (6 + 7 imply it); (c) adopt literally (3-strike
-   counter + git reset). *Rec:* **(a)** — draft: *"If the SAME blocker survives a reset-and-retry
-   cycle a second time with no real progress, stop — record it under the Owner queue and end the
-   unit; a guard that won't go green is a real fix you're missing or an owner fork, not something
-   to thrash."* Decline (c): git reset is already in 6; a magic count is Goodhart-brittle
-   (P3/P10); the "formatting/markdown" framing doesn't fit this repo's *semantic* guards.
+**Open questions:** (none)
 
 **Incoming findings:** (none)
 
@@ -101,7 +91,8 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
   first, STATE + diffs last for cache hits) — non-actionable in an agent-agnostic prompt (agent
   doesn't control host context assembly; vendor/time-specific, P6/D-176); contradicts the
   grep-on-demand ledger design (a cached prefix = reading 3.5k+ lines every session, the hazard P2
-  bounds). Companion "unstick" idea parked, not declined (Open question above).
+  bounds). Companion "unstick" idea NOT declined — ADOPTED (owner-approved) as the discipline-6
+  bounded-recovery stop condition, DA-012.
 - **Privileged Display (D-150–D-152):** per-toggle orthogonal scheduling (removed by D-151 pivot);
   persisted last-applied seed for `DisplayTogglesCoordinator` (revisit on real reports); QS tile /
   notification grayscale action; refresh-rate forcing / OEM alternate keys (D-048/D-149); manual
@@ -111,6 +102,14 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-21 — **DA-012** (owner-approved): anti-thrash stop condition in Session discipline 6
+  (Recovery) — if the SAME blocker survives a second reset-and-retry cycle with no progress, stop,
+  Owner-queue the blocker, end the unit (was: no termination condition → thrash the window, P6).
+  Anchors the stop to a green checkpoint (branch never ends red) + persists the Owner-queue note.
+  Adopts the DA-011 rec (the minimal stop-and-escalate kernel), not the literal 3-strike counter.
+  Mirrored to the harness prompt (P7 + template 3.2) — **v1.3→v1.4**. DA-005 rule-review:
+  fresh-context subagent, SAFE-WITH-FIXES (2 should-fixes + 3 nits adopted). DA-011 Open question
+  retired.
 - 2026-07-21 — **DA-011** (external-review triage #4): DECLINED prompt-cache doc-ordering
   (non-actionable in an agent-agnostic prompt; contradicts the grep-on-demand ledger design —
   P2/P6/D-176) → Decided non-items. PARKED the "unstick"/anti-thrash idea as an Owner-queue Open

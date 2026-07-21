@@ -306,3 +306,26 @@
   per P3/P10; the "formatting/markdown" framing doesn't match this repo's semantic guards). No
   code, no rule, and no harness-prompt change this unit (both items decline/park) — harness stays
   v1.3.
+- DA-012: anti-thrash stop condition in Session discipline 6 (Recovery) — owner-approved
+  2026-07-21 (the DA-011 Open question, resolved: owner said "implement your recommendation",
+  which answers the 7(d) process-shaping fork). Adds a bounded-recovery clause: reset →
+  re-attempt smaller stays, but if the SAME blocker survives a second reset-and-retry cycle with
+  no real progress the session STOPS — resets once more to the last green checkpoint (so the
+  branch never ends red — discipline 3/5), records the blocker under the Owner queue, commits +
+  pushes that STATE update (durable across session death), and ends the unit, instead of burning
+  the usage window re-running a guard (the P6 weakest-agent failure mode; Recovery previously
+  named no termination condition, so a literal reading looped indefinitely). Framed as "a
+  guard/gate that won't go green is either a real fix you're missing or an owner fork (discipline
+  7) — neither is solved by re-running it", plus a discipline-7-style anti-abuse caveat (the stop
+  is for a genuinely stuck blocker, not cover for abandoning a failure you could diagnose), so it
+  routes to the right existing channel rather than adding a new one. Adopts the DA-011
+  recommendation (the minimal stop-and-escalate kernel) and NOT the literal suggestion (a 3-strike
+  counter + git reset): git reset is already in 6, and a *bare* attempt-count is Goodhart-brittle
+  (P3/P10) — the clause keys on a floor of ≥2 cycles gated by a "no real progress" judgment, not a
+  bare count, matched to this repo's semantic guards where a failure usually signals a real fix,
+  not a fight. Mirrored into the generalized harness prompt (P7 "bounded" + template 3.2 discipline
+  6) to keep the export in lockstep — harness **v1.3 → v1.4**. This is a Session-discipline
+  (legislation) change: the DA-005 rule-review ran in a fresh-context subagent — verdict
+  SAFE-WITH-FIXES; its two should-fixes (anchor the stop to a green checkpoint so the branch never
+  ends red; add the anti-abuse caveat) and three nits were all adopted before commit. Owner queue
+  Open question retired.

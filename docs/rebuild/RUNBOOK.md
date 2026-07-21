@@ -253,11 +253,21 @@ any moment (rate limit, window end, compaction).
    supports one (DA-003) — accountability for triaging its findings stays with the session.
 5. **Multi-unit work** uses the playbook-5 persisted-plan pattern (plan file + STATE checklist)
    so any session can resume the backlog mid-stream.
-6. **Recovery.** If the unit in flight has gone wrong, do not flail forward: reset the working
-   tree to the last green checkpoint (`git status` first, then `git reset --hard HEAD` and a
-   careful `git clean` of files you created), re-run `scripts/ladder.sh` to confirm green, then
-   re-attempt smaller. If the dead end taught a durable lesson, record it (STATE line or D-row)
-   before retrying. Pushed checkpoints are immutable — recovery never rewrites pushed history.
+6. **Recovery — bounded, with a stop condition (DA-012).** If the unit in flight has gone
+   wrong, do not flail forward: reset the working tree to the last green checkpoint (`git
+   status` first, then `git reset --hard HEAD` and a careful `git clean` of files you created),
+   re-run `scripts/ladder.sh` to confirm green, then re-attempt smaller. If the dead end taught
+   a durable lesson, record it (STATE line or D-row) before retrying. **But recovery is not
+   infinite: if the SAME blocker survives a second reset-and-retry cycle with no real progress,
+   stop — do not keep thrashing it.** Reset once more to the last green checkpoint (never end a
+   unit red — discipline 3/5), record the blocker (what failed, what you tried) under `STATE.md`
+   Owner queue, commit + push that STATE update so it survives session death, and end the unit.
+   A guard/gate that won't go green is either a real fix you're missing (a code or doc problem —
+   diagnose it, don't just re-run it) or an owner fork (discipline 7) — neither is solved by
+   burning the usage window re-running a script (the P6 weakest-agent failure mode). The stop is
+   for a genuinely stuck blocker, not cover for abandoning a failure you could diagnose — a gate
+   fails for a reason; find it before you invoke the stop. Pushed checkpoints are immutable —
+   recovery never rewrites pushed history.
 7. **Ask, don't assume (owner-judgment forks — D-167).** Some decisions are the owner's, and a
    plausible guess is worse than a pause: the owner has pivoted mid-feature before (D-151
    removed an entire already-on-branch segment). When a unit hits a fork that is (a)
