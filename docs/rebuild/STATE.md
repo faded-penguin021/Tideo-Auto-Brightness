@@ -87,6 +87,14 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 - **Triage #3 (2026-07-21, adopts in DA-010):** full verify-train script (invariants owner-side);
   PR-draft "whole train" guard (not machine-derivable, attestation Goodhart); warm-up sentinel
   (Gradle's lock IS the sync).
+- **Triage #5 (2026-07-21, DA-013, all four declined):** ledger-ID allocator script (guards
+  1c/5 already make numbering errors non-shippable with instructive fails; contiguity isn't
+  load-bearing — five historic base-file gaps harmless; third ledger-mechanization decline);
+  RUNBOOK split into per-playbook files behind an index (premature at ~490 lines; prompt
+  adaptation note already carries the scaling rule); XML tags around constitution rules
+  (vendor prompting folklore, the DA-011 class — rails, not markup, are the weak-agent answer,
+  P13/DA-009); STATE compression commit-or-ledger gate (already covered by the compression
+  definition; STATE is git-tracked — compression demotes to history, never destroys, DA-004).
 - **Triage #4 (2026-07-21, DA-011):** prompt-cache doc-ordering (load constitution/RUNBOOK/ledger
   first, STATE + diffs last for cache hits) — non-actionable in an agent-agnostic prompt (agent
   doesn't control host context assembly; vendor/time-specific, P6/D-176); contradicts the
@@ -102,6 +110,10 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-21 — **DA-013** (external-review triage #5, Gemini on harness prompt v1.4): all four
+  suggestions DECLINED → Decided non-items (ledger-ID allocator script; RUNBOOK per-playbook
+  split; XML tags in the constitution; compression commit-or-ledger gate). No code, rule, or
+  harness-prompt change — harness stays v1.4. Detail in the DA-013 row.
 - 2026-07-21 — **DA-012** (owner-approved): anti-thrash stop condition in Session discipline 6
   (Recovery) — if the SAME blocker survives a second reset-and-retry cycle with no progress, stop,
   Owner-queue the blocker, end the unit (was: no termination condition → thrash the window, P6).

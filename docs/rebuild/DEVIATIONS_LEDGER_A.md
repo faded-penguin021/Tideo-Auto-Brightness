@@ -329,3 +329,38 @@
   SAFE-WITH-FIXES; its two should-fixes (anchor the stop to a green checkpoint so the branch never
   ends red; add the anti-abuse caveat) and three nits were all adopted before commit. Owner queue
   Open question retired.
+- DA-013: external-review triage #5 (Gemini, reviewing the generalized harness prompt v1.4) —
+  all four suggestions DECLINED → STATE Decided non-items. **(1) Ledger-ID allocator script**
+  (`new-ledger-entry.sh` computing the next ID + handling rollover): the mistakes it predicts
+  are already non-shippable — guard 1c auto-locates the live ledger file and FAILS a row that
+  starts past the cap; guard 5 FAILS duplicate row numbers and unresolvable citations, with
+  instructive messages the agent self-corrects from (DA-009 philosophy). A helper script
+  inverts the discovery burden (the weak agent must remember to invoke it; guards check
+  artifacts the work produces anyway — P3), and empirics support decline: the one rollover
+  (D-176→DA-001) executed correctly, and the base ledger's five historic number gaps
+  (D-055/059/063/067/068, migration-era) have harmed nothing in 3.3k lines — contiguity is not
+  a load-bearing property; uniqueness + citation resolution are, and both are machine-checked.
+  Third ledger-mechanization decline (generated index: triage #2; active-file symlink/marker:
+  triage #1) — the P10 re-proposal pattern. If a numbering error ever actually ships, the cheap
+  fix is a forward-only contiguity check appended to guard 5 (live file only — the base file's
+  historic gaps grandfather out), not an allocator script. **(2) Split the RUNBOOK into
+  per-playbook files behind an index** ("context dilution"): premature at ~490 lines — the
+  binding sections (Session discipline, glue/rule-review protocols) are most of the read and
+  apply every session regardless of playbook; playbooks are header-addressable; the harness
+  prompt's adaptation notes already state the size-scaling continuum ("fold the RUNBOOK into
+  the constitution… split only when the playbooks multiply"). Revisit via self-adaptation (the
+  prompt's P15) only if the runbook actually strains a session read. **(3) XML-style tags
+  around critical constitution rules** (claimed better attention anchoring for weak models):
+  vendor-tuned prompting folklore — the DA-011 decline class (vendor/time-specific advice in an
+  agent-agnostic harness, P6/D-176). Markdown headers are the cross-agent convention
+  (AGENTS.md ecosystem, human/GitHub rendering), and the harness's real answer to
+  weak-attention agents is rails, not markup: permission denials, the instructive command
+  guard, and machine guards bind even when prose is skipped (P13/DA-009). **(4) STATE
+  compression gate** ("an item cannot be compressed out unless cited in a commit or moved to
+  the ledger"): already covered — the DA-004 compression definition commands durable gotchas →
+  ledger, completed stages → Changelog lines, Owner-queue items never dropped, protected
+  sections always survive — and the proposed gate's first branch is vacuous: STATE.md is
+  git-tracked and the checkpoint invariant commits it every unit, so compression demotes
+  content to git history, it never destroys it (the P2 design: bound the hot path, not the
+  archive). The residue no artifact can verify would be an attestation-style prose gate
+  (P3/D-162 — keep declining). No code, rule, or harness-prompt change — harness stays v1.4.
