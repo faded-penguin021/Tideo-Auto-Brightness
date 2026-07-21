@@ -14,6 +14,9 @@
 # Guards (fail fast, before any build):
 #   1. STATE.md length rule (mirrors STATE.md's own preamble, DA-004 hysteresis): quiet to
 #      14 KB, then warn to deep-compress to <= 9 KB; FAIL over the 16 KB hard cap.
+#      1a: compression-landing rule (DA-014) — FAIL when a change trims STATE out of warn
+#      territory (> 14 KB before) but lands in the 9–14 KB debounce band instead of on the
+#      <= 9 KB floor (catches the micro-trim the stateless thresholds miss).
 #      1b: required sections present
 #      (over-compression tripwire). 1c: deviations-ledger rollover reminder (D-153).
 #      (LADDER_STATE_FILE / LADDER_LEDGER_FILE override the paths — used only by
@@ -67,14 +70,51 @@ fail() { echo "LADDER FAIL: $1" >&2; exit 1; }
 # --- guard 1: STATE.md length rule (DA-004 hysteresis: grow freely to 14 KB; when the warn
 # fires, compress DEEP to <= 9 KB in one pass — never trim to just under a threshold, that
 # only re-arms the warn a session later; fail > 16 KB) ---
+# The three thresholds live here as named constants because guard 1a below also depends on the
+# floor and warn line — one source of truth, lockstep with the STATE.md length-guard preamble.
+STATE_HARD_BYTES=16384    # hard cap: fail over
+STATE_WARN_BYTES=14336    # warn line: compression pass due over
+STATE_FLOOR_BYTES=9216    # deep-compression target (<= 9 KB); warn−floor IS the debounce band
 [ -f "$STATE_FILE" ] || fail "$STATE_FILE not found (run from the repo, or fix LADDER_STATE_FILE)"
 state_bytes=$(wc -c < "$STATE_FILE" | tr -d '[:space:]')
-if [ "$state_bytes" -gt 16384 ]; then
+if [ "$state_bytes" -gt "$STATE_HARD_BYTES" ]; then
   fail "$STATE_FILE is ${state_bytes} B — over the 16 KB hard cap; compress DEEP to <= 9 KB before committing (DA-004; see its length-guard preamble)"
-elif [ "$state_bytes" -gt 14336 ]; then
+elif [ "$state_bytes" -gt "$STATE_WARN_BYTES" ]; then
   echo "LADDER WARN: $STATE_FILE is ${state_bytes} B (> 14 KB) — compression pass due: compress DEEP to <= 9 KB in ONE pass, not to just under a line (DA-004)"
 else
   echo "LADDER: STATE.md size OK (${state_bytes} B / 14 KB warn line)"
+fi
+
+# --- guard 1a: STATE.md compression-landing rule (DA-004 debounce enforcement; DA-014) ---
+# The stateless thresholds above cannot tell a genuine deep compression from a "micro-trim"
+# that shrinks STATE to just under the warn line and re-arms the warn a session or two later —
+# the Goodhart hole the owner hit before stating the rule by hand. This sub-check supplies the
+# missing state: if the PREVIOUS committed STATE was over the warn line (a compression was
+# owed) and this change brings it down but lands in the 9–14 KB debounce band instead of on
+# the <= 9 KB floor, the compression pass didn't finish — FAIL. It judges the current size
+# against the last COMMITTED size: normally HEAD (the trim is in the working tree, pre-commit),
+# falling back to HEAD~1 when the working tree hasn't touched STATE (a trim that is already
+# committed, e.g. a re-run in CI — build.yml checks out with full depth, so HEAD~1 is present).
+# It fires ONLY on a shrink out of warn territory: normal growth and sub-warn edits never trip
+# it, and an author who leaves STATE bloated is caught by guard 1's warn/fail, not here (the
+# "one deep pass or nothing" philosophy — a partial trim into the band is the failure mode, a
+# bloated file is already flagged). Residual: a micro-trim buried under later commits on the
+# same branch won't re-fire in CI, but it DID fail the ladder at its own authoring-time run
+# (the enforcement point that matters, RUNBOOK Session discipline).
+if git rev-parse --git-dir >/dev/null 2>&1 && git cat-file -e "HEAD:$STATE_FILE" 2>/dev/null; then
+  base_ref=HEAD
+  # git diff --quiet HEAD is the precise "working tree unchanged vs HEAD" test (staged OR
+  # unstaged); a byte-preserving edit would fool a size-equality check.
+  if git diff --quiet HEAD -- "$STATE_FILE" && git cat-file -e "HEAD~1:$STATE_FILE" 2>/dev/null; then
+    base_ref=HEAD~1
+  fi
+  prev_bytes=$(git show "$base_ref:$STATE_FILE" 2>/dev/null | wc -c | tr -d '[:space:]')
+  if [ "$prev_bytes" -gt "$STATE_WARN_BYTES" ] && [ "$state_bytes" -le "$STATE_WARN_BYTES" ] \
+       && [ "$state_bytes" -gt "$STATE_FLOOR_BYTES" ]; then
+    fail "$STATE_FILE was ${prev_bytes} B (> 14 KB warn) and this change trims it only to ${state_bytes} B — still inside the 9-14 KB debounce band. A compression pass must land <= 9 KB in ONE pass, never just under the warn line (a micro-trim re-arms the warn a session later; DA-004)."
+  elif [ "$prev_bytes" -gt "$STATE_WARN_BYTES" ] && [ "$state_bytes" -le "$STATE_FLOOR_BYTES" ]; then
+    echo "LADDER: STATE.md deep-compressed ${prev_bytes} B -> ${state_bytes} B (landed <= 9 KB floor; DA-004)"
+  fi
 fi
 
 # --- guard 1b: STATE.md required structure (over-compression tripwire) ---

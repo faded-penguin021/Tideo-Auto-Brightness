@@ -1,6 +1,6 @@
 # The Agentic Maintenance Harness — a generalized, reusable prompt
 
-**Harness version 1.4 (2026-07-21).** Instantiating repos may note the version they adopted
+**Harness version 1.5 (2026-07-21).** Instantiating repos may note the version they adopted
 (e.g. "AMH v1.1") in their constitution, so process drift is diagnosable as the harness evolves.
 
 This document generalizes the maintenance harness used in this repository (the constitution
@@ -406,8 +406,11 @@ concurrency model, protected data flows, forbidden shortcuts. Each cites its led
 > prose. The **Project**, **Current state**, and **Owner queue** sections must always survive
 > compression (Owner queue items are the owner's to close — compress their prose, never drop
 > an open item). (`scripts/ladder.sh` machine-checks: warn > {{WARN_KB}} KB, fail >
-> {{HARD_KB}} KB. Pick the numbers so warn−compress-to spans many sessions of growth and
-> hard−warn leaves one long session of margin — e.g. 9/14/16.)
+> {{HARD_KB}} KB, **and** a landing check — a change that trims the file from over the warn
+> line but leaves it in the {{COMPRESS_TO_KB}}–{{WARN_KB}} KB band FAILS, so a compression must
+> reach the ≤ {{COMPRESS_TO_KB}} KB floor rather than just clear the warn. Pick the numbers so
+> warn−compress-to spans many sessions of growth and hard−warn leaves one long session of
+> margin — e.g. 9/14/16.)
 
 ## Project
 {{FIVE_LINE_SUMMARY — enough that a fresh session needs no other orientation doc.}}
@@ -608,7 +611,13 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
 1. **Guards first (seconds, no build):**
    - *State length (hysteresis):* quiet below the warn line; over it, warn with the deep
      compress-to target in the message; **fail** over the hard cap. Never make the warn line
-     the compression target — the gap between them is the debounce.
+     the compression target — the gap between them is the debounce. Add a *landing* check that
+     supplies the state the size thresholds lack: compare the current size to the committed one
+     (working tree vs HEAD, falling back to HEAD~1 for a just-committed trim), and **fail** when
+     a change trims the file out of warn territory but lands in the debounce band instead of on
+     the compress-to floor — otherwise a micro-trim to just under the warn line passes and
+     re-arms the warn a session later (the Goodhart hole). It fires only on a shrink out of warn
+     territory, so growth and sub-warn edits never trip it.
    - *State structure:* fail if a required section header is missing (over-compression
      tripwire); warn if the Owner-queue header vanished (data loss for the human).
    - *Ledger rollover:* warn approaching the line cap; fail when the live file's LAST row

@@ -110,6 +110,39 @@ out_rc=0
 if [ "$out_rc" -eq 1 ]; then pass=$((pass + 1)); else failures+=("LADDER_STATE_FILE override honored"); fi
 rm "$SANDBOX/docs/rebuild/state_big.md"
 
+# --- guard 1a: compression-landing debounce (DA-014) ----------------------------------------
+# The stateless thresholds can't tell a deep compression from a micro-trim that lands just
+# under the warn line; 1a adds the missing state by judging the current size against the
+# committed one. Commit an over-warn STATE so HEAD carries a compression debt, then trim.
+write_state 15000
+git_q add -A >/dev/null && git_q commit -qm "state over warn"
+write_state 12000                       # trim into the 9-14 KB debounce band = micro-trim
+check "guard 1a: micro-trim out of warn into the 9-14 band fails" 1 "9-14 KB debounce band"
+write_state 5000                        # genuine deep compression to <= 9 KB
+check "guard 1a: deep compression to <= 9 KB passes" 0 "deep-compressed"
+git_q reset --hard -q "$BASELINE_SHA"
+# HEAD~1 fallback: a trim that is already COMMITTED (working tree == HEAD, e.g. a CI re-run)
+# is judged against HEAD~1, so the committed micro-trim still fails / deep compress still passes.
+write_state 15000
+git_q add -A >/dev/null && git_q commit -qm "state over warn"
+write_state 12000
+git_q add -A >/dev/null && git_q commit -qm "committed micro-trim"
+check "guard 1a: committed micro-trim (HEAD~1 fallback) fails" 1 "9-14 KB debounce band"
+git_q reset --hard -q "$BASELINE_SHA"
+write_state 15000
+git_q add -A >/dev/null && git_q commit -qm "state over warn"
+write_state 5000
+git_q add -A >/dev/null && git_q commit -qm "committed deep compression"
+check "guard 1a: committed deep compression (HEAD~1 fallback) passes" 0 "deep-compressed"
+git_q reset --hard -q "$BASELINE_SHA"
+# A shrink that never crossed the warn line is normal editing, not a compression debt.
+write_state 12000
+git_q add -A >/dev/null && git_q commit -qm "state in safe band"
+write_state 10000
+check "guard 1a: shrink within the safe band does not trip" 0 "STATE.md size OK"
+git_q reset --hard -q "$BASELINE_SHA"
+write_state 0
+
 # --- guard 1b: required sections ------------------------------------------------------------
 
 sed -i '/## Changelog/d' "$SANDBOX/docs/rebuild/STATE.md"

@@ -10,7 +10,9 @@
 > must always survive compression (Owner queue items are the owner's to close — compress their
 > prose, never drop an open item). The migration narrative is frozen in `../history/` — do not
 > re-accumulate it here. (`scripts/ladder.sh` guard 1 machine-checks: warn > 14 KB, fail
-> > 16 KB.)
+> > 16 KB. Guard 1a (DA-014) machine-enforces the landing: a change that trims STATE from over
+> the warn line but leaves it in the 9–14 KB band **fails** — a compression pass must reach the
+> ≤ 9 KB floor, not just clear the warn.)
 
 ## Project
 
@@ -44,17 +46,18 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
    `main` (only session branch; supersets the train). Squash commit takes the PR title+body —
    draft = the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit fixes,
-     force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176, DA-001…DA-012)`
+     force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176, DA-001…DA-014)`
    - *Body:* **Features (1.8.0/vc18):** automation intent surface (D-157, `docs/AUTOMATION.md`) ·
      TalkBack A0–A7 + crash-log capture (D-156/D-158) · force dark via Shizuku/root (D-172) ·
      context write-through + baseline revert (D-170). **Fixes:** IME dead-gap (D-159) · RESUME
      gate (D-160) · audit closes (D-163–D-165) · super-dimming relabel + MaxBright auto-raise
      (D-168/D-169) · stale User Guide. **Repo hardening:** `ladder.sh` acceptance + 10 guards +
-     command guard, CI-run, own regression suite (D-161/D-166/D-173/D-174/DA-006–DA-012) · guarded
+     command guard, CI-run, own regression suite (D-161/D-166/D-173/D-174/DA-006–DA-012) ·
+     STATE compression-landing guard 1a (DA-014) · guarded
      Owner queue + ask-don't-assume (D-167) · secret hygiene (`redact.sh` + leak protocol +
      instruction
      hierarchy, D-175/DA-006/DA-007) · Gradle parallel/config-cache. **Harness (D-176/DA-001…
-     DA-012, prompt v1.4):** `AGENTS.md` stub + neutral `session-start.sh`; thin `.claude/`
+     DA-014, prompt v1.5):** `AGENTS.md` stub + neutral `session-start.sh`; thin `.claude/`
      adapter; ledger 1000-line rollover; branch-train; fresh-context glue/rule review;
      bounded-recovery stop condition (DA-012). **Release:** vc18 / 1.8.0.
 2. After CI green: on-device `DEVICE_TEST_SCRIPT.md` **§§12–15**; findings → **Incoming
@@ -110,6 +113,14 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-21 — **DA-014** (owner-requested): STATE.md compression-LANDING enforcement — new
+  ladder **guard 1a** fails a "micro-trim" that shrinks STATE out of warn territory (> 14 KB)
+  into the 9–14 KB debounce band instead of onto the ≤ 9 KB floor (the stateless guard 1
+  couldn't tell a deep compression from a warn-clearing trim). Judges current vs last-committed
+  size (HEAD, HEAD~1 fallback for a committed trim); thresholds are now named constants shared
+  with guard 1. Lockstep: STATE length-guard preamble + harness prompt §3.1/§3.4 (**v1.4→v1.5**);
+  fixture suite +4 cases (43 green). DA-005 rule-review: fresh-context subagent, SAFE-WITH-FIXES,
+  both should-fixes + nit adopted. Detail in the DA-014 row.
 - 2026-07-21 — **DA-013** (external-review triage #5, Gemini on harness prompt v1.4): all four
   suggestions DECLINED → Decided non-items (ledger-ID allocator script; RUNBOOK per-playbook
   split; XML tags in the constitution; compression commit-or-ledger gate). No code, rule, or

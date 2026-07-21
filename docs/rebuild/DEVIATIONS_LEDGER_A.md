@@ -364,3 +364,30 @@
   content to git history, it never destroys it (the P2 design: bound the hot path, not the
   archive). The residue no artifact can verify would be an attestation-style prose gate
   (P3/D-162 — keep declining). No code, rule, or harness-prompt change — harness stays v1.4.
+- DA-014: STATE.md compression-LANDING enforcement — owner-requested (2026-07-21). The DA-004
+  hysteresis guard (ladder guard 1) is STATELESS: it only sees the current byte size against the
+  warn (14 KB) and hard (16 KB) lines, so a "micro-trim" that shrinks STATE to just under the
+  warn line SATISFIES it while defeating its intent — the warn re-arms a session or two later
+  (the exact Goodhart hole named in the DA-004 length-guard preamble and the RUNBOOK
+  rule-review bug-class list; the owner reports hitting it — the agent only deep-compressed
+  after the rule was stated by hand). Fix: new sub-check **guard 1a** supplies the missing state
+  by judging the current size against the last COMMITTED size — HEAD when the trim is in the
+  working tree (authoring time), falling back to HEAD~1 (via `git diff --quiet HEAD`) when the
+  working tree is unchanged, i.e. a trim that is already committed (a CI re-run; build.yml uses
+  full-depth checkout so HEAD~1 is present). It FAILS when a change trims STATE out of warn
+  territory (prev > 14 KB) but lands in the 9–14 KB debounce band (> 9 KB) instead of on the
+  ≤ 9 KB floor; it fires ONLY on a shrink out of warn territory, so normal growth and sub-warn
+  edits never trip it (a still-bloated file stays guard 1's job). The three thresholds are now
+  named constants in ladder.sh (`STATE_FLOOR/WARN/HARD_BYTES` = 9216/14336/16384) so guard 1 and
+  1a share one source of truth. Lockstep prose: the STATE.md length-guard preamble and the
+  generalized harness prompt (§3.1 STATE template + §3.4 guard spec, still fully templated on
+  `{{COMPRESS_TO_KB}}/{{WARN_KB}}/{{HARD_KB}}`) both document the landing check — harness
+  **v1.4 → v1.5**. Fixture suite (`test-ladder-guards.sh`) adds fail+pass cases for BOTH the
+  primary (working ≠ HEAD) and HEAD~1-fallback (committed trim) paths — 43 guard cases green.
+  Residual (documented at the guard): a micro-trim buried under later same-branch commits won't
+  re-fire in CI, but it DID fail the ladder at its own authoring-time run (the enforcement point
+  that matters). DA-005 rule-review: fresh-context subagent, verdict SAFE-WITH-FIXES — both
+  should-fixes adopted before commit (this ledger row for the DA-014 citation; the HEAD~1-fallback
+  test cases) plus nit 5 (`git diff --quiet HEAD` as the precise "unchanged" test over a
+  byte-equality heuristic); nits 3/4 (shrink-only firing; one-pass-vs-checkpoint tension) noted
+  as by-design, consistent with the "compress in ONE pass" rule text.
