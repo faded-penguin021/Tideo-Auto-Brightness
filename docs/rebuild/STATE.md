@@ -123,7 +123,9 @@ One line per shipped change (newest first); detail in the D-rows and git history
   command guard — agent-neutral `scripts/command-guard.sh` (force-push / push-to-main /
   env-dump rails, deny reasons the agent self-corrects from), wired as the Claude Code
   Bash PreToolUse hook; self-test = ladder guard 10; joins guard-7 legislation list +
-  D-176 adapter checklist. Static deny rules + prose stay as layers beneath it.
+  D-176 adapter checklist. Static deny rules + prose stay as layers beneath it. Generalized
+  export folded into `docs/AGENTIC_HARNESS_PROMPT.md` (P13 + adapter/ladder templates) as
+  **harness v1.2**.
 
 - 2026-07-20 — **DA-008** (owner-reopened): secret-shape commit guard — ladder guard 9
   scans worktree (NUL-safe list) + staged blobs via `redact.sh --scan`/`--scan-staged`

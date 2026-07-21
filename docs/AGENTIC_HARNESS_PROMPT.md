@@ -1,6 +1,6 @@
 # The Agentic Maintenance Harness — a generalized, reusable prompt
 
-**Harness version 1.1 (2026-07-20).** Instantiating repos may note the version they adopted
+**Harness version 1.2 (2026-07-21).** Instantiating repos may note the version they adopted
 (e.g. "AMH v1.1") in their constitution, so process drift is diagnosable as the harness evolves.
 
 This document generalizes the maintenance harness used in this repository (the constitution
@@ -140,7 +140,20 @@ checklist — the pass holds only what tests *cannot* see. Verdict goes in the c
 
 **P13. Hard rails in the permission layer; discipline in prose.** Denials that must never be
 crossed (force-push, pushing to the default branch) live in tool-permission deny rules —
-enforced even if the prose is forgotten. Mirror the hardest rails **server-side** where the
+enforced even if the prose is forgotten. Where the agent supports **pre-execution hooks**,
+add an *instructive* command guard above the static deny list: a script that checks each
+command against the hard rails and blocks with a reason that names the rule and the correct
+alternative — the reason is fed back to the agent, which self-corrects in one step instead of
+fighting a mute prefix-matched denial (and a deterministic rule enforced by a hook needs no
+prose repetition *for that agent*; keep the prose anyway — it binds hook-less agents).
+Hard-won pattern rules for such a guard: judge only each simple-command segment's LEADING
+command, so quoted text that merely *contains* a forbidden command (commit messages, doc
+heredocs, the guard's own CLI) never trips it — both false-positive classes here surfaced
+live on day one; target agent MISTAKES, not evasion (quoting/prefix tricks are accepted
+misses — the deny rules, prose, and server rails layer beneath); fail-open on malformed hook
+input (a guard that bricks every command gets disabled, not fixed); and give it a
+blocked+allowed self-test matrix run as a ladder guard, since a rail must not regress
+silently. Mirror the hardest rails **server-side** where the
 host supports it — branch protection on the default branch (PRs required; force-push and
 deletion blocked) and secret-scanning push protection — because the agent-side permission
 layer binds only agents that load it; server-side rails bind every actor and every tool, and
@@ -343,8 +356,10 @@ concurrency model, protected data flows, forbidden shortcuts. Each cites its led
   session-start hook, run it yourself first.
 - Per-agent adapters live in dot-dirs and contain wiring only. A new agent's adapter must:
   run the bootstrap at session start, mirror the permission deny rails (env dumps,
-  force-push, push to `{{DEFAULT_BRANCH}}`) if the agent supports permission rules, and
-  honor the one-session-one-branch rule above.
+  force-push, push to `{{DEFAULT_BRANCH}}`) if the agent supports permission rules, wire
+  `scripts/command-guard.sh` as a pre-execution command check where the agent supports
+  hooks (it blocks the same rails with an instructive deny reason the agent can
+  self-correct from), and honor the one-session-one-branch rule above.
 ```
 
 ---
@@ -467,8 +482,9 @@ something, fix before commit and ledger anything durable.
 
 ## Rule-review protocol (MANDATORY for binding-rule / guard diffs)
 Diffs changing the harness's legislation — the constitution, this runbook's protocols,
-guard semantics AND their fixture suite, the session bootstrap, ledger preambles, adapter
-permission rails — get the same fresh-context pass (strongest tier regardless of diff size;
+guard semantics AND their fixture suite, the mechanical rail scripts (redaction filter,
+pre-execution command guard — a silently weakened rail is a weakened rail), the session
+bootstrap, ledger preambles, adapter permission rails — get the same fresh-context pass (strongest tier regardless of diff size;
 NO self-review fallback: a session that cannot spawn a fresh context parks the rule change
 for the human). Routine state-file edits are exempt, EXCEPT the state file's rule-bearing
 sections (length-guard preamble, decided non-items). The reviewer hunts these RULE bug
@@ -583,6 +599,12 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
      server-side push-protection layer, which fires at push — this guard is the earlier,
      commit-time net. Consequence: any fixture token in the tree must be runtime-generated,
      never a stored literal.
+   - *Rail self-tests:* every mechanical rail script (`redact.sh`, the pre-execution
+     command guard) carries its own fixture self-test, and the ladder runs them — a
+     silently regressed pattern must fail the build, not pass quietly. The command guard's
+     matrix asserts both directions: forbidden commands block, and the known
+     false-positive classes (quoted text naming a forbidden command; prose naming a
+     forbidden path) stay allowed.
    - *Local-only advisories (WARN, skipped in CI):* checkpoint tripwire (code changed vs
      default branch but STATE.md not in the diff → the changelog line is probably missing);
      stale-branch tripwire (behind the default branch — a real conflict risk in
@@ -593,7 +615,8 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
      ledger rows, never plans);
      rule-review tripwire (the UNCOMMITTED diff — staged/unstaged/untracked — touches a
      legislation file: the constitution, the runbook, the guard script + its fixture suite,
-     the session bootstrap, permission config → remind that the rule-review protocol applies
+     the rail scripts, the session bootstrap, permission config → remind that the
+     rule-review protocol applies
      before commit. Deliberately excluded: the state file and the ledgers — they change in
      nearly every unit, and warn fatigue kills tripwires; their legislative sections stay
      prose-only).
@@ -635,6 +658,14 @@ your agent's equivalent):
   `.env`-style files — P17). Prose forbids it; the permission layer *enforces* it. An agent
   without permission-rule support still inherits the prose rule — the rails are
   defense-in-depth, not the only copy of the policy.
+- **Instructive pre-execution guard (P13, where the agent supports pre-tool-use hooks):**
+  wire the agent-neutral `scripts/command-guard.sh` so every shell command is checked
+  against the hard rails before it runs, and a violation is blocked with a reason naming
+  the rule and the correct alternative (Claude Code: a Bash PreToolUse hook; exit 2 +
+  stderr = the reason shown to the model). This is the layer that makes rails
+  *self-correcting* — the static deny list stays beneath it as the second net. Follow the
+  P13 pattern rules: leading-command matching, mistake-not-evasion threat model, fail-open
+  on malformed input, self-test run by the ladder.
 - **Output redaction (P17, where supported):** if the agent exposes an output-filter hook,
   pipe tool/terminal output through `scripts/redact.sh` so known token shapes are scrubbed
   before they reach the context window. State explicitly in the adapter which layers it
