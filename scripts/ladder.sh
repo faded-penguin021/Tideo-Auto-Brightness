@@ -46,6 +46,9 @@
 #      secret BEFORE commit (server push protection only fires at push, when the secret is
 #      already in history and only the owner-executed rewrite path remains, DA-006).
 #      Fixture tokens must be runtime-generated so the tree stays inert.
+#   10. command-guard.sh self-test (DA-009): the pre-execution command rail (force-push /
+#      push-to-main / env-dump blocks with instructive deny reasons) must not regress
+#      silently — same rationale as guard 8.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -187,7 +190,7 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ] && git rev-parse --git-dir >/dev/null 2>&
   # A new agent adapter's permission-config file joins this list (CLAUDE.md Agent harness).
   for f in CLAUDE.md AGENTS.md docs/rebuild/RUNBOOK.md scripts/ladder.sh \
            scripts/test-ladder-guards.sh scripts/session-start.sh scripts/redact.sh \
-           .claude/settings.json; do
+           scripts/command-guard.sh .claude/settings.json; do
     if git status --porcelain -- "$f" 2>/dev/null | grep -q .; then
       legislation_touched="$legislation_touched $f"
     fi
@@ -217,6 +220,16 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   scripts/redact.sh --scan-staged \
     || fail "secret-shaped content in a STAGED blob (above) — unstage and purge it before committing; the index is what a commit records (DA-008)"
   echo "LADDER: secret-shape scan OK (worktree + staged)"
+fi
+
+# --- guard 10: command-guard self-test (DA-009) — the pre-execution command rail is a rail
+# like guard 8's filter; a silently broken pattern must fail the ladder. Milliseconds. ---
+if [ -x scripts/command-guard.sh ]; then
+  scripts/command-guard.sh --self-test >/dev/null \
+    || fail "scripts/command-guard.sh --self-test FAILED — a command-guard pattern regressed; fix the rail before committing (DA-009)"
+  echo "LADDER: command-guard self-test OK"
+else
+  fail "scripts/command-guard.sh missing or not executable — the DA-009 command rail is gone"
 fi
 
 # --- guard 2: D-115 skip-ci tokens in unmerged commit messages ---

@@ -118,6 +118,12 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-21 — **DA-009** (owner-relayed external insight): instructive pre-execution
+  command guard — agent-neutral `scripts/command-guard.sh` (force-push / push-to-main /
+  env-dump rails, deny reasons the agent self-corrects from), wired as the Claude Code
+  Bash PreToolUse hook; self-test = ladder guard 10; joins guard-7 legislation list +
+  D-176 adapter checklist. Static deny rules + prose stay as layers beneath it.
+
 - 2026-07-20 — **DA-008** (owner-reopened): secret-shape commit guard — ladder guard 9
   scans worktree (NUL-safe list) + staged blobs via `redact.sh --scan`/`--scan-staged`
   (scan = filter, drift-free; value-free output, now test-asserted); found + fixed two

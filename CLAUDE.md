@@ -36,8 +36,8 @@ row may overflow the cap, the next row opens the next file (`DA-…` → `DB-…
 
 ```bash
 scripts/ladder.sh                 # ALL rungs below in one command, after fast local guards
-                                  # (guards 1-9: state/ledger/citation/changelog/skip-ci/
-                                  # secret-shape checks + advisories — enumerated in the
+                                  # (guards 1-10: state/ledger/citation/changelog/skip-ci/
+                                  # secret-shape/command-rail checks + advisories — see the
                                   # ladder.sh header); --guards-only for docs-only work
 ./gradlew :domain:test            # pure-JVM engine + golden parity tests
 ./gradlew :platform:test          # Robolectric adapter tests
@@ -158,5 +158,7 @@ fallback, D-172) — not "grant-only".
 - Per-agent adapters live in dot-dirs; today only `.claude/settings.json` exists. A new
   agent's adapter must: run `scripts/session-start.sh` at session start, mirror the deny
   rules (env dumps, force-push, push-to-main) if the agent supports permission rules,
-  honor the session-branch rule above, and add its permission-config file to ladder
-  guard 7's legislation list (DA-006).
+  wire `scripts/command-guard.sh` as a pre-execution command check where the agent
+  supports hooks (it blocks the same three rails with an instructive deny reason the
+  agent can self-correct from, DA-009), honor the session-branch rule above, and add its
+  permission-config file to ladder guard 7's legislation list (DA-006).

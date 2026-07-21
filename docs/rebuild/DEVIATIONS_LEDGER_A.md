@@ -200,3 +200,40 @@
   (staged-blob scan, value-free test assertions, temp-file traps, limitation honesty,
   PR-draft refresh, guard summaries de-enumerated to the ladder.sh header as single
   source) except the binary grep pass, declined as above.
+
+- **DA-009: instructive pre-execution command guard (2026-07-21).** External insight
+  (a Reddit thread the owner relayed, triaged as data per DA-006): a deterministic rule
+  enforces better as a pre-tool-use hook whose DENY REASON is fed back to the agent — the
+  agent reads the reason and self-corrects, instead of fighting a mute prefix-matched deny
+  rule. Applied: agent-neutral `scripts/command-guard.sh` splits a command into
+  simple-command segments and checks each against the three hard rails — force-push in any
+  spelling (`--force`/`-with-lease`/`-if-includes`, `-f`, ref-deleting `--mirror`/
+  `--prune`, `+refspec`), any push targeting main (positional, `HEAD:main`, `:main`
+  deletion, `refs/heads/main`), and env dumps (bare `env` — including flags/assignments
+  with no command, `printenv`, `export -p`, PID-path `/proc/<id>/environ` reads) —
+  blocking with a reason naming the rule and the correct alternative. The git rails judge
+  only a segment's LEADING command with `push` as git's verb, so quoted text that merely
+  CONTAINS "git push origin main" (commit messages, doc heredocs, this guard's own argv
+  mode) never trips them; the environ pattern requires a PID-ish path segment so prose
+  naming the rule as `/proc/*/environ` passes. Both false-positive classes were caught
+  LIVE (the environ one by this unit's own doc write, the quoted-text one reproduced by
+  the DA-005 reviewer, who had to base64-encode test candidates to run them at all) and
+  are pinned in the self-test. Claude Code adapter wires it as a
+  Bash PreToolUse hook (`--claude-hook`: exit 2 + stderr = readable deny); the static
+  deny rules stay as a second layer; the prose binds everything a regex can't see and
+  non-hook agents entirely. Fail-open on malformed hook input BY DESIGN (a guard that
+  bricks every Bash call gets disabled, not fixed — the deny-rule and prose layers back
+  it). Known misses, accepted for the same layering reason (threat model = agent
+  MISTAKES, not evasion): prefixed invocations (`sudo`/`git -C`/`git -c … push`), folded
+  short flags (`-uf`), quoting/substitution evasions (`'main'`, backticks, backslash-
+  newline), `set`/`declare -x` dumps. Self-test (blocked+allowed matrix) runs as **ladder
+  guard 10** (guard-8 rationale: a rail must not regress silently); the script joins
+  guard 7's legislation list, the RUNBOOK DA-005 legislation enumeration, and the D-176
+  adapter checklist. The unit's DA-005 rule-review pass: 4 should-fix (quoted-text FP
+  anchoring; `--mirror` bypass — it would have deleted remote `main`, absent locally;
+  CLAUDE.md "guards 1-9" lockstep; RUNBOOK enumeration) + 3 nits — all adopted except
+  `set`/`declare -x` (accepted-miss, above). The thread's other ideas were already
+  applied or N/A (secret-shield ≈ guards 8/9, danger-blocker ≈ deny rules, Stop-hook gate
+  ≈ the ladder in CI); no CLAUDE.md prose was deleted — the constitution binds non-hook
+  agents, so hookable rules stay as prose (the saving lands in fewer failed-denial
+  round-trips, not fewer lines).

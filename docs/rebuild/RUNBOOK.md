@@ -345,7 +345,8 @@ Any diff that changes the harness's LEGISLATION — CLAUDE.md, this runbook's pr
 Session discipline, `scripts/ladder.sh` guard semantics **and their fixture suite
 `scripts/test-ladder-guards.sh`** (a weakened fixture softens the net every later guard
 change is tested against), `scripts/session-start.sh`, `scripts/redact.sh` (DA-007 — a
-silently weakened redaction filter is a weakened rail), ledger preambles, adapter permission
+silently weakened redaction filter is a weakened rail), `scripts/command-guard.sh` (DA-009 —
+same weakened-rail rationale for the pre-execution command rail), ledger preambles, adapter permission
 rules (e.g. `.claude/settings.json` allow/deny), `AGENTS.md` — gets the same fresh-context
 review as glue (DA-003 mechanics: the reviewer receives the diff, this checklist, and tree
 access — never the author's rationale), with three differences: the reviewer defaults to the
