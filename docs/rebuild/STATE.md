@@ -54,7 +54,7 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
    draft for the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit
      fixes, force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176,
-     DA-001…DA-008)`
+     DA-001…DA-009)`
    - *Body:*
      **Features (1.8.0/vc18):** opt-in automation intent surface — verbs, LOAD_PROFILE/
      CONTEXTS_RESUME, outbound STATE_CHANGED; `docs/AUTOMATION.md` (D-157) · TalkBack
@@ -65,8 +65,9 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
      relabel + MaxBright auto-raise parity (D-168/D-169) · stale User Guide copy.
      **Repo hardening:** `scripts/ladder.sh` one-command acceptance + guards (STATE caps,
      ledger rollover, citation integrity + `[cited]` sync, skip-ci scan, changelog cap,
-     rule-review tripwire, redaction self-test, secret-shape commit scan) with its own
-     regression suite, run by CI (D-161/D-166/D-173/D-174/DA-006–DA-008) · Owner queue +
+     rule-review tripwire, redaction self-test, secret-shape commit scan, command-rail
+     self-test) + the instructive pre-execution command guard (PreToolUse hook, DA-009),
+     with its own regression suite, run by CI (D-161/D-166/D-173/D-174/DA-006–DA-009) · Owner queue +
      ask-don't-assume (D-167) · secret hygiene: prose + `redact.sh` filter + leak-response
      protocol + instruction hierarchy (D-175/DA-006/DA-007) · Gradle parallel/config-cache.
      **Agent-agnostic harness (D-176/DA-001…DA-008):** `AGENTS.md` pointer stub + neutral
