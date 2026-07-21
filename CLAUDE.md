@@ -143,7 +143,8 @@ fallback, D-172) — not "grant-only".
   superset branch** is squash-merged to `main` via **ONE PR** — the squash commit takes the
   PR title/body, so a staged PR draft must describe the net `origin/main..HEAD` diff (the
   whole train), never just the last session's commits. Consequences: the ladder's
-  behind-`origin/main` WARN is usually structural (don't merge `main` in without a concrete
+  behind-`origin/main` WARN classifies itself via a test-merge (DA-010) — follow its verdict
+  (structural → do NOT merge `main` in; inconclusive → don't merge without a concrete
   reason); before citing another session branch in docs, verify it still exists
   (`git ls-remote --heads origin`). Do not open a PR unless asked.
 

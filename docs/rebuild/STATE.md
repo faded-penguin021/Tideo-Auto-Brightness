@@ -54,7 +54,7 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
    draft for the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit
      fixes, force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176,
-     DA-001…DA-009)`
+     DA-001…DA-010)`
    - *Body:*
      **Features (1.8.0/vc18):** opt-in automation intent surface — verbs, LOAD_PROFILE/
      CONTEXTS_RESUME, outbound STATE_CHANGED; `docs/AUTOMATION.md` (D-157) · TalkBack
@@ -67,7 +67,7 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
      ledger rollover, citation integrity + `[cited]` sync, skip-ci scan, changelog cap,
      rule-review tripwire, redaction self-test, secret-shape commit scan, command-rail
      self-test) + the instructive pre-execution command guard (PreToolUse hook, DA-009),
-     with its own regression suite, run by CI (D-161/D-166/D-173/D-174/DA-006–DA-009) · Owner queue +
+     with its own regression suite, run by CI (D-161/D-166/D-173/D-174/DA-006–DA-010) · Owner queue +
      ask-don't-assume (D-167) · secret hygiene: prose + `redact.sh` filter + leak-response
      protocol + instruction hierarchy (D-175/DA-006/DA-007) · Gradle parallel/config-cache.
      **Agent-agnostic harness (D-176/DA-001…DA-008):** `AGENTS.md` pointer stub + neutral
@@ -107,6 +107,13 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
   ever published standalone); ledger `Status:` retrofit (row-prose supersession notes,
   now codified); Owner-queue aging guard (date-stamps suffice). (The local secret-pattern
   guard decline was owner-reopened same day → ladder guard 9, DA-008.)
+- **External AI-review triage #3 (2026-07-21, adopts + reasons in DA-010):** full
+  verify-train script (train invariants are owner-side / not locally decidable; the
+  mechanizable piece — behind-main classification — WAS adopted into guard 4); guard
+  failing a PR draft that "doesn't describe the whole train" (not machine-derivable;
+  attestation-shaped, re-litigates D-162/DA-006); warm-up completion sentinel awaited by
+  the ladder (Gradle's inter-process lock IS the sync; identical wall time, second
+  mechanism that can drift — an informational in-flight note was adopted instead).
 - **Privileged Display (decided at Segments 4.5–5, D-150–D-152):** per-toggle orthogonal
   scheduling (removed by the D-151 pivot — scheduling IS "a Contexts rule loads a profile
   carrying display fields", winner-takes-all); persisted last-applied seed for
@@ -119,6 +126,11 @@ Deviations live in `DEVIATIONS_LEDGER.md` (live file `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-21 — **DA-010** (external-review triage #3): ladder guard 4 now classifies
+  behind-main mechanically (merge-tree test-merge → "do NOT merge" when main brings no
+  content; reconcile advice otherwise) + warm-up in-flight note before the Gradle rung.
+  Declines (see Decided non-items): verify-train script, PR-draft scope guard, warm-up
+  sentinel. Harness prompt → **v1.3**.
 - 2026-07-21 — **DA-009** (owner-relayed external insight): instructive pre-execution
   command guard — agent-neutral `scripts/command-guard.sh` (force-push / push-to-main /
   env-dump rails, deny reasons the agent self-corrects from), wired as the Claude Code

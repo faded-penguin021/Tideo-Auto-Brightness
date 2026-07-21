@@ -1,6 +1,6 @@
 # The Agentic Maintenance Harness — a generalized, reusable prompt
 
-**Harness version 1.2 (2026-07-21).** Instantiating repos may note the version they adopted
+**Harness version 1.3 (2026-07-21).** Instantiating repos may note the version they adopted
 (e.g. "AMH v1.1") in their constitution, so process drift is diagnosable as the harness evolves.
 
 This document generalizes the maintenance harness used in this repository (the constitution
@@ -169,8 +169,23 @@ branch merges, in ONE squash PR. Under (b): the squash commit inherits the PR ti
 any staged PR draft must describe the net `origin/{{DEFAULT_BRANCH}}..HEAD` diff (the whole
 train, its adds and removes), never just the last session's commits; behind-default-branch
 warnings are usually structural (the default branch advances by squash commits of the very
-train); and agents verify a branch still exists (`git ls-remote --heads origin`) before
-citing it in docs — the human prunes without notice.
+train) — and the guard script should decide *which* case applies mechanically rather than
+leave the topology call to the agent: a *clean* content-level test-merge (`git merge-tree
+--write-tree`, exit 0, no worktree touch) that leaves HEAD's tree unchanged proves the
+default branch brings nothing the branch lacks, so the warning itself can say "do NOT
+merge". Require the clean exit, not just tree equality — a modify/delete conflict exits 1
+while leaving HEAD's version in the tree. A conflicting or differing result keeps the
+reconcile advice, hedged "inspect what the merge would bring first" (a deliberate revert
+on the branch looks like missing content — the squash-then-revert trap). An *empty*
+result — unrelated histories in a shallow/partial clone, or an old git — keeps the
+neutral "usually structural" wording: never assert a divergence the tool didn't prove
+(shallow CI/container clones make this fallback common — the classifier helps where
+history permits, and must stay honest where it doesn't);
+and agents verify a branch still exists (`git ls-remote --heads origin`) before
+citing it in docs — the human prunes without notice. The train invariants that are *not*
+locally decidable (cut from the newest branch, superseded branches pruned, only the final
+superset merges) are owner-side actions — don't build agent-side checks that can only
+guess at them.
 
 **P14. Initialization is one agent-neutral script, idempotent, with background warm-up.** A
 single `scripts/session-start.sh` that any agent's hook mechanism invokes (and that an agent
@@ -178,7 +193,10 @@ with no hook support runs manually — say so in the instructions file): (a) boo
 toolchain idempotently (instant when cached), gated on an explicit remote-environment flag —
 never a heuristic that could surprise a developer machine; (b) launches build-system warm-up
 in the background so the first ladder run doesn't pay the cold cost serially while the agent
-reads docs; (c) verifies the checked-out branch and warns on `main`/detached HEAD (the first
+reads docs — synchronize via the build tool's own inter-process lock, not a completion
+sentinel (a ladder that queues behind the warm-up costs the same wall time as one that waits
+for a sentinel, and the second mechanism can drift; the ladder just *says* the warm-up is
+still running so a slow first rung reads as expected, not hung); (c) verifies the checked-out branch and warns on `main`/detached HEAD (the first
 misplaced commit is the expensive one); (d) prints the protocol pointer ("read STATE first,
 then the RUNBOOK playbook"). The script self-locates its repo root — it must not depend on
 any one agent's environment variables.
@@ -608,8 +626,9 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
    - *Local-only advisories (WARN, skipped in CI):* checkpoint tripwire (code changed vs
      default branch but STATE.md not in the diff → the changelog line is probably missing);
      stale-branch tripwire (behind the default branch — a real conflict risk in
-     branch-per-change mode, usually structural in branch-train mode (P13); either way merge,
-     never rebase pushed history);
+     branch-per-change mode, usually structural in branch-train mode; classify mechanically
+     with the P13 test-merge and say "do NOT merge" when the default branch brings nothing;
+     when it does bring content, merge — never rebase pushed history);
      plan-orphan tripwire (a file under `docs/plans/` not referenced from STATE.md's active
      work → a finished or pivoted plan missed its deletion step; plans must die — code cites
      ledger rows, never plans);

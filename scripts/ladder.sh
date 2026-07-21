@@ -34,7 +34,9 @@
 #      never add CI noise, D-166): 3 = checkpoint tripwire (code/config changed vs main but
 #      STATE.md carries no matching entry — RUNBOOK Session discipline 3); 4 = stale-branch
 #      tripwire (HEAD behind origin/main CAN invite a squash-merge conflict — but under the
-#      DA-002 branch-train model behind-main is usually structural, so it stays advisory).
+#      DA-002 branch-train model behind-main is usually structural, so it stays advisory;
+#      DA-010: a merge-tree test-merge classifies which case applies, so the warning itself
+#      says "do NOT merge" when origin/main brings no content this branch lacks).
 #   7. Rule-review tripwire (DA-006; WARN-only, skipped under GITHUB_ACTIONS): uncommitted
 #      changes touching harness-legislation files (constitution + its AGENTS.md pointer,
 #      RUNBOOK, this script + its test suite, session bootstrap, adapter permission config)
@@ -265,10 +267,29 @@ if git rev-parse --verify -q origin/main >/dev/null; then
     # guard 4: stale-branch tripwire. Behind origin/main invites a squash-merge conflict the
     # agent's own green ladder can't see. Advice must stay force-push-free: rebasing pushed
     # checkpoints would need a force-push, which the git rules forbid — merge instead (the
-    # merge commit vanishes at squash-merge anyway).
+    # merge commit vanishes at squash-merge anyway). DA-010: don't make the agent reason
+    # about train topology — a content-level test-merge (git merge-tree, no worktree touch)
+    # decides mechanically: if merging origin/main would leave HEAD's tree unchanged, main
+    # brings nothing this branch lacks (the DA-002 structural case — main advanced by squash
+    # commits of this very train) and the advice is a hard "do NOT merge".
     behind=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
     if [ "$behind" -gt 0 ]; then
-      echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main. In the DA-002 branch-train model this is usually STRUCTURAL (main advances by squash commits of this very train) — reconcile only if main carries work this branch genuinely lacks: 'git merge origin/main' (rebase ONLY if nothing is pushed yet; pushed checkpoints are immutable, never force-push)."
+      # The structural claim requires a CLEAN merge (rc 0) AND an unchanged tree: on a
+      # conflict (rc 1) the OID still prints, and a modify/delete conflict can leave the
+      # merged tree EQUAL to HEAD's while the real merge would stop on the conflict — tree
+      # equality alone is not proof (DA-005 review finding, fixture-pinned). EMPTY output
+      # (rc 128: unrelated histories in a shallow/partial clone, pre-2.38 git) means it
+      # could not decide at all — fall back to the neutral wording, never assert a
+      # divergence the tool didn't prove (found live: this container's shallow clone).
+      merge_rc=0
+      merged_tree=$(git merge-tree --write-tree origin/main HEAD 2>/dev/null | head -n 1) || merge_rc=$?
+      if [ "$merge_rc" -eq 0 ] && [ -n "$merged_tree" ] && [ "$merged_tree" = "$(git rev-parse 'HEAD^{tree}')" ]; then
+        echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main, but a clean test-merge shows origin/main brings NO content this branch lacks — the DA-002 structural case (main advances by squash commits of this very train). Do NOT merge origin/main in; keep working."
+      elif [ -n "$merged_tree" ] && [ "$merge_rc" -le 1 ]; then
+        echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main and a test-merge shows origin/main carries content differences (or a conflicting change) this branch lacks (DA-010). Inspect what the merge would bring first — a deliberate revert on this branch can look like missing content — and reconcile only if main carries work this branch genuinely lacks: 'git merge origin/main' (rebase ONLY if nothing is pushed yet; pushed checkpoints are immutable, never force-push)."
+      else
+        echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main (test-merge inconclusive — shallow/partial clone or old git). In the DA-002 branch-train model this is usually STRUCTURAL (main advances by squash commits of this very train) — reconcile only if main carries work this branch genuinely lacks: 'git merge origin/main' (rebase ONLY if nothing is pushed yet; pushed checkpoints are immutable, never force-push)."
+      fi
     fi
   fi
 else
@@ -281,6 +302,12 @@ if [ "$guards_only" -eq 1 ]; then
 fi
 
 # --- the five rungs, one Gradle invocation (same task set as build.yml) ---
+# If the session-start warm-up (D-173) is still in flight, say so: Gradle's inter-process
+# lock serializes this build behind it (total wall time ≈ one cold build — expected, not a
+# hang). Informational only — the lock IS the synchronization; no sentinel/wait (DA-010).
+if pgrep -f 'warm-gradle\.sh' >/dev/null 2>&1; then
+  echo "LADDER: Gradle warm-up still running — this build queues behind its lock; a long first rung is expected, not a hang (progress: ~/.gradle-warmup.log)"
+fi
 start=$SECONDS
 ./gradlew :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug "$@"
 echo "LADDER PASS (guards + 5 rungs) in $((SECONDS - start))s"

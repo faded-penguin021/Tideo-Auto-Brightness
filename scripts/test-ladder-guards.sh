@@ -68,6 +68,7 @@ write_state 0
 write_ledger 10
 write_gradle 7
 printf 'Short changelog.\n' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
+printf 'shared baseline\n' > "$SANDBOX/app/shared.txt"   # guard 4's modify/delete fixture
 git_q init -q
 git_q add -A
 git_q commit -qm baseline
@@ -220,6 +221,51 @@ git_q reset -q --hard "$BASELINE_SHA"
 git_q commit -q --allow-empty -m 'harmless commit saying skip-ci (hyphenated)'
 check "guard 2: hyphenated skip-ci is allowed" 0 "no skip-ci tokens"
 git_q reset -q --hard "$BASELINE_SHA"
+
+# --- guard 4: stale-branch tripwire classification (DA-010) ---------------------------------
+
+# Structural case: origin/main is a squash of work this branch already contains (same tree,
+# different commit) -> the warning must say the merge is NOT wanted.
+printf 'unit work\n' > "$SANDBOX/app/work.txt"
+git_q add -A
+git_q commit -qm 'unit work'
+squash_sha=$(git_q commit-tree 'HEAD^{tree}' -p "$BASELINE_SHA" -m 'squash of the train')
+git_q update-ref refs/remotes/origin/main "$squash_sha"
+check "guard 4: behind-main, no content delta -> structural, do NOT merge" 0 "Do NOT merge origin/main"
+# Divergent case: origin/main carries a file this branch lacks -> reconcile advice. The
+# commit is built with plumbing (temp index) so the sandbox worktree stays untouched.
+tmpidx="$SANDBOX/.git/tmp-index-g4"
+hotfix_blob=$(printf 'hotfix\n' | git_q hash-object -w --stdin)
+GIT_INDEX_FILE="$tmpidx" git_q read-tree "$BASELINE_SHA"
+GIT_INDEX_FILE="$tmpidx" git_q update-index --add --cacheinfo "100644,$hotfix_blob,app/hotfix.txt"
+divergent_tree=$(GIT_INDEX_FILE="$tmpidx" git_q write-tree)
+rm -f "$tmpidx"
+divergent_sha=$(git_q commit-tree "$divergent_tree" -p "$BASELINE_SHA" -m 'hotfix on main')
+git_q update-ref refs/remotes/origin/main "$divergent_sha"
+check "guard 4: behind-main with content differences -> reconcile advice" 0 "carries content differences"
+# Modify/delete conflict (DA-005 review BLOCKER): branch modified app/shared.txt, main
+# deleted it. merge-ort exits 1 but leaves HEAD's version in the written tree, so the
+# merged-tree OID EQUALS HEAD's — tree equality alone must never yield "do NOT merge".
+printf 'branch edit\n' > "$SANDBOX/app/shared.txt"
+git_q add -A
+git_q commit -qm 'edit shared on branch'
+GIT_INDEX_FILE="$tmpidx" git_q read-tree "$BASELINE_SHA"
+GIT_INDEX_FILE="$tmpidx" git_q update-index --force-remove app/shared.txt
+del_tree=$(GIT_INDEX_FILE="$tmpidx" git_q write-tree)
+rm -f "$tmpidx"
+del_sha=$(git_q commit-tree "$del_tree" -p "$BASELINE_SHA" -m 'delete shared on main')
+git_q update-ref refs/remotes/origin/main "$del_sha"
+check "guard 4: modify/delete conflict (tree==HEAD, rc 1) -> reconcile, never structural" 0 "carries content differences"
+git_q reset -q --hard "$BASELINE_SHA"
+git_q update-ref refs/remotes/origin/main "$BASELINE_SHA"
+# Inconclusive case: origin/main with an UNRELATED history (orphan commit — the shallow/
+# partial-clone shape found live) -> merge-tree can't decide; neutral wording, no false
+# divergence claim.
+orphan_sha=$(git_q commit-tree "$(git_q hash-object -w -t tree /dev/null)" -m 'orphan main')
+git_q update-ref refs/remotes/origin/main "$orphan_sha"
+check "guard 4: unrelated histories -> inconclusive neutral wording" 0 "test-merge inconclusive"
+git_q reset -q --hard "$BASELINE_SHA"
+git_q update-ref refs/remotes/origin/main "$BASELINE_SHA"
 
 # --- guard 7: rule-review tripwire (DA-006) --------------------------------------------------
 

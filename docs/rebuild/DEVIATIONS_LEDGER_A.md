@@ -237,3 +237,46 @@
   ≈ the ladder in CI); no CLAUDE.md prose was deleted — the constitution binds non-hook
   agents, so hookable rules stay as prose (the saving lands in fewer failed-denial
   round-trips, not fewer lines).
+
+- **DA-010: external-review triage #3 — mechanize the branch-train call; no warm-up
+  sentinel (2026-07-21).** Owner-relayed external suggestions (triaged as data per DA-006).
+  **Adopted (reduced):** (a) ladder guard 4 no longer asks the agent to reason about train
+  topology — a content-level test-merge (`git merge-tree --write-tree origin/main HEAD`,
+  no worktree touch) classifies the behind-main state three ways: a CLEAN merge (rc 0)
+  whose tree == HEAD's proves main brings NO content the branch lacks (the DA-002
+  structural case; warning says "do NOT merge") — rc 0 is required because a modify/delete
+  conflict exits 1 while leaving HEAD's version in the tree, so tree equality ALONE is not
+  proof (this unit's rule-review BLOCKER, reviewer-reproduced, fixture-pinned); a printed
+  tree otherwise (rc ≤ 1: content differences or conflicts) → reconcile advice, hedged
+  "inspect what the merge would bring first" because a deliberate revert on the branch
+  looks like missing content on main (the squash-then-revert trap); EMPTY output
+  (merge-tree undecidable: unrelated histories in a shallow/partial clone — found LIVE on
+  this very container's clone — or pre-2.38 git) → the original neutral wording, never a
+  divergence claim the tool didn't prove. Addresses the reviewer's real worry — an agent
+  misreading "usually structural" and merging main in harmfully — with a mechanical check
+  over artifacts that exist anyway (P3-compliant, unlike an attestation), though only
+  where history permits: a shallow remote-container clone lands in the inconclusive
+  fallback (this one does); deepening the clone per ladder run was DECLINED (network on
+  the hot path for a WARN-level advisory). Four guard fixtures added (squash-equivalent /
+  plumbing-built divergent / modify-delete conflict / orphan-history main; suite 38
+  cases). (b) The ladder prints an informational note before the Gradle rung when
+  `warm-gradle.sh` is still running: the build queues behind Gradle's inter-process lock,
+  so a long first rung is expected, not a hang. **Declined:** (1) a full "verify-train"
+  script — the remaining train invariants (cut from newest, superseded pruned, final
+  superset merges) are owner-side actions not locally decidable, and branch-citation
+  liveness needs the network on every run for one rare consumer (the prose
+  `git ls-remote` rule suffices); (2) a guard failing when a staged PR draft "does not
+  mention the train's total scope" — "describes the whole diff" is not machine-derivable;
+  a keyword/range check is exactly the attestation-shaped Goodhart bait P3 and the D-162/
+  DA-006 declines forbid, and the net-diff rule is already stated at the point of use
+  (STATE PR draft, CLAUDE.md git rules, harness P13); (3) a warm-up completion sentinel
+  awaited by the ladder — Gradle's own lock IS the synchronization; waiting on a sentinel
+  costs identical wall time and adds a second mechanism that can drift (warm-gradle.sh
+  header already documents worst-case = cold cost). Generalized export: harness prompt
+  → **v1.3** (P13 test-merge classification + owner-side-invariants boundary, P14
+  no-sentinel rationale, 3.4 tripwire text). The unit's DA-005 rule-review pass: 1 BLOCKER
+  (the modify/delete tree-equality misclassification above — it would have printed "do NOT
+  merge" on a merge that conflicts) + 2 should-fix (revert-trap hedge; shallow-clone
+  honesty in this row and STATE) + nits (CLAUDE.md consequence sentence updated; pgrep
+  substring match accepted for an informational line) — all adopted except history
+  deepening, declined as above.
