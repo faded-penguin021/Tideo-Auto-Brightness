@@ -113,6 +113,11 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-22 — **Doc drift fix** (owner-requested): README + `architecture/privilege_tiers.md`
+  undercounted runtime Shizuku as "exactly one place" / "never a runtime binder dependency" —
+  corrected to the **two** genuine runtime uses (no-Location Wi-Fi SSID `cmd wifi status`; global
+  force-dark `debug.hwui.force_dark`, D-172), matching CLAUDE.md and `ForceDarkController` code.
+  `docs/history/` snapshots left frozen. Docs-only; no D-row (drift already logged at D-172).
 - 2026-07-21 — **DA-014** (owner-requested): STATE.md compression-LANDING enforcement — new
   ladder **guard 1a** fails a "micro-trim" that shrinks STATE out of warn territory (> 14 KB)
   into the 9–14 KB debounce band instead of onto the ≤ 9 KB floor (the stateless guard 1
