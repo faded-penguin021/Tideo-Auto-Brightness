@@ -1,6 +1,6 @@
 # The Agentic Maintenance Harness — a generalized, reusable prompt
 
-**Harness version 1.5 (2026-07-21).** Instantiating repos may note the version they adopted
+**Harness version 1.6 (2026-07-21).** Instantiating repos may note the version they adopted
 (e.g. "AMH v1.1") in their constitution, so process drift is diagnosable as the harness evolves.
 
 This document generalizes the maintenance harness used in this repository (the constitution
@@ -29,19 +29,26 @@ document. Docs describe the system as-built and *will* drift; the standing order
 conflicts with the code, trust the code and correct the doc." Without this rule, agents
 oscillate between conflicting sources or "fix" correct code to match a stale doc.
 
-**P2. Tier memory by mutability and size, and bound every tier that agents must read.**
-Long-context repos die by unbounded accumulation. Split memory into four tiers:
+**P2. Tier memory like a computer's memory hierarchy — and bound every tier an agent must
+read.** Long-context repos die by unbounded accumulation; the fix is the one hardware already
+uses — distinct storage tiers, each with the mutability and size discipline its role demands.
+This analogy is the harness's through-line, and naming it is load-bearing, not decorative: a
+transferring agent (any vendor, any model) already understands memory hierarchy, so it
+carries the *why* of every tier's rule without re-derivation.
 
-| Tier | Artifact | Mutability | Size discipline |
+| Tier | Hardware analog | Artifact | Mutability & discipline |
 |---|---|---|---|
-| Constitution | The agent-instructions file (the Part-2 prompt) | Stable; edited rarely, deliberately | Small by construction |
-| Working memory | `STATE.md` | Rewritten freely | **Machine-enforced cap** (warn/fail), compression protocol, protected sections |
-| Permanent memory | Numbered append-only ledger | Append-only, never compressed | Per-file line cap + rollover to sibling files |
-| Archive | `docs/history/` | Frozen; consult, never extend | Unbounded but never on the hot path |
+| Constitution | ROM / firmware | the agent-instructions file (the Part-2 prompt) | Boot-loaded, read-mostly; changed rarely and deliberately; small by construction |
+| Working memory | RAM | `STATE.md` | Rewritten freely but **capacity-bounded** — a machine-enforced cap forces compaction (hysteresis, protected regions); volatile, so results must be *flushed* to durable tiers |
+| Permanent memory | Disk / append-only journal | the numbered ledger | Append-only, never rewritten; rolls to a new volume at a size cap; every durable fact lands here, citable forever |
+| Archive | Cold storage / backup tape | `docs/history/` | Frozen; consult, never extend; off the hot path, so unbounded is fine |
 
-The key move: history that must never be lost goes to the *ledger* (append-only, citable);
-narrative that has served its purpose goes to the *archive*; only the small working set stays
-in the file every session reads first.
+Two corollaries the analogy makes self-evident: **(a)** the checkpoint invariant (P5) is
+*write-back before power loss* — working memory is volatile, so a unit's result is flushed to
+disk (commit + ledger row) before the session can die; **(b)** durable facts belong on disk
+(the citable ledger), spent narrative in cold storage (the archive), and only the small
+working set in the RAM every session reads first — the cardinal sin is letting RAM accrete
+what belongs on disk.
 
 **P3. Machine-check everything checkable — but only over artifacts the work produces anyway.**
 Guards verify diffs, file sizes, commit messages, citation cross-references — things that exist
@@ -56,9 +63,10 @@ hand-maintained lockstep between "what the agent runs" and "what CI runs" — di
 where "green locally, red in CI" mysteries breed. Provide a `--guards-only` fast path for
 docs-only work, and test the guards themselves with a fixture suite (guards are code).
 
-**P5. Checkpoint invariant: assume the session dies at any moment.** Every unit of work ends
-*acceptance green → state-file changelog line → commit → push* before the next unit starts. An
-interrupted session (rate limit, context window, crash) loses at most the unit in flight.
+**P5. Checkpoint invariant: assume the session dies at any moment.** This is P2's *write-back
+before power loss* — RAM is volatile, so flush. Every unit of work ends *acceptance green →
+state-file changelog line → commit → push* before the next unit starts. An interrupted session
+(rate limit, context window, crash) loses at most the unit in flight.
 Corollaries: work strictly sequentially (no parallel subagents on one repo — they have burned
 whole usage windows), keep units small (≈ one focused hour) and independently shippable, and
 give each a **binary** acceptance check — tests or a scripted comparison, never "looks right".
@@ -195,8 +203,10 @@ locally decidable (cut from the newest branch, superseded branches pruned, only 
 superset merges) are owner-side actions — don't build agent-side checks that can only
 guess at them.
 
-**P14. Initialization is one agent-neutral script, idempotent, with background warm-up.** A
-single `scripts/session-start.sh` that any agent's hook mechanism invokes (and that an agent
+**P14. Initialization is one agent-neutral script, idempotent, with background warm-up.**
+Extending P2's analogy: this is the machine's *boot sequence*, and the ladder guards (P4) are
+its *power-on self-test* — cheap checks that must pass before the machine is allowed to run.
+A single `scripts/session-start.sh` that any agent's hook mechanism invokes (and that an agent
 with no hook support runs manually — say so in the instructions file): (a) bootstraps the
 toolchain idempotently (instant when cached), gated on an explicit remote-environment flag —
 never a heuristic that could surprise a developer machine; (b) launches build-system warm-up

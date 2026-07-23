@@ -113,6 +113,11 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-22 — **Harness v1.6** (owner-requested, no D-row): codified the computer-memory
+  analogy as the harness prompt's through-line — P2 table gains a hardware-analog column
+  (ROM/RAM/disk-journal/cold-storage), checkpoint invariant reframed as write-back-before-
+  power-loss (P5), init+guards as boot/POST (P14); redundant post-table paragraph folded in.
+  Export doc only (not this repo's legislation, DA-005 scope) — no rule-review required.
 - 2026-07-22 — **Doc drift fix** (owner-requested): README + `architecture/privilege_tiers.md`
   undercounted runtime Shizuku as "exactly one place" / "never a runtime binder dependency" —
   corrected to the **two** genuine runtime uses (no-Location Wi-Fi SSID `cmd wifi status`; global
