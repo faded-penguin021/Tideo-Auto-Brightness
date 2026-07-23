@@ -57,7 +57,7 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
      Owner queue + ask-don't-assume (D-167) · secret hygiene (`redact.sh` + leak protocol +
      instruction
      hierarchy, D-175/DA-006/DA-007) · Gradle parallel/config-cache. **Harness (D-176/DA-001…
-     DA-015, prompt v1.7):** `AGENTS.md` stub + neutral `session-start.sh`; thin `.claude/`
+     DA-015, prompt v1.8):** `AGENTS.md` stub + neutral `session-start.sh`; thin `.claude/`
      adapter; ledger 1000-line rollover; branch-train; fresh-context glue/rule review;
      bounded-recovery stop condition (DA-012). **Release:** vc18 / 1.8.0.
 2. After CI green: on-device `DEVICE_TEST_SCRIPT.md` **§§12–15**; findings → **Incoming
@@ -122,6 +122,10 @@ One line per shipped change (newest first); detail in the D-rows and git history
   test (seeded, 5×4000 cases, engine ≡ reference live); ladder **guard 11** falsifiable
   doc-facts (Shizuku site count, incident-only bar; rule-review: 2 blockers fixed, minSdk
   fact dropped); prompt **v1.7** opens with the P0 thesis; KPI + orphan-provenance declined.
+- 2026-07-22 — **Harness v1.8** (owner-requested, no D-row): back-ported the two DA-015 ideas
+  the export was missing — P19 (exploit a reference oracle differentially + seeded) and P20
+  (falsifiable doc-facts, incident-only bar) + its guard-spec bullet. DA-001…DA-014 were
+  already reflected.
 - 2026-07-22 — **Harness v1.6** (owner-requested, no D-row): codified the computer-memory
   analogy as the harness prompt's through-line — P2 table gains a hardware-analog column
   (ROM/RAM/disk-journal/cold-storage), checkpoint invariant reframed as write-back-before-
