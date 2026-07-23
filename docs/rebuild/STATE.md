@@ -26,8 +26,9 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 **Shipped: v1.7.0** (vc17, on `main`). **Code-complete, awaiting owner release cut: 1.8.0 /
 vc18** — intent control (D-157), a11y + crash-log capture (D-156/D-158), IME (D-159), audit
-(D-160), force dark (D-172). Whole train on ONE branch `claude/agent-agnostic-harness-fmb35b`
-(other session branches deleted, 2026-07-19). No active work; no plan files.
+(D-160), force dark (D-172), + curve-wizard top-K sort fix (DA-016). Train now on ONE branch
+`claude/curve-fitting-zone-boundaries-2nnwmb` (cut from + supersets `…-fmb35b`; pre-fmb35b
+session branches deleted 2026-07-19). No active work; no plan files.
 `PARITY_CHECKLIST.md` zero-`pending`; parity tests green; TODO/FIXME 0; `parity_gaps.md` 0 open.
 Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
@@ -42,16 +43,18 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 **Pending owner actions (the 1.8.0 release path):**
 
 1. **PR deferred until F-Droid review completes** (owner 2026-07-09); local ladder = build.yml
-   task set. **ONE PR** (owner 2026-07-10) from **`claude/agent-agnostic-harness-fmb35b`** →
-   `main` (only session branch; supersets the train). Squash commit takes the PR title+body —
+   task set. **ONE PR** (owner 2026-07-10) from **`claude/curve-fitting-zone-boundaries-2nnwmb`**
+   → `main` (only live session branch; supersets the train). Squash commit takes the PR title+body —
    draft = the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit fixes,
-     force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176, DA-001…DA-015)`
+     force dark — plus repo hardening, the agent-agnostic harness, and the curve-wizard sort fix
+     (D-156…D-176, DA-001…DA-016)`
    - *Body:* **Features (1.8.0/vc18):** automation intent surface (D-157, `docs/AUTOMATION.md`) ·
      TalkBack A0–A7 + crash-log capture (D-156/D-158) · force dark via Shizuku/root (D-172) ·
      context write-through + baseline revert (D-170). **Fixes:** IME dead-gap (D-159) · RESUME
      gate (D-160) · audit closes (D-163–D-165) · super-dimming relabel + MaxBright auto-raise
-     (D-168/D-169) · stale User Guide. **Repo hardening:** `ladder.sh` acceptance + 11 guards +
+     (D-168/D-169) · curve-wizard Stage 1 top-K bubble-up sort (DA-016) · stale User Guide.
+     **Repo hardening:** `ladder.sh` acceptance + 11 guards +
      command guard, CI-run, own regression suite (D-161/D-166/D-173/D-174/DA-006–DA-015) ·
      differential sweep parity test (DA-015) · STATE compression-landing guard 1a (DA-014) · guarded
      Owner queue + ask-don't-assume (D-167) · secret hygiene (`redact.sh` + leak protocol +
@@ -118,6 +121,11 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-23 — **DA-016** (owner-reported field bug): curve-wizard Stage 1 top-K bubble-up was
+  mis-ported (`while` guarded on the swap, no `t--`) → one swap per insert → shortlist collapsed
+  to a 1–2 candidate window, suppressing valid zone-boundary suggestions. Ported both branches to
+  the reference `for (t in k downTo 1)` full pass; regenerated `wizard.csv` (production-derived
+  lock, 10/12 cases shifted); added `wizard_topKCandidatesAreSortedDescendingByScore_DA016`.
 - 2026-07-22 — **DA-015** (owner-directed cross-model triage): differential sweep parity
   test (seeded, 5×4000 cases, engine ≡ reference live); ladder **guard 11** falsifiable
   doc-facts (Shizuku site count, incident-only bar; rule-review: 2 blockers fixed, minSdk

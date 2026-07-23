@@ -423,3 +423,28 @@
   discipline 7 — an agent optimizing that number stops escalating the forks it must
   escalate. **DECLINED: orphan-provenance/total-coverage extension** of `[cited]` —
   self-flagged by the proposer; no incident; ceremony (P10).
+
+- DA-016 [cited]: curve-wizard Stage 1 top-K bubble-up mis-port — the reference's full bubble
+  pass (`for (t = k; t > 0; t--) { if (score[t] > score[t-1]) swap }`, task38 Java Block #1
+  L649–667) was ported as a `while (t > 0 && score[t] > score[t-1]) { swap }` with NO `t--`.
+  Guarding the loop on the swap condition, without a decrement, does **at most one adjacent
+  swap** per insert: a newly-inserted candidate climbs one slot and stops instead of bubbling
+  to its sorted rank. Consequence is not cosmetic — the eviction gate compares against the LAST
+  slot (`combinedScore > z1_scores[TOP_K_Z1-1]`), which is only the running minimum when the
+  array stays sorted; with the single-swap bug every candidate funnels through slot K−1 and can
+  reach slot K−2 at most, so the effective shortlist **collapses from top-5 to a 1–2 candidate
+  window** and the better boundary splits are overwritten before Stage 2 evaluates them. Field
+  symptom (owner, on-device): a valid dataset where Tasker suggests new zone boundaries but the
+  app returns the current ones unchanged — the diagnostics log shows real candidates stranded at
+  `#4/#5` behind `-9999` placeholders (`Cand(k=3)/Cand(k=4)`), the exact fingerprint. **Fix:**
+  both branches (dup-update + new-insert) ported verbatim to `for (t in k downTo 1)` with the
+  conditional swap. **Golden impact:** `wizard.csv` is a production-derived regression LOCK
+  (D-037), not an independent oracle, so it had frozen the buggy output; regenerated — 10/12
+  non-null cases shifted (all but the two `t4_darkHeavy` cases, whose data yields the same
+  shortlist either way). Ground truth is the Tasker Java the owner supplied + code inspection
+  (the port is otherwise faithful per S6/G3 gates); there is no independent transcribed wizard
+  reference, so the shift is justified by conformance to the reference, not by production.
+  **Guard against regression:** `wizard_topKCandidatesAreSortedDescendingByScore_DA016` asserts
+  a STRUCTURAL property of the reference (Top-Cand scores are monotone non-increasing) parsed
+  from the diagnostics log — independent of any captured value, fails on single-swap, passes on
+  full-pass. `[cited]`: `CurveSuggestionEngine.kt` Stage 1 cites DA-016.

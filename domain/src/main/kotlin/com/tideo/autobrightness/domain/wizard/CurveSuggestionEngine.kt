@@ -227,20 +227,29 @@ object CurveSuggestionEngine {
 
             val dupIdx = (0 until topKZ1).firstOrNull { z1Scores[it] > -9998.0 && abs(z1Values[it] - tempForm2d) < 1e-9 } ?: -1
             if (dupIdx != -1) {
+                // Duplicate boundary found: update if the new split scores better, then bubble up.
                 if (combinedScore > z1Scores[dupIdx]) {
                     z1Scores[dupIdx] = combinedScore
-                    var t = dupIdx
-                    while (t > 0 && z1Scores[t] > z1Scores[t - 1]) {
-                        var tmp = z1Scores[t - 1]; z1Scores[t - 1] = z1Scores[t]; z1Scores[t] = tmp
-                        tmp = z1Values[t - 1]; z1Values[t - 1] = z1Values[t]; z1Values[t] = tmp
+                    // Full bubble pass — t decrements every iteration, the swap is conditional. A
+                    // guard-on-swap while-loop would do at most ONE swap and collapse the top-K
+                    // shortlist to a 1–2 candidate window (DA-016).
+                    // Tasker: task38 Java Block #1, Stage 1 top-K bubble-up L649–655.
+                    for (t in dupIdx downTo 1) {
+                        if (z1Scores[t] > z1Scores[t - 1]) {
+                            var tmp = z1Scores[t - 1]; z1Scores[t - 1] = z1Scores[t]; z1Scores[t] = tmp
+                            tmp = z1Values[t - 1]; z1Values[t - 1] = z1Values[t]; z1Values[t] = tmp
+                        }
                     }
                 }
             } else if (combinedScore > z1Scores[topKZ1 - 1]) {
+                // New boundary candidate: insert at the bottom slot and bubble up (full pass, DA-016).
                 z1Scores[topKZ1 - 1] = combinedScore; z1Values[topKZ1 - 1] = tempForm2d
-                var t = topKZ1 - 1
-                while (t > 0 && z1Scores[t] > z1Scores[t - 1]) {
-                    var tmp = z1Scores[t - 1]; z1Scores[t - 1] = z1Scores[t]; z1Scores[t] = tmp
-                    tmp = z1Values[t - 1]; z1Values[t - 1] = z1Values[t]; z1Values[t] = tmp
+                // Tasker: task38 Java Block #1, Stage 1 top-K bubble-up L659–667.
+                for (t in topKZ1 - 1 downTo 1) {
+                    if (z1Scores[t] > z1Scores[t - 1]) {
+                        var tmp = z1Scores[t - 1]; z1Scores[t - 1] = z1Scores[t]; z1Scores[t] = tmp
+                        tmp = z1Values[t - 1]; z1Values[t - 1] = z1Values[t]; z1Values[t] = tmp
+                    }
                 }
             }
         }
