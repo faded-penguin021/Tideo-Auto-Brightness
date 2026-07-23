@@ -46,6 +46,9 @@
 #      print a reminder that the DA-005 rule-review protocol applies before commit.
 #   8. redact.sh self-test (DA-007): the secret-redaction filter is a rail — a silent regex
 #      regression must fail the ladder, not pass quietly.
+#   11. Falsifiable doc-facts (DA-015): a prose claim with a shipped drift incident gets a
+#      machine anchor — constant in the guard, lockstep with the cited doc sentence
+#      (Shizuku runtime-site count, d66de4c). Incident-only admission bar.
 #   9. Secret-shape tree scan (DA-008): FAIL if redacting any tracked/untracked text file
 #      would change it — the scan IS the DA-007 filter, so the two cannot drift. Catches a
 #      secret BEFORE commit (server push protection only fires at push, when the secret is
@@ -273,6 +276,23 @@ if [ -x scripts/command-guard.sh ]; then
 else
   fail "scripts/command-guard.sh missing or not executable — the DA-009 command rail is gone"
 fi
+
+# --- guard 11: falsifiable doc-facts (DA-015) — a load-bearing prose claim earns a machine
+# anchor only AFTER a real drift incident (P10; this is not a doc-testing framework — the
+# incident-only bar is BINDING: a fact without one was reviewed out, DA-015). The expected
+# value is a constant HERE, in lockstep with the cited doc sentence — the guard checks CODE
+# against the constant and never parses prose; changing either side means changing both
+# (guard 7 fires on this file; rule-review applies). This is a TRIPWIRE, not proof: it
+# counts files naming ShizukuShell, not semantic call sites.
+# Fact (drift incident d66de4c): CLAUDE.md "Shizuku is a genuine optional runtime
+# dependency in exactly two places" — consumer files referencing ShizukuShell, excluding
+# its own definition.
+shizuku_expected=2
+shizuku_sites=$(grep -rl 'ShizukuShell' platform/src/main app/src/main 2>/dev/null \
+  | grep -cv '/ShizukuShell\.kt$' || true)
+[ "$shizuku_sites" = "$shizuku_expected" ] \
+  || fail "doc-fact drift: ${shizuku_sites} file(s) reference ShizukuShell but the docs claim exactly ${shizuku_expected} runtime places — update the claim in CLAUDE.md (and its restatements in README.md + docs/rebuild/architecture/privilege_tiers.md, the d66de4c drift sites) AND this guard's constant in lockstep (DA-015)"
+echo "LADDER: doc-facts OK (Shizuku runtime sites = ${shizuku_sites})"
 
 # --- guard 2: D-115 skip-ci tokens in unmerged commit messages ---
 if ! git rev-parse --verify -q origin/main >/dev/null; then

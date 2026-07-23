@@ -36,9 +36,9 @@ row may overflow the cap, the next row opens the next file (`DA-…` → `DB-…
 
 ```bash
 scripts/ladder.sh                 # ALL rungs below in one command, after fast local guards
-                                  # (guards 1-10: state/ledger/citation/changelog/skip-ci/
-                                  # secret-shape/command-rail checks + advisories — see the
-                                  # ladder.sh header); --guards-only for docs-only work
+                                  # (guards 1-11: state/ledger/citation/changelog/skip-ci/
+                                  # secret-shape/command-rail/doc-fact checks + advisories —
+                                  # see the ladder.sh header); --guards-only for docs-only work
 ./gradlew :domain:test            # pure-JVM engine + golden parity tests
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests

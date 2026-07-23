@@ -1,6 +1,6 @@
 # The Agentic Maintenance Harness — a generalized, reusable prompt
 
-**Harness version 1.6 (2026-07-21).** Instantiating repos may note the version they adopted
+**Harness version 1.7 (2026-07-22).** Instantiating repos may note the version they adopted
 (e.g. "AMH v1.1") in their constitution, so process drift is diagnosable as the harness evolves.
 
 This document generalizes the maintenance harness used in this repository (the constitution
@@ -23,6 +23,17 @@ combination.
 ---
 
 ## Part 1 — Design principles (the extracted logic)
+
+**P0. The thesis every mechanism answers to.** *Maximize correct, shippable change per unit
+of owner attention — assuming the executing agent is the weakest one, and that it may die
+mid-task.* Every principle below is a corollary; every proposed addition must justify itself
+against this sentence (more shipped correctness, or less owner attention per change), and
+additions that satisfy neither are ceremony regardless of how sophisticated they sound. One
+guardrail is part of the thesis itself: owner attention is minimized by REMOVING unnecessary
+decisions, never by suppressing warranted escalation — P8's ask-don't-assume outranks
+attention-thrift, which is also why "owner decisions per change" must stay a design
+orientation and never a measured KPI (a session optimizing that number stops escalating
+exactly the forks it must escalate).
 
 **P1. Declare a ground-truth hierarchy.** Code + immutable test fixtures outrank every
 document. Docs describe the system as-built and *will* drift; the standing order is "when a doc

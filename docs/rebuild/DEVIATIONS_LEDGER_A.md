@@ -391,3 +391,35 @@
   test cases) plus nit 5 (`git diff --quiet HEAD` as the precise "unchanged" test over a
   byte-equality heuristic); nits 3/4 (shrink-only firing; one-pass-vs-checkpoint tension) noted
   as by-design, consistent with the "compress in ONE pass" rule text.
+
+- DA-015 [cited]: adversarial cross-model triage of the "one for the ages" proposals
+  (owner-directed, 2026-07-22) — a successor model hostile-reviewed its predecessor's three
+  harness proposals; two adopted with modifications, one halved, plus one standing decline.
+  **ADOPTED-modified (1): differential sweep parity test.** The "you have an oracle" framing
+  was corrected: `TaskerReference` is a transcription sharing provenance with the port
+  (correlated extraction errors are invisible to it) — what a sweep really buys is detection
+  of MODERNIZATION divergence (rounding, branch edges — the D-030/D-034 classes). And random
+  inputs would violate guard determinism, so: `DifferentialSweepParityTest` (fixed seed
+  20260722, 5×4000 cases, zero new deps) evaluates engine vs reference LIVE, extending the
+  `mapping661VsPlot663_agree` precedent; mismatches route to parity_gaps.md (D-002), never
+  auto-fixed. First run taught the domain lesson now documented in the test: min/max
+  brightness are INTEGRAL settings — fractional sweep inputs produced 3491/4000 spurious
+  clamping diffs (engine Int config vs reference raw doubles), an input-domain bug, not a
+  parity gap; integral inputs → all green. **ADOPTED-narrowed (2): guard 11, falsifiable
+  doc-facts.** Prose claims get machine anchors ONLY after a shipped drift incident
+  (incident-only bar is binding) and via constants-in-guard citing the doc — never prose
+  parsing. Sole fact: the Shizuku runtime-site count (= 2), whose drift incident is d66de4c.
+  Its DA-005 rule-review found 2 BLOCKERs (this row initially missing from the diff — then
+  self-caught by guard 5 via the sweep test's citation, hence this row's [cited] marker;
+  CLAUDE.md still claiming "guards 1-10" — the exact stale-count crime the guard prosecutes,
+  fixed same commit) + 2 should-fix (a minSdk fact admitted WITHOUT an incident, violating
+  the guard's own bar, and its check Goodhart-able by a comment line — resolved by DROPPING
+  the minSdk fact) + 2 nits (over-count fixture added; "tripwire, not proof" honesty +
+  restatement-sweep pointer in the fail message). **ADOPTED-halved (3): the thesis, P0.**
+  The harness's unifying claim now opens the prompt (v1.7): maximize correct shippable
+  change per unit of owner attention, weakest-agent assumption, die-anytime assumption.
+  The companion "measure owner-decisions-per-change as a KPI" is DECLINED: re-litigates the
+  declined metrics dashboard, not artifact-derivable (P3), and Goodharts directly against
+  discipline 7 — an agent optimizing that number stops escalating the forks it must
+  escalate. **DECLINED: orphan-provenance/total-coverage extension** of `[cited]` —
+  self-flagged by the proposer; no incident; ceremony (P10).

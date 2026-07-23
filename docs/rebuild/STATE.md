@@ -46,18 +46,18 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
    `main` (only session branch; supersets the train). Squash commit takes the PR title+body —
    draft = the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit fixes,
-     force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176, DA-001…DA-014)`
+     force dark — plus repo hardening and the agent-agnostic harness (D-156…D-176, DA-001…DA-015)`
    - *Body:* **Features (1.8.0/vc18):** automation intent surface (D-157, `docs/AUTOMATION.md`) ·
      TalkBack A0–A7 + crash-log capture (D-156/D-158) · force dark via Shizuku/root (D-172) ·
      context write-through + baseline revert (D-170). **Fixes:** IME dead-gap (D-159) · RESUME
      gate (D-160) · audit closes (D-163–D-165) · super-dimming relabel + MaxBright auto-raise
-     (D-168/D-169) · stale User Guide. **Repo hardening:** `ladder.sh` acceptance + 10 guards +
-     command guard, CI-run, own regression suite (D-161/D-166/D-173/D-174/DA-006–DA-012) ·
-     STATE compression-landing guard 1a (DA-014) · guarded
+     (D-168/D-169) · stale User Guide. **Repo hardening:** `ladder.sh` acceptance + 11 guards +
+     command guard, CI-run, own regression suite (D-161/D-166/D-173/D-174/DA-006–DA-015) ·
+     differential sweep parity test (DA-015) · STATE compression-landing guard 1a (DA-014) · guarded
      Owner queue + ask-don't-assume (D-167) · secret hygiene (`redact.sh` + leak protocol +
      instruction
      hierarchy, D-175/DA-006/DA-007) · Gradle parallel/config-cache. **Harness (D-176/DA-001…
-     DA-014, prompt v1.5):** `AGENTS.md` stub + neutral `session-start.sh`; thin `.claude/`
+     DA-015, prompt v1.7):** `AGENTS.md` stub + neutral `session-start.sh`; thin `.claude/`
      adapter; ledger 1000-line rollover; branch-train; fresh-context glue/rule review;
      bounded-recovery stop condition (DA-012). **Release:** vc18 / 1.8.0.
 2. After CI green: on-device `DEVICE_TEST_SCRIPT.md` **§§12–15**; findings → **Incoming
@@ -90,6 +90,11 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 - **Triage #3 (2026-07-21, adopts in DA-010):** full verify-train script (invariants owner-side);
   PR-draft "whole train" guard (not machine-derivable, attestation Goodhart); warm-up sentinel
   (Gradle's lock IS the sync).
+- **Triage #6 (2026-07-22, DA-015 — cross-model, two adopted modified):** owner-decisions-
+  per-change as a measured KPI (Goodharts against discipline 7 — an agent optimizing it
+  stops escalating; re-litigates the declined metrics dashboard; not P3-derivable; kept as
+  the P0 design orientation only); orphan-provenance/total-coverage `[cited]` extension
+  (proposer-flagged; no incident; ceremony).
 - **Triage #5 (2026-07-21, DA-013, all four declined):** ledger-ID allocator script (guards
   1c/5 already make numbering errors non-shippable with instructive fails; contiguity isn't
   load-bearing — five historic base-file gaps harmless; third ledger-mechanization decline);
@@ -113,6 +118,10 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-22 — **DA-015** (owner-directed cross-model triage): differential sweep parity
+  test (seeded, 5×4000 cases, engine ≡ reference live); ladder **guard 11** falsifiable
+  doc-facts (Shizuku site count, incident-only bar; rule-review: 2 blockers fixed, minSdk
+  fact dropped); prompt **v1.7** opens with the P0 thesis; KPI + orphan-provenance declined.
 - 2026-07-22 — **Harness v1.6** (owner-requested, no D-row): codified the computer-memory
   analogy as the harness prompt's through-line — P2 table gains a hardware-analog column
   (ROM/RAM/disk-journal/cold-storage), checkpoint invariant reframed as write-back-before-

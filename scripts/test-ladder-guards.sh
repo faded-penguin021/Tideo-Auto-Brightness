@@ -58,6 +58,14 @@ write_gradle() {  # $1 = versionCode
     > "$SANDBOX/app/build.gradle.kts"
 }
 
+write_shizuku_fixtures() {  # guard 11: definition + exactly two consumer files
+  local d="$SANDBOX/platform/src/main/kotlin"
+  mkdir -p "$d"
+  printf 'class ShizukuShell\n' > "$d/ShizukuShell.kt"
+  printf 'uses ShizukuShell\n'  > "$d/ConsumerA.kt"
+  printf 'uses ShizukuShell\n'  > "$d/ConsumerB.kt"
+}
+
 git_q() { git -C "$SANDBOX" -c user.email=t@t -c user.name=t "$@"; }
 
 mkdir -p "$SANDBOX/docs/rebuild" "$SANDBOX/scripts" "$SANDBOX/app" "$SANDBOX/$CHANGELOG_DIR"
@@ -67,6 +75,7 @@ cp "$REPO_ROOT/scripts/command-guard.sh" "$SANDBOX/scripts/command-guard.sh"   #
 write_state 0
 write_ledger 10
 write_gradle 7
+write_shizuku_fixtures
 printf 'Short changelog.\n' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
 printf 'shared baseline\n' > "$SANDBOX/app/shared.txt"   # guard 4's modify/delete fixture
 git_q init -q
@@ -245,6 +254,16 @@ check "guard 9: staged-then-reverted secret fails" 1 "STAGED blob"
 git_q reset -q -- app/staged.txt
 rm "$SANDBOX/app/staged.txt"
 check "guard 9: clean tree passes" 0 "secret-shape scan OK (worktree + staged)"
+
+# --- guard 11: falsifiable doc-facts --------------------------------------------------------
+
+rm "$SANDBOX/platform/src/main/kotlin/ConsumerB.kt"
+check "guard 11: Shizuku under-count fails" 1 "doc-fact drift"
+printf 'uses ShizukuShell\n' > "$SANDBOX/platform/src/main/kotlin/ConsumerB.kt"
+printf 'uses ShizukuShell\n' > "$SANDBOX/platform/src/main/kotlin/ConsumerC.kt"
+check "guard 11: Shizuku over-count fails (the d66de4c direction)" 1 "doc-fact drift"
+rm "$SANDBOX/platform/src/main/kotlin/ConsumerC.kt"
+check "guard 11: matching fact passes" 0 "doc-facts OK"
 
 # --- guard 2: D-115 skip-ci tokens ----------------------------------------------------------
 
