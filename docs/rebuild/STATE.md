@@ -92,11 +92,12 @@ zero-`pending`; parity tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Chang
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
-- 2026-07-24 — **CI end-of-build hang fix** (PR #91 first run): config-cache STORE hung under
-  build.yml's `--no-daemon` single-use daemon (tasks green in ~2.5 min, no `BUILD SUCCESSFUL`,
-  3 Robolectric workers alive at the 30-min cap). CI now passes `--no-configuration-cache`
-  (local keeps it, D-161 U4); `~/.robolectric` cached; ladder step capped 20 min + jstack dump
-  on failure.
+- 2026-07-24 — **CI hang root-caused + fixed (DA-017)** (PR #91, two red runs):
+  `ForceDarkControllerTest` spawned the runner's real `su`, whose password prompt blocked
+  `rootExec`'s unbounded stdout read forever (named by run 2's jstack step; run 1's
+  config-cache-store theory disproven — flag kept as a cost skip). Fix in production code:
+  stdin closed at spawn + 15 s bounded wait with kill. CI hardening kept:
+  `--no-configuration-cache`, `~/.robolectric` cached, 20-min ladder step cap + jstack dump.
 - 2026-07-24 — **F-Droid inclusion complete; release PR opened:** `fdroiddata!41202` merged
   (detail in Owner queue 1); release **PR #91** opened and retargeted to `main` with the
   whole-train title/body; train tip advanced to this session's branch.

@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 /**
  * D-172: the global "force dark" rendering override (`debug.hwui.force_dark`) — the DarQ-style
@@ -50,19 +51,31 @@ object ForceDarkController {
     }
 
     /**
-     * `su -c` fallback (mirrors [RootWifiSsidStrategy][com.tideo.autobrightness.platform.context.RootWifiSsidStrategy]).
-     * Gated on exit code 0 so a missing `su` binary or a denied prompt reads as null (unavailable)
-     * — never as a legitimate empty/false property read. Blocking `su` runs on IO.
+     * `su -c` fallback. Gated on exit code 0 so a missing `su` binary or a denied prompt reads as
+     * null (unavailable) — never as a legitimate empty/false property read. Bounded end-to-end
+     * (DA-017 — PR #91 CI hang: a password-prompting host `su` held stdin/stdout open and the
+     * unbounded stdout read blocked forever): stdin is closed so a prompt reads EOF, and the wait
+     * is capped with a kill on expiry — su-manager GUI prompts auto-deny inside the cap (Magisk
+     * ~10 s). Waiting BEFORE reading is safe here, unlike the dumpsys-sized reads in
+     * [WifiSsidStrategies][com.tideo.autobrightness.platform.context.RootWifiSsidStrategy]:
+     * the property output is a few bytes, so it can never fill the pipe buffer.
      */
     private suspend fun rootExec(script: String): String? = withContext(Dispatchers.IO) {
         try {
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", script))
-            val stdout = process.inputStream.bufferedReader().use { it.readText() }
-            if (process.waitFor() == 0) stdout else null
+            process.outputStream.close()
+            if (!process.waitFor(SU_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                return@withContext null
+            }
+            if (process.exitValue() != 0) return@withContext null
+            process.inputStream.bufferedReader().use { it.readText() }
         } catch (_: Throwable) {
             null
         }
     }
+
+    private const val SU_TIMEOUT_SECONDS = 15L
 }
 
 /**

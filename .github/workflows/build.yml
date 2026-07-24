@@ -79,14 +79,15 @@ jobs:
       # lint (hard gate), debug APK. Extra flags are forwarded to Gradle. The local-only advisory
       # guards (checkpoint/stale-branch) self-skip under GITHUB_ACTIONS.
       #
-      # --no-configuration-cache (PR #91 hang, 2026-07-24): under CI's --no-daemon single-use
-      # daemon, the config-cache STORE hung after the last task — all tasks done in ~2.5 min,
-      # BUILD SUCCESSFUL never printed, Gradle + Kotlin daemons and all three Robolectric test
-      # workers still alive when the 30-min job cap killed the run. Local sessions keep the config
-      # cache (persistent daemon, repeated invocations — that's what it's for, D-161 U4); CI's
-      # single invocation only ever paid the store cost, so disabling it here loses nothing.
-      # timeout-minutes caps a recurrence at the STEP so the thread-dump step below still runs
-      # (a job-level kill skips subsequent steps and leaves no diagnosis).
+      # --no-configuration-cache: CI's single Gradle invocation only ever PAYS the config-cache
+      # store cost (nothing reuses it), so skip it; local sessions keep the cache (persistent
+      # daemon, repeated invocations — that's what it's for, D-161 U4). History (PR #91, DA-017):
+      # run 1's end-of-build hang was first blamed on the config-cache store; run 2 hung WITH this
+      # flag and the thread-dump step below named the real culprit — a Robolectric test blocked
+      # forever reading the runner's password-prompting `su` (ForceDarkController root fallback;
+      # fixed with closed stdin + a bounded wait). timeout-minutes caps any hang at the STEP so
+      # the thread-dump step still runs (a job-level kill skips subsequent steps and leaves no
+      # diagnosis).
       - name: Acceptance ladder (scripts/ladder.sh)
         timeout-minutes: 20
         run: scripts/ladder.sh --no-daemon --no-configuration-cache

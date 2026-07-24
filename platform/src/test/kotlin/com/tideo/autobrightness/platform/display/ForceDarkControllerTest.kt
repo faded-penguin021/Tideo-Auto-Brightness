@@ -32,9 +32,11 @@ class ForceDarkControllerTest {
 
     @Test
     fun readIsNullWhenNoPrivilegedShellIsAvailable() = runTest {
-        // Robolectric has no Shizuku binder (exec short-circuits to null) and no `su` binary (the
-        // root fallback throws → null) — the controller must surface that as null (unknown),
-        // never as false (known-off).
+        // Robolectric has no Shizuku binder (exec short-circuits to null); the host's `su` cannot
+        // grant root under test — missing binary → throw, password prompt → EOF on closed stdin,
+        // a stall → the bounded wait kills it (DA-017: an earlier unbounded read blocked forever
+        // on GitHub's password-prompting `su`, hanging CI at the job cap). Every one of those must
+        // surface as null (unknown), never as false (known-off).
         assertNull(ForceDarkController.read(context))
     }
 

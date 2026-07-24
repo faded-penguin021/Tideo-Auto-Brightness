@@ -448,3 +448,28 @@
   a STRUCTURAL property of the reference (Top-Cand scores are monotone non-increasing) parsed
   from the diagnostics log — independent of any captured value, fails on single-swap, passes on
   full-pass. `[cited]`: `CurveSuggestionEngine.kt` Stage 1 cites DA-016.
+
+- DA-017 [cited]: unbounded root-shell reads hang forever on a prompting `su` — the CI hang
+  class behind PR #91's two red runs. `ForceDarkController.rootExec` (D-172) read the child's
+  stdout to EOF before `waitFor()` with stdin left open; on hosts where `su` EXISTS but prompts
+  for a password (GitHub's ubuntu runner as the unprivileged `runner` user, desktop Linux) the
+  prompt never returns, the child never exits, and `readText()` blocks forever — jstack-proven
+  in run 2 by the failure()-gated thread-dump step (`ForceDarkControllerTest.
+  readIsNullWhenNoPrivilegedShellIsAvailable` → `rootExec$2` RUNNABLE in `readBytes` on a
+  `ProcessPipeInputStream`, process reaper waiting). The test's comment had assumed "no `su`
+  binary → throws → null"; local runs masked the bug because the sandbox container runs as
+  root (`su` succeeds, `getprop` missing → exit 127 → null, fast). Run 1's hang was first
+  mis-attributed to the config-cache STORE under CI's single-use daemon; run 2 reproduced the
+  hang WITH `--no-configuration-cache`, exonerating it (the flag stays in build.yml as a pure
+  cost skip). **Fix (production, not test-only — the same stall would freeze the single
+  pipeline coroutine on-device):** close the child's stdin at spawn (a password prompt reads
+  EOF and fails fast), bound the wait (`waitFor(15 s)` — su-manager GUI prompts auto-deny
+  inside that, Magisk ~10 s), `destroyForcibly()` + null on expiry, and gate the stdout read
+  AFTER the exit-code check (safe here because the property output is a few bytes and cannot
+  fill the pipe buffer; the read-before-wait order in `WifiSsidStrategies.execShell` remains
+  REQUIRED there for dumpsys-sized output). **Known accepted residual:** `execShell`
+  (RootWifiSsidStrategy/DumpsysWifiSsidStrategy) and `ShizukuUserService` keep unbounded
+  reads — on-device-only paths, never spawned by tests (strategy tests inject fakes), and the
+  root SSID strategy shares the theoretical on-device stall; bound them the same way if a
+  field report ever implicates them. `[cited]`: ForceDarkController.kt `rootExec` kdoc + its
+  test's hermeticity comment cite DA-017.
