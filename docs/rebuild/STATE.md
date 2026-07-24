@@ -45,10 +45,10 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 1. **F-Droid review COMPLETE → PR now unblocked** (was: deferred until F-Droid review completes,
    owner 2026-07-09). `fdroiddata!41202` (`com.tideo.autobrightness`) **merged by linsui 2026-07-24**;
-   vc17/1.7.0 packaged as a reproducible `Binaries` build (release APK verified, signing key pinned),
-   recipe merged **byte-for-byte as submitted, no AntiFeatures**. Agent verified the merge outcome
-   (public MR API) but not the 12 discussion notes (notes API 401 anon) — any note follow-up is
-   unrecorded here. Local ladder = build.yml
+   vc17/1.7.0 packaged as a reproducible `Binaries` build, recipe merged
+   **byte-for-byte, no AntiFeatures**. Reviewer (fitguy) verified signing = pinned
+   key, gating, zero traffic, VT 0/42 — **no follow-up requested**; declared `INTERNET` is only
+   the opt-in `ipwho.is` geo-IP fallback (D-105/D-121). Local ladder = build.yml
    task set. **ONE PR** (owner 2026-07-10) from **`claude/linsui-merge-review-wy21zg`**
    → `main` (current train tip; supersets `…-2nnwmb`). Squash commit takes the PR title+body —
    draft = the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
