@@ -83,6 +83,14 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
   per-playbook split; XML tags in the constitution; STATE compression commit-or-ledger gate.
 - **Triage #6 (2026-07-22, DA-015):** owner-decisions-per-change KPI (Goodharts against
   discipline 7; kept as P0 design orientation only); orphan-provenance `[cited]` extension.
+- **Triage #7 (2026-07-24, DA-021) — "Claude 5 context engineering" blog rules:** no harness
+  change, no CLAUDE.md rewrite. Progressive disclosure / interface-over-examples / principle-based
+  guidance are already the design; the imperative bulk here is **policy rails** (git, secrets,
+  ledger, ladder), not the capability constraints that post says to delete. Auto-memory ≠ STATE.md
+  (shared, guard-checked artifact). Skills declined on D-176 agent-neutrality (`.claude/` forks the
+  constitution per-agent). RUNBOOK per-playbook split stays declined (DA-013) — external content is
+  not new evidence. Carried awareness, no action: Opus 5 over-verifies when instructed to verify
+  (glue-review/rule-review stay — real catch history) and delegates to subagents more readily.
 - **Privileged Display (D-150–D-152):** per-toggle orthogonal scheduling (D-151 pivot);
   persisted last-applied seed (revisit on real reports); QS tile / notification grayscale
   action; refresh-rate forcing / OEM alternate keys (D-048/D-149); manual Extra-Dim toggle
@@ -92,6 +100,8 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-24 — **DA-021** (triage #7, owner-asked): assessed the "Claude 5 context engineering"
+  rules against this harness — verdict no change (detail in the decided non-item above).
 - 2026-07-24 — **DA-020** (owner-requested, no Tasker source): Ko-fi support link on two surfaces —
   `.github/FUNDING.yml` (`ko_fi: fadedpenguin021`, drives the repo Sponsor button; GitHub reads the
   file, not a settings toggle) and an About-screen "Support development" card whose button opens the

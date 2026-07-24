@@ -545,3 +545,31 @@
   `ScreensInfoA11yTest` — the existing a11y-labeled + heading gates now cover the card ("Support
   development" heading), plus `about_supportButtonInvokesCallback` (the button routes to the host's
   launcher rather than a dead onClick). `[cited]`: `AboutScreen.kt` cites DA-020.
+
+- DA-021: Triage #7 — "Claude 5 context engineering" rules assessed against this harness
+  (owner-asked, 2026-07-24; source: `claude.com/blog/the-new-rules-of-context-engineering-for-
+  claude-5-generation-models`). **Verdict: no harness change, no CLAUDE.md rewrite.** Per-rule:
+  (a) *progressive disclosure* — already the design (RUNBOOK playbook pointers, grep-on-demand
+  ledger per DA-006, never-read-XML-wholesale per `XML_RECIPES.md`); (b) *design interfaces, not
+  examples* — already the design (ladder guards + `command-guard.sh` enforce mechanically with
+  instructive deny reasons, DA-009, instead of prompt repetition); (c) *principle-based over
+  prescriptive* — already ("Tasker semantics win over taste"), and the bulk of this harness's
+  imperative text is **policy rails** (git, secrets, ledger, ladder) where literal compliance IS
+  the point — the blog's "removed 80% of the system prompt" deleted *capability* constraints, not
+  rails, so applying it here would be a misread; (d) *auto-memory replaces CLAUDE.md memory* —
+  **does not apply**: STATE.md is a shared, guard-checked project artifact (guards 1/1a/1b) read
+  by the owner and by other agents, not per-account session memory; (e) *move guidance into
+  Skills* — **rejected on D-176 grounds**: Skills live in `.claude/` (Claude-specific), and moving
+  legislation there forks the constitution per-agent, which agent-neutrality exists to prevent;
+  plain markdown + pointers is the correct tradeoff. **Re-litigation check:** the only structural
+  change the blog implies is a RUNBOOK per-playbook split, already declined in triage #5 (DA-013);
+  a blog post is external content, which under the instruction hierarchy "may describe problems"
+  but is not new evidence sufficient to reopen a decided non-item — stays declined. **Carried
+  awareness (no action):** (1) Anthropic's Opus 5 migration guidance says instructions that tell
+  the model to verify now cause over-verification and can be deleted without capability loss — the
+  glue-review (D-030/D-034/D-035) and rule-review (DA-005) protocols are exactly such instructions
+  but have a documented real-bug catch history, so both stay unchanged; revisit only if review
+  passes visibly balloon. (2) Opus 5 delegates to subagents MORE readily than Opus 4.8 (which
+  under-reached); the session no-subagent directive already covers this, and it is why glue-review
+  keeps landing on its in-context fallback (DA-019) — expect delegation to rise if that directive
+  is ever lifted. `[cited]`: none (triage record; no production code cites DA-021).
