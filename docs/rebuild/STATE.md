@@ -47,8 +47,6 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
    squash commit; no `[skip ci]`-class tokens (D-115).
 2. Cut **v1.8.1 / vc19** from `main` via the Release UI — tag `v1.8.1`; release.yml builds + signs
    the tagged commit; F-Droid `UpdateCheckMode: Tags` auto-builds the update.
-3. **Server-side rails (DA-006):** enable on GitHub — `main` branch protection (PRs required;
-   force-push + deletion blocked) + secret-scanning push protection. (Carried from 1.8.0.)
 
 **Open questions:** (none)
 
@@ -56,6 +54,8 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 - 2026-07-24 — Owner on-device-verified the **DA-018** Resume fix (Tests A + B in
   `RESUME_CONTEXT_TEST.md`): "Confirmed that it works." No regressions reported.
+- 2026-07-24 — Owner confirmed the **server-side rails (DA-006)** are now enabled on GitHub
+  (`main` branch protection + secret-scanning push protection) — closes the carried 1.8.0 item.
 
 ## Decided non-items (don't re-litigate without new evidence)
 
