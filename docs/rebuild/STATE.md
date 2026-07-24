@@ -49,8 +49,8 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
    **byte-for-byte, no AntiFeatures**. Reviewer (fitguy) verified signing = pinned
    key, gating, zero traffic, VT 0/42 — **no follow-up requested**; declared `INTERNET` is only
    the opt-in `ipwho.is` geo-IP fallback (D-105/D-121). Local ladder = build.yml
-   task set. **ONE PR** (owner 2026-07-10) from **`claude/linsui-merge-review-wy21zg`**
-   → `main` (current train tip; supersets `…-2nnwmb`). Squash commit takes the PR title+body —
+   task set. **ONE PR = #91** (open 2026-07-24, base `main`) from **`claude/linsui-merge-review-wy21zg`**
+   (current train tip; supersets `…-2nnwmb`). Squash commit takes the PR title+body —
    draft = the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit fixes,
      force dark — plus repo hardening, the agent-agnostic harness, and the curve-wizard sort fix
