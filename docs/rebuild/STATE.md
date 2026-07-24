@@ -24,14 +24,13 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 ## Current state
 
-**Shipped: v1.7.0** (vc17, on `main`; live on F-Droid since 2026-07-24 — `fdroiddata!41202`).
-**Code-complete, awaiting owner release: 1.8.0 / vc18** — intent control (D-157), a11y +
-crash-log capture (D-156/D-158), IME (D-159), audit (D-160), force dark (D-172), curve-wizard
-top-K sort fix (DA-016), CI config-cache hang fix. Train tip `claude/linsui-merge-review-wy21zg`
-(supersets `…-2nnwmb` → `…-fmb35b`; pre-fmb35b branches deleted 2026-07-19). **Release PR #91
-open** (base `main`, whole train). No active work; no plan files. `PARITY_CHECKLIST.md`
-zero-`pending`; parity tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per
-`RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
+**Shipped: v1.8.0** (vc18, on `main` via PR #91 — intent control, a11y + crash-log, IME, audit,
+force dark, curve-wizard sort fix, D-156…D-176 + DA-001…DA-017). **Code-complete, awaiting owner
+release: 1.8.1 / vc19** — the **DA-018** Resume-context fix (this session), on branch
+`claude/resume-context-automation-stale-e0mw73` off `main`. Patch bump; F-Droid changelog
+`19.txt` added. No other active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
+tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
+`DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 ## Owner queue
 
@@ -41,22 +40,18 @@ zero-`pending`; parity tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Chang
 > findings** = owner on-device results. Items leave when done/answered/triaged (delete + record
 > as a Changelog line or D-row). Final chat message restates this queue.
 
-**Pending owner actions (the 1.8.0 release path):**
+**Pending owner actions (the 1.8.1 release path):**
 
-1. **Squash-merge release PR #91** once CI is green (base `main`, head
-   `claude/linsui-merge-review-wy21zg` = the whole train, D-156…D-176 + DA-001…DA-016). Title +
-   body are live on the PR and become the squash commit — no `[skip ci]`-class tokens (D-115).
-   F-Droid gate cleared: `fdroiddata!41202` (`com.tideo.autobrightness`) merged by linsui
-   2026-07-24 — reproducible `Binaries` build, recipe byte-for-byte, no AntiFeatures; reviewer
-   verified signing = pinned key, permission gating, zero traffic, VT 0/42, **no follow-up**;
-   declared `INTERNET` = the opt-in `ipwho.is` geo-IP fallback (D-105/D-121).
-2. After CI green: on-device `DEVICE_TEST_SCRIPT.md` **§§12–15**; findings → **Incoming
+1. **On-device verify the DA-018 Resume fix** with the debug APK sent this session (the
+   `RESUME_CONTEXT_TEST.md` script) — confirm Resume immediately applies a matching rule / reverts
+   to the last manually-loaded profile with the settings screens in sync; findings → **Incoming
    findings**.
-3. Cut **v1.8.0 / vc18** from `main` via the Release UI — tag `v1.8.0`; release.yml builds the
-   tagged commit and signs with the F-Droid-pinned key; F-Droid `UpdateCheckMode: Tags`
-   auto-builds the update.
+2. **Merge `claude/resume-context-automation-stale-e0mw73` → `main`** (1.8.1 / vc19, DA-018) once CI
+   is green — no `[skip ci]`-class tokens (D-115).
+3. Cut **v1.8.1 / vc19** from `main` via the Release UI — tag `v1.8.1`; release.yml builds + signs
+   the tagged commit; F-Droid `UpdateCheckMode: Tags` auto-builds the update.
 4. **Server-side rails (DA-006):** enable on GitHub — `main` branch protection (PRs required;
-   force-push + deletion blocked) + secret-scanning push protection.
+   force-push + deletion blocked) + secret-scanning push protection. (Carried from 1.8.0.)
 
 **Open questions:** (none)
 
@@ -98,7 +93,8 @@ One line per shipped change (newest first); detail in the D-rows and git history
   loaded profile (indicator/settings diverged). Fix: a dedicated `ACTION_RESUME_CONTEXT` verb runs a
   genuine `evaluate(RESUME)` then Set Initial Brightness (Tasker `_ContextResume` flow), and the resolver
   fallback is now the persisted `%AAB_ProfileUser` = last manually-loaded profile (`ContextBaseline` v2,
-  `userProfileName`). Rides on the train tip; folds into the pending 1.8.0/vc18.
+  `userProfileName`). Cut as **1.8.1 / vc19** (patch, on `main` after 1.8.0 shipped); debug APK + test
+  script sent to owner; awaiting owner on-device verify + release.
 - 2026-07-24 — **CI hang root-caused + fixed (DA-017)** (PR #91, two red runs):
   `ForceDarkControllerTest` spawned the runner's real `su`, whose password prompt blocked
   `rootExec`'s unbounded stdout read forever (named by run 2's jstack step; run 1's
