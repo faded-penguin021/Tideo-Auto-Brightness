@@ -63,9 +63,12 @@ jobs:
       - name: Cache Gradle
         uses: actions/cache@v5
         with:
+          # ~/.robolectric: the android-all jars Robolectric fetches at TEST RUNTIME live outside
+          # ~/.gradle, so without this line every run re-downloads them from Maven Central.
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            ~/.robolectric
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
@@ -73,10 +76,30 @@ jobs:
       # (scripts/ladder.sh) so CI and local share ONE task-set definition (D-166) rather than a
       # hand-maintained copy. The script runs its pre-flight guards (STATE length/structure, ledger
       # rollover, D-115 skip-ci token scan) and then the five rungs: domain + platform + app tests,
-      # lint (hard gate), debug APK. --no-daemon is forwarded to Gradle. The local-only advisory
+      # lint (hard gate), debug APK. Extra flags are forwarded to Gradle. The local-only advisory
       # guards (checkpoint/stale-branch) self-skip under GITHUB_ACTIONS.
+      #
+      # --no-configuration-cache (PR #91 hang, 2026-07-24): under CI's --no-daemon single-use
+      # daemon, the config-cache STORE hung after the last task — all tasks done in ~2.5 min,
+      # BUILD SUCCESSFUL never printed, Gradle + Kotlin daemons and all three Robolectric test
+      # workers still alive when the 30-min job cap killed the run. Local sessions keep the config
+      # cache (persistent daemon, repeated invocations — that's what it's for, D-161 U4); CI's
+      # single invocation only ever paid the store cost, so disabling it here loses nothing.
+      # timeout-minutes caps a recurrence at the STEP so the thread-dump step below still runs
+      # (a job-level kill skips subsequent steps and leaves no diagnosis).
       - name: Acceptance ladder (scripts/ladder.sh)
-        run: scripts/ladder.sh --no-daemon
+        timeout-minutes: 20
+        run: scripts/ladder.sh --no-daemon --no-configuration-cache
+
+      # If the ladder step fails or times out, dump every live JVM's threads so a hang names its
+      # culprit (stuck test, worker teardown, daemon stop) instead of burning the cap silently.
+      - name: Thread-dump surviving JVMs (hang diagnosis)
+        if: failure() || cancelled()
+        run: |
+          for p in $(pgrep java || true); do
+            echo "=== jstack $p ($(ps -o args= -p "$p" | cut -c1-120)) ==="
+            jstack "$p" || true
+          done
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v6

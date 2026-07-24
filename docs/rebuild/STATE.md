@@ -127,6 +127,10 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-24 — **CI end-of-build hang fix** (PR #91 first run): config-cache STORE hung under
+  build.yml's `--no-daemon` single-use daemon (tasks green in ~2.5 min, no `BUILD SUCCESSFUL`,
+  3 Robolectric workers alive at the 30-min cap). CI now passes `--no-configuration-cache`
+  (local keeps it, D-161 U4); `~/.robolectric` cached; ladder step capped 20 min + jstack on fail.
 - 2026-07-23 — **DA-016** (owner-reported field bug): curve-wizard Stage 1 top-K bubble-up was
   mis-ported (`while` guarded on the swap, no `t--`) → one swap per insert → shortlist collapsed
   to a 1–2 candidate window, suppressing valid zone-boundary suggestions. Ported both branches to
@@ -136,15 +140,11 @@ One line per shipped change (newest first); detail in the D-rows and git history
   test (seeded, 5×4000 cases, engine ≡ reference live); ladder **guard 11** falsifiable
   doc-facts (Shizuku site count, incident-only bar; rule-review: 2 blockers fixed, minSdk
   fact dropped); prompt **v1.7** opens with the P0 thesis; KPI + orphan-provenance declined.
-- 2026-07-22 — **Harness v1.8** (owner-requested, no D-row): back-ported the two DA-015 ideas
-  the export was missing — P19 (exploit a reference oracle differentially + seeded) and P20
-  (falsifiable doc-facts, incident-only bar) + its guard-spec bullet. DA-001…DA-014 were
-  already reflected.
-- 2026-07-22 — **Harness v1.6** (owner-requested, no D-row): codified the computer-memory
-  analogy as the harness prompt's through-line — P2 table gains a hardware-analog column
-  (ROM/RAM/disk-journal/cold-storage), checkpoint invariant reframed as write-back-before-
-  power-loss (P5), init+guards as boot/POST (P14); redundant post-table paragraph folded in.
-  Export doc only (not this repo's legislation, DA-005 scope) — no rule-review required.
+- 2026-07-22 — **Harness v1.8** (owner-requested, no D-row): back-ported P19 (differential
+  reference oracle, seeded) + P20 (falsifiable doc-facts) from DA-015 into the export.
+- 2026-07-22 — **Harness v1.6** (owner-requested, no D-row): computer-memory analogy as the
+  harness prompt's through-line (P2 hardware-analog column, P5 write-back-before-power-loss,
+  P14 boot/POST). Export doc only (DA-005 scope).
 - 2026-07-22 — **Doc drift fix** (owner-requested): README + `architecture/privilege_tiers.md`
   undercounted runtime Shizuku as "exactly one place" / "never a runtime binder dependency" —
   corrected to the **two** genuine runtime uses (no-Location Wi-Fi SSID `cmd wifi status`; global

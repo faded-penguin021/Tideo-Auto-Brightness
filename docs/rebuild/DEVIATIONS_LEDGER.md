@@ -2940,7 +2940,7 @@ the permanent registry — never compress or remove them.
   action externally, re-derive each implicit precondition of its old triggers ("asymmetric sibling
   gates", D-142 family). `:app`-only; `:domain`/`:platform`/goldens untouched. Folds into 1.8.0/vc18.
 
-- **D-161: session discipline — the model-tier review policy is retired and replaced by structure.**
+- **D-161 [cited]: session discipline — the model-tier review policy is retired and replaced by structure.**
   Owner instruction (2026-07-10; budget context: the strongest-model window is closing and later
   maintenance sessions may run on lesser models, strictly one tool call at a time). D-035's answer
   to the D-030/D-034 class — Sonnet segments passed their own acceptance gates, review still found
