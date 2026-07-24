@@ -26,9 +26,10 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 **Shipped: v1.8.0** (vc18, on `main` via PR #91 — intent control, a11y + crash-log, IME, audit,
 force dark, curve-wizard sort fix, D-156…D-176 + DA-001…DA-017). **Code-complete, awaiting owner
-release: 1.8.1 / vc19** — the **DA-018** Resume-context fix (this session), on branch
-`claude/resume-context-automation-stale-e0mw73` off `main`. Patch bump; F-Droid changelog
-`19.txt` added. No other active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
+release: 1.8.1 / vc19** — the **DA-018** Resume-context fix + **DA-019** changelog char-count guard
+(this session), **PR #92 open** (base `main`, head `claude/resume-context-automation-stale-e0mw73`).
+Owner on-device-verified the Resume fix. Patch bump; F-Droid changelog `19.txt` added. No other
+active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
 tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
@@ -42,20 +43,19 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 **Pending owner actions (the 1.8.1 release path):**
 
-1. **On-device verify the DA-018 Resume fix** with the debug APK sent this session (the
-   `RESUME_CONTEXT_TEST.md` script) — confirm Resume immediately applies a matching rule / reverts
-   to the last manually-loaded profile with the settings screens in sync; findings → **Incoming
-   findings**.
-2. **Merge `claude/resume-context-automation-stale-e0mw73` → `main`** (1.8.1 / vc19, DA-018) once CI
-   is green — no `[skip ci]`-class tokens (D-115).
-3. Cut **v1.8.1 / vc19** from `main` via the Release UI — tag `v1.8.1`; release.yml builds + signs
+1. **Squash-merge PR #92** (1.8.1 / vc19, DA-018 + DA-019) once CI is green — the body becomes the
+   squash commit; no `[skip ci]`-class tokens (D-115).
+2. Cut **v1.8.1 / vc19** from `main` via the Release UI — tag `v1.8.1`; release.yml builds + signs
    the tagged commit; F-Droid `UpdateCheckMode: Tags` auto-builds the update.
-4. **Server-side rails (DA-006):** enable on GitHub — `main` branch protection (PRs required;
+3. **Server-side rails (DA-006):** enable on GitHub — `main` branch protection (PRs required;
    force-push + deletion blocked) + secret-scanning push protection. (Carried from 1.8.0.)
 
 **Open questions:** (none)
 
-**Incoming findings:** (none)
+**Incoming findings:**
+
+- 2026-07-24 — Owner on-device-verified the **DA-018** Resume fix (Tests A + B in
+  `RESUME_CONTEXT_TEST.md`): "Confirmed that it works." No regressions reported.
 
 ## Decided non-items (don't re-litigate without new evidence)
 
