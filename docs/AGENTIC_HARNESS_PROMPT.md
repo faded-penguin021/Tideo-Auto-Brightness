@@ -718,7 +718,8 @@ One bash script, `set -euo pipefail`, run by both the agent and CI. Structure:
      nearly every unit, and warn fatigue kills tripwires; their legislative sections stay
      prose-only).
    - {{DOMAIN_GUARDS: any repo-specific machine-checkable release rule — e.g. a changelog
-     length cap, a version-monotonicity check.}}
+     length cap (mind the unit: a store's "500 char" limit is CHARACTERS/codepoints, not bytes —
+     `wc -c` overcounts multibyte text), a version-monotonicity check.}}
 2. **`--guards-only` exits here** (docs-only work).
 3. **The full verification set** in one invocation: `{{TEST + LINT + BUILD tasks}}`.
 

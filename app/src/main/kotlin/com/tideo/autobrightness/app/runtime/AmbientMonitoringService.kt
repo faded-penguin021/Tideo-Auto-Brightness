@@ -178,6 +178,22 @@ class AmbientMonitoringService : Service() {
                     controller.reapply()
                 }
             }
+            ACTION_RESUME_CONTEXT -> {
+                // DA-018: "Resume context automation" (Profiles banner / CONTEXTS_RESUME). Same D-140
+                // not-running gate as REAPPLY — a Resume aimed at a dead pipeline must not birth a zombie
+                // (the manual lock is already cleared in the store; the next start evaluates fresh).
+                if (!controller.state.value.serviceOn) return stopNotRunning(startId)
+                ensureRunning()
+                // Tasker _ContextResume → evaluate contexts → Set Initial Brightness: a GENUINE
+                // evaluate(RESUME) so a currently-matching rule applies NOW / a no-match reverts to
+                // %AAB_ProfileUser, THEN reapply (Set Initial Brightness). Unlike REAPPLY (reevaluate
+                // only republishes), this actually re-runs the resolver so the store + active-profile
+                // label stop diverging (the owner-reported staleness after Resume).
+                scope.launch {
+                    contextEngine.resumeContextAutomation()
+                    controller.reapply()
+                }
+            }
             ACTION_PANIC -> {
                 // task528 panic = full stop (not a pausable state, G1-F4): restore brightness +
                 // drop dimming, then tear the service down like Disable.
@@ -610,6 +626,9 @@ class AmbientMonitoringService : Service() {
         const val ACTION_DISABLE = "com.tideo.autobrightness.runtime.action.DISABLE"
         const val ACTION_PANIC = "com.tideo.autobrightness.runtime.action.PANIC"
         const val ACTION_REAPPLY = "com.tideo.autobrightness.runtime.action.REAPPLY"
+        // DA-018: resume context automation — a genuine context re-evaluation (evaluate(RESUME)) then
+        // Set Initial Brightness, distinct from REAPPLY's republish-only path.
+        const val ACTION_RESUME_CONTEXT = "com.tideo.autobrightness.runtime.action.RESUME_CONTEXT"
         const val EXTRA_REASON = "reason"
 
         // D-157 (U5): the PUBLIC outbound event contract for automation frameworks (Tasker / MacroDroid).

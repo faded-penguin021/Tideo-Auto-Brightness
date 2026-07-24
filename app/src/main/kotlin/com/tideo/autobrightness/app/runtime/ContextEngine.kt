@@ -65,7 +65,6 @@ class ContextEngine(
     private val signalSource: ContextSignalSource,
     private val onProfileChanged: () -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
-    private val userProfileName: String = "Default",
     private val debugSink: DebugSink = NoOpDebugSink,
     private val contextLoadSink: ContextLoadSink = NoOpContextLoadSink,
 ) {
@@ -147,9 +146,25 @@ class ContextEngine(
         val current = settingsProvider()
         if (current.contextOverride) {
             _activeContext.value = null
-            currentProfileName = userProfileName
+            currentProfileName = baselineStore.userProfileName()
         }
         _effective.value = current
+    }
+
+    /**
+     * Resume context automation after the manual lock was cleared (the Profiles "Resume" banner / the
+     * external `CONTEXTS_RESUME` verb, G2R-F30). The Tasker flow is `_ContextResume` → evaluate contexts
+     * → Set Initial Brightness: this is the middle step — a GENUINE evaluation (caller [ContextCaller.RESUME],
+     * cooldown 0, no PASS-2 veto) so a currently-matching rule applies NOW and a no-match reverts to
+     * `%AAB_ProfileUser` (the last manually-loaded profile) immediately, instead of the live store staying
+     * pinned to the loaded profile until the next signal change (DA-018 — the owner-reported staleness).
+     * `reevaluate()` alone (the old [AmbientMonitoringService] REAPPLY path) only republishes the freshly
+     * unlocked settings; it never runs the resolver, so the active-profile label and the settings screens
+     * diverged. The caller runs Set Initial Brightness ([BrightnessPipelineController.reapply]) after.
+     */
+    suspend fun resumeContextAutomation() {
+        reevaluate()
+        evaluate(ContextCaller.RESUME)
     }
 
     fun start(scope: CoroutineScope) {
@@ -369,9 +384,12 @@ class ContextEngine(
         if (!plugChanged && cooldown > 0 && last != null && now - last < cooldown) return@withLock
 
         val signals = signalSource.assemble(snap.app, snap.batteryPercent, snap.plugged, snap.wifi, snap.lat, snap.lon)
+        // %AAB_ProfileUser (DA-018): the last manually-loaded profile = the no-match revert target and
+        // the "am I on a non-baseline profile?" reference for the APP_CHANGED veto. Read once per eval.
+        val userProfile = baselineStore.userProfileName()
 
         // PASS 2 — veto gates.
-        if (!shouldProceed(caller, signals, tokens)) return@withLock
+        if (!shouldProceed(caller, signals, tokens, userProfile)) return@withLock
         lastEvalTime = now
         recordState(signals)
 
@@ -382,23 +400,31 @@ class ContextEngine(
             "app ${signals.app.ifEmpty { "—" }} · loc ${signals.lat},${signals.lon} · wifi ${signals.wifi.ifEmpty { "—" }}"
         }
         val knownProfiles = profileCatalog.names()
+        // The no-match revert target is %AAB_ProfileUser (the last manually-loaded profile), not the
+        // hardcoded "Default" — so after Resume the active-profile label matches the settings the
+        // pipeline actually runs (the write-through live store, D-170), instead of claiming "Default".
         val resolution = ContextOverrideResolver.resolve(
             rules = rules.map { it.toSpec() },
             signals = signals,
             overrideActive = current.contextOverride,
-            userProfile = userProfileName,
+            userProfile = userProfile,
             profileExists = { knownProfiles.contains(it) },
         )
         apply(resolution, current, rules, caller)
     }
 
-    private fun shouldProceed(caller: ContextCaller, signals: ContextSignals, tokens: ContextSignalTokens): Boolean {
+    private fun shouldProceed(
+        caller: ContextCaller,
+        signals: ContextSignals,
+        tokens: ContextSignalTokens,
+        userProfile: String,
+    ): Boolean {
         val midnightRollover = signals.dayOfWeek != lastDay && lastDay != -1
         if (caller == ContextCaller.RESUME || midnightRollover) return true
         return when (caller) {
             ContextCaller.APP_CHANGED -> {
                 val isRuleActive = _activeContext.value != null
-                val isNonDefault = currentProfileName != null && currentProfileName != userProfileName
+                val isNonDefault = currentProfileName != null && currentProfileName != userProfile
                 val appInCache = tokens.appPackages.contains(signals.app)
                 (isRuleActive || isNonDefault || appInCache) && signals.app != lastApp
             }

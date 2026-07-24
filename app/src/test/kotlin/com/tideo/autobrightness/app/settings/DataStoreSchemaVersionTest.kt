@@ -31,8 +31,9 @@ class DataStoreSchemaVersionTest {
     }
 
     @Test
-    fun `context-baseline store is at schema v1 with an identity default`() {
-        assertEquals(1, ContextBaseline.SCHEMA_VERSION)
+    fun `context-baseline store is at schema v2 with an identity default`() {
+        // v2 (DA-018): added the persisted %AAB_ProfileUser name (userProfileName, default "Default").
+        assertEquals(2, ContextBaseline.SCHEMA_VERSION)
         assertEquals(ContextBaseline(), ContextBaselineSerializer.defaultValue)
     }
 

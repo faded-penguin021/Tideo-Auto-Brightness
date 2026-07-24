@@ -155,8 +155,11 @@ so check it explicitly.
 - **F-Droid changelog:** add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the
   filename is the **versionCode**, not the name) with a short user-facing note. **Keep it under 500
   characters** (whole file incl. the trailing newline — aim ≤ 480 for margin): F-Droid's code-quality
-  scan flags a longer `whatsNew` as a Minor finding (`wc -c` the file before committing — and ladder
-  guard 6 machine-fails the current versionCode's file over 500 B, D-173). **`release.yml`
+  scan flags a longer `whatsNew` as a Minor finding. The cap is on **characters (codepoints), not
+  bytes** (DA-019) — a note with em dashes / accents / emoji can exceed 500 bytes while under 500
+  chars, so `wc -c` **overcounts**; measure with `LC_ALL=C tr -d '\200-\277' < file | wc -c`
+  (strips UTF-8 continuation bytes → one byte per codepoint), which is exactly what ladder guard 6
+  machine-fails the current versionCode's file over (D-173). **`release.yml`
   auto-reuses this file as the GitHub Release's "What's new" section (D-123)** — it reads the tagged
   build's `versionCode`, looks up the matching changelog, and slots it between the owner's UI summary
   and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release

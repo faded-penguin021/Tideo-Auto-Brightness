@@ -1,0 +1,1 @@
+Fix "Resume context automation": pressing Resume now immediately re-evaluates your context rules — a matching rule applies at once, and with no match it reverts to your last manually-loaded profile — instead of leaving the settings screens showing the old profile while the label flipped to "Default".

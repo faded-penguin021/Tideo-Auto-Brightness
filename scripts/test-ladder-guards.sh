@@ -208,9 +208,16 @@ write_ledger 10
 # --- guard 6: F-Droid changelog cap ---------------------------------------------------------
 
 head -c 501 /dev/zero | tr '\0' 'x' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
-check "guard 6: 501-byte changelog fails" 1 "over the 500-char F-Droid whatsNew cap"
+check "guard 6: 501-char (ASCII) changelog fails" 1 "over the 500-char F-Droid whatsNew cap"
 head -c 500 /dev/zero | tr '\0' 'x' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
-check "guard 6: 500-byte changelog passes" 0 "F-Droid changelog OK"
+check "guard 6: 500-char (ASCII) changelog passes" 0 "F-Droid changelog OK"
+# DA-019: the guard counts CHARACTERS (codepoints), not bytes. A note of 250 em dashes is 750
+# bytes but only 250 chars — the old byte check failed it; the char check must PASS it.
+for _ in $(seq 250); do printf '\xe2\x80\x94'; done > "$SANDBOX/$CHANGELOG_DIR/7.txt"
+check "guard 6: >500 bytes but <=500 chars (multibyte) passes" 0 "F-Droid changelog OK"
+# ...and 501 multibyte chars (1503 bytes) must still FAIL — the cap is on characters, not bytes.
+for _ in $(seq 501); do printf '\xe2\x80\x94'; done > "$SANDBOX/$CHANGELOG_DIR/7.txt"
+check "guard 6: 501-char (multibyte) changelog fails" 1 "over the 500-char F-Droid whatsNew cap"
 printf 'Short changelog.\n' > "$SANDBOX/$CHANGELOG_DIR/7.txt"
 
 # --- guard 8: redact.sh self-test -----------------------------------------------------------

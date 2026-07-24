@@ -473,3 +473,55 @@
   root SSID strategy shares the theoretical on-device stall; bound them the same way if a
   field report ever implicates them. `[cited]`: ForceDarkController.kt `rootExec` kdoc + its
   test's hermeticity comment cite DA-017.
+
+- DA-018 [cited]: "Resume context automation" now runs a GENUINE context evaluation and reverts to
+  `%AAB_ProfileUser` = the last manually-loaded profile (owner-reported bug + owner decision, 2026-07-24).
+  **Report:** pressing the Profiles "Resume" banner showed the active profile flip to "Default" (no rule
+  matching), but the matching rule wasn't applied and the parameter screens stayed on the loaded profile
+  — indicator and settings diverged. **Two root causes.** (1) The Resume path
+  (`ProfileApplier.resumeContextAutomation` → `AutoBrightnessRuntime.reapply` → service `ACTION_REAPPLY`)
+  only called `ContextEngine.reevaluate()` (a republish of the freshly-unlocked settings) + `reapply()`;
+  it never ran the resolver. Screen-on ("resume context automation", `onScreenOn`) worked ONLY because it
+  additionally calls `contextEngine.onScreenOn()` → a real `evaluate(TIME)`. Owner-confirmed Tasker flow:
+  `_ContextResume` → **evaluate contexts** → **Set Initial Brightness**. Fix: a dedicated
+  `ACTION_RESUME_CONTEXT` verb (`AutoBrightnessRuntime.resumeContext`) whose service handler runs
+  `contextEngine.resumeContextAutomation()` (= `reevaluate()` then `evaluate(RESUME)`, cooldown 0 / no
+  PASS-2 veto) THEN `controller.reapply()` (Set Initial Brightness). Same D-140 not-running gate as
+  REAPPLY. (2) The resolver's no-match fallback (`ContextOverrideResolver.userProfile`) was the hardcoded
+  `ContextEngine` default `"Default"` (AppModule never wired it, D-014(c)), so on a no-match the
+  active-profile label was set to "Default" even though the live store (D-170 write-through) still held
+  the manually-loaded profile — the divergence. Fix (Tasker parity, contexts_spec §4 "reverts to
+  `%AAB_ProfileUser`"): persist `%AAB_ProfileUser` = the last manually-loaded profile NAME in
+  `ContextBaseline` (store 9, schema v1→v2, `userProfileName`, survives snapshot `clear()`);
+  `ProfileApplier.applyProfile` records it; the engine reads it per-eval as the resolver fallback + the
+  `APP_CHANGED` "non-baseline profile" reference (replaced the removed `userProfileName` ctor param);
+  Resume leaves it intact (it reverts TO it). Net: a currently-matching rule applies on Resume at once,
+  and a no-match labels the active profile as `%AAB_ProfileUser` — matching the write-through settings the
+  pipeline runs (D-170 unchanged: the loaded profile stays the live baseline; only the label/fallback name
+  was wrong). **Deferred:** import (`SettingsViewModel.replaceAll`) still doesn't set `%AAB_ProfileUser`
+  (its name is saved separately by the screen); a later Resume after an import falls back to the prior
+  `%AAB_ProfileUser`. Not the reported path; noted for a follow-up if it surfaces. Tests:
+  `ContextEngineTest` ×2 `_DA018` (matching rule applies on resume; no-match reverts to `%AAB_ProfileUser`
+  not "Default"), `ProfileApplierTest` ×3 `_DA018` (records the name / routes to the resume verb / leaves
+  the name intact), `AmbientMonitoringServiceTest` (RESUME_CONTEXT D-140 not-running gate),
+  `DataStoreSchemaVersionTest` (context-baseline v2). `[cited]`: `ContextEngine.kt`
+  (`resumeContextAutomation` + resolver fallback), `ProfileApplier.kt`, `AutoBrightnessRuntime.kt`
+  (`resumeContext`), `AmbientMonitoringService.kt` (`ACTION_RESUME_CONTEXT`), `ContextBaselineStore.kt`
+  (`userProfileName`) cite DA-018.
+
+- DA-019: F-Droid changelog guard counts CHARACTERS, not bytes (owner-instructed correction of
+  D-173, 2026-07-24). D-173's ladder guard 6 measured the changelog with `wc -c` (bytes) while its
+  own message + RUNBOOK §6 said "500 characters" — a prose/guard unit-drift (the DA-004 lockstep bug
+  class). F-Droid's code-quality scan caps the `whatsNew` by string LENGTH (codepoints), so a note
+  with multibyte glyphs (em dashes, accents, emoji) could exceed 500 bytes while under the real
+  500-char limit and false-fail the guard (and the RUNBOOK's `wc -c` advice overcounted the same
+  way). Fix: guard 6 now counts codepoints, locale-independent — `LC_ALL=C tr -d '\200-\277' < file
+  | wc -c` strips UTF-8 continuation bytes (0x80-0xBF), leaving one byte per codepoint (lead byte /
+  ASCII byte); message + OK line report "chars". Prose synced: RUNBOOK §6 (the `wc -c` advice
+  replaced with the codepoint recipe), the guard-6 header comment, and the agent-agnostic
+  `AGENTIC_HARNESS_PROMPT.md` {{DOMAIN_GUARDS}} example (mind-the-unit note). Fixtures
+  (`test-ladder-guards.sh`) gain two multibyte cases: 250 em dashes (750 B / 250 chars) must PASS,
+  501 em dashes (1503 B / 501 chars) must FAIL — the ASCII 500/501 cases stay. Rule-review
+  (DA-005): in-context (this session cannot spawn a fresh reviewer under the no-subagent harness
+  directive); owner directed the change and is the arbiter. `19.txt` (this release) is 302 chars,
+  unaffected. `[cited]`: none (guard/prose only; no production code cites DA-019).

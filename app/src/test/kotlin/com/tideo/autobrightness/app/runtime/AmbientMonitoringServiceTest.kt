@@ -129,6 +129,18 @@ class AmbientMonitoringServiceTest {
         assertTrue(shadowOf(service).isStoppedBySelf, "REAPPLY on a not-running service must not start the pipeline (D-140)")
     }
 
+    @Test
+    fun resumeContext_whenPipelineNotRunning_stopsSelfInsteadOfStartingThePipeline() {
+        // DA-018: the new RESUME_CONTEXT verb shares REAPPLY's D-140 not-running gate — a Resume aimed
+        // at a dead pipeline must not birth a zombie FGS (the manual lock is already cleared in the store).
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+
+        val result = service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_RESUME_CONTEXT), 0, 1)
+
+        assertEquals(android.app.Service.START_NOT_STICKY, result)
+        assertTrue(shadowOf(service).isStoppedBySelf, "RESUME_CONTEXT on a not-running service must not start the pipeline (D-140)")
+    }
+
     // The positive path must survive the D-140 gate: once START has run the pipeline (serviceOn=true,
     // set synchronously by controller.start()), PAUSE and REAPPLY act on it and keep the service up.
     //
