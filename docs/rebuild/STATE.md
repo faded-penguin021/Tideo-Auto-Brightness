@@ -26,9 +26,10 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 **Shipped: v1.7.0** (vc17, on `main`). **Code-complete, awaiting owner release cut: 1.8.0 /
 vc18** — intent control (D-157), a11y + crash-log capture (D-156/D-158), IME (D-159), audit
-(D-160), force dark (D-172), + curve-wizard top-K sort fix (DA-016). Train now on ONE branch
-`claude/curve-fitting-zone-boundaries-2nnwmb` (cut from + supersets `…-fmb35b`; pre-fmb35b
-session branches deleted 2026-07-19). No active work; no plan files.
+(D-160), force dark (D-172), + curve-wizard top-K sort fix (DA-016). Train tip now
+`claude/linsui-merge-review-wy21zg` (cut from + supersets `…-2nnwmb` → `…-fmb35b`; pre-fmb35b
+branches deleted 2026-07-19); this session adds only the F-Droid-merge record below (no code/D-row).
+No active work; no plan files.
 `PARITY_CHECKLIST.md` zero-`pending`; parity tests green; TODO/FIXME 0; `parity_gaps.md` 0 open.
 Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
@@ -42,9 +43,14 @@ Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 **Pending owner actions (the 1.8.0 release path):**
 
-1. **PR deferred until F-Droid review completes** (owner 2026-07-09); local ladder = build.yml
-   task set. **ONE PR** (owner 2026-07-10) from **`claude/curve-fitting-zone-boundaries-2nnwmb`**
-   → `main` (only live session branch; supersets the train). Squash commit takes the PR title+body —
+1. **F-Droid review COMPLETE → PR now unblocked** (was: deferred until F-Droid review completes,
+   owner 2026-07-09). `fdroiddata!41202` (`com.tideo.autobrightness`) **merged by linsui 2026-07-24**;
+   vc17/1.7.0 packaged as a reproducible `Binaries` build (release APK verified, signing key pinned),
+   recipe merged **byte-for-byte as submitted, no AntiFeatures**. Agent verified the merge outcome
+   (public MR API) but not the 12 discussion notes (notes API 401 anon) — any note follow-up is
+   unrecorded here. Local ladder = build.yml
+   task set. **ONE PR** (owner 2026-07-10) from **`claude/linsui-merge-review-wy21zg`**
+   → `main` (current train tip; supersets `…-2nnwmb`). Squash commit takes the PR title+body —
    draft = the FULL `origin/main..HEAD` payload (no `[skip ci]`-class tokens, D-115):
    - *Title:* `1.8.0 (vc18): intent control, a11y + crash-log capture, IME/RESUME/audit fixes,
      force dark — plus repo hardening, the agent-agnostic harness, and the curve-wizard sort fix
