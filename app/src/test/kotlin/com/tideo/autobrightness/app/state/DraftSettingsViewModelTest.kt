@@ -99,6 +99,44 @@ class DraftSettingsViewModelTest {
     }
 
     @Test
+    fun apply_raisesMaxBrightToFitCurve_D169() {
+        // D-169 (_SaveButtonMisc A5–A11): a steep curve whose value at Zone 2 End (~252) exceeds a low
+        // MaxBright (150) leaves form3A < 0. Apply must RAISE MaxBright to the curve minimum (253) and
+        // announce it, instead of blocking the save.
+        val steep = AabSettings(
+            form1A = 5.0, zone1End = 35, form2B = 20f, form2C = 10, zone2End = 3000, maxBrightness = 200,
+        )
+        setBaseline(steep)
+        val vm = seededVm()
+        vm.edit { it.copy(maxBrightness = 150) }
+        idle()
+        // The Misc screen opts in (Tasker _SaveButtonMisc); the Curve screen does not.
+        vm.apply(raiseMaxBrightForCurve = true)
+
+        val result = awaitCommitted { it.maxBrightness == 253 }
+        assertEquals(253, result.maxBrightness, "Apply raises MaxBright to the curve's Zone 2 End value")
+        // The draft snaps to the committed value (D-164 fixed-point) so the screen is not left dirty.
+        assertEquals(253, vm.draft.value.maxBrightness, "the draft reflects the auto-raised value")
+    }
+
+    @Test
+    fun apply_curveScreen_doesNotRaiseMaxBright_D169() {
+        // D-169: a plain apply() (the Curve/other screens) must NOT touch MaxBright — Tasker only
+        // auto-raises on the Misc scene save. The too-low value commits as-is; form3A just warns.
+        val steep = AabSettings(
+            form1A = 5.0, zone1End = 35, form2B = 20f, form2C = 10, zone2End = 3000, maxBrightness = 200,
+        )
+        setBaseline(steep)
+        val vm = seededVm()
+        vm.edit { it.copy(maxBrightness = 150) }
+        idle()
+        vm.apply()
+
+        val result = awaitCommitted { it.maxBrightness == 150 }
+        assertEquals(150, result.maxBrightness, "the Curve/other-screen Apply leaves MaxBright untouched")
+    }
+
+    @Test
     fun apply_clampsOutOfRangeValues() {
         // D-085 (S14): a parameter screen must never persist an unsafe value. An out-of-range draft
         // (maxBrightness 999) is clamped on Apply (→ 255) rather than written raw to the engine.
@@ -110,6 +148,30 @@ class DraftSettingsViewModelTest {
 
         val result = awaitCommitted { it.maxBrightness == 255 }
         assertEquals(255, result.maxBrightness, "Apply clamps out-of-range values (validate)")
+    }
+
+    @Test
+    fun apply_snapsDraftToValidatedCommit_soDirtyClears_D164() {
+        // D-164 (audit finding C1): validate() rewrites cross-field pairs on commit — maxWaitMs is
+        // coerced up to minWaitMs — and the Misc wait sliders (1..99 / 2..100) can produce
+        // min=99/max=2 with only an ADVISORY banner. Apply used to commit (99,99) while the draft
+        // kept (99,2): draft ≠ committed forever (perpetually dirty, a slider showing a value that
+        // silently didn't persist — the G3-F3 class, cross-field edition, unfixable by aligning
+        // ranges). apply() must be a FIXED POINT: the draft snaps to the exact validated copy it
+        // commits, dirty converges to false, and the epoch bump rebinds seed-once fields.
+        setBaseline(AabSettings(minWaitMs = 10, maxWaitMs = 50))
+        val vm = seededVm()
+        val epochAtSeed = vm.epoch.value
+        vm.edit { it.copy(minWaitMs = 99, maxWaitMs = 2) }
+        idle()
+        vm.apply()
+
+        val result = awaitCommitted { it.minWaitMs == 99 }
+        assertEquals(99, result.maxWaitMs, "validate() coerces maxWaitMs up to minWaitMs on commit")
+        assertEquals(99, vm.draft.value.maxWaitMs, "the draft snaps to the validated copy Apply committed")
+        assertTrue(vm.epoch.value > epochAtSeed, "Apply bumps the epoch so seed-once fields rebind")
+        idle()
+        assertFalse(vm.dirty.value, "Apply must converge: draft == committed after the snap")
     }
 
     @Test

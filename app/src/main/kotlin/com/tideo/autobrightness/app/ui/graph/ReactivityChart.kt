@@ -79,6 +79,7 @@ fun ReactivityChart(
         yAxisLabel = stringResource(R.string.chart_threshold_pct),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
+        contentDescription = stringResource(R.string.a11y_graph_reactivity),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -141,6 +142,7 @@ fun AlphaResponseChart(
         yAxisLabel = stringResource(R.string.chart_alpha),
         showLegend = true,
         interactive = true, // scrub readout (owner: charts must stay interactive)
+        contentDescription = stringResource(R.string.a11y_graph_alpha),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -1,8 +1,13 @@
 package com.tideo.autobrightness.app.runtime
 
+import android.app.Application
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.os.Looper
+import androidx.test.core.app.ApplicationProvider
+import com.tideo.autobrightness.app.storage.settingsDataStore
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -10,7 +15,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowToast
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -124,8 +131,17 @@ class AmbientMonitoringServiceTest {
 
     // The positive path must survive the D-140 gate: once START has run the pipeline (serviceOn=true,
     // set synchronously by controller.start()), PAUSE and REAPPLY act on it and keep the service up.
+    //
+    // ACTION_START falls into the service's `else` branch, whose D-140 START_STICKY defense fires a
+    // `scope.launch { if (!serviceEnabled) disableAndStop() }` on Dispatchers.Default (a background
+    // thread). With the DataStore left at its default `serviceEnabled=false` that guard could tear the
+    // service down mid-test, nondeterministically — a real race, not a test artifact. Seed
+    // `serviceEnabled=true` first (exactly what every explicit starter does in production, per the
+    // branch's own comment) so the guard is a no-op regardless of thread timing.
     @Test
     fun pauseAndReapply_whilePipelineRunning_keepTheServiceUp() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
         val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
         try {
             val service = controller.get()
@@ -136,6 +152,87 @@ class AmbientMonitoringServiceTest {
         } finally {
             controller.destroy()
         }
+    }
+
+    // ---- D-157 (U5): outbound event.STATE_CHANGED contract + teardown ordering ----
+
+    // The publisher only emits while opted-in AND running; the OFF transition is onDestroy's job, so a
+    // not-running or opted-out snapshot maps to null (nothing broadcast).
+    @Test
+    fun outboundSnapshot_isNullWhenOptedOutOrNotRunning() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+        assertNull(
+            service.outboundSnapshot(enabled = false, state = PipelineState(serviceOn = true), profile = "Night"),
+            "opted out → publish nothing",
+        )
+        assertNull(
+            service.outboundSnapshot(enabled = true, state = PipelineState(serviceOn = false), profile = null),
+            "not running → the OFF event is onDestroy's, not the collector's",
+        )
+    }
+
+    @Test
+    fun outboundSnapshot_reflectsRunningPausedAndProfile() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+
+        val active = service.outboundSnapshot(true, PipelineState(serviceOn = true, paused = false), "Night")!!
+        assertEquals(true, active.enabled)
+        assertEquals(true, active.running, "on and not paused = actively adjusting")
+        assertEquals(false, active.paused)
+        assertEquals("Night", active.profile)
+
+        val paused = service.outboundSnapshot(true, PipelineState(serviceOn = true, paused = true), null)!!
+        assertEquals(true, paused.enabled)
+        assertFalse(paused.running, "paused = not actively adjusting")
+        assertEquals(true, paused.paused)
+        assertNull(paused.profile, "no profile in force is surfaced as a null extra")
+    }
+
+    @Test
+    fun buildStateChangedIntent_carriesTheFullPublicContract() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+
+        val intent = service.buildStateChangedIntent(enabled = true, running = false, paused = true, profile = "Night")
+
+        assertEquals(AmbientMonitoringService.ACTION_STATE_CHANGED, intent.action)
+        assertEquals(true, intent.getBooleanExtra(AmbientMonitoringService.EXTRA_ENABLED, false))
+        assertEquals(false, intent.getBooleanExtra(AmbientMonitoringService.EXTRA_RUNNING, true))
+        assertEquals(true, intent.getBooleanExtra(AmbientMonitoringService.EXTRA_PAUSED, false))
+        assertEquals("Night", intent.getStringExtra(AmbientMonitoringService.EXTRA_PROFILE))
+        // Global (no package restriction) so a third-party automation receiver can pick it up.
+        assertNull(intent.`package`, "the outbound event must not be package-restricted")
+    }
+
+    // onDestroy is the single authoritative OFF emitter, covering EVERY stop path uniformly. When the
+    // user has opted in (cache = true), tearing the service down broadcasts a final off-state; when they
+    // never opted in, nothing is emitted.
+    @Test
+    fun onDestroy_broadcastsFinalOffEvent_whenOptedIn() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        controller.get().externalControlEnabled = true
+
+        controller.destroy()
+
+        val off = shadowOf(app).broadcastIntents
+            .last { it.action == AmbientMonitoringService.ACTION_STATE_CHANGED }
+        assertEquals(false, off.getBooleanExtra(AmbientMonitoringService.EXTRA_ENABLED, true))
+        assertEquals(false, off.getBooleanExtra(AmbientMonitoringService.EXTRA_RUNNING, true))
+        assertEquals(false, off.getBooleanExtra(AmbientMonitoringService.EXTRA_PAUSED, true))
+        assertNull(off.getStringExtra(AmbientMonitoringService.EXTRA_PROFILE))
+    }
+
+    @Test
+    fun onDestroy_emitsNothing_whenExternalControlNeverEnabled() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        // externalControlEnabled stays at its default false.
+        controller.destroy()
+
+        assertTrue(
+            shadowOf(app).broadcastIntents.none { it.action == AmbientMonitoringService.ACTION_STATE_CHANGED },
+            "no outbound event may leak when external control was never opted into",
+        )
     }
 
     @Test

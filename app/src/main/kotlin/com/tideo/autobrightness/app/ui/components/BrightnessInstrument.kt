@@ -30,6 +30,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.tideo.autobrightness.R
@@ -57,6 +59,9 @@ fun BrightnessInstrument(
     val on = state.serviceEnabled
     val applied = state.currentBrightness ?: state.targetBrightness
     val target = state.targetBrightness
+    // D-156: the master on/off switch sits alone (the caption above reads "APPLIED BRIGHTNESS", not a
+    // label for it), so TalkBack would announce a nameless switch — give it an explicit label.
+    val serviceLabel = stringResource(R.string.a11y_service_toggle)
 
     // Roll the big number to its new value instead of snapping (owner: "numbers changing"). G3-F5:
     // the cycle now publishes the DESTINATION (targetBrightness) at the START of the on-device sweep
@@ -109,7 +114,8 @@ fun BrightnessInstrument(
             Switch(
                 checked = on,
                 onCheckedChange = onToggleService,
-                modifier = Modifier.testTag("service_switch"),
+                modifier = Modifier.testTag("service_switch")
+                    .semantics { contentDescription = serviceLabel },
             )
         }
 

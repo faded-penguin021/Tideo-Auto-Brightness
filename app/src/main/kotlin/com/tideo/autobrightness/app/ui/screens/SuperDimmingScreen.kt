@@ -176,10 +176,15 @@ fun SuperDimmingContent(
                     epoch = epoch, committed = committed.dimmingExponent, isInt = false, enabled = dimEnabled,
                     help = TaskerHelp.DIMMING_EXPONENT, testTag = "field_dimmingExponent",
                 )
+                // The threshold field is SHARED between super dimming and software dimming (D-168):
+                // Tasker relabels it "PWM Thresh" and flashes a different help when software dimming is
+                // on (there it is the hardware floor, not the super-dimming activation point).
                 NumberSettingField(
-                    stringResource(R.string.sd_threshold), draft.dimmingThreshold, { onEdit { s -> s.copy(dimmingThreshold = it.toInt()) } },
+                    stringResource(if (draft.pwmSensitive) R.string.sd_pwm_threshold else R.string.sd_threshold),
+                    draft.dimmingThreshold, { onEdit { s -> s.copy(dimmingThreshold = it.toInt()) } },
                     epoch = epoch, committed = committed.dimmingThreshold, enabled = dimEnabled,
-                    help = TaskerHelp.DIMMING_THRESHOLD, testTag = "field_dimmingThreshold",
+                    help = if (draft.pwmSensitive) TaskerHelp.PWM_THRESHOLD else TaskerHelp.DIMMING_THRESHOLD,
+                    testTag = "field_dimmingThreshold",
                 )
                 // task513/610: threshold must not sit below minimum brightness.
                 if (draft.dimmingThreshold < draft.minBrightness) {

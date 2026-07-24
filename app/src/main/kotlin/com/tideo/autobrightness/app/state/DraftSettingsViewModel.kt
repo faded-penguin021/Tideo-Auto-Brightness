@@ -14,9 +14,13 @@ import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -114,6 +118,12 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
         .map { list -> list.any { it.severity == Severity.CRITICAL } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    // D-169: when Apply auto-raises MaxBright to fit the curve (_SaveButtonMisc A9), emit the new
+    // value so the active screen can flash the Tasker-style "adjusted to N" confirmation (A15). A
+    // buffered SharedFlow (not StateFlow) so it is a one-shot event, replayed to no new collector.
+    private val _maxBrightnessRaised = MutableSharedFlow<Int>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val maxBrightnessRaised: SharedFlow<Int> = _maxBrightnessRaised.asSharedFlow()
+
     val tier: StateFlow<Tier> = privilegeManager.tierFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Tier.NONE)
 
@@ -132,13 +142,32 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
      * service/identity fields are preserved from the live committed value (never edited here), so an
      * Apply cannot flip the master switch or the context lock.
      */
-    fun apply() {
+    fun apply(raiseMaxBrightForCurve: Boolean = false) {
         // D-085 (S14 carry-forward): clamp out-of-range fields on commit so a parameter screen can
         // never persist an unsafe value (e.g. maxBrightness 999, scale 0). This is the same per-field
         // clamp every other persistence path already runs (SettingsStore, import/export, legacy); the
         // draft Apply used to bypass it and write the raw draft straight to DataStore. Critical errors
         // (form coefficients) still block Apply earlier via hasCriticalError.
-        val toCommit = _draft.value.validate()
+        // D-169 (_SaveButtonMisc A5–A11): if the curve leaves no zone-3 headroom (form3A < 0) and
+        // MaxBright is below 255, RAISE MaxBright to the minimum the curve needs before committing —
+        // Tasker force-fixes and flashes "adjusted to N" rather than blocking the save. form3A is now
+        // an ADVISORY (SettingsValidator), so it no longer trips hasCriticalError; the two remaining
+        // form errors (form2A<0, form2C>zone1End) still block Apply (D-052 stands for those).
+        // Only the MISC screen opts in — Tasker runs this in `_SaveButtonMisc` (the Misc scene save);
+        // the Curve scene save just reddens form3A (task583 advisory), never touching MaxBright.
+        val fix = if (raiseMaxBrightForCurve) _draft.value.raiseMaxBrightnessForCurve() else MaxBrightnessFix(_draft.value, null)
+        val toCommit = fix.settings.validate()
+        // D-164: validate() may REWRITE the draft (NaN resets, per-field clamps, cross-field
+        // coercions like maxWaitMs ≥ minWaitMs — reachable from the Misc wait sliders). Snap the
+        // draft to the exact copy being committed so Apply is a FIXED POINT: dirty converges to
+        // false and every control shows the value that actually persisted, instead of a
+        // perpetually-dirty screen whose slider silently disagrees with the DataStore (the G3-F3
+        // failure class, which range-alignment alone cannot fix for cross-field rules). The epoch
+        // bump rebinds seed-once text fields to the snapped values (same contract as discard()).
+        _draft.value = toCommit
+        _epoch.update { it + 1 }
+        // A15: announce the auto-raise with the value that actually persisted (post-clamp).
+        if (fix.raisedTo != null) _maxBrightnessRaised.tryEmit(toCommit.maxBrightness)
         viewModelScope.launch {
             val committedNow = app.settingsDataStore.updateData { current ->
                 toCommit.copy(

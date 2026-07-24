@@ -398,7 +398,8 @@ class SettingsScreensTest {
 
     @Test
     fun curveBrightness_criticalError_disablesApply() {
-        // G2R-F18/D-052: a CRITICAL curve error (form3A<0) must disable Apply even while dirty.
+        // G2R-F18/D-052: a CRITICAL curve error (form2A<0, from form1A<0) must disable Apply even while
+        // dirty. (form3A<0 dropped to ADVISORY in D-169 — it auto-raises MaxBright instead of blocking.)
         val invalid = AabSettings(form1A = -1.0)
         val errors = SettingsValidator.validate(invalid)
         assertTrue(errors.any { it.severity == com.tideo.autobrightness.app.settings.Severity.CRITICAL })

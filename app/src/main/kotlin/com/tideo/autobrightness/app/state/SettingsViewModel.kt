@@ -5,18 +5,21 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
-import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.DataStoreContextBaselineStore
 import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.FieldError
+import com.tideo.autobrightness.app.settings.ProfileApplier
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.settings.UserProfileStore
+import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
+import kotlin.math.ceil
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -38,6 +41,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val appModule = AppModule(application)
     private val privilegeManager: PrivilegeManager = appModule.privilegeManager
     private val userProfiles: UserProfileStore = appModule.userProfileStore
+
+    /** VM-free profile-load/context-resume logic, shared verbatim with the external control receiver
+     *  (D-157 U3). The ViewModel just wraps these in [viewModelScope]. */
+    private val profileApplier = ProfileApplier(application, userProfiles)
 
     init {
         // Seed the five built-in profiles once so the Profiles screen + context catalog see them.
@@ -90,38 +97,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * Apply a saved named profile (the [UserProfileStore] set; built-ins are seeded into it). The live
-     * service-enabled flag plus the GLOBAL preferences `detectOverrides` and `debugLevel` are preserved:
-     * neither is part of the task626 profile snapshot, so loading a profile must not turn manual-override
-     * detection off (G2-F8) nor change the selected debug category (G2R-F9).
-     *
-     * A manual profile load also latches the **manual context lock** `%AAB_ContextOverride=true`
-     * (G2R-F30, D-014/D-038a) so the context watchers stop overriding the user's deliberate choice; the
-     * Profiles screen surfaces a "Resume" affordance ([resumeContextAutomation]) to clear it.
-     */
+    /** Apply a saved named profile — delegates to [ProfileApplier.applyProfile] (D-157 U3), the same
+     *  path the external control receiver's `LOAD_PROFILE` drives. */
     fun applyProfile(name: String) {
-        viewModelScope.launch {
-            val profile = userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return@launch
-            val updated = app.settingsDataStore.updateData { current ->
-                profile.copy(
-                    serviceEnabled = current.serviceEnabled,
-                    detectOverrides = current.detectOverrides,
-                    debugLevel = current.debugLevel,
-                    panicSensitivity = current.panicSensitivity,
-                    contextOverride = true, // latch the manual context lock (G2R-F30)
-                )
-            }
-            // Surface the loaded profile on the Dashboard (LiveRuntimeState, in-memory bridge).
-            LiveRuntimeState.setActiveProfile(name)
-            // task592/626 apply re-runs Advanced Auto Brightness so the new curve takes effect
-            // immediately, not at the next sensor tick (G2-F16).
-            if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
-        }
+        viewModelScope.launch { profileApplier.applyProfile(name) }
     }
 
     fun replaceAll(newSettings: AabSettings) {
         viewModelScope.launch {
+            // An import is a manual "these settings are authoritative" moment like applyProfile —
+            // drop any pre-override baseline snapshot or a later revert would resurrect it (D-170;
+            // clear-first for the same benign-death ordering as ProfileApplier.applyProfile).
+            DataStoreContextBaselineStore(app.contextBaselineDataStore).clear()
             val updated = app.settingsDataStore.updateData { current ->
                 // Preserve the live service flag + the global DetectOverrides (G2-F8) and debugLevel
                 // (G2R-F9) preferences — neither belongs to an imported profile's parameter set. An
@@ -170,15 +157,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { userProfiles.restoreFactory() }
     }
 
-    /**
-     * Clear the manual context lock latched by [applyProfile] and re-evaluate so the context watchers
-     * resume overriding (G2R-F30). Mirrors Tasker clearing %AAB_ContextOverride.
-     */
+    /** Clear the manual context lock latched by [applyProfile] — delegates to
+     *  [ProfileApplier.resumeContextAutomation] (D-157 U3), shared with the receiver's `CONTEXTS_RESUME`. */
     fun resumeContextAutomation() {
-        viewModelScope.launch {
-            val updated = app.settingsDataStore.updateData { it.copy(contextOverride = false) }
-            if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
-        }
+        viewModelScope.launch { profileApplier.resumeContextAutomation() }
     }
 }
 
@@ -192,3 +174,39 @@ fun AabSettings.derivedCoefficients(): BrightnessFormulae.ContinuityCoefficients
         zone2End = zone2End.toDouble(),
         maxBrightness = maxBrightness.toDouble(),
     )
+
+/**
+ * The minimum MaxBright the current curve needs — `ceil` of the brightness the curve reaches at
+ * Zone 2 End. Below it, the zone-3 headroom coefficient form3A is negative.
+ * Tasker: `_SaveButtonMisc` A8 `min_req_bright` (D-169).
+ */
+fun AabSettings.minRequiredMaxBrightness(): Int =
+    ceil(
+        BrightnessFormulae.zone2EndBrightness(
+            form1A = form1A.toDouble(),
+            form2B = form2B.toDouble(),
+            form2C = form2C.toDouble(),
+            zone1End = zone1End.toDouble(),
+            zone2End = zone2End.toDouble(),
+        ),
+    ).toInt()
+
+/** Result of [raiseMaxBrightnessForCurve]: the (possibly) adjusted settings + the new value if raised. */
+data class MaxBrightnessFix(val settings: AabSettings, val raisedTo: Int?)
+
+/**
+ * Tasker `_SaveButtonMisc` A5–A11: when MaxBright < 255 and the curve leaves no zone-3 headroom
+ * (form3A < 0), Tasker RAISES MaxBright to the minimum the curve needs (`min_req_bright`) instead of
+ * refusing the save. Ported here (D-169, an owner-approved revision of the D-052 form3A block): Apply
+ * force-fixes MaxBright and tells the user, rather than blocking with an opaque form3A warning.
+ *
+ * The A5 gate (`< 255`) is preserved — a curve that overflows even at full brightness is left for the
+ * form3A advisory, matching Tasker (which only reddens the field there). Only ever RAISES MaxBright.
+ */
+fun AabSettings.raiseMaxBrightnessForCurve(): MaxBrightnessFix {
+    if (maxBrightness >= 255) return MaxBrightnessFix(this, null) // A5 gate
+    if (derivedCoefficients().form3A >= 0.0) return MaxBrightnessFix(this, null) // A7
+    val minReq = minRequiredMaxBrightness() // A8
+    if (minReq <= maxBrightness) return MaxBrightnessFix(this, null) // never lower
+    return MaxBrightnessFix(copy(maxBrightness = minReq), minReq) // A9
+}

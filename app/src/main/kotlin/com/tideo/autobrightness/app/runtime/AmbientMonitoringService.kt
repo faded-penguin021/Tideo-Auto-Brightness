@@ -19,8 +19,11 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
+import com.tideo.autobrightness.app.control.ControlPrefsStore
+import com.tideo.autobrightness.app.storage.controlPrefsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
+import com.tideo.autobrightness.platform.display.ForceDarkController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,6 +57,17 @@ class AmbientMonitoringService : Service() {
     private lateinit var privilegeManager: com.tideo.autobrightness.platform.privilege.PrivilegeManager
     private var notificationJob: Job? = null
     private var panicJob: Job? = null
+    // D-157 (U5): outbound STATE_CHANGED publisher + a cache of the opt-in flag. The cache lets
+    // onDestroy() decide synchronously whether to emit the final off-state event (its DataStore read
+    // would be async, and the scope is being torn down). Written by the publisher on Dispatchers.Default,
+    // read on the main thread in onDestroy → @Volatile for visibility (S12.9e volatile convention).
+    private var stateEventJob: Job? = null
+    // internal (not private) so the onDestroy final-off-event test can set the cache deterministically
+    // without driving the Dispatchers.Default publisher.
+    @Volatile internal var externalControlEnabled = false
+    // D-172: one-shot per service instance (kept non-null after completion so ensureRunning's
+    // re-entries — resume/reapply — never re-bind Shizuku).
+    private var forceDarkJob: Job? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // Rising-edge latch so the high-priority override alert + toast fire ONCE per override, not on
@@ -210,6 +224,8 @@ class AmbientMonitoringService : Service() {
         contextEngine.start(scope)
         displayToggles.start(scope)
         startPanicDetector()
+        startStateEventPublisher()
+        startForceDarkReapply()
         if (notificationJob?.isActive == true) return
         val manualOverrideFlow = applicationContext.settingsDataStore.data
             .map { it.contextOverride }
@@ -258,6 +274,25 @@ class AmbientMonitoringService : Service() {
     }
 
     /**
+     * D-172: re-assert the force-dark prop (`debug.hwui.force_dark`) once per service instance —
+     * the prop resets on every reboot, so the boot-started service restores the user's saved choice.
+     * Gated on the persisted opt-in FIRST (while off this is a cheap DataStore read — no Shizuku
+     * bind, no su spawn, the app never touches the property). Only TRUE is ever asserted: an off
+     * opt-in means "leave the property alone", not "force it off" — the user may drive it via
+     * developer options. Fire-and-forget: with no privileged shell yet (Shizuku typically isn't up
+     * right after boot; the root fallback usually is) apply() returns null and the next service
+     * start retries; the Tools card shows the live truth meanwhile.
+     */
+    private fun startForceDarkReapply() {
+        if (forceDarkJob != null) return
+        forceDarkJob = scope.launch {
+            if (ControlPrefsStore(applicationContext.controlPrefsDataStore).forceDarkEnabled.first()) {
+                ForceDarkController.apply(applicationContext, enabled = true)
+            }
+        }
+    }
+
+    /**
      * prof769/task528 panic detector (G2R-F77): collect the upside-down + shake gesture and fire the
      * task528 panic — SOS vibration + restore brightness 255 + disable super dimming + service Off.
      */
@@ -270,6 +305,85 @@ class AmbientMonitoringService : Service() {
             }
         }
     }
+
+    /**
+     * D-157 (U5): outbound `event.STATE_CHANGED` broadcasts so automation frameworks can *react* to
+     * Tideo (pause/resume, profile change, service on/off), not just command it. Opt-in — gated by the
+     * SAME `ControlPrefsStore.externalControlEnabled` flag as the inbound `ControlReceiver`; while off,
+     * nothing is emitted (and the [externalControlEnabled] cache stays false, so onDestroy also stays
+     * silent). Combining the flag flow in means flipping the toggle ON re-emits the current snapshot.
+     *
+     * Only *running* snapshots are published here (`serviceOn` true), distinct-until-changed; the single
+     * authoritative OFF event is emitted by [onDestroy] (which covers every stop path — SERVICE_OFF
+     * toggle, Disable, Panic — uniformly, unlike the collector, which the scope teardown races).
+     */
+    private fun startStateEventPublisher() {
+        if (stateEventJob?.isActive == true) return
+        val controlEnabledFlow = ControlPrefsStore(applicationContext.controlPrefsDataStore).externalControlEnabled
+        stateEventJob = scope.launch {
+            // LiveRuntimeState.activeProfile is the name of the profile in force whether loaded manually
+            // (LOAD_PROFILE / Profiles UI) or by a context rule (F46) — exactly what automation wants for
+            // the `profile` extra, and already the single source the Dashboard uses.
+            combine(
+                controlEnabledFlow,
+                controller.state,
+                LiveRuntimeState.activeProfile,
+            ) { enabled, state, profile ->
+                // Cache the opt-in flag for onDestroy's final off-state decision (see the field doc).
+                externalControlEnabled = enabled
+                outboundSnapshot(enabled, state, profile)
+            }
+                .distinctUntilChanged()
+                .collect { snap ->
+                    snap?.let { broadcastStateChanged(it.enabled, it.running, it.paused, it.profile) }
+                }
+        }
+    }
+
+    /**
+     * Send the public [ACTION_STATE_CHANGED] broadcast (D-157 U5). Global (no `setPackage`) so a
+     * third-party automation app's receiver can pick it up — the whole point of the event. It carries
+     * only low-sensitivity liveness flags and is emitted solely while the user has opted in, so no
+     * permission gate (plan: no new manifest permission).
+     */
+    private fun broadcastStateChanged(enabled: Boolean, running: Boolean, paused: Boolean, profile: String?) {
+        sendBroadcast(buildStateChangedIntent(enabled, running, paused, profile))
+    }
+
+    /**
+     * The distinct-until-changed running snapshot, or null to publish nothing: while the opt-in is off,
+     * or while the pipeline is not up (the OFF transition is [onDestroy]'s single authoritative event,
+     * not the collector's). Pure — extracted so it is deterministically unit-tested without driving the
+     * Dispatchers.Default collector.
+     */
+    internal fun outboundSnapshot(enabled: Boolean, state: PipelineState, profile: String?): OutboundState? =
+        if (!enabled || !state.serviceOn) {
+            null
+        } else {
+            OutboundState(
+                enabled = true,
+                running = !state.paused, // actively adjusting = on AND not paused
+                paused = state.paused,
+                profile = profile,
+            )
+        }
+
+    /** Build the public [ACTION_STATE_CHANGED] intent. Extracted for a deterministic contract test. */
+    internal fun buildStateChangedIntent(enabled: Boolean, running: Boolean, paused: Boolean, profile: String?): Intent =
+        Intent(ACTION_STATE_CHANGED).apply {
+            putExtra(EXTRA_ENABLED, enabled)
+            putExtra(EXTRA_RUNNING, running)
+            putExtra(EXTRA_PAUSED, paused)
+            putExtra(EXTRA_PROFILE, profile)
+        }
+
+    /** The distinct-until-changed outbound snapshot (D-157 U5). */
+    internal data class OutboundState(
+        val enabled: Boolean,
+        val running: Boolean,
+        val paused: Boolean,
+        val profile: String?,
+    )
 
     /**
      * task528 act0 (code62 Vibrate Pattern): the S.O.S. morse pattern. `setView`-less vibration so the
@@ -445,8 +559,17 @@ class AmbientMonitoringService : Service() {
     }
 
     override fun onDestroy() {
+        // D-157 (U5): the single authoritative outbound OFF event, emitted BEFORE scope.cancel() tears
+        // down the publisher (D-139-class ordering). onDestroy is the one exit common to EVERY stop path
+        // — SERVICE_OFF toggle (stopService), Disable, Panic — so automation always sees a final off,
+        // where the collector alone would be raced by the teardown. Gated by the cached opt-in flag so
+        // nothing leaks when external control was never enabled. (A system-driven kill+restart shows a
+        // brief off→on; that is honest and self-corrects, as the LiveRuntimeState watchdog already
+        // assumes for onDestroy.)
+        if (externalControlEnabled) broadcastStateChanged(enabled = false, running = false, paused = false, profile = null)
         runCatching { unregisterReceiver(screenReceiver) }
         panicJob?.cancel(); panicJob = null
+        stateEventJob?.cancel(); stateEventJob = null
         contextEngine.stop()
         controller.stop()
         // Return the display toggles to the baseline profile's values (D-151 resting state): a
@@ -488,6 +611,15 @@ class AmbientMonitoringService : Service() {
         const val ACTION_PANIC = "com.tideo.autobrightness.runtime.action.PANIC"
         const val ACTION_REAPPLY = "com.tideo.autobrightness.runtime.action.REAPPLY"
         const val EXTRA_REASON = "reason"
+
+        // D-157 (U5): the PUBLIC outbound event contract for automation frameworks (Tasker / MacroDroid).
+        // Distinct `event.*` namespace from the inbound `control.*` (ControlReceiver) and the internal
+        // `runtime.action.*` above. Emitted only while ControlPrefsStore.externalControlEnabled is on.
+        const val ACTION_STATE_CHANGED = "com.tideo.autobrightness.event.STATE_CHANGED"
+        const val EXTRA_ENABLED = "enabled" // Boolean: the service/pipeline is on
+        const val EXTRA_RUNNING = "running" // Boolean: actively adjusting (on AND not paused)
+        const val EXTRA_PAUSED = "paused" // Boolean: paused
+        const val EXTRA_PROFILE = "profile" // String?: the profile name in force, or absent/null
         private const val CHANNEL_ID = "ambient_monitoring"
         private const val OVERRIDE_CHANNEL_ID = "manual_override"
         private const val NOTIFICATION_ID = 1001

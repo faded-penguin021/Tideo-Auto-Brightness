@@ -5,7 +5,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+            "command": "$CLAUDE_PROJECT_DIR/scripts/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/command-guard.sh --claude-hook"
           }
         ]
       }
@@ -17,7 +28,39 @@
       "Bash(/opt/gradle/bin/gradle:*)",
       "Bash(scripts/setup-android-sdk.sh)",
       "Bash(./scripts/setup-android-sdk.sh)",
-      "Bash(bash scripts/setup-android-sdk.sh)"
+      "Bash(bash scripts/setup-android-sdk.sh)",
+      "Bash(scripts/ladder.sh)",
+      "Bash(scripts/ladder.sh:*)",
+      "Bash(./scripts/ladder.sh)",
+      "Bash(./scripts/ladder.sh:*)",
+      "Bash(bash scripts/ladder.sh)",
+      "Bash(bash scripts/ladder.sh:*)",
+      "Bash(scripts/test-ladder-guards.sh)",
+      "Bash(./scripts/test-ladder-guards.sh)",
+      "Bash(bash scripts/test-ladder-guards.sh)",
+      "Bash(scripts/session-start.sh)",
+      "Bash(./scripts/session-start.sh)",
+      "Bash(bash scripts/session-start.sh)",
+      "Bash(scripts/warm-gradle.sh)",
+      "Bash(./scripts/warm-gradle.sh)",
+      "Bash(bash scripts/warm-gradle.sh)"
+    ],
+    "deny": [
+      "Bash(env)",
+      "Bash(printenv)",
+      "Bash(printenv:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin main)",
+      "Bash(git push -u origin main:*)",
+      "Bash(git push -u origin main)",
+      "Bash(git push origin +:*)",
+      "Bash(git push -u origin +:*)",
+      "Bash(git push origin HEAD:main)",
+      "Bash(git push origin HEAD:main:*)",
+      "Bash(git push -u origin HEAD:main)",
+      "Bash(git push -u origin HEAD:main:*)"
     ]
   }
 }

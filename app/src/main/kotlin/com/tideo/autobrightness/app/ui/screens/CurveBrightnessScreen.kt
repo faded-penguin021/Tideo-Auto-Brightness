@@ -56,6 +56,10 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = com.tideo.autobrightness.app.ui.components.rememberToaster()
 
+    // D-169: the Curve screen does NOT auto-raise MaxBright — like Tasker's curve scene it only reddens
+    // form3A (the ErrorBanner below). The MaxBright auto-raise + "adjusted to N" flash is Misc-only
+    // (Tasker _SaveButtonMisc), so no maxBrightnessRaised collector here.
+
     // D-125: a wizard suggestion reaches this screen ONLY when the user ran the Tools wizard and tapped
     // "Preview graph" — it is applied to this VM's draft during its initial seed (see
     // DraftSettingsViewModel / CurveSuggestionPreview), so the fields show the suggested values with the

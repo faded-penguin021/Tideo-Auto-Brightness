@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.app.ui.theme.AabDataCaption
@@ -133,7 +134,11 @@ fun KeyValueRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = Dimens.space2)
-            .testTag(testTag),
+            .testTag(testTag)
+            // D-156: key + value are one datum — merge them so TalkBack reads "<key>, <value>" as a
+            // single announcement (mirrors DerivedReadout). The row is not interactive, so this only
+            // groups the reading; `value_<testTag>` stays addressable via the unmerged tree.
+            .semantics(mergeDescendants = true) {},
     ) {
         Text(
             key.uppercase(),

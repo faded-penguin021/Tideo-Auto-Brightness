@@ -115,7 +115,7 @@ filled by S1/S2 during extraction.
 | task620 L26400 · _AdaptiveBrightnessSceneSize | ✓ S1 | | — | dropped(Tasker scene auto-sizing — obsolete; Compose lays out responsively, no fixed-size scenes) |
 | task623 L26926 · _ContextManager | ✓ S1 | | app/settings/ContextRuleStore.kt (S10 — upsert/delete CRUD) | ported |
 | task625 L27185 · _AppPicker | ✓ S1 | | Compose app picker in the context-rule editor (S12.5c/S12.9f) — `ContextsViewModel.installedApps()` via `PackageManager.queryIntentActivities(LAUNCHER)` + launcher `<queries>` + icons | ported |
-| task626 L27355 · _ContextResume | ✓ S1 | | mergeProfile() 39-key snapshot (S10); RESUME caller (cooldown 0/forced eval) | ported (snapshot+caller) |
+| task626 L27355 · _ContextResume | ✓ S1 | | mergeProfile() 39-key set (S10); RESUME caller (cooldown 0/forced eval); D-170 persisted baseline snapshot/restore (`ContextBaselineStore`) — context loads write through to the live settings store, the no-match revert restores the snapshot | ported (write-through+snapshot+caller, D-170) |
 | task630 L27585+L27817 · _ContextLocnListener (×2) | ✓ S1 | | platform/context/AndroidLocationReader.locationUpdates continuous listener hosted in the FGS scope, gated on the [LOC] token + ≥100 m debounce (S12.7c, prof765/766, D-056) | ported |
 | task631 L27939+L28432 · _ContextF5NetLoc (×2) | ✓ S1 | | subsumed by the continuous `locationUpdates` listener (S12.7c/D-056); task631's adaptive-backoff/zombie watchdog folds into the OS `requestLocationUpdates` lifecycle | ported (subsumed) |
 | task633 L28827 · _GetWifiForContext | ✓ S1 | | platform/WifiInfoReader.currentSsid (S12.7d) — typed SsidResult feeding the rule editor's "use current SSID" via the no-Location order | ported (editor SSID read) |

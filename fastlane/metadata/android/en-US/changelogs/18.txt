@@ -1,0 +1,9 @@
+Automation (Tasker/MacroDroid): control Tideo — on/off, pause, reapply, reset, load a profile — via broadcast intents, and get state events back. Off by default; enable under Tools.
+
+Force dark (Shizuku/root): dark-render apps without a dark theme (debug.hwui.force_dark). Apps pick it up when re-opened; re-applied at each service start.
+
+Accessibility (TalkBack): controls now announce properly across the app.
+
+Diagnostics: latest crash report kept on-device to copy.
+
+Plus fixes.

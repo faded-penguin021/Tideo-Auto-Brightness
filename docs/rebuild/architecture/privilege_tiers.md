@@ -20,8 +20,12 @@ Detection is a first-hit probe (`AndroidPrivilegeManager.detectTier`), highest-f
 ## ELEVATED grant channels
 
 `WRITE_SECURE_SETTINGS` is `signature|privileged` and cannot be requested at runtime; it must be
-*granted* through one of three channels. **Shizuku is only a grant channel — never a runtime binder
-dependency** (CLAUDE.md).
+*granted* through one of three channels. **For elevation, Shizuku is only a grant channel — the
+grant path never holds a runtime binder open for secure writes** (after the grant, super dimming
+and the Privileged Display toggles go through `Settings.Secure`/`Global` directly). Shizuku's two
+genuine runtime uses (no-Location Wi-Fi SSID via `cmd wifi status`; global force-dark via
+`debug.hwui.force_dark`, D-172) are separate optional shell features, not part of the elevation
+path — CLAUDE.md.
 
 1. **ADB (always offered, the invariant).** `adbGrantInstruction()` returns
    `adb shell pm grant <pkg> android.permission.WRITE_SECURE_SETTINGS`. Requires no companion app and is

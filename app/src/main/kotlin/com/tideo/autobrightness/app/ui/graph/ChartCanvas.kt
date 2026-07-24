@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -113,6 +115,9 @@ fun ChartCanvas(
     xTickFormatter: ((Float) -> String)? = null,
     showLegend: Boolean = false,
     interactive: Boolean = false,
+    /** A2 (D-156): TalkBack text alternative for the whole Canvas (invisible to TalkBack otherwise).
+     *  Attached to the chart's draw node so the graph announces a one-sentence summary. */
+    contentDescription: String? = null,
     height: Dp = 240.dp,
     axisColor: Color = Color.Gray,
     gridColor: Color = Color.Gray.copy(alpha = 0.25f),
@@ -175,6 +180,12 @@ fun ChartCanvas(
                     }
                 }
             }
+        }
+        // A2 (D-156): expose the graph to TalkBack. The Canvas is a leaf draw node with no intrinsic
+        // semantics, so this adds a readable summary without affecting the interactive-node audit
+        // (no OnClick/toggle is added). The legend Texts stay as their own adjacent nodes.
+        contentDescription?.let { cd ->
+            canvasModifier = canvasModifier.semantics { this.contentDescription = cd }
         }
 
         Canvas(modifier = canvasModifier) {

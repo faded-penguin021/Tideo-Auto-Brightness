@@ -194,6 +194,109 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     clears it). Re-enable the service. **Expected:** the baseline's display fields re-assert on
     start — panic is an escape hatch, not a permanent opt-out.
 
+## 12. Accessibility — TalkBack & touch targets (D-156) — NEW 1.8.0
+
+The a11y backlog (D-156, units A0–A7) is verified in CI by the `SemanticsAudit`
+gate + the `TouchTargetsA11yTest` floor, but semantics tests only *approximate* TalkBack, and Compose's
+runtime `minimumInteractiveComponentSize()` expansion is **not observable in Robolectric** — so the two
+checks below are **owner-verified on-device** (no emulator/KVM). Turn TalkBack on:
+Settings → Accessibility → TalkBack → On (or hold both volume keys). Swipe right/left to move the focus,
+double-tap to activate.
+
+40. **Every control announces a meaningful name (TalkBack).** Swipe through, in turn: the Dashboard
+    (master switch says "Auto brightness service, switch"; the amber Stale / Override / resume banners
+    are **announced automatically** when they appear — don't have to be focused), the Menu rows, and a
+    representative settings screen of each kind — a slider screen (Curve/Reactivity), a switch-heavy
+    screen (Misc/Super Dimming), Tools, Privileged Display (at ELEVATED), and the Contexts rule editor.
+    **Expected:** no control focuses as "unlabeled", "button", or a bare symbol; each slider/switch reads
+    its field name; the ⓘ help buttons read "Help: <field>"; section headers are reachable via TalkBack's
+    heading navigation (swipe up/down with the rotor on "Headings"); the app-picker checkboxes read their
+    app name. The chart screens' graphs read a one-sentence summary (e.g. "Brightness curve graph, …");
+    the pager ‹ › read "Previous/Next chart".
+41. **Touch targets are reachable (Switch Access / large-finger).** Enable Settings → Accessibility →
+    Switch Access (or just verify by touch): the primary tap affordances — nav rows, cards, the ‹ › chart
+    arrows, Apply/Discard, the back arrow, and the M3 sliders/switches/checkboxes — are each **≥ 48 dp**
+    and comfortably hittable. **Known/accepted residual:** the chart **pager position dots** are small
+    (~8–10 dp) *indicators*, not a primary control — page with the 48 dp arrows or a horizontal swipe
+    instead (they are excluded from the automated floor by design — `TouchTargetsA11yTest`).
+
+## 13. Automation control — intent surface (D-157) — NEW 1.8.0
+
+Opt-in external control (Tasker / MacroDroid). CI covers the gate + verb routing + the outbound event
+contract (`ControlReceiverTest`, `AmbientMonitoringServiceTest`), but end-to-end delivery from a real
+automation app and the `SERVICE_ON` background-start behavior are **owner-verified on-device**. Full
+reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation app needed) unless noted.
+
+42. **Off by default ⇒ commands ignored.** With **Tools → Automation control** OFF, send
+    `adb shell am broadcast -a com.tideo.autobrightness.control.SERVICE_ON -n com.tideo.autobrightness/.app.control.ControlReceiver`.
+    **Expected:** nothing happens (service stays off). Turn the toggle ON, resend. **Expected:** the
+    service starts (Dashboard shows it running).
+43. **Core verbs route.** With the toggle ON and the service running, send `PAUSE`, then `RESUME`, then
+    `REAPPLY`, then `PANIC` (same action namespace/component). **Expected:** pause holds brightness,
+    resume re-adapts, reapply recomputes now, panic restores brightness + stops (like the notification
+    **Reset**). `SERVICE_TOGGLE`/`SERVICE_OFF` flip/stop the service. Then, with the service turned
+    **off** (master switch off, automation toggle still ON), send `RESUME`. **Expected:** nothing
+    happens — an external RESUME never overrides the master switch (D-160).
+44. **`LOAD_PROFILE` + resume.** Send `LOAD_PROFILE` with `--es name "Night"` (a real saved profile).
+    **Expected:** that profile loads and the manual lock latches (Dashboard shows the profile);
+    `CONTEXTS_RESUME` clears it and hands control back to context rules. An unknown `name` is a no-op.
+45. **`SERVICE_ON` while not running.** With the service OFF (but the toggle ON), send `SERVICE_ON`.
+    **Expected:** it starts. If the device is aggressive about background starts and it does **not**
+    start (Dashboard shows *degraded*), exempt Tideo from battery optimization and retry — it should
+    then start (documented caveat).
+46. **Outbound `STATE_CHANGED` events.** Register for `com.tideo.autobrightness.event.STATE_CHANGED`
+    (Tasker *Intent Received*, or `adb shell dumpsys` / a logging receiver). Toggle the service, pause,
+    resume, load a profile. **Expected:** an event fires on each change carrying
+    `enabled`/`running`/`paused`/`profile`; a final `enabled=false` event fires when the service stops.
+    With the Automation-control toggle OFF, **no** events are emitted.
+
+## 14. Edge-to-edge + keyboard insets (D-159) — NEW 1.8.0
+
+`MainActivity` now calls `enableEdgeToEdge()` **app-wide** (plus manifest `adjustResize` and the
+Scaffold-level `imePadding()`), which changed how EVERY screen receives system-bar and keyboard
+insets on API 31–36. CI cannot see insets — this sweep is the only real gate. Test with **gesture
+navigation** first, then repeat the marked items with **3-button navigation** (taller nav bar).
+
+47. **Draft-screen keyboard lift (the D-159 bug itself).** On Curve & Brightness, focus the LAST
+    field of the scroll and type. **Expected:** the keyboard opens, the sticky Discard/Apply bar sits
+    directly ON TOP of the keyboard (lifted once, not twice), and there is NO keyboard-tall empty gap
+    between the last field / bar and the keyboard. Scroll the list while the keyboard is open — the
+    content ends at the bar, no dead zone. Repeat on Super Dimming ("Circadian dim spread", the
+    original repro field). *(both nav modes)*
+48. **Dialog editors unaffected.** Open a Contexts rule editor (Dialog window, D-098) and focus a
+    text field. **Expected:** Save/Cancel stay visible above the keyboard exactly as in 1.7.0 —
+    the activity-level edge-to-edge change must not alter Dialog insets.
+49. **All-screens insets spot-sweep.** Visit Dashboard → Menu → each settings screen → Tools →
+    Profiles → About/Guide. **Expected:** no content under the status bar, no bottom controls clipped
+    by the nav bar (D-100 class), no newly doubled top/bottom padding anywhere. *(both nav modes)*
+50. **Keyboard on non-draft surfaces.** Profiles screen → "Save current as…" name field; Contexts
+    SSID field. **Expected:** the focused field stays visible above the keyboard; no pan-jump of the
+    whole window (adjustResize + inset dispatch, not legacy ADJUST_PAN).
+
+## 15. Force dark via Shizuku/root (D-172) — NEW 1.8.0
+
+Global `debug.hwui.force_dark` toggle in Tools. Live paths try Shizuku (**running and
+authorized**) first, then a root shell; the switch itself always persists.
+
+51. **Toggle applies.** Shizuku running → Tools → "Force dark (Shizuku/root)" → switch ON.
+    **Expected:** toast "Applied — fully re-open an app to see it"; status line flips to
+    "Currently active on this device."; a fully re-opened light-theme-only app (e.g. Bandcamp)
+    renders dark. An app that was already running stays light until swipe-killed and re-opened.
+    On a rooted device, repeat with Shizuku stopped — the root fallback (one `su` prompt on
+    first use) must behave identically.
+52. **Toggle reverts.** Switch OFF, swipe-kill + re-open the same app. **Expected:** light again;
+    status "Currently inactive on this device."
+53. **No privileged shell** (unrooted, or root denied). Stop Shizuku, re-enter Tools.
+    **Expected:** after the probe (~4 s max) the gold "Neither Shizuku nor root is available…"
+    line shows; flipping the switch still persists and toasts "Saved — will apply once Shizuku
+    or root is available". No crash, no hang.
+54. **Reboot re-assert.** Switch ON → reboot → start Shizuku → start the Tideo service (or toggle
+    it off/on). **Expected:** `adb shell getprop debug.hwui.force_dark` reads `true` again without
+    touching the Tools switch; a re-opened target app is dark.
+55. **Opt-out leaves the prop alone.** Switch OFF (opt-out), set the prop by hand
+    (`adb shell setprop debug.hwui.force_dark true`), restart the service. **Expected:** the prop
+    stays `true` — Tideo never writes it while the opt-in is off.
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

@@ -6,8 +6,9 @@ playbook that matches your task, read the reference docs it names, then do the w
 
 The migration narrative (segment briefs, gate findings) is frozen in `../history/` — consult it,
 don't extend it. The numbered deviations live in `DEVIATIONS_LEDGER.md`, a permanent append-only
-registry (never compress it; append the next number in the LIVE ledger file — 200 rows per file,
-then it rolls over to `DEVIATIONS_LEDGER_A.md`/DA-001, `_B.md`/DB-001, …; D-153). **Code + golden
+registry (never compress it; append the next number in the LIVE ledger file — base file closed
+at D-176; from `DEVIATIONS_LEDGER_A.md`/DA-001 on, 1000 lines per file, final row may overflow,
+next row opens `_B.md`/DB-001, …; D-153/DA-001). **Code + golden
 vectors are ground truth**; where any doc disagrees with the code, trust the code (and fix the doc).
 
 ## Where logic lives
@@ -36,7 +37,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | Known parity deviations / open gaps | `parity_gaps.md` |
 | Privilege tiers / permissions / DataStore schema | `architecture/*` |
 | Material 3 audit | `design/m3_audit.md` |
-| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
+| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
 ## Change-type playbooks
 
@@ -154,7 +155,8 @@ so check it explicitly.
 - **F-Droid changelog:** add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the
   filename is the **versionCode**, not the name) with a short user-facing note. **Keep it under 500
   characters** (whole file incl. the trailing newline — aim ≤ 480 for margin): F-Droid's code-quality
-  scan flags a longer `whatsNew` as a Minor finding (`wc -c` the file before committing). **`release.yml`
+  scan flags a longer `whatsNew` as a Minor finding (`wc -c` the file before committing — and ladder
+  guard 6 machine-fails the current versionCode's file over 500 B, D-173). **`release.yml`
   auto-reuses this file as the GitHub Release's "What's new" section (D-123)** — it reads the tagged
   build's `versionCode`, looks up the matching changelog, and slots it between the owner's UI summary
   and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release
@@ -228,12 +230,84 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
 - **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
   If anything here was wrong/stale, fix this section in the same change.
 
+## Session discipline (BINDING for every maintenance session — D-161)
+
+Structural rules replacing the retired model-tier policy: D-035 moved code segments to Opus after
+D-030/D-034 (segments passed their own gates; review still found shipped bugs), but a top-tier
+model is no longer a given — assume this session may run on a lesser model and may be cut off at
+any moment (rate limit, window end, compaction).
+
+1. **Strictly sequential.** No parallel subagents; one unit of work at a time (the D-133
+   sequential-segments rule, generalized to all work). Parallel agent fan-out has burned an
+   entire usage window before; it is never the cheap path here. (A single BLOCKING
+   glue-review subagent inside a unit is sequential work, not fan-out — DA-003.)
+2. **Small, shippable units.** ≤ ~1 focused hour each, independently shippable, with a hard
+   **binary** acceptance check (tests / `scripts/ladder.sh` / a scripted comparison — never
+   "looks right"). Prefer mechanical steps with hard gates over judgment calls.
+3. **Checkpoint invariant.** Every unit ends: acceptance green → STATE.md Changelog line →
+   commit → push. Never start a second unit on top of an uncommitted first — an interrupted
+   session must lose at most the unit in flight.
+4. **You are the last reviewer.** The glue-review protocol (below) is mandatory at every model
+   tier — and the rule-review protocol for harness legislation (DA-005); there is no stronger
+   pass behind you. Delegate the pass itself to a fresh-context subagent where the harness
+   supports one (DA-003) — accountability for triaging its findings stays with the session.
+5. **Multi-unit work** uses the playbook-5 persisted-plan pattern (plan file + STATE checklist)
+   so any session can resume the backlog mid-stream.
+6. **Recovery — bounded, with a stop condition (DA-012).** If the unit in flight has gone
+   wrong, do not flail forward: reset the working tree to the last green checkpoint (`git
+   status` first, then `git reset --hard HEAD` and a careful `git clean` of files you created),
+   re-run `scripts/ladder.sh` to confirm green, then re-attempt smaller. If the dead end taught
+   a durable lesson, record it (STATE line or D-row) before retrying. **But recovery is not
+   infinite: if the SAME blocker survives a second reset-and-retry cycle with no real progress,
+   stop — do not keep thrashing it.** Reset once more to the last green checkpoint (never end a
+   unit red — discipline 3/5), record the blocker (what failed, what you tried) under `STATE.md`
+   Owner queue, commit + push that STATE update so it survives session death, and end the unit.
+   A guard/gate that won't go green is either a real fix you're missing (a code or doc problem —
+   diagnose it, don't just re-run it) or an owner fork (discipline 7) — neither is solved by
+   burning the usage window re-running a script (the P6 weakest-agent failure mode). The stop is
+   for a genuinely stuck blocker, not cover for abandoning a failure you could diagnose — a gate
+   fails for a reason; find it before you invoke the stop. Pushed checkpoints are immutable —
+   recovery never rewrites pushed history.
+7. **Ask, don't assume (owner-judgment forks — D-167).** Some decisions are the owner's, and a
+   plausible guess is worse than a pause: the owner has pivoted mid-feature before (D-151
+   removed an entire already-on-branch segment). When a unit hits a fork that is (a)
+   **irreversible or expensive to unwind** (schema migration, deleting a feature, renaming a
+   public surface), (b) **user-visible behavior with no parity source** (no Tasker artifact or
+   golden vector says which way), (c) **semver-ambiguous** (could be read as minor vs major), or
+   (d) **process/policy reshaping** (changing how the owner works, not just the code): do NOT
+   resolve it by picking. Stop at the last green checkpoint, record the question under
+   `STATE.md ## Owner queue` → **Open questions** — date-stamped `[YYYY-MM-DD]` (age is the
+   owner's triage cue, DA-006), the fork, the options, and your
+   recommendation with reasons — then end the unit and move to independent work (or end the
+   session). A session's **final chat message restates the Owner queue** so the owner sees
+   pending items without opening STATE. Routine engineering judgment inside a unit's stated
+   scope is NOT a fork — this rule is for decisions the owner would want to make, not cover for
+   avoiding decisions the agent should make.
+8. **Verification disclosure (D-175).** Every commit body states what was actually verified
+   (which ladder rungs/tests ran — for docs-only units, `--guards-only`) and names what could
+   NOT be verified locally. On-device behavior stays owner-verified (`DEVICE_TEST_SCRIPT.md`);
+   never imply a green ladder covers it. This is disclosure of real actions, not an
+   attestation gate (the D-162 line holds).
+
 ## Glue-review protocol (MANDATORY for `:platform` / `:app` runtime changes)
 
 Any change touching a `:platform` adapter or `:app` runtime glue (service, pipeline controller,
 observers, receivers, tile, notification actions) gets a **second, adversarial diff pass before
-commit**: after the ladder is green, re-read the FULL diff fresh — as a hostile reviewer, not the
-author — hunting specifically the ledger's proven bug classes:
+commit**, after the ladder is green.
+
+**Who performs the pass (DA-003): a fresh-context reviewer, not the authoring context.** The
+context that wrote a diff is anchored on its own reasoning and predisposed to accept it. Run
+the pass in a review subagent (or your harness's equivalent clean invocation) that receives:
+the full diff, the bug-class checklist below, and read access to the tree — and does NOT
+receive the author's rationale or chat history. Scale the reviewer to the diff: a small
+mechanical diff may use a light model tier; a large or glue-heavy diff gets the strongest
+tier available. This is the one sanctioned subagent (a single, BLOCKING review inside the
+unit — Session discipline 1's fan-out ban is about parallel *work*). The session stays
+accountable: triage every finding (fix it, or record why not) — a clean report is read, not
+rubber-stamped. Only if the harness cannot spawn any fresh context, fall back to the
+in-context pass: re-read the FULL diff fresh — as a hostile reviewer, not the author.
+
+Either way, the pass hunts specifically the ledger's proven bug classes:
 
 - condition/gate **polarity and missing operands** (D-030 b: `scalingUse` dropped from an AND gate);
 - **list/insertion order** — newest-first vs newest-last (D-030 b: Array Push at index 1);
@@ -261,6 +335,12 @@ author — hunting specifically the ledger's proven bug classes:
   result overwrites the newer truth, sometimes latching (D-143: an in-flight SSID resolve landing
   after `onLost` resurrected a "connected" state; a late failed resolve wiped a confirmed SSID
   and the resolved-network skip then blocked recovery until reconnect).
+- **persisting a TRANSFORMED copy of visible edit state without writing the transform back** —
+  any commit path that validates/clamps/coerces on the way to disk must snap the visible state
+  (draft, field, slider) to the exact persisted copy, or the UI diverges permanently from the
+  store (D-164: draft Apply committed `validate()`'s cross-field-coerced copy while the draft
+  kept the raw pair — perpetually dirty screen, a slider showing a value that never persisted;
+  the G3-F3 class, which range-alignment alone cannot fix for cross-field rules).
 
 Rationale (D-030/D-034/D-035): every Sonnet migration segment passed its own acceptance gate,
 yet dedicated review found real shipped bugs in exactly this glue — golden vectors cannot see
@@ -269,23 +349,101 @@ review pass or stronger model behind you now; this second pass replaces it. If t
 nothing, say so in the commit/PR body ("glue-review pass: clean"); if it finds something, fix
 it before commit and record anything durable as a `D-NN`.
 
+## Rule-review protocol (MANDATORY for binding-rule / guard changes — DA-005)
+
+Any diff that changes the harness's LEGISLATION — CLAUDE.md, this runbook's protocols or
+Session discipline, `scripts/ladder.sh` guard semantics **and their fixture suite
+`scripts/test-ladder-guards.sh`** (a weakened fixture softens the net every later guard
+change is tested against), `scripts/session-start.sh`, `scripts/redact.sh` (DA-007 — a
+silently weakened redaction filter is a weakened rail), `scripts/command-guard.sh` (DA-009 —
+same weakened-rail rationale for the pre-execution command rail), ledger preambles, adapter permission
+rules (e.g. `.claude/settings.json` allow/deny), `AGENTS.md` — gets the same fresh-context
+review as glue (DA-003 mechanics: the reviewer receives the diff, this checklist, and tree
+access — never the author's rationale), with three differences: the reviewer defaults to the
+**strongest available tier regardless of diff size** (a three-line rule edit can carry a
+semantic bomb; size is a bad proxy for rule diffs); there is **NO self-review fallback** for
+rule diffs — a session that cannot spawn a fresh context parks the rule change in the Owner
+queue (discipline 7(d)) for a session that can, instead of reviewing its own legislation;
+and it hunts RULE bug classes, each from this repo's history:
+
+- **rule contradiction** — the new rule vs an existing binding rule (the DA-003 carve-out
+  from the D-161 fan-out ban exists precisely because the two rules collide);
+- **prose/guard lockstep drift** — a number or behavior stated in prose diverging from the
+  guard constant/logic enforcing it (the DA-001/DA-004 lockstep obligations);
+- **Goodhart-ability** — the rule can be satisfied without its intent (trimming to just
+  under 12 KB satisfied the old length guard while defeating it — DA-004);
+- **enforcement asymmetry** — prose implies a protection no guard or permission rail
+  actually checks (either say it's prose-only, or add the check);
+- **citation validity** — guard 5 deliberately does not scan docs, so D-row cites in rule
+  prose are checked HERE: the row exists and actually says what the rule claims;
+- **agent-agnosticism regression** — the rule silently assumes one agent's machinery,
+  filenames, or env vars (D-176).
+
+Out of scope: routine STATE.md edits (changelog lines, queue items, Current state) —
+working memory, not legislation. Two STATE sections ARE legislation and stay in scope: the
+**length-guard preamble** (guard-lockstep thresholds) and **Decided non-items** (binding
+declines). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
+their triage). Ladder guard 7 (DA-006) WARNs when the *uncommitted* diff touches a
+legislation file — that tripwire only *surfaces* the obligation, it never certifies the
+pass; the review itself stays prose-enforced (the D-162 no-attestation-gates line holds).
+STATE.md and the ledger files are deliberately outside the tripwire (they change in nearly
+every unit — warn fatigue kills tripwires), so their legislative sections stay wholly
+prose-covered. **One level of meta only:** the reviewer reports, the session triages, the
+owner arbitrates via the Owner queue — nobody reviews the reviewer.
+
+## Incident: leaked credential (DA-006)
+
+If a secret (token, key, password) has reached a commit, a pushed branch, a log, or any other
+output: stop normal work — **containment outranks the checkpoint invariant.**
+
+1. **Never repeat the value again** — not in STATE, the ledger, chat, an issue, or a
+   "look what leaked" diff. Refer to it by key name only (D-175 discipline).
+2. **Owner queue, immediately** (Pending owner actions): the key name, where it landed
+   (commit SHA / file / log), and the exposure window. Push nothing new containing it.
+3. **The owner rotates the credential FIRST** — rotation, not history cleanup, is what ends
+   the exposure; treat the value as burned even after cleanup.
+4. **History rewrite is the ONE sanctioned exception** to "never rewrite pushed history" and
+   the force-push rail: owner-decided AND owner-executed — an agent never runs the rewrite
+   (the deny rail stays for agents; the owner lifts it for themselves). Scoped to removing
+   the secret (e.g. `git filter-repo`), coordinated with the remote. Never as part of normal
+   engineering.
+5. Afterward: ledger row for the incident; if a guard or deny rule could have caught it, add
+   it with a fixture test.
+
 ## Acceptance ladder
 
-Run the relevant subset until green (on-device behavior is owner-verified — no emulator, no KVM):
+**One command: `scripts/ladder.sh`** — fast pre-flight guards, then all five rungs in a
+single Gradle invocation. The guards are enumerated ONLY in the `ladder.sh` header comment
+(single source — prose re-enumerations here and in CLAUDE.md kept drifting as guards were
+added, DA-008 F8): failing checks for STATE length/structure, ledger rollover, citation
+integrity, changelog cap, skip-ci tokens, redaction self-test, and secret shapes, plus
+WARN-only advisories that self-skip in CI. The guards themselves are regression-tested by
+`scripts/test-ladder-guards.sh` (sandbox-repo fixtures, seconds; also a `build.yml` step —
+run it whenever you change a guard, D-173). On remote containers the session-start hook
+launches `scripts/warm-gradle.sh` in the background (D-173), so by the time you first run the
+ladder the cold dependency/compile cost has usually already been paid; `~/.gradle-warmup.log`
+shows its progress, `AAB_SKIP_WARMUP=1` disables it. **`build.yml`'s "Acceptance ladder"
+step invokes this same script (D-166)**, so CI and local share one task-set definition — there
+is no hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
+seconds; extra args are forwarded to Gradle.
+
+The rungs individually (run the relevant subset until green; on-device behavior is
+owner-verified — no emulator, no KVM):
 
 ```bash
 ./gradlew :domain:test            # pure-JVM engine + golden parity tests
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests
 ./gradlew :app:assembleDebug      # APK
-./gradlew :app:lintDebug          # lint vs frozen baseline
+./gradlew :app:lintDebug          # lint (hard gate — no baseline; targeted suppressions in app/lint.xml)
 ```
 
 ## When CI fails on a PR (workflow vs code)
 
-The local ladder (above) and CI (`.github/workflows/build.yml`) run the *same* Gradle tasks, so a
-green local tree usually means green CI. When CI is red but local is green, the failure is in the
-**environment/workflow**, not your code — diagnose before "fixing tests". Triage in this order:
+The local ladder (above) and CI (`.github/workflows/build.yml`) run the *same* script —
+`build.yml` invokes `scripts/ladder.sh` (D-166) — so a green local tree usually means green CI.
+When CI is red but local is green, the failure is in the **environment/workflow**, not your code
+— diagnose before "fixing tests". Triage in this order:
 
 1. **Read the failing step's log** — distinguish the three kinds:
    - **Real failure** (a test assertion, a lint finding, a compile error): reproduce locally with the
@@ -315,8 +473,14 @@ If this runbook lacks what you need for the task in front of you:
 1. Consult the live reference docs above (esp. `DEVIATIONS_LEDGER.md`) and the frozen
    `../history/` narrative.
 2. If you learn a durable fact future sessions need, record it as a new numbered deviation
-   in the live ledger file (200-row cap + rollover, D-153) and/or correct the relevant
+   in the live ledger file (1000-line cap + rollover, D-153/DA-001) and/or correct the relevant
    reference doc — provenance-stamped, terse.
 3. If a playbook here is wrong, stale, or missing a case you just handled, **fix this RUNBOOK in
    the same change.** Treat the runbook as code: it should always reflect how changes are
    actually made now.
+
+Boundary (DA-006): self-adaptation covers *operational* content — playbooks, the doc index,
+module maps, commands, stale paths. *Binding* rules (Session discipline, the review
+protocols, guard semantics, git/permission policy) are never self-adaptation: they go
+through the rule-review protocol (DA-005), and process-reshaping changes through the Owner
+queue (Session discipline 7(d)).

@@ -31,6 +31,12 @@ class DataStoreSchemaVersionTest {
     }
 
     @Test
+    fun `context-baseline store is at schema v1 with an identity default`() {
+        assertEquals(1, ContextBaseline.SCHEMA_VERSION)
+        assertEquals(ContextBaseline(), ContextBaselineSerializer.defaultValue)
+    }
+
+    @Test
     fun `override-points store is at schema v1 with an identity default`() {
         assertEquals(1, OverridePoints.SCHEMA_VERSION)
         assertEquals(OverridePoints(), OverridePointsSerializer.defaultValue)

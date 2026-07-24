@@ -105,4 +105,46 @@ class WizardParityTest {
         )
         assertEquals(0.001, input.tau, "default τ must be the act2 0.001, not the 4.0 fallback")
     }
+
+    /**
+     * DA-016: the Stage 1 "Top-K Zone1End" shortlist MUST be sorted descending by score, so the
+     * best-scoring boundary candidates survive into Stage 2. The reference (task38 Java Block #1
+     * L649–667) bubbles each inserted candidate fully up into place; a mis-port that swaps only once
+     * per insert leaves candidates stranded behind the -9999 placeholders, collapsing the effective
+     * shortlist to a 1–2 candidate window and suppressing valid boundary suggestions.
+     *
+     * This asserts a structural property of the reference algorithm (monotone-nonincreasing scores),
+     * NOT a production-captured value, so it is independent ground truth — it fails on the single-swap
+     * bug and passes on the faithful full-pass bubble. The diagnostics log emits each retained slot as
+     * `  Top Cand #<i>: Z1End=<lux> (Score: <score>)`.
+     */
+    @Test
+    fun wizard_topKCandidatesAreSortedDescendingByScore_DA016() {
+        // A dataset that spans all five lux bins with enough points to yield several real Zone1End
+        // split candidates (N − 8 ≥ 2 ⇒ topK ≥ 2), so mis-ordering is observable.
+        val overrides = listOf(
+            OverridePoint(1.0, 4.0), OverridePoint(3.0, 7.0), OverridePoint(6.0, 10.0),
+            OverridePoint(12.0, 16.0), OverridePoint(20.0, 24.0), OverridePoint(45.0, 38.0),
+            OverridePoint(90.0, 52.0), OverridePoint(180.0, 66.0), OverridePoint(400.0, 84.0),
+            OverridePoint(900.0, 108.0), OverridePoint(2000.0, 140.0), OverridePoint(5000.0, 180.0),
+            OverridePoint(12000.0, 220.0), OverridePoint(30000.0, 248.0),
+        )
+        val result = CurveSuggestionEngine.suggest(
+            CurveSuggestionInput(overrides = overrides, currentCurve = BrightnessCurveConfig(), tau = 4.0),
+        )
+        assertTrue(result != null, "expected a suggestion for a well-populated dataset")
+
+        val scoreRegex = Regex("""Top Cand #\d+: Z1End=[-\d.]+ \(Score: (-?[\d.]+)\)""")
+        val scores = scoreRegex.findAll(result.diagnosticsLog).map { it.groupValues[1].toDouble() }.toList()
+        assertTrue(scores.size >= 2, "expected at least two Top Cand rows, got ${scores.size}")
+
+        for (i in 1 until scores.size) {
+            assertTrue(
+                scores[i] <= scores[i - 1],
+                "Top-K shortlist must be sorted descending by score, but #${i + 1} (${scores[i]}) " +
+                    "> #$i (${scores[i - 1]}) — a real candidate is stranded behind a placeholder " +
+                    "(single-swap bubble bug). Full log:\n${result.diagnosticsLog}",
+            )
+        }
+    }
 }

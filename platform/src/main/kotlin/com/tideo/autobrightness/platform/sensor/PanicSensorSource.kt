@@ -108,26 +108,50 @@ class PanicGestureDetector(
  * upside-down state and returns — exactly as a Tasker STATE only re-fires on re-entry ("the profile
  * won't trigger again until the phone is flipped straight and then upside-down again", `tmp/Tmp.md`).
  *
+ * D-165: "leaves the upside-down state" must be a **sustained** straight spell ([rearmFrames]
+ * consecutive non-inverted readings), not a single reading. The instantaneous orientation flickers
+ * false during a vigorous same-axis shake — the exact artifact the 10 s window is already immune to
+ * (see the window comment in [AndroidPanicSensorSource]) — and the α=0.9 gravity low-pass keeps it
+ * false for ~5-6 readings after ONE strong spike even with the phone held stably inverted. A
+ * single-reading clear therefore let "timed-out window → keep holding inverted → shake hard" re-open
+ * a fresh window and fire a real panic without any flip straight, breaking the STATE re-entry contract.
+ *
  * Pure state machine, clock-free: the Android source owns the orientation/display/proximity sensing and
  * the 10 s window; this only decides *whether a new window may start*.
  */
-class PanicGate {
-    // True once a window has run for the current inversion; cleared when the phone is flipped straight.
+class PanicGate(
+    // 25 readings ≈ 0.5 s at SENSOR_DELAY_GAME (~50 Hz): unreachable by shake/filter artifacts
+    // (single-spike recovery is ~5-6 readings; oscillating shakes keep interrupting the streak),
+    // trivially reached by a genuine flip straight (a real re-entry takes ≥1 s of handling).
+    private val rearmFrames: Int = REARM_FRAMES,
+) {
+    // True once a window has run for the current inversion; cleared after a SUSTAINED straight spell.
     private var consumed = false
+    private var straightStreak = 0
 
     /**
      * Whether a fresh shake window may start now. [armed] = sustained-upside-down ∧ display-on ∧
-     * proximity-not-near. [upsideDown] is the instantaneous orientation: leaving upside-down clears the
-     * latch so the next inversion can re-arm.
+     * proximity-not-near. [upsideDown] is the instantaneous orientation: [rearmFrames] consecutive
+     * non-inverted readings clear the latch so the next inversion can re-arm (D-165).
      */
     fun canArm(armed: Boolean, upsideDown: Boolean): Boolean {
-        if (!upsideDown) consumed = false
+        if (upsideDown) {
+            straightStreak = 0
+        } else if (consumed && ++straightStreak >= rearmFrames) {
+            consumed = false
+        }
         return armed && !consumed
     }
 
-    /** Record that a shake window ran (fired OR timed out). Latches until the next upside-down exit. */
+    /** Record that a shake window ran (fired OR timed out). Latches until a sustained straight spell. */
     fun consume() {
         consumed = true
+        straightStreak = 0
+    }
+
+    companion object {
+        /** Default re-arm spell length, in consecutive non-inverted readings (D-165). */
+        const val REARM_FRAMES = 25
     }
 }
 

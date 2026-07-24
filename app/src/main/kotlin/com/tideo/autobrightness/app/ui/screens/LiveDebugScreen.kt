@@ -28,6 +28,8 @@ import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.provider.Settings
@@ -175,13 +177,16 @@ private fun PanicSensitivityCard(current: Int, onSet: (Int) -> Unit) {
             stringResource(R.string.panic_sensitivity_value, level)
         }
         DiagnosticLine("panic_sensitivity_value") { append(valueLabel) }
+        // D-156: the value line above is a sibling, so the slider needs its own contentDescription.
+        val sliderLabel = stringResource(R.string.a11y_panic_sensitivity)
         Slider(
             value = position,
             onValueChange = { position = it },
             onValueChangeFinished = { onSet(position.roundToInt()) },
             valueRange = 0f..10f,
             steps = 9, // 9 interior stops → 11 discrete positions (0..10)
-            modifier = Modifier.fillMaxWidth().testTag("panic_sensitivity_slider"),
+            modifier = Modifier.fillMaxWidth().testTag("panic_sensitivity_slider")
+                .semantics { contentDescription = sliderLabel },
         )
         Text(
             stringResource(R.string.panic_sensitivity_help),

@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +34,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,16 +47,19 @@ import com.tideo.autobrightness.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.app.CrashLogStore
 import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.runtime.PowerDrawCalibrator
 import com.tideo.autobrightness.app.runtime.PowerDrawProgress
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
+import com.tideo.autobrightness.app.state.ControlPrefsViewModel
 import com.tideo.autobrightness.app.state.CurveSuggestionPreview
 import com.tideo.autobrightness.app.state.PowerDrawViewModel
 import com.tideo.autobrightness.app.state.SettingsViewModel
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
+import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.graph.PowerDrawChart
@@ -62,7 +68,9 @@ import com.tideo.autobrightness.domain.wizard.CurveSuggestionEngine
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionInput
 import com.tideo.autobrightness.domain.wizard.CurveSuggestionResult
 import com.tideo.autobrightness.domain.wizard.OverridePoint
+import com.tideo.autobrightness.platform.display.ForceDarkController
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Tools: curve wizard + power-draw calibration (Tasker Debug Scene + wizard). The debug-category
@@ -72,8 +80,10 @@ fun ToolsScreen(
     navController: NavHostController,
     vm: SettingsViewModel = viewModel(),
     powerVm: PowerDrawViewModel = viewModel(),
+    controlVm: ControlPrefsViewModel = viewModel(),
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val externalControlEnabled by controlVm.externalControlEnabled.collectAsStateWithLifecycle()
     val overridePoints by vm.overridePoints.collectAsStateWithLifecycle()
     val powerSamples by powerVm.samples.collectAsStateWithLifecycle()
     val powerRunning by powerVm.running.collectAsStateWithLifecycle()
@@ -81,10 +91,29 @@ fun ToolsScreen(
     val powerHasData by powerVm.hasData.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val toast = rememberToaster()
+    val scope = rememberCoroutineScope()
     var showPrep by remember { mutableStateOf(false) }
+
+    // D-172: the force-dark card's LIVE prop state (`getprop debug.hwui.force_dark` via Shizuku,
+    // root fallback), probed once on entry and refreshed after each toggle. `probed=false` hides
+    // the status line until the first probe returns (the Shizuku bind can take up to 4 s), so
+    // "not reachable" is never shown while the probe is still in flight.
+    val forceDarkEnabled by controlVm.forceDarkEnabled.collectAsStateWithLifecycle()
+    var forceDarkLive by remember { mutableStateOf<Boolean?>(null) }
+    var forceDarkProbed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        forceDarkLive = ForceDarkController.read(context)
+        forceDarkProbed = true
+    }
+
+    // D-158: the latest locally-captured crash trace, if any. Read once on entry — the app restarts
+    // after a crash, so re-opening Tools always re-reads the newest file from disk.
+    val crashStore = remember(context) { CrashLogStore.of(context) }
+    val latestCrashLog = remember(crashStore) { crashStore.latest() }
 
     ToolsContent(
         recordedPoints = overridePoints,
+        latestCrashLog = latestCrashLog,
         onBack = { navController.popBackStack() },
         // D-125: stash the wizard's fit as a transient draft transform (curve → suggested), then jump to
         // Curve & Brightness — whose VM applies it on its initial seed: suggested values in the fields,
@@ -130,6 +159,29 @@ fun ToolsScreen(
         powerProgress = powerProgress?.let { "${it.message} (${it.step}/${it.total})" },
         powerHasData = powerHasData,
         onCalibratePower = { showPrep = true },
+        externalControlEnabled = externalControlEnabled,
+        onSetExternalControlEnabled = controlVm::setExternalControlEnabled,
+        forceDarkEnabled = forceDarkEnabled,
+        forceDarkLiveState = forceDarkLive,
+        forceDarkProbed = forceDarkProbed,
+        // D-172: persist the choice FIRST (so a Shizuku outage can't lose it — the service re-assert
+        // reads the store), then apply live and reflect the verified result in the status line.
+        onSetForceDarkEnabled = { enabled ->
+            controlVm.setForceDarkEnabled(enabled)
+            scope.launch {
+                val result = ForceDarkController.apply(context, enabled)
+                forceDarkLive = result
+                forceDarkProbed = true
+                toast(
+                    when {
+                        result == enabled -> R.string.toast_force_dark_applied
+                        result == null && enabled -> R.string.toast_force_dark_pending
+                        result == null -> R.string.toast_force_dark_unreachable_off
+                        else -> R.string.toast_force_dark_failed
+                    },
+                )
+            }
+        },
     )
 
     // task524 entry: the prep dialog (Airplane Mode / close apps / don't touch / unplug) → Start shows
@@ -263,6 +315,13 @@ fun ToolsContent(
     powerProgress: String? = null,
     powerHasData: Boolean = false,
     onCalibratePower: () -> Unit = {},
+    latestCrashLog: String? = null,
+    externalControlEnabled: Boolean = false,
+    onSetExternalControlEnabled: (Boolean) -> Unit = {},
+    forceDarkEnabled: Boolean = false,
+    forceDarkLiveState: Boolean? = null,
+    forceDarkProbed: Boolean = false,
+    onSetForceDarkEnabled: (Boolean) -> Unit = {},
 ) {
     SettingsScaffold(stringResource(R.string.title_tools), onBack) { padding ->
         SettingsColumn(padding) {
@@ -294,6 +353,149 @@ fun ToolsContent(
                     }
                 }
             }
+
+            ForceDarkCard(forceDarkEnabled, forceDarkLiveState, forceDarkProbed, onSetForceDarkEnabled)
+
+            DiagnosticsCard(latestCrashLog)
+
+            AutomationControlCard(externalControlEnabled, onSetExternalControlEnabled)
+        }
+    }
+}
+
+/**
+ * D-172: the global force-dark override (`debug.hwui.force_dark` via Shizuku with a root fallback —
+ * the DarQ mechanism, global-only: per-app flipping is a lost race, the renderer reads the prop
+ * before any foreground detection can land). The Switch is the PERSISTED opt-in
+ * ([ControlPrefsStore.forceDarkEnabled][com.tideo.autobrightness.app.control.ControlPrefsStore]);
+ * the status line below it is the live prop truth — probed on entry, refreshed after each toggle —
+ * so a privileged-shell outage shows as "saved but not applied" instead of silently lying. The ⓘ
+ * help leads with the applies-on-app-start disclaimer (owner-requested).
+ */
+@Composable
+private fun ForceDarkCard(
+    enabled: Boolean,
+    liveState: Boolean?,
+    probed: Boolean,
+    onSetEnabled: (Boolean) -> Unit,
+) {
+    AabCard(Modifier.testTag("force_dark_card")) {
+        SectionHeader(stringResource(R.string.tools_force_dark_header), divider = true)
+        Text(
+            stringResource(R.string.tools_force_dark_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SwitchSettingRow(
+            label = stringResource(R.string.tools_force_dark_toggle_label),
+            checked = enabled,
+            onCheckedChange = onSetEnabled,
+            help = R.string.help_tools_force_dark,
+            testTag = "force_dark_toggle",
+        )
+        if (probed) {
+            // Gold (= secondary, the m3_audit warning/emphasis role) for the unreachable warning;
+            // the plain on/off state stays in the muted variant color.
+            Text(
+                when (liveState) {
+                    null -> stringResource(R.string.tools_force_dark_unreachable)
+                    true -> stringResource(R.string.tools_force_dark_state_on)
+                    false -> stringResource(R.string.tools_force_dark_state_off)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (liveState == null) {
+                    MaterialTheme.colorScheme.secondary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.testTag("force_dark_status"),
+            )
+        }
+    }
+}
+
+/**
+ * D-157 (U4): the opt-in external intent-control surface (Tasker / MacroDroid). A Switch bound to
+ * [ControlPrefsStore][com.tideo.autobrightness.app.control.ControlPrefsStore].externalControlEnabled
+ * (default OFF, the D-105 pattern) — while off the exported `ControlReceiver` ignores every action —
+ * plus a "Show actions" dialog listing the public verbs, the `name` extra, an `adb` example, and the
+ * battery-optimization caveat for SERVICE_ON. The verbs reuse the same hardened paths the tile/widget
+ * drive; no data leaves the app.
+ */
+@Composable
+private fun AutomationControlCard(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
+    var showActions by remember { mutableStateOf(false) }
+    AabCard(Modifier.testTag("automation_card")) {
+        SectionHeader(stringResource(R.string.tools_automation_header), divider = true)
+        Text(
+            stringResource(R.string.tools_automation_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SwitchSettingRow(
+            label = stringResource(R.string.tools_automation_toggle_label),
+            checked = enabled,
+            onCheckedChange = onSetEnabled,
+            help = R.string.help_tools_automation,
+            testTag = "automation_toggle",
+        )
+        OutlinedButton(
+            onClick = { showActions = true },
+            modifier = Modifier.fillMaxWidth().testTag("automation_show_actions"),
+        ) { Text(stringResource(R.string.tools_automation_show_actions)) }
+    }
+    if (showActions) {
+        AlertDialog(
+            onDismissRequest = { showActions = false },
+            title = { Text(stringResource(R.string.tools_automation_actions_title)) },
+            text = {
+                Text(
+                    stringResource(R.string.tools_automation_actions_body),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showActions = false },
+                    modifier = Modifier.testTag("automation_actions_close"),
+                ) { Text(stringResource(R.string.action_ok)) }
+            },
+            modifier = Modifier.testTag("automation_actions_dialog"),
+        )
+    }
+}
+
+/**
+ * D-158: local crash-log capture. [AabApplication][com.tideo.autobrightness.app.AabApplication]
+ * writes the last few uncaught-exception traces under `filesDir/crash`; this row lets the owner copy
+ * the most recent one to the clipboard (the existing `%AAB_Test` copy pattern — clipboard, never a
+ * share intent/FileProvider). Shows a "none recorded" state until the first crash.
+ */
+@Composable
+private fun DiagnosticsCard(latestCrashLog: String?) {
+    val clipboard = LocalClipboardManager.current
+    val toast = rememberToaster()
+    AabCard(Modifier.testTag("diagnostics_card")) {
+        SectionHeader(stringResource(R.string.tools_diagnostics_header), divider = true)
+        Text(
+            stringResource(R.string.tools_diagnostics_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (latestCrashLog != null) {
+            OutlinedButton(
+                onClick = {
+                    clipboard.setText(AnnotatedString(latestCrashLog))
+                    toast(R.string.toast_crash_log_copied)
+                },
+                modifier = Modifier.fillMaxWidth().testTag("copy_crash_log"),
+            ) { Text(stringResource(R.string.tools_copy_crash_log)) }
+        } else {
+            Text(
+                stringResource(R.string.tools_no_crash_log),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.testTag("no_crash_log"),
+            )
         }
     }
 }
@@ -330,11 +532,14 @@ private fun WizardCard(
                 stringResource(R.string.tools_inertia, "%.3f".format(tau)),
                 style = MaterialTheme.typography.bodySmall,
             )
+            // D-156: the τ label above is a sibling Text, so it does not merge onto the Slider node;
+            // give the slider its own contentDescription for TalkBack.
+            val tauLabel = stringResource(R.string.a11y_wizard_tau)
             Slider(
                 value = tau,
                 onValueChange = { tau = it },
                 valueRange = 0.001f..5f,
-                modifier = Modifier.testTag("wizard_tau"),
+                modifier = Modifier.testTag("wizard_tau").semantics { contentDescription = tauLabel },
             )
             OutlinedButton(
                 onClick = {

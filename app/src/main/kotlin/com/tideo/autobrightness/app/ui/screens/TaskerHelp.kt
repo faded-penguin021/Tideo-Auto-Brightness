@@ -93,8 +93,14 @@ object TaskerHelp {
     /** task506 — %AAB_DimmingExponent. */
     @StringRes val DIMMING_EXPONENT = R.string.help_dimming_exponent
 
-    /** task421 — %AAB_DimmingThreshold. */
+    /** task421 — %AAB_DimmingThreshold (super-dimming mode label "SD threshold"). */
     @StringRes val DIMMING_THRESHOLD = R.string.help_dimming_threshold
+
+    /**
+     * task421 — %AAB_DimmingThreshold when software dimming (PWM) is on: Tasker swaps the shared
+     * threshold field's label to "PWM Thresh" and flashes this instead (D-168).
+     */
+    @StringRes val PWM_THRESHOLD = R.string.help_pwm_threshold
 
     /** task510 — %AAB_DimmingEnabled. */
     @StringRes val DIMMING_ENABLED = R.string.help_dimming_enabled

@@ -1,5 +1,7 @@
 # Tideo Auto Brightness
 
+![Tideo Auto Brightness — the auto-brightness that shows its work](docs/banner.png)
+
 [![Build](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml/badge.svg)](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/faded-penguin021/tideo-auto-brightness?display_name=tag&sort=semver)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
 [![Downloads](https://img.shields.io/github/downloads/faded-penguin021/tideo-auto-brightness/total?logo=github)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
@@ -40,6 +42,9 @@ decision logic are golden-tested against a transcription of the original Tasker 
   charging state, Wi-Fi SSID, or day of week, with priority-based conflict resolution.
 - **Live Debug scene**: a glass-box that shows relevant inputs and outputs.
 - **Emergency recovery**, a safety feature for when the screen is too dark, flip the phone upside-down and shake to force brightness to maximum. It also resets all privileged display toggles (grayscale, inversion, Night Light, …) to their defaults.
+- **Automation control (optional, off by default)**: an opt-in broadcast surface so apps like Tasker
+  or MacroDroid can turn Tideo on/off, pause, reset, or load a profile, and react to its state
+  changes. See **[Automation](docs/AUTOMATION.md)**.
 
 
 <p align="center">
@@ -110,7 +115,7 @@ adb shell pm grant com.tideo.autobrightness android.permission.WRITE_SECURE_SETT
 After the grant, Tideo writes the secure setting **directly** (no Shizuku binder needed for dimming).
 The grant is detected the next time the screen turns on or when the app is opened.
 
-> **One runtime use of Shizuku.** Beyond the one-time grant, Shizuku is used at runtime in exactly one optional place: the **no-Location Wi-Fi SSID** context uses `cmd wifi status` through Shizuku's shell so Wi-Fi-based context rules can read the SSID *without* the Location permission.
+> **Two runtime uses of Shizuku.** Beyond the one-time grant, Shizuku is used at runtime in exactly two optional places, both through Shizuku's shell (with a root fallback): the **no-Location Wi-Fi SSID** context runs `cmd wifi status` so Wi-Fi-based context rules can read the SSID *without* the Location permission, and the **global force-dark** toggle sets the `debug.hwui.force_dark` system property (which isn't reachable through secure settings).
 
 ## Troubleshooting
 
@@ -143,6 +148,16 @@ request, and only as a last resort:
 
 Everything else runs entirely on-device.
 
+## Automation (Tasker / MacroDroid)
+
+Tideo can be driven by automation apps through an **opt-in** broadcast surface: commands to turn the
+service on/off, pause/resume, reapply, reset, or load a profile, plus outbound state-change events so
+your macros can *react* to Tideo. It is **off until you enable it** under
+**Tools → Automation control** (there is no password, so any app can send commands while it is on).
+
+**See [`docs/AUTOMATION.md`](docs/AUTOMATION.md)** for the full list of actions, the profile-name
+extra, the outbound `STATE_CHANGED` event, and `adb`/Tasker/MacroDroid examples.
+
 ## Module layout
 
 A 3-module Gradle build:
@@ -169,7 +184,7 @@ or run `scripts/setup-android-sdk.sh`).
 
 The rebuild is complete. Maintenance is driven by documents under `docs/rebuild/`:
 
-- [`docs/rebuild/CLAUDE.md`](docs/rebuild/CLAUDE.md) — instructions for agentic workflow.
+- [`CLAUDE.md`](CLAUDE.md) — instructions for agentic workflow (any coding agent; `AGENTS.md` points here).
 - [`docs/rebuild/STATE.md`](docs/rebuild/STATE.md) — current project state and session memory.
 - [`docs/rebuild/RUNBOOK.md`](docs/rebuild/RUNBOOK.md) — maintenance playbook (change-type guides).
 - [`docs/rebuild/PARITY_CHECKLIST.md`](docs/rebuild/PARITY_CHECKLIST.md) — every Tasker artifact tracked
@@ -178,6 +193,7 @@ The rebuild is complete. Maintenance is driven by documents under `docs/rebuild/
   registry of numbered deviations (D-001…); consult to avoid repeating solved mistakes.
 - [`docs/rebuild/DEVICE_TEST_SCRIPT.md`](docs/rebuild/DEVICE_TEST_SCRIPT.md) — the on-device acceptance
   script.
+- [`docs/AUTOMATION.md`](docs/AUTOMATION.md) — the external automation (Tasker / MacroDroid) reference.
 - [`docs/history/`](docs/history/) — frozen record of the migration (segment briefs, gate findings).
 
 ## Contributing
