@@ -41,6 +41,16 @@ object AutoBrightnessRuntime {
     fun reapply(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_REAPPLY)
 
     /**
+     * DA-018: resume context automation (the Profiles "Resume" banner / external `CONTEXTS_RESUME`).
+     * Distinct from [reapply]: the service runs a GENUINE context evaluation (`evaluate(RESUME)`) so a
+     * currently-matching rule applies now and a no-match reverts to `%AAB_ProfileUser`, THEN Set Initial
+     * Brightness — the Tasker `_ContextResume` → evaluate contexts → Set Initial Brightness flow. Plain
+     * reapply only republishes the settings, leaving the store pinned to the manually-loaded profile.
+     * Same not-running contract as reapply (validated service-side, D-140).
+     */
+    fun resumeContext(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_RESUME_CONTEXT)
+
+    /**
      * D-157: full-stop panic from an external command (mirrors the notification's Reset button, which
      * sends the same [AmbientMonitoringService.ACTION_PANIC]): restore brightness, drop dimming, tear
      * the service down. Safe when not running — startForegroundService creates the instance, it panics

@@ -92,11 +92,17 @@ class ContextEngineTest {
         }
     }
 
-    /** In-memory pre-override baseline snapshot (task626 `_ContextResume`, D-170). */
-    private class FakeBaselineStore(var stored: AabSettings? = null) : ContextBaselineStore {
+    /** In-memory pre-override baseline snapshot (task626 `_ContextResume`, D-170) + the persisted
+     *  `%AAB_ProfileUser` name (DA-018). `name` defaults "Default" (D-014(c)) and survives `clear()`. */
+    private class FakeBaselineStore(
+        var stored: AabSettings? = null,
+        var name: String = "Default",
+    ) : ContextBaselineStore {
         override suspend fun snapshot(): AabSettings? = stored
         override suspend fun save(baseline: AabSettings) { stored = baseline }
         override suspend fun clear() { stored = null }
+        override suspend fun userProfileName(): String = name
+        override suspend fun setUserProfileName(name: String) { this.name = name }
     }
 
     private data class EngineHarness(
@@ -901,6 +907,58 @@ class ContextEngineTest {
         advanceUntilIdle()
         assertEquals(3, h.settings.value.minBrightness, "the unchanged no-match eval restores the stale snapshot")
         assertNull(stale.stored, "and clears it")
+        h.scope.cancel()
+    }
+
+    // --- DA-018: Resume context automation runs a genuine evaluation + reverts to %AAB_ProfileUser ---
+
+    @Test
+    fun resumeContextAutomation_appliesCurrentlyMatchingRuleImmediately_DA018() = runTest {
+        // DA-018 (owner report "the rule is not immediately applied"): Resume must run a GENUINE
+        // evaluation (Tasker _ContextResume → evaluate contexts → Set Initial Brightness), so a rule
+        // matching the current environment applies AT ONCE. The old REAPPLY path only republished the
+        // unlocked settings, so a matching rule didn't apply until the next signal change.
+        val src = FakeSignalSource(app = "com.netflix.mediaclient") // the Cinema (Video Streaming) rule matches
+        // The Resume banner appears in the manual-lock state: start latched.
+        val h = engine(listOf(videoStreamingRule), src, baseline = baseline.copy(contextOverride = true))
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertNull(h.engine.activeContext.value, "the manual lock suppresses the rule before Resume")
+
+        // ProfileApplier clears the lock in the store first, then the service runs this on the engine.
+        h.settings.value = h.settings.value.copy(contextOverride = false)
+        h.engine.resumeContextAutomation()
+        advanceUntilIdle()
+
+        assertEquals("Cinema", h.engine.activeContext.value, "Resume applies the matching rule immediately")
+        assertEquals(true, h.engine.effectiveSettings().dimmingEnabled, "the rule's profile is written through (D-170)")
+        h.scope.cancel()
+    }
+
+    @Test
+    fun resumeContextAutomation_noMatch_revertsToUserProfileNotDefault_DA018() = runTest {
+        // DA-018 (owner report "settings screens are still stale"): with no rule matching, Resume must
+        // label the active profile as %AAB_ProfileUser (the last manually-loaded profile), NOT the
+        // hardcoded "Default" — so the indicator agrees with the write-through settings the pipeline
+        // runs (D-170). Under the old resolver fallback the label flipped to "Default" while the live
+        // store kept the loaded profile, which read as stale.
+        LiveRuntimeState.reset()
+        val src = FakeSignalSource(app = "com.other.app") // no rule matches
+        val h = engine(
+            listOf(videoStreamingRule), src,
+            baselineStore = FakeBaselineStore(name = "Outdoors"), // %AAB_ProfileUser = last manual load
+        )
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        // A manual load would have pinned the loaded profile's label; prove Resume re-derives it.
+        LiveRuntimeState.setActiveProfile("Movie Night")
+
+        h.engine.resumeContextAutomation()
+        advanceUntilIdle()
+
+        assertNull(h.engine.activeContext.value, "no rule matches → no active context")
+        assertEquals("Outdoors", LiveRuntimeState.activeProfile.value, "reverts to %AAB_ProfileUser, not Default")
+        assertEquals(baseline, h.engine.effectiveSettings(), "no snapshot → the live store is unchanged")
         h.scope.cancel()
     }
 

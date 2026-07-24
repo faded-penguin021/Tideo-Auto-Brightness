@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.settings
 
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
+import com.tideo.autobrightness.app.runtime.AmbientMonitoringService
 import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.storage.userProfilesDataStore
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -74,6 +76,48 @@ class ProfileApplierTest {
         applier.applyProfile("Battery Saver")
 
         assertNull(store.snapshot(), "a manual profile load drops the pre-override snapshot (D-170)")
+    }
+
+    @Test
+    fun applyProfile_recordsUserProfileName_DA018() = runBlocking {
+        // DA-018: a manual load is now %AAB_ProfileUser — the last manually-loaded profile, the target a
+        // later Resume / no-match reverts to. The NAME is persisted so the resolver fallback + the
+        // active-profile label match the loaded settings instead of collapsing to "Default".
+        seed(AabSettings(serviceEnabled = false))
+        val store = DataStoreContextBaselineStore(app.contextBaselineDataStore)
+
+        applier.applyProfile("Battery Saver")
+
+        assertEquals("Battery Saver", store.userProfileName(), "a manual load records %AAB_ProfileUser (DA-018)")
+    }
+
+    @Test
+    fun resumeContextAutomation_routesToResumeContextAction_DA018() = runBlocking {
+        // DA-018: Resume drives the genuine re-evaluation verb (evaluate(RESUME) → Set Initial
+        // Brightness), NOT plain REAPPLY (which only republishes and left the store pinned to the loaded
+        // profile). serviceEnabled=true so the action is emitted.
+        seed(AabSettings(serviceEnabled = true, contextOverride = true))
+
+        applier.resumeContextAutomation()
+
+        val intent = shadowOf(app).nextStartedService
+        assertEquals(
+            AmbientMonitoringService.ACTION_RESUME_CONTEXT,
+            intent.action,
+            "Resume must run a real context re-evaluation, not a republish-only REAPPLY",
+        )
+    }
+
+    @Test
+    fun resumeContextAutomation_leavesUserProfileNameIntact_DA018() = runBlocking {
+        // Resume reverts TO %AAB_ProfileUser, so it must not overwrite it (only a manual load sets it).
+        seed(AabSettings(serviceEnabled = false, contextOverride = true))
+        val store = DataStoreContextBaselineStore(app.contextBaselineDataStore)
+        store.setUserProfileName("Outdoors")
+
+        applier.resumeContextAutomation()
+
+        assertEquals("Outdoors", store.userProfileName(), "Resume leaves %AAB_ProfileUser unchanged (DA-018)")
     }
 
     @Test

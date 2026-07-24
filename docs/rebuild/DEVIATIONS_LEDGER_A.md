@@ -473,3 +473,38 @@
   root SSID strategy shares the theoretical on-device stall; bound them the same way if a
   field report ever implicates them. `[cited]`: ForceDarkController.kt `rootExec` kdoc + its
   test's hermeticity comment cite DA-017.
+
+- DA-018 [cited]: "Resume context automation" now runs a GENUINE context evaluation and reverts to
+  `%AAB_ProfileUser` = the last manually-loaded profile (owner-reported bug + owner decision, 2026-07-24).
+  **Report:** pressing the Profiles "Resume" banner showed the active profile flip to "Default" (no rule
+  matching), but the matching rule wasn't applied and the parameter screens stayed on the loaded profile
+  — indicator and settings diverged. **Two root causes.** (1) The Resume path
+  (`ProfileApplier.resumeContextAutomation` → `AutoBrightnessRuntime.reapply` → service `ACTION_REAPPLY`)
+  only called `ContextEngine.reevaluate()` (a republish of the freshly-unlocked settings) + `reapply()`;
+  it never ran the resolver. Screen-on ("resume context automation", `onScreenOn`) worked ONLY because it
+  additionally calls `contextEngine.onScreenOn()` → a real `evaluate(TIME)`. Owner-confirmed Tasker flow:
+  `_ContextResume` → **evaluate contexts** → **Set Initial Brightness**. Fix: a dedicated
+  `ACTION_RESUME_CONTEXT` verb (`AutoBrightnessRuntime.resumeContext`) whose service handler runs
+  `contextEngine.resumeContextAutomation()` (= `reevaluate()` then `evaluate(RESUME)`, cooldown 0 / no
+  PASS-2 veto) THEN `controller.reapply()` (Set Initial Brightness). Same D-140 not-running gate as
+  REAPPLY. (2) The resolver's no-match fallback (`ContextOverrideResolver.userProfile`) was the hardcoded
+  `ContextEngine` default `"Default"` (AppModule never wired it, D-014(c)), so on a no-match the
+  active-profile label was set to "Default" even though the live store (D-170 write-through) still held
+  the manually-loaded profile — the divergence. Fix (Tasker parity, contexts_spec §4 "reverts to
+  `%AAB_ProfileUser`"): persist `%AAB_ProfileUser` = the last manually-loaded profile NAME in
+  `ContextBaseline` (store 9, schema v1→v2, `userProfileName`, survives snapshot `clear()`);
+  `ProfileApplier.applyProfile` records it; the engine reads it per-eval as the resolver fallback + the
+  `APP_CHANGED` "non-baseline profile" reference (replaced the removed `userProfileName` ctor param);
+  Resume leaves it intact (it reverts TO it). Net: a currently-matching rule applies on Resume at once,
+  and a no-match labels the active profile as `%AAB_ProfileUser` — matching the write-through settings the
+  pipeline runs (D-170 unchanged: the loaded profile stays the live baseline; only the label/fallback name
+  was wrong). **Deferred:** import (`SettingsViewModel.replaceAll`) still doesn't set `%AAB_ProfileUser`
+  (its name is saved separately by the screen); a later Resume after an import falls back to the prior
+  `%AAB_ProfileUser`. Not the reported path; noted for a follow-up if it surfaces. Tests:
+  `ContextEngineTest` ×2 `_DA018` (matching rule applies on resume; no-match reverts to `%AAB_ProfileUser`
+  not "Default"), `ProfileApplierTest` ×3 `_DA018` (records the name / routes to the resume verb / leaves
+  the name intact), `AmbientMonitoringServiceTest` (RESUME_CONTEXT D-140 not-running gate),
+  `DataStoreSchemaVersionTest` (context-baseline v2). `[cited]`: `ContextEngine.kt`
+  (`resumeContextAutomation` + resolver fallback), `ProfileApplier.kt`, `AutoBrightnessRuntime.kt`
+  (`resumeContext`), `AmbientMonitoringService.kt` (`ACTION_RESUME_CONTEXT`), `ContextBaselineStore.kt`
+  (`userProfileName`) cite DA-018.

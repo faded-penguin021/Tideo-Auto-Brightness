@@ -92,6 +92,13 @@ zero-`pending`; parity tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Chang
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-24 — **DA-018** (owner-reported field bug): "Resume context automation" only republished
+  (`ContextEngine.reevaluate` + reapply) — never ran the resolver — so a matching rule didn't apply and
+  the active-profile label flipped to the hardcoded "Default" while the write-through settings kept the
+  loaded profile (indicator/settings diverged). Fix: a dedicated `ACTION_RESUME_CONTEXT` verb runs a
+  genuine `evaluate(RESUME)` then Set Initial Brightness (Tasker `_ContextResume` flow), and the resolver
+  fallback is now the persisted `%AAB_ProfileUser` = last manually-loaded profile (`ContextBaseline` v2,
+  `userProfileName`). Rides on the train tip; folds into the pending 1.8.0/vc18.
 - 2026-07-24 — **CI hang root-caused + fixed (DA-017)** (PR #91, two red runs):
   `ForceDarkControllerTest` spawned the runner's real `su`, whose password prompt blocked
   `rootExec`'s unbounded stdout read forever (named by run 2's jstack step; run 1's

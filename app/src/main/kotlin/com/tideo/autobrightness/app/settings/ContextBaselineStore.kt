@@ -19,21 +19,39 @@ import kotlinx.serialization.json.Json
  * taken once, on the baseline→override transition; rule→rule switches keep it. It is cleared when
  * the revert restores it — and by any manual "these settings are now authoritative" moment (manual
  * profile load / Resume via [ProfileApplier]), mirroring task626 re-snapshotting the live var set.
+ *
+ * [userProfileName] is the persisted NAME of `%AAB_ProfileUser` — the user's baseline profile, which
+ * is the last profile the user loaded by hand (DA-018 / contexts_spec §4). It is the no-match revert
+ * TARGET (`ContextOverrideResolver.userProfile`), so it must survive the snapshot's shorter lifecycle
+ * (a snapshot `clear()` must NOT reset the name). Defaults `"Default"` (D-014(c)); a manual load
+ * updates it via [setUserProfileName].
  */
 interface ContextBaselineStore {
     suspend fun snapshot(): AabSettings?
     suspend fun save(baseline: AabSettings)
     suspend fun clear()
+
+    /** `%AAB_ProfileUser` — the user's baseline profile name (the last manually-loaded profile). */
+    suspend fun userProfileName(): String
+
+    /** Record `%AAB_ProfileUser` (a manual profile load, DA-018). Independent of the snapshot. */
+    suspend fun setUserProfileName(name: String)
 }
 
-/** On-disk wrapper for the [ContextBaselineStore] snapshot. */
+/** On-disk wrapper for the [ContextBaselineStore] snapshot + the persisted `%AAB_ProfileUser` name. */
 @Serializable
 data class ContextBaseline(
     val schemaVersion: Int = SCHEMA_VERSION,
     val snapshot: AabSettings? = null,
+    // DA-018: the last manually-loaded profile name (`%AAB_ProfileUser`), the no-match revert target.
+    // Persisted alongside the snapshot (this record IS the "%AAB_ProfileUser revert file", D-170) but
+    // outliving it — snapshot clears leave this untouched. Defaults "Default" (D-014(c)).
+    val userProfileName: String = "Default",
 ) {
     companion object {
-        const val SCHEMA_VERSION = 1
+        // v2 (DA-018): added userProfileName. Additive + ignoreUnknownKeys → v1 files decode with the
+        // "Default" default (no migration hook reads this constant).
+        const val SCHEMA_VERSION = 2
     }
 }
 
@@ -63,10 +81,16 @@ class DataStoreContextBaselineStore(
     private val store: DataStore<ContextBaseline>,
 ) : ContextBaselineStore {
     override suspend fun snapshot(): AabSettings? = store.data.first().snapshot
+    // DA-018: `copy` (not a fresh ContextBaseline) so the snapshot save/clear preserves the persisted
+    // %AAB_ProfileUser name — the name outlives the snapshot's baseline→override→revert lifecycle.
     override suspend fun save(baseline: AabSettings) {
-        store.updateData { ContextBaseline(snapshot = baseline) }
+        store.updateData { it.copy(snapshot = baseline) }
     }
     override suspend fun clear() {
-        store.updateData { ContextBaseline(snapshot = null) }
+        store.updateData { it.copy(snapshot = null) }
+    }
+    override suspend fun userProfileName(): String = store.data.first().userProfileName
+    override suspend fun setUserProfileName(name: String) {
+        store.updateData { it.copy(userProfileName = name) }
     }
 }
