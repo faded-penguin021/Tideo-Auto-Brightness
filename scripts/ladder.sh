@@ -24,8 +24,9 @@
 #   5. D-citation integrity (D-173): every D-/DA-/DB-NNN cited in app/ domain/ platform/
 #      .github/ sources must resolve to a row in its ledger file; ledger row numbers must be
 #      unique; the rows' [cited] markers must match the citation set both ways (D-174).
-#      6. F-Droid changelog cap (D-173): the CURRENT versionCode's
-#      fastlane changelog must be <= 500 bytes (RUNBOOK §6; F-Droid flags longer whatsNew).
+#      6. F-Droid changelog cap (D-173, char count DA-019): the CURRENT versionCode's
+#      fastlane changelog must be <= 500 CHARACTERS (codepoints, not bytes — RUNBOOK §6;
+#      F-Droid flags a longer whatsNew by string length, so a multibyte note may exceed 500 B).
 #   2. D-115 skip-ci token scan over unmerged commit messages (origin/main..HEAD) — the
 #      same fixed-string token set release-preflight.yml enforces at PR time. Catching a
 #      token BEFORE push matters here: force-push is forbidden (CLAUDE.md git rules), so a
@@ -204,21 +205,26 @@ stale=$(comm -13 <(printf '%s\n' $cited | grep . | sort -u) <(printf '%s\n' $mar
 [ -z "$stale" ] || fail "ledger row(s) marked [cited] but no longer cited anywhere in scope: $(echo $stale) — remove the marker, or restore the lost citation (D-174)"
 echo "LADDER: D-citations OK ($(echo "$cited" | grep -c . || true) distinct, all resolve; [cited] markers in sync; no duplicate ledger rows)"
 
-# --- guard 6: F-Droid changelog cap (D-173) ---
-# RUNBOOK §6: changelogs/<versionCode>.txt must stay under 500 characters (whole file, wc -c)
-# or F-Droid's code-quality scan flags the whatsNew. Only the CURRENT versionCode's file is
-# checked — it is the one the next tag ships; historical files (e.g. the pre-rule 9.txt,
-# 1158 B) are shipped facts, not actionable. Existence is release-preflight.yml's job (it
-# knows whether the PR ships app code); this guard only rejects an oversize file.
+# --- guard 6: F-Droid changelog cap (D-173; char count DA-019) ---
+# RUNBOOK §6: changelogs/<versionCode>.txt must stay under 500 CHARACTERS (whole file incl. the
+# trailing newline) or F-Droid's code-quality scan flags the whatsNew. F-Droid measures string
+# LENGTH (codepoints), not bytes, so this counts characters — a note with multibyte glyphs
+# (em dashes, accents, emoji) may run past 500 bytes while still under the real 500-char limit.
+# Codepoint count, locale-independent: strip UTF-8 continuation bytes (0x80-0xBF) with LC_ALL=C
+# tr, then wc -c the remainder — one byte survives per codepoint (the lead byte / any ASCII byte).
+# Only the CURRENT versionCode's file is checked — it is the one the next tag ships; historical
+# files (e.g. the pre-rule 9.txt) are shipped facts, not actionable. Existence is
+# release-preflight.yml's job (it knows whether the PR ships app code); this guard only rejects
+# an oversize file.
 vc=$(grep -oE 'versionCode[[:space:]]*=[[:space:]]*[0-9]+' app/build.gradle.kts 2>/dev/null \
   | grep -oE '[0-9]+' | head -1 || true)
 if [ -n "$vc" ] && [ -f "fastlane/metadata/android/en-US/changelogs/${vc}.txt" ]; then
   cl="fastlane/metadata/android/en-US/changelogs/${vc}.txt"
-  cl_bytes=$(wc -c < "$cl" | tr -d '[:space:]')
-  if [ "$cl_bytes" -gt 500 ]; then
-    fail "$cl is ${cl_bytes} B — over the 500-char F-Droid whatsNew cap (RUNBOOK §6). Shorten it."
+  cl_chars=$(LC_ALL=C tr -d '\200-\277' < "$cl" | wc -c | tr -d '[:space:]')
+  if [ "$cl_chars" -gt 500 ]; then
+    fail "$cl is ${cl_chars} chars — over the 500-char F-Droid whatsNew cap (RUNBOOK §6). Shorten it."
   fi
-  echo "LADDER: F-Droid changelog OK ($cl, ${cl_bytes} B <= 500)"
+  echo "LADDER: F-Droid changelog OK ($cl, ${cl_chars} chars <= 500)"
 fi
 
 # --- guard 7: rule-review tripwire (DA-006; WARN-only, local-only — skipped under

@@ -508,3 +508,20 @@
   (`resumeContextAutomation` + resolver fallback), `ProfileApplier.kt`, `AutoBrightnessRuntime.kt`
   (`resumeContext`), `AmbientMonitoringService.kt` (`ACTION_RESUME_CONTEXT`), `ContextBaselineStore.kt`
   (`userProfileName`) cite DA-018.
+
+- DA-019: F-Droid changelog guard counts CHARACTERS, not bytes (owner-instructed correction of
+  D-173, 2026-07-24). D-173's ladder guard 6 measured the changelog with `wc -c` (bytes) while its
+  own message + RUNBOOK §6 said "500 characters" — a prose/guard unit-drift (the DA-004 lockstep bug
+  class). F-Droid's code-quality scan caps the `whatsNew` by string LENGTH (codepoints), so a note
+  with multibyte glyphs (em dashes, accents, emoji) could exceed 500 bytes while under the real
+  500-char limit and false-fail the guard (and the RUNBOOK's `wc -c` advice overcounted the same
+  way). Fix: guard 6 now counts codepoints, locale-independent — `LC_ALL=C tr -d '\200-\277' < file
+  | wc -c` strips UTF-8 continuation bytes (0x80-0xBF), leaving one byte per codepoint (lead byte /
+  ASCII byte); message + OK line report "chars". Prose synced: RUNBOOK §6 (the `wc -c` advice
+  replaced with the codepoint recipe), the guard-6 header comment, and the agent-agnostic
+  `AGENTIC_HARNESS_PROMPT.md` {{DOMAIN_GUARDS}} example (mind-the-unit note). Fixtures
+  (`test-ladder-guards.sh`) gain two multibyte cases: 250 em dashes (750 B / 250 chars) must PASS,
+  501 em dashes (1503 B / 501 chars) must FAIL — the ASCII 500/501 cases stay. Rule-review
+  (DA-005): in-context (this session cannot spawn a fresh reviewer under the no-subagent harness
+  directive); owner directed the change and is the arbiter. `19.txt` (this release) is 302 chars,
+  unaffected. `[cited]`: none (guard/prose only; no production code cites DA-019).
