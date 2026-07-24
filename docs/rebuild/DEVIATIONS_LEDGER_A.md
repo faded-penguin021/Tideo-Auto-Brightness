@@ -525,3 +525,23 @@
   (DA-005): in-context (this session cannot spawn a fresh reviewer under the no-subagent harness
   directive); owner directed the change and is the arbiter. `19.txt` (this release) is 302 chars,
   unaffected. `[cited]`: none (guard/prose only; no production code cites DA-019).
+
+- DA-020 [cited]: Ko-fi support link (owner-requested, 2026-07-24) — a Tideo-only addition with **no Tasker
+  source** (RUNBOOK playbook 5). Two surfaces, both owner-chosen: `.github/FUNDING.yml`
+  (`ko_fi: fadedpenguin021`) drives the repo's Sponsor button — GitHub reads that file, the
+  Settings > Features > Sponsorships toggle only governs GitHub Sponsors itself, so there is no
+  settings-only way to do it; and an About-screen "Support development" card whose OutlinedButton
+  (`testTag about_support_kofi`) launches `ACTION_VIEW` on the URL. The URL lives in a
+  `translatable="false"` string (`about_support_url`) so translators cannot break the link, and the
+  launch is wrapped in `catch (ActivityNotFoundException)` → `AabFlash` showing the URL: a device
+  with no browser, or a work profile that blocks the cross-profile intent, throws rather than
+  no-ops, and an unguarded `startActivity` would crash the About screen. The intent also carries
+  `FLAG_ACTIVITY_NEW_TASK` — glue-review catch: a non-Activity host context throws
+  `AndroidRuntimeException`, which that catch clause would NOT cover. Declined for now (owner):
+  README badge/support section and the F-Droid `Donate:` metadata field (the latter is an MR
+  against `fdroiddata`, not this repo — available later without touching the app). Copy states the
+  app is free/ad-free/no-telemetry and that nothing is paywalled, keeping F-Droid's
+  no-`NonFreeNet`/no-anti-feature posture intact — it is a link, not an in-app payment path. Tests:
+  `ScreensInfoA11yTest` — the existing a11y-labeled + heading gates now cover the card ("Support
+  development" heading), plus `about_supportButtonInvokesCallback` (the button routes to the host's
+  launcher rather than a dead onClick). `[cited]`: `AboutScreen.kt` cites DA-020.

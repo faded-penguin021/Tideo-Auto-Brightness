@@ -24,11 +24,10 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 ## Current state
 
-**Shipped: v1.8.0** (vc18, on `main` via PR #91 — intent control, a11y + crash-log, IME, audit,
-force dark, curve-wizard sort fix, D-156…D-176 + DA-001…DA-017). **Code-complete, awaiting owner
-release: 1.8.1 / vc19** — the **DA-018** Resume-context fix + **DA-019** changelog char-count guard
-(this session), **PR #92 open** (base `main`, head `claude/resume-context-automation-stale-e0mw73`).
-Owner on-device-verified the Resume fix. Patch bump; F-Droid changelog `19.txt` added. No other
+**Shipped: v1.8.1** (vc19, tagged — PR #92 merged: the DA-018 Resume-context fix + DA-019 changelog
+char-count guard; v1.8.0/vc18 before it). **Code-complete, awaiting owner release: 1.8.2 / vc20** —
+**DA-020** Ko-fi support link (this session): `.github/FUNDING.yml` Sponsor button + the About-screen
+support card. Patch bump; F-Droid changelog `20.txt` added. No other
 active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
 tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 `DEVIATIONS_LEDGER.md` (live `_A.md`).
@@ -41,19 +40,25 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 > findings** = owner on-device results. Items leave when done/answered/triaged (delete + record
 > as a Changelog line or D-row). Final chat message restates this queue.
 
-**Pending owner actions (the 1.8.1 release path):**
+**Pending owner actions (the 1.8.2 release path):**
 
-1. **Squash-merge PR #92** (1.8.1 / vc19, DA-018 + DA-019) once CI is green — the body becomes the
-   squash commit; no `[skip ci]`-class tokens (D-115).
-2. Cut **v1.8.1 / vc19** from `main` via the Release UI — tag `v1.8.1`; release.yml builds + signs
+1. Merge this session's branch (`claude/ko-fi-integration-3midbd`, 1.8.2 / vc20, DA-020) once CI is
+   green — no PR opened yet (none requested); the PR body becomes the squash commit, no
+   `[skip ci]`-class tokens (D-115).
+2. Cut **v1.8.2 / vc20** from `main` via the Release UI — tag `v1.8.2`; release.yml builds + signs
    the tagged commit; F-Droid `UpdateCheckMode: Tags` auto-builds the update.
+3. **Optional, owner-only:** add `Donate: https://ko-fi.com/fadedpenguin021` to the app's
+   `fdroiddata` metadata (a merge request there, not this repo) if the F-Droid listing should show
+   the link too — declined for this change, available any time.
 
-**Open questions:** (none)
+**Open questions:**
+
+- **Semver call for DA-020** — cut as **patch** (1.8.2): the About card adds no capability or
+  setting. If you read a new visible card as a user-facing feature, say so and it becomes 1.9.0 /
+  vc20 (versionCode unchanged either way) before the tag is cut.
 
 **Incoming findings:**
 
-- 2026-07-24 — Owner on-device-verified the **DA-018** Resume fix (Tests A + B in
-  `RESUME_CONTEXT_TEST.md`): "Confirmed that it works." No regressions reported.
 - 2026-07-24 — Owner confirmed the **server-side rails (DA-006)** are now enabled on GitHub
   (`main` branch protection + secret-scanning push protection) — closes the carried 1.8.0 item.
 
@@ -87,6 +92,11 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-24 — **DA-020** (owner-requested, no Tasker source): Ko-fi support link on two surfaces —
+  `.github/FUNDING.yml` (`ko_fi: fadedpenguin021`, drives the repo Sponsor button; GitHub reads the
+  file, not a settings toggle) and an About-screen "Support development" card whose button opens the
+  page via `ACTION_VIEW`, guarded against `ActivityNotFoundException` (flashes the URL instead of
+  crashing). README badge + F-Droid `Donate:` metadata declined by the owner for now.
 - 2026-07-24 — **DA-018** (owner-reported field bug): "Resume context automation" only republished
   (`ContextEngine.reevaluate` + reapply) — never ran the resolver — so a matching rule didn't apply and
   the active-profile label flipped to the hardcoded "Default" while the write-through settings kept the

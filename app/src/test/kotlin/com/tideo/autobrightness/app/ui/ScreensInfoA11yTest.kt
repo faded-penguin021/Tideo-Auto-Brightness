@@ -62,16 +62,26 @@ class ScreensInfoA11yTest {
 
     @Test
     fun about_allInteractiveNodesAreLabeled() {
-        compose.setContent { MaterialTheme { AboutContent(version = "1.8.0", onBack = {}) } }
+        compose.setContent { MaterialTheme { AboutContent(version = "1.8.0", onBack = {}, onSupport = {}) } }
         compose.assertAllInteractiveNodesAreLabeled()
     }
 
     @Test
     fun about_sectionHeadersAreHeadings() {
-        compose.setContent { MaterialTheme { AboutContent(version = "1.8.0", onBack = {}) } }
+        compose.setContent { MaterialTheme { AboutContent(version = "1.8.0", onBack = {}, onSupport = {}) } }
         compose.assertHeadingExists("About & License")
         compose.assertHeadingExists("Acknowledgments")
+        compose.assertHeadingExists("Support development")
         compose.assertHeadingExists("MIT License")
+    }
+
+    /** DA-020: the Ko-fi button is present and routes to the host's URL launcher, not a dead onClick. */
+    @Test
+    fun about_supportButtonInvokesCallback() {
+        var supported = 0
+        compose.setContent { MaterialTheme { AboutContent(version = "1.8.0", onBack = {}, onSupport = { supported++ }) } }
+        compose.onNodeWithTag("about_support_kofi").performScrollTo().performClick()
+        kotlin.test.assertEquals(1, supported)
     }
 
     // --- User Guide ------------------------------------------------------------------------------
