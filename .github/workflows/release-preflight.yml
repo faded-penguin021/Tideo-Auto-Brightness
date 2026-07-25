@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: release-preflight-${{ github.ref }}
@@ -28,7 +27,7 @@ concurrency:
 jobs:
   preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # pure shell + gh, runs in seconds; cap a hung gh call
+    timeout-minutes: 10  # pure shell + local git diff/log; runs in seconds
     steps:
       - name: Checkout (full history + tags)
         uses: actions/checkout@v5
@@ -50,12 +49,15 @@ jobs:
       # ---------------------------------------------------------------------------------------------
       - name: Guard against skip-ci tokens (D-115)
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          gh pr view "$PR" --json title,commits \
-            --jq '.title, (.commits[] | .messageHeadline, (.messageBody // ""))' > pr_text.txt
+          {
+            printf '%s\n' "$PR_TITLE"
+            git log --format='%s%n%b' "$BASE_SHA..$HEAD_SHA"
+          } > pr_text.txt
           # GitHub honors all of these on push/pull_request events.
           TOKENS=('[skip ci]' '[ci skip]' '[no ci]' '[skip actions]' '[actions skip]' '***NO_CI***')
           found=0
@@ -82,12 +84,13 @@ jobs:
       # ---------------------------------------------------------------------------------------------
       - name: Golden fixtures immutable unless STATE.md justifies (D-162)
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          if ! FILES=$(gh pr view "$PR" --json files --jq '.files[].path' 2>/dev/null) || [ -z "$FILES" ]; then
-            echo "::warning::Could not list changed files; skipping the golden-fixture gate."
+          FILES=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          if [ -z "$FILES" ]; then
+            echo "No changed files found; skipping the golden-fixture gate."
             exit 0
           fi
           golden=false state=false
@@ -118,13 +121,14 @@ jobs:
       - name: Classify PR (ships app code?)
         id: classify
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          if ! FILES=$(gh pr view "$PR" --json files --jq '.files[].path' 2>/dev/null) || [ -z "$FILES" ]; then
-            echo "::warning::Could not list changed files; enforcing the release-prep gate to be safe."
-            echo "ships=true" >> "$GITHUB_OUTPUT"
+          FILES=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          if [ -z "$FILES" ]; then
+            echo "No changed files found; release-prep gate skipped."
+            echo "ships=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "Changed files:"; printf '  %s\n' $FILES

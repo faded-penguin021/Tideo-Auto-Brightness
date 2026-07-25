@@ -1,0 +1,4 @@
+# Drives the repository's "Sponsor" button (GitHub reads this file — there is no settings
+# toggle for third-party platforms). Ko-fi is Tideo's only funding channel; the app itself
+# ships no paid features, ads, or telemetry.
+ko_fi: fadedpenguin021

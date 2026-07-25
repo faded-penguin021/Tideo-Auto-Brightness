@@ -24,11 +24,10 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 ## Current state
 
-**Shipped: v1.8.0** (vc18, on `main` via PR #91 — intent control, a11y + crash-log, IME, audit,
-force dark, curve-wizard sort fix, D-156…D-176 + DA-001…DA-017). **Code-complete, awaiting owner
-release: 1.8.1 / vc19** — the **DA-018** Resume-context fix + **DA-019** changelog char-count guard
-(this session), **PR #92 open** (base `main`, head `claude/resume-context-automation-stale-e0mw73`).
-Owner on-device-verified the Resume fix. Patch bump; F-Droid changelog `19.txt` added. No other
+**Shipped: v1.8.1** (vc19, tagged — PR #92 merged: the DA-018 Resume-context fix + DA-019 changelog
+char-count guard; v1.8.0/vc18 before it). **No release pending** — this session's branch is
+docs/repo-surface only (DA-020→DA-022 funding links, DA-021 triage #7); `app/`, `domain/`, and
+`platform/` are byte-identical to `main`, so vc20 stays unassigned for the next real release. No other
 active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
 tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 `DEVIATIONS_LEDGER.md` (live `_A.md`).
@@ -41,19 +40,16 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 > findings** = owner on-device results. Items leave when done/answered/triaged (delete + record
 > as a Changelog line or D-row). Final chat message restates this queue.
 
-**Pending owner actions (the 1.8.1 release path):**
+**Pending owner actions:**
 
-1. **Squash-merge PR #92** (1.8.1 / vc19, DA-018 + DA-019) once CI is green — the body becomes the
-   squash commit; no `[skip ci]`-class tokens (D-115).
-2. Cut **v1.8.1 / vc19** from `main` via the Release UI — tag `v1.8.1`; release.yml builds + signs
-   the tagged commit; F-Droid `UpdateCheckMode: Tags` auto-builds the update.
+1. Merge this session's branch (`claude/ko-fi-integration-3midbd`) once CI is green — no PR opened
+   yet (none requested); the PR body becomes the squash commit, no `[skip ci]`-class tokens (D-115).
+   **No release follows** — docs/repo-surface only, no version bump, nothing to tag.
 
 **Open questions:** (none)
 
 **Incoming findings:**
 
-- 2026-07-24 — Owner on-device-verified the **DA-018** Resume fix (Tests A + B in
-  `RESUME_CONTEXT_TEST.md`): "Confirmed that it works." No regressions reported.
 - 2026-07-24 — Owner confirmed the **server-side rails (DA-006)** are now enabled on GitHub
   (`main` branch protection + secret-scanning push protection) — closes the carried 1.8.0 item.
 
@@ -78,6 +74,14 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
   per-playbook split; XML tags in the constitution; STATE compression commit-or-ledger gate.
 - **Triage #6 (2026-07-22, DA-015):** owner-decisions-per-change KPI (Goodharts against
   discipline 7; kept as P0 design orientation only); orphan-provenance `[cited]` extension.
+- **Triage #7 (2026-07-24, DA-021) — "Claude 5 context engineering" blog rules:** no harness
+  change, no CLAUDE.md rewrite. Progressive disclosure / interface-over-examples / principle-based
+  guidance are already the design; the imperative bulk here is **policy rails** (git, secrets,
+  ledger, ladder), not the capability constraints that post says to delete. Auto-memory ≠ STATE.md
+  (shared, guard-checked artifact). Skills declined on D-176 agent-neutrality (`.claude/` forks the
+  constitution per-agent). RUNBOOK per-playbook split stays declined (DA-013) — external content is
+  not new evidence. Carried awareness, no action: Opus 5 over-verifies when instructed to verify
+  (glue-review/rule-review stay — real catch history) and delegates to subagents more readily.
 - **Privileged Display (D-150–D-152):** per-toggle orthogonal scheduling (D-151 pivot);
   persisted last-applied seed (revisit on real reports); QS tile / notification grayscale
   action; refresh-rate forcing / OEM alternate keys (D-048/D-149); manual Extra-Dim toggle
@@ -87,6 +91,14 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-25 — **DA-023** (PR #93 CI): release-preflight no longer calls the GitHub CLI/API to read PR title/commits/files; it derives the same data from the checked-out full-history repository (`github.event.pull_request.*` SHAs + local `git log`/`git diff`) so docs-only PRs are not blocked by repeated GitHub API/internal-server failures.
+- 2026-07-24 — **DA-021** (triage #7, owner-asked): assessed the "Claude 5 context engineering"
+  rules against this harness — verdict no change (detail in the decided non-item above).
+- 2026-07-24 — **DA-020 → DA-022** (owner-requested, then owner-reversed pre-release): Ko-fi funding
+  is a **repo-side surface only** — `.github/FUNDING.yml` (`ko_fi: fadedpenguin021`, drives the repo
+  Sponsor button; GitHub reads the file, not a settings toggle) plus a shields.io badge in the README
+  badge row. The About-screen support card, its strings/test, the 1.8.2/vc20 bump and `20.txt` were
+  all reverted to match `main`; no in-app donation link and no F-Droid `Donate:` field ship.
 - 2026-07-24 — **DA-018** (owner-reported field bug): "Resume context automation" only republished
   (`ContextEngine.reevaluate` + reapply) — never ran the resolver — so a matching rule didn't apply and
   the active-profile label flipped to the hardcoded "Default" while the write-through settings kept the

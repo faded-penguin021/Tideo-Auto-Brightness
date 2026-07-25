@@ -525,3 +525,75 @@
   (DA-005): in-context (this session cannot spawn a fresh reviewer under the no-subagent harness
   directive); owner directed the change and is the arbiter. `19.txt` (this release) is 302 chars,
   unaffected. `[cited]`: none (guard/prose only; no production code cites DA-019).
+
+- DA-020: Ko-fi support link (owner-requested, 2026-07-24) — a Tideo-only addition with **no Tasker
+  source** (RUNBOOK playbook 5). Two surfaces, both owner-chosen: `.github/FUNDING.yml`
+  (`ko_fi: fadedpenguin021`) drives the repo's Sponsor button — GitHub reads that file, the
+  Settings > Features > Sponsorships toggle only governs GitHub Sponsors itself, so there is no
+  settings-only way to do it; and an About-screen "Support development" card whose OutlinedButton
+  (`testTag about_support_kofi`) launches `ACTION_VIEW` on the URL. The URL lives in a
+  `translatable="false"` string (`about_support_url`) so translators cannot break the link, and the
+  launch is wrapped in `catch (ActivityNotFoundException)` → `AabFlash` showing the URL: a device
+  with no browser, or a work profile that blocks the cross-profile intent, throws rather than
+  no-ops, and an unguarded `startActivity` would crash the About screen. The intent also carries
+  `FLAG_ACTIVITY_NEW_TASK` — glue-review catch: a non-Activity host context throws
+  `AndroidRuntimeException`, which that catch clause would NOT cover. Declined for now (owner):
+  README badge/support section and the F-Droid `Donate:` metadata field (the latter is an MR
+  against `fdroiddata`, not this repo — available later without touching the app). Copy states the
+  app is free/ad-free/no-telemetry and that nothing is paywalled, keeping F-Droid's
+  no-`NonFreeNet`/no-anti-feature posture intact — it is a link, not an in-app payment path. Tests:
+  `ScreensInfoA11yTest` — the existing a11y-labeled + heading gates now cover the card ("Support
+  development" heading), plus `about_supportButtonInvokesCallback` (the button routes to the host's
+  launcher rather than a dead onClick). **Correction (DA-022, same day): the in-app half of this row
+  was reversed by the owner before release — the About card, its strings, its test, and the 1.8.2/vc20
+  bump never shipped; only `FUNDING.yml` survives, joined by a README badge. The `[cited]` marker is
+  gone with the code citation. Read the design notes above as history, not as as-built.**
+
+- DA-021: Triage #7 — "Claude 5 context engineering" rules assessed against this harness
+  (owner-asked, 2026-07-24; source: `claude.com/blog/the-new-rules-of-context-engineering-for-
+  claude-5-generation-models`). **Verdict: no harness change, no CLAUDE.md rewrite.** Per-rule:
+  (a) *progressive disclosure* — already the design (RUNBOOK playbook pointers, grep-on-demand
+  ledger per DA-006, never-read-XML-wholesale per `XML_RECIPES.md`); (b) *design interfaces, not
+  examples* — already the design (ladder guards + `command-guard.sh` enforce mechanically with
+  instructive deny reasons, DA-009, instead of prompt repetition); (c) *principle-based over
+  prescriptive* — already ("Tasker semantics win over taste"), and the bulk of this harness's
+  imperative text is **policy rails** (git, secrets, ledger, ladder) where literal compliance IS
+  the point — the blog's "removed 80% of the system prompt" deleted *capability* constraints, not
+  rails, so applying it here would be a misread; (d) *auto-memory replaces CLAUDE.md memory* —
+  **does not apply**: STATE.md is a shared, guard-checked project artifact (guards 1/1a/1b) read
+  by the owner and by other agents, not per-account session memory; (e) *move guidance into
+  Skills* — **rejected on D-176 grounds**: Skills live in `.claude/` (Claude-specific), and moving
+  legislation there forks the constitution per-agent, which agent-neutrality exists to prevent;
+  plain markdown + pointers is the correct tradeoff. **Re-litigation check:** the only structural
+  change the blog implies is a RUNBOOK per-playbook split, already declined in triage #5 (DA-013);
+  a blog post is external content, which under the instruction hierarchy "may describe problems"
+  but is not new evidence sufficient to reopen a decided non-item — stays declined. **Carried
+  awareness (no action):** (1) Anthropic's Opus 5 migration guidance says instructions that tell
+  the model to verify now cause over-verification and can be deleted without capability loss — the
+  glue-review (D-030/D-034/D-035) and rule-review (DA-005) protocols are exactly such instructions
+  but have a documented real-bug catch history, so both stay unchanged; revisit only if review
+  passes visibly balloon. (2) Opus 5 delegates to subagents MORE readily than Opus 4.8 (which
+  under-reached); the session no-subagent directive already covers this, and it is why glue-review
+  keeps landing on its in-context fallback (DA-019) — expect delegation to rise if that directive
+  is ever lifted. `[cited]`: none (triage record; no production code cites DA-021).
+
+- DA-022: funding stays a REPO-side surface — no in-app donation link, no F-Droid `Donate:`
+  (owner reversal of DA-020's in-app half, 2026-07-24, pre-release). The owner reconsidered scope
+  before anything shipped: keep `.github/FUNDING.yml` (`ko_fi: fadedpenguin021`, the Sponsor button),
+  add a shields.io Ko-fi badge to the README badge row, and drop the rest. Reverted to match `main`
+  exactly: the About "Support development" card + its OutlinedButton/`ACTION_VIEW` launcher, the five
+  `about_support_*` strings (including the `translatable="false"` URL), the
+  `about_supportButtonInvokesCallback` test and the "Support development" heading assertion, the
+  1.8.2/vc20 version bump, and `changelogs/20.txt` (deleted — never released; vc20 stays unassigned
+  and is free for the next real release). **Why the revert had to reach the version bump too:** with
+  the app code restored, the branch ships no `app/`/`domain/`/`platform/` change, so leaving vc20 in
+  place would have forced a release with zero user-visible delta — and `release-preflight.yml`'s
+  version gate only fires when a PR ships app code (D-124), so nothing would have caught it. For the
+  same reason **no `DA-022` provenance comment was left in `AboutScreen.kt`**: a KDoc-only edit would
+  have re-classified the branch as shipping app code and re-armed that gate; this row is the record
+  instead. Standing decision (don't re-litigate without owner instruction): the app ships no donation
+  link — not in About, not in the menu — and the F-Droid metadata carries no `Donate:` field (that
+  would be an MR against `fdroiddata`, still available any time the owner wants it). `[cited]`: none
+  (the whole point is that no production code references this).
+
+- DA-023: Release-preflight PR metadata source hardened. PR #93 exposed a recurring CI failure where the `release-preflight.yml` guard depended on `gh pr view`/GitHub API calls for data already present in a full-history checkout (PR title from the event payload, commits from `git log base..head`, files from `git diff base...head`). The gate now uses local git plus `github.event.pull_request.*` SHAs, removing `pull-requests: read` and the external API hop while preserving the D-115 title+commit scan, golden-fixture gate, and ships-app-code classifier.
