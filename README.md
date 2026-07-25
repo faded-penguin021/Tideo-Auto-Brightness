@@ -9,6 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![minSdk](https://img.shields.io/badge/minSdk-31-success)](https://developer.android.com/about/versions/12)
 [![Kotlin](https://img.shields.io/badge/Kotlin-Compose-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/fadedpenguin021)
 
 **A glass-box replacement for Android's adaptive brightness.** You taught Android your brightness
 preferences and it is *still* wrong. Tideo replaces the opaque on-device machine learning with deterministic,

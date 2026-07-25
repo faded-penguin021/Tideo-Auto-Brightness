@@ -1,1 +1,0 @@
-Adds a "Support development" card to the About screen with a link to the project's Ko-fi page. Tideo stays free, open source, ad-free, and collects nothing — no feature is locked behind it.

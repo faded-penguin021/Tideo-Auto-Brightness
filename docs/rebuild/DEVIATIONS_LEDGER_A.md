@@ -526,7 +526,7 @@
   directive); owner directed the change and is the arbiter. `19.txt` (this release) is 302 chars,
   unaffected. `[cited]`: none (guard/prose only; no production code cites DA-019).
 
-- DA-020 [cited]: Ko-fi support link (owner-requested, 2026-07-24) — a Tideo-only addition with **no Tasker
+- DA-020: Ko-fi support link (owner-requested, 2026-07-24) — a Tideo-only addition with **no Tasker
   source** (RUNBOOK playbook 5). Two surfaces, both owner-chosen: `.github/FUNDING.yml`
   (`ko_fi: fadedpenguin021`) drives the repo's Sponsor button — GitHub reads that file, the
   Settings > Features > Sponsorships toggle only governs GitHub Sponsors itself, so there is no
@@ -544,7 +544,10 @@
   no-`NonFreeNet`/no-anti-feature posture intact — it is a link, not an in-app payment path. Tests:
   `ScreensInfoA11yTest` — the existing a11y-labeled + heading gates now cover the card ("Support
   development" heading), plus `about_supportButtonInvokesCallback` (the button routes to the host's
-  launcher rather than a dead onClick). `[cited]`: `AboutScreen.kt` cites DA-020.
+  launcher rather than a dead onClick). **Correction (DA-022, same day): the in-app half of this row
+  was reversed by the owner before release — the About card, its strings, its test, and the 1.8.2/vc20
+  bump never shipped; only `FUNDING.yml` survives, joined by a README badge. The `[cited]` marker is
+  gone with the code citation. Read the design notes above as history, not as as-built.**
 
 - DA-021: Triage #7 — "Claude 5 context engineering" rules assessed against this harness
   (owner-asked, 2026-07-24; source: `claude.com/blog/the-new-rules-of-context-engineering-for-
@@ -573,3 +576,22 @@
   under-reached); the session no-subagent directive already covers this, and it is why glue-review
   keeps landing on its in-context fallback (DA-019) — expect delegation to rise if that directive
   is ever lifted. `[cited]`: none (triage record; no production code cites DA-021).
+
+- DA-022: funding stays a REPO-side surface — no in-app donation link, no F-Droid `Donate:`
+  (owner reversal of DA-020's in-app half, 2026-07-24, pre-release). The owner reconsidered scope
+  before anything shipped: keep `.github/FUNDING.yml` (`ko_fi: fadedpenguin021`, the Sponsor button),
+  add a shields.io Ko-fi badge to the README badge row, and drop the rest. Reverted to match `main`
+  exactly: the About "Support development" card + its OutlinedButton/`ACTION_VIEW` launcher, the five
+  `about_support_*` strings (including the `translatable="false"` URL), the
+  `about_supportButtonInvokesCallback` test and the "Support development" heading assertion, the
+  1.8.2/vc20 version bump, and `changelogs/20.txt` (deleted — never released; vc20 stays unassigned
+  and is free for the next real release). **Why the revert had to reach the version bump too:** with
+  the app code restored, the branch ships no `app/`/`domain/`/`platform/` change, so leaving vc20 in
+  place would have forced a release with zero user-visible delta — and `release-preflight.yml`'s
+  version gate only fires when a PR ships app code (D-124), so nothing would have caught it. For the
+  same reason **no `DA-022` provenance comment was left in `AboutScreen.kt`**: a KDoc-only edit would
+  have re-classified the branch as shipping app code and re-armed that gate; this row is the record
+  instead. Standing decision (don't re-litigate without owner instruction): the app ships no donation
+  link — not in About, not in the menu — and the F-Droid metadata carries no `Donate:` field (that
+  would be an MR against `fdroiddata`, still available any time the owner wants it). `[cited]`: none
+  (the whole point is that no production code references this).

@@ -25,9 +25,9 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 ## Current state
 
 **Shipped: v1.8.1** (vc19, tagged — PR #92 merged: the DA-018 Resume-context fix + DA-019 changelog
-char-count guard; v1.8.0/vc18 before it). **Code-complete, awaiting owner release: 1.8.2 / vc20** —
-**DA-020** Ko-fi support link (this session): `.github/FUNDING.yml` Sponsor button + the About-screen
-support card. Patch bump; F-Droid changelog `20.txt` added. No other
+char-count guard; v1.8.0/vc18 before it). **No release pending** — this session's branch is
+docs/repo-surface only (DA-020→DA-022 funding links, DA-021 triage #7); `app/`, `domain/`, and
+`platform/` are byte-identical to `main`, so vc20 stays unassigned for the next real release. No other
 active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
 tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 `DEVIATIONS_LEDGER.md` (live `_A.md`).
@@ -40,22 +40,13 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 > findings** = owner on-device results. Items leave when done/answered/triaged (delete + record
 > as a Changelog line or D-row). Final chat message restates this queue.
 
-**Pending owner actions (the 1.8.2 release path):**
+**Pending owner actions:**
 
-1. Merge this session's branch (`claude/ko-fi-integration-3midbd`, 1.8.2 / vc20, DA-020) once CI is
-   green — no PR opened yet (none requested); the PR body becomes the squash commit, no
-   `[skip ci]`-class tokens (D-115).
-2. Cut **v1.8.2 / vc20** from `main` via the Release UI — tag `v1.8.2`; release.yml builds + signs
-   the tagged commit; F-Droid `UpdateCheckMode: Tags` auto-builds the update.
-3. **Optional, owner-only:** add `Donate: https://ko-fi.com/fadedpenguin021` to the app's
-   `fdroiddata` metadata (a merge request there, not this repo) if the F-Droid listing should show
-   the link too — declined for this change, available any time.
+1. Merge this session's branch (`claude/ko-fi-integration-3midbd`) once CI is green — no PR opened
+   yet (none requested); the PR body becomes the squash commit, no `[skip ci]`-class tokens (D-115).
+   **No release follows** — docs/repo-surface only, no version bump, nothing to tag.
 
-**Open questions:**
-
-- **Semver call for DA-020** — cut as **patch** (1.8.2): the About card adds no capability or
-  setting. If you read a new visible card as a user-facing feature, say so and it becomes 1.9.0 /
-  vc20 (versionCode unchanged either way) before the tag is cut.
+**Open questions:** (none)
 
 **Incoming findings:**
 
@@ -102,11 +93,11 @@ One line per shipped change (newest first); detail in the D-rows and git history
 
 - 2026-07-24 — **DA-021** (triage #7, owner-asked): assessed the "Claude 5 context engineering"
   rules against this harness — verdict no change (detail in the decided non-item above).
-- 2026-07-24 — **DA-020** (owner-requested, no Tasker source): Ko-fi support link on two surfaces —
-  `.github/FUNDING.yml` (`ko_fi: fadedpenguin021`, drives the repo Sponsor button; GitHub reads the
-  file, not a settings toggle) and an About-screen "Support development" card whose button opens the
-  page via `ACTION_VIEW`, guarded against `ActivityNotFoundException` (flashes the URL instead of
-  crashing). README badge + F-Droid `Donate:` metadata declined by the owner for now.
+- 2026-07-24 — **DA-020 → DA-022** (owner-requested, then owner-reversed pre-release): Ko-fi funding
+  is a **repo-side surface only** — `.github/FUNDING.yml` (`ko_fi: fadedpenguin021`, drives the repo
+  Sponsor button; GitHub reads the file, not a settings toggle) plus a shields.io badge in the README
+  badge row. The About-screen support card, its strings/test, the 1.8.2/vc20 bump and `20.txt` were
+  all reverted to match `main`; no in-app donation link and no F-Droid `Donate:` field ship.
 - 2026-07-24 — **DA-018** (owner-reported field bug): "Resume context automation" only republished
   (`ContextEngine.reevaluate` + reapply) — never ran the resolver — so a matching rule didn't apply and
   the active-profile label flipped to the hardcoded "Default" while the write-through settings kept the
