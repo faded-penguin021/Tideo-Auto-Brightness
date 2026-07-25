@@ -91,6 +91,7 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-25 — **DA-023** (PR #93 CI): release-preflight no longer calls the GitHub CLI/API to read PR title/commits/files; it derives the same data from the checked-out full-history repository (`github.event.pull_request.*` SHAs + local `git log`/`git diff`) so docs-only PRs are not blocked by repeated GitHub API/internal-server failures.
 - 2026-07-24 — **DA-021** (triage #7, owner-asked): assessed the "Claude 5 context engineering"
   rules against this harness — verdict no change (detail in the decided non-item above).
 - 2026-07-24 — **DA-020 → DA-022** (owner-requested, then owner-reversed pre-release): Ko-fi funding

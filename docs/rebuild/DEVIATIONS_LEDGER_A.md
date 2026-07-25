@@ -595,3 +595,5 @@
   link — not in About, not in the menu — and the F-Droid metadata carries no `Donate:` field (that
   would be an MR against `fdroiddata`, still available any time the owner wants it). `[cited]`: none
   (the whole point is that no production code references this).
+
+- DA-023: Release-preflight PR metadata source hardened. PR #93 exposed a recurring CI failure where the `release-preflight.yml` guard depended on `gh pr view`/GitHub API calls for data already present in a full-history checkout (PR title from the event payload, commits from `git log base..head`, files from `git diff base...head`). The gate now uses local git plus `github.event.pull_request.*` SHAs, removing `pull-requests: read` and the external API hop while preserving the D-115 title+commit scan, golden-fixture gate, and ships-app-code classifier.
