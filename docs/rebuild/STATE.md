@@ -24,15 +24,19 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 ## Current state
 
-**Shipped: v1.8.1** (vc19, tagged). **Release pending: 1.8.2 / vc20**, cut on this branch: the AGP
-bump changes the shipped APK, so RUNBOOK §6 required the bump (patch — internal/packaging, no
-behavior change); `changelogs/20.txt` written. Train tip `claude/badge-workflow-verify-77m62f`
-(DA-025); this branch is cut from it and carries **AGP 8.7.3 → 8.13.2** (DA-026) + the **F-Droid
-compatibility CI** (DA-027/DA-028, green on real infrastructure), open as **PR #96** — the owner is
-keeping this branch as the base for the next fix/feature. Two hardening changes are folded into the
-same train (DA-029 bounded profile import, DA-030 sticky-restart gate), so vc20 is **no longer a
-packaging-only release** — it carries `app/` source; `changelogs/20.txt` says so. `domain/` and
-`platform/` are still byte-identical to 1.8.1. At the tag: the one-shot DA-026 reproducibility check (RUNBOOK playbook 6) must not be
+**Shipped: v1.8.1** (vc19, tagged). **Release pending: 1.8.2 / vc20** (patch), cut on the train
+branch `claude/gradle-deprecation-fdroid-870gh3`: the AGP bump changes the shipped APK, so RUNBOOK §6
+required it. Train tip `claude/badge-workflow-verify-77m62f` (DA-025) → `…-870gh3`, which carries
+**AGP 8.7.3 → 8.13.2** (DA-026) + the **F-Droid compatibility CI** (DA-027/DA-028, green on real
+infrastructure) and is open as **PR #96 → `main`** — the owner is keeping it as the base for the
+next fix/feature. **Stacked on it: PR #99** (`claude/fold-prs-97-98-cdi4dp` → `…-870gh3`), which
+folds the two concept PRs #97/#98 in as DA-029 (bounded profile import) + DA-030 (sticky-restart
+gate); #97/#98 are superseded and close unmerged. So vc20 is **no longer a packaging-only release** —
+it carries `app/` source and `changelogs/20.txt` says so; `domain/` and `platform/` are still
+byte-identical to 1.8.1. Merge order is #99 into the train branch first, then #96 squash-merges the
+whole train — **PR #96's body still describes the AGP-only diff and must be updated to the net
+`origin/main..HEAD` payload before that squash (DA-002).** At the tag: the one-shot DA-026
+reproducibility check (RUNBOOK playbook 6) must not be
 skipped — 1.8.2 is the first release under the new AGP — and the DA-024 store icon lands with it.
 No other active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity tests green;
 TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
@@ -48,9 +52,12 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 **Pending owner actions:**
 
-1. Squash-merge **PR #96** (`claude/gradle-deprecation-fdroid-870gh3` → `main`) once CI is green,
-   then **cut 1.8.2 / vc20** from the GitHub "Draft a new release" UI. The bump is already in the
-   branch, so the release is just tag + publish.
+1. Merge **PR #99** (`claude/fold-prs-97-98-cdi4dp` → `claude/gradle-deprecation-fdroid-870gh3`)
+   once CI is green, close **#97/#98** unmerged (superseded — their commits are contained in #99),
+   then **rewrite PR #96's body** to describe the net `origin/main..HEAD` train (it currently claims
+   "No `app/`/`domain/`/`platform/` source change", which #99 makes false — and the body becomes the
+   squash commit, DA-002). Then squash-merge **PR #96** → `main` and **cut 1.8.2 / vc20** from the
+   GitHub "Draft a new release" UI. The bump is already in the branch, so the release is tag + publish.
 2. **At that tagged release (one-shot, DA-026):** after `release.yml` publishes, check F-Droid's
    build log for that versionCode reports `...successfully verified`. First release under AGP 8.13.2,
    so it is the first time F-Droid rebuilds our signed APK on the new toolchain — pre-verified in
