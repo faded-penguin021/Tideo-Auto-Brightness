@@ -637,3 +637,44 @@
   fallback-value parameter, so the alternatives were a hand-maintained static badge (drifts
   immediately) or no badge at all — a transiently-red badge that becomes correct on its own is the
   cheaper trade. `[cited]`: none (README only; no production code path).
+
+- DA-026: **AGP 8.7.3 → 8.13.2** (owner-approved after a verification run, 2026-07-28). Trigger: the
+  F-Droid buildserver log for vc19 closed with "Deprecated Gradle features were used in this build,
+  making it incompatible with Gradle 9.0", alongside its louder sibling "This Android Gradle plugin
+  (8.7.3) was tested up to compileSdk = 35" (we build 36). `--warning-mode all` localizes the first
+  precisely: **three** deprecations, all inside AGP itself — `ApplicationVariantImpl`
+  `.isWearAppUnbundled`, `BuildType.isUseProguard`, `BuildType$AgpDecorated.isCrunchPngs`, one rule
+  (Groovy "is-"-prefixed Boolean properties, dropped in Gradle 9). **No repo script contributes one**,
+  so no local edit removes them — only an AGP bump does. Nothing forced the date either: F-Droid runs
+  `gradlew-fdroid`, which took 8.14.3 **from our own `distributionUrl`**, so Gradle 9 could never
+  arrive uninvited. The bump was made anyway, early and deliberately, because for a
+  reproducible-build app the risk of a toolchain change is cashed at the **next tagged release** — a
+  cheaper place to spend it is a quiet maintenance branch, not inside a release.
+  **Verified in F-Droid's own pipeline, not by inspection.** The `registry.gitlab.com/fdroid/`
+  `fdroidserver:buildserver` image (the environment that produced the log) was run locally against
+  both AGP versions via its real entry point, `/usr/local/bin/gradlew-fdroid assembleRelease` from
+  `app/`, with its `/opt/android-sdk` and JDK 21. One accommodation: the container has no direct
+  egress, so the Gradle 8.14.3 distribution was pre-seeded into `gradlew-fdroid`'s cache **after**
+  its SHA-256 was matched against *both* gradle.org's published checksum and F-Droid's
+  gradle-transparency-log entry (`bd711022…`) — i.e. exactly the check the script performs, not a
+  bypass of it. **The rig validated itself:** at 8.7.3 it reproduced the pasted log (same two warning
+  classes, same `84 actionable tasks`) and its APK is content-identical to the **published v1.8.1
+  binary** — 119 zip entries, every CRC equal — which is F-Droid's own "successfully verified"
+  verdict, re-derived locally. At 8.13.2 in that same image: BUILD SUCCESSFUL, **both warning classes
+  gone**, `lintVitalRelease` green (a release-only gate the ladder's `lintDebug` rung never exercises),
+  and F-Droid auto-installed build-tools 35.0.0 instead of 34.0.0 with no fuss. **Reproducibility
+  measured, not assumed:** the F-Droid image and the dev environment — different distro, different JDK
+  patch build (Debian 21.0.11 vs Ubuntu 21.0.10), different build-tools — emitted an APK with
+  *identical whole-file SHA-256* (`d85cb90b…`), which is stronger than the content equality F-Droid
+  actually requires. Delta against shipped 1.8.1 is **4 entries**: `classes.dex`, `classes2.dex`,
+  `assets/dexopt/baseline.prof`, `.profm` — new D8 + profile generator; resources, manifest and native
+  libs are CRC-unchanged. The narrow delta is partly structural: this app sets no `minifyEnabled`/
+  proguard config, so R8's optimizer — the usual source of cross-version dex churn — is not in play.
+  **Residual risk, stated rather than papered over:** (1) the GitHub Actions runner is a *third*
+  environment, never exercised here — two dissimilar environments agreeing byte-for-byte is strong
+  evidence a third agrees, not proof; (2) no emulator exists in CI, so new-D8 dex is behaviorally
+  covered only by the JVM/Robolectric ladder plus lint — on-device remains owner-verified as always.
+  Both fold into one release-time obligation, written into RUNBOOK playbook 6: on the **first tagged
+  release after this bump**, confirm F-Droid's reproducible-build comparison passed before treating
+  the toolchain as settled. AGP 9.x was not considered a candidate — it is a migration (Gradle 9,
+  built-in Kotlin), not a version bump. `[cited]`: none (build tooling; no production code path).

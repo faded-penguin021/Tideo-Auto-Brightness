@@ -24,13 +24,14 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 ## Current state
 
-**Shipped: v1.8.1** (vc19, tagged — PR #92 merged: the DA-018 Resume-context fix + DA-019 changelog
-char-count guard; v1.8.0/vc18 before it). **No release pending** — this session's branch is
-docs/repo-surface + F-Droid metadata only (DA-020→DA-022 funding links, DA-021 triage #7, DA-024
-store icon); `app/`, `domain/`, and
-`platform/` are byte-identical to `main`, so vc20 stays unassigned for the next real release.
-The DA-024 store icon reaches F-Droid only when it builds the **next tagged release**. No other
-active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
+**Shipped: v1.8.1** (vc19, tagged; v1.8.0/vc18 before it). **No release pending** — no version bump on
+this branch, so vc20 stays unassigned for the next real release. The branch train tip is
+`claude/badge-workflow-verify-77m62f` (DA-025 badges); this session's branch is cut from it and adds
+the **AGP 8.7.3 → 8.13.2** bump (DA-026) — build tooling only, no `app/`/`domain/`/`platform/` source
+change, but it *does* change the next release's APK (`classes*.dex` + baseline profile), which makes
+the DA-026 release-time reproducibility check in RUNBOOK playbook 6 the one thing that must not be
+skipped at the next tag. The DA-024 store icon likewise reaches F-Droid only at that **next tagged
+release**. No other active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
 tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
@@ -44,14 +45,11 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 **Pending owner actions:**
 
-1. Squash-merge **PR #95** (`claude/fdroid-store-icon-missing-fp9721` → `main`, cut from `main` at
-   13de281 — the previous train landed as PR #93) once CI is green; opened from the Claude Code UI,
-   body already describes the net `origin/main..HEAD` diff and is `[skip ci]`-clean (D-115).
-   **No release follows on
-   its own** — docs + F-Droid metadata only, no version bump, nothing to tag. But note the payoff is
-   release-gated: the DA-024 store icon shows up in F-Droid clients only after F-Droid builds the
-   **next tagged release**, so it rides along with whatever ships next rather than fixing 1.8.1's
-   listing.
+1. **At the next tagged release (one-shot, DA-026):** after `release.yml` publishes, check F-Droid's
+   build log for that versionCode reports `...successfully verified`. First release under AGP 8.13.2,
+   so it is the first time F-Droid rebuilds our signed APK on the new toolchain — pre-verified in
+   their own buildserver image, but never on the GitHub Actions runner. Full bullet + what a mismatch
+   does (and does not) mean in RUNBOOK playbook 6; delete both once one release lands green.
 
 **Open questions:** (none)
 
@@ -98,6 +96,16 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-28 — **DA-026** (owner-asked, from the vc19 F-Droid build log): **AGP 8.7.3 → 8.13.2**.
+  The log's "incompatible with Gradle 9.0" notice is three deprecations *inside AGP*, none from our
+  scripts, and F-Droid takes its Gradle version from our own `distributionUrl` — so nothing forced the
+  date; the bump was taken early on purpose, since a toolchain change cashes its risk at the next
+  release. Verified in F-Droid's own `fdroidserver:buildserver` image via its real
+  `gradlew-fdroid assembleRelease` entry point (Gradle seed checksum-matched to gradle.org *and* the
+  F-Droid transparency log): at 8.7.3 the rig reproduces the pasted log and the published v1.8.1 APK
+  content (119/119 CRCs); at 8.13.2 both warning classes vanish, `lintVitalRelease` passes, and the
+  F-Droid image and dev env emit an **identical whole-file SHA-256** APK. Delta vs 1.8.1 is 4 entries
+  (2 dex + baseline profile). Release-time re-verify obligation in RUNBOOK playbook 6 + Owner queue.
 - 2026-07-28 — **DA-025** (owner-started, verified + finished this session): README badge row now
   distinguishes the two download sources — `Downloads (GitHub)` (live: 326) and a new
   `Downloads (F-Droid)` (shields `dynamic/json` over the `kitswas/fdroid-metrics-dashboard`

@@ -173,6 +173,16 @@ so check it explicitly.
   `docs/rebuild/design/store_icon.svg`. No guard enforces the lockstep (the incident-only bar, DA-015:
   the drift itself hasn't happened yet); this bullet is the check. The icon only reaches the store
   when F-Droid builds a **new tagged release** — an existing release's listing never backfills.
+- **⚠️ One-time, next release only — confirm F-Droid still reproduces (DA-026).** The AGP 8.7.3 →
+  8.13.2 bump changes `classes*.dex` and the baseline profile, so the **first tagged release after
+  it** is the first time F-Droid rebuilds our GitHub-signed APK under the new toolchain. It was
+  verified in F-Droid's own buildserver image before shipping (byte-identical APK across two
+  environments), but the GitHub Actions runner was never the environment under test. After that
+  release builds, check the F-Droid build log reports `...successfully verified` /
+  `compared built binary to supplied reference binary successfully` for the new versionCode. If it
+  instead reports a mismatch, the app is **not** delisted — F-Droid simply doesn't publish that
+  version — and the fix is a repo-side determinism fix, not a rollback of the release. **Delete this
+  bullet once one release has verified green**; it is a one-shot check, not standing process.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
   process, a `DEVIATIONS_LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
   (D-127): the history lives in `STATE.md`, the ledger, the fastlane changelogs, and git — the gradle
