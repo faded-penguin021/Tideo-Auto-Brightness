@@ -1,6 +1,10 @@
 package com.tideo.autobrightness.app.settings
 
 import androidx.test.core.app.ApplicationProvider
+import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.io.InputStream
+import kotlinx.coroutines.runBlocking
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
@@ -18,6 +22,17 @@ class ProfileLoadResultTest {
     private val manager = ProfileImportExportManager(ApplicationProvider.getApplicationContext())
 
     @Test
+    fun `normal app export imports through bounded reader`() = runBlocking {
+        val name = "bounded-reader-round-trip"
+        manager.exportToAppPrivate(name, AabSettings(minBrightness = 17))
+
+        val result = manager.importFromAppPrivate(name)
+
+        assertTrue(result is ProfileLoadResult.Success)
+        assertEquals(17, result.settings.minBrightness)
+    }
+
+    @Test
     fun `our export format is a Success`() {
         // The app's own export wraps settings in an AabProfilePayload { schemaVersion, settings }.
         val payload = """{ "schemaVersion": 3, "settings": { "minBrightness": 7 } }"""
@@ -29,10 +44,53 @@ class ProfileLoadResultTest {
     @Test
     fun `a Tasker nested config is a LegacyFallback`() {
         val taskerConfig = """{ "general": { "z1_end": 50.0 } }"""
-        val result = manager.decodePayload(taskerConfig)
+        val result = manager.readAndDecode(ByteArrayInputStream(taskerConfig.encodeToByteArray()))
         assertTrue(result is ProfileLoadResult.LegacyFallback, "expected LegacyFallback, got $result")
         assertEquals(50, (result as ProfileLoadResult.LegacyFallback).settings.zone1End)
         assertTrue(result.jsonError.isNotEmpty(), "the JSON error should be recorded")
+    }
+
+    @Test
+    fun `input exactly at encoded limit is accepted by the reader`() {
+        val prefix = """{ "schemaVersion": 3, "settings": { "minBrightness": 19 } }"""
+        val bytes = prefix.padEnd(ProfileImportExportManager.MAX_ENCODED_PROFILE_BYTES).encodeToByteArray()
+
+        val result = manager.readAndDecode(ByteArrayInputStream(bytes))
+
+        assertTrue(result is ProfileLoadResult.Success)
+        assertEquals(19, result.settings.minBrightness)
+    }
+
+    @Test
+    fun `input one byte over encoded limit is rejected`() {
+        val bytes = ByteArray(ProfileImportExportManager.MAX_ENCODED_PROFILE_BYTES + 1) { ' '.code.toByte() }
+
+        assertEquals(ProfileLoadResult.TooLarge, manager.readAndDecode(ByteArrayInputStream(bytes)))
+    }
+
+    @Test
+    fun `absent and inaccurate declared sizes cannot bypass streaming bound`() {
+        val normal = """{ "schemaVersion": 3, "settings": { "minBrightness": 23 } }""".encodeToByteArray()
+        assertTrue(manager.readAndDecode(ByteArrayInputStream(normal), declaredSize = null) is ProfileLoadResult.Success)
+
+        val oversized = ByteArray(ProfileImportExportManager.MAX_ENCODED_PROFILE_BYTES + 1)
+        assertEquals(
+            ProfileLoadResult.TooLarge,
+            manager.readAndDecode(ByteArrayInputStream(oversized), declaredSize = 1),
+        )
+    }
+
+    @Test
+    fun `malformed UTF-8 and stream failures are typed read failures`() {
+        assertEquals(
+            ProfileLoadResult.ReadFailure,
+            manager.readAndDecode(ByteArrayInputStream(byteArrayOf(0xC3.toByte(), 0x28))),
+        )
+        val failingStream = object : InputStream() {
+            override fun read(): Int = throw IOException("private provider detail")
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = read()
+        }
+        assertEquals(ProfileLoadResult.ReadFailure, manager.readAndDecode(failingStream))
     }
 
     @Test

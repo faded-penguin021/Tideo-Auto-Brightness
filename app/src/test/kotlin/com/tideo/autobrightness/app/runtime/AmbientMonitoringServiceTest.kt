@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.storage.settingsDataStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,6 +23,113 @@ import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 class AmbientMonitoringServiceTest {
+
+    @Test
+    fun disabledStickyRestart_stopsWithoutStartingRuntimeOrWriters() {
+        val gate = CompletableDeferred<Unit>()
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            service.stickyRestartEnabledReader = { gate.await(); false }
+
+            service.onStartCommand(null, 0, 41)
+            assertNotNull(shadowOf(service).lastForegroundNotification, "FGS deadline is met while the gate waits")
+            assertEquals(0, service.runtimeStartCount, "no runtime component or writer may start before confirmation")
+
+            gate.complete(Unit)
+            waitUntil { shadowOf(service).isStoppedBySelf }
+            assertEquals(0, service.runtimeStartCount, "disabled restart must never reach runtime/writer startup")
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    @Test
+    fun enabledStickyRestart_startsRuntimeExactlyOnce() {
+        val gate = CompletableDeferred<Unit>()
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            service.stickyRestartEnabledReader = { gate.await(); true }
+            service.onStartCommand(null, 0, 42)
+
+            gate.complete(Unit)
+            waitUntil { service.runtimeStartCount == 1 }
+            assertEquals(1, service.runtimeStartCount)
+            assertFalse(shadowOf(service).isStoppedBySelf)
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    @Test
+    fun failedStickyRestartRead_failsClosedWithoutRuntimeStartup() {
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            service.stickyRestartEnabledReader = { error("unreadable settings") }
+
+            service.onStartCommand(null, 0, 46)
+            waitUntil { shadowOf(service).isStoppedBySelf }
+
+            assertEquals(0, service.runtimeStartCount)
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    @Test
+    fun destructionWhileStickyRestartGatePending_preventsLateRuntimeStartup() {
+        val readerReturned = CompletableDeferred<Unit>()
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        val service = controller.get()
+        service.stickyRestartEnabledReader = {
+            readerReturned.complete(Unit)
+            true
+        }
+        service.onStartCommand(null, 0, 43)
+
+        runBlocking { readerReturned.await() }
+        // The background read has completed, but its main-thread decision has not run. Destroy in
+        // precisely the cancel-after-last-suspension window that previously allowed late startup.
+        controller.destroy()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(0, service.runtimeStartCount, "destroy must cancel the gate before any runtime stop/write path")
+    }
+
+    @Test
+    fun explicitStartWhileStickyRestartGatePending_supersedesGateAndStartsOnce() {
+        val readerReturned = CompletableDeferred<Unit>()
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            service.stickyRestartEnabledReader = {
+                readerReturned.complete(Unit)
+                false
+            }
+            service.onStartCommand(null, 0, 44)
+            runBlocking { readerReturned.await() }
+
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 45)
+            assertEquals(1, service.runtimeStartCount, "trusted explicit starts retain synchronous semantics")
+            shadowOf(Looper.getMainLooper()).idle()
+
+            assertEquals(1, service.runtimeStartCount, "the cancelled sticky decision cannot start or stop again")
+            assertFalse(shadowOf(service).isStoppedBySelf)
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    private fun waitUntil(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 2_000
+        while (!condition() && System.currentTimeMillis() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        assertTrue(condition(), "asynchronous service transition timed out")
+    }
 
     @Test
     fun onStartCommand_postsForegroundNotification() {
@@ -144,12 +252,8 @@ class AmbientMonitoringServiceTest {
     // The positive path must survive the D-140 gate: once START has run the pipeline (serviceOn=true,
     // set synchronously by controller.start()), PAUSE and REAPPLY act on it and keep the service up.
     //
-    // ACTION_START falls into the service's `else` branch, whose D-140 START_STICKY defense fires a
-    // `scope.launch { if (!serviceEnabled) disableAndStop() }` on Dispatchers.Default (a background
-    // thread). With the DataStore left at its default `serviceEnabled=false` that guard could tear the
-    // service down mid-test, nondeterministically — a real race, not a test artifact. Seed
-    // `serviceEnabled=true` first (exactly what every explicit starter does in production, per the
-    // branch's own comment) so the guard is a no-op regardless of thread timing.
+    // ACTION_START is a trusted explicit command: its caller has already persisted serviceEnabled,
+    // and it deliberately bypasses the asynchronous null-intent sticky-restart gate.
     @Test
     fun pauseAndReapply_whilePipelineRunning_keepTheServiceUp() {
         val app = ApplicationProvider.getApplicationContext<Context>()

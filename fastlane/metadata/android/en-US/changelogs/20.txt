@@ -2,4 +2,6 @@ Maintenance release.
 
 Updated the Android build toolchain (Android Gradle Plugin 8.13.2), which clears the last build warnings and keeps future Gradle versions supported. Verified against F-Droid's own build image so the reproducible build is preserved.
 
-No change to how the app behaves: brightness curves, profiles, context rules and settings are all untouched.
+Importing a profile now reads the file safely and says so when it is too large or unreadable. A service restarted by the system stays off if you switched it off.
+
+Brightness curves, profiles and context rules are unchanged.
