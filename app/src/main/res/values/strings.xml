@@ -589,6 +589,8 @@
     <string name="toast_loaded_entry">Loaded %1$s</string>
     <string name="toast_load_failed_detail">Load failed: %1$s</string>
     <string name="profiles_unreadable">Couldn\'t read this profile. It isn\'t a Tideo export or a Tasker AAB config.</string>
+    <string name="profiles_too_large">This profile is too large to import.</string>
+    <string name="profiles_read_failed">Couldn\'t safely read this profile. Try selecting it again.</string>
 
     <!-- Profiles (body + dialogs) -->
     <string name="profiles_save_as">Save current settings as…</string>
