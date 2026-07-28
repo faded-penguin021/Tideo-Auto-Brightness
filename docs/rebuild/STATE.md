@@ -98,6 +98,13 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-28 — **DA-025** (owner-started, verified + finished this session): README badge row now
+  distinguishes the two download sources — `Downloads (GitHub)` (live: 326) and a new
+  `Downloads (F-Droid)` (shields `dynamic/json` over the `kitswas/fdroid-metrics-dashboard`
+  per-package JSON), each linked to its own source. The F-Droid badge currently renders
+  `resource not found`: the URL template is correct (proved by substituting a published package,
+  which returns a real count) — the app only landed on F-Droid today, so the dashboard's daily
+  cronjob has no data file for `com.tideo.autobrightness` yet. It self-heals with no repo change.
 - 2026-07-28 — README install surface: the official **"Get it on F-Droid" badge**
   (`f-droid.org/badge/get-it-on.png` — the owner-specified English asset; a shields.io variant was
   declined, and the `.svg` at the same path is the alternate) linking to

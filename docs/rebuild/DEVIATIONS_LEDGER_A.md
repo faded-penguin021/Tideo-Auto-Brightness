@@ -619,3 +619,21 @@
   (2) F-Droid regenerates listing metadata when it builds a **new tagged release**, so the icon
   appears at the next release, not retroactively on 1.8.1 — nothing to do on the owner's side but
   ship the next version. `[cited]`: none (metadata + docs only; no production code path).
+
+- DA-025: F-Droid downloads badge added to the README badge row, and the existing GitHub downloads
+  badge relabelled so the two are distinguishable at a glance — `Downloads (GitHub)`
+  (`shields.io/github/downloads/…/total`, live: 326) and `Downloads (F-Droid)` (shields.io
+  `dynamic/json` over `kitswas/fdroid-metrics-dashboard`'s `processed/total/`
+  `com.tideo.autobrightness.json`, `$.total_downloads`), each linking to its own source (Releases /
+  the F-Droid package page). Both labels are percent-encoded (`%28`/`%29`) so the parentheses cannot
+  terminate the Markdown image destination early. **The F-Droid badge renders
+  `Downloads (F-Droid): resource not found` today, and that is expected, not a malformed URL** — the
+  same URL with `app.organicmaps.json` substituted returns a real count (3 657 545), which isolates
+  the fault to the missing per-package JSON upstream. The app landed on F-Droid on 2026-07-28 (the
+  package page lists exactly one version, 1.8.1/vc19), so it has no download history for the
+  dashboard's daily cronjob to process yet; the badge self-heals with no repo change once that file
+  appears. If it is still 404 after a few weeks of the listing being live, the question is for the
+  dashboard upstream, not this repo. Deliberately not mitigated: shields' `dynamic/json` has no
+  fallback-value parameter, so the alternatives were a hand-maintained static badge (drifts
+  immediately) or no badge at all — a transiently-red badge that becomes correct on its own is the
+  cheaper trade. `[cited]`: none (README only; no production code path).

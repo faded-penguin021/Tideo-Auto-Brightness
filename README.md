@@ -5,7 +5,7 @@
 [![Build](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml/badge.svg)](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/faded-penguin021/tideo-auto-brightness?display_name=tag&sort=semver)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
 [![Downloads (GitHub)](https://img.shields.io/github/downloads/faded-penguin021/tideo-auto-brightness/total?logo=github)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
-![Downloads (F-Droid)](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2Fkitswas%2Ffdroid-metrics-dashboard%2Fraw%2Frefs%2Fheads%2Fmain%2Fprocessed%2Ftotal%2Fcom.tideo.autobrightness.json&query=%24.total_downloads&logo=fdroid&label=Downloads%20(all%20time))
+[![Downloads (F-Droid)](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2Fkitswas%2Ffdroid-metrics-dashboard%2Fraw%2Frefs%2Fheads%2Fmain%2Fprocessed%2Ftotal%2Fcom.tideo.autobrightness.json&query=%24.total_downloads&logo=fdroid&label=Downloads%20%28F-Droid%29)](https://f-droid.org/packages/com.tideo.autobrightness/)
 [![Stars](https://img.shields.io/github/stars/faded-penguin021/tideo-auto-brightness?logo=github)](https://github.com/faded-penguin021/tideo-auto-brightness/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![minSdk](https://img.shields.io/badge/minSdk-31-success)](https://developer.android.com/about/versions/12)
