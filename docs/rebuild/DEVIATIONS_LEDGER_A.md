@@ -718,3 +718,42 @@
   (no metadata-driven orchestration, no buildserver VM isolation), the real signing key is never
   involved, and F-Droid ultimately compares against the **release job's** APK — a third environment
   this never exercises. `[cited]`: none (CI + docs; no production code path).
+
+- DA-028 [cited]: **Adversarial pass on DA-027, and what it found** (owner-budgeted single pass,
+  2026-07-28). The pipeline shipped after a rule-review and hands-on local verification, and was
+  still wrong in ways that mattered — recorded here because the *pattern* is the lesson: every
+  defect below survived local verification precisely because local verification never exercised
+  GitHub's own plumbing. **A1 (the workflow could never have passed):** `upload-artifact` roots the
+  archive at the **least common ancestor** of its input paths, so uploading a deep
+  `app/build/outputs/apk/release/*.apk` together with a workspace-root log put the APK at
+  `normal/app/build/outputs/apk/release/…`, while every consumer read `normal/app-release.apk`.
+  Stages 3 and 4 failed on the first real run, exactly as predicted, and the CI log says it in
+  words: "Multiple search paths detected. Calculating the least common ancestor". DA-027's claim
+  that `compare` was "exercised in both polarities" was true and *irrelevant* — it was never run
+  against the artifact layout the workflow produces. Fixed by staging both jobs' outputs into one
+  flat `artifacts/` directory. **A2 (the release backstop was dead):** GitHub **ANDs** ref filters
+  with path filters on `push`, and a tag push carries no file diff, so `tags: ['v*']` + `paths:`
+  could never fire — while RUNBOOK, `FDROID_VALIDATION.md` and DA-027 all asserted "every `v*` tag"
+  as *the guarantee*. Fixed by dropping `paths:` from `push` (every `main` push now runs too;
+  accepted cost). **A4:** `if: failure()` is job-scoped, so an artifact-download or SDK-setup
+  failure emitted a confidently wrong annotation ("Two builds of this commit disagree…") — now
+  scoped per step id. **A3:** the multi-GB image pull got its own step so a disk failure cannot be
+  misreported as the project being incompatible. **B1/B2/B6 (fail-open):** `cmd_metadata` returned
+  0 on *any* exception (a 404 — recipe moved, app dropped — read as "outage"), and every recipe key
+  silently degraded to "skip", so an unparsed recipe printed "repository still satisfies the live
+  fdroiddata recipe" having verified nothing. Now: HTTP answers fail, only unreachability warns,
+  and an unparsable key is a failure — verified with a 404 URL and a keyless page, both rc=1.
+  **B3:** a malformed signing block returned the IDs found so far, failing open on exactly the
+  tampered framing the check exists for; now raises. **B4:** `0x1b93ad61` was mislabelled v4 (it is
+  v3.1; v4 lives in a separate `.idsig`). **B5:** the CRC map keyed a dict on filename, hiding
+  duplicate zip entries. Docs corrected where they overclaimed: the scanner does not catch the
+  D-137 blob (the stage table said it did), CRC32-per-entry is not "the same bytes", and the local
+  repro command is the workflow's *minus* its cache mounts. **Carried, unfixed:** the two-build
+  comparison may still false-alarm on build-tools skew between a hosted runner and the buildserver
+  image (no `buildToolsVersion` pin) — left unpinned until CI produces evidence, since pinning
+  changes the release build to fix a hypothetical. **Correction to DA-027:** its trailer says
+  "`[cited]`: none", which was wrong on arrival — `.github/` is inside ladder guard 5's scan scope
+  and the workflow header cites DA-027; the row's `[cited]` marker is correct and the trailer is
+  superseded by this sentence (ledger rows are append-only, so the error stays visible).
+  `[cited]`: `.github/workflows/fdroid-compat.yml` (artifact-staging and push-trigger comments),
+  `scripts/fdroid-check.py` (the fail-closed rationale comments).

@@ -66,10 +66,10 @@ reject.
 |---|---|---|
 | 2 — normal release build | the repo still builds a release APK cleanly, with no build-output cache to hide breakage; signs it with a throwaway runner-local key so the real AGP signing path runs | `Normal release build failed` |
 | 3 — F-Droid build | the project builds under fdroidserver's toolchain, and still produces an **unsigned** APK (F-Droid supplies no signing config) | `F-Droid compatibility validation failed` |
-| 3 — scanner | `fdroid scanner --exit-code` on the built APK: known non-free classes, extra signing blocks | `F-Droid scanner check failed` |
+| 3 — scanner | `fdroid scanner --exit-code` on the built APK: known non-free classes (it also inspects signing blocks, but see the note below — it does not flag the one that matters here) | `F-Droid scanner check failed` |
 | 3 — signing blocks | no unexpected APK Signing Block IDs — chiefly AGP's Play dependency-metadata blob `0x504b4453`, which `dependenciesInfo { … = false }` disables (D-137) | `Signing assumption check failed` |
 | 3 — metadata | the repo still satisfies the **live** fdroiddata recipe: `subdir` exists, the release asset name still matches `Binaries:`, `versionName` is still tag-shaped, `versionCode` has not gone backwards, no product flavors | `Metadata validation failed` |
-| 4 — reproducibility | the normal build and the F-Droid build of one commit contain the same bytes | `Reproducibility validation failed` |
+| 4 — reproducibility | every zip entry of the normal build and the F-Droid build of one commit matches by name and CRC32 (contents, not zip framing) | `Reproducibility validation failed` |
 
 The signing-block check earns its place empirically: `fdroid scanner` was run against a build with
 `dependenciesInfo` deliberately re-enabled and **did not flag it** (the blob is legal; it just
@@ -92,8 +92,10 @@ worse than none.
 - **No index or listing validation.** Whether the store page renders (icon, changelog, screenshots)
   is not checked here; the fastlane rules live in RUNBOOK playbook 6 and ladder guard 6.
 - **No on-device behavior.** There is no emulator in CI; behavior remains owner-verified.
-- **`metadata` and `scanner` need the network.** If gitlab.com is unreachable, `metadata` warns and
-  passes rather than failing on someone else's outage.
+- **`metadata` and `scanner` need the network.** If gitlab.com cannot be *reached*, `metadata`
+  warns and passes rather than failing on someone else's outage. An HTTP answer is different: a
+  404 (recipe moved, app dropped from fdroiddata) fails the check, and a recipe whose shape it can
+  no longer parse fails too, rather than passing having checked nothing.
 
 ## Reading a failure
 
@@ -119,6 +121,7 @@ with the command that reproduces it locally.
   docker run --rm -v "$PWD":/repo -w /repo/app \
     registry.gitlab.com/fdroid/fdroidserver:buildserver gradlew-fdroid assembleRelease
   ```
+  (This is the workflow's command without its two cache mounts, which only affect speed.)
 - **F-Droid scanner check failed** — fdroidserver's own scanner found something upstream rejects,
   typically a new dependency pulling in known non-free code or a binary committed to the repo.
   Needs `ANDROID_HOME` and build-tools on `PATH` for `dexdump`/`apksigner`:
@@ -151,13 +154,18 @@ with the command that reproduces it locally.
 
 ## When it runs, and what it costs
 
-Pull requests **and `main` pushes** touching `**/*.gradle.kts`, `gradle/**`, `gradle.properties`,
-`fastlane/metadata/**`, `scripts/fdroid-check.py`, `fdroid-compat.yml` or `release.yml`; every `v*`
-tag; and `workflow_dispatch` for anything else. Not every PR — the buildserver image is a multi-GB
-pull and the F-Droid build is a cold Gradle run, so it is far heavier than `build.yml` (which still
-gates every PR). The path filter is the cost control; the `main` run is what gives a release commit
-a verdict *before* it is tagged; the tag run is a backstop that necessarily lands after the tag
-exists. A release commit that matched no path has no run — dispatch one by hand before tagging.
+Pull requests touching `**/*.gradle.kts`, `gradle/**`, `gradle.properties`,
+`fastlane/metadata/**`, `scripts/fdroid-check.py`, `fdroid-compat.yml` or `release.yml`; **every
+push to `main` and every `v*` tag, unfiltered**; and `workflow_dispatch` for anything else.
+
+The push trigger carries no path filter on purpose. GitHub ANDs ref filters with path filters, and
+a tag push has no file diff of its own — a `paths:` list there would have made the tag run (the
+release backstop) silently never fire. The cost is that every `main` push runs this workflow, which
+is accepted: a backstop that does not run is worth less than the minutes it saves. PRs keep the
+filter, since that is where the volume is, and `build.yml` still gates every PR regardless.
+
+The `main` run is what gives a release commit a verdict *before* it is tagged; the tag run
+necessarily lands after the tag exists, so it catches a bad release rather than preventing one.
 
 ## Maintenance burden
 

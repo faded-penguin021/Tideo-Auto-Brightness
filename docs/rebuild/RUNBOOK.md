@@ -177,14 +177,15 @@ so check it explicitly.
 - **Check the F-Droid compatibility run before tagging (DA-027).** `fdroid-compat.yml` rebuilds the
   commit in F-Droid's own `fdroidserver:buildserver` image via `gradlew-fdroid`, runs `fdroid
   scanner`, checks the APK signing blocks (D-137) and the live fdroiddata recipe, and compares the
-  F-Droid build against a normal release build. It runs on **PRs and `main` pushes** that touch
-  `**/*.gradle.kts`, `gradle/**`, `gradle.properties`, `fastlane/metadata/**`,
-  `scripts/fdroid-check.py`, `fdroid-compat.yml` or `release.yml`; on **every `v*` tag**; and on
-  **`workflow_dispatch`**. Three consequences for a release, in the order they bite:
+  F-Droid build against a normal release build. It runs on **PRs** touching `**/*.gradle.kts`,
+  `gradle/**`, `gradle.properties`, `fastlane/metadata/**`, `scripts/fdroid-check.py`,
+  `fdroid-compat.yml` or `release.yml`; on **every `main` push and every `v*` tag, unfiltered**
+  (path filters and ref filters are ANDed, so a filtered tag trigger would never fire — DA-028);
+  and on **`workflow_dispatch`**. Three consequences for a release, in the order they bite:
   - The **tag run fires after the tag exists** — backstop, not gate. The pre-tag evidence is the run
-    on the release commit itself (from its PR or the `main` push). If that commit matched no path in
-    the filter there is no run: fire one by hand (**Actions → F-Droid compatibility → Run workflow**)
-    before tagging whenever the release carries a build change.
+    on the release commit itself: every `main` push now runs it, so a commit merged to `main` has a
+    verdict. Tagging something that never landed on `main` (or re-checking after a red run) means
+    firing one by hand: **Actions → F-Droid compatibility → Run workflow**.
   - **If it is red, do not tag** — and if a *tag* run goes red, fix and re-release before F-Droid
     picks the tag up; red there means the release would silently never appear in F-Droid.
   - Green does not prove the **metadata** check ran: it warns-and-passes when gitlab.com is

@@ -32,17 +32,11 @@ on:
       - '.github/workflows/fdroid-compat.yml'
       - '.github/workflows/release.yml'
   push:
-    # main: the release commit gets a verdict BEFORE anyone tags it (the tag trigger below fires
-    # after the tag already exists, which is a backstop, not a gate). Same path filter as PRs.
+    # NO `paths:` here, deliberately (DA-028). GitHub ANDs ref filters with path filters on `push`, and a
+    # tag push carries no file diff of its own — a `paths:` filter would make the tag trigger
+    # (the release backstop) silently never fire. Cost: every main push runs this, not just
+    # build-affecting ones. Correctness beats the saved minutes; PRs keep the filter.
     branches: [main]
-    paths:
-      - '**/*.gradle.kts'
-      - 'gradle/**'
-      - 'gradle.properties'
-      - 'fastlane/metadata/**'
-      - 'scripts/fdroid-check.py'
-      - '.github/workflows/fdroid-compat.yml'
-      - '.github/workflows/release.yml'
     tags: ['v*']
   # The pre-tag escape hatch: run it on demand for any ref, e.g. before cutting a release whose
   # commit did not match the path filter.
@@ -104,6 +98,7 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 1 -dname "CN=fdroid-compat-ci"
 
       - name: Build release APK
+        id: build
         env:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/ephemeral.jks
           KEYSTORE_PASSWORD: android
@@ -116,19 +111,29 @@ jobs:
             2>&1 | tee release-build.log
 
       - name: Explain failure
-        if: failure()
+        if: failure() && steps.build.conclusion == 'failure'
         run: |
           echo "::error title=Normal release build failed::The repository no longer builds a release APK in a clean environment. Fix the build first — the F-Droid stages cannot be interpreted until this one is green."
+
+      # Staged into one flat directory (DA-028) so the artifact's internal layout is exactly these
+      # filenames. (upload-artifact roots the archive at the least common ancestor of its input
+      # paths: mixing a deep APK path with a workspace-root log silently produced
+      # `app/build/outputs/apk/release/…` inside the artifact, which every consumer then missed.)
+      - name: Stage release artifacts
+        if: always()
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/release/*.apk artifacts/ 2>/dev/null || true
+          cp app/build/outputs/mapping/release/*.txt artifacts/ 2>/dev/null || true
+          cp release-build.log artifacts/ 2>/dev/null || true
+          ls -l artifacts/
 
       - name: Upload release build artifacts
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: normal-release-build
-          path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/mapping/release/*.txt
-            release-build.log
+          path: artifacts/
           if-no-files-found: warn
           retention-days: 14
 
@@ -168,7 +173,16 @@ jobs:
           rm -f gradle/wrapper/gradle-wrapper.jar
           mkdir -p ~/.cache/gradlew-fdroid ~/.gradle-fdroid
 
+      # Separate from the build so a pull failure (the buildserver image is multi-GB and hosted
+      # runners are disk-tight) reports itself instead of being blamed on the project.
+      - name: Pull the F-Droid buildserver image
+        run: |
+          df -h / | tail -1
+          docker image prune -af >/dev/null 2>&1 || true
+          docker pull "$FDROID_IMAGE"
+
       - name: Build with fdroidserver's gradlew-fdroid
+        id: fdroid_build
         run: |
           set -o pipefail
           docker run --rm \
@@ -182,6 +196,7 @@ jobs:
       # signed release. If a signing config ever gets hardcoded into the build script, this
       # produces app-release.apk instead and upstream's assumptions break — catch it here.
       - name: Assert the F-Droid build is unsigned
+        id: unsigned
         run: |
           set -euo pipefail
           if [ ! -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
@@ -191,18 +206,27 @@ jobs:
           fi
 
       - name: Explain failure
-        if: failure()
+        if: failure() && (steps.fdroid_build.conclusion == 'failure' || steps.unsigned.conclusion == 'failure')
         run: |
           echo "::error title=F-Droid compatibility validation failed::The project no longer builds under fdroidserver's toolchain even though it may build fine locally. Common causes: an AGP/Gradle pair their gradlew-fdroid will not run, a dependency resolvable only from a repository they disallow, or a build script that needs the wrapper jar. See docs/rebuild/FDROID_VALIDATION.md and fdroid-build.log."
+
+      # Flat staging, same reason as stage 2. sudo: the container ran as root, so the build
+      # outputs it wrote into the workspace are root-owned.
+      - name: Stage F-Droid artifacts
+        if: always()
+        run: |
+          mkdir -p artifacts
+          sudo cp app/build/outputs/apk/release/*.apk artifacts/ 2>/dev/null || true
+          cp fdroid-build.log artifacts/ 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" artifacts/
+          ls -l artifacts/
 
       - name: Upload F-Droid build artifacts
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: fdroid-release-build
-          path: |
-            app/build/outputs/apk/release/*.apk
-            fdroid-build.log
+          path: artifacts/
           if-no-files-found: warn
           retention-days: 14
 
@@ -237,6 +261,7 @@ jobs:
       # F-Droid would forgive. (apksigcopier is the tool for the signed-vs-signed case; both
       # inputs here are ours, so plain content comparison is the more direct check.)
       - name: Compare the two APKs
+        id: compare
         run: |
           python3 scripts/fdroid-check.py compare \
             normal/app-release.apk \
@@ -246,7 +271,7 @@ jobs:
       # Only on mismatch, and only to explain it: diffoscope is slow and its output is a
       # diagnosis aid, never the gate.
       - name: Diff the APKs (diffoscope, on failure only)
-        if: failure()
+        if: failure() && steps.compare.conclusion == 'failure'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq diffoscope-minimal
@@ -254,7 +279,7 @@ jobs:
             normal/app-release.apk fdroid/app-release-unsigned.apk || true
 
       - name: Explain failure
-        if: failure()
+        if: failure() && steps.compare.conclusion == 'failure'
         run: |
           echo "::error title=Reproducibility validation failed::Two builds of this commit disagree. F-Droid publishes our signed release only when its own rebuild matches, so this would stall the next release upstream. Start with reproducibility-report.json (which entries differ), then diffoscope-report.html."
 
@@ -300,13 +325,14 @@ jobs:
         run: pipx install fdroidserver
 
       - name: Scan the APK with fdroidserver (non-free classes, signing blocks)
+        id: scanner
         run: |
           set -o pipefail
           export PATH="$PATH:$ANDROID_HOME/build-tools/35.0.0"
           fdroid scanner --exit-code normal/app-release.apk 2>&1 | tee fdroid-scanner.log
 
       - name: Explain scanner failure
-        if: failure()
+        if: failure() && steps.scanner.conclusion == 'failure'
         run: |
           echo "::error title=F-Droid scanner check failed::fdroidserver's scanner found something F-Droid would reject — typically a new dependency pulling in known non-free code, or a binary blob committed to the repo. See fdroid-scanner.log."
 

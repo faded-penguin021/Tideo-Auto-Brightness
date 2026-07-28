@@ -25,6 +25,7 @@ import json
 import re
 import struct
 import sys
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -46,7 +47,7 @@ RECIPE_URL = (
 KNOWN_SIGNING_BLOCK_IDS = {
     0x7109871A: "APK Signature Scheme v2",
     0xF05368C0: "APK Signature Scheme v3",
-    0x1B93AD61: "APK Signature Scheme v4",
+    0x1B93AD61: "APK Signature Scheme v3.1",
     0x42726577: "verity padding block",
     0x6DFF800D: "source stamp",
 }
@@ -75,20 +76,27 @@ def _ok(message: str) -> int:
 # --------------------------------------------------------------------------------------
 
 
-def _content_map(apk: Path) -> dict[str, int]:
-    """Map every non-signature zip entry to its CRC.
+def _content_map(apk: Path) -> dict[str, list[int]]:
+    """Map every non-signature zip entry name to the CRC(s) stored under it.
 
-    CRCs, not raw bytes: this compares what the APK *contains*, independent of zip framing
-    (entry order, alignment, timestamps). That is deliberately the same acceptance
-    criterion F-Droid's own reproducible-build comparison uses — it strips signatures and
-    compares contents — so this stage cannot fail on a difference F-Droid would forgive.
+    Per-entry CRC32, not raw bytes: this compares entry *contents* independent of zip framing
+    (entry order, alignment, timestamps), which is the level F-Droid's own reproducible-build
+    comparison works at — so this stage does not fail on a difference F-Droid would forgive.
+    A CRC32 is a checksum, not a hash: it proves difference reliably and sameness only to
+    within a collision, which is the right trade for a change-detector.
+
+    The value is a LIST because a zip may legitimately carry duplicate entry names, and a
+    duplicate appearing in one APK but not the other is exactly the packaging hazard worth
+    catching — a dict keyed on filename would silently keep only the last one.
     """
+    out: dict[str, list[int]] = {}
     with zipfile.ZipFile(apk) as zf:
-        return {
-            info.filename: info.CRC
-            for info in zf.infolist()
-            if not SIGNATURE_ENTRY_RE.match(info.filename)
-        }
+        for info in zf.infolist():
+            if not SIGNATURE_ENTRY_RE.match(info.filename):
+                out.setdefault(info.filename, []).append(info.CRC)
+    for crcs in out.values():
+        crcs.sort()
+    return out
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
@@ -159,7 +167,11 @@ def _signing_block_ids(apk: Path) -> list[int] | None:
     while pos < end:
         length = struct.unpack("<Q", data[pos : pos + 8])[0]
         if length < 4 or pos + 8 + length > end + 8:
-            break
+            # Do NOT return what was parsed so far (DA-028): unknown IDs could sit past this point, and
+            # reporting a partial list as complete would fail open on the tampered case.
+            raise ValueError(
+                f"malformed APK Signing Block at offset {pos}: pair length {length} does not fit"
+            )
         ids.append(struct.unpack("<I", data[pos + 8 : pos + 12])[0])
         pos += 8 + length
     return ids
@@ -170,7 +182,10 @@ def cmd_signing_blocks(args: argparse.Namespace) -> int:
     if not apk.is_file():
         return _fail("Signing assumption check failed", f"APK not found: {apk}")
 
-    ids = _signing_block_ids(apk)
+    try:
+        ids = _signing_block_ids(apk)
+    except ValueError as exc:
+        return _fail("Signing assumption check failed", f"{apk.name}: {exc}")
     if ids is None:
         # Not a failure by itself: an unsigned APK simply has nothing to check. The
         # workflow only points this at the signed build, so say so rather than pass mutely.
@@ -212,17 +227,41 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     try:
         with urllib.request.urlopen(RECIPE_URL, timeout=30) as resp:
             recipe = resp.read().decode()
-    except Exception as exc:  # noqa: BLE001 — any network failure means "cannot check"
-        # Upstream being unreachable is not a repo defect. Warn and pass: a gate that
-        # fails on someone else's outage teaches contributors to ignore it.
-        print(f"::warning title=Metadata validation skipped::could not fetch {RECIPE_URL}: {exc}")
+    except urllib.error.HTTPError as exc:
+        # The server answered, and the answer was "no". A 404 means the recipe moved, was
+        # renamed, or the app was dropped from fdroiddata — all real, all things a release
+        # needs to know about. Never treat this as an outage.
+        return _fail(
+            "Metadata validation failed",
+            f"fdroiddata returned HTTP {exc.code} for {RECIPE_URL}. The recipe may have moved or "
+            "the app may no longer be in fdroiddata — check the package page before releasing.",
+        )
+    except Exception as exc:  # noqa: BLE001 — genuinely could not reach the server
+        # Only a transport-level failure gets the free pass: a gate that fails on someone
+        # else's outage teaches contributors to ignore it. Anything the server *answered*
+        # is handled above.
+        print(f"::warning title=Metadata validation skipped::could not reach {RECIPE_URL}: {exc}")
         return 0
 
     problems: list[str] = []
     app_gradle = (REPO_ROOT / "app" / "build.gradle.kts").read_text()
 
+    # A key we cannot parse is a FAILURE, not a skip (DA-028). Silently degrading to "checked nothing,
+    # reported success" is the one outcome this whole subcommand exists to prevent: it would
+    # keep printing "satisfies the recipe" long after the recipe stopped being understood.
+    def required(value: str | None, key: str) -> str | None:
+        if not value:
+            problems.append(
+                f"could not read '{key}' from the recipe — its shape changed, so the checks "
+                "that depend on it did NOT run (fix this script against the current recipe)"
+            )
+            return None
+        return value
+
     # 1. Source layout: the recipe builds `subdir: app`.
-    subdir = _recipe_value(recipe, "  - subdir") or _recipe_value(recipe, "    subdir")
+    subdir = required(
+        _recipe_value(recipe, "  - subdir") or _recipe_value(recipe, "    subdir"), "subdir"
+    )
     if subdir and not (REPO_ROOT / subdir / "build.gradle.kts").is_file():
         problems.append(
             f"the recipe builds subdir '{subdir}', but {subdir}/build.gradle.kts does not exist"
@@ -234,9 +273,13 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     if not binaries:
         m = re.search(r"^Binaries:\s*\n\s*(\S+)\s*$", recipe, re.M)
         binaries = m.group(1) if m else ""
+    binaries = required(binaries, "Binaries") or ""
     if binaries:
         asset = binaries.rsplit("/", 1)[-1]
         release_yml = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text()
+        # Substring over the whole file: deliberately loose. The asset name appears in several
+        # steps and pinning this to one of them would break on an innocuous refactor; a rename
+        # that misses EVERY mention is the failure worth catching.
         if asset not in release_yml:
             problems.append(
                 f"the recipe downloads the release asset '{asset}', which release.yml no "
@@ -250,15 +293,23 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     # 3. UpdateCheckMode: Tags + AutoUpdateMode: Version means our tag is v<versionName>,
     #    so versionName must stay a plain dotted release version.
     version_name = re.search(r'versionName\s*=\s*"([^"]+)"', app_gradle)
-    if version_name and not re.fullmatch(r"\d+\.\d+\.\d+", version_name.group(1)):
+    if not version_name:
+        problems.append("could not read versionName from app/build.gradle.kts")
+    elif not re.fullmatch(r"\d+\.\d+\.\d+", version_name.group(1)):
         problems.append(
             f"versionName '{version_name.group(1)}' is not the plain X.Y.Z form the "
             "recipe's UpdateCheckMode: Tags / AutoUpdateMode: Version rely on"
         )
 
     # 4. versionCode must never move backwards past what upstream already published.
-    current_code = _recipe_value(recipe, "CurrentVersionCode")
+    current_raw = required(_recipe_value(recipe, "CurrentVersionCode"), "CurrentVersionCode")
+    current_digits = re.match(r"\s*(\d+)", current_raw or "")   # tolerate a trailing comment
+    current_code = current_digits.group(1) if current_digits else None
+    if current_raw and not current_code:
+        problems.append(f"CurrentVersionCode in the recipe is not a number: {current_raw!r}")
     version_code = re.search(r"versionCode\s*=\s*(\d+)", app_gradle)
+    if not version_code:
+        problems.append("could not read versionCode from app/build.gradle.kts")
     if current_code and version_code and int(version_code.group(1)) < int(current_code):
         problems.append(
             f"versionCode {version_code.group(1)} is lower than the published "
