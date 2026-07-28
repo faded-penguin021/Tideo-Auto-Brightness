@@ -97,6 +97,11 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-28 — README install surface: the official **"Get it on F-Droid" badge**
+  (`f-droid.org/badge/get-it-on.png` — the owner-specified English asset; a shields.io variant was
+  declined, and the `.svg` at the same path is the alternate) linking to
+  `f-droid.org/packages/com.tideo.autobrightness/`, plus an Install step naming F-Droid as a source
+  alongside Releases with the different-signing-key caveat. Both URLs verified live (HTTP 200).
 - 2026-07-28 — **DA-024** (owner-reported, store screenshot): the F-Droid listing showed the generic
   placeholder icon because the app ships only an adaptive-icon XML and F-Droid can't rasterize one.
   Added `fastlane/metadata/android/en-US/images/icon.png` (512×512) rendered from the new in-repo
