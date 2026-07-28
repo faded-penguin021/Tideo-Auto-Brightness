@@ -1,0 +1,328 @@
+name: F-Droid compatibility
+
+# Early warning for "works on GitHub, fails on F-Droid" (DA-027).
+#
+# F-Droid does not ship our CI's APK — it rebuilds the tagged commit itself, in its own
+# environment, with its own tooling, and (for this app) publishes our signed release only if
+# its rebuild MATCHES ours byte-for-byte. So a green build.yml proves nothing about F-Droid:
+# their build uses the fdroidserver buildserver image, a clean checkout with no wrapper jar,
+# no signing config, and their own `gradlew-fdroid` instead of ours. This workflow runs the
+# real thing on our side, before a release is tagged.
+#
+# It is a guardrail, NOT a replica of the F-Droid build farm — what it deliberately does not
+# cover, and how to read each failure, is documented in docs/rebuild/FDROID_VALIDATION.md.
+# Read that before changing anything here.
+#
+# Cost note: the buildserver image is a multi-GB pull and the F-Droid build is a cold,
+# cache-poor Gradle run, so this is far heavier than build.yml. Hence the path filter on PRs
+# (only changes that can plausibly affect an F-Droid build) plus an unconditional run on
+# every v* tag, which is the moment being protected. build.yml still gates every PR.
+#
+# Node 24 runtime policy (see build.yml): every action pinned here is a major declaring
+# `runs.using: node24` — checkout@v5, setup-java@v5, setup-android@v4, cache@v5,
+# upload-artifact@v6, download-artifact@v6. Do NOT downgrade any of them.
+on:
+  pull_request:
+    paths:
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'fastlane/metadata/**'
+      - 'scripts/fdroid-check.py'
+      - '.github/workflows/fdroid-compat.yml'
+      - '.github/workflows/release.yml'
+  push:
+    # main: the release commit gets a verdict BEFORE anyone tags it (the tag trigger below fires
+    # after the tag already exists, which is a backstop, not a gate). Same path filter as PRs.
+    branches: [main]
+    paths:
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'fastlane/metadata/**'
+      - 'scripts/fdroid-check.py'
+      - '.github/workflows/fdroid-compat.yml'
+      - '.github/workflows/release.yml'
+    tags: ['v*']
+  # The pre-tag escape hatch: run it on demand for any ref, e.g. before cutting a release whose
+  # commit did not match the path filter.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fdroid-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Stages 1 + 2 ─────────────────────────────────────────────────────────────────────
+  # A clean, cache-poor release build in a normal environment. This is the control the
+  # F-Droid build is compared against, and it is signed — with a throwaway key generated on
+  # the runner — so the real AGP signing path runs and the signed-APK checks below have
+  # something to inspect. No repository secret is used or needed.
+  release-build:
+    name: Stage 2 — normal release build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (clean)
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      # Immutable downloads ONLY — resolved dependency artifacts and Gradle distributions,
+      # both content-addressed and safe to reuse. Build outputs (~/.gradle/caches/build-cache-*,
+      # .gradle/, build/) are deliberately NOT cached: a cached task output could mask exactly
+      # the breakage this workflow exists to find.
+      - name: Cache Gradle downloads (immutable only)
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-fdroid-compat-${{ hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-fdroid-compat-
+
+      # The keystore is generated here, used here, and dies with the runner. It exists only so
+      # AGP takes its signing code path (app/build.gradle.kts drives signing entirely from env
+      # vars, D-137 era) — the resulting APK is a test artifact, never published, and the
+      # password is intentionally the worthless Android debug convention.
+      - name: Generate ephemeral signing key (throwaway, runner-local)
+        run: |
+          keytool -genkeypair -keystore "$RUNNER_TEMP/ephemeral.jks" \
+            -storepass android -keypass android -alias ci \
+            -keyalg RSA -keysize 2048 -validity 1 -dname "CN=fdroid-compat-ci"
+
+      - name: Build release APK
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/ephemeral.jks
+          KEYSTORE_PASSWORD: android
+          KEY_ALIAS: ci
+          KEY_PASSWORD: android
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleRelease \
+            --no-daemon --no-build-cache --no-configuration-cache \
+            2>&1 | tee release-build.log
+
+      - name: Explain failure
+        if: failure()
+        run: |
+          echo "::error title=Normal release build failed::The repository no longer builds a release APK in a clean environment. Fix the build first — the F-Droid stages cannot be interpreted until this one is green."
+
+      - name: Upload release build artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: normal-release-build
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/mapping/release/*.txt
+            release-build.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ── Stage 3 ──────────────────────────────────────────────────────────────────────────
+  # The F-Droid build, in F-Droid's own published buildserver image, through F-Droid's own
+  # entry point (`gradlew-fdroid`). We do not reimplement fdroidserver: the only preparation
+  # applied is the two documented things a buildserver checkout differs by — an SDK-pointing
+  # local.properties, and no gradle-wrapper.jar (F-Droid deletes that unverifiable binary and
+  # substitutes its own checksum-verified Gradle). Everything else is theirs, so when their
+  # tooling evolves, this stage follows it for free.
+  fdroid-build:
+    name: Stage 3 — F-Droid compatibility build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FDROID_IMAGE: registry.gitlab.com/fdroid/fdroidserver:buildserver
+    steps:
+      - name: Checkout (clean)
+        uses: actions/checkout@v5
+
+      # Only the Gradle distribution that gradlew-fdroid downloads (checksum-verified against
+      # F-Droid's gradle-transparency-log on first fetch) and resolved dependencies. Keyed on
+      # the wrapper properties, so a distributionUrl change starts from a cold, honest cache.
+      - name: Cache F-Droid Gradle downloads (immutable only)
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/gradlew-fdroid
+            ~/.gradle-fdroid/caches/modules-2
+          key: ${{ runner.os }}-gradlew-fdroid-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: ${{ runner.os }}-gradlew-fdroid-
+
+      - name: Prepare checkout the way a buildserver checkout arrives
+        run: |
+          set -euo pipefail
+          printf 'sdk.dir=/opt/android-sdk\n' | tee local.properties app/local.properties
+          rm -f gradle/wrapper/gradle-wrapper.jar
+          mkdir -p ~/.cache/gradlew-fdroid ~/.gradle-fdroid
+
+      - name: Build with fdroidserver's gradlew-fdroid
+        run: |
+          set -o pipefail
+          docker run --rm \
+            -v "$PWD":/repo -w /repo/app \
+            -v "$HOME/.cache/gradlew-fdroid":/root/.cache/gradlew-fdroid \
+            -v "$HOME/.gradle-fdroid":/root/.gradle \
+            "$FDROID_IMAGE" gradlew-fdroid assembleRelease \
+            2>&1 | tee fdroid-build.log
+
+      # F-Droid builds unsigned and signs nothing; for this app it then compares against our
+      # signed release. If a signing config ever gets hardcoded into the build script, this
+      # produces app-release.apk instead and upstream's assumptions break — catch it here.
+      - name: Assert the F-Droid build is unsigned
+        run: |
+          set -euo pipefail
+          if [ ! -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            echo "::error title=F-Droid compatibility validation failed::The F-Droid build did not produce app-release-unsigned.apk. F-Droid builds with no signing configuration, so a keystore reachable without ANDROID_KEYSTORE_FILE (e.g. hardcoded in app/build.gradle.kts) breaks that assumption."
+            ls -la app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+
+      - name: Explain failure
+        if: failure()
+        run: |
+          echo "::error title=F-Droid compatibility validation failed::The project no longer builds under fdroidserver's toolchain even though it may build fine locally. Common causes: an AGP/Gradle pair their gradlew-fdroid will not run, a dependency resolvable only from a repository they disallow, or a build script that needs the wrapper jar. See docs/rebuild/FDROID_VALIDATION.md and fdroid-build.log."
+
+      - name: Upload F-Droid build artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fdroid-release-build
+          path: |
+            app/build/outputs/apk/release/*.apk
+            fdroid-build.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ── Stage 4 ──────────────────────────────────────────────────────────────────────────
+  # The property F-Droid actually enforces for this app: two independent builds of one commit
+  # must agree. Comparing the two APKs beats building twice in one environment — it varies the
+  # environment, which is where reproducibility actually breaks.
+  reproducibility:
+    name: Stage 4 — reproducibility validation
+    runs-on: ubuntu-latest
+    needs: [release-build, fdroid-build]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (for scripts/fdroid-check.py)
+        uses: actions/checkout@v5
+
+      - name: Download normal release build
+        uses: actions/download-artifact@v6
+        with:
+          name: normal-release-build
+          path: normal/
+
+      - name: Download F-Droid build
+        uses: actions/download-artifact@v6
+        with:
+          name: fdroid-release-build
+          path: fdroid/
+
+      # Signature-agnostic by construction: it compares zip-entry contents, skipping the v1
+      # signature files, and v2/v3 signatures live outside the zip entirely. That is the same
+      # acceptance criterion F-Droid's own comparison uses, so this cannot fail on a difference
+      # F-Droid would forgive. (apksigcopier is the tool for the signed-vs-signed case; both
+      # inputs here are ours, so plain content comparison is the more direct check.)
+      - name: Compare the two APKs
+        run: |
+          python3 scripts/fdroid-check.py compare \
+            normal/app-release.apk \
+            fdroid/app-release-unsigned.apk \
+            --report reproducibility-report.json
+
+      # Only on mismatch, and only to explain it: diffoscope is slow and its output is a
+      # diagnosis aid, never the gate.
+      - name: Diff the APKs (diffoscope, on failure only)
+        if: failure()
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq diffoscope-minimal
+          diffoscope --html diffoscope-report.html \
+            normal/app-release.apk fdroid/app-release-unsigned.apk || true
+
+      - name: Explain failure
+        if: failure()
+        run: |
+          echo "::error title=Reproducibility validation failed::Two builds of this commit disagree. F-Droid publishes our signed release only when its own rebuild matches, so this would stall the next release upstream. Start with reproducibility-report.json (which entries differ), then diffoscope-report.html."
+
+      - name: Upload reproducibility diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: reproducibility-report
+          path: |
+            reproducibility-report.json
+            diffoscope-report.html
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ── Stage 3 (continued) + metadata ───────────────────────────────────────────────────
+  # Checks that need the built APK or the live recipe. `fdroid scanner` is the official
+  # tool F-Droid runs against submissions; the other two are ours, covering gaps it has.
+  fdroid-checks:
+    name: Stage 3 — fdroidserver scanner + metadata
+    runs-on: ubuntu-latest
+    needs: [release-build]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download normal release build
+        uses: actions/download-artifact@v6
+        with:
+          name: normal-release-build
+          path: normal/
+
+      # dexdump + apksigner, which fdroid scanner shells out to.
+      - name: Set up Android SDK (build-tools for the scanner)
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'build-tools;35.0.0'
+
+      # From PyPI, the project's own release channel — so the check tracks upstream instead of
+      # a copy of it. Unpinned on purpose: a scanner that lags upstream is a scanner that misses
+      # what upstream will reject.
+      - name: Install fdroidserver
+        run: pipx install fdroidserver
+
+      - name: Scan the APK with fdroidserver (non-free classes, signing blocks)
+        run: |
+          set -o pipefail
+          export PATH="$PATH:$ANDROID_HOME/build-tools/35.0.0"
+          fdroid scanner --exit-code normal/app-release.apk 2>&1 | tee fdroid-scanner.log
+
+      - name: Explain scanner failure
+        if: failure()
+        run: |
+          echo "::error title=F-Droid scanner check failed::fdroidserver's scanner found something F-Droid would reject — typically a new dependency pulling in known non-free code, or a binary blob committed to the repo. See fdroid-scanner.log."
+
+      # Covers what the scanner does not: AGP's Play dependency-metadata blob (D-137), which is
+      # legal, invisible to the scanner, and quietly destroys byte-identical rebuilds.
+      - name: Check APK signing blocks (D-137)
+        run: python3 scripts/fdroid-check.py signing-blocks normal/app-release.apk
+
+      - name: Check metadata assumptions against the live fdroiddata recipe
+        run: python3 scripts/fdroid-check.py metadata
+
+      - name: Upload scanner output
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fdroid-scanner-log
+          path: fdroid-scanner.log
+          if-no-files-found: warn
+          retention-days: 14

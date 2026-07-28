@@ -678,3 +678,43 @@
   release after this bump**, confirm F-Droid's reproducible-build comparison passed before treating
   the toolchain as settled. AGP 9.x was not considered a candidate — it is a migration (Gradle 9,
   built-in Kotlin), not a version bump. `[cited]`: none (build tooling; no production code path).
+
+- DA-027 [cited]: **F-Droid compatibility validation pipeline** — `.github/workflows/fdroid-compat.yml` +
+  `scripts/fdroid-check.py` + `FDROID_VALIDATION.md` (owner-specified design, 2026-07-28; the DA-026
+  session surfaced that a green `build.yml` says nothing about F-Droid). Problem: F-Droid rebuilds
+  the tagged commit itself, in reproducible-build mode, and publishes our signed APK only if its own
+  rebuild **matches** — a mismatch is silent (that version simply never appears), lands days later,
+  and lands after the release is public. Design (rationale in full in `FDROID_VALIDATION.md`):
+  **use their tooling, do not model it.** Stage 3 runs F-Droid's published
+  `fdroidserver:buildserver` image through its own entry point `gradlew-fdroid assembleRelease`,
+  with the checkout prepared only the two ways a buildserver checkout differs (SDK `local.properties`;
+  no `gradle-wrapper.jar`) — so upstream evolution is inherited, not chased. Stage 2 is a
+  cache-poor normal release build signed with a **runner-generated throwaway key** (no repo secret;
+  it exists so AGP's real signing path runs). Stage 4 compares the two APKs rather than building
+  twice in one environment: determinism was never the risk, cross-environment agreement is what
+  F-Droid actually tests. `fdroid scanner` is installed unpinned from PyPI on purpose — a scanner
+  frozen behind upstream misses what upstream will reject. Caching is restricted to immutable
+  downloads (dependency artifacts, the checksum-verified Gradle distribution); build outputs are
+  never cached, since a cached task output could mask the very breakage the workflow hunts.
+  **Three checks are ours because fdroidserver has no equivalent**, all in one stdlib-only helper:
+  `compare` (nothing upstream answers "did these two builds match" before a release exists; compares
+  zip-entry CRCs and skips v1 signature files, so it is signature-blind by construction — the signed
+  control and the unsigned F-Droid build are directly comparable, and it uses F-Droid's own
+  contents-level criterion so it cannot fail on a difference they would forgive), `signing-blocks`,
+  and `metadata` (checks THIS repo against the LIVE fdroiddata recipe — fetched, never vendored, so
+  it cannot assert yesterday's truth). **`signing-blocks` earned its place empirically:** a build
+  with `dependenciesInfo` re-enabled (the D-137 regression) was scanned by `fdroid scanner`, which
+  passed it — the Play dependency blob `0x504b4453` is legal, invisible to the scanner, and quietly
+  destroys byte-identical rebuilds; the allowlist check catches it, verified against that artifact.
+  Every stage was exercised before shipping, not just written: the buildserver container build was
+  run with the workflow's exact `docker run` (BUILD SUCCESSFUL, unsigned APK produced), and each
+  helper subcommand was run against real APKs in **both** polarities — `compare` passing on
+  cross-environment builds of one commit *and* on the signed-vs-unsigned pair the workflow actually
+  feeds it, failing on genuinely different builds; `signing-blocks` passing clean and failing on the
+  regression artifact. Triggers are PRs touching build/Gradle/fastlane/release files, every `v*` tag,
+  and dispatch — the path filter is cost control (multi-GB image pull + cold Gradle run), the tag
+  trigger is the guarantee that no release is tagged without this having run. Deliberate
+  non-coverage, stated in the doc so the guardrail is not over-trusted: it is not `fdroid build`
+  (no metadata-driven orchestration, no buildserver VM isolation), the real signing key is never
+  involved, and F-Droid ultimately compares against the **release job's** APK — a third environment
+  this never exercises. `[cited]`: none (CI + docs; no production code path).

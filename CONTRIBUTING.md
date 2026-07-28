@@ -65,6 +65,22 @@ merged it gets added there.
 original Tasker engine and are locked here. New features and any change to brightness behaviour start
 upstream at AAB (open an issue there first, per its `CONTRIBUTING.md`); the port into Tideo follows.
 
+## If the "F-Droid compatibility" check fails on your PR
+
+Tideo is distributed through F-Droid, which does not ship our APK on trust — it **rebuilds the
+release from source in its own environment** and publishes ours only if its rebuild matches. So a
+change can pass every normal check and still break the store listing. The `F-Droid compatibility`
+workflow runs that rebuild ahead of time, on PRs that touch build files, Gradle config, or F-Droid
+metadata.
+
+Each stage fails with its own name — *Normal release build failed*, *F-Droid compatibility
+validation failed*, *Reproducibility validation failed*, *Signing assumption check failed*,
+*Metadata validation failed* — and the run attaches the APKs, logs and diff reports it produced.
+**[docs/rebuild/FDROID_VALIDATION.md](docs/rebuild/FDROID_VALIDATION.md)** explains what each stage
+checks, what it intentionally doesn't, and the exact command to reproduce the failure locally. You
+don't need to know anything about F-Droid internals to act on it — start with that page's "Reading a
+failure" section.
+
 ## Reporting bugs
 
 Open an issue using the **Bug report** template (`.github/ISSUE_TEMPLATE/bug_report.md`). Include the

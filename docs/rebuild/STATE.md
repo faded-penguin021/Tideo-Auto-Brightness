@@ -24,16 +24,15 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 ## Current state
 
-**Shipped: v1.8.1** (vc19, tagged; v1.8.0/vc18 before it). **No release pending** — no version bump on
-this branch, so vc20 stays unassigned for the next real release. The branch train tip is
-`claude/badge-workflow-verify-77m62f` (DA-025 badges); this session's branch is cut from it and adds
-the **AGP 8.7.3 → 8.13.2** bump (DA-026) — build tooling only, no `app/`/`domain/`/`platform/` source
-change, but it *does* change the next release's APK (`classes*.dex` + baseline profile), which makes
-the DA-026 release-time reproducibility check in RUNBOOK playbook 6 the one thing that must not be
-skipped at the next tag. The DA-024 store icon likewise reaches F-Droid only at that **next tagged
-release**. No other active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
-tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
-`DEVIATIONS_LEDGER.md` (live `_A.md`).
+**Shipped: v1.8.1** (vc19, tagged; v1.8.0/vc18 before it). **No release pending** — no version bump,
+so vc20 stays unassigned for the next real release. Train tip `claude/badge-workflow-verify-77m62f`
+(DA-025); this session's branch is cut from it and carries the **AGP 8.7.3 → 8.13.2** bump (DA-026)
+plus the **F-Droid compatibility CI** (DA-027, `fdroid-compat.yml`). No `app/`/`domain/`/`platform/`
+source change — but the AGP bump does change the next release's APK (`classes*.dex` + baseline
+profile), so the one-shot DA-026 reproducibility check at the next tag (RUNBOOK playbook 6) must not
+be skipped; the DA-024 store icon also lands only at that next tagged release. No other active work;
+no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity tests green; TODO/FIXME 0;
+`parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 ## Owner queue
 
@@ -96,6 +95,14 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-28 — **DA-027** (owner-specified design): **F-Droid compatibility CI** —
+  `fdroid-compat.yml` rebuilds the commit in F-Droid's own `fdroidserver:buildserver` image via their
+  `gradlew-fdroid`, runs `fdroid scanner`, and compares that build against a cache-poor normal release
+  build signed with a throwaway runner key. Three gap checks in `scripts/fdroid-check.py` (`compare`,
+  `signing-blocks`, `metadata` — the last against the *live* fdroiddata recipe); `signing-blocks`
+  exists because `fdroid scanner` demonstrably does **not** flag the D-137 Play dependency blob. Every
+  stage exercised in both polarities before shipping; coverage limits in `FDROID_VALIDATION.md`, wired
+  into RUNBOOK playbook 6, CI-failure triage, and CONTRIBUTING.
 - 2026-07-28 — **DA-026** (owner-asked, from the vc19 F-Droid build log): **AGP 8.7.3 → 8.13.2**.
   The log's "incompatible with Gradle 9.0" notice is three deprecations *inside AGP*, none from our
   scripts, and F-Droid takes its Gradle version from our own `distributionUrl` — so nothing forced the
@@ -113,15 +120,11 @@ One line per shipped change (newest first); detail in the D-rows and git history
   `resource not found`: the URL template is correct (proved by substituting a published package,
   which returns a real count) — the app only landed on F-Droid today, so the dashboard's daily
   cronjob has no data file for `com.tideo.autobrightness` yet. It self-heals with no repo change.
-- 2026-07-28 — README install surface: the official **"Get it on F-Droid" badge**
-  (`f-droid.org/badge/get-it-on.png` — the owner-specified English asset; a shields.io variant was
-  declined, and the `.svg` at the same path is the alternate) linking to
-  `f-droid.org/packages/com.tideo.autobrightness/`, plus an Install step naming F-Droid as a source
-  alongside Releases. Both URLs verified live (HTTP 200). **Correction in the same session
-  (owner-caught):** the step first claimed the two sources use different signing keys — false. The
-  fdroiddata recipe is reproducible-build mode (`Binaries:` + `AllowedAPKSigningKeys`
-  `3d2d9dd1…`, verified against the live YAML, the D-137 submission landing), so F-Droid
-  redistributes *our* signed APK — the sources are interchangeable, no uninstall to switch.
+- 2026-07-28 — README install surface: official **"Get it on F-Droid" badge** + an Install step
+  naming F-Droid alongside Releases (both URLs verified live). **Owner-caught correction:** the two
+  sources do NOT use different signing keys — the fdroiddata recipe is reproducible-build mode
+  (`Binaries:` + `AllowedAPKSigningKeys` `3d2d9dd1…`), so F-Droid redistributes *our* signed APK and
+  the sources are interchangeable, no uninstall to switch.
 - 2026-07-28 — **DA-024** (owner-reported, store screenshot): the F-Droid listing showed the generic
   placeholder icon because the app ships only an adaptive-icon XML and F-Droid can't rasterize one.
   Added `fastlane/metadata/android/en-US/images/icon.png` (512×512) rendered from the new in-repo
