@@ -15,8 +15,9 @@ name: F-Droid compatibility
 #
 # Cost note: the buildserver image is a multi-GB pull and the F-Droid build is a cold,
 # cache-poor Gradle run, so this is far heavier than build.yml. Hence the path filter on PRs
-# (only changes that can plausibly affect an F-Droid build) plus an unconditional run on
-# every v* tag, which is the moment being protected. build.yml still gates every PR.
+# (only changes that can plausibly affect an F-Droid build). Pushes to main and v* tags run
+# unfiltered — see the `push:` comment below for why filtering them was a bug, not a saving.
+# build.yml still gates every PR.
 #
 # Node 24 runtime policy (see build.yml): every action pinned here is a major declaring
 # `runs.using: node24` — checkout@v5, setup-java@v5, setup-android@v4, cache@v5,
@@ -32,8 +33,8 @@ on:
       - '.github/workflows/fdroid-compat.yml'
       - '.github/workflows/release.yml'
   push:
-    # NO `paths:` here, deliberately (DA-028). GitHub ANDs ref filters with path filters on `push`, and a
-    # tag push carries no file diff of its own — a `paths:` filter would make the tag trigger
+    # NO `paths:` here, deliberately (DA-028). GitHub ANDs ref filters with path filters on
+    # `push`, and a tag push carries no file diff — a `paths:` filter would make the tag trigger
     # (the release backstop) silently never fire. Cost: every main push runs this, not just
     # build-affecting ones. Correctness beats the saved minutes; PRs keep the filter.
     branches: [main]

@@ -24,17 +24,17 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 ## Current state
 
-**Shipped: v1.8.1** (vc19, tagged). **Release pending: 1.8.2 / vc20** — cut on this branch because the
-AGP bump changes the shipped APK (release-preflight's classifier correctly flagged it; RUNBOOK §6
-requires the bump, and weakening the gate was never an option). Patch, per §6: internal/packaging, no
-user-visible behavior change. `fastlane/.../changelogs/20.txt` written. Train tip
-`claude/badge-workflow-verify-77m62f` (DA-025); this branch is cut from it and carries **AGP 8.7.3 →
-8.13.2** (DA-026) + the **F-Droid compatibility CI** (DA-027), open as **PR #96**. No
-`app/`/`domain/`/`platform/` source change. At the tag: the one-shot DA-026 reproducibility check
-(RUNBOOK playbook 6) must not be skipped — 1.8.2 is the first release under the new AGP — and the
-DA-024 store icon lands with it. No other active work; no plan files. `PARITY_CHECKLIST.md`
-zero-`pending`; parity tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`;
-deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
+**Shipped: v1.8.1** (vc19, tagged). **Release pending: 1.8.2 / vc20**, cut on this branch: the AGP
+bump changes the shipped APK, so RUNBOOK §6 required the bump (patch — internal/packaging, no
+behavior change); `changelogs/20.txt` written. Train tip `claude/badge-workflow-verify-77m62f`
+(DA-025); this branch is cut from it and carries **AGP 8.7.3 → 8.13.2** (DA-026) + the **F-Droid
+compatibility CI** (DA-027/DA-028, green on real infrastructure), open as **PR #96** — the owner is
+keeping this branch as the base for the next fix/feature. No `app/`/`domain/`/`platform/` source
+change. At the tag: the one-shot DA-026 reproducibility check (RUNBOOK playbook 6) must not be
+skipped — 1.8.2 is the first release under the new AGP — and the DA-024 store icon lands with it.
+No other active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity tests green;
+TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
+`DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 ## Owner queue
 
@@ -73,8 +73,7 @@ deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
   test matrices (Goodhart, re-litigates D-162).
 - **Triage #2 (2026-07-20, DA-006):** verification manifests + machine session header; generated
   ledger index (grep IS the index); metrics dashboard; dep SHA-pinning playbook; scaffold
-  CLI/profiles; ledger `Status:` retrofit; Owner-queue aging guard. (Secret-pattern decline
-  owner-reopened → guard 9, DA-008.)
+  CLI/profiles; ledger `Status:` retrofit; Owner-queue aging guard.
 - **Triage #3 (2026-07-21, DA-010):** full verify-train script; PR-draft "whole train" guard;
   warm-up sentinel (Gradle's lock IS the sync).
 - **Triage #4 (2026-07-21, DA-011):** prompt-cache doc-ordering (non-actionable agent-agnostic,
@@ -83,14 +82,10 @@ deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
   per-playbook split; XML tags in the constitution; STATE compression commit-or-ledger gate.
 - **Triage #6 (2026-07-22, DA-015):** owner-decisions-per-change KPI (Goodharts against
   discipline 7; kept as P0 design orientation only); orphan-provenance `[cited]` extension.
-- **Triage #7 (2026-07-24, DA-021) — "Claude 5 context engineering" blog rules:** no harness
-  change, no CLAUDE.md rewrite. Progressive disclosure / interface-over-examples / principle-based
-  guidance are already the design; the imperative bulk here is **policy rails** (git, secrets,
-  ledger, ladder), not the capability constraints that post says to delete. Auto-memory ≠ STATE.md
-  (shared, guard-checked artifact). Skills declined on D-176 agent-neutrality (`.claude/` forks the
-  constitution per-agent). RUNBOOK per-playbook split stays declined (DA-013) — external content is
-  not new evidence. Carried awareness, no action: Opus 5 over-verifies when instructed to verify
-  (glue-review/rule-review stay — real catch history) and delegates to subagents more readily.
+- **Triage #7 (2026-07-24, DA-021) — "Claude 5 context engineering" blog rules:** no harness change,
+  no CLAUDE.md rewrite. Its advice is already the design; the imperative bulk here is **policy rails**
+  (git, secrets, ledger, ladder), not capability constraints. Auto-memory ≠ STATE.md; skills declined
+  on D-176 agent-neutrality; RUNBOOK split stays declined (external content is not new evidence).
 - **Privileged Display (D-150–D-152):** per-toggle orthogonal scheduling (D-151 pivot);
   persisted last-applied seed (revisit on real reports); QS tile / notification grayscale
   action; refresh-rate forcing / OEM alternate keys (D-048/D-149); manual Extra-Dim toggle
@@ -100,81 +95,30 @@ deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
-- 2026-07-28 — **1.8.2 / vc20 cut** (patch): the DA-026 AGP bump changes the shipped APK, so
-  release-preflight's ships-app-code classifier required the version bump (RUNBOOK §6) — taken as a
-  patch (internal/packaging, no behavior change) rather than weakening the gate. Changelog `20.txt`.
-- 2026-07-28 — **DA-027** (owner-specified design): **F-Droid compatibility CI** —
-  `fdroid-compat.yml` rebuilds the commit in F-Droid's own `fdroidserver:buildserver` image via their
-  `gradlew-fdroid`, runs `fdroid scanner`, and compares that build against a cache-poor normal release
-  build signed with a throwaway runner key. Three gap checks in `scripts/fdroid-check.py` (`compare`,
-  `signing-blocks`, `metadata` — the last against the *live* fdroiddata recipe); `signing-blocks`
-  exists because `fdroid scanner` demonstrably does **not** flag the D-137 Play dependency blob. Every
-  stage exercised in both polarities before shipping; coverage limits in `FDROID_VALIDATION.md`, wired
-  into RUNBOOK playbook 6, CI-failure triage, and CONTRIBUTING.
-- 2026-07-28 — **DA-026** (owner-asked, from the vc19 F-Droid build log): **AGP 8.7.3 → 8.13.2**.
-  The log's "incompatible with Gradle 9.0" notice is three deprecations *inside AGP*, none from our
-  scripts, and F-Droid takes its Gradle version from our own `distributionUrl` — so nothing forced the
-  date; the bump was taken early on purpose, since a toolchain change cashes its risk at the next
-  release. Verified in F-Droid's own `fdroidserver:buildserver` image via its real
-  `gradlew-fdroid assembleRelease` entry point (Gradle seed checksum-matched to gradle.org *and* the
-  F-Droid transparency log): at 8.7.3 the rig reproduces the pasted log and the published v1.8.1 APK
-  content (119/119 CRCs); at 8.13.2 both warning classes vanish, `lintVitalRelease` passes, and the
-  F-Droid image and dev env emit an **identical whole-file SHA-256** APK. Delta vs 1.8.1 is 4 entries
-  (2 dex + baseline profile). Release-time re-verify obligation in RUNBOOK playbook 6 + Owner queue.
-- 2026-07-28 — **DA-025** (owner-started, verified + finished this session): README badge row now
-  distinguishes the two download sources — `Downloads (GitHub)` (live: 326) and a new
-  `Downloads (F-Droid)` (shields `dynamic/json` over the `kitswas/fdroid-metrics-dashboard`
-  per-package JSON), each linked to its own source. The F-Droid badge currently renders
-  `resource not found`: the URL template is correct (proved by substituting a published package,
-  which returns a real count) — the app only landed on F-Droid today, so the dashboard's daily
-  cronjob has no data file for `com.tideo.autobrightness` yet. It self-heals with no repo change.
-- 2026-07-28 — README install surface: official **"Get it on F-Droid" badge** + an Install step
-  naming F-Droid alongside Releases (both URLs verified live). **Owner-caught correction:** the two
-  sources do NOT use different signing keys — the fdroiddata recipe is reproducible-build mode
-  (`Binaries:` + `AllowedAPKSigningKeys` `3d2d9dd1…`), so F-Droid redistributes *our* signed APK and
-  the sources are interchangeable, no uninstall to switch.
-- 2026-07-28 — **DA-024** (owner-reported, store screenshot): the F-Droid listing showed the generic
-  placeholder icon because the app ships only an adaptive-icon XML and F-Droid can't rasterize one.
-  Added `fastlane/metadata/android/en-US/images/icon.png` (512×512) rendered from the new in-repo
-  source `docs/rebuild/design/store_icon.svg`; re-render lockstep is prose in RUNBOOK playbook 6
-  (no guard — DA-015 incident-only bar). Visible at the next tagged release, not retroactively.
-- 2026-07-24/25 — **DA-023** (PR #93 CI): release-preflight derives PR title/commits/files from the
-  checked-out repo instead of the GitHub CLI/API, so docs-only PRs stop being blocked by API flakes.
-  **DA-021** (triage #7): assessed the "Claude 5 context engineering" rules — no change (see the
-  decided non-item). **DA-020 → DA-022**: Ko-fi funding is a **repo-side surface only**
-  (`.github/FUNDING.yml` + README badge) — the in-app support card and the version bump that
-  accompanied it were owner-reversed pre-release, back to matching `main`.
-- 2026-07-24 — **DA-018** (owner-reported field bug): "Resume context automation" only republished
-  (`ContextEngine.reevaluate` + reapply) — never ran the resolver — so a matching rule didn't apply and
-  the active-profile label flipped to the hardcoded "Default" while the write-through settings kept the
-  loaded profile (indicator/settings diverged). Fix: a dedicated `ACTION_RESUME_CONTEXT` verb runs a
-  genuine `evaluate(RESUME)` then Set Initial Brightness (Tasker `_ContextResume` flow), and the resolver
-  fallback is now the persisted `%AAB_ProfileUser` = last manually-loaded profile (`ContextBaseline` v2,
-  `userProfileName`). Cut as **1.8.1 / vc19** (patch, on `main` after 1.8.0 shipped); debug APK + test
-  script sent to owner; awaiting owner on-device verify + release.
-- 2026-07-24 — **CI hang root-caused + fixed (DA-017)** (PR #91, two red runs):
-  `ForceDarkControllerTest` spawned the runner's real `su`, whose password prompt blocked
-  `rootExec`'s unbounded stdout read forever (named by run 2's jstack step; run 1's
-  config-cache-store theory disproven — flag kept as a cost skip). Fix in production code:
-  stdin closed at spawn + 15 s bounded wait with kill. CI hardening kept:
-  `--no-configuration-cache`, `~/.robolectric` cached, 20-min ladder step cap + jstack dump.
-- 2026-07-24 — **F-Droid inclusion complete; release PR opened:** `fdroiddata!41202` merged
-  (detail in Owner queue 1); release **PR #91** opened and retargeted to `main` with the
-  whole-train title/body; train tip advanced to this session's branch.
-- 2026-07-23 — **DA-016** (owner-reported field bug): curve-wizard Stage 1 top-K bubble-up
-  mis-ported (one swap per insert) → shortlist collapsed; ported the reference full pass,
-  regenerated `wizard.csv` (10/12 cases shifted), added sorted-descending test.
-- 2026-07-22 — **DA-015** (cross-model triage): differential sweep parity test (seeded, 5×4000);
-  ladder guard 11 falsifiable doc-facts; prompt v1.7→v1.8 (P0 thesis; P19/P20 back-port).
-  Also harness v1.6 export polish; runtime-Shizuku doc count corrected one → two (D-172).
-- 2026-07-21 — **DA-011…DA-014:** triages #4/#5 (declines above); bounded-recovery stop
-  condition (DA-012, discipline 6, harness v1.4); STATE compression-landing guard 1a (DA-014,
-  harness v1.5).
-- 2026-07-10..21 — **D-161…D-176 + DA-001…DA-010:** repo hardening (`ladder.sh` guards + test
-  suite, CI-run, deny rules + command guard, guarded Owner queue, secret hygiene D-175/
-  DA-006–DA-009); triages #1–#3; final adversarial audit; parity/relabel fixes; force dark;
-  agent-agnostic harness (D-176); branch-train (DA-002); STATE hysteresis (DA-004); harness
-  prompt v1.0→v1.3. Detail in each row.
+- 2026-07-28 — **1.8.2 / vc20 cut** (patch): release-preflight correctly classified the AGP bump as
+  shipping app code, so RUNBOOK §6 required the bump — taken rather than weakening the gate.
+- 2026-07-28 — **DA-026 → DA-028**: **AGP 8.7.3 → 8.13.2**, verified in F-Droid's own buildserver
+  image (at 8.7.3 the rig reproduces both the published log and the v1.8.1 APK content; at 8.13.2
+  the warnings vanish and two environments emit an identical whole-file SHA-256). Then the
+  **F-Droid compatibility CI** (DA-027) and its adversarial fixes (DA-028) — green on real
+  infrastructure at PR #96, but only after the pass caught that `upload-artifact`'s
+  least-common-ancestor rooting made stages 3+4 unpassable and that `paths:` + `tags:` are ANDed,
+  so the advertised release backstop never fired. Limits in `FDROID_VALIDATION.md`.
+- 2026-07-28 — **DA-024 + DA-025 + README install surface**: F-Droid store icon PNG (the listing
+  can't rasterize our adaptive-icon XML; lands at the next tagged release), split
+  GitHub/F-Droid download badges, and the "Get it on F-Droid" badge. **Owner-caught correction:**
+  the two download sources share one signing key — reproducible-build mode means F-Droid
+  redistributes *our* signed APK, so they are interchangeable.
+- 2026-07-23/25 — **DA-016, DA-018, DA-021, DA-023, DA-020→DA-022**: curve-wizard top-K bubble-up
+  mis-port fixed (`wizard.csv` regenerated); the **1.8.1/vc19** Resume-context field bug
+  (`ACTION_RESUME_CONTEXT` runs a genuine `evaluate(RESUME)`; resolver falls back to the persisted
+  `%AAB_ProfileUser`); release-preflight freed from the GitHub API; triage #7 (no change); Ko-fi as
+  a repo-side surface only, the in-app card owner-reversed pre-release.
+- 2026-07-10..24 — **D-161…D-176 + DA-001…DA-017**: repo hardening (ladder guards + fixture suite,
+  deny rules + command guard, guarded Owner queue, secret hygiene D-175/DA-006–DA-009); triages
+  #1–#6; agent-agnostic harness (D-176); branch-train (DA-002); STATE hysteresis (DA-004/DA-014);
+  the DA-017 CI hang (a test blocked forever on the runner's password-prompting `su`); F-Droid
+  inclusion (`fdroiddata!41202`); final adversarial audit; force dark; harness prompt v1.0→v1.8.
 - 2026-06-23..07-09 — **v1.0.0 Tasker→Kotlin rebuild** (Gate 3; frozen in `../history/`) →
   **1.7.0/vc17** → 1.8.0 close-out: D-096–D-160 — SDK 36/JDK 21/CodeQL, release CI, glue
   review, F-backlog, **Privileged Display** (D-151 pivot), intent control, a11y + crash-log,
