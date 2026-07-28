@@ -814,10 +814,13 @@
   rather than D-140's `disableAndStop()` — deliberately: `disableAndStop` persists
   `serviceEnabled = false`, which would be a **write** caused by a transient read failure, and its
   `LiveRuntimeState.reset()` + widget repaint are moot when nothing ever started.
-  `runtimeStarted`/`runtimeStartCount` exist so `onDestroy` does not `stop()` a
+  `runtimeStarted` exists so `onDestroy` does not `stop()` a
   `contextEngine`/`controller`/`displayToggles` that was never started (the display-toggle stop is
   a *baseline re-apply*, i.e. a privileged write — the one that must not fire on a service that
-  did nothing). `stickyRestartEnabledReader` is an `internal` test seam on the same precedent as
+  did nothing). Its companion `runtimeStartCount` deliberately does **not** latch, unlike the flag:
+  the concept PR incremented it only on the first activation, which made its own
+  "starts exactly once" supersession assertions unfalsifiable — a latched counter reads 1 whether
+  the gate was superseded correctly or fired a second `ensureRunning()` on top of the explicit start. `stickyRestartEnabledReader` is an `internal` test seam on the same precedent as
   `externalControlEnabled`: the race is otherwise untestable, because a real DataStore read
   completes before the test can interleave a superseding command.
   `[cited]`: `app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt`

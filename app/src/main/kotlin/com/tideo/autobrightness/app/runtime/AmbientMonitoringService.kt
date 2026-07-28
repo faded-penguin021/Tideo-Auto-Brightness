@@ -297,10 +297,11 @@ class AmbientMonitoringService : Service() {
     }
 
     private fun ensureRunning() {
-        if (!runtimeStarted) {
-            runtimeStarted = true
-            runtimeStartCount++
-        }
+        // DA-030: runtimeStarted LATCHES (onDestroy only needs "was the graph ever up"), but the
+        // counter must NOT — a latched counter cannot tell one activation from two, which is exactly
+        // what the supersession tests claim to prove.
+        runtimeStarted = true
+        runtimeStartCount++
         // Refresh the cached tier at the service-resume points (start / resume / reapply) so an
         // out-of-band grant is reflected without the per-cycle permission check the dimming path used
         // to do (G1-F5). currentTier() reads this cache thereafter.
