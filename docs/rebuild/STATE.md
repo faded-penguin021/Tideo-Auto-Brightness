@@ -33,9 +33,9 @@ next fix/feature. **Stacked on it: PR #99** (`claude/fold-prs-97-98-cdi4dp` → 
 folds the two concept PRs #97/#98 in as DA-029 (bounded profile import) + DA-030 (sticky-restart
 gate); #97/#98 are superseded and close unmerged. So vc20 is **no longer a packaging-only release** —
 it carries `app/` source and `changelogs/20.txt` says so; `domain/` and `platform/` are still
-byte-identical to 1.8.1. Merge order is #99 into the train branch first, then #96 squash-merges the
-whole train — **PR #96's body still describes the AGP-only diff and must be updated to the net
-`origin/main..HEAD` payload before that squash (DA-002).** At the tag: the one-shot DA-026
+byte-identical to 1.8.1. #99 is **merged** into the train branch and PR #96's title/body have been
+rewritten to the net `origin/main..HEAD` payload (DA-002 — the body becomes the squash commit), so
+#96 squash-merging the whole train is the remaining step. At the tag: the one-shot DA-026
 reproducibility check (RUNBOOK playbook 6) must not be
 skipped — 1.8.2 is the first release under the new AGP — and the DA-024 store icon lands with it.
 No other active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity tests green;
@@ -52,12 +52,10 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 **Pending owner actions:**
 
-1. Merge **PR #99** (`claude/fold-prs-97-98-cdi4dp` → `claude/gradle-deprecation-fdroid-870gh3`)
-   once CI is green, close **#97/#98** unmerged (superseded — their commits are contained in #99),
-   then **rewrite PR #96's body** to describe the net `origin/main..HEAD` train (it currently claims
-   "No `app/`/`domain/`/`platform/` source change", which #99 makes false — and the body becomes the
-   squash commit, DA-002). Then squash-merge **PR #96** → `main` and **cut 1.8.2 / vc20** from the
-   GitHub "Draft a new release" UI. The bump is already in the branch, so the release is tag + publish.
+1. Close **#97/#98** unmerged (superseded — their commits are contained in the merged #99), then
+   squash-merge **PR #96** → `main` and **cut 1.8.2 / vc20** from the GitHub "Draft a new release"
+   UI. The bump is already in the branch, so the release is tag + publish. (#99 is merged and #96's
+   title/body already describe the whole train, DA-002.)
 2. **At that tagged release (one-shot, DA-026):** after `release.yml` publishes, check F-Droid's
    build log for that versionCode reports `...successfully verified`. First release under AGP 8.13.2,
    so it is the first time F-Droid rebuilds our signed APK on the new toolchain — pre-verified in
