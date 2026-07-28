@@ -757,3 +757,68 @@
   superseded by this sentence (ledger rows are append-only, so the error stays visible).
   `[cited]`: `.github/workflows/fdroid-compat.yml` (artifact-staging and push-trigger comments),
   `scripts/fdroid-check.py` (the fail-closed rationale comments).
+
+- DA-029 [cited]: **Profile import is a bounded stream, not `readText()`** (folded from the concept
+  PR #97 into the 1.8.2 train). `ProfileImportExportManager.importFromDocument` read a
+  user-chosen SAF document with `bufferedReader().readText()` — an unbounded allocation driven by
+  a provider we do not control, so a multi-GB (or endless) document was an OOM on the UI path. Now
+  `readAndDecode` streams into a `ByteArrayOutputStream` with a `MAX_ENCODED_PROFILE_BYTES` =
+  256 KiB budget **plus one probe byte**: reading the cap exactly is accepted, cap+1 proves
+  overflow without buffering it, and the probe is what makes "exactly at the limit" and "one over"
+  distinguishable at all (a plain `read` up to the cap cannot tell a full buffer from a truncated
+  one). `OpenableColumns.SIZE` is used **only** as an early reject — a provider's declared size is
+  a hint from the same untrusted source as the bytes, so a lying small size still hits the
+  streamed bound; there is a test for exactly that bypass. Decoding is strict UTF-8
+  (`CodingErrorAction.REPORT` on malformed **and** unmappable input) rather than the replacement
+  behaviour of `readText()`, because silently substituting U+FFFD turns "this file is not a
+  profile" into a confusing parse error further down. Two new `ProfileLoadResult` variants
+  (`TooLarge`, `ReadFailure`) carry those outcomes to the one exhaustive `when` in
+  `ProfilesContextsScreen` (`ProfilesScreen` only renders the resulting string, so it needed no
+  change) with their own strings — an oversized file and a corrupt one are different user
+  problems and the old single `profiles_unreadable` conflated them. Two consequences worth
+  knowing: (1) `importFromAppPrivate` **no longer throws** `FileNotFoundException` for a missing
+  app-private profile, it returns `ReadFailure` — the two import entry points now have the same
+  total signature, and no production caller relied on the throw (only tests did); (2) the
+  parser-exception detail was dropped from the `Log.w`/`Log.e` lines, since a failing parse quotes
+  imported content into logcat that the D-158 crash-log capture can then surface — the strings are
+  still carried on `TotalFailure` for the caller, they are just not logged. The 256 KiB number is
+  deliberately loose (a full pretty-printed export is a few KiB); this is an allocation bound, not
+  a schema constraint, and it must not be tightened into one.
+  `[cited]`: `app/src/main/kotlin/com/tideo/autobrightness/app/settings/ProfileImportExportManager.kt`
+  (the cap constant and the declared-size-is-a-hint comment).
+
+- DA-030 [cited]: **`START_STICKY` restarts gate the runtime on the persisted opt-in** (folded
+  from the concept PR #98 into the 1.8.2 train; **extends the D-140 defense, does not replace
+  it**). D-140 already knew the hole — the OS restarts a killed FGS with a **null** intent, and
+  the user may have disabled the service while the old process was dead (the toggle's
+  `stopService` is a no-op then) — but its fix ran `ensureRunning()` **first** and tore the
+  pipeline down afterwards from a `scope.launch`. So a disabled service still briefly started the
+  sensors, the brightness writer, the context engine and the display-toggle writes: a
+  start-then-undo, and the undo wrote settings the user had switched off. Now the **null-intent
+  path alone** defers `ensureRunning()` behind an async read of the persisted `serviceEnabled`;
+  the foreground notification is still posted synchronously at the top of `onStartCommand`, so
+  the FGS deadline is met by a notification with no runtime behind it — that ordering is the whole
+  reason this can be async at all. Explicit (non-null) intents keep the **synchronous**
+  `ensureRunning()` and skip the read entirely: every explicit starter persists `serviceEnabled`
+  before sending (`BootCompletedReceiver` and `MaintenanceWorker` read it, `ControlReceiver`/tile/
+  widget `updateData` it first) — verified caller-by-caller, and that invariant is what this
+  branch rests on, so a **new** ACTION_START sender must pre-persist or it must not use this path.
+  Three race guards, all necessary and none sufficient alone: a monotonic `stickyRestartGeneration`
+  bumped by every command and by `onDestroy`; a `destroyed` flag; and re-checking both on
+  `mainHandler.post` **after** the read returns, because `Job.cancel()` cannot stop a coroutine
+  that has already passed its last suspension point — cancellation alone would still let a stale
+  read call `ensureRunning()` on a dying service. The read **fails closed**: an unreadable store
+  yields `false` (`CancellationException` rethrown first, so cancellation is never mistaken for
+  corruption), because the failure mode to avoid is a foregrounded service holding sensors and
+  writers with nobody having asked for it. The disabled outcome calls `stopNotRunning(startId)`
+  rather than D-140's `disableAndStop()` — deliberately: `disableAndStop` persists
+  `serviceEnabled = false`, which would be a **write** caused by a transient read failure, and its
+  `LiveRuntimeState.reset()` + widget repaint are moot when nothing ever started.
+  `runtimeStarted`/`runtimeStartCount` exist so `onDestroy` does not `stop()` a
+  `contextEngine`/`controller`/`displayToggles` that was never started (the display-toggle stop is
+  a *baseline re-apply*, i.e. a privileged write — the one that must not fire on a service that
+  did nothing). `stickyRestartEnabledReader` is an `internal` test seam on the same precedent as
+  `externalControlEnabled`: the race is otherwise untestable, because a real DataStore read
+  completes before the test can interleave a superseding command.
+  `[cited]`: `app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt`
+  (the gate, the generation/destroyed comments and the fail-closed rationale).

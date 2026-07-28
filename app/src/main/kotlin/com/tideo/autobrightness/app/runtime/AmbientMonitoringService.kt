@@ -24,6 +24,7 @@ import com.tideo.autobrightness.app.storage.controlPrefsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
 import com.tideo.autobrightness.platform.display.ForceDarkController
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -68,6 +69,22 @@ class AmbientMonitoringService : Service() {
     // D-172: one-shot per service instance (kept non-null after completion so ensureRunning's
     // re-entries — resume/reapply — never re-bind Shizuku).
     private var forceDarkJob: Job? = null
+    // DA-030 (extends D-140): state for the null-intent START_STICKY gate. The generation counter is
+    // bumped by every command AND by onDestroy, and re-checked on the main thread after the read
+    // returns — cancel() alone cannot stop a coroutine that has already passed its last suspension,
+    // so cancellation is necessary but not sufficient to keep a stale read from starting the runtime.
+    private var stickyRestartGateJob: Job? = null
+    private var stickyRestartGeneration = 0L
+    private var destroyed = false
+    // DA-030: test seam for holding the sticky-restart DataStore read in flight (same precedent as
+    // externalControlEnabled below). Production always reads the persisted setting; a real read
+    // completes before a test can interleave the superseding command the race is about.
+    internal var stickyRestartEnabledReader: suspend () -> Boolean = {
+        applicationContext.settingsDataStore.data.first().serviceEnabled
+    }
+    internal var runtimeStartCount = 0
+        private set
+    private var runtimeStarted = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // Rising-edge latch so the high-priority override alert + toast fire ONCE per override, not on
@@ -141,6 +158,15 @@ class AmbientMonitoringService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
         )
 
+        // A real command supersedes a pending OS-restart decision. In particular ACTION_START is
+        // trusted because every explicit starter persists serviceEnabled before sending it, so it
+        // retains the existing synchronous startup latency and semantics.
+        if (intent != null) {
+            stickyRestartGeneration++
+            stickyRestartGateJob?.cancel()
+            stickyRestartGateJob = null
+        }
+
         when (intent?.action) {
             ACTION_PAUSE -> {
                 // D-140: startForegroundService CREATES the service, so a PAUSE aimed at "the running
@@ -205,14 +231,53 @@ class AmbientMonitoringService : Service() {
                 return START_NOT_STICKY
             }
             else -> {
-                ensureRunning()
-                // D-140 defense for the START_STICKY hole: an OS sticky restart (null intent) re-runs
-                // the pipeline unconditionally, but the user may have disabled the service while it was
-                // dead (the toggle's stopService is a no-op then) — re-check the persisted flag and tear
-                // down if it says off. All explicit starters already pre-check serviceEnabled, so for
-                // them this read is a cheap no-op.
-                scope.launch {
-                    if (!applicationContext.settingsDataStore.data.first().serviceEnabled) disableAndStop()
+                if (intent != null) {
+                    // DA-030: an explicit start keeps the synchronous path and skips the read. Every
+                    // explicit starter already establishes serviceEnabled first — BootCompletedReceiver
+                    // and MaintenanceWorker read it before sending, ControlReceiver/tile/widget
+                    // updateData it before sending. A NEW ACTION_START sender must do the same or it
+                    // does not belong on this branch.
+                    ensureRunning()
+                } else {
+                    // DA-030, extending the D-140 defense for the START_STICKY hole (D-140 called
+                    // ensureRunning() first and undid it after, so a disabled service still briefly
+                    // ran sensors, the brightness writer and the display-toggle writes):
+                    // an OS restart supplies a null intent,
+                    // and the user may have disabled the service while its old process was dead. The
+                    // foreground notification above satisfies the FGS deadline, but NOTHING in the
+                    // runtime graph starts until DataStore confirms the persisted opt-in. A later null
+                    // delivery replaces this decision; the startId paired with the winning read is the
+                    // one stopped on the disabled path.
+                    stickyRestartGateJob?.cancel()
+                    val generation = ++stickyRestartGeneration
+                    stickyRestartGateJob = scope.launch {
+                        val enabled = try {
+                            stickyRestartEnabledReader()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // A corrupt/unreadable store must fail closed rather than strand an empty
+                            // START_STICKY foreground service indefinitely.
+                            false
+                        }
+                        // Lifecycle commands are delivered on main. Serialize the decision there too:
+                        // cancel() alone cannot stop a coroutine that has returned from its last
+                        // suspension, whereas this generation check makes supersession/destruction
+                        // authoritative even in that completion race.
+                        mainHandler.post {
+                            if (destroyed || stickyRestartGeneration != generation) return@post
+                            stickyRestartGateJob = null
+                            if (enabled) {
+                                ensureRunning()
+                            } else {
+                                // NOT D-140's disableAndStop(): that persists serviceEnabled = false,
+                                // which would turn a transient read failure into a write, and its
+                                // LiveRuntimeState.reset() + widget repaint are moot when the runtime
+                                // never started.
+                                stopNotRunning(startId)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -232,6 +297,10 @@ class AmbientMonitoringService : Service() {
     }
 
     private fun ensureRunning() {
+        if (!runtimeStarted) {
+            runtimeStarted = true
+            runtimeStartCount++
+        }
         // Refresh the cached tier at the service-resume points (start / resume / reapply) so an
         // out-of-band grant is reflected without the per-cycle permission check the dimming path used
         // to do (G1-F5). currentTier() reads this cache thereafter.
@@ -584,14 +653,19 @@ class AmbientMonitoringService : Service() {
         // assumes for onDestroy.)
         if (externalControlEnabled) broadcastStateChanged(enabled = false, running = false, paused = false, profile = null)
         runCatching { unregisterReceiver(screenReceiver) }
+        destroyed = true
+        stickyRestartGeneration++
+        stickyRestartGateJob?.cancel(); stickyRestartGateJob = null
         panicJob?.cancel(); panicJob = null
         stateEventJob?.cancel(); stateEventJob = null
-        contextEngine.stop()
-        controller.stop()
-        // Return the display toggles to the baseline profile's values (D-151 resting state): a
-        // context-profile override must not outlive the runtime that applies it. Before
-        // scope.cancel() so the coordinator can serialize against an in-flight apply.
-        displayToggles.stop()
+        if (runtimeStarted) {
+            contextEngine.stop()
+            controller.stop()
+            // Return the display toggles to the baseline profile's values (D-151 resting state): a
+            // context-profile override must not outlive the runtime that applies it. Before
+            // scope.cancel() so the coordinator can serialize against an in-flight apply.
+            displayToggles.stop()
+        }
         // Watchdog instead of an immediate reset (S12.9d): if the OS restarts the FGS and it
         // republishes within the grace window, the live data survives; otherwise it is cleared so the
         // Dashboard does not show a stale "live" snapshot for a dead loop. A genuine user-driven stop

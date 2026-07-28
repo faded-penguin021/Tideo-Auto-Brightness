@@ -43,8 +43,10 @@ class ProfileImportExportManager(
     companion object {
         private const val TAG = "ProfileImport"
 
-        // A full pretty-printed AabSettings export is only a few KiB. This leaves ample room for
-        // future fields and legacy configs while bounding allocations from untrusted providers.
+        // DA-029: an allocation bound, NOT a schema constraint — a full pretty-printed AabSettings
+        // export is only a few KiB, and the slack is deliberate (future fields, fat legacy configs).
+        // Do not tighten it to "what a profile needs"; its job is to stop an untrusted SAF provider
+        // from driving an unbounded read on the import path.
         internal const val MAX_ENCODED_PROFILE_BYTES = 256 * 1024
     }
 
@@ -74,6 +76,9 @@ class ProfileImportExportManager(
     }
 
     suspend fun importFromDocument(uri: Uri, resolver: ContentResolver = context.contentResolver): ProfileLoadResult {
+        // DA-029: OpenableColumns.SIZE is a HINT, never the bound. It comes from the same untrusted
+        // provider as the bytes, so it can only buy an early reject — a provider that under-reports
+        // still meets the streamed cap in readAndDecode.
         val declaredSize = runCatching {
             resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
@@ -89,6 +94,13 @@ class ProfileImportExportManager(
         }
     }
 
+    /**
+     * DA-029: read at most [MAX_ENCODED_PROFILE_BYTES] **plus one probe byte** and decode as strict
+     * UTF-8. The probe byte is what makes "exactly at the cap" and "one over" distinguishable — a
+     * read that stops at the cap cannot tell a full buffer from a truncated one. Strict decoding
+     * (REPORT, not the U+FFFD substitution `readText()` does) keeps "not a profile file" from
+     * arriving at the parser as a confusing syntax error.
+     */
     internal fun readAndDecode(input: InputStream, declaredSize: Long? = null): ProfileLoadResult {
         if (declaredSize != null && declaredSize > MAX_ENCODED_PROFILE_BYTES) {
             return ProfileLoadResult.TooLarge
