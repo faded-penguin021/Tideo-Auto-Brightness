@@ -26,8 +26,10 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 **Shipped: v1.8.1** (vc19, tagged — PR #92 merged: the DA-018 Resume-context fix + DA-019 changelog
 char-count guard; v1.8.0/vc18 before it). **No release pending** — this session's branch is
-docs/repo-surface only (DA-020→DA-022 funding links, DA-021 triage #7); `app/`, `domain/`, and
-`platform/` are byte-identical to `main`, so vc20 stays unassigned for the next real release. No other
+docs/repo-surface + F-Droid metadata only (DA-020→DA-022 funding links, DA-021 triage #7, DA-024
+store icon); `app/`, `domain/`, and
+`platform/` are byte-identical to `main`, so vc20 stays unassigned for the next real release.
+The DA-024 store icon reaches F-Droid only when it builds the **next tagged release**. No other
 active work; no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity
 tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 `DEVIATIONS_LEDGER.md` (live `_A.md`).
@@ -42,9 +44,13 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 **Pending owner actions:**
 
-1. Merge this session's branch (`claude/ko-fi-integration-3midbd`) once CI is green — no PR opened
-   yet (none requested); the PR body becomes the squash commit, no `[skip ci]`-class tokens (D-115).
-   **No release follows** — docs/repo-surface only, no version bump, nothing to tag.
+1. Merge this session's branch (`claude/fdroid-store-icon-missing-fp9721`, cut from `main` at 13de281
+   — the previous train landed as PR #93) once CI is green; no PR opened yet (none requested), and the
+   PR body becomes the squash commit, so no `[skip ci]`-class tokens (D-115). **No release follows on
+   its own** — docs + F-Droid metadata only, no version bump, nothing to tag. But note the payoff is
+   release-gated: the DA-024 store icon shows up in F-Droid clients only after F-Droid builds the
+   **next tagged release**, so it rides along with whatever ships next rather than fixing 1.8.1's
+   listing.
 
 **Open questions:** (none)
 
@@ -91,6 +97,11 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-28 — **DA-024** (owner-reported, store screenshot): the F-Droid listing showed the generic
+  placeholder icon because the app ships only an adaptive-icon XML and F-Droid can't rasterize one.
+  Added `fastlane/metadata/android/en-US/images/icon.png` (512×512) rendered from the new in-repo
+  source `docs/rebuild/design/store_icon.svg`; re-render lockstep is prose in RUNBOOK playbook 6
+  (no guard — DA-015 incident-only bar). Visible at the next tagged release, not retroactively.
 - 2026-07-25 — **DA-023** (PR #93 CI): release-preflight no longer calls the GitHub CLI/API to read PR title/commits/files; it derives the same data from the checked-out full-history repository (`github.event.pull_request.*` SHAs + local `git log`/`git diff`) so docs-only PRs are not blocked by repeated GitHub API/internal-server failures.
 - 2026-07-24 — **DA-021** (triage #7, owner-asked): assessed the "Claude 5 context engineering"
   rules against this harness — verdict no change (detail in the decided non-item above).
