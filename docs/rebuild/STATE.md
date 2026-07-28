@@ -24,15 +24,17 @@ tile, boot receiver). Privileges: **BASIC** `WRITE_SETTINGS` = full core pipelin
 
 ## Current state
 
-**Shipped: v1.8.1** (vc19, tagged; v1.8.0/vc18 before it). **No release pending** — no version bump,
-so vc20 stays unassigned for the next real release. Train tip `claude/badge-workflow-verify-77m62f`
-(DA-025); this session's branch is cut from it and carries the **AGP 8.7.3 → 8.13.2** bump (DA-026)
-plus the **F-Droid compatibility CI** (DA-027, `fdroid-compat.yml`). No `app/`/`domain/`/`platform/`
-source change — but the AGP bump does change the next release's APK (`classes*.dex` + baseline
-profile), so the one-shot DA-026 reproducibility check at the next tag (RUNBOOK playbook 6) must not
-be skipped; the DA-024 store icon also lands only at that next tagged release. No other active work;
-no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity tests green; TODO/FIXME 0;
-`parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
+**Shipped: v1.8.1** (vc19, tagged). **Release pending: 1.8.2 / vc20** — cut on this branch because the
+AGP bump changes the shipped APK (release-preflight's classifier correctly flagged it; RUNBOOK §6
+requires the bump, and weakening the gate was never an option). Patch, per §6: internal/packaging, no
+user-visible behavior change. `fastlane/.../changelogs/20.txt` written. Train tip
+`claude/badge-workflow-verify-77m62f` (DA-025); this branch is cut from it and carries **AGP 8.7.3 →
+8.13.2** (DA-026) + the **F-Droid compatibility CI** (DA-027), open as **PR #96**. No
+`app/`/`domain/`/`platform/` source change. At the tag: the one-shot DA-026 reproducibility check
+(RUNBOOK playbook 6) must not be skipped — 1.8.2 is the first release under the new AGP — and the
+DA-024 store icon lands with it. No other active work; no plan files. `PARITY_CHECKLIST.md`
+zero-`pending`; parity tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`;
+deviations in `DEVIATIONS_LEDGER.md` (live `_A.md`).
 
 ## Owner queue
 
@@ -44,7 +46,10 @@ no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity tests green; TODO/FI
 
 **Pending owner actions:**
 
-1. **At the next tagged release (one-shot, DA-026):** after `release.yml` publishes, check F-Droid's
+1. Squash-merge **PR #96** (`claude/gradle-deprecation-fdroid-870gh3` → `main`) once CI is green,
+   then **cut 1.8.2 / vc20** from the GitHub "Draft a new release" UI. The bump is already in the
+   branch, so the release is just tag + publish.
+2. **At that tagged release (one-shot, DA-026):** after `release.yml` publishes, check F-Droid's
    build log for that versionCode reports `...successfully verified`. First release under AGP 8.13.2,
    so it is the first time F-Droid rebuilds our signed APK on the new toolchain — pre-verified in
    their own buildserver image, but never on the GitHub Actions runner. Full bullet + what a mismatch
@@ -95,6 +100,9 @@ no plan files. `PARITY_CHECKLIST.md` zero-`pending`; parity tests green; TODO/FI
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-28 — **1.8.2 / vc20 cut** (patch): the DA-026 AGP bump changes the shipped APK, so
+  release-preflight's ships-app-code classifier required the version bump (RUNBOOK §6) — taken as a
+  patch (internal/packaging, no behavior change) rather than weakening the gate. Changelog `20.txt`.
 - 2026-07-28 — **DA-027** (owner-specified design): **F-Droid compatibility CI** —
   `fdroid-compat.yml` rebuilds the commit in F-Droid's own `fdroidserver:buildserver` image via their
   `gradlew-fdroid`, runs `fdroid scanner`, and compares that build against a cache-poor normal release
@@ -130,14 +138,12 @@ One line per shipped change (newest first); detail in the D-rows and git history
   Added `fastlane/metadata/android/en-US/images/icon.png` (512×512) rendered from the new in-repo
   source `docs/rebuild/design/store_icon.svg`; re-render lockstep is prose in RUNBOOK playbook 6
   (no guard — DA-015 incident-only bar). Visible at the next tagged release, not retroactively.
-- 2026-07-25 — **DA-023** (PR #93 CI): release-preflight no longer calls the GitHub CLI/API to read PR title/commits/files; it derives the same data from the checked-out full-history repository (`github.event.pull_request.*` SHAs + local `git log`/`git diff`) so docs-only PRs are not blocked by repeated GitHub API/internal-server failures.
-- 2026-07-24 — **DA-021** (triage #7, owner-asked): assessed the "Claude 5 context engineering"
-  rules against this harness — verdict no change (detail in the decided non-item above).
-- 2026-07-24 — **DA-020 → DA-022** (owner-requested, then owner-reversed pre-release): Ko-fi funding
-  is a **repo-side surface only** — `.github/FUNDING.yml` (`ko_fi: fadedpenguin021`, drives the repo
-  Sponsor button; GitHub reads the file, not a settings toggle) plus a shields.io badge in the README
-  badge row. The About-screen support card, its strings/test, the 1.8.2/vc20 bump and `20.txt` were
-  all reverted to match `main`; no in-app donation link and no F-Droid `Donate:` field ship.
+- 2026-07-24/25 — **DA-023** (PR #93 CI): release-preflight derives PR title/commits/files from the
+  checked-out repo instead of the GitHub CLI/API, so docs-only PRs stop being blocked by API flakes.
+  **DA-021** (triage #7): assessed the "Claude 5 context engineering" rules — no change (see the
+  decided non-item). **DA-020 → DA-022**: Ko-fi funding is a **repo-side surface only**
+  (`.github/FUNDING.yml` + README badge) — the in-app support card and the version bump that
+  accompanied it were owner-reversed pre-release, back to matching `main`.
 - 2026-07-24 — **DA-018** (owner-reported field bug): "Resume context automation" only republished
   (`ContextEngine.reevaluate` + reapply) — never ran the resolver — so a matching rule didn't apply and
   the active-profile label flipped to the hardcoded "Default" while the write-through settings kept the
