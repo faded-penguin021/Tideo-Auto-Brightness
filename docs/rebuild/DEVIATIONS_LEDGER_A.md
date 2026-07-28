@@ -597,3 +597,25 @@
   (the whole point is that no production code references this).
 
 - DA-023: Release-preflight PR metadata source hardened. PR #93 exposed a recurring CI failure where the `release-preflight.yml` guard depended on `gh pr view`/GitHub API calls for data already present in a full-history checkout (PR title from the event payload, commits from `git log base..head`, files from `git diff base...head`). The gate now uses local git plus `github.event.pull_request.*` SHAs, removing `pull-requests: read` and the external API hop while preserving the D-115 title+commit scan, golden-fixture gate, and ships-app-code classifier.
+
+- DA-024: F-Droid store icon shipped as a PNG — the listing showed the client's generic placeholder
+  (owner screenshot, Droid-ify "Geïnstalleerd" list, 2026-07-28). Root cause: the app's only launcher
+  icon is `app/src/main/res/mipmap-anydpi/ic_launcher.xml`, an `<adaptive-icon>` over two vector
+  drawables, with no raster mipmap at any density (correct for the app — minSdk 31 — but F-Droid's
+  index generation cannot rasterize an XML icon resource, so it emits no icon and the client falls
+  back to its placeholder). The rest of the listing was already correct, which localizes the fault
+  precisely: the title and summary Droid-ify displays are verbatim `fastlane/metadata/android/en-US/`
+  `title.txt` + `short_description.txt`, so F-Droid *is* reading our fastlane tree — only
+  `images/icon.png` was missing from it. Fix: add that file, 512×512, rendered from
+  `docs/rebuild/design/store_icon.svg` — a 1:1 hand transcription of `ic_launcher_background.xml`
+  (full-bleed teal gradient) + `ic_launcher_foreground.xml` (S13c "Radial Dial", 0.88 group scale),
+  kept in-repo as the regeneration source with its rasterizer recipe in the file header. Nothing in
+  `app/`/`domain/`/`platform/` changes; the adaptive icon on-device is untouched and stays the
+  on-device icon. **Two consequences worth stating:** (1) the store PNG is a *copy* of the launcher
+  vectors, so a launcher-icon change that skips the re-render silently ships a stale store icon — the
+  lockstep is prose-enforced in RUNBOOK playbook 6, deliberately NOT a ladder guard, because DA-015's
+  incident-only bar is binding and the drift incident it would anchor has not occurred (the incident
+  here is a *missing* icon, not a drifted one; add the guard if and when a stale render ships).
+  (2) F-Droid regenerates listing metadata when it builds a **new tagged release**, so the icon
+  appears at the next release, not retroactively on 1.8.1 — nothing to do on the owner's side but
+  ship the next version. `[cited]`: none (metadata + docs only; no production code path).

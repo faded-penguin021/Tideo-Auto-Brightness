@@ -81,8 +81,17 @@ decision logic are golden-tested against a transcription of the original Tasker 
 
 ## Install
 
+<p align="center">
+  <a href="https://f-droid.org/packages/com.tideo.autobrightness/"><img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="80"></a>
+</p>
+
 1. **Disable** the system's stock Adaptive/Auto Brightness (Settings → Display).
-2. Install the APK from [Releases][releases].
+2. Install from **[F-Droid][fdroid]** (recommended — automatic updates), or grab the APK directly
+   from [Releases][releases]. Both are the **same APK**: F-Droid rebuilds each tagged release from
+   this repo's source, verifies it byte-for-byte against the published release APK, and distributes
+   that binary with its original developer signature (a *reproducible build* — `Binaries:` +
+   `AllowedAPKSigningKeys` in the F-Droid recipe). So the two sources are interchangeable: you can
+   switch either way, or update from whichever is faster, with no uninstall and no loss of settings.
 3. Launch Tideo, complete onboarding (grant notifications + *Modify system settings*), and toggle the **main service** on from the Dashboard.
 
 `minSdk` 31 (Android 12) · `target`/`compile` SDK 36.
@@ -220,4 +229,5 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the **Bug report** issue template.
 
 [aab]: https://github.com/faded-penguin021/AdvancedAutoBrightness
 [releases]: https://github.com/faded-penguin021/tideo-auto-brightness/releases
+[fdroid]: https://f-droid.org/packages/com.tideo.autobrightness/
 [dkma]: https://dontkillmyapp.com

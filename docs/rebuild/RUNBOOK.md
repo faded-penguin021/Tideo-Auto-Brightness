@@ -165,6 +165,14 @@ so check it explicitly.
   and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release
   body; just keep this file accurate. (If it's missing, the release still publishes with only the auto
   "What's Changed".)
+- **F-Droid store icon (DA-024):** the listing icon comes from
+  `fastlane/metadata/android/en-US/images/icon.png` (512×512), **not** from the APK — F-Droid cannot
+  rasterize our adaptive-icon XML (`mipmap-anydpi/ic_launcher.xml`), so with no PNG the client shows
+  its generic placeholder. That PNG is a rendered copy of the launcher vectors, so **any launcher-icon
+  change must re-render it in the same unit** — source + one-line recipe in
+  `docs/rebuild/design/store_icon.svg`. No guard enforces the lockstep (the incident-only bar, DA-015:
+  the drift itself hasn't happened yet); this bullet is the check. The icon only reaches the store
+  when F-Droid builds a **new tagged release** — an existing release's listing never backfills.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
   process, a `DEVIATIONS_LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
   (D-127): the history lives in `STATE.md`, the ledger, the fastlane changelogs, and git — the gradle

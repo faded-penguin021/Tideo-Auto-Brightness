@@ -1,0 +1,40 @@
+<!--
+  F-Droid / store icon SOURCE (DA-024). Hand-transcribed 1:1 from the adaptive launcher icon:
+  app/src/main/res/drawable/ic_launcher_background.xml (teal gradient, full-bleed 108x108) +
+  ic_launcher_foreground.xml (S13c "Radial Dial" mark, 0.88 group scale about the centre).
+  F-Droid cannot rasterize an adaptive-icon XML, so the store listing needs a PNG; this file is
+  the regeneration source for fastlane/metadata/android/en-US/images/icon.png.
+
+  Regenerate after ANY launcher-icon change (RUNBOOK playbook 6, F-Droid store icon):
+      python3 -c "import cairosvg; cairosvg.svg2png(url='docs/rebuild/design/store_icon.svg', \
+        write_to='fastlane/metadata/android/en-US/images/icon.png', \
+        output_width=512, output_height=512)"
+  (any SVG rasterizer at 512x512 works — rsvg-convert, Inkscape, resvg). VectorDrawable pathData
+  is SVG path syntax, so paths copy across verbatim; the only translations are the aapt gradient
+  -> <linearGradient>, the <group> scale -> a transform, and #47FFFFFF -> stroke-opacity 0.278.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="54" y1="0" x2="54" y2="108">
+      <stop offset="0" stop-color="#00A986"/>
+      <stop offset="1" stop-color="#007C63"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background: full-bleed brand teal gradient (ic_launcher_background.xml) -->
+  <path d="M0,0 L108,0 L108,108 L0,108 Z" fill="url(#bg)"/>
+
+  <!-- foreground: ic_launcher_foreground.xml, 0.88 group scale about (54,54) -->
+  <g transform="translate(54,54) scale(0.88) translate(-54,-54)">
+    <path fill="none" stroke="#FFC107" stroke-width="5" stroke-linecap="round"
+          d="M54,35 L54,29 M67.44,40.56 L71.68,36.32 M73,54 L79,54
+             M67.44,67.44 L71.68,71.68 M54,73 L54,79 M40.56,67.44 L36.32,71.68
+             M35,54 L29,54 M40.56,40.56 L36.32,36.32"/>
+    <path fill="#FFC107" d="M54,41 A13,13 0 1,1 53.99,41 Z"/>
+    <path fill="none" stroke="#FFFFFF" stroke-opacity="0.278" stroke-width="5" stroke-linecap="round"
+          d="M54,24 A30,30 0 1,1 29.43,71.21"/>
+    <path fill="none" stroke="#FFC107" stroke-width="5" stroke-linecap="round"
+          d="M54,24 A30,30 0 0,1 84,54"/>
+    <path fill="#FFFFFF" d="M84,48 A6,6 0 1,1 83.99,48 Z"/>
+  </g>
+</svg>
