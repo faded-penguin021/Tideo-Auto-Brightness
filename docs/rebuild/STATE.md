@@ -95,6 +95,9 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-28 — Fixed null-intent `START_STICKY` restarts to await the persisted service-enabled
+  flag behind the already-posted foreground notification before activating any runtime component;
+  explicit starts stay synchronous, and pending gates are safely superseded or destroyed.
 - 2026-07-28 — **1.8.2 / vc20 cut** (patch): release-preflight correctly classified the AGP bump as
   shipping app code, so RUNBOOK §6 required the bump — taken rather than weakening the gate.
 - 2026-07-28 — **DA-026 → DA-028**: **AGP 8.7.3 → 8.13.2**, verified in F-Droid's own buildserver
