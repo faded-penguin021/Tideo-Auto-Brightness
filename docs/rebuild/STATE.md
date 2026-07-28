@@ -44,9 +44,10 @@ tests green; TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; de
 
 **Pending owner actions:**
 
-1. Merge this session's branch (`claude/fdroid-store-icon-missing-fp9721`, cut from `main` at 13de281
-   — the previous train landed as PR #93) once CI is green; no PR opened yet (none requested), and the
-   PR body becomes the squash commit, so no `[skip ci]`-class tokens (D-115). **No release follows on
+1. Squash-merge **PR #95** (`claude/fdroid-store-icon-missing-fp9721` → `main`, cut from `main` at
+   13de281 — the previous train landed as PR #93) once CI is green; opened from the Claude Code UI,
+   body already describes the net `origin/main..HEAD` diff and is `[skip ci]`-clean (D-115).
+   **No release follows on
    its own** — docs + F-Droid metadata only, no version bump, nothing to tag. But note the payoff is
    release-gated: the DA-024 store icon shows up in F-Droid clients only after F-Droid builds the
    **next tagged release**, so it rides along with whatever ships next rather than fixing 1.8.1's
