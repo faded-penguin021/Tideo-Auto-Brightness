@@ -86,10 +86,12 @@ decision logic are golden-tested against a transcription of the original Tasker 
 </p>
 
 1. **Disable** the system's stock Adaptive/Auto Brightness (Settings → Display).
-2. Install from **[F-Droid][fdroid]** (built and signed by F-Droid from this repo's tagged source, with
-   automatic updates), or grab the APK directly from [Releases][releases] if you prefer the build
-   signed by the developer. The two are signed by different keys, so pick one and stay with it —
-   switching later needs an uninstall, which wipes your settings.
+2. Install from **[F-Droid][fdroid]** (recommended — automatic updates), or grab the APK directly
+   from [Releases][releases]. Both are the **same APK**: F-Droid rebuilds each tagged release from
+   this repo's source, verifies it byte-for-byte against the published release APK, and distributes
+   that binary with its original developer signature (a *reproducible build* — `Binaries:` +
+   `AllowedAPKSigningKeys` in the F-Droid recipe). So the two sources are interchangeable: you can
+   switch either way, or update from whichever is faster, with no uninstall and no loss of settings.
 3. Launch Tideo, complete onboarding (grant notifications + *Modify system settings*), and toggle the **main service** on from the Dashboard.
 
 `minSdk` 31 (Android 12) · `target`/`compile` SDK 36.

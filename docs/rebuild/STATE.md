@@ -101,7 +101,11 @@ One line per shipped change (newest first); detail in the D-rows and git history
   (`f-droid.org/badge/get-it-on.png` — the owner-specified English asset; a shields.io variant was
   declined, and the `.svg` at the same path is the alternate) linking to
   `f-droid.org/packages/com.tideo.autobrightness/`, plus an Install step naming F-Droid as a source
-  alongside Releases with the different-signing-key caveat. Both URLs verified live (HTTP 200).
+  alongside Releases. Both URLs verified live (HTTP 200). **Correction in the same session
+  (owner-caught):** the step first claimed the two sources use different signing keys — false. The
+  fdroiddata recipe is reproducible-build mode (`Binaries:` + `AllowedAPKSigningKeys`
+  `3d2d9dd1…`, verified against the live YAML, the D-137 submission landing), so F-Droid
+  redistributes *our* signed APK — the sources are interchangeable, no uninstall to switch.
 - 2026-07-28 — **DA-024** (owner-reported, store screenshot): the F-Droid listing showed the generic
   placeholder icon because the app ships only an adaptive-icon XML and F-Droid can't rasterize one.
   Added `fastlane/metadata/android/en-US/images/icon.png` (512×512) rendered from the new in-repo
