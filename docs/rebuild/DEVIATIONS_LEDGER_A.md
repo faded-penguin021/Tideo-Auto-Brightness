@@ -893,3 +893,19 @@
   progress, nullable-stream failure, and value-free exception logs remain the outer transport guard.
   `[cited]`: `ProfileImportExportManager.kt`, `ImportStructureGuard.kt`, `UserProfileStore.kt`, and
   `SettingsViewModel.kt` (native/legacy boundary, structural/store bounds, validation and consent).
+
+- DA-037 [cited]: the geo-IP security/privacy review retained the explicit default-off feature but
+  closed its untrusted-network and retry boundaries. `GeoIpLocationClient` now refuses redirects,
+  bounds declared and streamed bodies to 16 KiB, uses a structural JSON parser requiring literal
+  `success:true` plus finite in-range numeric coordinates, disconnects on coroutine cancellation, and
+  propagates cancellation. `CircadianWindowProvider` independently validates every acquired snapshot
+  before state/persistence and records an attempt for the day even on failure, preventing sensor cycles
+  from repeatedly spending battery or disclosing the public IP. Failures preserve the last safe cached
+  location/default windows. TLS deliberately trusts Android's platform CAs without pinning; the fixed
+  HTTPS endpoint, app-wide cleartext ban, disabled redirects, strict low-impact response contract, and
+  fail-closed semantics make pin-rotation availability risk unjustified. UI/store/README disclosures now
+  name the third party, public-IP disclosure, automatic daily bound, per-tap manual request, and local
+  coordinate persistence; no coordinate logging exists and backup rules exclude this DataStore.
+  `[cited]`: `GeoIpLocationClient.kt` and `CircadianWindowProvider.kt` (transport/parser/cancellation and
+  consumer/retry boundaries, including a persisted daily attempt marker); full caller, policy, persistence and trust assessment in
+  `architecture/geo_ip_audit.md`.

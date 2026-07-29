@@ -100,6 +100,12 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 ## Changelog
 
+- 2026-07-29 — DA-037 completed the geo-IP fallback review: retained explicit default-off consent and
+  local-first ordering; added redirect refusal, a 16 KiB response cap, structural JSON and strict
+  coordinate validation, cancellation propagation/disconnect, fail-closed consumer validation, and a
+  once-per-day failed-attempt bound; expanded UI/privacy copy for public-IP disclosure, manual-request
+  frequency and on-device coordinate persistence.
+
 - 2026-07-29 — DA-036 completed the profile import/export adversarial review: bounded JSON and
   legacy structures/numbers/catalogs, strict native schemas and fields, collision-safe private
   filenames, validation at every persistence/apply boundary, and secure toggles preserved on direct

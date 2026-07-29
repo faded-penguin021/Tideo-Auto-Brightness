@@ -79,16 +79,26 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         val lat = prefs[SUN_LAT]
         val lon = prefs[SUN_LON]
         val day = prefs[SUN_DAY]
-        if (lat != null && lon != null && day != null) CachedSunLocation(lat, lon, day) else null
+        if (lat != null && lon != null && day != null && validCoordinates(lat, lon)) {
+            CachedSunLocation(lat, lon, day)
+        } else null
     }
 
     /** Persist the daily-resolved location (D-103). */
     suspend fun writeCachedSunLocation(latitude: Double, longitude: Double, day: Long) {
+        if (!validCoordinates(latitude, longitude)) return
         dataStore.edit { prefs ->
             prefs[SUN_LAT] = latitude
             prefs[SUN_LON] = longitude
             prefs[SUN_DAY] = day
         }
+    }
+
+    /** DA-037: persisted disclosure bound, so process death cannot repeat an automatic lookup today. */
+    suspend fun readGeoIpAttemptDay(): Long? = dataStore.data.first()[GEO_IP_ATTEMPT_DAY]
+
+    suspend fun writeGeoIpAttemptDay(day: Long) {
+        dataStore.edit { it[GEO_IP_ATTEMPT_DAY] = day }
     }
 
     /** Revert to live data (today + current location) — mirrors `_ExperimentClearDate`. */
@@ -109,6 +119,12 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         val SUN_LAT = doublePreferencesKey("sun_cached_lat")
         val SUN_LON = doublePreferencesKey("sun_cached_lon")
         val SUN_DAY = longPreferencesKey("sun_cached_day")
+        val GEO_IP_ATTEMPT_DAY = longPreferencesKey("geo_ip_attempt_day")
+
+        fun validCoordinates(latitude: Double, longitude: Double): Boolean =
+            latitude.isFinite() && latitude in -90.0..90.0 &&
+                longitude.isFinite() && longitude in -180.0..180.0 &&
+                (latitude != 0.0 || longitude != 0.0)
     }
 }
 
