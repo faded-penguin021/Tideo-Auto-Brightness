@@ -100,6 +100,8 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 ## Changelog
 
+- 2026-07-29 — DA-034 completed the manifest/privacy audit: permission request, disclosure, denial and revocation flows; explicit cloud/transfer allowlists for every personal-data category; stronger DUMP/elevated copy; and debug-only throwable logging with local crash diagnostics excluded from migration. Background location remains declared but has no second-stage in-app grant flow, now documented honestly.
+
 One line per shipped change (newest first); detail in the D-rows and git history.
 
 - 2026-07-29 — DA-033 reverted the unsanctioned DA-032 repository/container bootstrap changes;

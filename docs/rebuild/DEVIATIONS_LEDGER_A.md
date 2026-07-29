@@ -852,3 +852,22 @@
   select JDK 21 directly and must not source this removed repository path. This rollback does not
   modify that external configuration; it restores the existing repository SDK helper, session
   hook, ladder, README, and `CLAUDE.md` unchanged.
+
+- DA-034 [cited]: the permission/privacy audit replaced implicit backup and release-diagnostic
+  assumptions with enforceable minimization. Android 12+ extraction rules are now allowlists: cloud
+  receives only core settings + saved profiles; direct device transfer additionally receives
+  user-authored context rules; coordinates/cache, SSIDs/app identities in cloud, behavioral points,
+  health/power diagnostics, context baselines, device-local consent flags, crash traces and root
+  app-private profile exports transfer nowhere. The default-on service state is deliberately portable
+  (fresh installs also start enabled), while default-off geo-IP/external-control consent is not. A unit
+  test locks both allowlists. Every manifest
+  permission and the Accessibility binding now has a feature/request/disclosure/denial/revocation
+  trace; notably, `ACCESS_BACKGROUND_LOCATION` is declared but has no implemented second-stage grant
+  flow, so docs no longer claim it is offered. DUMP copy now acknowledges the broad permission while
+  bounding Tideo's use to discarded `dumpsys wifi` output; elevated copy enumerates its secure display
+  effects and revocation. Finally, release builds no longer send process-coroutine throwables to
+  logcat (`BuildConfig.DEBUG` gate); fixed profile outcome logs remain value-free, and crash stacks
+  remain explicit-copy, app-private diagnostics excluded from all migration.
+  `[cited]`: `app/src/main/res/xml/data_extraction_rules.xml` (privacy allowlists/comment),
+  `app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AppProcessScope.kt` (debug-only throwable),
+  and `app/src/test/kotlin/com/tideo/autobrightness/app/DataExtractionRulesTest.kt` (contract).
