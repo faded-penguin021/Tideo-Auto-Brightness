@@ -871,3 +871,11 @@
   `[cited]`: `app/src/main/res/xml/data_extraction_rules.xml` (privacy allowlists/comment),
   `app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AppProcessScope.kt` (debug-only throwable),
   and `app/src/test/kotlin/com/tideo/autobrightness/app/DataExtractionRulesTest.kt` (contract).
+
+- DA-035 [cited]: the F-Droid compatibility workflow's Node-24 policy named
+  `actions/download-artifact@v6` as Node 24 without checking the action's actual default runtime;
+  v6 still declares `runs.using: node20` and caused CI's deprecation notice. All three download steps
+  now use `actions/download-artifact@v7`, the action's explicit Node-24 migration (v7 otherwise keeps
+  the v4+ artifact contract used here). The workflow comment now records the precise v6/v7 boundary
+  so the policy describes the pin rather than merely asserting it.
+  `[cited]`: `.github/workflows/fdroid-compat.yml` (Node runtime policy and all download steps).

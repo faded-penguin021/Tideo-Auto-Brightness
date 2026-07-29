@@ -21,7 +21,8 @@ name: F-Droid compatibility
 #
 # Node 24 runtime policy (see build.yml): every action pinned here is a major declaring
 # `runs.using: node24` — checkout@v5, setup-java@v5, setup-android@v4, cache@v5,
-# upload-artifact@v6, download-artifact@v6. Do NOT downgrade any of them.
+# upload-artifact@v6, download-artifact@v7. In particular, download-artifact v6 still declares (DA-035)
+# `runs.using: node20`; v7 is its Node 24 migration. Do NOT downgrade any of them.
 on:
   pull_request:
     paths:
@@ -245,13 +246,13 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download normal release build
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: normal-release-build
           path: normal/
 
       - name: Download F-Droid build
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: fdroid-release-build
           path: fdroid/
@@ -308,7 +309,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download normal release build
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: normal-release-build
           path: normal/

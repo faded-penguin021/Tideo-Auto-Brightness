@@ -64,9 +64,9 @@ not automatic logs or telemetry; clipboard export always follows an explicit tap
 ## Opt-in and disclosure result
 
 - Geo-IP defaults off and names `ipwho.is`; accessibility overlay, usage access, location, DUMP,
-  elevated access, external automation control, and the monitoring service all require separate user
-  action except that monitoring itself is intentionally default-on and visibly foregrounded. Context
-  collectors are feature/rule gated. There is no telemetry or automatic upload path.
+  elevated access and external automation control all require separate user action. Monitoring itself
+  is intentionally default-on and visibly foregrounded. Context collectors are feature/rule gated.
+  There is no telemetry or automatic upload path.
 - The revised elevated and DUMP copy describes actual capability rather than understating it. The
   accessibility metadata and UI disclose presentation-only behavior and prevent window-content read.
 - The incomplete background-location grant flow is the one disclosure/behavior gap found. Until a

@@ -18,9 +18,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- F89 audit: the context-rule location gate + once-a-day circadian sun refresh read location
          from the foreground service while the UI is backgrounded (specialUse FGS, not a location FGS),
-         which needs background-location access on API 29+. Declared so the capability exists; the
-         Background access is declared for that capability, but DA-034 found no implemented second-stage
-         "Allow all the time" request/deep-link; normal installs therefore run this path foreground-only. -->
+         which needs background-location access on API 29+. Declared so the capability exists, but
+         DA-034 found no implemented second-stage "Allow all the time" request/deep-link; normal
+         installs therefore run this path foreground-only. -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- task528 panic: S.O.S. morse vibration pattern (prof769 → _PanicButton act0, code62). -->
     <uses-permission android:name="android.permission.VIBRATE" />
