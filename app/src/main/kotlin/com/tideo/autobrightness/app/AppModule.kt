@@ -115,6 +115,8 @@ class AppModule(context: Context) {
             // instead of falling back to TimeContext defaults until re-acquired (Tasker %AAB_SunLat/…).
             loadCachedLocation = { experimentPrefs.readCachedSunLocation() },
             persistLocation = { lat, lon, day -> experimentPrefs.writeCachedSunLocation(lat, lon, day) },
+            loadGeoIpAttemptDay = { experimentPrefs.readGeoIpAttemptDay() },
+            persistGeoIpAttemptDay = { day -> experimentPrefs.writeGeoIpAttemptDay(day) },
         )
 
         val controller = BrightnessPipelineController(

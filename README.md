@@ -151,11 +151,13 @@ request, and only as a last resort:
 
 - **IP-geolocation fallback (optional, off by default, HTTPS).** Circadian scaling needs an approximate location to compute local sunrise/sunset. Tideo tries, in order: a fixed latitude/longitude you pin → the device's
   last-known location → a fresh GPS/network fix. Only if *all* of those are unavailable does it fall
-  back to a single `GET https://ipwho.is/` (HTTPS) to estimate your city
-  from your public IP. **You can turn it off** under
+  back to a single `GET https://ipwho.is/` (HTTPS), disclosing your public IP to that third party so it
+  can estimate your city. **You can turn it off** under
   **Circadian → Date & location → "IP-based location fallback"**, and it is **off until you opt in**. When
-  it is off, Tideo never contacts ipwho.is. The same opt-in fallback also backs the Circadian **"Use
-  current location"** button when no on-device fix is available.
+  it is off, Tideo never contacts ipwho.is. Automatic acquisition is attempted at most once per day;
+  successful approximate coordinates are stored only in the app's on-device preferences so circadian
+  state survives a restart. The same opt-in fallback also backs the Circadian **"Use current location"**
+  button when no on-device fix is available; each user tap can make one additional request.
 
 Everything else runs entirely on-device.
 

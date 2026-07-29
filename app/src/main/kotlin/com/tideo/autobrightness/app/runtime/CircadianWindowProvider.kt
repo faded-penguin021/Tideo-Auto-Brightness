@@ -6,6 +6,7 @@ import com.tideo.autobrightness.domain.circadian.SolarCalculator
 import com.tideo.autobrightness.platform.context.LocationReader
 import com.tideo.autobrightness.platform.context.LocationResult
 import com.tideo.autobrightness.platform.context.LocationSnapshot
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -88,6 +89,8 @@ class CircadianWindowProvider(
     private val loadCachedLocation: suspend () -> CachedSunLocation? = { null },
     private val persistLocation: suspend (latitude: Double, longitude: Double, day: Long) -> Unit =
         { _, _, _ -> },
+    private val loadGeoIpAttemptDay: suspend () -> Long? = { null },
+    private val persistGeoIpAttemptDay: suspend (day: Long) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
     // F73: offset at the TARGET instant, not "now" — covers DST and fixed dates in another season.
     private val tzOffsetForDate: (dateEpochSec: Long) -> Double = { dateEpochSec ->
@@ -106,6 +109,8 @@ class CircadianWindowProvider(
     // F83: the once-a-day acquired location (Android or geo-IP), keyed by the day it was acquired for.
     @Volatile private var resolvedLoc: LocationSnapshot? = null
     @Volatile private var resolvedDay: Long = Long.MIN_VALUE
+    @Volatile private var attemptedDay: Long = Long.MIN_VALUE
+    @Volatile private var acquisitionReady = false
     private val acquiring = AtomicBoolean(false)
 
     // D-110: fired when a location resolves AFTER construction (cache seed or a fresh acquire) so the
@@ -125,7 +130,7 @@ class CircadianWindowProvider(
         get() = _onWindowsRefreshed
         set(value) {
             _onWindowsRefreshed = value
-            if (resolvedLoc != null) value()
+            if (resolvedLoc != null || acquisitionReady) value()
         }
 
     /** D-110: the location backing the live circadian modifier + its freshness, for the UI staleness
@@ -138,6 +143,7 @@ class CircadianWindowProvider(
         // F39 override drives the windows; invalidate the cache (and force a re-acquire) when it changes.
         scope.launch {
             overrideFlow.collect {
+                if (it == override) return@collect
                 override = it
                 cacheKey = null
                 resolvedDay = Long.MIN_VALUE
@@ -148,15 +154,17 @@ class CircadianWindowProvider(
         // instead of falling back to TimeContext defaults. Don't clobber a fresher in-memory fix that
         // a concurrent acquire may already have set. current() still re-acquires when the day rolls.
         scope.launch {
-            val cached = runCatching { loadCachedLocation() }.getOrNull() ?: return@launch
-            if (resolvedLoc == null) {
-                resolvedLoc = LocationSnapshot(cached.latitude, cached.longitude)
+            val cached = cancellableOrNull { loadCachedLocation() }
+            val cachedSnapshot = cached?.let { LocationSnapshot(it.latitude, it.longitude) }
+            if (resolvedLoc == null && cachedSnapshot?.hasValidCoordinates() == true) {
+                resolvedLoc = cachedSnapshot
                 resolvedDay = cached.day
                 cacheKey = null
-                // D-110: recompute now that a (possibly day-old) cached location is available — the
-                // initial brightness may already have been set with the default windows in stable light.
-                onWindowsRefreshed()
             }
+            cancellableOrNull { loadGeoIpAttemptDay() }?.let { attemptedDay = it }
+            acquisitionReady = true
+            // Recompute from a cache, or re-enter current() now that the persisted attempt gate is known.
+            onWindowsRefreshed()
         }
     }
 
@@ -177,7 +185,7 @@ class CircadianWindowProvider(
             LocationSnapshot(ov.latitude!!, ov.longitude!!)
         } else {
             // F83: acquire (once a day, async) when we have no fix or the day rolled over.
-            if (resolvedLoc == null || resolvedDay != day) triggerAcquire(day)
+            if (acquisitionReady && (resolvedLoc == null || resolvedDay != day)) triggerAcquire(day, todayDay)
             // D-110: fall back to the last resolved location even when the day has rolled over and no
             // fresh fix is available (location + geo-IP off) — recompute TODAY's windows with the cached
             // coordinates instead of returning null → the default-window 0.85. status records the age so
@@ -200,19 +208,27 @@ class CircadianWindowProvider(
     }
 
     // F83: task90 act5–41 acquisition order, async — Android last-known → fresh fix → ipwho.is.
-    private fun triggerAcquire(day: Long) {
+    private fun triggerAcquire(locationDay: Long, attemptDay: Long) {
+        if (attemptedDay == attemptDay) return
         if (!acquiring.compareAndSet(false, true)) return
+        // DA-037: success or failure, bound automatic acquisition to once per real calendar day.
+        // The manual UI action remains separately user-triggered and can retry once per tap.
+        attemptedDay = attemptDay
         scope.launch {
             try {
+                // Persist before any network work. Failure still leaves the in-process bound intact.
+                cancellableOrNull { persistGeoIpAttemptDay(attemptDay) }
                 val snap = location.lastKnownLocation()
-                    ?: (runCatching { location.currentLocation() }.getOrNull() as? LocationResult.Available)?.snapshot
+                    ?: (cancellableOrNull { location.currentLocation() } as? LocationResult.Available)?.snapshot
                     ?: geoIpFallback()
-                if (snap != null) {
+                // DA-037: every acquisition source is untrusted at this boundary. An invalid endpoint
+                // response or corrupt system/cache value must not replace the last safe circadian state.
+                if (snap != null && snap.hasValidCoordinates()) {
                     resolvedLoc = snap
-                    resolvedDay = day
+                    resolvedDay = locationDay
                     cacheKey = null // recompute windows with the freshly acquired location
                     // D-103: persist so the next cold start reuses it before re-acquiring.
-                    runCatching { persistLocation(snap.latitude, snap.longitude, day) }
+                    cancellableOrNull { persistLocation(snap.latitude, snap.longitude, locationDay) }
                     // D-110: a fresh fix landed asynchronously — recompute so the modifier updates even
                     // if the light is steady (no sensor cycle would otherwise call current() again).
                     onWindowsRefreshed()
@@ -221,6 +237,19 @@ class CircadianWindowProvider(
                 acquiring.set(false)
             }
         }
+    }
+
+    private fun LocationSnapshot.hasValidCoordinates(): Boolean =
+        latitude.isFinite() && latitude in -90.0..90.0 &&
+            longitude.isFinite() && longitude in -180.0..180.0 &&
+            (latitude != 0.0 || longitude != 0.0)
+
+    private suspend fun <T> cancellableOrNull(block: suspend () -> T): T? = try {
+        block()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
     }
 
     companion object {

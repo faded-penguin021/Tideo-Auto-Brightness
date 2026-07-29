@@ -578,7 +578,7 @@
     <string name="help_scale_transition">Duration of the dawn/dusk transition.</string>
     <string name="help_taper_midpoint">Brightness level where compression centres.</string>
     <string name="help_taper_steepness">Slope of the dynamic-range compression.</string>
-    <string name="help_circadian_ip_fallback">Off by default. When GPS/network gives no fix and no fixed location is set, turn this on to look up an approximate location from your public IP via ipwho.is (HTTPS). This also powers \"Use current location\" below when no on-device fix is available.</string>
+    <string name="help_circadian_ip_fallback">Off by default. Only when GPS/network gives no fix and no fixed location is set, this sends your public IP to ipwho.is over HTTPS to look up approximate coordinates. The automatic lookup runs at most once per day and saves the coordinates on this device; \"Use current location\" can also make one lookup each time you tap it after on-device location fails.</string>
 
     <!-- Profiles import/export status (shown as a toast) -->
     <string name="toast_exported">Exported.</string>

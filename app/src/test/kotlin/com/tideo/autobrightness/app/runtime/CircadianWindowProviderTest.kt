@@ -219,6 +219,80 @@ class CircadianWindowProviderTest {
         scope.cancel()
     }
 
+    @Test
+    fun invalidGeoIpFix_isNotPersistedOrApplied() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        var persisted = false
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(),
+            geoIpFallback = { LocationSnapshot(91.0, 5.0) },
+            persistLocation = { _, _, _ -> persisted = true },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+
+        assertNull(provider.current(transitionFactor), "invalid fallback must preserve fail-closed defaults")
+        assertFalse(persisted, "invalid coordinates must not corrupt the persisted circadian cache")
+        scope.cancel()
+    }
+
+    @Test
+    fun failedAutomaticAcquisition_isAttemptedOnlyOncePerDay() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        var requests = 0
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(),
+            geoIpFallback = { requests++; null },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+
+        repeat(10) { assertNull(provider.current(transitionFactor)) }
+        assertEquals(1, requests, "pipeline evaluations must not repeatedly disclose the public IP")
+        scope.cancel()
+    }
+
+    @Test
+    fun persistedAttemptDay_preventsRetryAfterProcessRestart() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val today = midJuneEpochSec() / 86_400L
+        var requests = 0
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(),
+            geoIpFallback = { requests++; null },
+            loadGeoIpAttemptDay = { today },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+
+        repeat(3) { assertNull(provider.current(transitionFactor)) }
+        assertEquals(0, requests, "persisted daily gate must survive process death")
+        scope.cancel()
+    }
+
+    @Test
+    fun corruptPersistedLocation_isRejected() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation()),
+            location = FakeLocationReader(),
+            geoIpFallback = { null },
+            loadCachedLocation = { CachedSunLocation(Double.NaN, 5.0, midJuneEpochSec() / 86_400L) },
+            clock = { midJuneEpochSec() * 1000L },
+            tzOffsetForDate = { 2.0 },
+        )
+
+        assertNull(provider.current(transitionFactor), "corrupt cache must not enter circadian state")
+        scope.cancel()
+    }
+
     // ----- D-103: persist/restore the once-a-day location across process restarts -----
 
     @Test

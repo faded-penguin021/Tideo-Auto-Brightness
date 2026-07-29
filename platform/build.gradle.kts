@@ -36,6 +36,7 @@ android {
 dependencies {
     implementation(project(":domain"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.shizuku.api)
 
     testImplementation(libs.kotlin.test)
