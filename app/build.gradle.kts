@@ -68,6 +68,9 @@ android {
     }
 
     buildFeatures {
+        // Privacy audit (DA-034): AppProcessScope uses the variant constant to compile raw
+        // throwable logging out of release behavior while retaining actionable debug logs.
+        buildConfig = true
         compose = true
     }
 

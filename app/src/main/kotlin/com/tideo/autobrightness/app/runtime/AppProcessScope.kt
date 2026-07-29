@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.runtime
 
 import android.content.BroadcastReceiver
 import android.util.Log
+import com.tideo.autobrightness.BuildConfig
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,8 +16,9 @@ import kotlinx.coroutines.launch
  * Replaces the ad-hoc `CoroutineScope(Dispatchers.*)` instances that were previously allocated
  * per-call and never cancelled — each one a small structured-concurrency leak (its [Job] was rooted
  * nowhere and could neither be observed nor cancelled). A [SupervisorJob] keeps one failed child from
- * cancelling its siblings, and a logging [CoroutineExceptionHandler] surfaces a crash in detached
- * work instead of letting it vanish silently.
+ * cancelling its siblings. Detached failures are logged with their throwable only in debug builds:
+ * exception messages and stacks can contain URIs, package names, or system state and therefore must
+ * not become release-log diagnostics.
  *
  * Scope ownership policy (the audit, deliverable #1):
  *  - Use this for process-scoped fire-and-forget launches with no narrower owner — the
@@ -29,7 +31,9 @@ object AppProcessScope : CoroutineScope {
     private const val TAG = "AppProcessScope"
 
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        Log.e(TAG, "Uncaught exception in process-scoped coroutine", throwable)
+        if (BuildConfig.DEBUG) {
+            Log.e(TAG, "Uncaught exception in process-scoped coroutine", throwable)
+        }
     }
 
     override val coroutineContext = SupervisorJob() + Dispatchers.Default + exceptionHandler

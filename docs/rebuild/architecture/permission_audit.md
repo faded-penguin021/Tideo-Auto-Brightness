@@ -1,29 +1,74 @@
-# Permission audit (S12.9c #9)
+# Permission, consent, and revocation audit (DA-034)
 
-Every permission declared in `app/src/main/AndroidManifest.xml`, why it exists, the feature that needs
-it, whether it is in v1 scope, whether it is removable, and the S14 recommendation. **Docs only — S14
-decides actual removals / the release-grade permission set.**
+Source of truth: `app/src/main/AndroidManifest.xml`, its referenced component XML, and the call sites
+named below. “Denied” includes never granted; “revoked” means a previously working grant/app-op is
+removed. Every optional privacy-sensitive path fails closed or falls back; none uploads telemetry.
 
-| Permission | Use | Feature | v1 scope | Removable | S14 recommendation |
-|---|---|---|---|---|---|
-| `WRITE_SETTINGS` | write `Settings.System` screen brightness + brightness mode | Core pipeline (BASIC tier) | ✅ yes | ❌ no | **Keep.** Foundational; user-grantable. |
-| `WRITE_SECURE_SETTINGS` | write `Settings.Secure` `reduce_bright_colors` (super dimming) | Super dimming (ELEVATED tier) | ✅ yes | ❌ no (feature-defining) | **Keep.** `signature\|privileged`; granted via ADB/Shizuku/root, not at runtime. `tools:ignore=ProtectedPermissions` is expected. |
-| `POST_NOTIFICATIONS` | the ongoing FGS notification + override notification | Foreground service runtime | ✅ yes | ❌ no | **Keep.** Runtime-requested on API 33+; guarded by `< TIRAMISU` for 31/32. |
-| `FOREGROUND_SERVICE` | run `AmbientMonitoringService` | Service runtime | ✅ yes | ❌ no | **Keep.** |
-| `FOREGROUND_SERVICE_SPECIAL_USE` | the `specialUse` FGS subtype (continuous light monitoring) | Service runtime | ✅ yes | ❌ no | **Keep.** Verify the Play `specialUse` declaration/justification at release (S14). |
-| `RECEIVE_BOOT_COMPLETED` | restart monitoring after reboot | `BootCompletedReceiver` | ✅ yes | ⚠️ optional | **Keep** (expected UX: auto-start on boot). |
-| `PACKAGE_USAGE_STATS` | read the foreground app for per-app context rules | Context rules (app trigger) | ✅ yes (contexts) | ⚠️ yes, if per-app rules cut | **Keep.** appop; granted via the usage-access deep-link, not a dialog. Only meaningful when an app rule exists. |
-| `ACCESS_COARSE_LOCATION` | context location gate + circadian sunrise/sunset | Contexts + circadian | ✅ yes | ⚠️ yes, if location features cut | **Keep**, but make optional/lazy (already requested in the Setup Location step). |
-| `ACCESS_FINE_LOCATION` | precise location for the context location gate | Contexts | ✅ yes | ⚠️ yes | **Re-evaluate.** COARSE may suffice for the haversine gate radius; consider dropping FINE at S14 if precision isn't needed. |
-| `ACCESS_BACKGROUND_LOCATION` | location reads from the FGS while UI backgrounded (API 29+) | Contexts + daily sun refresh | ✅ yes | ⚠️ yes | **Re-evaluate.** Heaviest Play-policy item. Confirm it's truly needed vs. foreground-only reads; document justification or drop at S14. |
-| `VIBRATE` | panic S.O.S. morse pattern (task528 / prof769) | Panic button | ✅ yes | ⚠️ optional | **Keep** (cheap, normal permission). |
-| `INTERNET` | geo-IP location fallback (`ipwho.is`, HTTPS — D-121) when no Android fix (task90 act28) | Circadian location fallback + Circadian "Use current location" (D-120) | ✅ yes | ⚠️ yes | **Keep** (owner-binding fallback, D-069). Now **HTTPS** (D-121): the prior `ip-api.com` cleartext exception is removed. The fallback is opt-in/default-off (D-105). |
-| `DUMP` | in-process `dumpsys wifi` for the no-Location SSID read (DumpsysWifiSsidStrategy) | Wi-Fi context rules without Location (D-130) | ✅ yes (contexts) | ⚠️ optional | **Keep (declared, D-130).** `signature\|privileged` but ALSO `development`, so user-grantable over ADB (`pm grant … android.permission.DUMP`), exactly like `WRITE_SECURE_SETTINGS`. Ungranted the `dumpsys wifi` exec is permission-denied and the SSID read falls through (Shizuku/root `cmd wifi status` → Location). `tools:ignore=ProtectedPermissions` is expected. **Security:** read-only diagnostics, no writes/escalation; user-initiated ADB grant only (never requested at runtime), revoked on uninstall; the app invokes only `dumpsys wifi`. DUMP *in general* is a broad info-disclosure surface (other services' dumps), which is why it stays **opt-in** behind Shizuku/root/Location, not nudged. Low risk for an informed user granting it to this open-source build. |
+| Permission / binding | Exact feature and use | Request flow and user explanation | Denial behavior | Revocation behavior |
+|---|---|---|---|---|
+| `WRITE_SETTINGS` | BASIC-tier core: `ScreenBrightnessController` writes system brightness and brightness mode. | Setup opens `ACTION_MANAGE_WRITE_SETTINGS`; the required card says it grants brightness control and that the service otherwise cannot change brightness. This is a special-access screen, not a runtime dialog. | Tier is `NONE`; UI and service may run, but guarded writes fail/no-op rather than crash. Setup remains incomplete but is skippable. | `PrivilegeManager.refresh()` observes the loss. Later writes fail safely; Android retains whatever brightness/mode was last written until the user or system changes it. |
+| `WRITE_SECURE_SETTINGS` | ELEVATED tier: super dimming (`reduce_bright_colors`) and profile display toggles (Night Light/temperature, color correction, inversion, AOD, stay-awake while charging, force-SDR). Secure settings are written directly after the grant. | Optional Setup/Privileged Display cards disclose the secure-display effects. It cannot be runtime-requested: the user chooses ADB, one-tap Shizuku grant, or root; ADB is always shown. | BASIC brightness remains fully functional; every elevated write is gated/no-op. The profile preferences remain stored for a later grant. | Tier falls on the next refresh and future secure writes stop. Revocation does **not** restore prior system values; the last applied values remain system state. Revoke with `adb shell pm revoke … WRITE_SECURE_SETTINGS` or uninstall. |
+| `DUMP` | Optional no-Location SSID strategy runs only fixed `dumpsys wifi`, parses the connected SSID in memory, discards all other bounded output, then falls through to other strategies as needed. | Never requested or nudged during Setup. “Use current SSID” help appears only after other reads fail, describes DUMP as broad system diagnostics, states this app's fixed read-only command/no output retention, and offers a copyable ADB grant command. | `dumpsys` is permission-denied; SSID resolution falls through to Shizuku/root `cmd wifi status`, then the Location-gated network API. Wi-Fi rules receive no SSID if all fail. | Identical to denial on the next read; already persisted rule SSIDs are not deleted. Revoke with `adb shell pm revoke … DUMP` or uninstall. |
+| `PACKAGE_USAGE_STATS` | `UsageStatsManager` polls activity-resumed events for package identities used by per-app context rules. Identities are held in runtime state; user-selected package names also live in context rules. | Optional Setup step deep-links to `ACTION_USAGE_ACCESS_SETTINGS`. It becomes “needed” only when an app rule exists and explains foreground-app detection; the Context editor also provides the grant hint/link. | The app watcher is not started without an app rule and permission. App-trigger matching stays unavailable; other context dimensions and brightness continue. | Permission is checked when the watcher is configured/restarted; queries then return no usable events, so package matches stop. Stored app rules remain for a future re-grant. |
+| `ACCESS_COARSE_LOCATION` | Approximate Android location for circadian sunrise/sunset, location-radius rules, and the final platform SSID fallback. | Optional Setup runtime request asks coarse and fine together after explaining location rules and Wi-Fi-name fallback. Android may grant approximate only. The circadian screen separately discloses/controls the **network** fallback. | Android fixes are unavailable. Circadian uses its daily cache/default sun times (or opt-in geo-IP); location rules cannot match; SSID tries no-Location strategies first. | Readers catch the security failure/stop producing fixes. Existing context geofences and the last daily circadian cache remain stored, but no new Android location is acquired. |
+| `ACCESS_FINE_LOCATION` | Precise form of the same Android-location read, principally useful for small-radius geofences; Android may downgrade the combined request to approximate. | Same optional coarse+fine dialog; there is no separate fine-only prompt. The current Setup copy does not claim that precise location is mandatory. | With coarse granted, approximate fixes still drive the same features with reduced accuracy; with neither grant, coarse denial behavior applies. | Android can downgrade to approximate while the app runs; later reads use that accuracy. Stored coordinates are unchanged. |
+| `ACCESS_BACKGROUND_LOCATION` | Intended to allow location-rule and daily circadian acquisition while the special-use foreground service runs with the UI backgrounded. | **Declared but not requested by current code.** Setup requests only coarse/fine; there is no second-stage “Allow all the time” request or app-settings deep-link. Therefore normal installs do not grant it. This gap is documented rather than represented as consent obtained. | Foreground/UI location acquisition works; background delivery is OS-limited and background-dependent matches/refreshes may wait until the app returns foreground. The service and non-location rules continue. | Same as denial; no crash and no deletion of rules/caches. A grant, if manually made in App info, can be removed there at any time. |
+| `POST_NOTIFICATIONS` | Shows the ongoing foreground-service control/status notification and override/permission-needed notifications. | On API 33+, `MainActivity` may show the runtime dialog at launch and Setup provides a clearly labelled retry card. API 31–32 auto-grant it. | The foreground service may still run, but Android suppresses notification-drawer visibility; in-app status, tile/widget controls, and core brightness continue. | Later notification posts are suppressed. Service settings and runtime opt-in do not change. |
+| `FOREGROUND_SERVICE` | Base permission for `AmbientMonitoringService`, which continuously consumes the light sensor and controls brightness. | Normal install permission; no dialog. Monitoring is enabled by default to match the shipped Tasker behavior and starts on app bootstrap; the persistent notification makes operation visible and Dashboard/tile/widget/notification can stop it. | Install/platform policy failure prevents FGS start; the start path posts a permission-needed state rather than silently doing background work. | Not independently user-revocable; disabling/stopping the app/service ends collection and brightness writes. |
+| `FOREGROUND_SERVICE_SPECIAL_USE` | Declares the FGS subtype used for continuous ambient-light monitoring; the manifest property gives that exact justification. | Normal install permission, no dialog. The default-on master service setting, user controls, and ongoing notification provide the visible control surface; this is not represented as an opt-in permission. | If the platform refuses this type, monitoring cannot remain active in background. | Not independently user-revocable; stopping the service or app removes the behavior. |
+| `RECEIVE_BOOT_COMPLETED` | `BootCompletedReceiver` restarts monitoring after boot **only** when persisted `serviceEnabled` is true. | Normal install permission, no dialog. `serviceEnabled` defaults true and is persisted; the Dashboard/tile/widget/notification stop action changes it to false before the next boot. | No automatic restart; opening/starting the app manually still works. | Android does not offer a standalone revoke. Disabling master service prevents the receiver from starting it; force-stop also suppresses broadcasts until next launch. |
+| `VIBRATE` | Panic/reset gesture emits the Tasker S.O.S. vibration pattern after stopping automation and forcing safe brightness. | Normal install permission, no dialog; the Panic feature is user-triggered/configured. | Reset/maximum-brightness safety action still runs; only haptic confirmation is absent. | Not independently user-revocable on supported Android versions; system haptic/device policy may suppress output. |
+| `INTERNET` | Sole app network client is `GeoIpLocationClient`, an HTTPS request to `ipwho.is` for coarse coordinates when Android supplies no fix. No analytics, ads, profile sync, or command transport. Cleartext is disabled globally. | Normal install permission, no dialog. Network use is **default off** and enabled only by the circadian “IP fallback” switch, whose copy names the third party and purpose. | With the toggle off, no request is attempted. Offline/failed/invalid responses return unavailable; cached/default sun times remain and the brightness pipeline continues. | Not independently user-revocable by Android; turning the feature switch off immediately prevents future requests. Firewall/network loss follows denial behavior. |
+| `ACCESS_NETWORK_STATE` | `ConnectivityManager`/`NetworkCallback` observes Wi-Fi connectivity and reads `WifiInfo` for SSID matching; it does not inspect traffic. | Normal install permission, no dialog. The Context editor explains why the Wi-Fi name is needed and the Location/privileged alternatives. | The network callback path cannot resolve connectivity/SSID; privileged and Location strategies may still succeed. Other rules continue. | Not independently user-revocable; network disable/loss emits disconnected state and Wi-Fi rules stop matching. |
+| `BIND_ACCESSIBILITY_SERVICE` (service gate, held by Android rather than requested by the app) | Android alone may bind `AabToastAccessibilityService`, which draws diagnostic/context flashes over other apps. XML sets `canRetrieveWindowContent=false`; callback ignores all events and never reads/acts on UI content. | Default off. Live Debug clearly describes an optional presentation-only overlay and deep-links to system Accessibility settings; Android shows its own enablement confirmation. | Flashes remain inside Tideo (or use its foreground toast fallback); all automation works. | `onUnbind` removes the global presenter immediately; future flashes use in-app fallback. No data was persisted by this service. |
 
-## Notes
+## Findings and privacy conclusions
 
-- No `MANAGE_EXTERNAL_STORAGE` / broad storage permission — legacy config import uses SAF (a folder
-  grant), so none is needed (G2R-F16).
-- The heaviest Play-policy reviews at release will be `*_LOCATION` (esp. background) and the
-  `specialUse` FGS justification — flagged above for S14.
-- `<queries>` LAUNCHER (not a permission) backs the per-app context-rule picker (G2-F14).
+- `WRITE_SECURE_SETTINGS` and `DUMP` are powerful development permissions despite the app's narrow
+  call sites. They stay optional, have no automatic runtime prompt, and now disclose both the app's
+  exact operation and the user's revocation route. `DUMP` command output is bounded and never logged
+  or persisted.
+- Background location has a manifest declaration and runtime need but **no complete grant flow**.
+  The app must not claim otherwise. Adding a second-stage request is a future user-visible product
+  decision; today revocation/absence degrades location work as described above.
+- Usage access, Location, Accessibility, DUMP, elevated access, geo-IP and external broadcast control
+  are opt-in. The core BASIC pipeline requires only Modify System Settings; context signal collectors
+  are lazy-gated by relevant rules where applicable.
+- `MainActivity` currently prompts for notifications at launch before the Setup explanation is read;
+  Setup also provides disclosure and retry. This is the only privacy-adjacent prompt that is eager.
+- There is no broad storage permission. Profile import/export uses user-selected SAF documents/tree
+  grants. `<queries>` for launcher activities is package visibility, not an Android permission; it
+  populates the explicit app-rule picker and does not transmit the list.
+
+## Logging and diagnostic disclosure audit
+
+A source-wide search of `app/src/main` and `platform/src/main` found exactly two diagnostic sinks:
+Android logcat calls and the app-private crash ring.
+
+| Data class scrutinized | Finding |
+|---|---|
+| Imported profile content and parser failures | `ProfileImportExportManager` logs only fixed outcome strings. It never logs the content, parser exception, provider, display name, or URI. Parser exception messages remain transient typed result metadata and current UI maps typed failures to fixed user copy. |
+| URIs / SAF profile names | No URI or document name is logged. Some exceptional export/import paths can show the initiating user an exception message in the foreground UI; that is not background logging or transmission. Persisted SAF read grants remain Android-owned capability state. |
+| Package identities, SSIDs, coordinates | No logcat call receives these values. They can be deliberately shown to the user in foreground UI/toasts while selecting a rule (“connected to …”, acquired coordinates) and context/profile names can appear in opt-in debug flashes. Raw Wi-Fi command output is never logged or stored. |
+| Privileged command output/errors | Root, Shizuku and DUMP adapters return bounded typed success/data and discard stderr/unused stdout. They do not log argv, stdout, stderr, exit text or thrown exceptions. |
+| Exceptions | The process-scoped coroutine handler used to pass a raw throwable to `Log.e` in every build. It is now compiled behind `BuildConfig.DEBUG`; release builds emit neither its message nor stack. Profile logs omit exception objects. |
+| System-state values | The named Tasker debug categories render selected values only on the user-facing flash/debug surfaces when configured. `service_health` and power samples are app-private stores, not logs, and are excluded from backup/transfer. |
+| Crash diagnostics | `CrashLogStore` intentionally records the five newest uncaught stacks under app-private `files/crash`. Tools discloses that they stay on-device and requires an explicit Copy action to move one to the clipboard. The backup allowlist excludes them from cloud and transfer. This facility exists in release, so it can contain sensitive exception text; its local-only, user-mediated design is the control. |
+
+The remaining production `Log.w`/`Log.e` calls are fixed strings for profile read/format outcomes;
+they contain no user or system values. There is no logging API in `platform/src/main`. Android release
+builds are not minified, so this conclusion rests on call-site data minimization rather than assuming
+log stripping. User-facing curve-wizard reports and live diagnostics are deliberate foreground tools,
+not automatic logs or telemetry; clipboard export always follows an explicit tap/run.
+
+## Opt-in and disclosure result
+
+- Geo-IP defaults off and names `ipwho.is`; accessibility overlay, usage access, location, DUMP,
+  elevated access and external automation control all require separate user action. Monitoring itself
+  is intentionally default-on and visibly foregrounded. Context collectors are feature/rule gated.
+  There is no telemetry or automatic upload path.
+- The revised elevated and DUMP copy describes actual capability rather than understating it. The
+  accessibility metadata and UI disclose presentation-only behavior and prevent window-content read.
+- The incomplete background-location grant flow is the one disclosure/behavior gap found. Until a
+  dedicated second-stage flow is owner-approved, the honest behavior is foreground-only acquisition
+  plus graceful degradation—not an implied “Allow all the time” grant.
