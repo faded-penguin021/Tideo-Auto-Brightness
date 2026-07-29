@@ -208,9 +208,14 @@ external value to privileged and persistence sinks; review SAF and network bound
 root/Shizuku command; then model service lifecycle and restoration transitions. Only after this
 model is agreed should implementation details be assessed.
 
+Completed implementation-review segments:
+
+- [`COMPONENT_SECURITY_AUDIT.md`](COMPONENT_SECURITY_AUDIT.md) — manifest component matrix,
+  actions/extras, authorization gates, replay and malformed-input behavior, profile selection,
+  foreground-service creation, and the deliberately open automation boundary.
+
 For each invariant, record (a) entry points, (b) validation or authorization checks, (c) sinks and
 side effects, (d) race/failure behavior, and (e) executable evidence. Tests should include hostile
 and boundary inputs, process recreation where practical, and negative assertions that a privileged
 sink was not called. A platform guarantee used as a control must be named precisely (permission,
 protection level, binder identity, or component export rule); “Android handles it” is not evidence.
-

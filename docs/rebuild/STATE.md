@@ -102,6 +102,10 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-29 — Completed the Android component audit segment: manifest-wide activity/service/
+  receiver/provider matrix, action/extra-to-side-effect traces, export/permission/code gates,
+  replay/malformed-profile/FGS analysis, and explicit classification of enabled external control's
+  ambient local authority as a documented product decision rather than an automatic defect.
 - 2026-07-29 — Added the pre-implementation security audit model: protected display/configuration
   assets, Android IPC/SAF/network/root/Shizuku trust boundaries, attacker and lifecycle-failure
   classes, and explicit safety, consent, restoration, resource, and data-minimization invariants.
