@@ -291,6 +291,10 @@ class AmbientMonitoringService : Service() {
      * a startForegroundService), so the notification only blips.
      */
     private fun stopNotRunning(startId: Int): Int {
+        // A fresh instance may be recovering after process death while the old process left MANUAL
+        // mode or Extra Dim behind. The graph did not start, but controller.stop() is deliberately
+        // recovery-safe and clears those persisted/unknown residues without starting a sensor.
+        controller.stop()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf(startId)
         return START_NOT_STICKY

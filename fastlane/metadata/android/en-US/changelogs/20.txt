@@ -1,7 +1,5 @@
-Maintenance release.
+Maintenance and safety release.
 
-Updated the Android build toolchain (Android Gradle Plugin 8.13.2), which clears the last build warnings and keeps future Gradle versions supported. Verified against F-Droid's own build image so the reproducible build is preserved.
+Updated the Android build toolchain while preserving F-Droid reproducibility. Profile imports now reject oversized or unreadable files, and a system restart respects the service-off setting.
 
-Importing a profile now reads the file safely and says so when it is too large or unreadable. A service restarted by the system stays off if you switched it off.
-
-Brightness curves, profiles and context rules are unchanged.
+Stopping restores Android's brightness mode and clears leftover Extra Dim state. Emergency Reset continues its recovery steps if one system setting fails, and Extra Dim activation no longer risks applying a stale level.

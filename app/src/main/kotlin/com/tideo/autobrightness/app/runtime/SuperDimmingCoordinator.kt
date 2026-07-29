@@ -163,17 +163,20 @@ class SuperDimmingCoordinator(
             return
         }
 
-        // task650 act10-14: write reduce_bright_colors_activated=1 once, then the level each cycle.
+        // Write the bounded level BEFORE activation. If the process dies between the two writes the
+        // feature remains off; the reverse order can briefly apply an OEM/default stale level and
+        // produce an extreme unintended dim. Do not advance the latch on a failed write: a revoked
+        // permission or SettingsProvider failure must be retried by the next cycle/cleanup rather
+        // than being mistaken for successfully engaged state (DA-038).
         // NOTE (G2-F9, device gate): these are the AOSP "Extra dim" secure keys
         // (reduce_bright_colors_activated / reduce_bright_colors_level). Some OEM skins ship a
         // renamed/relocated key (or require the accessibility feature pre-enabled); if engagement
         // logs "ON" here (debug 5) but the screen does not visibly dim on a given device, that is OEM
         // secure-key variance, not a logic bug — see SecureDimmingController + STATE.md D-048.
-        if (engaged != true) {
-            secureDimming.setActivated(true)
-            engaged = true
+        val levelWritten = secureDimming.setLevel(level).isSuccess
+        if (engaged != true && levelWritten) {
+            if (secureDimming.setActivated(true).isSuccess) engaged = true
         }
-        secureDimming.setLevel(level)
         val mode = if (pwmPath) "PWM" else "SD"
         emitDebug(settings) { "ON ($mode) level $level (target $targetBrightness < ${settings.dimmingThreshold})" }
     }
@@ -208,8 +211,10 @@ class SuperDimmingCoordinator(
      *  only a known-off latch skips the writes, so a fresh process clears any pre-death residual. */
     override fun disengage() {
         if (engaged == false) return
-        secureDimming.setLevel(0)
-        secureDimming.setActivated(false)
-        engaged = false
+        // Clear activation even when the level clear fails: OFF is the safety-critical write. Keep
+        // the latch unknown unless BOTH writes succeeded, so a later stop/cycle retries cleanup.
+        val levelCleared = secureDimming.setLevel(0).isSuccess
+        val deactivated = secureDimming.setActivated(false).isSuccess
+        if (levelCleared && deactivated) engaged = false
     }
 }

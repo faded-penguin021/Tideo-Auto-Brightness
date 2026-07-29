@@ -909,3 +909,16 @@
   `[cited]`: `GeoIpLocationClient.kt` and `CircadianWindowProvider.kt` (transport/parser/cancellation and
   consumer/retry boundaries, including a persisted daily attempt marker); full caller, policy, persistence and trust assessment in
   `architecture/geo_ip_audit.md`.
+
+- DA-038 [cited]: the end-to-end display-write safety audit made teardown and failure ordering
+  explicit. Normal controller stop now independently clears Extra Dim and restores the user's
+  persisted brightness mode after cancelling future frames; even a fresh null-intent/control-created
+  service runs that residue cleanup without starting sensors. Panic attempts manual mode, brightness
+  255, mode restoration and Extra Dim OFF independently, so a SettingsProvider/OEM exception cannot
+  short-circuit later recovery. Extra Dim now writes its bounded level before activation, never marks
+  a failed engage/disengage successful, attempts activation OFF even if level-zero fails, and retries
+  unknown cleanup after revocation/provider failures. The audit records every brightness/display
+  writer, OEM normalization, typed/bounded inputs, observer suppression, cancellation and sticky-
+  restart ordering, unavoidable hard-kill/revoked-grant limits, and the adversarial lifecycle matrix.
+  `[cited]`: `BrightnessPipelineController.kt`, `AmbientMonitoringService.kt`, `PanicHandler.kt`,
+  `SuperDimmingCoordinator.kt`, and `architecture/runtime_display_safety_audit.md`.

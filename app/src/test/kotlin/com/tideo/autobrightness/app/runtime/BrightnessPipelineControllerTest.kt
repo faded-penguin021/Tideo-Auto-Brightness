@@ -39,11 +39,12 @@ class BrightnessPipelineControllerTest {
     private class FakeBrightness : ScreenBrightnessController {
         val writes = mutableListOf<Int>()
         var current = 0
+        var modeRestores = 0
         private var lastWrite: Int? = null
         override fun read(): Int = current
         override fun write(level: Int) { current = level; lastWrite = level; writes += level }
         override fun forceManualMode() = Unit
-        override fun restoreMode() = Unit
+        override fun restoreMode() { modeRestores++ }
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
         override fun isOnScreenSelfWrite(): Boolean = current == lastWrite
         override fun clearSelfWriteMarker() { lastWrite = null }
@@ -75,6 +76,24 @@ class BrightnessPipelineControllerTest {
         trustUnreliableSensor = true,
         scalingEnabled = false,
     )
+
+    @Test
+    fun stop_clearsDimmingAndRestoresBrightnessMode_DA038() = runTest {
+        val brightness = FakeBrightness()
+        val dimming = FakeDimming()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = FakeSensor(), brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = { settings }, scope = scope, dimming = dimming,
+        )
+
+        controller.start()
+        controller.stop()
+
+        assertEquals(1, dimming.disengaged)
+        assertEquals(1, brightness.modeRestores)
+        scope.cancel()
+    }
 
     // Unconfined dispatcher so the sensor/observer collectors subscribe eagerly and emissions are
     // delivered synchronously; animation delays still respect virtual time (advanceUntilIdle).

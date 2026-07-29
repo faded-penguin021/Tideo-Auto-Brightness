@@ -13,13 +13,18 @@ class SuperDimmingCoordinatorTest {
     private class FakeSecureDimming : SecureDimmingController {
         var activated: Boolean? = null
         val levels = mutableListOf<Int>()
+        val writes = mutableListOf<String>()
+        var failLevel = false
+        var failActivation = false
         override fun setLevel(level: Int): Result<Unit> {
             levels += level
-            return Result.success(Unit)
+            writes += "level:$level"
+            return if (failLevel) Result.failure(SecurityException("revoked")) else Result.success(Unit)
         }
         override fun setActivated(on: Boolean): Result<Unit> {
             activated = on
-            return Result.success(Unit)
+            writes += "activated:$on"
+            return if (failActivation) Result.failure(SecurityException("revoked")) else Result.success(Unit)
         }
     }
 
@@ -61,6 +66,34 @@ class SuperDimmingCoordinatorTest {
         assertEquals(true, secure.activated, "reduce_bright_colors_activated should be set on")
         assertTrue(secure.levels.isNotEmpty(), "a dim level should be written")
         assertTrue(secure.levels.last() > 0, "below-threshold dimming should be a positive level")
+        assertTrue(secure.writes.first().startsWith("level:"), "safe ordering writes level before activation")
+    }
+
+    @Test
+    fun failedLevelWrite_doesNotActivateAndRetriesNextCycle_DA038() {
+        val secure = FakeSecureDimming().apply { failLevel = true }
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        assertEquals(null, secure.activated, "a missing level must never activate an unknown OEM level")
+
+        secure.failLevel = false
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        assertEquals(true, secure.activated, "failed engagement must remain retryable")
+    }
+
+    @Test
+    fun failedDeactivate_keepsCleanupRetryable_DA038() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        secure.failActivation = true
+
+        coordinator.disengage()
+        val firstOffAttempts = secure.writes.count { it == "activated:false" }
+        coordinator.disengage()
+
+        assertEquals(firstOffAttempts + 1, secure.writes.count { it == "activated:false" })
     }
 
     // G2R-F65 (REOPENED): PWM-sensitive mode also engages Extra Dim below the threshold (via the
