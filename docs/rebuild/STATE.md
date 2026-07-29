@@ -31,7 +31,7 @@ required it. Train tip `claude/badge-workflow-verify-77m62f` (DA-025) → `…-8
 infrastructure) and is open as **PR #96 → `main`** — the owner is keeping it as the base for the
 next fix/feature. **Stacked on it: PR #99** (`claude/fold-prs-97-98-cdi4dp` → `…-870gh3`), which
 folds the two concept PRs #97/#98 in as DA-029 (bounded profile import) + DA-030 (sticky-restart
-gate); #97/#98 are superseded and close unmerged. So vc20 is **no longer a packaging-only release** —
+gate); #97/#98 are superseded and close unmerged. The pending vc20 is **not a packaging-only release** —
 it carries `app/` source and `changelogs/20.txt` says so; `domain/` and `platform/` are still
 byte-identical to 1.8.1. #99 is **merged** into the train branch and PR #96's title/body have been
 rewritten to the net `origin/main..HEAD` payload (DA-002 — the body becomes the squash commit), so
@@ -99,6 +99,11 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
   (D-144/D-149).
 
 ## Changelog
+
+- 2026-07-29 — DA-038 traced every sensor/display write and hardened screen-safety recovery: stop
+  restores persisted brightness mode and clears possible Extra Dim residue (including disabled sticky
+  recreation), panic failures cannot skip later recovery attempts, and Extra Dim uses level-before-on
+  ordering with failure-aware retryable latches. Added the adversarial lifecycle contract matrix.
 
 - 2026-07-29 — DA-037 completed the geo-IP fallback review: retained explicit default-off consent and
   local-first ordering; added redirect refusal, a 16 KiB response cap, structural JSON and strict

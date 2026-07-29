@@ -157,6 +157,9 @@ class BrightnessPipelineController(
         consumerJob?.cancel(); consumerJob = null
         proximityTracker.stop()
         inCycle.set(false)
+        // DA-038: independently clear pre-death Extra Dim residue and return brightness-mode ownership.
+        runCatching { dimming.disengage() }
+        runCatching { brightness.restoreMode() }
     }
 
     // Lifecycle entry points — the service posts these; they run in consumer order.
