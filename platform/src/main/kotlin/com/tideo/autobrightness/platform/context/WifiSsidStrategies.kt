@@ -2,6 +2,10 @@ package com.tideo.autobrightness.platform.context
 
 import android.content.Context
 import com.tideo.autobrightness.platform.privilege.ShizukuShell
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 /**
  * One ordered attempt to read the connected SSID WITHOUT Location, per Tasker's `_GetWifiNoLocation
@@ -18,7 +22,7 @@ fun interface WifiSsidStrategy {
  */
 class ShizukuWifiSsidStrategy(private val context: Context) : WifiSsidStrategy {
     override suspend fun trySsid(): String? {
-        val out = ShizukuShell.exec(context, arrayOf("sh", "-c", "cmd wifi status")) ?: return null
+        val out = ShizukuShell.read(context, ShizukuShell.ReadOperation.WIFI_STATUS) ?: return null
         return normalizeSsid(parseCmdWifiStatus(out))
     }
 }
@@ -54,14 +58,45 @@ class DumpsysWifiSsidStrategy(@Suppress("unused") private val context: Context) 
  * EOF *before* waiting so the (potentially large) `dumpsys wifi` output can't deadlock against a full
  * pipe buffer; mirrors AndroidPrivilegeManager.tryGrantViaRoot's blocking `su` invocation.
  */
-private fun execShell(command: Array<String>): String? = try {
-    val process = Runtime.getRuntime().exec(command)
-    val stdout = process.inputStream.bufferedReader().use { it.readText() }
-    process.waitFor()
-    stdout.ifBlank { null }
-} catch (_: Throwable) {
-    null
+private suspend fun execShell(command: Array<String>): String? = withContext(Dispatchers.IO) {
+    try {
+        val process = Runtime.getRuntime().exec(command)
+        process.outputStream.close()
+        var stdout = ByteArray(0)
+        var stderrOverflow = false
+        var readFailed = false
+        val stdoutThread = thread(name = "aab-wifi-stdout") {
+            try {
+                stdout = process.inputStream.use { it.readNBytes(OUTPUT_LIMIT + 1) }
+            } catch (_: Throwable) {
+                readFailed = true
+            }
+        }
+        val stderrThread = thread(name = "aab-wifi-stderr") {
+            try {
+                stderrOverflow = process.errorStream.use { it.readNBytes(ERROR_LIMIT + 1).size > ERROR_LIMIT }
+            } catch (_: Throwable) {
+                readFailed = true
+            }
+        }
+        if (!process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            process.waitFor()
+        }
+        stdoutThread.join()
+        stderrThread.join()
+        if (process.exitValue() != 0 || readFailed || stdout.size > OUTPUT_LIMIT || stderrOverflow) {
+            return@withContext null
+        }
+        stdout.toString(Charsets.UTF_8).ifBlank { null }
+    } catch (_: Throwable) {
+        null
+    }
 }
+
+private const val COMMAND_TIMEOUT_SECONDS = 15L
+private const val OUTPUT_LIMIT = 256 * 1024
+private const val ERROR_LIMIT = 4 * 1024
 
 /** Extracts the SSID from `cmd wifi status` output (`Wifi is connected to "SSID"`). */
 internal fun parseCmdWifiStatus(output: String): String? {

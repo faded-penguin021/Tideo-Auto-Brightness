@@ -825,3 +825,30 @@
   completes before the test can interleave a superseding command.
   `[cited]`: `app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt`
   (the gate, the generation/destroyed comments and the fail-closed rationale).
+
+- DA-031 [cited]: privileged execution was reduced from generic Binder command/package parameters to
+  an operation allowlist. `IShizukuUserService` now exposes only package-free secure-settings grant,
+  Wi-Fi status, and Boolean force-dark operations; `ShizukuUserService` derives the grant target from
+  its Shizuku-supplied `Context`, uses fixed argv without a shell, and bounds time/stdout/stderr.
+  Shizuku grant binding now times out, handles disconnect, completes once, and unbinds on every path;
+  root/DUMP Wi-Fi and root grant processes gained timeout, cleanup, exit-code gates, and bounded
+  streams. The complete argument/caller/output trace is
+  `architecture/privileged_command_audit.md`. `[cited]`: `ShizukuUserService.kt` constructor and
+  fixed-operation comment; `IShizukuUserService.aidl` allowlist comment.
+
+- DA-032: the remote-container bootstrap now matches the actual build matrix instead of
+  inheriting the image's JDK 25 and installing the stale Android 35 platform. The source-only
+  `scripts/setup-container.sh` exports the installed JDK 21 and Android SDK paths into the agent's
+  shell, delegates the idempotent SDK setup, validates SDK 36 + build-tools 35.0.0, and reports the
+  repository Gradle wrapper's selected version. `setup-android-sdk.sh` now installs/checks
+  compile SDK 36. This is local enablement, not a replacement for `fdroid-compat.yml`'s independent
+  cross-environment reproducibility validation.
+
+- DA-033: **DA-032 is reverted.** The setup request explicitly required the answer in chat, and
+  repository-wide harness and constitution changes were not authorized. In particular, a cloud
+  environment setup command can run before the session branch (and its newly added script) is
+  available, which made `source scripts/setup-container.sh` fail with a missing file. Container
+  runtime selection therefore remains an environment-level concern: the external cloud setup must
+  select JDK 21 directly and must not source this removed repository path. This rollback does not
+  modify that external configuration; it restores the existing repository SDK helper, session
+  hook, ladder, README, and `CLAUDE.md` unchanged.
