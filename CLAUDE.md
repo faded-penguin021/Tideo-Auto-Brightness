@@ -19,8 +19,7 @@ row may overflow the cap, the next row opens the next file (`DA-…` → `DB-…
 
 ## Maintenance protocol (every session)
 
-1. In the standard agent container, source `scripts/setup-container.sh` (selects JDK 21 and
-   bootstraps SDK 36); elsewhere run `scripts/setup-android-sdk.sh` if `local.properties` is missing.
+1. Run `scripts/setup-android-sdk.sh` if `local.properties` is missing (~4 min first time).
 2. Read `docs/rebuild/STATE.md` — current project state and any active/staged work.
 3. Open the matching change-type playbook in `docs/rebuild/RUNBOOK.md`; read the reference docs
    it names before touching code.

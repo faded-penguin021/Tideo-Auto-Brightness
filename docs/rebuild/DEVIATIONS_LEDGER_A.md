@@ -843,3 +843,12 @@
   repository Gradle wrapper's selected version. `setup-android-sdk.sh` now installs/checks
   compile SDK 36. This is local enablement, not a replacement for `fdroid-compat.yml`'s independent
   cross-environment reproducibility validation.
+
+- DA-033: **DA-032 is reverted.** The setup request explicitly required the answer in chat, and
+  repository-wide harness and constitution changes were not authorized. In particular, a cloud
+  environment setup command can run before the session branch (and its newly added script) is
+  available, which made `source scripts/setup-container.sh` fail with a missing file. Container
+  runtime selection therefore remains an environment-level concern: the external cloud setup must
+  select JDK 21 directly and must not source this removed repository path. This rollback does not
+  modify that external configuration; it restores the existing repository SDK helper, session
+  hook, ladder, README, and `CLAUDE.md` unchanged.

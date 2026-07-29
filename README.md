@@ -180,10 +180,8 @@ A 3-module Gradle build:
 
 ## Building
 
-Requires JDK 21 (the CI and reproducibility lanes build with 21) and the Android SDK
-(`local.properties` with `sdk.dir`). In the standard agent container, run
-`source scripts/setup-container.sh`; on a normal development machine with JDK 21 already selected,
-run `scripts/setup-android-sdk.sh` if the SDK is absent.
+Requires JDK 21+ (the toolchain targets 21) and the Android SDK (`local.properties` with `sdk.dir`,
+or run `scripts/setup-android-sdk.sh`).
 
 ```bash
 ./gradlew :domain:test              # pure-JVM engine + golden parity tests
