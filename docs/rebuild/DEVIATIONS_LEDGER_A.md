@@ -835,3 +835,11 @@
   streams. The complete argument/caller/output trace is
   `architecture/privileged_command_audit.md`. `[cited]`: `ShizukuUserService.kt` constructor and
   fixed-operation comment; `IShizukuUserService.aidl` allowlist comment.
+
+- DA-032: the remote-container bootstrap now matches the actual build matrix instead of
+  inheriting the image's JDK 25 and installing the stale Android 35 platform. The source-only
+  `scripts/setup-container.sh` exports the installed JDK 21 and Android SDK paths into the agent's
+  shell, delegates the idempotent SDK setup, validates SDK 36 + build-tools 35.0.0, and reports the
+  repository Gradle wrapper's selected version. `setup-android-sdk.sh` now installs/checks
+  compile SDK 36. This is local enablement, not a replacement for `fdroid-compat.yml`'s independent
+  cross-environment reproducibility validation.

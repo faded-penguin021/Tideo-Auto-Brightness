@@ -58,6 +58,8 @@
 #   10. command-guard.sh self-test (DA-009): the pre-execution command rail (force-push /
 #      push-to-main / env-dump blocks with instructive deny reasons) must not regress
 #      silently — same rationale as guard 8.
+#      10a. On the standard agent image, the sourceable container bootstrap contract verifies
+#      JDK 21 selection, SDK/build-tools readiness, transactional failure, and PATH idempotence.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -281,6 +283,14 @@ if [ -x scripts/command-guard.sh ]; then
   echo "LADDER: command-guard self-test OK"
 else
   fail "scripts/command-guard.sh missing or not executable — the DA-009 command rail is gone"
+fi
+
+# Standard-container-only setup contract. Hosted CI selects JDK 21 through setup-java at a
+# runner-specific path; the standard agent image has the fixed path this sourceable helper targets.
+if [ -x scripts/test-container-setup.sh ] && [ -x /usr/lib/jvm/java-21-openjdk-amd64/bin/java ]; then
+  scripts/test-container-setup.sh >/dev/null \
+    || fail "scripts/test-container-setup.sh FAILED — JDK/SDK bootstrap contract regressed (DA-032)"
+  echo "LADDER: standard-container setup contract OK"
 fi
 
 # --- guard 11: falsifiable doc-facts (DA-015) — a load-bearing prose claim earns a machine

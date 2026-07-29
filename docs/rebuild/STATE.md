@@ -102,6 +102,9 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-29 — DA-032 fixed the standard-container bootstrap: a sourceable setup selects JDK 21,
+  installs/validates compile SDK 36 plus build-tools 35.0.0, verifies the repository wrapper, and
+  points agents to the full acceptance ladder rather than silently building under the image's JDK 25.
 - 2026-07-29 — DA-031 privileged-command audit and hardening: traced every root/Shizuku/shell
   argument to its trusted source; replaced generic AIDL exec and caller-selected grant package with
   fixed typed operations; bounded process time/output/error streams; added cleanup, disconnect,

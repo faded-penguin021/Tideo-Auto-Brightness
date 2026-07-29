@@ -12,8 +12,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # machine (manual local setup is Maintenance protocol step 1). Neutral signal: AAB_REMOTE=1;
 # CLAUDE_CODE_REMOTE=true (set by Claude Code on the web) is honored for back-compat (D-176).
 if [ "${AAB_REMOTE:-}" = "1" ] || [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
-  "$ROOT/scripts/setup-android-sdk.sh"
-  echo "Android SDK ready; local.properties written."
+  # Source so the warm-up launched below inherits JDK 21 rather than the container's default JDK 25.
+  # The interactive agent shell should likewise source this file (CLAUDE.md protocol).
+  source "$ROOT/scripts/setup-container.sh"
+  echo "JDK 21 and Android SDK ready; local.properties written."
 
   # D-173: warm Gradle in the background while the session reads the maintenance docs — a
   # fresh container's first ladder run otherwise pays the full dependency+compile+test cost
