@@ -54,11 +54,17 @@ fun BroadcastReceiver.goAsync(block: suspend () -> Unit) {
     // Non-null under a real system dispatch; null only when a receiver is invoked directly (e.g. a
     // Robolectric unit test calling onReceive), so finish() is called defensively.
     val pendingResult = goAsync()
-    AppProcessScope.launch {
-        try {
-            block()
-        } finally {
-            pendingResult?.finish()
+    try {
+        AppProcessScope.launch {
+            try {
+                block()
+            } finally {
+                pendingResult?.finish()
+            }
         }
+    } catch (failure: Throwable) {
+        // A rejected/synchronously-failed launch never enters the coroutine's finally.
+        pendingResult?.finish()
+        throw failure
     }
 }

@@ -11,6 +11,7 @@ import com.tideo.autobrightness.app.storage.controlPrefsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
 import kotlinx.coroutines.flow.first
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * D-157: the **exported** external-control surface for automation frameworks (Tasker / MacroDroid).
@@ -37,11 +38,30 @@ class ControlReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        // DA-039: this is an exported, caller-unrestricted receiver. DataStore serializes individual
+        // writes, but it does not bound the number of goAsync coroutines/PendingResults or serialize
+        // the later service/widget side effects. Admit one whole command at a time and drop overlap;
+        // explicit ON/OFF verbs let well-behaved automation converge on a retry without an unbounded
+        // in-process queue. This is a resource bound, not caller authentication.
+        if (!commandInFlight.compareAndSet(false, true)) return
         // Read the LOAD_PROFILE extra here (the intent is not passed further); a missing/blank name
         // makes LOAD_PROFILE a no-op (ProfileApplier ignores an unknown name anyway).
-        val profileName = intent.getStringExtra(EXTRA_PROFILE_NAME)
+        val profileName = runCatching { intent.getStringExtra(EXTRA_PROFILE_NAME) }.getOrNull()
         // goAsync: the gate read is a DataStore lookup; keep the broadcast alive off the main thread.
-        goAsync { handle(context.applicationContext, action, profileName) }
+        try {
+            goAsync {
+                try {
+                    handle(context.applicationContext, action, profileName)
+                } finally {
+                    commandInFlight.set(false)
+                }
+            }
+        } catch (failure: Throwable) {
+            // The coroutine's finally owns normal/async release. If PendingResult acquisition or
+            // launch itself fails synchronously, the block never starts, so release here instead.
+            commandInFlight.set(false)
+            throw failure
+        }
     }
 
     /**
@@ -113,5 +133,11 @@ class ControlReceiver : BroadcastReceiver() {
 
         /** String extra on [ACTION_LOAD_PROFILE]: the saved/built-in profile name to load. */
         const val EXTRA_PROFILE_NAME = "name"
+
+        private val commandInFlight = AtomicBoolean(false)
+
+        /** Test seam for the process-wide admission bound; production uses the same atomic directly. */
+        internal fun tryAcquireCommand(): Boolean = commandInFlight.compareAndSet(false, true)
+        internal fun releaseCommand() = commandInFlight.set(false)
     }
 }
