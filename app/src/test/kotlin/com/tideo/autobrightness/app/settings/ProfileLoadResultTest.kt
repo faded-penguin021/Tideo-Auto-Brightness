@@ -9,6 +9,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -91,6 +92,42 @@ class ProfileLoadResultTest {
             override fun read(buffer: ByteArray, offset: Int, length: Int): Int = read()
         }
         assertEquals(ProfileLoadResult.ReadFailure, manager.readAndDecode(failingStream))
+    }
+
+    @Test
+    fun `zero byte bulk reads cannot stall or bypass the cap`() {
+        var remaining = ProfileImportExportManager.MAX_ENCODED_PROFILE_BYTES + 1
+        val hostile = object : InputStream() {
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = 0
+            override fun read(): Int = if (remaining-- > 0) ' '.code else -1
+        }
+        assertEquals(ProfileLoadResult.TooLarge, manager.readAndDecode(hostile))
+    }
+
+    @Test
+    fun `native payload rejects unsupported schemas unknown fields and excessive structure`() {
+        listOf(
+            """{ "schemaVersion": 999, "settings": {} }""",
+            """{ "schemaVersion": 3, "unexpected": true, "settings": {} }""",
+            """{ "schemaVersion": 3, "settings": { "unexpected": true } }""",
+            """{ "schemaVersion": 3, "schemaVersion": 3, "settings": {} }""",
+            "[".repeat(ImportStructureGuard.MAX_DEPTH + 1) + "0" +
+                "]".repeat(ImportStructureGuard.MAX_DEPTH + 1),
+        ).forEach { input ->
+            assertTrue(manager.decodePayload(input) is ProfileLoadResult.TotalFailure, input.take(80))
+        }
+    }
+
+    @Test
+    fun `private filename normalization rejects dot aliases and avoids collisions`() {
+        val dot = manager.sanitizeFileName(".")
+        val dotDot = manager.sanitizeFileName("..")
+        val blank = manager.sanitizeFileName("   ")
+        assertTrue(dot.startsWith("profile-") && dot.endsWith(".json"))
+        assertTrue(dotDot.startsWith("profile-") && dotDot.endsWith(".json"))
+        assertTrue(blank.startsWith("profile-") && blank.endsWith(".json"))
+        assertNotEquals(dot, dotDot)
+        assertNotEquals(manager.sanitizeFileName("a?"), manager.sanitizeFileName("a!"))
     }
 
     @Test

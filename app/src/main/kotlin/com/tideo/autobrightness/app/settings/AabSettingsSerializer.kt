@@ -16,7 +16,8 @@ object AabSettingsSerializer : Serializer<AabSettings> {
     override suspend fun readFrom(input: InputStream): AabSettings {
         return runCatching {
             val raw = json.decodeFromString(AabSettings.serializer(), input.readBytes().decodeToString())
-            migrate(raw)
+            require(raw.schemaVersion in 1..CURRENT_SCHEMA_VERSION)
+            migrate(raw).validate()
         }.getOrDefault(defaultValue)
     }
 

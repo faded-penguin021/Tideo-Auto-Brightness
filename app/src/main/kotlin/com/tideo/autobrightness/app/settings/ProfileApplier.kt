@@ -38,7 +38,7 @@ class ProfileApplier(
      * unknown name is a no-op (external callers may send an arbitrary string).
      */
     suspend fun applyProfile(name: String) {
-        val profile = userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return
+        val profile = (userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return).validate()
         // The manual choice becomes the new baseline — drop any pre-override snapshot (D-170).
         // Clear BEFORE the settings write: a death in between means the load simply didn't take
         // (benign), whereas write-then-clear could leave a stale snapshot that a later revert

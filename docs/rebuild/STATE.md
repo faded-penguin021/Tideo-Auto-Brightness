@@ -100,6 +100,11 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 ## Changelog
 
+- 2026-07-29 — DA-036 completed the profile import/export adversarial review: bounded JSON and
+  legacy structures/numbers/catalogs, strict native schemas and fields, collision-safe private
+  filenames, validation at every persistence/apply boundary, and secure toggles preserved on direct
+  import until the existing named-profile preview supplies informed consent.
+
 - 2026-07-29 — DA-035 corrected the F-Droid compatibility workflow’s last Node 20 action: all download-artifact steps move from v6 (still `node20`) to the explicit Node 24 v7 major, and the misleading policy comment now records that boundary. The DA-034 follow-up also corrected two review-copy defects without changing behavior.
 
 - 2026-07-29 — DA-034 completed the manifest/privacy audit: permission request, disclosure, denial and revocation flows; explicit cloud/transfer allowlists for every personal-data category; stronger DUMP/elevated copy; and debug-only throwable logging with local crash diagnostics excluded from migration. Background location remains declared but has no second-stage in-app grant flow, now documented honestly.

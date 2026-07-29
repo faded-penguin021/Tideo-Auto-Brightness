@@ -12,8 +12,10 @@ import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Outcome of loading a profile file (S12.9c #3). Replaces the old silent
@@ -50,7 +52,7 @@ class ProfileImportExportManager(
         internal const val MAX_ENCODED_PROFILE_BYTES = 256 * 1024
     }
 
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val json = Json { ignoreUnknownKeys = false; prettyPrint = true }
 
     suspend fun exportToAppPrivate(profileName: String, settings: AabSettings): String {
         val fileName = sanitizeFileName(profileName)
@@ -150,11 +152,27 @@ class ProfileImportExportManager(
      * second. Logs only the outcome, never parser details that could quote imported content.
      */
     fun decodePayload(content: String): ProfileLoadResult {
+        runCatching { ImportStructureGuard.requireBoundedJson(content) }.exceptionOrNull()?.let {
+            return ProfileLoadResult.TotalFailure(it.message ?: "JSON structure rejected", "Legacy parse not attempted")
+        }
         val jsonAttempt = runCatching {
-            json.decodeFromString(AabProfilePayload.serializer(), content).settings.validate()
+            val payload = json.decodeFromString(AabProfilePayload.serializer(), content)
+            require(payload.schemaVersion in 1..CURRENT_SCHEMA_VERSION) { "Unsupported profile schema" }
+            require(payload.settings.schemaVersion in 1..CURRENT_SCHEMA_VERSION) { "Unsupported settings schema" }
+            AabSettingsSerializer.migrate(payload.settings).validate()
         }
         jsonAttempt.getOrNull()?.let { return ProfileLoadResult.Success(it) }
         val jsonError = jsonAttempt.exceptionOrNull()?.message ?: "JSON parse failed"
+
+        // A payload that identifies itself as the native format must never be reinterpreted as the
+        // deliberately tolerant legacy format. Otherwise a future/invalid native schema could turn
+        // into an all-default "successful" legacy import and bypass its schema decision.
+        val nativeShape = runCatching {
+            (json.parseToJsonElement(content) as? JsonObject)?.keys?.any { it == "schemaVersion" || it == "settings" }
+        }.getOrNull() == true
+        if (nativeShape) {
+            return ProfileLoadResult.TotalFailure(jsonError, "Native payload is not eligible for legacy fallback")
+        }
 
         val legacyAttempt = runCatching { TaskerLegacyProfileSerializer.deserialize(content).validate() }
         legacyAttempt.getOrNull()?.let {
@@ -166,14 +184,23 @@ class ProfileImportExportManager(
         return ProfileLoadResult.TotalFailure(jsonError, legacyError)
     }
 
-    private fun sanitizeFileName(profileName: String): String {
-        val safeName = profileName.trim().replace(Regex("[^a-zA-Z0-9._-]"), "_")
-        return if (safeName.endsWith(".json")) safeName else "$safeName.json"
+    internal fun sanitizeFileName(profileName: String): String {
+        val trimmed = profileName.trim().removeSuffix(".json")
+        val normalized = trimmed.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+            .trim('.', '_', '-')
+            .take(96)
+        val base = normalized.ifBlank { "profile" }
+        // Names that normalize to the same visible stem get different private files.
+        val suffix = if (base == trimmed) "" else "-${profileName.sha256Prefix()}"
+        return "$base$suffix.json"
     }
+
+    private fun String.sha256Prefix(): String = MessageDigest.getInstance("SHA-256")
+        .digest(encodeToByteArray()).take(6).joinToString("") { "%02x".format(it) }
 }
 
 @Serializable
-private data class AabProfilePayload(
+internal data class AabProfilePayload(
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val settings: AabSettings,
 )
