@@ -102,6 +102,9 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-29 — Added the pre-implementation security audit model: protected display/configuration
+  assets, Android IPC/SAF/network/root/Shizuku trust boundaries, attacker and lifecycle-failure
+  classes, and explicit safety, consent, restoration, resource, and data-minimization invariants.
 - 2026-07-28 — **DA-029 + DA-030** (folded into the 1.8.2/vc20 train): profile import is now a
   bounded stream (256 KiB cap, strict UTF-8, provider-declared size demoted to a hint) with typed
   `TooLarge`/`ReadFailure` outcomes surfaced in the Profiles UI; and a null-intent `START_STICKY`
