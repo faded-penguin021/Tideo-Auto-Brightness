@@ -157,10 +157,7 @@ class BrightnessPipelineController(
         consumerJob?.cancel(); consumerJob = null
         proximityTracker.stop()
         inCycle.set(false)
-        // Stop is also the crash/restart recovery boundary (DA-038): after all future frames are
-        // cancelled, best-effort clear a possibly pre-death Extra Dim residue and return ownership
-        // of SCREEN_BRIGHTNESS_MODE to the user. Both are idempotent and independent so one provider
-        // failure cannot suppress the other safety restoration.
+        // DA-038: independently clear pre-death Extra Dim residue and return brightness-mode ownership.
         runCatching { dimming.disengage() }
         runCatching { brightness.restoreMode() }
     }
