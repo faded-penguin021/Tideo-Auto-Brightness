@@ -9,6 +9,7 @@ import android.provider.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.TimeUnit
 
 // Tasker: task378 _DetectPrivilege — first-hit probe: WRITE_SECURE → WRITE_SETTINGS → NONE.
 // D-016: ADB/Shizuku/root are GRANT channels only; elevated truth = checkPermission.
@@ -74,7 +75,11 @@ class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
         val process = Runtime.getRuntime().exec(
             arrayOf("su", "-c", "pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS")
         )
-        if (process.waitFor() == 0) {
+        process.outputStream.close()
+        if (!process.waitFor(ROOT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            false
+        } else if (process.exitValue() == 0) {
             refresh()
             currentTier() >= Tier.ELEVATED
         } else false
@@ -90,5 +95,9 @@ class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
             if (result is ShizukuGrantGateway.Result.Success) refresh()
             onResult(result)
         }
+    }
+
+    private companion object {
+        const val ROOT_TIMEOUT_SECONDS = 15L
     }
 }

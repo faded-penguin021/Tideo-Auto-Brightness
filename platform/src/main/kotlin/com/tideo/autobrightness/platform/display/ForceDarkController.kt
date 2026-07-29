@@ -35,19 +35,24 @@ object ForceDarkController {
      * property reads as false (HWUI's default).
      */
     suspend fun read(context: Context): Boolean? =
-        exec(context, "getprop $PROP")?.let(::parseForceDarkProp)
+        exec(context, enabled = null)?.let(::parseForceDarkProp)
 
     /**
      * Writes the property, then returns the re-read value as verification (so the caller sees the
      * state the renderer will actually pick up), or null when no privileged shell is available.
      */
     suspend fun apply(context: Context, enabled: Boolean): Boolean? =
-        exec(context, "setprop $PROP ${if (enabled) "true" else "false"} && getprop $PROP")
+        exec(context, enabled)
             ?.let(::parseForceDarkProp)
 
     /** Shizuku first, root second (the task105 order the Wi-Fi SSID strategies also mirror). */
-    private suspend fun exec(context: Context, script: String): String? = shellMutex.withLock {
-        ShizukuShell.exec(context, arrayOf("sh", "-c", script)) ?: rootExec(script)
+    private suspend fun exec(context: Context, enabled: Boolean?): String? = shellMutex.withLock {
+        val shizuku = if (enabled == null) {
+            ShizukuShell.read(context, ShizukuShell.ReadOperation.FORCE_DARK)
+        } else {
+            ShizukuShell.setForceDark(context, enabled)
+        }
+        shizuku ?: rootExec(enabled)
     }
 
     /**
@@ -60,8 +65,10 @@ object ForceDarkController {
      * [WifiSsidStrategies][com.tideo.autobrightness.platform.context.RootWifiSsidStrategy]:
      * the property output is a few bytes, so it can never fill the pipe buffer.
      */
-    private suspend fun rootExec(script: String): String? = withContext(Dispatchers.IO) {
+    private suspend fun rootExec(enabled: Boolean?): String? = withContext(Dispatchers.IO) {
         try {
+            val script = if (enabled == null) "getprop $PROP" else
+                "setprop $PROP ${if (enabled) "true" else "false"} && getprop $PROP"
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", script))
             process.outputStream.close()
             if (!process.waitFor(SU_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {

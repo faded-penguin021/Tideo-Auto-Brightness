@@ -825,3 +825,13 @@
   completes before the test can interleave a superseding command.
   `[cited]`: `app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt`
   (the gate, the generation/destroyed comments and the fail-closed rationale).
+
+- DA-031 [cited]: privileged execution was reduced from generic Binder command/package parameters to
+  an operation allowlist. `IShizukuUserService` now exposes only package-free secure-settings grant,
+  Wi-Fi status, and Boolean force-dark operations; `ShizukuUserService` derives the grant target from
+  its Shizuku-supplied `Context`, uses fixed argv without a shell, and bounds time/stdout/stderr.
+  Shizuku grant binding now times out, handles disconnect, completes once, and unbinds on every path;
+  root/DUMP Wi-Fi and root grant processes gained timeout, cleanup, exit-code gates, and bounded
+  streams. The complete argument/caller/output trace is
+  `architecture/privileged_command_audit.md`. `[cited]`: `ShizukuUserService.kt` constructor and
+  fixed-operation comment; `IShizukuUserService.aidl` allowlist comment.

@@ -7,12 +7,15 @@ interface IShizukuUserService {
     // Special transaction id Shizuku invokes when it tears the user service down.
     void destroy() = 16777114;
 
-    // Runs `pm grant <packageName> android.permission.WRITE_SECURE_SETTINGS` in the privileged
-    // process. Returns an empty string on success, or a non-empty diagnostic on failure.
-    String grantWriteSecureSettings(String packageName) = 1;
+    // Grants only the package whose Context constructed the user service. No caller-supplied
+    // package or command crosses this privileged boundary.
+    boolean grantWriteSecureSettings() = 1;
 
-    // Runs an arbitrary command in the privileged (shell uid 2000 / root) process and returns its
-    // stdout (empty string on failure). Used by the no-Location SSID path (_GetWifiNoLocation V3,
-    // S12.7d/G2R-F41): `cmd wifi status` reads the connected SSID without ACCESS_FINE_LOCATION.
-    String exec(in String[] command) = 2;
+    // Narrow, allowlisted operations. Implementations use argv arrays (never `sh -c`) and bound
+    // process lifetime plus stdout/stderr before returning data to the unprivileged app process.
+    String wifiStatus() = 2;
+
+    String readForceDark() = 3;
+
+    String setForceDark(boolean enabled) = 4;
 }

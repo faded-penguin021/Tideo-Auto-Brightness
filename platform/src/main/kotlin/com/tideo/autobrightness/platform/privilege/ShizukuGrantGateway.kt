@@ -6,6 +6,9 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
 import rikka.shizuku.Shizuku
+import java.util.Timer
+import java.util.TimerTask
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
@@ -29,6 +32,7 @@ enum class ShizukuAvailability { RUNNING, INSTALLED_NOT_RUNNING, NOT_INSTALLED }
  */
 object ShizukuGrantGateway {
     private const val REQUEST_CODE = 1001
+    private const val BIND_TIMEOUT_MS = 15_000L
 
     /** The Shizuku manager app package (Shizuku + the legacy Sui-less builds both use this id). */
     const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
@@ -115,7 +119,16 @@ object ShizukuGrantGateway {
             .debuggable(false)
             .version(1)
 
-        val connection = object : ServiceConnection {
+        val completed = AtomicBoolean(false)
+        val timer = Timer("shizuku-grant-timeout", true)
+        lateinit var connection: ServiceConnection
+        fun finish(result: Result) {
+            if (!completed.compareAndSet(false, true)) return
+            timer.cancel()
+            runCatching { Shizuku.unbindUserService(args, connection, true) }
+            onResult(result)
+        }
+        connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                 // Binder transactions block — run off the (likely main) callback thread.
                 thread(name = "shizuku-grant") {
@@ -124,25 +137,28 @@ object ShizukuGrantGateway {
                             Result.Failed("user service binder unavailable")
                         } else {
                             val service = IShizukuUserService.Stub.asInterface(binder)
-                            val diagnostic = service.grantWriteSecureSettings(appContext.packageName)
-                            if (diagnostic.isNullOrEmpty()) Result.Success else Result.Failed(diagnostic)
+                            if (service.grantWriteSecureSettings()) Result.Success
+                            else Result.Failed("secure-settings grant failed")
                         }
                     } catch (t: Throwable) {
                         Result.Failed(t.message ?: t.javaClass.simpleName)
-                    } finally {
-                        runCatching { Shizuku.unbindUserService(args, this, true) }
                     }
-                    onResult(result)
+                    finish(result)
                 }
             }
 
-            override fun onServiceDisconnected(name: ComponentName?) {}
+            override fun onServiceDisconnected(name: ComponentName?) {
+                finish(Result.Failed("user service disconnected"))
+            }
         }
 
         try {
             Shizuku.bindUserService(args, connection)
+            timer.schedule(object : TimerTask() {
+                override fun run() = finish(Result.Failed("user service timed out"))
+            }, BIND_TIMEOUT_MS)
         } catch (t: Throwable) {
-            onResult(Result.Failed(t.message ?: t.javaClass.simpleName))
+            finish(Result.Failed("user service bind failed"))
         }
     }
 }

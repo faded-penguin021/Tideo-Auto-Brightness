@@ -102,6 +102,11 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 One line per shipped change (newest first); detail in the D-rows and git history.
 
+- 2026-07-29 — DA-031 privileged-command audit and hardening: traced every root/Shizuku/shell
+  argument to its trusted source; replaced generic AIDL exec and caller-selected grant package with
+  fixed typed operations; bounded process time/output/error streams; added cleanup, disconnect,
+  exit-code, and non-sensitive error handling; documented the remaining device-verification limits.
+
 - 2026-07-29 — Completed the Android component audit segment: manifest-wide activity/service/
   receiver/provider matrix, action/extra-to-side-effect traces, export/permission/code gates,
   replay/malformed-profile/FGS analysis, and explicit classification of enabled external control's
