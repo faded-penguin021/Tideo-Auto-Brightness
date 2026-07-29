@@ -13,6 +13,7 @@ import com.tideo.autobrightness.app.settings.ProfileApplier
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.SettingsValidator
 import com.tideo.autobrightness.app.settings.UserProfileStore
+import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
@@ -113,12 +114,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 // Preserve the live service flag + the global DetectOverrides (G2-F8) and debugLevel
                 // (G2R-F9) preferences — neither belongs to an imported profile's parameter set. An
                 // import is also a manual load → latch the context lock (G2R-F30).
-                newSettings.copy(
+                newSettings.validate().copy(
                     serviceEnabled = current.serviceEnabled,
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
                     panicSensitivity = current.panicSensitivity,
                     contextOverride = true,
+                    // Import has no per-capability preview. Keep every secure/elevated field at its
+                    // current value so choosing a document cannot silently opt the user into secure
+                    // display writes. A legacy profile saved to the catalog can still carry these
+                    // fields; applying it later goes through the visible profile preview.
+                    dimmingEnabled = current.dimmingEnabled,
+                    nightLightEnabled = current.nightLightEnabled,
+                    nightLightTemperature = current.nightLightTemperature,
+                    nightLightCircadianEnabled = current.nightLightCircadianEnabled,
+                    daltonizerMode = current.daltonizerMode,
+                    inversionEnabled = current.inversionEnabled,
+                    alwaysOnDisplayEnabled = current.alwaysOnDisplayEnabled,
+                    stayAwakeChargingEnabled = current.stayAwakeChargingEnabled,
+                    hdrForceSdrEnabled = current.hdrForceSdrEnabled,
                 )
             }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)

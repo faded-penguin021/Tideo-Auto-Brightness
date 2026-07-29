@@ -879,3 +879,17 @@
   the v4+ artifact contract used here). The workflow comment now records the precise v6/v7 boundary
   so the policy describes the pin rather than merely asserting it.
   `[cited]`: `.github/workflows/fdroid-compat.yml` (Node runtime policy and all download steps).
+
+- DA-036 [cited]: the profile import review closed the validation boundaries around DA-029's
+  byte-stream cap. Native payloads now reject unknown fields, duplicate keys, future/invalid schema
+  versions, excessive nesting/container sizes, and overlong strings before recursive JSON parsing;
+  a rejected native-shaped payload cannot fall through to the tolerant legacy parser. Legacy
+  numeric conversion rejects non-finite/overflowing rounded values and bounds flat fields, while
+  folder enumeration and the saved-profile catalog have collection/name limits. Every store/save/get/
+  apply/import persistence boundary validates settings, and direct document import preserves secure
+  display/super-dimming choices until the user uses the existing named-profile preview. Private export
+  names trim dot aliases, bound stems, and add a hash when normalization could collide. The existing
+  256 KiB streamed cap, plus-one probe, strict UTF-8 decoder, false size-hint handling, zero-read
+  progress, nullable-stream failure, and value-free exception logs remain the outer transport guard.
+  `[cited]`: `ProfileImportExportManager.kt`, `ImportStructureGuard.kt`, `UserProfileStore.kt`, and
+  `SettingsViewModel.kt` (native/legacy boundary, structural/store bounds, validation and consent).

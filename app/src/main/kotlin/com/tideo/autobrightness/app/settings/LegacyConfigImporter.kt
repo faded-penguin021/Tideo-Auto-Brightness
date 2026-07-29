@@ -20,6 +20,7 @@ data class LegacyConfigEntry(val name: String, val uri: Uri)
  * is the supported way to reach it.
  */
 object LegacyConfigImporter {
+    internal const val MAX_LISTED_CONFIGS = 256
 
     /** Persist the long-lived read permission on a tree URI returned by `OpenDocumentTree`. */
     fun persistGrant(context: Context, treeUri: Uri) {
@@ -49,7 +50,7 @@ object LegacyConfigImporter {
                 ),
                 null, null, null,
             )?.use { cursor ->
-                while (cursor.moveToNext()) {
+                while (out.size < MAX_LISTED_CONFIGS && cursor.moveToNext()) {
                     val id = cursor.getString(0)
                     val name = cursor.getString(1) ?: continue
                     if (!name.endsWith(".json", ignoreCase = true)) continue

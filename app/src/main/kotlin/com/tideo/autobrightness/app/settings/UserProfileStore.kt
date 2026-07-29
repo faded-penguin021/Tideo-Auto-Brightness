@@ -43,7 +43,15 @@ object SavedProfilesSerializer : Serializer<SavedProfiles> {
 
     override suspend fun readFrom(input: InputStream): SavedProfiles =
         runCatching {
-            json.decodeFromString(SavedProfiles.serializer(), input.readBytes().decodeToString())
+            val decoded = json.decodeFromString(SavedProfiles.serializer(), input.readBytes().decodeToString())
+            require(decoded.profiles.size <= UserProfileStore.MAX_PROFILES)
+            decoded.copy(
+                profiles = decoded.profiles.map {
+                    require(it.name.isNotBlank() && it.name != "." && it.name != ".." &&
+                        it.name.length <= UserProfileStore.MAX_PROFILE_NAME_CHARS)
+                    it.copy(settings = it.settings.validate())
+                }.distinctBy { it.name },
+            )
         }.getOrDefault(defaultValue)
 
     override suspend fun writeTo(t: SavedProfiles, output: OutputStream) {
@@ -63,6 +71,11 @@ object SavedProfilesSerializer : Serializer<SavedProfiles> {
  */
 class UserProfileStore(private val dataStore: DataStore<SavedProfiles>) {
 
+    companion object {
+        internal const val MAX_PROFILES = 128
+        internal const val MAX_PROFILE_NAME_CHARS = 96
+    }
+
     /** The saved profiles in display order (built-ins first), seeding lazily on collect. */
     fun profilesFlow(): Flow<List<SavedProfile>> = dataStore.data.map { seedIfNeeded(it).profiles }
 
@@ -75,7 +88,7 @@ class UserProfileStore(private val dataStore: DataStore<SavedProfiles>) {
     suspend fun names(): List<String> = profiles().map { it.name }
 
     /** Resolve a profile NAME to its parameter set, or null if unknown (catalog fallback handles that). */
-    suspend fun get(name: String): AabSettings? = profiles().firstOrNull { it.name == name }?.settings
+    suspend fun get(name: String): AabSettings? = profiles().firstOrNull { it.name == name }?.settings?.validate()
 
     /** Seed the five built-ins exactly once. Idempotent after the first call. */
     suspend fun ensureSeeded() {
@@ -87,13 +100,17 @@ class UserProfileStore(private val dataStore: DataStore<SavedProfiles>) {
      * [SavedProfile.builtIn] flag (so an edited built-in is still "factory" for restore purposes).
      */
     suspend fun save(name: String, settings: AabSettings) {
+        val safeName = name.trim()
+        require(safeName.isNotBlank() && safeName != "." && safeName != ".." &&
+            safeName.length <= MAX_PROFILE_NAME_CHARS) { "Invalid profile name" }
         dataStore.updateData { raw ->
             val current = seedIfNeeded(raw)
-            val exists = current.profiles.any { it.name == name }
+            val exists = current.profiles.any { it.name == safeName }
+            require(exists || current.profiles.size < MAX_PROFILES) { "Too many saved profiles" }
             val profiles = if (exists) {
-                current.profiles.map { if (it.name == name) it.copy(settings = settings) else it }
+                current.profiles.map { if (it.name == safeName) it.copy(settings = settings.validate()) else it }
             } else {
-                current.profiles + SavedProfile(name = name, settings = settings, builtIn = false)
+                current.profiles + SavedProfile(name = safeName, settings = settings.validate(), builtIn = false)
             }
             current.copy(profiles = profiles)
         }
