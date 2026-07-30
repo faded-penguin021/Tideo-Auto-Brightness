@@ -922,3 +922,18 @@
   restart ordering, unavoidable hard-kill/revoked-grant limits, and the adversarial lifecycle matrix.
   `[cited]`: `BrightnessPipelineController.kt`, `AmbientMonitoringService.kt`, `PanicHandler.kt`,
   `SuperDimmingCoordinator.kt`, and `architecture/runtime_display_safety_audit.md`.
+
+- DA-039 [cited]: the runtime resource/lifetime audit traced every sensor, observer, context
+  listener, poller, WorkManager job, FGS start, coroutine, Binder operation, child process,
+  asynchronous broadcast, DataStore mutation, notification and widget refresh. Registrations have
+  lifecycle-owned teardown; shell/Binder paths have finite time/output bounds; maintenance is unique
+  at Android's 15-minute minimum; foreground-app, location and Wi-Fi work retain their rule/screen
+  gates. The exported opt-in automation receiver was the exception: each unrestricted broadcast
+  created another process-scope coroutine and `PendingResult`, while DataStore serialized only its
+  own transaction rather than the complete command and later service/widget effects. It now admits
+  one complete command process-wide and drops overlap, bounding pending work without a timing quota
+  that would make legitimate automation brittle. Explicit ON/OFF remain convergence verbs; TOGGLE
+  remains intentionally non-idempotent. The audit records the co-installed-app flood threat and why
+  single-flight serialization, rather than an unbounded queue or wall-clock rate limit, is the
+  required current control. `[cited]`: `ControlReceiver.kt` (atomic admission and release),
+  `architecture/runtime_resource_lifetime_audit.md` (callback matrix and threat case).

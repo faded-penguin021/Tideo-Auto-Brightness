@@ -100,6 +100,11 @@ TODO/FIXME 0; `parity_gaps.md` 0 open. Changes per `RUNBOOK.md`; deviations in
 
 ## Changelog
 
+- 2026-07-29 — DA-039 traced runtime callback, polling, worker, coroutine, Binder/process and refresh
+  lifetimes; all existing registrations and subprocesses are bounded. External automation commands
+  are now single-flight (overlap dropped), preventing an opted-in co-installed app from building an
+  unbounded `goAsync`/DataStore/service backlog; the full ownership/frequency matrix is recorded.
+
 - 2026-07-29 — DA-038 traced every sensor/display write and hardened screen-safety recovery: stop
   restores persisted brightness mode and clears possible Extra Dim residue (including disabled sticky
   recreation), panic failures cannot skip later recovery attempts, and Extra Dim uses level-before-on
