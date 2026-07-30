@@ -937,3 +937,29 @@
   single-flight serialization, rather than an unbounded queue or wall-clock rate limit, is the
   required current control. `[cited]`: `ControlReceiver.kt` (atomic admission and release),
   `architecture/runtime_resource_lifetime_audit.md` (callback matrix and threat case).
+
+- DA-040: the dependency/build/release audit inventoried every direct declaration and privileged
+  boundary without changing versions. No unexpected repository, dynamic version, release debug/test
+  packaging, tracked signing material, cross-run artifact download, enabled minification, broad lint
+  baseline, or manifest merge override was found. Two facts remain actionable: the approved GitHub
+  Dependabot alert status was unavailable in this remote-less/`gh`-less checkout and is therefore
+  unknown rather than green; and the normal Gradle wrapper pins 8.14.3 by URL but not
+  `distributionSha256Sum`, leaving wrapper-executable integrity to HTTPS/cache (F-Droid's independent
+  transparency-log check covers only its own path). The latter is distinct from the previously declined
+  Gradle dependency-verification program. Action pinning and dependency verification remain declined
+  absent concrete compromise/tampering evidence. Full evidence, dependency table, minification/Binder
+  analysis, artifact boundaries, and reproducibility/provenance assumptions are in
+  `DEPENDENCY_RELEASE_SECURITY_AUDIT.md`.
+
+- DA-041: owner-supplied approved-advisory evidence corrects DA-040's environment-limited status: the
+  repository has **no open Dependabot alerts** as of 2026-07-30. The audit now records that point-in-time
+  result, the completed Owner-queue check is removed, and no dependency version change is indicated.
+  This does not alter DA-040's separate Gradle-wrapper digest finding or reopen the declined action
+  pinning / Gradle dependency-verification programs.
+
+- DA-042: the concrete wrapper-executable integrity gap from DA-040 is closed.
+  `gradle-wrapper.properties` now carries `distributionSha256Sum` for the Gradle 8.14.3 binary-only
+  ZIP; the committed value was independently matched against Gradle's release-checksums page and the
+  distribution's official `.sha256` endpoint. Gradle Wrapper therefore rejects a changed download
+  before execution, while F-Droid keeps its separate transparency-log verification. This changes no
+  dependency version and does not reopen the declined Gradle dependency-verification program.
