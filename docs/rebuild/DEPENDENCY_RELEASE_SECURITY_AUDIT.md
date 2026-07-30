@@ -39,16 +39,15 @@ the separate grant gateway can grant this package `WRITE_SECURE_SETTINGS`.
 
 ## Findings
 
-### Verified risk: wrapper distribution lacks a repository-pinned digest
+### Resolved finding: wrapper distribution now has a repository-pinned digest
 
-`gradle-wrapper.properties` validates the distribution URL but has no `distributionSha256Sum`.
-Normal local and GitHub builds therefore trust HTTPS, DNS/CDN delivery, and the Gradle cache for the
-Gradle 8.14.3 executable rather than checking a digest committed with the wrapper configuration.
-F-Droid's separate `gradlew-fdroid` path checksum-verifies against its transparency log, so that path
-does not remove the normal-build gap. This is narrower than, and is not a re-proposal of, Gradle
-dependency verification: it concerns the wrapper executable itself. Add the official Gradle 8.14.3
-binary-distribution SHA-256 in a dedicated follow-up after independently obtaining it from Gradle's
-official checksum publication.
+The initial audit found that `gradle-wrapper.properties` validated the distribution URL but had no
+`distributionSha256Sum`. DA-042 resolves that executable-integrity gap by pinning the official Gradle
+8.14.3 binary-only ZIP SHA-256, independently matched against both Gradle's checksum publication and
+the distribution's `.sha256` endpoint. Normal local and GitHub wrapper downloads now reject bytes that
+do not match the committed digest; F-Droid retains its independent transparency-log verification.
+This remains narrower than, and is not a re-proposal of, Gradle dependency verification: it concerns
+the wrapper executable itself.
 
 ### Approved advisory result: no open Dependabot alerts
 

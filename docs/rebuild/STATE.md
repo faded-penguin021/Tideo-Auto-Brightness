@@ -23,11 +23,10 @@ No plan files; parity checklist has zero pending, tests are green, TODO/FIXME an
 Changes follow RUNBOOK; durable deviations are in the live `_A.md` ledger.
 
 **2026-07-30 dependency/release audit (DA-040):** direct dependencies and privileged surfaces are
-inventoried in `DEPENDENCY_RELEASE_SECURITY_AUDIT.md`; no versions changed. Verified risks are (1)
-the normal Gradle 8.14.3 wrapper has no committed `distributionSha256Sum` (F-Droid verifies only its
-independent wrapper path). The owner subsequently confirmed there are no open Dependabot alerts
-(DA-041), closing the audit's local-evidence gap; no dependency version change is warranted by the
-approved process. Add the official wrapper digest in a dedicated follow-up.
+inventoried in `DEPENDENCY_RELEASE_SECURITY_AUDIT.md`; no versions changed. The
+normal Gradle 8.14.3 wrapper originally lacked `distributionSha256Sum`; DA-042 now pins Gradle's
+official binary ZIP digest, closing that executable-integrity gap. The owner confirmed there are no
+open Dependabot alerts (DA-041), so no dependency version change is warranted by the approved process.
 
 ## Owner queue
 
@@ -68,6 +67,8 @@ approved process. Add the official wrapper digest in a dedicated follow-up.
 
 One line per shipped change (newest first); detail lives in the deviation rows and git history.
 
+- 2026-07-30 — **DA-042:** pinned the Gradle 8.14.3 binary wrapper distribution to Gradle's official
+  SHA-256, verified through both official checksum surfaces; wrapper downloads now fail on mismatch.
 - 2026-07-30 — **DA-041:** owner confirmed no open Dependabot alerts; corrected DA-040's unavailable
   local status to the approved point-in-time result and removed the completed Owner-queue action.
 - 2026-07-30 — **DA-040 dependency/build/release security audit:** inventoried direct and privileged

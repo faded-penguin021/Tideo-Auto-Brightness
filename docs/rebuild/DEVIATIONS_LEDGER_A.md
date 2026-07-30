@@ -956,3 +956,10 @@
   result, the completed Owner-queue check is removed, and no dependency version change is indicated.
   This does not alter DA-040's separate Gradle-wrapper digest finding or reopen the declined action
   pinning / Gradle dependency-verification programs.
+
+- DA-042: the concrete wrapper-executable integrity gap from DA-040 is closed.
+  `gradle-wrapper.properties` now carries `distributionSha256Sum` for the Gradle 8.14.3 binary-only
+  ZIP; the committed value was independently matched against Gradle's release-checksums page and the
+  distribution's official `.sha256` endpoint. Gradle Wrapper therefore rejects a changed download
+  before execution, while F-Droid keeps its separate transparency-log verification. This changes no
+  dependency version and does not reopen the declined Gradle dependency-verification program.
