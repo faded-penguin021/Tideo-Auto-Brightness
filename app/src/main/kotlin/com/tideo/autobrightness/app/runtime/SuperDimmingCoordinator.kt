@@ -173,11 +173,35 @@ class SuperDimmingCoordinator(
         // renamed/relocated key (or require the accessibility feature pre-enabled); if engagement
         // logs "ON" here (debug 5) but the screen does not visibly dim on a given device, that is OEM
         // secure-key variance, not a logic bug — see SecureDimmingController + STATE.md D-048.
+        val mode = if (pwmPath) "PWM" else "SD"
         val levelWritten = secureDimming.setLevel(level).isSuccess
-        if (engaged != true && levelWritten) {
+        if (!levelWritten) {
+            // DB-001: a failed level write while ALREADY engaged is the dangerous case, and the
+            // previous code was silent about it — the latch was already `true`, so it skipped
+            // activation and returned, leaving the screen pinned at the PREVIOUS level. Since levels
+            // fall as the target rises, that stale level is typically STRONGER than the one just
+            // requested: the user brightens the room, the write fails, and the screen stays dark.
+            // Fail safe instead: drop to a known-off state (best effort) and mark the latch UNKNOWN
+            // so the next cycle re-engages from scratch rather than trusting a level it never wrote.
+            // ONLY when we know we are engaged. From UNKNOWN (fresh process) or known-off, a failed
+            // level write means nothing of ours is on screen, and writing activation here would be a
+            // secure write we have no reason to make — the pre-existing "a missing level must never
+            // activate an unknown OEM level" invariant covers that case and still holds.
+            if (engaged == true) {
+                val cleared = secureDimming.setActivated(false).isSuccess
+                engaged = if (cleared) false else null
+            }
+            emitDebug(settings) {
+                "FAILED ($mode) level $level not written (target $targetBrightness) — Extra Dim cleared"
+            }
+            return
+        }
+        if (engaged != true) {
             if (secureDimming.setActivated(true).isSuccess) engaged = true
         }
-        val mode = if (pwmPath) "PWM" else "SD"
+        // Report ON only for a level that actually reached the secure setting. The old message was
+        // emitted unconditionally, so a failed write still logged "ON <new level>" and sent device
+        // diagnosis after the wrong suspect (DB-001).
         emitDebug(settings) { "ON ($mode) level $level (target $targetBrightness < ${settings.dimmingThreshold})" }
     }
 

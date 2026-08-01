@@ -963,3 +963,37 @@
   distribution's official `.sha256` endpoint. Gradle Wrapper therefore rejects a changed download
   before execution, while F-Droid keeps its separate transparency-log verification. This changes no
   dependency version and does not reopen the declined Gradle dependency-verification program.
+
+- DA-043 [cited]: **External-control admission bounds the receiver, not the work it leaves behind**
+  (adversarial review of the hardening branch, 2026-07-31). `ControlReceiver` admits one command at a
+  time, but releases the slot when *routing* finishes — and most verbs finish routing by posting an
+  event, so the backlog simply moved downstream into an `UNLIMITED` pipeline channel. Fixed in two
+  layers, both in `BrightnessPipelineController.postControl`: **consecutive-duplicate coalescing**
+  (every control event is idempotent with respect to its immediate predecessor of the same type) plus
+  a **hard cap** of 64 queued control events. The coalescing shape is deliberate and narrower than
+  the "coalesce REAPPLY/PAUSE/RESUME" that was proposed: same-type-anywhere folding drops the third
+  event of a `Pause→Resume→Pause` sequence and leaves the pipeline resumed against the user's last
+  intent, which `ControlFloodBoundTest.coalescingNeverLosesAStateTransition` pins. `OverrideDetected`
+  is capped but never coalesced — it carries the observed brightness, so folding acts on a stale
+  slider position. **Declined: a priority lane for PANIC/DISABLE.** They never enter this channel;
+  they are service actions that run `emergencyStop`/teardown directly, so a flood of ordinary verbs
+  cannot starve them — the property the proposal wanted already holds structurally. Also fixed here:
+  unknown actions are refused *before* the process-wide admission gate, so junk cannot make the
+  receiver drop a legitimate command arriving beside it. Evidence: `ControlFloodBoundTest` (10 000
+  reapplies → 1 pending event; 10 000 alternating verbs → capped, cap demonstrably engaged).
+  `[cited]`: `BrightnessPipelineController.postControl`, `ControlReceiver.KNOWN_ACTIONS`.
+
+- DA-044 [cited]: **SAF provider I/O ran on the UI dispatcher, unbounded.** `importFromDocument` /
+  `exportToDocument` are `suspend` but did their `ContentResolver` query, stream open and read/write
+  synchronously on the caller's dispatcher — and the caller is a Compose activity-result callback on
+  `Dispatchers.Main.immediate`, calling into a provider the user picked in the system file picker,
+  i.e. arbitrary third-party code. The DA-029 256 KiB cap bounds how much a lying provider can make
+  us *allocate*; it does nothing about one that never returns from `read()`. Now: all provider work
+  on `Dispatchers.IO` under a 20 s `withTimeout`, and `CancellationException` is rethrown instead of
+  being flattened into `ReadFailure` by a broad `runCatching`. **Stated limit, not a claim of
+  cancellation:** the timeout frees the *caller*, not the thread — Android cannot abort a binder call
+  already inside a hostile provider, so that IO-dispatcher thread stays parked until the provider
+  yields. What is bought is that it is a pooled IO thread rather than the UI thread, and that the
+  user sees an error rather than a frozen screen. A timeout deliberately maps onto the existing
+  `ReadFailure` rather than a new result type: the user's next step is identical, and the extra
+  variant would fan out through every caller's `when`. `[cited]`: `ProfileImportExportManager`.

@@ -38,6 +38,11 @@ class ControlReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        // DA-043: an unknown verb can do nothing, so it must not consume the process-wide admission
+        // slot on its way to doing nothing. Rejecting here means a flood of junk actions cannot make
+        // the receiver drop a legitimate command that arrives alongside it — and it costs an
+        // unauthenticated caller the DataStore read the gate check would otherwise perform.
+        if (action !in KNOWN_ACTIONS) return
         // DA-039: this is an exported, caller-unrestricted receiver. DataStore serializes individual
         // writes, but it does not bound the number of goAsync coroutines/PendingResults or serialize
         // the later service/widget side effects. Admit one whole command at a time and drop overlap;
@@ -133,6 +138,19 @@ class ControlReceiver : BroadcastReceiver() {
 
         /** String extra on [ACTION_LOAD_PROFILE]: the saved/built-in profile name to load. */
         const val EXTRA_PROFILE_NAME = "name"
+
+        /** Every verb [route] can act on. Anything else is refused before the admission gate. */
+        internal val KNOWN_ACTIONS = setOf(
+            ACTION_SERVICE_ON,
+            ACTION_SERVICE_OFF,
+            ACTION_SERVICE_TOGGLE,
+            ACTION_PAUSE,
+            ACTION_RESUME,
+            ACTION_REAPPLY,
+            ACTION_PANIC,
+            ACTION_LOAD_PROFILE,
+            ACTION_CONTEXTS_RESUME,
+        )
 
         private val commandInFlight = AtomicBoolean(false)
 

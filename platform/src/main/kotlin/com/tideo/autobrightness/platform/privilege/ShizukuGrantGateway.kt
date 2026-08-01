@@ -32,6 +32,16 @@ enum class ShizukuAvailability { RUNNING, INSTALLED_NOT_RUNNING, NOT_INSTALLED }
  */
 object ShizukuGrantGateway {
     private const val REQUEST_CODE = 1001
+
+    /**
+     * DB-005: wall-clock bound on the permission prompt. Long enough for a user to find the Shizuku
+     * dialog, read it and decide; short enough that a dismissed prompt does not strand the caller
+     * (and the listener) for the life of the process.
+     */
+    private const val PROMPT_TIMEOUT_MS = 120_000L
+
+    /** DB-005: one grant flow at a time — all requests share [REQUEST_CODE]. */
+    private val grantInFlight = AtomicBoolean(false)
     private const val BIND_TIMEOUT_MS = 15_000L
 
     /** The Shizuku manager app package (Shizuku + the legacy Sui-less builds both use this id). */
@@ -80,14 +90,34 @@ object ShizukuGrantGateway {
      * background thread — callers marshal to the UI thread themselves).
      */
     fun requestGrant(context: Context, onResult: (Result) -> Unit) {
+        // DB-005: single-flight. Every request shares one REQUEST_CODE, so two overlapping flows
+        // cannot tell their results apart — the first listener to see the code consumes it and the
+        // second is left waiting on a callback that will never come. There is exactly one grant to
+        // obtain, so serialise: a second caller is told the first is still running.
+        if (!grantInFlight.compareAndSet(false, true)) {
+            onResult(Result.Failed("A Shizuku grant is already in progress"))
+            return
+        }
+        val settled = AtomicBoolean(false)
+        var promptTimer: Timer? = null
+        // Single exit for every path, so the in-flight flag and the timer are released exactly once.
+        val complete: (Result) -> Unit = { result ->
+            if (settled.compareAndSet(false, true)) {
+                promptTimer?.cancel()
+                grantInFlight.set(false)
+                onResult(result)
+            }
+        }
+
         if (!isAvailable()) {
-            onResult(Result.Unavailable)
+            complete(Result.Unavailable)
             return
         }
         if (hasPermission()) {
-            bindAndGrant(context, onResult)
+            bindAndGrant(context, complete)
             return
         }
+
         val listener = object : Shizuku.OnRequestPermissionResultListener {
             override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
                 if (requestCode != REQUEST_CODE) return
@@ -95,18 +125,32 @@ object ShizukuGrantGateway {
                 // listener and re-fires it on unrelated future requests.
                 Shizuku.removeRequestPermissionResultListener(this)
                 if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                    bindAndGrant(context, onResult)
+                    bindAndGrant(context, complete)
                 } else {
-                    onResult(Result.PermissionDenied)
+                    complete(Result.PermissionDenied)
                 }
             }
         }
         Shizuku.addRequestPermissionResultListener(listener)
+        // DB-005: the BIND had a timeout; the prompt did not. A user who dismisses the Shizuku
+        // dialog without answering produces no callback at all, so the listener stayed registered
+        // for the life of the process and the caller's continuation never ran. Bound the whole flow.
+        promptTimer = Timer("shizuku-prompt-timeout", true).apply {
+            schedule(
+                object : TimerTask() {
+                    override fun run() {
+                        runCatching { Shizuku.removeRequestPermissionResultListener(listener) }
+                        complete(Result.Failed("Shizuku permission prompt timed out"))
+                    }
+                },
+                PROMPT_TIMEOUT_MS,
+            )
+        }
         try {
             Shizuku.requestPermission(REQUEST_CODE)
         } catch (t: Throwable) {
             Shizuku.removeRequestPermissionResultListener(listener)
-            onResult(Result.Failed(t.message ?: t.javaClass.simpleName))
+            complete(Result.Failed(t.message ?: t.javaClass.simpleName))
         }
     }
 

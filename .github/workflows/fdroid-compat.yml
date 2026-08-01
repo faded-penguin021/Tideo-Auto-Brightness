@@ -155,6 +155,11 @@ jobs:
     steps:
       - name: Checkout (clean)
         uses: actions/checkout@v5
+        with:
+          # This whole workspace is bind-mounted into the F-Droid buildserver image below. The token
+          # is read-only and short-lived, but there is no reason for it to be inside a container
+          # running a moving third-party image, so do not persist it in .git/config.
+          persist-credentials: false
 
       # Only the Gradle distribution that gradlew-fdroid downloads (checksum-verified against
       # F-Droid's gradle-transparency-log on first fetch) and resolved dependencies. Keyed on
@@ -345,6 +350,12 @@ jobs:
 
       - name: Check metadata assumptions against the live fdroiddata recipe
         run: python3 scripts/fdroid-check.py metadata
+
+      # DB-003: the checker's own regression suite. Runtime-built fixtures, no network, seconds to
+      # run — and it is the only thing standing between "the comparator reads bytes" and a silent
+      # return to trusting archive metadata.
+      - name: Self-test the comparator and signing-block reader
+        run: python3 scripts/fdroid-check.py selftest
 
       - name: Upload scanner output
         if: always()

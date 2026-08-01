@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Privacy allowlist (DA-034). DataStore files live under files/datastore/.
-     Cloud receives only ordinary brightness configuration and saved profiles. Device transfer may
-     additionally carry user-authored context rules, including their SSIDs, app package names and
-     location geofences. Runtime telemetry, cached/fixed coordinates, learned override points,
-     power samples, default-off privacy-consent gates, context baselines, crash traces and app-private profile exports
-     are deliberately omitted from both destinations. See architecture/datastore_map.md. -->
+<!-- Privacy allowlist (DA-034, corrected DB-002). DataStore files live under files/datastore/.
+     Cloud receives brightness configuration and saved profiles. Device transfer may additionally
+     carry user-authored context rules, including their SSIDs, app package names and location
+     geofences. Runtime telemetry, cached/fixed coordinates, learned override points, power samples,
+     default-off privacy-consent gates, context baselines, crash traces and app-private profile
+     exports are deliberately omitted from both destinations. See architecture/datastore_map.md.
+
+     NOTE (DB-002): aab_settings.json is not purely configuration — it also holds `serviceEnabled`
+     and `contextOverride`, which describe what THIS installation was doing. Backup eligibility is
+     per-file, so those fields travel with the config; SettingsBackupAgent.onRestoreFinished() resets
+     them on arrival (SettingsBackupSanitizer). The allowlist below and that sanitizer are one
+     control in two halves — changing either without the other reopens the stale-state hole. -->
 <data-extraction-rules>
     <cloud-backup>
         <include domain="file" path="datastore/aab_settings.json" />

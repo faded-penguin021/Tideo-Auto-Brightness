@@ -308,4 +308,70 @@ class SuperDimmingCoordinatorTest {
         assertEquals(levelsAfter, secure.levels.size)
         assertFalse(secure.levels.size > levelsAfter)
     }
+
+
+    // ---- DB-001: a level write that fails while Extra Dim is ALREADY engaged ------------------
+    // The pre-existing failure test only covered the first engagement, where the latch is still
+    // false and nothing is on screen yet. The dangerous case is the opposite one.
+
+    @Test
+    fun engagedThenFailedLevelWrite_clearsExtraDimInsteadOfLeavingTheOldLevel() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+        // Engage hard: a very dark target produces a strong dim level.
+        coordinator.apply(targetBrightness = 1, settings = dimmingOn)
+        assertEquals(true, secure.activated, "precondition: dimming is engaged")
+        val strongLevel = secure.levels.last()
+        secure.writes.clear()
+
+        // The user brightens the room; the weaker level write now fails (permission revoked).
+        secure.failLevel = true
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+
+        assertEquals(
+            false,
+            secure.activated,
+            "a failed level write must not leave the screen pinned at the previous, stronger level ($strongLevel)",
+        )
+        assertTrue(
+            secure.writes.contains("activated:false"),
+            "expected a best-effort deactivation, got ${secure.writes}",
+        )
+    }
+
+    @Test
+    fun failedLevelWrite_isNotReportedAsEngagedAtTheNewLevel() {
+        val secure = FakeSecureDimming()
+        val sink = RecordingDebugSink()
+        val coordinator = SuperDimmingCoordinator(secure, sink) { Tier.ELEVATED }
+        coordinator.apply(targetBrightness = 1, settings = dimmingOn.copy(debugLevel = DebugCategory.SUPER_DIMMING.level))
+        sink.emitted.clear()
+
+        secure.failLevel = true
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn.copy(debugLevel = DebugCategory.SUPER_DIMMING.level))
+
+        val message = sink.emitted.single().second
+        assertFalse(message.startsWith("ON"), "a failed write reported success: $message")
+        assertTrue(message.contains("FAILED"), "expected an explicit failure diagnostic, got: $message")
+    }
+
+    @Test
+    fun afterAFailedLevelWrite_theNextCycleReEngagesFromScratch() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+        coordinator.apply(targetBrightness = 1, settings = dimmingOn)
+        secure.failLevel = true
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        secure.failLevel = false
+        secure.writes.clear()
+
+        // Permission is back: the latch must not still believe it is engaged, or activation is skipped.
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+
+        assertEquals(true, secure.activated)
+        assertTrue(
+            secure.writes.contains("activated:true"),
+            "the latch stayed engaged across the failure, so re-activation never ran: ${secure.writes}",
+        )
+    }
 }

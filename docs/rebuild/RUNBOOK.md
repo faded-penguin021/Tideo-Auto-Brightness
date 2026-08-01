@@ -38,6 +38,8 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | Privilege tiers / permissions / DataStore schema | `architecture/*` |
 | Material 3 audit | `design/m3_audit.md` |
 | What the F-Droid compatibility CI proves (and does not) | `FDROID_VALIDATION.md` |
+| Threat model — assets, attackers, invariants | `SECURITY_AUDIT_MODEL.md` |
+| Which control enforces an invariant, and what proves it | `SECURITY_REVIEW.md` |
 | Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
 ## Change-type playbooks

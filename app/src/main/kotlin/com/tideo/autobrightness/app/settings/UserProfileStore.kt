@@ -39,11 +39,40 @@ data class SavedProfiles(
 object SavedProfilesSerializer : Serializer<SavedProfiles> {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
+    /**
+     * DB-004: allocation ceiling for the persisted profile set, derived from the limits that already
+     * exist — [UserProfileStore.MAX_PROFILES] profiles, each a pretty-printed settings object of a
+     * few KiB — with generous slack. Not a schema constraint: raise it if the settings object grows.
+     */
+    internal const val MAX_ENCODED_PROFILES_BYTES = 4 * 1024 * 1024
+
     override val defaultValue: SavedProfiles = SavedProfiles()
 
+    /**
+     * DB-004: bound the READ before parsing it.
+     *
+     * The profile-count and name-length limits below are applied to the *decoded object*, so
+     * `readBytes()` had already materialised the entire file — and the count limit implies a size
+     * limit anyway (128 profiles of a bounded settings object is well under a megabyte). This store
+     * is app-private, so the input is corrupt state rather than an attacker's, but "corrupt state
+     * cannot make us allocate without limit" is cheap to hold and the alternative is an OOM on a
+     * path whose whole job is recovering from bad data.
+     */
     override suspend fun readFrom(input: InputStream): SavedProfiles =
         runCatching {
-            val decoded = json.decodeFromString(SavedProfiles.serializer(), input.readBytes().decodeToString())
+            // readNBytes is API 33; minSdk is 31, so read the bound by hand (+1 probe byte, which is
+            // what distinguishes "exactly at the cap" from "truncated at the cap").
+            val raw = java.io.ByteArrayOutputStream()
+            val chunk = ByteArray(DEFAULT_BUFFER_SIZE)
+            var remaining = MAX_ENCODED_PROFILES_BYTES + 1
+            while (remaining > 0) {
+                val count = input.read(chunk, 0, minOf(chunk.size, remaining))
+                if (count < 0) break
+                raw.write(chunk, 0, count)
+                remaining -= count
+            }
+            require(raw.size() <= MAX_ENCODED_PROFILES_BYTES) { "Saved profiles file is implausibly large" }
+            val decoded = json.decodeFromString(SavedProfiles.serializer(), raw.toByteArray().decodeToString())
             require(decoded.profiles.size <= UserProfileStore.MAX_PROFILES)
             decoded.copy(
                 profiles = decoded.profiles.map {

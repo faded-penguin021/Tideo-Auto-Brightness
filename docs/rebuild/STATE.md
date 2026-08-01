@@ -19,11 +19,14 @@ Privileged Display.
 1.8.2 bump; PR #99 folded bounded profile import + sticky-restart gating into it, and PR #96's
 squash title/body describe the net train. At the tag, run DA-026's one-shot F-Droid reproducibility
 check; the DA-024 store icon lands with it. `domain/` and `platform/` remain byte-identical to 1.8.1.
-No plan files; parity checklist has zero pending, tests are green, TODO/FIXME and parity gaps are zero.
-Changes follow RUNBOOK; durable deviations are in the live `_A.md` ledger.
+The 2026-07-31 adversarial round (DA-043/DA-044 + DB-001…DB-007) then fixed five confirmed findings
+in that hardening plus three the review did not name, and merged six audit documents into
+`SECURITY_REVIEW.md`. No plan files; parity checklist has zero pending, tests are green, TODO/FIXME
+and parity gaps are zero. Changes follow RUNBOOK; the ledger rolled over — the live file is now
+`DEVIATIONS_LEDGER_B.md` (`_A.md` closed at its 1000-line cap).
 
 **2026-07-30 dependency/release audit (DA-040):** direct dependencies and privileged surfaces are
-inventoried in `DEPENDENCY_RELEASE_SECURITY_AUDIT.md`; no versions changed. The
+inventoried in `SECURITY_REVIEW.md` (dependency row); no versions changed. The
 normal Gradle 8.14.3 wrapper originally lacked `distributionSha256Sum`; DA-042 now pins Gradle's
 official binary ZIP digest, closing that executable-integrity gap. The owner confirmed there are no
 open Dependabot alerts (DA-041), so no dependency version change is warranted by the approved process.
@@ -64,6 +67,23 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
   reports; QS/notification grayscale action; refresh-rate/OEM keys; manual Extra-Dim toggle.
 
 ## Changelog
+
+- 2026-07-31 — **Adversarial security round (DA-043/DA-044 + DB-001…DB-007).** Five findings against
+  the hardening branch, all real, all fixed: external-control admission bounded the receiver but not
+  the pipeline queue behind it (now coalescing + capped, `ControlFloodBoundTest`); SAF provider I/O
+  ran on the UI dispatcher unbounded (now `Dispatchers.IO` + 20 s + cancellation); a failed Extra Dim
+  level write left the previous, **stronger** level on screen while reporting `ON`; backup carried
+  `serviceEnabled`/`contextOverride` (now sanitized at restore); the F-Droid comparator trusted
+  declared CRC32 metadata and its docs overclaimed (now SHA-256 over decompressed bytes, EOCD-anchored
+  signing-block reader, `selftest`). **Three the review did not find:** a `stdoutLimit = 0` that made
+  any output from `pm grant` read as failure; the sanitizer's first design no-opping on the common
+  case (`serviceEnabled` defaults **true** and kotlinx omits defaults, so the risky backup is the one
+  where the key is absent); and unbounded post-kill reaps. **One rebuttal that became a correction:**
+  a test written to disprove the geo-IP cancellation finding confirmed it instead — `invokeOnCompletion`
+  on a job parked in `read()` cannot fire until that read returns. **Declined with reasons:** splitting
+  the settings DataStore, a PANIC/DISABLE priority lane (they never use that queue), `apksigcopier`
+  here, reordering profile apply (the proposed order silently reverts a user's load), and folding
+  `FDROID_VALIDATION.md` into the RUNBOOK.
 
 One line per shipped change (newest first); detail lives in the deviation rows and git history.
 

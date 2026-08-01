@@ -21,6 +21,7 @@ Why the checks are shaped the way they are is documented in
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import struct
@@ -76,26 +77,34 @@ def _ok(message: str) -> int:
 # --------------------------------------------------------------------------------------
 
 
-def _content_map(apk: Path) -> dict[str, list[int]]:
-    """Map every non-signature zip entry name to the CRC(s) stored under it.
+def _content_map(apk: Path) -> dict[str, list[str]]:
+    """Map every non-signature zip entry name to the SHA-256 of its DECOMPRESSED bytes.
 
-    Per-entry CRC32, not raw bytes: this compares entry *contents* independent of zip framing
-    (entry order, alignment, timestamps), which is the level F-Droid's own reproducible-build
-    comparison works at — so this stage does not fail on a difference F-Droid would forgive.
-    A CRC32 is a checksum, not a hash: it proves difference reliably and sameness only to
-    within a collision, which is the right trade for a change-detector.
+    DB-003: this used to read `ZipInfo.CRC` — the checksum the archive *declares* — and never
+    decompressed anything. That trusts metadata to describe payload: an entry whose bytes were
+    changed while its CRC field was left alone compared equal, which the repo's own selftest now
+    demonstrates. It is also a 32-bit checksum being asked to stand in for content identity.
 
-    The value is a LIST because a zip may legitimately carry duplicate entry names, and a
-    duplicate appearing in one APK but not the other is exactly the packaging hazard worth
-    catching — a dict keyed on filename would silently keep only the last one.
+    Hashing the decompressed bytes fixes both: it is the entry's actual content, at collision
+    resistance that makes "equal hash, different bytes" not worth reasoning about. Reading the bytes
+    also means a corrupt entry raises instead of silently comparing equal.
+
+    Still deliberately *not* a byte-for-byte archive comparison: zip framing (entry order, alignment,
+    extra fields, timestamps) is excluded, because two honest builds of one commit may legitimately
+    differ there. See FDROID_VALIDATION.md for what this is and is not evidence of.
     """
-    out: dict[str, list[int]] = {}
+    out: dict[str, list[str]] = {}
     with zipfile.ZipFile(apk) as zf:
         for info in zf.infolist():
-            if not SIGNATURE_ENTRY_RE.match(info.filename):
-                out.setdefault(info.filename, []).append(info.CRC)
-    for crcs in out.values():
-        crcs.sort()
+            if info.is_dir() or SIGNATURE_ENTRY_RE.match(info.filename):
+                continue
+            digest = hashlib.sha256()
+            with zf.open(info) as entry:
+                for chunk in iter(lambda: entry.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            out.setdefault(info.filename, []).append(digest.hexdigest())
+    for digests in out.values():
+        digests.sort()
     return out
 
 
@@ -105,7 +114,16 @@ def cmd_compare(args: argparse.Namespace) -> int:
         if not p.is_file():
             return _fail("Reproducibility validation failed", f"APK not found: {p}")
 
-    ma, mb = _content_map(a), _content_map(b)
+    try:
+        ma, mb = _content_map(a), _content_map(b)
+    except (zipfile.BadZipFile, OSError) as exc:
+        # A corrupt entry is a reproducibility failure with a clearer cause than "these differ" —
+        # and reading the bytes is what surfaces it at all (the old CRC-metadata comparison could
+        # not have noticed). Report it as the stage failure it is, not as a traceback.
+        return _fail(
+            "Reproducibility validation failed",
+            f"an APK could not be read as a valid archive: {exc}",
+        )
     only_a = sorted(set(ma) - set(mb))
     only_b = sorted(set(mb) - set(ma))
     changed = sorted(k for k in set(ma) & set(mb) if ma[k] != mb[k])
@@ -125,8 +143,8 @@ def cmd_compare(args: argparse.Namespace) -> int:
 
     if report["identical"]:
         return _ok(
-            f"{len(ma)} entries identical between {a.name} and {b.name} "
-            "(signature files excluded) — the two builds reproduce each other"
+            f"{len(ma)} entries match by SHA-256 of their decompressed bytes between {a.name} "
+            f"and {b.name} (signature files excluded) — the two builds agree on content"
         )
 
     for name in only_a:
@@ -152,29 +170,69 @@ def cmd_compare(args: argparse.Namespace) -> int:
 def _signing_block_ids(apk: Path) -> list[int] | None:
     """Return the APK Signing Block IDs, or None if the APK is unsigned.
 
-    Layout (Android docs, "APK Signing Block"): the block sits between the zip entries and
-    the central directory, framed by an 8-byte size at each end and the magic
-    "APK Sig Block 42"; inside it is a sequence of length-prefixed ID/value pairs.
+    DB-003: located by STRUCTURE, not by search. The previous version did `data.rfind(b"APK Sig
+    Block 42")` over the whole file, so any occurrence of those 16 bytes inside an entry's payload
+    could be mistaken for the block header — an attacker-supplied string deciding where a security
+    check starts reading. It also allowed a pair to overrun the block by eight bytes
+    (`pos + 8 + length > end + 8`), i.e. the last pair could claim length past the region.
+
+    The real layout (Android "APK Signing Block"): [zip entries][APK Signing Block][central
+    directory][EOCD]. The EOCD records where the central directory starts, and the signing block is
+    the region ending immediately before it, framed by an 8-byte size at each end plus the magic. So
+    walk EOCD → central-directory offset → the 24 bytes before it, and verify the magic *there*.
     """
     data = apk.read_bytes()
-    magic = data.rfind(b"APK Sig Block 42")
-    if magic < 0:
+    cd_offset = _central_directory_offset(data)
+    if cd_offset is None or cd_offset < 24:
         return None
-    size_end = struct.unpack("<Q", data[magic - 8 : magic])[0]
-    pos = magic + 16 - 8 - size_end + 8  # skip the leading size field
-    end = magic - 8
+    # The 8 bytes at [cd_offset-24, cd_offset-16) are the trailing size; the 16 after it, the magic.
+    if data[cd_offset - 16 : cd_offset] != b"APK Sig Block 42":
+        return None  # no signing block: an unsigned (or v1-only) APK
+    size_end = struct.unpack("<Q", data[cd_offset - 24 : cd_offset - 16])[0]
+    block_start = cd_offset - 8 - size_end  # start of the leading size field
+    if block_start < 0 or block_start + 8 > len(data):
+        raise ValueError("APK Signing Block size field does not fit the file")
+    size_start = struct.unpack("<Q", data[block_start : block_start + 8])[0]
+    if size_start != size_end:
+        raise ValueError(f"APK Signing Block size mismatch: {size_start} vs {size_end}")
+
+    pos = block_start + 8            # first ID/value pair
+    end = cd_offset - 24             # first byte past the last pair
     ids: list[int] = []
     while pos < end:
+        if pos + 8 > end:
+            raise ValueError(f"truncated pair length field at offset {pos}")
         length = struct.unpack("<Q", data[pos : pos + 8])[0]
-        if length < 4 or pos + 8 + length > end + 8:
-            # Do NOT return what was parsed so far (DA-028): unknown IDs could sit past this point, and
-            # reporting a partial list as complete would fail open on the tampered case.
+        # A pair is [8-byte length][4-byte id][value]; length counts id+value, so it must be >= 4 and
+        # must not run past the pairs region. `> end` — not `> end + 8`, which tolerated an overrun.
+        if length < 4 or pos + 8 + length > end:
             raise ValueError(
                 f"malformed APK Signing Block at offset {pos}: pair length {length} does not fit"
             )
         ids.append(struct.unpack("<I", data[pos + 8 : pos + 12])[0])
         pos += 8 + length
+    if pos != end:
+        raise ValueError(f"APK Signing Block pairs end at {pos}, expected {end}")
     return ids
+
+
+def _central_directory_offset(data: bytes) -> int | None:
+    """Offset of the zip central directory, read from the End Of Central Directory record."""
+    # EOCD is 22 bytes plus a comment of up to 0xFFFF; scan back from the end for its signature.
+    max_back = min(len(data), 22 + 0xFFFF)
+    window = data[len(data) - max_back :]
+    idx = window.rfind(b"PK\x05\x06")
+    if idx < 0:
+        return None
+    eocd = len(data) - max_back + idx
+    if eocd + 20 > len(data):
+        return None
+    offset = struct.unpack("<I", data[eocd + 16 : eocd + 20])[0]
+    if offset == 0xFFFFFFFF:
+        # ZIP64: the real offset lives in the ZIP64 EOCD record. APKs this large are not a thing
+        # here, and guessing would be worse than declining.
+        raise ValueError("ZIP64 archives are not supported by the signing-block reader")
+    return offset if offset <= len(data) else None
 
 
 def cmd_signing_blocks(args: argparse.Namespace) -> int:
@@ -184,7 +242,7 @@ def cmd_signing_blocks(args: argparse.Namespace) -> int:
 
     try:
         ids = _signing_block_ids(apk)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         return _fail("Signing assumption check failed", f"{apk.name}: {exc}")
     if ids is None:
         # Not a failure by itself: an unsigned APK simply has nothing to check. The
@@ -336,6 +394,67 @@ def cmd_metadata(args: argparse.Namespace) -> int:
     return _ok("repository still satisfies the live fdroiddata recipe")
 
 
+# --------------------------------------------------------------------------------------
+# selftest — the checks the checker's own defects would have passed (DB-003)
+# --------------------------------------------------------------------------------------
+
+
+def cmd_selftest(_args: argparse.Namespace) -> int:
+    """Prove the two DB-003 defects stay fixed, using fixtures built at runtime.
+
+    Runtime-built, never stored: a committed binary fixture is a blob nobody re-reads, and the
+    repo's own rule is that fixture material is generated, not checked in.
+    """
+    import contextlib
+    import io
+    import tempfile
+
+    failures: list[str] = []
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+
+        # 1. Content vs declared metadata. Two archives with identical CRC fields but different
+        #    payload bytes: the CRC-metadata comparison called these equal.
+        honest, tampered = root / "honest.apk", root / "tampered.apk"
+        for path in (honest, tampered):
+            with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as zf:
+                zf.writestr("classes.dex", "HONEST-PAYLOAD--")
+        raw = tampered.read_bytes().replace(b"HONEST-PAYLOAD--", b"EVIL-PAYLOAD----")
+        tampered.write_bytes(raw)  # CRC fields still describe the original bytes
+
+        same_declared_crc = [i.CRC for i in zipfile.ZipFile(honest).infolist()] == [
+            i.CRC for i in zipfile.ZipFile(tampered).infolist()
+        ]
+        if not same_declared_crc:
+            failures.append("fixture is not exercising the defect: declared CRCs already differ")
+        args = argparse.Namespace(apk_a=str(honest), apk_b=str(tampered), report=None)
+        # Swallow the inner run's output: it is a NEGATIVE case, and its failure annotation would
+        # otherwise read as this selftest failing.
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            tampered_verdict = cmd_compare(args)
+        if tampered_verdict == 0:
+            failures.append("compare() called byte-different APKs identical (CRC metadata trusted)")
+
+        # 2. Signing-block location. The magic string inside an ENTRY must not be mistaken for the
+        #    block header — the old global rfind() would have found this one.
+        decoy = root / "decoy.apk"
+        with zipfile.ZipFile(decoy, "w", zipfile.ZIP_STORED) as zf:
+            zf.writestr("assets/payload.bin", b"x" * 32 + b"APK Sig Block 42" + b"y" * 32)
+        try:
+            ids = _signing_block_ids(decoy)
+        except ValueError as exc:
+            ids = f"raised {exc}"  # type: ignore[assignment]
+        if ids is not None:
+            failures.append(f"signing-block reader was fooled by entry content: {ids}")
+
+    for failure in failures:
+        print(f"  - {failure}")
+    if failures:
+        return _fail("Self-test failed", f"{len(failures)} regression(s) in fdroid-check itself")
+    return _ok("selftest: content comparison reads bytes; signing-block reader is EOCD-anchored")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -352,6 +471,9 @@ def main() -> int:
 
     p_meta = sub.add_parser("metadata", help="check the repo against the live fdroiddata recipe")
     p_meta.set_defaults(func=cmd_metadata)
+
+    p_self = sub.add_parser("selftest", help="prove this script's own DB-003 fixes still hold")
+    p_self.set_defaults(func=cmd_selftest)
 
     args = parser.parse_args()
     return args.func(args)

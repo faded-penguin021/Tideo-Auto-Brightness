@@ -9,7 +9,6 @@ import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * exactly as prof760's `%AAB_MainLoop != On` clause drops them in Tasker (a re-entry mutex, D-021),
  * implemented here as the [inCycle] busy flag. All durable runtime state lives in [state] and is
  * written ONLY from the consumer coroutine (via [PipelineRuntimeContext]); the sensor/observer
- * collectors signal it via [events].
+ * collectors signal it through [ControlEventGate], which also bounds the control backlog (DA-043).
  *
  * Pipeline sources (pipeline_spec.md):
  *   - prof760/task554 main loop      → [LightSensorSource] → gated → [PipelineEvent.SensorTick]
@@ -98,7 +97,7 @@ class BrightnessPipelineController(
         clock = clock,
     )
 
-    private val events = Channel<PipelineEvent>(Channel.UNLIMITED)
+    private val controlGate = ControlEventGate() // DA-043 backlog bound
 
     private val overrideMonitor = OverrideMonitor(brightnessObserver) {
         val s = _state.value
@@ -129,7 +128,7 @@ class BrightnessPipelineController(
     override fun cacheSettings(settings: AabSettings) { cachedSettings = settings }
     override fun armInitialSettle(untilMs: Long) { suppressOverrideUntilMs = untilMs }
     override fun overrideSuppressed(): Boolean = clock() < suppressOverrideUntilMs
-    override fun postOverrideDetected(observed: Int) { events.trySend(PipelineEvent.OverrideDetected(observed)) }
+    override fun postOverrideDetected(observed: Int) { postControl(PipelineEvent.OverrideDetected(observed)) }
 
     /** Begin the pipeline: claim foreground state, start the consumer + sensor + observer flows. */
     fun start() {
@@ -137,13 +136,11 @@ class BrightnessPipelineController(
         _state.update { it.copy(serviceOn = true) }
         consumerJob = scope.launch {
             cachedSettings = settingsProvider().also { throttle.seed(it.throttleDefaultMs) }
-            for (event in events) {
-                handle(event)
-            }
+            controlGate.consumeEach { handle(it) }
         }
         overrideJob = scope.launch {
             overrideMonitor.overrides().collect { observed ->
-                events.trySend(PipelineEvent.OverrideDetected(observed))
+                postControl(PipelineEvent.OverrideDetected(observed))
             }
         }
         startSensor()
@@ -163,21 +160,24 @@ class BrightnessPipelineController(
     }
 
     // Lifecycle entry points — the service posts these; they run in consumer order.
-    fun onScreenOff() { events.trySend(PipelineEvent.ScreenOff) }
-    fun onScreenOn() { events.trySend(PipelineEvent.ScreenOn) }
-    fun pause() { events.trySend(PipelineEvent.Pause) }
-    fun resume() { events.trySend(PipelineEvent.Resume) }
+    fun onScreenOff() { postControl(PipelineEvent.ScreenOff) }
+    fun onScreenOn() { postControl(PipelineEvent.ScreenOn) }
+    fun pause() { postControl(PipelineEvent.Pause) }
+    fun resume() { postControl(PipelineEvent.Resume) }
 
     /** A context override swapped the active profile: re-apply the initial brightness (task43 act21). */
-    override fun onContextChanged() { events.trySend(PipelineEvent.ContextChanged) }
+    override fun onContextChanged() { postControl(PipelineEvent.ContextChanged) }
 
     /**
-     * A settings Apply / profile load committed new parameters: re-run the pipeline immediately so the
-     * change takes effect without waiting for a new sensor reading (G2-F16). This is an UNLIMITED
-     * control event — it is NOT subject to the drop-not-queue sensor mutex — and reuses the same
-     * re-evaluate path as a context swap (re-read effective settings → Set Initial Brightness).
+     * A settings Apply / profile load committed new parameters: re-run the pipeline immediately
+     * (G2-F16). A control event — not subject to the drop-not-queue sensor mutex — reusing the
+     * context-swap path (re-read effective settings → Set Initial Brightness).
      */
-    fun reapply() { events.trySend(PipelineEvent.ContextChanged) }
+    fun reapply() { postControl(PipelineEvent.ContextChanged) }
+
+    // DA-043 bound; OverrideDetected carries a value, so it is capped but never folded.
+    private fun postControl(event: PipelineEvent) = controlGate.admit(event, event !is PipelineEvent.OverrideDetected)
+    internal val controlBacklog: ControlEventGate get() = controlGate // DA-043 counters (test seam)
 
     /**
      * prof769/task528 panic: restore a sane brightness, drop super dimming, and FULL STOP
@@ -241,7 +241,7 @@ class BrightnessPipelineController(
         if (!passes) return
         // Re-entry mutex: claim the cycle slot, or drop. Cleared when the cycle completes.
         if (!inCycle.compareAndSet(false, true)) return
-        if (events.trySend(PipelineEvent.SensorTick(lux, accuracy)).isFailure) {
+        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux, accuracy))) {
             inCycle.set(false)
         }
     }

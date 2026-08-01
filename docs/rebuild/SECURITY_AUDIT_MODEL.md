@@ -208,11 +208,13 @@ external value to privileged and persistence sinks; review SAF and network bound
 root/Shizuku command; then model service lifecycle and restoration transitions. Only after this
 model is agreed should implementation details be assessed.
 
-Completed implementation-review segments:
+Implementation review lives in ONE place: [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md) — the
+boundary/invariant/control/evidence matrix, the accepted product risk, the device-verification list,
+and the outcome of each adversarial round. This file stays implementation-light on purpose: when the
+two disagree, the code and the tests linked from the review are what settle it.
 
-- [`COMPONENT_SECURITY_AUDIT.md`](COMPONENT_SECURITY_AUDIT.md) — manifest component matrix,
-  actions/extras, authorization gates, replay and malformed-input behavior, profile selection,
-  foreground-service creation, and the deliberately open automation boundary.
+(The per-segment audit documents this list used to enumerate were merged into that review in the
+DA-042…DB-005 round — they had begun to repeat each other's boundaries, traces and test wish-lists.)
 
 For each invariant, record (a) entry points, (b) validation or authorization checks, (c) sinks and
 side effects, (d) race/failure behavior, and (e) executable evidence. Tests should include hostile

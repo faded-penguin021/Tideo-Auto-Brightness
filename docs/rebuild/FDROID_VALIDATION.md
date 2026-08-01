@@ -40,13 +40,27 @@ runner against the one built in F-Droid's image. Building twice in one environme
 determinism, which was never the risk; reproducibility breaks *across* environments, which is
 exactly what F-Droid exercises.
 
-**Compare contents, not bytes.** `scripts/fdroid-check.py compare` compares zip-entry CRCs and
-skips v1 signature files (v2/v3 signatures live outside the zip). It is therefore signature-blind
-by construction — the signed control and the unsigned F-Droid build are directly comparable — and
-it uses the same acceptance criterion F-Droid's own comparison does, so it cannot fail on a
-difference F-Droid would forgive. `apksigcopier compare` is the tool for the signed-vs-signed case;
-both inputs here are ours, so content comparison is the more direct check. `diffoscope` runs only
-on failure, as a diagnosis aid, never as the gate.
+**Compare entry contents, and be precise about what that is worth.** `scripts/fdroid-check.py
+compare` hashes each entry's **decompressed bytes** with SHA-256, skipping v1 signature files (v2/v3
+signatures live outside the zip entirely). It is therefore signature-blind by construction, so the
+signed control and the unsigned F-Droid build are directly comparable.
+
+Two corrections to what this file used to claim (DB-003):
+
+- It compared **declared CRC32 metadata**, not content — an archive whose bytes changed while its
+  CRC fields did not compared equal. `fdroid-check.py selftest` builds exactly that pair and proves
+  the current code catches it.
+- It claimed to use "the same acceptance criterion F-Droid uses" and to be unable to fail on a
+  difference F-Droid would forgive. **That was wrong.** F-Droid's reproducible-build process copies
+  the upstream APK's signature onto its own unsigned rebuild and verifies it (`apksigcopier`), which
+  requires the bytes outside the signing block to match. Equal per-entry content hashes are strong
+  early evidence of that, not the same test. This stage is a *pre-tag heuristic*; F-Droid's own
+  verification is the acceptance decision.
+
+`apksigcopier` is deliberately not used here: it verifies a *published, upstream-signed* APK against
+a rebuild, and both inputs at this stage are our own — one signed by a throwaway CI key. There is no
+upstream signature to copy until a release exists. `diffoscope` runs only on failure, as a diagnosis
+aid, never as the gate.
 
 **One helper script, only for the gaps.** `scripts/fdroid-check.py` has three subcommands and
 exists because fdroidserver has no equivalent: `compare` (no upstream tool answers "did these two
@@ -69,7 +83,7 @@ reject.
 | 3 — scanner | `fdroid scanner --exit-code` on the built APK: known non-free classes (it also inspects signing blocks, but see the note below — it does not flag the one that matters here) | `F-Droid scanner check failed` |
 | 3 — signing blocks | no unexpected APK Signing Block IDs — chiefly AGP's Play dependency-metadata blob `0x504b4453`, which `dependenciesInfo { … = false }` disables (D-137) | `Signing assumption check failed` |
 | 3 — metadata | the repo still satisfies the **live** fdroiddata recipe: `subdir` exists, the release asset name still matches `Binaries:`, `versionName` is still tag-shaped, `versionCode` has not gone backwards, no product flavors | `Metadata validation failed` |
-| 4 — reproducibility | every zip entry of the normal build and the F-Droid build of one commit matches by name and CRC32 (contents, not zip framing) | `Reproducibility validation failed` |
+| 4 — reproducibility | every zip entry of the normal build and the F-Droid build of one commit matches by name and SHA-256 of its decompressed bytes (contents, not zip framing) | `Reproducibility validation failed` |
 
 The signing-block check earns its place empirically: `fdroid scanner` was run against a build with
 `dependenciesInfo` deliberately re-enabled and **did not flag it** (the blob is legal; it just
@@ -89,6 +103,9 @@ worse than none.
 - **It cannot prove the third environment.** F-Droid compares *their* build against the APK the
   **GitHub Actions release job** produced. This workflow compares a GitHub runner against their
   image — strong evidence, not proof, that the release job agrees too.
+- **It is not F-Droid's acceptance test.** Stage 4 compares entry contents; F-Droid copies the
+  published signature onto its rebuild and verifies it. Green here makes a mismatch there unlikely;
+  it does not make it impossible (DB-003).
 - **No index or listing validation.** Whether the store page renders (icon, changelog, screenshots)
   is not checked here; the fastlane rules live in RUNBOOK playbook 6 and ladder guard 6.
 - **No on-device behavior.** There is no emulator in CI; behavior remains owner-verified.

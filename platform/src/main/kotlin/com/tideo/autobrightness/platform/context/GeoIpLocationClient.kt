@@ -2,6 +2,8 @@ package com.tideo.autobrightness.platform.context
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
@@ -66,26 +68,43 @@ class GeoIpLocationClient(
             return LocationSnapshot(lat, lon)
         }
 
-        private suspend fun fetchGeoIp(): String? {
+        /**
+         * DB-006: the blocking request runs in a CHILD coroutine so that cancellation can actually
+         * reach the socket.
+         *
+         * The previous shape registered `coroutineContext.job.invokeOnCompletion { conn.disconnect() }`
+         * and then did the blocking call **on that same job**. A job's completion handlers run when
+         * the job *completes*, and a job parked in an uninterruptible `read()` does not complete on
+         * `cancel()` — it completes when the read returns. So the disconnect could only fire after
+         * the very wait it existed to cut short: dead code for its own purpose, and the reason the
+         * security review was right to call the "cancellation disconnects the request" claim
+         * unsupported. A regression test pins both halves (BlockingReadCancellationTest).
+         *
+         * Now: the parent suspends in `await()` — a real suspension point — so cancellation unwinds
+         * it immediately, `finally` closes the socket, and the blocked child is released by that
+         * close. Worst case for an UNCANCELLED request is unchanged and remains 30 s connect + 30 s
+         * read.
+         */
+        private suspend fun fetchGeoIp(): String? = coroutineScope {
             val conn = (URL(URL_GEO_IP).openConnection() as HttpsURLConnection).apply {
                 connectTimeout = TIMEOUT_MS
                 readTimeout = TIMEOUT_MS
                 requestMethod = "GET"
                 instanceFollowRedirects = false // Never move the public-IP disclosure to another host.
             }
-            // HttpURLConnection is blocking; disconnecting closes its socket when the owning scope is cancelled.
-            val cancellation = coroutineContext.job.invokeOnCompletion { cause ->
-                if (cause != null) conn.disconnect()
-            }
-            return try {
+            val request = async(Dispatchers.IO) {
                 if (conn.responseCode != HttpsURLConnection.HTTP_OK) null
                 else conn.inputStream.use { readBounded(it, conn.contentLengthLong) }
+            }
+            try {
+                request.await()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 null
             } finally {
-                cancellation.dispose()
+                // Runs while the child may still be parked in the blocking read: closing the socket
+                // is what unparks it, so this must happen BEFORE we wait for the child to finish.
                 conn.disconnect()
             }
         }

@@ -232,6 +232,15 @@ class AmbientMonitoringService : Service() {
             }
             else -> {
                 if (intent != null) {
+                    // DB-005: an unrecognised action must not be a start command. This branch used to
+                    // treat "any non-null intent" as ACTION_START, so a typo'd or future action name
+                    // silently started the whole runtime — fail-open dispatch on a service that the
+                    // component audit already flags as export-risky if it is ever exported.
+                    // (No log line: this file deliberately carries none, and the action string is
+                    // caller-supplied text.)
+                    if (intent.action != null && intent.action != ACTION_START) {
+                        return stopNotRunning(startId)
+                    }
                     // DA-030: an explicit start keeps the synchronous path and skips the read. Every
                     // explicit starter already establishes serviceEnabled first — BootCompletedReceiver
                     // and MaintenanceWorker read it before sending, ControlReceiver/tile/widget

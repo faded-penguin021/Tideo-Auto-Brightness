@@ -13,6 +13,11 @@ import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -50,51 +55,111 @@ class ProfileImportExportManager(
         // Do not tighten it to "what a profile needs"; its job is to stop an untrusted SAF provider
         // from driving an unbounded read on the import path.
         internal const val MAX_ENCODED_PROFILE_BYTES = 256 * 1024
+
+        /**
+         * DA-044: wall-clock bound on one SAF import/export. Generous enough for a large document on
+         * slow cloud-backed storage, short enough that a stalled provider surfaces as an error rather
+         * than an apparently hung app.
+         */
+        internal const val PROVIDER_TIMEOUT_MS = 20_000L
     }
 
     private val json = Json { ignoreUnknownKeys = false; prettyPrint = true }
 
     suspend fun exportToAppPrivate(profileName: String, settings: AabSettings): String {
         val fileName = sanitizeFileName(profileName)
-        context.openFileOutput(fileName, Context.MODE_PRIVATE).use { output ->
-            output.write(json.encodeToString(AabProfilePayload.serializer(), AabProfilePayload(settings = settings.validate())).encodeToByteArray())
+        val payload = json.encodeToString(
+            AabProfilePayload.serializer(),
+            AabProfilePayload(settings = settings.validate()),
+        ).encodeToByteArray()
+        withContext(Dispatchers.IO) {
+            context.openFileOutput(fileName, Context.MODE_PRIVATE).use { output -> output.write(payload) }
         }
         return fileName
     }
 
+    /**
+     * DA-044: encode first, then hand the bytes to a bounded IO-dispatcher write.
+     *
+     * The caller is a Compose activity-result callback running on `Dispatchers.Main.immediate`, and
+     * `openOutputStream`/`write` are synchronous calls into a **provider chosen by the user in the
+     * system file picker** — i.e. arbitrary third-party code. Doing that work on the caller's
+     * dispatcher let a slow or deliberately stalling provider block the UI thread outright.
+     */
     suspend fun exportToDocument(uri: Uri, settings: AabSettings, resolver: ContentResolver = context.contentResolver) {
-        resolver.openOutputStream(uri)?.use { output ->
-            output.write(json.encodeToString(AabProfilePayload.serializer(), AabProfilePayload(settings = settings.validate())).encodeToByteArray())
-        } ?: throw FileNotFoundException("Unable to open output stream for uri=$uri")
-    }
-
-    suspend fun importFromAppPrivate(profileName: String): ProfileLoadResult {
-        return runCatching {
-            context.openFileInput(sanitizeFileName(profileName)).use { readAndDecode(it) }
-        }.getOrElse {
-            Log.w(TAG, "Profile input could not be read")
-            ProfileLoadResult.ReadFailure
-        }
-    }
-
-    suspend fun importFromDocument(uri: Uri, resolver: ContentResolver = context.contentResolver): ProfileLoadResult {
-        // DA-029: OpenableColumns.SIZE is a HINT, never the bound. It comes from the same untrusted
-        // provider as the bytes, so it can only buy an early reject — a provider that under-reports
-        // still meets the streamed cap in readAndDecode.
-        val declaredSize = runCatching {
-            resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
+        val payload = json.encodeToString(
+            AabProfilePayload.serializer(),
+            AabProfilePayload(settings = settings.validate()),
+        ).encodeToByteArray()
+        withContext(Dispatchers.IO) {
+            withTimeout(PROVIDER_TIMEOUT_MS) {
+                resolver.openOutputStream(uri)?.use { output -> output.write(payload) }
+                    ?: throw FileNotFoundException("Unable to open output stream for uri=$uri")
             }
-        }.getOrNull()
-        return runCatching {
-            resolver.openInputStream(uri)?.use { readAndDecode(it, declaredSize) }
-                ?: return ProfileLoadResult.ReadFailure
-        }.getOrElse {
-            // URI and provider exception details can contain private document names or authorities.
+        }
+    }
+
+    /** App-private read: trusted bytes, but still file I/O and still cancellable (DA-044). */
+    suspend fun importFromAppPrivate(profileName: String): ProfileLoadResult = withContext(Dispatchers.IO) {
+        try {
+            context.openFileInput(sanitizeFileName(profileName)).use { readAndDecode(it) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
             Log.w(TAG, "Profile input could not be read")
             ProfileLoadResult.ReadFailure
         }
     }
+
+    /**
+     * DA-044: every provider call — query, open, read, decode — runs on [Dispatchers.IO] under a
+     * wall-clock bound, and cancellation stays cancellation.
+     *
+     * Two distinct hazards, two distinct mitigations. The 256 KiB cap (DA-029) bounds how much a
+     * lying provider can make us *allocate*; it does nothing about a provider that simply never
+     * returns from `read()`. [PROVIDER_TIMEOUT_MS] bounds how long the *caller* waits for that.
+     *
+     * Honest limit: a timeout unblocks the caller, not the thread. Android offers no way to abort a
+     * `read()` already inside a hostile provider's binder call, so that IO-dispatcher thread stays
+     * parked until the provider yields. What this buys is that the parked thread is a pooled IO
+     * thread instead of the UI thread, and that the user gets an error instead of a frozen screen.
+     */
+    suspend fun importFromDocument(uri: Uri, resolver: ContentResolver = context.contentResolver): ProfileLoadResult =
+        withContext(Dispatchers.IO) {
+            try {
+                withTimeout(PROVIDER_TIMEOUT_MS) {
+                    // DA-029: OpenableColumns.SIZE is a HINT, never the bound. It comes from the same
+                    // untrusted provider as the bytes, so it can only buy an early reject — a provider
+                    // that under-reports still meets the streamed cap in readAndDecode.
+                    val declaredSize = try {
+                        resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        null
+                    }
+                    resolver.openInputStream(uri)?.use { readAndDecode(it, declaredSize) }
+                        ?: ProfileLoadResult.ReadFailure
+                }
+            } catch (timeout: TimeoutCancellationException) {
+                // Deliberately NOT a distinct result type: to the user "the file could not be read"
+                // and "the provider stopped responding" lead to the same next step, and the extra
+                // variant would fan out through every caller's when-branch for no decision.
+                Log.w(TAG, "Profile input timed out")
+                ProfileLoadResult.ReadFailure
+            } catch (cancelled: CancellationException) {
+                // The screen was left / the scope died. Cancellation is control flow, not a parse
+                // failure — swallowing it here would report a bogus error and break structured
+                // concurrency for the caller.
+                throw cancelled
+            } catch (_: Exception) {
+                // URI and provider exception details can contain private document names or authorities.
+                Log.w(TAG, "Profile input could not be read")
+                ProfileLoadResult.ReadFailure
+            }
+        }
 
     /**
      * DA-029: read at most [MAX_ENCODED_PROFILE_BYTES] **plus one probe byte** and decode as strict
