@@ -179,7 +179,11 @@
   rate silently changes the gesture's timing; that is a separate, tested change. Evidence: four cases
   in `PanicSensorSourceTest` (no registration while the requirement is unmet; register/release across
   power transitions; release/re-arm across screen off/on; a window interrupted by screen-off does not
-  survive). **Owner-confirmed 2026-08-02:** wireless charging counting as plugged
+  survive). **Device verification for the whole 1.8.2 train lives in one place** —
+  `DEVICE_TEST_SCRIPT_1.8.2.md` — which superseded the two per-round scripts this train produced
+  (`SECURITY_ROUND_TEST_SCRIPT.md`, `PARITY_ROUND_TEST_SCRIPT.md`). Same reason as DB-007: three
+  overlapping checklists is how a reader ends up not knowing which one is current.
+  **Owner-confirmed 2026-08-02:** wireless charging counting as plugged
   (`EXTRA_PLUGGED > 0`, matching the upstream Java) is accepted as-is — shaking a phone upside down
   while it stays on a Qi pad is not a scenario worth narrowing the check for. Do not restrict this to
   USB without new evidence. `[cited]`: `AndroidPanicSensorSource`, `AabSettings.panicRequiresPlugged`,
