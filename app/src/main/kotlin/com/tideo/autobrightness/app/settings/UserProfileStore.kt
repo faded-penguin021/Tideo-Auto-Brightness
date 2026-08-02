@@ -39,11 +39,48 @@ data class SavedProfiles(
 object SavedProfilesSerializer : Serializer<SavedProfiles> {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
+    /**
+     * DB-004: allocation ceiling for the persisted profile set, derived from the limits that already
+     * exist — [UserProfileStore.MAX_PROFILES] profiles, each a pretty-printed settings object of a
+     * few KiB — with generous slack. Not a schema constraint: raise it if the settings object grows.
+     */
+    internal const val MAX_ENCODED_PROFILES_BYTES = 4 * 1024 * 1024
+
     override val defaultValue: SavedProfiles = SavedProfiles()
 
+    /**
+     * DB-004: bound the READ before parsing it.
+     *
+     * The profile-count and name-length limits below are applied to the *decoded object*, so
+     * `readBytes()` had already materialised the entire file — and the count limit implies a size
+     * limit anyway (128 profiles of a bounded settings object is well under a megabyte). This store
+     * is app-private, so the input is corrupt state rather than an attacker's, but "corrupt state
+     * cannot make us allocate without limit" is cheap to hold and the alternative is an OOM on a
+     * path whose whole job is recovering from bad data.
+     */
     override suspend fun readFrom(input: InputStream): SavedProfiles =
         runCatching {
-            json.decodeFromString(SavedProfiles.serializer(), input.readBytes().decodeToString())
+            // readNBytes is API 33; minSdk is 31, so read the bound by hand (+1 probe byte, which is
+            // what distinguishes "exactly at the cap" from "truncated at the cap").
+            val raw = java.io.ByteArrayOutputStream()
+            val chunk = ByteArray(DEFAULT_BUFFER_SIZE)
+            var remaining = MAX_ENCODED_PROFILES_BYTES + 1
+            while (remaining > 0) {
+                val count = input.read(chunk, 0, minOf(chunk.size, remaining))
+                if (count < 0) break
+                raw.write(chunk, 0, count)
+                remaining -= count
+            }
+            require(raw.size() <= MAX_ENCODED_PROFILES_BYTES) { "Saved profiles file is implausibly large" }
+            val decoded = json.decodeFromString(SavedProfiles.serializer(), raw.toByteArray().decodeToString())
+            require(decoded.profiles.size <= UserProfileStore.MAX_PROFILES)
+            decoded.copy(
+                profiles = decoded.profiles.map {
+                    require(it.name.isNotBlank() && it.name != "." && it.name != ".." &&
+                        it.name.length <= UserProfileStore.MAX_PROFILE_NAME_CHARS)
+                    it.copy(settings = it.settings.validate())
+                }.distinctBy { it.name },
+            )
         }.getOrDefault(defaultValue)
 
     override suspend fun writeTo(t: SavedProfiles, output: OutputStream) {
@@ -63,6 +100,11 @@ object SavedProfilesSerializer : Serializer<SavedProfiles> {
  */
 class UserProfileStore(private val dataStore: DataStore<SavedProfiles>) {
 
+    companion object {
+        internal const val MAX_PROFILES = 128
+        internal const val MAX_PROFILE_NAME_CHARS = 96
+    }
+
     /** The saved profiles in display order (built-ins first), seeding lazily on collect. */
     fun profilesFlow(): Flow<List<SavedProfile>> = dataStore.data.map { seedIfNeeded(it).profiles }
 
@@ -75,7 +117,7 @@ class UserProfileStore(private val dataStore: DataStore<SavedProfiles>) {
     suspend fun names(): List<String> = profiles().map { it.name }
 
     /** Resolve a profile NAME to its parameter set, or null if unknown (catalog fallback handles that). */
-    suspend fun get(name: String): AabSettings? = profiles().firstOrNull { it.name == name }?.settings
+    suspend fun get(name: String): AabSettings? = profiles().firstOrNull { it.name == name }?.settings?.validate()
 
     /** Seed the five built-ins exactly once. Idempotent after the first call. */
     suspend fun ensureSeeded() {
@@ -87,13 +129,17 @@ class UserProfileStore(private val dataStore: DataStore<SavedProfiles>) {
      * [SavedProfile.builtIn] flag (so an edited built-in is still "factory" for restore purposes).
      */
     suspend fun save(name: String, settings: AabSettings) {
+        val safeName = name.trim()
+        require(safeName.isNotBlank() && safeName != "." && safeName != ".." &&
+            safeName.length <= MAX_PROFILE_NAME_CHARS) { "Invalid profile name" }
         dataStore.updateData { raw ->
             val current = seedIfNeeded(raw)
-            val exists = current.profiles.any { it.name == name }
+            val exists = current.profiles.any { it.name == safeName }
+            require(exists || current.profiles.size < MAX_PROFILES) { "Too many saved profiles" }
             val profiles = if (exists) {
-                current.profiles.map { if (it.name == name) it.copy(settings = settings) else it }
+                current.profiles.map { if (it.name == safeName) it.copy(settings = settings.validate()) else it }
             } else {
-                current.profiles + SavedProfile(name = name, settings = settings, builtIn = false)
+                current.profiles + SavedProfile(name = safeName, settings = settings.validate(), builtIn = false)
             }
             current.copy(profiles = profiles)
         }

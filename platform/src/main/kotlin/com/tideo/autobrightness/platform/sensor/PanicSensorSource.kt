@@ -8,6 +8,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.BatteryManager
 import android.os.PowerManager
 import com.tideo.autobrightness.domain.panic.PanicShakeGate
 import kotlinx.coroutines.channels.awaitClose
@@ -185,6 +186,16 @@ class AndroidPanicSensorSource(
     private val sensitivity: () -> Int,
     /** Current `%AAB_Proximity ~ Near` — the gesture only arms while NOT near (covered/in-pocket = no panic). */
     private val isNear: () -> Boolean,
+    /**
+     * Current `%AAB_PanicPlugged` (DB-009, issue #110): when true the gesture only works on external
+     * power. Read at every registration AND arming decision, never cached.
+     *
+     * **Nullable on purpose (DB-011).** `null` means *not known yet* — the caller's effective-settings
+     * snapshot has not resolved. The caller must not collapse that into `false`: a fabricated default
+     * reads as "no restriction", which is precisely how a plugged-only gesture fired on battery
+     * (device report C4). Unknown is handled here, once, as fail-closed.
+     */
+    private val requiresPlugged: () -> Boolean? = { false },
     private val detector: PanicGestureDetector = PanicGestureDetector(),
     private val gate: PanicGate = PanicGate(),
     private val windowMs: Long = 10_000L,
@@ -206,21 +217,33 @@ class AndroidPanicSensorSource(
         // power.isInteractive on every sample would be a synchronous IPC to system_server). Seed once,
         // then flip it on the cheap SCREEN_ON/OFF protected broadcasts.
         val interactive = AtomicBoolean(power.isInteractive)
-        val screenReceiver = object : BroadcastReceiver() {
-            override fun onReceive(c: Context?, intent: Intent?) {
-                when (intent?.action) {
-                    Intent.ACTION_SCREEN_ON -> interactive.set(true)
-                    Intent.ACTION_SCREEN_OFF -> interactive.set(false)
-                }
-            }
-        }
-        context.registerReceiver(
-            screenReceiver,
-            IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_ON)
-                addAction(Intent.ACTION_SCREEN_OFF)
-            },
+
+        // DB-009: plugged state, seeded from the STICKY battery broadcast (registerReceiver(null, …)
+        // reads the last one without registering anything) and then maintained on the two explicit
+        // power-transition broadcasts. ACTION_BATTERY_CHANGED itself is deliberately NOT registered:
+        // it fires on every level/temperature tick, which is exactly the kind of always-on cost this
+        // gate exists to remove.
+        val plugged = AtomicBoolean(
+            context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                ?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+                ?.let { it > 0 } ?: false,
         )
+
+        /**
+         * The `%AAB_PanicPlugged` half of "could this gesture fire right now" — resolved in ONE place
+         * for both the registration gate and the arming gate (DB-011).
+         *
+         * Unknown (`null`) is **fail-closed**: with no resolved settings snapshot we cannot tell
+         * whether the user asked for plugged-only, and guessing "no restriction" is exactly the
+         * failure the device pass found. Guessing the other way costs the gesture a few hundred ms at
+         * service start (the service now waits for that snapshot before collecting this flow at all),
+         * and it is re-evaluated on the next screen/power transition — it can never latch.
+         */
+        fun pluggedRequirementMet(): Boolean = when (requiresPlugged()) {
+            null -> false
+            false -> true
+            true -> plugged.get()
+        }
 
         // --- Window state (mutated only from sensor callbacks, all on one looper → single-threaded) ---
         var windowActive = false
@@ -230,11 +253,19 @@ class AndroidPanicSensorSource(
         // gravity-stripped accelerometer residual.
         var shakeMagnitude = 0.0
 
-        // Both window outcomes — a qualifying shake (fire) and the 10 s timeout (veto) — consume the
-        // gesture: it will not re-arm until the phone is flipped straight and inverted again (D-021).
-        fun endWindow() {
+        // Clear the in-flight window WITHOUT consuming the gesture. Used when the sensor is released
+        // (DB-009): releasing is not an outcome of the gesture, so it must not latch the
+        // consume-until-re-entry gate — doing so left the user needing a flip-straight-and-back after
+        // every screen-off, which a test caught immediately.
+        fun resetWindow() {
             windowActive = false
             shakeGate = null
+        }
+
+        // Both window OUTCOMES — a qualifying shake (fire) and the 10 s timeout (veto) — consume the
+        // gesture: it will not re-arm until the phone is flipped straight and inverted again (D-021).
+        fun endWindow() {
+            resetWindow()
             gate.consume()
         }
 
@@ -243,7 +274,12 @@ class AndroidPanicSensorSource(
                 val now = clock()
                 val sustainedUpsideDown = detector.onAccelerometer(event.values[0], event.values[1], event.values[2])
                 if (linear == null) shakeMagnitude = detector.linearMagnitude
-                val armed = sustainedUpsideDown && interactive.get() && !isNear()
+                // DB-011: the plugged requirement gates ARMING, not just registration. The registration
+                // gate below is a battery optimisation and is only re-evaluated on broadcasts — so a
+                // decision taken under a stale or not-yet-known requirement stayed in force until the
+                // next screen/power transition, and a plugged-only gesture fired on battery (C4). The
+                // preconditions that make firing wrong are checked here, where firing happens.
+                val armed = sustainedUpsideDown && interactive.get() && !isNear() && pluggedRequirementMet()
 
                 if (windowActive) {
                     // Faithful to the A2 Java: once armed, the 10 s window runs to completion and is NOT
@@ -291,15 +327,71 @@ class AndroidPanicSensorSource(
             }
         }
 
-        // SENSOR_DELAY_GAME (~50 Hz) matches the A2 Java's registration — fast enough to track a shake.
-        sensorManager.registerListener(accelListener, accel, SensorManager.SENSOR_DELAY_GAME)
-        if (linear != null && linearListener != null) {
-            sensorManager.registerListener(linearListener, linear, SensorManager.SENSOR_DELAY_GAME)
+        // --- DB-009: register the accelerometer ONLY while the gesture could actually fire --------
+        //
+        // This is the structural difference from Tasker, and the reason it mattered. There, the
+        // profile's Orientation STATE does the watching (the platform's job, effectively free) and the
+        // A3 Java registers the accelerometer for at most the 10 s shake window. Here the orientation
+        // watch IS the trigger, so the listener was registered for the entire life of the service —
+        // SENSOR_DELAY_GAME, ~50 Hz, all day, including with the screen off, where the gesture cannot
+        // fire at all because arming requires `interactive`.
+        //
+        // The gate below is exactly the set of preconditions that are cheap to observe via broadcast
+        // and that make firing impossible while false:
+        //   - screen off        → arming already required `interactive`; nothing is lost.
+        //   - unplugged, when the user asked for plugged-only (A3's early veto, before it registers
+        //     its own listener).
+        // Everything else (orientation, proximity, shake) still needs the sensor to evaluate.
+        var registered = false
+        fun canFire(): Boolean = interactive.get() && pluggedRequirementMet()
+        fun syncSensors() {
+            val want = canFire()
+            if (want == registered) return
+            if (want) {
+                // SENSOR_DELAY_GAME (~50 Hz) matches the A2 Java's registration — fast enough to track
+                // a shake.
+                sensorManager.registerListener(accelListener, accel, SensorManager.SENSOR_DELAY_GAME)
+                if (linear != null && linearListener != null) {
+                    sensorManager.registerListener(linearListener, linear, SensorManager.SENSOR_DELAY_GAME)
+                }
+            } else {
+                sensorManager.unregisterListener(accelListener)
+                if (linearListener != null) sensorManager.unregisterListener(linearListener)
+                // A half-finished gesture must not survive the gap: drop the window and the filter
+                // state so the next registration starts from a clean, unseeded gravity estimate.
+                // resetWindow(), NOT endWindow() — see above.
+                resetWindow()
+                detector.reset()
+            }
+            registered = want
         }
+
+        val stateReceiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_ON -> interactive.set(true)
+                    Intent.ACTION_SCREEN_OFF -> interactive.set(false)
+                    Intent.ACTION_POWER_CONNECTED -> plugged.set(true)
+                    Intent.ACTION_POWER_DISCONNECTED -> plugged.set(false)
+                }
+                syncSensors()
+            }
+        }
+        context.registerReceiver(
+            stateReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(Intent.ACTION_POWER_DISCONNECTED)
+            },
+        )
+        syncSensors()
+
         awaitClose {
             sensorManager.unregisterListener(accelListener)
             if (linearListener != null) sensorManager.unregisterListener(linearListener)
-            runCatching { context.unregisterReceiver(screenReceiver) }
+            runCatching { context.unregisterReceiver(stateReceiver) }
         }
     }
 }

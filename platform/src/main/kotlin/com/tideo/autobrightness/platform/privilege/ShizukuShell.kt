@@ -12,12 +12,12 @@ import kotlin.concurrent.thread
 import kotlin.coroutines.resume
 
 /**
- * Runs one-shot shell commands through a Shizuku-bound privileged process (S12.7d, G2R-F41). Reuses
+ * Runs allowlisted privileged operations through a Shizuku-bound process (S12.7d, G2R-F41). Reuses
  * the same documented [ShizukuUserService] / AIDL pattern as [ShizukuGrantGateway] — we never reflect
  * into hidden `Shizuku.newProcess` (owner-reported fragile in factory apps).
  *
- * The only caller is the no-Location SSID path (`cmd wifi status`); it returns null whenever Shizuku
- * is unavailable / unpermitted / the bind fails, so the reader can fall through to the next strategy.
+ * Callers can request only Wi-Fi status or the fixed force-dark property; no argv or shell text
+ * crosses Binder. Failures return null so callers can fall through to their root strategy.
  */
 object ShizukuShell {
     private const val BIND_TIMEOUT_MS = 4_000L
@@ -28,8 +28,20 @@ object ShizukuShell {
         false
     }
 
-    /** Executes [command] in the privileged process and returns its stdout, or null on any failure. */
-    suspend fun exec(context: Context, command: Array<String>): String? {
+    enum class ReadOperation { WIFI_STATUS, FORCE_DARK }
+
+    suspend fun read(context: Context, operation: ReadOperation): String? = call(context) { service ->
+        when (operation) {
+            ReadOperation.WIFI_STATUS -> service.wifiStatus()
+            ReadOperation.FORCE_DARK -> service.readForceDark()
+        }
+    }
+
+    suspend fun setForceDark(context: Context, enabled: Boolean): String? = call(context) {
+        it.setForceDark(enabled)
+    }
+
+    private suspend fun call(context: Context, operation: (IShizukuUserService) -> String?): String? {
         if (!isUsable()) return null
         val appContext = context.applicationContext
         val args = Shizuku.UserServiceArgs(
@@ -49,7 +61,7 @@ object ShizukuShell {
                                 if (binder == null || !binder.pingBinder()) {
                                     null
                                 } else {
-                                    IShizukuUserService.Stub.asInterface(binder).exec(command)
+                                    operation(IShizukuUserService.Stub.asInterface(binder))
                                 }
                             } catch (_: Throwable) {
                                 null

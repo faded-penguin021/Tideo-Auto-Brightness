@@ -4,7 +4,8 @@
 
 [![Build](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml/badge.svg)](https://github.com/faded-penguin021/tideo-auto-brightness/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/faded-penguin021/tideo-auto-brightness?display_name=tag&sort=semver)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
-[![Downloads](https://img.shields.io/github/downloads/faded-penguin021/tideo-auto-brightness/total?logo=github)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
+[![Downloads (GitHub)](https://img.shields.io/github/downloads/faded-penguin021/tideo-auto-brightness/total?logo=github)](https://github.com/faded-penguin021/tideo-auto-brightness/releases)
+[![Downloads (F-Droid)](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2Fkitswas%2Ffdroid-metrics-dashboard%2Fraw%2Frefs%2Fheads%2Fmain%2Fprocessed%2Ftotal%2Fcom.tideo.autobrightness.json&query=%24.total_downloads&logo=fdroid&label=Downloads%20%28F-Droid%29)](https://f-droid.org/packages/com.tideo.autobrightness/)
 [![Stars](https://img.shields.io/github/stars/faded-penguin021/tideo-auto-brightness?logo=github)](https://github.com/faded-penguin021/tideo-auto-brightness/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![minSdk](https://img.shields.io/badge/minSdk-31-success)](https://developer.android.com/about/versions/12)
@@ -150,11 +151,13 @@ request, and only as a last resort:
 
 - **IP-geolocation fallback (optional, off by default, HTTPS).** Circadian scaling needs an approximate location to compute local sunrise/sunset. Tideo tries, in order: a fixed latitude/longitude you pin → the device's
   last-known location → a fresh GPS/network fix. Only if *all* of those are unavailable does it fall
-  back to a single `GET https://ipwho.is/` (HTTPS) to estimate your city
-  from your public IP. **You can turn it off** under
+  back to a single `GET https://ipwho.is/` (HTTPS), disclosing your public IP to that third party so it
+  can estimate your city. **You can turn it off** under
   **Circadian → Date & location → "IP-based location fallback"**, and it is **off until you opt in**. When
-  it is off, Tideo never contacts ipwho.is. The same opt-in fallback also backs the Circadian **"Use
-  current location"** button when no on-device fix is available.
+  it is off, Tideo never contacts ipwho.is. Automatic acquisition is attempted at most once per day;
+  successful approximate coordinates are stored only in the app's on-device preferences so circadian
+  state survives a restart. The same opt-in fallback also backs the Circadian **"Use current location"**
+  button when no on-device fix is available; each user tap can make one additional request.
 
 Everything else runs entirely on-device.
 

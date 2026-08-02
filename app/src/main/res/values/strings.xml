@@ -80,7 +80,7 @@
     <string name="ssid_help_options">You can skip the Location requirement if the app can read the name directly:\n\n•  Shizuku or root — the app runs \"cmd wifi status\" (works with root too).\n•  Otherwise, grant DUMP over ADB and the app reads \"dumpsys wifi\":</string>
     <string name="ssid_help_copy_dump">Copy ADB command</string>
     <string name="ssid_help_copied">ADB command copied</string>
-    <string name="ssid_help_dump_security">DUMP is a read-only diagnostics permission you grant manually over ADB (revoked when you uninstall). This app uses it only to read the Wi-Fi name.</string>
+    <string name="ssid_help_dump_security">DUMP is a broad system-diagnostics permission you grant manually over ADB. Tideo uses it only for the read-only “dumpsys wifi” command and never stores the command output. You can revoke it over ADB at any time; uninstalling also revokes it.</string>
     <string name="ssid_help_regex_caveat">If your SSID contains \"SSID\", this will cause problems. Sorry, not sorry.</string>
     <string name="rule_priority_over_max">Above the 1–100 range — this will be saved as 100.</string>
     <!-- D-114: Tasker-style confirmations for destructive profile/rule actions. -->
@@ -101,6 +101,8 @@
     <string name="panic_sensitivity_value">Level: %1$d / 10</string>
     <string name="panic_sensitivity_passthrough">Level: 0 (pass-through)</string>
     <string name="panic_sensitivity_help">Sets the shake intensity/duration to trigger an Emergency UI Reset (hold the phone upside-down, screen on, then shake). 0 = pass-through (disables the shake requirement); 10 = long, vigorous shake.</string>
+    <string name="panic_plugged_label">Only when plugged in</string>
+    <string name="panic_plugged_help">The panic gesture will only work when plugged in via USB cable. Leave this off if you want the gesture available on battery.</string>
 
     <!-- Dashboard -->
     <string name="dashboard_stale_banner">Live data may be stale — the monitor may have stopped responding.</string>
@@ -307,6 +309,7 @@
     <string name="toast_settings_applied">Settings applied</string>
     <string name="toast_reset_defaults">Reset to defaults</string>
     <string name="toast_max_bright_raised">Max brightness too low for this curve — raised to %1$d (value at Zone 2 End).</string>
+    <string name="toast_dimming_strength_clamped">Strength setpoint reduced to %1$d — above this the screen can go fully black.</string>
     <string name="toast_diagnostics_copied">Diagnostics copied to clipboard</string>
     <string name="toast_suggestion_applied">Suggestion applied</string>
     <string name="toast_full_report_copied">Full report copied to clipboard</string>
@@ -351,7 +354,7 @@
     <string name="onboarding_done">Done</string>
     <string name="onboarding_skip">Skip for now</string>
     <string name="onboarding_restricted_body">Installed outside the Play Store, Android may block the \"Modify system settings\" toggle below (and \"Usage access\", for per-app rules) — it looks greyed out or shows \"Restricted setting\". Tap it anyway; that usually shows the unlock prompt. If not, open App info → ⋮ menu → \"Allow restricted settings\", then return here.</string>
-    <string name="onboarding_elevated_body">Enables super dimming below the dimming threshold. Choose any one channel — it is a one-time grant of WRITE_SECURE_SETTINGS.</string>
+    <string name="onboarding_elevated_body">Allows Tideo to change secure display settings used by super dimming and optional profile display toggles (Night Light, color correction/inversion, always-on display, stay-awake while charging, and force-SDR). Choose any one channel for the one-time WRITE_SECURE_SETTINGS grant; revoke it later with ADB or by uninstalling.</string>
     <string name="onboarding_shizuku_prompt">Shizuku is installed but not running — start the Shizuku app, then return here.</string>
     <string name="onboarding_restricted_title">Heads up: restricted settings</string>
     <string name="onboarding_open_app_info">Open App info</string>
@@ -578,7 +581,7 @@
     <string name="help_scale_transition">Duration of the dawn/dusk transition.</string>
     <string name="help_taper_midpoint">Brightness level where compression centres.</string>
     <string name="help_taper_steepness">Slope of the dynamic-range compression.</string>
-    <string name="help_circadian_ip_fallback">Off by default. When GPS/network gives no fix and no fixed location is set, turn this on to look up an approximate location from your public IP via ipwho.is (HTTPS). This also powers \"Use current location\" below when no on-device fix is available.</string>
+    <string name="help_circadian_ip_fallback">Off by default. Only when GPS/network gives no fix and no fixed location is set, this sends your public IP to ipwho.is over HTTPS to look up approximate coordinates. The automatic lookup runs at most once per day and saves the coordinates on this device; \"Use current location\" can also make one lookup each time you tap it after on-device location fails.</string>
 
     <!-- Profiles import/export status (shown as a toast) -->
     <string name="toast_exported">Exported.</string>
@@ -589,6 +592,8 @@
     <string name="toast_loaded_entry">Loaded %1$s</string>
     <string name="toast_load_failed_detail">Load failed: %1$s</string>
     <string name="profiles_unreadable">Couldn\'t read this profile. It isn\'t a Tideo export or a Tasker AAB config.</string>
+    <string name="profiles_too_large">This profile is too large to import.</string>
+    <string name="profiles_read_failed">Couldn\'t safely read this profile. Try selecting it again.</string>
 
     <!-- Profiles (body + dialogs) -->
     <string name="profiles_save_as">Save current settings as…</string>

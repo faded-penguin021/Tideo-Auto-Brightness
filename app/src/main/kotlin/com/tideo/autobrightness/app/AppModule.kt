@@ -115,6 +115,8 @@ class AppModule(context: Context) {
             // instead of falling back to TimeContext defaults until re-acquired (Tasker %AAB_SunLat/…).
             loadCachedLocation = { experimentPrefs.readCachedSunLocation() },
             persistLocation = { lat, lon, day -> experimentPrefs.writeCachedSunLocation(lat, lon, day) },
+            loadGeoIpAttemptDay = { experimentPrefs.readGeoIpAttemptDay() },
+            persistGeoIpAttemptDay = { day -> experimentPrefs.writeGeoIpAttemptDay(day) },
         )
 
         val controller = BrightnessPipelineController(
@@ -134,6 +136,12 @@ class AppModule(context: Context) {
                 // so a post-start ADB/Shizuku grant is still picked up on the next wake (G1-F5 intent
                 // preserved, the per-cycle permission check dropped).
                 tierProvider = { privilegeManager.currentTier() },
+                // DB-012: "the next wake" was too late in practice — a grant made over adb with the
+                // screen ON stayed invisible until a screen-off/on or an app restart, because every
+                // AppModule call site builds its OWN PrivilegeManager, so the UI's refresh cannot
+                // reach this one. The coordinator re-detects (rate-limited) only when it wanted to
+                // dim and believed it could not.
+                refreshTier = { privilegeManager.refresh() },
                 debugSink = debugSink,
             ),
             debugSink = debugSink,
@@ -158,6 +166,14 @@ class AppModule(context: Context) {
             context = appContext,
             sensitivity = { (contextEngine.effectiveSnapshot ?: AabSettings()).panicSensitivity },
             isNear = { controller.state.value.proximityNear },
+            // DB-009 (%AAB_PanicPlugged): read from the same effective snapshot as the sensitivity, so
+            // a profile/context that carries the flag applies it too.
+            //
+            // DB-011: passed through NULLABLE — no `?: AabSettings()` here. Before the first context
+            // evaluation the snapshot is null, and fabricating a default silently answered "the user
+            // did not ask for plugged-only" for a user who had. The source treats null as unknown and
+            // fails closed; the service waits for a real snapshot before collecting at all.
+            requiresPlugged = { contextEngine.effectiveSnapshot?.panicRequiresPlugged },
         )
 
         // Display-toggle profile fields (D-151): applied on profile change through the context

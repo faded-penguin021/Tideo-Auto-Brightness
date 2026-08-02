@@ -40,7 +40,8 @@ fun AabSettings.changedCount(reference: AabSettings = AabSettings()): Int =
 /**
  * Keys excluded from the changed-vs-default diff (G2R-F84 + modal exclusions). `serviceEnabled` and
  * `contextOverride` are runtime/identity latches (never profile parameters). `debugLevel`,
- * `detectOverrides`, `quickSettingsEnabled`, `notificationsEnabled` and `panicSensitivity` are GLOBAL
+ * `detectOverrides`, `quickSettingsEnabled`, `notificationsEnabled`, `panicSensitivity` and
+ * `panicRequiresPlugged` are GLOBAL
  * preferences the profile load deliberately preserves (G2-F8/G2R-F9/D-116) — listing them in a profile
  * diff is misleading. `thresholdMidpoint` is DERIVED (log10(zone2End), task570 act39), not tuned.
  */
@@ -49,6 +50,7 @@ private val EXCLUDED_KEYS = setOf(
     "contextOverride",
     "debugLevel",
     "panicSensitivity",
+    "panicRequiresPlugged",
     "detectOverrides",
     "quickSettingsEnabled",
     "notificationsEnabled",
@@ -148,6 +150,7 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "notificationsEnabled" -> notificationsEnabled.toString()
     "debugLevel" -> debugLevel.toString()
     "panicSensitivity" -> panicSensitivity.toString()
+    "panicRequiresPlugged" -> panicRequiresPlugged.toString()
     "contextOverride" -> contextOverride.toString()
     // D-151/D-152 display-toggle profile fields; a null temperature means "device default"
     // (never written).

@@ -64,6 +64,12 @@ fun SuperDimmingScreen(
     val dateLocation by extras.dateLocation.collectAsStateWithLifecycle()
     var defaultLatLon by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     LaunchedEffect(Unit) { defaultLatLon = runCatching { extras.defaultLatLon() }.getOrNull() }
+    // DB-008 (_SaveButtonDimming A11, issue #110): Apply clamps a strength setpoint above 65 down to
+    // it. Say so — the field then shows 65, and the user learns why rather than finding a number they
+    // did not type.
+    LaunchedEffect(vm) {
+        vm.dimmingStrengthClamped.collect { toast(R.string.toast_dimming_strength_clamped, it) }
+    }
     SuperDimmingContent(
         draft, committed, epoch, dirty, tier, live,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,

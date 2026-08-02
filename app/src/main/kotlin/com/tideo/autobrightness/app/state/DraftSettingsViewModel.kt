@@ -124,6 +124,13 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
     private val _maxBrightnessRaised = MutableSharedFlow<Int>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val maxBrightnessRaised: SharedFlow<Int> = _maxBrightnessRaised.asSharedFlow()
 
+    // DB-008 (_SaveButtonDimming A11, issue #110): Apply corrects a dimming-strength setpoint above
+    // MAX_DIMMING_STRENGTH_SETPOINT down to it. Announce it, because a value silently changing under
+    // the user is the same class of dishonesty as the field that used to show 100 while 65 applied.
+    // Same one-shot buffered SharedFlow contract as maxBrightnessRaised.
+    private val _dimmingStrengthClamped = MutableSharedFlow<Int>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val dimmingStrengthClamped: SharedFlow<Int> = _dimmingStrengthClamped.asSharedFlow()
+
     val tier: StateFlow<Tier> = privilegeManager.tierFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Tier.NONE)
 
@@ -156,6 +163,9 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
         // Only the MISC screen opts in — Tasker runs this in `_SaveButtonMisc` (the Misc scene save);
         // the Curve scene save just reddens form3A (task583 advisory), never touching MaxBright.
         val fix = if (raiseMaxBrightForCurve) _draft.value.raiseMaxBrightnessForCurve() else MaxBrightnessFix(_draft.value, null)
+        // DB-008: remember what the user asked for, so the clamp below can be reported rather than
+        // applied silently. Read BEFORE validate(), which is what performs the correction.
+        val requestedStrength = fix.settings.dimmingStrength
         val toCommit = fix.settings.validate()
         // D-164: validate() may REWRITE the draft (NaN resets, per-field clamps, cross-field
         // coercions like maxWaitMs ≥ minWaitMs — reachable from the Misc wait sliders). Snap the
@@ -168,6 +178,13 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
         _epoch.update { it + 1 }
         // A15: announce the auto-raise with the value that actually persisted (post-clamp).
         if (fix.raisedTo != null) _maxBrightnessRaised.tryEmit(toCommit.maxBrightness)
+        // DB-008 (A11): only when the value actually MOVED — announcing a correction that did not
+        // happen is precisely the misinformation issue #110 is about. (Tasker's A9 originally tested
+        // `> 64.999999999`, which fired at exactly 65 too; upstream has since moved it to
+        // `> 65.0000000001`, so the two agree.)
+        if (toCommit.dimmingStrength < requestedStrength) {
+            _dimmingStrengthClamped.tryEmit(toCommit.dimmingStrength)
+        }
         viewModelScope.launch {
             val committedNow = app.settingsDataStore.updateData { current ->
                 toCommit.copy(

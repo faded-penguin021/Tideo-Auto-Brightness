@@ -37,6 +37,11 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | Known parity deviations / open gaps | `parity_gaps.md` |
 | Privilege tiers / permissions / DataStore schema | `architecture/*` |
 | Material 3 audit | `design/m3_audit.md` |
+| What the F-Droid compatibility CI proves (and does not) | `FDROID_VALIDATION.md` |
+| Threat model — assets, attackers, invariants | `SECURITY_AUDIT_MODEL.md` |
+| The standing on-device acceptance pass (permanent, cited by §number) | `DEVICE_TEST_SCRIPT.md` |
+| What the *unreleased* train changed, for the owner to check (ephemeral) | `DEVICE_TEST_SCRIPT_<version>.md` |
+| Which control enforces an invariant, and what proves it | `SECURITY_REVIEW.md` |
 | Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
 ## Change-type playbooks
@@ -173,6 +178,43 @@ so check it explicitly.
   `docs/rebuild/design/store_icon.svg`. No guard enforces the lockstep (the incident-only bar, DA-015:
   the drift itself hasn't happened yet); this bullet is the check. The icon only reaches the store
   when F-Droid builds a **new tagged release** — an existing release's listing never backfills.
+- **Check the F-Droid compatibility run before tagging (DA-027).** `fdroid-compat.yml` rebuilds the
+  commit in F-Droid's own `fdroidserver:buildserver` image via `gradlew-fdroid`, runs `fdroid
+  scanner`, checks the APK signing blocks (D-137) and the live fdroiddata recipe, and compares the
+  F-Droid build against a normal release build. It runs on **PRs** touching `**/*.gradle.kts`,
+  `gradle/**`, `gradle.properties`, `fastlane/metadata/**`, `scripts/fdroid-check.py`,
+  `fdroid-compat.yml` or `release.yml`; on **every `main` push and every `v*` tag, unfiltered**
+  (path filters and ref filters are ANDed, so a filtered tag trigger would never fire — DA-028);
+  and on **`workflow_dispatch`**. Three consequences for a release, in the order they bite:
+  - The **tag run fires after the tag exists** — backstop, not gate. The pre-tag evidence is the run
+    on the release commit itself: every `main` push now runs it, so a commit merged to `main` has a
+    verdict. Tagging something that never landed on `main` (or re-checking after a red run) means
+    firing one by hand: **Actions → F-Droid compatibility → Run workflow**.
+  - **If it is red, do not tag** — and if a *tag* run goes red, fix and re-release before F-Droid
+    picks the tag up; red there means the release would silently never appear in F-Droid.
+  - Green does not prove the **metadata** check ran: it warns-and-passes when gitlab.com is
+    unreachable (deliberate — see `FDROID_VALIDATION.md`, which also lists what green never covers:
+    the real signing key, the release job as a third environment, store-listing metadata).
+  **No guard enforces this bullet** — `release-preflight.yml` does not look at F-Droid; this bullet
+  is the check (same standing as the DA-024 icon lockstep above).
+- **⚠️ One-time, next release only — confirm F-Droid still reproduces (DA-026).** The AGP 8.7.3 →
+  8.13.2 bump changes `classes*.dex` and the baseline profile, so the **first tagged release after
+  it** is the first time F-Droid rebuilds our GitHub-signed APK under the new toolchain. It was
+  verified in F-Droid's own buildserver image before shipping (byte-identical APK across two
+  environments), but the GitHub Actions runner was never the environment under test. After that
+  release builds, check the F-Droid build log reports `...successfully verified` /
+  `compared built binary to supplied reference binary successfully` for the new versionCode. If it
+  instead reports a mismatch, the app is **not** delisted — F-Droid simply doesn't publish that
+  version — and the fix is a repo-side determinism fix, not a rollback of the release. **Delete this
+  bullet once one release has verified green**; it is a one-shot check, not standing process.
+- **Retire the round script (DB-010).** A train under development may carry **one**
+  `DEVICE_TEST_SCRIPT_<version>.md` — what *this* unreleased train changed, so the owner isn't
+  re-running the whole app to check one fix. It is **ephemeral**: when the version ships, fold
+  anything with standing value into the numbered sections of `DEVICE_TEST_SCRIPT.md` (append or
+  extend an existing step — sections are cited by number, so never renumber) and **delete** the
+  round file. Git history is its archive; `docs/history/` is not (that is the frozen migration
+  record and takes no maintenance-era files). Two round scripts alive at once means the previous
+  one should already have been retired.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
   process, a `DEVIATIONS_LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
   (D-127): the history lives in `STATE.md`, the ledger, the fastlane changelogs, and git — the gradle
@@ -471,6 +513,19 @@ When CI is red but local is green, the failure is in the **environment/workflow*
      unrelated to the diff. Re-run the job once. If it passes, it was a flake — note it and move on;
      do **not** "fix" code for a flake. If it recurs, treat it as an environment issue and harden the
      workflow (pin the action version, add a retry, drop a poisoned cache key).
+   - **F-Droid-only failure** (`fdroid-compat.yml` red while `build.yml` is green): that is the
+     workflow doing its job — the repo builds for us but not for F-Droid, or the two builds no
+     longer match. It is a *real* failure with a real consequence (the next release silently not
+     appearing in F-Droid), not an environment quirk to re-run away. Read the annotation's title
+     (`Normal release build failed`, `F-Droid compatibility validation failed`, `F-Droid scanner
+     check failed`, `Signing assumption check failed`, `Metadata validation failed`,
+     `Reproducibility validation failed`), then `FDROID_VALIDATION.md` → "Reading a failure", which
+     gives the local reproduction command for each. The exception: upstream moves under us (their
+     image or the unpinned `fdroid scanner` changed) — treat that as an environment change and say
+     so in the PR. **The generic remedy below does not apply: do NOT pin the buildserver image or
+     the scanner to get green.** Tracking upstream is the design (DA-027); a frozen copy of
+     upstream's opinion stops predicting what upstream will reject. Adapt the repo — or if upstream
+     itself broke, say so and wait.
 2. **Changing a workflow is in scope** when the failure is environmental — workflows are code; fix
    `.github/workflows/*` in the same PR as the change that needs it (don't disable a check to get
    green). **Never** weaken a gate (skip tests, drop `abortOnError`, `continue-on-error`) to pass CI.

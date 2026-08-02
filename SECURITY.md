@@ -14,6 +14,12 @@ This is a solo-maintained app; reports are handled best-effort, normally within 
 
 ## Scope notes (by design, not vulnerabilities)
 
+The assumptions, trust boundaries, attacker classes, and release-blocking invariants used for
+implementation audits are defined in
+[`docs/rebuild/SECURITY_AUDIT_MODEL.md`](docs/rebuild/SECURITY_AUDIT_MODEL.md). Read that model
+before assessing individual code paths; the controls that enforce it, the evidence for each, and the
+residual risks are in [`docs/rebuild/SECURITY_REVIEW.md`](docs/rebuild/SECURITY_REVIEW.md).
+
 - The app writes `Settings.System.SCREEN_BRIGHTNESS`/`SCREEN_BRIGHTNESS_MODE` under the
   user-granted `WRITE_SETTINGS`, and — only after an explicit one-time ADB/Shizuku/root
   `pm grant` — `Settings.Secure` dimming (`WRITE_SECURE_SETTINGS`) and `dumpsys wifi` SSID

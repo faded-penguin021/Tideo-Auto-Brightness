@@ -1,14 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-   Backup / device-transfer rules for Android 12+ (S12.9a: closes lint DataExtractionRules).
-   Stub: defaults back up all DataStore settings. Tighten with <include>/<exclude> if any
-   sensitive data is ever added (none today).
--->
+<!-- Privacy allowlist (DA-034, corrected DB-002). DataStore files live under files/datastore/.
+     Cloud receives brightness configuration and saved profiles. Device transfer may additionally
+     carry user-authored context rules, including their SSIDs, app package names and location
+     geofences. Runtime telemetry, cached/fixed coordinates, learned override points, power samples,
+     default-off privacy-consent gates, context baselines, crash traces and app-private profile
+     exports are deliberately omitted from both destinations. See architecture/datastore_map.md.
+
+     NOTE (DB-002): aab_settings.json is not purely configuration — it also holds `serviceEnabled`
+     and `contextOverride`, which describe what THIS installation was doing. Backup eligibility is
+     per-file, so those fields travel with the config; SettingsBackupAgent.onRestoreFinished() resets
+     them on arrival (SettingsBackupSanitizer). The allowlist below and that sanitizer are one
+     control in two halves — changing either without the other reopens the stale-state hole. -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- Add <exclude> entries here if cloud backup should skip any files. -->
+        <include domain="file" path="datastore/aab_settings.json" />
+        <include domain="file" path="datastore/aab_user_profiles.json" />
     </cloud-backup>
     <device-transfer>
-        <!-- Add <exclude> entries here if device-to-device transfer should skip any files. -->
+        <include domain="file" path="datastore/aab_settings.json" />
+        <include domain="file" path="datastore/aab_user_profiles.json" />
+        <include domain="file" path="datastore/aab_context_rules.json" />
     </device-transfer>
 </data-extraction-rules>

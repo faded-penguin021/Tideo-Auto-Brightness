@@ -27,6 +27,20 @@ class SettingsViewModelTest {
 
     private fun committed(): AabSettings = runBlocking { app.settingsDataStore.data.first() }
 
+    /**
+     * Idle + poll until the app starts a service (bounded ~1s), returning its intent.
+     *
+     * `nextStartedService` CONSUMES the queue head, so the poll keeps the first non-null it sees.
+     */
+    private fun awaitStartedService(): android.content.Intent? {
+        repeat(100) {
+            idle()
+            shadowOf(app).nextStartedService?.let { return it }
+            Thread.sleep(10)
+        }
+        return null
+    }
+
     private fun awaitCommitted(predicate: (AabSettings) -> Boolean): AabSettings {
         repeat(100) {
             idle()
@@ -82,8 +96,12 @@ class SettingsViewModelTest {
         assertEquals(true, result.serviceEnabled, "the live service flag is preserved across a load")
 
         // …and a re-evaluate is requested (service running), so the change takes effect immediately.
-        idle()
-        val started = shadowOf(app).nextStartedService
+        // Polled, not read after a single idle(): `replaceAll` sends the intent AFTER its
+        // `updateData` returns, while `awaitCommitted` above watches the DataStore FLOW — which can
+        // observe the write before the view-model coroutine resumes to send it. One idle() was a bet
+        // on that gap already being closed, and it lost on a loaded CI runner (green locally, red on
+        // the runner at e462f8a). Same assertion, bounded wait instead of an assumption.
+        val started = awaitStartedService()
         assertEquals(
             com.tideo.autobrightness.app.runtime.AmbientMonitoringService.ACTION_REAPPLY,
             started?.action,

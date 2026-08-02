@@ -1,8 +1,16 @@
-# DEVICE_TEST_SCRIPT — Gate 3 on-device acceptance
+# DEVICE_TEST_SCRIPT — the standing on-device acceptance pass
+
+**The one permanent device script.** Originally the Gate 3 acceptance pass for v1.0.0; it now covers
+the whole shipped app and is the regression sweep for a release. Sections are cited by number from
+code and from the ledger — **add sections at the end, never renumber**.
+
+Per-round scripts (`DEVICE_TEST_SCRIPT_<version>.md`) are the *other* kind: one at a time, covering
+only what an unreleased train changed, deleted once that version ships — with anything worth keeping
+folded in here first (RUNBOOK §6).
 
 Run this end-to-end on a real device (no emulator — the SoC has no KVM here, and the light/proximity/
 battery sensors, OEM brightness range, Shizuku binder, and doze are only exercisable on hardware). Tick
-each step's **Expected**; log any miss in `STATE.md` → "Gate findings". Build + install the debug APK
+each step's **Expected**; log any miss in `STATE.md` → "Owner queue". Build + install the debug APK
 with `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` (or grab a published
 build from Releases).
 
@@ -44,13 +52,13 @@ optional.
 12. Reboot the device. **Expected:** the service self-starts (foreground notification returns) if it was
     enabled (specialUse FGS is boot-eligible).
 
-## 4. Proximity damp (prof759/task545) — NEW S14
+## 4. Proximity damp (prof759/task545)
 
 13. With the service running in changing light, cover the **top** of the phone (proximity "near", e.g.
     hold it to your ear). **Expected:** brightness reactivity is **damped** (changes ~10× slower) but the
     loop does **not** pause; uncovering restores normal reactivity. (Live Debug LuxAlpha drops while near.)
 
-## 5. Panic reset (prof769/task528) — sensitivity tuned in S14
+## 5. Panic reset (prof769/task528)
 
 14. Hold the phone **upside down** (charging port up) and **shake** vertically. **Expected:** an **S.O.S.
     vibration**, brightness forced to **maximum**, the service stops (full reset).
@@ -99,6 +107,16 @@ optional.
       `dumpsys wifi`). With Shizuku or root instead, the same read succeeds via `cmd wifi status`.
 25. Manually load a profile (Profiles). **Expected:** context automation **pauses** (Resume banner);
     screen off→on or Resume re-enables it.
+    - **Resume re-evaluates, it does not reset (DA-018).** With a rule currently MATCHING, load a
+      *different* profile by hand, then tap **Resume**. **Expected:** the **rule's** profile becomes
+      active (its name shows as the active context and the settings screens show its values) — not
+      the hand-loaded one, and not "Default".
+    - **Resume with NO rule matching falls back in sync.** Make sure nothing matches, hand-load a
+      non-default profile, tap **Resume**. **Expected:** that profile stays active — the label and
+      the Curve & Brightness / Reactivity screens **agree**. The 1.8.1 bug was the label flipping to
+      "Default" while the settings screens still showed the loaded profile.
+    - **[opt]** With External control on, `com.tideo.autobrightness.control.CONTEXTS_RESUME` must
+      behave exactly like the banner's Resume.
 
 ## 9. Charts, wizard, calibration, profiles
 
@@ -121,7 +139,7 @@ optional.
     survives doze (service not killed — exempt from battery optimization if needed, see dontkillmyapp),
     acceptable battery drain, **no ANRs/crashes**, brightness stays sensible.
 
-## 11. Privileged Display toggles [ELEVATED] (D-149–D-152) — NEW 1.7.0
+## 11. Privileged Display toggles [ELEVATED] (D-149–D-152)
 
 The toggles are `AabSettings` **profile fields** applied on profile change by
 `DisplayTogglesCoordinator` (super-dimming model, idempotent only-on-change); with the service OFF,
@@ -194,7 +212,7 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     clears it). Re-enable the service. **Expected:** the baseline's display fields re-assert on
     start — panic is an escape hatch, not a permanent opt-out.
 
-## 12. Accessibility — TalkBack & touch targets (D-156) — NEW 1.8.0
+## 12. Accessibility — TalkBack & touch targets (D-156)
 
 The a11y backlog (D-156, units A0–A7) is verified in CI by the `SemanticsAudit`
 gate + the `TouchTargetsA11yTest` floor, but semantics tests only *approximate* TalkBack, and Compose's
@@ -220,7 +238,7 @@ double-tap to activate.
     (~8–10 dp) *indicators*, not a primary control — page with the 48 dp arrows or a horizontal swipe
     instead (they are excluded from the automated floor by design — `TouchTargetsA11yTest`).
 
-## 13. Automation control — intent surface (D-157) — NEW 1.8.0
+## 13. Automation control — intent surface (D-157)
 
 Opt-in external control (Tasker / MacroDroid). CI covers the gate + verb routing + the outbound event
 contract (`ControlReceiverTest`, `AmbientMonitoringServiceTest`), but end-to-end delivery from a real
@@ -250,7 +268,7 @@ reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation ap
     `enabled`/`running`/`paused`/`profile`; a final `enabled=false` event fires when the service stops.
     With the Automation-control toggle OFF, **no** events are emitted.
 
-## 14. Edge-to-edge + keyboard insets (D-159) — NEW 1.8.0
+## 14. Edge-to-edge + keyboard insets (D-159)
 
 `MainActivity` now calls `enableEdgeToEdge()` **app-wide** (plus manifest `adjustResize` and the
 Scaffold-level `imePadding()`), which changed how EVERY screen receives system-bar and keyboard
@@ -273,7 +291,7 @@ navigation** first, then repeat the marked items with **3-button navigation** (t
     SSID field. **Expected:** the focused field stays visible above the keyboard; no pan-jump of the
     whole window (adjustResize + inset dispatch, not legacy ADJUST_PAN).
 
-## 15. Force dark via Shizuku/root (D-172) — NEW 1.8.0
+## 15. Force dark via Shizuku/root (D-172)
 
 Global `debug.hwui.force_dark` toggle in Tools. Live paths try Shizuku (**running and
 authorized**) first, then a root shell; the switch itself always persists.
@@ -300,4 +318,4 @@ authorized**) first, then a root shell; the switch itself always persists.
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures
-in `STATE.md` → "Gate findings" for a punch-list session. Gate 3 pass → bump `versionName` to `1.0.0`.
+in `STATE.md` → "Owner queue" for a punch-list session.

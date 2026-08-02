@@ -14,10 +14,13 @@ class PanicHandler(
 ) {
     /** task528 act6-8: force manual mode, write 255, restore mode, disable super dimming. */
     fun execute() {
-        brightness.forceManualMode()
-        brightness.write(PANIC_BRIGHTNESS) // task528 act6: Set Display Brightness 255
-        brightness.restoreMode()
-        dimming.disengage() // task528 act7/8: Disable Super Dimming
+        // Every operation is best-effort and independent (DA-038). A SettingsProvider/OEM failure
+        // in an earlier write must never prevent the later screen-safety operations, especially the
+        // Extra Dim OFF attempt. restoreMode also runs even when the brightness write fails.
+        runCatching { brightness.forceManualMode() }
+        runCatching { brightness.write(PANIC_BRIGHTNESS) } // task528 act6
+        runCatching { brightness.restoreMode() }
+        runCatching { dimming.disengage() } // task528 act7/8
     }
 
     companion object {

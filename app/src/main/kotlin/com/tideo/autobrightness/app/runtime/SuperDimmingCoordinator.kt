@@ -70,8 +70,26 @@ internal fun circadianDimMultiplier(scaleDynamic: Double, settings: AabSettings)
 class SuperDimmingCoordinator(
     private val secureDimming: SecureDimmingController,
     private val debugSink: DebugSink = NoOpDebugSink,
+    /**
+     * Re-detect the privilege tier (DB-012). The service's cached tier (G1-F5) is refreshed only at
+     * its own resume points — service start and screen-on — and `AppModule` is constructed per call
+     * site, so the *UI's* `privilegeManager.refresh()` updates a DIFFERENT instance. A grant made
+     * over adb/Shizuku with the screen on therefore stayed invisible to the running service until a
+     * screen-off/on or an app restart; the device pass hit exactly that ("kept complaining about
+     * write secure settings even though i regranted; restarting the app resolved that").
+     */
+    private val refreshTier: () -> Unit = {},
+    private val clock: () -> Long = System::currentTimeMillis,
+    // Last so the `SuperDimmingCoordinator(secure) { Tier.ELEVATED }` trailing-lambda form keeps working.
     private val tierProvider: () -> Tier,
 ) : DimmingCoordinator {
+
+    // Last time a cache-miss re-detect ran. Bounds the Binder cost: the refresh below sits on the
+    // pipeline's cycle path, and an un-granted user who leaves dimming enabled hits it every cycle.
+    // Nullable, not 0L: a test clock (and a device clock read moments after boot) starts AT 0, so a
+    // zero sentinel would swallow the very first re-detect. Nullable also avoids the Long.MIN_VALUE
+    // sentinel's overflow on `now - last`.
+    private var lastTierRefresh: Long? = null
 
     // %AAB_DimmingStatus — true while reduce_bright_colors is engaged, false when known-off.
     // D-144: null = UNKNOWN, the fresh-process state. Tasker's %AAB_DimmingStatus is a PERSISTED
@@ -95,11 +113,24 @@ class SuperDimmingCoordinator(
      *    and never dimmed — this restores the dim-below-floor half.
      */
     override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) {
-        val elevated = tierProvider() >= Tier.ELEVATED
         val belowThreshold = targetBrightness < settings.dimmingThreshold
         val pwmPath = settings.pwmSensitive && belowThreshold
         val superPath = settings.dimmingEnabled && belowThreshold
         val wantsDim = pwmPath || superPath
+
+        // DB-012: the ONE moment a stale tier cache is visibly wrong — the user asked for dimming and
+        // we believe we may not write. Re-detect (rate-limited) instead of waiting for the next
+        // screen-on, so an adb/Shizuku grant made while the screen is on self-heals within a cycle.
+        var elevated = tierProvider() >= Tier.ELEVATED
+        if (wantsDim && !elevated) {
+            val now = clock()
+            val last = lastTierRefresh
+            if (last == null || now - last >= TIER_REFRESH_MIN_INTERVAL_MS) {
+                lastTierRefresh = now
+                refreshTier()
+                elevated = tierProvider() >= Tier.ELEVATED
+            }
+        }
         val shouldEngage = wantsDim && elevated
 
         // task646 act6/act7: the circadian DimDynamic multiplier (G2R-F90 — was hardcoded null, D-040).
@@ -163,18 +194,45 @@ class SuperDimmingCoordinator(
             return
         }
 
-        // task650 act10-14: write reduce_bright_colors_activated=1 once, then the level each cycle.
+        // Write the bounded level BEFORE activation. If the process dies between the two writes the
+        // feature remains off; the reverse order can briefly apply an OEM/default stale level and
+        // produce an extreme unintended dim. Do not advance the latch on a failed write: a revoked
+        // permission or SettingsProvider failure must be retried by the next cycle/cleanup rather
+        // than being mistaken for successfully engaged state (DA-038).
         // NOTE (G2-F9, device gate): these are the AOSP "Extra dim" secure keys
         // (reduce_bright_colors_activated / reduce_bright_colors_level). Some OEM skins ship a
         // renamed/relocated key (or require the accessibility feature pre-enabled); if engagement
         // logs "ON" here (debug 5) but the screen does not visibly dim on a given device, that is OEM
         // secure-key variance, not a logic bug — see SecureDimmingController + STATE.md D-048.
-        if (engaged != true) {
-            secureDimming.setActivated(true)
-            engaged = true
-        }
-        secureDimming.setLevel(level)
         val mode = if (pwmPath) "PWM" else "SD"
+        val levelWritten = secureDimming.setLevel(level).isSuccess
+        if (!levelWritten) {
+            // DB-001: a failed level write while ALREADY engaged is the dangerous case, and the
+            // previous code was silent about it — the latch was already `true`, so it skipped
+            // activation and returned, leaving the screen pinned at the PREVIOUS level. Since levels
+            // fall as the target rises, that stale level is typically STRONGER than the one just
+            // requested: the user brightens the room, the write fails, and the screen stays dark.
+            // Fail safe instead: drop to a known-off state (best effort) and mark the latch UNKNOWN
+            // so the next cycle re-engages from scratch rather than trusting a level it never wrote.
+            // ONLY when we know we are engaged. From UNKNOWN (fresh process) or known-off, a failed
+            // level write means nothing of ours is on screen, and writing activation here would be a
+            // secure write we have no reason to make — the pre-existing "a missing level must never
+            // activate an unknown OEM level" invariant covers that case and still holds.
+            if (engaged == true) {
+                val cleared = secureDimming.setActivated(false).isSuccess
+                engaged = if (cleared) false else null
+            }
+            emitDebug(settings) {
+                "FAILED ($mode) level $level not written (target $targetBrightness) — Extra Dim cleared"
+            }
+            return
+        }
+        if (engaged != true) {
+            if (secureDimming.setActivated(true).isSuccess) engaged = true
+        }
+        // Report ON only for a level that actually reached the secure setting. The old message was
+        // emitted unconditionally, so a failed write still logged "ON <new level>" and sent device
+        // diagnosis after the wrong suspect (DB-001).
         emitDebug(settings) { "ON ($mode) level $level (target $targetBrightness < ${settings.dimmingThreshold})" }
     }
 
@@ -208,8 +266,19 @@ class SuperDimmingCoordinator(
      *  only a known-off latch skips the writes, so a fresh process clears any pre-death residual. */
     override fun disengage() {
         if (engaged == false) return
-        secureDimming.setLevel(0)
-        secureDimming.setActivated(false)
-        engaged = false
+        // Clear activation even when the level clear fails: OFF is the safety-critical write. Keep
+        // the latch unknown unless BOTH writes succeeded, so a later stop/cycle retries cleanup.
+        val levelCleared = secureDimming.setLevel(0).isSuccess
+        val deactivated = secureDimming.setActivated(false).isSuccess
+        if (levelCleared && deactivated) engaged = false
+    }
+
+    private companion object {
+        /**
+         * Floor between cache-miss tier re-detects (DB-012). `detectTier()` is a Binder permission
+         * check; 10 s is imperceptible to someone who just ran `pm grant` and keeps the cost off a
+         * per-cycle path for an unprivileged user who leaves dimming enabled.
+         */
+        const val TIER_REFRESH_MIN_INTERVAL_MS = 10_000L
     }
 }

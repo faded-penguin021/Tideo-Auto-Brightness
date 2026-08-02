@@ -619,3 +619,381 @@
   (2) F-Droid regenerates listing metadata when it builds a **new tagged release**, so the icon
   appears at the next release, not retroactively on 1.8.1 — nothing to do on the owner's side but
   ship the next version. `[cited]`: none (metadata + docs only; no production code path).
+
+- DA-025: F-Droid downloads badge added to the README badge row, and the existing GitHub downloads
+  badge relabelled so the two are distinguishable at a glance — `Downloads (GitHub)`
+  (`shields.io/github/downloads/…/total`, live: 326) and `Downloads (F-Droid)` (shields.io
+  `dynamic/json` over `kitswas/fdroid-metrics-dashboard`'s `processed/total/`
+  `com.tideo.autobrightness.json`, `$.total_downloads`), each linking to its own source (Releases /
+  the F-Droid package page). Both labels are percent-encoded (`%28`/`%29`) so the parentheses cannot
+  terminate the Markdown image destination early. **The F-Droid badge renders
+  `Downloads (F-Droid): resource not found` today, and that is expected, not a malformed URL** — the
+  same URL with `app.organicmaps.json` substituted returns a real count (3 657 545), which isolates
+  the fault to the missing per-package JSON upstream. The app landed on F-Droid on 2026-07-28 (the
+  package page lists exactly one version, 1.8.1/vc19), so it has no download history for the
+  dashboard's daily cronjob to process yet; the badge self-heals with no repo change once that file
+  appears. If it is still 404 after a few weeks of the listing being live, the question is for the
+  dashboard upstream, not this repo. Deliberately not mitigated: shields' `dynamic/json` has no
+  fallback-value parameter, so the alternatives were a hand-maintained static badge (drifts
+  immediately) or no badge at all — a transiently-red badge that becomes correct on its own is the
+  cheaper trade. `[cited]`: none (README only; no production code path).
+
+- DA-026: **AGP 8.7.3 → 8.13.2** (owner-approved after a verification run, 2026-07-28). Trigger: the
+  F-Droid buildserver log for vc19 closed with "Deprecated Gradle features were used in this build,
+  making it incompatible with Gradle 9.0", alongside its louder sibling "This Android Gradle plugin
+  (8.7.3) was tested up to compileSdk = 35" (we build 36). `--warning-mode all` localizes the first
+  precisely: **three** deprecations, all inside AGP itself — `ApplicationVariantImpl`
+  `.isWearAppUnbundled`, `BuildType.isUseProguard`, `BuildType$AgpDecorated.isCrunchPngs`, one rule
+  (Groovy "is-"-prefixed Boolean properties, dropped in Gradle 9). **No repo script contributes one**,
+  so no local edit removes them — only an AGP bump does. Nothing forced the date either: F-Droid runs
+  `gradlew-fdroid`, which took 8.14.3 **from our own `distributionUrl`**, so Gradle 9 could never
+  arrive uninvited. The bump was made anyway, early and deliberately, because for a
+  reproducible-build app the risk of a toolchain change is cashed at the **next tagged release** — a
+  cheaper place to spend it is a quiet maintenance branch, not inside a release.
+  **Verified in F-Droid's own pipeline, not by inspection.** The `registry.gitlab.com/fdroid/`
+  `fdroidserver:buildserver` image (the environment that produced the log) was run locally against
+  both AGP versions via its real entry point, `/usr/local/bin/gradlew-fdroid assembleRelease` from
+  `app/`, with its `/opt/android-sdk` and JDK 21. One accommodation: the container has no direct
+  egress, so the Gradle 8.14.3 distribution was pre-seeded into `gradlew-fdroid`'s cache **after**
+  its SHA-256 was matched against *both* gradle.org's published checksum and F-Droid's
+  gradle-transparency-log entry (`bd711022…`) — i.e. exactly the check the script performs, not a
+  bypass of it. **The rig validated itself:** at 8.7.3 it reproduced the pasted log (same two warning
+  classes, same `84 actionable tasks`) and its APK is content-identical to the **published v1.8.1
+  binary** — 119 zip entries, every CRC equal — which is F-Droid's own "successfully verified"
+  verdict, re-derived locally. At 8.13.2 in that same image: BUILD SUCCESSFUL, **both warning classes
+  gone**, `lintVitalRelease` green (a release-only gate the ladder's `lintDebug` rung never exercises),
+  and F-Droid auto-installed build-tools 35.0.0 instead of 34.0.0 with no fuss. **Reproducibility
+  measured, not assumed:** the F-Droid image and the dev environment — different distro, different JDK
+  patch build (Debian 21.0.11 vs Ubuntu 21.0.10), different build-tools — emitted an APK with
+  *identical whole-file SHA-256* (`d85cb90b…`), which is stronger than the content equality F-Droid
+  actually requires. Delta against shipped 1.8.1 is **4 entries**: `classes.dex`, `classes2.dex`,
+  `assets/dexopt/baseline.prof`, `.profm` — new D8 + profile generator; resources, manifest and native
+  libs are CRC-unchanged. The narrow delta is partly structural: this app sets no `minifyEnabled`/
+  proguard config, so R8's optimizer — the usual source of cross-version dex churn — is not in play.
+  **Residual risk, stated rather than papered over:** (1) the GitHub Actions runner is a *third*
+  environment, never exercised here — two dissimilar environments agreeing byte-for-byte is strong
+  evidence a third agrees, not proof; (2) no emulator exists in CI, so new-D8 dex is behaviorally
+  covered only by the JVM/Robolectric ladder plus lint — on-device remains owner-verified as always.
+  Both fold into one release-time obligation, written into RUNBOOK playbook 6: on the **first tagged
+  release after this bump**, confirm F-Droid's reproducible-build comparison passed before treating
+  the toolchain as settled. AGP 9.x was not considered a candidate — it is a migration (Gradle 9,
+  built-in Kotlin), not a version bump. `[cited]`: none (build tooling; no production code path).
+
+- DA-027 [cited]: **F-Droid compatibility validation pipeline** — `.github/workflows/fdroid-compat.yml` +
+  `scripts/fdroid-check.py` + `FDROID_VALIDATION.md` (owner-specified design, 2026-07-28; the DA-026
+  session surfaced that a green `build.yml` says nothing about F-Droid). Problem: F-Droid rebuilds
+  the tagged commit itself, in reproducible-build mode, and publishes our signed APK only if its own
+  rebuild **matches** — a mismatch is silent (that version simply never appears), lands days later,
+  and lands after the release is public. Design (rationale in full in `FDROID_VALIDATION.md`):
+  **use their tooling, do not model it.** Stage 3 runs F-Droid's published
+  `fdroidserver:buildserver` image through its own entry point `gradlew-fdroid assembleRelease`,
+  with the checkout prepared only the two ways a buildserver checkout differs (SDK `local.properties`;
+  no `gradle-wrapper.jar`) — so upstream evolution is inherited, not chased. Stage 2 is a
+  cache-poor normal release build signed with a **runner-generated throwaway key** (no repo secret;
+  it exists so AGP's real signing path runs). Stage 4 compares the two APKs rather than building
+  twice in one environment: determinism was never the risk, cross-environment agreement is what
+  F-Droid actually tests. `fdroid scanner` is installed unpinned from PyPI on purpose — a scanner
+  frozen behind upstream misses what upstream will reject. Caching is restricted to immutable
+  downloads (dependency artifacts, the checksum-verified Gradle distribution); build outputs are
+  never cached, since a cached task output could mask the very breakage the workflow hunts.
+  **Three checks are ours because fdroidserver has no equivalent**, all in one stdlib-only helper:
+  `compare` (nothing upstream answers "did these two builds match" before a release exists; compares
+  zip-entry CRCs and skips v1 signature files, so it is signature-blind by construction — the signed
+  control and the unsigned F-Droid build are directly comparable, and it uses F-Droid's own
+  contents-level criterion so it cannot fail on a difference they would forgive), `signing-blocks`,
+  and `metadata` (checks THIS repo against the LIVE fdroiddata recipe — fetched, never vendored, so
+  it cannot assert yesterday's truth). **`signing-blocks` earned its place empirically:** a build
+  with `dependenciesInfo` re-enabled (the D-137 regression) was scanned by `fdroid scanner`, which
+  passed it — the Play dependency blob `0x504b4453` is legal, invisible to the scanner, and quietly
+  destroys byte-identical rebuilds; the allowlist check catches it, verified against that artifact.
+  Every stage was exercised before shipping, not just written: the buildserver container build was
+  run with the workflow's exact `docker run` (BUILD SUCCESSFUL, unsigned APK produced), and each
+  helper subcommand was run against real APKs in **both** polarities — `compare` passing on
+  cross-environment builds of one commit *and* on the signed-vs-unsigned pair the workflow actually
+  feeds it, failing on genuinely different builds; `signing-blocks` passing clean and failing on the
+  regression artifact. Triggers are PRs touching build/Gradle/fastlane/release files, every `v*` tag,
+  and dispatch — the path filter is cost control (multi-GB image pull + cold Gradle run), the tag
+  trigger is the guarantee that no release is tagged without this having run. Deliberate
+  non-coverage, stated in the doc so the guardrail is not over-trusted: it is not `fdroid build`
+  (no metadata-driven orchestration, no buildserver VM isolation), the real signing key is never
+  involved, and F-Droid ultimately compares against the **release job's** APK — a third environment
+  this never exercises. `[cited]`: none (CI + docs; no production code path).
+
+- DA-028 [cited]: **Adversarial pass on DA-027, and what it found** (owner-budgeted single pass,
+  2026-07-28). The pipeline shipped after a rule-review and hands-on local verification, and was
+  still wrong in ways that mattered — recorded here because the *pattern* is the lesson: every
+  defect below survived local verification precisely because local verification never exercised
+  GitHub's own plumbing. **A1 (the workflow could never have passed):** `upload-artifact` roots the
+  archive at the **least common ancestor** of its input paths, so uploading a deep
+  `app/build/outputs/apk/release/*.apk` together with a workspace-root log put the APK at
+  `normal/app/build/outputs/apk/release/…`, while every consumer read `normal/app-release.apk`.
+  Stages 3 and 4 failed on the first real run, exactly as predicted, and the CI log says it in
+  words: "Multiple search paths detected. Calculating the least common ancestor". DA-027's claim
+  that `compare` was "exercised in both polarities" was true and *irrelevant* — it was never run
+  against the artifact layout the workflow produces. Fixed by staging both jobs' outputs into one
+  flat `artifacts/` directory. **A2 (the release backstop was dead):** GitHub **ANDs** ref filters
+  with path filters on `push`, and a tag push carries no file diff, so `tags: ['v*']` + `paths:`
+  could never fire — while RUNBOOK, `FDROID_VALIDATION.md` and DA-027 all asserted "every `v*` tag"
+  as *the guarantee*. Fixed by dropping `paths:` from `push` (every `main` push now runs too;
+  accepted cost). **A4:** `if: failure()` is job-scoped, so an artifact-download or SDK-setup
+  failure emitted a confidently wrong annotation ("Two builds of this commit disagree…") — now
+  scoped per step id. **A3:** the multi-GB image pull got its own step so a disk failure cannot be
+  misreported as the project being incompatible. **B1/B2/B6 (fail-open):** `cmd_metadata` returned
+  0 on *any* exception (a 404 — recipe moved, app dropped — read as "outage"), and every recipe key
+  silently degraded to "skip", so an unparsed recipe printed "repository still satisfies the live
+  fdroiddata recipe" having verified nothing. Now: HTTP answers fail, only unreachability warns,
+  and an unparsable key is a failure — verified with a 404 URL and a keyless page, both rc=1.
+  **B3:** a malformed signing block returned the IDs found so far, failing open on exactly the
+  tampered framing the check exists for; now raises. **B4:** `0x1b93ad61` was mislabelled v4 (it is
+  v3.1; v4 lives in a separate `.idsig`). **B5:** the CRC map keyed a dict on filename, hiding
+  duplicate zip entries. Docs corrected where they overclaimed: the scanner does not catch the
+  D-137 blob (the stage table said it did), CRC32-per-entry is not "the same bytes", and the local
+  repro command is the workflow's *minus* its cache mounts. **Carried, unfixed:** the two-build
+  comparison may still false-alarm on build-tools skew between a hosted runner and the buildserver
+  image (no `buildToolsVersion` pin) — left unpinned until CI produces evidence, since pinning
+  changes the release build to fix a hypothetical. **Correction to DA-027:** its trailer says
+  "`[cited]`: none", which was wrong on arrival — `.github/` is inside ladder guard 5's scan scope
+  and the workflow header cites DA-027; the row's `[cited]` marker is correct and the trailer is
+  superseded by this sentence (ledger rows are append-only, so the error stays visible).
+  `[cited]`: `.github/workflows/fdroid-compat.yml` (artifact-staging and push-trigger comments),
+  `scripts/fdroid-check.py` (the fail-closed rationale comments).
+
+- DA-029 [cited]: **Profile import is a bounded stream, not `readText()`** (folded from the concept
+  PR #97 into the 1.8.2 train). `ProfileImportExportManager.importFromDocument` read a
+  user-chosen SAF document with `bufferedReader().readText()` — an unbounded allocation driven by
+  a provider we do not control, so a multi-GB (or endless) document was an OOM on the UI path. Now
+  `readAndDecode` streams into a `ByteArrayOutputStream` with a `MAX_ENCODED_PROFILE_BYTES` =
+  256 KiB budget **plus one probe byte**: reading the cap exactly is accepted, cap+1 proves
+  overflow without buffering it, and the probe is what makes "exactly at the limit" and "one over"
+  distinguishable at all (a plain `read` up to the cap cannot tell a full buffer from a truncated
+  one). `OpenableColumns.SIZE` is used **only** as an early reject — a provider's declared size is
+  a hint from the same untrusted source as the bytes, so a lying small size still hits the
+  streamed bound; there is a test for exactly that bypass. Decoding is strict UTF-8
+  (`CodingErrorAction.REPORT` on malformed **and** unmappable input) rather than the replacement
+  behaviour of `readText()`, because silently substituting U+FFFD turns "this file is not a
+  profile" into a confusing parse error further down. Two new `ProfileLoadResult` variants
+  (`TooLarge`, `ReadFailure`) carry those outcomes to the one exhaustive `when` in
+  `ProfilesContextsScreen` (`ProfilesScreen` only renders the resulting string, so it needed no
+  change) with their own strings — an oversized file and a corrupt one are different user
+  problems and the old single `profiles_unreadable` conflated them. Two consequences worth
+  knowing: (1) `importFromAppPrivate` **no longer throws** `FileNotFoundException` for a missing
+  app-private profile, it returns `ReadFailure` — the two import entry points now have the same
+  total signature, and no production caller relied on the throw (only tests did); (2) the
+  parser-exception detail was dropped from the `Log.w`/`Log.e` lines, since a failing parse quotes
+  imported content into logcat that the D-158 crash-log capture can then surface — the strings are
+  still carried on `TotalFailure` for the caller, they are just not logged. The 256 KiB number is
+  deliberately loose (a full pretty-printed export is a few KiB); this is an allocation bound, not
+  a schema constraint, and it must not be tightened into one.
+  `[cited]`: `app/src/main/kotlin/com/tideo/autobrightness/app/settings/ProfileImportExportManager.kt`
+  (the cap constant and the declared-size-is-a-hint comment).
+
+- DA-030 [cited]: **`START_STICKY` restarts gate the runtime on the persisted opt-in** (folded
+  from the concept PR #98 into the 1.8.2 train; **extends the D-140 defense, does not replace
+  it**). D-140 already knew the hole — the OS restarts a killed FGS with a **null** intent, and
+  the user may have disabled the service while the old process was dead (the toggle's
+  `stopService` is a no-op then) — but its fix ran `ensureRunning()` **first** and tore the
+  pipeline down afterwards from a `scope.launch`. So a disabled service still briefly started the
+  sensors, the brightness writer, the context engine and the display-toggle writes: a
+  start-then-undo, and the undo wrote settings the user had switched off. Now the **null-intent
+  path alone** defers `ensureRunning()` behind an async read of the persisted `serviceEnabled`;
+  the foreground notification is still posted synchronously at the top of `onStartCommand`, so
+  the FGS deadline is met by a notification with no runtime behind it — that ordering is the whole
+  reason this can be async at all. Explicit (non-null) intents keep the **synchronous**
+  `ensureRunning()` and skip the read entirely: every explicit starter persists `serviceEnabled`
+  before sending (`BootCompletedReceiver` and `MaintenanceWorker` read it, `ControlReceiver`/tile/
+  widget `updateData` it first) — verified caller-by-caller, and that invariant is what this
+  branch rests on, so a **new** ACTION_START sender must pre-persist or it must not use this path.
+  Three race guards, all necessary and none sufficient alone: a monotonic `stickyRestartGeneration`
+  bumped by every command and by `onDestroy`; a `destroyed` flag; and re-checking both on
+  `mainHandler.post` **after** the read returns, because `Job.cancel()` cannot stop a coroutine
+  that has already passed its last suspension point — cancellation alone would still let a stale
+  read call `ensureRunning()` on a dying service. The read **fails closed**: an unreadable store
+  yields `false` (`CancellationException` rethrown first, so cancellation is never mistaken for
+  corruption), because the failure mode to avoid is a foregrounded service holding sensors and
+  writers with nobody having asked for it. The disabled outcome calls `stopNotRunning(startId)`
+  rather than D-140's `disableAndStop()` — deliberately: `disableAndStop` persists
+  `serviceEnabled = false`, which would be a **write** caused by a transient read failure, and its
+  `LiveRuntimeState.reset()` + widget repaint are moot when nothing ever started.
+  `runtimeStarted` exists so `onDestroy` does not `stop()` a
+  `contextEngine`/`controller`/`displayToggles` that was never started (the display-toggle stop is
+  a *baseline re-apply*, i.e. a privileged write — the one that must not fire on a service that
+  did nothing). Its companion `runtimeStartCount` deliberately does **not** latch, unlike the flag:
+  the concept PR incremented it only on the first activation, which made its own
+  "starts exactly once" supersession assertions unfalsifiable — a latched counter reads 1 whether
+  the gate was superseded correctly or fired a second `ensureRunning()` on top of the explicit start. `stickyRestartEnabledReader` is an `internal` test seam on the same precedent as
+  `externalControlEnabled`: the race is otherwise untestable, because a real DataStore read
+  completes before the test can interleave a superseding command.
+  `[cited]`: `app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt`
+  (the gate, the generation/destroyed comments and the fail-closed rationale).
+
+- DA-031 [cited]: privileged execution was reduced from generic Binder command/package parameters to
+  an operation allowlist. `IShizukuUserService` now exposes only package-free secure-settings grant,
+  Wi-Fi status, and Boolean force-dark operations; `ShizukuUserService` derives the grant target from
+  its Shizuku-supplied `Context`, uses fixed argv without a shell, and bounds time/stdout/stderr.
+  Shizuku grant binding now times out, handles disconnect, completes once, and unbinds on every path;
+  root/DUMP Wi-Fi and root grant processes gained timeout, cleanup, exit-code gates, and bounded
+  streams. The complete argument/caller/output trace is
+  `architecture/privileged_command_audit.md`. `[cited]`: `ShizukuUserService.kt` constructor and
+  fixed-operation comment; `IShizukuUserService.aidl` allowlist comment.
+
+- DA-032: the remote-container bootstrap now matches the actual build matrix instead of
+  inheriting the image's JDK 25 and installing the stale Android 35 platform. The source-only
+  `scripts/setup-container.sh` exports the installed JDK 21 and Android SDK paths into the agent's
+  shell, delegates the idempotent SDK setup, validates SDK 36 + build-tools 35.0.0, and reports the
+  repository Gradle wrapper's selected version. `setup-android-sdk.sh` now installs/checks
+  compile SDK 36. This is local enablement, not a replacement for `fdroid-compat.yml`'s independent
+  cross-environment reproducibility validation.
+
+- DA-033: **DA-032 is reverted.** The setup request explicitly required the answer in chat, and
+  repository-wide harness and constitution changes were not authorized. In particular, a cloud
+  environment setup command can run before the session branch (and its newly added script) is
+  available, which made `source scripts/setup-container.sh` fail with a missing file. Container
+  runtime selection therefore remains an environment-level concern: the external cloud setup must
+  select JDK 21 directly and must not source this removed repository path. This rollback does not
+  modify that external configuration; it restores the existing repository SDK helper, session
+  hook, ladder, README, and `CLAUDE.md` unchanged.
+
+- DA-034 [cited]: the permission/privacy audit replaced implicit backup and release-diagnostic
+  assumptions with enforceable minimization. Android 12+ extraction rules are now allowlists: cloud
+  receives only core settings + saved profiles; direct device transfer additionally receives
+  user-authored context rules; coordinates/cache, SSIDs/app identities in cloud, behavioral points,
+  health/power diagnostics, context baselines, device-local consent flags, crash traces and root
+  app-private profile exports transfer nowhere. The default-on service state is deliberately portable
+  (fresh installs also start enabled), while default-off geo-IP/external-control consent is not. A unit
+  test locks both allowlists. Every manifest
+  permission and the Accessibility binding now has a feature/request/disclosure/denial/revocation
+  trace; notably, `ACCESS_BACKGROUND_LOCATION` is declared but has no implemented second-stage grant
+  flow, so docs no longer claim it is offered. DUMP copy now acknowledges the broad permission while
+  bounding Tideo's use to discarded `dumpsys wifi` output; elevated copy enumerates its secure display
+  effects and revocation. Finally, release builds no longer send process-coroutine throwables to
+  logcat (`BuildConfig.DEBUG` gate); fixed profile outcome logs remain value-free, and crash stacks
+  remain explicit-copy, app-private diagnostics excluded from all migration.
+  `[cited]`: `app/src/main/res/xml/data_extraction_rules.xml` (privacy allowlists/comment),
+  `app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AppProcessScope.kt` (debug-only throwable),
+  and `app/src/test/kotlin/com/tideo/autobrightness/app/DataExtractionRulesTest.kt` (contract).
+
+- DA-035 [cited]: the F-Droid compatibility workflow's Node-24 policy named
+  `actions/download-artifact@v6` as Node 24 without checking the action's actual default runtime;
+  v6 still declares `runs.using: node20` and caused CI's deprecation notice. All three download steps
+  now use `actions/download-artifact@v7`, the action's explicit Node-24 migration (v7 otherwise keeps
+  the v4+ artifact contract used here). The workflow comment now records the precise v6/v7 boundary
+  so the policy describes the pin rather than merely asserting it.
+  `[cited]`: `.github/workflows/fdroid-compat.yml` (Node runtime policy and all download steps).
+
+- DA-036 [cited]: the profile import review closed the validation boundaries around DA-029's
+  byte-stream cap. Native payloads now reject unknown fields, duplicate keys, future/invalid schema
+  versions, excessive nesting/container sizes, and overlong strings before recursive JSON parsing;
+  a rejected native-shaped payload cannot fall through to the tolerant legacy parser. Legacy
+  numeric conversion rejects non-finite/overflowing rounded values and bounds flat fields, while
+  folder enumeration and the saved-profile catalog have collection/name limits. Every store/save/get/
+  apply/import persistence boundary validates settings, and direct document import preserves secure
+  display/super-dimming choices until the user uses the existing named-profile preview. Private export
+  names trim dot aliases, bound stems, and add a hash when normalization could collide. The existing
+  256 KiB streamed cap, plus-one probe, strict UTF-8 decoder, false size-hint handling, zero-read
+  progress, nullable-stream failure, and value-free exception logs remain the outer transport guard.
+  `[cited]`: `ProfileImportExportManager.kt`, `ImportStructureGuard.kt`, `UserProfileStore.kt`, and
+  `SettingsViewModel.kt` (native/legacy boundary, structural/store bounds, validation and consent).
+
+- DA-037 [cited]: the geo-IP security/privacy review retained the explicit default-off feature but
+  closed its untrusted-network and retry boundaries. `GeoIpLocationClient` now refuses redirects,
+  bounds declared and streamed bodies to 16 KiB, uses a structural JSON parser requiring literal
+  `success:true` plus finite in-range numeric coordinates, disconnects on coroutine cancellation, and
+  propagates cancellation. `CircadianWindowProvider` independently validates every acquired snapshot
+  before state/persistence and records an attempt for the day even on failure, preventing sensor cycles
+  from repeatedly spending battery or disclosing the public IP. Failures preserve the last safe cached
+  location/default windows. TLS deliberately trusts Android's platform CAs without pinning; the fixed
+  HTTPS endpoint, app-wide cleartext ban, disabled redirects, strict low-impact response contract, and
+  fail-closed semantics make pin-rotation availability risk unjustified. UI/store/README disclosures now
+  name the third party, public-IP disclosure, automatic daily bound, per-tap manual request, and local
+  coordinate persistence; no coordinate logging exists and backup rules exclude this DataStore.
+  `[cited]`: `GeoIpLocationClient.kt` and `CircadianWindowProvider.kt` (transport/parser/cancellation and
+  consumer/retry boundaries, including a persisted daily attempt marker); full caller, policy, persistence and trust assessment in
+  `architecture/geo_ip_audit.md`.
+
+- DA-038 [cited]: the end-to-end display-write safety audit made teardown and failure ordering
+  explicit. Normal controller stop now independently clears Extra Dim and restores the user's
+  persisted brightness mode after cancelling future frames; even a fresh null-intent/control-created
+  service runs that residue cleanup without starting sensors. Panic attempts manual mode, brightness
+  255, mode restoration and Extra Dim OFF independently, so a SettingsProvider/OEM exception cannot
+  short-circuit later recovery. Extra Dim now writes its bounded level before activation, never marks
+  a failed engage/disengage successful, attempts activation OFF even if level-zero fails, and retries
+  unknown cleanup after revocation/provider failures. The audit records every brightness/display
+  writer, OEM normalization, typed/bounded inputs, observer suppression, cancellation and sticky-
+  restart ordering, unavoidable hard-kill/revoked-grant limits, and the adversarial lifecycle matrix.
+  `[cited]`: `BrightnessPipelineController.kt`, `AmbientMonitoringService.kt`, `PanicHandler.kt`,
+  `SuperDimmingCoordinator.kt`, and `architecture/runtime_display_safety_audit.md`.
+
+- DA-039 [cited]: the runtime resource/lifetime audit traced every sensor, observer, context
+  listener, poller, WorkManager job, FGS start, coroutine, Binder operation, child process,
+  asynchronous broadcast, DataStore mutation, notification and widget refresh. Registrations have
+  lifecycle-owned teardown; shell/Binder paths have finite time/output bounds; maintenance is unique
+  at Android's 15-minute minimum; foreground-app, location and Wi-Fi work retain their rule/screen
+  gates. The exported opt-in automation receiver was the exception: each unrestricted broadcast
+  created another process-scope coroutine and `PendingResult`, while DataStore serialized only its
+  own transaction rather than the complete command and later service/widget effects. It now admits
+  one complete command process-wide and drops overlap, bounding pending work without a timing quota
+  that would make legitimate automation brittle. Explicit ON/OFF remain convergence verbs; TOGGLE
+  remains intentionally non-idempotent. The audit records the co-installed-app flood threat and why
+  single-flight serialization, rather than an unbounded queue or wall-clock rate limit, is the
+  required current control. `[cited]`: `ControlReceiver.kt` (atomic admission and release),
+  `architecture/runtime_resource_lifetime_audit.md` (callback matrix and threat case).
+
+- DA-040: the dependency/build/release audit inventoried every direct declaration and privileged
+  boundary without changing versions. No unexpected repository, dynamic version, release debug/test
+  packaging, tracked signing material, cross-run artifact download, enabled minification, broad lint
+  baseline, or manifest merge override was found. Two facts remain actionable: the approved GitHub
+  Dependabot alert status was unavailable in this remote-less/`gh`-less checkout and is therefore
+  unknown rather than green; and the normal Gradle wrapper pins 8.14.3 by URL but not
+  `distributionSha256Sum`, leaving wrapper-executable integrity to HTTPS/cache (F-Droid's independent
+  transparency-log check covers only its own path). The latter is distinct from the previously declined
+  Gradle dependency-verification program. Action pinning and dependency verification remain declined
+  absent concrete compromise/tampering evidence. Full evidence, dependency table, minification/Binder
+  analysis, artifact boundaries, and reproducibility/provenance assumptions are in
+  `DEPENDENCY_RELEASE_SECURITY_AUDIT.md`.
+
+- DA-041: owner-supplied approved-advisory evidence corrects DA-040's environment-limited status: the
+  repository has **no open Dependabot alerts** as of 2026-07-30. The audit now records that point-in-time
+  result, the completed Owner-queue check is removed, and no dependency version change is indicated.
+  This does not alter DA-040's separate Gradle-wrapper digest finding or reopen the declined action
+  pinning / Gradle dependency-verification programs.
+
+- DA-042: the concrete wrapper-executable integrity gap from DA-040 is closed.
+  `gradle-wrapper.properties` now carries `distributionSha256Sum` for the Gradle 8.14.3 binary-only
+  ZIP; the committed value was independently matched against Gradle's release-checksums page and the
+  distribution's official `.sha256` endpoint. Gradle Wrapper therefore rejects a changed download
+  before execution, while F-Droid keeps its separate transparency-log verification. This changes no
+  dependency version and does not reopen the declined Gradle dependency-verification program.
+
+- DA-043 [cited]: **External-control admission bounds the receiver, not the work it leaves behind**
+  (adversarial review of the hardening branch, 2026-07-31). `ControlReceiver` admits one command at a
+  time, but releases the slot when *routing* finishes — and most verbs finish routing by posting an
+  event, so the backlog simply moved downstream into an `UNLIMITED` pipeline channel. Fixed in two
+  layers, both in `BrightnessPipelineController.postControl`: **consecutive-duplicate coalescing**
+  (every control event is idempotent with respect to its immediate predecessor of the same type) plus
+  a **hard cap** of 64 queued control events. The coalescing shape is deliberate and narrower than
+  the "coalesce REAPPLY/PAUSE/RESUME" that was proposed: same-type-anywhere folding drops the third
+  event of a `Pause→Resume→Pause` sequence and leaves the pipeline resumed against the user's last
+  intent, which `ControlFloodBoundTest.coalescingNeverLosesAStateTransition` pins. `OverrideDetected`
+  is capped but never coalesced — it carries the observed brightness, so folding acts on a stale
+  slider position. **Declined: a priority lane for PANIC/DISABLE.** They never enter this channel;
+  they are service actions that run `emergencyStop`/teardown directly, so a flood of ordinary verbs
+  cannot starve them — the property the proposal wanted already holds structurally. Also fixed here:
+  unknown actions are refused *before* the process-wide admission gate, so junk cannot make the
+  receiver drop a legitimate command arriving beside it. Evidence: `ControlFloodBoundTest` (10 000
+  reapplies → 1 pending event; 10 000 alternating verbs → capped, cap demonstrably engaged).
+  `[cited]`: `BrightnessPipelineController.postControl`, `ControlReceiver.KNOWN_ACTIONS`.
+
+- DA-044 [cited]: **SAF provider I/O ran on the UI dispatcher, unbounded.** `importFromDocument` /
+  `exportToDocument` are `suspend` but did their `ContentResolver` query, stream open and read/write
+  synchronously on the caller's dispatcher — and the caller is a Compose activity-result callback on
+  `Dispatchers.Main.immediate`, calling into a provider the user picked in the system file picker,
+  i.e. arbitrary third-party code. The DA-029 256 KiB cap bounds how much a lying provider can make
+  us *allocate*; it does nothing about one that never returns from `read()`. Now: all provider work
+  on `Dispatchers.IO` under a 20 s `withTimeout`, and `CancellationException` is rethrown instead of
+  being flattened into `ReadFailure` by a broad `runCatching`. **Stated limit, not a claim of
+  cancellation:** the timeout frees the *caller*, not the thread — Android cannot abort a binder call
+  already inside a hostile provider, so that IO-dispatcher thread stays parked until the provider
+  yields. What is bought is that it is a pooled IO thread rather than the UI thread, and that the
+  user sees an error rather than a frozen screen. A timeout deliberately maps onto the existing
+  `ReadFailure` rather than a new result type: the user's next step is identical, and the extra
+  variant would fan out through every caller's `when`. `[cited]`: `ProfileImportExportManager`.

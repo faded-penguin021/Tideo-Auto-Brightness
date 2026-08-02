@@ -124,6 +124,14 @@ fun ProfilesContextsScreen(
             loadError = context.getString(R.string.profiles_unreadable)
             context.getString(R.string.toast_load_failed)
         }
+        ProfileLoadResult.TooLarge -> {
+            loadError = context.getString(R.string.profiles_too_large)
+            context.getString(R.string.toast_load_failed)
+        }
+        ProfileLoadResult.ReadFailure -> {
+            loadError = context.getString(R.string.profiles_read_failed)
+            context.getString(R.string.toast_load_failed)
+        }
     }
 
     // Previously-granted Download/AAB/configs tree (persisted SAF permission), if any.

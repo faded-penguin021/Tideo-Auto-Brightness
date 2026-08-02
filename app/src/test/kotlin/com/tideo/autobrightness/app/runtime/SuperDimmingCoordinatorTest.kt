@@ -13,13 +13,18 @@ class SuperDimmingCoordinatorTest {
     private class FakeSecureDimming : SecureDimmingController {
         var activated: Boolean? = null
         val levels = mutableListOf<Int>()
+        val writes = mutableListOf<String>()
+        var failLevel = false
+        var failActivation = false
         override fun setLevel(level: Int): Result<Unit> {
             levels += level
-            return Result.success(Unit)
+            writes += "level:$level"
+            return if (failLevel) Result.failure(SecurityException("revoked")) else Result.success(Unit)
         }
         override fun setActivated(on: Boolean): Result<Unit> {
             activated = on
-            return Result.success(Unit)
+            writes += "activated:$on"
+            return if (failActivation) Result.failure(SecurityException("revoked")) else Result.success(Unit)
         }
     }
 
@@ -61,6 +66,34 @@ class SuperDimmingCoordinatorTest {
         assertEquals(true, secure.activated, "reduce_bright_colors_activated should be set on")
         assertTrue(secure.levels.isNotEmpty(), "a dim level should be written")
         assertTrue(secure.levels.last() > 0, "below-threshold dimming should be a positive level")
+        assertTrue(secure.writes.first().startsWith("level:"), "safe ordering writes level before activation")
+    }
+
+    @Test
+    fun failedLevelWrite_doesNotActivateAndRetriesNextCycle_DA038() {
+        val secure = FakeSecureDimming().apply { failLevel = true }
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        assertEquals(null, secure.activated, "a missing level must never activate an unknown OEM level")
+
+        secure.failLevel = false
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        assertEquals(true, secure.activated, "failed engagement must remain retryable")
+    }
+
+    @Test
+    fun failedDeactivate_keepsCleanupRetryable_DA038() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        secure.failActivation = true
+
+        coordinator.disengage()
+        val firstOffAttempts = secure.writes.count { it == "activated:false" }
+        coordinator.disengage()
+
+        assertEquals(firstOffAttempts + 1, secure.writes.count { it == "activated:false" })
     }
 
     // G2R-F65 (REOPENED): PWM-sensitive mode also engages Extra Dim below the threshold (via the
@@ -274,5 +307,125 @@ class SuperDimmingCoordinatorTest {
         coordinator.disengage()
         assertEquals(levelsAfter, secure.levels.size)
         assertFalse(secure.levels.size > levelsAfter)
+    }
+
+
+    // ---- DB-001: a level write that fails while Extra Dim is ALREADY engaged ------------------
+    // The pre-existing failure test only covered the first engagement, where the latch is still
+    // false and nothing is on screen yet. The dangerous case is the opposite one.
+
+    @Test
+    fun engagedThenFailedLevelWrite_clearsExtraDimInsteadOfLeavingTheOldLevel() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+        // Engage hard: a very dark target produces a strong dim level.
+        coordinator.apply(targetBrightness = 1, settings = dimmingOn)
+        assertEquals(true, secure.activated, "precondition: dimming is engaged")
+        val strongLevel = secure.levels.last()
+        secure.writes.clear()
+
+        // The user brightens the room; the weaker level write now fails (permission revoked).
+        secure.failLevel = true
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+
+        assertEquals(
+            false,
+            secure.activated,
+            "a failed level write must not leave the screen pinned at the previous, stronger level ($strongLevel)",
+        )
+        assertTrue(
+            secure.writes.contains("activated:false"),
+            "expected a best-effort deactivation, got ${secure.writes}",
+        )
+    }
+
+    @Test
+    fun failedLevelWrite_isNotReportedAsEngagedAtTheNewLevel() {
+        val secure = FakeSecureDimming()
+        val sink = RecordingDebugSink()
+        val coordinator = SuperDimmingCoordinator(secure, sink) { Tier.ELEVATED }
+        coordinator.apply(targetBrightness = 1, settings = dimmingOn.copy(debugLevel = DebugCategory.SUPER_DIMMING.level))
+        sink.emitted.clear()
+
+        secure.failLevel = true
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn.copy(debugLevel = DebugCategory.SUPER_DIMMING.level))
+
+        val message = sink.emitted.single().second
+        assertFalse(message.startsWith("ON"), "a failed write reported success: $message")
+        assertTrue(message.contains("FAILED"), "expected an explicit failure diagnostic, got: $message")
+    }
+
+    @Test
+    fun afterAFailedLevelWrite_theNextCycleReEngagesFromScratch() {
+        val secure = FakeSecureDimming()
+        val coordinator = SuperDimmingCoordinator(secure) { Tier.ELEVATED }
+        coordinator.apply(targetBrightness = 1, settings = dimmingOn)
+        secure.failLevel = true
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        secure.failLevel = false
+        secure.writes.clear()
+
+        // Permission is back: the latch must not still believe it is engaged, or activation is skipped.
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+
+        assertEquals(true, secure.activated)
+        assertTrue(
+            secure.writes.contains("activated:true"),
+            "the latch stayed engaged across the failure, so re-activation never ran: ${secure.writes}",
+        )
+    }
+
+    // ---- DB-012: a stale tier cache must self-heal, not wait for the next screen-on ------------
+
+    @Test
+    fun wantsDimButBelievesUnprivileged_reDetectsTheTier_andEngagesInTheSameCycle() {
+        val secure = FakeSecureDimming()
+        var tier = Tier.BASIC
+        var refreshes = 0
+        // The device shape: the grant landed over adb, but this process's cached tier still says BASIC.
+        val coordinator = SuperDimmingCoordinator(
+            secureDimming = secure,
+            refreshTier = { refreshes++; tier = Tier.ELEVATED },
+            clock = { 0L },
+            tierProvider = { tier },
+        )
+
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+
+        assertEquals(1, refreshes, "a cache miss on the path the user can see must re-detect the tier")
+        assertEquals(true, secure.activated, "the re-detected grant must take effect without a restart")
+    }
+
+    @Test
+    fun reDetectIsRateLimited_soAnUngrantedUserDoesNotBinderCheckEveryCycle() {
+        var now = 0L
+        var refreshes = 0
+        val coordinator = SuperDimmingCoordinator(
+            secureDimming = FakeSecureDimming(),
+            refreshTier = { refreshes++ }, // never grants: the permanently-unprivileged user
+            clock = { now },
+            tierProvider = { Tier.BASIC },
+        )
+
+        repeat(20) { coordinator.apply(targetBrightness = 5, settings = dimmingOn) }
+        assertEquals(1, refreshes, "20 cycles inside the interval must cost ONE permission re-detect")
+
+        now += 10_000L
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        assertEquals(2, refreshes, "the floor must expire, or a later grant could never be noticed")
+    }
+
+    @Test
+    fun elevatedPath_neverReDetects() {
+        var refreshes = 0
+        val coordinator = SuperDimmingCoordinator(
+            secureDimming = FakeSecureDimming(),
+            refreshTier = { refreshes++ },
+            tierProvider = { Tier.ELEVATED },
+        )
+
+        repeat(5) { coordinator.apply(targetBrightness = 5, settings = dimmingOn) }
+
+        assertEquals(0, refreshes, "the happy path must not add a Binder check to the cycle")
     }
 }

@@ -41,6 +41,7 @@ object TaskerLegacyProfileSerializer {
             throw LegacyProfileParseException("Empty legacy profile input")
         }
         if (trimmed.startsWith("{")) {
+            ImportStructureGuard.requireBoundedJson(trimmed)
             val root = runCatching { json.parseToJsonElement(trimmed) as? JsonObject }.getOrNull()
             if (root != null) return deserializeJson(root)
             // Looked like JSON but did not parse to an object — fall through to the key=value attempt.
@@ -113,6 +114,9 @@ object TaskerLegacyProfileSerializer {
             .lineSequence()
             .map { it.trim() }
             .filter { it.startsWith("%AAB_") && it.contains('=') }
+            .take(ImportStructureGuard.MAX_CONTAINER_ENTRIES + 1)
+            .toList()
+            .also { require(it.size <= ImportStructureGuard.MAX_CONTAINER_ENTRIES) { "Too many legacy fields" } }
             .associate { line ->
                 val index = line.indexOf('=')
                 line.substring(0, index).trim() to line.substring(index + 1).trim()
@@ -156,6 +160,7 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_ScaleTaperSteepness"]?.toFloatOrNull()?.let { settings = settings.copy(scaleTaperSteepness = it) }
         map["%AAB_ScaleTransitionFactor"]?.toFloatOrNull()?.let { settings = settings.copy(scaleTransitionFactor = it) }
         map["%AAB_TrustUnreliable"]?.let { settings = settings.copy(trustUnreliableSensor = it.asBoolean(settings.trustUnreliableSensor)) }
+        map["%AAB_PanicPlugged"]?.let { settings = settings.copy(panicRequiresPlugged = it.asBoolean(settings.panicRequiresPlugged)) }
         map["%AAB_QSUse"]?.let { settings = settings.copy(quickSettingsEnabled = it.asBoolean(settings.quickSettingsEnabled)) }
         map["%AAB_NotifyUse"]?.let { settings = settings.copy(notificationsEnabled = it.asBoolean(settings.notificationsEnabled)) }
         map["%AAB_Debug"]?.asRoundedInt()?.let { settings = settings.copy(debugLevel = it) }
@@ -191,17 +196,19 @@ object TaskerLegacyProfileSerializer {
     // fields the rebuild models as Int. The old `toIntOrNull()` returned null on a decimal string, so
     // the field silently kept its default — the "Form1A didn't stick" symptom. Round instead (matching
     // the nested-JSON path's `intRound`). A plain integer string ("5") rounds to itself.
-    private fun String.asRoundedInt(): Int? = trim().toDoubleOrNull()?.let { Math.round(it).toInt() }
-    private fun String.asRoundedLong(): Long? = trim().toDoubleOrNull()?.let { Math.round(it) }
+    private fun String.asRoundedInt(): Int? = trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+        ?.let { Math.round(it).takeIf { rounded -> rounded in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt() }
+    private fun String.asRoundedLong(): Long? = trim().toDoubleOrNull()?.takeIf { it.isFinite() }?.let { Math.round(it) }
 
     // --- nested-JSON value readers (tolerant: numbers stored as JSON doubles, booleans as JSON bools
     //     by performSave's getG/getI/getB, but accept "On"/"Off"/"1" string variants too) ---
 
     private fun JsonObject.prim(key: String): JsonPrimitive? = this[key] as? JsonPrimitive
-    private fun JsonObject.dbl(key: String): Double? = prim(key)?.doubleOrNull
-    private fun JsonObject.flt(key: String): Float? = prim(key)?.doubleOrNull?.toFloat()
-    private fun JsonObject.intRound(key: String): Int? = prim(key)?.doubleOrNull?.let { Math.round(it).toInt() }
-    private fun JsonObject.longRound(key: String): Long? = prim(key)?.doubleOrNull?.let { Math.round(it) }
+    private fun JsonObject.dbl(key: String): Double? = prim(key)?.doubleOrNull?.takeIf { it.isFinite() }
+    private fun JsonObject.flt(key: String): Float? = dbl(key)?.toFloat()?.takeIf { it.isFinite() }
+    private fun JsonObject.intRound(key: String): Int? = dbl(key)?.let { Math.round(it) }
+        ?.takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt()
+    private fun JsonObject.longRound(key: String): Long? = dbl(key)?.let { Math.round(it) }
     private fun JsonObject.bool(key: String): Boolean? {
         val p = prim(key) ?: return null
         p.booleanOrNull?.let { return it }

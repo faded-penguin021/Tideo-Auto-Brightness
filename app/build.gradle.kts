@@ -18,8 +18,8 @@ android {
         // the change — RUNBOOK §6 "Cutting a release". `release-preflight.yml` (D-124) enforces this on PRs.
         // Per-version history is NOT kept here — see the STATE.md Changelog, DEVIATIONS_LEDGER, and
         // fastlane/.../changelogs/<versionCode>.txt.
-        versionCode = 19
-        versionName = "1.8.1"
+        versionCode = 20
+        versionName = "1.8.2"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 
@@ -68,6 +68,9 @@ android {
     }
 
     buildFeatures {
+        // Privacy audit (DA-034): AppProcessScope uses the variant constant to compile raw
+        // throwable logging out of release behavior while retaining actionable debug logs.
+        buildConfig = true
         compose = true
     }
 
