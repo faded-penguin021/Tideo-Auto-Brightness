@@ -21,7 +21,11 @@ squash title/body describe the net train. At the tag, run DA-026's one-shot F-Dr
 check; the DA-024 store icon lands with it. `domain/` and `platform/` remain byte-identical to 1.8.1.
 The 2026-07-31 adversarial round (DA-043/DA-044 + DB-001…DB-007) then fixed five confirmed findings
 in that hardening plus three the review did not name, and merged six audit documents into
-`SECURITY_REVIEW.md`. No plan files; parity checklist has zero pending, tests are green, TODO/FIXME
+`SECURITY_REVIEW.md`. Device verification is now two files with a lifecycle (DB-010): the permanent
+`DEVICE_TEST_SCRIPT.md` and the ephemeral `DEVICE_TEST_SCRIPT_1.8.2.md`, which is **deleted at the
+1.8.2 tag** after folding anything durable into the permanent one (RUNBOOK §6). Three retired round
+scripts are gone; `RESUME_CONTEXT_TEST.md`'s DA-018 checks live on as step 25's sub-bullets.
+No plan files; parity checklist has zero pending, tests are green, TODO/FIXME
 and parity gaps are zero. Changes follow RUNBOOK; the ledger rolled over — the live file is now
 `DEVIATIONS_LEDGER_B.md` (`_A.md` closed at its 1000-line cap).
 

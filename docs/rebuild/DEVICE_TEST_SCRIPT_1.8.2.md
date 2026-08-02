@@ -3,6 +3,11 @@
 Covers the **full `origin/main..HEAD` diff** for the 1.8.2 / vc20 train, organised by what a person
 can actually observe on a phone. Supersedes the two per-round scripts from this train.
 
+> **Ephemeral (DB-010).** This file dies when 1.8.2 ships: anything with standing value gets folded
+> into the numbered sections of `DEVICE_TEST_SCRIPT.md` and this file is deleted (RUNBOOK §6). The
+> permanent regression sweep is `DEVICE_TEST_SCRIPT.md`; this one exists so the owner isn't re-running
+> the whole app to check one train's changes.
+
 **Not a regression pass.** Brightness curves, profiles, context rules, the wizard, graphs, tile,
 widget and notification are untouched by this train and are covered by the JVM/Robolectric suites —
 they are deliberately absent below. Everything here is something this branch *changed*, and most of

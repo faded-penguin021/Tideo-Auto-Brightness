@@ -188,3 +188,25 @@
   while it stays on a Qi pad is not a scenario worth narrowing the check for. Do not restrict this to
   USB without new evidence. `[cited]`: `AndroidPanicSensorSource`, `AabSettings.panicRequiresPlugged`,
   `LiveDebugViewModel.setPanicRequiresPlugged`, `AmbientMonitoringService.startPanicGateWatcher`.
+- DB-010: **Per-round device scripts were accreting into a graveyard; they now have a lifecycle.**
+  Every round that needed owner verification added its own `*_TEST*.md` and none were ever removed —
+  `RESUME_CONTEXT_TEST.md` (DA-018, executed and shipped in 1.8.1), plus this train's
+  `SECURITY_ROUND_TEST_SCRIPT.md` and `PARITY_ROUND_TEST_SCRIPT.md` (already folded into
+  `DEVICE_TEST_SCRIPT_1.8.2.md`, DB-009). Four scripts, three of them describing work the owner had
+  already signed off, and no rule saying which one a reader should run. The rule (RUNBOOK §6): there
+  is **one permanent** script, `DEVICE_TEST_SCRIPT.md`, and **at most one** ephemeral
+  `DEVICE_TEST_SCRIPT_<version>.md` for the unreleased train; when that version ships, anything with
+  standing value is folded into the permanent script and the round file is **deleted**. Retiring
+  `RESUME_CONTEXT_TEST.md` under that rule is what proved the fold is the load-bearing half — the
+  DA-018 fix (Resume re-evaluates the rules rather than resetting to Default, and the label agrees
+  with the settings screens when nothing matches) was **not** covered by the permanent script's
+  step 25, which only checked that the Resume banner appears. Deleting the file without folding
+  would have silently lost a regression check for a real shipped bug; it is now step 25's sub-bullets.
+  **`docs/history/` is deliberately NOT the archive** — its README defines it as the frozen record of
+  the one-time Tasker migration, and filing maintenance-era rounds there would make "frozen" a lie
+  and put stale scripts back in a reader's path. Git history is the archive; a deleted script is one
+  `git log --diff-filter=D` away. Also de-timestamped the permanent script's headings ("— NEW 1.8.0",
+  "— NEW S14"): the D-NNN citations in each section already carry provenance, and version markers on
+  shipped sections just read as staleness. Section **numbers** are cited by code
+  (`TouchTargetsA11yTest` → §12) and by ledger rows (§11 step 38, §13) — append sections, never
+  renumber.
