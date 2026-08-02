@@ -31,6 +31,7 @@ data class LiveDebugUiState(
     val debugLevel: Int = 0,
     /** The GLOBAL %AAB_PanicSensitivity (0..10, D-116) — the slider lives here, like the debug category. */
     val panicSensitivity: Int = 8,
+    val panicRequiresPlugged: Boolean = false,
     /** Whether the opt-in global-flash AccessibilityService is enabled (G2R-F50). */
     val globalToastsEnabled: Boolean = false,
 )
@@ -41,6 +42,7 @@ private data class LiveDebugSettings(
     val maxBrightness: Int,
     val debugLevel: Int,
     val panicSensitivity: Int,
+    val panicRequiresPlugged: Boolean,
 )
 
 /**
@@ -54,7 +56,7 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
     private val app = application
 
     private val settingsFlow = app.settingsDataStore.data
-        .map { LiveDebugSettings(it.minBrightness, it.maxBrightness, it.debugLevel, it.panicSensitivity) }
+        .map { LiveDebugSettings(it.minBrightness, it.maxBrightness, it.debugLevel, it.panicSensitivity, it.panicRequiresPlugged) }
 
     // Re-read on demand (the screen pokes this on resume) since enabling the AccessibilityService
     // happens in system Settings, outside any DataStore/flow we observe (G2R-F50).
@@ -75,6 +77,7 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
             maxBrightness = settings.maxBrightness,
             debugLevel = settings.debugLevel,
             panicSensitivity = settings.panicSensitivity,
+            panicRequiresPlugged = settings.panicRequiresPlugged,
             globalToastsEnabled = global,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LiveDebugUiState())
@@ -99,6 +102,18 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
     fun setPanicSensitivity(value: Int) {
         viewModelScope.launch {
             app.settingsDataStore.updateData { it.copy(panicSensitivity = value.coerceIn(0, 10)) }
+        }
+    }
+
+    /**
+     * DB-009 (%AAB_PanicPlugged, issue #110): restrict the panic gesture to external power.
+     *
+     * A global pref like the sensitivity beside it — never a profile field, because the gesture is a
+     * safety escape hatch and must not change because a context rule swapped profiles.
+     */
+    fun setPanicRequiresPlugged(value: Boolean) {
+        viewModelScope.launch {
+            app.settingsDataStore.updateData { it.copy(panicRequiresPlugged = value) }
         }
     }
 

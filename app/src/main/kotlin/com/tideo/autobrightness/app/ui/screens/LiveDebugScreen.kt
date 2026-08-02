@@ -45,6 +45,7 @@ import com.tideo.autobrightness.app.state.LiveDebugViewModel
 import com.tideo.autobrightness.app.ui.components.AabTopBar
 import com.tideo.autobrightness.app.ui.components.DiagnosticCard
 import com.tideo.autobrightness.app.ui.components.DiagnosticLine
+import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.fmt
 import com.tideo.autobrightness.app.ui.components.fmtAlpha
 import com.tideo.autobrightness.app.ui.components.fmtInt
@@ -80,6 +81,7 @@ fun LiveDebugScreen(navController: NavHostController, vm: LiveDebugViewModel = v
         state = state,
         onSelectDebug = vm::setDebugLevel,
         onSetPanicSensitivity = vm::setPanicSensitivity,
+        onSetPanicRequiresPlugged = vm::setPanicRequiresPlugged,
         onEnableGlobalToasts = {
             // Deep-link to the system Accessibility settings so the user can enable the overlay.
             runCatching {
@@ -100,6 +102,7 @@ fun LiveDebugContent(
     onSelectDebug: (Int) -> Unit,
     onBack: () -> Unit,
     onSetPanicSensitivity: (Int) -> Unit = {},
+    onSetPanicRequiresPlugged: (Boolean) -> Unit = {},
     onEnableGlobalToasts: () -> Unit = {},
 ) {
     val p = state.pipeline
@@ -152,7 +155,12 @@ fun LiveDebugContent(
 
             // %AAB_PanicSensitivity slider (D-116) — last on the scene, mirroring the Tasker Debug
             // scene where it sits at the bottom and feeds _SetPanicSensitivity.
-            PanicSensitivityCard(state.panicSensitivity, onSetPanicSensitivity)
+            PanicSensitivityCard(
+                state.panicSensitivity,
+                onSetPanicSensitivity,
+                state.panicRequiresPlugged,
+                onSetPanicRequiresPlugged,
+            )
         }
     }
 }
@@ -163,7 +171,12 @@ fun LiveDebugContent(
  * 0 is pass-through (the panic fires with no shake requirement); higher needs a longer/harder shake.
  */
 @Composable
-private fun PanicSensitivityCard(current: Int, onSet: (Int) -> Unit) {
+private fun PanicSensitivityCard(
+    current: Int,
+    onSet: (Int) -> Unit,
+    requiresPlugged: Boolean,
+    onSetRequiresPlugged: (Boolean) -> Unit,
+) {
     DiagnosticCard(
         title = stringResource(R.string.title_panic_sensitivity),
         testTag = "panic_sensitivity_card",
@@ -191,6 +204,17 @@ private fun PanicSensitivityCard(current: Int, onSet: (Int) -> Unit) {
         Text(
             stringResource(R.string.panic_sensitivity_help),
             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+        )
+        // DB-009 (%AAB_PanicPlugged, issue #110): opt-in restriction to external power. Off by
+        // default — the gesture is the way out of an unreadable screen, so it keeps working on
+        // battery unless the user deliberately narrows it.
+        SwitchSettingRow(
+            label = stringResource(R.string.panic_plugged_label),
+            checked = requiresPlugged,
+            onCheckedChange = onSetRequiresPlugged,
+            // The component carries its own helper line — no sibling Text (design coherence).
+            helper = stringResource(R.string.panic_plugged_help),
+            testTag = "switch_panicRequiresPlugged",
         )
     }
 }

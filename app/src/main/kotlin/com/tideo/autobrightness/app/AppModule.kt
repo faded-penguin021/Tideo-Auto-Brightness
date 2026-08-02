@@ -160,6 +160,9 @@ class AppModule(context: Context) {
             context = appContext,
             sensitivity = { (contextEngine.effectiveSnapshot ?: AabSettings()).panicSensitivity },
             isNear = { controller.state.value.proximityNear },
+            // DB-009 (%AAB_PanicPlugged): read from the same effective snapshot as the sensitivity, so
+            // a profile/context that carries the flag applies it too.
+            requiresPlugged = { (contextEngine.effectiveSnapshot ?: AabSettings()).panicRequiresPlugged },
         )
 
         // Display-toggle profile fields (D-151): applied on profile change through the context

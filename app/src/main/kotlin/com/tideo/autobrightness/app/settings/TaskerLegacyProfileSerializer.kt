@@ -160,6 +160,7 @@ object TaskerLegacyProfileSerializer {
         map["%AAB_ScaleTaperSteepness"]?.toFloatOrNull()?.let { settings = settings.copy(scaleTaperSteepness = it) }
         map["%AAB_ScaleTransitionFactor"]?.toFloatOrNull()?.let { settings = settings.copy(scaleTransitionFactor = it) }
         map["%AAB_TrustUnreliable"]?.let { settings = settings.copy(trustUnreliableSensor = it.asBoolean(settings.trustUnreliableSensor)) }
+        map["%AAB_PanicPlugged"]?.let { settings = settings.copy(panicRequiresPlugged = it.asBoolean(settings.panicRequiresPlugged)) }
         map["%AAB_QSUse"]?.let { settings = settings.copy(quickSettingsEnabled = it.asBoolean(settings.quickSettingsEnabled)) }
         map["%AAB_NotifyUse"]?.let { settings = settings.copy(notificationsEnabled = it.asBoolean(settings.notificationsEnabled)) }
         map["%AAB_Debug"]?.asRoundedInt()?.let { settings = settings.copy(debugLevel = it) }

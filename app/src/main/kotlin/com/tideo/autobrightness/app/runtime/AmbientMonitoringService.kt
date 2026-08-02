@@ -32,6 +32,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -58,6 +60,8 @@ class AmbientMonitoringService : Service() {
     private lateinit var privilegeManager: com.tideo.autobrightness.platform.privilege.PrivilegeManager
     private var notificationJob: Job? = null
     private var panicJob: Job? = null
+    // DB-009: watches %AAB_PanicPlugged so a toggle change re-evaluates the sensor gate at once.
+    private var panicGateJob: Job? = null
     // D-157 (U5): outbound STATE_CHANGED publisher + a cache of the opt-in flag. The cache lets
     // onDestroy() decide synchronously whether to emit the final off-state event (its DataStore read
     // would be async, and the scope is being torn down). Written by the publisher on Dispatchers.Default,
@@ -403,6 +407,35 @@ class AmbientMonitoringService : Service() {
                 panicAndStop()
             }
         }
+        startPanicGateWatcher()
+    }
+
+    /**
+     * DB-009: restart the panic collector when `%AAB_PanicPlugged` changes.
+     *
+     * The source decides whether to hold the accelerometer registered, and it re-decides on screen and
+     * power transitions — neither of which happens when the user simply flips the toggle. Without this,
+     * turning the restriction OFF while unplugged with the screen on would leave the gesture inert
+     * until the next screen-off, i.e. exactly when someone is standing there testing it. Restarting the
+     * flow re-evaluates the gate immediately; it is a cheap cancel + re-collect, not a runtime restart.
+     */
+    private fun startPanicGateWatcher() {
+        if (panicGateJob?.isActive == true) return
+        panicGateJob = scope.launch {
+            contextEngine.effectiveFlow
+                .map { it?.panicRequiresPlugged ?: false }
+                .distinctUntilChanged()
+                .drop(1) // the first emission is the state the collector already started under
+                .collect {
+                    panicJob?.cancelAndJoin()
+                    panicJob = scope.launch {
+                        panicSensor.events().collect {
+                            vibrateSos()
+                            panicAndStop()
+                        }
+                    }
+                }
+        }
     }
 
     /**
@@ -671,6 +704,7 @@ class AmbientMonitoringService : Service() {
         stickyRestartGeneration++
         stickyRestartGateJob?.cancel(); stickyRestartGateJob = null
         panicJob?.cancel(); panicJob = null
+        panicGateJob?.cancel(); panicGateJob = null
         stateEventJob?.cancel(); stateEventJob = null
         if (runtimeStarted) {
             contextEngine.stop()

@@ -101,6 +101,8 @@
     <string name="panic_sensitivity_value">Level: %1$d / 10</string>
     <string name="panic_sensitivity_passthrough">Level: 0 (pass-through)</string>
     <string name="panic_sensitivity_help">Sets the shake intensity/duration to trigger an Emergency UI Reset (hold the phone upside-down, screen on, then shake). 0 = pass-through (disables the shake requirement); 10 = long, vigorous shake.</string>
+    <string name="panic_plugged_label">Only when plugged in</string>
+    <string name="panic_plugged_help">The panic gesture will only work when plugged in via USB cable. Leave this off if you want the gesture available on battery.</string>
 
     <!-- Dashboard -->
     <string name="dashboard_stale_banner">Live data may be stale — the monitor may have stopped responding.</string>

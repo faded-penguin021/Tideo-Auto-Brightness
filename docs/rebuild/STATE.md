@@ -68,6 +68,15 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
 
 ## Changelog
 
+- 2026-08-02 — **DB-009 (issue #110, upstream Tasker parity + a battery bug it exposed).** New global
+  pref `panicRequiresPlugged` (`%AAB_PanicPlugged`, default OFF) restricts the panic gesture to
+  external power, surfaced on Live Debug beside the sensitivity slider. Implementing it surfaced the
+  real problem: Tideo's orientation watch IS the trigger (Tasker gets it free from a profile STATE),
+  so the accelerometer was held at ~50 Hz for the life of the service — **including screen-off, where
+  the gesture cannot fire**. Registration is now demand-driven on `interactive && (!requiresPlugged ||
+  plugged)`, re-evaluated on screen and power broadcasts. A test caught the first version consuming
+  the gesture on release, which would have required a flip-straight-and-back after every screen-off.
+
 - 2026-08-02 — **DB-008 (issue #110, upstream Tasker parity).** Dimming strength was clamped to 65 in
   the math but not in the stored setpoint, so the field showed 100 while the screen dimmed to 65 — the
   reporter confirmed it with `adb shell settings get secure`. Ported the owner's upstream

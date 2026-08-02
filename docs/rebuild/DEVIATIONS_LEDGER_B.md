@@ -139,3 +139,37 @@
   contain A9–A12 — the task text in issue #110 is the source of record for it.
   `[cited]`: `AabSettingsMapper.validate`, `AabSettings.MAX_DIMMING_STRENGTH_SETPOINT`,
   `DraftSettingsViewModel.apply`, `SuperDimmingScreen`, `SettingsValidator`.
+
+- DB-009 [cited]: **Optional "only when plugged in" panic gesture — and the always-on accelerometer it
+  exposed** (upstream Tasker `_PanicButton` A3 + `%AAB_PanicPlugged`, issue #110, owner-reported
+  2026-08-02). Two things in one row because the feature and the battery fix are the same code path.
+  **The feature.** A new global pref `panicRequiresPlugged` (default **OFF** — the gesture is the way
+  out of an unreadable screen, so it must keep working on battery unless the user deliberately narrows
+  it) gates the panic gesture on external power, mirroring the upstream Java's early veto. Global, not
+  a profile field: a context rule swapping profiles must not change whether the safety escape hatch
+  works. Surfaced on Live Debug beside the sensitivity slider, matching the Tasker scene's placement.
+  **The battery bug it exposed.** Tideo's structure differs from Tasker's in a way that mattered:
+  there, the profile's Orientation STATE does the watching (the platform's job, effectively free) and
+  the A3 Java registers the accelerometer only for the ≤10 s shake window. Here the orientation watch
+  IS the trigger, so `AndroidPanicSensorSource` held `TYPE_ACCELEROMETER` (plus
+  `TYPE_LINEAR_ACCELERATION` where present) at `SENSOR_DELAY_GAME` ≈ 50 Hz for the entire life of the
+  service — **including with the screen off, where the gesture cannot fire at all**, because arming
+  already required `interactive`. Registration is now demand-driven: the listeners are held only while
+  the gesture could actually fire (`interactive && (!requiresPlugged || plugged)`), re-evaluated on
+  SCREEN_ON/OFF and POWER_CONNECTED/DISCONNECTED. Plugged state is seeded from the **sticky**
+  `ACTION_BATTERY_CHANGED` (`registerReceiver(null, …)` reads the last broadcast without registering)
+  and then maintained on the two explicit power transitions — `ACTION_BATTERY_CHANGED` itself is
+  deliberately not registered, since it fires on every level/temperature tick, i.e. exactly the
+  always-on cost being removed. **A test caught a real regression in the first version:** releasing the
+  sensor called `endWindow()`, which consumes the gesture — so after every screen-off the user needed a
+  full flip-straight-and-back before the gesture would arm again. Releasing is not an outcome of the
+  gesture; it now calls a `resetWindow()` that clears the in-flight window without latching the
+  D-021 consume-until-re-entry gate. The detector is also reset so the next registration starts from an
+  unseeded gravity estimate rather than a stale one. Deliberately **not** done: a two-rate scheme
+  (slow orientation watch, 50 Hz only inside the window). It would cut the remaining screen-on cost,
+  but `sustainedFrames` and `PanicGate.REARM_FRAMES` are tuned in FRAMES at ~50 Hz, so changing the
+  rate silently changes the gesture's timing; that is a separate, tested change. Evidence: four cases
+  in `PanicSensorSourceTest` (no registration while the requirement is unmet; register/release across
+  power transitions; release/re-arm across screen off/on; a window interrupted by screen-off does not
+  survive). `[cited]`: `AndroidPanicSensorSource`, `AabSettings.panicRequiresPlugged`,
+  `LiveDebugViewModel.setPanicRequiresPlugged`, `AmbientMonitoringService.startPanicGateWatcher`.

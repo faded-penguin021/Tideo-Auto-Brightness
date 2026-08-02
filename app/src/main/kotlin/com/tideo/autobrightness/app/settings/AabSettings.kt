@@ -64,6 +64,10 @@ data class AabSettings(
     // The baseline/fresh-install default MUST be false or context switching never works (D-038).
     // A saved override-profile stores true here; the baseline AabSettings does not.
     val contextOverride: Boolean = false,
+    // Tasker: %AAB_PanicPlugged (_PanicButton A3, issue #110). Default OFF — the panic gesture is an
+    // escape hatch from an unreadable screen, so it must keep working on battery unless the user
+    // deliberately narrows it.
+    val panicRequiresPlugged: Boolean = false,
     // Tasker: %AAB_SetupTitle; onboarding dialog title (D-008)
     val setupTitle: String = "Advanced Auto Brightness Setup",
     // --- Privileged display toggles (rebuild-only, no Tasker source — D-151/D-152). ALL of the
@@ -177,6 +181,7 @@ object AabSettingsContract {
         AabSettingRule("%AAB_Debug", "debugLevel", AabValueType.Int, "0", "range 0..9"),
         AabSettingRule("%AAB_PanicSensitivity", "panicSensitivity", AabValueType.Int, "8", "range 0..10"),
         AabSettingRule("%AAB_ContextOverride", "contextOverride", AabValueType.Boolean, "false", "must be true|false"),
+        AabSettingRule("%AAB_PanicPlugged", "panicRequiresPlugged", AabValueType.Boolean, "false", "must be true|false"),
         // Rebuild-only display-toggle profile fields (D-151/D-152) — invented %AAB_ names, the
         // D-116 panicSensitivity precedent (no Tasker source; the name exists for diff/export display).
         AabSettingRule("%AAB_NightLight", "nightLightEnabled", AabValueType.Boolean, "false", "must be true|false"),

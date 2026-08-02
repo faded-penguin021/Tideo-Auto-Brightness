@@ -30,14 +30,28 @@ class PanicSensorSourceTest {
     private var now = 0L
     private var sensitivity = 0
     private var near = false
+    private var requiresPlugged = false
 
     private fun source(windowMs: Long = 10_000L) = AndroidPanicSensorSource(
         context = context,
         sensitivity = { sensitivity },
         isNear = { near },
+        requiresPlugged = { requiresPlugged },
         windowMs = windowMs,
         clock = { now },
     )
+
+    /** How many listeners the source currently holds — the battery question, made observable. */
+    private fun registeredListenerCount(): Int = shadowOf(sensorManager).listeners.size
+
+    /**
+     * Send a system broadcast AND let it be delivered: Robolectric posts receivers to the main looper,
+     * so without the idle() the assertion runs before the receiver does.
+     */
+    private fun broadcast(action: String) {
+        context.sendBroadcast(android.content.Intent(action))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+    }
 
     private fun accelSensor(): Sensor {
         val sensor = ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)
@@ -125,6 +139,90 @@ class PanicSensorSourceTest {
 
         upsideDownFrames(20)
         assertEquals(0, events.size, "proximity-near must block the panic gesture")
+        job.cancel()
+    }
+
+    // ---- DB-009: %AAB_PanicPlugged + the registration gate (issue #110) -----------------------
+
+    @Test
+    fun requiresPlugged_whileOnBattery_doesNotEvenRegisterTheAccelerometer() = runTest {
+        accelSensor()
+        sensitivity = 0
+        requiresPlugged = true // and the Robolectric default battery state is "not plugged"
+        val events = mutableListOf<Unit>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
+
+        assertEquals(
+            0,
+            registeredListenerCount(),
+            "an unsatisfiable gesture must not hold a 50 Hz sensor listener open",
+        )
+
+        // Nothing to feed the detector, so nothing can fire.
+        upsideDownFrames(40)
+        assertEquals(0, events.size, "the gesture must not fire while the plugged requirement is unmet")
+        job.cancel()
+    }
+
+    @Test
+    fun requiresPlugged_registersOnPowerConnected_andReleasesOnDisconnect() = runTest {
+        accelSensor()
+        sensitivity = 0
+        requiresPlugged = true
+        val events = mutableListOf<Unit>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
+        assertEquals(0, registeredListenerCount())
+
+        broadcast(android.content.Intent.ACTION_POWER_CONNECTED)
+        assertEquals(1, registeredListenerCount(), "plugging in must arm the sensor")
+        upsideDownFrames(6)
+        assertEquals(1, events.size, "the gesture works normally once plugged in")
+
+        broadcast(android.content.Intent.ACTION_POWER_DISCONNECTED)
+        assertEquals(
+            0,
+            registeredListenerCount(),
+            "unplugging must release the sensor again, not leave it running",
+        )
+        job.cancel()
+    }
+
+    @Test
+    fun screenOff_releasesTheSensor_evenWithoutThePluggedRestriction() = runTest {
+        accelSensor()
+        sensitivity = 0
+        requiresPlugged = false
+        val events = mutableListOf<Unit>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
+        assertEquals(1, registeredListenerCount(), "screen on + no restriction → the gesture is live")
+
+        // Arming has always required an interactive display, so holding the listener open with the
+        // screen off bought nothing and cost ~50 Hz all night. This is the battery half of DB-009.
+        broadcast(android.content.Intent.ACTION_SCREEN_OFF)
+        assertEquals(0, registeredListenerCount(), "screen off must release the accelerometer")
+
+        broadcast(android.content.Intent.ACTION_SCREEN_ON)
+        assertEquals(1, registeredListenerCount(), "screen on must re-arm it")
+        upsideDownFrames(6)
+        assertEquals(1, events.size, "the gesture still works after a screen-off/on cycle")
+        job.cancel()
+    }
+
+    @Test
+    fun aWindowInterruptedByScreenOff_doesNotSurviveIntoTheNextRegistration() = runTest {
+        accelSensor()
+        sensitivity = 5 // a real shake window, not pass-through
+        val events = mutableListOf<Unit>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { source(windowMs = 10_000L).events().collect { events += it } }
+
+        upsideDownFrames(6) // arms a shake window
+        broadcast(android.content.Intent.ACTION_SCREEN_OFF)
+        broadcast(android.content.Intent.ACTION_SCREEN_ON)
+
+        // The gravity filter was reset, so the first frame after re-registration only re-seeds it —
+        // a half-finished window must not be resumable across the gap.
+        sample(0f, -9.81f, 0f)
+        assertEquals(0, events.size, "a stale window must not fire after the sensor was released")
         job.cancel()
     }
 }
