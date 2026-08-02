@@ -70,8 +70,26 @@ internal fun circadianDimMultiplier(scaleDynamic: Double, settings: AabSettings)
 class SuperDimmingCoordinator(
     private val secureDimming: SecureDimmingController,
     private val debugSink: DebugSink = NoOpDebugSink,
+    /**
+     * Re-detect the privilege tier (DB-012). The service's cached tier (G1-F5) is refreshed only at
+     * its own resume points — service start and screen-on — and `AppModule` is constructed per call
+     * site, so the *UI's* `privilegeManager.refresh()` updates a DIFFERENT instance. A grant made
+     * over adb/Shizuku with the screen on therefore stayed invisible to the running service until a
+     * screen-off/on or an app restart; the device pass hit exactly that ("kept complaining about
+     * write secure settings even though i regranted; restarting the app resolved that").
+     */
+    private val refreshTier: () -> Unit = {},
+    private val clock: () -> Long = System::currentTimeMillis,
+    // Last so the `SuperDimmingCoordinator(secure) { Tier.ELEVATED }` trailing-lambda form keeps working.
     private val tierProvider: () -> Tier,
 ) : DimmingCoordinator {
+
+    // Last time a cache-miss re-detect ran. Bounds the Binder cost: the refresh below sits on the
+    // pipeline's cycle path, and an un-granted user who leaves dimming enabled hits it every cycle.
+    // Nullable, not 0L: a test clock (and a device clock read moments after boot) starts AT 0, so a
+    // zero sentinel would swallow the very first re-detect. Nullable also avoids the Long.MIN_VALUE
+    // sentinel's overflow on `now - last`.
+    private var lastTierRefresh: Long? = null
 
     // %AAB_DimmingStatus — true while reduce_bright_colors is engaged, false when known-off.
     // D-144: null = UNKNOWN, the fresh-process state. Tasker's %AAB_DimmingStatus is a PERSISTED
@@ -95,11 +113,24 @@ class SuperDimmingCoordinator(
      *    and never dimmed — this restores the dim-below-floor half.
      */
     override fun apply(targetBrightness: Int, settings: AabSettings, scaleDynamic: Double) {
-        val elevated = tierProvider() >= Tier.ELEVATED
         val belowThreshold = targetBrightness < settings.dimmingThreshold
         val pwmPath = settings.pwmSensitive && belowThreshold
         val superPath = settings.dimmingEnabled && belowThreshold
         val wantsDim = pwmPath || superPath
+
+        // DB-012: the ONE moment a stale tier cache is visibly wrong — the user asked for dimming and
+        // we believe we may not write. Re-detect (rate-limited) instead of waiting for the next
+        // screen-on, so an adb/Shizuku grant made while the screen is on self-heals within a cycle.
+        var elevated = tierProvider() >= Tier.ELEVATED
+        if (wantsDim && !elevated) {
+            val now = clock()
+            val last = lastTierRefresh
+            if (last == null || now - last >= TIER_REFRESH_MIN_INTERVAL_MS) {
+                lastTierRefresh = now
+                refreshTier()
+                elevated = tierProvider() >= Tier.ELEVATED
+            }
+        }
         val shouldEngage = wantsDim && elevated
 
         // task646 act6/act7: the circadian DimDynamic multiplier (G2R-F90 — was hardcoded null, D-040).
@@ -240,5 +271,14 @@ class SuperDimmingCoordinator(
         val levelCleared = secureDimming.setLevel(0).isSuccess
         val deactivated = secureDimming.setActivated(false).isSuccess
         if (levelCleared && deactivated) engaged = false
+    }
+
+    private companion object {
+        /**
+         * Floor between cache-miss tier re-detects (DB-012). `detectTier()` is a Binder permission
+         * check; 10 s is imperceptible to someone who just ran `pm grant` and keeps the cost off a
+         * per-cycle path for an unprivileged user who leaves dimming enabled.
+         */
+        const val TIER_REFRESH_MIN_INTERVAL_MS = 10_000L
     }
 }

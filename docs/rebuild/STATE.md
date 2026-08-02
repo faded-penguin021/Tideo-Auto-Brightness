@@ -50,6 +50,23 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
 
 **Incoming findings:**
 
+- 2026-08-02 — **Owner device pass on 1.8.2-debug: 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED.** Two
+  real defects, both fixed: **C4** the plugged-only panic gesture fired on battery (DB-011) and
+  **F3/F4** a re-granted WRITE_SECURE_SETTINGS was invisible to the running service until an app
+  restart (DB-012). The other three FAILs were defects in the test script, not the app — H used
+  `am force-stop`, which cancels the sticky restart it was testing (so H1's PASS was empty too); G4's
+  slow-provider condition never occurred (Drive answered from cache); J6 followed a failed reinstall
+  at J3. K2/K3 were BLOCKED by Shizuku UI behaviour the steps had assumed away. All corrected in
+  `DEVICE_TEST_SCRIPT_1.8.2.md`, which now carries a "Round 2" list of what to re-run.
+- 2026-08-02 — **Harm caused by our own script (DB-013).** Section J's `bmgr restore <token>` omitted
+  the package argument; that is a whole-device restore, and it overwrote stored settings across many
+  unrelated apps on the owner's phone, irreversibly. Section J is now retired outright at the owner's
+  instruction (see Decided non-items), and the script states its blast radius up front.
+- 2026-08-02 — **Owner-queue candidate (from DB-012):** `PrivilegeManager` is per-`AppModule`, and
+  `AppModule` is constructed at ~10 call sites, so "the shared tier cache" is only shared within one
+  instance. A process-wide singleton is the real fix; DB-012 self-heals the one user-visible symptom
+  instead, because the lifetime/threading change is too broad for a train at its tag.
+
 - 2026-07-30 — Owner confirmed the approved Dependabot view has no open alerts, closing DA-040's
   local-evidence gap (DA-041); no dependency bump is indicated.
 - 2026-07-24 — Owner confirmed GitHub `main` protection and secret-scanning push protection enabled
@@ -69,6 +86,11 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
   existing rails are intentional and agent-neutral. Companion recovery stop became DA-012.
 - **Privileged Display (D-150–152):** per-toggle scheduling; persisted last-applied seed absent real
   reports; QS/notification grayscale action; refresh-rate/OEM keys; manual Extra-Dim toggle.
+- **On-device backup/restore verification (owner, 2026-08-02, DB-013):** not to be tested again. The
+  script's whole-device `bmgr restore` damaged unrelated apps; the owner declined a re-run and the
+  decline is binding. `SettingsBackupSanitizer` stays unit-tested and the allowlist inspectable; that
+  `onRestoreFinished` is actually invoked is an **accepted unverified residual** for 1.8.2. Do not
+  re-add the steps or re-raise this without new evidence (e.g. a spare device offered by the owner).
 
 ## Changelog
 

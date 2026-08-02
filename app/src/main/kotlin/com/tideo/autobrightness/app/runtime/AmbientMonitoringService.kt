@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -402,6 +403,14 @@ class AmbientMonitoringService : Service() {
     private fun startPanicDetector() {
         if (panicJob?.isActive == true) return
         panicJob = scope.launch {
+            // DB-011: do not start sensing until the effective settings exist. The source reads
+            // `%AAB_PanicPlugged` from `ContextEngine.effectiveSnapshot`, which is null until the
+            // first context evaluation completes — and the gesture's registration decision is only
+            // re-run on screen/power broadcasts, so a decision taken during that window could stand
+            // for the rest of the service's life. Waiting costs nothing (the gesture needs ~0.1 s of
+            // sustained inversion plus a shake) and removes the race rather than papering over it.
+            // The same `filterNotNull()` wait is what DisplayTogglesCoordinator already does.
+            contextEngine.effectiveFlow.filterNotNull().first()
             panicSensor.events().collect {
                 vibrateSos()
                 panicAndStop()

@@ -188,10 +188,14 @@ class AndroidPanicSensorSource(
     private val isNear: () -> Boolean,
     /**
      * Current `%AAB_PanicPlugged` (DB-009, issue #110): when true the gesture only works on external
-     * power. Read at every registration decision, not cached, so flipping it takes effect at the next
-     * screen or power transition.
+     * power. Read at every registration AND arming decision, never cached.
+     *
+     * **Nullable on purpose (DB-011).** `null` means *not known yet* — the caller's effective-settings
+     * snapshot has not resolved. The caller must not collapse that into `false`: a fabricated default
+     * reads as "no restriction", which is precisely how a plugged-only gesture fired on battery
+     * (device report C4). Unknown is handled here, once, as fail-closed.
      */
-    private val requiresPlugged: () -> Boolean = { false },
+    private val requiresPlugged: () -> Boolean? = { false },
     private val detector: PanicGestureDetector = PanicGestureDetector(),
     private val gate: PanicGate = PanicGate(),
     private val windowMs: Long = 10_000L,
@@ -225,6 +229,22 @@ class AndroidPanicSensorSource(
                 ?.let { it > 0 } ?: false,
         )
 
+        /**
+         * The `%AAB_PanicPlugged` half of "could this gesture fire right now" — resolved in ONE place
+         * for both the registration gate and the arming gate (DB-011).
+         *
+         * Unknown (`null`) is **fail-closed**: with no resolved settings snapshot we cannot tell
+         * whether the user asked for plugged-only, and guessing "no restriction" is exactly the
+         * failure the device pass found. Guessing the other way costs the gesture a few hundred ms at
+         * service start (the service now waits for that snapshot before collecting this flow at all),
+         * and it is re-evaluated on the next screen/power transition — it can never latch.
+         */
+        fun pluggedRequirementMet(): Boolean = when (requiresPlugged()) {
+            null -> false
+            false -> true
+            true -> plugged.get()
+        }
+
         // --- Window state (mutated only from sensor callbacks, all on one looper → single-threaded) ---
         var windowActive = false
         var windowDeadline = 0L
@@ -254,7 +274,12 @@ class AndroidPanicSensorSource(
                 val now = clock()
                 val sustainedUpsideDown = detector.onAccelerometer(event.values[0], event.values[1], event.values[2])
                 if (linear == null) shakeMagnitude = detector.linearMagnitude
-                val armed = sustainedUpsideDown && interactive.get() && !isNear()
+                // DB-011: the plugged requirement gates ARMING, not just registration. The registration
+                // gate below is a battery optimisation and is only re-evaluated on broadcasts — so a
+                // decision taken under a stale or not-yet-known requirement stayed in force until the
+                // next screen/power transition, and a plugged-only gesture fired on battery (C4). The
+                // preconditions that make firing wrong are checked here, where firing happens.
+                val armed = sustainedUpsideDown && interactive.get() && !isNear() && pluggedRequirementMet()
 
                 if (windowActive) {
                     // Faithful to the A2 Java: once armed, the 10 s window runs to completion and is NOT
@@ -318,7 +343,7 @@ class AndroidPanicSensorSource(
         //     its own listener).
         // Everything else (orientation, proximity, shake) still needs the sensor to evaluate.
         var registered = false
-        fun canFire(): Boolean = interactive.get() && (!requiresPlugged() || plugged.get())
+        fun canFire(): Boolean = interactive.get() && pluggedRequirementMet()
         fun syncSensors() {
             val want = canFire()
             if (want == registered) return

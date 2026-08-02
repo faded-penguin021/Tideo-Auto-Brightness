@@ -30,13 +30,17 @@ class PanicSensorSourceTest {
     private var now = 0L
     private var sensitivity = 0
     private var near = false
-    private var requiresPlugged = false
+    /** The nullable truth the source consumes; `requiresPlugged` is the boolean shorthand for it. */
+    private var requiresPluggedOrNull: Boolean? = false
+    private var requiresPlugged: Boolean
+        get() = requiresPluggedOrNull == true
+        set(value) { requiresPluggedOrNull = value }
 
     private fun source(windowMs: Long = 10_000L) = AndroidPanicSensorSource(
         context = context,
         sensitivity = { sensitivity },
         isNear = { near },
-        requiresPlugged = { requiresPlugged },
+        requiresPlugged = { requiresPluggedOrNull },
         windowMs = windowMs,
         clock = { now },
     )
@@ -205,6 +209,64 @@ class PanicSensorSourceTest {
         assertEquals(1, registeredListenerCount(), "screen on must re-arm it")
         upsideDownFrames(6)
         assertEquals(1, events.size, "the gesture still works after a screen-off/on cycle")
+        job.cancel()
+    }
+
+    // ---- DB-011: the requirement is authoritative at ARM time, not only at registration ---------
+
+    @Test
+    fun requirementTurningOnAfterRegistration_stopsTheGesture_withNoPowerBroadcast() = runTest {
+        accelSensor()
+        sensitivity = 0
+        requiresPlugged = false // registers: screen on, no restriction
+        val events = mutableListOf<Unit>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
+        assertEquals(1, registeredListenerCount())
+
+        // The restriction turns on with the device still unplugged and the screen still on — so NO
+        // broadcast arrives to re-run the registration decision. This is the device-report C4 shape:
+        // whatever the gate decided at registration time was still in force at fire time.
+        requiresPlugged = true
+        upsideDownFrames(40)
+        assertEquals(0, events.size, "the plugged requirement must gate FIRING, not just registration")
+        job.cancel()
+    }
+
+    @Test
+    fun unknownRequirement_neitherRegistersNorFires() = runTest {
+        accelSensor()
+        sensitivity = 0
+        requiresPluggedOrNull = null // no effective-settings snapshot yet (service just started)
+        val events = mutableListOf<Unit>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
+
+        assertEquals(0, registeredListenerCount(), "an unknown requirement must not arm the sensor")
+        upsideDownFrames(40)
+        assertEquals(
+            0,
+            events.size,
+            "an unknown restriction must not be read as 'no restriction' — that is how a plugged-only " +
+                "gesture fired on battery",
+        )
+        job.cancel()
+    }
+
+    @Test
+    fun unknownRequirement_isTransient_gestureWorksOnceTheSnapshotArrives() = runTest {
+        accelSensor()
+        sensitivity = 0
+        requiresPluggedOrNull = null
+        val events = mutableListOf<Unit>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
+        assertEquals(0, registeredListenerCount())
+
+        // The snapshot resolves to "no restriction". Fail-closed must not be a one-way door: the very
+        // next screen-on re-runs the decision and the gesture becomes live again.
+        requiresPluggedOrNull = false
+        broadcast(android.content.Intent.ACTION_SCREEN_ON)
+        assertEquals(1, registeredListenerCount(), "a resolved snapshot must re-arm the sensor")
+        upsideDownFrames(6)
+        assertEquals(1, events.size, "the gesture must work normally once the requirement is known")
         job.cancel()
     }
 

@@ -210,3 +210,69 @@
   shipped sections just read as staleness. Section **numbers** are cited by code
   (`TouchTargetsA11yTest` → §12) and by ledger rows (§11 step 38, §13) — append sections, never
   renumber.
+- DB-011 [cited]: **The plugged-only panic restriction was a registration gate, not a firing gate —
+  and an unresolved settings snapshot read as "no restriction".** Owner device pass 2026-08-02,
+  case C4: with `%AAB_PanicPlugged` ON, the gesture fired on battery. Two independent defects, both
+  needed for the observed failure. (1) `AndroidPanicSensorSource.canFire()` decided only whether to
+  hold the accelerometer registered, and that decision is re-run **only** on screen/power broadcasts;
+  arming itself checked orientation, display and proximity but never the power requirement. So any
+  registration taken under a wrong or not-yet-known requirement stayed in force indefinitely — the
+  gate was advisory where it needed to be authoritative. The requirement is now evaluated at ARM time
+  as well, in one shared `pluggedRequirementMet()`; registration remains a battery optimisation.
+  (2) The caller read `(contextEngine.effectiveSnapshot ?: AabSettings()).panicRequiresPlugged`, and
+  `effectiveSnapshot` is **null until the first context evaluation completes** (`ContextEngine` seeds
+  `_effective` from a launched coroutine in `start()`). Fabricating `AabSettings()` answered "the
+  user did not ask for plugged-only" for a user who had — a safety restriction failing OPEN on
+  "unknown". Since panic **stops the service**, the natural device sequence is fire → re-enable →
+  test again, which lands squarely in that window: a service re-enabled while already unplugged
+  registered the sensor and never saw another power broadcast to correct itself. The lambda is now
+  `() -> Boolean?`, the null is handled once in the source as **fail-closed**, and
+  `AmbientMonitoringService.startPanicDetector` awaits `effectiveFlow.filterNotNull().first()` before
+  collecting, so unknown is transient by construction rather than by luck. Fail-closed costs the
+  gesture the few hundred ms before the first evaluation; failing open costs the user the setting
+  they asked for. Evidence: `requirementTurningOnAfterRegistration_stopsTheGesture_withNoPowerBroadcast`
+  fails on the pre-fix source (`expected:<0> but was:<1>`) — the arm-time gate is load-bearing, not
+  belt-and-braces — plus two tests pinning that unknown neither registers nor fires and that it
+  re-arms as soon as the snapshot resolves. **A nullable value crossing a module boundary is the
+  place to look: `?: SomeDefaults()` at a call site turns "I don't know" into a confident wrong
+  answer, and the type system stops helping.** `[cited]`: `AndroidPanicSensorSource.requiresPlugged`,
+  `AppModule` panic wiring, `AmbientMonitoringService.startPanicDetector`.
+- DB-012 [cited]: **The service's cached privilege tier never saw a grant made while the screen was
+  on.** Owner device pass 2026-08-02, case F3/F4: after `pm grant WRITE_SECURE_SETTINGS` was
+  restored, Extra Dim kept reporting the missing permission — "restarting the app resolved that".
+  G1-F5 caches the tier and refreshes it at the service's resume points (start, screen-on) to keep
+  two Binder checks off every dimming cycle; that is still right. What was wrong is the assumption in
+  its comment that "a post-start ADB/Shizuku grant is still picked up on the next wake": **every
+  `AppModule(...)` call site constructs its own `AndroidPrivilegeManager`** (the UI builds one per
+  ViewModel/screen), so the UI's `refresh()` on resume updates an instance the service has never
+  heard of. With the screen never turning off, nothing re-detected. Fix: `SuperDimmingCoordinator`
+  re-detects on the one path where a stale cache is *visible* — it wants to dim and believes it may
+  not write — rate-limited to once per 10 s, so the happy path adds no Binder call (pinned by
+  `elevatedPath_neverReDetects`) and a permanently unprivileged user pays one check per 10 s, not one
+  per cycle. Deliberately NOT done: making `PrivilegeManager` a process singleton. That is the real
+  root cause and a better end state, but it changes lifetime and threading for ~10 call sites
+  including onboarding, and this train is at its tag; the self-heal is contained and testable. Left
+  as an Owner-queue candidate. The rate-limit timestamp is nullable, not `0L` — a clock that starts
+  at 0 (tests, and a device moments after boot) would otherwise swallow the first re-detect, which is
+  how the first version of the test failed. `[cited]`: `SuperDimmingCoordinator.refreshTier`,
+  `AppModule` dimming wiring.
+- DB-013: **A test script is executable, and this one shipped a device-wide destructive command.**
+  Section J of `DEVICE_TEST_SCRIPT_1.8.2.md` said `adb shell bmgr restore <token>`. Without a package
+  argument that is **not** an app-scoped restore: it replays the backup set for every package in it,
+  overwriting the current data of unrelated apps. The owner ran it on their daily driver on
+  2026-08-02 and lost stored settings across many apps — irreversibly, since the only "undo" would be
+  a newer backup that does not exist. The step now requires
+  `bmgr restore <token> com.tideo.autobrightness.debug`, carries a stop-sign warning, and the script
+  opens with a blast-radius line naming J as the only section that can touch anything outside `$PKG`.
+  **The rule this earns: a device script is code, and its commands get the same "what does this touch
+  if I am wrong" reading as a migration.** Scope-by-default is the test: `pm revoke $PKG`,
+  `am crash $PKG`, `settings get` are all self-limiting, and every other step in this file was; a
+  device-wide verb hidden behind an app-shaped one is exactly the shape to catch in review.
+  **Owner decision, same day: section J is retired, not re-run** — recorded in `STATE.md` Decided
+  non-items. So the DB-010 fold does NOT carry J into `DEVICE_TEST_SCRIPT.md`; what carries is the
+  accepted residual, that `SettingsBackupAgent.onRestoreFinished()` is never exercised outside a real
+  restore and nothing proves it is invoked (the sanitizer's decision logic and the allowlist are
+  covered; the wiring between them is not). Two lesser instances in the same section, corrected
+  together: `bmgr transport …` switches the device's transport globally (restore the original), and
+  `bmgr backupnow` on the Google transport commonly no-ops for a sideloaded package, so a "nothing
+  was backed up" result was being read as an app defect when it is a transport limitation.

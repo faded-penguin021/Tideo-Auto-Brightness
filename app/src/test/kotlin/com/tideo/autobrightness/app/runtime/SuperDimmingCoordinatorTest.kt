@@ -374,4 +374,58 @@ class SuperDimmingCoordinatorTest {
             "the latch stayed engaged across the failure, so re-activation never ran: ${secure.writes}",
         )
     }
+
+    // ---- DB-012: a stale tier cache must self-heal, not wait for the next screen-on ------------
+
+    @Test
+    fun wantsDimButBelievesUnprivileged_reDetectsTheTier_andEngagesInTheSameCycle() {
+        val secure = FakeSecureDimming()
+        var tier = Tier.BASIC
+        var refreshes = 0
+        // The device shape: the grant landed over adb, but this process's cached tier still says BASIC.
+        val coordinator = SuperDimmingCoordinator(
+            secureDimming = secure,
+            refreshTier = { refreshes++; tier = Tier.ELEVATED },
+            clock = { 0L },
+            tierProvider = { tier },
+        )
+
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+
+        assertEquals(1, refreshes, "a cache miss on the path the user can see must re-detect the tier")
+        assertEquals(true, secure.activated, "the re-detected grant must take effect without a restart")
+    }
+
+    @Test
+    fun reDetectIsRateLimited_soAnUngrantedUserDoesNotBinderCheckEveryCycle() {
+        var now = 0L
+        var refreshes = 0
+        val coordinator = SuperDimmingCoordinator(
+            secureDimming = FakeSecureDimming(),
+            refreshTier = { refreshes++ }, // never grants: the permanently-unprivileged user
+            clock = { now },
+            tierProvider = { Tier.BASIC },
+        )
+
+        repeat(20) { coordinator.apply(targetBrightness = 5, settings = dimmingOn) }
+        assertEquals(1, refreshes, "20 cycles inside the interval must cost ONE permission re-detect")
+
+        now += 10_000L
+        coordinator.apply(targetBrightness = 5, settings = dimmingOn)
+        assertEquals(2, refreshes, "the floor must expire, or a later grant could never be noticed")
+    }
+
+    @Test
+    fun elevatedPath_neverReDetects() {
+        var refreshes = 0
+        val coordinator = SuperDimmingCoordinator(
+            secureDimming = FakeSecureDimming(),
+            refreshTier = { refreshes++ },
+            tierProvider = { Tier.ELEVATED },
+        )
+
+        repeat(5) { coordinator.apply(targetBrightness = 5, settings = dimmingOn) }
+
+        assertEquals(0, refreshes, "the happy path must not add a Binder check to the cycle")
+    }
 }
