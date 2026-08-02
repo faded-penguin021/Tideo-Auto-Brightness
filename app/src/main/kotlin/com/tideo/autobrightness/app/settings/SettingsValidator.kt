@@ -107,12 +107,14 @@ object SettingsValidator {
             )
         }
 
-        // task607 (AAB Superdimming Settings focuschange): strength is clamped to 65 to avoid a screen
-        // that is too dark — surface the clamp as an advisory rather than silently capping.
-        if (settings.dimmingStrength > 65) {
+        // task607 + _SaveButtonDimming A9-A12 (DB-008, issue #110): the setpoint itself is capped at
+        // MAX_DIMMING_STRENGTH_SETPOINT — a fully dark screen locks the user out. This advisory is the
+        // warning BEFORE Apply; Apply then performs the correction and flashes the result.
+        if (settings.dimmingStrength > MAX_DIMMING_STRENGTH_SETPOINT) {
             errors += FieldError(
                 "dimmingStrength",
-                "Dimming strength (${settings.dimmingStrength}) will be clamped to 65 to keep the screen readable.",
+                "Dimming strength (${settings.dimmingStrength}) will be reduced to " +
+                    "$MAX_DIMMING_STRENGTH_SETPOINT when you apply — above that the screen can go fully black.",
             )
         }
 

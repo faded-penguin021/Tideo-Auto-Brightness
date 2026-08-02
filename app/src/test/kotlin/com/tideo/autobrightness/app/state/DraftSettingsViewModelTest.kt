@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -219,5 +220,70 @@ class DraftSettingsViewModelTest {
         val second = seededVm()
         assertEquals(35, second.draft.value.zone1End, "preview is one-shot — the next VM seeds plainly")
         assertFalse(second.dirty.value)
+    }
+
+    // ---- DB-008: _SaveButtonDimming A9-A12 (issue #110) ---------------------------------------
+    // The screen used to show the strength the user typed while the runtime clamped the effect to 65.
+    // Apply now corrects the SETPOINT and says so, so the number on screen is the number in effect.
+
+    @Test
+    fun apply_clampsDimmingStrengthSetpoint_andSnapsTheDraftToIt() {
+        setBaseline(AabSettings(dimmingStrength = 25))
+        val vm = seededVm()
+
+        vm.edit { it.copy(dimmingStrength = 100) }
+        idle()
+        assertEquals(100, vm.draft.value.dimmingStrength, "the draft holds what was typed until Apply")
+
+        vm.apply()
+        val committed = awaitCommitted { it.dimmingStrength == 65 }
+
+        assertEquals(65, committed.dimmingStrength, "the persisted setpoint must be the clamped value")
+        assertEquals(
+            65,
+            vm.draft.value.dimmingStrength,
+            "the field must show 65 after Apply — showing 100 while 65 applies is issue #110",
+        )
+        assertFalse(vm.dirty.value, "Apply must be a fixed point: draft == committed afterwards")
+    }
+
+    @Test
+    fun apply_announcesTheClamp_onlyWhenTheValueActuallyMoved() {
+        setBaseline(AabSettings(dimmingStrength = 25))
+        val vm = seededVm()
+        val announced = mutableListOf<Int>()
+        val collector = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)
+            .launch { vm.dimmingStrengthClamped.collect { announced += it } }
+
+        // Exactly at the cap: nothing is corrected, so nothing may be announced. (Tasker's A9 test is
+        // `> 64.999999999`, which its float setpoint satisfies at 65 too — it flashes for a value it
+        // did not change. Announcing a correction that did not happen is the same misinformation.)
+        vm.edit { it.copy(dimmingStrength = 65) }
+        idle()
+        vm.apply()
+        awaitCommitted { it.dimmingStrength == 65 }
+        assertTrue(announced.isEmpty(), "a setpoint of exactly 65 is not a clamp: $announced")
+
+        // Above the cap: corrected, and reported with the value that actually persisted.
+        vm.edit { it.copy(dimmingStrength = 90) }
+        idle()
+        vm.apply()
+        awaitCommitted { it.dimmingStrength == 65 }
+        idle()
+        assertEquals(listOf(65), announced, "the clamp must be announced with the persisted value")
+        collector.cancel()
+    }
+
+    @Test
+    fun apply_leavesAStrengthBelowTheCapAlone() {
+        setBaseline(AabSettings(dimmingStrength = 25))
+        val vm = seededVm()
+
+        vm.edit { it.copy(dimmingStrength = 64) }
+        idle()
+        vm.apply()
+
+        assertEquals(64, awaitCommitted { it.dimmingStrength == 64 }.dimmingStrength)
+        assertEquals(64, vm.draft.value.dimmingStrength)
     }
 }

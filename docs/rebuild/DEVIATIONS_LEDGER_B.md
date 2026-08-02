@@ -111,3 +111,31 @@
   declined:** folding `FDROID_VALIDATION.md` into the RUNBOOK. It is already a single home rather
   than a repetition — the RUNBOOK links to it and does not restate it — and 184 lines of pipeline
   reference inside a change-type playbook would bury the release procedure it is meant to support.
+
+- DB-008 [cited]: **The dimming-strength setpoint is now clamped, not just its effect** (upstream
+  Tasker `_SaveButtonDimming` A9–A12, issue #110, owner-reported 2026-08-02). `SoftwareDimming.dimShell`
+  has always clamped `strength × dimDynamic` to `[0, 65]` — a fully dark screen locks the user out,
+  which is why the panic gesture exists — but the *stored setpoint* kept whatever was typed. A user
+  who set 100 saw 100 in the field, read the dimming graph as reaching 100 %, and measured 65 on the
+  device. The reporter did exactly that, with `adb shell settings get secure` to confirm. Nothing was
+  wrong with the math; **the UI was lying about the input**, which is the bug the owner fixed upstream
+  and this row ports.
+  Ported: the clamp moved into `AabSettings.validate()`'s per-field clamp block, so the setpoint is
+  corrected on **every** write path, and `DraftSettingsViewModel.apply()` announces it (`toast_dimming_
+  strength_clamped`) with the value that actually persisted. Apply stays a fixed point — the draft
+  snaps to 65, so the field shows what is in effect and the screen is not left perpetually dirty.
+  **Deliberate deviation 1 (broader than the Tasker task):** Tasker clamps only in the dimming save
+  button; Tideo clamps in the shared validate(). Tasker's per-scene saves write individual variables,
+  whereas a Tideo Apply persists the whole settings object, and an imported or legacy profile carrying
+  100 would otherwise reproduce the exact lie in another entry path. One rule, every path.
+  **Deliberate deviation 2 (narrower):** Tasker's A9 test is `> 64.999999999`, which its float setpoint
+  also satisfies at exactly 65 — so it flashes "clamped to 65" for a value it did not change. Tideo's
+  setpoint is an `Int` and the announcement fires only when the value actually moved: reporting a
+  correction that did not happen is the same class of misinformation as the field that showed 100.
+  The pre-Apply `SettingsValidator` advisory is kept and reworded to describe what Apply will do.
+  Evidence: three cases in `DraftSettingsViewModelTest` (clamp + draft snap + fixed point; announce
+  only when moved, including the exactly-65 case; below-cap untouched). Note for future extraction
+  work: `docs/rebuild/extraction/_source/` predates this upstream change, so the frozen XML does not
+  contain A9–A12 — the task text in issue #110 is the source of record for it.
+  `[cited]`: `AabSettingsMapper.validate`, `AabSettings.MAX_DIMMING_STRENGTH_SETPOINT`,
+  `DraftSettingsViewModel.apply`, `SuperDimmingScreen`, `SettingsValidator`.

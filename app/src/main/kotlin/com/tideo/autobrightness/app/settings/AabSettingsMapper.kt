@@ -90,7 +90,14 @@ fun AabSettings.validate(): AabSettings {
         form1A = form1A.nanTo(d.form1A).coerceIn(1.0, 20.0),
         form2B = form2B.nanTo(d.form2B).coerceIn(0.1f, 30f),
         form2C = form2C.coerceIn(1, 50),
-        dimmingStrength = dimmingStrength.coerceIn(0, 100),
+        // DB-008 (_SaveButtonDimming A9-A12, issue #110): the SETPOINT is clamped to 65, not just the
+        // runtime product. SoftwareDimming.dimShell has always clamped strength x dimDynamic to
+        // [0, 65] (a fully dark screen locks the user out — the reason the panic gesture exists), but
+        // the stored setpoint kept whatever was typed, so the UI showed 100 while the screen dimmed to
+        // 65. The value on screen has to be the value in effect; clamping here makes every write path
+        // agree (draft Apply, import, legacy config, external profile) instead of only the save button
+        // Tasker patched. Typing above 65 is still allowed — it is corrected on save, as in Tasker.
+        dimmingStrength = dimmingStrength.coerceIn(0, MAX_DIMMING_STRENGTH_SETPOINT),
         dimmingExponent = dimmingExponent.nanTo(d.dimmingExponent).coerceIn(0.5f, 5f),
         // The dimming threshold is a BRIGHTNESS level (super-dimming engages when target < threshold),
         // so it spans the full brightness domain 0..255 like min/maxBrightness — not 0..100. The Tasker

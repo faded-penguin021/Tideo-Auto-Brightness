@@ -307,6 +307,7 @@
     <string name="toast_settings_applied">Settings applied</string>
     <string name="toast_reset_defaults">Reset to defaults</string>
     <string name="toast_max_bright_raised">Max brightness too low for this curve — raised to %1$d (value at Zone 2 End).</string>
+    <string name="toast_dimming_strength_clamped">Strength setpoint reduced to %1$d — above this the screen can go fully black.</string>
     <string name="toast_diagnostics_copied">Diagnostics copied to clipboard</string>
     <string name="toast_suggestion_applied">Suggestion applied</string>
     <string name="toast_full_report_copied">Full report copied to clipboard</string>

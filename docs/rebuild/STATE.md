@@ -68,6 +68,14 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
 
 ## Changelog
 
+- 2026-08-02 — **DB-008 (issue #110, upstream Tasker parity).** Dimming strength was clamped to 65 in
+  the math but not in the stored setpoint, so the field showed 100 while the screen dimmed to 65 — the
+  reporter confirmed it with `adb shell settings get secure`. Ported the owner's upstream
+  `_SaveButtonDimming` A9–A12 fix: the setpoint is clamped in the shared `validate()` (every write
+  path, not just the save button), Apply announces the correction with the value that persisted, and
+  the draft snaps so the field shows what is in effect. Announce only when the value actually moved —
+  Tasker's `> 64.999999999` test also fires at exactly 65 and flashes for a value it did not change.
+
 - 2026-07-31 — **Adversarial security round (DA-043/DA-044 + DB-001…DB-007).** Five findings against
   the hardening branch, all real, all fixed: external-control admission bounded the receiver but not
   the pipeline queue behind it (now coalescing + capped, `ControlFloodBoundTest`); SAF provider I/O
