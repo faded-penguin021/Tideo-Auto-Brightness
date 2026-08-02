@@ -137,6 +137,8 @@
   only when moved, including the exactly-65 case; below-cap untouched). Note for future extraction
   work: `docs/rebuild/extraction/_source/` predates this upstream change, so the frozen XML does not
   contain A9–A12 — the task text in issue #110 is the source of record for it.
+  **Owner-confirmed 2026-08-02:** deviation 2 stands — the flash stays suppressed at exactly 65. Do
+  not "restore parity" here; the divergence from Tasker's `> 64.999999999` branch is intentional.
   `[cited]`: `AabSettingsMapper.validate`, `AabSettings.MAX_DIMMING_STRENGTH_SETPOINT`,
   `DraftSettingsViewModel.apply`, `SuperDimmingScreen`, `SettingsValidator`.
 
@@ -171,5 +173,8 @@
   rate silently changes the gesture's timing; that is a separate, tested change. Evidence: four cases
   in `PanicSensorSourceTest` (no registration while the requirement is unmet; register/release across
   power transitions; release/re-arm across screen off/on; a window interrupted by screen-off does not
-  survive). `[cited]`: `AndroidPanicSensorSource`, `AabSettings.panicRequiresPlugged`,
+  survive). **Owner-confirmed 2026-08-02:** wireless charging counting as plugged
+  (`EXTRA_PLUGGED > 0`, matching the upstream Java) is accepted as-is — shaking a phone upside down
+  while it stays on a Qi pad is not a scenario worth narrowing the check for. Do not restrict this to
+  USB without new evidence. `[cited]`: `AndroidPanicSensorSource`, `AabSettings.panicRequiresPlugged`,
   `LiveDebugViewModel.setPanicRequiresPlugged`, `AmbientMonitoringService.startPanicGateWatcher`.
