@@ -178,10 +178,10 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
         _epoch.update { it + 1 }
         // A15: announce the auto-raise with the value that actually persisted (post-clamp).
         if (fix.raisedTo != null) _maxBrightnessRaised.tryEmit(toCommit.maxBrightness)
-        // DB-008 (A11): only when the value actually MOVED. Tasker's A9 test is
-        // `> 64.999999999`, which its float setpoint also satisfies at exactly 65 — it flashes
-        // "clamped to 65" for a value it did not change. Tideo's setpoint is an Int, and announcing a
-        // correction that did not happen is precisely the misinformation issue #110 is about.
+        // DB-008 (A11): only when the value actually MOVED — announcing a correction that did not
+        // happen is precisely the misinformation issue #110 is about. (Tasker's A9 originally tested
+        // `> 64.999999999`, which fired at exactly 65 too; upstream has since moved it to
+        // `> 65.0000000001`, so the two agree.)
         if (toCommit.dimmingStrength < requestedStrength) {
             _dimmingStrengthClamped.tryEmit(toCommit.dimmingStrength)
         }

@@ -128,17 +128,23 @@
   button; Tideo clamps in the shared validate(). Tasker's per-scene saves write individual variables,
   whereas a Tideo Apply persists the whole settings object, and an imported or legacy profile carrying
   100 would otherwise reproduce the exact lie in another entry path. One rule, every path.
-  **Deliberate deviation 2 (narrower):** Tasker's A9 test is `> 64.999999999`, which its float setpoint
-  also satisfies at exactly 65 — so it flashes "clamped to 65" for a value it did not change. Tideo's
-  setpoint is an `Int` and the announcement fires only when the value actually moved: reporting a
-  correction that did not happen is the same class of misinformation as the field that showed 100.
+  **Deviation 2 (narrower) — RESOLVED UPSTREAM 2026-08-02, no longer a deviation.** As shipped, A9
+  tested `> 64.999999999`, which a float setpoint also satisfies at exactly 65 — so Tasker flashed
+  "clamped to 65" for a value it had not changed. Tideo's setpoint is an `Int` and its announcement
+  fires only when the value actually moved, because reporting a correction that did not happen is the
+  same class of misinformation as the field that showed 100. The owner then changed A9 to
+  `> 65.0000000001`, which never fires at 65 either: **the two now agree**, and no Tideo code changed
+  to make that true. Enumerated so a future parity pass reads this as convergence, not as a divergence
+  to close.
   The pre-Apply `SettingsValidator` advisory is kept and reworded to describe what Apply will do.
   Evidence: three cases in `DraftSettingsViewModelTest` (clamp + draft snap + fixed point; announce
   only when moved, including the exactly-65 case; below-cap untouched). Note for future extraction
   work: `docs/rebuild/extraction/_source/` predates this upstream change, so the frozen XML does not
   contain A9–A12 — the task text in issue #110 is the source of record for it.
-  **Owner-confirmed 2026-08-02:** deviation 2 stands — the flash stays suppressed at exactly 65. Do
-  not "restore parity" here; the divergence from Tasker's `> 64.999999999` branch is intentional.
+  **Owner-confirmed 2026-08-02, then superseded the same day:** the flash stays suppressed at exactly
+  65 — first as an accepted deviation, now as plain parity, since upstream A9 became
+  `> 65.0000000001`. Either way the behaviour is settled: **do not make Apply announce a clamp at
+  exactly 65.**
   `[cited]`: `AabSettingsMapper.validate`, `AabSettings.MAX_DIMMING_STRENGTH_SETPOINT`,
   `DraftSettingsViewModel.apply`, `SuperDimmingScreen`, `SettingsValidator`.
 

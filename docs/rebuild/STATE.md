@@ -83,7 +83,8 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
   `_SaveButtonDimming` A9–A12 fix: the setpoint is clamped in the shared `validate()` (every write
   path, not just the save button), Apply announces the correction with the value that persisted, and
   the draft snaps so the field shows what is in effect. Announce only when the value actually moved —
-  Tasker's `> 64.999999999` test also fires at exactly 65 and flashes for a value it did not change.
+  the A9 test as shipped (`> 64.999999999`) also fired at exactly 65, flashing for a value it did not
+  change. Upstream has since moved A9 to `> 65.0000000001`, so the two now agree with no Tideo change.
 
 - 2026-07-31 — **Adversarial security round (DA-043/DA-044 + DB-001…DB-007).** Five findings against
   the hardening branch, all real, all fixed: external-control admission bounded the receiver but not

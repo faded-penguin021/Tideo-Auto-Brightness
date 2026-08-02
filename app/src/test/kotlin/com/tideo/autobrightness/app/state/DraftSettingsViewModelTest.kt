@@ -255,9 +255,9 @@ class DraftSettingsViewModelTest {
         val collector = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)
             .launch { vm.dimmingStrengthClamped.collect { announced += it } }
 
-        // Exactly at the cap: nothing is corrected, so nothing may be announced. (Tasker's A9 test is
-        // `> 64.999999999`, which its float setpoint satisfies at 65 too — it flashes for a value it
-        // did not change. Announcing a correction that did not happen is the same misinformation.)
+        // Exactly at the cap: nothing is corrected, so nothing may be announced — announcing a
+        // correction that did not happen is the same misinformation issue #110 is about. Upstream
+        // agrees since A9 became `> 65.0000000001` (it previously fired at 65 as well).
         vm.edit { it.copy(dimmingStrength = 65) }
         idle()
         vm.apply()
