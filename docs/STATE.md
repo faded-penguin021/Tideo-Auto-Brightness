@@ -29,14 +29,14 @@ and Privileged Display. Maintenance runs on the **Agentic Maintenance Harness (A
 
 ## Current state
 
-**Active: converging this repo's harness onto the AMH** (`faded-penguin021/AMH`, amh-v3.0.0).
-The harness originated here, was spun out, and diverged; we now run stock AMH, with everything
-it duplicates deleted and everything genuinely ours in its extension points. Units 1–3 done —
-docs at the AMH paths, all 228 ledger rows in the parser's shape, AMH 3.0.0 installed, ladder
-green. **The five shipped scripts are upstream's byte-for-byte and hash-checked against
-`scripts/MANIFEST.sha256` — never edit one;** changes go to `amh.conf`, `scripts/guards/` or
-`scripts/verify.sh`. Remaining: prose reconciliation (AGENTS.md becomes the constitution,
-CLAUDE.md its pointer, `docs/HARNESS_LOCAL.md` records every local delta) and the ledger rows.
+**Harness: AMH 3.0.0, converged and green (DB-014…DB-016).** The maintenance harness this repo
+originated was spun out as [AMH](https://github.com/faded-penguin021/AMH), diverged, and has now
+been replaced by upstream's. **The five scripts under `scripts/` named in
+`scripts/MANIFEST.sha256` are upstream's byte-for-byte and hash-checked every run — never edit
+one;** changes go to `amh.conf`, `scripts/guards/*.sh` or `scripts/verify.sh`. The constitution
+is `AGENTS.md` (`CLAUDE.md` points at it; rows written before 2026-08-03 cite the old name).
+`docs/HARNESS_LOCAL.md` records every local deviation from a stock install and is the document
+the next upgrade reads first.
 
 **Shipped: v1.8.1 (vc19). Release pending: 1.8.2 / vc20.** The train branch
 `claude/gradle-deprecation-fdroid-870gh3` carries AGP 8.13.2, F-Droid compatibility CI and the
@@ -112,13 +112,15 @@ ledger rolled over twice — the live volume is `LEDGER_B.md`.
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
 
-- 2026-08-03 — **AMH convergence, units 1–3.** Adopted AMH 3.0.0 at the `full`
-  profile, replacing the harness this repo originated. Docs moved to the AMH layout, all 124
-  bold-form ledger row headers normalized to the only shape AMH's parser reads, and the five
-  shipped scripts replaced ours — 8 of our 11 guards were already theirs, and we gain
-  author-identity, shipped-integrity and repo-local-guard rungs. What stayed ours moved to the
-  extension points: `scripts/bootstrap.sh`, `scripts/verify.sh`, four `scripts/guards/` and a
-  17-case `scripts/tests/local-guards.sh`.
+- 2026-08-03 — **AMH convergence complete (DB-014…DB-016).** Adopted AMH 3.0.0 at the `full`
+  profile, replacing the harness this repo originated. Docs moved to the AMH layout; all 124
+  bold-form ledger row headers normalized to the only shape AMH's parser reads; the five shipped
+  scripts replaced ours (8 of our 11 guards were already theirs, and we gain author-identity,
+  shipped-integrity and repo-local-guard rungs). What stayed ours moved to the extension points:
+  `scripts/bootstrap.sh`, `scripts/verify.sh`, four `scripts/guards/` and a 19-case
+  `scripts/tests/local-guards.sh`. `AGENTS.md` became the constitution and `CLAUDE.md` its
+  pointer; `docs/HARNESS_LOCAL.md` records every local delta; `docs/AGENTIC_HARNESS_PROMPT.md`
+  was deleted as superseded by the AMH repository.
 - 2026-08-02 — **DB-008/DB-009 (issue #110, upstream Tasker parity).** Dimming strength is now
   clamped in the shared `validate()` on every write path, so the field can no longer show 100
   while the screen dims to 65. New `panicRequiresPlugged` pref restricts the panic gesture to

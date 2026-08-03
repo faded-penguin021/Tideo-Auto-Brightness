@@ -276,3 +276,53 @@
   together: `bmgr transport …` switches the device's transport globally (restore the original), and
   `bmgr backupnow` on the Google transport commonly no-ops for a sideloaded package, so a "nothing
   was backed up" result was being read as an app defect when it is a transport limitation.
+
+- DB-014 [cited]: **The harness this repo invented was replaced by the harness it became.** The
+  maintenance harness originated here (constitution + `STATE.md` + `RUNBOOK.md` + the ledger +
+  `scripts/ladder.sh` + session bootstrap), was generalized into `docs/AGENTIC_HARNESS_PROMPT.md`
+  and spun out as [AMH](https://github.com/faded-penguin021/AMH). The two then diverged, and the
+  local copy was the one without upstream's fixes. Converging on **amh-v3.0.0** (`full` profile):
+  the five shipped scripts are upstream's byte-for-byte, hash-checked against
+  `scripts/MANIFEST.sha256` every run, so **editing one is now a build failure, not a habit** —
+  changes go to `amh.conf`, `scripts/guards/*.sh` or `scripts/verify.sh`. Eight of our eleven
+  guards were already upstream's; the other three plus the staged half of the secret scan became
+  repo-local guards, and we gained author-identity, shipped-integrity and repo-local-guard rungs
+  we never had. Docs moved to the AMH layout (`docs/STATE.md`, `docs/RUNBOOK.md`,
+  `docs/LEDGER{,_A,_B}.md`) and the constitution moved from `CLAUDE.md` to `AGENTS.md`, reversing
+  D-176's "the name is historical, kept so existing citations stay valid" — upstream's canonical
+  name won because compatibility with the harness we now consume outranks compatibility with our
+  own old citations. Rows written before this date cite `CLAUDE.md`; they mean `AGENTS.md`.
+  `docs/AGENTIC_HARNESS_PROMPT.md` was deleted: it is the AMH repository now, and a stale
+  snapshot in `docs/` would read as authoritative while drifting against every upstream release.
+  **The durable rule: everything local lives in a declared extension point, and
+  `docs/HARNESS_LOCAL.md` is the single record of what and why** — that document is what keeps
+  the next upgrade a file copy instead of a merge. `[cited]`: `scripts/bootstrap.sh`.
+
+- DB-015: **The ledger's row-header shape is load-bearing, and 124 of 228 rows did not have it.**
+  AMH enumerates rows with `sed -n 's/^- \(D[A-Z]\?-[0-9]\+\)\( \[cited\]\)\?:.*/\1\2/p'`, which
+  reads a row only when the ID is the first thing after `- `. Our rows had drifted into two
+  shapes: `- D-001: …` and `- **D-060 (S12.7h) — …`. The bold form was invisible to the parser,
+  so 68 live citations would have failed as unresolved. Normalized every header to
+  `- D-NNN[ [cited]]: **…` by moving the bold OPENING marker after the colon — row text
+  byte-identical, per-line `**` count unchanged, nothing deleted, renumbered or reordered; 33
+  rows that had no colon gained one, which is the whole of the +33 B delta. **The rule: a row
+  header is a machine interface, not formatting.** Two ledger preambles were teaching the old
+  shape as the canonical example to copy, which would have silently reintroduced invisible rows;
+  a fresh-context review caught that, and `scripts/tests/local-guards.sh` now has a fixture where
+  a re-bolded volume must fail rather than pass on rows it never read.
+
+- DB-016 [cited]: **A guard that counts the wrong thing reports the strongest line it has.**
+  `scripts/guards/ledger-prefix.sh` — the repo-local half of citation checking, since the shipped
+  guard pools volumes and cannot know that a `DB-` row belongs in `LEDGER_B.md` — counted
+  *volumes* to decide whether it had checked anything. A volume whose rows did not parse
+  contributed zero rows, the prefix loop never ran for it, and the guard printed "every row in
+  the volume its prefix names". Not hypothetical: that is exactly the state DB-015 converted away
+  from, so re-bolding one volume would disarm the guard for it. Fixed to count rows and fail a
+  volume yielding none. **Same guard, second defect, same class:** it read `LEDGER_DIR` and
+  `LEDGER_BASENAME` from the environment, but the ladder assigns them without `export` and runs
+  each guard as `bash <guard>` — a child process. The guard was always using its own hardcoded
+  defaults, invisibly, because those defaults happened to equal the configured values; pointing
+  `LEDGER_DIR` elsewhere would have left the real ledger unchecked while the guard reported on an
+  empty directory. It now sources `amh.conf` itself. **The rule for every repo-local guard: source
+  the config, never inherit it, and make "I checked nothing" a failure that names its subject.**
+  Both are fixture-pinned. `[cited]`: `scripts/guards/ledger-prefix.sh`.

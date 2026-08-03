@@ -158,6 +158,26 @@ ledger_tree lp-none
 run_guard lp-none ledger-prefix
 expect_fail "no volumes at all fails rather than passing vacuously" "checked nothing"
 
+# The narrower vacuous pass: volumes EXIST, but one yields no parseable rows, so the loop that
+# judges prefixes never runs for it. Before this case the guard counted volumes rather than
+# rows and printed its strongest success line having read nothing. The bold shape below is the
+# real one — every row in this repo carried it until they were normalized.
+ledger_tree lp-unparseable
+printf -- '- D-001: base row.\n' >"$SANDBOX/lp-unparseable/docs/LEDGER.md"
+printf -- '- **DA-001**: a re-bolded row no parser reads.\n' >"$SANDBOX/lp-unparseable/docs/LEDGER_A.md"
+run_guard lp-unparseable ledger-prefix
+expect_fail "a volume yielding 0 parseable rows fails instead of passing on rows it never read" "0 parseable rows"
+
+# The guard must read LEDGER_DIR from amh.conf, not from the environment: the ladder assigns it
+# without exporting and runs guards in a child shell, so an inherited read silently pins the
+# guard to its own defaults. Configure a non-default location and it must follow.
+ledger_tree lp-configured
+mkdir -p "$SANDBOX/lp-configured/memory"
+printf 'LEDGER_DIR=memory\nLEDGER_BASENAME=LEDGER\n' >"$SANDBOX/lp-configured/amh.conf"
+printf -- '- D-001: a row in the configured location.\n' >"$SANDBOX/lp-configured/memory/LEDGER.md"
+run_guard lp-configured ledger-prefix
+expect_pass "the guard follows LEDGER_DIR from amh.conf rather than its own default"
+
 # =============================================================================
 printf '· staged-secrets\n'
 

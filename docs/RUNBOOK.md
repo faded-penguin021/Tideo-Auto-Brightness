@@ -163,8 +163,8 @@ so check it explicitly.
   scan flags a longer `whatsNew` as a Minor finding. The cap is on **characters (codepoints), not
   bytes** (DA-019) — a note with em dashes / accents / emoji can exceed 500 bytes while under 500
   chars, so `wc -c` **overcounts**; measure with `LC_ALL=C tr -d '\200-\277' < file | wc -c`
-  (strips UTF-8 continuation bytes → one byte per codepoint), which is exactly what ladder guard 6
-  machine-fails the current versionCode's file over (D-173). **`release.yml`
+  (strips UTF-8 continuation bytes → one byte per codepoint), which is exactly what
+  `scripts/guards/fdroid-changelog.sh` machine-fails the current versionCode's file over (D-173). **`release.yml`
   auto-reuses this file as the GitHub Release's "What's new" section (D-123)** — it reads the tagged
   build's `versionCode`, looks up the matching changelog, and slots it between the owner's UI summary
   and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release
@@ -427,7 +427,7 @@ and it hunts RULE bug classes, each from this repo's history:
   under 12 KB satisfied the old length guard while defeating it — DA-004);
 - **enforcement asymmetry** — prose implies a protection no guard or permission rail
   actually checks (either say it's prose-only, or add the check);
-- **citation validity** — guard 5 deliberately does not scan docs, so D-row cites in rule
+- **citation validity** — the citation guard deliberately does not scan docs (`CITATION_SCAN_PATHS` in `amh.conf`, which today covers `app domain platform .github scripts`), so D-row cites in rule
   prose are checked HERE: the row exists and actually says what the rule claims;
 - **agent-agnosticism regression** — the rule silently assumes one agent's machinery,
   filenames, or env vars (D-176).
@@ -436,8 +436,8 @@ Out of scope: routine STATE.md edits (changelog lines, queue items, Current stat
 working memory, not legislation. Two STATE sections ARE legislation and stay in scope: the
 **length-guard preamble** (guard-lockstep thresholds) and **Decided non-items** (binding
 declines). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
-their triage). Ladder guard 7 (DA-006) WARNs when the *uncommitted* diff touches a
-legislation file — that tripwire only *surfaces* the obligation, it never certifies the
+their triage). The ladder's rule-file advisory (DA-006) WARNs when the *uncommitted* diff touches a file
+named in `RULE_FILES` (`amh.conf`) — that tripwire only *surfaces* the obligation, it never certifies the
 pass; the review itself stays prose-enforced (the D-162 no-attestation-gates line holds).
 STATE.md and the ledger files are deliberately outside the tripwire (they change in nearly
 every unit — warn fatigue kills tripwires), so their legislative sections stay wholly

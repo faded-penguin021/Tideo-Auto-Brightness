@@ -4,7 +4,7 @@
 # Never called on a developer machine unless they set that flag themselves, which is why
 # nothing here asks whether it is wanted: reaching this file IS the answer.
 #
-# Yours, not shipped: this is the AMH's toolchain extension point (docs/HARNESS_LOCAL.md).
+# Yours, not shipped: this is the AMH's toolchain extension point (DB-014, docs/HARNESS_LOCAL.md).
 # It carries what the pre-AMH scripts/session-start.sh did on remote containers (D-173/D-176).
 set -euo pipefail
 

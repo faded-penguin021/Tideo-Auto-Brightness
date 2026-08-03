@@ -196,7 +196,9 @@ or run `scripts/setup-android-sdk.sh`).
 
 The rebuild is complete. Maintenance is driven by these documents:
 
-- [`CLAUDE.md`](CLAUDE.md) — instructions for agentic workflow (any coding agent; `AGENTS.md` points here).
+- [`AGENTS.md`](AGENTS.md) — the constitution for any coding agent (`CLAUDE.md` points here).
+- [`docs/HARNESS_LOCAL.md`](docs/HARNESS_LOCAL.md) — how this repo extends the upstream
+  [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH), and every local delta.
 - [`docs/STATE.md`](docs/STATE.md) — current project state and session memory.
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — maintenance playbook (change-type guides).
 - [`docs/rebuild/PARITY_CHECKLIST.md`](docs/rebuild/PARITY_CHECKLIST.md) — every Tasker artifact tracked
