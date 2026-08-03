@@ -80,7 +80,7 @@ jobs:
       #     reference implementations are immutable test fixtures (CLAUDE.md): production code
       #     conforms to THEM, and changing one requires proof the extraction was wrong plus a
       #     STATE.md entry. This machine-checks the checkable half: a PR that touches a golden
-      #     fixture must also touch docs/rebuild/STATE.md (the justification entry).
+      #     fixture must also touch docs/STATE.md (the justification entry).
       # ---------------------------------------------------------------------------------------------
       - name: Golden fixtures immutable unless STATE.md justifies (D-162)
         env:
@@ -98,11 +98,11 @@ jobs:
             case "$f" in
               domain/src/test/resources/golden/*) golden=true ;;
               domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/*) golden=true ;;
-              docs/rebuild/STATE.md) state=true ;;
+              docs/STATE.md) state=true ;;
             esac
           done <<< "$FILES"
           if [ "$golden" = "true" ] && [ "$state" = "false" ]; then
-            echo "::error::This PR changes golden vectors / reference implementations without touching docs/rebuild/STATE.md."
+            echo "::error::This PR changes golden vectors / reference implementations without touching docs/STATE.md."
             echo "::error::They are immutable fixtures (CLAUDE.md): production code conforms to THEM. Changing one"
             echo "::error::requires proof the extraction was wrong, recorded as a STATE.md entry (D-162)."
             exit 1

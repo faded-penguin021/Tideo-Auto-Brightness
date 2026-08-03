@@ -33,18 +33,18 @@ write_state() {  # $1 = approx extra bytes of filler (0 = minimal)
       head -c "$1" /dev/zero | tr '\0' 'x'
       printf '\n'
     fi
-  } > "$SANDBOX/docs/rebuild/STATE.md"
+  } > "$SANDBOX/docs/STATE.md"
 }
 
 write_ledger() {  # $1 = row count, $2 = target file (default base ledger)
-  local n="$1" f="${2:-$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md}" i
+  local n="$1" f="${2:-$SANDBOX/docs/LEDGER.md}" i
   { printf '# ledger fixture\n\n'
     for i in $(seq 1 "$n"); do printf -- '- D-%03d: fixture row\n' "$i"; done
   } > "$f"
 }
 
 write_ledger_padded() {  # $1 = filler lines BEFORE the final row, $2 = trailing continuation
-  local pad="$1" tail="${2:-0}" f="${3:-$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md}"
+  local pad="$1" tail="${2:-0}" f="${3:-$SANDBOX/docs/LEDGER.md}"
   { printf '# ledger fixture\n\n'
     [ "$pad" -gt 0 ] && seq 1 "$pad" | sed 's/.*/  filler prose line/'
     printf -- '- D-001: fixture row\n'
@@ -154,10 +154,10 @@ write_state 0
 
 # --- guard 1b: required sections ------------------------------------------------------------
 
-sed -i '/## Changelog/d' "$SANDBOX/docs/rebuild/STATE.md"
+sed -i '/## Changelog/d' "$SANDBOX/docs/STATE.md"
 check "guard 1b: missing required section fails" 1 'missing required section "## Changelog"'
 write_state 0
-sed -i '/## Owner queue/d' "$SANDBOX/docs/rebuild/STATE.md"
+sed -i '/## Owner queue/d' "$SANDBOX/docs/STATE.md"
 check "guard 1b: missing Owner queue only warns" 0 "missing '## Owner queue' (D-167)"
 write_state 0
 
@@ -172,10 +172,10 @@ check "guard 1c: >= 900 lines warns" 0 "rollover soon"
 write_ledger 10
 
 # _A.md presence redirects the live-file pick (and DA- citation routing further down).
-write_ledger 150 "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
-sed -i 's/- D-/- DA-/' "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
-check "guard 1c: _A.md becomes the live file" 0 "lines in docs/rebuild/DEVIATIONS_LEDGER_A.md"
-rm "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER_A.md"
+write_ledger 150 "$SANDBOX/docs/LEDGER_A.md"
+sed -i 's/- D-/- DA-/' "$SANDBOX/docs/LEDGER_A.md"
+check "guard 1c: _A.md becomes the live file" 0 "lines in docs/LEDGER_A.md"
+rm "$SANDBOX/docs/LEDGER_A.md"
 
 # LADDER_LEDGER_FILE override (the documented test-suite hook).
 write_ledger_padded 1005 0 "$SANDBOX/docs/rebuild/ledger_full.md"
@@ -187,21 +187,21 @@ rm "$SANDBOX/docs/rebuild/ledger_full.md"
 # --- guard 5: D-citation integrity ----------------------------------------------------------
 
 printf '// cited: D-002\n' > "$SANDBOX/app/Cited.kt"
-sed -i 's/^- D-002:/- D-002 [cited]:/' "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md"
+sed -i 's/^- D-002:/- D-002 [cited]:/' "$SANDBOX/docs/LEDGER.md"
 check "guard 5: cited + marked row passes" 0 "1 distinct, all resolve; [cited] markers in sync"
 write_ledger 10
 check "guard 5: cited row missing its [cited] marker fails" 1 "missing the [cited] marker"
 rm "$SANDBOX/app/Cited.kt"
-sed -i 's/^- D-004:/- D-004 [cited]:/' "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md"
+sed -i 's/^- D-004:/- D-004 [cited]:/' "$SANDBOX/docs/LEDGER.md"
 check "guard 5: stale [cited] marker fails" 1 "no longer cited anywhere in scope"
 write_ledger 10
 printf '// cited: D-999\n' > "$SANDBOX/app/Cited.kt"
 check "guard 5: dangling citation fails" 1 "dangling deviation citation D-999"
 printf '// cited: DA-001\n' > "$SANDBOX/app/Cited.kt"
-check "guard 5: DA- cite without ledger A fails" 1 "DEVIATIONS_LEDGER_A.md not found"
+check "guard 5: DA- cite without ledger A fails" 1 "LEDGER_A.md not found"
 rm "$SANDBOX/app/Cited.kt"
 
-printf -- '- D-005: duplicate\n' >> "$SANDBOX/docs/rebuild/DEVIATIONS_LEDGER.md"
+printf -- '- D-005: duplicate\n' >> "$SANDBOX/docs/LEDGER.md"
 check "guard 5: duplicate ledger row fails" 1 "duplicate deviation row number"
 write_ledger 10
 

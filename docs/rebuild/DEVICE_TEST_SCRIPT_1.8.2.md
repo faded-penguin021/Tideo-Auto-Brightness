@@ -261,7 +261,7 @@ package argument. That is a **whole-device** restore — it replays the backup s
 it and overwrites the current data of unrelated apps. Run on the owner's daily driver it reset stored
 settings across many apps, irreversibly. Scoping it (`bmgr restore <token> $PKG`) fixes the command,
 but the owner has declined to re-run this section at all, and that decline stands: **do not re-add
-these steps, and do not ask again without new evidence** (`STATE.md` → Decided non-items).
+these steps, and do not ask again without new evidence** (`../STATE.md` → Decided non-items).
 
 **What that costs, stated plainly:** `SettingsBackupAgent.onRestoreFinished()` never executes outside
 a real restore, so nothing in CI or on-device proves it *runs*. What IS proven is the part that

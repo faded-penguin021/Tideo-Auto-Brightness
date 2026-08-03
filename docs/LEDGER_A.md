@@ -2,7 +2,7 @@
 
 > **Append-only registry — NEVER archived, compressed, or truncated.** This is the canonical,
 > permanent home for every numbered deviation/discovery from DA-001 on (the base block D-001…
-> D-176 lives in `DEVIATIONS_LEDGER.md`, closed by DA-001). Code comments and docs cite
+> D-176 lives in `LEDGER.md`, closed by DA-001). Code comments and docs cite
 > entries as bare `DA-0NN` and must always resolve here, so no entry may ever be deleted or
 > summarized away. **Append new maintenance deviations as DA-001, DA-002, … at the bottom** —
 > one continuous sequence, never restart numbering. The highest-value "don't repeat these
@@ -16,11 +16,11 @@
 > owner-instructed).** THIS FILE holds at most **1000 lines** (`scripts/ladder.sh`
 > `LEDGER_CAP_LINES` — keep the two in lockstep). The FINAL row may finish past the cap, but
 > no row may ever START past it: when the file stands at more than 1000 lines, do NOT append
-> here — create **`DEVIATIONS_LEDGER_B.md`** with this same header discipline and start
+> here — create **`LEDGER_B.md`** with this same header discipline and start
 > numbering at **DB-001**, and so on (`_C.md` → DC-…). Existing rows are never moved,
 > renumbered, or summarized — the cap bounds *file size* (an unbounded single file is a
 > read/context hazard for agentic maintenance flows), not history.
-> A citation's prefix names its file: `D-…` → `DEVIATIONS_LEDGER.md`, `DA-…` → this file,
+> A citation's prefix names its file: `D-…` → `LEDGER.md`, `DA-…` → this file,
 > `DB-…` → ledger B. Cites stay bare (`DA-017`) everywhere, exactly like `D-017`.
 > "Same header discipline" means: carry over the *structural* header content (the append-only
 > warning, this cap-&-rollover paragraph with the prefixes/filenames advanced, the
@@ -48,7 +48,7 @@
   1c — the constant and this paragraph move in lockstep). The final row may FINISH past the
   cap; the next row must open the next file — machine-checked as "no row may START past the
   cap line". Warn lead: 900 lines, mirroring the old 10-row lead. Consequences: the base
-  `DEVIATIONS_LEDGER.md` is **closed** with D-176 as its final row — numbers D-177…D-184 are
+  `LEDGER.md` is **closed** with D-176 as its final row — numbers D-177…D-184 are
   never assigned (a citation `D-177+` is always a typo); its preamble carries a closure note
   (structural edit, D-171 precedent — no rows touched). Guard 1c rewritten (line-based,
   last-row-start check); `test-ladder-guards.sh` guard-1c fixtures rewritten to match;

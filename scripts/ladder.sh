@@ -62,7 +62,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-STATE_FILE="${LADDER_STATE_FILE:-docs/rebuild/STATE.md}"
+STATE_FILE="${LADDER_STATE_FILE:-docs/STATE.md}"
 guards_only=0
 if [ "${1:-}" = "--guards-only" ]; then
   guards_only=1
@@ -143,8 +143,8 @@ LEDGER_CAP_LINES=1000   # owner-tunable (DA-001); warn lead below mirrors the ol
 LEDGER_WARN_LINES=$((LEDGER_CAP_LINES - 100))
 LEDGER_FILE="${LADDER_LEDGER_FILE:-}"
 if [ -z "$LEDGER_FILE" ]; then
-  LEDGER_FILE=docs/rebuild/DEVIATIONS_LEDGER.md
-  for f in docs/rebuild/DEVIATIONS_LEDGER_B.md docs/rebuild/DEVIATIONS_LEDGER_A.md; do
+  LEDGER_FILE=docs/LEDGER.md
+  for f in docs/LEDGER_B.md docs/LEDGER_A.md; do
     if [ -f "$f" ]; then LEDGER_FILE="$f"; break; fi
   done
 fi
@@ -179,15 +179,15 @@ cited=$(grep -rhoE '\bD[AB]?-[0-9]{3}\b' \
   app domain platform .github 2>/dev/null | sort -u || true)
 for id in $cited; do
   case "$id" in
-    DA-*) lf=docs/rebuild/DEVIATIONS_LEDGER_A.md ;;
-    DB-*) lf=docs/rebuild/DEVIATIONS_LEDGER_B.md ;;
-    *)    lf=docs/rebuild/DEVIATIONS_LEDGER.md ;;
+    DA-*) lf=docs/LEDGER_A.md ;;
+    DB-*) lf=docs/LEDGER_B.md ;;
+    *)    lf=docs/LEDGER.md ;;
   esac
   [ -f "$lf" ] || fail "citation $id cannot resolve: ledger file $lf not found (D-173)"
   grep -qE "^- (\*\*)?${id}\b" "$lf" \
     || fail "dangling deviation citation $id — no such row in $lf. Fix the typo or append the missing ledger row (D-173)."
 done
-for lf in docs/rebuild/DEVIATIONS_LEDGER.md docs/rebuild/DEVIATIONS_LEDGER_A.md docs/rebuild/DEVIATIONS_LEDGER_B.md; do
+for lf in docs/LEDGER.md docs/LEDGER_A.md docs/LEDGER_B.md; do
   [ -f "$lf" ] || continue
   dupes=$(grep -oE '^- (\*\*)?D[AB]?-[0-9]{3}' "$lf" | grep -oE 'D[AB]?-[0-9]{3}' | sort | uniq -d || true)
   [ -z "$dupes" ] || fail "duplicate deviation row number(s) in $lf: $(echo $dupes) — renumber the newest append (D-173)"
@@ -197,8 +197,8 @@ done
 # directly after its number; guard both directions so the marker is verified derived state
 # (grep '\[cited\]' on a ledger file = every code-anchored row, no tree cross-reference).
 marked=$(grep -hoE '^- (\*\*)?D[AB]?-[0-9]{3} \[cited\]' \
-    docs/rebuild/DEVIATIONS_LEDGER.md docs/rebuild/DEVIATIONS_LEDGER_A.md \
-    docs/rebuild/DEVIATIONS_LEDGER_B.md 2>/dev/null | grep -oE 'D[AB]?-[0-9]{3}' | sort -u || true)
+    docs/LEDGER.md docs/LEDGER_A.md \
+    docs/LEDGER_B.md 2>/dev/null | grep -oE 'D[AB]?-[0-9]{3}' | sort -u || true)
 unmarked=$(comm -23 <(printf '%s\n' $cited | grep . | sort -u) <(printf '%s\n' $marked | grep .) || true)
 stale=$(comm -13 <(printf '%s\n' $cited | grep . | sort -u) <(printf '%s\n' $marked | grep .) || true)
 [ -z "$unmarked" ] || fail "ledger row(s) cited from code but missing the [cited] marker: $(echo $unmarked) — insert \" [cited]\" directly after the row number (D-174)"
@@ -239,7 +239,7 @@ fi
 if [ "${GITHUB_ACTIONS:-}" != "true" ] && git rev-parse --git-dir >/dev/null 2>&1; then
   legislation_touched=""
   # A new agent adapter's permission-config file joins this list (CLAUDE.md Agent harness).
-  for f in CLAUDE.md AGENTS.md docs/rebuild/RUNBOOK.md scripts/ladder.sh \
+  for f in CLAUDE.md AGENTS.md docs/RUNBOOK.md scripts/ladder.sh \
            scripts/test-ladder-guards.sh scripts/session-start.sh scripts/redact.sh \
            scripts/command-guard.sh .claude/settings.json; do
     if git status --porcelain -- "$f" 2>/dev/null | grep -q .; then
@@ -327,8 +327,8 @@ if git rev-parse --verify -q origin/main >/dev/null; then
     # (RUNBOOK Session discipline 3) still binds every unit.
     changed=$( { git diff --name-only origin/main..HEAD; git status --porcelain | sed 's/^...//'; } | sort -u )
     code_changed=$(printf '%s\n' "$changed" | grep -vE '^$|^docs/|(^|/)[^/]*\.md$' || true)
-    if [ -n "$code_changed" ] && ! printf '%s\n' "$changed" | grep -qx 'docs/rebuild/STATE.md'; then
-      echo "LADDER WARN: code/config changed but docs/rebuild/STATE.md is not in the diff — the checkpoint invariant wants a STATE Changelog line before commit (RUNBOOK Session discipline 3)."
+    if [ -n "$code_changed" ] && ! printf '%s\n' "$changed" | grep -qx 'docs/STATE.md'; then
+      echo "LADDER WARN: code/config changed but docs/STATE.md is not in the diff — the checkpoint invariant wants a STATE Changelog line before commit (RUNBOOK Session discipline 3)."
     fi
     # guard 4: stale-branch tripwire. Behind origin/main invites a squash-merge conflict the
     # agent's own green ladder can't see. Advice must stay force-push-free: rebasing pushed

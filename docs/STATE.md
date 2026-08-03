@@ -14,6 +14,14 @@ Privileged Display.
 
 ## Current state
 
+**Active work: converging this repo's harness onto the Agentic Maintenance Harness
+(`faded-penguin021/AMH`, amh-v3.0.0).** The harness that originated here was spun out and
+diverged; the plan is to run stock AMH, delete everything it duplicates, and re-home what is
+genuinely ours in its extension points (`amh.conf`, `scripts/verify.sh`, `scripts/guards/`,
+`scripts/bootstrap.sh`). Unit 1 of 6 done: STATE/RUNBOOK/ledgers moved to the AMH paths
+(`docs/STATE.md`, `docs/RUNBOOK.md`, `docs/LEDGER{,_A,_B}.md`). Remaining: ledger row-header
+normalization, the AMH install, repo-local guards, prose reconciliation, and the record.
+
 **Shipped: v1.8.1 (vc19). Release pending: 1.8.2 / vc20.** The train branch
 `claude/gradle-deprecation-fdroid-870gh3` carries AGP 8.13.2, F-Droid compatibility CI, and the
 1.8.2 bump; PR #99 folded bounded profile import + sticky-restart gating into it, and PR #96's
@@ -21,16 +29,16 @@ squash title/body describe the net train. At the tag, run DA-026's one-shot F-Dr
 check; the DA-024 store icon lands with it. `domain/` and `platform/` remain byte-identical to 1.8.1.
 The 2026-07-31 adversarial round (DA-043/DA-044 + DB-001…DB-007) then fixed five confirmed findings
 in that hardening plus three the review did not name, and merged six audit documents into
-`SECURITY_REVIEW.md`. Device verification is now two files with a lifecycle (DB-010): the permanent
-`DEVICE_TEST_SCRIPT.md` and the ephemeral `DEVICE_TEST_SCRIPT_1.8.2.md`, which is **deleted at the
+`rebuild/SECURITY_REVIEW.md`. Device verification is now two files with a lifecycle (DB-010): the permanent
+`rebuild/DEVICE_TEST_SCRIPT.md` and the ephemeral `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md`, which is **deleted at the
 1.8.2 tag** after folding anything durable into the permanent one (RUNBOOK §6). Three retired round
-scripts are gone; `RESUME_CONTEXT_TEST.md`'s DA-018 checks live on as step 25's sub-bullets.
+scripts are gone; `rebuild/RESUME_CONTEXT_TEST.md`'s DA-018 checks live on as step 25's sub-bullets.
 No plan files; parity checklist has zero pending, tests are green, TODO/FIXME
 and parity gaps are zero. Changes follow RUNBOOK; the ledger rolled over — the live file is now
-`DEVIATIONS_LEDGER_B.md` (`_A.md` closed at its 1000-line cap).
+`LEDGER_B.md` (`_A.md` closed at its 1000-line cap).
 
 **2026-07-30 dependency/release audit (DA-040):** direct dependencies and privileged surfaces are
-inventoried in `SECURITY_REVIEW.md` (dependency row); no versions changed. The
+inventoried in `rebuild/SECURITY_REVIEW.md` (dependency row); no versions changed. The
 normal Gradle 8.14.3 wrapper originally lacked `distributionSha256Sum`; DA-042 now pins Gradle's
 official binary ZIP digest, closing that executable-integrity gap. The owner confirmed there are no
 open Dependabot alerts (DA-041), so no dependency version change is warranted by the approved process.
@@ -57,7 +65,7 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
   `am force-stop`, which cancels the sticky restart it was testing (so H1's PASS was empty too); G4's
   slow-provider condition never occurred (Drive answered from cache); J6 followed a failed reinstall
   at J3. K2/K3 were BLOCKED by Shizuku UI behaviour the steps had assumed away. All corrected in
-  `DEVICE_TEST_SCRIPT_1.8.2.md`, which now carries a "Round 2" list of what to re-run.
+  `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md`, which now carries a "Round 2" list of what to re-run.
 - 2026-08-02 — **Harm caused by our own script (DB-013).** Section J's `bmgr restore <token>` omitted
   the package argument; that is a whole-device restore, and it overwrote stored settings across many
   unrelated apps on the owner's phone, irreversibly. Section J is now retired outright at the owner's
@@ -94,6 +102,11 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
 
 ## Changelog
 
+- 2026-08-03 — **AMH convergence unit 1.** Moved the harness docs to the AMH layout
+  (`docs/rebuild/{STATE,RUNBOOK}.md` → `docs/`, `DEVIATIONS_LEDGER{,_A,_B}.md` →
+  `docs/LEDGER{,_A,_B}.md`) and repointed every live reference; `docs/rebuild/` keeps the
+  reference docs. The frozen `docs/history/*_rebuild.md` archive was left untouched.
+
 - 2026-08-02 — **DB-009 (issue #110, upstream Tasker parity + a battery bug it exposed).** New global
   pref `panicRequiresPlugged` (`%AAB_PanicPlugged`, default OFF) restricts the panic gesture to
   external power, surfaced on Live Debug beside the sensitivity slider. Implementing it surfaced the
@@ -127,7 +140,7 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
   on a job parked in `read()` cannot fire until that read returns. **Declined with reasons:** splitting
   the settings DataStore, a PANIC/DISABLE priority lane (they never use that queue), `apksigcopier`
   here, reordering profile apply (the proposed order silently reverts a user's load), and folding
-  `FDROID_VALIDATION.md` into the RUNBOOK.
+  `rebuild/FDROID_VALIDATION.md` into the RUNBOOK.
 
 One line per shipped change (newest first); detail lives in the deviation rows and git history.
 

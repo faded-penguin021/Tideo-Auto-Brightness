@@ -7,28 +7,29 @@ A native **Kotlin/Compose** Android app that is a feature-parity rebuild of the 
 The original Tasker XML lives in `docs/rebuild/extraction/_source/` (gitignored, 1.6 MB —
 **never read it wholesale; use `docs/rebuild/XML_RECIPES.md`**). The migration narrative
 (segment briefs, gate findings) is frozen in `docs/history/`. The numbered deviations live in
-`docs/rebuild/DEVIATIONS_LEDGER.md` — a **permanent, append-only registry** (code cites bare
+`docs/LEDGER.md` — a **permanent, append-only registry** (code cites bare
 `D-NN`; code-cited rows carry a guard-synced `[cited]` marker, D-174; never compress or delete
 entries; append the next number in the LIVE ledger file —
 the base file is closed at D-176; from `_A.md` on each file caps at **1000 lines** — the final
 row may overflow the cap, the next row opens the next file (`DA-…` → `DB-…`, D-153/DA-001).
 
-> **Ground truth:** code + golden test vectors. The docs under `docs/rebuild/` and
-> `docs/history/` describe the app as-built and may drift — when a doc conflicts with the code,
-> trust the code and correct the doc.
+> **Ground truth:** code + golden test vectors. Every document in `docs/` — the live harness
+> memory (`STATE.md`, `RUNBOOK.md`, `LEDGER*.md`), the reference docs under `docs/rebuild/`,
+> and the frozen `docs/history/` archive — describes the app as-built and may drift; when a doc
+> conflicts with the code, trust the code and correct the doc.
 
 ## Maintenance protocol (every session)
 
 1. Run `scripts/setup-android-sdk.sh` if `local.properties` is missing (~4 min first time).
-2. Read `docs/rebuild/STATE.md` — current project state and any active/staged work.
-3. Open the matching change-type playbook in `docs/rebuild/RUNBOOK.md`; read the reference docs
+2. Read `docs/STATE.md` — current project state and any active/staged work.
+3. Open the matching change-type playbook in `docs/RUNBOOK.md`; read the reference docs
    it names before touching code.
 4. Do the work under RUNBOOK **Session discipline** (D-161: sequential, small checkpointed
    units, binary acceptance). Consult/flip the rows you affect in `docs/rebuild/PARITY_CHECKLIST.md`
    (only when the change touches a Tasker artifact — most maintenance now doesn't; the checklist is
    zero-`pending` and recent work is Tasker-independent).
 5. Run the acceptance ladder (below) until green. **Never leave the branch red.**
-6. Update `docs/rebuild/STATE.md` (honor its length guard) and, if the runbook itself was
+6. Update `docs/STATE.md` (honor its length guard) and, if the runbook itself was
    insufficient, fix the runbook in the same change.
 7. Commit and push: `git push -u origin <your-session-branch>`.
 
@@ -80,7 +81,7 @@ fallback, D-172) — not "grant-only".
 - minSdk 31, target/compile 36. No legacy API branches below 31.
 - Kotlin official code style; match existing file/package layout.
 
-## Invariants that still bind (full catalog: `docs/rebuild/DEVIATIONS_LEDGER.md`)
+## Invariants that still bind (full catalog: `docs/LEDGER.md`)
 
 - **Concurrency model is BINDING:** a single pipeline coroutine; one event runs to completion
   (including animation); events arriving mid-cycle are **DROPPED, not queued** (the Tasker

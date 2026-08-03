@@ -11,8 +11,8 @@
 >
 > **File cap & rollover (D-153, cap revised to 184 by D-171 — both owner-instructed).** THIS
 > FILE holds at most **184 rows** (D-001…D-184). When a 185th deviation is needed, do NOT add it
-> here — create **`DEVIATIONS_LEDGER_A.md`** with this same header discipline and start numbering
-> at **DA-001**; that file caps at DA-184, then `DEVIATIONS_LEDGER_B.md` starts **DB-001**, and so
+> here — create **`LEDGER_A.md`** with this same header discipline and start numbering
+> at **DA-001**; that file caps at DA-184, then `LEDGER_B.md` starts **DB-001**, and so
 > on. Existing rows are never moved, renumbered, or summarized — the cap bounds *file size* (an
 > unbounded single file is a read/context hazard for agentic maintenance flows), not history.
 > A citation's prefix names its file: `D-…` → this file, `DA-…` → ledger A, `DB-…` → ledger B.
@@ -20,7 +20,7 @@
 > **CLOSED (DA-001, owner-instructed 2026-07-19): D-176 is this file's final row.** The
 > rollover unit changed from rows to LINES (1000/file, final row may overflow) and this file
 > was already past the line cap, so rows **D-177…D-184 are never assigned** — any such
-> citation is a typo. The live ledger is `DEVIATIONS_LEDGER_A.md` (DA-001…); append there.
+> citation is a typo. The live ledger is `LEDGER_A.md` (DA-001…); append there.
 > "Same header discipline" means: carry over the *structural* header content (the append-only
 > warning, this cap-&-rollover paragraph with the prefixes/filenames advanced, the
 > citation-routing sentence, the ground-truth rule, the `[cited]`-marker paragraph below) but
@@ -2745,8 +2745,8 @@ the permanent registry — never compress or remove them.
   this row for the mechanism, D-171 for the current cap. The registry
   stays permanent and append-only, but each ledger FILE caps at **200 rows** (now 184, D-171):
   D-001…D-200 live
-  here; the 201st deviation opens `DEVIATIONS_LEDGER_A.md` starting **DA-001**, which caps at
-  DA-200 and hands over to `DEVIATIONS_LEDGER_B.md`/**DB-001**, and so on. Rationale: an
+  here; the 201st deviation opens `LEDGER_A.md` starting **DA-001**, which caps at
+  DA-200 and hands over to `LEDGER_B.md`/**DB-001**, and so on. Rationale: an
   unbounded single file is a growing read/context hazard for agentic maintenance flows, and
   summarizing was rejected outright — rows are cited by number from code and must stay
   verbatim forever. The prefix routes a cite to its file (D-/DA-/DB-…); cites stay bare.
@@ -2966,7 +2966,7 @@ the permanent registry — never compress or remove them.
   (c) RUNBOOK Session-discipline rule 6 "Recovery" — reset to the last green checkpoint, re-run
   the ladder, re-attempt smaller; never rewrite pushed history; (d) `release-preflight.yml`
   golden-fixture gate — a PR touching `domain/src/test/resources/golden/` or
-  `domain/src/test/kotlin/.../domain/reference/` must also touch `docs/rebuild/STATE.md`
+  `domain/src/test/kotlin/.../domain/reference/` must also touch `docs/STATE.md`
   (machine-checks the checkable half of the CLAUDE.md immutability rule; the reviewer still
   judges the justification). Rejected, with reasons (do not re-litigate without new evidence):
   structured checkbox output for glue-review (a ticked checklist is exactly as fakeable as the
@@ -3040,7 +3040,7 @@ the permanent registry — never compress or remove them.
   `claude/**` pushes" (non-items 2026-07-10) — same triggers, one source of truth for the task
   set. CI keeps the length/section/ledger/skip-ci guards for free. **U2 — checkpoint tripwire
   (ladder guard 3):** WARN when non-doc code/config changed vs `origin/main` (committed + working
-  tree) but `docs/rebuild/STATE.md` is absent from that diff — mechanizes the weakest link of the
+  tree) but `docs/STATE.md` is absent from that diff — mechanizes the weakest link of the
   checkpoint invariant (RUNBOOK Session discipline 3), the most likely single-step omission for a
   lesser model or a session about to be cut. **U3 — stale-branch tripwire (ladder guard 4):** WARN
   when HEAD is behind `origin/main` (a stale branch is invisible to a green ladder but becomes the
@@ -3176,7 +3176,7 @@ the permanent registry — never compress or remove them.
 
 - **D-171: Ledger file cap lowered 200 → 184 rows (owner-instructed, docs/process only).**
   Revises the D-153 rollover threshold; the rollover mechanism itself (open
-  `DEVIATIONS_LEDGER_A.md`/DA-001 when the live file fills, then `_B.md`/DB-001; rows never moved,
+  `LEDGER_A.md`/DA-001 when the live file fills, then `_B.md`/DB-001; rows never moved,
   renumbered, or summarized; cites stay bare and route by prefix) is unchanged. This file now
   holds at most **184 rows** (D-001…D-184); the 185th deviation opens ledger A at DA-001, which
   caps at DA-184, and so on. Surfaces updated in lockstep: the ledger header + live preamble, the

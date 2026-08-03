@@ -9,8 +9,8 @@ This replaces six point-in-time audit documents (`COMPONENT_SECURITY_AUDIT.md`,
 `architecture/runtime_resource_lifetime_audit.md`, `architecture/privileged_command_audit.md`,
 `architecture/geo_ip_audit.md`). They repeated each other's trust boundaries, call traces and test
 wish-lists; what was durable is in the matrix below, linked to the code and the tests rather than
-re-narrated. Decisions and accepted risks live in `DEVIATIONS_LEDGER_A.md`; dated observations live
-in `STATE.md`.
+re-narrated. Decisions and accepted risks live in `../LEDGER_A.md`; dated observations live
+in `../STATE.md`.
 
 ## Status legend
 
@@ -101,6 +101,6 @@ Secondary items:
 |---|---|
 | What are we protecting, from whom, under what assumptions? | `SECURITY_AUDIT_MODEL.md` |
 | Which control enforces which invariant, and what proves it? | this file |
-| How do I cut a release / read an F-Droid failure? | `RUNBOOK.md` playbook 6, `FDROID_VALIDATION.md` |
-| Why was it decided this way? What was declined? | `DEVIATIONS_LEDGER_A.md` |
-| What is true as of a date (alerts, versions, state)? | `STATE.md` |
+| How do I cut a release / read an F-Droid failure? | `../RUNBOOK.md` playbook 6, `FDROID_VALIDATION.md` |
+| Why was it decided this way? What was declined? | `../LEDGER_A.md` |
+| What is true as of a date (alerts, versions, state)? | `../STATE.md` |

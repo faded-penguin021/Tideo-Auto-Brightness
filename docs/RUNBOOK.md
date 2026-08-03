@@ -4,10 +4,10 @@ The Tasker→Kotlin rebuild is **done and shipped** (v1.0.0). This is the entry 
 *changing* the app afterward while preserving Tasker feature parity. Pick the change-type
 playbook that matches your task, read the reference docs it names, then do the work.
 
-The migration narrative (segment briefs, gate findings) is frozen in `../history/` — consult it,
-don't extend it. The numbered deviations live in `DEVIATIONS_LEDGER.md`, a permanent append-only
+The migration narrative (segment briefs, gate findings) is frozen in `docs/history/` — consult it,
+don't extend it. The numbered deviations live in `docs/LEDGER.md`, a permanent append-only
 registry (never compress it; append the next number in the LIVE ledger file — base file closed
-at D-176; from `DEVIATIONS_LEDGER_A.md`/DA-001 on, 1000 lines per file, final row may overflow,
+at D-176; from `LEDGER_A.md`/DA-001 on, 1000 lines per file, final row may overflow,
 next row opens `_B.md`/DB-001, …; D-153/DA-001). **Code + golden
 vectors are ground truth**; where any doc disagrees with the code, trust the code (and fix the doc).
 
@@ -21,7 +21,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 - **`:app`** — Compose M3 UI (~9 screens), DataStore settings (`AabSettings`), foreground
   service runtime, QS tile, boot receiver, notification.
 
-## Reference-doc index (live, in `docs/rebuild/` unless noted)
+## Reference-doc index (live; bare names are in `docs/rebuild/`, paths are repo-relative)
 
 | Question | Doc |
 |---|---|
@@ -42,7 +42,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | The standing on-device acceptance pass (permanent, cited by §number) | `DEVICE_TEST_SCRIPT.md` |
 | What the *unreleased* train changed, for the owner to check (ephemeral) | `DEVICE_TEST_SCRIPT_<version>.md` |
 | Which control enforces an invariant, and what proves it | `SECURITY_REVIEW.md` |
-| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
+| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `docs/LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
 ## Change-type playbooks
 
@@ -60,7 +60,7 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 
 ### 1. Tasker profile added / changed / removed (a trigger context or pipeline gate)
 - **Read first:** `extraction/profiles.md` (+ `contexts_spec.md` for context watchers); the
-  relevant `DEVIATIONS_LEDGER` rows (profile gating, ConditionList semantics). Re-read the XML
+  relevant `docs/LEDGER.md` rows (profile gating, ConditionList semantics). Re-read the XML
   only via `XML_RECIPES.md`.
 - **Code:** the hardcoded-boolean profile gates in `:domain`/`:platform` (no generic
   ConditionList evaluator exists — gates are explicit Kotlin booleans with a truth-table test).
@@ -92,7 +92,7 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 
 ### 4. Bug fix
 - **Read first:** the reference doc for the affected area (above) + any related
-  `DEVIATIONS_LEDGER` row.
+  `docs/LEDGER.md` row.
 - **Steps:** reproduce → add/adjust a failing test first → fix so it conforms to the golden
   vectors (never edit a golden vector to pass; changing one needs proof the extraction was
   wrong + a `STATE.md` entry) → run the ladder → **glue-review protocol** (below) if the fix
@@ -216,7 +216,7 @@ so check it explicitly.
   record and takes no maintenance-era files). Two round scripts alive at once means the previous
   one should already have been retired.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
-  process, a `DEVIATIONS_LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
+  process, a `docs/LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
   (D-127): the history lives in `STATE.md`, the ledger, the fastlane changelogs, and git — the gradle
   file keeps only the bump *invariant* comment, not a running log (it had grown to ~50 lines of
   redundant narrative).
@@ -536,8 +536,8 @@ When CI is red but local is green, the failure is in the **environment/workflow*
 ## Self-adaptation — keep this runbook useful
 
 If this runbook lacks what you need for the task in front of you:
-1. Consult the live reference docs above (esp. `DEVIATIONS_LEDGER.md`) and the frozen
-   `../history/` narrative.
+1. Consult the live reference docs above (esp. `docs/LEDGER.md`) and the frozen
+   `docs/history/` narrative.
 2. If you learn a durable fact future sessions need, record it as a new numbered deviation
    in the live ledger file (1000-line cap + rollover, D-153/DA-001) and/or correct the relevant
    reference doc — provenance-stamped, terse.

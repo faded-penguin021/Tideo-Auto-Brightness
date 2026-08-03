@@ -39,4 +39,4 @@ else
 fi
 
 # Maintenance pointer (every session).
-echo "Maintenance: read docs/rebuild/STATE.md first, then the matching change-type playbook in docs/rebuild/RUNBOOK.md (protocol in CLAUDE.md; AGENTS.md points there)."
+echo "Maintenance: read docs/STATE.md first, then the matching change-type playbook in docs/RUNBOOK.md (protocol in CLAUDE.md; AGENTS.md points there)."

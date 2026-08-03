@@ -1,7 +1,7 @@
 # DEVIATIONS & DISCOVERIES LEDGER B — permanent registry (DB-001…)
 
 > **Append-only registry — NEVER archived, compressed, or truncated.** The continuation of
-> `DEVIATIONS_LEDGER_A.md`, which closed at its 1000-line cap (D-153 mechanism, DA-001 line-based
+> `LEDGER_A.md`, which closed at its 1000-line cap (D-153 mechanism, DA-001 line-based
 > cap). Code comments and docs cite entries as bare `DB-0NN` and must always resolve here, so no
 > entry may ever be deleted or summarized away. **Append new maintenance deviations as DB-001,
 > DB-002, … at the bottom** — one continuous sequence, never restart numbering. Code + golden
@@ -12,7 +12,7 @@
 > **File cap & rollover.** THIS FILE holds at most **1000 lines** (`scripts/ladder.sh`
 > `LEDGER_CAP_LINES` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
 > may ever START past it: when this file stands at more than 1000 lines, create
-> **`DEVIATIONS_LEDGER_C.md`** with this same header discipline and start numbering at **DC-001**.
+> **`LEDGER_C.md`** with this same header discipline and start numbering at **DC-001**.
 > Existing rows are never moved, renumbered, or rewritten by a rollover.
 
 - DB-001 [cited]: **A failed Extra Dim level write left the previous, stronger level on screen.**

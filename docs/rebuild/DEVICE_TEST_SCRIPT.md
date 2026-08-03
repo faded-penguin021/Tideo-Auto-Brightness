@@ -10,7 +10,7 @@ folded in here first (RUNBOOK §6).
 
 Run this end-to-end on a real device (no emulator — the SoC has no KVM here, and the light/proximity/
 battery sensors, OEM brightness range, Shizuku binder, and doze are only exercisable on hardware). Tick
-each step's **Expected**; log any miss in `STATE.md` → "Owner queue". Build + install the debug APK
+each step's **Expected**; log any miss in `../STATE.md` → "Owner queue". Build + install the debug APK
 with `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` (or grab a published
 build from Releases).
 
@@ -318,4 +318,4 @@ authorized**) first, then a root shell; the switch itself always persists.
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures
-in `STATE.md` → "Owner queue" for a punch-list session.
+in `../STATE.md` → "Owner queue" for a punch-list session.
