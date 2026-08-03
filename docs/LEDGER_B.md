@@ -352,3 +352,31 @@
   Supersedes DA-021's decline of a harness rewrite from an external context-engineering blog:
   that source was third-party and general, this one is first-party and model-specific, which is
   the new evidence Decided non-items require.
+
+- DB-018: **The rule-review pass on DB-017 found 12 defects, 3 of them binding — and the worst
+  was a rule whose deletion was invisible precisely because the thing it guarded is invisible.**
+  DB-017 cut the constitution 42%; the mandatory review landed after the commit (rate limits) and
+  is recorded here rather than in that row because the row is immutable.
+  **The blocking one:** the reduction dropped "never a personal address, **including one handed to
+  the agent in its own session context**". Claude Code injects the owner's real email into every
+  session's context, so an agent reading only "use the owner's handle or a no-reply alias" while
+  holding that address has nothing telling it *that* address is the forbidden one — the natural
+  reading is that a harness-supplied owner email is the sanctioned identity. The ladder's identity
+  rung explicitly cannot tell a personal address from a work one, so nothing downstream catches
+  it, and a pushed commit cannot be repaired without the rewrite this repo forbids. The clause was
+  the entire mechanism. **The rule: when a rule's subject is something the agent is *handed*
+  rather than something it fetches, the rule is invisible to a redundancy check — no other file
+  mentions it, because no other file can see it.**
+  **The second:** the adapter-coverage table written in the same change credited Codex with a
+  bootstrap, a command rail and full deny rails, all "per upstream template". Its own adapter
+  files say the opposite in terms — no session-start hook, no pre-shell hook, and prefix rules
+  with no path-glob operand. The table was three lines above a paragraph correctly describing
+  Codex's actual situation, and it violated the honesty requirement stated seven lines above it.
+  A false coverage claim in the document the constitution names as the single answer is worse
+  than no document.
+  **The third:** "say which layer holds a rule whenever you add one" was cut to a narrower remark
+  about this file not restating script coverage. That sentence is why `scripts/guards/doc-facts.sh`
+  exists (drift incident d66de4c) and why RUNBOOK has to write "no guard enforces this bullet".
+  **What this says about compressing legislation:** every one of the three survived a
+  "is it stated elsewhere?" check and failed a "would a session do the wrong thing?" check. The
+  first is the test an author can run; only a fresh reader can run the second.

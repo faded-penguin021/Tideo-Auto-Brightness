@@ -54,12 +54,6 @@ live volume is `LEDGER_B.md`.
 
 **Pending owner actions:**
 
-1. **DB-017 landed without its rule-review pass.** The fresh-context reviewer was launched but
-   had not returned when rate limits forced the commit; the constitution is a 42% cut, which is
-   the diff class where a deleted binding rule is indistinguishable from a removed redundancy.
-   Re-run the rule-review protocol against `git show <DB-017 commit>:AGENTS.md` before treating
-   the reduction as settled.
-
 1. Confirm F-Droid reports 1.8.2 successfully verified — the first AGP 8.13.2 release. Follow
    RUNBOOK §6/DA-026 if it differs. **Not observable from a session**; the owner settles it.
    When it lands, the DB-010 fold above becomes due and this item closes.
@@ -112,6 +106,13 @@ live volume is `LEDGER_B.md`.
 
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
+
+- 2026-08-03 — **DB-018: the DB-017 review found 12 defects, 3 binding.** Restored the clause
+  forbidding a personal address *handed to the agent in its session context* (the harness injects
+  one, and nothing downstream catches it); corrected an adapter-coverage table that credited Codex
+  with a bootstrap and command rail its own config disclaims; restored "say which layer holds a
+  rule". Plus the push-retry contract, the branch-existence check, three Tasker semantics, two
+  action codes, and four smaller losses. Constitution 155 → 168 lines.
 
 - 2026-08-03 — **DB-017: constitution cut 42% on Claude-5 context-engineering guidance.**
   217 → 155 lines. Auto-memory declined (per-agent, and this harness's memory must be

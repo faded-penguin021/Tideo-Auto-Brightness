@@ -64,7 +64,7 @@ session while drifting against every upstream release.
   Here the naming is the rule, so a `DB-` row misfiled into `LEDGER_A.md` resolves cleanly and
   passes upstream.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 17 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 19 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -133,7 +133,7 @@ that exist today:
 | Adapter | Bootstrap | Command rail | Deny rails | Output redaction |
 |---|---|---|---|---|
 | `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | per upstream template | per upstream template | per upstream template | **no** |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | **no** — Codex has no repository-local session-start hook; run `scripts/session-start.sh` by hand | **no** — no pre-shell hook, so `scripts/command-guard.sh` is a script nobody calls and every Bash call is unjudged | **partial** — `amh.rules` prefix rules only; the policy has no path-glob operand, so nested `.env` and arbitrary `/proc/<pid>/environ` cannot be expressed | **no** |
 
 **An agent with no pre-execution hook has no command rail at all.** `scripts/command-guard.sh` is
 then a script nobody calls, and the constitution's prose is the only layer standing. No check can

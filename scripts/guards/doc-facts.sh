@@ -29,7 +29,7 @@ shizuku_expected=2
 shizuku_sites=$(grep -rl 'ShizukuShell' platform/src/main app/src/main 2>/dev/null |
 	grep -cv '/ShizukuShell\.kt$')
 if [ "${shizuku_sites:-0}" != "$shizuku_expected" ]; then
-	printf 'doc-fact drift: %s file(s) reference ShizukuShell but the docs claim exactly %s runtime places — update the claim in the constitution (CLAUDE.md today; AGENTS.md once the pointer swap lands) and its restatements in README.md, the d66de4c drift site, AND this guard'"'"'s constant in lockstep (DA-015)\n' \
+	printf 'doc-fact drift: %s file(s) reference ShizukuShell but the docs claim exactly %s runtime places — update the claim in the constitution (AGENTS.md) and its restatement in README.md, the d66de4c drift site, AND this guard'"'"'s constant in lockstep (DA-015)\n' \
 		"$shizuku_sites" "$shizuku_expected" >&2
 	fails=$((fails + 1))
 fi
