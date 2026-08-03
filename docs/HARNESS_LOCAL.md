@@ -109,6 +109,37 @@ carries this repo's JDK/SDK/cache setup.
 **`scripts/bootstrap.sh`** holds the Android SDK setup and the background Gradle warm-up
 (D-173), and runs only when `AAB_REMOTE=1` — never implicitly on a developer machine.
 
+## Adding an agent adapter
+
+`AGENTS.md` is the constitution for every agent; an adapter is wiring only, and lives in a
+dot-dir (`.claude/`, `.codex/`). A new one must:
+
+- run `scripts/session-start.sh` at session start;
+- translate its own vendor environment variables into the neutral flag `amh.conf` names — **in
+  the adapter, never in a shipped script** (that is what the `CLAUDE_CODE_REMOTE` → `AAB_REMOTE`
+  line above is);
+- mirror the deny rails — environment dumps, force-push, pushing to `main` — if the agent
+  supports permission rules;
+- wire `scripts/command-guard.sh` as a pre-execution check if the agent supports hooks;
+- pipe tool output through `scripts/redact.sh` if the agent has an output-filter hook;
+- honour one session, one branch;
+- add its config file to `RULE_FILES` in `amh.conf`, so a diff to it trips the rule-review
+  tripwire.
+
+**State which of those layers the adapter actually provides, honestly**, in the adapter's own
+`$comment` field. A false coverage claim is what stops the next reader checking by hand. The two
+that exist today:
+
+| Adapter | Bootstrap | Command rail | Deny rails | Output redaction |
+|---|---|---|---|---|
+| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | per upstream template | per upstream template | per upstream template | **no** |
+
+**An agent with no pre-execution hook has no command rail at all.** `scripts/command-guard.sh` is
+then a script nobody calls, and the constitution's prose is the only layer standing. No check can
+detect this: telling a hook invocation from a manual one needs vendor-specific environment
+variables the harness will not assume.
+
 ## Upgrading
 
 Follow `docs/UPGRADING.md` in the AMH repository. In short: clone the target tag, read

@@ -54,6 +54,12 @@ live volume is `LEDGER_B.md`.
 
 **Pending owner actions:**
 
+1. **DB-017 landed without its rule-review pass.** The fresh-context reviewer was launched but
+   had not returned when rate limits forced the commit; the constitution is a 42% cut, which is
+   the diff class where a deleted binding rule is indistinguishable from a removed redundancy.
+   Re-run the rule-review protocol against `git show <DB-017 commit>:AGENTS.md` before treating
+   the reduction as settled.
+
 1. Confirm F-Droid reports 1.8.2 successfully verified — the first AGP 8.13.2 release. Follow
    RUNBOOK §6/DA-026 if it differs. **Not observable from a session**; the owner settles it.
    When it lands, the DB-010 fold above becomes due and this item closes.
@@ -106,6 +112,11 @@ live volume is `LEDGER_B.md`.
 
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
+
+- 2026-08-03 — **DB-017: constitution cut 42% on Claude-5 context-engineering guidance.**
+  217 → 155 lines. Auto-memory declined (per-agent, and this harness's memory must be
+  cross-agent and reviewable); a verification skill declined as indirection over a one-word
+  interface. Landed unreviewed — see the Owner queue.
 
 - 2026-08-03 — **DB-010 fold done at the 1.8.2 tag (owner-approved).** The ephemeral
   `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md` is deleted; its durable checks became steps 15a/15b

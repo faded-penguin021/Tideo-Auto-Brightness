@@ -326,3 +326,29 @@
   empty directory. It now sources `amh.conf` itself. **The rule for every repo-local guard: source
   the config, never inherit it, and make "I checked nothing" a failure that names its subject.**
   Both are fixture-pinned. `[cited]`: `scripts/guards/ledger-prefix.sh`.
+
+- DB-017: **The constitution was cut 42% on Anthropic's Claude-5 context-engineering guidance,
+  and one part of it was declined.** Owner-requested test of the freshly-converged harness.
+  Applied: judgment over enumerated rules ("write code that reads like the code around it"
+  replacing style lists); single mentions (secret hygiene stopped restating what
+  `command-guard.sh`'s header says and now points at it, because a restatement is a thing that
+  drifts); progressive disclosure (the adapter-authoring spec moved to `docs/HARNESS_LOCAL.md`,
+  the module map defers to RUNBOOK's deeper copy, the Gradle rungs to `scripts/verify.sh`); and
+  references to artifacts over descriptions of them. 217 → 155 lines, 15.7 → 9.2 KB.
+  **Declined, owner decision: auto-memory.** The guidance says to stop maintaining memory files
+  because the agent preserves its own. That is per-agent, and this harness's memory is a
+  cross-agent, in-repo, reviewable artifact — the ledger's whole value is that a bug found by one
+  session teaches a *different* agent nine sessions later, which no private memory can do.
+  **Also declined: a skill for verification.** Verification here is already one command with the
+  detail inside `scripts/verify.sh`; wrapping that in a skill is indirection over an interface
+  that is already one word.
+  **Two cuts were caught and reverted before landing**, both the same shape — prose that looked
+  redundant because another file also said it, where the constitution was the only thing that
+  said it *in time*: the "never read the 1.6 MB source XML wholesale, go via `XML_RECIPES.md`"
+  hazard (`XML_RECIPES.md` states it, but only after you have already opened the wrong file), and
+  "no new dependency unless the change clearly warrants one", which lived nowhere else in live
+  prose. **The rule this earns: when compressing legislation, "another file says it" is not
+  sufficient — ask whether the reader reaches that file BEFORE the mistake.**
+  Supersedes DA-021's decline of a harness rewrite from an external context-engineering blog:
+  that source was third-party and general, this one is first-party and model-specific, which is
+  the new evidence Decided non-items require.
