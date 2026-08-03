@@ -102,10 +102,13 @@ open Dependabot alerts (DA-041), so no dependency version change is warranted by
 
 ## Changelog
 
-- 2026-08-03 — **AMH convergence unit 1.** Moved the harness docs to the AMH layout
+- 2026-08-03 — **AMH convergence units 1–2.** Harness docs moved to the AMH layout
   (`docs/rebuild/{STATE,RUNBOOK}.md` → `docs/`, `DEVIATIONS_LEDGER{,_A,_B}.md` →
-  `docs/LEDGER{,_A,_B}.md`) and repointed every live reference; `docs/rebuild/` keeps the
-  reference docs. The frozen `docs/history/*_rebuild.md` archive was left untouched.
+  `docs/LEDGER{,_A,_B}.md`), every live reference repointed, the frozen `docs/history/`
+  archive untouched. Then all 124 bold-form row headers were normalized to
+  `- D-NNN[ [cited]]: **…`, the only shape AMH's citation guard reads (it saw 104 of 228).
+  The bold opener moves after the colon; 33 rows had none and gained one (+33 B). Row text,
+  row count (228) and line counts are otherwise unchanged.
 
 - 2026-08-02 — **DB-009 (issue #110, upstream Tasker parity + a battery bug it exposed).** New global
   pref `panicRequiresPlugged` (`%AAB_PanicPlugged`, default OFF) restricts the panic gesture to

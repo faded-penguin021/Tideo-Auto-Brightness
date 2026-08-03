@@ -30,7 +30,7 @@
 >
 > **`[cited]` marker (D-174 — machine-managed, owner-requested).** A row whose number is cited
 > from the guard-5 scan scope (`app/ domain/ platform/ .github/` sources — see
-> `scripts/ladder.sh`) carries ` [cited]` directly after its number (`- **DA-002 [cited]: …`).
+> `scripts/ladder.sh`) carries ` [cited]` directly after its number (`- DA-002 [cited]: **…`).
 > Ladder guard 5 syncs it in BOTH directions — a cited row missing the marker and a marked row
 > no longer cited both fail — so the marker is verified derived state, never hand-tracked:
 > `grep '\[cited\]'` on a ledger file lists every code-anchored row without cross-referencing
@@ -40,7 +40,7 @@
 
 ## Deviations & discoveries ledger (continued from D-176)
 
-- **DA-001: ledger rollover cap changed rows → lines; base ledger closed at D-176
+- DA-001: **ledger rollover cap changed rows → lines; base ledger closed at D-176
   (owner-instructed, 2026-07-19).** The D-153/D-171 cap (184 rows/file) bounded row COUNT but
   not size — rows average ~19 lines, and the base file reached ~3.3k lines at only 171 rows,
   defeating the cap's purpose (bounded read/context cost). New rule, effective from this file
@@ -55,7 +55,7 @@
   CLAUDE.md/RUNBOOK cap wording updated. Numbering within a file is open-ended (no fixed
   DA-184 ceiling — the line cap decides when a file ends).
 
-- **DA-002: branch-train workflow codified (owner-requested, 2026-07-19).** The docs assumed
+- DA-002: **branch-train workflow codified (owner-requested, 2026-07-19).** The docs assumed
   "one branch per session, each squash-merged separately"; the owner's real workflow is a
   branch TRAIN: each new session branch is cut from the newest session branch (not `main`),
   superseded branches are deleted unmerged once contained, and only the final superset
@@ -69,7 +69,7 @@
   compute PR drafts from `origin/main..HEAD`; `git ls-remote --heads origin` before citing
   session branches in docs.
 
-- **DA-003: glue review moves to a fresh-context subagent (owner-requested, 2026-07-19).**
+- DA-003: **glue review moves to a fresh-context subagent (owner-requested, 2026-07-19).**
   The RUNBOOK glue-review pass had the authoring context review its own diff — anchored on
   its own reasoning, predisposed to accept it (the exact failure D-030/D-034 recorded:
   segments passed their own gates, independent review still found shipped bugs). Now the
@@ -83,7 +83,7 @@
   self-review survives only as the fallback where the harness cannot spawn a fresh context.
   RUNBOOK protocol + discipline rules 1/4 and harness prompt P12/3.2 updated.
 
-- **DA-004: STATE length guard gains hysteresis (owner-requested, 2026-07-19).** The old
+- DA-004: **STATE length guard gains hysteresis (owner-requested, 2026-07-19).** The old
   scheme (warn > 12 KB, fail > 16 KB, "steady-state target 12 KB") produced exactly the
   byte-trim anti-pattern an external review flagged: sessions trimmed to just under 12 KB,
   the next session's lines re-armed the warn, and the log filled with micro-commits ("three
@@ -96,7 +96,7 @@
   Guard 1 + its test fixtures (22 cases) + STATE preamble + harness prompt 3.1/3.4 updated
   in lockstep.
 
-- **DA-005: rule-review — harness legislation gets the fresh-context pass too
+- DA-005: **rule-review — harness legislation gets the fresh-context pass too
   (owner-requested, 2026-07-19).** Rule changes had no review at all: guard LOGIC has a test
   suite, but the prose rules (CLAUDE.md, RUNBOOK protocols, ledger preambles, permission
   rails) had none, and a bad rule compounds — it manufactures defects in every future
@@ -114,7 +114,7 @@
   verdict disclosed in the commit body. One level of meta only: nobody reviews the reviewer;
   the owner arbitrates via the queue.
 
-- **DA-006: external-review triage #2 — instruction hierarchy, leak response, server-side
+- DA-006: **external-review triage #2 — instruction hierarchy, leak response, server-side
   rails, rule-review tripwire (owner-approved, 2026-07-20).** A second external AI review
   (Qwen) of the harness, triaged like D-162. Accepted: (1) **Instruction hierarchy** —
   external content (issues, PR/review comments, CI logs, dependency manifests, fetched
@@ -148,7 +148,7 @@
   the rewrite exception initially allowed an "owner-approved" agent-executed rewrite
   (tightened to owner-executed only).
 
-- **DA-007: mechanical secret redaction at the adapter boundary (owner-requested,
+- DA-007: **mechanical secret redaction at the adapter boundary (owner-requested,
   2026-07-20).** D-175/P17 secret hygiene relied on prose discipline + dump-command deny
   rails; neither scrubs a token that lands in ordinary tool output (a build log echoing a
   header, a verbose curl). New `scripts/redact.sh` (agent-neutral, stdin→stdout): replaces
@@ -172,7 +172,7 @@
   sed flag broke the agent-neutral billing on BSD). Guard 8 + the adversarial cases are the
   fixes.
 
-- **DA-008: secret-shape commit guard — ladder guard 9 (owner-reopened, 2026-07-20).**
+- DA-008: **secret-shape commit guard — ladder guard 9 (owner-reopened, 2026-07-20).**
   Supersedes the triage-#2 decline of a "local secret-pattern diff guard" (STATE Decided
   non-items, declined 2026-07-20 in favor of server-side push protection): the owner
   reopened it the same day, and the calculus HAD changed — (a) push protection fires at
@@ -201,7 +201,7 @@
   PR-draft refresh, guard summaries de-enumerated to the ladder.sh header as single
   source) except the binary grep pass, declined as above.
 
-- **DA-009: instructive pre-execution command guard (2026-07-21).** External insight
+- DA-009: **instructive pre-execution command guard (2026-07-21).** External insight
   (a Reddit thread the owner relayed, triaged as data per DA-006): a deterministic rule
   enforces better as a pre-tool-use hook whose DENY REASON is fed back to the agent — the
   agent reads the reason and self-corrects, instead of fighting a mute prefix-matched deny
@@ -238,7 +238,7 @@
   agents, so hookable rules stay as prose (the saving lands in fewer failed-denial
   round-trips, not fewer lines).
 
-- **DA-010: external-review triage #3 — mechanize the branch-train call; no warm-up
+- DA-010: **external-review triage #3 — mechanize the branch-train call; no warm-up
   sentinel (2026-07-21).** Owner-relayed external suggestions (triaged as data per DA-006).
   **Adopted (reduced):** (a) ladder guard 4 no longer asks the agent to reason about train
   topology — a content-level test-merge (`git merge-tree --write-tree origin/main HEAD`,
