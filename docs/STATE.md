@@ -38,16 +38,20 @@ is `AGENTS.md` (`CLAUDE.md` points at it; rows written before 2026-08-03 cite th
 `docs/HARNESS_LOCAL.md` records every local deviation from a stock install and is the document
 the next upgrade reads first.
 
-**Shipped: v1.8.1 (vc19). Release pending: 1.8.2 / vc20.** The train branch
-`claude/gradle-deprecation-fdroid-870gh3` carries AGP 8.13.2, F-Droid compatibility CI and the
-1.8.2 bump; PR #99 folded bounded profile import + sticky-restart gating in, and PR #96's squash
-title/body describe the net train. At the tag run DA-026's one-shot F-Droid reproducibility
-check; the DA-024 store icon lands with it. `domain/` and `platform/` are byte-identical to
-1.8.1. Device verification is two files with a lifecycle (DB-010): the permanent
-`rebuild/DEVICE_TEST_SCRIPT.md` and the ephemeral `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md`,
-**deleted at the 1.8.2 tag** after folding anything durable into the permanent one (RUNBOOK §6).
-No plan files; parity checklist zero-pending; tests green; TODO/FIXME and parity gaps zero. The
-ledger rolled over twice — the live volume is `LEDGER_B.md`.
+**Shipped: v1.8.2 (vc20).** Verified 2026-08-03: `v1.8.2` is tagged on origin and `main` carries
+vc20. The train (AGP 8.13.2, F-Droid compatibility CI, bounded profile import, sticky-restart
+gating, the DA-024 store icon) is merged. **Awaiting F-Droid**: the reproducible-build verification
+of the first AGP 8.13.2 release is the owner's to confirm — no session can observe it.
+
+**Due now that the tag is cut (RUNBOOK §6 / DB-010):** `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md` is
+the ephemeral round script and is deleted at the tag, after folding anything durable into the
+permanent `rebuild/DEVICE_TEST_SCRIPT.md`. Deliberately NOT done yet: its "Round 2" list is live
+evidence while F-Droid verification is outstanding, and DA-026 may send the owner back to it.
+Do the fold once F-Droid confirms.
+
+`domain/` and `platform/` are byte-identical to 1.8.1. No plan files; parity checklist
+zero-pending; tests green; TODO/FIXME and parity gaps zero. The ledger rolled over twice — the
+live volume is `LEDGER_B.md`.
 
 ## Owner queue
 
@@ -56,12 +60,9 @@ ledger rolled over twice — the live volume is `LEDGER_B.md`.
 
 **Pending owner actions:**
 
-1. Close #97/#98 unmerged (superseded by merged #99), squash-merge PR #96 to `main`, and cut
-   **1.8.2/vc20** from GitHub's release UI.
-2. At that tag, after `release.yml`, confirm F-Droid reports the version successfully verified.
-   This is the first AGP 8.13.2 release; follow RUNBOOK §6/DA-026 if it differs, then remove
-   both items.
-   Check: `git ls-remote --tags origin 'refs/tags/v1.8.2'` — a line back means the tag is cut.
+1. Confirm F-Droid reports 1.8.2 successfully verified — the first AGP 8.13.2 release. Follow
+   RUNBOOK §6/DA-026 if it differs. **Not observable from a session**; the owner settles it.
+   When it lands, the DB-010 fold above becomes due and this item closes.
 
 **Open questions:** (none)
 
