@@ -43,12 +43,6 @@ vc20. The train (AGP 8.13.2, F-Droid compatibility CI, bounded profile import, s
 gating, the DA-024 store icon) is merged. **Awaiting F-Droid**: the reproducible-build verification
 of the first AGP 8.13.2 release is the owner's to confirm — no session can observe it.
 
-**Due now that the tag is cut (RUNBOOK §6 / DB-010):** `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md` is
-the ephemeral round script and is deleted at the tag, after folding anything durable into the
-permanent `rebuild/DEVICE_TEST_SCRIPT.md`. Deliberately NOT done yet: its "Round 2" list is live
-evidence while F-Droid verification is outstanding, and DA-026 may send the owner back to it.
-Do the fold once F-Droid confirms.
-
 `domain/` and `platform/` are byte-identical to 1.8.1. No plan files; parity checklist
 zero-pending; tests green; TODO/FIXME and parity gaps zero. The ledger rolled over twice — the
 live volume is `LEDGER_B.md`.
@@ -112,6 +106,14 @@ live volume is `LEDGER_B.md`.
 
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
+
+- 2026-08-03 — **DB-010 fold done at the 1.8.2 tag (owner-approved).** The ephemeral
+  `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md` is deleted; its durable checks became steps 15a/15b
+  (plugged-only panic, demand-driven accelerometer) and 19a–19c (setpoint clamp where it is
+  stored, live grant pickup, failed Extra Dim level write) in the permanent
+  `rebuild/DEVICE_TEST_SCRIPT.md`. The train's other sections tested hardening of features the
+  standing script already covers and whose bounds are unit-tested, so they did not carry over.
+  Section J stays retired (DB-013) with its unverified residual recorded above.
 
 - 2026-08-03 — **AMH convergence complete (DB-014…DB-016).** Adopted AMH 3.0.0 at the `full`
   profile, replacing the harness this repo originated. Docs moved to the AMH layout; all 124

@@ -65,6 +65,20 @@ optional.
 15. **Grab the phone out of a pocket and turn the screen on normally** (do not deliberately invert+shake).
     **Expected:** panic does **NOT** fire — the 3 s post-wake grace + the stricter inversion threshold
     suppress the grab-to-wake false trigger.
+15a. **"Only when plugged in"** (Live Debug, under Panic Sensitivity; default **off**, DB-009).
+    Unplugged with it **on**, gesture. **Expected:** nothing. Plug in — without locking the screen —
+    and gesture. **Expected:** fires, so the toggle takes effect immediately rather than at the next
+    screen-off. Unplug and gesture again: nothing.
+    **Run that last step twice**: once continuing from the plugged case, and once after stopping and
+    re-enabling the service while unplugged. The second shape is the one that broke (DB-011) — the
+    gesture started before the settings snapshot resolved and an unresolved snapshot read as "no
+    restriction".
+15b. **The accelerometer is released while the screen is off** and re-registered on screen-on
+    (DB-009 — it was held at ~50 Hz for the life of the service, including screen-off, where the
+    gesture cannot fire). With the toggle off: lock, wait ~10 s, unlock and **immediately** gesture.
+    **Expected:** fires first time. **Fail:** it needs a preparatory flip-straight-and-back to arm.
+    Then shake it upside down with the screen off and unlock. **Expected:** brightness untouched,
+    service still running.
 
 ## 6. Super dimming [ELEVATED] (task646/650/645/700/698)
 
@@ -79,6 +93,26 @@ optional.
     floor while the secure layer dims below it.
 19. **Circadian dimming:** set Spread (Circadian) to 100 with circadian scaling on, in daylight hours.
     **Expected:** super dimming is **suppressed** during the circadian daytime boost (G2R-F90).
+19a. **Strength setpoint is clamped where it is stored, not only where it is used** (DB-008).
+    65 was always the effective ceiling, but the field kept showing whatever was typed. Set
+    **Strength Setpoint = 100** → **Apply**. **Expected:** a message says it was reduced to 65 **and
+    the field reads 65**; leave the screen and return, still 65. **64** → Apply: stays 64, no message.
+    **65** → Apply: stays 65 and **no message** (the announcement fires only when the value actually
+    moved). Then confirm the correction was cosmetic at the value level —
+    `adb shell settings get secure reduce_bright_colors_level` at strength 65, threshold 1, circadian
+    spread 0, dark room. **Fail:** dimming got *weaker*; the clamp was only ever meant to correct the
+    display.
+19b. **A grant made while the app is running is picked up without a restart** (DB-012). With the
+    service running and the screen on, grant `WRITE_SECURE_SETTINGS` over adb. **Expected:** the tier
+    badge reaches **ELEVATED** within ~10 s and super dimming starts working, with no app restart.
+    **Known residual:** `PrivilegeManager` is per-`AppModule` and `AppModule` is built at ~10 call
+    sites, so the tier cache is shared only within one instance; DB-012 self-heals the visible symptom
+    rather than making it process-wide.
+19c. **A failed Extra Dim level write does not leave the previous, stronger level on screen**
+    (DB-001). Hard to force deliberately — if a level write ever fails (revoked grant,
+    SettingsProvider error) while dimming is engaged, **Expected:** the app deactivates and re-engages
+    from scratch on the next cycle, and the debug line reports `ON <level>` only for a write that
+    actually landed.
 
 ## 7. Circadian scaling (task90)
 
