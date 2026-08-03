@@ -1,11 +1,12 @@
 {
+  "$comment": "AMH adapter for Claude Code — wiring only, no logic. All behaviour lives in the constitution and scripts/. Layers this adapter provides: the instructive pre-execution command guard (scripts/command-guard.sh, which reads the PreToolUse payload on stdin — no flag), static deny rails, and pre-allowed verification commands. It does NOT provide output redaction: Claude Code has no output-filter hook, so scripts/redact.sh stays available for manual piping and is what the ladder's secret scan and scripts/guards/staged-secrets.sh use. The SessionStart hook translates Claude Code's own CLAUDE_CODE_REMOTE=true into the neutral AAB_REMOTE=1 that amh.conf names — vendor env vars are the adapter's job, never the shipped scripts'. The owner mirrors the hardest rails server-side (branch protection, secret-scanning push protection); these rules bind only agents that load them.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/scripts/session-start.sh"
+            "command": "bash -c 'if [ \"$CLAUDE_CODE_REMOTE\" = true ]; then export AAB_REMOTE=1; fi; exec \"$CLAUDE_PROJECT_DIR/scripts/session-start.sh\"'"
           }
         ]
       }
@@ -16,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/scripts/command-guard.sh --claude-hook"
+            "command": "$CLAUDE_PROJECT_DIR/scripts/command-guard.sh"
           }
         ]
       }
@@ -24,43 +25,65 @@
   },
   "permissions": {
     "allow": [
+      "Bash(scripts/ladder.sh)",
+      "Bash(scripts/ladder.sh --guards-only)",
+      "Bash(scripts/verify.sh)",
+      "Bash(scripts/session-start.sh)",
+      "Bash(scripts/bootstrap.sh)",
+      "Bash(scripts/test-ladder-guards.sh)",
+      "Bash(scripts/tests/local-guards.sh)",
+      "Bash(scripts/redact.sh:*)",
+      "Bash(scripts/command-guard.sh:*)",
+      "Bash(scripts/setup-android-sdk.sh)",
+      "Bash(scripts/warm-gradle.sh)",
       "Bash(./gradlew:*)",
       "Bash(/opt/gradle/bin/gradle:*)",
-      "Bash(scripts/setup-android-sdk.sh)",
-      "Bash(./scripts/setup-android-sdk.sh)",
-      "Bash(bash scripts/setup-android-sdk.sh)",
-      "Bash(scripts/ladder.sh)",
-      "Bash(scripts/ladder.sh:*)",
-      "Bash(./scripts/ladder.sh)",
-      "Bash(./scripts/ladder.sh:*)",
-      "Bash(bash scripts/ladder.sh)",
-      "Bash(bash scripts/ladder.sh:*)",
-      "Bash(scripts/test-ladder-guards.sh)",
-      "Bash(./scripts/test-ladder-guards.sh)",
-      "Bash(bash scripts/test-ladder-guards.sh)",
-      "Bash(scripts/session-start.sh)",
-      "Bash(./scripts/session-start.sh)",
-      "Bash(bash scripts/session-start.sh)",
-      "Bash(scripts/warm-gradle.sh)",
-      "Bash(./scripts/warm-gradle.sh)",
-      "Bash(bash scripts/warm-gradle.sh)"
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git ls-remote:*)"
     ],
     "deny": [
-      "Bash(env)",
-      "Bash(printenv)",
-      "Bash(printenv:*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
       "Bash(git push origin main:*)",
       "Bash(git push origin main)",
       "Bash(git push -u origin main:*)",
       "Bash(git push -u origin main)",
+      "Bash(git push origin HEAD:main)",
+      "Bash(git push -u origin HEAD:main)",
+      "Bash(git push origin +main:*)",
+      "Bash(git push origin +HEAD:main)",
       "Bash(git push origin +:*)",
       "Bash(git push -u origin +:*)",
-      "Bash(git push origin HEAD:main)",
-      "Bash(git push origin HEAD:main:*)",
-      "Bash(git push -u origin HEAD:main)",
-      "Bash(git push -u origin HEAD:main:*)"
+      "Bash(git push --mirror:*)",
+      "Bash(git push --all:*)",
+      "Bash(source .env:*)",
+      "Bash(source ./.env:*)",
+      "Bash(. .env:*)",
+      "Bash(. ./.env:*)",
+      "Bash(env)",
+      "Bash(env:*)",
+      "Bash(printenv)",
+      "Bash(printenv:*)",
+      "Bash(set)",
+      "Bash(export -p)",
+      "Bash(declare -p)",
+      "Bash(declare -x)",
+      "Bash(typeset -p)",
+      "Bash(typeset -x)",
+      "Read(/proc/*/environ)",
+      "Read(/proc/**/environ)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)"
     ]
   }
 }

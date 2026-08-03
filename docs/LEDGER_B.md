@@ -9,8 +9,8 @@
 > entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
 >
-> **File cap & rollover.** THIS FILE holds at most **1000 lines** (`scripts/ladder.sh`
-> `LEDGER_CAP_LINES` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
+> **File cap & rollover.** THIS FILE holds at most **1000 lines**
+> (`LEDGER_LINE_CAP` in `amh.conf` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
 > may ever START past it: when this file stands at more than 1000 lines, create
 > **`LEDGER_C.md`** with this same header discipline and start numbering at **DC-001**.
 > Existing rows are never moved, renumbered, or rewritten by a rollover.

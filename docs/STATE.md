@@ -1,182 +1,142 @@
 # STATE — project state & session memory
 
-> **Length guard (DA-004 hysteresis).** Grow freely to **14 KB**. Once warned, compress once to
-> **≤ 9 KB**; fail >16 KB. Preserve Project, Current state, Owner queue, decided non-items and
-> Changelog. Compress completed work into Changelog lines; move durable rules to the append-only
-> ledger. Guard 1/1a enforces the 9→14 KB debounce landing; never micro-trim.
+> **Length guard (DA-004 hysteresis — read before editing).** Grow freely to **14 KB**; no
+> trimming below that line. When the guard warns, run ONE deep compression pass to **≤ 9 KB** —
+> never trim to just under the threshold, because a micro-trim re-arms the warning a session
+> later and the wide band IS the debounce. That floor is a **ceiling, not a target**: if the
+> pass lands short, fold MORE completed stages rather than micro-trimming toward it. Fail above
+> **16 KB**. Compression means: collapse each completed stage into one Changelog line, fold
+> changelog clusters, move durable gotchas to the append-only ledger, delete narrative prose.
+> **Project**, **Current state**, **Decided non-items** and **Changelog** must always survive —
+> those four are `STATE_REQUIRED_SECTIONS` and the guard FAILS on a missing or empty one.
+> **Owner queue** is protected separately at WARN level: never delete it, and never silently
+> drop items during compression — they are the owner's to close, so compress their prose
+> rather than dropping an open item.
+>
+> `scripts/ladder.sh` machine-checks the band, the required sections, and that a pass actually lands on the floor
+> rather than just clearing the warning; above the cap it tells a compression pass from an
+> ordinary edit by how much the file shrank (`STATE_EDIT_DELTA_BYTES` in `amh.conf`), so fixing
+> a typo up here does not oblige you to compress the whole file. All four numbers live in
+> `amh.conf` — keep this paragraph in lockstep with them.
 
 ## Project
 
 Native Kotlin/Compose rebuild of Tasker `Advanced_Auto_Brightness_V3.3`: `:domain` pure-JVM
-math/decisions, `:platform` Android adapters, and `:app` Compose/DataStore/FGS UI/runtime. BASIC
-`WRITE_SETTINGS` provides the core pipeline; ELEVATED `WRITE_SECURE_SETTINGS` adds super dimming and
-Privileged Display.
+math/decisions, `:platform` Android adapters, `:app` Compose/DataStore/FGS UI/runtime. BASIC
+`WRITE_SETTINGS` provides the core pipeline; ELEVATED `WRITE_SECURE_SETTINGS` adds super dimming
+and Privileged Display. Maintenance runs on the **Agentic Maintenance Harness (AMH 3.0.0)** —
+`AGENTS.md` + this file + `docs/RUNBOOK.md` + `docs/LEDGER*.md` + `scripts/ladder.sh`.
 
 ## Current state
 
-**Active work: converging this repo's harness onto the Agentic Maintenance Harness
-(`faded-penguin021/AMH`, amh-v3.0.0).** The harness that originated here was spun out and
-diverged; the plan is to run stock AMH, delete everything it duplicates, and re-home what is
-genuinely ours in its extension points (`amh.conf`, `scripts/verify.sh`, `scripts/guards/`,
-`scripts/bootstrap.sh`). Unit 1 of 6 done: STATE/RUNBOOK/ledgers moved to the AMH paths
-(`docs/STATE.md`, `docs/RUNBOOK.md`, `docs/LEDGER{,_A,_B}.md`). Remaining: ledger row-header
-normalization, the AMH install, repo-local guards, prose reconciliation, and the record.
+**Active: converging this repo's harness onto the AMH** (`faded-penguin021/AMH`, amh-v3.0.0).
+The harness originated here, was spun out, and diverged; we now run stock AMH, with everything
+it duplicates deleted and everything genuinely ours in its extension points. Units 1–3 done —
+docs at the AMH paths, all 228 ledger rows in the parser's shape, AMH 3.0.0 installed, ladder
+green. **The five shipped scripts are upstream's byte-for-byte and hash-checked against
+`scripts/MANIFEST.sha256` — never edit one;** changes go to `amh.conf`, `scripts/guards/` or
+`scripts/verify.sh`. Remaining: prose reconciliation (AGENTS.md becomes the constitution,
+CLAUDE.md its pointer, `docs/HARNESS_LOCAL.md` records every local delta) and the ledger rows.
 
 **Shipped: v1.8.1 (vc19). Release pending: 1.8.2 / vc20.** The train branch
-`claude/gradle-deprecation-fdroid-870gh3` carries AGP 8.13.2, F-Droid compatibility CI, and the
-1.8.2 bump; PR #99 folded bounded profile import + sticky-restart gating into it, and PR #96's
-squash title/body describe the net train. At the tag, run DA-026's one-shot F-Droid reproducibility
-check; the DA-024 store icon lands with it. `domain/` and `platform/` remain byte-identical to 1.8.1.
-The 2026-07-31 adversarial round (DA-043/DA-044 + DB-001…DB-007) then fixed five confirmed findings
-in that hardening plus three the review did not name, and merged six audit documents into
-`rebuild/SECURITY_REVIEW.md`. Device verification is now two files with a lifecycle (DB-010): the permanent
-`rebuild/DEVICE_TEST_SCRIPT.md` and the ephemeral `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md`, which is **deleted at the
-1.8.2 tag** after folding anything durable into the permanent one (RUNBOOK §6). Three retired round
-scripts are gone; `rebuild/RESUME_CONTEXT_TEST.md`'s DA-018 checks live on as step 25's sub-bullets.
-No plan files; parity checklist has zero pending, tests are green, TODO/FIXME
-and parity gaps are zero. Changes follow RUNBOOK; the ledger rolled over — the live file is now
-`LEDGER_B.md` (`_A.md` closed at its 1000-line cap).
-
-**2026-07-30 dependency/release audit (DA-040):** direct dependencies and privileged surfaces are
-inventoried in `rebuild/SECURITY_REVIEW.md` (dependency row); no versions changed. The
-normal Gradle 8.14.3 wrapper originally lacked `distributionSha256Sum`; DA-042 now pins Gradle's
-official binary ZIP digest, closing that executable-integrity gap. The owner confirmed there are no
-open Dependabot alerts (DA-041), so no dependency version change is warranted by the approved process.
+`claude/gradle-deprecation-fdroid-870gh3` carries AGP 8.13.2, F-Droid compatibility CI and the
+1.8.2 bump; PR #99 folded bounded profile import + sticky-restart gating in, and PR #96's squash
+title/body describe the net train. At the tag run DA-026's one-shot F-Droid reproducibility
+check; the DA-024 store icon lands with it. `domain/` and `platform/` are byte-identical to
+1.8.1. Device verification is two files with a lifecycle (DB-010): the permanent
+`rebuild/DEVICE_TEST_SCRIPT.md` and the ephemeral `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md`,
+**deleted at the 1.8.2 tag** after folding anything durable into the permanent one (RUNBOOK §6).
+No plan files; parity checklist zero-pending; tests green; TODO/FIXME and parity gaps zero. The
+ledger rolled over twice — the live volume is `LEDGER_B.md`.
 
 ## Owner queue
 
-> **Protected (D-167).** Owner actions/questions/findings survive compression. Final chat restates it.
+> **Protected (D-167).** Owner actions/questions/findings survive compression; items leave only
+> when done, answered or triaged. Test each item before restating it. Final chat restates it.
 
 **Pending owner actions:**
 
 1. Close #97/#98 unmerged (superseded by merged #99), squash-merge PR #96 to `main`, and cut
    **1.8.2/vc20** from GitHub's release UI.
-2. At that tag, after `release.yml`, confirm F-Droid reports the version successfully verified. This
-   is the first AGP 8.13.2 release; follow RUNBOOK §6/DA-026 if it differs, then remove both items.
+2. At that tag, after `release.yml`, confirm F-Droid reports the version successfully verified.
+   This is the first AGP 8.13.2 release; follow RUNBOOK §6/DA-026 if it differs, then remove
+   both items.
+   Check: `git ls-remote --tags origin 'refs/tags/v1.8.2'` — a line back means the tag is cut.
 
 **Open questions:** (none)
 
 **Incoming findings:**
 
-- 2026-08-02 — **Owner device pass on 1.8.2-debug: 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED.** Two
-  real defects, both fixed: **C4** the plugged-only panic gesture fired on battery (DB-011) and
-  **F3/F4** a re-granted WRITE_SECURE_SETTINGS was invisible to the running service until an app
-  restart (DB-012). The other three FAILs were defects in the test script, not the app — H used
-  `am force-stop`, which cancels the sticky restart it was testing (so H1's PASS was empty too); G4's
-  slow-provider condition never occurred (Drive answered from cache); J6 followed a failed reinstall
-  at J3. K2/K3 were BLOCKED by Shizuku UI behaviour the steps had assumed away. All corrected in
-  `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md`, which now carries a "Round 2" list of what to re-run.
-- 2026-08-02 — **Harm caused by our own script (DB-013).** Section J's `bmgr restore <token>` omitted
-  the package argument; that is a whole-device restore, and it overwrote stored settings across many
-  unrelated apps on the owner's phone, irreversibly. Section J is now retired outright at the owner's
-  instruction (see Decided non-items), and the script states its blast radius up front.
-- 2026-08-02 — **Owner-queue candidate (from DB-012):** `PrivilegeManager` is per-`AppModule`, and
-  `AppModule` is constructed at ~10 call sites, so "the shared tier cache" is only shared within one
-  instance. A process-wide singleton is the real fix; DB-012 self-heals the one user-visible symptom
-  instead, because the lifetime/threading change is too broad for a train at its tag.
+- 2026-08-02 — **Owner device pass on 1.8.2-debug: 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED.**
+  Two real defects, both fixed: **C4** plugged-only panic fired on battery (DB-011); **F3/F4** a
+  re-granted WRITE_SECURE_SETTINGS stayed invisible to the running service until an app restart
+  (DB-012). The other three FAILs were script defects, not app defects (H used `am force-stop`,
+  which cancels the sticky restart it was testing; G4's slow-provider condition never occurred;
+  J6 followed a failed reinstall). K2/K3 were BLOCKED by Shizuku UI behaviour the steps assumed
+  away. All corrected in `rebuild/DEVICE_TEST_SCRIPT_1.8.2.md`, which carries a "Round 2" list.
+- 2026-08-02 — **Harm caused by our own script (DB-013).** Section J's `bmgr restore <token>`
+  omitted the package argument — a whole-device restore that irreversibly overwrote stored
+  settings across many unrelated apps on the owner's phone. Section J is retired outright at the
+  owner's instruction (see Decided non-items) and the script states its blast radius up front.
+- 2026-08-02 — **Owner-queue candidate (from DB-012):** `PrivilegeManager` is per-`AppModule` and
+  `AppModule` is built at ~10 call sites, so "the shared tier cache" is shared only within one
+  instance. A process-wide singleton is the real fix; DB-012 self-heals the visible symptom
+  instead, the lifetime/threading change being too broad for a train at its tag.
+- 2026-07-30 — Owner confirmed no open Dependabot alerts, closing DA-040's local-evidence gap
+  (DA-041). 2026-07-24 — Owner confirmed `main` protection and secret-scanning push protection
+  are enabled (DA-006).
 
-- 2026-07-30 — Owner confirmed the approved Dependabot view has no open alerts, closing DA-040's
-  local-evidence gap (DA-041); no dependency bump is indicated.
-- 2026-07-24 — Owner confirmed GitHub `main` protection and secret-scanning push protection enabled
-  (DA-006).
-
-## Decided non-items (don't re-litigate without new evidence)
+## Decided non-items
 
 - **Repo/process:** root changelog; speculative dependency bumps; standalone drift audit; action
   SHA-pinning; Gradle dependency verification; widening build CI to session branches (D-161).
-  DA-040's wrapper-distribution digest is a narrower executable-integrity finding, not dependency
-  verification; it does not reopen either declined program.
-- **Triage #1–#6 (D-162, DA-006/010/011/013/015):** glue checkbox output; ledger index/symlink/status
-  retrofit/ID allocator; session delta/header/manifest; per-playbook matrices or RUNBOOK split;
-  dashboard/KPIs/aging guard; dependency-pin playbook; scaffold CLI/profiles; full train verifier,
-  warm-up sentinel, PR-body guard; auto-memory/prompt-order rewrite; orphan-provenance expansion.
-- **Triage #7 (DA-021):** no harness/constitution rewrite from the external context-engineering blog;
-  existing rails are intentional and agent-neutral. Companion recovery stop became DA-012.
-- **Privileged Display (D-150–152):** per-toggle scheduling; persisted last-applied seed absent real
-  reports; QS/notification grayscale action; refresh-rate/OEM keys; manual Extra-Dim toggle.
-- **On-device backup/restore verification (owner, 2026-08-02, DB-013):** not to be tested again. The
-  script's whole-device `bmgr restore` damaged unrelated apps; the owner declined a re-run and the
-  decline is binding. `SettingsBackupSanitizer` stays unit-tested and the allowlist inspectable; that
-  `onRestoreFinished` is actually invoked is an **accepted unverified residual** for 1.8.2. Do not
-  re-add the steps or re-raise this without new evidence (e.g. a spare device offered by the owner).
+  DA-040's wrapper-distribution digest is a narrower executable-integrity finding and reopens
+  neither declined program.
+- **Triage #1–#6 (D-162, DA-006/010/011/013/015):** glue checkbox output; ledger
+  index/symlink/status retrofit/ID allocator; session delta/header/manifest; per-playbook
+  matrices or RUNBOOK split; dashboard/KPIs/aging guard; dependency-pin playbook; scaffold
+  CLI/profiles; full train verifier, warm-up sentinel, PR-body guard; auto-memory/prompt-order
+  rewrite; orphan-provenance expansion.
+- **Triage #7 (DA-021):** no harness rewrite from the external context-engineering blog; the
+  rails are intentional and agent-neutral. Companion recovery stop became DA-012.
+- **Privileged Display (D-150–152):** per-toggle scheduling; persisted last-applied seed absent
+  real reports; QS/notification grayscale action; refresh-rate/OEM keys; manual Extra-Dim toggle.
+- **On-device backup/restore verification (owner, 2026-08-02, DB-013):** not to be tested again.
+  The script's whole-device `bmgr restore` damaged unrelated apps; the owner declined a re-run
+  and that decline is binding. `SettingsBackupSanitizer` stays unit-tested and its allowlist
+  inspectable; that `onRestoreFinished` is actually invoked is an **accepted unverified
+  residual** for 1.8.2. Do not re-add the steps without new evidence (e.g. a spare device).
 
 ## Changelog
 
-- 2026-08-03 — **AMH convergence units 1–2.** Harness docs moved to the AMH layout
-  (`docs/rebuild/{STATE,RUNBOOK}.md` → `docs/`, `DEVIATIONS_LEDGER{,_A,_B}.md` →
-  `docs/LEDGER{,_A,_B}.md`), every live reference repointed, the frozen `docs/history/`
-  archive untouched. Then all 124 bold-form row headers were normalized to
-  `- D-NNN[ [cited]]: **…`, the only shape AMH's citation guard reads (it saw 104 of 228).
-  The bold opener moves after the colon; 33 rows had none and gained one (+33 B). Row text,
-  row count (228) and line counts are otherwise unchanged.
+One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
+rows and in git history.
 
-- 2026-08-02 — **DB-009 (issue #110, upstream Tasker parity + a battery bug it exposed).** New global
-  pref `panicRequiresPlugged` (`%AAB_PanicPlugged`, default OFF) restricts the panic gesture to
-  external power, surfaced on Live Debug beside the sensitivity slider. Implementing it surfaced the
-  real problem: Tideo's orientation watch IS the trigger (Tasker gets it free from a profile STATE),
-  so the accelerometer was held at ~50 Hz for the life of the service — **including screen-off, where
-  the gesture cannot fire**. Registration is now demand-driven on `interactive && (!requiresPlugged ||
-  plugged)`, re-evaluated on screen and power broadcasts. A test caught the first version consuming
-  the gesture on release, which would have required a flip-straight-and-back after every screen-off.
-
-- 2026-08-02 — **DB-008 (issue #110, upstream Tasker parity).** Dimming strength was clamped to 65 in
-  the math but not in the stored setpoint, so the field showed 100 while the screen dimmed to 65 — the
-  reporter confirmed it with `adb shell settings get secure`. Ported the owner's upstream
-  `_SaveButtonDimming` A9–A12 fix: the setpoint is clamped in the shared `validate()` (every write
-  path, not just the save button), Apply announces the correction with the value that persisted, and
-  the draft snaps so the field shows what is in effect. Announce only when the value actually moved —
-  the A9 test as shipped (`> 64.999999999`) also fired at exactly 65, flashing for a value it did not
-  change. Upstream has since moved A9 to `> 65.0000000001`, so the two now agree with no Tideo change.
-
-- 2026-07-31 — **Adversarial security round (DA-043/DA-044 + DB-001…DB-007).** Five findings against
-  the hardening branch, all real, all fixed: external-control admission bounded the receiver but not
-  the pipeline queue behind it (now coalescing + capped, `ControlFloodBoundTest`); SAF provider I/O
-  ran on the UI dispatcher unbounded (now `Dispatchers.IO` + 20 s + cancellation); a failed Extra Dim
-  level write left the previous, **stronger** level on screen while reporting `ON`; backup carried
-  `serviceEnabled`/`contextOverride` (now sanitized at restore); the F-Droid comparator trusted
-  declared CRC32 metadata and its docs overclaimed (now SHA-256 over decompressed bytes, EOCD-anchored
-  signing-block reader, `selftest`). **Three the review did not find:** a `stdoutLimit = 0` that made
-  any output from `pm grant` read as failure; the sanitizer's first design no-opping on the common
-  case (`serviceEnabled` defaults **true** and kotlinx omits defaults, so the risky backup is the one
-  where the key is absent); and unbounded post-kill reaps. **One rebuttal that became a correction:**
-  a test written to disprove the geo-IP cancellation finding confirmed it instead — `invokeOnCompletion`
-  on a job parked in `read()` cannot fire until that read returns. **Declined with reasons:** splitting
-  the settings DataStore, a PANIC/DISABLE priority lane (they never use that queue), `apksigcopier`
-  here, reordering profile apply (the proposed order silently reverts a user's load), and folding
-  `rebuild/FDROID_VALIDATION.md` into the RUNBOOK.
-
-One line per shipped change (newest first); detail lives in the deviation rows and git history.
-
-- 2026-07-30 — **DA-042:** pinned the Gradle 8.14.3 binary wrapper distribution to Gradle's official
-  SHA-256, verified through both official checksum surfaces; wrapper downloads now fail on mismatch.
-- 2026-07-30 — **DA-041:** owner confirmed no open Dependabot alerts; corrected DA-040's unavailable
-  local status to the approved point-in-time result and removed the completed Owner-queue action.
-- 2026-07-30 — **DA-040 dependency/build/release security audit:** inventoried direct and privileged
-  dependencies, repositories, wrapper/signing/minification/lint/manifest policy, CI artifacts and
-  provenance assumptions without version changes. Recorded the missing wrapper digest and initially
-  unavailable local advisory evidence, while keeping action pinning/dependency verification declined
-  absent new evidence; DA-041 records the owner's no-open-alert confirmation.
-- 2026-07-29 — **DA-039:** traced callback/poller/worker/coroutine/Binder/process lifetimes; bounded
-  external automation with process-wide single-flight admission.
-- 2026-07-29 — **DA-038:** audited every display write; teardown restores mode/Extra Dim safely,
-  panic recovery is independent, and Extra Dim ordering/latches are failure-aware.
-- 2026-07-29 — **DA-037:** hardened opt-in geo-IP with redirect refusal, 16 KiB/strict JSON and
-  coordinate bounds, cancellation, fail-closed consumption, daily retry bound and explicit privacy copy.
-- 2026-07-29 — **DA-036:** bounded native/legacy profile structures, schemas, catalogs and names;
-  validation covers every persistence/apply boundary and direct imports preserve secure toggles.
-- 2026-07-29 — **DA-034/035:** completed permission/privacy allowlists and debug-only throwable logs;
-  corrected F-Droid download-artifact to Node-24 v7.
-- 2026-07-29 — **DA-031:** privileged commands became fixed typed Shizuku operations with bounded
-  Binder/process time/output, cleanup and value-free failures. DA-032 bootstrap was reverted by DA-033.
-- 2026-07-29 — completed Android component/action/export/permission/replay/FGS audit and pre-work
-  security model; enabled external automation remains an explicit ambient local-authority decision.
-- 2026-07-28 — **DA-029/030:** 256 KiB strict streamed profile imports with typed UI failures; sticky
-  restart waits for persisted opt-in and is supersession-safe. Cut pending 1.8.2/vc20.
-- 2026-07-28 — **DA-024–028:** store icon/badges; AGP 8.13.2; F-Droid buildserver compatibility and
-  cross-environment APK-content reproducibility CI, including artifact-root and tag-trigger fixes.
-- 2026-07-23..25 — **DA-016/018/020–023:** wizard top-K fix, 1.8.1 RESUME-context fix, API-free release
-  preflight, triage #7, and Ko-fi repo-only owner correction.
-- 2026-07-10..24 — **D-161–176 + DA-001–017:** ladder/ledger/state/harness/secret/git rails,
-  branch-train, F-Droid inclusion, force dark, triages #1–#6 and final adversarial audit.
-- 2026-06-23..07-09 — **v1.0.0 rebuild → 1.7.0/vc17 → 1.8.0:** D-096–160 shipped SDK36/JDK21,
-  release/CodeQL/glue gates, Privileged Display, intent control, accessibility/crash log and IME/RESUME.
+- 2026-08-03 — **AMH convergence, units 1–3.** Adopted AMH 3.0.0 at the `full`
+  profile, replacing the harness this repo originated. Docs moved to the AMH layout, all 124
+  bold-form ledger row headers normalized to the only shape AMH's parser reads, and the five
+  shipped scripts replaced ours — 8 of our 11 guards were already theirs, and we gain
+  author-identity, shipped-integrity and repo-local-guard rungs. What stayed ours moved to the
+  extension points: `scripts/bootstrap.sh`, `scripts/verify.sh`, four `scripts/guards/` and a
+  17-case `scripts/tests/local-guards.sh`.
+- 2026-08-02 — **DB-008/DB-009 (issue #110, upstream Tasker parity).** Dimming strength is now
+  clamped in the shared `validate()` on every write path, so the field can no longer show 100
+  while the screen dims to 65. New `panicRequiresPlugged` pref restricts the panic gesture to
+  external power; implementing it exposed the accelerometer being held at ~50 Hz for the life of
+  the service, including screen-off where the gesture cannot fire — registration is now
+  demand-driven.
+- 2026-07-31 — **Adversarial security round (DA-043/DA-044 + DB-001…DB-007).** Five findings
+  against the hardening branch, all real, all fixed; three more the review did not find; one
+  rebuttal that became a correction. Six audit documents merged into
+  `rebuild/SECURITY_REVIEW.md`.
+- 2026-07-23..30 — **DA-016–042:** wizard top-K fix, 1.8.1 RESUME-context fix, API-free release
+  preflight, triage #7; store icon; AGP 8.13.2; F-Droid buildserver compatibility and
+  cross-environment APK reproducibility CI; 256 KiB strict streamed profile imports;
+  supersession-safe sticky restart; privileged commands became fixed typed Shizuku operations
+  with bounded Binder/process time; permission/privacy allowlists; hardened opt-in geo-IP;
+  bounded profile structures; every display write and callback/worker lifetime audited;
+  dependency/build/release audit; Gradle wrapper pinned to its official SHA-256.
+- 2026-06-23..07-24 — **D-096–176 + DA-001–015:** v1.0.0 rebuild through 1.8.0 — SDK36/JDK21,
+  release/CodeQL/glue gates, Privileged Display, intent control, accessibility/crash log,
+  IME/RESUME; then the ladder/ledger/state/harness/secret/git rails, branch-train, F-Droid
+  inclusion, force dark, triages #1–#6 and the final adversarial audit.

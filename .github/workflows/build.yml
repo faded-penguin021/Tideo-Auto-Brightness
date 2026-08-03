@@ -29,21 +29,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          # Full history + all branches (cheap on this repo) so origin/main resolves and
-          # ladder.sh's guard 2 (D-115 token scan over origin/main..HEAD) genuinely runs in CI
-          # with a correct merge base. The default depth-1 single-ref checkout makes the guard
-          # silently self-skip ("origin/main unavailable"). Guards 3/4 self-skip in CI by design.
+          # Full history + all branches (cheap on this repo) so origin/main resolves. Two ladder
+          # rungs diff against it — the poison-token scan (D-115) and the author-identity check —
+          # and both degrade to "checked NOTHING" without it, loudly but harmlessly. The default
+          # depth-1 single-ref checkout is what causes that. The local-only advisories self-skip
+          # under CI by design.
           fetch-depth: 0
-
-      # Regression tests for ladder.sh's own pre-flight guards (D-173): pure shell against a
-      # sandbox fixture repo, runs in seconds. Placed before the toolchain setup so a broken
-      # guard fails fast — the guards are load-bearing for the Acceptance-ladder step below.
-      - name: Ladder guard self-tests
-        run: bash scripts/test-ladder-guards.sh
 
       # JDK 21: Robolectric 4.16+ requires it to run tests under SDK 36 (Android 16 / targetSdk 36).
       # The app still compiles to 17 bytecode (sourceCompatibility/jvmTarget = 17) — this is only the
       # JDK that runs Gradle + the test JVM.
+      # Runs the shipped guards' own fixture suite BEFORE the ladder, and deliberately so: the
+      # ladder exits on the first guard failure without reaching scripts/verify.sh, where this
+      # suite otherwise lives. Without this step a red guard tells you nothing about whether the
+      # guards themselves regressed — which is the case you most want distinguished. Seconds of
+      # pure shell against sandbox fixture repos, so it also fails fast, before toolchain setup.
+      - name: Guard fixture suites
+        run: |
+          bash scripts/test-ladder-guards.sh
+          bash scripts/tests/local-guards.sh
+
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
@@ -72,25 +77,19 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      # The CLAUDE.md acceptance ladder, invoked through the same script the local session runs
-      # (scripts/ladder.sh) so CI and local share ONE task-set definition (D-166) rather than a
-      # hand-maintained copy. The script runs its pre-flight guards (STATE length/structure, ledger
-      # rollover, D-115 skip-ci token scan) and then the five rungs: domain + platform + app tests,
-      # lint (hard gate), debug APK. Extra flags are forwarded to Gradle. The local-only advisory
-      # guards (checkpoint/stale-branch) self-skip under GITHUB_ACTIONS.
+      # The acceptance ladder, invoked through the same script the local session runs, so CI and
+      # local share ONE definition of "verified" rather than a hand-maintained copy (D-166).
+      # The ladder runs its guards (working-memory band and structure, ledger rollover, citation
+      # integrity, secret shapes, poison tokens, author identity, shipped-script integrity, the
+      # rail self-tests and this repo's guards under scripts/guards/) and then scripts/verify.sh:
+      # the two fixture suites, then domain + platform + app tests, lint and the debug APK.
       #
-      # --no-configuration-cache: CI's single Gradle invocation only ever PAYS the config-cache
-      # store cost (nothing reuses it), so skip it; local sessions keep the cache (persistent
-      # daemon, repeated invocations — that's what it's for, D-161 U4). History (PR #91, DA-017):
-      # run 1's end-of-build hang was first blamed on the config-cache store; run 2 hung WITH this
-      # flag and the thread-dump step below named the real culprit — a Robolectric test blocked
-      # forever reading the runner's password-prompting `su` (ForceDarkController root fallback;
-      # fixed with closed stdin + a bounded wait). timeout-minutes caps any hang at the STEP so
-      # the thread-dump step still runs (a job-level kill skips subsequent steps and leaves no
-      # diagnosis).
+      # No Gradle flags here any more: the shipped ladder takes no pass-through arguments, so
+      # scripts/verify.sh adds --no-daemon --no-configuration-cache itself when CI is set. The
+      # local-only advisories self-skip under CI.
       - name: Acceptance ladder (scripts/ladder.sh)
         timeout-minutes: 20
-        run: scripts/ladder.sh --no-daemon --no-configuration-cache
+        run: scripts/ladder.sh
 
       # If the ladder step fails or times out, dump every live JVM's threads so a hang names its
       # culprit (stuck test, worker teardown, daemon stop) instead of burning the cap silently.

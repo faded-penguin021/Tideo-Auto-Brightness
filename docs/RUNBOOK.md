@@ -465,20 +465,28 @@ output: stop normal work — **containment outranks the checkpoint invariant.**
 
 ## Acceptance ladder
 
-**One command: `scripts/ladder.sh`** — fast pre-flight guards, then all five rungs in a
-single Gradle invocation. The guards are enumerated ONLY in the `ladder.sh` header comment
-(single source — prose re-enumerations here and in CLAUDE.md kept drifting as guards were
-added, DA-008 F8): failing checks for STATE length/structure, ledger rollover, citation
-integrity, changelog cap, skip-ci tokens, redaction self-test, and secret shapes, plus
-WARN-only advisories that self-skip in CI. The guards themselves are regression-tested by
-`scripts/test-ladder-guards.sh` (sandbox-repo fixtures, seconds; also a `build.yml` step —
-run it whenever you change a guard, D-173). On remote containers the session-start hook
-launches `scripts/warm-gradle.sh` in the background (D-173), so by the time you first run the
-ladder the cold dependency/compile cost has usually already been paid; `~/.gradle-warmup.log`
-shows its progress, `AAB_SKIP_WARMUP=1` disables it. **`build.yml`'s "Acceptance ladder"
-step invokes this same script (D-166)**, so CI and local share one task-set definition — there
-is no hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
-seconds; extra args are forwarded to Gradle.
+**One command: `scripts/ladder.sh`** — the shipped AMH guards, then this repo's guards under
+`scripts/guards/`, then `scripts/verify.sh`, which holds the five Gradle rungs in a single
+invocation. The ladder is a **shipped script: never edit it** (`docs/HARNESS_LOCAL.md`); the
+integrity rung hashes it against `scripts/MANIFEST.sha256` every run. It takes **no arguments
+other than `--guards-only`** and forwards nothing to Gradle — a flag you want under CI belongs
+in `scripts/verify.sh`, which is where `--no-daemon --no-configuration-cache` now lives.
+
+The guards are not enumerated in prose anywhere, deliberately (re-enumerations kept drifting as
+guards were added, DA-008 F8). To see what runs, read `scripts/ladder.sh`'s `run_guards`
+function and `ls scripts/guards/`; the ladder also names every rung as it executes. Both
+fixture suites — `scripts/test-ladder-guards.sh` for the shipped guards and
+`scripts/tests/local-guards.sh` for ours — run inside `scripts/verify.sh`, and again as a
+standalone `build.yml` step before the ladder so that a red guard still tells you whether the
+guards themselves regressed. Run them whenever you change a guard (D-173).
+
+On remote containers the session bootstrap runs `scripts/bootstrap.sh`, which launches
+`scripts/warm-gradle.sh` in the background (D-173), so by the time you first run the ladder the
+cold dependency/compile cost has usually already been paid; `~/.gradle-warmup.log` shows its
+progress, `AAB_SKIP_WARMUP=1` disables it. **`build.yml`'s "Acceptance ladder" step invokes
+this same script (D-166)**, so CI and local share one definition of verified — there is no
+hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
+seconds.
 
 The rungs individually (run the relevant subset until green; on-device behavior is
 owner-verified — no emulator, no KVM):

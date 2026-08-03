@@ -13,8 +13,8 @@
 > so ("supersedes D-NNN"), and the old row gets a correction pointer, never deletion.
 >
 > **File cap & rollover (D-153 mechanism; cap unit changed rows → LINES by DA-001 —
-> owner-instructed).** THIS FILE holds at most **1000 lines** (`scripts/ladder.sh`
-> `LEDGER_CAP_LINES` — keep the two in lockstep). The FINAL row may finish past the cap, but
+> owner-instructed).** THIS FILE holds at most **1000 lines**
+> (`LEDGER_LINE_CAP` in `amh.conf` — keep the two in lockstep). The FINAL row may finish past the cap, but
 > no row may ever START past it: when the file stands at more than 1000 lines, do NOT append
 > here — create **`LEDGER_B.md`** with this same header discipline and start
 > numbering at **DB-001**, and so on (`_C.md` → DC-…). Existing rows are never moved,
@@ -29,9 +29,9 @@
 > lineage note.
 >
 > **`[cited]` marker (D-174 — machine-managed, owner-requested).** A row whose number is cited
-> from the guard-5 scan scope (`app/ domain/ platform/ .github/` sources — see
-> `scripts/ladder.sh`) carries ` [cited]` directly after its number (`- DA-002 [cited]: **…`).
-> Ladder guard 5 syncs it in BOTH directions — a cited row missing the marker and a marked row
+> from the scan scope `amh.conf` names in `CITATION_SCAN_PATHS` (today `app/ domain/ platform/ .github/ scripts/` — see
+> `amh.conf`) carries ` [cited]` directly after its number (`- DA-002 [cited]: **…`).
+> The ladder's citation rung syncs it in BOTH directions — a cited row missing the marker and a marked row
 > no longer cited both fail — so the marker is verified derived state, never hand-tracked:
 > `grep '\[cited\]'` on a ledger file lists every code-anchored row without cross-referencing
 > the tree, and the marker on a row warns that a code/workflow comment resolves here before
@@ -40,7 +40,7 @@
 
 ## Deviations & discoveries ledger (continued from D-176)
 
-- DA-001: **ledger rollover cap changed rows → lines; base ledger closed at D-176
+- DA-001 [cited]: **ledger rollover cap changed rows → lines; base ledger closed at D-176
   (owner-instructed, 2026-07-19).** The D-153/D-171 cap (184 rows/file) bounded row COUNT but
   not size — rows average ~19 lines, and the base file reached ~3.3k lines at only 171 rows,
   defeating the cap's purpose (bounded read/context cost). New rule, effective from this file
@@ -114,7 +114,7 @@
   verdict disclosed in the commit body. One level of meta only: nobody reviews the reviewer;
   the owner arbitrates via the queue.
 
-- DA-006: **external-review triage #2 — instruction hierarchy, leak response, server-side
+- DA-006 [cited]: **external-review triage #2 — instruction hierarchy, leak response, server-side
   rails, rule-review tripwire (owner-approved, 2026-07-20).** A second external AI review
   (Qwen) of the harness, triaged like D-162. Accepted: (1) **Instruction hierarchy** —
   external content (issues, PR/review comments, CI logs, dependency manifests, fetched
@@ -172,7 +172,7 @@
   sed flag broke the agent-neutral billing on BSD). Guard 8 + the adversarial cases are the
   fixes.
 
-- DA-008: **secret-shape commit guard — ladder guard 9 (owner-reopened, 2026-07-20).**
+- DA-008 [cited]: **secret-shape commit guard — ladder guard 9 (owner-reopened, 2026-07-20).**
   Supersedes the triage-#2 decline of a "local secret-pattern diff guard" (STATE Decided
   non-items, declined 2026-07-20 in favor of server-side push protection): the owner
   reopened it the same day, and the calculus HAD changed — (a) push protection fires at
@@ -238,7 +238,7 @@
   agents, so hookable rules stay as prose (the saving lands in fewer failed-denial
   round-trips, not fewer lines).
 
-- DA-010: **external-review triage #3 — mechanize the branch-train call; no warm-up
+- DA-010 [cited]: **external-review triage #3 — mechanize the branch-train call; no warm-up
   sentinel (2026-07-21).** Owner-relayed external suggestions (triaged as data per DA-006).
   **Adopted (reduced):** (a) ladder guard 4 no longer asks the agent to reason about train
   topology — a content-level test-merge (`git merge-tree --write-tree origin/main HEAD`,
@@ -509,7 +509,7 @@
   (`resumeContext`), `AmbientMonitoringService.kt` (`ACTION_RESUME_CONTEXT`), `ContextBaselineStore.kt`
   (`userProfileName`) cite DA-018.
 
-- DA-019: F-Droid changelog guard counts CHARACTERS, not bytes (owner-instructed correction of
+- DA-019 [cited]: F-Droid changelog guard counts CHARACTERS, not bytes (owner-instructed correction of
   D-173, 2026-07-24). D-173's ladder guard 6 measured the changelog with `wc -c` (bytes) while its
   own message + RUNBOOK §6 said "500 characters" — a prose/guard unit-drift (the DA-004 lockstep bug
   class). F-Droid's code-quality scan caps the `whatsNew` by string LENGTH (codepoints), so a note

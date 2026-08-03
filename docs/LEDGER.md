@@ -28,9 +28,9 @@
 > "Seeded by the S0 audit" lead-in stay unique to THIS file.
 >
 > **`[cited]` marker (D-174 — machine-managed, owner-requested).** A row whose number is cited
-> from the guard-5 scan scope (`app/ domain/ platform/ .github/` sources — see
-> `scripts/ladder.sh`) carries ` [cited]` directly after its number (`- D-172 [cited]: **…`,
-> `- D-061 [cited]: **(S12.7i) — …`). Ladder guard 5 syncs it in BOTH directions — a cited row
+> from the scan scope `amh.conf` names in `CITATION_SCAN_PATHS` (today `app/ domain/ platform/ .github/ scripts/` — see
+> `amh.conf`) carries ` [cited]` directly after its number (`- D-172 [cited]: **…`,
+> `- D-061 [cited]: **(S12.7i) — …`). The ladder's citation rung syncs it in BOTH directions — a cited row
 > missing the marker and a marked row no longer cited both fail — so the marker is verified
 > derived state, never hand-tracked: `grep '\[cited\]'` on a ledger file lists every
 > code-anchored row without cross-referencing the tree, and the marker on a row warns that a
@@ -485,7 +485,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   surface the DetectOverrides toggle so this is verifiable at Gate 2.
   (Affects S11, S12, Gate 2.)
 
-- D-042: S10 CONTEXT-OVERRIDE decisions (sanctioned by the S10 brief + extraction; flagged for S12/S14).
+- D-042 [cited]: S10 CONTEXT-OVERRIDE decisions (sanctioned by the S10 brief + extraction; flagged for S12/S14).
   (a) **Override = whole-profile swap, NOT scale/min/max.** The S10 brief's parenthetical "(scale/min/
   max/disable per spec)" predates the S2 correction; contexts_spec §4 (authoritative) + D-014 say
   `_ProfileManager LOAD_FILE` replaces the entire curve/threshold/anim/dynamic/dimming parameter set.
@@ -519,7 +519,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   always evaluates once regardless of clock value (the 0-init would have blocked the seed eval when
   clock≈0; harmless in prod but a real edge). (Affects S12, S14.)
 
-- D-043: S11 UI-SHELL decisions (sanctioned by the S11 brief; flagged for S12/S13/S14).
+- D-043 [cited]: S11 UI-SHELL decisions (sanctioned by the S11 brief; flagged for S12/S13/S14).
   (a) **Shizuku grant exec closed via a bound user service, NOT reflection (D-032 closed).** The
   owner reported `Shizuku.newProcess`-style reflection being fragile in Tasker-factory apps, so the
   documented user-service pattern was implemented: AIDL `IShizukuUserService` (`destroy()=16777114`,
@@ -562,7 +562,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Done button reads "Skip for now" until BASIC is granted. First-run routing: NavGraph starts on
   Onboarding when tier==NONE. (Affects S12, S13, S14.)
 
-- D-044: S12 SETTINGS/TOOLS SCREENS + CHART ENGINE decisions (sanctioned by the S12 brief; flagged
+- D-044 [cited]: S12 SETTINGS/TOOLS SCREENS + CHART ENGINE decisions (sanctioned by the S12 brief; flagged
   for S13/S14/Gate 2).
   (a) **Step-0 triage method (D-027f).** Rather than rewrite 168 doc rows inline, an "S12 Step-0
   triage" section was APPENDED to `anonymous_handlers.md` committing every row to a bucket: (a)
@@ -2740,7 +2740,7 @@ the permanent registry — never compress or remove them.
   edit). Per owner: the profile-semantics UI copy shrank to one line ("if you need that many
   words the UI/UX is wrong"). Folds into the unreleased 1.7.0 / versionCode 17.
 
-- D-153: **Ledger file cap + rollover (owner-instructed, docs/process only).** ⚠️ **The cap
+- D-153 [cited]: **Ledger file cap + rollover (owner-instructed, docs/process only).** ⚠️ **The cap
   figure below was later lowered 200 → 184 by D-171** (the rollover mechanism is unchanged); read
   this row for the mechanism, D-171 for the current cap. The registry
   stays permanent and append-only, but each ledger FILE caps at **200 rows** (now 184, D-171):
@@ -3275,7 +3275,7 @@ the permanent registry — never compress or remove them.
   implied to cover it. Disclosure of real actions, not attestation-as-gate, so it stays
   outside the D-162 decline.
 
-- D-176: **agent-agnostic harness (owner-requested, 2026-07-19).** The harness no longer
+- D-176 [cited]: **agent-agnostic harness (owner-requested, 2026-07-19).** The harness no longer
   assumes Claude Code as the only agent. `AGENTS.md` (new, repo root) is a pointer stub so
   AGENTS.md-reading agents (Codex family etc.) pick up the rules natively — all instructions
   stay in `CLAUDE.md`, which remains the canonical constitution (no rename: live docs, frozen

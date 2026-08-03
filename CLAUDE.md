@@ -36,10 +36,10 @@ row may overflow the cap, the next row opens the next file (`DA-…` → `DB-…
 ## Build commands
 
 ```bash
-scripts/ladder.sh                 # ALL rungs below in one command, after fast local guards
-                                  # (guards 1-11: state/ledger/citation/changelog/skip-ci/
-                                  # secret-shape/command-rail/doc-fact checks + advisories —
-                                  # see the ladder.sh header); --guards-only for docs-only work
+scripts/ladder.sh                 # ALL verification in one command: the shipped AMH guards,
+                                  # this repo's guards under scripts/guards/, then
+                                  # scripts/verify.sh (the rungs below). --guards-only for
+                                  # docs-only work. Takes no other arguments.
 ./gradlew :domain:test            # pure-JVM engine + golden parity tests
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests
@@ -154,13 +154,15 @@ fallback, D-172) — not "grant-only".
 - This file is the constitution for **any** coding agent — the name is historical, kept so
   existing citations stay valid. `AGENTS.md` is the cross-agent pointer here; it must only
   point, never diverge.
-- Session bootstrap is agent-neutral: `scripts/session-start.sh` (remote SDK setup gated on
-  `AAB_REMOTE=1`, or `CLAUDE_CODE_REMOTE=true` for back-compat; branch check; maintenance
-  pointer).
-- Per-agent adapters live in dot-dirs; today only `.claude/settings.json` exists. A new
+- Session bootstrap is agent-neutral: `scripts/session-start.sh` (toolchain setup via `scripts/bootstrap.sh`,
+  gated on `AAB_REMOTE=1` alone; branch check; working-memory headroom; protocol pointer).
+  **Claude Code's `CLAUDE_CODE_REMOTE=true` is translated to `AAB_REMOTE=1` by the adapter**,
+  not by the script — so invoking the bootstrap by hand on a remote container needs
+  `AAB_REMOTE=1` set yourself.
+- Per-agent adapters live in dot-dirs: `.claude/settings.json` and `.codex/`. A new
   agent's adapter must: run `scripts/session-start.sh` at session start, mirror the deny
   rules (env dumps, force-push, push-to-main) if the agent supports permission rules,
   wire `scripts/command-guard.sh` as a pre-execution command check where the agent
   supports hooks (it blocks the same three rails with an instructive deny reason the
   agent can self-correct from, DA-009), honor the session-branch rule above, and add its
-  permission-config file to ladder guard 7's legislation list (DA-006).
+  permission-config file to `RULE_FILES` in `amh.conf` (DA-006).
