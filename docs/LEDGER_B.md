@@ -394,3 +394,8 @@
   version line, and STATE's working record. The release-template key diff is a separate required
   check: it exposed the deliberately unset `LEDGER_ROW_CHAR_CAP`, which remains on the shipped
   script's 2000-byte default rather than pretending every declared key was locally configured.
+
+- DB-020: **The owner set `LEDGER_ROW_CHAR_CAP=750`, superseding DB-019's use of the shipped
+  2000-byte default.** The smaller bound is deliberate: a ledger row should preserve one durable
+  lesson, not its debugging narrative. The ladder guard holds the rule for new rows; historical
+  committed rows remain exempt.

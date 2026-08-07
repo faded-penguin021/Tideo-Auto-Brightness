@@ -107,6 +107,9 @@ live volume is `LEDGER_B.md`.
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
 
+- 2026-08-07 — **Ledger row cap set to 750 bytes (DB-020).** Replaced AMH's 2000-byte default
+  with the owner's tighter bound for future durable lessons; historical rows remain exempt.
+
 - 2026-08-07 — **AMH upgraded 3.0.0 → 4.1.0 (DB-019).** Replaced the complete shipped-script
   set, added the runtime tool/adapter inventory, documented unlimited ledger-volume carry and
   chain reachability, and recorded the numeric harness version in the constitution.
