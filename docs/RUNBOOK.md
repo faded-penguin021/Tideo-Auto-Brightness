@@ -223,8 +223,12 @@ so check it explicitly.
 - **Tagging stays an owner step** — do not create tags or open releases yourself.
 - **CI guardrail (`release-preflight.yml`, D-124).** A secret-free PR check enforces this checklist so a
   miss is caught before merge, not after a bad tag. It runs the version/changelog checks **only when the
-  PR ships app code** (any changed file outside `docs/`, `.github/`, `scripts/`, `fastlane/`, `*.md`, or a
-  `src/test`/`androidTest` tree) — a docs/workflow/test-only PR skips them. When it fires it requires:
+  PR ships app code**: shipped `src/main`/`src/release` trees, Gradle build graph/toolchain files,
+  wrapper files, or ProGuard/consumer rules. Harness/config/docs/workflow/test/metadata changes do
+  not manufacture a release bump. Any path in neither explicit class fails closed and must be
+  classified in the same PR. **Prose-only invariant:** if the build begins consuming a file under
+  a non-shipping tree, that input is reclassified as shipping in the introducing PR; CI cannot infer
+  a future Gradle input graph. When the release gate fires it requires:
   `versionCode` **strictly greater** than the latest `v*` tag's code, `versionName` not regressed below
   that tag and semver-shaped, and a non-empty `changelogs/<versionCode>.txt`. The **skip-ci token scan**
   (D-115) runs on *every* PR — it greps the PR's commit messages + title + body (not file contents) for

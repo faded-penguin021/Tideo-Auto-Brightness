@@ -399,3 +399,11 @@
   2000-byte default.** The smaller bound is deliberate: a ledger row should preserve one durable
   lesson, not its debugging narrative. The ladder guard holds the rule for new rows; historical
   committed rows remain exempt.
+
+- DB-021 [cited]: **Release preflight now positively identifies artifact-producing paths instead
+  of treating every unknown file as app code.** The exclusion-based classifier made the AMH-only
+  `amh.conf` change demand a version bump from released code 20 to 21. The workflow now enables
+  release preparation for explicit artifact surfaces, skips known maintenance surfaces, and fails
+  closed on unknown paths. Rename folding is disabled so both endpoints are classified. Prose only:
+  if the build later consumes a known non-shipping path, reclassify it in the introducing PR.
+  `[cited]`: `.github/workflows/release-preflight.yml`.

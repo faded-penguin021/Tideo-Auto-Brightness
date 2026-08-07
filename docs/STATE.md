@@ -107,6 +107,10 @@ live volume is `LEDGER_B.md`.
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
 
+- 2026-08-07 — **Release-preflight AMH false positive fixed (DB-021).** Replaced the
+  exclusion-based "ships app code" fallback with explicit shipping/non-shipping classes and a
+  fail-closed unknown class, so this harness-only train no longer demands a fake version bump.
+
 - 2026-08-07 — **Ledger row cap set to 750 bytes (DB-020).** Replaced AMH's 2000-byte default
   with the owner's tighter bound for future durable lessons; historical rows remain exempt.
 
