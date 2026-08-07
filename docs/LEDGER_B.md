@@ -13,6 +13,10 @@
 > (`LEDGER_LINE_CAP` in `amh.conf` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
 > may ever START past it: when this file stands at more than 1000 lines, create
 > **`LEDGER_C.md`** with this same header discipline and start numbering at **DC-001**.
+> The suffix advances as an odometer over A–Z without limit (`_Z` → `_AA`, `_AZ` → `_BA`,
+> `_ZZ` → `_AAA`). The volumes form a chain walked from `LEDGER.md`; a volume after a missing
+> link is unreachable and is not a volume, however well its name is shaped. The ladder computes
+> and prints the next reachable volume name when rollover is due.
 > Existing rows are never moved, renumbered, or rewritten by a rollover.
 
 - DB-001 [cited]: **A failed Extra Dim level write left the previous, stronger level on screen.**
@@ -380,3 +384,13 @@
   **What this says about compressing legislation:** every one of the three survived a
   "is it stated elsewhere?" check and failed a "would a session do the wrong thing?" check. The
   first is the test an author can run; only a fresh reader can run the second.
+
+- DB-019: **An AMH upgrade has three independent version surfaces, and prose authority is not a
+  substitute for the value.** At the 3.0.0 → 4.1.0 upgrade, `amh.conf` correctly named 3.0.0 and
+  `docs/STATE.md` agreed, but the constitution only said that `amh.conf` was authoritative; it did
+  not record a numeric version despite the upstream upgrade contract requiring one. The scripts
+  could therefore be replaced without leaving the constitution mechanically comparable on the
+  next upgrade. The upgrade now updates all three: `AMH_VERSION`, an explicit constitution
+  version line, and STATE's working record. The release-template key diff is a separate required
+  check: it exposed the deliberately unset `LEDGER_ROW_CHAR_CAP`, which remains on the shipped
+  script's 2000-byte default rather than pretending every declared key was locally configured.

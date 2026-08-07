@@ -58,6 +58,7 @@ STATE_OWNER_QUEUE_SECTION='## Owner queue'
 LEDGER_DIR=docs
 LEDGER_BASENAME=LEDGER
 LEDGER_LINE_CAP=800
+LEDGER_ROW_CHAR_CAP=2000
 CITATION_SCAN_PATHS='scripts .github'
 CITATION_EXCLUDE=''
 POISON_TOKENS='[skip ci]|[ci skip]'
@@ -246,22 +247,216 @@ guard_state_structure() {
 	fi
 }
 
-live_ledger() {
-	local f last=''
-	for f in "$LEDGER_DIR/$LEDGER_BASENAME.md" "$LEDGER_DIR/${LEDGER_BASENAME}"_*.md; do
-		[ -f "$f" ] && last=$f
+# THE VOLUME CHAIN. A volume is not a file whose name looks right — it is a file the
+# scheme can REACH: start at the base volume and apply the carry rule below until the
+# next name is missing. Membership is reachability, and the walk stops at the first gap.
+#
+# Two rejected rules, both of which failed on a real tree and both of which failed
+# QUIETLY, which is why this one is computed rather than matched:
+#
+#   * last glob match — the shell's collation, not volume age. Under C, LEDGER_AA.md
+#     sorts BETWEEN LEDGER_A.md and LEDGER_B.md; under a locale ignoring punctuation at
+#     the primary level it sorts before LEDGER_A.md. Either way the live volume sticks
+#     at Z forever.
+#   * greatest `[A-Z]+` suffix in shortlex order (length, then alphabet) — right about
+#     the numbering and wrong about membership. LEDGER_ARCHIVE.md is all capitals and
+#     LONG, so it outranks every real volume and pins the cap rung on a file nobody
+#     writes to, reporting `ok` forever. A one-line untracked file switched the rung off.
+#
+# A chain cannot be joined by naming a file well, and the same walk answers both
+# questions this script asks — which file is live, and which files hold rows.
+volume_path() { # <suffix, empty for the base volume>
+	if [ -z "$1" ]; then
+		printf '%s/%s.md' "$LEDGER_DIR" "$LEDGER_BASENAME"
+	else
+		printf '%s/%s_%s.md' "$LEDGER_DIR" "$LEDGER_BASENAME" "$1"
+	fi
+}
+
+# One copy of the name-parsing rule. The prefix is CHECKED rather than assumed: `${name#pre}`
+# is a no-op when the prefix is absent, so without the case below this answers "volume,
+# suffix OTHER" for docs/OTHER.md. Unreachable from the two callers here, which feed it
+# names this file constructed — and a helper that is only correct because of where it is
+# called from is a trap for the next caller.
+#
+# The bracket range is spelled out instead of `A-Z`: a glob range is collation-dependent,
+# and a locale with dictionary ordering can admit lowercase letters into `A-Z`.
+volume_suffix() { # <ledger path>; prints its suffix ('' for the base volume), 1 if not a volume
+	local name suffix
+	name=${1##*/}
+	name=${name%.md}
+	[ "$name" = "$LEDGER_BASENAME" ] && return 0
+	case $name in "${LEDGER_BASENAME}_"*) ;; *) return 1 ;; esac
+	suffix=${name#"${LEDGER_BASENAME}_"}
+	case $suffix in
+	'' | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZ]*) return 1 ;;
+	esac
+	printf '%s' "$suffix"
+}
+
+# Every volume the chain reaches, base first, one path per line. Empty output means no
+# ledger at all — NOT "no volumes past the base", which is one line.
+chain_volumes() {
+	local suffix='' path
+	while :; do
+		path=$(volume_path "$suffix")
+		[ -f "$path" ] || return 0
+		printf '%s\n' "$path"
+		suffix=$(next_volume_suffix "$suffix") || return 0
 	done
-	printf '%s' "$last"
+}
+
+live_ledger() { chain_volumes | tail -1; }
+
+extract_ledger_rows() { # <tree-dir> <rows-dir>
+	local tree=$1 rows=$2 path
+	mkdir -p "$rows"
+	while IFS= read -r path; do
+		awk -v out="$rows" '
+			function flush(    file, n) {
+				if (id == "") return
+				n = count
+				while (n > 1 && lines[n] == "") n--
+				file = out "/" id
+				for (i = 1; i <= n; i++) print lines[i] >file
+				close(file)
+				delete lines
+				count = 0
+			}
+			/^- D[A-Z]*-[0-9]+( \[cited\])?: / {
+				flush()
+				id = $2
+				sub(/ \[cited\]:$/, "", id)
+				sub(/:$/, "", id)
+				lines[++count] = $0
+				next
+			}
+			id != "" { lines[++count] = $0 }
+			END { flush() }
+		' "$tree/$path"
+	done
+}
+
+guard_new_ledger_row_lengths() {
+	local cap=${LEDGER_ROW_CHAR_CAP:-0} changed path suffix='' next checked=0 row id count
+	case $cap in
+		'' | *[!0-9]*)
+			fail "LEDGER_ROW_CHAR_CAP must be a non-negative integer, got '${LEDGER_ROW_CHAR_CAP:-}'"
+			return
+			;;
+	esac
+	[ "$cap" -gt 0 ] || return
+	git rev-parse --verify -q HEAD >/dev/null 2>&1 || return
+	changed=$(git diff --name-only HEAD -- "$LEDGER_DIR" | awk -v dir="$LEDGER_DIR" -v base="$LEDGER_BASENAME" '
+		$0 == dir "/" base ".md" { found = 1 }
+		$0 ~ "^" dir "/" base "_[A-Z]+[.]md$" { found = 1 }
+		END { exit found ? 0 : 1 }
+	') || return
+	: "$changed"
+	mkdir -p "$TMP/head-ledger/$LEDGER_DIR" "$TMP/work-ledger/$LEDGER_DIR" "$TMP/head-rows" "$TMP/work-rows"
+	: >"$TMP/head-chain"
+	while :; do
+		path=$(volume_path "$suffix")
+		if ! git cat-file -e "HEAD:$path" 2>/dev/null; then
+			[ -n "$suffix" ] && break
+			return
+		fi
+		git show "HEAD:$path" >"$TMP/head-ledger/$path" || return
+		printf '%s\n' "$path" >>"$TMP/head-chain"
+		next=$(next_volume_suffix "$suffix") || break
+		suffix=$next
+	done
+	while IFS= read -r path; do
+		mkdir -p "$TMP/work-ledger/$(dirname "$path")"
+		cp "$path" "$TMP/work-ledger/$path" || return
+	done <"$TMP/chain"
+	extract_ledger_rows "$TMP/head-ledger" "$TMP/head-rows" <"$TMP/head-chain"
+	extract_ledger_rows "$TMP/work-ledger" "$TMP/work-rows" <"$TMP/chain"
+	for row in "$TMP"/work-rows/D*-*; do
+		[ -e "$row" ] || continue
+		id=${row##*/}
+		[ -f "$TMP/head-rows/$id" ] && continue
+		checked=$((checked + 1))
+		# Locale-stable character policy: count bytes with LC_ALL=C. For ordinary ASCII
+		# ledger prose that is one byte per character; UTF-8 non-ASCII text is charged by
+		# encoded bytes so the verdict is identical across host locales.
+		count=$(LC_ALL=C wc -c <"$row") || return
+		count=${count//[[:space:]]/}
+		if [ "$count" -gt "$cap" ]; then
+			fail "$id: new ledger row is $count byte-counted character(s), over LEDGER_ROW_CHAR_CAP=$cap — keep the durable lesson concise and shorten the draft before commit; historical committed rows and sanctioned metadata-only additions are exempt"
+			return
+		fi
+	done
+	[ "$checked" -gt 0 ] && ok "checked $checked new ledger row(s) against LEDGER_ROW_CHAR_CAP=$cap"
+}
+
+
+# The suffix of the volume AFTER the given one, as an odometer over A–Z with carry:
+# '' → A, A → B, Z → AA, AZ → BA, ZZ → AAA. Computed rather than looked up, because a
+# table is the thing that has a last entry — the single-letter scheme this replaces was a
+# table with Z at the end of it, and nothing said what came next.
+next_volume_suffix() { # <current suffix, empty for the base volume>
+	local s=$1 alphabet=ABCDEFGHIJKLMNOPQRSTUVWXYZ i c head out='' carry=1
+	if [ -z "$s" ]; then
+		printf 'A'
+		return
+	fi
+	i=$((${#s} - 1))
+	while [ "$i" -ge 0 ]; do
+		c=${s:i:1}
+		if [ "$carry" -eq 1 ]; then
+			if [ "$c" = Z ]; then
+				c=A # carry stays set: Z rolls to A and the digit to its left advances
+			else
+				head=${alphabet%%"$c"*}
+				# A character this odometer does not know leaves `head` as the WHOLE
+				# alphabet, and the substring one past its end is empty — so the digit
+				# would silently vanish and the answer come back one character short.
+				# Refuse instead. The callers here only ever pass a validated suffix,
+				# so this is declared unreachable rather than fixtured; it exists
+				# because a shorter name is the one wrong answer nobody would notice.
+				[ "${#head}" -lt 26 ] || return 1
+				c=${alphabet:${#head}+1:1}
+				carry=0
+			fi
+		fi
+		out=$c$out
+		i=$((i - 1))
+	done
+	[ "$carry" -eq 1 ] && out=A$out
+	printf '%s' "$out"
 }
 
 guard_ledger_rollover() {
 	section "Permanent memory: ledger file cap"
-	local live lines last_row size
+	local live lines last_row size suffix next f orphans=''
 	live=$(live_ledger)
 	if [ -z "$live" ]; then
+		# The chain starts at the base volume, so a tree holding continuation volumes
+		# and no base has nothing this rung can measure — and `skip` would render that
+		# identically to a repository that has not started a ledger yet. Say which.
+		for f in "$LEDGER_DIR/${LEDGER_BASENAME}"_*.md; do
+			if [ -f "$f" ]; then
+				fail "$(volume_path '') is missing while continuation volume(s) exist — the chain is walked from the base volume, so no cap can be checked until it is back (volumes are never deleted)"
+				return
+			fi
+		done
 		skip "no ledger yet"
 		return
 	fi
+	# Volume-SHAPED files the chain does not reach: a volume that was deleted from the
+	# middle, or a file that merely looks like one. This rung cannot tell those apart and
+	# does not guess — but it will not stay quiet either, because rows in an unreachable
+	# file are invisible to every check here. The cap below is still the live volume's.
+	chain_volumes >"$TMP/chain"
+	guard_new_ledger_row_lengths
+	for f in "$LEDGER_DIR/${LEDGER_BASENAME}"_*.md; do
+		[ -f "$f" ] || continue
+		grep -qxF "$f" "$TMP/chain" && continue
+		orphans="$orphans $f"
+	done
+	[ -n "$orphans" ] &&
+		warn "volume-shaped file(s) the chain does not reach:$orphans — either a volume is missing from the chain or these are not volumes. Nothing reads their rows."
 	lines=$(wc -l <"$live")
 	# Bytes are REPORTED, never gated. The cap counts lines because a line is what a
 	# row is appended in, but the quantity it stands in for is read cost — and the two
@@ -276,12 +471,24 @@ guard_ledger_rollover() {
 	size=$(wc -c <"$live")
 	size=$((size * 10 / 1024))
 	size="$((size / 10)).$((size % 10))"
-	last_row=$(grep -n '^- D[A-Z]\?-[0-9]\+' "$live" | tail -1 | cut -d: -f1)
+	# The row pattern admits ANY number of volume letters (a `DAA-` row, a `DAAA-` row),
+	# not the one it used to. A scheme that stops at Z is a scheme with a silent failure at
+	# the end of it: rows in a volume the pattern cannot match are invisible here, so the
+	# cap can never fire on them, and invisible to the citation scan below in both
+	# directions at once — every rung green, on a file nobody is writing to.
+	# The examples above stop at the hyphen on purpose: a complete id in a shipped comment
+	# IS a citation as far as the guard below is concerned, and these rows do not exist.
+	last_row=$(grep -n '^- D[A-Z]*-[0-9]\+' "$live" | tail -1 | cut -d: -f1)
 	# Every branch carries the size, the FAIL branch above all: that is the volume at
 	# its largest, and rollover is the one moment the owner is deciding whether a line
 	# cap still stands in for read cost at all.
 	if [ -n "$last_row" ] && [ "$last_row" -gt "$LEDGER_LINE_CAP" ]; then
-		fail "$live: a row STARTS at line $last_row (${size} KB), past the ${LEDGER_LINE_CAP}-line cap — open the next volume (rows are never moved or renumbered)"
+		# The next volume's name is COMPUTED, so the diagnostic stays right past Z — and
+		# it names the row prefix too, because the file name and the prefix are the same
+		# suffix and a rollover that gets one of them wrong is not caught by anything.
+		suffix=$(volume_suffix "$live")
+		next=$(next_volume_suffix "$suffix")
+		fail "$live: a row STARTS at line $last_row (${size} KB), past the ${LEDGER_LINE_CAP}-line cap — open $LEDGER_DIR/${LEDGER_BASENAME}_$next.md, numbering from D$next-001 (rows are never moved or renumbered)"
 	elif [ "$lines" -ge $((LEDGER_LINE_CAP * 9 / 10)) ]; then
 		warn "$live: $lines lines / ${size} KB, approaching the ${LEDGER_LINE_CAP}-line cap — the next rollover is near"
 	else
@@ -327,11 +534,14 @@ guard_citations() {
 	# Every ledger row, and whether it carries the machine-synced [cited] marker.
 	: >"$rows"
 	: >"$marked"
+	# The CHAIN, not the glob. Globbing would harvest rows from any LEDGER_*.md sitting in
+	# the directory, so a scratch file could supply a duplicate row id — and the rung above
+	# would refuse to call that same file a volume. Two guards disagreeing about what a
+	# volume is was the shape being fixed; the walk is shared so they cannot.
 	local f
-	for f in "$LEDGER_DIR/$LEDGER_BASENAME.md" "$LEDGER_DIR/${LEDGER_BASENAME}"_*.md; do
-		[ -f "$f" ] || continue
-		sed -n 's/^- \(D[A-Z]\?-[0-9]\+\)\( \[cited\]\)\?:.*/\1\2/p' "$f" >>"$rows.raw"
-	done
+	while IFS= read -r f; do
+		sed -n 's/^- \(D[A-Z]*-[0-9]\+\)\( \[cited\]\)\?:.*/\1\2/p' "$f" >>"$rows.raw"
+	done < <(chain_volumes)
 	if [ -f "$rows.raw" ]; then
 		awk '{print $1}' "$rows.raw" | sort >"$rows"
 		awk 'NF>1{print $1}' "$rows.raw" | sort >"$marked"
@@ -347,7 +557,19 @@ guard_citations() {
 
 	: >"$cited"
 	if [ -s "$scan_files" ]; then
-		xargs -0 grep -hoE 'D[A-Z]?-[0-9]+' <"$scan_files" 2>/dev/null | sort -u >"$cited"
+		# Same unbounded volume pattern the row scan uses: an id the scan cannot see is
+		# not an unresolved citation, it is no citation at all, and every `DAA-` row used
+		# to be exactly that in both directions.
+		#
+		# `-w` is what keeps the widening honest, and it is not decoration. Unanchored,
+		# `D[A-Z]*-[0-9]+` matches INSIDE a word: `README-<n>` and `PRODUCTION-<n>` each
+		# yield an id built from the tail of the word — an id that appears nowhere in the
+		# tree, reported as an unresolved citation the reader cannot grep for. (Spelling
+		# those two out here would file this comment as a citation to them. Widening a
+		# pattern changes what the text around it MEANS, this file included.) Whole-word
+		# matching also closes the same trap one letter down, where `XL-003` used to
+		# yield a citation to L-003 (AMH ledger row DB004(g)); that one shipped.
+		xargs -0 grep -hwoE 'D[A-Z]*-[0-9]+' <"$scan_files" 2>/dev/null | sort -u >"$cited"
 	fi
 
 	local unresolved missing_marker stale_marker
@@ -918,6 +1140,110 @@ advisories() {
 	[ "$WARNS" = 0 ] && ok "nothing to flag"
 }
 
+# --- the verdict's subject --------------------------------------------------
+# Every verdict line below ends with the commit and the worktree state it is a verdict
+# ABOUT. The ladder said "green" and never said green OF WHAT — not here, not in the boot
+# banner, nowhere in a session's output — for three releases, until an external reader
+# found it in one pass (AMH ledger row DA025).
+#
+# It is one printf on lines that already existed, deliberately. The alternative on offer
+# was a JSON run receipt written to an ignored directory; it was refused as forgeable and
+# as a second verdict vocabulary, and this is the same intent reported in output the ladder
+# already prints — the shape DA022(d) settled on for the ledger's byte count.
+#
+# Nothing consumes this string. It is not parsed, no exit code varies with it, and no
+# guard, CI step or agent decision procedure may take it as input: it is a sentence for
+# whoever reads the transcript, and the moment something branches on it, it has become the
+# self-report gate the harness bans (P3).
+#
+# The dirty case is the whole reason the line exists, so it does not merely append a word.
+# The ladder verifies the WORKING TREE — the secret scan and the citation scan both read
+# untracked files — so attributing a green run to `HEAD` while the tree differs from it is
+# a claim about a commit nobody verified. It says so in those words.
+#
+# THE DIRTINESS PROBE IS NOT `git status --porcelain`, and that is the single most
+# important line in this function. `status` honours `status.showUntrackedFiles`, which can
+# be set in the repository's own `.git/config` or in a user-level `~/.gitconfig` that no
+# diff can see; `git ls-files -co --exclude-standard` — what the secret scan and the
+# citation scan actually read — does not. With that key set to `no`, `status` reports a
+# tree as clean while the scans are reading, and failing on, untracked files that are not
+# in HEAD: the exact misattribution this line exists to prevent, reachable by one command
+# that edits no tracked file and therefore appears in no diff and trips no guard. So the
+# probe is built from the SAME sources the guards read. `.gitignore` is honoured by both,
+# which is why an ignored build directory still does not render every run dirty.
+#
+# `--no-renames` because the count claims to be PATHS: rename detection collapses a moved
+# file into one entry, so `git mv a b` would report one path having changed two.
+#
+# What this still cannot see, stated because the paragraph above is a coverage claim:
+# `git update-index --assume-unchanged` hides a modified tracked file from `diff` and from
+# `status` alike, so such a file reads as clean here. That is a deliberate act on one path,
+# not a passive misconfiguration, and no probe built out of git's own plumbing escapes it.
+#
+# Four states, and none of them may be reported as one of the others:
+#
+#   (a) git names no repository from here — an extracted tarball outside any checkout, or
+#                               an adopter mid-setup. Names no commit. Note what `has_git`
+#                               actually asks, since every guard above uses it too: whether
+#                               git resolves A repository from the working directory, which
+#                               inside a monorepo `vendor/` or a dotfiles $HOME is the
+#                               ENCLOSING one. A tree with no `.git` of its own is then
+#                               described by its parent's commit, and so is the rest of the
+#                               ladder. A repository too broken for `rev-parse --git-dir`
+#                               also lands here, which understates it and is accepted: both
+#                               readings tell the reader not to trust a commit name.
+#   (b) git will not answer   — a corrupt index, above all. (An index LOCK is not this: a
+#                               stale `.git/index.lock` leaves `git diff` exiting 0.) An
+#                               empty answer is INDISTINGUISHABLE from a clean tree, so the
+#                               exit status is read and an unusable answer is reported as
+#                               UNKNOWN rather than collapsed into "clean" (AMH ledger row
+#                               D019).
+#   (c) unborn HEAD           — `git init` with nothing committed. There is no commit to
+#                               name, which is not the same as there being no repository.
+#   (d) a commit, clean or dirty.
+#
+# Only the COUNT is printed: the names are the tree's business and a verdict line is not
+# where a path belongs. It is sampled AFTER rung 3 returns, so a verification set that
+# wrote into its own worktree would be counted — none of the shipped ones does, and one
+# that did would be reporting something true.
+subject() {
+	local sha paths rc n
+	if ! has_git; then
+		printf 'git names no repository from here, so this verdict names no commit'
+		return
+	fi
+	sha=$(git rev-parse --short HEAD 2>/dev/null)
+	# `&&`-chained rather than piped, so a git that refuses is caught by this assignment's
+	# own exit status instead of by whatever `sort` thought of it. Not sorted here for the
+	# same reason: the dedup happens below, once the status has been read.
+	paths=$({
+		git diff --name-only --no-renames &&
+			git diff --cached --name-only --no-renames &&
+			git ls-files -o --exclude-standard
+	} 2>/dev/null)
+	rc=$?
+	if [ "$rc" -ne 0 ]; then
+		if [ -n "$sha" ]; then
+			printf 'HEAD %s, worktree state UNKNOWN (git would not report it) — this verdict may not be about that commit' "$sha"
+		else
+			printf 'commit and worktree state both UNKNOWN (git would not report them) — this verdict names no commit'
+		fi
+		return
+	fi
+	if [ -z "$paths" ]; then
+		n=0
+	else
+		n=$(printf '%s\n' "$paths" | sort -u | wc -l | tr -d ' ')
+	fi
+	if [ -z "$sha" ]; then
+		printf 'no commit yet (unborn HEAD), %s uncommitted path(s) — this verdict names no commit' "$n"
+	elif [ "$n" = 0 ]; then
+		printf 'HEAD %s, worktree clean' "$sha"
+	else
+		printf 'HEAD %s + %s uncommitted path(s) — the tree just verified is NOT that commit' "$sha" "$n"
+	fi
+}
+
 # =============================================================================
 run_guards() {
 	guard_state_size
@@ -936,12 +1262,12 @@ run_guards() {
 run_guards
 
 if [ "$FAILS" -gt 0 ]; then
-	printf '\n✗ guards: %d failure(s), %d warning(s)\n' "$FAILS" "$WARNS"
+	printf '\n✗ guards: %d failure(s), %d warning(s) — %s\n' "$FAILS" "$WARNS" "$(subject)"
 	exit 1
 fi
 
 if [ "$GUARDS_ONLY" = 1 ]; then
-	printf '\n✓ guards clean (%d warning(s)) — guards-only run, verification set NOT executed\n' "$WARNS"
+	printf '\n✓ guards clean (%d warning(s)), verification set NOT executed (guards-only run) — %s\n' "$WARNS" "$(subject)"
 	exit 0
 fi
 
@@ -951,12 +1277,12 @@ fi
 section "Verification set (scripts/verify.sh)"
 if [ ! -x scripts/verify.sh ]; then
 	fail "scripts/verify.sh is missing or not executable — the ladder has no verification rung"
-	printf '\n✗ ladder red\n'
+	printf '\n✗ ladder red — %s\n' "$(subject)"
 	exit 1
 fi
 if scripts/verify.sh; then
-	printf '\n✓ ladder green (%d warning(s))\n' "$WARNS"
+	printf '\n✓ ladder green (%d warning(s)) — %s\n' "$WARNS" "$(subject)"
 	exit 0
 fi
-printf '\n✗ ladder red — verification set failed\n'
+printf '\n✗ ladder red (verification set failed) — %s\n' "$(subject)"
 exit 1

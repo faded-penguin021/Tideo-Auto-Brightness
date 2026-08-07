@@ -4,7 +4,8 @@ A native Kotlin/Compose Android app: a feature-parity rebuild of the Tasker proj
 `Advanced_Auto_Brightness_V3.3`, shipped at v1.0.0. Work now is maintenance.
 
 Maintenance runs on the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH);
-`AMH_VERSION` in `amh.conf` is the authority on which release. **`docs/HARNESS_LOCAL.md` is the
+This constitution records **AMH 4.1.0**; `AMH_VERSION` in `amh.conf` is the authority on which
+release. **`docs/HARNESS_LOCAL.md` is the
 harness's own documentation** — which scripts are upstream's and unfixable locally, what each
 repo-local guard does, every `amh.conf` value that differs from stock. Read it before changing
 anything under `scripts/`.

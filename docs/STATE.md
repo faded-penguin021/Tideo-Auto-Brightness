@@ -24,12 +24,12 @@
 Native Kotlin/Compose rebuild of Tasker `Advanced_Auto_Brightness_V3.3`: `:domain` pure-JVM
 math/decisions, `:platform` Android adapters, `:app` Compose/DataStore/FGS UI/runtime. BASIC
 `WRITE_SETTINGS` provides the core pipeline; ELEVATED `WRITE_SECURE_SETTINGS` adds super dimming
-and Privileged Display. Maintenance runs on the **Agentic Maintenance Harness (AMH 3.0.0)** —
+and Privileged Display. Maintenance runs on the **Agentic Maintenance Harness (AMH 4.1.0)** —
 `AGENTS.md` + this file + `docs/RUNBOOK.md` + `docs/LEDGER*.md` + `scripts/ladder.sh`.
 
 ## Current state
 
-**Harness: AMH 3.0.0, converged and green (DB-014…DB-016).** The maintenance harness this repo
+**Harness: AMH 4.1.0, upgraded from 3.0.0 (DB-019).** The maintenance harness this repo
 originated was spun out as [AMH](https://github.com/faded-penguin021/AMH), diverged, and has now
 been replaced by upstream's. **The five scripts under `scripts/` named in
 `scripts/MANIFEST.sha256` are upstream's byte-for-byte and hash-checked every run — never edit
@@ -106,6 +106,10 @@ live volume is `LEDGER_B.md`.
 
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
+
+- 2026-08-07 — **AMH upgraded 3.0.0 → 4.1.0 (DB-019).** Replaced the complete shipped-script
+  set, added the runtime tool/adapter inventory, documented unlimited ledger-volume carry and
+  chain reachability, and recorded the numeric harness version in the constitution.
 
 - 2026-08-03 — **DB-018: the DB-017 review found 12 defects, 3 binding.** Restored the clause
   forbidding a personal address *handed to the agent in its session context* (the harness injects

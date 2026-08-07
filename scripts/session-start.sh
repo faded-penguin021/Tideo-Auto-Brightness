@@ -32,10 +32,30 @@ STATE_FILE=docs/STATE.md
 STATE_WARN_KB=14
 STATE_COMPRESS_TO_KB=9
 REMOTE_FLAG=AMH_REMOTE
+# Both empty by default, which switches the runtime-inventory lines off entirely. Same
+# reasoning as MERGE_MODE and the release keys above: an adopter's amh.conf is theirs forever
+# and the harness cannot upgrade it, so a key this script reads but their file predates must
+# have a value here, or the whole banner dies under `set -u` on the first upgraded session.
+# Both lists live in amh.conf rather than here so this script names no vendor and no
+# toolchain of its own — the adopter declares theirs (P14).
+REQUIRED_TOOLS=''
+ADAPTER_FILES=''
 # shellcheck source=/dev/null
 [ -f "$ROOT/amh.conf" ] && . "$ROOT/amh.conf"
 
 say() { printf '%s\n' "$*"; }
+
+
+reset_dotenv_advisory() {
+	local slug uid state
+	slug=${ROOT//\//_}
+	slug=${slug// /_}
+	uid=${UID:-unknown}
+	state=/tmp/amh-command-guard-dotenv-advisory-$uid-$slug
+	rm -f -- "$state" 2>/dev/null || true
+}
+
+reset_dotenv_advisory
 
 say "── AMH session start ─────────────────────────────────────────"
 
@@ -185,6 +205,79 @@ if [ -f "$STATE_FILE" ]; then
 	fi
 else
 	say "· ⚠ $STATE_FILE is missing — working memory is where every session starts."
+fi
+
+# 3b. Runtime inventory: which declared tools are on PATH, and which adapter files this
+#     repository ships. Both lists come from amh.conf, so this script names no vendor.
+#
+#     NOTHING CONSUMES THIS. It is a line a human reads, printed and discarded. No guard, CI
+#     step, gate or agent decision procedure may branch on these states, and none does — the
+#     manifest that would have stored them was refused precisely so that no future code could
+#     (AMH ledger rows DA024 and DA001).
+#
+#     Two vocabularies, and the asymmetry between them is the entire point:
+#
+#     (a) A TOOL is `observed` or `unavailable`. `type -P` is a real probe — it ran, and its
+#         answer is a fact about this environment. Only the NAME is printed, never the resolved
+#         path: that leaks a home directory and a username into the transcript for no diagnostic
+#         gain (P17).
+#
+#         `type -P` and NOT `command -v`, which resolves builtins, functions and aliases before
+#         it looks at PATH. Under `command -v` this script reports its own `say()` helper — and
+#         anything an adopter's sourced amh.conf happens to define — as an installed tool, and
+#         `printf` as `observed` on a machine holding no binaries at all. `observed` is the one
+#         state whose entire warrant is "the probe ran and the answer is a fact about this
+#         environment"; a builtin makes it a fact about this bash instead. The design is careful
+#         that `unknown` never becomes `unavailable`; this is the symmetric hazard, a non-fact
+#         becoming `observed`, and it is the one the fixtures pin.
+#     (b) An ADAPTER FILE is `configured` or `unknown` — NEVER `observed`, and never
+#         `unavailable`. Present means the repository REQUESTS an integration; it is not evidence
+#         that a hook ever fired, and nothing here can see one fire. That is why the lifecycle
+#         probe layer was refused rather than deferred: a marker cannot name its caller, and the
+#         manual path the constitution mandates writes a byte-identical one. Absent means this
+#         repository declares none — a user-level or globally-configured adapter is invisible
+#         from inside the tree, so `unavailable` would be a claim about the world derived from a
+#         fact about the repo. `unknown` is never translated into `unavailable`, `disabled` or
+#         `safe`.
+#
+#     `set -f` around both loops. An entry containing a glob character would otherwise be
+#     expanded against the working directory, so `REQUIRED_TOOLS='*'` would report every file in
+#     the repo root as a missing tool. Neither list can express a name containing a space, and
+#     saying so here is cheaper than a quoting scheme nobody needs.
+#     Each line is gated on whether its LOOP produced anything, not on whether the config value
+#     was non-empty: a whitespace-only value splits to nothing, and the raw test would print a
+#     bare `· tools:` header, or `· adapters:` followed by two lines of gloss explaining zero
+#     states.
+if [ -n "$REQUIRED_TOOLS" ]; then
+	inv=''
+	set -f
+	for t in $REQUIRED_TOOLS; do
+		if type -P -- "$t" >/dev/null 2>&1; then
+			inv="$inv $t observed ·"
+		else
+			inv="$inv $t unavailable ·"
+		fi
+	done
+	set +f
+	[ -n "$inv" ] && say "· tools:${inv% ·}"
+fi
+
+if [ -n "$ADAPTER_FILES" ]; then
+	inv=''
+	set -f
+	for a in $ADAPTER_FILES; do
+		if [ -e "$a" ]; then
+			inv="$inv $a configured ·"
+		else
+			inv="$inv $a unknown ·"
+		fi
+	done
+	set +f
+	if [ -n "$inv" ]; then
+		say "· adapters:${inv% ·}"
+		say "  configured = requested by this repo, never observed firing; unknown = none declared here,"
+		say "  which is not evidence that none exists. Nothing reads these states."
+	fi
 fi
 
 # 4. Protocol pointer.

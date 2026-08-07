@@ -1,7 +1,7 @@
 # HARNESS_LOCAL — what this repo adds on top of stock AMH
 
 This repository runs the **Agentic Maintenance Harness**
-([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v3.0.0**
+([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v4.1.0**
 under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.
@@ -83,6 +83,8 @@ exactly one case turns red.
 | `CITATION_EXCLUDE` | the two test paths | Their fixtures carry synthetic IDs by design. Scanning `scripts/` is safe by construction, not by luck: **upstream never writes a bare `D-NNN` in a shipped script** — it spells its own rows `AMH ledger row D004` precisely so an adopter's citation guard cannot resolve them (confirmed by the AMH maintainer, 2026-08-03). No upgrade check needed. |
 | `AUTHOR_EMAIL_ALLOW` | three no-reply aliases | The owner's forge alias, GitHub's web-UI committer, and the agent's. States which identities are expected; no regex can tell a personal address from a work one. |
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
+| `REQUIRED_TOOLS` | `bash git java` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. The session banner reports availability; nothing consumes the states. |
+| `ADAPTER_FILES` | the Claude and Codex adapter paths | Names every adapter this repository ships. `configured` reports file presence, not that an integration or hook actually ran. |
 | `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,verify.sh}` | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. |
 
 ## Adapter and CI notes
