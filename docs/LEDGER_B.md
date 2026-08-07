@@ -1,7 +1,7 @@
 # DEVIATIONS & DISCOVERIES LEDGER B — permanent registry (DB-001…)
 
 > **Append-only registry — NEVER archived, compressed, or truncated.** The continuation of
-> `DEVIATIONS_LEDGER_A.md`, which closed at its 1000-line cap (D-153 mechanism, DA-001 line-based
+> `LEDGER_A.md`, which closed at its 1000-line cap (D-153 mechanism, DA-001 line-based
 > cap). Code comments and docs cite entries as bare `DB-0NN` and must always resolve here, so no
 > entry may ever be deleted or summarized away. **Append new maintenance deviations as DB-001,
 > DB-002, … at the bottom** — one continuous sequence, never restart numbering. Code + golden
@@ -9,10 +9,14 @@
 > entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
 >
-> **File cap & rollover.** THIS FILE holds at most **1000 lines** (`scripts/ladder.sh`
-> `LEDGER_CAP_LINES` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
+> **File cap & rollover.** THIS FILE holds at most **1000 lines**
+> (`LEDGER_LINE_CAP` in `amh.conf` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
 > may ever START past it: when this file stands at more than 1000 lines, create
-> **`DEVIATIONS_LEDGER_C.md`** with this same header discipline and start numbering at **DC-001**.
+> **`LEDGER_C.md`** with this same header discipline and start numbering at **DC-001**.
+> The suffix advances as an odometer over A–Z without limit (`_Z` → `_AA`, `_AZ` → `_BA`,
+> `_ZZ` → `_AAA`). The volumes form a chain walked from `LEDGER.md`; a volume after a missing
+> link is unreachable and is not a volume, however well its name is shaped. The ladder computes
+> and prints the next reachable volume name when rollover is due.
 > Existing rows are never moved, renumbered, or rewritten by a rollover.
 
 - DB-001 [cited]: **A failed Extra Dim level write left the previous, stronger level on screen.**
@@ -276,3 +280,130 @@
   together: `bmgr transport …` switches the device's transport globally (restore the original), and
   `bmgr backupnow` on the Google transport commonly no-ops for a sideloaded package, so a "nothing
   was backed up" result was being read as an app defect when it is a transport limitation.
+
+- DB-014 [cited]: **The harness this repo invented was replaced by the harness it became.** The
+  maintenance harness originated here (constitution + `STATE.md` + `RUNBOOK.md` + the ledger +
+  `scripts/ladder.sh` + session bootstrap), was generalized into `docs/AGENTIC_HARNESS_PROMPT.md`
+  and spun out as [AMH](https://github.com/faded-penguin021/AMH). The two then diverged, and the
+  local copy was the one without upstream's fixes. Converging on **amh-v3.0.0** (`full` profile):
+  the five shipped scripts are upstream's byte-for-byte, hash-checked against
+  `scripts/MANIFEST.sha256` every run, so **editing one is now a build failure, not a habit** —
+  changes go to `amh.conf`, `scripts/guards/*.sh` or `scripts/verify.sh`. Eight of our eleven
+  guards were already upstream's; the other three plus the staged half of the secret scan became
+  repo-local guards, and we gained author-identity, shipped-integrity and repo-local-guard rungs
+  we never had. Docs moved to the AMH layout (`docs/STATE.md`, `docs/RUNBOOK.md`,
+  `docs/LEDGER{,_A,_B}.md`) and the constitution moved from `CLAUDE.md` to `AGENTS.md`, reversing
+  D-176's "the name is historical, kept so existing citations stay valid" — upstream's canonical
+  name won because compatibility with the harness we now consume outranks compatibility with our
+  own old citations. Rows written before this date cite `CLAUDE.md`; they mean `AGENTS.md`.
+  `docs/AGENTIC_HARNESS_PROMPT.md` was deleted: it is the AMH repository now, and a stale
+  snapshot in `docs/` would read as authoritative while drifting against every upstream release.
+  **The durable rule: everything local lives in a declared extension point, and
+  `docs/HARNESS_LOCAL.md` is the single record of what and why** — that document is what keeps
+  the next upgrade a file copy instead of a merge. `[cited]`: `scripts/bootstrap.sh`.
+
+- DB-015: **The ledger's row-header shape is load-bearing, and 124 of 228 rows did not have it.**
+  AMH enumerates rows with `sed -n 's/^- \(D[A-Z]\?-[0-9]\+\)\( \[cited\]\)\?:.*/\1\2/p'`, which
+  reads a row only when the ID is the first thing after `- `. Our rows had drifted into two
+  shapes: `- D-001: …` and `- **D-060 (S12.7h) — …`. The bold form was invisible to the parser,
+  so 68 live citations would have failed as unresolved. Normalized every header to
+  `- D-NNN[ [cited]]: **…` by moving the bold OPENING marker after the colon — row text
+  byte-identical, per-line `**` count unchanged, nothing deleted, renumbered or reordered; 33
+  rows that had no colon gained one, which is the whole of the +33 B delta. **The rule: a row
+  header is a machine interface, not formatting.** Two ledger preambles were teaching the old
+  shape as the canonical example to copy, which would have silently reintroduced invisible rows;
+  a fresh-context review caught that, and `scripts/tests/local-guards.sh` now has a fixture where
+  a re-bolded volume must fail rather than pass on rows it never read.
+
+- DB-016 [cited]: **A guard that counts the wrong thing reports the strongest line it has.**
+  `scripts/guards/ledger-prefix.sh` — the repo-local half of citation checking, since the shipped
+  guard pools volumes and cannot know that a `DB-` row belongs in `LEDGER_B.md` — counted
+  *volumes* to decide whether it had checked anything. A volume whose rows did not parse
+  contributed zero rows, the prefix loop never ran for it, and the guard printed "every row in
+  the volume its prefix names". Not hypothetical: that is exactly the state DB-015 converted away
+  from, so re-bolding one volume would disarm the guard for it. Fixed to count rows and fail a
+  volume yielding none. **Same guard, second defect, same class:** it read `LEDGER_DIR` and
+  `LEDGER_BASENAME` from the environment, but the ladder assigns them without `export` and runs
+  each guard as `bash <guard>` — a child process. The guard was always using its own hardcoded
+  defaults, invisibly, because those defaults happened to equal the configured values; pointing
+  `LEDGER_DIR` elsewhere would have left the real ledger unchecked while the guard reported on an
+  empty directory. It now sources `amh.conf` itself. **The rule for every repo-local guard: source
+  the config, never inherit it, and make "I checked nothing" a failure that names its subject.**
+  Both are fixture-pinned. `[cited]`: `scripts/guards/ledger-prefix.sh`.
+
+- DB-017: **The constitution was cut 42% on Anthropic's Claude-5 context-engineering guidance,
+  and one part of it was declined.** Owner-requested test of the freshly-converged harness.
+  Applied: judgment over enumerated rules ("write code that reads like the code around it"
+  replacing style lists); single mentions (secret hygiene stopped restating what
+  `command-guard.sh`'s header says and now points at it, because a restatement is a thing that
+  drifts); progressive disclosure (the adapter-authoring spec moved to `docs/HARNESS_LOCAL.md`,
+  the module map defers to RUNBOOK's deeper copy, the Gradle rungs to `scripts/verify.sh`); and
+  references to artifacts over descriptions of them. 217 → 155 lines, 15.7 → 9.2 KB.
+  **Declined, owner decision: auto-memory.** The guidance says to stop maintaining memory files
+  because the agent preserves its own. That is per-agent, and this harness's memory is a
+  cross-agent, in-repo, reviewable artifact — the ledger's whole value is that a bug found by one
+  session teaches a *different* agent nine sessions later, which no private memory can do.
+  **Also declined: a skill for verification.** Verification here is already one command with the
+  detail inside `scripts/verify.sh`; wrapping that in a skill is indirection over an interface
+  that is already one word.
+  **Two cuts were caught and reverted before landing**, both the same shape — prose that looked
+  redundant because another file also said it, where the constitution was the only thing that
+  said it *in time*: the "never read the 1.6 MB source XML wholesale, go via `XML_RECIPES.md`"
+  hazard (`XML_RECIPES.md` states it, but only after you have already opened the wrong file), and
+  "no new dependency unless the change clearly warrants one", which lived nowhere else in live
+  prose. **The rule this earns: when compressing legislation, "another file says it" is not
+  sufficient — ask whether the reader reaches that file BEFORE the mistake.**
+  Supersedes DA-021's decline of a harness rewrite from an external context-engineering blog:
+  that source was third-party and general, this one is first-party and model-specific, which is
+  the new evidence Decided non-items require.
+
+- DB-018: **The rule-review pass on DB-017 found 12 defects, 3 of them binding — and the worst
+  was a rule whose deletion was invisible precisely because the thing it guarded is invisible.**
+  DB-017 cut the constitution 42%; the mandatory review landed after the commit (rate limits) and
+  is recorded here rather than in that row because the row is immutable.
+  **The blocking one:** the reduction dropped "never a personal address, **including one handed to
+  the agent in its own session context**". Claude Code injects the owner's real email into every
+  session's context, so an agent reading only "use the owner's handle or a no-reply alias" while
+  holding that address has nothing telling it *that* address is the forbidden one — the natural
+  reading is that a harness-supplied owner email is the sanctioned identity. The ladder's identity
+  rung explicitly cannot tell a personal address from a work one, so nothing downstream catches
+  it, and a pushed commit cannot be repaired without the rewrite this repo forbids. The clause was
+  the entire mechanism. **The rule: when a rule's subject is something the agent is *handed*
+  rather than something it fetches, the rule is invisible to a redundancy check — no other file
+  mentions it, because no other file can see it.**
+  **The second:** the adapter-coverage table written in the same change credited Codex with a
+  bootstrap, a command rail and full deny rails, all "per upstream template". Its own adapter
+  files say the opposite in terms — no session-start hook, no pre-shell hook, and prefix rules
+  with no path-glob operand. The table was three lines above a paragraph correctly describing
+  Codex's actual situation, and it violated the honesty requirement stated seven lines above it.
+  A false coverage claim in the document the constitution names as the single answer is worse
+  than no document.
+  **The third:** "say which layer holds a rule whenever you add one" was cut to a narrower remark
+  about this file not restating script coverage. That sentence is why `scripts/guards/doc-facts.sh`
+  exists (drift incident d66de4c) and why RUNBOOK has to write "no guard enforces this bullet".
+  **What this says about compressing legislation:** every one of the three survived a
+  "is it stated elsewhere?" check and failed a "would a session do the wrong thing?" check. The
+  first is the test an author can run; only a fresh reader can run the second.
+
+- DB-019: **An AMH upgrade has three independent version surfaces, and prose authority is not a
+  substitute for the value.** At the 3.0.0 → 4.1.0 upgrade, `amh.conf` correctly named 3.0.0 and
+  `docs/STATE.md` agreed, but the constitution only said that `amh.conf` was authoritative; it did
+  not record a numeric version despite the upstream upgrade contract requiring one. The scripts
+  could therefore be replaced without leaving the constitution mechanically comparable on the
+  next upgrade. The upgrade now updates all three: `AMH_VERSION`, an explicit constitution
+  version line, and STATE's working record. The release-template key diff is a separate required
+  check: it exposed the deliberately unset `LEDGER_ROW_CHAR_CAP`, which remains on the shipped
+  script's 2000-byte default rather than pretending every declared key was locally configured.
+
+- DB-020: **The owner set `LEDGER_ROW_CHAR_CAP=750`, superseding DB-019's use of the shipped
+  2000-byte default.** The smaller bound is deliberate: a ledger row should preserve one durable
+  lesson, not its debugging narrative. The ladder guard holds the rule for new rows; historical
+  committed rows remain exempt.
+
+- DB-021 [cited]: **Release preflight now positively identifies artifact-producing paths instead
+  of treating every unknown file as app code.** The exclusion-based classifier made the AMH-only
+  `amh.conf` change demand a version bump from released code 20 to 21. The workflow now enables
+  release preparation for explicit artifact surfaces, skips known maintenance surfaces, and fails
+  closed on unknown paths. Rename folding is disabled so both endpoints are classified. Prose only:
+  if the build later consumes a known non-shipping path, reclassify it in the introducing PR.
+  `[cited]`: `.github/workflows/release-preflight.yml`.

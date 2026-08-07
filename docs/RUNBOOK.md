@@ -4,10 +4,10 @@ The Tasker→Kotlin rebuild is **done and shipped** (v1.0.0). This is the entry 
 *changing* the app afterward while preserving Tasker feature parity. Pick the change-type
 playbook that matches your task, read the reference docs it names, then do the work.
 
-The migration narrative (segment briefs, gate findings) is frozen in `../history/` — consult it,
-don't extend it. The numbered deviations live in `DEVIATIONS_LEDGER.md`, a permanent append-only
+The migration narrative (segment briefs, gate findings) is frozen in `docs/history/` — consult it,
+don't extend it. The numbered deviations live in `docs/LEDGER.md`, a permanent append-only
 registry (never compress it; append the next number in the LIVE ledger file — base file closed
-at D-176; from `DEVIATIONS_LEDGER_A.md`/DA-001 on, 1000 lines per file, final row may overflow,
+at D-176; from `LEDGER_A.md`/DA-001 on, 1000 lines per file, final row may overflow,
 next row opens `_B.md`/DB-001, …; D-153/DA-001). **Code + golden
 vectors are ground truth**; where any doc disagrees with the code, trust the code (and fix the doc).
 
@@ -21,7 +21,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 - **`:app`** — Compose M3 UI (~9 screens), DataStore settings (`AabSettings`), foreground
   service runtime, QS tile, boot receiver, notification.
 
-## Reference-doc index (live, in `docs/rebuild/` unless noted)
+## Reference-doc index (live; bare names are in `docs/rebuild/`, paths are repo-relative)
 
 | Question | Doc |
 |---|---|
@@ -42,7 +42,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | The standing on-device acceptance pass (permanent, cited by §number) | `DEVICE_TEST_SCRIPT.md` |
 | What the *unreleased* train changed, for the owner to check (ephemeral) | `DEVICE_TEST_SCRIPT_<version>.md` |
 | Which control enforces an invariant, and what proves it | `SECURITY_REVIEW.md` |
-| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `DEVIATIONS_LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
+| Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `docs/LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
 ## Change-type playbooks
 
@@ -60,7 +60,7 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 
 ### 1. Tasker profile added / changed / removed (a trigger context or pipeline gate)
 - **Read first:** `extraction/profiles.md` (+ `contexts_spec.md` for context watchers); the
-  relevant `DEVIATIONS_LEDGER` rows (profile gating, ConditionList semantics). Re-read the XML
+  relevant `docs/LEDGER.md` rows (profile gating, ConditionList semantics). Re-read the XML
   only via `XML_RECIPES.md`.
 - **Code:** the hardcoded-boolean profile gates in `:domain`/`:platform` (no generic
   ConditionList evaluator exists — gates are explicit Kotlin booleans with a truth-table test).
@@ -92,7 +92,7 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 
 ### 4. Bug fix
 - **Read first:** the reference doc for the affected area (above) + any related
-  `DEVIATIONS_LEDGER` row.
+  `docs/LEDGER.md` row.
 - **Steps:** reproduce → add/adjust a failing test first → fix so it conforms to the golden
   vectors (never edit a golden vector to pass; changing one needs proof the extraction was
   wrong + a `STATE.md` entry) → run the ladder → **glue-review protocol** (below) if the fix
@@ -163,8 +163,8 @@ so check it explicitly.
   scan flags a longer `whatsNew` as a Minor finding. The cap is on **characters (codepoints), not
   bytes** (DA-019) — a note with em dashes / accents / emoji can exceed 500 bytes while under 500
   chars, so `wc -c` **overcounts**; measure with `LC_ALL=C tr -d '\200-\277' < file | wc -c`
-  (strips UTF-8 continuation bytes → one byte per codepoint), which is exactly what ladder guard 6
-  machine-fails the current versionCode's file over (D-173). **`release.yml`
+  (strips UTF-8 continuation bytes → one byte per codepoint), which is exactly what
+  `scripts/guards/fdroid-changelog.sh` machine-fails the current versionCode's file over (D-173). **`release.yml`
   auto-reuses this file as the GitHub Release's "What's new" section (D-123)** — it reads the tagged
   build's `versionCode`, looks up the matching changelog, and slots it between the owner's UI summary
   and GitHub's auto "What's Changed". So the owner no longer hand-copies the changelog into the release
@@ -216,15 +216,19 @@ so check it explicitly.
   record and takes no maintenance-era files). Two round scripts alive at once means the previous
   one should already have been retired.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release
-  process, a `DEVIATIONS_LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
+  process, a `docs/LEDGER.md` row. **Do NOT keep a per-version changelog in `build.gradle.kts`**
   (D-127): the history lives in `STATE.md`, the ledger, the fastlane changelogs, and git — the gradle
   file keeps only the bump *invariant* comment, not a running log (it had grown to ~50 lines of
   redundant narrative).
 - **Tagging stays an owner step** — do not create tags or open releases yourself.
 - **CI guardrail (`release-preflight.yml`, D-124).** A secret-free PR check enforces this checklist so a
   miss is caught before merge, not after a bad tag. It runs the version/changelog checks **only when the
-  PR ships app code** (any changed file outside `docs/`, `.github/`, `scripts/`, `fastlane/`, `*.md`, or a
-  `src/test`/`androidTest` tree) — a docs/workflow/test-only PR skips them. When it fires it requires:
+  PR ships app code**: shipped `src/main`/`src/release` trees, Gradle build graph/toolchain files,
+  wrapper files, or ProGuard/consumer rules. Harness/config/docs/workflow/test/metadata changes do
+  not manufacture a release bump. Any path in neither explicit class fails closed and must be
+  classified in the same PR. **Prose-only invariant:** if the build begins consuming a file under
+  a non-shipping tree, that input is reclassified as shipping in the introducing PR; CI cannot infer
+  a future Gradle input graph. When the release gate fires it requires:
   `versionCode` **strictly greater** than the latest `v*` tag's code, `versionName` not regressed below
   that tag and semver-shaped, and a non-empty `changelogs/<versionCode>.txt`. The **skip-ci token scan**
   (D-115) runs on *every* PR — it greps the PR's commit messages + title + body (not file contents) for
@@ -427,7 +431,7 @@ and it hunts RULE bug classes, each from this repo's history:
   under 12 KB satisfied the old length guard while defeating it — DA-004);
 - **enforcement asymmetry** — prose implies a protection no guard or permission rail
   actually checks (either say it's prose-only, or add the check);
-- **citation validity** — guard 5 deliberately does not scan docs, so D-row cites in rule
+- **citation validity** — the citation guard deliberately does not scan docs (`CITATION_SCAN_PATHS` in `amh.conf`, which today covers `app domain platform .github scripts`), so D-row cites in rule
   prose are checked HERE: the row exists and actually says what the rule claims;
 - **agent-agnosticism regression** — the rule silently assumes one agent's machinery,
   filenames, or env vars (D-176).
@@ -436,8 +440,8 @@ Out of scope: routine STATE.md edits (changelog lines, queue items, Current stat
 working memory, not legislation. Two STATE sections ARE legislation and stay in scope: the
 **length-guard preamble** (guard-lockstep thresholds) and **Decided non-items** (binding
 declines). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
-their triage). Ladder guard 7 (DA-006) WARNs when the *uncommitted* diff touches a
-legislation file — that tripwire only *surfaces* the obligation, it never certifies the
+their triage). The ladder's rule-file advisory (DA-006) WARNs when the *uncommitted* diff touches a file
+named in `RULE_FILES` (`amh.conf`) — that tripwire only *surfaces* the obligation, it never certifies the
 pass; the review itself stays prose-enforced (the D-162 no-attestation-gates line holds).
 STATE.md and the ledger files are deliberately outside the tripwire (they change in nearly
 every unit — warn fatigue kills tripwires), so their legislative sections stay wholly
@@ -465,20 +469,28 @@ output: stop normal work — **containment outranks the checkpoint invariant.**
 
 ## Acceptance ladder
 
-**One command: `scripts/ladder.sh`** — fast pre-flight guards, then all five rungs in a
-single Gradle invocation. The guards are enumerated ONLY in the `ladder.sh` header comment
-(single source — prose re-enumerations here and in CLAUDE.md kept drifting as guards were
-added, DA-008 F8): failing checks for STATE length/structure, ledger rollover, citation
-integrity, changelog cap, skip-ci tokens, redaction self-test, and secret shapes, plus
-WARN-only advisories that self-skip in CI. The guards themselves are regression-tested by
-`scripts/test-ladder-guards.sh` (sandbox-repo fixtures, seconds; also a `build.yml` step —
-run it whenever you change a guard, D-173). On remote containers the session-start hook
-launches `scripts/warm-gradle.sh` in the background (D-173), so by the time you first run the
-ladder the cold dependency/compile cost has usually already been paid; `~/.gradle-warmup.log`
-shows its progress, `AAB_SKIP_WARMUP=1` disables it. **`build.yml`'s "Acceptance ladder"
-step invokes this same script (D-166)**, so CI and local share one task-set definition — there
-is no hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
-seconds; extra args are forwarded to Gradle.
+**One command: `scripts/ladder.sh`** — the shipped AMH guards, then this repo's guards under
+`scripts/guards/`, then `scripts/verify.sh`, which holds the five Gradle rungs in a single
+invocation. The ladder is a **shipped script: never edit it** (`docs/HARNESS_LOCAL.md`); the
+integrity rung hashes it against `scripts/MANIFEST.sha256` every run. It takes **no arguments
+other than `--guards-only`** and forwards nothing to Gradle — a flag you want under CI belongs
+in `scripts/verify.sh`, which is where `--no-daemon --no-configuration-cache` now lives.
+
+The guards are not enumerated in prose anywhere, deliberately (re-enumerations kept drifting as
+guards were added, DA-008 F8). To see what runs, read `scripts/ladder.sh`'s `run_guards`
+function and `ls scripts/guards/`; the ladder also names every rung as it executes. Both
+fixture suites — `scripts/test-ladder-guards.sh` for the shipped guards and
+`scripts/tests/local-guards.sh` for ours — run inside `scripts/verify.sh`, and again as a
+standalone `build.yml` step before the ladder so that a red guard still tells you whether the
+guards themselves regressed. Run them whenever you change a guard (D-173).
+
+On remote containers the session bootstrap runs `scripts/bootstrap.sh`, which launches
+`scripts/warm-gradle.sh` in the background (D-173), so by the time you first run the ladder the
+cold dependency/compile cost has usually already been paid; `~/.gradle-warmup.log` shows its
+progress, `AAB_SKIP_WARMUP=1` disables it. **`build.yml`'s "Acceptance ladder" step invokes
+this same script (D-166)**, so CI and local share one definition of verified — there is no
+hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
+seconds.
 
 The rungs individually (run the relevant subset until green; on-device behavior is
 owner-verified — no emulator, no KVM):
@@ -536,8 +548,8 @@ When CI is red but local is green, the failure is in the **environment/workflow*
 ## Self-adaptation — keep this runbook useful
 
 If this runbook lacks what you need for the task in front of you:
-1. Consult the live reference docs above (esp. `DEVIATIONS_LEDGER.md`) and the frozen
-   `../history/` narrative.
+1. Consult the live reference docs above (esp. `docs/LEDGER.md`) and the frozen
+   `docs/history/` narrative.
 2. If you learn a durable fact future sessions need, record it as a new numbered deviation
    in the live ledger file (1000-line cap + rollover, D-153/DA-001) and/or correct the relevant
    reference doc — provenance-stamped, terse.

@@ -207,6 +207,7 @@ awk '/<Task sr="task661">/,/<\/Task>/' $X | grep -o '<code>[0-9]*</code>' | sort
 Frequent codes in this project (derive others from context/`<label>` hints, record unknowns —
 do not guess): 547 Variable Set · 37 If · 38 End If · 43 Else/Else-If · 130 Perform Task ·
 548 Flash · 549 Variable Clear · 474 Java Code · 598 Variable Search/Replace · 30 Wait ·
+590 Variable Split · 105 Set Clipboard ·
 137 Stop · 810 Set Display Brightness · 235 Custom Setting · 779(?) shell-adjacent ·
 523 Notify · 159/165(?) — verify in place.
 

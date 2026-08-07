@@ -80,7 +80,7 @@ jobs:
       #     reference implementations are immutable test fixtures (CLAUDE.md): production code
       #     conforms to THEM, and changing one requires proof the extraction was wrong plus a
       #     STATE.md entry. This machine-checks the checkable half: a PR that touches a golden
-      #     fixture must also touch docs/rebuild/STATE.md (the justification entry).
+      #     fixture must also touch docs/STATE.md (the justification entry).
       # ---------------------------------------------------------------------------------------------
       - name: Golden fixtures immutable unless STATE.md justifies (D-162)
         env:
@@ -88,7 +88,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          FILES=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          # Disable rename folding so moving a golden fixture away still exposes its old path.
+          FILES=$(git diff --no-renames --name-only "$BASE_SHA...$HEAD_SHA")
           if [ -z "$FILES" ]; then
             echo "No changed files found; skipping the golden-fixture gate."
             exit 0
@@ -98,11 +99,11 @@ jobs:
             case "$f" in
               domain/src/test/resources/golden/*) golden=true ;;
               domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/*) golden=true ;;
-              docs/rebuild/STATE.md) state=true ;;
+              docs/STATE.md) state=true ;;
             esac
           done <<< "$FILES"
           if [ "$golden" = "true" ] && [ "$state" = "false" ]; then
-            echo "::error::This PR changes golden vectors / reference implementations without touching docs/rebuild/STATE.md."
+            echo "::error::This PR changes golden vectors / reference implementations without touching docs/STATE.md."
             echo "::error::They are immutable fixtures (CLAUDE.md): production code conforms to THEM. Changing one"
             echo "::error::requires proof the extraction was wrong, recorded as a STATE.md entry (D-162)."
             exit 1
@@ -114,9 +115,11 @@ jobs:
           fi
 
       # ---------------------------------------------------------------------------------------------
-      # 2. Does this PR ship app code? If EVERY changed file is docs/workflow/test/metadata, the
-      #    version+changelog gate is skipped. Anything else (main source, build config, manifest, res,
-      #    gradle) counts as shipping.
+      # 2. Does this PR ship app code? Match the artifact-producing surfaces positively (DB-021):
+      #    treating every unknown repository file as app code makes harness/config maintenance demand a fake
+      #    release. Unknown paths fail closed. If the build starts consuming a file under a known
+      #    non-shipping tree, reclassify that input in the same PR; this policy is prose-reviewed,
+      #    because the workflow cannot infer Gradle's future input graph.
       # ---------------------------------------------------------------------------------------------
       - name: Classify PR (ships app code?)
         id: classify
@@ -125,29 +128,56 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          FILES=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          # Classify both sides of a rename: removing shipped code is itself a shipping change.
+          FILES=$(git diff --no-renames --name-only "$BASE_SHA...$HEAD_SHA")
           if [ -z "$FILES" ]; then
             echo "No changed files found; release-prep gate skipped."
             echo "ships=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "Changed files:"; printf '  %s\n' $FILES
+          echo "Changed files:"
+          while IFS= read -r f; do printf '  %s\n' "$f"; done <<< "$FILES"
+          classify_path() {
+            case "$1" in
+              */src/main/*|*/src/release/*) echo ships ;;                          # shipped source/resources/manifests
+              */build.gradle.kts|build.gradle.kts|settings.gradle.kts) echo ships ;; # module/root build graph
+              gradle.properties|gradle/libs.versions.toml|gradle/wrapper/*) echo ships ;;
+              gradlew|gradlew.bat|buildSrc/*) echo ships ;;
+              */proguard-rules.pro|*/consumer-rules.pro) echo ships ;;
+              docs/*|.github/*|.claude/*|.codex/*|scripts/*|fastlane/*) echo nonships ;;
+              */src/test/*|*/src/testFixtures/*|*/src/androidTest/*|*/src/sharedTest/*) echo nonships ;;
+              *.md|amh.conf|.gitignore|.gitattributes|LICENSE|LICENSE.*|*/lint.xml) echo nonships ;;
+              *) echo unknown ;;
+            esac
+          }
+
+          # Pin both sides of the scope boundary in the workflow that enforces it.
+          [ "$(classify_path app/src/main/AndroidManifest.xml)" = ships ]
+          [ "$(classify_path app/build.gradle.kts)" = ships ]
+          [ "$(classify_path amh.conf)" = nonships ]
+          [ "$(classify_path scripts/ladder.sh)" = nonships ]
+          [ "$(classify_path domain/src/test/kotlin/ExampleTest.kt)" = nonships ]
+          [ "$(classify_path future-artifact-input.conf)" = unknown ]
+
           ships=false
           while IFS= read -r f; do
             [ -z "$f" ] && continue
-            case "$f" in
-              docs/*|.github/*|.claude/*|scripts/*|*.md) ;;                         # docs / CI / agent-harness config / scripts (D-173)
-              fastlane/*) ;;                                                        # store metadata, not app code
-              */src/test/*|*/src/testFixtures/*|*/src/androidTest/*|*/src/sharedTest/*) ;;  # tests don't ship
-              .gitignore|.gitattributes|LICENSE|LICENSE.*) ;;
-              *) ships=true; break ;;                                              # main src, build, res, gradle, manifest
+            classification=$(classify_path "$f")
+            case "$classification" in
+              ships) ships=true ;;
+              nonships) ;;
+              *)
+                echo "::error::Unclassified changed path: $f"
+                echo "::error::Add it to classify_path as ships or nonships; release preflight fails closed."
+                exit 1
+                ;;
             esac
           done <<< "$FILES"
           echo "ships=$ships" >> "$GITHUB_OUTPUT"
           if [ "$ships" = "true" ]; then
             echo "PR ships app code → release-prep gate ENABLED."
           else
-            echo "PR is docs/workflow/test/metadata only → release-prep gate SKIPPED (skip-ci guard still ran)."
+            echo "Every changed path is explicitly non-shipping → release-prep gate SKIPPED (skip-ci guard still ran)."
           fi
 
       # ---------------------------------------------------------------------------------------------

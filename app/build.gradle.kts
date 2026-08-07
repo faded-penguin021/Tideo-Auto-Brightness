@@ -16,7 +16,7 @@ android {
         // INVARIANT when bumping these: versionName ≥ the latest `v*` tag, versionCode strictly greater
         // than every released code (F-Droid rejects a re-used code), bumped by semver per the *nature* of
         // the change — RUNBOOK §6 "Cutting a release". `release-preflight.yml` (D-124) enforces this on PRs.
-        // Per-version history is NOT kept here — see the STATE.md Changelog, DEVIATIONS_LEDGER, and
+        // Per-version history is NOT kept here — see the docs/STATE.md Changelog, docs/LEDGER.md, and
         // fastlane/.../changelogs/<versionCode>.txt.
         versionCode = 20
         versionName = "1.8.2"

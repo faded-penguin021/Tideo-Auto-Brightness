@@ -1,0 +1,24 @@
+# AMH static deny rails for Codex. Wiring only; AGENTS.md and scripts/ own the
+# behavior and explanations. Prefix rules cannot provide output filtering or
+# invoke scripts/command-guard.sh as a pre-execution hook.
+
+# Environment dumps and direct secret-file reads.
+prefix_rule(pattern = ["env"], decision = "forbidden", justification = "AMH forbids environment dumps; check only whether a named key is set.")
+prefix_rule(pattern = ["printenv"], decision = "forbidden", justification = "AMH forbids environment dumps; check only whether a named key is set.")
+prefix_rule(pattern = ["set"], decision = "forbidden", justification = "AMH forbids shell state dumps.")
+prefix_rule(pattern = ["export", "-p"], decision = "forbidden", justification = "AMH forbids exported-environment dumps.")
+prefix_rule(pattern = ["declare", ["-p", "-x"]], decision = "forbidden", justification = "AMH forbids shell variable dumps.")
+prefix_rule(pattern = ["typeset", ["-p", "-x"]], decision = "forbidden", justification = "AMH forbids shell variable dumps.")
+prefix_rule(pattern = ["source", [".env", "./.env"]], decision = "forbidden", justification = "AMH forbids loading secret-bearing .env files.")
+prefix_rule(pattern = [".", [".env", "./.env"]], decision = "forbidden", justification = "AMH forbids loading secret-bearing .env files.")
+prefix_rule(pattern = [["cat", "head", "tail", "less", "more", "strings", "grep", "wc", "sha256sum", "md5sum"], [".env", "./.env", "/proc/self/environ"]], decision = "forbidden", justification = "AMH forbids reading secret-bearing .env files and process environments.")
+
+# Codex prefix policy has no path-glob operand, so nested .env paths and arbitrary
+# /proc/<pid>/environ paths cannot be expressed here. scripts/command-guard.sh covers
+# its enumerated reader forms; AGENTS.md remains binding beyond both mechanical rails.
+
+# Git publication rails. The instructive command guard covers more spellings
+# when run directly; these rules express the forms Codex's prefix policy can.
+prefix_rule(pattern = ["git", "push", ["--force", "-f", "--force-with-lease", "--mirror", "--all"]], decision = "forbidden", justification = "AMH forbids force-pushes and broad pushes.")
+prefix_rule(pattern = ["git", "push", "origin", ["--force", "-f", "--force-with-lease", "--mirror", "--all"]], decision = "forbidden", justification = "AMH forbids force-pushes and broad pushes.")
+prefix_rule(pattern = ["git", "push", "origin", ["main", "HEAD:main", "+main", "+HEAD:main"]], decision = "forbidden", justification = "AMH forbids pushes to DEFAULT_BRANCH; push the assigned session branch.")

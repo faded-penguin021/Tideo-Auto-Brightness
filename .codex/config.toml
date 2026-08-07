@@ -1,0 +1,6 @@
+# Codex adapter for the AMH. Wiring only: all behavioral policy lives in
+# AGENTS.md and scripts/. Codex currently has no repository-local session-start,
+# pre-shell, or output-filter lifecycle hook, so this file does not pretend to
+# run scripts/session-start.sh, scripts/command-guard.sh, or scripts/redact.sh.
+# The supported repository-local command-policy layer is wired separately in
+# .codex/rules/amh.rules. The command guard remains available for direct use.

@@ -9,7 +9,7 @@ production engine helpers (`smoothLux`, `dynamicThreshold`, `absoluteThresholds`
 `mapLuxToBrightness`, `compressedDynamicScale`, `calculateAnimation`, `BrightnessFormulae`) pass
 their golden-vector parity tests at 1e-9. `SoftwareDimming` (`finalDimLevel`, `dimShell`) is
 additionally covered by `superdimming.csv` (2016 rows). `OverrideRules` and `InitialBrightness`
-are covered by dedicated unit-test classes. See STATE.md D-030 for residual deviations.
+are covered by dedicated unit-test classes. See `../LEDGER.md` D-030 for residual deviations.
 
 The rows below are preserved as a historical record of each gap's root cause and S5 fix.
 

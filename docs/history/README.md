@@ -22,7 +22,7 @@ acceptance soak) all passed.
 - **`STATE_rebuild.md`** — the migration's cross-session memory: segment log, the layered
   "Current state" punch-list history, gate findings, and check results.
 
-> **The deviations ledger is NOT here — it lives at `docs/rebuild/DEVIATIONS_LEDGER.md`.** ⭐ It
+> **The deviations ledger is NOT here — it lives at `docs/LEDGER.md`.** ⭐ It
 > is a **permanent, append-only registry** (not frozen): ~96 numbered corrections to earlier
 > wrong assumptions (e.g. embedded Java is action code 474 not 598; `task661` holds no Java;
 > ConditionList children are alphabetical in the XML; the single-coroutine drop-on-reentry
@@ -33,6 +33,6 @@ acceptance soak) all passed.
 
 These files describe the app **as it was built**. Code and golden vectors are ground truth; if
 anything here conflicts with the current code, **trust the code**. For live, forward-looking
-docs see `docs/rebuild/RUNBOOK.md` (maintenance playbook), `docs/rebuild/STATE.md` (current
+docs see `docs/RUNBOOK.md` (maintenance playbook), `docs/STATE.md` (current
 project state), and the live reference docs (`extraction/`, `XML_RECIPES.md`,
 `PARITY_CHECKLIST.md`, `screen_map.md`) that remain in `docs/rebuild/`.

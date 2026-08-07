@@ -1,379 +1,1288 @@
 #!/usr/bin/env bash
-# ladder.sh — one-command local acceptance ladder + pre-flight guards.
+# AMH — the acceptance ladder: ONE verification entrypoint, shared by the agent and
+# CI by construction (P4). CI invokes this exact script, so "green locally, red in
+# CI" can only ever mean environment, never a lockstep the humans forgot to update.
 #
-# build.yml's "Acceptance ladder" step invokes THIS script directly (D-166), so the Gradle
-# task set is shared by construction — there is no hand-maintained lockstep between the two.
-# (CLAUDE.md "Build commands" / RUNBOOK "Acceptance ladder" still list the same five rungs
-# individually; they remain the human-readable ground truth.)
+#   scripts/ladder.sh                 fast guards, then the full verification set
+#   scripts/ladder.sh --guards-only   guards only (seconds) — for docs-only work
 #
-# Usage:
-#   scripts/ladder.sh                    guards, then the full 5-rung ladder
-#   scripts/ladder.sh --guards-only      guards only (docs-only units; seconds, no Gradle)
-#   scripts/ladder.sh <gradle args...>   extra args forwarded to Gradle (e.g. --no-daemon)
+# Repo-agnostic by design, which is what lets a repo verify it runs the harness's
+# own artifact byte-for-byte. Everything repo-specific lives in three places:
+#   amh.conf          values (branches, size bands, scan scope)
+#   scripts/guards/*  extra guards this repo has earned
+#   scripts/verify.sh the full test/build/lint set (rung 3)
 #
-# Guards (fail fast, before any build):
-#   1. STATE.md length rule (mirrors STATE.md's own preamble, DA-004 hysteresis): quiet to
-#      14 KB, then warn to deep-compress to <= 9 KB; FAIL over the 16 KB hard cap.
-#      1a: compression-landing rule (DA-014) — FAIL when a change trims STATE out of warn
-#      territory (> 14 KB before) but lands in the 9–14 KB debounce band instead of on the
-#      <= 9 KB floor (catches the micro-trim the stateless thresholds miss).
-#      1b: required sections present
-#      (over-compression tripwire). 1c: deviations-ledger rollover reminder (D-153).
-#      (LADDER_STATE_FILE / LADDER_LEDGER_FILE override the paths — used only by
-#      scripts/test-ladder-guards.sh, the guards' own test suite.)
-#   5. D-citation integrity (D-173): every D-/DA-/DB-NNN cited in app/ domain/ platform/
-#      .github/ sources must resolve to a row in its ledger file; ledger row numbers must be
-#      unique; the rows' [cited] markers must match the citation set both ways (D-174).
-#      6. F-Droid changelog cap (D-173, char count DA-019): the CURRENT versionCode's
-#      fastlane changelog must be <= 500 CHARACTERS (codepoints, not bytes — RUNBOOK §6;
-#      F-Droid flags a longer whatsNew by string length, so a multibyte note may exceed 500 B).
-#   2. D-115 skip-ci token scan over unmerged commit messages (origin/main..HEAD) — the
-#      same fixed-string token set release-preflight.yml enforces at PR time. Catching a
-#      token BEFORE push matters here: force-push is forbidden (CLAUDE.md git rules), so a
-#      poisoned pushed message stays on the branch until a squash-merge folds it into the
-#      squash commit on main, where GitHub silently skips ALL workflows (the v1.2.0
-#      incident). This file's own token list is inert: GitHub and the PR scan read commit
-#      messages/titles, never file contents.
-#   3/4. Local human-in-the-loop advisories (WARN-only; skipped under GITHUB_ACTIONS so they
-#      never add CI noise, D-166): 3 = checkpoint tripwire (code/config changed vs main but
-#      STATE.md carries no matching entry — RUNBOOK Session discipline 3); 4 = stale-branch
-#      tripwire (HEAD behind origin/main CAN invite a squash-merge conflict — but under the
-#      DA-002 branch-train model behind-main is usually structural, so it stays advisory;
-#      DA-010: a merge-tree test-merge classifies which case applies, so the warning itself
-#      says "do NOT merge" when origin/main brings no content this branch lacks).
-#   7. Rule-review tripwire (DA-006; WARN-only, skipped under GITHUB_ACTIONS): uncommitted
-#      changes touching harness-legislation files (constitution + its AGENTS.md pointer,
-#      RUNBOOK, this script + its test suite, session bootstrap, adapter permission config)
-#      print a reminder that the DA-005 rule-review protocol applies before commit.
-#   8. redact.sh self-test (DA-007): the secret-redaction filter is a rail — a silent regex
-#      regression must fail the ladder, not pass quietly.
-#   11. Falsifiable doc-facts (DA-015): a prose claim with a shipped drift incident gets a
-#      machine anchor — constant in the guard, lockstep with the cited doc sentence
-#      (Shizuku runtime-site count, d66de4c). Incident-only admission bar.
-#   9. Secret-shape tree scan (DA-008): FAIL if redacting any tracked/untracked text file
-#      would change it — the scan IS the DA-007 filter, so the two cannot drift. Catches a
-#      secret BEFORE commit (server push protection only fires at push, when the secret is
-#      already in history and only the owner-executed rewrite path remains, DA-006).
-#      Fixture tokens must be runtime-generated so the tree stays inert.
-#   10. command-guard.sh self-test (DA-009): the pre-execution command rail (force-push /
-#      push-to-main / env-dump blocks with instructive deny reasons) must not regress
-#      silently — same rationale as guard 8.
-set -euo pipefail
+# No `set -e`: every guard must run so one change gets ONE complete report instead of
+# a whack-a-mole sequence of first failures. Failures are counted, not thrown.
+#
+# On `AMH ledger row DNNN` references below: they point at the HARNESS's ledger, which
+# explains why this script is shaped the way it is. They are deliberately NOT written as
+# `D-NNN` citations, because a citation is a promise that the ID resolves — and in your
+# repository it never can, since those rows are ours and cannot appear in your ledger.
+# Written as citations they made the ladder's citation guard fail on a repo its owner had
+# not yet touched, for rows they could not have written.
 
-cd "$(dirname "$0")/.."
+set -uo pipefail
 
-STATE_FILE="${LADDER_STATE_FILE:-docs/rebuild/STATE.md}"
-guards_only=0
-if [ "${1:-}" = "--guards-only" ]; then
-  guards_only=1
-  shift
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT" || exit 1
+
+GUARDS_ONLY=0
+case "${1:-}" in
+--guards-only) GUARDS_ONLY=1 ;;
+"") ;;
+-h | --help)
+	sed -n '2,16p' "$0"
+	exit 0
+	;;
+*)
+	printf 'usage: %s [--guards-only]\n' "$0" >&2
+	exit 2
+	;;
+esac
+
+# --- configuration ----------------------------------------------------------
+DEFAULT_BRANCH=main
+# No BRANCH_PREFIX default here: the ladder never reads it. A default for a key this
+# script does not use is a claim it honours one — command-guard.sh and session-start.sh
+# are where the prefix lives.
+STATE_FILE=docs/STATE.md
+STATE_COMPRESS_TO_KB=9
+STATE_WARN_KB=14
+STATE_HARD_KB=16
+# Largest shrink above the soft cap that still counts as an ordinary edit rather than a
+# compression pass that stopped short. See guard_state_size for why this exists.
+STATE_EDIT_DELTA_BYTES=1024
+STATE_REQUIRED_SECTIONS='## Project|## Current state|## Changelog'
+STATE_OWNER_QUEUE_SECTION='## Owner queue'
+LEDGER_DIR=docs
+LEDGER_BASENAME=LEDGER
+LEDGER_LINE_CAP=800
+LEDGER_ROW_CHAR_CAP=2000
+CITATION_SCAN_PATHS='scripts .github'
+CITATION_EXCLUDE=''
+POISON_TOKENS='[skip ci]|[ci skip]'
+# Extended regex an author/committer address must match WHOLE (it is wrapped in ^(…)$).
+# EMPTY here on purpose, and empty is a valid setting: see guard_author_identity. An
+# adopter who never sets this key still gets the half of that guard that needs no list.
+AUTHOR_EMAIL_ALLOW=''
+PLAN_DIR=docs/plans
+RULE_FILES=''
+# shellcheck source=/dev/null
+[ -f "$ROOT/amh.conf" ] && . "$ROOT/amh.conf"
+
+FAILS=0
+WARNS=0
+section() { printf '\n▸ %s\n' "$1"; }
+ok() { printf '   ok    %s\n' "$1"; }
+warn() {
+	printf '   WARN  %s\n' "$1"
+	WARNS=$((WARNS + 1))
+}
+fail() {
+	printf '   FAIL  %s\n' "$1"
+	FAILS=$((FAILS + 1))
+}
+skip() { printf '   skip  %s\n' "$1"; }
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+in_ci() { [ -n "${CI:-}" ]; }
+has_git() { git rev-parse --git-dir >/dev/null 2>&1; }
+upstream_ref() {
+	local r="origin/$DEFAULT_BRANCH"
+	git rev-parse --verify --quiet "$r" >/dev/null 2>&1 && printf '%s' "$r"
+}
+
+# =============================================================================
+# 1. GUARDS — seconds, no build. Each one checks an artifact the work produces
+#    anyway (P3): file sizes, diffs, commit messages, citations. Never a
+#    self-reported attestation, which an agent can emit without doing the work.
+# =============================================================================
+
+guard_state_size() {
+	section "Working memory: $STATE_FILE size band (hysteresis)"
+	if [ ! -f "$STATE_FILE" ]; then
+		fail "$STATE_FILE is missing — it is protocol step 1 for every session"
+		return
+	fi
+	local cur warn_b hard_b comp_b prev shrank delta
+	cur=$(wc -c <"$STATE_FILE")
+	warn_b=$((STATE_WARN_KB * 1024))
+	hard_b=$((STATE_HARD_KB * 1024))
+	comp_b=$((STATE_COMPRESS_TO_KB * 1024))
+
+	if [ "$cur" -gt "$hard_b" ]; then
+		fail "$((cur / 1024)) KB exceeds the ${STATE_HARD_KB} KB hard cap — compress to ≤ ${STATE_COMPRESS_TO_KB} KB now"
+	elif [ "$cur" -gt "$warn_b" ]; then
+		warn "$((cur / 1024)) KB is over the ${STATE_WARN_KB} KB soft cap — run ONE deep compression pass to ≤ ${STATE_COMPRESS_TO_KB} KB (not to just under the cap)"
+	else
+		ok "$((cur / 1024)) KB (soft cap ${STATE_WARN_KB} KB, hard ${STATE_HARD_KB} KB)"
+	fi
+
+	# Landing check. Size thresholds alone are Goodhart-able: a trim that stops short of
+	# the floor passes and re-arms the warning a session later. Compare against the
+	# committed size and require a compression, once started, to actually LAND on the
+	# floor.
+	#
+	# "Any shrink above the cap IS a compression pass" was the first form of that, and it
+	# is wrong in the other direction: it failed a 15-byte deletion twice, once for fixing
+	# a wrong path and once for closing a queue item, and the only compliant move each
+	# time was to pad the file back. So judge the shrink's SIZE and whether it CROSSES
+	# the cap, in three branches:
+	#
+	#   1. crosses from above the cap to at or below it — must land on the floor. This is
+	#      the original hole verbatim and stays closed.
+	#   2. stays above the cap and is smaller than the edit delta — an ordinary edit.
+	#      Allowed; the size warning above is still armed, so the compression is still owed.
+	#   3. stays above the cap and reaches the delta — a compression pass that stopped
+	#      short, which is the grow-to-15.5 / trim-to-14.2 loop the debounce exists to
+	#      prevent. Must reach the floor.
+	#
+	# The delta sits in a wide empty gap: no plausible ordinary edit runs to 1 KB, and no
+	# real compression pass on a file this size comes in under about 5 KB. It is the SHRINK
+	# that is being measured, never the band — widening the band is what reopens the
+	# original hole, and nothing here touches it. Growth, and edits that start below the
+	# cap, never reach this check at all.
+	has_git || return
+	prev=$(git show "HEAD:$STATE_FILE" 2>/dev/null | wc -c)
+	if [ "$prev" = "$cur" ]; then
+		prev=$(git show "HEAD~1:$STATE_FILE" 2>/dev/null | wc -c)
+	fi
+	[ "${prev:-0}" -gt 0 ] || return
+	[ "$prev" -gt "$warn_b" ] && [ "$cur" -lt "$prev" ] || return
+	shrank=$((prev - cur))
+
+	# A threshold arriving from config is exactly the kind of property that is not this
+	# guard's subject, so a malformed one must not decide anything quietly. Left alone,
+	# `[ "$shrank" -lt "$delta" ]` on a non-numeric delta writes an error to stderr and
+	# takes the ELSE branch — the guard then fails an ordinary edit while printing two
+	# numbers that contradict its own verdict. Fall back to the shipped default, loudly.
+	delta=$STATE_EDIT_DELTA_BYTES
+	case $delta in
+	'' | 0 | *[!0-9]*)
+		warn "STATE_EDIT_DELTA_BYTES='$delta' is not a positive byte count — using 1024. Fix it in amh.conf; a guard that reads a malformed threshold and carries on quietly is how a band gets widened by accident."
+		delta=1024
+		;;
+	esac
+
+	# Byte counts, not KB, in every verdict below. Integer KB rounds toward zero on both
+	# sides of a comparison, so the honest outcomes print as contradictions: a pass that
+	# lands at 9215 reads `landed at 8 KB (floor 9 KB)`, which an agent could answer by
+	# padding the file back, and a 14848-byte stop reads `stops short at 14 KB, still
+	# above the 14 KB soft cap`. Bytes are what the guard actually compared.
+	if [ "$cur" -le "$warn_b" ]; then
+		# Branch 1 deliberately does NOT consult the shrink: once the file is back under
+		# the cap, how it got there does not matter — the floor is the floor. So the
+		# wording describes the CROSSING, and claims no classification the guard did not
+		# make. A one-byte deletion from 14337 lands here, and that is the owner's rule.
+		if [ "$cur" -gt "$comp_b" ]; then
+			fail "crossed below the soft cap but stops short at $cur bytes — the floor is $comp_b bytes (${STATE_COMPRESS_TO_KB} KB), and landing in the band re-arms the warning next session. Fold more completed stages into single Changelog lines or move content to the ledger — do not micro-trim."
+		else
+			ok "crossed below the soft cap and landed at $cur bytes, at or under the $comp_b-byte floor (from $prev bytes)"
+		fi
+	elif [ "$shrank" -lt "$delta" ]; then
+		ok "edit above the soft cap (shrank $shrank bytes, under the $delta-byte edit delta); compression still owed"
+	else
+		fail "unfinished compression pass: shrank $shrank bytes, at or over the $delta-byte edit delta, and stopped at $cur bytes — still above the soft cap ($warn_b bytes), and the floor is $comp_b bytes. Fold more completed stages into single Changelog lines or move content to the ledger — do not micro-trim."
+	fi
+}
+
+# A section is present only if its header stands at the start of a line AND something
+# non-blank follows before the next header. Header-presence alone is trivially gamed:
+# the cheapest way to "survive compression" is to keep four headings and delete every
+# body under them. This does not judge whether the content is any GOOD — no guard can —
+# it only refuses to call an empty shell a section.
+section_has_body() { # <file> <header>
+	awk -v h="$2" '
+		index($0, h) == 1 && !inside { inside = 1; next }
+		inside && /^#{1,6} / { exit }
+		inside && NF { found = 1; exit }
+		END { exit(found ? 0 : 1) }
+	' "$1"
+}
+
+guard_state_structure() {
+	section "Working memory: required sections"
+	[ -f "$STATE_FILE" ] || return
+	# EVERY level-2 heading, not just the required ones. A scripted edit to this file
+	# anchored on a string its own preamble also contains and spliced the whole document in
+	# after itself; sections appeared twice, one copy carrying state a later session had
+	# already superseded, and it passed the ladder, CI and a push. Nothing else here can see
+	# a duplicate: the caps measure bytes and the landing check measures shrink, both of
+	# which a duplicate satisfies, and existence was satisfied twice over.
+	#
+	# Scoped to the CONFIGURED sections it would have closed that incident and nothing
+	# around it — the heading the botched edit actually keyed on was the owner queue, which
+	# is checked separately below, and the non-items heading is in no list at all. A splice
+	# duplicates whatever it duplicates, so the question has to be asked of the document
+	# rather than of a list: any repeated `## ` heading is the signature.
+	local problems=0 dupes
+	dupes=$(grep '^##[[:space:]]' "$STATE_FILE" | sed 's/[[:space:]]*$//' | sort | uniq -d)
+	if [ -n "$dupes" ]; then
+		while IFS= read -r sec; do
+			[ -n "$sec" ] || continue
+			fail "heading '$sec' appears more than once — this file is the session's working memory, and two copies of a section are two answers to the same question. Usually a scripted edit that spliced the document into itself: delete the stale copy rather than merging them."
+			problems=$((problems + 1))
+		done <<<"$dupes"
+	fi
+	local sec
+	while IFS= read -r sec; do
+		[ -n "$sec" ] || continue
+		if ! grep -q "^${sec}[[:space:]]*$" "$STATE_FILE"; then
+			fail "section '$sec' is missing — over-compression deleted it"
+			problems=$((problems + 1))
+		elif ! section_has_body "$STATE_FILE" "$sec"; then
+			fail "section '$sec' is empty — the header survived compression but its content did not"
+			problems=$((problems + 1))
+		fi
+	done < <(printf '%s\n' "$STATE_REQUIRED_SECTIONS" | tr '|' '\n')
+	[ "$problems" = 0 ] && ok "all required sections present and non-empty"
+	# WARN, not fail: the owner's channel is theirs, and a session that has genuinely
+	# closed every item should not be blocked. The asymmetry is deliberate and is
+	# stated wherever this section is described as protected.
+	if ! grep -q "^${STATE_OWNER_QUEUE_SECTION}[[:space:]]*$" "$STATE_FILE"; then
+		warn "'$STATE_OWNER_QUEUE_SECTION' has vanished — that section is the owner's channel; its items are theirs to close"
+	fi
+}
+
+# THE VOLUME CHAIN. A volume is not a file whose name looks right — it is a file the
+# scheme can REACH: start at the base volume and apply the carry rule below until the
+# next name is missing. Membership is reachability, and the walk stops at the first gap.
+#
+# Two rejected rules, both of which failed on a real tree and both of which failed
+# QUIETLY, which is why this one is computed rather than matched:
+#
+#   * last glob match — the shell's collation, not volume age. Under C, LEDGER_AA.md
+#     sorts BETWEEN LEDGER_A.md and LEDGER_B.md; under a locale ignoring punctuation at
+#     the primary level it sorts before LEDGER_A.md. Either way the live volume sticks
+#     at Z forever.
+#   * greatest `[A-Z]+` suffix in shortlex order (length, then alphabet) — right about
+#     the numbering and wrong about membership. LEDGER_ARCHIVE.md is all capitals and
+#     LONG, so it outranks every real volume and pins the cap rung on a file nobody
+#     writes to, reporting `ok` forever. A one-line untracked file switched the rung off.
+#
+# A chain cannot be joined by naming a file well, and the same walk answers both
+# questions this script asks — which file is live, and which files hold rows.
+volume_path() { # <suffix, empty for the base volume>
+	if [ -z "$1" ]; then
+		printf '%s/%s.md' "$LEDGER_DIR" "$LEDGER_BASENAME"
+	else
+		printf '%s/%s_%s.md' "$LEDGER_DIR" "$LEDGER_BASENAME" "$1"
+	fi
+}
+
+# One copy of the name-parsing rule. The prefix is CHECKED rather than assumed: `${name#pre}`
+# is a no-op when the prefix is absent, so without the case below this answers "volume,
+# suffix OTHER" for docs/OTHER.md. Unreachable from the two callers here, which feed it
+# names this file constructed — and a helper that is only correct because of where it is
+# called from is a trap for the next caller.
+#
+# The bracket range is spelled out instead of `A-Z`: a glob range is collation-dependent,
+# and a locale with dictionary ordering can admit lowercase letters into `A-Z`.
+volume_suffix() { # <ledger path>; prints its suffix ('' for the base volume), 1 if not a volume
+	local name suffix
+	name=${1##*/}
+	name=${name%.md}
+	[ "$name" = "$LEDGER_BASENAME" ] && return 0
+	case $name in "${LEDGER_BASENAME}_"*) ;; *) return 1 ;; esac
+	suffix=${name#"${LEDGER_BASENAME}_"}
+	case $suffix in
+	'' | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZ]*) return 1 ;;
+	esac
+	printf '%s' "$suffix"
+}
+
+# Every volume the chain reaches, base first, one path per line. Empty output means no
+# ledger at all — NOT "no volumes past the base", which is one line.
+chain_volumes() {
+	local suffix='' path
+	while :; do
+		path=$(volume_path "$suffix")
+		[ -f "$path" ] || return 0
+		printf '%s\n' "$path"
+		suffix=$(next_volume_suffix "$suffix") || return 0
+	done
+}
+
+live_ledger() { chain_volumes | tail -1; }
+
+extract_ledger_rows() { # <tree-dir> <rows-dir>
+	local tree=$1 rows=$2 path
+	mkdir -p "$rows"
+	while IFS= read -r path; do
+		awk -v out="$rows" '
+			function flush(    file, n) {
+				if (id == "") return
+				n = count
+				while (n > 1 && lines[n] == "") n--
+				file = out "/" id
+				for (i = 1; i <= n; i++) print lines[i] >file
+				close(file)
+				delete lines
+				count = 0
+			}
+			/^- D[A-Z]*-[0-9]+( \[cited\])?: / {
+				flush()
+				id = $2
+				sub(/ \[cited\]:$/, "", id)
+				sub(/:$/, "", id)
+				lines[++count] = $0
+				next
+			}
+			id != "" { lines[++count] = $0 }
+			END { flush() }
+		' "$tree/$path"
+	done
+}
+
+guard_new_ledger_row_lengths() {
+	local cap=${LEDGER_ROW_CHAR_CAP:-0} changed path suffix='' next checked=0 row id count
+	case $cap in
+		'' | *[!0-9]*)
+			fail "LEDGER_ROW_CHAR_CAP must be a non-negative integer, got '${LEDGER_ROW_CHAR_CAP:-}'"
+			return
+			;;
+	esac
+	[ "$cap" -gt 0 ] || return
+	git rev-parse --verify -q HEAD >/dev/null 2>&1 || return
+	changed=$(git diff --name-only HEAD -- "$LEDGER_DIR" | awk -v dir="$LEDGER_DIR" -v base="$LEDGER_BASENAME" '
+		$0 == dir "/" base ".md" { found = 1 }
+		$0 ~ "^" dir "/" base "_[A-Z]+[.]md$" { found = 1 }
+		END { exit found ? 0 : 1 }
+	') || return
+	: "$changed"
+	mkdir -p "$TMP/head-ledger/$LEDGER_DIR" "$TMP/work-ledger/$LEDGER_DIR" "$TMP/head-rows" "$TMP/work-rows"
+	: >"$TMP/head-chain"
+	while :; do
+		path=$(volume_path "$suffix")
+		if ! git cat-file -e "HEAD:$path" 2>/dev/null; then
+			[ -n "$suffix" ] && break
+			return
+		fi
+		git show "HEAD:$path" >"$TMP/head-ledger/$path" || return
+		printf '%s\n' "$path" >>"$TMP/head-chain"
+		next=$(next_volume_suffix "$suffix") || break
+		suffix=$next
+	done
+	while IFS= read -r path; do
+		mkdir -p "$TMP/work-ledger/$(dirname "$path")"
+		cp "$path" "$TMP/work-ledger/$path" || return
+	done <"$TMP/chain"
+	extract_ledger_rows "$TMP/head-ledger" "$TMP/head-rows" <"$TMP/head-chain"
+	extract_ledger_rows "$TMP/work-ledger" "$TMP/work-rows" <"$TMP/chain"
+	for row in "$TMP"/work-rows/D*-*; do
+		[ -e "$row" ] || continue
+		id=${row##*/}
+		[ -f "$TMP/head-rows/$id" ] && continue
+		checked=$((checked + 1))
+		# Locale-stable character policy: count bytes with LC_ALL=C. For ordinary ASCII
+		# ledger prose that is one byte per character; UTF-8 non-ASCII text is charged by
+		# encoded bytes so the verdict is identical across host locales.
+		count=$(LC_ALL=C wc -c <"$row") || return
+		count=${count//[[:space:]]/}
+		if [ "$count" -gt "$cap" ]; then
+			fail "$id: new ledger row is $count byte-counted character(s), over LEDGER_ROW_CHAR_CAP=$cap — keep the durable lesson concise and shorten the draft before commit; historical committed rows and sanctioned metadata-only additions are exempt"
+			return
+		fi
+	done
+	[ "$checked" -gt 0 ] && ok "checked $checked new ledger row(s) against LEDGER_ROW_CHAR_CAP=$cap"
+}
+
+
+# The suffix of the volume AFTER the given one, as an odometer over A–Z with carry:
+# '' → A, A → B, Z → AA, AZ → BA, ZZ → AAA. Computed rather than looked up, because a
+# table is the thing that has a last entry — the single-letter scheme this replaces was a
+# table with Z at the end of it, and nothing said what came next.
+next_volume_suffix() { # <current suffix, empty for the base volume>
+	local s=$1 alphabet=ABCDEFGHIJKLMNOPQRSTUVWXYZ i c head out='' carry=1
+	if [ -z "$s" ]; then
+		printf 'A'
+		return
+	fi
+	i=$((${#s} - 1))
+	while [ "$i" -ge 0 ]; do
+		c=${s:i:1}
+		if [ "$carry" -eq 1 ]; then
+			if [ "$c" = Z ]; then
+				c=A # carry stays set: Z rolls to A and the digit to its left advances
+			else
+				head=${alphabet%%"$c"*}
+				# A character this odometer does not know leaves `head` as the WHOLE
+				# alphabet, and the substring one past its end is empty — so the digit
+				# would silently vanish and the answer come back one character short.
+				# Refuse instead. The callers here only ever pass a validated suffix,
+				# so this is declared unreachable rather than fixtured; it exists
+				# because a shorter name is the one wrong answer nobody would notice.
+				[ "${#head}" -lt 26 ] || return 1
+				c=${alphabet:${#head}+1:1}
+				carry=0
+			fi
+		fi
+		out=$c$out
+		i=$((i - 1))
+	done
+	[ "$carry" -eq 1 ] && out=A$out
+	printf '%s' "$out"
+}
+
+guard_ledger_rollover() {
+	section "Permanent memory: ledger file cap"
+	local live lines last_row size suffix next f orphans=''
+	live=$(live_ledger)
+	if [ -z "$live" ]; then
+		# The chain starts at the base volume, so a tree holding continuation volumes
+		# and no base has nothing this rung can measure — and `skip` would render that
+		# identically to a repository that has not started a ledger yet. Say which.
+		for f in "$LEDGER_DIR/${LEDGER_BASENAME}"_*.md; do
+			if [ -f "$f" ]; then
+				fail "$(volume_path '') is missing while continuation volume(s) exist — the chain is walked from the base volume, so no cap can be checked until it is back (volumes are never deleted)"
+				return
+			fi
+		done
+		skip "no ledger yet"
+		return
+	fi
+	# Volume-SHAPED files the chain does not reach: a volume that was deleted from the
+	# middle, or a file that merely looks like one. This rung cannot tell those apart and
+	# does not guess — but it will not stay quiet either, because rows in an unreachable
+	# file are invisible to every check here. The cap below is still the live volume's.
+	chain_volumes >"$TMP/chain"
+	guard_new_ledger_row_lengths
+	for f in "$LEDGER_DIR/${LEDGER_BASENAME}"_*.md; do
+		[ -f "$f" ] || continue
+		grep -qxF "$f" "$TMP/chain" && continue
+		orphans="$orphans $f"
+	done
+	[ -n "$orphans" ] &&
+		warn "volume-shaped file(s) the chain does not reach:$orphans — either a volume is missing from the chain or these are not volumes. Nothing reads their rows."
+	lines=$(wc -l <"$live")
+	# Bytes are REPORTED, never gated. The cap counts lines because a line is what a
+	# row is appended in, but the quantity it stands in for is read cost — and the two
+	# drift, because rows are prose and prose wraps at whatever width its author used.
+	# A second failing threshold on bytes was refused (AMH ledger row DA022): no
+	# context-overflow incident is on record, and this harness does not ship guards for
+	# harms it has not seen. Printing the number costs nothing and lets the owner see
+	# the proxy diverging before deciding whether it needs a gate at all.
+	# One decimal, not integer KB: a volume under 1024 bytes would otherwise report
+	# `0 KB`, which is both false and exactly the kind of quiet rounding this figure
+	# exists to expose. Tenths in integer arithmetic — no bc, no float.
+	size=$(wc -c <"$live")
+	size=$((size * 10 / 1024))
+	size="$((size / 10)).$((size % 10))"
+	# The row pattern admits ANY number of volume letters (a `DAA-` row, a `DAAA-` row),
+	# not the one it used to. A scheme that stops at Z is a scheme with a silent failure at
+	# the end of it: rows in a volume the pattern cannot match are invisible here, so the
+	# cap can never fire on them, and invisible to the citation scan below in both
+	# directions at once — every rung green, on a file nobody is writing to.
+	# The examples above stop at the hyphen on purpose: a complete id in a shipped comment
+	# IS a citation as far as the guard below is concerned, and these rows do not exist.
+	last_row=$(grep -n '^- D[A-Z]*-[0-9]\+' "$live" | tail -1 | cut -d: -f1)
+	# Every branch carries the size, the FAIL branch above all: that is the volume at
+	# its largest, and rollover is the one moment the owner is deciding whether a line
+	# cap still stands in for read cost at all.
+	if [ -n "$last_row" ] && [ "$last_row" -gt "$LEDGER_LINE_CAP" ]; then
+		# The next volume's name is COMPUTED, so the diagnostic stays right past Z — and
+		# it names the row prefix too, because the file name and the prefix are the same
+		# suffix and a rollover that gets one of them wrong is not caught by anything.
+		suffix=$(volume_suffix "$live")
+		next=$(next_volume_suffix "$suffix")
+		fail "$live: a row STARTS at line $last_row (${size} KB), past the ${LEDGER_LINE_CAP}-line cap — open $LEDGER_DIR/${LEDGER_BASENAME}_$next.md, numbering from D$next-001 (rows are never moved or renumbered)"
+	elif [ "$lines" -ge $((LEDGER_LINE_CAP * 9 / 10)) ]; then
+		warn "$live: $lines lines / ${size} KB, approaching the ${LEDGER_LINE_CAP}-line cap — the next rollover is near"
+	else
+		ok "$live: $lines/$LEDGER_LINE_CAP lines, ${size} KB (grep it; a volume is retrieval storage, not a read)"
+	fi
+}
+
+guard_citations() {
+	section "Citations: code ↔ ledger, both directions"
+	local scan_files=$TMP/scanfiles rows=$TMP/rows cited=$TMP/cited marked=$TMP/marked
+	# NUL-separated throughout, for the reason the secret scan states below: a
+	# word-split file list drops every name containing a space, and the drop is
+	# invisible — the guard reports the same green it reports for a clean tree.
+	: >"$scan_files"
+	# `set -f` for the two config lists below: they are split on whitespace ON PURPOSE,
+	# but an unquoted expansion also GLOBS, so an entry containing `?` or `*` would be
+	# rewritten into whatever happens to sit in the working directory — a third way for
+	# the scanned scope to differ from what amh.conf says it is.
+	set -f
+	local p
+	for p in $CITATION_SCAN_PATHS; do
+		[ -e "$p" ] || continue
+		if has_git; then
+			git ls-files -co --exclude-standard -z -- "$p" >>"$scan_files"
+		else
+			find "$p" -type f -print0 >>"$scan_files"
+		fi
+	done
+	local ex f
+	for ex in $CITATION_EXCLUDE; do
+		# Whole paths and directory prefixes, matched literally. The grep form this
+		# replaces interpolated $ex as a REGEX and kept the unfiltered list whenever
+		# the exclusion emptied it — two more ways for the same scope to drift.
+		: >"$scan_files.t"
+		while IFS= read -r -d '' f; do
+			case $f in "$ex" | "$ex"/*) continue ;; esac
+			printf '%s\0' "$f" >>"$scan_files.t"
+		done <"$scan_files"
+		mv "$scan_files.t" "$scan_files"
+	done
+	set +f
+
+	# Every ledger row, and whether it carries the machine-synced [cited] marker.
+	: >"$rows"
+	: >"$marked"
+	# The CHAIN, not the glob. Globbing would harvest rows from any LEDGER_*.md sitting in
+	# the directory, so a scratch file could supply a duplicate row id — and the rung above
+	# would refuse to call that same file a volume. Two guards disagreeing about what a
+	# volume is was the shape being fixed; the walk is shared so they cannot.
+	local f
+	while IFS= read -r f; do
+		sed -n 's/^- \(D[A-Z]*-[0-9]\+\)\( \[cited\]\)\?:.*/\1\2/p' "$f" >>"$rows.raw"
+	done < <(chain_volumes)
+	if [ -f "$rows.raw" ]; then
+		awk '{print $1}' "$rows.raw" | sort >"$rows"
+		awk 'NF>1{print $1}' "$rows.raw" | sort >"$marked"
+	else
+		: >"$rows"
+	fi
+
+	local dupes
+	dupes=$(uniq -d <"$rows")
+	if [ -n "$dupes" ]; then
+		fail "duplicate ledger row numbers: $(printf '%s' "$dupes" | tr '\n' ' ')"
+	fi
+
+	: >"$cited"
+	if [ -s "$scan_files" ]; then
+		# Same unbounded volume pattern the row scan uses: an id the scan cannot see is
+		# not an unresolved citation, it is no citation at all, and every `DAA-` row used
+		# to be exactly that in both directions.
+		#
+		# `-w` is what keeps the widening honest, and it is not decoration. Unanchored,
+		# `D[A-Z]*-[0-9]+` matches INSIDE a word: `README-<n>` and `PRODUCTION-<n>` each
+		# yield an id built from the tail of the word — an id that appears nowhere in the
+		# tree, reported as an unresolved citation the reader cannot grep for. (Spelling
+		# those two out here would file this comment as a citation to them. Widening a
+		# pattern changes what the text around it MEANS, this file included.) Whole-word
+		# matching also closes the same trap one letter down, where `XL-003` used to
+		# yield a citation to L-003 (AMH ledger row DB004(g)); that one shipped.
+		xargs -0 grep -hwoE 'D[A-Z]*-[0-9]+' <"$scan_files" 2>/dev/null | sort -u >"$cited"
+	fi
+
+	local unresolved missing_marker stale_marker
+	unresolved=$(comm -23 "$cited" <(sort -u "$rows"))
+	if [ -n "$unresolved" ]; then
+		fail "cited from configured implementation paths but no such ledger row: $(printf '%s' "$unresolved" | tr '\n' ' ')"
+	fi
+	missing_marker=$(comm -23 "$cited" <(sort -u "$marked"))
+	if [ -n "$missing_marker" ]; then
+		fail "cited from configured implementation paths but not marked [cited] in the ledger: $(printf '%s' "$missing_marker" | tr '\n' ' ') — the marker warns the next reader that an implementation artifact depends on the row"
+	fi
+	stale_marker=$(comm -13 "$cited" <(sort -u "$marked"))
+	if [ -n "$stale_marker" ]; then
+		fail "marked [cited] but no longer cited from configured implementation paths: $(printf '%s' "$stale_marker" | tr '\n' ' ') — drop the marker (never the row)"
+	fi
+	[ -z "$unresolved$missing_marker$stale_marker$dupes" ] && ok "$(wc -l <"$cited" | tr -d ' ') citation(s) resolve; markers in sync"
+}
+
+guard_secret_shapes() {
+	section "Secret-shape scan (the redaction filter IS the scan)"
+	# This guard is the repo's ENTIRE secret scan (AMH ledger row D004), so it must not be
+	# possible to switch it off by accident. It used to test `-x` and print `skip` when the bit
+	# was missing: `chmod -x scripts/redact.sh` — or an archive download, or
+	# core.fileMode=false — turned the scan into a green line with a live credential
+	# sitting in the tree. Presence is now the question, and the answer to "absent" is
+	# a failure, not a skip. The exec bit no longer decides anything: the filter is run
+	# through `bash` explicitly.
+	if [ ! -f scripts/redact.sh ]; then
+		fail "scripts/redact.sh is missing — it IS this repo's secret scan, so its absence is a failure, not a skip"
+		return
+	fi
+	# ...and PRESENCE is not the same as WORKING. The verdict below is "the filter's
+	# output differs from the file", which an empty, truncating, crashing or
+	# pass-through filter satisfies for nothing at all — every file reads as clean and
+	# the rung prints ok. A positive control first, so the scan has to prove it can
+	# still catch something before its silence is allowed to mean anything. The token is
+	# generated at runtime: a stored literal would make this file fail its own scan
+	# (AMH ledger row D004).
+	local canary
+	# Bounded read, then slice: `tr </dev/urandom | head -c N` leaves tr writing into a
+	# closed pipe, so every run printed `tr: write error: Broken pipe` into the ladder's
+	# output. Harmless, but noise in a guard's output trains readers to skim it.
+	canary=''
+	while [ "${#canary}" -lt 16 ]; do
+		canary=$canary$(head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Z0-9')
+	done
+	canary="AKIA${canary:0:16}"
+	if printf 'x %s x\n' "$canary" | bash scripts/redact.sh 2>/dev/null | grep -qF "$canary"; then
+		fail "scripts/redact.sh did not redact a generated test token — the filter is empty, broken or pass-through, and this scan would report green on everything"
+		return
+	fi
+	local list=$TMP/files.nul hits=0
+	if has_git; then
+		git ls-files -co --exclude-standard -z >"$list"
+	else
+		find . -type f -not -path './.git/*' -print0 >"$list"
+	fi
+	# NUL-separated: a word-split list silently skips names with spaces or non-ASCII
+	# characters, and a scan with a silent hole is worse than no scan.
+	local f pos cmperr=$TMP/cmp.err
+	while IFS= read -r -d '' f; do
+		[ -f "$f" ] || continue
+		LC_ALL=C grep -qI . "$f" 2>/dev/null || continue # text files only
+		# `cmp`'s stderr carries the truncation verdict (`EOF on -`) while its stdout
+		# carries the difference verdict. Discarding stderr made a filter that stopped
+		# mid-stream indistinguishable from a clean file.
+		# shellcheck disable=SC2094 # "$f" is opened twice for READING only — once as the
+		# filter's stdin, once as cmp's operand. SC2094 warns about a read/write pair;
+		# nothing in this pipeline writes "$f", and comparing a file against its own
+		# filtered stream is precisely what the scan is.
+		pos=$(bash scripts/redact.sh <"$f" 2>/dev/null | cmp - "$f" 2>"$cmperr")
+		if [ -s "$cmperr" ]; then
+			fail "scripts/redact.sh did not filter all of $f ($(tr -d '\n' <"$cmperr")) — a truncated stream reads as clean"
+			hits=$((hits + 1))
+			continue
+		fi
+		if [ -n "$pos" ]; then
+			# Report the POSITION only. A diagnostic that regresses to printing the
+			# matched line defeats the entire point of the guard.
+			fail "credential-shaped string in $f (${pos#*differ: })"
+			hits=$((hits + 1))
+		fi
+	done <"$list"
+	[ "$hits" = 0 ] && ok "no credential-shaped strings in tracked or untracked text files"
+}
+
+guard_poison_tokens() {
+	section "Commit messages: poison tokens"
+	local base
+	base=$(upstream_ref)
+	if ! has_git || [ -z "$base" ]; then
+		# WARN, not skip. Without `origin/$DEFAULT_BRANCH` this guard has nothing to diff
+		# against and checks nothing — it ran inert in the reference repo for its entire
+		# life while printing a line that read like a considered pass. A guard that is
+		# switched off must say so more loudly than one that passed (AMH ledger row D019).
+		warn "no $DEFAULT_BRANCH reference to compare against — this guard checked NOTHING. Fetch it (\`git fetch origin $DEFAULT_BRANCH\`) or accept that poison tokens are unguarded locally."
+		return
+	fi
+	local msgs tok hits=0
+	msgs=$(git log --format='%B' "$base..HEAD" 2>/dev/null)
+	if [ -z "$msgs" ]; then
+		ok "no new commits to check"
+		return
+	fi
+	while IFS= read -r tok; do
+		[ -n "$tok" ] || continue
+		if printf '%s' "$msgs" | grep -qF -- "$tok"; then
+			fail "commit message contains '$tok' — a squash merge would fold it onto $DEFAULT_BRANCH, and force-push is forbidden, so it is permanent until merge"
+			hits=$((hits + 1))
+		fi
+	done < <(printf '%s\n' "$POISON_TOKENS" | tr '|' '\n')
+	[ "$hits" = 0 ] && ok "clean"
+}
+
+# Git author identity, over `%ae` AND `%ce` across origin/<default>..HEAD.
+#
+# **What this guard cannot do, plainly, because implying more than a guard delivers is
+# what stops the next reader checking by hand: it cannot tell a personal address from a
+# work one, nor a forge no-reply alias from the address it stands in for.** A
+# well-formed address that is simply the wrong identity for this project passes here.
+# Choosing which identity to commit under stays a prose rule; this rung catches only the
+# machine-generated case below, plus whatever pattern the repository chose to state.
+#
+# Two halves, deliberately unequal.
+#
+# ZERO-CONFIG: fail on the identities git invents when nobody configured one — `root@box`,
+# `you@localhost`, `you@laptop.local`, `you@box.localdomain`, `(none)`, an empty field,
+# anything with no `@` at all. These are machine names rather than addresses, which is why
+# this half needs no list of who is allowed to commit here. The surface is small but it is
+# NOT empty, and saying it was empty would be the false-coverage claim this file warns
+# about everywhere else: `.local` is a real Active Directory and mDNS suffix, and a build
+# account can legitimately be `root@` a real domain. That is what the override below is
+# for. Using the repository's OWN history as an allowlist was considered and rejected: a
+# first-time contributor and a misconfigured one are indistinguishable, so it would fail
+# every commit of a new branch and teach the reader to skip the rung.
+#
+# OPT-IN: AUTHOR_EMAIL_ALLOW, an extended regex matched against the WHOLE address, empty
+# by default IN THIS SCRIPT. That default is load-bearing rather than lazy — amh.conf is
+# yours forever and this harness cannot upgrade it, so a rung that needed a new key would
+# turn an existing adopter's ladder red until they hand-edited a file they were told they
+# own. Unset means the zero-config half alone, and the ok line says which.
+#
+# The allowlist is consulted FIRST and a match ends the check, so naming an address makes
+# it acceptable whatever shape it has. Without that ordering the zero-config half is a
+# dead end: `alice@corp.local` would be rejected, adding it to the very key this file
+# offers for "state your identities" would not help, and the only remedy left would be
+# editing a shipped script whose header says not to. No adopter should ever be told that.
+# With the key unset — the default — nothing overrides anything.
+#
+# One caveat about anchoring, since the wrapper cannot defend against everything: the
+# pattern is wrapped in `^(…)$`, so a top-level alternation is fine (`a@x\.com|b@y\.com`),
+# but one carrying unbalanced-looking parentheses of its own — `a)|(b` — reparses into
+# `^(a)|(b)$` and is silently unanchored. It is still a valid regex, so the probe below
+# cannot catch it. Write alternations without stray parentheses.
+#
+# The window is origin/<default>..HEAD because that is where the fix is still available:
+# an unpushed commit is amendable, a merged one is not, and a repo that forbids itself
+# force-push has no other chance. A PRE-commit guard is impossible here — an identity you
+# have not committed yet is not on disk to check — but that is a fact about one moment,
+# not about all of them.
+#
+# The failure lines print the offending identity. It is already in the commit object this
+# guard is naming, so the line publishes nothing the metadata does not, and a rung that
+# said only "some identity is wrong" would leave you grepping for which.
+guard_author_identity() {
+	section "Git author identity ($DEFAULT_BRANCH..HEAD)"
+	local base
+	base=$(upstream_ref)
+	if ! has_git || [ -z "$base" ]; then
+		# WARN, not skip, for the reason the poison-token scan states above: a guard that
+		# resolved no ref checked NOTHING and must say so louder than a pass does
+		# (AMH ledger row D019). The message LEADS with its own subject rather than with
+		# the condition, because the scan above emits the same condition in the same words:
+		# a fixture grepping the shared opening is satisfied by whichever rung printed it,
+		# and the distinguishing clause sat past a backtick no assertion could quote
+		# without tripping the linter.
+		warn "author identity is unguarded locally: no $DEFAULT_BRANCH reference to compare against, so this guard checked NOTHING. Fetch it (\`git fetch origin $DEFAULT_BRANCH\`)."
+		return
+	fi
+
+	# A malformed regex must not decide anything quietly. Left alone, `grep -E` on one
+	# exits 2 — indistinguishable from "no match" to an `if` — so every identity in the
+	# repository would fail on an allowlist that allows nothing. Probe it against empty
+	# input once: exit 0 or 1 is a verdict, 2 or more is a broken pattern.
+	# `state` carries WHY no allowlist was applied, so the ok line cannot claim the key is
+	# unset when it is set and invalid. A verdict line that contradicts the warning above
+	# it is the shape this script has already been burned by once.
+	local allow=$AUTHOR_EMAIL_ALLOW rc=0 state=unset
+	if [ -n "$allow" ]; then
+		state=applied
+		grep -qE "^($allow)$" </dev/null 2>/dev/null || rc=$?
+		if [ "$rc" -gt 1 ]; then
+			warn "AUTHOR_EMAIL_ALLOW is not a valid extended regex — ignoring it, so only the zero-config half of this guard ran. Fix it in amh.conf; an allowlist that silently allows nothing fails every identity for the wrong reason."
+			allow=''
+			state=ignored
+		fi
+	fi
+
+	local commits idents
+	commits=$(git rev-list --count "$base..HEAD" 2>/dev/null)
+	# One line per field per commit, so the diagnostic can name WHICH field is wrong. A
+	# rebase or an amend by another tool rewrites the committer while the author survives
+	# untouched, which is the case checking `%ae` alone misses entirely.
+	idents=$(git log --format='author %ae%ncommitter %ce' "$base..HEAD" 2>/dev/null | sort -u)
+	if [ -z "$idents" ]; then
+		ok "no new commits to check"
+		return
+	fi
+
+	# One arm per distinguishable shape, each with its OWN wording. A single message shared
+	# across the invented shapes reads fine and is untestable: with one fixture behind the
+	# lot, four of the five globs could be deleted and every assertion still passed, because
+	# nothing could tell which pattern had matched. `.local` and `.localdomain` do share an
+	# arm, and its message names both — they are one shape (a LAN machine name) reached by
+	# two suffixes, and each has its own fixture.
+	local line field addr lower bad hits=0 seen=0
+	while IFS= read -r line; do
+		field=${line%% *}
+		addr=${line#* }
+		[ "$addr" = "$line" ] && addr='' # "author" with an empty field and no trailing text
+		seen=$((seen + 1))
+
+		# The stated identities win over everything below — see the ordering note above.
+		if [ -n "$allow" ] && printf '%s' "$addr" | grep -qE "^($allow)$"; then
+			continue
+		fi
+
+		# Lower-cased for matching only; every message prints the address as committed.
+		# git stores what it was handed, so `ROOT@LOCALHOST` is a real thing to receive,
+		# and `case` globs are case-sensitive — without this the whole half below is
+		# bypassed by holding down shift.
+		lower=$(printf '%s' "$addr" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+		bad=''
+		case $lower in
+		'')
+			bad="is EMPTY — git recorded no address at all in this field"
+			;;
+		*'(none)'*)
+			bad="carries git's '(none)' placeholder, which is what it writes when the machine's hostname has no domain — the usual identity of an unconfigured container"
+			;;
+		root@*)
+			bad="is the machine's root account, which git falls back to when no user.email is set — not an address anyone reads"
+			;;
+		*@localhost)
+			bad="names localhost, which is every machine and therefore no address"
+			;;
+		*@*.local | *@*.localdomain)
+			bad="names a local-only host (.local, .localdomain), which is an mDNS or LAN machine name rather than a deliverable address"
+			;;
+		*@*) ;;
+		*)
+			bad="is not an email address — it has no '@', so git took a bare name"
+			;;
+		esac
+		if [ -n "$bad" ]; then
+			fail "$field identity '$addr' $bad. Set user.email and amend before pushing; a pushed commit cannot be repaired without the rewrite this repo forbids."
+			hits=$((hits + 1))
+			continue
+		fi
+		if [ -n "$allow" ]; then
+			fail "$field identity '$addr' does not match AUTHOR_EMAIL_ALLOW — this repository states which identities its commits carry, and this is not one of them."
+			hits=$((hits + 1))
+		fi
+	done <<<"$idents"
+
+	if [ "$hits" = 0 ]; then
+		case $state in
+		applied)
+			ok "$seen distinct field/address pair(s) over $commits commit(s); all well-formed and admitted by AUTHOR_EMAIL_ALLOW"
+			;;
+		ignored)
+			ok "$seen distinct field/address pair(s) over $commits commit(s); all well-formed. AUTHOR_EMAIL_ALLOW was IGNORED as malformed (see the warning above), so no allowlist was applied"
+			;;
+		*)
+			ok "$seen distinct field/address pair(s) over $commits commit(s); all well-formed. AUTHOR_EMAIL_ALLOW is unset, so no allowlist was applied"
+			;;
+		esac
+	fi
+}
+
+guard_rail_selftests() {
+	section "Rail self-tests (a silently regressed rail is no rail)"
+	local s
+	for s in scripts/redact.sh scripts/command-guard.sh; do
+		# `[ -x ]` here printed nothing at all when the bit was missing — this whole
+		# section went blank and the ladder stayed green. Absence gets a `skip` line,
+		# the script's convention everywhere else; the exec bit gets no vote.
+		if [ ! -f "$s" ]; then
+			skip "$s is not a readable file — nothing self-tested it"
+			continue
+		fi
+		if out=$(bash "$s" --self-test 2>&1); then
+			ok "$s"
+		else
+			fail "$s self-test failed:"
+			printf '%s\n' "$out" | sed 's/^/         /'
+		fi
+	done
+}
+
+# sha256 for one file, through whichever tool this machine has. Reads from STDIN rather than
+# passing the path, so no filename ever reaches a tool's argument parsing and both tools emit
+# the same `<hash>  -` shape. The trailing `sed` keeps the leading hex run and drops the rest.
+# Prints nothing if neither tool exists — the caller decides what that means, and it is
+# not allowed to mean "clean".
+amh_sha256_tool() {
+	if command -v sha256sum >/dev/null 2>&1; then
+		printf 'sha256sum'
+	elif command -v shasum >/dev/null 2>&1; then
+		printf 'shasum'
+	fi
+}
+amh_sha256() { # <tool> <file>
+	case $1 in
+	sha256sum) sha256sum <"$2" ;;
+	shasum) shasum -a 256 <"$2" ;;
+	esac | sed 's/[^0-9a-f].*//'
+}
+
+# The shipped scripts are still the ones the harness shipped.
+#
+# This is the SECOND integrity check over these files in the harness's own repository and
+# the FIRST one in yours, and the distinction is the whole point: the meta-repo's copy-drift
+# guard proves *it runs what it ships*, this rung proves *you still run what we shipped you*.
+# Different claims, different trees, and only this one travels.
+#
+# What it is actually defending against is not malice. A shipped script edited locally —
+# a threshold nudged, a rung deleted, a `return` added at the top of a guard — turns every
+# future upgrade from a copy into a merge, and does it silently: the edit works, the ladder
+# stays green, and the cost lands on whoever runs the next upgrade a year later. The three
+# places a local change legitimately goes are amh.conf, scripts/guards/*.sh and
+# scripts/verify.sh, and this rung's failure message names them, because a guard that only
+# says "no" teaches people to delete the guard.
+#
+# WHAT IT CANNOT SEE, stated plainly because the rest of this comment is a coverage claim and
+# an overstated one is what stops the next reader checking by hand:
+#
+#   1. The edit that DELETES this rung. A ladder that no longer calls this function reports
+#      nothing, and no rung inside a script can be the thing that notices the script was cut.
+#      The manifest is checkable by hand for exactly this reason — `sha256sum -c` against it
+#      needs none of this code — and the header of the manifest says so.
+#   2. A line REMOVED from the manifest excuses that file. This rung refuses the one removal
+#      that would be self-serving (the entry for the ladder itself, see below) and reports the
+#      count of what it checked, so a shrinking count is the signal for the rest. That is a
+#      weaker claim than "no file can be excused", and the prose around this feature must not
+#      make the stronger one.
+#
+# ABSENCE IS NOT A FAILURE, and that asymmetry is deliberate. The documented upgrade path is a
+# copy out of the harness checkout; someone who copied only `*.sh` before the manifest existed
+# has no manifest at all, and a rung that failed on absence would turn their ladder red for
+# having followed the instructions in front of them — a fix that bills the person it broke.
+#
+# It is a WARN rather than a `skip`, which is the one place this rung breaks the convention the
+# rest of this file uses for an absent artifact (no ledger, no repo-local guards). Those are
+# repo-shape choices that assert nothing; this one is different in kind — deleting the manifest
+# is also the documented way to live with a deliberate local patch, so the state an adopter
+# reaches ON PURPOSE to switch the rung off must not be the quietest line the ladder prints. A
+# disabled guard has to be louder than a passing one, and `skip` is counted by nothing.
+#
+# The same reasoning governs the STALE case, which is the likelier one and is worth stating
+# in the failure text rather than leaving to be discovered: an adopter who upgrades with
+# `cp .../scripts/*.sh scripts/` gets new scripts against last version's manifest, and every
+# one of them then reads as tampered. The manifest sits in the same directory as the scripts
+# it describes precisely so that copying the directory keeps them together.
+#
+# The path is a CONSTANT here, not an amh.conf key. A configurable path is a supported way
+# to point the rung at nothing and collect a green `skip` — the shape this harness has
+# already been burned by, one layer down, and the reason the secret scan stopped consulting
+# a file mode.
+guard_shipped_integrity() {
+	section "Shipped scripts: integrity against the install manifest"
+	local manifest=scripts/MANIFEST.sha256 self=scripts/ladder.sh
+	if [ ! -f "$manifest" ]; then
+		warn "$manifest is absent, so the shipped scripts were NOT checked against the hashes the harness published for them — this rung checked NOTHING. An install or upgrade through the harness's init script writes one; a hand copy of *.sh alone does not."
+		return
+	fi
+	local tool
+	tool=$(amh_sha256_tool)
+	if [ -z "$tool" ]; then
+		# WARN, not skip: absence of the manifest is a state the adopter chose, absence of a
+		# hashing tool is a property of the machine that has nothing to do with the subject.
+		warn "neither sha256sum nor shasum is on PATH, so $manifest was NOT verified — this rung checked NOTHING. Install coreutils (or Perl's shasum) if you want the shipped scripts covered here."
+		return
+	fi
+	local line n=0 checked=0 bad=0 covers_self=0 want rest file got
+	while IFS= read -r line || [ -n "$line" ]; do
+		n=$((n + 1))
+		case $line in '' | '#'*) continue ;; esac
+		# sha256sum's own format: `<hash>  <path>`, with `*` marking binary mode. Parsed
+		# rather than trusted — a manifest this cannot read is a manifest that checked
+		# nothing, so a malformed line FAILS instead of being skipped past.
+		want=${line%% *}
+		rest=${line#"$want"}
+		rest=${rest#"${rest%%[![:space:]]*}"}
+		file=${rest#\*}
+		case $want in
+		*[!0-9a-f]* | '') file='' ;;
+		esac
+		# A manifest entry names a shipped script and nothing else: `scripts/<name>`, one
+		# level, no `..` and no absolute path. Without this the rung will happily hash
+		# /etc/hostname and then tell you re-running the harness's init script will restore
+		# it — a true verdict wrapped in a false description of what was checked, which is
+		# worse than no verdict. The constraint is also what bounds the damage a hand-edited
+		# manifest can do: it can excuse a shipped script, it cannot point the rung at
+		# somewhere else entirely.
+		case $file in
+		scripts/*/* | scripts/ | *'..'*) file='' ;;
+		scripts/?*) ;;
+		*) file='' ;;
+		esac
+		if [ -z "$file" ] || [ "${#want}" -ne 64 ]; then
+			fail "$manifest line $n is not a sha256 entry naming a shipped script — the form is a 64-character hash, two spaces, then scripts/<name>. The file is corrupt or hand-edited, and a manifest that cannot be read verifies nothing. Re-install it from the harness checkout."
+			bad=$((bad + 1))
+			continue
+		fi
+		[ "$file" = "$self" ] && covers_self=1
+		checked=$((checked + 1))
+		if [ ! -f "$file" ]; then
+			fail "$manifest names $file, which is not in this tree — a shipped script has been deleted, or the manifest belongs to a different version. Re-run the harness's init script against this repo to restore both."
+			bad=$((bad + 1))
+			continue
+		fi
+		got=$(amh_sha256 "$tool" "$file")
+		if [ "$got" != "$want" ]; then
+			fail "$file does not match the hash the harness published for it. If you edited it: the change belongs in amh.conf, in a guard under scripts/guards/, or in scripts/verify.sh — re-running the harness's init script puts the shipped copy back. If you upgraded by copying *.sh by hand: copy $manifest out of the same directory too, or this rung reports every new script as edited."
+			bad=$((bad + 1))
+		fi
+	done <"$manifest"
+	if [ "$checked" = 0 ] && [ "$bad" = 0 ]; then
+		# Every line a comment, or no lines at all. Green here would be a pass earned by an
+		# empty file, which is the one verdict this rung must never give.
+		fail "$manifest lists no scripts — an empty manifest passes everything. Re-install it from the harness checkout."
+		return
+	fi
+	# The one entry that may never go missing is the one covering the file you are reading.
+	# Deleting a line excuses that script; deleting THIS line excuses the script that decides
+	# whether anything else is excused, and from there every other verdict here is worth
+	# nothing. It is the only self-serving omission, so it is the only one that can be refused
+	# without a list of shipped names — which this script must not carry, since the set changes
+	# between versions and yours may be older or newer than the manifest's.
+	if [ "$covers_self" = 0 ]; then
+		fail "$manifest does not cover $self — a manifest that omits the ladder cannot vouch for anything, because the ladder is what reads it. Re-install it from the harness checkout."
+		bad=$((bad + 1))
+	fi
+	[ "$bad" = 0 ] && ok "$checked shipped script(s) match the published hashes ($tool) — a lower count than your version ships means the manifest was edited"
+}
+
+# The section header is printed unconditionally, and the number of guards that actually
+# RAN is always reported. Both were conditional on finding a guard, so `rm -rf
+# scripts/guards` left this rung emitting nothing whatsoever — no header, no skip, no
+# count — and the ladder stayed green. An empty extension point is a legitimate state for
+# an adopter who has earned no repo-local guards yet; printing NOTHING for it is not, and
+# it is indistinguishable from five guards that all passed silently. The disabled state
+# must be louder than the passing one (AMH ledger row D019), so absence gets a `skip` line,
+# the convention this script uses everywhere else, and the count is stated either way.
+guard_repo_local() {
+	section "Repo-local guards"
+	if [ -e scripts/guards ] && [ ! -d scripts/guards ]; then
+		skip "scripts/guards exists but is not a directory — 0 repo-local guard(s) ran"
+		return
+	fi
+	if [ ! -d scripts/guards ]; then
+		skip "scripts/guards (directory absent) — 0 repo-local guard(s) ran"
+		return
+	fi
+	local g ran=0 seen=0
+	for g in scripts/guards/*.sh; do
+		# `-e` is false for an unmatched glob (bash leaves the pattern itself) AND for a
+		# broken symlink, so `-L` is tested too. Anything the glob matched is COUNTED and,
+		# if it cannot be run, named: `[ -f ]` alone silently dropped a broken symlink or
+		# a directory called `x.sh`, and the count line then said "holds no *.sh" — an
+		# affirmative false, which is worse than the silence this function was fixed to
+		# stop. The same defect one level in.
+		[ -e "$g" ] || [ -L "$g" ] || continue
+		seen=$((seen + 1))
+		if [ ! -f "$g" ]; then
+			skip "$(basename "$g") is not a regular file — NOT run"
+			continue
+		fi
+		ran=$((ran + 1))
+		if out=$(bash "$g" 2>&1); then
+			ok "$(basename "$g")${out:+ — $out}"
+		else
+			fail "$(basename "$g"):"
+			printf '%s\n' "$out" | sed 's/^/         /'
+		fi
+	done
+	if [ "$seen" = 0 ]; then
+		skip "scripts/guards holds no *.sh — 0 repo-local guard(s) ran"
+	elif [ "$ran" = 0 ]; then
+		skip "nothing in scripts/guards was runnable — 0 repo-local guard(s) ran"
+	else
+		ok "$ran repo-local guard(s) ran"
+	fi
+}
+
+# --- local-only advisories --------------------------------------------------
+# WARN-only, skipped in CI: they describe the state of a working session, which CI
+# does not have. Warn fatigue kills tripwires, so this list stays short.
+advisories() {
+	in_ci && return
+	has_git || return
+	local base
+	base=$(upstream_ref)
+	section "Local advisories (not run in CI)"
+
+	if [ -n "$base" ]; then
+		local changed
+		changed=$(git diff --name-only "$base...HEAD" 2>/dev/null)
+		if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qF "$STATE_FILE"; then
+			warn "this branch changes files but not $STATE_FILE — the checkpoint's changelog line is probably missing"
+		fi
+
+		if ! git merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+			local mt rc tree
+			mt=$(git merge-tree --write-tree "$base" HEAD 2>/dev/null)
+			rc=$?
+			tree=$(printf '%s' "$mt" | head -1)
+			if [ "$rc" -eq 0 ] && [ -n "$mt" ] && [ "$tree" = "$(git rev-parse 'HEAD^{tree}' 2>/dev/null)" ]; then
+				warn "behind $base, but a clean test-merge leaves this tree unchanged — structural (the default branch advanced by a squash of this very work). Do NOT merge."
+			elif [ "$rc" -eq 0 ] && [ -n "$mt" ]; then
+				warn "behind $base and the merge would bring content — inspect what it brings, then merge it in (never rebase pushed history)."
+			elif [ -z "$mt" ]; then
+				warn "behind $base — could not classify (shallow clone or an older git). Usually structural; inspect before merging."
+			else
+				warn "behind $base and a test-merge conflicts — inspect what the merge would bring first (a deliberate revert on this branch looks like missing content)."
+			fi
+		fi
+	fi
+
+	if [ -d "$PLAN_DIR" ]; then
+		local p
+		for p in "$PLAN_DIR"/*; do
+			[ -f "$p" ] || continue
+			if ! grep -qF "$(basename "$p")" "$STATE_FILE" 2>/dev/null; then
+				warn "$p is not referenced from $STATE_FILE — a finished or pivoted plan missed its completion step. Move a completed plan worth retaining whole to docs/history/ when that archive tier exists; otherwise delete it. Code cites ledger rows, never plans."
+			fi
+		done
+	fi
+
+	if [ -n "$RULE_FILES" ]; then
+		local dirty rf touched=''
+		dirty=$( (
+			git diff --name-only
+			git diff --cached --name-only
+			git ls-files -o --exclude-standard
+		) 2>/dev/null | sort -u)
+		# Literal whole-path or directory-prefix matches, and `set -f` so an entry is
+		# never glob-expanded against the working directory — see guard_citations. The
+		# grep form this replaces interpolated each entry as a regex.
+		set -f
+		local d
+		for rf in $RULE_FILES; do
+			while IFS= read -r d; do
+				case $d in
+				"$rf" | "$rf"/*)
+					touched="$touched $rf"
+					break
+					;;
+				esac
+			done <<<"$dirty"
+		done
+		set +f
+		if [ -n "$touched" ]; then
+			warn "uncommitted diff touches legislation:$touched — the rule-review protocol applies (fresh-context reviewer, strongest tier, no self-review fallback) BEFORE commit."
+		fi
+	fi
+	[ "$WARNS" = 0 ] && ok "nothing to flag"
+}
+
+# --- the verdict's subject --------------------------------------------------
+# Every verdict line below ends with the commit and the worktree state it is a verdict
+# ABOUT. The ladder said "green" and never said green OF WHAT — not here, not in the boot
+# banner, nowhere in a session's output — for three releases, until an external reader
+# found it in one pass (AMH ledger row DA025).
+#
+# It is one printf on lines that already existed, deliberately. The alternative on offer
+# was a JSON run receipt written to an ignored directory; it was refused as forgeable and
+# as a second verdict vocabulary, and this is the same intent reported in output the ladder
+# already prints — the shape DA022(d) settled on for the ledger's byte count.
+#
+# Nothing consumes this string. It is not parsed, no exit code varies with it, and no
+# guard, CI step or agent decision procedure may take it as input: it is a sentence for
+# whoever reads the transcript, and the moment something branches on it, it has become the
+# self-report gate the harness bans (P3).
+#
+# The dirty case is the whole reason the line exists, so it does not merely append a word.
+# The ladder verifies the WORKING TREE — the secret scan and the citation scan both read
+# untracked files — so attributing a green run to `HEAD` while the tree differs from it is
+# a claim about a commit nobody verified. It says so in those words.
+#
+# THE DIRTINESS PROBE IS NOT `git status --porcelain`, and that is the single most
+# important line in this function. `status` honours `status.showUntrackedFiles`, which can
+# be set in the repository's own `.git/config` or in a user-level `~/.gitconfig` that no
+# diff can see; `git ls-files -co --exclude-standard` — what the secret scan and the
+# citation scan actually read — does not. With that key set to `no`, `status` reports a
+# tree as clean while the scans are reading, and failing on, untracked files that are not
+# in HEAD: the exact misattribution this line exists to prevent, reachable by one command
+# that edits no tracked file and therefore appears in no diff and trips no guard. So the
+# probe is built from the SAME sources the guards read. `.gitignore` is honoured by both,
+# which is why an ignored build directory still does not render every run dirty.
+#
+# `--no-renames` because the count claims to be PATHS: rename detection collapses a moved
+# file into one entry, so `git mv a b` would report one path having changed two.
+#
+# What this still cannot see, stated because the paragraph above is a coverage claim:
+# `git update-index --assume-unchanged` hides a modified tracked file from `diff` and from
+# `status` alike, so such a file reads as clean here. That is a deliberate act on one path,
+# not a passive misconfiguration, and no probe built out of git's own plumbing escapes it.
+#
+# Four states, and none of them may be reported as one of the others:
+#
+#   (a) git names no repository from here — an extracted tarball outside any checkout, or
+#                               an adopter mid-setup. Names no commit. Note what `has_git`
+#                               actually asks, since every guard above uses it too: whether
+#                               git resolves A repository from the working directory, which
+#                               inside a monorepo `vendor/` or a dotfiles $HOME is the
+#                               ENCLOSING one. A tree with no `.git` of its own is then
+#                               described by its parent's commit, and so is the rest of the
+#                               ladder. A repository too broken for `rev-parse --git-dir`
+#                               also lands here, which understates it and is accepted: both
+#                               readings tell the reader not to trust a commit name.
+#   (b) git will not answer   — a corrupt index, above all. (An index LOCK is not this: a
+#                               stale `.git/index.lock` leaves `git diff` exiting 0.) An
+#                               empty answer is INDISTINGUISHABLE from a clean tree, so the
+#                               exit status is read and an unusable answer is reported as
+#                               UNKNOWN rather than collapsed into "clean" (AMH ledger row
+#                               D019).
+#   (c) unborn HEAD           — `git init` with nothing committed. There is no commit to
+#                               name, which is not the same as there being no repository.
+#   (d) a commit, clean or dirty.
+#
+# Only the COUNT is printed: the names are the tree's business and a verdict line is not
+# where a path belongs. It is sampled AFTER rung 3 returns, so a verification set that
+# wrote into its own worktree would be counted — none of the shipped ones does, and one
+# that did would be reporting something true.
+subject() {
+	local sha paths rc n
+	if ! has_git; then
+		printf 'git names no repository from here, so this verdict names no commit'
+		return
+	fi
+	sha=$(git rev-parse --short HEAD 2>/dev/null)
+	# `&&`-chained rather than piped, so a git that refuses is caught by this assignment's
+	# own exit status instead of by whatever `sort` thought of it. Not sorted here for the
+	# same reason: the dedup happens below, once the status has been read.
+	paths=$({
+		git diff --name-only --no-renames &&
+			git diff --cached --name-only --no-renames &&
+			git ls-files -o --exclude-standard
+	} 2>/dev/null)
+	rc=$?
+	if [ "$rc" -ne 0 ]; then
+		if [ -n "$sha" ]; then
+			printf 'HEAD %s, worktree state UNKNOWN (git would not report it) — this verdict may not be about that commit' "$sha"
+		else
+			printf 'commit and worktree state both UNKNOWN (git would not report them) — this verdict names no commit'
+		fi
+		return
+	fi
+	if [ -z "$paths" ]; then
+		n=0
+	else
+		n=$(printf '%s\n' "$paths" | sort -u | wc -l | tr -d ' ')
+	fi
+	if [ -z "$sha" ]; then
+		printf 'no commit yet (unborn HEAD), %s uncommitted path(s) — this verdict names no commit' "$n"
+	elif [ "$n" = 0 ]; then
+		printf 'HEAD %s, worktree clean' "$sha"
+	else
+		printf 'HEAD %s + %s uncommitted path(s) — the tree just verified is NOT that commit' "$sha" "$n"
+	fi
+}
+
+# =============================================================================
+run_guards() {
+	guard_state_size
+	guard_state_structure
+	guard_ledger_rollover
+	guard_citations
+	guard_secret_shapes
+	guard_poison_tokens
+	guard_author_identity
+	guard_rail_selftests
+	guard_shipped_integrity
+	guard_repo_local
+	advisories
+}
+
+run_guards
+
+if [ "$FAILS" -gt 0 ]; then
+	printf '\n✗ guards: %d failure(s), %d warning(s) — %s\n' "$FAILS" "$WARNS" "$(subject)"
+	exit 1
 fi
 
-fail() { echo "LADDER FAIL: $1" >&2; exit 1; }
-
-# --- guard 1: STATE.md length rule (DA-004 hysteresis: grow freely to 14 KB; when the warn
-# fires, compress DEEP to <= 9 KB in one pass — never trim to just under a threshold, that
-# only re-arms the warn a session later; fail > 16 KB) ---
-# The three thresholds live here as named constants because guard 1a below also depends on the
-# floor and warn line — one source of truth, lockstep with the STATE.md length-guard preamble.
-STATE_HARD_BYTES=16384    # hard cap: fail over
-STATE_WARN_BYTES=14336    # warn line: compression pass due over
-STATE_FLOOR_BYTES=9216    # deep-compression target (<= 9 KB); warn−floor IS the debounce band
-[ -f "$STATE_FILE" ] || fail "$STATE_FILE not found (run from the repo, or fix LADDER_STATE_FILE)"
-state_bytes=$(wc -c < "$STATE_FILE" | tr -d '[:space:]')
-if [ "$state_bytes" -gt "$STATE_HARD_BYTES" ]; then
-  fail "$STATE_FILE is ${state_bytes} B — over the 16 KB hard cap; compress DEEP to <= 9 KB before committing (DA-004; see its length-guard preamble)"
-elif [ "$state_bytes" -gt "$STATE_WARN_BYTES" ]; then
-  echo "LADDER WARN: $STATE_FILE is ${state_bytes} B (> 14 KB) — compression pass due: compress DEEP to <= 9 KB in ONE pass, not to just under a line (DA-004)"
-else
-  echo "LADDER: STATE.md size OK (${state_bytes} B / 14 KB warn line)"
+if [ "$GUARDS_ONLY" = 1 ]; then
+	printf '\n✓ guards clean (%d warning(s)), verification set NOT executed (guards-only run) — %s\n' "$WARNS" "$(subject)"
+	exit 0
 fi
 
-# --- guard 1a: STATE.md compression-landing rule (DA-004 debounce enforcement; DA-014) ---
-# The stateless thresholds above cannot tell a genuine deep compression from a "micro-trim"
-# that shrinks STATE to just under the warn line and re-arms the warn a session or two later —
-# the Goodhart hole the owner hit before stating the rule by hand. This sub-check supplies the
-# missing state: if the PREVIOUS committed STATE was over the warn line (a compression was
-# owed) and this change brings it down but lands in the 9–14 KB debounce band instead of on
-# the <= 9 KB floor, the compression pass didn't finish — FAIL. It judges the current size
-# against the last COMMITTED size: normally HEAD (the trim is in the working tree, pre-commit),
-# falling back to HEAD~1 when the working tree hasn't touched STATE (a trim that is already
-# committed, e.g. a re-run in CI — build.yml checks out with full depth, so HEAD~1 is present).
-# It fires ONLY on a shrink out of warn territory: normal growth and sub-warn edits never trip
-# it, and an author who leaves STATE bloated is caught by guard 1's warn/fail, not here (the
-# "one deep pass or nothing" philosophy — a partial trim into the band is the failure mode, a
-# bloated file is already flagged). Residual: a micro-trim buried under later commits on the
-# same branch won't re-fire in CI, but it DID fail the ladder at its own authoring-time run
-# (the enforcement point that matters, RUNBOOK Session discipline).
-if git rev-parse --git-dir >/dev/null 2>&1 && git cat-file -e "HEAD:$STATE_FILE" 2>/dev/null; then
-  base_ref=HEAD
-  # git diff --quiet HEAD is the precise "working tree unchanged vs HEAD" test (staged OR
-  # unstaged); a byte-preserving edit would fool a size-equality check.
-  if git diff --quiet HEAD -- "$STATE_FILE" && git cat-file -e "HEAD~1:$STATE_FILE" 2>/dev/null; then
-    base_ref=HEAD~1
-  fi
-  prev_bytes=$(git show "$base_ref:$STATE_FILE" 2>/dev/null | wc -c | tr -d '[:space:]')
-  if [ "$prev_bytes" -gt "$STATE_WARN_BYTES" ] && [ "$state_bytes" -le "$STATE_WARN_BYTES" ] \
-       && [ "$state_bytes" -gt "$STATE_FLOOR_BYTES" ]; then
-    fail "$STATE_FILE was ${prev_bytes} B (> 14 KB warn) and this change trims it only to ${state_bytes} B — still inside the 9-14 KB debounce band. A compression pass must land <= 9 KB in ONE pass, never just under the warn line (a micro-trim re-arms the warn a session later; DA-004)."
-  elif [ "$prev_bytes" -gt "$STATE_WARN_BYTES" ] && [ "$state_bytes" -le "$STATE_FLOOR_BYTES" ]; then
-    echo "LADDER: STATE.md deep-compressed ${prev_bytes} B -> ${state_bytes} B (landed <= 9 KB floor; DA-004)"
-  fi
+# =============================================================================
+# 3. The full verification set, in one invocation.
+# =============================================================================
+section "Verification set (scripts/verify.sh)"
+if [ ! -x scripts/verify.sh ]; then
+	fail "scripts/verify.sh is missing or not executable — the ladder has no verification rung"
+	printf '\n✗ ladder red — %s\n' "$(subject)"
+	exit 1
 fi
-
-# --- guard 1b: STATE.md required structure (over-compression tripwire) ---
-# The length-guard preamble says Project + Current state must survive any compression; Decided
-# non-items and the Changelog are the other two load-bearing sections. Losing one = data loss.
-for h in '## Project' '## Current state' '## Decided non-items' '## Changelog'; do
-  grep -qF "$h" "$STATE_FILE" \
-    || fail "$STATE_FILE is missing required section \"$h\" — over-compressed? Restore it (see the length-guard preamble)"
-done
-# Owner queue (D-167) is WARN-level: losing it is data loss for the OWNER's pending
-# actions/questions/findings, but shouldn't hard-block an unrelated build — restore it from
-# git history, never let the warning stand.
-grep -qF '## Owner queue' "$STATE_FILE" \
-  || echo "LADDER WARN: $STATE_FILE is missing '## Owner queue' (D-167) — a compression pass ate the owner's pending actions/questions/findings; restore it from git history."
-echo "LADDER: STATE.md required sections present"
-
-# --- guard 1c: deviations-ledger rollover (D-153 mechanism; DA-001: LINE-based cap from
-# ledger A on — the base ledger closed at D-176). The final row of a file may FINISH past the
-# cap, but no row may START past it: a row starting beyond the cap belonged in the next file.
-# (LADDER_LEDGER_FILE overrides the path — used only by the guard's own tests.)
-LEDGER_CAP_LINES=1000   # owner-tunable (DA-001); warn lead below mirrors the old 10-row lead
-LEDGER_WARN_LINES=$((LEDGER_CAP_LINES - 100))
-LEDGER_FILE="${LADDER_LEDGER_FILE:-}"
-if [ -z "$LEDGER_FILE" ]; then
-  LEDGER_FILE=docs/rebuild/DEVIATIONS_LEDGER.md
-  for f in docs/rebuild/DEVIATIONS_LEDGER_B.md docs/rebuild/DEVIATIONS_LEDGER_A.md; do
-    if [ -f "$f" ]; then LEDGER_FILE="$f"; break; fi
-  done
+if scripts/verify.sh; then
+	printf '\n✓ ladder green (%d warning(s)) — %s\n' "$WARNS" "$(subject)"
+	exit 0
 fi
-if [ -f "$LEDGER_FILE" ]; then
-  ledger_lines=$(wc -l < "$LEDGER_FILE" | tr -d '[:space:]')
-  last_row_start=$(grep -nE '^- (\*\*)?D[AB]?-[0-9]' "$LEDGER_FILE" | tail -1 | cut -d: -f1 || true)
-  if [ -n "$last_row_start" ] && [ "$last_row_start" -gt "$LEDGER_CAP_LINES" ]; then
-    fail "live ledger $LEDGER_FILE: last row starts at line ${last_row_start} (> ${LEDGER_CAP_LINES}) — that row belongs in the next ledger file; roll over (D-153/DA-001)"
-  elif [ "$ledger_lines" -gt "$LEDGER_CAP_LINES" ]; then
-    echo "LADDER WARN: live ledger $LEDGER_FILE at ${ledger_lines} lines (> ${LEDGER_CAP_LINES}) — the NEXT deviation opens the next ledger file (D-153/DA-001)"
-  elif [ "$ledger_lines" -ge "$LEDGER_WARN_LINES" ]; then
-    echo "LADDER WARN: live ledger $LEDGER_FILE at ${ledger_lines}/${LEDGER_CAP_LINES} lines — rollover soon (D-153/DA-001)"
-  else
-    echo "LADDER: live ledger OK (${ledger_lines}/${LEDGER_CAP_LINES} lines in $LEDGER_FILE)"
-  fi
-else
-  fail "live ledger $LEDGER_FILE not found"
-fi
-
-# --- guard 5: D-citation integrity (D-173; numbered after the pre-existing guards 1-4,
-# whose numbers are cited by immutable ledger rows and never change) ---
-# Code and workflows cite deviations as bare D-NN, and the ledger preamble's contract is that
-# every citation "must always resolve" to a row. Machine-check the checkable half over the
-# artifacts the work produces anyway: every D-/DA-/DB-NNN in app/ domain/ platform/ .github/
-# sources must match a row in its ledger file (prefix names the file, D-153), and no ledger
-# file may carry a duplicate row number. Catches citation typos, a code comment merged before
-# its ledger row was appended, and a mis-numbered append. scripts/ is deliberately NOT
-# scanned (scripts/test-ladder-guards.sh synthesizes fixture ledgers/citations), nor is doc
-# prose (it legitimately uses range/cap notation like "D-001…D-184" that names no real row).
-cited=$(grep -rhoE '\bD[AB]?-[0-9]{3}\b' \
-  --include='*.kt' --include='*.kts' --include='*.xml' --include='*.yml' --include='*.yaml' \
-  app domain platform .github 2>/dev/null | sort -u || true)
-for id in $cited; do
-  case "$id" in
-    DA-*) lf=docs/rebuild/DEVIATIONS_LEDGER_A.md ;;
-    DB-*) lf=docs/rebuild/DEVIATIONS_LEDGER_B.md ;;
-    *)    lf=docs/rebuild/DEVIATIONS_LEDGER.md ;;
-  esac
-  [ -f "$lf" ] || fail "citation $id cannot resolve: ledger file $lf not found (D-173)"
-  grep -qE "^- (\*\*)?${id}\b" "$lf" \
-    || fail "dangling deviation citation $id — no such row in $lf. Fix the typo or append the missing ledger row (D-173)."
-done
-for lf in docs/rebuild/DEVIATIONS_LEDGER.md docs/rebuild/DEVIATIONS_LEDGER_A.md docs/rebuild/DEVIATIONS_LEDGER_B.md; do
-  [ -f "$lf" ] || continue
-  dupes=$(grep -oE '^- (\*\*)?D[AB]?-[0-9]{3}' "$lf" | grep -oE 'D[AB]?-[0-9]{3}' | sort | uniq -d || true)
-  [ -z "$dupes" ] || fail "duplicate deviation row number(s) in $lf: $(echo $dupes) — renumber the newest append (D-173)"
-done
-
-# [cited] marker sync (D-174): a row cited from the scan scope above carries " [cited]"
-# directly after its number; guard both directions so the marker is verified derived state
-# (grep '\[cited\]' on a ledger file = every code-anchored row, no tree cross-reference).
-marked=$(grep -hoE '^- (\*\*)?D[AB]?-[0-9]{3} \[cited\]' \
-    docs/rebuild/DEVIATIONS_LEDGER.md docs/rebuild/DEVIATIONS_LEDGER_A.md \
-    docs/rebuild/DEVIATIONS_LEDGER_B.md 2>/dev/null | grep -oE 'D[AB]?-[0-9]{3}' | sort -u || true)
-unmarked=$(comm -23 <(printf '%s\n' $cited | grep . | sort -u) <(printf '%s\n' $marked | grep .) || true)
-stale=$(comm -13 <(printf '%s\n' $cited | grep . | sort -u) <(printf '%s\n' $marked | grep .) || true)
-[ -z "$unmarked" ] || fail "ledger row(s) cited from code but missing the [cited] marker: $(echo $unmarked) — insert \" [cited]\" directly after the row number (D-174)"
-[ -z "$stale" ] || fail "ledger row(s) marked [cited] but no longer cited anywhere in scope: $(echo $stale) — remove the marker, or restore the lost citation (D-174)"
-echo "LADDER: D-citations OK ($(echo "$cited" | grep -c . || true) distinct, all resolve; [cited] markers in sync; no duplicate ledger rows)"
-
-# --- guard 6: F-Droid changelog cap (D-173; char count DA-019) ---
-# RUNBOOK §6: changelogs/<versionCode>.txt must stay under 500 CHARACTERS (whole file incl. the
-# trailing newline) or F-Droid's code-quality scan flags the whatsNew. F-Droid measures string
-# LENGTH (codepoints), not bytes, so this counts characters — a note with multibyte glyphs
-# (em dashes, accents, emoji) may run past 500 bytes while still under the real 500-char limit.
-# Codepoint count, locale-independent: strip UTF-8 continuation bytes (0x80-0xBF) with LC_ALL=C
-# tr, then wc -c the remainder — one byte survives per codepoint (the lead byte / any ASCII byte).
-# Only the CURRENT versionCode's file is checked — it is the one the next tag ships; historical
-# files (e.g. the pre-rule 9.txt) are shipped facts, not actionable. Existence is
-# release-preflight.yml's job (it knows whether the PR ships app code); this guard only rejects
-# an oversize file.
-vc=$(grep -oE 'versionCode[[:space:]]*=[[:space:]]*[0-9]+' app/build.gradle.kts 2>/dev/null \
-  | grep -oE '[0-9]+' | head -1 || true)
-if [ -n "$vc" ] && [ -f "fastlane/metadata/android/en-US/changelogs/${vc}.txt" ]; then
-  cl="fastlane/metadata/android/en-US/changelogs/${vc}.txt"
-  cl_chars=$(LC_ALL=C tr -d '\200-\277' < "$cl" | wc -c | tr -d '[:space:]')
-  if [ "$cl_chars" -gt 500 ]; then
-    fail "$cl is ${cl_chars} chars — over the 500-char F-Droid whatsNew cap (RUNBOOK §6). Shorten it."
-  fi
-  echo "LADDER: F-Droid changelog OK ($cl, ${cl_chars} chars <= 500)"
-fi
-
-# --- guard 7: rule-review tripwire (DA-006; WARN-only, local-only — skipped under
-# GITHUB_ACTIONS like guards 3/4, numbered after the pre-existing guards whose numbers are
-# cited by immutable ledger rows). The DA-005 rule-review protocol binds any diff to harness
-# legislation; no guard can perform that review — this tripwire only SURFACES the obligation,
-# by scanning the UNCOMMITTED changes (staged/unstaged/untracked; per-unit, unlike guard 3's
-# per-branch diff base, so it stops warning once the reviewed unit is committed). STATE.md
-# and the ledger files are deliberately NOT in the list: they change in nearly every unit
-# (changelog/queue/row appends) and warning every unit is warn fatigue — their legislative
-# sections (preambles, Decided non-items) stay prose-covered (RUNBOOK Rule-review protocol).
-if [ "${GITHUB_ACTIONS:-}" != "true" ] && git rev-parse --git-dir >/dev/null 2>&1; then
-  legislation_touched=""
-  # A new agent adapter's permission-config file joins this list (CLAUDE.md Agent harness).
-  for f in CLAUDE.md AGENTS.md docs/rebuild/RUNBOOK.md scripts/ladder.sh \
-           scripts/test-ladder-guards.sh scripts/session-start.sh scripts/redact.sh \
-           scripts/command-guard.sh .claude/settings.json; do
-    if git status --porcelain -- "$f" 2>/dev/null | grep -q .; then
-      legislation_touched="$legislation_touched $f"
-    fi
-  done
-  if [ -n "$legislation_touched" ]; then
-    echo "LADDER WARN: uncommitted changes touch harness legislation:${legislation_touched} — the rule-review protocol applies before commit (fresh-context reviewer, strongest tier; RUNBOOK Rule-review, DA-005/DA-006)."
-  fi
-fi
-
-# --- guard 8: redact.sh self-test (DA-007) — the redaction filter is a rail; a silently
-# broken pattern must fail the ladder. Milliseconds; fake tokens generated at runtime. ---
-if [ -x scripts/redact.sh ]; then
-  scripts/redact.sh --self-test >/dev/null \
-    || fail "scripts/redact.sh --self-test FAILED — a redaction pattern regressed; fix the filter before committing (DA-007)"
-  echo "LADDER: redact.sh self-test OK"
-else
-  fail "scripts/redact.sh missing or not executable — the DA-007 redaction rail is gone"
-fi
-
-# --- guard 9: secret-shape tree scan (DA-008; see header) ---
-if git rev-parse --git-dir >/dev/null 2>&1; then
-  # NUL-separated list + xargs -0: filenames with spaces/non-ASCII must be SCANNED, not
-  # silently skipped — a word-split list was this guard's original blocker-class bug.
-  git ls-files -z -co --exclude-standard | xargs -0 scripts/redact.sh --scan \
-    || fail "secret-shaped content in the tree (files above, value-free positions) — never commit credentials; a FIXTURE token must be runtime-generated, never a stored literal (DA-008)"
-  # The worktree scan alone misses a staged-then-reverted secret: also scan staged blobs.
-  scripts/redact.sh --scan-staged \
-    || fail "secret-shaped content in a STAGED blob (above) — unstage and purge it before committing; the index is what a commit records (DA-008)"
-  echo "LADDER: secret-shape scan OK (worktree + staged)"
-fi
-
-# --- guard 10: command-guard self-test (DA-009) — the pre-execution command rail is a rail
-# like guard 8's filter; a silently broken pattern must fail the ladder. Milliseconds. ---
-if [ -x scripts/command-guard.sh ]; then
-  scripts/command-guard.sh --self-test >/dev/null \
-    || fail "scripts/command-guard.sh --self-test FAILED — a command-guard pattern regressed; fix the rail before committing (DA-009)"
-  echo "LADDER: command-guard self-test OK"
-else
-  fail "scripts/command-guard.sh missing or not executable — the DA-009 command rail is gone"
-fi
-
-# --- guard 11: falsifiable doc-facts (DA-015) — a load-bearing prose claim earns a machine
-# anchor only AFTER a real drift incident (P10; this is not a doc-testing framework — the
-# incident-only bar is BINDING: a fact without one was reviewed out, DA-015). The expected
-# value is a constant HERE, in lockstep with the cited doc sentence — the guard checks CODE
-# against the constant and never parses prose; changing either side means changing both
-# (guard 7 fires on this file; rule-review applies). This is a TRIPWIRE, not proof: it
-# counts files naming ShizukuShell, not semantic call sites.
-# Fact (drift incident d66de4c): CLAUDE.md "Shizuku is a genuine optional runtime
-# dependency in exactly two places" — consumer files referencing ShizukuShell, excluding
-# its own definition.
-shizuku_expected=2
-shizuku_sites=$(grep -rl 'ShizukuShell' platform/src/main app/src/main 2>/dev/null \
-  | grep -cv '/ShizukuShell\.kt$' || true)
-[ "$shizuku_sites" = "$shizuku_expected" ] \
-  || fail "doc-fact drift: ${shizuku_sites} file(s) reference ShizukuShell but the docs claim exactly ${shizuku_expected} runtime places — update the claim in CLAUDE.md (and its restatements in README.md + docs/rebuild/architecture/privilege_tiers.md, the d66de4c drift sites) AND this guard's constant in lockstep (DA-015)"
-echo "LADDER: doc-facts OK (Shizuku runtime sites = ${shizuku_sites})"
-
-# --- guard 2: D-115 skip-ci tokens in unmerged commit messages ---
-if ! git rev-parse --verify -q origin/main >/dev/null; then
-  git fetch origin main --quiet 2>/dev/null || true
-fi
-if git rev-parse --verify -q origin/main >/dev/null; then
-  log_text=$(git log origin/main..HEAD --format='%s%n%b')
-  TOKENS=('[skip ci]' '[ci skip]' '[no ci]' '[skip actions]' '[actions skip]' '***NO_CI***')
-  for t in "${TOKENS[@]}"; do
-    if printf '%s' "$log_text" | grep -Fq -- "$t"; then
-      fail "forbidden CI-skip token \"$t\" in an unmerged commit message (D-115). Reword the commit (say 'skip-ci', never the literal) BEFORE pushing — force-push is not allowed."
-    fi
-  done
-  echo "LADDER: no skip-ci tokens in origin/main..HEAD commit messages"
-
-  # --- guards 3 & 4: local human-in-the-loop advisories (WARN-only; D-166) ---
-  # Skipped under GITHUB_ACTIONS: these target the interactive session workflow, not the CI
-  # gate (CI keeps guards 1/1b/1c/2 above). Both only ever WARN, so they never fail a build.
-  if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
-    # guard 3: checkpoint tripwire (RUNBOOK Session discipline 3). If any non-doc code/config
-    # changed relative to main (committed + working tree) but STATE.md is not in that diff, the
-    # checkpoint invariant's STATE Changelog line is probably still missing.
-    # Residual (known): the diff base is origin/main, so this is per-BRANCH, not per-unit —
-    # once any earlier unit on the branch touched STATE.md, a later unit that forgets its
-    # Changelog line will NOT warn. Silence here is not confirmation; the invariant itself
-    # (RUNBOOK Session discipline 3) still binds every unit.
-    changed=$( { git diff --name-only origin/main..HEAD; git status --porcelain | sed 's/^...//'; } | sort -u )
-    code_changed=$(printf '%s\n' "$changed" | grep -vE '^$|^docs/|(^|/)[^/]*\.md$' || true)
-    if [ -n "$code_changed" ] && ! printf '%s\n' "$changed" | grep -qx 'docs/rebuild/STATE.md'; then
-      echo "LADDER WARN: code/config changed but docs/rebuild/STATE.md is not in the diff — the checkpoint invariant wants a STATE Changelog line before commit (RUNBOOK Session discipline 3)."
-    fi
-    # guard 4: stale-branch tripwire. Behind origin/main invites a squash-merge conflict the
-    # agent's own green ladder can't see. Advice must stay force-push-free: rebasing pushed
-    # checkpoints would need a force-push, which the git rules forbid — merge instead (the
-    # merge commit vanishes at squash-merge anyway). DA-010: don't make the agent reason
-    # about train topology — a content-level test-merge (git merge-tree, no worktree touch)
-    # decides mechanically: if merging origin/main would leave HEAD's tree unchanged, main
-    # brings nothing this branch lacks (the DA-002 structural case — main advanced by squash
-    # commits of this very train) and the advice is a hard "do NOT merge".
-    behind=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
-    if [ "$behind" -gt 0 ]; then
-      # The structural claim requires a CLEAN merge (rc 0) AND an unchanged tree: on a
-      # conflict (rc 1) the OID still prints, and a modify/delete conflict can leave the
-      # merged tree EQUAL to HEAD's while the real merge would stop on the conflict — tree
-      # equality alone is not proof (DA-005 review finding, fixture-pinned). EMPTY output
-      # (rc 128: unrelated histories in a shallow/partial clone, pre-2.38 git) means it
-      # could not decide at all — fall back to the neutral wording, never assert a
-      # divergence the tool didn't prove (found live: this container's shallow clone).
-      merge_rc=0
-      merged_tree=$(git merge-tree --write-tree origin/main HEAD 2>/dev/null | head -n 1) || merge_rc=$?
-      if [ "$merge_rc" -eq 0 ] && [ -n "$merged_tree" ] && [ "$merged_tree" = "$(git rev-parse 'HEAD^{tree}')" ]; then
-        echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main, but a clean test-merge shows origin/main brings NO content this branch lacks — the DA-002 structural case (main advances by squash commits of this very train). Do NOT merge origin/main in; keep working."
-      elif [ -n "$merged_tree" ] && [ "$merge_rc" -le 1 ]; then
-        echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main and a test-merge shows origin/main carries content differences (or a conflicting change) this branch lacks (DA-010). Inspect what the merge would bring first — a deliberate revert on this branch can look like missing content — and reconcile only if main carries work this branch genuinely lacks: 'git merge origin/main' (rebase ONLY if nothing is pushed yet; pushed checkpoints are immutable, never force-push)."
-      else
-        echo "LADDER WARN: branch is ${behind} commit(s) behind origin/main (test-merge inconclusive — shallow/partial clone or old git). In the DA-002 branch-train model this is usually STRUCTURAL (main advances by squash commits of this very train) — reconcile only if main carries work this branch genuinely lacks: 'git merge origin/main' (rebase ONLY if nothing is pushed yet; pushed checkpoints are immutable, never force-push)."
-      fi
-    fi
-  fi
-else
-  echo "LADDER WARN: origin/main unavailable (offline?) — D-115 token scan + branch advisories skipped"
-fi
-
-if [ "$guards_only" -eq 1 ]; then
-  echo "LADDER PASS (guards only)"
-  exit 0
-fi
-
-# --- the five rungs, one Gradle invocation (same task set as build.yml) ---
-# If the session-start warm-up (D-173) is still in flight, say so: Gradle's inter-process
-# lock serializes this build behind it (total wall time ≈ one cold build — expected, not a
-# hang). Informational only — the lock IS the synchronization; no sentinel/wait (DA-010).
-if pgrep -f 'warm-gradle\.sh' >/dev/null 2>&1; then
-  echo "LADDER: Gradle warm-up still running — this build queues behind its lock; a long first rung is expected, not a hang (progress: ~/.gradle-warmup.log)"
-fi
-start=$SECONDS
-./gradlew :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug "$@"
-echo "LADDER PASS (guards + 5 rungs) in $((SECONDS - start))s"
+printf '\n✗ ladder red (verification set failed) — %s\n' "$(subject)"
+exit 1
