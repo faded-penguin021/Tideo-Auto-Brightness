@@ -194,7 +194,7 @@ class CorePipelineParityTest {
 
     /**
      * Cross-validate task661 (runtime) vs task663 (plot-side copy) of the 3-zone mapping over the
-     * golden lux grid (D-002/D-027c). They must agree because Form2D ≡ Zone1End; any disagreement
+     * golden lux grid (D-002/D-027(c)). They must agree because Form2D ≡ Zone1End; any disagreement
      * would be recorded in parity_gaps.md and re-derived from XML — never guessed.
      */
     @Test

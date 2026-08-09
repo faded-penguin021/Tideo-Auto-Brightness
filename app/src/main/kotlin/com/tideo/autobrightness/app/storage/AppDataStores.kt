@@ -47,7 +47,7 @@ val Context.contextRulesDataStore: DataStore<ContextOverrideConfig> by dataStore
 )
 
 // Recorded manual-override training points (%AAB_Overrides): captured at runtime by the pipeline so
-// the curve wizard + curve overlay have real input (G2R-F13/F14; closes the D-044c capture gap).
+// the curve wizard + curve overlay have real input (G2R-F13/F14; closes the D-044(c) capture gap).
 val Context.overridePointsDataStore: DataStore<OverridePoints> by dataStore(
     fileName = "aab_override_points.json",
     serializer = OverridePointsSerializer,
@@ -55,7 +55,7 @@ val Context.overridePointsDataStore: DataStore<OverridePoints> by dataStore(
 
 // User-editable named profiles (S12.6d, G2R-F15): the five DefaultProfiles seeded once, then
 // overwritable, plus any "Save current as…" entries. AppProfileCatalog reads this so context rules
-// can target user profiles too (closes the D-042c unknown-profile gap).
+// can target user profiles too (closes the D-042(c) unknown-profile gap).
 val Context.userProfilesDataStore: DataStore<SavedProfiles> by dataStore(
     fileName = "aab_user_profiles.json",
     serializer = SavedProfilesSerializer,

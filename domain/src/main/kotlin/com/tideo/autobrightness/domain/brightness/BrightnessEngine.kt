@@ -27,7 +27,7 @@ import kotlin.math.sqrt
  *      String-free path (gap-01 R1, gap-02 R1). See [bigScale].
  *   3. NO clamping where the source omits it — `lux_alpha` is not clamped to [0,1] (gap-01 R2), the
  *      `^0.33` curve bases are not `coerceAtLeast`'d, and the post-curve value is not re-clamped to
- *      [min,max] inside the map step (gap-03 R2 / D-010a/b).
+ *      [min,max] inside the map step (gap-03 R2 / D-010(a)/(b)).
  *
  * These are immutable fixtures: production code conforms to the golden vectors, never the reverse.
  */
@@ -139,7 +139,7 @@ class BrightnessEngine {
     ): Pair<Double, Double> {
         val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
         val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
-        // Tasker task535: lux_alpha is NOT clamped to [0,1] (D-010a, gap-01 R2 fix). task544 then damps
+        // Tasker task535: lux_alpha is NOT clamped to [0,1] (D-010(a), gap-01 R2 fix). task544 then damps
         // it ×luxAlphaDamp (0.1 when proximity is near) before the EMA + downstream consumers.
         val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta)) * luxAlphaDamp
         val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
@@ -168,7 +168,7 @@ class BrightnessEngine {
     }
 
     fun mapLuxToBrightness(smoothedLux: Double, cfg: BrightnessCurveConfig): Double {
-        // Tasker task661: NO coerceAtLeast on ^0.33 bases, NO clamp to [min,max] here (D-010b, gap-03 R2 fix)
+        // Tasker task661: NO coerceAtLeast on ^0.33 bases, NO clamp to [min,max] here (D-010(b), gap-03 R2 fix)
         return when {
             smoothedLux < cfg.zone1End -> cfg.form1A * sqrt(smoothedLux)
             smoothedLux < cfg.zone2End -> cfg.form2A + cfg.form2B * (

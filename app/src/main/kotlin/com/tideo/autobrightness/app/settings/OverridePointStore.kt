@@ -34,7 +34,7 @@ data class OverridePoints(val points: List<OverridePointRecord> = emptyList()) {
 /**
  * DataStore serializer for the recorded override points. Survives service/process restarts so the
  * Tools curve-suggestion wizard and the brightness-curve overlay (G2R-F13/F14) have real input,
- * instead of always starting from an empty set (the D-044c gap).
+ * instead of always starting from an empty set (the D-044(c) gap).
  */
 object OverridePointsSerializer : Serializer<OverridePoints> {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

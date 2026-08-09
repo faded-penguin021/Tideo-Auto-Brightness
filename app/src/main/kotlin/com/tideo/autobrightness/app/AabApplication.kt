@@ -29,7 +29,7 @@ class AabApplication : Application() {
  * Installs [CrashLogHandler] as the default uncaught-exception handler, chaining to whatever handler
  * was previously registered (on Android that is the platform killer that ends the process).
  *
- * **Idempotent (glue-review, D-034c):** a process that somehow runs this twice will not stack a
+ * **Idempotent (glue-review, D-034(c)):** a process that somehow runs this twice will not stack a
  * second [CrashLogHandler] onto the first (which would write the same trace twice and re-invoke the
  * killer twice) — if the current default is already ours we leave it in place. A fresh process
  * (the only case that matters after a crash) starts with the platform handler and gets wrapped once.
@@ -63,7 +63,7 @@ internal class CrashLogHandler(
 /**
  * On-disk ring of the [KEEP] newest uncaught-exception traces under a single directory (D-158).
  * All state is the directory itself — nothing is assumed to survive process death (glue-review,
- * D-034c), so a trace written by the dying process is read back by the fresh one after restart.
+ * D-034(c)), so a trace written by the dying process is read back by the fresh one after restart.
  * Timestamped filenames (`crash-<epochMillis>.txt`) sort chronologically as plain strings.
  */
 class CrashLogStore(

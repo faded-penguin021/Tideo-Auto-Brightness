@@ -57,6 +57,11 @@ session while drifting against every upstream release.
 - **`doc-facts.sh`** — one machine anchor per load-bearing prose claim that has *already* drifted
   in a shipped commit. The incident-only bar is binding (DA-015): this is not a doc-testing
   framework, and a fact proposed without a named drift commit was reviewed out once already.
+  Three anchors today: the Shizuku runtime-site count (`d66de4c`), the parenthesised sub-item
+  citation form (`3949383` — the whole-word matcher makes the bare-suffixed form resolve to
+  nothing, so the shipped citation rung stays green while a row loses its pointer, DB-022), and
+  the constitution's AMH version against `AMH_VERSION` (DB-019, where the two drifted apart
+  because the constitution carried no number to compare).
 - **`staged-secrets.sh`** — the shipped scan reads the working tree, which misses a secret that
   was staged and then edited out of the file on disk. The index is what `git commit` records.
 - **`ledger-prefix.sh`** — the shipped citation guard pools every volume and asks only whether an
@@ -64,7 +69,7 @@ session while drifting against every upstream release.
   Here the naming is the rule, so a `DB-` row misfiled into `LEDGER_A.md` resolves cleanly and
   passes upstream.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 19 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 24 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.

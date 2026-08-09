@@ -339,7 +339,7 @@ internal class PipelineCycleRunner(
         // the high-priority notification + toast (G2R-F35).
         ctx.update { it.copy(paused = true, pausedByOverride = true, overrideHistory = history) }
         // Persist the captured training point (newest first) so the wizard + curve overlay have real
-        // input across restarts (G2R-F13; closes D-044c).
+        // input across restarts (G2R-F13; closes D-044(c)).
         history.firstOrNull()?.let { (lux, bright) -> overrideSink.record(lux, bright) }
     }
 

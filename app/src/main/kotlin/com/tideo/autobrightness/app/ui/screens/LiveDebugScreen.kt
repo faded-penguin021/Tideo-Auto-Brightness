@@ -282,7 +282,7 @@ fun DebugLevelSelector(current: Int, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val debugLabels = stringArrayResource(R.array.debug_labels)
     // Anchor the menu to the button (Box wrapper) — a bare DropdownMenu sibling has no anchor and
-    // floats away from its trigger (D-114b, same fix as the rule-editor profile selector).
+    // floats away from its trigger (D-114(b), same fix as the rule-editor profile selector).
     Box {
         OutlinedButton(
             onClick = { expanded = true },

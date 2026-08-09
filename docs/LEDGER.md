@@ -485,7 +485,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   surface the DetectOverrides toggle so this is verifiable at Gate 2.
   (Affects S11, S12, Gate 2.)
 
-- D-042: S10 CONTEXT-OVERRIDE decisions (sanctioned by the S10 brief + extraction; flagged for S12/S14).
+- D-042 [cited]: S10 CONTEXT-OVERRIDE decisions (sanctioned by the S10 brief + extraction; flagged for S12/S14).
   (a) **Override = whole-profile swap, NOT scale/min/max.** The S10 brief's parenthetical "(scale/min/
   max/disable per spec)" predates the S2 correction; contexts_spec §4 (authoritative) + D-014 say
   `_ProfileManager LOAD_FILE` replaces the entire curve/threshold/anim/dynamic/dimming parameter set.
@@ -519,7 +519,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   always evaluates once regardless of clock value (the 0-init would have blocked the seed eval when
   clock≈0; harmless in prod but a real edge). (Affects S12, S14.)
 
-- D-043: S11 UI-SHELL decisions (sanctioned by the S11 brief; flagged for S12/S13/S14).
+- D-043 [cited]: S11 UI-SHELL decisions (sanctioned by the S11 brief; flagged for S12/S13/S14).
   (a) **Shizuku grant exec closed via a bound user service, NOT reflection (D-032 closed).** The
   owner reported `Shizuku.newProcess`-style reflection being fragile in Tasker-factory apps, so the
   documented user-service pattern was implemented: AIDL `IShizukuUserService` (`destroy()=16777114`,
@@ -562,7 +562,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   Done button reads "Skip for now" until BASIC is granted. First-run routing: NavGraph starts on
   Onboarding when tier==NONE. (Affects S12, S13, S14.)
 
-- D-044: S12 SETTINGS/TOOLS SCREENS + CHART ENGINE decisions (sanctioned by the S12 brief; flagged
+- D-044 [cited]: S12 SETTINGS/TOOLS SCREENS + CHART ENGINE decisions (sanctioned by the S12 brief; flagged
   for S13/S14/Gate 2).
   (a) **Step-0 triage method (D-027f).** Rather than rewrite 168 doc rows inline, an "S12 Step-0
   triage" section was APPENDED to `anonymous_handlers.md` committing every row to a bucket: (a)

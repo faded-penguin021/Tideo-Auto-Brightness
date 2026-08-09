@@ -98,10 +98,21 @@ expect_fail "an unreadable versionCode fails rather than passing vacuously" "che
 # =============================================================================
 printf '· doc-facts\n'
 
+# A tree the guard's OTHER rows pass on, so each case isolates one fact. The version pair and
+# the citation scan scope are seeded clean here and perturbed by the cases that test them.
+doc_facts_baseline() { # <dir>
+	local d=$SANDBOX/$1
+	mkdir -p "$d"
+	printf 'AMH_VERSION=4.1.0\n' >"$d/amh.conf"
+	printf 'This constitution records **AMH 4.1.0**; `AMH_VERSION` in `amh.conf` is the authority.\n' \
+		>"$d/AGENTS.md"
+}
+
 shizuku_tree() { # <dir> <consumer-count>
 	local d=$SANDBOX/$1 i=0
 	rm -rf "$d"
 	mkdir -p "$d/platform/src/main" "$d/app/src/main"
+	doc_facts_baseline "$1"
 	printf 'object ShizukuShell { fun exec() {} }\n' >"$d/platform/src/main/ShizukuShell.kt"
 	while [ "$i" -lt "$2" ]; do
 		printf 'val x = ShizukuShell.exec()\n' >"$d/app/src/main/Consumer$i.kt"
@@ -126,6 +137,39 @@ expect_fail "dropping to one consumer fails too — drift is bidirectional" "doc
 shizuku_tree df-zero 0
 run_guard df-zero doc-facts
 expect_fail "the definition file alone is zero consumers, not one" "0 file(s)"
+
+# Sub-item citation form (DB-022). The bare-suffixed spelling resolves to no ledger row under
+# the whole-word matcher, so the shipped citation rung cannot see it — only this guard can.
+shizuku_tree df-cite-ok 2
+printf '// parity note, see D-042(c) and D-010(a)/(b)\n' >"$SANDBOX/df-cite-ok/app/src/main/Cite.kt"
+run_guard df-cite-ok doc-facts
+expect_pass "parenthesised sub-item citations pass"
+
+shizuku_tree df-cite-bad 2
+printf '// parity note, see D-042c\n' >"$SANDBOX/df-cite-bad/app/src/main/Cite.kt"
+run_guard df-cite-bad doc-facts
+expect_fail "a bare-suffixed sub-item citation fails" "Cite.kt"
+
+# The exclusions must hold, or the guard fires on the synthetic ids its own sibling suites use.
+shizuku_tree df-cite-excluded 2
+mkdir -p "$SANDBOX/df-cite-excluded/scripts/tests"
+printf '// fixture id D-999z\n' >"$SANDBOX/df-cite-excluded/scripts/tests/fixtures.sh"
+printf '// fixture id D-998y\n' >"$SANDBOX/df-cite-excluded/scripts/test-ladder-guards.sh"
+run_guard df-cite-excluded doc-facts
+expect_pass "synthetic ids in the excluded fixture paths are not citations"
+
+# Version pair (DB-019). amh.conf is the authority; the constitution must state the same number.
+shizuku_tree df-ver-drift 2
+printf 'AMH_VERSION=4.2.0\n' >"$SANDBOX/df-ver-drift/amh.conf"
+run_guard df-ver-drift doc-facts
+expect_fail "a constitution version behind amh.conf fails" "records AMH 4.1.0 but amh.conf sets AMH_VERSION=4.2.0"
+
+# The absent-version case is the one that actually happened (DB-019): amh.conf said 3.0.0 and
+# the constitution named no version at all, so nothing could be compared.
+shizuku_tree df-ver-absent 2
+printf '`AMH_VERSION` in `amh.conf` is the authority on which release.\n' >"$SANDBOX/df-ver-absent/AGENTS.md"
+run_guard df-ver-absent doc-facts
+expect_fail "a constitution stating no version fails rather than passing vacuously" "states no"
 
 # =============================================================================
 printf '· ledger-prefix\n'

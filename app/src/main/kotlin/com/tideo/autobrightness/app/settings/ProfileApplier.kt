@@ -33,7 +33,7 @@ class ProfileApplier(
      * detection off (G2-F8) nor change the selected debug category (G2R-F9).
      *
      * A manual profile load also latches the **manual context lock** `%AAB_ContextOverride=true`
-     * (G2R-F30, D-014/D-038a) so the context watchers stop overriding the user's deliberate choice; the
+     * (G2R-F30, D-014/D-038(a)) so the context watchers stop overriding the user's deliberate choice; the
      * Profiles screen surfaces a "Resume" affordance ([resumeContextAutomation]) to clear it. An
      * unknown name is a no-op (external callers may send an arbitrary string).
      */

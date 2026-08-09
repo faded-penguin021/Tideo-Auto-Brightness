@@ -88,7 +88,7 @@ internal fun fmtPercent(value: Double?): String =
 
 /**
  * Format the smoothing alpha for DISPLAY, clamped to ≥ 0 (G2R-F86). The engine value is intentionally
- * left unclamped (Tasker task535 parity, D-010a — `domain/` untouched); a brief transient can compute a
+ * left unclamped (Tasker task535 parity, D-010(a) — `domain/` untouched); a brief transient can compute a
  * small negative `1 - exp(-Δ·effectiveDelta)` which is meaningless to show, so only the readout floors.
  */
 internal fun fmtAlpha(value: Double?): String = fmt(value?.coerceAtLeast(0.0), 3)

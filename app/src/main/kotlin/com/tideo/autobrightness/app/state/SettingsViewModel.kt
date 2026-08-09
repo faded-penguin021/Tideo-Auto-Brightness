@@ -30,12 +30,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Single ViewModel backing every S12 parameter screen (Curve & Brightness, Reactivity, Animation &
- * Dimming, Dynamic Scale). The DataStore is the source of truth (G1-F3 / D-043c pattern): edits
+ * Dimming, Dynamic Scale). The DataStore is the source of truth (G1-F3 / D-043(c) pattern): edits
  * persist immediately and flow back, so the notification, QS tile and other screens stay coherent.
  *
  * Validation is advisory and Tasker-faithful: [SettingsValidator] (task583/707) reddens fields but
  * never blocks the write — exactly like the Tasker scenes (the anonymous-handler triage maps the
- * 583/707 `_RedInvalidFormulae` rows here, D-027f bucket (c)).
+ * 583/707 `_RedInvalidFormulae` rows here, D-027(f) bucket (c)).
  */
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application

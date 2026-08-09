@@ -46,7 +46,7 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
         .map { it.byPriority() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Saved profile names a rule can switch to (built-ins + user profiles, G2R-F15/D-042c). */
+    /** Saved profile names a rule can switch to (built-ins + user profiles, G2R-F15/D-042(c)). */
     val profileNames: StateFlow<List<String>> = userProfiles.profilesFlow()
         .map { profiles -> profiles.map { it.name } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

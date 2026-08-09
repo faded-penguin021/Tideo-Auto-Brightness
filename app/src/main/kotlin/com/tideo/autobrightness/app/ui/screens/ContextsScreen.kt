@@ -369,7 +369,7 @@ internal fun RuleEditor(
             )
 
             Text(stringResource(R.string.contexts_switch_profile), style = MaterialTheme.typography.labelMedium)
-            // D-114b: emphasise the selected profile — gold + titleSmall (matching the rule card's
+            // D-114(b): emphasise the selected profile — gold + titleSmall (matching the rule card's
             // "Loads <profile>") with a dropdown caret, so the chosen target stands out in the editor.
             // The DropdownMenu MUST be wrapped in a Box with its anchor button (like ProfileCard's
             // overflow): a bare DropdownMenu sibling in the scrolling Column has no anchor and floats

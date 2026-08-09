@@ -107,6 +107,15 @@ live volume is `LEDGER_B.md`.
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
 
+- 2026-08-09 — **AMH 4.1.0 upgrade audited; the dropped citation markers restored (DB-022).**
+  The shipped scripts, `amh.conf` keys and version records all check out against the release. One
+  correction: the 4.0.0 whole-word matcher stopped resolving `D-042c`-style sub-item citations, and
+  the upgrade answered by deleting three `[cited]` markers. The 25 lettered citations are now
+  written `D-042(c)` and the markers are back. `doc-facts.sh` gained two anchors — the suffixed
+  form, which no shipped rung can see, and the constitution's AMH version against `AMH_VERSION`
+  (the DB-019 drift) — with five new fixture cases (19 → 24). Also folded in the 4.x seed prose
+  on `LEDGER_ROW_CHAR_CAP` that the live volume's header was missing.
+
 - 2026-08-07 — **Release-preflight AMH false positive fixed (DB-021).** Replaced the
   exclusion-based "ships app code" fallback with explicit shipping/non-shipping classes and a
   fail-closed unknown class, so this harness-only train no longer demands a fake version bump.

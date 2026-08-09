@@ -3,12 +3,13 @@
 A native Kotlin/Compose Android app: a feature-parity rebuild of the Tasker project
 `Advanced_Auto_Brightness_V3.3`, shipped at v1.0.0. Work now is maintenance.
 
-Maintenance runs on the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH);
+Maintenance runs on the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
 This constitution records **AMH 4.1.0**; `AMH_VERSION` in `amh.conf` is the authority on which
-release. **`docs/HARNESS_LOCAL.md` is the
-harness's own documentation** — which scripts are upstream's and unfixable locally, what each
-repo-local guard does, every `amh.conf` value that differs from stock. Read it before changing
-anything under `scripts/`.
+release, and the two are moved together — `scripts/guards/doc-facts.sh` fails when they drift.
+**`docs/HARNESS_LOCAL.md` is the harness's own
+documentation** — which scripts are upstream's and unfixable locally, what each repo-local guard
+does, every `amh.conf` value that differs from stock. Read it before changing anything under
+`scripts/`.
 
 > **Ground truth: code + the golden test vectors.** Every document here describes the app
 > as-built and may drift. When a doc conflicts with the code, trust the code and fix the doc.
@@ -54,7 +55,11 @@ the point is that a bug found by one session teaches a different agent nine sess
 Two mechanical contracts the ladder enforces, so get them right rather than discovering them:
 a row header must read ``- D-NNN[ [cited]]: …`` — any other shape is invisible to every parser in
 the tree (DB-015) — and a row cited from code carries `[cited]`, which you write and the ladder
-checks both ways.
+checks both ways. The ladder matches a citation as a **whole word**, so a sub-item is cited as
+`D-042(c)` — parenthesised, never a bare letter appended to the number. A bare-suffixed id
+resolves to nothing, so the ladder reports the row's marker as stale and the tempting fix is to
+delete a marker code still depends on (DB-022). `scripts/guards/doc-facts.sh` fails on the
+suffixed form, and on this file's AMH version drifting from `AMH_VERSION`.
 
 ## Architecture
 

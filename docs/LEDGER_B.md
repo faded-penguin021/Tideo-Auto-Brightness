@@ -8,6 +8,13 @@
 > vectors are ground truth; if an entry conflicts with current code, trust the code and correct the
 > entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
+> **Keep new rows concise and at or below `LEDGER_ROW_CHAR_CAP`** — **750 bytes** here
+> (`LEDGER_ROW_CHAR_CAP` in `amh.conf`; keep this number, `amh.conf` and `docs/HARNESS_LOCAL.md`
+> in lockstep). Counted with `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
+> byte per character and non-ASCII UTF-8 is charged by encoded bytes. Capture the durable lesson,
+> not the whole debugging narrative — the narrative stays in the commit and its PR body, because
+> git history is the archive and `docs/history/` is frozen (DB-010). Rows already present at HEAD
+> are historical and exempt.
 >
 > **File cap & rollover.** THIS FILE holds at most **1000 lines**
 > (`LEDGER_LINE_CAP` in `amh.conf` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
@@ -385,7 +392,7 @@
   "is it stated elsewhere?" check and failed a "would a session do the wrong thing?" check. The
   first is the test an author can run; only a fresh reader can run the second.
 
-- DB-019: **An AMH upgrade has three independent version surfaces, and prose authority is not a
+- DB-019 [cited]: **An AMH upgrade has three independent version surfaces, and prose authority is not a
   substitute for the value.** At the 3.0.0 → 4.1.0 upgrade, `amh.conf` correctly named 3.0.0 and
   `docs/STATE.md` agreed, but the constitution only said that `amh.conf` was authoritative; it did
   not record a numeric version despite the upstream upgrade contract requiring one. The scripts
@@ -394,6 +401,8 @@
   version line, and STATE's working record. The release-template key diff is a separate required
   check: it exposed the deliberately unset `LEDGER_ROW_CHAR_CAP`, which remains on the shipped
   script's 2000-byte default rather than pretending every declared key was locally configured.
+  **Correction pointer (DB-022):** the same upgrade commit also removed three `[cited]` markers
+  this row does not mention; the version pair is now anchored in `scripts/guards/doc-facts.sh`.
 
 - DB-020: **The owner set `LEDGER_ROW_CHAR_CAP=750`, superseding DB-019's use of the shipped
   2000-byte default.** The smaller bound is deliberate: a ledger row should preserve one durable
@@ -407,3 +416,12 @@
   closed on unknown paths. Rename folding is disabled so both endpoints are classified. Prose only:
   if the build later consumes a known non-shipping path, reclassify it in the introducing PR.
   `[cited]`: `.github/workflows/release-preflight.yml`.
+
+- DB-022 [cited]: **When a guard stops seeing a true fact, change the fact's spelling, never the
+  record.** AMH 4.0.0 matches citations with `grep -w`, so the bare-suffixed form 25 comments
+  used for a lettered sub-item stopped resolving. Three of the ten parent rows were cited ONLY
+  that way, went stale, and upgrade commit `3949383` dropped their `[cited]` markers — deleting
+  the warning the marker exists to give, while code still depended on the rows. The other seven
+  survived only because a bare cite sat elsewhere. Sub-items are now `D-042(c)`, matched as a
+  whole word. `doc-facts.sh` fails the suffixed form, which no shipped rung can see. Supersedes
+  that commit's removal; DB-019 does not record it.

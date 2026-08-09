@@ -59,7 +59,7 @@ object TaskerReference {
 
     // ---- task535 "Lux Smoothing (Java)" --------------------------------------------------
     // Java L15205-L15248. %vars: %par1(raw lux), %par2(prev smoothed), %AAB_ThreshDynamic(percent),
-    // %AAB_DeltaFactor, %AAB_Zone1End. NOTE: lux_alpha is NOT clamped to [0,1] (D-010a).
+    // %AAB_DeltaFactor, %AAB_Zone1End. NOTE: lux_alpha is NOT clamped to [0,1] (D-010(a)).
     data class SmoothingResult(
         val smoothedLux: Double,
         val luxAlpha: Double,
@@ -175,7 +175,7 @@ object TaskerReference {
     // ---- task661 "Map Lux to Brightness (Java) V2" — mapping maths (code-547) -------------
     // act4/6/8 (L33732/L33865/L33878), DoMaths. Condition uses %smoothed_lux; formula uses %par1;
     // in the pipeline smoothed_lux == par1, so a single `lux` argument is faithful.
-    // NO coerceAtLeast on the ^0.33 bases, NO clamp to [min,max] here (D-010b). Form2D ≡ Zone1End.
+    // NO coerceAtLeast on the ^0.33 bases, NO clamp to [min,max] here (D-010(b)). Form2D ≡ Zone1End.
     //
     //   lux < zone1End : form1a * sqrt(lux)
     //   lux < zone2End : form2a + form2b * ( (lux-form2c)^0.33 - (form2d-form2c)^0.33 )

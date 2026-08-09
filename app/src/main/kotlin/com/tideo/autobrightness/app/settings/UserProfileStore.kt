@@ -92,7 +92,7 @@ object SavedProfilesSerializer : Serializer<SavedProfiles> {
  * Persistence + CRUD for user-editable named profiles (S12.6d, G2R-F15; owner-decision 3). The five
  * [DefaultProfiles] are seeded once (then overwritable); "Restore factory profiles" re-seeds them.
  * [AppProfileCatalog] reads this store so context rules can target user profiles too (closes the
- * D-042c "unknown rule.profile → null" gap).
+ * D-042(c) "unknown rule.profile → null" gap).
  *
  * The global preferences (serviceEnabled / contextOverride / detectOverrides / debugLevel) are NOT a
  * profile's concern — they are preserved by the apply path (SettingsViewModel.applyProfile), never by

@@ -152,7 +152,7 @@ class SettingsScreensTest {
     @Test
     fun misc_negativeLuxAlpha_isClampedToZeroInDisplay_G2RF86() {
         // G2R-F86: a transient negative smoothing alpha shows as "0.000" (display clamp only; the
-        // engine value is intentionally left unclamped for parity, D-010a).
+        // engine value is intentionally left unclamped for parity, D-010(a)).
         val seeded = PipelineState(throttleMs = 1310L, luxAlpha = -0.42)
         compose.setContent {
             MaterialTheme {

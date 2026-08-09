@@ -137,7 +137,7 @@ class ContextEngine(
      * Republish the live settings and honor the manual context lock (settings Apply / profile load,
      * G2R-F11/F12). Post-D-170 the live store IS the effective settings, so an edit needs no re-merge
      * — this refreshes [effectiveFlow] for its collectors (DisplayTogglesCoordinator, panic) and,
-     * when `%AAB_ContextOverride` is latched (a manual profile load, G2R-F30, D-014/D-038a), drops
+     * when `%AAB_ContextOverride` is latched (a manual profile load, G2R-F30, D-014/D-038(a)), drops
      * any still-active context: the user's choice is authoritative and the watchers stay suppressed
      * until a "Resume" clears the latch. The service calls this before
      * [BrightnessPipelineController.reapply].

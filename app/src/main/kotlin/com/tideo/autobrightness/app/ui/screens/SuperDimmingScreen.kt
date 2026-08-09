@@ -163,7 +163,7 @@ fun SuperDimmingContent(
                     }
                 }
                 // Labels + verbatim long-press help from extraction/scenes/superdimming_settings.md (S12.6e).
-                // task509/511 _DimmingUIToggle — ELEVATED-gated (secure reduce_bright_colors path, D-040a).
+                // task509/511 _DimmingUIToggle — ELEVATED-gated (secure reduce_bright_colors path, D-040(a)).
                 // Mutually exclusive with PWM/software dimming (G2-F10): enabling super dimming disables PWM.
                 SwitchSettingRow(
                     stringResource(R.string.sd_use_super), draft.dimmingEnabled,
