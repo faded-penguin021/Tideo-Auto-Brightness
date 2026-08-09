@@ -1,7 +1,7 @@
 # HARNESS_LOCAL — what this repo adds on top of stock AMH
 
 This repository runs the **Agentic Maintenance Harness**
-([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v4.1.0**
+([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v4.2.0**
 under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.
@@ -74,6 +74,23 @@ Nothing upstream knows these guards exist, so without it their failure paths nev
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
 
+**A repo-local guard's exit code is an interface, not just pass/fail (AMH 4.2.0, DB-023).**
+Three verdicts: exit 0 passes, exit 2 whose *merged* output begins `WARN ` warns without turning
+the ladder red, and every other non-zero fails. The marker is mandatory because bash exits 2 on
+a syntax error — and `grep` and `diff` exit 2 on trouble — so an unmarked exit 2 is read as a
+broken guard rather than a mild opinion. The contract is the **ladder's**: a workflow or script
+calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
+`scripts/guards/*.sh` outside `scripts/ladder.sh`.
+
+**All four of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
+secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
+— for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
+`doc-facts.sh` is the interesting one: its anchors are deliberate approximations and *can* fire on
+a true claim (a fifth file naming `ShizukuShell` without being a runtime dependency site, per that
+guard's own header). It stays fail-closed anyway, because reconciling the prose against the code
+is the work the anchor exists to force. Choose the tier when you add a guard, and say here which
+you chose and why.
+
 ## Every `amh.conf` value that differs from stock
 
 | Key | Ours | Why |
@@ -86,7 +103,7 @@ exactly one case turns red.
 | `STATE_REQUIRED_SECTIONS` | `+ ## Decided non-items` | Where declined work is recorded; losing it invites re-litigating settled questions (D-162, DA-021). |
 | `POISON_TOKENS` | `+ [no ci] [skip actions] [actions skip]` | D-115: `release-preflight.yml` enforces this wider set at PR time; the two must agree. |
 | `CITATION_SCAN_PATHS` | `+ scripts` | The repo-local guards and `verify.sh` depend on ledger rows exactly as the Kotlin does. Safe because the shipped scripts name upstream's rows as `AMH ledger row D004` — a form the guard does not read as a citation. |
-| `CITATION_EXCLUDE` | the two test paths | Their fixtures carry synthetic IDs by design. Scanning `scripts/` is safe by construction, not by luck: **upstream never writes a bare `D-NNN` in a shipped script** — it spells its own rows `AMH ledger row D004` precisely so an adopter's citation guard cannot resolve them (confirmed by the AMH maintainer, 2026-08-03). No upgrade check needed. |
+| `CITATION_EXCLUDE` | the two test paths | Their fixtures carry synthetic IDs by design. Scanning `scripts/` is safe by construction, not by luck: **upstream never writes a bare `D-NNN` in a shipped script** — it spells its own rows `AMH ledger row D004` precisely so an adopter's citation guard cannot resolve them (confirmed by the AMH maintainer, 2026-08-03; since 4.2.0 a guard in AMH's own repository fails if that ever stops being true, so the guarantee is enforced rather than promised). No upgrade check needed. Dropping the key would pull the shipped fixture suite's synthetic IDs into scope and report them as unresolved in a file we may never edit. |
 | `AUTHOR_EMAIL_ALLOW` | three no-reply aliases | The owner's forge alias, GitHub's web-UI committer, and the agent's. States which identities are expected; no regex can tell a personal address from a work one. |
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
 | `REQUIRED_TOOLS` | `bash git java` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. The session banner reports availability; nothing consumes the states. |

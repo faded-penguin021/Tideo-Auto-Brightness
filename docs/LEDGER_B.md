@@ -425,3 +425,12 @@
   survived only because a bare cite sat elsewhere. Sub-items are now `D-042(c)`, matched as a
   whole word. `doc-facts.sh` fails the suffixed form, which no shipped rung can see. Supersedes
   that commit's removal; DB-019 does not record it.
+
+- DB-023: **A repo-local guard's exit code became an interface, and the safe default is still to
+  fail closed.** AMH 4.2.0 gives `scripts/guards/*.sh` three verdicts: 0 passes, 2 with merged
+  output starting `WARN ` warns without turning the ladder red, anything else fails. The marker
+  is required because bash exits 2 on a syntax error and `grep`/`diff` on trouble, so an unmarked
+  2 stays a failure rather than a downgraded opinion. Reclassification is mechanical —
+  exit code plus prefix, never intent — so the upgrade check is `grep -rn 'exit 2' scripts/guards/`;
+  ours matched nothing and no verdict moved. All four stay fail-closed: the warn tier is for a rule
+  with unenumerated legitimate exceptions, and none of ours has any.

@@ -1035,7 +1035,21 @@ guard_repo_local() {
 		skip "scripts/guards (directory absent) — 0 repo-local guard(s) ran"
 		return
 	fi
-	local g ran=0 seen=0
+	# Three verdicts, not two. A repo-local guard exits 0 for pass and non-zero for fail, with
+	# ONE exception: exit 2 whose output begins `WARN ` is a warning — it prints through the
+	# ladder's own warn channel, lands in the warning count and the verdict line, and does not
+	# turn the ladder red. That is for a rule whose violation is usually wrong but sometimes
+	# legitimately right, where failing closed would teach the adopter to delete the guard.
+	#
+	# The marker is required BECAUSE bash itself exits 2 on a syntax error. Without it, a guard
+	# that stopped parsing would be downgraded from a failure into a warning — a broken guard
+	# reporting as a mild opinion is the fail-open shape this file refuses everywhere else. A
+	# syntax error's message does not begin with `WARN `, so the unmarked exit 2 stays a failure
+	# and says why — as do `grep` and `diff`, which exit 2 on trouble, so the diagnostic names
+	# a class rather than one cause. The marker is matched against the guard's MERGED output
+	# (stdout and stderr, as everywhere else here), so a guard that prints to stdout before
+	# warning on stderr does not warn. The warn text is the first line; the rest is indented.
+	local g ran=0 seen=0 out rc
 	for g in scripts/guards/*.sh; do
 		# `-e` is false for an unmatched glob (bash leaves the pattern itself) AND for a
 		# broken symlink, so `-L` is tested too. Anything the glob matched is COUNTED and,
@@ -1050,12 +1064,35 @@ guard_repo_local() {
 			continue
 		fi
 		ran=$((ran + 1))
-		if out=$(bash "$g" 2>&1); then
+		out=$(bash "$g" 2>&1)
+		rc=$?
+		case $rc in
+		0)
 			ok "$(basename "$g")${out:+ — $out}"
-		else
+			;;
+		2)
+			case $out in
+			'WARN '*)
+				# FIRST LINE ONLY as the warn text, the rest indented like every other
+				# continuation this file prints. A guard that warns in several lines would
+				# otherwise hand raw text straight into the transcript at column zero — and
+				# the ladder's own vocabulary lives at column zero, so `   ok    ...` or a
+				# `✓ ladder green` line inside a guard's warning would render as the
+				# ladder's verdict rather than as the guard's opinion of it.
+				warn "$(basename "$g") — $(printf '%s' "${out#WARN }" | head -1)"
+				printf '%s\n' "${out#WARN }" | tail -n +2 | sed 's/^/         /'
+				;;
+			*)
+				fail "$(basename "$g") exited 2 without the leading WARN marker — read as a broken guard, not a warning (bash exits 2 on a syntax error, and grep and diff exit 2 on trouble):"
+				printf '%s\n' "$out" | sed 's/^/         /'
+				;;
+			esac
+			;;
+		*)
 			fail "$(basename "$g"):"
 			printf '%s\n' "$out" | sed 's/^/         /'
-		fi
+			;;
+		esac
 	done
 	if [ "$seen" = 0 ]; then
 		skip "scripts/guards holds no *.sh — 0 repo-local guard(s) ran"

@@ -24,14 +24,14 @@
 Native Kotlin/Compose rebuild of Tasker `Advanced_Auto_Brightness_V3.3`: `:domain` pure-JVM
 math/decisions, `:platform` Android adapters, `:app` Compose/DataStore/FGS UI/runtime. BASIC
 `WRITE_SETTINGS` provides the core pipeline; ELEVATED `WRITE_SECURE_SETTINGS` adds super dimming
-and Privileged Display. Maintenance runs on the **Agentic Maintenance Harness (AMH 4.1.0)** —
+and Privileged Display. Maintenance runs on the **Agentic Maintenance Harness (AMH 4.2.0)** —
 `AGENTS.md` + this file + `docs/RUNBOOK.md` + `docs/LEDGER*.md` + `scripts/ladder.sh`.
 
 ## Current state
 
-**Harness: AMH 4.1.0, upgraded from 3.0.0 (DB-019).** The maintenance harness this repo
-originated was spun out as [AMH](https://github.com/faded-penguin021/AMH), diverged, and has now
-been replaced by upstream's. **The five scripts under `scripts/` named in
+**Harness: AMH 4.2.0 (DB-023; converged at 3.0.0, DB-014…DB-016).** The maintenance harness this
+repo originated was spun out as [AMH](https://github.com/faded-penguin021/AMH), diverged, and has
+now been replaced by upstream's. **The five scripts under `scripts/` named in
 `scripts/MANIFEST.sha256` are upstream's byte-for-byte and hash-checked every run — never edit
 one;** changes go to `amh.conf`, `scripts/guards/*.sh` or `scripts/verify.sh`. The constitution
 is `AGENTS.md` (`CLAUDE.md` points at it; rows written before 2026-08-03 cite the old name).
@@ -106,6 +106,15 @@ live volume is `LEDGER_B.md`.
 
 One line per shipped change or completed unit (newest first). Detail lives in the cited ledger
 rows and in git history.
+
+- 2026-08-09 — **AMH upgraded 4.1.0 → 4.2.0 (DB-023).** MINOR, no binding rule changed. Copied
+  the shipped set (`ladder.sh`, `session-start.sh`, `test-ladder-guards.sh`, the manifest;
+  `command-guard.sh` and `redact.sh` unchanged upstream). Repo-local guards gained a warn tier —
+  ours all stay fail-closed, and the release's one reclassification check found nothing of ours
+  exits 2. The destructive-command advisory now rearms each session — a gap upstream found after
+  our 4.1.0 audit had passed those scripts clean, not one we recorded. No new `amh.conf` keys and
+  no seed changes; the `CITATION_EXCLUDE` guarantee
+  is now enforced by a guard in AMH's own repo rather than promised, and is recorded as such.
 
 - 2026-08-09 — **AMH 4.1.0 upgrade audited; the dropped citation markers restored (DB-022).**
   The shipped scripts, `amh.conf` keys and version records all check out against the release. One
