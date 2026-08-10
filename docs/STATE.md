@@ -3,8 +3,9 @@
 > **Length guard (DA-004 hysteresis — read before editing).** The thresholds are
 > `STATE_WARN_KB`, `STATE_COMPRESS_TO_KB` and `STATE_HARD_KB` in `amh.conf`, named here and
 > deliberately **not** restated as numbers: nothing checks this prose against the config, so a
-> copied number drifts silently the first time a threshold moves. `scripts/ladder.sh` prints the
-> soft and hard caps when it passes and the floor when it warns. Grow freely to the soft cap; no
+> copied number drifts silently the first time a threshold moves. `scripts/ladder.sh` names the
+> soft and hard caps whenever it reports the size, and the floor whenever it warns, fails, or
+> confirms a completed landing. Grow freely to the soft cap; no
 > trimming below it. When the guard warns, run ONE deep pass to the floor — never trim to just
 > under the soft cap, because a micro-trim re-arms the warning a session later and the wide band
 > IS the debounce. The floor is a **ceiling, not a target**: if the pass lands short, fold MORE
@@ -16,7 +17,11 @@
 > those four are `STATE_REQUIRED_SECTIONS` and the guard FAILS on a missing or empty one.
 > **Owner queue** is protected separately at WARN level: never delete it and never silently drop
 > items during compression — they are the owner's to close, so compress their prose rather than
-> dropping an open item.
+> dropping an open item. Separately, **no `##` heading may appear twice** — that check is asked of
+> every level-2 heading in the document, not just the configured four, because a scripted edit
+> that splices the file into itself duplicates whatever it happens to duplicate. Two copies of a
+> section are two answers to the same question, and nothing else here can see one: the caps
+> measure bytes and the landing check measures shrink, both of which a duplicate satisfies.
 >
 > The ladder also checks WHERE a pass lands, and the rule is sharper than it reads. **Any** edit
 > that takes the file from above the soft cap to at or below it must reach the floor, however
@@ -25,7 +30,21 @@
 > pass and an ordinary edit applies only while the file is **still above** the cap. Two traps
 > follow: never pad the file back up to escape that failure, and never trim a file that is
 > already under the cap — a pass that starts below it is invisible to the landing check, so
-> nothing will tell you it stopped short.
+> nothing will tell you it stopped short. The structure checks above still run at every size; it
+> is only the size guard's landing half that goes quiet. That silence is the absence of a check,
+> not a verdict that the edit was right — and **do not reach for a threshold to cover it.** It is
+> the SHRINK that is measured, never the band, and a check that read any large shrink as a
+> compression pass would fail a session for deleting one resolved Owner-queue item from a healthy
+> file, leaving padding the file back as the only way to pass.
+>
+> **That list is the whole of what these two functions check** — this file existing at all, sizes,
+> the required sections and their bodies, repeated headings, the Owner-queue heading, the landing
+> check, plus a warning if `STATE_EDIT_DELTA_BYTES` is malformed. It is a claim about
+> `guard_state_size` and `guard_state_structure` in `scripts/ladder.sh`, a file that upgrades
+> independently of this one, so treat those two functions as the authority: if a later harness
+> version adds a rung, this sentence is what goes stale, and nothing checks it against the script.
+> Everything else here — what to fold, what to move to the ledger, whether to compress at all —
+> is prose you are asked to keep, and no guard will catch you breaking it.
 
 ## Project
 
@@ -36,7 +55,7 @@ Privileged Display. Maintenance runs on the **AMH** (`amh.conf` records the vers
 
 ## Current state
 
-**Harness: AMH 5.1.0 (DB-024; converged at 3.0.0, DB-014…DB-016).** The harness this repo
+**Harness: AMH 5.2.0 (DB-027; converged at 3.0.0, DB-014…DB-016).** The harness this repo
 originated was spun out as [AMH](https://github.com/faded-penguin021/AMH) and is now replaced by
 upstream's. **The five scripts named in `scripts/MANIFEST.sha256` are upstream's byte-for-byte
 and hash-checked every run — never edit one;** changes go to `amh.conf`, `scripts/guards/*.sh` or
@@ -104,6 +123,19 @@ zero-pending; tests green; TODO/FIXME and parity gaps zero. Live ledger: `LEDGER
 ## Changelog
 
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
+
+- 2026-08-10 — **AMH upgraded 5.1.0 → 5.2.0 (DB-027).** MINOR, and no shipped script changed — the copy
+  moved only the manifest's version banner, hashes identical. The whole entry is the seed
+  length-guard preamble, hand-applied: our enumeration of what the ladder machine-checks was
+  missing the repeated-`##`-heading check, and had no statement that the list was complete. Both
+  added, scoped as a claim about `guard_state_size` and `guard_state_structure` rather than a
+  timeless one, since the script upgrades independently of this file. The sub-cap paragraph a
+  previous session had already written gained the two halves it lacked: that the structure checks
+  still run at every size, and why covering the gap with a threshold is the wrong repair. No new
+  `amh.conf` key, no verdict moved. **Not taken from the seed:** its claim that the floor is "the
+  one value a healthy tree never prints" is false — `guard_state_size` prints the floor on the `ok`
+  line confirming a completed landing. Ours states the ladder's output correctly instead; raise it
+  upstream.
 
 - 2026-08-10 — **AMH upgraded 4.2.0 → 5.1.0 (DB-024…DB-026).** The one MAJOR (5.0.0,
   `LEDGER_ROW_CHAR_CAP` default 2000 → 800) was a no-op: our 750 is set explicitly. Only

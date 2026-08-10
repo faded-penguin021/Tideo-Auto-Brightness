@@ -1,7 +1,7 @@
 # HARNESS_LOCAL — what this repo adds on top of stock AMH
 
 This repository runs the **Agentic Maintenance Harness**
-([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v5.1.0**
+([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v5.2.0**
 under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.

@@ -464,3 +464,12 @@
   to pad the file back up. Inverse trap: `ladder.sh` gates the whole check on the file at HEAD
   exceeding the cap, so a pass that STARTS below it is never landing-checked and can stop short in
   silence — as this upgrade's first pass did, at 9438 bytes against a 9216-byte floor.
+
+- DB-027: **A completeness claim about a guard is a drift class; scope it to named functions.**
+  AMH 5.2.0 closed the STATE preamble's list of machine-checked properties: a list that stops
+  without saying it is complete leaves every prose rule after it reading in the same enforced
+  voice — the shape of DB-026, where a sub-cap pass stopped short and nothing said so. Ours also
+  omitted a check it always had (repeated `##` headings). The closure is a claim about
+  `guard_state_size` and `guard_state_structure`, not a timeless "and nothing else": the script
+  upgrades independently of a seed we own forever and nothing compares the two, so the sentence
+  goes stale the first time upstream adds a rung. Named functions make that findable.
