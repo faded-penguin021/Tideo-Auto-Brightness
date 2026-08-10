@@ -140,7 +140,7 @@ mk() { # mk <name> -> prints the fixture path
 		LEDGER_DIR=docs
 		LEDGER_BASENAME=LEDGER
 		LEDGER_LINE_CAP=800
-		LEDGER_ROW_CHAR_CAP=2000
+		LEDGER_ROW_CHAR_CAP=800
 		CITATION_SCAN_PATHS='scripts'
 		CITATION_EXCLUDE=''
 		POISON_TOKENS='[skip ci]'
@@ -631,25 +631,25 @@ expect_fail "the rollover FAILURE reports the size too — that is the branch th
 
 
 d=$(mk ledger_row_char_under_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=2000/LEDGER_ROW_CHAR_CAP=120/' "$d/amh.conf"
+sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=120/' "$d/amh.conf"
 printf -- '- D-003: short enough.\n' >>"$d/docs/LEDGER.md"
 expect_pass_saying "a concise new ledger row under the byte-counted character cap passes" "$d" \
 	"checked 1 new ledger row(s) against LEDGER_ROW_CHAR_CAP=120"
 
 d=$(mk ledger_row_char_over_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=2000/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
+sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
 printf -- '- D-003: long row. %s\n' "$(filler 120)" >>"$d/docs/LEDGER.md"
 expect_fail "a new ledger row over the byte-counted character cap fails" "$d" \
 	"over LEDGER_ROW_CHAR_CAP=80"
 
 d=$(mk ledger_row_char_committed_over_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=2000/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
+sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
 printf -- '- D-003: committed long row. %s\n' "$(filler 120)" >>"$d/docs/LEDGER.md"
 (cd "$d" && git add amh.conf docs/LEDGER.md && git commit -qm long-ledger-history)
 expect_pass "an already committed over-cap ledger row is historical and exempt" "$d"
 
 d=$(mk ledger_row_char_superseded_pointer_existing)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=2000/LEDGER_ROW_CHAR_CAP=10/' "$d/amh.conf"
+sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=10/' "$d/amh.conf"
 printf -- '  Superseded by D-999.\n' >>"$d/docs/LEDGER.md"
 expect_pass "a sanctioned metadata-only supersession on an existing row is exempt" "$d"
 

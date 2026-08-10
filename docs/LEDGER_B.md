@@ -8,17 +8,22 @@
 > vectors are ground truth; if an entry conflicts with current code, trust the code and correct the
 > entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
-> **Keep new rows concise and at or below `LEDGER_ROW_CHAR_CAP`** — **750 bytes** here
-> (`LEDGER_ROW_CHAR_CAP` in `amh.conf`; keep this number, `amh.conf` and `docs/HARNESS_LOCAL.md`
-> in lockstep). Counted with `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
+> **Keep new rows concise and at or below `LEDGER_ROW_CHAR_CAP`** in `amh.conf` — the key is
+> named here and deliberately not restated as a number, because nothing checks this preamble
+> against the config and a copied number goes stale the first time the cap moves. Read it from
+> `amh.conf`; the ladder prints it only on a run that has a new row to check, so it is not a
+> substitute. Counted with `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
 > byte per character and non-ASCII UTF-8 is charged by encoded bytes. Capture the durable lesson,
-> not the whole debugging narrative — the narrative stays in the commit and its PR body, because
-> git history is the archive and `docs/history/` is frozen (DB-010). Rows already present at HEAD
-> are historical and exempt.
+> not the whole debugging narrative — the narrative stays in the commit and its PR body (which
+> survive the squash as the merged commit's message) and `docs/history/` is frozen (DB-010). But
+> the SEQUENCE of work does not survive: intermediate states inside a train are destroyed, so
+> anything a later session must be able to look up belongs in the row, not in the history around
+> it. Rows already present at HEAD are historical and exempt.
 >
-> **File cap & rollover.** THIS FILE holds at most **1000 lines**
-> (`LEDGER_LINE_CAP` in `amh.conf` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
-> may ever START past it: when this file stands at more than 1000 lines, create
+> **File cap & rollover.** THIS FILE holds at most `LEDGER_LINE_CAP` lines from `amh.conf`,
+> named rather than restated for the same reason as the row cap above; the ladder prints the
+> live count against it on every run. The FINAL row may finish past the cap, but no row
+> may ever START past it: when this file stands at more than that many lines, create
 > **`LEDGER_C.md`** with this same header discipline and start numbering at **DC-001**.
 > The suffix advances as an odometer over A–Z without limit (`_Z` → `_AA`, `_AZ` → `_BA`,
 > `_ZZ` → `_AAA`). The volumes form a chain walked from `LEDGER.md`; a volume after a missing
@@ -434,3 +439,28 @@
   exit code plus prefix, never intent — so the upgrade check is `grep -rn 'exit 2' scripts/guards/`;
   ours matched nothing and no verdict moved. All four stay fail-closed: the warn tier is for a rule
   with unenumerated legitimate exceptions, and none of ours has any.
+
+- DB-024: **An explicitly set `amh.conf` key is what turns an upstream default change into a
+  no-op.** AMH 5.0.0 dropped the shipped `LEDGER_ROW_CHAR_CAP` default 2000 → 800 and called it a
+  MAJOR; this repo absorbed it without an edit because DB-020 had already set 750 explicitly.
+  Upgrade cost lands on keys left UNSET: `ladder.sh` assigns its defaults first and sources
+  `amh.conf` after, so an omitted key silently tracks upstream. The 5.1.0 corollary: prose
+  restating a configured number is a second, unchecked copy — nothing compares preamble text to
+  `amh.conf`. The STATE and live-ledger preambles now name the key and let the ladder print the
+  live value, removing the lockstep obligation instead of restating it.
+
+- DB-025: **Deleting a lockstep obligation is only safe once the copies are actually gone.** The
+  5.1.0 prose change removed "keep in lockstep" from `amh.conf` and the ledger header and asserted
+  no prose copy of `LEDGER_LINE_CAP` remained — while `1000` still stood twice in the RUNBOOK and
+  in HARNESS_LOCAL. Nothing scans docs, so this traded a tripwire for a false all-clear: the next
+  session to move the cap would be told there was nothing else to update. De-numbering the copies
+  is what makes the claim true; where one copy must survive (HARNESS_LOCAL records what we set
+  versus stock), name it as the surviving one rather than denying it exists.
+
+- DB-026: **The STATE landing check fires on the CROSSING, not on the size of the edit.** Any edit
+  taking the file from above `STATE_WARN_KB` to at or below it must reach `STATE_COMPRESS_TO_KB`
+  — a five-byte typo fix at 14340 bytes hard-fails, and `STATE_EDIT_DELTA_BYTES` does not apply
+  because that branch is only reached while still above the cap. The escape is to fold more, never
+  to pad the file back up. Inverse trap: `ladder.sh` gates the whole check on the file at HEAD
+  exceeding the cap, so a pass that STARTS below it is never landing-checked and can stop short in
+  silence — as this upgrade's first pass did, at 9438 bytes against a 9216-byte floor.

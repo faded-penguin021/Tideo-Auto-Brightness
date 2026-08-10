@@ -4,7 +4,7 @@ A native Kotlin/Compose Android app: a feature-parity rebuild of the Tasker proj
 `Advanced_Auto_Brightness_V3.3`, shipped at v1.0.0. Work now is maintenance.
 
 Maintenance runs on the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
-This constitution records **AMH 4.2.0**; `AMH_VERSION` in `amh.conf` is the authority on which
+This constitution records **AMH 5.1.0**; `AMH_VERSION` in `amh.conf` is the authority on which
 release, and the two are moved together — `scripts/guards/doc-facts.sh` fails when they drift.
 **`docs/HARNESS_LOCAL.md` is the harness's own documentation** — which scripts are upstream's and
 unfixable locally, what each repo-local guard does and which verdict tier it uses, every
@@ -50,6 +50,19 @@ the point is that a bug found by one session teaches a different agent nine sess
 - `docs/LEDGER*.md` — **permanent, append-only.** Never compress, delete or renumber a row.
   Grep it; never read a volume whole. Append to the live volume (`LEDGER_B.md`).
 - `docs/history/` — frozen. Consult, never edit.
+
+> **Establish coverage before you report an absence.** "It does not exist" and "it never
+> happened" are claims about your search until you can say what you searched and that it could
+> have contained the thing. Before reporting one, name an artifact that could have held the
+> answer — naming the command that already failed to see it discharges nothing. The recurring
+> trap is local git state under this repo's `MERGE_MODE` (see `amh.conf`): a squash merge lands
+> an entire train of sessions as ONE commit, so every INTERMEDIATE state and every superseded
+> branch is destroyed on purpose. `git log` therefore cannot answer "was this ever tried",
+> "when did this change" or "what did that session do" — the ledger, the `docs/STATE.md`
+> changelog and `docs/history/` are what survive. Released states are a different question and
+> git still answers it: tags and `git show <tag>:<path>` are evidence, and the release playbook
+> depends on them. Nothing enforces this; no pre-execution check can see a belief formed after
+> a command returns.
 
 Two mechanical contracts the ladder enforces, so get them right rather than discovering them:
 a row header must read ``- D-NNN[ [cited]]: …`` — any other shape is invisible to every parser in
