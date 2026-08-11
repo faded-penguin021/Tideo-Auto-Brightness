@@ -12,15 +12,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
-/**
- * Parity tests for [CurveSuggestionEngine] (task38 + task655) against committed golden vectors.
- *
- * Each test case is defined in [GoldenVectorGenerator.wizardTestCases]; the golden CSV captures
- * the deterministic output of the optimization engine for each fixed input. Any change to the
- * engine that shifts a zone boundary or curve parameter will fail these tests.
- *
- * Segment: S6.
- */
+/** Parity tests for CurveSuggestionEngine (task38 + task655) against golden vectors (S6). */
 class WizardParityTest {
 
     private fun golden(name: String): Map<String, Map<String, String>> {
@@ -76,12 +68,7 @@ class WizardParityTest {
         if (mismatches.isNotEmpty()) fail("wizard diverges in ${mismatches.size} cases:\n${mismatches.joinToString("\n")}")
     }
 
-    /**
-     * Independent abort-path check (S8.5/D-037): task38 returns the "error" path (null) when the
-     * override set has fewer than 9 points after ghost injection. No golden case exercises this;
-     * 2 real points + ≤5 ghosts < 9 → null. This assertion does not depend on a production-derived
-     * golden, so it is genuine ground truth for the abort contract.
-     */
+    /** S8.5/D-037: abort when override set < 9 points after ghost injection. */
     @Test
     fun wizard_abortsBelowMinimumDataPoints() {
         val input = CurveSuggestionInput(
@@ -91,12 +78,7 @@ class WizardParityTest {
         assertNull(CurveSuggestionEngine.suggest(input), "fewer than 9 points must abort to null")
     }
 
-    /**
-     * G3-F17 (Gate 3): the default τ is the faithful task38 act2 value 0.001 (which the Java engine
-     * actually reads every real run), NOT the unreachable 4.0 Java-header fallback. Defaulting to 4.0
-     * over-damped suggestions toward the current curve ("suggestion quality is poor"). The goldens all
-     * pass τ explicitly, so they do not pin this default — this assertion does.
-     */
+    /** G3-F17: default τ=0.001 (task38 act2), not 4.0 fallback. */
     @Test
     fun wizard_defaultTauIsTheFaithfulAct2Value() {
         val input = CurveSuggestionInput(
@@ -106,22 +88,9 @@ class WizardParityTest {
         assertEquals(0.001, input.tau, "default τ must be the act2 0.001, not the 4.0 fallback")
     }
 
-    /**
-     * DA-016: the Stage 1 "Top-K Zone1End" shortlist MUST be sorted descending by score, so the
-     * best-scoring boundary candidates survive into Stage 2. The reference (task38 Java Block #1
-     * L649–667) bubbles each inserted candidate fully up into place; a mis-port that swaps only once
-     * per insert leaves candidates stranded behind the -9999 placeholders, collapsing the effective
-     * shortlist to a 1–2 candidate window and suppressing valid boundary suggestions.
-     *
-     * This asserts a structural property of the reference algorithm (monotone-nonincreasing scores),
-     * NOT a production-captured value, so it is independent ground truth — it fails on the single-swap
-     * bug and passes on the faithful full-pass bubble. The diagnostics log emits each retained slot as
-     * `  Top Cand #<i>: Z1End=<lux> (Score: <score>)`.
-     */
+    /** DA-016: Top-K Zone1End shortlist sorted descending by score (catch single-swap bubble bug). */
     @Test
     fun wizard_topKCandidatesAreSortedDescendingByScore_DA016() {
-        // A dataset that spans all five lux bins with enough points to yield several real Zone1End
-        // split candidates (N − 8 ≥ 2 ⇒ topK ≥ 2), so mis-ordering is observable.
         val overrides = listOf(
             OverridePoint(1.0, 4.0), OverridePoint(3.0, 7.0), OverridePoint(6.0, 10.0),
             OverridePoint(12.0, 16.0), OverridePoint(20.0, 24.0), OverridePoint(45.0, 38.0),

@@ -13,22 +13,8 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.fail
 
-/**
- * Differential sweep (DA-015): the production engine vs [TaskerReference] evaluated LIVE,
- * side-by-side, over a seeded pseudo-random input sweep — generated golden coverage between
- * the hand-picked grid points of the committed CSVs. Extends the live-differential precedent
- * of [CorePipelineParityTest.mapping661VsPlot663_agree] from one pairing to the core pipeline.
- *
- * DETERMINISTIC by construction: fixed [SEED], so every run evaluates the identical case set —
- * a red run is always reproducible (the repo's guards are deterministic; a flaky rung gets
- * disabled, not fixed). Honest scope: [TaskerReference] is a transcription sharing provenance
- * with the port, so agreement here rules out divergence introduced by the MODERNIZATION
- * (rounding, branch edges, zone boundaries — the D-030/D-034 bug classes), not extraction
- * error; extraction stays covered by the XML recipes + parity_gaps flow.
- *
- * A mismatch is a parity finding: triage into docs/rebuild/parity_gaps.md and re-derive from
- * the XML (D-002) — never edit the reference, never silence the case.
- */
+/** DA-015: production engine vs TaskerReference (deterministic SEED=20260722).
+ * Mismatches → docs/rebuild/parity_gaps.md; never edit reference (D-002). */
 class DifferentialSweepParityTest {
 
     private val engine = BrightnessEngine()
@@ -60,11 +46,7 @@ class DifferentialSweepParityTest {
     }
 
     private fun Random.sweepVariant(): SweepVariant {
-        // min/max brightness are INTEGRAL settings (the config holds them as Int — Android
-        // brightness); fractional values are outside the modeled input domain and produce
-        // spurious engine-vs-reference clamping diffs, not parity findings.
         val maxB = (200 + nextInt(56)).toDouble()
-        // ~10% of variants pin min == max (the minEqMaxBright golden edge).
         val minB = if (nextDouble() < 0.1) maxB else (1 + nextInt(maxB.toInt())).toDouble()
         val z1 = 30.0 + nextDouble() * 20.0
         return SweepVariant(

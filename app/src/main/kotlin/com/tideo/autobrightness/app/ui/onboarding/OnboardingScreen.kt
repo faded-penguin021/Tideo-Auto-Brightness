@@ -68,20 +68,13 @@ data class OnboardingUiState(
     val needsUsageAccess: Boolean = false,
     val usageAccessGranted: Boolean = false,
     val locationGranted: Boolean = false,
-    // G2R-F33: sideloaded installs (not from the Play Store) may hit Android's "Restricted setting"
-    // block on the WRITE_SETTINGS / accessibility toggles → show the "Allow restricted settings" hint.
+    // Sideloaded installs may hit Android's "Restricted setting" block (G2R-F33).
     val sideloaded: Boolean = false,
     val elevatedMessage: String? = null,
     val adbCommand: String = "",
 )
 
-/**
- * Privilege onboarding (task563's 8 gates + order; the polling-dialog flow itself is a sanctioned
- * deviation, D-024). Steps: POST_NOTIFICATIONS → WRITE_SETTINGS (the BASIC gate that makes the core
- * pipeline work) → optional ELEVATED (super dimming, three grant channels, skippable) → usage access
- * (only when app context-rules exist). The Activity-result launchers + privilege probing live in this
- * wrapper; [OnboardingContent] is stateless so it renders under a Robolectric compose test.
- */
+/** Privilege onboarding (task563 gates, D-024): POST_NOTIFICATIONS → WRITE_SETTINGS → ELEVATED → usage access. */
 @Composable
 fun OnboardingScreen(navController: NavHostController) {
     val context = LocalContext.current
@@ -137,7 +130,7 @@ fun OnboardingScreen(navController: NavHostController) {
 
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
-    ) { reprobe() } // ACTION_MANAGE_WRITE_SETTINGS returns no result; re-check canWrite.
+    ) { reprobe() }
 
     val usageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -149,7 +142,7 @@ fun OnboardingScreen(navController: NavHostController) {
 
     val appInfoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
-    ) { reprobe() } // App-info screen returns no result; re-check grants on return (F33).
+    ) { reprobe() }
 
     OnboardingContent(
         state = ui,
@@ -176,10 +169,8 @@ fun OnboardingScreen(navController: NavHostController) {
         onRequestShizuku = {
             ui = ui.copy(elevatedMessage = "Requesting Shizuku grant…")
             privilegeManager.requestShizukuGrant { result ->
-                // Callback may arrive off the main thread; mutating Compose state is fine here as it
-                // schedules a recomposition. reprobe() reads the refreshed tier set on success.
                 ui = ui.copy(elevatedMessage = result.toMessage())
-                reprobe()
+                reprobe() // Reads refreshed tier on success
             }
         },
         onTryRoot = {
@@ -188,8 +179,7 @@ fun OnboardingScreen(navController: NavHostController) {
             reprobe()
         },
         onRequestUsageAccess = { usageLauncher.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
-        // G2R-F57: land on the Menu hub (not a dead Dashboard); Back from the Menu exits cleanly.
-        onDone = { navController.completeOnboarding() },
+        onDone = { navController.completeOnboarding() }, // G2R-F57: land on Menu hub
     )
 }
 
@@ -217,12 +207,9 @@ fun OnboardingContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // D-131: app language picker — first thing in setup since it governs everything shown below.
-            // Not yet functional (English only); see OnboardingLanguageCard.
+            // D-131: app language picker (English only); see OnboardingLanguageCard.
             OnboardingLanguageCard()
-            // G2R-F33: sideloaded apps may see "Modify system settings" / accessibility toggles greyed
-            // out under Android's restricted-settings block; guide the one-time "Allow restricted
-            // settings" fix up front, before the grant steps that it gates.
+            // G2R-F33: show restricted settings hint if needed (sideloaded app).
             if (state.sideloaded) {
                 RestrictedSettingsCard(onOpenAppInfo)
             }
@@ -242,8 +229,7 @@ fun OnboardingContent(
                 onAction = onRequestWriteSettings,
                 testTag = "step_write_settings",
             )
-            // G2R-F41 (perm half): Location is needed for the location-based SSID fallback and for
-            // location context rules. Optional — the Shizuku/dump SSID path needs no Location at all.
+            // Location for SSID fallback + context rules; optional (G2R-F41).
             StepCard(
                 title = stringResource(R.string.onboarding_step3_title),
                 body = stringResource(R.string.onboarding_step3_body),
@@ -253,8 +239,7 @@ fun OnboardingContent(
                 testTag = "step_location",
             )
             ElevatedStepCard(state, onCopyAdb, onRequestShizuku, onTryRoot)
-            // G2R-F24: usage access is OPTIONAL by default (per D-024/task563) — always shown so it is
-            // discoverable, but only flagged as needed once a per-app context rule exists.
+            // Usage access is OPTIONAL by default (D-024/task563).
             StepCard(
                 title = if (state.needsUsageAccess) stringResource(R.string.onboarding_usage_title_needed)
                 else stringResource(R.string.onboarding_usage_title_optional),
@@ -276,13 +261,7 @@ fun OnboardingContent(
     }
 }
 
-/**
- * App-language picker (D-131), shown at the top of onboarding. Scaffolded but **not yet functional** —
- * English is the only available language, so the menu lists it alone and selecting it is a no-op. Once
- * translated `values-<lang>/` resources land (see CONTRIBUTING.md), add their display names here and wire
- * the choice to `AppCompatDelegate.setApplicationLocales(...)`. The control exists now so the surface is
- * discoverable (reachable later via Menu → Recheck Permissions) and translators can see where it appears.
- */
+/** App-language picker (D-131), not yet functional (English only). Wired when translated resources land. */
 @Composable
 private fun OnboardingLanguageCard() {
     var expanded by remember { mutableStateOf(false) }
@@ -299,7 +278,6 @@ private fun OnboardingLanguageCard() {
                     Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                 }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    // Only English for now; future translated locales are added here.
                     DropdownMenuItem(text = { Text(english) }, onClick = { expanded = false })
                 }
             }
@@ -318,9 +296,7 @@ private fun RestrictedSettingsCard(onOpenAppInfo: () -> Unit) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.onboarding_restricted_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                // G3-F13: cover Usage access too, and tell the user to tap the greyed toggle anyway
-                // (it still triggers Android's unlock prompt). Kept short — no emoji.
-                stringResource(R.string.onboarding_restricted_body),
+                stringResource(R.string.onboarding_restricted_body), // G3-F13: tap greyed toggle
                 style = MaterialTheme.typography.bodyMedium,
             )
             OutlinedButton(onClick = onOpenAppInfo, modifier = Modifier.testTag("open_app_info")) {
@@ -369,12 +345,9 @@ private fun ElevatedStepCard(
             if (state.tier == Tier.ELEVATED) {
                 Text(stringResource(R.string.onboarding_granted), color = MaterialTheme.colorScheme.tertiary)
             } else {
-                // ADB is ALWAYS offered — it is the channel that needs no companion app (the invariant
-                // the other channels layer on top of).
                 Text(stringResource(R.string.onboarding_adb_label), style = MaterialTheme.typography.labelMedium)
                 Text(state.adbCommand, style = MaterialTheme.typography.bodySmall)
-                // Shizuku, when installed-but-not-running, can't be one-tap-granted: pingBinder() fails
-                // until the user starts the Shizuku app, so prompt for that instead of hiding the path.
+                // Shizuku not running: prompt to start it before one-tap grant.
                 if (state.shizukuAvailability == ShizukuAvailability.INSTALLED_NOT_RUNNING) {
                     Text(
                         stringResource(R.string.onboarding_shizuku_prompt),
@@ -431,11 +404,7 @@ private fun hasLocationPermission(context: Context): Boolean =
     context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-/**
- * Best-effort detection of a sideloaded install (G2R-F33): an installer that is null or not a known
- * app store implies the user installed the APK directly, which is when Android's restricted-settings
- * block applies. Errs toward showing the hint (returns true on any failure) — it is purely advisory.
- */
+/** Best-effort sideload detection (G2R-F33): errs toward showing hint, purely advisory. */
 private fun isLikelySideloaded(context: Context): Boolean = try {
     val installer = context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
     installer == null || installer !in PLAY_STORE_INSTALLERS

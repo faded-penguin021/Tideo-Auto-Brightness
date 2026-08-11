@@ -3,19 +3,7 @@ package com.tideo.autobrightness.app.ui.screens
 import androidx.annotation.StringRes
 import com.tideo.autobrightness.R
 
-/**
- * Verbatim Tasker long-press help text (S12.6e, G2R-F19/F20/F21).
- *
- * Every AAB settings-scene label carries a `longclick` help task that Flashes (action code 548) an
- * explanatory string. These map each parameter to the **verbatim** Flash text — the single source of
- * truth for the parameter tooltips — surfaced via the `help=` arg of the settings field primitives.
- *
- * D-131 (i18n): the text moved to `strings.xml` (`help_*`) so it is translatable; these constants are
- * now the matching `@StringRes` ids. Do NOT paraphrase; changing a string requires re-deriving it from
- * the XML (extraction/scenes + the help task id noted on each line).
- *
- * Provenance: extraction/scenes/{reactivity,brightness,misc,superdimming}_settings.md → longclick task.
- */
+/** Tasker help text mappings (S12.6e, G2R-F19/F20/F21, D-131 i18n). Single source of truth for parameter tooltips. */
 object TaskerHelp {
     // --- Reactivity scene (extraction/scenes/reactivity_settings.md) -----------------------------
     /** task719 — %aab_threshdarkpc. */

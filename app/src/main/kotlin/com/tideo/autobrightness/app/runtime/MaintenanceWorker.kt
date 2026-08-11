@@ -7,12 +7,7 @@ import com.tideo.autobrightness.app.settings.SettingsStore
 import com.tideo.autobrightness.app.storage.serviceHealthDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 
-/**
- * Periodic safety net. Evaluation now lives entirely in the live foreground service
- * ([AmbientMonitoringService] + [BrightnessPipelineController]); this worker only re-ensures the
- * service is running (it can be killed under memory pressure) and records a health heartbeat.
- * The legacy poll-loop use case was removed in S9b.
- */
+/** Periodic safety net: re-ensure service is running, record heartbeat (S9b: poll-loop removed). */
 class MaintenanceWorker(
     appContext: Context,
     workerParams: WorkerParameters,

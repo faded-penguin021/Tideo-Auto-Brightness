@@ -18,18 +18,8 @@ import kotlin.concurrent.thread
  */
 enum class ShizukuAvailability { RUNNING, INSTALLED_NOT_RUNNING, NOT_INSTALLED }
 
-/**
- * Shizuku integration for the one-time WRITE_SECURE_SETTINGS grant (D-024: this gateway is the grant
- * channel only; after the grant the dimming path writes Settings.Secure directly, with no Shizuku
- * binder). NB (G3-F9): Shizuku has one *other*, optional runtime use elsewhere — the no-Location
- * Wi-Fi SSID strategy (`ShizukuWifiSsidStrategy` → `cmd wifi status`); that is a separate code path,
- * not this gateway, and the brightness pipeline never binds Shizuku.
- *
- * S11 completes the path S7 stubbed (D-032): request the Shizuku permission, then bind a
- * privileged [ShizukuUserService] (via [Shizuku.bindUserService]) and have it exec `pm grant`.
- * Implemented per the documented Shizuku user-service pattern (AIDL [IShizukuUserService]); we do
- * NOT reflect into hidden `Shizuku.newProcess` (owner-reported to be fragile in factory apps).
- */
+/** D-024/D-032: WRITE_SECURE_SETTINGS grant via Shizuku user service (IShizukuUserService).
+ * G3-F9: no-Location Wi-Fi SSID strategy separate (never used by brightness pipeline). */
 object ShizukuGrantGateway {
     private const val REQUEST_CODE = 1001
 
@@ -84,23 +74,15 @@ object ShizukuGrantGateway {
         false
     }
 
-    /**
-     * Requests Shizuku permission if needed, then binds the user service and grants
-     * WRITE_SECURE_SETTINGS. [onResult] is always invoked exactly once (it may arrive on a
-     * background thread — callers marshal to the UI thread themselves).
-     */
+    /** Request Shizuku permission, bind user service, grant WRITE_SECURE_SETTINGS. onResult called once. */
     fun requestGrant(context: Context, onResult: (Result) -> Unit) {
-        // DB-005: single-flight. Every request shares one REQUEST_CODE, so two overlapping flows
-        // cannot tell their results apart — the first listener to see the code consumes it and the
-        // second is left waiting on a callback that will never come. There is exactly one grant to
-        // obtain, so serialise: a second caller is told the first is still running.
+        // DB-005: single-flight (shared REQUEST_CODE, one grant to obtain).
         if (!grantInFlight.compareAndSet(false, true)) {
             onResult(Result.Failed("A Shizuku grant is already in progress"))
             return
         }
         val settled = AtomicBoolean(false)
         var promptTimer: Timer? = null
-        // Single exit for every path, so the in-flight flag and the timer are released exactly once.
         val complete: (Result) -> Unit = { result ->
             if (settled.compareAndSet(false, true)) {
                 promptTimer?.cancel()
@@ -121,8 +103,6 @@ object ShizukuGrantGateway {
         val listener = object : Shizuku.OnRequestPermissionResultListener {
             override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
                 if (requestCode != REQUEST_CODE) return
-                // Remove on ANY result for our code — leaving it registered on denial leaks the
-                // listener and re-fires it on unrelated future requests.
                 Shizuku.removeRequestPermissionResultListener(this)
                 if (grantResult == PackageManager.PERMISSION_GRANTED) {
                     bindAndGrant(context, complete)
@@ -132,9 +112,7 @@ object ShizukuGrantGateway {
             }
         }
         Shizuku.addRequestPermissionResultListener(listener)
-        // DB-005: the BIND had a timeout; the prompt did not. A user who dismisses the Shizuku
-        // dialog without answering produces no callback at all, so the listener stayed registered
-        // for the life of the process and the caller's continuation never ran. Bound the whole flow.
+        // DB-005: bound prompt timeout (dismissed dialog produces no callback).
         promptTimer = Timer("shizuku-prompt-timeout", true).apply {
             schedule(
                 object : TimerTask() {
@@ -174,7 +152,6 @@ object ShizukuGrantGateway {
         }
         connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                // Binder transactions block — run off the (likely main) callback thread.
                 thread(name = "shizuku-grant") {
                     val result = try {
                         if (binder == null || !binder.pingBinder()) {

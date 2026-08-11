@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 object AutoBrightnessRuntime {
     fun bootstrap(context: Context) {
         scheduleMaintenance(context)
-        // S12.9e: process-scoped + supervised + logged, not a detached per-call CoroutineScope.
+        // S12.9e: process-scoped + supervised.
         AppProcessScope.launch {
             val settings = SettingsStore(context.settingsDataStore).readRawSettings()
             if (settings.serviceEnabled) {
@@ -32,22 +32,10 @@ object AutoBrightnessRuntime {
     /** Resume the live pipeline from the UI (mirrors the notification's Resume action). */
     fun resume(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_RESUME)
 
-    /**
-     * Force the live pipeline to re-evaluate now (settings Apply / profile load, G2-F16). A no-op
-     * when the service is not running — the next start picks up the committed settings anyway.
-     * (The no-op is enforced SERVICE-side, D-140: startForegroundService always CREATES the service,
-     * so the fresh instance detects that no pipeline is running and stops itself.)
-     */
+    // G2-F16: force re-evaluate now; no-op when service not running (D-140).
     fun reapply(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_REAPPLY)
 
-    /**
-     * DA-018: resume context automation (the Profiles "Resume" banner / external `CONTEXTS_RESUME`).
-     * Distinct from [reapply]: the service runs a GENUINE context evaluation (`evaluate(RESUME)`) so a
-     * currently-matching rule applies now and a no-match reverts to `%AAB_ProfileUser`, THEN Set Initial
-     * Brightness — the Tasker `_ContextResume` → evaluate contexts → Set Initial Brightness flow. Plain
-     * reapply only republishes the settings, leaving the store pinned to the manually-loaded profile.
-     * Same not-running contract as reapply (validated service-side, D-140).
-     */
+    // DA-018: resume context automation (run genuine evaluation, not just reapply).
     fun resumeContext(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_RESUME_CONTEXT)
 
     /**

@@ -499,8 +499,6 @@ object CurveSuggestionEngine {
         )
     }
 
-    // ---- Private helpers (faithful ports of Java inner methods) ----------------------------
-
     private fun safePowDelta(v: Double, p: Double): Double = maxOf(v, 1e-9).pow(p)
 
     private fun getLogWeight(pt: DoubleArray): Double {

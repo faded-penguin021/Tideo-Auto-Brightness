@@ -45,74 +45,44 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 
-/**
- * Manual DI composition root for the runtime graph (rebuilt in S9b; extended in S10 with the
- * context-override engine). Composes the real S7 platform adapters + S9a pipeline + S9b super-dimming
- * layer + S10 [ContextEngine]. Replace with Hilt/Koin later without touching domain contracts.
- */
+/** Manual DI composition root for the runtime graph. */
 class AppModule(context: Context) {
     private val appContext = context.applicationContext
 
     val privilegeManager: PrivilegeManager = AndroidPrivilegeManager(appContext)
 
-    /** Persistence + CRUD for context rules (exposed for the S12 rule-editing UI). */
     val contextRuleStore: ContextRuleStore = ContextRuleStore(appContext.contextRulesDataStore)
-
-    /** Recorded manual-override training points — captured by the pipeline, read by the wizard +
-     *  curve overlay (G2R-F13/F14). */
+    // Recorded override points (G2R-F13/F14).
     val overridePointStore: OverridePointStore = OverridePointStore(appContext.overridePointsDataStore)
-
-    /** User-editable named profiles (S12.6d, G2R-F15): the Profiles screen + the context catalog. */
     val userProfileStore: UserProfileStore = UserProfileStore(appContext.userProfilesDataStore)
 
-    /**
-     * Build a fresh runtime graph for a service lifetime. The brightness writer and observer SHARE
-     * one instance so the suppress-echo marker is per-instance (D-034). The pipeline reads its
-     * settings through the [ContextEngine] so an active context override swaps the whole profile.
-     */
     fun createRuntime(scope: CoroutineScope): RuntimeGraph {
         val brightness = AndroidScreenBrightnessController(appContext)
-        // Runtime debug Flashes (the 10 %AAB_Debug categories, D-023/G2-F15) shown only when the
-        // matching debugLevel is selected; shared by the pipeline, dimming + context engine.
         val debugSink: DebugSink = ToastDebugSink(appContext)
-
-        // S12.9e: late-bound hook instead of `lateinit var controller` — the engine is constructed
-        // before the controller (the controller's settingsProvider reads through it), so the engine
-        // calls the controller through this holder, whose hook is assigned right after construction.
+        // Late-bound hook (engine constructed before controller).
         val controllerHook = ControllerHookHolder()
         val contextEngine = ContextEngine(
             rulesProvider = { contextRuleStore.rules() },
-            // React to rule add/edit/delete at runtime (a new app/location rule starts its listener
-            // immediately, not only at next screen-on/reboot).
             rulesFlow = contextRuleStore.rulesFlow(),
             settingsProvider = { appContext.settingsDataStore.data.first() },
-            // D-170 write-through: a context load writes the profile INTO the live settings store
-            // (Tasker LOAD_FILE parity — every screen shows the loaded values); the pre-override
-            // baseline is snapshotted to its own store and restored on the no-match revert.
+            // D-170: context load writes through to live settings store; baseline snapshotted and restored.
             settingsWriter = { transform -> appContext.settingsDataStore.updateData(transform) },
             baselineStore = DataStoreContextBaselineStore(appContext.contextBaselineDataStore),
             profileCatalog = AppProfileCatalog(userProfileStore),
             signalSource = AndroidContextSignalSource(appContext),
             onProfileChanged = { controllerHook.fire() },
             debugSink = debugSink,
-            // G2R-F25: toast on a runtime context-rule profile load (unconditional, not debug-gated).
             contextLoadSink = ToastContextLoadSink(appContext),
         )
 
-        // F73: real solar ramp windows for the dynamic-scale engine (today + last-known location, or
-        // the F39 fixed date/location override), so %AAB_ScaleDynamic tracks the actual sunrise.
         val experimentPrefs = ExperimentPrefsStore(appContext.experimentPrefsDataStore)
         val geoIpClient = GeoIpLocationClient()
+        // F73: real solar ramp windows. D-103: cache location for cold-start reuse. D-121: geo-IP fallback.
         val circadianWindows = CircadianWindowProvider(
             scope = scope,
             overrideFlow = experimentPrefs.dateLocation,
             location = AndroidLocationReader(appContext),
-            // F83: ipwho.is geo-IP fallback when no Android fix is available (task90 act28, HTTPS D-121).
-            // G3-F12 / D-105 (privacy): gated on the user's opt-IN (default off) — the app contacts
-            // ipwho.is only when the user has explicitly enabled the fallback.
             geoIpFallback = { if (experimentPrefs.geoIpEnabled.first()) geoIpClient.resolve() else null },
-            // D-103: persist/restore the once-a-day resolved location so a cold start reuses it
-            // instead of falling back to TimeContext defaults until re-acquired (Tasker %AAB_SunLat/…).
             loadCachedLocation = { experimentPrefs.readCachedSunLocation() },
             persistLocation = { lat, lon, day -> experimentPrefs.writeCachedSunLocation(lat, lon, day) },
             loadGeoIpAttemptDay = { experimentPrefs.readGeoIpAttemptDay() },
@@ -123,72 +93,41 @@ class AppModule(context: Context) {
             lightSensor = AndroidLightSensorSource(appContext),
             brightness = brightness,
             brightnessObserver = AndroidBrightnessObserver(appContext, brightness),
-            // Effective settings = the live store (context loads write through to it, D-170).
             settingsProvider = { contextEngine.effectiveSettings() },
             scope = scope,
             circadianWindowsProvider = circadianWindows::current,
             dimming = SuperDimmingCoordinator(
                 secureDimming = AndroidSecureDimmingController(appContext, privilegeManager),
-                // Read the CACHED tier (no IPC) each cycle. The previous `refresh()`-per-cycle ran
-                // checkSelfPermission + Settings.System.canWrite (two Binder calls) on every dimming
-                // evaluation. The cache is refreshed at the resume points instead (service start /
-                // screen-on, AmbientMonitoringService) and after an in-app grant (PrivilegeManager),
-                // so a post-start ADB/Shizuku grant is still picked up on the next wake (G1-F5 intent
-                // preserved, the per-cycle permission check dropped).
+                // DB-012: coordinator re-detects tier when dimming and caches expired (rate-limited).
                 tierProvider = { privilegeManager.currentTier() },
-                // DB-012: "the next wake" was too late in practice — a grant made over adb with the
-                // screen ON stayed invisible until a screen-off/on or an app restart, because every
-                // AppModule call site builds its OWN PrivilegeManager, so the UI's refresh cannot
-                // reach this one. The coordinator re-detects (rate-limited) only when it wanted to
-                // dim and believed it could not.
                 refreshTier = { privilegeManager.refresh() },
                 debugSink = debugSink,
             ),
             debugSink = debugSink,
-            // Persist captured override points so the wizard + curve overlay have real input (G2R-F13).
+            // G2R-F13: persist captured override points.
             overrideSink = { lux, brightness -> overridePointStore.record(lux, brightness) },
-            // prof759/task545: proximity-near damps the smoothing alpha ×0.1 (never pauses).
+            // prof759/task545: proximity damps smoothing alpha ×0.1.
             proximitySource = AndroidProximitySensorSource(appContext),
         )
-        // Wire the late-bound hook now that the controller exists (replaces the lateinit cycle).
         controllerHook.hook = controller
-        // D-110: when the circadian location resolves late (cache seed / async geo-IP or GPS fix),
-        // recompute brightness so the modifier updates even in steady light (where prof760 drops cycles
-        // and the initial brightness was set with the default windows). Wired post-construction because
-        // the provider feeds `current` into the controller above.
+        // D-110: recompute when circadian location resolves late.
         circadianWindows.onWindowsRefreshed = { controller.reapply() }
 
-        // prof769/task528 panic (D-116): armed by upside-down + display-on + proximity-NOT-near, then a
-        // %AAB_PanicSensitivity-scaled shake within 10 s → SOS + restore + full stop (F77). Sensitivity
-        // is the global pref (read per arming); proximity-near comes from the live pipeline state (the
-        // same %AAB_Proximity the ×0.1 smoothing damp uses).
+        // D-116: prof769/task528 panic (D-116); DB-009/DB-011: plugged detection.
         val panicSensor = AndroidPanicSensorSource(
             context = appContext,
             sensitivity = { (contextEngine.effectiveSnapshot ?: AabSettings()).panicSensitivity },
             isNear = { controller.state.value.proximityNear },
-            // DB-009 (%AAB_PanicPlugged): read from the same effective snapshot as the sensitivity, so
-            // a profile/context that carries the flag applies it too.
-            //
-            // DB-011: passed through NULLABLE — no `?: AabSettings()` here. Before the first context
-            // evaluation the snapshot is null, and fabricating a default silently answered "the user
-            // did not ask for plugged-only" for a user who had. The source treats null as unknown and
-            // fails closed; the service waits for a real snapshot before collecting at all.
             requiresPlugged = { contextEngine.effectiveSnapshot?.panicRequiresPlugged },
         )
 
-        // Display-toggle profile fields (D-151): applied on profile change through the context
-        // engine's effective-settings flow — its OWN collector in the service scope, never inside
-        // the pipeline cycle (the single-coroutine drop-on-reentry model is BINDING).
+        // D-151: display-toggle profile fields applied on profile change.
         val displayToggles = DisplayTogglesCoordinator(
             effectiveFlow = contextEngine.effectiveFlow,
             baselineFlow = appContext.settingsDataStore.data,
             display = AndroidSecureDisplayController(appContext, privilegeManager),
             tierProvider = { privilegeManager.currentTier() },
-            // D-154: the current circadian-ramp Kelvin — the same task90 tanh modifier that drives
-            // %AAB_ScaleDynamic, computed independently of pipeline cycles (steady light starves
-            // them, the D-110 lesson) with the pipeline's exact fallback: real solar windows when
-            // known, else the fixed TimeContext defaults (F73). Night anchor = the profile's
-            // temperature (or the AOSP default); day endpoint = the AOSP max (weakest filter).
+            // D-154: circadian-ramp Kelvin with real solar windows or TimeContext defaults (F73).
             circadianTemperature = { s ->
                 val nowSecOfDay = ((System.currentTimeMillis() / 1000L) % 86_400L).toDouble()
                 val w = circadianWindows.current(s.scaleTransitionFactor.toDouble())
@@ -219,19 +158,13 @@ class AppModule(context: Context) {
     }
 }
 
-/**
- * The composed runtime: the brightness pipeline + the context engine that feeds it + the panic
- * gesture source. The service drives both lifecycles together and reads [activeContext] for the
- * notification's context line; [panicSensor] fires the task528 panic on the prof769 gesture.
- */
+/** Composed runtime: pipeline + context engine + panic source. */
 class RuntimeGraph(
     val controller: BrightnessPipelineController,
     val contextEngine: ContextEngine,
     val panicSensor: PanicSensorSource,
-    /** Shared tier source. The service [refresh][PrivilegeManager.refresh]es it at resume points so a
-     *  post-start ADB/Shizuku grant is seen without re-checking the permission on every dimming cycle. */
     val privilegeManager: PrivilegeManager,
-    /** Display-toggle profile fields (D-151); the service drives its start/stop lifecycle. */
+    // D-151: display-toggle profile fields.
     val displayToggles: DisplayTogglesCoordinator,
 ) {
     val activeContext: StateFlow<String?> = contextEngine.activeContext

@@ -6,7 +6,7 @@ import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
 import com.tideo.autobrightness.domain.brightness.ThresholdConfig
 
-// Domain config mappings — used by S9a pipeline controller to build BrightnessPolicyInput.
+// Domain config mappings for BrightnessPolicyInput.
 
 fun AabSettings.toThresholdConfig(): ThresholdConfig = ThresholdConfig(
     threshDark = thresholdDark.toDouble(),
@@ -24,7 +24,7 @@ fun AabSettings.toAnimationConfig(): AnimationConfig = AnimationConfig(
     maxWaitMs = maxWaitMs.toLong(),
 )
 
-// Derives form2A / form3A via BrightnessFormulae for C0 continuity (D-002/D-004 chain).
+// D-002/D-004: derive form2A/form3A for C0 continuity.
 fun AabSettings.toBrightnessCurveConfig(): BrightnessCurveConfig {
     val coeffs = BrightnessFormulae.deriveContinuityCoefficients(
         form1A = form1A.toDouble(),
@@ -47,8 +47,7 @@ fun AabSettings.toBrightnessCurveConfig(): BrightnessCurveConfig {
         offset = offset.toDouble(),
         taperMidpoint = scaleTaperMidpoint.toDouble(),
         taperSteepness = scaleTaperSteepness.toDouble(),
-        // Tasker task661 act10/14 (D-036): %AAB_ScalingUse picks taper vs. linear; %AAB_Scale is
-        // the static multiplier used by the linear branch (mapped*Scale+Offset).
+        // D-036: %AAB_ScalingUse picks taper vs. linear; %AAB_Scale is linear multiplier.
         scalingUse = scalingEnabled,
         scale = scale.toDouble(),
     )
@@ -56,27 +55,19 @@ fun AabSettings.toBrightnessCurveConfig(): BrightnessCurveConfig {
 
 fun AabSettings.toDynamicScalingConfig(): DynamicScalingConfig = DynamicScalingConfig(
     enabled = scalingEnabled,
-    // SAFETY: the circadian SCALE spread must stay positive (1..100). A negative value flips the
-    // day/night curve and can drive ScaleDynamic to ≤0 → a black screen. Only the super-dimming
-    // circadian spread (dimSpreadPercent) is allowed to go negative (boost-in-daylight, D-072).
+    // D-072: scale spread must stay positive; dimSpread alone can go negative (boost-in-daylight).
     spreadPercent = scaleSpread.coerceIn(1, 100).toDouble(),
     dimSpreadPercent = dimSpread.toDouble(),
     steepness = scaleSteepness.toDouble(),
 )
 
 fun AabSettings.validate(): AabSettings {
-    // D-146: NaN passes straight through coerceIn (every comparison is false → coerceIn returns NaN),
-    // and the import parsers accept it ("NaN".toDoubleOrNull() parses) — a malformed profile file could
-    // otherwise persist NaN into the curve math. Reset a NaN field to its default before clamping.
-    // ±Infinity needs no guard: coerceIn's comparisons clamp it to the range edge.
+    // D-146: NaN → default; ±Infinity auto-clamped by coerceIn.
     fun Float.nanTo(default: Float): Float = if (isNaN()) default else this
     fun Double.nanTo(default: Double): Double = if (isNaN()) default else this
     val d = AabSettings()
 
-    // G3-F3 (Gate 3): floor is 0, not 1. The Misc slider exposes 0..75 (Tasker %AAB_MinBright range);
-    // clamping 0→1 on Apply meant committed(1) ≠ draft(0) so the screen stayed perpetually dirty and the
-    // value never stuck. Domain 0 maps to the OEM minimum (ScreenBrightnessController.toDevice coerces
-    // 0..255) — dimmest, not screen-off — so 0 is a valid brightness.
+    // G3-F3: floor is 0 (OEM minimum, dimmest not screen-off), not 1.
     val clampedMinBrightness = minBrightness.coerceIn(0, 255)
     val clampedZone1End = zone1End.coerceIn(1, 20_000)
     val clampedMinWait = minWaitMs.coerceIn(1, 5_000)
@@ -90,22 +81,12 @@ fun AabSettings.validate(): AabSettings {
         form1A = form1A.nanTo(d.form1A).coerceIn(1.0, 20.0),
         form2B = form2B.nanTo(d.form2B).coerceIn(0.1f, 30f),
         form2C = form2C.coerceIn(1, 50),
-        // DB-008 (_SaveButtonDimming A9-A12, issue #110): the SETPOINT is clamped to 65, not just the
-        // runtime product. SoftwareDimming.dimShell has always clamped strength x dimDynamic to
-        // [0, 65] (a fully dark screen locks the user out — the reason the panic gesture exists), but
-        // the stored setpoint kept whatever was typed, so the UI showed 100 while the screen dimmed to
-        // 65. The value on screen has to be the value in effect; clamping here makes every write path
-        // agree (draft Apply, import, legacy config, external profile) instead of only the save button
-        // Tasker patched. Typing above 65 is still allowed — it is corrected on save, as in Tasker.
+        // DB-008 (issue #110): clamp SETPOINT to 65 (runtime always clamped; UI/persistence must agree).
         dimmingStrength = dimmingStrength.coerceIn(0, MAX_DIMMING_STRENGTH_SETPOINT),
         dimmingExponent = dimmingExponent.nanTo(d.dimmingExponent).coerceIn(0.5f, 5f),
-        // The dimming threshold is a BRIGHTNESS level (super-dimming engages when target < threshold),
-        // so it spans the full brightness domain 0..255 like min/maxBrightness — not 0..100. The Tasker
-        // field (superdimming_settings.md elements36) is an uncapped numeric; the old 0..100 clamp was a
-        // rebuild artifact that prevented engaging dimming above brightness 100 (owner finding).
+        // Dimming threshold is brightness level (0..255), not percentage (old 0..100 was rebuild artifact).
         dimmingThreshold = dimmingThreshold.coerceIn(0, 255),
-        // S12.9c #6: dimSpread is signed (−100..100). The old 1..300 clamp silently turned the S12.9b
-        // negative-spread "boost in daylight" path into 1 on every save, making it unreachable.
+        // S12.9c #6: dimSpread is signed (−100..100), not 1..300 (old clamp blocked "boost in daylight").
         dimSpread = dimSpread.coerceIn(-100, 100),
         pwmExponent = pwmExponent.nanTo(d.pwmExponent).coerceIn(0.1f, 3f),
         throttleDefaultMs = throttleDefaultMs.coerceIn(100, 60_000),
@@ -125,10 +106,7 @@ fun AabSettings.validate(): AabSettings {
         scaleTransitionFactor = scaleTransitionFactor.nanTo(d.scaleTransitionFactor).coerceIn(0f, 1f),
         debugLevel = debugLevel.coerceIn(0, 9),
         panicSensitivity = panicSensitivity.coerceIn(0, 10),
-        // D-151 display-toggle profile fields: the temperature keeps its "unset = device default"
-        // null; a set value is clamped to the SecureDisplayController sanity band. An unknown
-        // daltonizer string (newer schema / hand-edited import) resets to OFF so one bad value
-        // cannot poison the profile (the D-146 spirit).
+        // D-151: display-toggle fields; unknown daltonizer resets to OFF (D-146 spirit).
         nightLightTemperature = nightLightTemperature?.coerceIn(1_000, 10_000),
         daltonizerMode = if (daltonizerMode in DALTONIZER_MODES) daltonizerMode else DALTONIZER_OFF,
     )

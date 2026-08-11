@@ -66,12 +66,7 @@ import com.tideo.autobrightness.app.ui.components.summary
 import com.tideo.autobrightness.app.ui.theme.Dimens
 import java.util.UUID
 
-/**
- * Legacy standalone Contexts surface, retained only for the existing screen tests. S12.9f folded the
- * live Contexts destination into the unified Profiles & Contexts screen
- * ([ProfilesContextsScreen]); the rule list + editor now render via [ContextRulesSection], reused by
- * both. The per-rule editor opens in a modal (see [ContextRulesSection]).
- */
+// Legacy standalone surface for screen tests; live Contexts moved to ProfilesContextsScreen.
 @Composable
 fun ContextsContent(
     rules: List<ContextRule>,
@@ -104,14 +99,7 @@ fun ContextsContent(
     }
 }
 
-/**
- * The Context-rules surface (S12.9f IA merge): a description, an "Add rule" action, and the
- * priority-ordered rule list (each card showing its target profile + priority + trigger summary).
- * Editing or adding a rule opens the full [RuleEditor] in a modal full-screen [Dialog] — this is the
- * Tasker UX where a profile owns its context rules and a rule targets a saved profile. Emitted into a
- * scrolling [Column] (e.g. [SettingsColumn]); reused by the unified [ProfilesContextsScreen] and the
- * legacy [ContextsContent]. Plumbing only — S13 restyles.
- */
+// Context-rules: rule list + editor in modal. Reused by ProfilesContextsScreen and ContextsContent.
 @Composable
 fun ContextRulesSection(
     rules: List<ContextRule>,

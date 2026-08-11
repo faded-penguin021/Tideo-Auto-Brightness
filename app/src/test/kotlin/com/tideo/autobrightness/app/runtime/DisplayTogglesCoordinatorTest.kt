@@ -16,16 +16,10 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * DisplayTogglesCoordinator (D-151): profile fields → device via the only-on-change apply path —
- * seed adopts the baseline without writing, profile swaps write per-field diffs, equal swaps write
- * nothing (manual/system changes stick), tier gate no-ops below ELEVATED, a null temperature is
- * never written, and stop() returns the toggles to the baseline's values (the resting state).
- */
+/** D-151: profile fields → device (only-on-change). Seed no-op, swaps write diffs, stop() returns to baseline. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DisplayTogglesCoordinatorTest {
 
-    /** In-memory device with a write log — the assertions are on WHICH writes happen. */
     private class FakeSecureDisplay : SecureDisplayController {
         val writes = mutableListOf<String>()
         private fun write(entry: String): Result<Unit> {
@@ -66,7 +60,7 @@ class DisplayTogglesCoordinatorTest {
     ) {
         val display = FakeSecureDisplay()
         var tier = tier
-        /** The D-154 ramp Kelvin the fake "sun" currently yields; null = ramp not computable. */
+        // D-154: ramp Kelvin the fake "sun" yields; null = not computable
         var rampKelvin: Int? = null
         val baselineFlow = MutableStateFlow(baseline)
         val effectiveFlow = MutableStateFlow<AabSettings?>(null)
@@ -86,8 +80,7 @@ class DisplayTogglesCoordinatorTest {
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = baseline
         runCurrent()
-        // Service start is not a profile change: a default chain must never touch the device
-        // (the system Night Light schedule keeps working for non-users of the feature).
+        // Service start is not a profile change; must never touch device
         assertTrue(h.display.writes.isEmpty(), "seed must not write: ${h.display.writes}")
     }
 
@@ -98,7 +91,7 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = baseline
         h.effectiveFlow.value = nightProfile
         runCurrent()
-        // inversion is false in BOTH — it must not be written.
+        // inversion is false in both; must not write
         assertEquals(
             listOf("nightLight=true", "temp=2700", "daltonizer=GRAYSCALE"),
             h.display.writes,
@@ -113,8 +106,7 @@ class DisplayTogglesCoordinatorTest {
         h.display.writes.clear()
         h.effectiveFlow.value = baseline
         runCurrent()
-        // Baseline turns Night Light + grayscale back off; its null temperature means "no opinion"
-        // (the system treats the temperature as a persistent preference), so no temp write.
+        // Baseline turns Night Light off; null temp means "no opinion" (persistent system pref)
         assertEquals(listOf("nightLight=false", "daltonizer=OFF"), h.display.writes)
     }
 

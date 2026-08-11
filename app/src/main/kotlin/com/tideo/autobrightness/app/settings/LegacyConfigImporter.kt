@@ -8,17 +8,7 @@ import android.provider.DocumentsContract
 /** One JSON config file discovered under the granted `Download/AAB/configs` tree (G2R-F16). */
 data class LegacyConfigEntry(val name: String, val uri: Uri)
 
-/**
- * SAF folder import for legacy Tasker profiles (S12.6d, G2R-F16; owner-decision 4). The user grants the
- * `Download/AAB/configs` directory ONCE via `OpenDocumentTree`; we persist the URI permission and then
- * enumerate the `*.json` files there with [DocumentsContract] (no `MANAGE_EXTERNAL_STORAGE`, no extra
- * dependency). Reading/decoding reuses [ProfileImportExportManager] which already falls back to the
- * [TaskerLegacyProfileSerializer] for raw legacy payloads.
- *
- * Scoped storage made `Download/AAB/configs` invisible to plain file APIs (the directory is owned by
- * Tasker), which is exactly why the on-device app "only saw Download/AAB" (G2R-F16) — a SAF tree grant
- * is the supported way to reach it.
- */
+/** SAF folder import for legacy Tasker profiles (S12.6d, G2R-F16): persist URI, enumerate *.json with DocumentsContract. */
 object LegacyConfigImporter {
     internal const val MAX_LISTED_CONFIGS = 256
 
