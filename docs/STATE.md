@@ -85,6 +85,12 @@ zero-pending; tests green; TODO/FIXME and parity gaps zero. Live ledger: `LEDGER
 
 **Incoming findings:**
 
+- 2026-08-11 — **Codex review of the comment-consolidation branch vs `main` PENDING** (owner-run,
+  read-only). Triage note: the Kotlin diff is comment-only *by construction* — each file was proved
+  by stripping comments from both sides and byte-comparing — so a finding alleging a behaviour
+  change there is a defect in that proof or a misread; verify before acting. Any fix touching
+  legislation needs its own DA-005 pass; the branch's covered 81cad7e, not its replacement.
+
 - 2026-08-02 — **Owner device pass on 1.8.2-debug: 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED.**
   Two real defects, both fixed (DB-011 plugged-only panic firing on battery; DB-012 a re-granted
   WRITE_SECURE_SETTINGS invisible to the running service until app restart). The other three FAILs
