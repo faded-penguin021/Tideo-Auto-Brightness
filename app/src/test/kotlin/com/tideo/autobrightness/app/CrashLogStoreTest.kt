@@ -13,10 +13,7 @@ import java.io.File
 import java.nio.file.Files
 
 /**
- * C1 acceptance (D-158). Exercises the crash-log ring ([CrashLogStore]) and the delegation contract
- * of [CrashLogHandler]. Pure JVM — the store is plain `java.io` + `java.time`, no Android — so this
- * runs off the Robolectric runner. The glue-review concerns (write-then-delegate, delegate even when
- * the write fails, install idempotency, disk-only state) each get a dedicated test below.
+ * C1 acceptance (D-158): crash-log ring and delegation contract (pure JVM, java.io + java.time).
  */
 class CrashLogStoreTest {
 
@@ -54,8 +51,7 @@ class CrashLogStoreTest {
     }
 
     @Test fun recordNeverThrowsWhenTheDirectoryCannotBeCreated() {
-        // Target a path that already exists as a FILE: mkdirs()/writeText both fail. record() must
-        // swallow — it runs on the dying thread and must never mask the crash it is capturing.
+        // mkdirs()/writeText fail; record() must swallow, never mask the crash on dying thread.
         val blocker = File(tmp, "notadir").apply { writeText("x") }
         val store = CrashLogStore(blocker) { 1L }
         store.record(RuntimeException("boom"))
@@ -76,8 +72,7 @@ class CrashLogStoreTest {
     }
 
     @Test fun handlerDelegatesEvenWhenTheWriteFails() {
-        // Unwritable target → record() swallows the write failure; delegation must still happen so
-        // the process is not left wedged (glue-review: write THEN delegate, delegate regardless).
+        // Write fails → record() swallows; delegation must still happen (write THEN delegate).
         val blocker = File(tmp, "blocker").apply { writeText("x") }
         val store = CrashLogStore(blocker) { 1L }
         var delegated = false
@@ -91,7 +86,7 @@ class CrashLogStoreTest {
 
     @Test fun handlerToleratesANullPreviousHandler() {
         val store = store { 9L }
-        // Bare JVM with no prior default handler: nothing to delegate to, but must not NPE.
+        // No prior handler; must not NPE.
         CrashLogHandler(store, null).uncaughtException(Thread.currentThread(), RuntimeException("x"))
         assertTrue(store.hasAny())
     }

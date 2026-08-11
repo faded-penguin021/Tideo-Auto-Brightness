@@ -18,10 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * D-172 acceptance. The Tools → "Force dark (Shizuku)" card: the Switch reflects and drives the
- * persisted opt-in, and the status line renders the LIVE prop truth as a tri-state — hidden until
- * the first Shizuku probe returns, then active / inactive / Shizuku-unreachable. Renders under the
- * a11y gate so the new interactive nodes stay TalkBack-labeled (D-156 convention).
+ * D-172 acceptance: Force dark card (Shizuku). Switch drives opt-in; status shows live prop tri-state.
  */
 @RunWith(RobolectricTestRunner::class)
 class ToolsForceDarkTest {

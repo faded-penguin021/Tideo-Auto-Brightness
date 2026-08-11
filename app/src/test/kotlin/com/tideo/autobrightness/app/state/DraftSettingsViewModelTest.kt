@@ -18,17 +18,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * S12.5b acceptance: the draft/preview → Apply model (G2-F1). Edits mutate a draft only; Apply commits
- * draft → DataStore; Discard reverts the draft to the committed value. Drives the real DataStore-backed
- * VM under Robolectric, idling the main looper to let the seed/commit coroutines settle.
+ * S12.5b acceptance: draft/preview → Apply model (G2-F1).
+ * Edits mutate draft only; Apply commits to DataStore; Discard reverts to committed.
  */
 @RunWith(RobolectricTestRunner::class)
 class DraftSettingsViewModelTest {
 
     private val app = ApplicationProvider.getApplicationContext<Application>()
 
-    // CurveSuggestionPreview is a process-global holder (D-125); clear it so a pending preview from one
-    // test can never leak into another's initial seed.
+    // D-125: clear process-global preview holder to prevent leaks between tests.
     @Before fun clearPreview() = CurveSuggestionPreview.clear()
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
@@ -53,12 +51,7 @@ class DraftSettingsViewModelTest {
 
     private fun seededVm(): DraftSettingsViewModel {
         val vm = DraftSettingsViewModel(app)
-        // Wait for the init collector to ACTUALLY seed the draft. The VM bumps `epoch` 0→1 on its
-        // first committed emission, so gate on that — NOT on `draft == committed()`, which is already
-        // true from construction when the committed baseline equals the AabSettings() defaults (e.g.
-        // minBrightness = 10). Returning early there left `seeded` false, so the first emission fired
-        // during a later idle() and clobbered the test's edit back to the committed value (flaky
-        // edit_marksDirty_thenDiscardReverts).
+        // Wait for init collector to seed; gate on epoch 0→1 (not draft == committed which may be true early).
         repeat(100) {
             idle()
             if (vm.epoch.value >= 1) return vm
@@ -78,7 +71,6 @@ class DraftSettingsViewModelTest {
         idle()
         assertEquals(42, vm.draft.value.minBrightness)
         assertTrue(vm.dirty.value, "editing the draft should mark it dirty")
-        // The committed value is untouched until Apply (temporary preview).
         assertEquals(10, committed().minBrightness)
 
         vm.discard()
@@ -101,9 +93,7 @@ class DraftSettingsViewModelTest {
 
     @Test
     fun apply_raisesMaxBrightToFitCurve_D169() {
-        // D-169 (_SaveButtonMisc A5–A11): a steep curve whose value at Zone 2 End (~252) exceeds a low
-        // MaxBright (150) leaves form3A < 0. Apply must RAISE MaxBright to the curve minimum (253) and
-        // announce it, instead of blocking the save.
+        // D-169: raise MaxBright to curve minimum (253) instead of blocking save.
         val steep = AabSettings(
             form1A = 5.0, zone1End = 35, form2B = 20f, form2C = 10, zone2End = 3000, maxBrightness = 200,
         )
@@ -111,19 +101,17 @@ class DraftSettingsViewModelTest {
         val vm = seededVm()
         vm.edit { it.copy(maxBrightness = 150) }
         idle()
-        // The Misc screen opts in (Tasker _SaveButtonMisc); the Curve screen does not.
         vm.apply(raiseMaxBrightForCurve = true)
 
         val result = awaitCommitted { it.maxBrightness == 253 }
         assertEquals(253, result.maxBrightness, "Apply raises MaxBright to the curve's Zone 2 End value")
-        // The draft snaps to the committed value (D-164 fixed-point) so the screen is not left dirty.
+        // D-164: draft snaps to committed so screen is not left dirty.
         assertEquals(253, vm.draft.value.maxBrightness, "the draft reflects the auto-raised value")
     }
 
     @Test
     fun apply_curveScreen_doesNotRaiseMaxBright_D169() {
-        // D-169: a plain apply() (the Curve/other screens) must NOT touch MaxBright — Tasker only
-        // auto-raises on the Misc scene save. The too-low value commits as-is; form3A just warns.
+        // D-169: plain apply() (Curve screen) must NOT touch MaxBright; Tasker only raises on Misc save.
         val steep = AabSettings(
             form1A = 5.0, zone1End = 35, form2B = 20f, form2C = 10, zone2End = 3000, maxBrightness = 200,
         )
@@ -139,8 +127,7 @@ class DraftSettingsViewModelTest {
 
     @Test
     fun apply_clampsOutOfRangeValues() {
-        // D-085 (S14): a parameter screen must never persist an unsafe value. An out-of-range draft
-        // (maxBrightness 999) is clamped on Apply (→ 255) rather than written raw to the engine.
+        // D-085: clamp out-of-range values on Apply instead of persisting unsafe values.
         setBaseline(AabSettings(maxBrightness = 200))
         val vm = seededVm()
         vm.edit { it.copy(maxBrightness = 999) }
@@ -153,13 +140,7 @@ class DraftSettingsViewModelTest {
 
     @Test
     fun apply_snapsDraftToValidatedCommit_soDirtyClears_D164() {
-        // D-164 (audit finding C1): validate() rewrites cross-field pairs on commit — maxWaitMs is
-        // coerced up to minWaitMs — and the Misc wait sliders (1..99 / 2..100) can produce
-        // min=99/max=2 with only an ADVISORY banner. Apply used to commit (99,99) while the draft
-        // kept (99,2): draft ≠ committed forever (perpetually dirty, a slider showing a value that
-        // silently didn't persist — the G3-F3 class, cross-field edition, unfixable by aligning
-        // ranges). apply() must be a FIXED POINT: the draft snaps to the exact validated copy it
-        // commits, dirty converges to false, and the epoch bump rebinds seed-once fields.
+        // D-164: apply() is a fixed point — draft snaps to validated copy, dirty converges to false.
         setBaseline(AabSettings(minWaitMs = 10, maxWaitMs = 50))
         val vm = seededVm()
         val epochAtSeed = vm.epoch.value
@@ -177,7 +158,7 @@ class DraftSettingsViewModelTest {
 
     @Test
     fun apply_preservesServiceEnabledFromCommitted() {
-        // serviceEnabled is a runtime/identity field — Apply must not flip the master switch.
+        // serviceEnabled is runtime/identity; Apply must not flip the master switch.
         setBaseline(AabSettings(serviceEnabled = false, offset = 0))
         val vm = seededVm()
         vm.edit { it.copy(offset = 7) }
@@ -191,9 +172,7 @@ class DraftSettingsViewModelTest {
 
     @Test
     fun initialSeed_appliesPendingCurveSuggestionPreview_D125() {
-        // D-125: a wizard "Preview graph" request is applied to the draft DURING the initial seed (the
-        // same atomic epoch 0→1 that populates the seed-once fields), so the suggested values show in
-        // the fields with the current values in [brackets], and nothing persists until Apply.
+        // D-125: preview applied to draft during initial seed; persists only on Apply.
         CurveSuggestionPreview.clear()
         setBaseline(AabSettings(maxBrightness = 200, zone1End = 35, form2C = 18))
         CurveSuggestionPreview.request { it.copy(zone1End = 77, form2C = 5) }
@@ -208,8 +187,7 @@ class DraftSettingsViewModelTest {
 
     @Test
     fun initialSeed_consumesPreviewOnce_soOtherScreensAreUnaffected_D125() {
-        // consume() is one-shot: a second screen's VM seeding after the preview was taken gets the
-        // plain committed values (no leak of the curve preview to e.g. the Misc/Reactivity drafts).
+        // consume() is one-shot; second screen's VM gets plain committed values (no leak).
         CurveSuggestionPreview.clear()
         setBaseline(AabSettings(zone1End = 35))
         CurveSuggestionPreview.request { it.copy(zone1End = 77) }
@@ -222,9 +200,7 @@ class DraftSettingsViewModelTest {
         assertFalse(second.dirty.value)
     }
 
-    // ---- DB-008: _SaveButtonDimming A9-A12 (issue #110) ---------------------------------------
-    // The screen used to show the strength the user typed while the runtime clamped the effect to 65.
-    // Apply now corrects the SETPOINT and says so, so the number on screen is the number in effect.
+    // DB-008: _SaveButtonDimming A9-A12 (issue #110) — clamp setpoint and reflect in field.
 
     @Test
     fun apply_clampsDimmingStrengthSetpoint_andSnapsTheDraftToIt() {
@@ -255,16 +231,14 @@ class DraftSettingsViewModelTest {
         val collector = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)
             .launch { vm.dimmingStrengthClamped.collect { announced += it } }
 
-        // Exactly at the cap: nothing is corrected, so nothing may be announced — announcing a
-        // correction that did not happen is the same misinformation issue #110 is about. Upstream
-        // agrees since A9 became `> 65.0000000001` (it previously fired at 65 as well).
+        // Exactly at cap: nothing corrected, so nothing announced (avoid false positives).
         vm.edit { it.copy(dimmingStrength = 65) }
         idle()
         vm.apply()
         awaitCommitted { it.dimmingStrength == 65 }
         assertTrue(announced.isEmpty(), "a setpoint of exactly 65 is not a clamp: $announced")
 
-        // Above the cap: corrected, and reported with the value that actually persisted.
+        // Above cap: corrected and reported.
         vm.edit { it.copy(dimmingStrength = 90) }
         idle()
         vm.apply()

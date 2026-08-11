@@ -17,9 +17,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * H3 glue-seam audit: `AndroidPanicSensorSource` arming had no test — the sustained-inversion
- * requirement, the pass-through fire, the 10 s window veto, and the consume-until-re-entry latch
- * (prof769 rework, D-116) are all glue in this source.
+ * H3 glue-seam audit: sustained-inversion, pass-through fire, 10 s window veto, re-entry latch.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -49,8 +47,7 @@ class PanicSensorSourceTest {
     private fun registeredListenerCount(): Int = shadowOf(sensorManager).listeners.size
 
     /**
-     * Send a system broadcast AND let it be delivered: Robolectric posts receivers to the main looper,
-     * so without the idle() the assertion runs before the receiver does.
+     * Send broadcast and let it be delivered; idle() ensures receiver runs before assertions.
      */
     private fun broadcast(action: String) {
         context.sendBroadcast(android.content.Intent(action))
@@ -86,8 +83,7 @@ class PanicSensorSourceTest {
         upsideDownFrames(6)
         assertEquals(1, events.size, "sustained inversion at sensitivity 0 fires immediately")
 
-        // Still inverted: the gesture is consumed — more frames must NOT re-fire (Tasker STATE
-        // semantics: no re-trigger until the phone leaves the state and re-enters, D-021).
+        // D-021: consumed gesture; no re-fire until re-entry.
         upsideDownFrames(10)
         assertEquals(1, events.size, "no re-fire while the phone stays inverted")
 
@@ -116,7 +112,7 @@ class PanicSensorSourceTest {
     @Test
     fun armedWindow_noQualifyingShake_vetoesOnTimeout() = runTest {
         accelSensor()
-        sensitivity = 5 // real shake required → a 10 s window opens on arming
+        sensitivity = 5 // real shake required; 10 s window opens on arming
         val events = mutableListOf<Unit>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
 
@@ -137,7 +133,7 @@ class PanicSensorSourceTest {
     fun proximityNear_blocksArming() = runTest {
         accelSensor()
         sensitivity = 0
-        near = true // %AAB_Proximity ~ Near: covered/in-pocket must never panic
+        near = true // Covered/in-pocket must never panic
         val events = mutableListOf<Unit>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
 
@@ -146,7 +142,7 @@ class PanicSensorSourceTest {
         job.cancel()
     }
 
-    // ---- DB-009: %AAB_PanicPlugged + the registration gate (issue #110) -----------------------
+    // ---- DB-009: %AAB_PanicPlugged + registration gate (issue #110) ----
 
     @Test
     fun requiresPlugged_whileOnBattery_doesNotEvenRegisterTheAccelerometer() = runTest {
@@ -200,8 +196,7 @@ class PanicSensorSourceTest {
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
         assertEquals(1, registeredListenerCount(), "screen on + no restriction → the gesture is live")
 
-        // Arming has always required an interactive display, so holding the listener open with the
-        // screen off bought nothing and cost ~50 Hz all night. This is the battery half of DB-009.
+        // DB-009: screen off must release sensor; holding it open costs ~50 Hz all night.
         broadcast(android.content.Intent.ACTION_SCREEN_OFF)
         assertEquals(0, registeredListenerCount(), "screen off must release the accelerometer")
 
@@ -212,7 +207,7 @@ class PanicSensorSourceTest {
         job.cancel()
     }
 
-    // ---- DB-011: the requirement is authoritative at ARM time, not only at registration ---------
+    // ---- DB-011: requirement authoritative at ARM time, not just registration ----
 
     @Test
     fun requirementTurningOnAfterRegistration_stopsTheGesture_withNoPowerBroadcast() = runTest {
@@ -223,9 +218,7 @@ class PanicSensorSourceTest {
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
         assertEquals(1, registeredListenerCount())
 
-        // The restriction turns on with the device still unplugged and the screen still on — so NO
-        // broadcast arrives to re-run the registration decision. This is the device-report C4 shape:
-        // whatever the gate decided at registration time was still in force at fire time.
+        // DB-011: no broadcast arrives to re-run registration; requirement must gate FIRING too.
         requiresPlugged = true
         upsideDownFrames(40)
         assertEquals(0, events.size, "the plugged requirement must gate FIRING, not just registration")
@@ -260,8 +253,7 @@ class PanicSensorSourceTest {
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { source().events().collect { events += it } }
         assertEquals(0, registeredListenerCount())
 
-        // The snapshot resolves to "no restriction". Fail-closed must not be a one-way door: the very
-        // next screen-on re-runs the decision and the gesture becomes live again.
+        // Fail-closed is not one-way; resolved snapshot re-runs decision on next screen-on.
         requiresPluggedOrNull = false
         broadcast(android.content.Intent.ACTION_SCREEN_ON)
         assertEquals(1, registeredListenerCount(), "a resolved snapshot must re-arm the sensor")
@@ -281,8 +273,7 @@ class PanicSensorSourceTest {
         broadcast(android.content.Intent.ACTION_SCREEN_OFF)
         broadcast(android.content.Intent.ACTION_SCREEN_ON)
 
-        // The gravity filter was reset, so the first frame after re-registration only re-seeds it —
-        // a half-finished window must not be resumable across the gap.
+        // Gravity filter reset; half-finished window must not resume across the gap.
         sample(0f, -9.81f, 0f)
         assertEquals(0, events.size, "a stale window must not fire after the sensor was released")
         job.cancel()
