@@ -124,6 +124,15 @@ zero-pending; tests green; TODO/FIXME and parity gaps zero. Live ledger: `LEDGER
 
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
 
+- 2026-08-11 — **Comment consolidation + a rail that holds it (DB-028).** The Kotlin was 18.7%
+  comment lines, much of it re-telling a ledger row verbatim; Conventions had decayed to "match
+  its comment density", telling each session to reproduce what it found. Prose moved to the `.md`
+  tier, code left carrying `D-NNN` pointers. New repo-local guard `comment-budget.sh` (fifth):
+  12-line cap on any contiguous comment block plus per-module line budgets, fail-closed, with a
+  `--hook` mode the Claude adapter runs on every `.kt` write so the cap lands on the edit rather
+  than in the end-of-session ladder run. Codex gets no equivalent — no post-edit hook — and
+  `HARNESS_LOCAL.md`'s adapter table says so. Fixture suite 24 → 39 cases.
+
 - 2026-08-10 — **AMH upgraded 5.1.0 → 5.2.0 (DB-027).** MINOR, and no shipped script changed — the copy
   moved only the manifest's version banner, hashes identical. The whole entry is the seed
   length-guard preamble, hand-applied: our enumeration of what the ladder machine-checks was

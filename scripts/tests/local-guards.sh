@@ -273,6 +273,207 @@ run_guard ss-reverted staged-secrets
 expect_fail "a staged-then-reverted secret fails — the worktree is clean, the index is not" "config.txt"
 
 # =============================================================================
+printf '· comment-budget\n'
+
+# This guard counts Kotlin comment LINES, so every case here is really a question about the
+# scanner: what it calls a comment. The negative cases below are the ones that matter — a scanner
+# that greps for a leading slash passes the first two and gets every remaining one wrong, and a
+# guard that miscounts is a guard the next session deletes rather than obeys.
+
+cb_guard() { # <dir>  — copy the guard in, optionally with a lowered budget
+	local d=$SANDBOX/$1
+	mkdir -p "$d/scripts/guards"
+	cp "$ROOT/scripts/guards/comment-budget.sh" "$d/scripts/guards/comment-budget.sh"
+}
+
+run_cb() { # <dir> <args...>
+	local d=$SANDBOX/$1
+	shift
+	OUT=$( (cd "$d" && bash scripts/guards/comment-budget.sh "$@" 2>&1) )
+	RC=$?
+}
+
+cb_tree() { # <dir>
+	local d=$SANDBOX/$1
+	rm -rf "$d"
+	mkdir -p "$d/app"
+	cb_guard "$1"
+}
+
+# --- block cap, via --file (needs no git) ---------------------------------------------------
+
+cb_tree cb-short
+printf 'package x\n// one\n// two\nval a = 1\n' >"$SANDBOX/cb-short/app/A.kt"
+run_cb cb-short --file app/A.kt
+expect_pass "a two-line comment block passes"
+
+cb_tree cb-long
+{
+	printf 'package x\n'
+	i=0
+	while [ "$i" -lt 20 ]; do
+		printf '// narrative line %s\n' "$i"
+		i=$((i + 1))
+	done
+	printf 'val a = 1\n'
+} >"$SANDBOX/cb-long/app/A.kt"
+run_cb cb-long --file app/A.kt
+expect_fail "a 20-line comment block fails" "over the 12-line cap"
+
+# THE false positive that would make this guard untrustworthy. A raw string full of comment-shaped
+# lines is a STRING — this is real in the tree (test fixtures embed Kotlin snippets), and a scanner
+# that flags it teaches people the guard is broken.
+cb_tree cb-rawstring
+{
+	printf 'package x\n'
+	printf 'val fixture = """\n'
+	i=0
+	while [ "$i" -lt 20 ]; do
+		printf '// this is string content, not a comment %s\n' "$i"
+		i=$((i + 1))
+	done
+	printf '"""\n'
+} >"$SANDBOX/cb-rawstring/app/A.kt"
+run_cb cb-rawstring --file app/A.kt
+expect_pass "20 comment-shaped lines inside a raw string pass — they are string content"
+
+# The four-quote run. Kotlin closes a raw string at the LAST quote of the run, so `""""` is one
+# content quote plus the terminator. Consuming a fixed three leaves a stray quote that opens a
+# phantom string and silently swallows every comment after it — this regressed exactly once, in
+# app/src/test/.../HardcodedStringCheckTest.kt, and the guard reported two fewer comment lines
+# than the file had. A scanner with that bug passes every other case in this file.
+cb_tree cb-quoterun
+{
+	printf 'package x\n'
+	printf 'val re = Regex("""foo\\s*"""")\n'
+	i=0
+	while [ "$i" -lt 20 ]; do
+		printf '// after the four-quote run, this IS a comment %s\n' "$i"
+		i=$((i + 1))
+	done
+	printf 'val a = 1\n'
+} >"$SANDBOX/cb-quoterun/app/A.kt"
+run_cb cb-quoterun --file app/A.kt
+expect_fail "comments after a four-quote raw-string terminator are still counted" "over the 12-line cap"
+
+# Block comments nest in Kotlin, so the inner */ does not end the outer comment.
+cb_tree cb-nested
+{
+	printf 'package x\n/*\n'
+	i=0
+	while [ "$i" -lt 8 ]; do
+		printf ' * outer /* inner */ still outer %s\n' "$i"
+		i=$((i + 1))
+	done
+	i=0
+	while [ "$i" -lt 8 ]; do
+		printf ' * more %s\n' "$i"
+		i=$((i + 1))
+	done
+	printf '*/\nval a = 1\n'
+} >"$SANDBOX/cb-nested/app/A.kt"
+run_cb cb-nested --file app/A.kt
+expect_fail "a nested block comment is counted as one long block" "over the 12-line cap"
+
+# A trailing comment sits on a line that also carries code, so it is not a comment-only line and
+# cannot start a block. 20 of them in a row must pass.
+cb_tree cb-trailing
+{
+	printf 'package x\n'
+	i=0
+	while [ "$i" -lt 20 ]; do
+		printf 'val v%s = %s // why this value\n' "$i" "$i"
+		i=$((i + 1))
+	done
+} >"$SANDBOX/cb-trailing/app/A.kt"
+run_cb cb-trailing --file app/A.kt
+expect_pass "20 consecutive trailing comments pass — those lines carry code"
+
+cb_tree cb-notkt
+printf 'not kotlin\n' >"$SANDBOX/cb-notkt/app/A.txt"
+run_cb cb-notkt --file app/A.txt
+expect_pass "a non-Kotlin path is not this guard's business"
+
+# --- hook mode ------------------------------------------------------------------------------
+
+cb_hook() { # <dir> <payload>
+	local d=$SANDBOX/$1
+	OUT=$( (cd "$d" && printf '%s' "$2" | bash scripts/guards/comment-budget.sh --hook 2>&1) )
+	RC=$?
+}
+
+cb_hook cb-long '{"tool_name":"Edit","tool_input":{"file_path":"app/A.kt"}}'
+if [ "$RC" = 2 ] && printf '%s' "$OUT" | grep -qF 'over the 12-line cap'; then
+	ok
+else
+	bad "hook mode must exit 2 with the diagnostic on stderr (Claude Code feeds stderr back only on 2); got rc=$RC: $OUT"
+fi
+
+# A hook that cannot read its payload must stay silent. Failing here would fire on every Edit in
+# the session, and a hook that cries wolf on every edit is one the next session removes.
+cb_hook cb-long 'this is not json'
+expect_pass "hook mode on an unparseable payload exits 0 rather than false-failing every edit"
+
+cb_hook cb-long '{"tool_input":{"file_path":"README.md"}}'
+expect_pass "hook mode ignores a non-Kotlin file_path"
+
+run_cb cb-long --nonsense
+if [ "$RC" = 3 ]; then
+	ok
+else
+	bad "a bad argument must exit 3, never 2 — the ladder reads a WARN-less 2 from a repo-local guard as a broken guard; got rc=$RC"
+fi
+
+# --- module budget, via the whole-tree mode (needs a git tree) -------------------------------
+
+cb_git_tree() { # <dir> <budget>
+	local d=$SANDBOX/$1
+	rm -rf "$d"
+	mkdir -p "$d/app"
+	cb_guard "$1"
+	# Lower the budget in the SANDBOX COPY so the arithmetic can be exercised without a
+	# multi-thousand-line fixture. The real constants are not what is under test here.
+	sed -i.bak "s/^BUDGET_app=.*/BUDGET_app=$2/" "$d/scripts/guards/comment-budget.sh"
+	rm -f "$d/scripts/guards/comment-budget.sh.bak"
+	git -C "$d" init -q 2>/dev/null
+	git -C "$d" config user.email t@example.com
+	git -C "$d" config user.name t
+}
+
+cb_git_tree cb-budget-ok 100
+printf 'package x\n// one\n// two\nval a = 1\n' >"$SANDBOX/cb-budget-ok/app/A.kt"
+git -C "$SANDBOX/cb-budget-ok" add -A
+run_cb cb-budget-ok
+expect_pass "a module under its comment budget passes"
+
+cb_git_tree cb-budget-over 3
+{
+	printf 'package x\n'
+	i=0
+	while [ "$i" -lt 4 ]; do
+		printf '// c%s\nval v%s = %s\n' "$i" "$i" "$i"
+		i=$((i + 1))
+	done
+} >"$SANDBOX/cb-budget-over/app/A.kt"
+git -C "$SANDBOX/cb-budget-over" add -A
+run_cb cb-budget-over
+expect_fail "a module over its comment budget fails" "over its 3-line budget"
+
+# The remedy has to be in the diagnostic. A guard that says only "no" gets its number raised.
+if printf '%s' "$OUT" | grep -qF 'NOT to raise the number'; then
+	ok
+else
+	bad "the budget diagnostic must name the remedy (move prose to the ledger), not just the violation: $OUT"
+fi
+
+# A tree with no Kotlin at all must not collect a green pass — it checked nothing.
+cb_git_tree cb-empty 100
+printf 'hello\n' >"$SANDBOX/cb-empty/app/notes.txt"
+git -C "$SANDBOX/cb-empty" add -A
+run_cb cb-empty
+expect_fail "a tree with no tracked Kotlin fails rather than passing vacuously" "checked NOTHING"
+
+# =============================================================================
 printf '\n'
 if [ "$FAILS" -gt 0 ]; then
 	printf 'repo-local guard fixtures: %d/%d case(s) FAILED\n' "$FAILS" "$CASES" >&2

@@ -89,9 +89,26 @@ SSID strategy and the force-dark toggle — not "grant-only". That count is mach
 
 ## Conventions
 
-Write code that reads like the code around it — match its naming, layout and comment density.
+Write code that reads like the code around it — match its naming and layout.
 minSdk 31, target/compile 36; no legacy branches below 31. No new dependency unless the change
 clearly warrants one.
+
+**Comments: the prose lives in the `.md` tier, the code carries the pointer.** A durable lesson
+belongs in its ledger row and an architecture narrative in `docs/rebuild/`; what stays in the
+source is one line naming the row — `// D-144: fresh-process UNKNOWN latch.` Re-telling a row in
+a comment creates a second copy to keep in sync, and the code copy is the one nobody updates.
+Keep a comment only if a competent Kotlin reader would be *surprised* without it; if it merely
+restates the code, delete it. Two things are exempt because they are load-bearing provenance, not
+narrative: the `// Tasker: task535 "Lux Smoothing (Java)" XML L15204` markers the section below
+mandates, and the `D-NNN` citations themselves — **never drop the last citation of a row from the
+code**, or its `[cited]` marker goes stale and the ladder fails.
+
+Which layer holds this: `scripts/guards/comment-budget.sh` caps any contiguous comment block at
+12 lines and holds a per-module comment-line budget, failing closed in the ladder and in CI; the
+Claude Code adapter runs the same block cap as a `PostToolUse` hook, so a long block is reported
+on the edit that writes it. **Codex has neither** — its prefix rules cannot express this, so for
+that agent these paragraphs are the only layer standing. Raising a budget is a rule change, not
+housekeeping: `scripts/guards` is in `RULE_FILES` and the review protocol applies.
 
 **The one rule that overrides taste: Tasker semantics win.** Port behaviour exactly, including
 odd rounding and quirks that look like bugs; modernise the *how*, never the *what*. Mark ported

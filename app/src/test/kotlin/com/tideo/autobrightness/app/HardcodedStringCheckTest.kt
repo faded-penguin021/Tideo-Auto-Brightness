@@ -5,14 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/**
- * i18n ratchet. The app shipped ~97 hardcoded UI strings; D-131 completed the extraction (the S14/D-075
- * backlog of section headers, per-field labels, long-press help, toasts, chart labels) so the app is
- * **fully translatable**. This test now enforces **zero** hardcoded user-facing strings: it fails if a
- * NEW inline `Text("…")`, `toast("…")`, or `contentDescription = "…"` literal appears in the Compose UI
- * tree. Resolve user-facing text via `stringResource(...)` / the resId `toast(...)` overload instead. It
- * also locks the converted notification surface (no literal notification strings).
- */
+// i18n ratchet (D-131): zero hardcoded user-facing strings. Use stringResource()/resId toast() instead.
 class HardcodedStringCheckTest {
 
     private val uiRoot = File("src/main/kotlin/com/tideo/autobrightness/app/ui")
@@ -25,8 +18,6 @@ class HardcodedStringCheckTest {
         Regex("""(Text|toast)\(\s*"|contentDescription\s*=\s*"""")
 
     companion object {
-        // D-131: the i18n extraction is COMPLETE — no hardcoded user-facing UI literal is allowed.
-        // RATCHET STAYS AT 0; any new user-facing string must go through strings.xml.
         private const val CEILING = 0
     }
 

@@ -473,3 +473,12 @@
   `guard_state_size` and `guard_state_structure`, not a timeless "and nothing else": the script
   upgrades independently of a seed we own forever and nothing compares the two, so the sentence
   goes stale the first time upstream adds a rung. Named functions make that findable.
+
+- DB-028 [cited]: **A convention with no mechanical layer drifts until it inverts its own rule.**
+  `AGENTS.md` put durable prose in the `.md` tier with a `D-NNN` pointer in the code, and nothing
+  checked it: the tree reached 7620 comment lines against 40651 of Kotlin (18.7%), much of it
+  re-telling a ledger row verbatim — two copies of one lesson, the code copy the one nobody
+  updates. Conventions had by then decayed to "match its comment density", instructing each
+  session to reproduce the bloat it found. Fixed by `comment-budget.sh`: a 12-line cap on any
+  contiguous comment block plus a per-module line budget, failing closed. The cap is the
+  load-bearing half — narrative does not fit in 12 lines, so it must go to the `.md`.

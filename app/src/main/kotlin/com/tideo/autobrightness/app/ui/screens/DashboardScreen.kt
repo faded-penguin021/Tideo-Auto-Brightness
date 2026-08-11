@@ -60,8 +60,6 @@ fun DashboardScreen(navController: NavHostController, viewModel: DashboardViewMo
     val tileAddSuccess = stringResource(R.string.dashboard_tile_add_success)
     val tileAlreadyAdded = stringResource(R.string.dashboard_tile_added)
     val tileFailed = stringResource(R.string.dashboard_tile_request_failed)
-    // Evaluated once when the dashboard is shown (cheap, non-reactive — these only change after the
-    // user adds a tile/widget, at which point they navigate away and back).
     val canAddTile = remember { viewModel.canAddTile() }
     val canAddWidget = remember { viewModel.canAddWidget() }
     DashboardContent(
@@ -73,12 +71,7 @@ fun DashboardScreen(navController: NavHostController, viewModel: DashboardViewMo
         canAddWidget = canAddWidget,
         onAddTile = {
             viewModel.addTile { result ->
-                // Android 13+ StatusBarManager result codes (only reachable there via canAddTile()):
-                //   2 = TILE_ADD_REQUEST_RESULT_TILE_ADDED (success),
-                //   1 = TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED,
-                //   0 = TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED (user dismissed → no toast).
-                // G3-F4 (Gate 3): result 2 was wrongly mapped to "already added", so a successful FIRST
-                // add reported "tile already exists". 2 is success; 1 is the already-added case.
+                // G3-F4: tile result codes (2=success, 1=already added, 0=dismissed).
                 when (result) {
                     2 -> toast(tileAddSuccess)
                     1 -> toast(tileAlreadyAdded)
@@ -92,15 +85,7 @@ fun DashboardScreen(navController: NavHostController, viewModel: DashboardViewMo
     )
 }
 
-/**
- * Stateless, fully driven by [state] + callbacks so it can render under a Robolectric compose test.
- *
- * S13c' (§06) — the screen now leads with a single **brightness instrument** hero (the applied 0–255
- * level + teal track + status pill + master switch) that answers "what is my screen doing?" at a glance,
- * then a quiet **readout strip** (lux · circadian · context) demoted below it. The stale / override /
- * degraded banners keep their tinted surfaces — those encode state. There is no Pause control (G2R-F79):
- * stopping = the master switch.
- */
+/** S13c' (§06): brightness instrument hero + quiet readout strip; no Pause (G2R-F79). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardContent(
@@ -126,21 +111,15 @@ fun DashboardContent(
             verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing),
         ) {
             TierBadge(tier = state.tier, onClick = onOpenOnboarding)
-            // S12.9d: the published live snapshot has aged past STALE while the service still claims to
-            // be running — the loop may be wedged. Warn rather than show a confidently-wrong readout.
             if (state.stale && state.serviceRunning) {
                 StaleBanner()
             }
-            // The hero instrument — the one focal element (carries the status, switch + applied level).
             BrightnessInstrument(state = state, onToggleService = onToggleService)
-            // The Resume-after-override affordance only appears when the engine paused itself because
-            // the user changed brightness manually (prof755/task567) — the one case Resume is for.
             if (state.pausedByOverride) {
                 OverrideCard(state.serviceRunning, onResume)
             }
             ReadoutStrip(state)
-            // D-110: dynamic scaling is on but the live modifier is running on a stale (day-old) or
-            // missing location — a quiet hint to turn Location on briefly so circadian tracks the real sun.
+            // D-110: hint if circadian modifier has stale or missing location.
             state.circadianLocation?.let { cl ->
                 if (cl.isStale || !cl.hasLocation) CircadianStaleHint(cl)
             }
@@ -157,12 +136,7 @@ fun DashboardContent(
     }
 }
 
-/**
- * Owner-requested quick actions: a "Reset to auto" control (re-apply / snap brightness to the
- * computed value) shown while the service runs, plus one-tap shortcuts to add the Quick Settings tile
- * and the home-screen widget — surfaced only when they can be added (the launcher supports pinning and
- * no widget is placed yet; the tile prompt is Android 13+). Hidden entirely when nothing applies.
- */
+/** Quick actions: Reset, tile/widget add shortcuts (owner-requested). */
 @Composable
 private fun QuickActionsCard(
     serviceRunning: Boolean,
@@ -180,7 +154,7 @@ private fun QuickActionsCard(
                 onClick = onResetToAuto,
                 modifier = Modifier.fillMaxWidth().testTag("dashboard_reset"),
             ) { Text(stringResource(R.string.dashboard_reset_auto)) }
-            // G3-F11: the owner couldn't tell what "Reset to auto" did — spell it out.
+            // G3-F11: explain what "Reset to auto" does.
             Text(
                 stringResource(R.string.dashboard_reset_auto_hint),
                 style = MaterialTheme.typography.bodySmall,
@@ -202,8 +176,7 @@ private fun QuickActionsCard(
     }
 }
 
-/** D-110: amber circadian staleness hint — the live modifier is on a day-old cached or default sun
- *  position. Same gold convention as [StaleBanner]; tapping the Circadian screen lets the user refresh. */
+/** D-110: amber circadian staleness hint (stale/missing location). */
 @Composable
 private fun CircadianStaleHint(status: CircadianLocationStatus) {
     val text = if (status.isStale) {
@@ -212,7 +185,7 @@ private fun CircadianStaleHint(status: CircadianLocationStatus) {
         stringResource(R.string.dashboard_circadian_no_location)
     }
     Card(
-        // D-156 (A3): dynamic banner — a polite liveRegion so TalkBack announces it when it appears/changes.
+        // D-156 (A3): polite liveRegion for TalkBack announcement.
         modifier = Modifier.fillMaxWidth().testTag("circadian_stale_hint")
             .semantics { liveRegion = LiveRegionMode.Polite },
         colors = CardDefaults.cardColors(containerColor = AabGold, contentColor = AabOnGold),
@@ -221,11 +194,11 @@ private fun CircadianStaleHint(status: CircadianLocationStatus) {
     }
 }
 
-/** Amber "live data may be stale" banner (S12.9d). */
+/** S12.9d: amber "live data may be stale" banner. */
 @Composable
 private fun StaleBanner() {
     Card(
-        // D-156 (A3): dynamic banner — a polite liveRegion so TalkBack announces it when it appears/changes.
+        // D-156 (A3): polite liveRegion for TalkBack announcement.
         modifier = Modifier.fillMaxWidth().testTag("stale_banner")
             .semantics { liveRegion = LiveRegionMode.Polite },
         colors = CardDefaults.cardColors(
@@ -256,9 +229,7 @@ private fun TierBadge(tier: Tier, onClick: () -> Unit) {
     )
 }
 
-/** Shown only while [pausedByOverride]: explains the pause and offers the one Resume control. Styled as
- *  Tasker's gold "Automation Paused" bar — vivid brand gold (not the muted dark `secondaryContainer`)
- *  with a high-contrast dark RESUME button carrying a ▶ icon (D-111). */
+/** D-111: Resume-after-override card (Tasker gold styling, high-contrast button). */
 @Composable
 private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
     Card(
@@ -290,11 +261,7 @@ private fun OverrideCard(serviceRunning: Boolean, onResume: () -> Unit) {
     }
 }
 
-/**
- * The quiet readout strip below the hero (S13c' §06): lux · circadian · context, each shown only when
- * meaningful (existing `takeIf` guards). The raw-lux + last-sample age and the super-dimming line sit
- * beneath as supporting detail. Values render in tabular Plex Mono via [ReadoutCell].
- */
+/** S13c' (§06): readout strip (lux · circadian · context) + supporting detail. */
 @Composable
 private fun ReadoutStrip(state: DashboardUiState) {
     AabCard(verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing)) {

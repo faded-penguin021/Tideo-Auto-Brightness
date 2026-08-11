@@ -1,10 +1,6 @@
 package com.tideo.autobrightness.app.settings
 
-/**
- * One row of the "full settings list" the Tasker AAB Profile dashboard shows (profile.md elements0:
- * "compares active settings vs factory defaults, tuned values shown yellow"). [changed] is true when
- * the value differs from the factory default → the UI highlights it in theme gold (S12.7h, G2R-F38).
- */
+/** One row of the full settings list (profiles.md elements0): compares vs factory defaults, gold highlight (S12.7h, G2R-F38). */
 data class SettingDisplayRow(
     val label: String,
     val taskerVariable: String,
@@ -12,13 +8,8 @@ data class SettingDisplayRow(
     val changed: Boolean,
 )
 
-/**
- * Every user-facing setting from [AabSettingsContract] with its current value, paired against a
- * [reference] (factory default by default) so the UI can gold-highlight tuned values (G2R-F38). No
- * reflection (owner caution): the per-key extractor is an explicit `when` kept in lock-step with the
- * contract. Runtime/identity keys (serviceEnabled, contextOverride) are excluded — they are not
- * profile parameters the dashboard compares.
- */
+/** All user-facing settings paired against reference (factory default) for diff display (G2R-F38).
+ * Explicit `when` extractor (no reflection, owner caution). Excludes runtime/identity keys. */
 fun AabSettings.displayRows(reference: AabSettings = AabSettings()): List<SettingDisplayRow> =
     AabSettingsContract.rules
         .filter { it.key !in EXCLUDED_KEYS }
@@ -37,14 +28,7 @@ fun AabSettings.displayRows(reference: AabSettings = AabSettings()): List<Settin
 fun AabSettings.changedCount(reference: AabSettings = AabSettings()): Int =
     displayRows(reference).count { it.changed }
 
-/**
- * Keys excluded from the changed-vs-default diff (G2R-F84 + modal exclusions). `serviceEnabled` and
- * `contextOverride` are runtime/identity latches (never profile parameters). `debugLevel`,
- * `detectOverrides`, `quickSettingsEnabled`, `notificationsEnabled`, `panicSensitivity` and
- * `panicRequiresPlugged` are GLOBAL
- * preferences the profile load deliberately preserves (G2-F8/G2R-F9/D-116) — listing them in a profile
- * diff is misleading. `thresholdMidpoint` is DERIVED (log10(zone2End), task570 act39), not tuned.
- */
+/** Excluded keys from diff (G2R-F84): runtime/identity latches, GLOBAL prefs preserved on load (G2-F8/G2R-F9/D-116), derived fields. */
 private val EXCLUDED_KEYS = setOf(
     "serviceEnabled",
     "contextOverride",
@@ -57,11 +41,7 @@ private val EXCLUDED_KEYS = setOf(
     "thresholdMidpoint",
 )
 
-/**
- * Friendly, end-user labels for the diff list (G2R-F84): the raw camelCase/`form1A` names are
- * meaningless to a user. Explicit map (no reflection, owner caution); kept in step with the screen
- * labels so the dashboard reads the same as the editors. Anything unmapped falls back to [humanize].
- */
+/** User-friendly labels for diff list (G2R-F84); unmapped keys fall back to [humanize] (no reflection). */
 private val FRIENDLY_LABELS: Map<String, String> = mapOf(
     "minBrightness" to "Min brightness",
     "maxBrightness" to "Max brightness",
@@ -108,7 +88,7 @@ private val FRIENDLY_LABELS: Map<String, String> = mapOf(
 internal fun friendlyLabel(key: String, taskerVariable: String): String =
     FRIENDLY_LABELS[key] ?: humanize(taskerVariable)
 
-/** Formatted value for a contract key. Explicit `when` (no reflection) — keep aligned with the contract. */
+/** Formatted value for contract key. Explicit `when` (no reflection, keep aligned). */
 internal fun AabSettings.valueFor(key: String): String = when (key) {
     "serviceEnabled" -> serviceEnabled.toString()
     "detectOverrides" -> detectOverrides.toString()
@@ -118,7 +98,7 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "scale" -> scale.toString()
     "zone1End" -> zone1End.toString()
     "zone2End" -> zone2End.toString()
-    // G2R-F70: form1A is a Double; show whole values without a trailing ".0" (5.0 → "5", 5.833 → "5.833").
+    // G2R-F70: drop ".0" from Doubles (5.0 → "5", 5.833 → "5.833").
     "form1A" -> if (form1A % 1.0 == 0.0) form1A.toInt().toString() else form1A.toString()
     "form2B" -> form2B.toString()
     "form2C" -> form2C.toString()
@@ -152,8 +132,7 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "panicSensitivity" -> panicSensitivity.toString()
     "panicRequiresPlugged" -> panicRequiresPlugged.toString()
     "contextOverride" -> contextOverride.toString()
-    // D-151/D-152 display-toggle profile fields; a null temperature means "device default"
-    // (never written).
+    // D-151/D-152: null temperature = "device default" (never written).
     "nightLightEnabled" -> nightLightEnabled.toString()
     "nightLightTemperature" -> nightLightTemperature?.toString() ?: "device default"
     "nightLightCircadianEnabled" -> nightLightCircadianEnabled.toString()
@@ -162,12 +141,11 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "alwaysOnDisplayEnabled" -> alwaysOnDisplayEnabled.toString()
     "stayAwakeChargingEnabled" -> stayAwakeChargingEnabled.toString()
     "hdrForceSdrEnabled" -> hdrForceSdrEnabled.toString()
-    // S12.9c #2: fail fast on schema drift. Every AabSettingsContract key must be handled above; a
-    // silent "" would hide a contract/extractor mismatch. SettingsDisplayContractDriftTest guards this.
+    // Fail fast on schema drift (S12.9c #2). SettingsDisplayContractDriftTest guards.
     else -> throw IllegalArgumentException("Unknown AabSettings key: '$key' (not in valueFor's when)")
 }
 
-/** "%AAB_MinBright" → "Min Bright": drop the prefix, space camelCase boundaries (readable, faithful). */
+/** "%AAB_MinBright" → "Min Bright": drop prefix, space camelCase (readable, faithful). */
 private fun humanize(taskerVariable: String): String {
     val bare = taskerVariable.removePrefix("%AAB_")
     val sb = StringBuilder()

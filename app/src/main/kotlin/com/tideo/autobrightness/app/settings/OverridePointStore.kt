@@ -10,12 +10,8 @@ import kotlinx.serialization.json.Json
 import java.io.InputStream
 import java.io.OutputStream
 
-/**
- * One persisted manual-override training point: the (lux, brightness) pair the user implicitly taught
- * by grabbing the system slider. The brightness is the de-compressed "ideal base" brightness produced
- * by [com.tideo.autobrightness.domain.brightness.OverrideRules.recordOverridePoint] (task561), so the
- * curve wizard fits against the same value Tasker stores in `%AAB_Overrides<N>`.
- */
+/** One manual-override training point: (lux, brightness) pair user teaches via slider. Brightness is
+ * de-compressed ideal base (task561), matching value Tasker stores in %AAB_Overrides<N>. */
 @Serializable
 data class OverridePointRecord(val lux: Double, val brightness: Double)
 
@@ -23,19 +19,12 @@ data class OverridePointRecord(val lux: Double, val brightness: Double)
 @Serializable
 data class OverridePoints(val points: List<OverridePointRecord> = emptyList()) {
     companion object {
-        /** Tasker task561 caps %AAB_Overrides at 50 entries. */
-        const val MAX_POINTS = 50
-
-        /** On-disk schema version (S12.9c #5; datastore_map.md). v1 = initial; bump on a breaking change. */
-        const val SCHEMA_VERSION = 1
+        const val MAX_POINTS = 50  // task561 cap
+        const val SCHEMA_VERSION = 1  // v1=initial; bump on breaking change (S12.9c #5)
     }
 }
 
-/**
- * DataStore serializer for the recorded override points. Survives service/process restarts so the
- * Tools curve-suggestion wizard and the brightness-curve overlay (G2R-F13/F14) have real input,
- * instead of always starting from an empty set (the D-044(c) gap).
- */
+/** DataStore serializer for override points. Survives process restarts so wizard/overlay have real input (D-044(c) gap). */
 object OverridePointsSerializer : Serializer<OverridePoints> {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -51,19 +40,14 @@ object OverridePointsSerializer : Serializer<OverridePoints> {
     }
 }
 
-/**
- * Persistence + capture for the manual-override training points. The pipeline records a point each
- * time it pauses on a genuine manual override (newest-first, capped at [OverridePoints.MAX_POINTS],
- * mirroring task561); the wizard / curve overlay read [points].
- */
+/** Persistence for manual-override training points: records on pause, newest-first, capped at MAX_POINTS. */
 class OverridePointStore(private val dataStore: DataStore<OverridePoints>) {
 
-    /** The recorded points as domain [OverridePoint]s (newest first), for the wizard + chart overlay. */
+    /** Recorded points as domain OverridePoints (newest first), for wizard + chart overlay. */
     fun points(): Flow<List<OverridePoint>> = dataStore.data.map { stored ->
         stored.points.map { OverridePoint(lux = it.lux, brightness = it.brightness) }
     }
 
-    /** Append a captured override point (newest first), dropping the oldest beyond the cap. */
     suspend fun record(lux: Double, brightness: Double) {
         dataStore.updateData { current ->
             val updated = listOf(OverridePointRecord(lux, brightness)) + current.points
@@ -71,10 +55,7 @@ class OverridePointStore(private val dataStore: DataStore<OverridePoints>) {
         }
     }
 
-    /**
-     * Delete the recorded point matching [point] (tap-to-delete on the curve chart, F36). Matches on
-     * the (lux, brightness) pair and removes only the first such record so duplicates are not all wiped.
-     */
+    /** Delete matching point (tap-to-delete on chart, F36). Matches (lux, brightness) pair; removes first only. */
     suspend fun delete(point: OverridePoint) {
         dataStore.updateData { current ->
             val idx = current.points.indexOfFirst {
@@ -84,7 +65,6 @@ class OverridePointStore(private val dataStore: DataStore<OverridePoints>) {
         }
     }
 
-    /** Clear all recorded points (Tools "reset overrides"). */
     suspend fun clear() {
         dataStore.updateData { OverridePoints() }
     }

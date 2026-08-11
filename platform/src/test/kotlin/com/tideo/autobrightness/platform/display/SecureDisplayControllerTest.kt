@@ -39,7 +39,6 @@ class SecureDisplayControllerTest {
     private fun secureInt(key: String) = Settings.Secure.getInt(context.contentResolver, key, -999)
     private fun globalInt(key: String) = Settings.Global.getInt(context.contentResolver, key, -999)
 
-    // --- tier gate ---------------------------------------------------------------------------
 
     @Test
     fun writes_failWhenNotElevated_andWriteNothing() {
@@ -61,7 +60,6 @@ class SecureDisplayControllerTest {
         assertEquals(-999, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
     }
 
-    // --- reads need no privilege ---------------------------------------------------------------
 
     @Test
     fun reads_workWithoutPrivilege_defaultingToOff() {
@@ -74,7 +72,6 @@ class SecureDisplayControllerTest {
         assertFalse(controller.readStayAwakePlugged())
     }
 
-    // --- night light ---------------------------------------------------------------------------
 
     @Test
     fun nightLight_roundTrips() {
@@ -112,7 +109,6 @@ class SecureDisplayControllerTest {
         assertEquals(NightLightAutoMode.MANUAL, controller.readNightLightAutoMode())
     }
 
-    // --- daltonizer ----------------------------------------------------------------------------
 
     @Test
     fun daltonizer_grayscale_writesValueAndEnabled() {
@@ -156,7 +152,6 @@ class SecureDisplayControllerTest {
         assertEquals(DaltonizerMode.OFF, controller.readDaltonizer())
     }
 
-    // --- inversion / AOD / stay-awake ----------------------------------------------------------
 
     @Test
     fun inversion_alwaysOn_stayAwake_roundTrip() {
@@ -179,7 +174,6 @@ class SecureDisplayControllerTest {
         assertEquals(0, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
     }
 
-    // --- HDR force-SDR (API-gated) --------------------------------------------------------------
 
     @Test
     fun hdr_unavailableBelowApi34_failsWithoutWriting() {

@@ -27,12 +27,7 @@ import com.tideo.autobrightness.app.ui.theme.AabMono
 import com.tideo.autobrightness.app.ui.theme.AabTeal
 import java.util.Calendar
 
-/**
- * The reusable glass-box **diagnostic card** (S12.6b, G2R-F7/F8). The Tasker AAB scenes embed live
- * `%AAB_*` readouts beneath their controls; these cards rebuild that on the relevant parameter
- * screens (and the dedicated Live Debug scene) from the live [PipelineState]. Live values render in
- * the AAB gold accent (`#FFC107`, [AabGold]) exactly like the Tasker debug HTML's strong-value colour.
- */
+/** S12.6b, G2R-F7/F8: diagnostic card with live %AAB_* readouts and AAB gold accents. */
 @Composable
 fun DiagnosticCard(title: String, testTag: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
@@ -48,7 +43,7 @@ fun DiagnosticCard(title: String, testTag: String, content: @Composable ColumnSc
     }
 }
 
-/** One diagnostic line; [build] appends plain text + gold [GoldenValue] runs into an annotated string. */
+/** Diagnostic line with optional gold-highlighted values. */
 @Composable
 fun DiagnosticLine(testTag: String? = null, build: AnnotatedString.Builder.() -> Unit) {
     val text = buildAnnotatedString { build() }
@@ -59,9 +54,7 @@ fun DiagnosticLine(testTag: String? = null, build: AnnotatedString.Builder.() ->
     )
 }
 
-/** Append a live value highlighted in the AAB gold accent (the Tasker debug "strong" colour). S13c':
- *  the gold run is set in Plex Mono with tabular figures so the glass-box readouts read as instrument
- *  data, not inline prose. */
+/** S13c': append value in AAB gold + Plex Mono tabular figures (instrument-style readout). */
 fun AnnotatedString.Builder.goldValue(value: String) {
     withStyle(
         SpanStyle(
@@ -78,19 +71,11 @@ internal fun fmt(value: Double?, digits: Int = 1): String =
 
 internal fun fmtInt(value: Int?): String = value?.toString() ?: "—"
 
-/**
- * Format a 0..1 reactivity fraction as a whole percentage (G2R-F56): the Tasker scenes bind the
- * threshold readouts to the `%aab_thresh*pc` percentage variables, so 0.5 must read "50%". Rounds to
- * the nearest whole percent (the on-screen Tasker value carries no decimals).
- */
+/** G2R-F56: format 0..1 fraction as whole percentage (Tasker parity %aab_thresh*pc). */
 internal fun fmtPercent(value: Double?): String =
     value?.let { "${Math.round(it * 100.0)}%" } ?: "—"
 
-/**
- * Format the smoothing alpha for DISPLAY, clamped to ≥ 0 (G2R-F86). The engine value is intentionally
- * left unclamped (Tasker task535 parity, D-010(a) — `domain/` untouched); a brief transient can compute a
- * small negative `1 - exp(-Δ·effectiveDelta)` which is meaningless to show, so only the readout floors.
- */
+/** G2R-F86: display clamps alpha to ≥0 (engine unclamped for task535 parity, D-010(a)). */
 internal fun fmtAlpha(value: Double?): String = fmt(value?.coerceAtLeast(0.0), 3)
 
 private fun nowHhMm(): String {
@@ -98,19 +83,14 @@ private fun nowHhMm(): String {
     return "%02d:%02d".format(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE))
 }
 
-// --- Reactivity screen card (G2R-F7) ------------------------------------------------------------
+// G2R-F7: Reactivity screen card
 
-/**
- * Stateless Reactivity diagnostic: "Current threshold [%AAB_ThreshDynamic] at [%SmoothedLux] lx;
- * Sensor dead zone [%AAB_ThreshAbsLow]–[%AAB_ThreshAbsHigh] lx" (G2R-F7 verbatim).
- */
+/** G2R-F7: Reactivity diagnostic (%AAB_ThreshDynamic, sensor dead zone). */
 @Composable
 fun ReactivityDiagnosticCardContent(state: PipelineState) {
     DiagnosticCard("Live reactivity", "reactivity_diagnostic_card") {
         DiagnosticLine("diag_reactivity_threshold") {
             append("Current threshold ")
-            // G2R-F56: the live reactivity threshold (%AAB_ThreshDynamic, a 0..1 fraction) reads as a
-            // percentage in the Tasker scene (bound to %aab_thresh*pc) — 0.5 → "50%".
             goldValue(fmtPercent(state.threshDynamic))
             append(" at ")
             goldValue(fmt(state.smoothedLux))
@@ -126,20 +106,16 @@ fun ReactivityDiagnosticCardContent(state: PipelineState) {
     }
 }
 
-/** Live wrapper: collects the pipeline snapshot and renders the Reactivity diagnostic card. */
+/** Live wrapper for Reactivity diagnostic. */
 @Composable
 fun ReactivityDiagnosticCard() {
     val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     ReactivityDiagnosticCardContent(state)
 }
 
-// --- Circadian screen card (G2R-F8) -------------------------------------------------------------
+// G2R-F8: Circadian screen card
 
-/**
- * Stateless Circadian diagnostic: "Uncompressed scale [%AAB_ScaleDynamic] at [%TIME]; True scale
- * [%AAB_ScaleDynamicCompress] at [%AAB_CurrentBright] brightness ([%AAB_MinBright]–[%AAB_MaxBright])"
- * (G2R-F8 verbatim). [timeLabel] is the current local HH:mm.
- */
+/** G2R-F8: Circadian diagnostic (%AAB_ScaleDynamic, compressed scale, brightness). */
 @Composable
 fun CircadianDiagnosticCardContent(
     state: PipelineState,
@@ -168,21 +144,16 @@ fun CircadianDiagnosticCardContent(
     }
 }
 
-/** Live wrapper: collects the pipeline snapshot and renders the Circadian diagnostic card. */
+/** Live wrapper for Circadian diagnostic. */
 @Composable
 fun CircadianDiagnosticCard(minBrightness: Int, maxBrightness: Int) {
     val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     CircadianDiagnosticCardContent(state, minBrightness, maxBrightness, nowHhMm())
 }
 
-// --- Curve & Brightness screen card (G2R-F58) ---------------------------------------------------
+// G2R-F58: Curve & Brightness screen card
 
-/**
- * Stateless Curve & Brightness live readout (Tasker `current_lux_and_bright`, brightness_settings.md
- * elements22): "Current smoothed lux [%SmoothedLux]" + "Current brightness (%AAB_MinBright–
- * %AAB_MaxBright) [%AAB_CurrentBright]" (G2R-F58). [minBrightness]/[maxBrightness] are the committed
- * range; the brightness shown is the PERCEIVED value (D-117).
- */
+/** G2R-F58: Curve & Brightness readout (task535 current_lux_and_bright); shows PERCEIVED brightness (D-117). */
 @Composable
 fun CurveBrightnessDiagnosticCardContent(state: PipelineState, minBrightness: Int, maxBrightness: Int) {
     DiagnosticCard("Live brightness", "curve_diagnostic_card") {
@@ -196,28 +167,22 @@ fun CurveBrightnessDiagnosticCardContent(state: PipelineState, minBrightness: In
             append("–")
             goldValue(maxBrightness.toString())
             append(") ")
-            // D-117: show the PERCEIVED brightness (un-floored targetBrightness) like the Dashboard and
-            // the curve graph's "Now" line. In PWM-sensitive mode lastAppliedBrightness is the floored
-            // hardware value held at the dimming threshold; the perceived value is what the screen looks
-            // like. Falls back to the applied value when equal (PWM-sensitive off → target == applied).
+            // D-117: PERCEIVED brightness (un-floored target); falls back to applied when equal.
             goldValue(fmtInt(state.targetBrightness ?: state.lastAppliedBrightness))
         }
     }
 }
 
-/** Live wrapper: collects the pipeline snapshot and renders the Curve & Brightness readout. */
+/** Live wrapper for Curve & Brightness readout. */
 @Composable
 fun CurveBrightnessDiagnosticCard(minBrightness: Int, maxBrightness: Int) {
     val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     CurveBrightnessDiagnosticCardContent(state, minBrightness, maxBrightness)
 }
 
-// --- Misc screen card (G2R-F58) -----------------------------------------------------------------
+// G2R-F58: Misc screen card
 
-/**
- * Stateless Misc live readout (Tasker `current_throttle_and_alpha`, misc_settings.md elements31):
- * "Current throttle [%AAB_Throttle] ms" + "Current smoothing α [%LuxAlpha]" (G2R-F58).
- */
+/** G2R-F58: Misc readout (throttle, smoothing alpha). */
 @Composable
 fun MiscDiagnosticCardContent(state: PipelineState) {
     DiagnosticCard("Live timing", "misc_diagnostic_card") {
@@ -228,26 +193,21 @@ fun MiscDiagnosticCardContent(state: PipelineState) {
         }
         DiagnosticLine("diag_misc_alpha") {
             append("Current smoothing α ")
-            // G2R-F86: display clamps to ≥ 0 (engine value left unclamped for parity).
             goldValue(fmtAlpha(state.luxAlpha))
         }
     }
 }
 
-/** Live wrapper: collects the pipeline snapshot and renders the Misc readout. */
+/** Live wrapper for Misc readout. */
 @Composable
 fun MiscDiagnosticCard() {
     val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     MiscDiagnosticCardContent(state)
 }
 
-// --- Super Dimming screen card (G2R-F58) --------------------------------------------------------
+// G2R-F58: Super Dimming screen card
 
-/**
- * Stateless Super Dimming live readout (superdimming_settings.md): "Dimming strength (rel)
- * [%AAB_DimmingCurrent]" + "Dimming level (abs) [%AAB_DimmingDS]" + "at [%AAB_CurrentBright]
- * brightness" (G2R-F58). The values are 0 while dimming is not engaged (target ≥ threshold).
- */
+/** G2R-F58: Super Dimming readout (strength, level, brightness). */
 @Composable
 fun SuperDimmingDiagnosticCardContent(state: PipelineState) {
     DiagnosticCard("Live super dimming", "super_dimming_diagnostic_card") {
@@ -265,7 +225,7 @@ fun SuperDimmingDiagnosticCardContent(state: PipelineState) {
     }
 }
 
-/** Live wrapper: collects the pipeline snapshot and renders the Super Dimming readout. */
+/** Live wrapper for Super Dimming readout. */
 @Composable
 fun SuperDimmingDiagnosticCard() {
     val state by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()

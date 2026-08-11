@@ -48,7 +48,7 @@ We **gained** three rungs with no local predecessor: `guard_author_identity`,
 the AMH repository now, and a stale local snapshot would read as authoritative to a future
 session while drifting against every upstream release.
 
-## The four repo-local guards, and why each is not upstream's job
+## The five repo-local guards, and why each is not upstream's job
 
 - **`fdroid-changelog.sh`** — F-Droid flags a `whatsNew` over 500 **characters**, and it measures
   codepoints, not bytes. `wc -c` rejects a legal note full of em dashes. Only the current
@@ -68,8 +68,19 @@ session while drifting against every upstream release.
   ID resolves *somewhere*, which is right for it: it cannot know an adopter's volume naming.
   Here the naming is the rule, so a `DB-` row misfiled into `LEDGER_A.md` resolves cleanly and
   passes upstream.
+- **`comment-budget.sh`** — the constitution puts durable prose in the `.md` tier and leaves a
+  `D-NNN` pointer in the code, and nothing enforced it: the tree reached 7620 comment lines
+  against 40651 lines of Kotlin, much of it re-telling a ledger row verbatim. Upstream cannot own
+  this — it ships no language-aware scanner and has no view on an adopter's comment conventions.
+  Two checks: a 12-line cap on any contiguous comment block (the structural one — narrative does
+  not fit in 12 lines, so it has to go to the `.md` and leave a pointer), and a per-module
+  comment-line budget (which catches density arriving as hundreds of individually-reasonable
+  two-line comments, the way the tree actually got here). Counting is a real Kotlin scan, not a
+  grep for a leading slash: `//` inside a string is code, a raw string full of `//` lines is code,
+  and block comments nest. The fixture suite's `cb-rawstring` case exists to fail the naive
+  implementation, and does. It also runs as a `--hook` mode; see the adapter table below.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 24 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 39 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -82,9 +93,14 @@ broken guard rather than a mild opinion. The contract is the **ladder's**: a wor
 calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
 `scripts/guards/*.sh` outside `scripts/ladder.sh`.
 
-**All four of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
+**All five of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
 secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
 — for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
+`comment-budget.sh` was the one real candidate for the warn tier and was refused it: a budget that
+only warns is a budget the next session spends, and warn fatigue is the documented failure mode
+for exactly this shape of rule. The escape hatch is not a warning, it is the constants in the
+guard's own header — raising one is visible in the diff and trips the rule-review tripwire, which
+is the reviewable version of the same flexibility.
 `doc-facts.sh` is the interesting one: its anchors are deliberate approximations and *can* fire on
 a true claim (a fifth file naming `ShizukuShell` without being a runtime dependency site, per that
 guard's own header). It stays fail-closed anyway, because reconciling the prose against the code
@@ -155,10 +171,20 @@ dot-dir (`.claude/`, `.codex/`). A new one must:
 `$comment` field. A false coverage claim is what stops the next reader checking by hand. The two
 that exist today:
 
-| Adapter | Bootstrap | Command rail | Deny rails | Output redaction |
-|---|---|---|---|---|
-| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | **no** — Codex has no repository-local session-start hook; run `scripts/session-start.sh` by hand | **no** — no pre-shell hook, so `scripts/command-guard.sh` is a script nobody calls and every Bash call is unjudged | **partial** — `amh.rules` prefix rules only; the policy has no path-glob operand, so nested `.env` and arbitrary `/proc/<pid>/environ` cannot be expressed | **no** |
+| Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail |
+|---|---|---|---|---|---|
+| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | **no** — Codex has no repository-local session-start hook; run `scripts/session-start.sh` by hand | **no** — no pre-shell hook, so `scripts/command-guard.sh` is a script nobody calls and every Bash call is unjudged | **partial** — `amh.rules` prefix rules only; the policy has no path-glob operand, so nested `.env` and arbitrary `/proc/<pid>/environ` cannot be expressed | **no** | **no** — a prefix rule judges a shell command, not a file an edit tool wrote; `AGENTS.md` Conventions is the only layer standing |
+
+**On the comment rail specifically.** The ladder guard is the coverage; the hook is only
+*salience*. A rule that lands solely in a ladder run arrives after the narrative is written and
+the session has moved on, which is why the same check also runs on the edit that writes it. The
+hook cannot block — `PostToolUse` fires after the tool has already run — and it exits 2 because
+that is the one code for which Claude Code feeds a hook's stderr back to the model. It is
+deliberately silent when it cannot parse its payload: a hook that fires spuriously on every edit
+is one the next session deletes, and the ladder still covers the tree either way. Nothing can
+detect that the hook stopped firing — `configured` in the session banner means a file is present,
+never that a hook ran.
 
 **An agent with no pre-execution hook has no command rail at all.** `scripts/command-guard.sh` is
 then a script nobody calls, and the constitution's prose is the only layer standing. No check can
