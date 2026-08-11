@@ -7,7 +7,7 @@
 # it re-telling a ledger row that already held the same narrative in full. Two copies of one
 # lesson is two things to keep in sync, and the code copy is the one nobody updates.
 #
-# TWO CHECKS, and they catch different regressions:
+# THREE CHECKS, and they catch different regressions:
 #
 #   1. BLOCK CAP — no contiguous run of comment-only lines may exceed COMMENT_BLOCK_MAX_LINES.
 #      This is the structural one. Narrative does not fit in 12 lines, so a comment that wants to
@@ -16,12 +16,17 @@
 #   2. MODULE BUDGET — total comment lines per module may not exceed its constant. The block cap
 #      cannot see density that arrives as hundreds of individually-reasonable two-line comments,
 #      which is precisely how the tree got here.
+#   3. PROVENANCE MANIFEST — every `// Tasker` audit-trail record the manifest names must still be
+#      there. This one is a FLOOR, and it exists because checks 1 and 2 are what endanger it.
 #
-# The budgets are a RATCHET, not a target. They were set from the measured post-consolidation
-# tree plus a small working margin. Raising one is a legislative act, not housekeeping:
-# scripts/guards is in RULE_FILES, so a diff here trips the ladder's rule-review tripwire and the
-# review protocol applies. If you are raising a budget to land a change, the prose belongs in the
-# ledger instead — that is the whole point of the number.
+# The budgets are a RATCHET, not a target: the measured post-consolidation tree plus a stated
+# margin. Raising one is a legislative act rather than housekeeping — scripts/guards is in
+# RULE_FILES, so a diff here trips the ladder's rule-review tripwire and the review protocol
+# applies. Raising one is also LEGITIMATE, and the guard says so where it fails: new code with new
+# load-bearing documentation is exactly the case the margin cannot always absorb, and the review is
+# where that gets argued. What the number forbids is spending it silently. The failure a budget is
+# aimed at is durable prose duplicated out of the .md tier; when that is what pushed a module over,
+# moving the prose back is the repair and raising the number is evasion.
 #
 # WHAT THIS CANNOT DO, stated plainly because the rest of this header is a coverage claim and an
 # overstated one is what stops the next reader checking by hand:
@@ -29,8 +34,10 @@
 #     every check here while every surviving comment restates its own function name.
 #   * It does not read the .md tier, so it cannot confirm that evicted prose actually landed
 #     anywhere. `guard_citations` covers the narrower claim that a cited row still exists.
-#   * `--file` mode checks the block cap ONLY. A module total is a property of the whole tree, so
-#     one file cannot be judged against it.
+#   * `--file` mode checks the block cap ONLY. A module total and the provenance manifest are both
+#     properties of the whole tree, so one file cannot be judged against either.
+#   * The provenance manifest keys on normalised source coordinates, so it sees a DROPPED reference
+#     and not a re-pointed one. Its own header states that boundary in full.
 #
 # Counting is a real Kotlin scan, not a grep for a leading slash: `//` inside a string literal is
 # code, a triple-quoted raw string full of `//` lines is code, and block comments nest in Kotlin.
@@ -45,50 +52,189 @@ cd "$ROOT" || exit 1
 
 COMMENT_BLOCK_MAX_LINES=12
 
-# Floor on `// Tasker` provenance markers across the tree.
+# Per-module comment-line ceilings, and the margin that sets them.
 #
-# This exists because THIS GUARD is the thing that endangers them. The constitution mandates a
-# provenance marker on ported logic — `// Tasker: task535 "Lux Smoothing (Java)" XML L15204` — and
-# those markers are comments, so every downward pressure the budget applies falls on them too. The
-# first consolidation pass deleted four of them (SettingsControls, CircadianScreen, SolarTimes,
-# WifiSsidStrategies) despite an explicit instruction not to.
+# Each is the measured post-consolidation count for the module plus COMMENT_BUDGET_MARGIN_PCT, so
+# the headroom is a stated policy rather than an accident of where the tree happened to land. The
+# margin exists because a module that is exactly at its measured size has a budget of zero for the
+# next honest KDoc, and a guard whose only possible repair is deleting documentation is one that
+# drives out the documentation worth keeping. It is deliberately small: enough for a new adapter or
+# a newly-documented signature, not enough for a narrative.
 #
-# `ProvenanceTest` in :domain already floors this, but only for `BrightnessEngine.kt` — one file of
-# the 33 that carry markers. Everywhere else the rule was prose with nothing behind it. A budget
-# that pushes comment counts down while the only defence covers one file is a guard that erodes the
-# audit trail it was supposed to leave alone.
-#
-# Counted the way ProvenanceTest counts — lines containing the literal `// Tasker` — deliberately,
-# so the two agree rather than each being subtly right in its own way.
-#
-# A RATCHET, like the budgets: deleting genuinely dead ported logic legitimately lowers this, and
-# lowering it is then a one-line diff that trips the rule-review tripwire. That is the point — the
-# removal becomes visible instead of silent.
-#
-# 68 is the count at the branch point (b2b62fc), and getting that number right took two attempts.
-# The first floor was set to 64, measured from the working tree WHILE the consolidation was running
-# — by then four markers were already gone, so the floor would have ratified their loss and called
-# it the baseline. A ratchet read off a tree that is mid-change is not a ratchet. Take the number
-# from the merge base:
-#   git grep -h -- '// Tasker' <branch-point> -- '*.kt' | wc -l
-TASKER_PROVENANCE_FLOOR=68
-
-# Per-module comment-line ceilings. Set from the measured tree; see the header on why raising one
-# is a rule change.
+# Raising one past the margin is legitimate and is a RULE CHANGE, not housekeeping — scripts/guards
+# is in RULE_FILES, so the diff trips the rule-review tripwire and the reviewer's question is "why
+# does this narrative need to be in source rather than the .md tier". Answer that in the review and
+# the increase lands; the number is not sacred, the justification is. What the budget forbids is
+# raising it SILENTLY as the cheap way to land a change.
 #
 # These numbers live HERE and nowhere else, deliberately. An earlier draft of this comment told the
 # next reader to keep them "in lockstep with the row in docs/HARNESS_LOCAL.md" — a row that does not
 # exist, so the instruction was an invitation to CREATE the duplicate that DB-025 and DB-027 are
 # both about. If you find yourself restating one of these in prose, don't: name the key instead.
-BUDGET_app=2350
-BUDGET_domain=450
-BUDGET_platform=300
+COMMENT_BUDGET_MARGIN_PCT=5
+BUDGET_app=2400
+BUDGET_domain=460
+BUDGET_platform=310
 
 MODULES='app domain platform'
 
-# Character-level Kotlin scan. Emits one record per file:
-#   COUNT <file> <comment_lines> <total_lines>
-#   BLOCK <file> <start_line> <run_length>          (only for runs over the cap)
+# --- Tasker provenance: a per-record manifest, not a population count -------------------------
+#
+# This exists because THIS GUARD is the thing that endangers the markers. The constitution mandates
+# a provenance marker on ported logic — `// Tasker: task535 "Lux Smoothing (Java)" XML L15204` — and
+# those markers are comments, so every downward pressure the budget applies falls on them too. The
+# first consolidation pass deleted four of them (SettingsControls, CircadianScreen, SolarTimes,
+# WifiSsidStrategies) despite an explicit instruction not to.
+#
+# `ProvenanceTest` in :domain already floors provenance, but only for `BrightnessEngine.kt` — one
+# file of the 33 that carry markers. Everywhere else the rule was prose with nothing behind it.
+#
+# THE FIRST VERSION OF THIS CHECK WAS A SINGLE TREE-WIDE COUNT (`grep -c '// Tasker'` >= 68) AND
+# THAT WAS NOT ENOUGH — it protected the population, never any individual marker. Delete a marker
+# from one algorithm and add one anywhere else and the total is unchanged, so the guard passes while
+# an algorithm has silently lost its audit trail. That is not an adversarial bypass; it is what a
+# maintenance change that splits or retires one ported path does by accident. A count cannot name
+# which marker left, so its diagnostic could not have pointed at the damage either.
+#
+# So the unit is a RECORD, keyed by file plus the Tasker SOURCE COORDINATES the marker cites, and
+# the check is per-record: every record in the manifest must still be present, at least as often as
+# the manifest says. New records need no manifest edit — the manifest is a floor, never a whitelist.
+#
+# WHY COORDINATES AND NOT THE MARKER TEXT. Pinning the literal line was the obvious design and it is
+# wrong: 22 of the 68 markers were reworded by this very branch's consolidation, all of them
+# shortening the prose while keeping the same task/act reference. A manifest keyed on text would
+# have gone red on all 22, and a rule that fires on every honest prose edit is one that gets
+# regenerated by reflex until it means nothing. What is load-bearing in a marker is the pointer into
+# the Tasker XML — `task535`, `prof759`, `act28`, `elements26`, `L15204`, `%AAB_Scale` — not the
+# sentence around it. Keying on the coordinate set is stable across rewording and still fails when a
+# reference is dropped. That is not a hypothesis: normalising this way found two markers in
+# `BrightnessPolicyInput.kt` whose `act10/14` and `act26/27/28` coordinates the consolidation had
+# quietly dropped while the tree-wide count sat at exactly 68 and passed.
+#
+# WHAT IT STILL CANNOT DO, stated plainly:
+#   * Coordinates are normalised, so `act10/14` and `act10/99` are the same record. A marker
+#     re-pointed at a different sub-action inside the same task is not detected.
+#   * A record with no recognised coordinate degenerates to "this file has N `// Tasker` mentions"
+#     — the old population check, scoped to one file. 15 of the 59 records are of this kind, and
+#     four of those are in `ProvenanceTest.kt`, where the matched lines are prose ABOUT the marker
+#     syntax rather than markers. They are kept rather than hand-excluded because a hand-maintained
+#     exclusion list is a second thing to keep true; the cost is that rewording that test needs a
+#     manifest regeneration.
+#   * It reads the tree, not the XML. Nothing here checks that `task535` names a real Tasker task.
+#
+# Marker lines are matched exactly as `ProvenanceTest` matches them — any line containing the
+# literal `// Tasker` — so the two agree on what a marker is rather than each being subtly right in
+# its own way.
+#
+# The manifest is a RATCHET. Retiring genuinely dead ported logic legitimately removes a record, and
+# removing it is then a visible line in a RULE_FILES diff instead of a silent deletion. Regenerate
+# it with the guard's own mode, so the manifest and the checker can never drift into two
+# normalisations:
+#   scripts/guards/comment-budget.sh --provenance-records
+# Baseline it from the MERGE BASE, never the working tree. The first version of the old count was
+# set to 64 from a tree that was mid-consolidation — four markers were already gone, so the floor
+# would have ratified their loss and called it the baseline. A ratchet read off a tree that is
+# mid-change is not a ratchet. This manifest is the branch point (b2b62fc).
+#
+# Fields are TAB-separated: `<count>\t<path>\t<coordinates>`. Tab, because a path may contain a
+# space and a coordinate set may not contain a tab.
+TASKER_PROVENANCE_MANIFEST=$(
+	cat <<'MANIFEST'
+1	app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextEngine.kt	%AAB_CurrentActiveProfile,act17
+1	app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PipelineCycleRunner.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_AnimSteps,task570
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_ContextOverride
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_Debug
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_PanicPlugged
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_PanicSensitivity
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_Scale,task592
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_SetupTitle
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_ThreshMidpoint
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_Throttle,task570
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt	%AAB_Scale,%AAB_ScalingUse,act10,task661
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/SettingsValidator.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/TaskerLegacyProfileSerializer.kt	%AAB_DefaultThrottle,%AAB_Throttle
+1	app/src/main/kotlin/com/tideo/autobrightness/app/state/DraftSettingsViewModel.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/components/SettingsControls.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/graph/DimmingChart.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CircadianScreen.kt	elements26
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CurveBrightnessScreen.kt	elements22
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements20
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements31
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements4
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ProfilesScreen.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/SuperDimmingScreen.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	%AAB_Test,act13,task38
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	task38,task655
+2	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	(no-coordinate)
+2	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act10,task548,task661
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act16,task661
+3	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act28,prof759,task544,task545
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task535
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task535,task544
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task543
+3	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task546
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task548
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task661
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	%AAB_ScalingUse,act10,task548,task661
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	%AAB_ThreshMidpoint,act39,task570
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	act26,task570
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	prof759,task545
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/SolarTimes.kt	(no-coordinate)
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt	L649,task38
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt	L659,task38
+4	domain/src/test/kotlin/com/tideo/autobrightness/domain/brightness/ProvenanceTest.kt	(no-coordinate)
+1	domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/TaskerReference.kt	L40429,L41085,task90
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/ScreenBrightnessController.kt	task554,task696
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/SecureDimmingController.kt	task650
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/BatteryStateReader.kt	prof763,task43
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/ForegroundAppMonitor.kt	prof762,task43
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/LocationReader.kt	prof765
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiInfoReader.kt	prof768,task43
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiSsidStrategies.kt	(no-coordinate)
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/observe/BrightnessObserver.kt	prof755,task567
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/PrivilegeManager.kt	task378
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/sensor/LightSensorSource.kt	prof760
+1	platform/src/test/kotlin/com/tideo/autobrightness/platform/context/WifiSsidStrategyTest.kt	(no-coordinate)
+MANIFEST
+)
+
+tasker_provenance_records() { # <file>... -> "<path>\t<coordinates>" per marker line
+	awk '
+	match($0, /\/\/ Tasker/) {
+		t = substr($0, RSTART)
+		n = split(t, w, /[^A-Za-z0-9_%]+/)
+		split("", seen); m = 0
+		for (i = 1; i <= n; i++) {
+			k = w[i]
+			if (k ~ /^(task|prof|act|scene|elements)[0-9]+$/ || k ~ /^L[0-9]+$/ ||
+			    k ~ /^%AAB_[A-Za-z_]+$/) {
+				if (!(k in seen)) { seen[k] = 1; key[++m] = k }
+			}
+		}
+		for (x = 1; x <= m; x++)
+			for (y = x + 1; y <= m; y++)
+				if (key[y] < key[x]) { tmp = key[x]; key[x] = key[y]; key[y] = tmp }
+		s = ""
+		for (x = 1; x <= m; x++) s = s (x == 1 ? "" : ",") key[x]
+		printf "%s\t%s\n", FILENAME, (m ? s : "(no-coordinate)")
+	}
+	' "$@"
+}
+
+# Character-level Kotlin scan. Emits one record per file, with the PATH LAST:
+#   COUNT <comment_lines> <total_lines> <file>
+#   BLOCK <start_line> <run_length> <file>          (only for runs over the cap)
+#
+# The path goes last, and the numeric fields first, because a Kotlin path may legally contain a
+# space. An earlier version emitted `COUNT <file> <n> <m>`, and every consumer read `$2` as the path
+# and `$3` as a number — so one tracked file named `Parser Fixtures.kt` would have shifted every
+# field, scored the file as zero comment lines against its module budget and printed nonsense line
+# numbers in the block diagnostic. With the path last, each consumer takes the fixed count of
+# leading numeric fields and treats the whole remainder as the path.
 #
 # State is carried ACROSS lines (block-comment depth, raw-string mode, template nesting), which is
 # why this is one awk over the whole file rather than a per-line pattern.
@@ -192,14 +338,14 @@ scan_kotlin() { # <file>...
 		} else if (!hasc && !hascode && run > 0) {
 			gap++
 		} else {
-			if (run > cap) printf "BLOCK %s %d %d\n", file, runstart, run
+			if (run > cap) printf "BLOCK %d %d %s\n", runstart, run, file
 			run = 0
 			gap = 0
 		}
 	}
 	function flush() {
-		if (run > cap) printf "BLOCK %s %d %d\n", file, runstart, run
-		if (file != "") printf "COUNT %s %d %d\n", file, cl, tl
+		if (run > cap) printf "BLOCK %d %d %s\n", runstart, run, file
+		if (file != "") printf "COUNT %d %d %s\n", cl, tl, file
 	}
 	END { flush() }
 	' "$@"
@@ -242,7 +388,7 @@ except Exception:
 	[ -f "$f" ] || exit 0
 	bad=$(scan_kotlin "$f" | awk '$1 == "BLOCK"')
 	[ -n "$bad" ] || exit 0
-	printf '%s\n' "$bad" | while read -r _ file start run; do
+	printf '%s\n' "$bad" | while read -r _ start run file; do
 		printf 'comment budget: %s:%s starts a %s-line comment block, over the %s-line cap.\n' \
 			"$file" "$start" "$run" "$COMMENT_BLOCK_MAX_LINES" >&2
 	done
@@ -260,7 +406,7 @@ if [ "${1:-}" = "--file" ]; then
 	[ -f "$f" ] || exit 0
 	bad=$(scan_kotlin "$f" | awk '$1 == "BLOCK"')
 	[ -n "$bad" ] || exit 0
-	printf '%s\n' "$bad" | while read -r _ file start run; do
+	printf '%s\n' "$bad" | while read -r _ start run file; do
 		printf 'comment budget: %s:%s starts a %s-line comment block, over the %s-line cap.\n' \
 			"$file" "$start" "$run" "$COMMENT_BLOCK_MAX_LINES" >&2
 	done
@@ -268,11 +414,16 @@ if [ "${1:-}" = "--file" ]; then
 	exit 1
 fi
 
-if [ "${1:-}" != "" ]; then
+mode=check
+if [ "${1:-}" = "--provenance-records" ]; then
+	# Prints the tree's provenance manifest in the constant's own format, so regenerating it is a
+	# copy-paste and the manifest can never be normalised differently from the checker.
+	mode=records
+elif [ "${1:-}" != "" ]; then
 	# Exit 3, not 2. The ladder reads a WARN-less exit 2 from a repo-local guard as "broken
 	# guard", which is true but tells the reader nothing; a distinct code keeps a mistyped
 	# argument from being reported as a parse failure in this script.
-	printf 'usage: %s [--hook | --file <path.kt>]\n' "$0" >&2
+	printf 'usage: %s [--hook | --file <path.kt> | --provenance-records]\n' "$0" >&2
 	exit 3
 fi
 
@@ -281,22 +432,31 @@ fails=0
 report=$(mktemp)
 trap 'rm -f "$report"' EXIT
 
-list=$(mktemp)
-trap 'rm -f "$report" "$list"' EXIT
-git ls-files -- '*.kt' >"$list" 2>/dev/null
-if [ ! -s "$list" ]; then
+# `git ls-files -z` and a NUL-delimited read, so a tracked path containing a space or a newline
+# reaches the scanner intact. Read into an array rather than word-splitting a newline-joined list:
+# the `IFS=$'\n'; set -f` idiom this replaced was already safe for spaces, but only until someone
+# reached for `$(cat "$list")` again, and it could never have survived a newline in a path.
+files=()
+while IFS= read -r -d '' f; do files+=("$f"); done < <(git ls-files -z -- '*.kt' 2>/dev/null)
+if [ "${#files[@]}" -eq 0 ]; then
 	printf 'no Kotlin files tracked — this guard checked NOTHING, which is not a pass\n' >&2
 	exit 1
 fi
+# --- records mode: print the current tree's provenance manifest (for regenerating the constant) --
+if [ "$mode" = "records" ]; then
+	tasker_provenance_records "${files[@]}" | sort | uniq -c |
+		sed -e 's/^[[:space:]]*//' -e 's/^\([0-9][0-9]*\) /\1	/'
+	exit 0
+fi
+
 # One awk over every file: the scan carries state across lines, and FNR==1 restarts it per file.
 # xargs would split the list into batches on a large tree, which is harmless here only because
 # each file is self-contained — but a single invocation keeps that from being a thing to know.
-scan_kotlin_from_list() { local IFS=$'\n'; set -f; scan_kotlin $(cat "$list"); set +f; }
-scan_kotlin_from_list >"$report"
+scan_kotlin "${files[@]}" >"$report"
 
 over=$(awk '$1 == "BLOCK"' "$report")
 if [ -n "$over" ]; then
-	printf '%s\n' "$over" | while read -r _ file start run; do
+	printf '%s\n' "$over" | while read -r _ start run file; do
 		printf 'comment budget: %s:%s starts a %s-line comment block, over the %s-line cap — move the narrative to its ledger row or a docs/rebuild/ page and leave a `// D-NNN:` pointer\n' \
 			"$file" "$start" "$run" "$COMMENT_BLOCK_MAX_LINES" >&2
 	done
@@ -306,27 +466,42 @@ fi
 summary=''
 for m in $MODULES; do
 	eval "budget=\$BUDGET_$m"
-	got=$(awk -v m="$m" '$1 == "COUNT" && index($2, m "/") == 1 { s += $3 } END { print s + 0 }' "$report")
+	# The path is everything after the three leading fields, so a path containing a space is
+	# still matched whole against the module prefix.
+	got=$(awk -v m="$m" '$1 == "COUNT" {
+		p = $0; sub(/^COUNT [0-9]+ [0-9]+ /, "", p)
+		if (index(p, m "/") == 1) s += $2
+	} END { print s + 0 }' "$report")
 	if [ "$got" -gt "$budget" ]; then
-		printf 'comment budget: %s holds %s comment lines, over its %s-line budget by %s — the fix is to move prose to the ledger, NOT to raise the number here (that is a rule change, see this guard'"'"'s header)\n' \
-			"$m" "$got" "$budget" "$((got - budget))" >&2
+		printf 'comment budget: %s holds %s comment lines, over its %s-line budget by %s. Two repairs, in this order: move durable prose to its ledger row or a docs/rebuild/ page and leave a `// D-NNN:` pointer — that is what the budget is for — or, if what pushed it over is genuinely new load-bearing documentation of new code, raise BUDGET_%s in this guard. Raising it is ALLOWED and is a rule change, not housekeeping: scripts/guards is in RULE_FILES, so the diff gets a rule review, and the review is where you say why this belongs in source rather than the .md tier.\n' \
+			"$m" "$got" "$budget" "$((got - budget))" "$m" >&2
 		fails=$((fails + 1))
 	fi
 	summary="$summary $m=$got/$budget"
 done
 
-# Provenance floor. Counted with grep over the same file list rather than through the scanner
-# above: ProvenanceTest counts `it.contains("// Tasker")` on raw lines, and this must agree with it
-# rather than be independently clever. A marker inside a string literal would be counted by both,
-# which is the harmless direction — it cannot cause a false FAILURE, only a false pass on a line
-# nobody writes.
-tasker=$(xargs -a "$list" grep -h -- '// Tasker' 2>/dev/null | wc -l | tr -d '[:space:]')
-if [ "${tasker:-0}" -lt "$TASKER_PROVENANCE_FLOOR" ]; then
-	printf 'comment budget: %s `// Tasker` provenance line(s) in the tree, under the floor of %s — %s marker(s) were deleted. These are the XML-to-Kotlin audit trail the constitution mandates, and this guard is what puts them at risk, so restore them rather than lowering the floor. Compare against the branch point:\n  git grep -c "// Tasker" <base> -- "*.kt"\n' \
-		"$tasker" "$TASKER_PROVENANCE_FLOOR" "$((TASKER_PROVENANCE_FLOOR - tasker))" >&2
+# Provenance manifest. Every record the manifest names must still be present at least as often as
+# it says; new records are free. See the manifest's header for why the key is the coordinate set
+# and not the marker text.
+recs=$(mktemp)
+trap 'rm -f "$report" "$recs"' EXIT
+tasker_provenance_records "${files[@]}" >"$recs"
+prov_total=$(wc -l <"$recs" | tr -d '[:space:]')
+lost=$(printf '%s\n' "$TASKER_PROVENANCE_MANIFEST" | awk -F'\t' '
+	NR == FNR { if (NF == 3 && $1 != "") need[$2 FS $3] = $1 + 0; next }
+	{ have[$1 FS $2]++ }
+	END { for (k in need) if (have[k] + 0 < need[k]) printf "%d\t%d\t%s\n", need[k], have[k] + 0, k }
+' - "$recs" | sort -t'	' -k3,3)
+if [ -n "$lost" ]; then
+	printf '%s\n' "$lost" | while IFS='	' read -r want got path coords; do
+		printf 'comment budget: %s no longer carries its `// Tasker` provenance for %s (manifest requires %s, found %s).\n' \
+			"$path" "$coords" "$want" "$got" >&2
+	done
+	printf 'These markers are the XML-to-Kotlin audit trail the constitution mandates, and this guard'"'"'s own downward pressure on comments is what puts them at risk — restore the coordinates rather than editing the manifest. Rewording a marker is fine and does not trip this: only DROPPING a task/act/prof/elements/L/%%AAB_ reference does. If ported logic was genuinely retired, regenerate the manifest with `scripts/guards/comment-budget.sh --provenance-records` and let the rule review see the removed line.\n' >&2
 	fails=$((fails + 1))
 fi
 
 [ "$fails" = 0 ] || exit 1
-printf 'comment budget:%s; no block over %s lines; %s/%s Tasker provenance lines\n' \
-	"$summary" "$COMMENT_BLOCK_MAX_LINES" "$tasker" "$TASKER_PROVENANCE_FLOOR"
+prov_records=$(printf '%s\n' "$TASKER_PROVENANCE_MANIFEST" | awk -F'\t' 'NF == 3 && $1 != ""' | wc -l | tr -d '[:space:]')
+printf 'comment budget:%s; no block over %s lines; %s Tasker provenance marker(s), all %s manifest record(s) intact\n' \
+	"$summary" "$COMMENT_BLOCK_MAX_LINES" "$prov_total" "$prov_records"

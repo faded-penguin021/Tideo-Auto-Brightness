@@ -104,11 +104,16 @@ mandates, and the `D-NNN` citations themselves — **never drop the last citatio
 code**, or its `[cited]` marker goes stale and the ladder fails.
 
 Which layer holds this: `scripts/guards/comment-budget.sh` caps any contiguous comment block at
-12 lines and holds a per-module comment-line budget, failing closed in the ladder and in CI; the
-Claude Code adapter runs the same block cap as a `PostToolUse` hook, so a long block is reported
-on the edit that writes it. **Codex has neither** — its prefix rules cannot express this, so for
-that agent these paragraphs are the only layer standing. Raising a budget is a rule change, not
-housekeeping: `scripts/guards` is in `RULE_FILES` and the review protocol applies.
+12 lines, holds a per-module comment-line budget, and floors the `// Tasker` markers against a
+manifest keyed on the **source coordinates** each one cites — so rewording a marker is free and
+dropping its `task`/`act`/`prof`/`elements`/`L` reference fails, naming the file that lost it. All
+three fail closed in the ladder and in CI; the Claude Code adapter runs the block cap as a
+`PostToolUse` hook, so a long block is reported on the edit that writes it. **Codex has neither
+hook** — its prefix rules cannot express this, so for that agent these paragraphs are the only
+layer standing. Raising a budget is legitimate and is a rule change, not housekeeping:
+`scripts/guards` is in `RULE_FILES` and the review protocol applies. The guard says the same where
+it fails, and that is deliberate — a diagnostic that forbade what this paragraph permits would just
+teach the reader to stop believing one of them.
 
 **The one rule that overrides taste: Tasker semantics win.** Port behaviour exactly, including
 odd rounding and quirks that look like bugs; modernise the *how*, never the *what*. Mark ported

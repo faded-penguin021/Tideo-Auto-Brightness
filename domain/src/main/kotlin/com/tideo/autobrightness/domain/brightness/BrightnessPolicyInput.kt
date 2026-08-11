@@ -57,13 +57,13 @@ data class BrightnessCurveConfig(
     val offset: Double = 0.0,
     val taperMidpoint: Double = 190.0,
     val taperSteepness: Double = 0.075,
-    // Tasker task661: %AAB_ScalingUse gates taper (task548) vs. linear scale+offset branch
+    // Tasker task661 act10/14: %AAB_ScalingUse gates taper (task548) vs. linear scale+offset branch
     val scalingUse: Boolean = true,
     val scale: Double = 1.0,
 )
 
 data class AnimationConfig(
-    // Tasker task570: AnimSteps=20, MinWait=25ms, MaxWait=65ms (D-004/D-008)
+    // Tasker task570 act26/27/28: AnimSteps=20, MinWait=25ms, MaxWait=65ms (D-004/D-008)
     val maxSteps: Int = 20,
     val minWaitMs: Long = 25,
     val maxWaitMs: Long = 65,

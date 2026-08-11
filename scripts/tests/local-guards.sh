@@ -555,7 +555,7 @@ fi
 
 # --- module budget, via the whole-tree mode (needs a git tree) -------------------------------
 
-cb_git_tree() { # <dir> <budget> [tasker-floor, default 0]
+cb_git_tree() { # <dir> <budget> [manifest-record...]
 	local d=$SANDBOX/$1
 	rm -rf "$d"
 	mkdir -p "$d/app"
@@ -563,9 +563,30 @@ cb_git_tree() { # <dir> <budget> [tasker-floor, default 0]
 	# Lower the budget in the SANDBOX COPY so the arithmetic can be exercised without a
 	# multi-thousand-line fixture. The real constants are not what is under test here.
 	sed -i.bak "s/^BUDGET_app=.*/BUDGET_app=$2/" "$d/scripts/guards/comment-budget.sh"
-	sed -i.bak "s/^TASKER_PROVENANCE_FLOOR=.*/TASKER_PROVENANCE_FLOOR=${3:-0}/" \
-		"$d/scripts/guards/comment-budget.sh"
 	rm -f "$d/scripts/guards/comment-budget.sh.bak"
+	# Replace the shipped provenance manifest with the fixture's own records (tab-separated
+	# `count<TAB>path<TAB>coordinates`, passed as $3...), or with an empty one when none are given.
+	# Rewriting the whole heredoc rather than patching a number is the point: the manifest IS the
+	# check now, so a fixture that exercises it has to state records the way the real one does.
+	local g=$d/scripts/guards/comment-budget.sh
+	local mf=$d/.fixture-manifest
+	: >"$mf"
+	local r
+	for r in "${@:3}"; do printf '%s\n' "$r" >>"$mf"; done
+	awk -v mf="$mf" '
+		/^TASKER_PROVENANCE_MANIFEST=\$\($/ {
+			print
+			print "\tcat <<'"'"'MANIFEST'"'"'"
+			while ((getline l < mf) > 0) print l
+			print "MANIFEST"
+			print ")"
+			skip = 1
+			next
+		}
+		skip && /^\)$/ { skip = 0; next }
+		skip { next }
+		{ print }
+	' "$g" >"$g.new" && mv "$g.new" "$g"
 	git -C "$d" init -q 2>/dev/null
 	git -C "$d" config user.email t@example.com
 	git -C "$d" config user.name t
@@ -591,19 +612,39 @@ run_cb cb-budget-over
 expect_fail "a module over its comment budget fails" "over its 3-line budget"
 
 # The remedy has to be in the diagnostic. A guard that says only "no" gets its number raised.
-if printf '%s' "$OUT" | grep -qF 'NOT to raise the number'; then
+if printf '%s' "$OUT" | grep -qF 'move durable prose to its ledger row'; then
 	ok
 else
 	bad "the budget diagnostic must name the remedy (move prose to the ledger), not just the violation: $OUT"
 fi
 
-# --- Tasker provenance floor -----------------------------------------------------------------
+# ...and it must ALSO name the escape hatch, because the escape hatch is real. An earlier version
+# said the fix was "NOT to raise the number here", while the guard's own header and
+# docs/HARNESS_LOCAL.md both describe raising a constant as the intended reviewable adjustment.
+# A diagnostic that forbids what the documentation permits either gets the documentation ignored or
+# gets an honest change parked; either way the reader stops trusting the guard. Both repairs, in
+# priority order, or this case is red.
+if printf '%s' "$OUT" | grep -qF 'rule change, not housekeeping'; then
+	ok
+else
+	bad "the budget diagnostic must also say that raising the budget is allowed and is a reviewed rule change — the header and HARNESS_LOCAL.md both say so, and a diagnostic that contradicts them is the enforcement asymmetry DA-005 hunts: $OUT"
+fi
+
+# --- Tasker provenance manifest ---------------------------------------------------------------
 #
 # This guard is the thing that endangers provenance markers: they are comments, so every downward
 # pressure the budget applies falls on them too. The first consolidation pass deleted four despite
 # an explicit instruction not to, which is why the floor exists and why it is fixtured.
+#
+# The first version of the check was a single tree-wide COUNT, and the cases below are mostly about
+# why that was not enough. A count protects the population, never any individual marker, so the
+# substitution case — delete one marker, add another elsewhere — passed it while an algorithm lost
+# its audit trail. That is the shape a real maintenance change has, not an adversarial one.
 
-cb_git_tree cb-prov-ok 100 2
+# The baseline: a tree whose markers match its manifest.
+cb_git_tree cb-prov-ok 100 \
+	$'1\tapp/A.kt\tL15204,task535' \
+	$'1\tapp/A.kt\tact22,task661'
 {
 	printf 'package x\n'
 	printf '// Tasker: task535 "Lux Smoothing (Java)" XML L15204\n'
@@ -613,25 +654,182 @@ cb_git_tree cb-prov-ok 100 2
 } >"$SANDBOX/cb-prov-ok/app/A.kt"
 git -C "$SANDBOX/cb-prov-ok" add -A
 run_cb cb-prov-ok
-expect_pass "a tree meeting the Tasker provenance floor passes"
+expect_pass "a tree carrying every manifest provenance record passes"
 
-cb_git_tree cb-prov-low 100 5
+cb_git_tree cb-prov-gone 100 \
+	$'1\tapp/A.kt\tL15204,task535' \
+	$'1\tapp/A.kt\tact22,task661'
 {
 	printf 'package x\n'
 	printf '// Tasker: task535 "Lux Smoothing (Java)" XML L15204\n'
 	printf 'val a = 1\n'
-} >"$SANDBOX/cb-prov-low/app/A.kt"
-git -C "$SANDBOX/cb-prov-low" add -A
-run_cb cb-prov-low
-expect_fail "deleting Tasker provenance below the floor fails" "under the floor of 5"
+	printf 'val b = 2\n'
+} >"$SANDBOX/cb-prov-gone/app/A.kt"
+git -C "$SANDBOX/cb-prov-gone" add -A
+run_cb cb-prov-gone
+expect_fail "deleting a manifest provenance record fails" "no longer carries its"
 
-# The remedy must point at restoring the markers, not at lowering the number — the floor is only
-# worth having if the obvious way out is closed.
-if printf '%s' "$OUT" | grep -qF 'restore them rather than lowering the floor'; then
+# It must name WHICH record went, or the diagnostic sends the reader to diff 68 markers by hand.
+# This is the whole reason the unit is a record and not a number.
+if printf '%s' "$OUT" | grep -qF 'act22,task661'; then
 	ok
 else
-	bad "the provenance diagnostic must tell the reader to restore the markers, not lower the floor: $OUT"
+	bad "the provenance diagnostic must name the coordinates of the record that went missing: $OUT"
 fi
+
+# THE CASE THE OLD COUNT COULD NOT SEE, and the reason this check was rewritten. One marker is
+# deleted and an unrelated one is added, so the tree-wide total is unchanged at 2 — the count
+# passed this and called the tree healthy.
+cb_git_tree cb-prov-swap 100 \
+	$'1\tapp/A.kt\tL15204,task535' \
+	$'1\tapp/A.kt\tact22,task661'
+{
+	printf 'package x\n'
+	printf '// Tasker: task535 "Lux Smoothing (Java)" XML L15204\n'
+	printf 'val a = 1\n'
+	printf '// Tasker: task999 act1 — newly ported logic, unrelated\n'
+	printf 'val b = 2\n'
+} >"$SANDBOX/cb-prov-swap/app/A.kt"
+git -C "$SANDBOX/cb-prov-swap" add -A
+run_cb cb-prov-swap
+expect_fail "substituting one marker for another fails even though the total is unchanged" "act22,task661"
+
+# Relocation is substitution across files, and is the form a refactor actually takes: the marker
+# still exists somewhere, so a tree-wide count is satisfied while the algorithm that was ported
+# no longer says where it came from.
+cb_git_tree cb-prov-moved 100 $'1\tapp/A.kt\tact22,task661'
+printf 'package x\nval a = 1\n' >"$SANDBOX/cb-prov-moved/app/A.kt"
+printf 'package x\n// Tasker: task661 act22\nval b = 2\n' >"$SANDBOX/cb-prov-moved/app/B.kt"
+git -C "$SANDBOX/cb-prov-moved" add -A
+run_cb cb-prov-moved
+expect_fail "a marker relocated to another file fails — the manifest keys on the file too" "app/A.kt"
+
+# The other direction, and it is what makes the manifest livable. 22 of the 68 real markers were
+# REWORDED by the consolidation this guard shipped with, every one keeping its task/act reference
+# while shortening the prose. A manifest keyed on the marker TEXT would have gone red on all 22,
+# and a rule that fires on every honest prose edit gets regenerated by reflex until it means
+# nothing. Only a dropped COORDINATE is a finding.
+cb_git_tree cb-prov-reworded 100 $'1\tapp/A.kt\tact22,task661'
+printf 'package x\n// Tasker task661 act22: a much shorter restatement.\nval a = 1\n' \
+	>"$SANDBOX/cb-prov-reworded/app/A.kt"
+git -C "$SANDBOX/cb-prov-reworded" add -A
+run_cb cb-prov-reworded
+expect_pass "rewording a marker while keeping its coordinates passes"
+
+# New provenance needs no manifest edit. The manifest is a floor, not a whitelist — if adding
+# newly-ported logic required a rule review, the guard would be taxing the thing it wants.
+cb_git_tree cb-prov-added 100 $'1\tapp/A.kt\tact22,task661'
+{
+	printf 'package x\n'
+	printf '// Tasker: task661 act22\n'
+	printf 'val a = 1\n'
+	printf '// Tasker: task700 act5 — newly ported\n'
+	printf 'val b = 2\n'
+} >"$SANDBOX/cb-prov-added/app/A.kt"
+git -C "$SANDBOX/cb-prov-added" add -A
+run_cb cb-prov-added
+expect_pass "adding new provenance needs no manifest change — the manifest is a floor, not a whitelist"
+
+# The remedy must point at restoring the markers, not at regenerating the manifest — the floor is
+# only worth having if the obvious way out is closed.
+run_cb cb-prov-gone
+if printf '%s' "$OUT" | grep -qF 'restore the coordinates rather than editing the manifest'; then
+	ok
+else
+	bad "the provenance diagnostic must tell the reader to restore the coordinates, not to regenerate the manifest: $OUT"
+fi
+
+# The manifest and the checker must share ONE normalisation, or the manifest pins records the
+# checker can never match and the guard is permanently red or permanently vacuous. `--provenance-records`
+# is the regeneration path the guard's header sends people to, so its output must be exactly what
+# the manifest wants: feed a tree's own emitted records back in as its manifest and it must pass.
+cb_git_tree cb-prov-roundtrip 100
+{
+	printf 'package x\n'
+	printf '// Tasker: task535 "Lux Smoothing (Java)" XML L15204\n'
+	printf 'val a = 1\n'
+	printf '// Tasker: prof759/task545 proximity damp\n'
+	printf 'val b = 2\n'
+} >"$SANDBOX/cb-prov-roundtrip/app/A.kt"
+git -C "$SANDBOX/cb-prov-roundtrip" add -A
+run_cb cb-prov-roundtrip --provenance-records
+if [ "$RC" = 0 ] && [ "$(printf '%s\n' "$OUT" | wc -l)" = 2 ]; then
+	ok
+else
+	bad "--provenance-records must emit one manifest line per distinct record (rc=$RC): $OUT"
+fi
+# Feed those exact lines back as the manifest — verbatim, tabs and all — rather than retyping
+# them, so this really is a round trip and not two hand-written strings that happen to agree.
+prov_records=()
+while IFS= read -r line; do
+	[ -n "$line" ] && prov_records+=("$line")
+done <<EOF
+$OUT
+EOF
+cb_git_tree cb-prov-roundtrip2 100 "${prov_records[@]}"
+{
+	printf 'package x\n'
+	printf '// Tasker: task535 "Lux Smoothing (Java)" XML L15204\n'
+	printf 'val a = 1\n'
+	printf '// Tasker: prof759/task545 proximity damp\n'
+	printf 'val b = 2\n'
+} >"$SANDBOX/cb-prov-roundtrip2/app/A.kt"
+git -C "$SANDBOX/cb-prov-roundtrip2" add -A
+run_cb cb-prov-roundtrip2
+expect_pass "records emitted by --provenance-records satisfy the manifest they are pasted into"
+
+# --- paths containing a space -----------------------------------------------------------------
+#
+# The scanner serialises its findings as text, so the record format decides whether a path with a
+# space survives the trip. It did not: the fields were `COUNT <file> <n> <m>`, and every consumer
+# read `$2` as the path and `$3` as a number, so one tracked `Parser Fixtures.kt` shifted every
+# field — the module sum scored the file as zero, and the block diagnostic printed a filename
+# fragment where the line number belonged. Kotlin filenames with spaces are unconventional and
+# perfectly legal, and this harness already treats whitespace-safe paths as a property worth having.
+# Both halves are fixtured because they parse the record separately.
+
+cb_git_tree cb-space-block 100
+{
+	printf 'package x\n'
+	i=0
+	while [ "$i" -lt 20 ]; do
+		printf '// narrative line %s\n' "$i"
+		i=$((i + 1))
+	done
+	printf 'val a = 1\n'
+} >"$SANDBOX/cb-space-block/app/Parser Fixtures.kt"
+git -C "$SANDBOX/cb-space-block" add -A
+run_cb cb-space-block
+expect_fail "the block cap sees a path containing a space" "over the 12-line cap"
+# The diagnostic must carry the WHOLE path and a real line number, not the fragment before the
+# space followed by the rest of the filename where the count belongs.
+if printf '%s' "$OUT" | grep -qF 'app/Parser Fixtures.kt:2 starts a 20-line'; then
+	ok
+else
+	bad "the block diagnostic mangled a path containing a space — expected 'app/Parser Fixtures.kt:2 starts a 20-line': $OUT"
+fi
+
+# The budget half reads the same record and has its own parse. With the fields shifted, this file's
+# 20 comment lines summed as zero and the module passed a budget it was well over.
+cb_git_tree cb-space-budget 3
+{
+	printf 'package x\n'
+	i=0
+	while [ "$i" -lt 4 ]; do
+		printf '// c%s\nval v%s = %s\n' "$i" "$i" "$i"
+		i=$((i + 1))
+	done
+} >"$SANDBOX/cb-space-budget/app/Parser Fixtures.kt"
+git -C "$SANDBOX/cb-space-budget" add -A
+run_cb cb-space-budget
+expect_fail "the module budget counts a file whose path contains a space" "over its 3-line budget"
+
+# ...and provenance, which reads the tree through the same file list.
+cb_git_tree cb-space-prov 100 $'1\tapp/Parser Fixtures.kt\tact22,task661'
+printf 'package x\nval a = 1\n' >"$SANDBOX/cb-space-prov/app/Parser Fixtures.kt"
+git -C "$SANDBOX/cb-space-prov" add -A
+run_cb cb-space-prov
+expect_fail "the provenance manifest tracks a path containing a space" "app/Parser Fixtures.kt"
 
 # A tree with no Kotlin at all must not collect a green pass — it checked nothing.
 cb_git_tree cb-empty 100

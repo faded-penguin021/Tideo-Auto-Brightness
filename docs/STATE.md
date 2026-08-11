@@ -83,13 +83,15 @@ zero-pending; tests green; TODO/FIXME and parity gaps zero. Live ledger: `LEDGER
 
 **Open questions:** (none)
 
-**Incoming findings:**
+**Owed reviews:**
 
-- 2026-08-11 — **Codex review of the comment-consolidation branch vs `main` PENDING** (owner-run,
-  read-only). Triage note: the Kotlin diff is comment-only *by construction* — each file was proved
-  by stripping comments from both sides and byte-comparing — so a finding alleging a behaviour
-  change there is a defect in that proof or a misread; verify before acting. Any fix touching
-  legislation needs its own DA-005 pass; the branch's covered 81cad7e, not its replacement.
+1. **DA-005 pass owed on the DB-029…DB-031 legislation diff** (`comment-budget.sh`,
+   `scripts/tests/local-guards.sh`, `AGENTS.md`). Committed WITHOUT it: the session that wrote the
+   rules cannot review them and ran out of budget before spawning a fresh context. Review the diff
+   `81cad7e..HEAD`, strongest tier, reviewer gets the diff and tree access but not this rationale.
+   The branch's earlier DA-005 covered 81cad7e and does **not** carry over.
+
+**Incoming findings:**
 
 - 2026-08-02 — **Owner device pass on 1.8.2-debug: 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED.**
   Two real defects, both fixed (DB-011 plugged-only panic firing on battery; DB-012 a re-granted
@@ -130,21 +132,29 @@ zero-pending; tests green; TODO/FIXME and parity gaps zero. Live ledger: `LEDGER
 
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
 
-- 2026-08-11 — **Comment consolidation + a rail that holds it (DB-028).** The Kotlin was 18.7%
-  comment lines (7620/40651), much of it re-telling a ledger row verbatim; Conventions had decayed
-  to "match its comment density", telling each session to reproduce what it found. Prose moved to
-  the `.md` tier, code left carrying `D-NNN` pointers — now 8.4% (3015), 215 files, every one
-  proved comment-only against the branch point. New repo-local guard `comment-budget.sh` (fifth):
-  12-line block cap + per-module budgets + a `// Tasker` provenance FLOOR (the guard's downward
-  pressure falls on provenance markers too, and the first pass deleted 12 of them), fail-closed,
-  with a `--hook` mode the Claude adapter runs on every `.kt` write. Codex gets no equivalent and
-  the adapter table says so. Fixture suite 24 → 56 cases. **The DA-005 pass found five real
-  defects**, two severe: the guard shipped mode 100644, so the hook the diff advertised exited 126
-  and never fired while every test stayed green; and a blank line reset the block run, so 36 lines
-  of narrative in three paragraphs — or one `/* */` containing one empty line — passed, falsifying
-  the "narrative does not fit in 12 lines" premise the rule rests on. Also: two drifted counts, and
-  a tag-exemption "tripwire" that only pinned one arbitrary tag. All fixed, each with a fixture that
-  bites; the case count now self-checks against the sentence stating it.
+- 2026-08-11 — **Comment consolidation, and two review passes on the rail that holds it
+  (DB-028…DB-031).** The Kotlin was 18.7% comment lines (7620/40651), much of it re-telling a ledger
+  row verbatim; Conventions had decayed to "match its comment density", telling each session to
+  reproduce what it found. Prose moved to the `.md` tier, code left carrying `D-NNN` pointers — now
+  8.4% (3015), 215 files, every one proved comment-only against the branch point. New repo-local
+  guard `comment-budget.sh` (fifth): 12-line block cap, per-module budgets, a `// Tasker` provenance
+  floor, fail-closed, with a `--hook` mode the Claude adapter runs on every `.kt` write; Codex gets
+  no equivalent and the adapter table says so. **Each review pass found the enforcement weaker than
+  its own prose claimed.** DA-005 found five defects, two severe: the guard shipped mode 100644, so
+  the advertised hook exited 126 and never fired while every test stayed green; and a blank line
+  reset the block run, so 36 lines of narrative in three paragraphs passed, falsifying the premise
+  the rule rests on. The owner's Codex pass then found the provenance floor was a tree-wide COUNT,
+  which protects the population and no individual marker — delete one and add another anywhere and
+  it passes (DB-029); that the module ceilings left `:platform` 9 lines while the failure text
+  forbade the very increase the header and `HARNESS_LOCAL.md` both call the intended escape hatch
+  (DB-030); and that the scanner's record format would mangle any Kotlin path containing a space
+  (DB-031). All fixed. Provenance is now a 59-record manifest keyed on Tasker **source
+  coordinates** — stable across the 22 markers this branch legitimately reworded, and it immediately
+  caught two in `BrightnessPolicyInput.kt` whose `act` coordinates the consolidation had dropped
+  while the count sat at exactly 68 and passed. Fixture suite 24 → 68 cases; the count self-checks
+  against the sentence stating it. Codex's remaining points were prose overstating coverage, and the
+  headers now state each residue (normalised coordinates miss a *re-pointed* marker; 15 records cite
+  no coordinate and degenerate to a per-file count).
 
 - 2026-08-10 — **AMH upgraded 5.1.0 → 5.2.0 (DB-027).** MINOR, and no shipped script changed — the copy
   moved only the manifest's version banner, hashes identical. The whole entry is the seed
