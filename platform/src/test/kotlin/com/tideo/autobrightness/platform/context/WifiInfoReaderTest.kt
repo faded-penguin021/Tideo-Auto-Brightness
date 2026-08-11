@@ -16,11 +16,7 @@ import org.robolectric.shadows.ShadowNetworkCapabilities
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * `ssidFlow()` NetworkCallback path (H3 seam; D-143): the SSID resolve runs asynchronously per
- * capabilities callback, so a resolve still in flight when the network state moves on must not
- * publish its stale result over the newer state.
- */
+/** ssidFlow() NetworkCallback path (H3 seam; D-143): drop stale in-flight resolves. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class WifiInfoReaderTest {
@@ -60,16 +56,13 @@ class WifiInfoReaderTest {
         val net = ShadowNetwork.newInstance(101)
         val caps = ShadowNetworkCapabilities.newInstance()
 
-        // Connect: the resolve starts and parks inside the strategy.
         f.callback.onCapabilitiesChanged(net, caps)
         assertEquals(1, f.strategy.calls.size, "resolve started")
 
-        // Disconnect while the resolve is still in flight: the flow publishes null.
         f.callback.onLost(net)
         assertEquals(listOf<String?>(null), f.emissions, "onLost publishes the disconnect")
 
-        // The stale resolve lands AFTER the disconnect — it must be dropped, not resurrect
-        // a "connected to StaleNet" state that then sticks until the next network change.
+        // Stale resolve landing after disconnect must be dropped.
         f.strategy.calls[0].complete("StaleNet")
         assertEquals(listOf<String?>(null), f.emissions, "stale in-flight SSID must not override the disconnect")
     }

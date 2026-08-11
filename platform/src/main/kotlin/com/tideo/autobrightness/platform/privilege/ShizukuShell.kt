@@ -11,14 +11,7 @@ import rikka.shizuku.Shizuku
 import kotlin.concurrent.thread
 import kotlin.coroutines.resume
 
-/**
- * Runs allowlisted privileged operations through a Shizuku-bound process (S12.7d, G2R-F41). Reuses
- * the same documented [ShizukuUserService] / AIDL pattern as [ShizukuGrantGateway] — we never reflect
- * into hidden `Shizuku.newProcess` (owner-reported fragile in factory apps).
- *
- * Callers can request only Wi-Fi status or the fixed force-dark property; no argv or shell text
- * crosses Binder. Failures return null so callers can fall through to their root strategy.
- */
+/** Privileged operations via Shizuku (S12.7d, G2R-F41). Wi-Fi status or force-dark only; null on failure. */
 object ShizukuShell {
     private const val BIND_TIMEOUT_MS = 4_000L
 
@@ -55,7 +48,7 @@ object ShizukuShell {
             suspendCancellableCoroutine { cont ->
                 val connection = object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                        // Binder transactions block — run off the (likely main) callback thread.
+                        // Run off callback thread; `this` is the ServiceConnection (not shadowed by thread{}).
                         thread(name = "shizuku-shell") {
                             val out = try {
                                 if (binder == null || !binder.pingBinder()) {
@@ -66,10 +59,6 @@ object ShizukuShell {
                             } catch (_: Throwable) {
                                 null
                             } finally {
-                                // `this` is the enclosing ServiceConnection — a plain thread{} lambda is
-                                // not a receiver lambda, so it does not shadow `this` (verified: reviewer's
-                                // suggested `this@ServiceConnection` / a captured-`connection` ref both fail
-                                // to compile for an anonymous object; `this` is the correct, only clean form).
                                 runCatching { Shizuku.unbindUserService(args, this, true) }
                             }
                             if (cont.isActive) cont.resume(out)

@@ -22,16 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * A6 acceptance (D-156). Renders the profiles/contexts + info surfaces under the
- * [assertAllInteractiveNodesAreLabeled] gate: About, User Guide, the standalone Profiles list (with
- * its collapsible manage/legacy sections expanded so every action renders), the Contexts rule list,
- * and the full rule editor with every trigger section open. `TaskerHelp.kt` is a `@StringRes` registry,
- * not a composable — nothing to render. Most controls are already labeled (A0 primitives / A1's
- * `TriggerEditors`); this unit's screen-local flags were the profiles' clickable `ExpandableSection`
- * header rows, whose visible title is a sibling `Text` that never merges onto the clickable node.
- * Template: SettingsScreensGroup2A11yTest (A5).
- */
+/** A6 acceptance (D-156): profiles/contexts + info surfaces under TalkBack gate. */
 @RunWith(RobolectricTestRunner::class)
 class ScreensInfoA11yTest {
 
@@ -58,8 +49,6 @@ class ScreensInfoA11yTest {
         }
     }
 
-    // --- About -----------------------------------------------------------------------------------
-
     @Test
     fun about_allInteractiveNodesAreLabeled() {
         compose.setContent { MaterialTheme { AboutContent(version = "1.8.0", onBack = {}) } }
@@ -73,8 +62,6 @@ class ScreensInfoA11yTest {
         compose.assertHeadingExists("Acknowledgments")
         compose.assertHeadingExists("MIT License")
     }
-
-    // --- User Guide ------------------------------------------------------------------------------
 
     @Test
     fun userGuide_allInteractiveNodesAreLabeled() {

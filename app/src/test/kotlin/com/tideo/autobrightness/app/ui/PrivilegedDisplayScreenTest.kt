@@ -25,13 +25,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Privileged Display screen (D-149; reworked by D-151/D-152): at ELEVATED ONE set of controls —
- * the display-toggle PROFILE fields, edited draft→Apply — renders and routes edits into the
- * draft; below ELEVATED the screen self-guards with the grant card offering all three grant
- * channels (adb always; Shizuku one-tap only with a live binder; root). Drives the stateless
- * [PrivilegedDisplayContent] directly (no ViewModel / real settings needed).
- */
+/** Privileged Display screen (D-149, reworked by D-151/D-152): display-toggle PROFILE fields. */
 @RunWith(RobolectricTestRunner::class)
 class PrivilegedDisplayScreenTest {
 
@@ -40,7 +34,6 @@ class PrivilegedDisplayScreenTest {
 
     private val elevated = PrivilegedDisplayUiState(tier = Tier.ELEVATED)
 
-    /** Compose the ELEVATED screen around a mutable draft; returns a reader for the draft. */
     private fun setDraftContent(
         state: PrivilegedDisplayUiState = elevated,
         initial: AabSettings = AabSettings(),
@@ -65,7 +58,6 @@ class PrivilegedDisplayScreenTest {
     @Test
     fun elevated_togglesEditTheDraft_once_noDuplicates() {
         val draft = setDraftContent()
-        // No grant card at ELEVATED; the terse profile note renders once.
         compose.onNodeWithTag("pd_grant_card").assertDoesNotExist()
         compose.onNodeWithTag("pd_profile_intro").assertExists()
 
@@ -84,7 +76,6 @@ class PrivilegedDisplayScreenTest {
     @Test
     fun infoAction_opensDialogWithTheAospKeysNote_andDismisses() {
         setDraftContent()
-        // The AOSP-keys / OEM-variance note is behind the top-bar ⓘ, not an inline footer.
         compose.onNodeWithTag("pd_info_dialog").assertDoesNotExist()
         compose.onNodeWithTag("pd_info_action").performClick()
         compose.onNodeWithTag("pd_info_dialog").assertExists()
@@ -94,7 +85,6 @@ class PrivilegedDisplayScreenTest {
 
     @Test
     fun infoAction_isAvailableBelowElevatedToo() {
-        // The note explains what the toggles do; it must be reachable even from the grant card.
         compose.setContent {
             MaterialTheme {
                 PrivilegedDisplayContent(state = PrivilegedDisplayUiState(tier = Tier.BASIC), onBack = {})

@@ -123,6 +123,7 @@ fun NumberSettingField(
             null
         },
         supportingText = {
+            // Tasker long-press help wins when revealed; validation errors always take priority.
             val helpText = help?.let { stringResource(it) }
             val msg = error ?: helpText?.takeIf { showHelp } ?: helper
             if (msg != null) Text(msg, modifier = Modifier.testTag("helptext_$testTag"))

@@ -14,25 +14,21 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * S12.9d — staleness gate over the process-wide live pipeline bridge: publish stamps the snapshot,
- * the freshness Flow ages it FRESH → AGING → STALE, and reset clears everything.
- */
+/** S12.9d: staleness gate (FRESH → AGING → STALE). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LiveRuntimeStateTest {
 
-    // LiveRuntimeState is a process singleton; reset around each test so state does not leak.
     @Before fun setUp() = LiveRuntimeState.reset()
     @After fun tearDown() = LiveRuntimeState.reset()
 
     @Test
     fun classify_boundaries() {
         assertEquals(Staleness.STALE, classifyStaleness(null, 0))
-        assertEquals(Staleness.FRESH, classifyStaleness(1_000L, 1_000L))     // age 0
-        assertEquals(Staleness.FRESH, classifyStaleness(0L, 2_999L))         // <3 s
-        assertEquals(Staleness.AGING, classifyStaleness(0L, 3_000L))         // 3 s
-        assertEquals(Staleness.AGING, classifyStaleness(0L, 10_000L))        // 10 s inclusive
-        assertEquals(Staleness.STALE, classifyStaleness(0L, 10_001L))        // >10 s
+        assertEquals(Staleness.FRESH, classifyStaleness(1_000L, 1_000L))
+        assertEquals(Staleness.FRESH, classifyStaleness(0L, 2_999L))
+        assertEquals(Staleness.AGING, classifyStaleness(0L, 3_000L))
+        assertEquals(Staleness.AGING, classifyStaleness(0L, 10_000L))
+        assertEquals(Staleness.STALE, classifyStaleness(0L, 10_001L))
     }
 
     @Test
@@ -55,7 +51,6 @@ class LiveRuntimeStateTest {
         runCurrent()
         assertEquals(Staleness.FRESH, emissions.last(), "fresh immediately after a publish")
 
-        // No new publish; the clock advances past the 10 s ceiling → the next tick ages it to STALE.
         now = 11_000L
         advanceTimeBy(1_500L)
         runCurrent()
@@ -70,7 +65,7 @@ class LiveRuntimeStateTest {
         assertNull(LiveRuntimeState.pipeline.value.smoothedLux)
         assertNull(LiveRuntimeState.activeContext.value)
         assertFalse(LiveRuntimeState.serviceRunning.value)
-        // A null stamp classifies as STALE so the UI never shows a dead loop as "live".
+        // Null stamp = STALE (UI never shows dead loop as live).
         assertEquals(Staleness.STALE, classifyStaleness(LiveRuntimeState.pipeline.value.lastPublishMs, 0L))
     }
 }

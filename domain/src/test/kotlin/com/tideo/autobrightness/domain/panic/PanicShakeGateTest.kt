@@ -7,21 +7,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Contract test for [PanicShakeGate] against a faithful transcription of the task528 `_PanicButton`
- * A2 "Java Code" leaky bucket (`tmp/Panic_profile_task.md` A2). The reference returns Tasker's
- * `should_stop`; the gate succeeds iff `should_stop == "false"` within the readings of the 10 s window.
- *
- * The platform source feeds ~50 Hz samples (SENSOR_DELAY_GAME), so a 10 s window is ≈500 readings —
- * the sequences below use that order of magnitude. Segment: panic-overhaul port (D-116).
+ * Contract test for [PanicShakeGate] vs task528 `_PanicButton` A2 Java leaky bucket.
+ * Reference returns `should_stop`; gate succeeds iff false within 10s window (~500 readings at 50 Hz).
+ * Segment: panic-overhaul port (D-116).
  */
 class PanicShakeGateTest {
 
-    /**
-     * Faithful port of the A2 Java accumulation (clamp 0..10; sens 0 ⇒ proceed immediately; per
-     * reading `mag > threshold` adds `mag − threshold` under a 0.98 leak else drains 0.90; success at
-     * `score ≥ targetScore`; no success within the window ⇒ timeout ⇒ stop). Returns true to STOP
-     * (veto), matching the Java's `should_stop`.
-     */
+    /** A2 Java accumulation: clamp 0..10, sens 0 = immediate, 0.98 leak else 0.90 drain. Returns true to STOP. */
     private fun referenceShouldStop(sensitivityRaw: Int, mags: List<Double>): Boolean {
         var sensitivity = sensitivityRaw
         if (sensitivity < 0) sensitivity = 0
@@ -56,14 +48,12 @@ class PanicShakeGateTest {
         val gate = PanicShakeGate(0)
         assertTrue(gate.isPassThrough)
         assertTrue(gate.onSample(0.0), "sens 0 must complete on the first sample")
-        // Reference agrees regardless of the (irrelevant) samples.
         assertMatchesReference(0, List(500) { 0.0 }, "sens 0 still / no shake")
         assertMatchesReference(0, List(500) { 30.0 }, "sens 0 vigorous shake")
     }
 
     @Test
     fun clampsSensitivityLikeJava() {
-        // 11 clamps to 10, -3 clamps to 0 (pass-through), both must match the reference.
         val vigorous = List(500) { 40.0 }
         assertMatchesReference(11, vigorous, "sens 11 → clamp 10")
         assertMatchesReference(-3, vigorous, "sens -3 → clamp 0")
@@ -73,7 +63,7 @@ class PanicShakeGateTest {
 
     @Test
     fun sustainedVigorousShake_completes() {
-        // Well above threshold even at sens 10 (threshold 20): 40 m/s² beats the 0.98 decay.
+        // 40 m/s² > threshold (20 at sens 10), beats 0.98 decay.
         for (sens in 1..10) {
             assertMatchesReference(sens, List(500) { 40.0 }, "sustained 40 m/s² at sens $sens")
             assertTrue(gateCompletes(sens, List(500) { 40.0 }), "sens $sens should pass a 40 m/s² shake")
@@ -82,7 +72,7 @@ class PanicShakeGateTest {
 
     @Test
     fun belowThreshold_neverCompletes_timesOut() {
-        // Magnitudes at/under threshold earn no points and the bucket drains → guaranteed timeout.
+        // Below threshold: bucket drains, timeout guaranteed.
         for (sens in 1..10) {
             val belowThreshold = List(500) { (sens * 2.0) - 0.5 } // strictly < threshold
             assertMatchesReference(sens, belowThreshold, "below-threshold at sens $sens")
@@ -92,17 +82,15 @@ class PanicShakeGateTest {
 
     @Test
     fun marginalShake_cannotOutpaceDecay_atHighSensitivity() {
-        // At sens 10 the threshold is 20 and target 400; a shake only slightly over threshold can't
-        // accumulate fast enough against the 0.98 leak — must veto (the Java's design intent).
-        val marginal = List(500) { 22.0 } // 2 over threshold each reading
+        // Sens 10: threshold 20, target 400; marginal 22 can't accumulate against 0.98 leak.
+        val marginal = List(500) { 22.0 }
         assertMatchesReference(10, marginal, "marginal 22 m/s² at sens 10")
         assertFalse(gateCompletes(10, marginal), "marginal shake should not pass at sens 10")
     }
 
     @Test
     fun matchesReferenceAcrossRandomisedTraces() {
-        // Deterministic fuzz: many sensitivities × varied shake traces (bursts, ramps, noise) — the
-        // gate must agree with the A2 transcription on every trace, success or timeout.
+        // Deterministic fuzz: many sensitivities × varied traces; gate agrees with A2 on all outcomes.
         val rng = Random(seed = 0xABL)
         repeat(400) { i ->
             val sens = rng.nextInt(0, 12) // include out-of-range to exercise clamping

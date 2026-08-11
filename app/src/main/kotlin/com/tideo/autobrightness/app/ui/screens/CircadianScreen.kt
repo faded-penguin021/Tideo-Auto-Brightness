@@ -222,6 +222,7 @@ fun CircadianContent(
 
             GraphSettingsGroup(stringResource(R.string.graph_taper)) {
                 SectionHeader(stringResource(R.string.circadian_taper_header), divider = true)
+                // Tasker Experiment slider: taper midpoint 130–240 (experiment_settings.md elements26, G2-F13).
                 IntSliderSettingField(
                     stringResource(R.string.circadian_taper_midpoint), draft.scaleTaperMidpoint, 130..240,
                     { onEdit { s -> s.copy(scaleTaperMidpoint = it) } },

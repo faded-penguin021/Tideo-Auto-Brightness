@@ -6,24 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * INDEPENDENT ground-truth checks for [SolarCalculator] (S8.5/D-037).
- *
- * The circadian golden CSV is generated FROM this same production code (TaskerReference delegates
- * to SolarCalculator — D-037), so CircadianParityTest is a regression-lock, not an independent
- * oracle. These assertions instead rely on astronomical invariants that hold no matter how the
- * algorithm is implemented; each would be violated by a specific class of systematic bug:
- *
- *   - day length ≈ 12 h at the equator on an equinox            → gross constant / unit errors
- *   - dawn < sunrise < noon < sunset < dusk                      → twilight-zenith / branch mix-ups
- *   - moving EAST advances sunrise (earlier UTC)                 → longitude sign error
- *   - N hemisphere long day in June, short in December (and the  → LATITUDE sign error
- *     reverse in the S hemisphere)
- *   - high latitude → midnight sun (June) / polar night (Dec)    → polar-branch (cosH) errors
- *
- * Tolerances are deliberately wide (never false-fail on equation-of-time / refraction / the date
- * not being the exact solstice) yet far tighter than any sign flip, which shifts results by hours.
- */
+/** INDEPENDENT ground-truth checks for SolarCalculator (S8.5/D-037). Asserts astronomical invariants (equinox day length, dawn<sunrise<noon<sunset<dusk, longitude/latitude sign errors, polar cases). Wide tolerances but tighter than sign flips. */
 class SolarInvariantTest {
 
     private fun epochNoonUtc(year: Int, month: Int, day: Int): Long =

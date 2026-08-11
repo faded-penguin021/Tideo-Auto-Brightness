@@ -10,13 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/**
- * D-157 (U4): backs the Tools → "Automation control" toggle. Reads/writes the opt-in
- * [ControlPrefsStore.externalControlEnabled] gate the exported `ControlReceiver` checks first.
- * Mirrors [CircadianExtrasViewModel]'s geo-IP opt-in wiring (StateFlow + a `viewModelScope`
- * setter) — the same default-off privacy/security pattern (D-105). Its OWN store, never an
- * `AabSettings` field, so profile apply/import can never flip it.
- */
+/** D-157 (U4): Automation control toggle; default-off privacy pattern (D-105); separate store, isolated from profiles. */
 class ControlPrefsViewModel(application: Application) : AndroidViewModel(application) {
     private val store = ControlPrefsStore(application.controlPrefsDataStore)
 
@@ -27,7 +21,7 @@ class ControlPrefsViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch { store.setExternalControlEnabled(enabled) }
     }
 
-    // D-172: the Tools → "Force dark (Shizuku/root)" opt-in, same store + same wiring pattern.
+    // D-172: Force dark opt-in (same wiring pattern).
     val forceDarkEnabled: StateFlow<Boolean> = store.forceDarkEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 

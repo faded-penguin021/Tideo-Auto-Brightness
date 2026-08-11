@@ -47,6 +47,7 @@ object SolarCalculator {
         dateEpochSec: Long,
         tzOffsetHours: Double,
     ): SolarTimesResult {
+        // Tasker: cal = Calendar.getInstance(); cal.setTimeInMillis(dateSeconds * 1000)
         // Explicit timezone for consistent dayOfYear / startOfDay.
         val tzMs = Math.round(tzOffsetHours * 3_600_000.0).toInt()
         val tz = SimpleTimeZone(tzMs, "AAB")

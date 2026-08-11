@@ -26,12 +26,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * A2 acceptance (D-156). The Canvas graphs are invisible to TalkBack and are NOT interactive in the
- * semantics sense, so the [assertAllInteractiveNodesAreLabeled] gate does not reach them — the A2 gate
- * is a targeted per-graph assertion that the chart's draw node now exposes a one-sentence
- * `contentDescription` text alternative (a11y_graph_* template). Template: SettingsControlsA11yTest (A0).
- */
+/** A2 acceptance (D-156): Canvas graphs expose contentDescription text alternative. */
 @RunWith(RobolectricTestRunner::class)
 class GraphsA11yTest {
 
@@ -41,7 +36,6 @@ class GraphsA11yTest {
     @Test
     fun brightnessCurveGraphExposesDescriptionWithRange() {
         compose.setContent { TideoTheme { BrightnessCurveChart(curve = BrightnessCurveConfig()) } }
-        // Default curve: minBrightness 10 → maxBrightness 255, named in the summary.
         compose.onNodeWithContentDescription("Brightness curve graph", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("from 10 to 255", substring = true).assertIsDisplayed()
     }
@@ -110,7 +104,6 @@ class GraphsA11yTest {
                 )
             }
         }
-        // Tap-to-step arrows announce localized labels; the interactive-node audit passes over the pager.
         compose.onNodeWithContentDescription("Previous chart").assertHasClickAction()
         compose.onNodeWithContentDescription("Next chart").assertHasClickAction()
         compose.assertAllInteractiveNodesAreLabeled()

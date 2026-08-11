@@ -10,13 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * App theme: the AAB **teal + gold** brand identity (S12.5a, replacing S11's dynamic Material-You
- * scheme — Gate-2 G2-F18: "the app does not look or feel like AAB"). Colours are derived from the
- * Tasker scenes (see [Color.kt] for per-value provenance), NOT invented.
- *
- * Dynamic colour is OFF by default so the brand identity is stable across devices; it is left as an
- * opt-in [dynamicColor] flag per the brief. DayNight is kept: the dark scheme is the faithful one
- * (Tasker is dark-first) and the light scheme is a derived courtesy.
+ * AAB teal + gold brand identity (S12.5a, G2-F18). Colours from Tasker scenes (Color.kt).
+ * Dynamic colour OFF by default for stable identity; DayNight kept (dark-first, per Tasker).
  */
 @Composable
 fun TideoTheme(
@@ -32,9 +27,7 @@ fun TideoTheme(
         darkTheme -> AabDarkColorScheme
         else -> AabLightColorScheme
     }
-    // S13a: wire the design-system foundation — the explicit AAB type scale (Type.kt) and the M3
-    // shape scale (Shape.kt). Both equal the values the app already rendered (behaviour-preserving);
-    // they give S13b/S13c a single owned place to tune typography emphasis and corner radii.
+    // S13a: wire design-system foundation (Type.kt type scale, Shape.kt shapes) for S13b/S13c tuning.
     MaterialTheme(
         colorScheme = colorScheme,
         typography = AabTypography,
@@ -43,7 +36,6 @@ fun TideoTheme(
     )
 }
 
-/** Dark-first AAB scheme: charcoal surfaces, teal primary, gold secondary. */
 private val AabDarkColorScheme = darkColorScheme(
     primary = AabTeal,
     onPrimary = AabOnTeal,
@@ -65,7 +57,6 @@ private val AabDarkColorScheme = darkColorScheme(
     onError = AabOnTeal,
 )
 
-/** Derived light scheme (kept muted so teal/gold remain the identity). */
 private val AabLightColorScheme = lightColorScheme(
     primary = AabTeal,
     onPrimary = AabOnTeal,

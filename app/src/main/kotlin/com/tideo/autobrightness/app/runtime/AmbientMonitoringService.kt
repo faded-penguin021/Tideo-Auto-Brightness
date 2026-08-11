@@ -175,7 +175,9 @@ class AmbientMonitoringService : Service() {
                 // DA-018: resume context automation; same D-140 not-running gate as REAPPLY.
                 if (!controller.state.value.serviceOn) return stopNotRunning(startId)
                 ensureRunning()
-                // Genuine context re-evaluation (not republish-only) so resolver runs fresh.
+                // Tasker _ContextResume → evaluate contexts → Set Initial Brightness: a GENUINE
+                // evaluate(RESUME), not REAPPLY's republish-only path, so the resolver re-runs and
+                // the store stops diverging from the active-profile label.
                 scope.launch {
                     contextEngine.resumeContextAutomation()
                     controller.reapply()

@@ -4,11 +4,7 @@ import org.junit.Test
 import java.io.File
 import kotlin.test.assertTrue
 
-/**
- * S12.9c #8: no screen may show the internal "Coming in <segment>" placeholder copy. Deferred screens
- * are honest ("not available yet") and carry a `// TODO(S13): implement` marker in source instead of
- * leaking the segment plan into the UI.
- */
+/** S12.9c #8: no placeholder "Coming in" copy; deferred screens use TODO marker instead (S13 audit). */
 class PlaceholderScreenAuditTest {
 
     @Test

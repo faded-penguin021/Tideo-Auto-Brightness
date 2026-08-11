@@ -22,19 +22,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * A3 acceptance (D-156). Renders Dashboard, Menu and Onboarding — each stateless Content composable,
- * seeded so every conditional surface is present — under the [assertAllInteractiveNodesAreLabeled]
- * gate, plus targeted assertions for the Dashboard's dynamic banners: they carry a polite liveRegion
- * so TalkBack announces them when they appear/change. Template: SettingsControlsA11yTest (A0).
- */
+/** A3 acceptance (D-156): Dashboard, Menu, Onboarding under TalkBack gate. */
 @RunWith(RobolectricTestRunner::class)
 class ScreensA11yTest {
 
     @get:Rule
     val compose = createComposeRule()
 
-    // A state that lights up every dynamic banner + optional surface, so the audit walks them all.
     private val fullDashboard = DashboardUiState(
         serviceEnabled = true,
         tier = Tier.ELEVATED,
@@ -51,7 +45,6 @@ class ScreensA11yTest {
         lastSampleMs = System.currentTimeMillis(),
         stale = true,
         health = ServiceHealthUiState(degradedMode = true, degradedReason = "sensor timeout"),
-        // No latitude/longitude → hasLocation is false → the circadian stale hint renders.
         circadianLocation = CircadianLocationStatus(),
     )
 
@@ -94,7 +87,6 @@ class ScreensA11yTest {
 
     @Test
     fun menu_allInteractiveNodesAreLabeled() {
-        // ELEVATED so the tier-gated Privileged group also renders and is audited.
         compose.setContent {
             TideoTheme {
                 MenuContent(
@@ -118,7 +110,6 @@ class ScreensA11yTest {
 
     @Test
     fun onboarding_allInteractiveNodesAreLabeled() {
-        // Seed the state so every optional card (restricted-settings, Shizuku, usage-needed) renders.
         compose.setContent {
             TideoTheme {
                 OnboardingContent(

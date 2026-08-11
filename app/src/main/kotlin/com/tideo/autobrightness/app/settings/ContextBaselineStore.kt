@@ -45,8 +45,6 @@ object ContextBaselineSerializer : Serializer<ContextBaseline> {
     override val defaultValue: ContextBaseline = ContextBaseline()
 
     override suspend fun readFrom(input: InputStream): ContextBaseline {
-        // An unreadable file degrades to "no snapshot": the revert then keeps the live settings,
-        // never guesses — the same fail-safe shape as AabSettingsSerializer.
         return runCatching {
             json.decodeFromString(ContextBaseline.serializer(), input.readBytes().decodeToString())
         }.getOrDefault(defaultValue)
@@ -57,13 +55,11 @@ object ContextBaselineSerializer : Serializer<ContextBaseline> {
     }
 }
 
-/** The production [ContextBaselineStore]: a typed-JSON DataStore (`aab_context_baseline.json`). */
 class DataStoreContextBaselineStore(
     private val store: DataStore<ContextBaseline>,
 ) : ContextBaselineStore {
     override suspend fun snapshot(): AabSettings? = store.data.first().snapshot
-    // DA-018: `copy` (not a fresh ContextBaseline) so the snapshot save/clear preserves the persisted
-    // %AAB_ProfileUser name — the name outlives the snapshot's baseline→override→revert lifecycle.
+    // DA-018: use `copy` so save/clear preserves persisted %AAB_ProfileUser name (outlives snapshot lifecycle).
     override suspend fun save(baseline: AabSettings) {
         store.updateData { it.copy(snapshot = baseline) }
     }

@@ -50,6 +50,7 @@ fun DimmingChart(
     }
 
     // Two y-axes (dimming_graph.md): LEFT = dim%, RIGHT = dim-shell magnitude.
+    // Tasker's dimming graph has TWO y-axes (dimming_graph.md): LEFT = dim progress % (the user curve +
     val series = listOf(
         ChartSeries(stringResource(R.string.chart_reference), referencePoints, AabGold, strokeWidthPx = 3f, dashed = true),
         ChartSeries(stringResource(R.string.chart_dim_shell), shellPoints, AabChartBlue, strokeWidthPx = 2f, onSecondaryAxis = true),

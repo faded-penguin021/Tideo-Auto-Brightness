@@ -85,6 +85,7 @@ internal fun parseCmdWifiStatus(output: String): String? {
 
 /** task633: Extract SSID from `dumpsys wifi` mWifiInfo line (two-step Tasker regex). */
 internal fun parseDumpsysWifi(output: String): String? {
+    // Tasker: `dumpsys wifi | grep mWifiInfo | grep COMPLETED` — the connected-network info line.
     val line = output.lineSequence()
         .firstOrNull { it.contains("mWifiInfo") && it.contains("COMPLETED") }
         ?: return null

@@ -4,7 +4,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Pure-JVM coverage for the F38 settings-display helper (changed-vs-default rows). */
+/** F38 settings-display helper coverage: changed-vs-default rows. */
 class SettingsDisplayTest {
 
     @Test
@@ -24,7 +24,7 @@ class SettingsDisplayTest {
 
     @Test
     fun runtimeKeys_areExcludedFromTheList() {
-        // serviceEnabled/contextOverride are runtime/identity, not profile parameters — never listed.
+        // Runtime/identity keys excluded from profile parameters.
         val vars = AabSettings().displayRows().map { it.taskerVariable }
         assertTrue("%AAB_Service" !in vars)
         assertTrue("%AAB_ContextOverride" !in vars)
@@ -32,8 +32,7 @@ class SettingsDisplayTest {
 
     @Test
     fun globalAndDerivedKeys_areExcludedFromTheList() {
-        // G2R-F84 modal exclusions: global prefs (debug/overrides/QS/notify) + derived midpoint are
-        // not part of a profile diff.
+        // G2R-F84: global prefs (debug/overrides/QS/notify) + derived midpoint excluded from profile diff.
         val vars = AabSettings().displayRows().map { it.taskerVariable }
         assertTrue("%AAB_Debug" !in vars)
         assertTrue("%AAB_DetectOverrides" !in vars)
@@ -44,7 +43,7 @@ class SettingsDisplayTest {
 
     @Test
     fun crypticKeys_useFriendlyLabels() {
-        // G2R-F84: the raw "form1A"/"form2C" names mean nothing to a user — show friendly labels.
+        // G2R-F84: friendly labels instead of raw "form1A"/"form2C" names.
         val rows = AabSettings().displayRows().associateBy { it.taskerVariable }
         assertEquals("Zone 1 scaling", rows.getValue("%AAB_Form1A").label)
         assertEquals("Zone 2 offset", rows.getValue("%AAB_Form2C").label)

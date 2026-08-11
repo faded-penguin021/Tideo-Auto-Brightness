@@ -5,11 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/**
- * S12.9c #4: the legacy parser throws on structurally-invalid input so [ProfileImportExportManager]
- * can build a `ProfileLoadResult.TotalFailure`. A valid-but-empty profile is NOT an error — it parses
- * to the task570 defaults.
- */
+/** S12.9c #4: legacy parser throws on structurally-invalid input so ProfileImportExportManager can build TotalFailure. Valid-but-empty parses to task570 defaults. */
 class LegacyProfileParseTest {
 
     @Test

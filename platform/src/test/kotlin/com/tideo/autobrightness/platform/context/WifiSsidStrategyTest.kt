@@ -136,6 +136,7 @@ class WifiSsidStrategyTest {
 
     @Test
     fun parseDumpsysWifi_requiresMWifiInfoLine() {
+        // Tasker's `grep mWifiInfo | grep COMPLETED` — a COMPLETED line without mWifiInfo is not the
         val out = "Network 1: SSID: Neighbour, status: COMPLETED, not mine"
         assertNull(parseDumpsysWifi(out))
     }

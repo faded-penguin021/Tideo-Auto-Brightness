@@ -21,41 +21,34 @@ val Context.settingsDataStore: DataStore<AabSettings> by dataStore(
 )
 val Context.serviceHealthDataStore by preferencesDataStore(name = "service_health")
 
-// Circadian "Experiment" fixed date + lat/lon override (experiment_settings.md elements37: %AAB_Date /
-// %AAB_Latitude / %AAB_Longitude). Unset = live data (today + current location). S12.7h / G2R-F39.
+// Circadian Experiment override (S12.7h / G2R-F39). Unset = live data.
 val Context.experimentPrefsDataStore by preferencesDataStore(name = "experiment_prefs")
 
-// D-157: opt-in gate for the external intent-control surface (Tasker / MacroDroid). Its OWN store,
-// not an AabSettings field, so profile apply/import chokepoints can never flip it. Default off.
+// D-157: opt-in gate for external intent-control surface; own store (not AabSettings field).
 val Context.controlPrefsDataStore by preferencesDataStore(name = "control_prefs")
 
-// Measured power-draw dataset (task524 _CalibratePowerDraw, %AAB_HTML_Graph8 / %data). Persisted so the
-// Tools PowerDrawChart survives restarts; overwritten on recalibration. S14.
+// Power-draw dataset (S14); persisted across restarts, overwritten on recalibration.
 val Context.powerDrawDataStore by preferencesDataStore(name = "power_draw")
 
-// D-170: the pre-override baseline snapshot (Tasker task626 _ContextResume / %AAB_ProfileUser).
-// Context-rule loads write through to settingsDataStore; this holds what the no-match revert restores.
+// D-170: pre-override baseline snapshot; context-rule loads write through to settingsDataStore.
 val Context.contextBaselineDataStore: DataStore<ContextBaseline> by dataStore(
     fileName = "aab_context_baseline.json",
     serializer = ContextBaselineSerializer,
 )
 
-// Context-override rules (S10): the rebuild's store for the rule set (Tasker contexts.json + caches).
+// Context-override rules (S10): rule set store (Tasker contexts.json + caches).
 val Context.contextRulesDataStore: DataStore<ContextOverrideConfig> by dataStore(
     fileName = "aab_context_rules.json",
     serializer = ContextRulesSerializer,
 )
 
-// Recorded manual-override training points (%AAB_Overrides): captured at runtime by the pipeline so
-// the curve wizard + curve overlay have real input (G2R-F13/F14; closes the D-044(c) capture gap).
+// Manual-override training points (D-044(c)); wizard/overlay input. Captured at runtime.
 val Context.overridePointsDataStore: DataStore<OverridePoints> by dataStore(
     fileName = "aab_override_points.json",
     serializer = OverridePointsSerializer,
 )
 
-// User-editable named profiles (S12.6d, G2R-F15): the five DefaultProfiles seeded once, then
-// overwritable, plus any "Save current as…" entries. AppProfileCatalog reads this so context rules
-// can target user profiles too (closes the D-042(c) unknown-profile gap).
+// User-editable named profiles (S12.6d, D-042(c)); DefaultProfiles seeded once, then overwritable.
 val Context.userProfilesDataStore: DataStore<SavedProfiles> by dataStore(
     fileName = "aab_user_profiles.json",
     serializer = SavedProfilesSerializer,

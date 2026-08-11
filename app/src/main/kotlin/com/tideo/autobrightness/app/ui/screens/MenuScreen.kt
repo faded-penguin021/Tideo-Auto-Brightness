@@ -45,26 +45,13 @@ import com.tideo.autobrightness.app.ui.components.NavRow
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.theme.Dimens
 
-/**
- * The AAB **Menu** home screen (S12.6a, G2R-F1/F2): the Compose rebuild of the Tasker AAB Menu scene
- * (menu.md, XML L4462) promoted from the S12.5a nav drawer into the app's canonical hub. It is the
- * start destination after onboarding and the back-target from every settings/tool screen.
- *
- * Layout mirrors the menu scene's three HTML cards: the gold-sun teal banner, the **Profiles &
- * Contexts hero card** (moved off the Dashboard), a Settings group, and an Info & Help group
- * (Recheck Permissions → Onboarding). The Dashboard is just another destination here (live status).
- *
- * S13c restyle (m3_audit §3 row 1): the flat `ListItem` rows are replaced by the shared S13b
- * navigation blocks — the hero promoted to [HeroNavCard] (teal edge + press motion) and the grouped
- * destinations rendered as [NavRow]s inside elevated [AabCard] sections (no more endless flat list).
- */
+/** AAB Menu home screen (S12.6a, G2R-F1/F2); Compose rebuild of Tasker AAB Menu scene promoted from
+ *  nav drawer. S13c restyle: shared navigation blocks in [AabCard] sections. */
 @Composable
 fun MenuScreen(navController: NavHostController) {
     val activeContext by LiveRuntimeState.activeContext.collectAsStateWithLifecycle()
     val manualOverride by LiveRuntimeState.manualOverride.collectAsStateWithLifecycle()
-    // D-149: the "Privileged" group is tier-gated, driven by the live tierFlow() (not a one-shot
-    // probe) and re-probed on resume, so an adb/Shizuku grant made while this screen was backgrounded
-    // surfaces the row on return without an app restart (same reprobe pattern as Onboarding).
+    // D-149: "Privileged" group tier-gated; tierFlow() re-probed on resume for background grants.
     val context = LocalContext.current
     val privilegeManager = remember { AppModule(context.applicationContext).privilegeManager }
     val tier by privilegeManager.tierFlow().collectAsStateWithLifecycle()
@@ -100,11 +87,7 @@ fun MenuContent(
     ) {
         AabMenuBanner()
         Column(
-            // Edge-to-edge (targetSdk 35, enforced on Android 15+): this hub has no Scaffold to apply
-            // the system-bar inset, so its scrolling content drew under the nav bar — the last row,
-            // "Recheck Permissions", was buried (worst with 3-button navigation). navigationBarsPadding()
-            // sits inside the scroll, giving the final row clearance to scroll fully into view; it reads
-            // 0 on pre-15 non-edge-to-edge windows, so no extra gap there.
+            // Edge-to-edge (Android 15+): navigationBarsPadding() lets final row scroll into view.
             modifier = Modifier
                 .navigationBarsPadding()
                 .padding(
@@ -113,7 +96,6 @@ fun MenuContent(
                 ),
             verticalArrangement = Arrangement.spacedBy(Dimens.sectionSpacing),
         ) {
-            // Live status — the former start destination, now reached from the hub.
             AabCard {
                 NavRow(
                     stringResource(AppRoute.Dashboard.titleRes), { onNavigate(AppRoute.Dashboard) },
@@ -122,10 +104,7 @@ fun MenuContent(
             }
 
             SectionHeader(stringResource(R.string.title_profiles_contexts), divider = true)
-            // S12.9f (D-070): Profiles and Contexts are one destination now — a single hero card. It
-            // still surfaces the live context status. F46 semantics: a manual profile load IS the
-            // override (latched %AAB_ContextOverride, cleared by Resume on the merged screen); a
-            // context *rule* being active is automation working as intended, NOT an override.
+            // S12.9f (D-070): Profiles and Contexts are one destination (hero card).
             HeroNavCard(
                 icon = Icons.Filled.Person,
                 title = stringResource(R.string.title_profiles_contexts),
@@ -136,15 +115,12 @@ fun MenuContent(
                 },
                 testTag = "hero_profiles_contexts",
                 onClick = { onNavigate(AppRoute.Profiles) },
-                // G3-F14: the owner found the full-prominence hero too dominant — use the quiet variant.
                 prominent = false,
             )
 
             SectionHeader(stringResource(R.string.menu_section_settings), divider = true)
             AabCard {
-                // G3-F10: Curve & Brightness had the same gear as Misc; "Create" (edit) reads as
-                // shaping the curve and removes the duplicate. A fuller Material Symbols pass for the
-                // remaining rows needs material-icons-extended (a dependency decision → STATE.md).
+                // G3-F10: "Create" icon for Curve & Brightness (edit action).
                 MenuNavRow(AppRoute.CurveBrightness, Icons.Filled.Create, onNavigate)
                 MenuNavRow(AppRoute.Reactivity, Icons.Filled.Refresh, onNavigate)
                 MenuNavRow(AppRoute.SuperDimming, Icons.Filled.PlayArrow, onNavigate)
@@ -152,8 +128,7 @@ fun MenuContent(
                 MenuNavRow(AppRoute.Misc, Icons.Filled.Settings, onNavigate)
             }
 
-            // D-149: ELEVATED-only group — hidden entirely below ELEVATED (the destinations are
-            // unusable without WRITE_SECURE_SETTINGS; the screen itself still self-guards).
+            // D-149: ELEVATED-only group.
             if (tier == Tier.ELEVATED) {
                 SectionHeader(stringResource(R.string.menu_section_privileged), divider = true)
                 AabCard {
@@ -178,7 +153,6 @@ fun MenuContent(
     }
 }
 
-/** A shared [NavRow] (tagged `menu_<route>`) used for the Dashboard + Settings + Info groups. */
 @Composable
 private fun MenuNavRow(
     route: AppRoute,

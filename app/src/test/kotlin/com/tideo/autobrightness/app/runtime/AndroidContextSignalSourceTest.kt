@@ -21,9 +21,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * S12.9d backfill — the Android context-signal source's clock/calendar/solar assembly: it passes the
- * engine-fed app/battery/wifi/location through untouched, derives day-of-week + local seconds-of-day
- * from the (injected) clock, and falls back to 06:00/18:00 sunrise/sunset when there is no location fix.
+ * S12.9d backfill: context-signal source clock/calendar/solar assembly.
+ * Pass-through app/battery/wifi/location; derive day-of-week/seconds-of-day; fallback to 06:00/18:00.
  */
 @RunWith(RobolectricTestRunner::class)
 class AndroidContextSignalSourceTest {
@@ -55,8 +54,7 @@ class AndroidContextSignalSourceTest {
         clock = { clockMs },
     )
 
-    // A fixed instant; derived clock fields are compared against a Calendar built the same way so the
-    // assertion is timezone-independent.
+    // Fixed instant; derived fields vs Calendar are timezone-independent.
     private val fixedClock = 1_750_000_000_000L
 
     @Test
@@ -86,7 +84,7 @@ class AndroidContextSignalSourceTest {
 
     @Test
     fun assemble_withFix_computesNonDefaultSolarTimes() = runTest {
-        // Amsterdam in June: sunrise well before 06:00, sunset well after 18:00 → not the fallbacks.
+        // Amsterdam (52.37, 4.90) with computed solar times (non-default).
         val signals = source(last = null, clockMs = fixedClock)
             .assemble(app = "", batteryPercent = 50, plugged = false, wifi = "", lat = 52.37, lon = 4.90)
         assertTrue(signals.sunriseLocalSecs in 0L until 86_400L)

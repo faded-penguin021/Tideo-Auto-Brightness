@@ -11,10 +11,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * S12.6d (G2R-F15): the user-editable profile store. Built-ins seed once, are overwritable, and a
- * factory restore re-seeds them while keeping user-created profiles.
- */
+/** S12.6d: user-editable profile store (built-ins seed once; factory restore re-seeds). */
 class UserProfileStoreTest {
 
     private class FakeDataStore<T>(initial: T) : DataStore<T> {
@@ -52,7 +49,7 @@ class UserProfileStoreTest {
         s.save("Default", AabSettings(minBrightness = 7))
         assertEquals(7, s.get("Default")?.minBrightness, "overwrite replaces the built-in's settings")
         assertEquals(before, s.names(), "overwrite keeps the entry in place (no duplicate/reorder)")
-        // The overwritten built-in is still 'factory' so restore can re-seed it.
+        // Overwritten built-in stays 'factory' so restore can re-seed it.
         assertTrue(s.profiles().first { it.name == "Default" }.builtIn)
     }
 

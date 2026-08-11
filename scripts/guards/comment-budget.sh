@@ -64,7 +64,14 @@ COMMENT_BLOCK_MAX_LINES=12
 # A RATCHET, like the budgets: deleting genuinely dead ported logic legitimately lowers this, and
 # lowering it is then a one-line diff that trips the rule-review tripwire. That is the point — the
 # removal becomes visible instead of silent.
-TASKER_PROVENANCE_FLOOR=64
+#
+# 68 is the count at the branch point (b2b62fc), and getting that number right took two attempts.
+# The first floor was set to 64, measured from the working tree WHILE the consolidation was running
+# — by then four markers were already gone, so the floor would have ratified their loss and called
+# it the baseline. A ratchet read off a tree that is mid-change is not a ratchet. Take the number
+# from the merge base:
+#   git grep -h -- '// Tasker' <branch-point> -- '*.kt' | wc -l
+TASKER_PROVENANCE_FLOOR=68
 
 # Per-module comment-line ceilings. Set from the measured tree; see the header on why raising one
 # is a rule change. Keep these in lockstep with the row in docs/HARNESS_LOCAL.md.

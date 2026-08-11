@@ -9,11 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * DB-002. The point of these is SEMANTIC: the old backup test pinned the file paths in the
- * allowlist, which locks in whatever the allowlist happens to say — including a mistake. These
- * assert what a restored settings file may claim about runtime state.
- */
+/** DB-002: Semantic test for sanitizer (runtime state, not file paths). */
 class SettingsBackupSanitizerTest {
 
     private val json = Json { prettyPrint = true }
@@ -41,7 +37,6 @@ class SettingsBackupSanitizerTest {
 
         val restored = SettingsBackupSanitizer.sanitize(backedUp)!!
 
-        // Round-trip through the real serializer: the restored file must still parse as settings.
         val settings = Json { ignoreUnknownKeys = true }
             .decodeFromString(AabSettings.serializer(), restored)
         assertEquals(7, settings.minBrightness)
@@ -52,8 +47,7 @@ class SettingsBackupSanitizerTest {
 
     @Test
     fun unknownFieldsSurviveSanitizing() {
-        // A file written by a newer version, restored onto an older one. Dropping fields we do not
-        // recognise would be data loss dressed up as a privacy control.
+        // Newer version file restored onto older: unknown fields must survive (not data loss).
         val fromNewerVersion = """{"schemaVersion":3,"serviceEnabled":true,"futureField":"keep-me"}"""
 
         val restored = SettingsBackupSanitizer.sanitize(fromNewerVersion)!!
@@ -65,11 +59,7 @@ class SettingsBackupSanitizerTest {
 
     @Test
     fun absentRuntimeFieldsAreForced_becauseAbsentMeansTheDefaultAndTheDefaultIsEnabled() {
-        // The whole reason this is not "reset the keys that are present": AabSettings.serviceEnabled
-        // defaults to TRUE and the store omits default-valued fields, so the backup of a device with
-        // the service running contains no serviceEnabled key at all. Restoring that file without
-        // forcing the field reads back `true` from the data class default — the exact stale-runtime
-        // state this sanitizer exists to stop.
+        // serviceEnabled defaults to TRUE; store omits defaults; must force absent fields.
         val serviceRunningAtBackupTime = """{"schemaVersion":3,"minBrightness":10}"""
 
         val restored = SettingsBackupSanitizer.sanitize(serviceRunningAtBackupTime)!!
@@ -86,18 +76,14 @@ class SettingsBackupSanitizerTest {
 
     @Test
     fun unparseableInputIsLeftAlone() {
-        // Returning null means "do not rewrite the file" — clobbering an unparseable restore would
-        // destroy data the app's own tolerant serializer might still recover.
+        // Return null (don't rewrite) on unparseable input; don't destroy data.
         assertNull(SettingsBackupSanitizer.sanitize("not json at all"))
         assertNull(SettingsBackupSanitizer.sanitize("[1,2,3]"))
     }
 
     @Test
     fun everyResetTargetIsARealSettingsField() {
-        // Guards against a rename silently turning a reset into a no-op: the sanitizer would keep
-        // "working" while the field it was meant to clear travelled untouched.
-        // Encode with defaults ON so every field is present: the production store omits defaults,
-        // which is exactly why this check cannot use the production encoder.
+        // Guard against rename silently turning reset into no-op.
         val allFields = Json { encodeDefaults = true }
             .encodeToString(AabSettings.serializer(), AabSettings())
         val fields = json.parseToJsonElement(allFields).jsonObject

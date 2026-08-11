@@ -7,6 +7,7 @@ import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
 
 /** SecureDimming controller (task650 _ApplyDimmingPrivileged): requires WRITE_SECURE_SETTINGS (ELEVATED tier). */
+// Tasker: task650 _ApplyDimmingPrivileged writes reduce_bright_colors_level/activated
 interface SecureDimmingController {
     fun setLevel(level: Int): Result<Unit>
     fun setActivated(on: Boolean): Result<Unit>
