@@ -86,16 +86,9 @@ data class ChartScatter(
 )
 
 /**
- * Reusable Compose-Canvas chart engine: axes + ticks (nice rounded values, no 191.25 artefacts),
- * linear & log10 x-scale, gridlines, multi-series polylines (solid + dashed), threshold/marker lines,
- * axis titles, an optional legend, a draggable scrub readout, and tappable scatter points. Pure
- * presentation — series are sampled from domain functions by the caller.
- *
- * **This is THE chart engine every chart builds on.** The rule is unchanged: **keep it generic — do
- * not special-case any one chart here.** (The S13 build-phase "do not modify" fence is lifted post-1.0
- * for *generic* engine improvements; D-104 added generic label-collision staggering and a landscape
- * height cap + horizontal-only scrub so vertical scroll passes through.) See [BrightnessCurveChart] for
- * the copy-this-pattern template instance.
+ * Reusable Compose-Canvas chart engine with axes, ticks (1/2/5×10ⁿ step), gridlines, polylines,
+ * markers, axis titles, legend, draggable scrub, and tappable scatter. D-104: generic label staggering
+ * prevents collision. Keep generic; don't special-case here.
  */
 @Composable
 fun ChartCanvas(
@@ -115,8 +108,7 @@ fun ChartCanvas(
     xTickFormatter: ((Float) -> String)? = null,
     showLegend: Boolean = false,
     interactive: Boolean = false,
-    /** A2 (D-156): TalkBack text alternative for the whole Canvas (invisible to TalkBack otherwise).
-     *  Attached to the chart's draw node so the graph announces a one-sentence summary. */
+    /** A2 (D-156): TalkBack text alternative. */
     contentDescription: String? = null,
     height: Dp = 240.dp,
     axisColor: Color = Color.Gray,
@@ -127,18 +119,14 @@ fun ChartCanvas(
     val labelStyle = TextStyle(color = labelColor, fontSize = 9.sp)
     val readoutStyle = TextStyle(color = labelColor, fontSize = 10.sp)
     val density = LocalDensity.current
-    // Landscape viewports are short; a full-height chart fills the screen and leaves no room to scroll
-    // past it (owner finding). Cap the height in landscape so the surrounding settings stay reachable.
+    // Landscape height cap for reachability.
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val effectiveHeight = if (landscape) height.coerceAtMost(160.dp) else height
-    // Extra left/bottom room for the rotated y-title and the x-title when axis labels are present.
     val leftPad = with(density) { (if (yAxisLabel != null) 46.dp else 34.dp).toPx() }
     val bottomPad = with(density) { (if (xAxisLabel != null) 32.dp else 18.dp).toPx() }
     val topPad = with(density) { 8.dp.toPx() }
-    // Room on the right for the secondary y-axis ticks + rotated title when present.
     val rightPad = with(density) { (if (secondaryYRange != null) 46.dp else 10.dp).toPx() }
 
-    // Scrub position in px (null = not scrubbing). Set by tap/drag when [interactive].
     var scrubPx by remember { mutableStateOf<Float?>(null) }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -147,9 +135,7 @@ fun ChartCanvas(
         var canvasModifier: Modifier = Modifier.fillMaxWidth().height(effectiveHeight)
         if (interactive) {
             canvasModifier = canvasModifier.pointerInput(Unit) {
-                // Horizontal-only: a vertical drag now scrolls the parent instead of being eaten by the
-                // chart (landscape: the tall interactive chart used to swallow the scroll). Horizontal
-                // drags still drive the scrub readout.
+                // Horizontal-only: vertical drag scrolls parent; horizontal drives scrub.
                 detectHorizontalDragGestures(
                     onDragEnd = { scrubPx = null },
                     onDragCancel = { scrubPx = null },
@@ -181,9 +167,7 @@ fun ChartCanvas(
                 }
             }
         }
-        // A2 (D-156): expose the graph to TalkBack. The Canvas is a leaf draw node with no intrinsic
-        // semantics, so this adds a readable summary without affecting the interactive-node audit
-        // (no OnClick/toggle is added). The legend Texts stay as their own adjacent nodes.
+        // D-156: TalkBack access for leaf Canvas node.
         contentDescription?.let { cd ->
             canvasModifier = canvasModifier.semantics { this.contentDescription = cd }
         }
@@ -198,10 +182,8 @@ fun ChartCanvas(
 
             fun toPxX(x: Float) = xToPx(x, xScale, xRange, plotLeft, plotW)
             fun toPxY(y: Float) = yToPx(y, yRange, plotTop, plotH)
-            // Secondary (right) axis mapping for series flagged onSecondaryAxis (dual-axis dimming).
             fun toPxYSec(y: Float) = yToPx(y, secondaryYRange ?: yRange, plotTop, plotH)
 
-            // ---- gridlines + axis ticks --------------------------------------------------------
             drawAxisTicks(
                 xScale, xRange, yRange, measurer, labelStyle, gridColor,
                 plotLeft, plotRight, plotTop, plotBottom, ::toPxX, ::toPxY, xTickFormatter,
@@ -215,14 +197,12 @@ fun ChartCanvas(
                 }
             }
 
-            // axes
             drawLine(axisColor, Offset(plotLeft, plotTop), Offset(plotLeft, plotBottom), 2f)
             drawLine(axisColor, Offset(plotLeft, plotBottom), Offset(plotRight, plotBottom), 2f)
             if (secondaryYRange != null) {
                 drawLine(axisColor, Offset(plotRight, plotTop), Offset(plotRight, plotBottom), 2f)
             }
 
-            // ---- axis titles -------------------------------------------------------------------
             xAxisLabel?.let {
                 val t = measurer.measure(it, labelStyle)
                 drawText(t, topLeft = Offset((plotLeft + plotRight) / 2f - t.size.width / 2f, size.height - t.size.height - 1f))
@@ -245,21 +225,16 @@ fun ChartCanvas(
                 }
             }
 
-            // ---- marker / threshold lines ------------------------------------------------------
-            // D-104: stagger labels of vertical markers that sit close in x (e.g. dawn↔sunrise,
-            // dusk↔sunset) so their rotated text doesn't overlap — a too-close label drops to the next
-            // row (offset down the line by its rotated length). Generic: isolated markers stay at row 0.
+            // D-104: stagger overlapping vertical marker labels to rows.
             var lastLabelPx = Float.NEGATIVE_INFINITY
             var labelRow = 0
             markers.forEach { m ->
                 m.x?.let {
                     val mx = toPxX(it)
                     drawLine(m.color, Offset(mx, plotTop), Offset(mx, plotBottom), 2f)
-                    // Vertical event label (e.g. "Sunrise") parked just inside the line near the top.
                     m.label?.let { lbl ->
                         val t = measurer.measure(lbl, TextStyle(color = m.color, fontSize = 8.sp))
-                        // A −90° label's horizontal footprint is its text height; if this marker falls
-                        // within that of the previous label, bump it a row down instead of overlapping.
+                        // Bump to next row if text footprint overlaps previous.
                         labelRow = if (abs(mx - lastLabelPx) < t.size.height + 4f) labelRow + 1 else 0
                         lastLabelPx = mx
                         val dy = labelRow * (t.size.width + 4f)
@@ -271,7 +246,6 @@ fun ChartCanvas(
                 m.y?.let { drawLine(m.color, Offset(plotLeft, toPxY(it)), Offset(plotRight, toPxY(it)), 2f) }
             }
 
-            // ---- series polylines --------------------------------------------------------------
             series.forEach { s ->
                 val mapY: (Float) -> Float = if (s.onSecondaryAxis) ::toPxYSec else ::toPxY
                 if (s.points.size < 2) {
@@ -290,21 +264,18 @@ fun ChartCanvas(
                 drawPath(path, s.color, style = Stroke(width = s.strokeWidthPx, pathEffect = effect))
             }
 
-            // ---- tappable scatter points -------------------------------------------------------
             scatter?.points?.forEach { p ->
                 val c = Offset(toPxX(p.x), toPxY(p.y))
                 drawCircle(scatter.color, radius = scatter.radiusPx, center = c)
                 drawCircle(Color.White, radius = scatter.radiusPx, center = c, style = Stroke(width = 2f))
             }
 
-            // ---- interactive scrub readout -----------------------------------------------------
             val sx = scrubPx
             if (interactive && sx != null) {
                 val px = sx.coerceIn(plotLeft, plotRight)
                 drawLine(axisColor, Offset(px, plotTop), Offset(px, plotBottom), 1.5f)
                 val dataX = pxToX(px, xScale, xRange, plotLeft, plotW)
                 val lines = buildList {
-                    // Match the x-axis label style (e.g. HH:MM on the time charts) when a formatter is set.
                     add("x: ${xTickFormatter?.invoke(dataX) ?: formatReadout(dataX)}")
                     series.filter { it.inLegend && it.points.size >= 2 }.forEach { s ->
                         seriesValueAt(s.points, dataX)?.let { v ->
@@ -320,7 +291,6 @@ fun ChartCanvas(
     }
 }
 
-/** Legend row: a coloured (solid/dashed) swatch + label per series, plus the scatter marker. */
 @Composable
 private fun ChartLegend(series: List<ChartSeries>, scatter: ChartScatter?, labelColor: Color) {
     Row(
@@ -352,8 +322,6 @@ private fun ChartLegend(series: List<ChartSeries>, scatter: ChartScatter?, label
         }
     }
 }
-
-// ---- coordinate mappings (shared by Canvas draw + pointer hit-testing) ----------------------------
 
 private fun xToPx(x: Float, xScale: AxisScale, xRange: ClosedFloatingPointRange<Float>, plotLeft: Float, plotW: Float): Float =
     when (xScale) {
@@ -432,7 +400,6 @@ private fun DrawScope.drawAxisTicks(
     yToPx: (Float) -> Float,
     xTickFormatter: ((Float) -> String)? = null,
 ) {
-    // Y ticks: nice rounded values (no 191.25 artefacts, F55).
     niceTicks(yRange.start, yRange.endInclusive).forEach { v ->
         val py = yToPx(v)
         drawLine(gridColor, Offset(plotLeft, py), Offset(plotRight, py), 1f)
@@ -440,7 +407,6 @@ private fun DrawScope.drawAxisTicks(
         drawText(txt, topLeft = Offset(0f, py - txt.size.height / 2f))
     }
 
-    // X ticks.
     when (xScale) {
         AxisScale.Linear -> {
             niceTicks(xRange.start, xRange.endInclusive).forEach { v ->
@@ -465,10 +431,7 @@ private fun DrawScope.drawAxisTicks(
     }
 }
 
-/**
- * "Nice" evenly-spaced ticks spanning [min,max] using a 1/2/5×10ⁿ step, so a 0..255 axis labels
- * 0/50/…/250 rather than 0/63.75/127.5/191.25/255 (F55). Returns ascending ticks within range.
- */
+/** "Nice" ticks using 1/2/5×10ⁿ step (F55). */
 internal fun niceTicks(min: Float, max: Float, target: Int = 5): List<Float> {
     val span = max - min
     if (span <= 0f || target < 1) return listOf(min)
@@ -485,7 +448,6 @@ internal fun niceTicks(min: Float, max: Float, target: Int = 5): List<Float> {
     val first = kotlin.math.ceil(min / step) * step
     val ticks = mutableListOf<Float>()
     var v = first
-    // guard against float drift producing a runaway loop.
     var guard = 0
     while (v <= max + step * 1e-3f && guard < 1000) {
         ticks.add(v)
@@ -495,7 +457,6 @@ internal fun niceTicks(min: Float, max: Float, target: Int = 5): List<Float> {
     return ticks
 }
 
-/** Linear interpolation of a sorted-ascending-x polyline's y at data-[x] (null if x is out of span). */
 internal fun seriesValueAt(points: List<Offset>, x: Float): Float? {
     if (points.size < 2) return points.firstOrNull()?.takeIf { abs(it.x - x) < 1e-3f }?.y
     if (x < points.first().x || x > points.last().x) return null
@@ -512,7 +473,6 @@ internal fun seriesValueAt(points: List<Offset>, x: Float): Float? {
     return null
 }
 
-/** Index of the candidate point nearest [target] within [maxDist] px, else -1 (scatter tap hit-test). */
 internal fun nearestIndex(points: List<Offset>, target: Offset, maxDist: Float): Int {
     var best = -1
     var bestD = maxDist
@@ -529,11 +489,7 @@ internal fun nearestIndex(points: List<Offset>, target: Offset, maxDist: Float):
 private fun formatTick(v: Float): String =
     if (v >= 1000f || v == v.toInt().toFloat()) v.toInt().toString() else "%.2f".format(v)
 
-/**
- * Scrub-tooltip value format: ~3 significant figures by magnitude, with trailing zeros trimmed. So a
- * circadian multiplier reads "1.15" (not "1.1"), an hour reads "5.8", a percent reads "35", and a lux
- * reads "500" — full precision where it matters without noisy trailing zeros (owner: tooltip rounding).
- */
+/** Scrub-tooltip format: ~3 sig figs by magnitude, trailing zeros trimmed. */
 private fun formatReadout(v: Float): String {
     val a = abs(v)
     val s = when {

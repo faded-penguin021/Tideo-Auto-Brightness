@@ -32,10 +32,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Drives [DashboardScreen]. Source of truth is the DataStore for persisted state and
- * [LiveRuntimeState] for the running pipeline; nothing is cached locally, so the notification's
- * Disable/Pause actions and a post-launch privilege grant all propagate to the UI (G1-F3 pattern,
- * carried forward per the S9b hand-off note).
+ * Drives [DashboardScreen] from DataStore persisted state and [LiveRuntimeState] pipeline.
+ * No local cache: notification actions and privilege grants propagate to UI (G1-F3 pattern).
  */
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
@@ -46,9 +44,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         .map { it.validate().serviceEnabled }
         .distinctUntilChanged()
 
-    // D-110: circadian location freshness for the dashboard hint. Surfaced only when dynamic scaling is
-    // on (otherwise the location is irrelevant). Mirrors CircadianWindowProvider.current()'s fallback so
-    // the dashboard agrees with the live modifier; null = scaling off → no hint.
+    // D-110: circadian location freshness for dashboard hint. Shown only when scaling is on.
+    // Mirrors CircadianWindowProvider.current() fallback for UI consistency.
     private val experimentPrefs = ExperimentPrefsStore(application.experimentPrefsDataStore)
     private val circadianStatusFlow = combine(
         app.settingsDataStore.data.map { it.validate().scalingEnabled }.distinctUntilChanged(),
@@ -140,44 +137,32 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            // Persist first (boot/screen receivers + maintenance read serviceEnabled), then start/stop.
+            // Persist first; boot/screen receivers + maintenance read serviceEnabled.
             app.settingsDataStore.updateData { it.copy(serviceEnabled = enabled) }
             AutoBrightnessRuntime.onSettingChanged(app, enabled)
         }
     }
 
-    // G2R-F79: the Dashboard no longer exposes a Pause control (stopping = disable the service). Only
-    // Resume remains, to clear a DETECTED manual override (pausedByOverride). The runtime Pause/Resume
-    // events still exist for the notification/override path; the dashboard just doesn't offer Pause.
+    // G2R-F79: only Resume remains (to clear pausedByOverride); Pause control removed.
     fun resume() = AutoBrightnessRuntime.resume(app)
 
     /**
-     * Owner "Reset to auto": snap the screen back to the freshly-computed automatic brightness now AND
-     * clear any manual-override pause.
-     *
-     * G3-F11 (Gate 3): this used [AutoBrightnessRuntime.reapply] (a `ContextChanged` event →
-     * `reapplyProfile`), which returns early whenever the pipeline is `paused` — i.e. exactly the
-     * detected-override state in which the user reaches for "Reset to auto" — so it did nothing. The
-     * Resume path clears the pause flags and unconditionally re-runs Set Initial Brightness (writes the
-     * computed level), so it resets in BOTH states: paused-by-override and running-normally. No-op when
-     * the service is not running; the next start applies the settings.
+     * Reset to automatic brightness and clear any manual-override pause.
+     * Resume clears pause flags and runs Set Initial Brightness (G3-F11). No-op when service off.
      */
     fun resetToAuto() = AutoBrightnessRuntime.resume(app)
 
     /** Whether the "Add Quick Settings tile" prompt is available (StatusBarManager API, Android 13+). */
     fun canAddTile(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
-    /** Whether to offer "Add widget": the launcher supports pinning AND none is placed yet (owner: only
-     *  offer it when one isn't already present). */
+    /** Whether to offer "Add widget" (launcher supports pinning AND none placed yet). */
     fun canAddWidget(): Boolean = runCatching {
         AppWidgetManager.getInstance(app).isRequestPinAppWidgetSupported &&
             !DashboardWidgetProvider.hasInstances(app)
     }.getOrDefault(false)
 
     /**
-     * Prompt the OS to add the QS tile (Android 13+). The system de-dupes: if the tile is already
-     * present it returns TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED — surfaced via [onResult] so the
-     * screen can toast "already added" rather than failing silently (owner: only when not present).
+     * Prompt OS to add QS tile (Android 13+). System de-dupes; [onResult] surfaces the status.
      */
     fun addTile(onResult: (Int) -> Unit) {
         if (!canAddTile()) return
@@ -193,7 +178,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }.onFailure { onResult(RESULT_REQUEST_FAILED) }
     }
 
-    /** Prompt the launcher to pin the home-screen widget (no-op if unsupported). */
     fun addWidget() {
         runCatching {
             val mgr = AppWidgetManager.getInstance(app)
@@ -204,7 +188,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     companion object {
-        /** Sentinel result for [addTile] when the request could not be dispatched at all. */
         const val RESULT_REQUEST_FAILED = -1
     }
 }

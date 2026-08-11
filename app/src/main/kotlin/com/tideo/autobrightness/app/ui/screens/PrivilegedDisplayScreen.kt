@@ -60,23 +60,13 @@ import com.tideo.autobrightness.platform.privilege.Tier
 import kotlin.math.roundToInt
 
 /**
- * Privileged Display (rebuild-only feature, D-149; reworked by D-151/D-152): the AOSP
- * display settings that `WRITE_SECURE_SETTINGS` unlocks
- * (Night Light + temperature, daltonizer/inversion, AOD, stay-awake-charging, experimental HDR
- * force-SDR), **all as PROFILE fields** edited draft→Apply like every other parameter screen —
- * one set of controls, no separate "device now" duplicates. Applying with the service running
- * flows through the runtime `DisplayTogglesCoordinator`; with it stopped, the VM writes the
- * device directly ([DisplayTogglesViewModel.applyNow]) so Apply is never a silent no-op.
- *
- * Reached from the Menu's tier-gated "Privileged" group; the route itself is always registered,
- * so the screen self-guards: below ELEVATED it renders a grant card offering all three grant
- * channels (adb copy / Shizuku one-tap / root), mirroring Onboarding's ELEVATED step.
+ * Privileged Display (D-149/D-151/D-152): AOSP display settings via draft→Apply.
+ * Self-guards below ELEVATED tier with grant card. One set of controls, no "device now" duplicates.
  */
 @Composable
 fun PrivilegedDisplayScreen(
     navController: NavHostController,
     vm: DisplayTogglesViewModel = viewModel(),
-    // The standard per-screen draft editor (G2-F1 preview→Apply) for the profile fields.
     draftVm: DraftSettingsViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -86,8 +76,7 @@ fun PrivilegedDisplayScreen(
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
 
-    // Re-probe on every return to the foreground: an adb grant, a Shizuku grant, or a Night Light
-    // schedule change made in the system Settings app must all show up without leaving the screen.
+    // Re-probe on foreground return to catch external changes (adb grant, Shizuku, Night Light schedule).
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -110,8 +99,7 @@ fun PrivilegedDisplayScreen(
         draftDirty = dirty,
         onEditDraft = draftVm::edit,
         onApplyDraft = {
-            // With the service running the commit reaches the device via reapply → the runtime
-            // coordinator; with it stopped there is no coordinator, so write directly (D-152).
+            // D-152: service off → write directly; service on → reapply via coordinator.
             if (!committed.serviceEnabled) vm.applyNow(draft.validate())
             draftVm.apply()
         },
@@ -132,8 +120,7 @@ fun PrivilegedDisplayContent(
     onApplyDraft: () -> Unit = {},
     onDiscardDraft: () -> Unit = {},
 ) {
-    // The AOSP-keys / OEM-variance note lives behind an ⓘ in the top bar (always reachable,
-    // regardless of scroll) instead of a wall of text at the foot of the screen.
+    // AOSP-keys / OEM-variance note behind ⓘ in top bar (always reachable).
     var showInfo by remember { mutableStateOf(false) }
     SettingsScaffold(
         title = stringResource(R.string.title_privileged_display),
@@ -244,8 +231,7 @@ fun PrivilegedDisplayContent(
         }
     }
 
-    // What these toggles write + the OEM-variance caveat (D-048 policy: documented for the user,
-    // never branched in code) — surfaced from the top-bar ⓘ instead of a footer card.
+    // Info dialog: what toggles write + OEM-variance caveat (D-048, documented for user).
     if (showInfo) {
         AlertDialog(
             onDismissRequest = { showInfo = false },
@@ -267,11 +253,7 @@ fun PrivilegedDisplayContent(
     }
 }
 
-/**
- * The below-ELEVATED guard card: all three grant channels via the existing PrivilegeManager
- * affordances, mirroring Onboarding's `ElevatedStepCard` (ADB is ALWAYS offered; Shizuku one-tap
- * only with a live binder; installed-but-not-running prompts to start the app first).
- */
+/** Below-ELEVATED guard card: all three grant channels, mirroring Onboarding's ElevatedStepCard. */
 @Composable
 private fun GrantChannelsCard(
     state: PrivilegedDisplayUiState,
@@ -312,11 +294,8 @@ private fun GrantChannelsCard(
 }
 
 /**
- * Kelvin slider for `night_display_color_temperature`. AOSP bounds/default verified 2026-07-03
- * (frameworks/base config.xml): min 2596, max 4082, default 2850 — OEMs may narrow/widen their real
- * range in their framework config (ColorDisplayService clamps what it applies; documented variance,
- * not branched). Commits on drag END; null = no profile opinion → the label says "device default"
- * and the thumb parks at the AOSP default until the first commit.
+ * Kelvin slider for `night_display_color_temperature`. Commits on drag END; null = device default.
+ * AOSP bounds 2596–4082, default 2850; OEMs may vary (ColorDisplayService clamps).
  */
 @Composable
 private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
@@ -350,8 +329,7 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
     }
 }
 
-/** One chip per daltonizer mode (5 incl. Off — a FlowRow so they wrap on narrow screens). */
-@OptIn(ExperimentalLayoutApi::class) // FlowRow (chip row that wraps on narrow screens)
+@OptIn(ExperimentalLayoutApi::class) // FlowRow wraps on narrow screens
 @Composable
 private fun DaltonizerPicker(selected: DaltonizerMode, onSelect: (DaltonizerMode) -> Unit) {
     Column {
@@ -377,8 +355,7 @@ private fun DaltonizerMode.labelRes(): Int = when (this) {
     DaltonizerMode.TRITANOMALY -> R.string.pd_daltonizer_tritan
 }
 
-// AOSP frameworks/base config_nightDisplayColorTemperature{Min,Default,Max} — shared with the
-// D-154 circadian temperature ramp via the SecureDisplayController companion.
+// AOSP frameworks/base config; shared with D-154 circadian ramp via SecureDisplayController.
 private const val AOSP_NIGHT_LIGHT_MIN_K = SecureDisplayController.NIGHT_LIGHT_MIN_K
 private const val AOSP_NIGHT_LIGHT_MAX_K = SecureDisplayController.NIGHT_LIGHT_MAX_K
 private const val AOSP_NIGHT_LIGHT_DEFAULT_K = SecureDisplayController.NIGHT_LIGHT_DEFAULT_K

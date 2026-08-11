@@ -8,33 +8,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/**
- * The persisted pre-override baseline snapshot (D-170 — Tasker task626 `_ContextResume` / the
- * `%AAB_ProfileUser` revert file). Context-rule profile loads WRITE THROUGH to the live settings
- * DataStore (Tasker parity: `_ProfileManager LOAD_FILE` repopulates the live `%AAB_*` variables, so
- * every screen shows the loaded values); this store holds the settings the user was running before
- * the first override, so the PASS 4 no-match revert (contexts_spec §4) can restore them.
- *
- * `snapshot == null` = no override in flight (the live settings ARE the baseline). The snapshot is
- * taken once, on the baseline→override transition; rule→rule switches keep it. It is cleared when
- * the revert restores it — and by any manual "these settings are now authoritative" moment (manual
- * profile load / Resume via [ProfileApplier]), mirroring task626 re-snapshotting the live var set.
- *
- * [userProfileName] is the persisted NAME of `%AAB_ProfileUser` — the user's baseline profile, which
- * is the last profile the user loaded by hand (DA-018 / contexts_spec §4). It is the no-match revert
- * TARGET (`ContextOverrideResolver.userProfile`), so it must survive the snapshot's shorter lifecycle
- * (a snapshot `clear()` must NOT reset the name). Defaults `"Default"` (D-014(c)); a manual load
- * updates it via [setUserProfileName].
- */
+/** Pre-override baseline snapshot (D-170, task626): holds settings before first override for PASS 4 revert (contexts_spec).
+ *  [userProfileName] is persisted %AAB_ProfileUser, the last manually-loaded profile (DA-018), separate from snapshot lifecycle. */
 interface ContextBaselineStore {
     suspend fun snapshot(): AabSettings?
     suspend fun save(baseline: AabSettings)
     suspend fun clear()
 
-    /** `%AAB_ProfileUser` — the user's baseline profile name (the last manually-loaded profile). */
+    /** %AAB_ProfileUser: last manually-loaded profile (DA-018); independent of snapshot. */
     suspend fun userProfileName(): String
 
-    /** Record `%AAB_ProfileUser` (a manual profile load, DA-018). Independent of the snapshot. */
+    /** Record %AAB_ProfileUser (DA-018). */
     suspend fun setUserProfileName(name: String)
 }
 
@@ -43,14 +27,11 @@ interface ContextBaselineStore {
 data class ContextBaseline(
     val schemaVersion: Int = SCHEMA_VERSION,
     val snapshot: AabSettings? = null,
-    // DA-018: the last manually-loaded profile name (`%AAB_ProfileUser`), the no-match revert target.
-    // Persisted alongside the snapshot (this record IS the "%AAB_ProfileUser revert file", D-170) but
-    // outliving it — snapshot clears leave this untouched. Defaults "Default" (D-014(c)).
+    // DA-018: last manually-loaded profile name (%AAB_ProfileUser), no-match revert target; outlives snapshot (D-170, D-014(c)).
     val userProfileName: String = "Default",
 ) {
     companion object {
-        // v2 (DA-018): added userProfileName. Additive + ignoreUnknownKeys → v1 files decode with the
-        // "Default" default (no migration hook reads this constant).
+        // v2 (DA-018): added userProfileName; additive + ignoreUnknownKeys for v1 compat.
         const val SCHEMA_VERSION = 2
     }
 }

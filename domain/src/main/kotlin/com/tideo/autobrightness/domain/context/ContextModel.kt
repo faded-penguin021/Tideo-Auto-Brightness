@@ -1,11 +1,6 @@
 package com.tideo.autobrightness.domain.context
 
-/**
- * Pure domain mirror of one context-override rule (contexts_spec §2.3). The app-side storage model
- * (`ContextRule`/`ContextTriggers`, S8) maps onto this for resolution; domain stays Android-free.
- *
- * A present trigger field is an active constraint; null = "this dimension is not used by the rule".
- */
+/** Pure domain mirror of context-override rule (contexts_spec §2.3). App-side storage maps onto this. Null field = dimension not used. */
 data class ContextRuleSpec(
     val id: String,
     val name: String,

@@ -79,8 +79,14 @@ session while drifting against every upstream release.
   grep for a leading slash: `//` inside a string is code, a raw string full of `//` lines is code,
   and block comments nest. The fixture suite's `cb-rawstring` case exists to fail the naive
   implementation, and does. It also runs as a `--hook` mode; see the adapter table below.
+  Its third check is a **floor**, not a cap, and it is there because this guard is what endangers
+  the thing it protects: `// Tasker` provenance markers are comments, so the budget's downward
+  pressure falls on them too, and the first consolidation pass deleted four despite an explicit
+  instruction not to. `ProvenanceTest` in `:domain` already floors provenance — but only for
+  `BrightnessEngine.kt`, one of the 26 files that carry markers. Everywhere else the constitution's
+  rule had nothing behind it. Counted the same way `ProvenanceTest` counts, so the two agree.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 39 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 42 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.

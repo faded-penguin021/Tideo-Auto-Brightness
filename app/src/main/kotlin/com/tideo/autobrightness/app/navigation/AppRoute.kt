@@ -3,16 +3,7 @@ package com.tideo.autobrightness.app.navigation
 import androidx.annotation.StringRes
 import com.tideo.autobrightness.R
 
-/**
- * The target Material 3 screen set from `docs/rebuild/screen_map.md`.
- *
- * S12.6a (G2R-F1/F2/F3/F4): the **AAB Menu is now a real home screen** ([Menu]) — the app hub that
- * the user returns to from every settings/tool screen (not the Dashboard). The Dashboard is a
- * separate live-status destination reached from the Menu. Two screens are renamed to match Tasker:
- * `Animation & Dimming` → **Super Dimming** and `Dynamic Scale` → **Circadian**.
- */
-// [label] is the English name (used by tests + internal logging); [titleRes] is the i18n string shown
-// in the UI (D-131). Keep them in sync if a screen is renamed.
+/** S12.6a (G2R-F1/F2/F3/F4): AAB Menu is now a real home screen (app hub). Dashboard is separate. Screens renamed: Animation & Dimming → Super Dimming; Dynamic Scale → Circadian. */
 enum class AppRoute(
     val route: String,
     val label: String,
@@ -26,52 +17,36 @@ enum class AppRoute(
     Reactivity("reactivity", "Reactivity", R.string.title_reactivity, "S12"),
     // S12.6a rename (G2R-F3): the screen owns super dimming + PWM after S12.5b, so its name follows.
     SuperDimming("super_dimming", "Super Dimming", R.string.title_super_dimming, "S12.6a"),
-    // S12.6a rename (G2R-F4): "Dynamic Scale" → "Circadian" (the Tasker name for the day/night curve).
     Circadian("circadian", "Circadian", R.string.title_circadian, "S12.6a"),
-    // S12.5b re-adds the Misc/General screen (G2-F2): the Tasker "Misc" scene's brightness range
-    // (min/max/offset/scale), animation (steps + min/max wait + throttle), notifications and debug
-    // fields live here — they were wrongly scattered onto other screens in S12.
+    // S12.5b: Misc screen hosts Tasker scene's brightness range, animation, notifications, debug fields.
     Misc("misc", "Misc", R.string.title_misc, "S12.5b"),
     Tools("tools", "Tools", R.string.title_tools, "S12"),
-    // S12.6b (G2R-F6): the AAB Debug scene rebuilt as a glass-box Live Debug Info destination — the
-    // live %AAB_* runtime readout + the (now global) debug-category selector, reached from the Menu.
+    // S12.6b (G2R-F6): AAB Debug scene rebuilt as glass-box Live Debug Info (runtime readout + debug-category selector).
     LiveDebug("live_debug", "Live Debug Info", R.string.title_live_debug, "S12.6b"),
-    // S12.9f (D-070): Profiles + Contexts folded into one destination — saved profiles + their
-    // context rules (rule editing in a modal). Replaces the separate Profiles and Contexts screens.
+    // S12.9f (D-070): Profiles + Contexts folded into one destination (rule editing in modal).
     Profiles("profiles", "Profiles & Contexts", R.string.title_profiles_contexts, "S12.9f"),
-    // D-149 (rebuild-only; profile fields D-151/D-152): ELEVATED-only display toggles behind the
-    // WRITE_SECURE_SETTINGS grant. The route is ALWAYS registered; the Menu shows its row only at
-    // Tier.ELEVATED and the screen itself renders a grant card below ELEVATED.
+    // D-149: ELEVATED-only display toggles behind WRITE_SECURE_SETTINGS grant.
     PrivilegedDisplay("privileged_display", "Privileged Display", R.string.title_privileged_display, "D-149"),
-    // S13d: the static reference screens (extraction/scenes/about.md + user_guide.md). The User Guide
-    // is also the post-onboarding first-run destination (G2R-F80).
+    // S13d: static reference screens (extraction/scenes/about.md + user_guide.md); User Guide is post-onboarding destination (G2R-F80).
     UserGuide("user_guide", "User Guide", R.string.title_user_guide, "S13d"),
     About("about", "About", R.string.title_about, "S13d");
 
     companion object {
-        /** Profiles & Contexts — the Menu's prominent hero card (one merged destination, S12.9f). */
+        /** Profiles & Contexts (one merged destination, S12.9f). */
         val heroDestinations: List<AppRoute> = listOf(Profiles)
 
-        /** The tunable parameter screens — the Menu "Settings" group. */
+        /** Tunable parameter screens (Menu "Settings" group). */
         val settingsDestinations: List<AppRoute> = listOf(
             CurveBrightness, Reactivity, SuperDimming, Circadian, Misc,
         )
 
-        /** Tools + Live Debug + reference content — the Menu "Info & Help" group. */
+        /** Tools + Live Debug + reference content (Menu "Info & Help" group). */
         val infoDestinations: List<AppRoute> = listOf(Tools, LiveDebug, UserGuide, About)
 
-        /**
-         * ELEVATED-gated destinations — the Menu's "Privileged" group, rendered only while
-         * `tierFlow()` reads [com.tideo.autobrightness.platform.privilege.Tier.ELEVATED] (D-149).
-         * Kept out of [menuNavDestinations] because those rows are unconditional.
-         */
+        /** ELEVATED-gated destinations (Menu "Privileged" group, D-149). */
         val privilegedDestinations: List<AppRoute> = listOf(PrivilegedDisplay)
 
-        /**
-         * Every destination surfaced as an UNCONDITIONAL plain navigation ROW in the Menu (the hero
-         * cards and the tier-gated [privilegedDestinations] render separately). Drives the menu
-         * list + the navigation smoke tests.
-         */
+        /** Unconditional navigation rows in Menu. Drives menu list + smoke tests. */
         val menuNavDestinations: List<AppRoute> =
             listOf(Dashboard) + settingsDestinations + infoDestinations
     }

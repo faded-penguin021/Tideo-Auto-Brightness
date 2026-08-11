@@ -426,7 +426,7 @@ fi
 
 # --- module budget, via the whole-tree mode (needs a git tree) -------------------------------
 
-cb_git_tree() { # <dir> <budget>
+cb_git_tree() { # <dir> <budget> [tasker-floor, default 0]
 	local d=$SANDBOX/$1
 	rm -rf "$d"
 	mkdir -p "$d/app"
@@ -434,6 +434,8 @@ cb_git_tree() { # <dir> <budget>
 	# Lower the budget in the SANDBOX COPY so the arithmetic can be exercised without a
 	# multi-thousand-line fixture. The real constants are not what is under test here.
 	sed -i.bak "s/^BUDGET_app=.*/BUDGET_app=$2/" "$d/scripts/guards/comment-budget.sh"
+	sed -i.bak "s/^TASKER_PROVENANCE_FLOOR=.*/TASKER_PROVENANCE_FLOOR=${3:-0}/" \
+		"$d/scripts/guards/comment-budget.sh"
 	rm -f "$d/scripts/guards/comment-budget.sh.bak"
 	git -C "$d" init -q 2>/dev/null
 	git -C "$d" config user.email t@example.com
@@ -464,6 +466,42 @@ if printf '%s' "$OUT" | grep -qF 'NOT to raise the number'; then
 	ok
 else
 	bad "the budget diagnostic must name the remedy (move prose to the ledger), not just the violation: $OUT"
+fi
+
+# --- Tasker provenance floor -----------------------------------------------------------------
+#
+# This guard is the thing that endangers provenance markers: they are comments, so every downward
+# pressure the budget applies falls on them too. The first consolidation pass deleted four despite
+# an explicit instruction not to, which is why the floor exists and why it is fixtured.
+
+cb_git_tree cb-prov-ok 100 2
+{
+	printf 'package x\n'
+	printf '// Tasker: task535 "Lux Smoothing (Java)" XML L15204\n'
+	printf 'val a = 1\n'
+	printf '// Tasker: task661 act22\n'
+	printf 'val b = 2\n'
+} >"$SANDBOX/cb-prov-ok/app/A.kt"
+git -C "$SANDBOX/cb-prov-ok" add -A
+run_cb cb-prov-ok
+expect_pass "a tree meeting the Tasker provenance floor passes"
+
+cb_git_tree cb-prov-low 100 5
+{
+	printf 'package x\n'
+	printf '// Tasker: task535 "Lux Smoothing (Java)" XML L15204\n'
+	printf 'val a = 1\n'
+} >"$SANDBOX/cb-prov-low/app/A.kt"
+git -C "$SANDBOX/cb-prov-low" add -A
+run_cb cb-prov-low
+expect_fail "deleting Tasker provenance below the floor fails" "under the floor of 5"
+
+# The remedy must point at restoring the markers, not at lowering the number — the floor is only
+# worth having if the obvious way out is closed.
+if printf '%s' "$OUT" | grep -qF 'restore them rather than lowering the floor'; then
+	ok
+else
+	bad "the provenance diagnostic must tell the reader to restore the markers, not lower the floor: $OUT"
 fi
 
 # A tree with no Kotlin at all must not collect a green pass — it checked nothing.

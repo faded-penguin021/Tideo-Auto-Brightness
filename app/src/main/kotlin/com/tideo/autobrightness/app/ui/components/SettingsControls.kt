@@ -47,11 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.R
 import kotlin.math.roundToInt
 
-/**
- * B1 (m3_audit §2.5) — a teal group label above a settings cluster. The optional [divider] draws a
- * thin `outlineVariant` rule immediately below (the owner "Pro-Tool" structure cue). [divider]
- * defaults to `false` so existing call sites are unchanged; S13c opts rows in as it groups screens.
- */
+/** B1 (m3_audit §2.5): teal group label. Optional [divider] draws rule below. Defaults false. */
 @Composable
 fun SectionHeader(text: String, divider: Boolean = false) {
     Text(
@@ -75,16 +71,7 @@ private fun formatNumber(value: Number, isInt: Boolean): String =
 private fun sameNumber(a: Number, b: Number, isInt: Boolean): Boolean =
     if (isInt) a.toInt() == b.toInt() else a.toFloat() == b.toFloat()
 
-/**
- * The "ⓘ" affordance that reveals a control's **Tasker long-press help** (G2R-F19/F20/F21). In the
- * Tasker scenes each parameter label carries a `longclick` help task that Flashes an explanatory
- * string; we port that verbatim and surface it on tap (the modern equivalent of Tasker's long-tap),
- * keeping the help text out of the way until requested. [tag] keys the button so a test can reveal it.
- *
- * D-156: the visible content is a bare glyph, so the button carries a per-field contentDescription
- * ("Help: <label>") and the glyph Text is cleared from semantics — TalkBack announces the label,
- * not the symbol.
- */
+/** The "ⓘ" affordance that reveals a control's Tasker long-press help (G2R-F19/F20/F21). Tap = long-tap. D-156: bare glyph with per-field contentDescription. */
 @Composable
 private fun HelpInfoButton(tag: String, label: String, onClick: () -> Unit) {
     val description = stringResource(R.string.a11y_help_for, label)
@@ -100,16 +87,7 @@ private fun HelpInfoButton(tag: String, label: String, onClick: () -> Unit) {
     }
 }
 
-/**
- * Outlined numeric field for the draft-edit model (S12.5b). The text is seeded **once per draft
- * epoch** ([epoch]) rather than re-keyed on the incoming [value]: re-seeding on every emission of a
- * committed value corrupted input mid-keystroke ("8.8" → backspace → "8.80.0", G2-F7). An empty
- * field is allowed and simply leaves the draft unchanged (no forced 0).
- *
- * When the draft [value] differs from the [committed]/active value, the committed value is shown in
- * `[brackets]` next to the label — Tasker's `_UpdateStaticSceneElements` behaviour (G2-F1).
- * [error] (from SettingsValidator) renders red; otherwise [helper] shows as supporting text.
- */
+/** Numeric field for draft-edit model (S12.5b). Text seeded once per epoch to avoid mid-keystroke corruption. Committed value shown in [brackets] (Tasker G2-F1). */
 @Composable
 fun NumberSettingField(
     label: String,
@@ -145,7 +123,6 @@ fun NumberSettingField(
             null
         },
         supportingText = {
-            // Tasker long-press help wins when revealed; validation errors always take priority.
             val helpText = help?.let { stringResource(it) }
             val msg = error ?: helpText?.takeIf { showHelp } ?: helper
             if (msg != null) Text(msg, modifier = Modifier.testTag("helptext_$testTag"))
@@ -157,11 +134,7 @@ fun NumberSettingField(
     )
 }
 
-/**
- * A bounded M3 [Slider] for an integer setting (S12.5b, G2-F3/F13). The Tasker Misc/Experiment scenes
- * render these six values as sliders with hard ranges (per the extraction scene docs) — free-text was wrong.
- * The committed/active value is shown in `[brackets]` when the draft differs.
- */
+/** Bounded M3 Slider for integer setting (S12.5b, G2-F3/F13). Committed value shown in [brackets] when draft differs. */
 @Composable
 fun IntSliderSettingField(
     label: String,
@@ -193,8 +166,7 @@ fun IntSliderSettingField(
             valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = (range.last - range.first - 1).coerceAtLeast(0),
             enabled = enabled,
-            // D-156: the label Text above is a separate node — name the slider itself so TalkBack
-            // announces "<label>, slider" instead of an anonymous percentage.
+            // D-156: name the slider so TalkBack announces "<label>, slider" instead of "percentage".
             modifier = modifier.fillMaxWidth().testTag(testTag).semantics { contentDescription = label },
         )
         val msg = help?.let { stringResource(it) }?.takeIf { showHelp } ?: helper
@@ -209,7 +181,7 @@ fun IntSliderSettingField(
     }
 }
 
-/** A labelled M3 switch row (collapses Tasker's overlaid on/off Switch pairs into one — D-017). */
+/** Labeled M3 switch row (collapses Tasker's overlaid on/off pairs — D-017). */
 @Composable
 fun SwitchSettingRow(
     label: String,
@@ -251,10 +223,7 @@ fun SwitchSettingRow(
     }
 }
 
-/**
- * A read-only derived value (e.g. live form2A/form3A, derived throttle) shown beneath its inputs.
- * D-156: label + value merge into one semantics node so TalkBack reads them as a single row.
- */
+/** Read-only derived value (e.g. live form2A/form3A, throttle). D-156: label + value merge for TalkBack. */
 @Composable
 fun DerivedReadout(label: String, value: String, testTag: String = label) {
     Row(
@@ -267,14 +236,7 @@ fun DerivedReadout(label: String, value: String, testTag: String = label) {
     }
 }
 
-/**
- * The Apply / Discard control bar (Tasker scenes' Apply + Reset buttons), enabled only when dirty.
- * Apply confirms with a toast (Tasker Flashes "Applied", G2-F12).
- *
- * When [criticalError] is set the Apply button is DISABLED even while dirty (G2R-F18 / D-052): a
- * critical curve error (form2A<0, form3A<0, form2C>zone1End) must not be appliable. This is a
- * sanctioned deviation from Tasker's advisory-only model (owner-decision 2); a hint row explains it.
- */
+/** Apply / Discard bar (Tasker scenes' Apply + Reset). Apply toasts "Applied" (G2-F12). When criticalError is set, Apply disabled even while dirty (G2R-F18/D-052). */
 @Composable
 fun DraftApplyBar(
     dirty: Boolean,
@@ -284,17 +246,7 @@ fun DraftApplyBar(
 ) {
     val toast = rememberToaster()
     Surface(tonalElevation = 3.dp) {
-        // Edge-to-edge (targetSdk 35, enforced on Android 15+): this sticky bottomBar draws behind the
-        // system navigation bar, so pad its content up clear of it — otherwise Discard/Apply sit under
-        // the nav bar (worst with 3-button navigation, which is taller than the gesture pill). Unlike
-        // the per-rule editor Dialog (D-098, where the nav-bar inset is never delivered to the dialog
-        // window), this bar lives in the MainActivity window, so navigationBarsPadding() resolves
-        // correctly; it reads 0 on pre-15 non-edge-to-edge windows, so no double padding.
-        // D-159: the keyboard lift is applied at the *Scaffold* level (DraftSettingsScaffold), NOT here.
-        // imePadding() on this bottom-bar Column inflated the bar's measured height by a whole keyboard,
-        // which Scaffold then reserved as content bottom-padding — a keyboard-tall dead gap at the end of
-        // the scroll, visible whenever the bottommost field was focused. Scaffold-level imePadding lifts
-        // the whole scaffold (bar included) above the keyboard with no dead space.
+        // Edge-to-edge (targetSdk 35): sticky bottomBar pads content clear of nav bar. D-159: keyboard lift at Scaffold level (not here).
         Column(
             Modifier
                 .fillMaxWidth()
@@ -329,12 +281,7 @@ fun DraftApplyBar(
     }
 }
 
-/**
- * Scaffold for the draft-edit parameter screens (S12.5b): a back arrow that confirms before
- * discarding unsaved edits, and a sticky [DraftApplyBar] at the bottom (Apply/Discard). Leaving the
- * screen throws the draft away (the per-screen VM is NavBackStackEntry-scoped), so a dirty back is
- * confirmed first to match Tasker's preview→Apply expectation.
- */
+/** Scaffold for draft-edit screens (S12.5b): back arrow confirms before discarding; sticky DraftApplyBar. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DraftSettingsScaffold(
@@ -351,11 +298,7 @@ fun DraftSettingsScaffold(
     val attemptBack: () -> Unit = { if (dirty) showConfirm = true else onNavigateBack() }
     BackHandler(enabled = true) { attemptBack() }
 
-    // D-159: imePadding() at the Scaffold level shrinks the whole scaffold above the keyboard, so the
-    // sticky [DraftApplyBar] sits just over it and the scroll's content-padding reserves only the bar's
-    // own height (no keyboard-tall dead zone at the end of the list). Relies on the edge-to-edge
-    // inset-dispatch model (MainActivity.enableEdgeToEdge, D-159) so the IME arrives as an inset here
-    // rather than resizing the window.
+    // D-159: Scaffold-level imePadding() shrinks scaffold above keyboard; sticky bar sits just over it (no dead zone).
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
@@ -367,8 +310,7 @@ fun DraftSettingsScaffold(
                     }
                 },
                 actions = {
-                    // Per-screen reset to the task570 baseline (G2R-F17): edits the draft, so the user
-                    // sees the defaults previewed and commits them with Apply.
+                    // Per-screen reset (G2R-F17): edits draft so user sees defaults previewed before Apply.
                     if (onReset != null) {
                         TextButton(onClick = onReset, modifier = Modifier.testTag("reset_screen")) {
                             Text(stringResource(R.string.action_reset))

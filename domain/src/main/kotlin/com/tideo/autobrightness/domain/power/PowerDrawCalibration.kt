@@ -3,25 +3,14 @@ package com.tideo.autobrightness.domain.power
 import kotlin.math.abs
 import kotlin.math.pow
 
-/**
- * One measured calibration point — the Tasker task524 `_CalibratePowerDraw` JSON `data` row
- * (`{brightness, current_ma, power_w}`), after net-of-idle post-processing.
- */
+/** One measured calibration point from Tasker task524 `_CalibratePowerDraw` JSON (brightness, current_ma, power_w), after post-processing. */
 data class PowerDrawSample(
     val brightness: Int,
     val currentMa: Double,
     val powerW: Double,
 )
 
-/**
- * Pure math for the Tasker task524 `_CalibratePowerDraw` routine (Java block, XML L14247–14702): the
- * geometric brightness-step distribution, the battery-current normalization, and the net-of-idle
- * post-processing. The device orchestration (driving the screen, the latch-breaker timing, the battery
- * reads) lives in `app/runtime/PowerDrawCalibrator` + `platform/context/PowerMeter`; this is the
- * testable algorithmic core, ported verbatim from the extracted Java.
- *
- * Provenance: `docs/rebuild/extraction/_source/java/task524_1_calibratepowerdraw.java.txt`.
- */
+/** Pure math for Tasker task524 `_CalibratePowerDraw` (geometric step distribution, current normalization, post-processing). Device orchestration in PowerDrawCalibrator + PowerMeter. Ported verbatim from extracted Java. */
 object PowerDrawCalibration {
     // task524 CONFIGURATION block (verbatim).
     const val TARGET_POINTS = 16
@@ -36,11 +25,7 @@ object PowerDrawCalibration {
     const val BASELINE_MAX_MA = 150.0
     const val BASELINE_MAX_CHECKS = 20
 
-    /**
-     * task524 step 1 "GENERATE GEOMETRIC STEPS": `val = (int)(255·(i/16)^0.45)` for i in 1..16, keep a
-     * step only when it advances ≥ [MIN_STEP_DIFF] from the last (or it is 255), and always append a
-     * final 255. Ported verbatim from the extracted Java (geometric distribution, exponent 0.45).
-     */
+    /** task524 step 1: GENERATE GEOMETRIC STEPS using exponent 0.45. Keep step if ≥MIN_STEP_DIFF advance or is 255; always append final 255. */
     fun generateSteps(): List<Int> {
         val steps = ArrayList<Int>()
         var last = 0
@@ -57,21 +42,13 @@ object PowerDrawCalibration {
         return steps
     }
 
-    /**
-     * task524: `BATTERY_PROPERTY_CURRENT_NOW` is reported in µA on most devices but mA on some. Take the
-     * magnitude (sign = charge/discharge direction) and, if `|raw| > 50000`, treat it as µA → mA (÷1000).
-     */
+    /** task524: BATTERY_PROPERTY_CURRENT_NOW reported in µA on most devices, mA on some. If |raw| > 50000, treat as µA → mA. */
     fun normalizeCurrentMa(rawProperty: Long): Double {
         val a = abs(rawProperty)
         return if (a > 50_000) a / 1000.0 else a.toDouble()
     }
 
-    /**
-     * task524 step 5 "Post-Process": if sample[0] mA > sample[1] mA the baseline is bogus → zero it,
-     * then subtract the per-run minimum (mA and W) from every point so each value is **net-of-idle**
-     * (`max(0, raw − min)`). [rawW] is the per-point `mA/1000 · V`; using `min(rawW)` matches the Java's
-     * `minMa/1000 · V` idle-power floor (same voltage frame, see the extraction note).
-     */
+    /** task524 step 5: POST-PROCESS. If sample[0] mA > sample[1], zero baseline. Subtract per-run min (mA/W) from every point (net-of-idle). */
     fun postProcess(
         brightness: List<Int>,
         rawMa: List<Double>,

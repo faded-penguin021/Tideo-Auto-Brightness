@@ -40,16 +40,13 @@ import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.app.ui.theme.Dimens
 
 /**
- * S13b component library (cont.) — navigation + action blocks from `m3_audit.md` §2.5 blueprints
- * B2/B3/B5. Built here, applied by S13c. The Menu's existing private `MenuHeroCard`/`MenuNavRow`
- * remain until S13c migrates the screens onto these shared versions (behaviour-preserving).
+ * S13b component library: navigation + action blocks (m3_audit §2.5 B2/B3/B5).
+ * Built here, applied by S13c. Private Menu components remain until S13c migration.
  */
 
 /**
- * B2 — the prominent navigation card (promoted from `MenuScreen`'s private hero card). A `large`-shape
- * [ElevatedCard] on `primaryContainer`, a **teal left-edge accent** bar, a gold-sun [icon] (the one
- * sanctioned raw-`AabGold` tint, m3_audit §2.4), a [title] + optional [subtitle], and a right-aligned
- * chevron. Presses give a subtle scale feedback (the §4 "press feedback on hero/CTA" motion).
+ * B2 — prominent navigation card with teal left edge, gold icon, title/subtitle, and chevron.
+ * Subtle scale press feedback (m3_audit §2.4/§4).
  */
 @Composable
 fun HeroNavCard(
@@ -59,9 +56,7 @@ fun HeroNavCard(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     testTag: String = title,
-    // G3-F14 (Gate 3): when false the card is toned down to a quiet, resting hero — no teal accent edge,
-    // resting elevation, a calmer surface and a smaller title — so it reads as a normal destination
-    // rather than dominating the Menu. Still a title+subtitle hero (icon, chevron, press motion intact).
+    // G3-F14: when false, toned down to quiet hero (no teal edge, resting elevation, smaller title).
     prominent: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -130,9 +125,8 @@ fun HeroNavCard(
 }
 
 /**
- * B3 — a clickable navigation row designed to live *inside* an [AabCard] group (no full-width
- * dividers; the card is the grouping). Optional leading [icon] (`onSurface`), [label] left, grey
- * (`onSurfaceVariant`) chevron right.
+ * B3 — clickable navigation row for inside [AabCard] groups.
+ * Optional leading icon, label left, grey chevron right.
  */
 @Composable
 fun NavRow(
@@ -152,7 +146,7 @@ fun NavRow(
         horizontalArrangement = Arrangement.spacedBy(Dimens.rowGap),
     ) {
         if (icon != null) {
-            // S13c' §08 "quiet the icons": nav icons orient, they don't compete with data — muted tint.
+            // S13c §08 "quiet the icons": nav icons don't compete with data (muted tint).
             Icon(
                 icon,
                 contentDescription = null,
@@ -175,13 +169,9 @@ fun NavRow(
     }
 }
 
-/** Visual style for an [ActionButton] in an [ActionButtonBar] (B5). */
 enum class ActionButtonStyle { Tonal, Outlined }
 
-/**
- * One action in an [ActionButtonBar]. The (i18n) [label] is supplied by the caller; [icon] is the
- * optional leading mark; [style] picks tonal (primary) vs outlined (secondary) emphasis.
- */
+/** One action in an [ActionButtonBar]: label (i18n), optional icon, tonal/outlined style. */
 data class ActionButton(
     val label: String,
     val onClick: () -> Unit,
@@ -192,9 +182,8 @@ data class ActionButton(
 )
 
 /**
- * B5 — a horizontal, weight-even row of action buttons, each with an optional leading icon
- * (generalised from the `DraftApplyBar` Apply/Discard pattern). Tonal for primary, outlined for
- * secondary; equal `weight(1f)`; [Dimens.rowGap] between.
+ * B5 — horizontal, weight-even row of action buttons with optional leading icons.
+ * Tonal/outlined emphasis; equal weight with [Dimens.rowGap] between.
  */
 @Composable
 fun ActionButtonBar(

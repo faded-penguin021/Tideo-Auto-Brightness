@@ -45,6 +45,27 @@ cd "$ROOT" || exit 1
 
 COMMENT_BLOCK_MAX_LINES=12
 
+# Floor on `// Tasker` provenance markers across the tree.
+#
+# This exists because THIS GUARD is the thing that endangers them. The constitution mandates a
+# provenance marker on ported logic — `// Tasker: task535 "Lux Smoothing (Java)" XML L15204` — and
+# those markers are comments, so every downward pressure the budget applies falls on them too. The
+# first consolidation pass deleted four of them (SettingsControls, CircadianScreen, SolarTimes,
+# WifiSsidStrategies) despite an explicit instruction not to.
+#
+# `ProvenanceTest` in :domain already floors this, but only for `BrightnessEngine.kt` — one file of
+# the 26 that carry markers. Everywhere else the rule was prose with nothing behind it. A budget
+# that pushes comment counts down while the only defence covers one file is a guard that erodes the
+# audit trail it was supposed to leave alone.
+#
+# Counted the way ProvenanceTest counts — lines containing the literal `// Tasker` — deliberately,
+# so the two agree rather than each being subtly right in its own way.
+#
+# A RATCHET, like the budgets: deleting genuinely dead ported logic legitimately lowers this, and
+# lowering it is then a one-line diff that trips the rule-review tripwire. That is the point — the
+# removal becomes visible instead of silent.
+TASKER_PROVENANCE_FLOOR=64
+
 # Per-module comment-line ceilings. Set from the measured tree; see the header on why raising one
 # is a rule change. Keep these in lockstep with the row in docs/HARNESS_LOCAL.md.
 BUDGET_app=99999
@@ -240,5 +261,18 @@ for m in $MODULES; do
 	summary="$summary $m=$got/$budget"
 done
 
+# Provenance floor. Counted with grep over the same file list rather than through the scanner
+# above: ProvenanceTest counts `it.contains("// Tasker")` on raw lines, and this must agree with it
+# rather than be independently clever. A marker inside a string literal would be counted by both,
+# which is the harmless direction — it cannot cause a false FAILURE, only a false pass on a line
+# nobody writes.
+tasker=$(xargs -a "$list" grep -h -- '// Tasker' 2>/dev/null | wc -l | tr -d '[:space:]')
+if [ "${tasker:-0}" -lt "$TASKER_PROVENANCE_FLOOR" ]; then
+	printf 'comment budget: %s `// Tasker` provenance line(s) in the tree, under the floor of %s — %s marker(s) were deleted. These are the XML-to-Kotlin audit trail the constitution mandates, and this guard is what puts them at risk, so restore them rather than lowering the floor. Compare against the branch point:\n  git grep -c "// Tasker" <base> -- "*.kt"\n' \
+		"$tasker" "$TASKER_PROVENANCE_FLOOR" "$((TASKER_PROVENANCE_FLOOR - tasker))" >&2
+	fails=$((fails + 1))
+fi
+
 [ "$fails" = 0 ] || exit 1
-printf 'comment budget:%s; no block over %s lines\n' "$summary" "$COMMENT_BLOCK_MAX_LINES"
+printf 'comment budget:%s; no block over %s lines; %s/%s Tasker provenance lines\n' \
+	"$summary" "$COMMENT_BLOCK_MAX_LINES" "$tasker" "$TASKER_PROVENANCE_FLOOR"
