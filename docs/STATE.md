@@ -51,62 +51,44 @@
 Native Kotlin/Compose rebuild of Tasker `Advanced_Auto_Brightness_V3.3`: `:domain` pure-JVM
 math/decisions, `:platform` Android adapters, `:app` Compose/DataStore/FGS UI/runtime. BASIC
 `WRITE_SETTINGS` runs the core pipeline; ELEVATED `WRITE_SECURE_SETTINGS` adds super dimming and
-Privileged Display. Maintenance runs on the **AMH** (`amh.conf` records the version).
+Privileged Display.
 
 ## Current state
 
-**Harness: AMH 5.2.0 (DB-027; converged at 3.0.0, DB-014…DB-016).** The harness this repo
-originated was spun out as [AMH](https://github.com/faded-penguin021/AMH) and is now replaced by
-upstream's. **The five scripts named in `scripts/MANIFEST.sha256` are upstream's byte-for-byte
-and hash-checked every run — never edit one;** changes go to `amh.conf`, `scripts/guards/*.sh` or
-`scripts/verify.sh`. The constitution is `AGENTS.md` (`CLAUDE.md` points at it; rows before
-2026-08-03 cite the old name). `docs/HARNESS_LOCAL.md` records every local deviation and holds
-the last prose copy of the cap values; it is what the next upgrade reads first.
+**Harness: AMH 5.2.0** (DB-027; converged at 3.0.0, DB-014…DB-016). **The five scripts in
+`scripts/MANIFEST.sha256` are upstream's byte-for-byte and hash-checked every run — never edit
+one;** changes go to `amh.conf`, `scripts/guards/*.sh` or `scripts/verify.sh`. Constitution:
+`AGENTS.md` (rows before 2026-08-03 cite the old name). `docs/HARNESS_LOCAL.md` records every
+local deviation; the next upgrade reads it first.
 
-**Shipped: v1.8.2 (vc20).** Verified 2026-08-03: `v1.8.2` is tagged on origin and `main` carries
-vc20. The train (AGP 8.13.2, F-Droid compatibility CI, bounded profile import, sticky-restart
-gating, the DA-024 store icon) is merged. **Awaiting F-Droid**: reproducible-build verification of
-the first AGP 8.13.2 release is the owner's to confirm — no session can observe it.
-
-`domain/` and `platform/` are byte-identical to 1.8.1. No plan files; parity checklist
-zero-pending; tests green; TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
+**Shipped: v1.8.2 (vc20)**, tagged, `main` carrying vc20. **Awaiting F-Droid** reproducible-build
+verification — the owner's to confirm. No plan files; parity checklist zero-pending; tests green;
+TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
 
 ## Owner queue
 
-> **Protected (D-167).** Owner actions/questions/findings survive compression; items leave only
-> when done, answered or triaged. Test each item before restating it. Final chat restates it.
+> **Protected (D-167).** Owner items survive compression and leave only when done, answered or
+> triaged. Test each before restating it; the final chat restates it.
 
 **Pending owner actions:**
 
-1. Confirm F-Droid reports 1.8.2 successfully verified — the first AGP 8.13.2 release. Follow
-   RUNBOOK §6/DA-026 if it differs. **Not observable from a session**; the owner settles it.
+1. Confirm F-Droid reports 1.8.2 verified — the first AGP 8.13.2 release; RUNBOOK §6/DA-026 if it
+   differs. **Not observable from a session**; the owner settles it.
 
 **Open questions:** (none)
 
-**Owed reviews:**
-
-1. **DA-005 pass owed on the DB-029…DB-031 legislation diff** (`comment-budget.sh`,
-   `scripts/tests/local-guards.sh`, `AGENTS.md`). Committed WITHOUT it: the session that wrote the
-   rules cannot review them and ran out of budget before spawning a fresh context. Review the diff
-   `81cad7e..HEAD`, strongest tier, reviewer gets the diff and tree access but not this rationale.
-   The branch's earlier DA-005 covered 81cad7e and does **not** carry over.
+**Owed reviews:** (none)
 
 **Incoming findings:**
 
-- 2026-08-02 — **Owner device pass on 1.8.2-debug: 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED.**
-  Two real defects, both fixed (DB-011 plugged-only panic firing on battery; DB-012 a re-granted
-  WRITE_SECURE_SETTINGS invisible to the running service until app restart). The other three FAILs
-  were script defects; K2/K3 BLOCKED by Shizuku UI behaviour the steps assumed away.
-- 2026-08-02 — **Harm caused by our own script (DB-013).** Section J's `bmgr restore <token>`
-  omitted the package argument — a whole-device restore that irreversibly overwrote settings
-  across unrelated apps on the owner's phone. Section J is retired at the owner's instruction (see
-  Decided non-items) and the script now states its blast radius up front.
-- 2026-08-02 — **Owner-queue candidate (from DB-012):** `PrivilegeManager` is per-`AppModule`,
-  built at ~10 call sites, so the "shared" tier cache is shared within one instance only. A
-  process-wide singleton is the real fix; DB-012 self-heals the symptom instead.
-- 2026-07-30 — Owner confirmed no open Dependabot alerts, closing DA-040's local-evidence gap
-  (DA-041). 2026-07-24 — Owner confirmed `main` protection and secret-scanning push protection
-  are enabled (DA-006).
+- 2026-08-02 — **Owner device pass, 1.8.2-debug: 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED.** Two
+  real defects fixed (DB-011, DB-012); three FAILs were script defects. Section J's `bmgr restore`
+  omitted its package argument and irreversibly overwrote settings across unrelated apps on the
+  owner's phone — retired at their instruction (DB-013).
+- **Still open (DB-012):** `PrivilegeManager` is per-`AppModule` at ~10 call sites, so the "shared"
+  tier cache is shared within one instance only. A process-wide singleton is the real fix.
+- 2026-07-30/24 — Owner confirmed no open Dependabot alerts (DA-041); `main` protection and
+  secret-scanning push protection on (DA-006).
 
 ## Decided non-items
 
@@ -131,63 +113,19 @@ zero-pending; tests green; TODO/FIXME and parity gaps zero. Live ledger: `LEDGER
 ## Changelog
 
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
-
-- 2026-08-11 — **Comment consolidation, and two review passes on the rail that holds it
-  (DB-028…DB-031).** The Kotlin was 18.7% comment lines (7620/40651), much of it re-telling a ledger
-  row verbatim; Conventions had decayed to "match its comment density", telling each session to
-  reproduce what it found. Prose moved to the `.md` tier, code left carrying `D-NNN` pointers — now
-  8.4% (3015), 215 files, every one proved comment-only against the branch point. New repo-local
-  guard `comment-budget.sh` (fifth): 12-line block cap, per-module budgets, a `// Tasker` provenance
-  floor, fail-closed, with a `--hook` mode the Claude adapter runs on every `.kt` write; Codex gets
-  no equivalent and the adapter table says so. **Each review pass found the enforcement weaker than
-  its own prose claimed.** DA-005 found five defects, two severe: the guard shipped mode 100644, so
-  the advertised hook exited 126 and never fired while every test stayed green; and a blank line
-  reset the block run, so 36 lines of narrative in three paragraphs passed, falsifying the premise
-  the rule rests on. The owner's Codex pass then found the provenance floor was a tree-wide COUNT,
-  which protects the population and no individual marker — delete one and add another anywhere and
-  it passes (DB-029); that the module ceilings left `:platform` 9 lines while the failure text
-  forbade the very increase the header and `HARNESS_LOCAL.md` both call the intended escape hatch
-  (DB-030); and that the scanner's record format would mangle any Kotlin path containing a space
-  (DB-031). All fixed. Provenance is now a 59-record manifest keyed on Tasker **source
-  coordinates** — stable across the 22 markers this branch legitimately reworded, and it immediately
-  caught two in `BrightnessPolicyInput.kt` whose `act` coordinates the consolidation had dropped
-  while the count sat at exactly 68 and passed. Fixture suite 24 → 68 cases; the count self-checks
-  against the sentence stating it. Codex's remaining points were prose overstating coverage, and the
-  headers now state each residue (normalised coordinates miss a *re-pointed* marker; 15 records cite
-  no coordinate and degenerate to a per-file count).
-
-- 2026-08-10 — **AMH upgraded 5.1.0 → 5.2.0 (DB-027).** MINOR, and no shipped script changed — the copy
-  moved only the manifest's version banner, hashes identical. The whole entry is the seed
-  length-guard preamble, hand-applied: our enumeration of what the ladder machine-checks was
-  missing the repeated-`##`-heading check, and had no statement that the list was complete. Both
-  added, scoped as a claim about `guard_state_size` and `guard_state_structure` rather than a
-  timeless one, since the script upgrades independently of this file. The sub-cap paragraph a
-  previous session had already written gained the two halves it lacked: that the structure checks
-  still run at every size, and why covering the gap with a threshold is the wrong repair. No new
-  `amh.conf` key, no verdict moved. **Not taken from the seed:** its claim that the floor is "the
-  one value a healthy tree never prints" is false — `guard_state_size` prints the floor on the `ok`
-  line confirming a completed landing. Ours states the ladder's output correctly instead; raise it
-  upstream.
-
-- 2026-08-10 — **AMH upgraded 4.2.0 → 5.1.0 (DB-024…DB-026).** The one MAJOR (5.0.0,
-  `LEDGER_ROW_CHAR_CAP` default 2000 → 800) was a no-op: our 750 is set explicitly. Only
-  `ladder.sh`, `test-ladder-guards.sh` and the manifest moved, and the release declares no
-  `amh.conf` key we do not already set. Both 5.1.0 seed-prose notes applied by hand. The
-  rule-review pass returned 8 findings, all triaged and fixed — the load-bearing two are DB-025/DB-026.
-- 2026-08-03..09 — **AMH convergence, then three upgrades to 4.2.0 (DB-014…DB-023).** Adopted AMH
-  3.0.0 at the `full` profile, replacing the harness this repo originated; then the runtime
-  inventory, unlimited volume carry, row cap 750, fail-closed preflight classes, a guard warn
-  tier. Two lessons cost work: a 42% constitution cut landed unreviewed and the review restored 12
-  defects, 3 binding (DB-018); and the whole-word matcher silently stopped resolving `D-042c`
-  citations, which an upgrade answered by deleting three `[cited]` markers (DB-022).
-- 2026-07-31..08-03 — **Tasker parity fixes, the adversarial security round, and the DB-010 fold
-  (DB-001…DB-013, DA-043/DA-044).** Dimming strength clamped in the shared `validate()` on every
-  write path; `panicRequiresPlugged` added, which exposed the accelerometer held at ~50 Hz for the
-  service's life (now demand-driven). Security round: five findings, all real, all fixed, three
-  more the review missed. At the 1.8.2 tag the ephemeral device script was folded into the
-  permanent `rebuild/DEVICE_TEST_SCRIPT.md`; Section J stays retired (DB-013).
-- 2026-06-23..07-30 — **D-096–176 + DA-001–042:** v1.0.0 through 1.8.1. The rebuild
-  (SDK36/JDK21, Privileged Display, intent control, accessibility/crash log, IME/RESUME), the
-  release/CodeQL/glue gates, the ladder/ledger/state/harness/secret/git rails, branch-train,
-  F-Droid inclusion and triages #1–#7; then the hardening train — AGP 8.13.2, reproducibility CI,
-  bounded profile imports, typed Shizuku operations, allowlists, wrapper pinned to its SHA-256.
+- 2026-08-11 — **Comment consolidation + the rail that holds it (DB-028…DB-033).** Kotlin comments
+  18.7% → 8.4% (7620 → 3015 lines, 215 files), each proved comment-only against the branch point;
+  prose moved to the `.md` tier with `D-NNN` pointers in code, and Conventions no longer says "match
+  its comment density". Fifth repo-local guard `comment-budget.sh` — block cap, module budgets,
+  Tasker-provenance manifest, fail-closed, plus a `--hook` mode the Claude adapter runs on every
+  `.kt` write (Codex has none; the adapter table says so). Fixtures 24 → 74, self-checking against
+  the sentence stating the count. **Three review passes, each finding the enforcement weaker than
+  its own prose claimed** — the six rows are the record.
+- 2026-06-23..08-10 — **v1.0.0 → 1.8.2, then the AMH convergence (D-096…D-176, DA-001…DA-044,
+  DB-001…DB-027).** The rebuild and its release/glue gates; the ladder/ledger/state/secret/git
+  rails, branch-train and F-Droid inclusion; triages #1–#7; the hardening train; Tasker parity
+  fixes and an adversarial security round (five findings, all real and fixed, three more the review
+  missed). Then AMH 3.0.0 at the `full` profile replaced the harness this repo originated, and four
+  upgrades carried it to 5.2.0. Two lessons cost real work: a 42% constitution cut landed unreviewed
+  (DB-018), and the whole-word matcher stopped resolving `D-042c` citations, answered by deleting
+  three `[cited]` markers (DB-022).

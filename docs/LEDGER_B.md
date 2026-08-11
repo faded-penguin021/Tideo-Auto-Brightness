@@ -465,7 +465,7 @@
   exceeding the cap, so a pass that STARTS below it is never landing-checked and can stop short in
   silence — as this upgrade's first pass did, at 9438 bytes against a 9216-byte floor.
 
-- DB-027 [cited]: **A completeness claim about a guard is a drift class; scope it to named functions.**
+- DB-027: **A completeness claim about a guard is a drift class; scope it to named functions.**
   AMH 5.2.0 closed the STATE preamble's list of machine-checked properties: a list that stops
   without saying it is complete leaves every prose rule after it reading in the same enforced
   voice — the shape of DB-026, where a sub-cap pass stopped short and nothing said so. Ours also
@@ -483,7 +483,7 @@
   contiguous comment block plus a per-module line budget, failing closed. The cap is the
   load-bearing half — narrative does not fit in 12 lines, so it must go to the `.md`.
 
-- DB-029: **A guard that counts a population protects no member of it.** `comment-budget.sh`
+- DB-029 [cited]: **A guard that counts a population protects no member of it.** `comment-budget.sh`
   floored `// Tasker` provenance at a tree-wide `grep -c` of 68 and claimed that defended the 33
   files carrying markers. It defended none: delete a marker from one algorithm, add one anywhere
   else, and the total is unchanged — the shape of a maintenance change that splits a ported path.
@@ -508,3 +508,20 @@
   file-list handoff was already whitespace-safe; the guard's own output protocol threw it away.
   Fixed by putting the numeric fields first and the **path last**, so each consumer takes a fixed
   count of leading fields and treats the remainder as the path.
+
+- DB-032: **A floor keyed more tightly than its own contract fires on honest edits, and its escape
+  hatch then erases it.** The provenance manifest keyed each record on a marker's whole
+  coordinate SET with multiplicity, while the guard, `AGENTS.md` and its failure text all promised
+  "only DROPPING a reference fails". Two edits that drop nothing failed: enriching a marker
+  (`task543` → `task543 act7` destroys the key) and merging two markers citing the same
+  coordinates — both edits this guard's own cap and budget push you toward. The documented remedy,
+  regenerate, re-baselines all records at once and ratifies whatever else went missing. Fix: one
+  record per (file, coordinate); key a floor at the granularity its prose promises.
+
+- DB-033: **An input a guard cannot parse must fail, not be skipped — including its own constant.**
+  The manifest check dropped any line not matching three tab-separated fields, so the cheapest
+  bypass in the guard was a whitespace-only diff: delete a marker, convert that one manifest line's
+  tabs to spaces, and it printed "all N record(s) intact" and exited 0 with N quietly one lower.
+  Reachable by accident (any heredoc re-indent) and invisible to the fixtures, since a manifest
+  parsing to zero records satisfies every case vacuously. The guard already applied the opposite
+  doctrine to tracked files and simply did not apply it to its own data.

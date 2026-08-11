@@ -105,8 +105,10 @@ code**, or its `[cited]` marker goes stale and the ladder fails.
 
 Which layer holds this: `scripts/guards/comment-budget.sh` caps any contiguous comment block at
 12 lines, holds a per-module comment-line budget, and floors the `// Tasker` markers against a
-manifest keyed on the **source coordinates** each one cites — so rewording a marker is free and
-dropping its `task`/`act`/`prof`/`elements`/`L` reference fails, naming the file that lost it. All
+manifest keyed on the **source coordinates** each one cites — one record per coordinate, so
+rewording a marker is free, adding a coordinate to one is free, and merging two markers that cite
+the same coordinates is free; dropping a `task`/`act`/`prof`/`scene`/`elements`/`L`/`%AAB_`
+reference from a file is what fails, naming the file that lost it. All
 three fail closed in the ladder and in CI; the Claude Code adapter runs the block cap as a
 `PostToolUse` hook, so a long block is reported on the edit that writes it. **Codex has neither
 hook** — its prefix rules cannot express this, so for that agent these paragraphs are the only

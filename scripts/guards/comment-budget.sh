@@ -69,12 +69,25 @@ COMMENT_BLOCK_MAX_LINES=12
 #
 # These numbers live HERE and nowhere else, deliberately. An earlier draft of this comment told the
 # next reader to keep them "in lockstep with the row in docs/HARNESS_LOCAL.md" — a row that does not
-# exist, so the instruction was an invitation to CREATE the duplicate that DB-025 and DB-027 are
-# both about. If you find yourself restating one of these in prose, don't: name the key instead.
+# exist, so the instruction was an invitation to CREATE the duplicate DB-025 is about. If you find
+# yourself restating one of these in prose, don't: name the key instead.
+#
+# The budgets are COMPUTED from the measured counts and the margin, not typed in beside them.
+# Typed in, they drifted immediately: the three constants were 2400/460/310 against measurements of
+# 2288/436/291, i.e. 4.90%, 5.50% and 6.53% — while the sentence above called them "the measured
+# count plus COMMENT_BUDGET_MARGIN_PCT", and nothing in the tree read the constant at all. A stated
+# policy that nothing computes and no number obeys is an accident with a name on it. Re-baseline by
+# updating MEASURED_* from a guard run; the ceilings follow.
 COMMENT_BUDGET_MARGIN_PCT=5
-BUDGET_app=2400
-BUDGET_domain=460
-BUDGET_platform=310
+MEASURED_app=2288
+MEASURED_domain=436
+MEASURED_platform=291
+for _m in app domain platform; do
+	eval "_meas=\$MEASURED_$_m"
+	# Integer ceiling: (x*pct + 99) / 100.
+	eval "BUDGET_$_m=\$(( _meas + (_meas * COMMENT_BUDGET_MARGIN_PCT + 99) / 100 ))"
+done
+unset _m _meas
 
 MODULES='app domain platform'
 
@@ -96,9 +109,19 @@ MODULES='app domain platform'
 # maintenance change that splits or retires one ported path does by accident. A count cannot name
 # which marker left, so its diagnostic could not have pointed at the damage either.
 #
-# So the unit is a RECORD, keyed by file plus the Tasker SOURCE COORDINATES the marker cites, and
-# the check is per-record: every record in the manifest must still be present, at least as often as
-# the manifest says. New records need no manifest edit — the manifest is a floor, never a whitelist.
+# So the unit is a RECORD: one file plus ONE Tasker source coordinate, and the check asks only
+# whether that coordinate is still cited somewhere in that file. New records need no manifest edit —
+# the manifest is a floor, never a whitelist.
+#
+# ONE coordinate per record, not the marker's whole coordinate set, and the distinction is the
+# contract. Keyed on the exact set with multiplicity, this fired on two edits that drop nothing:
+# ENRICHING a marker (`task543` → `task543 act7` destroyed the old key) and MERGING two markers that
+# cite the same coordinates (the per-record count acted as a line-count floor). Both are edits the
+# budget half of this guard actively asks for, and the documented remedy — regenerate — re-baselines
+# every record at once, silently ratifying anything else missing in the same branch. That is the
+# DB-029 defect returning through its own escape hatch. Per-coordinate keys make the guard fail
+# when, and only when, a reference is genuinely gone, which is what the failure text has always
+# promised.
 #
 # WHY COORDINATES AND NOT THE MARKER TEXT. Pinning the literal line was the obvious design and it is
 # wrong: 22 of the 68 markers were reworded by this very branch's consolidation, all of them
@@ -141,21 +164,28 @@ MODULES='app domain platform'
 TASKER_PROVENANCE_MANIFEST=$(
 	cat <<'MANIFEST'
 1	app/src/main/kotlin/com/tideo/autobrightness/app/runtime/AmbientMonitoringService.kt	(no-coordinate)
-1	app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextEngine.kt	%AAB_CurrentActiveProfile,act17
+1	app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextEngine.kt	%AAB_CurrentActiveProfile
+1	app/src/main/kotlin/com/tideo/autobrightness/app/runtime/ContextEngine.kt	act17
 1	app/src/main/kotlin/com/tideo/autobrightness/app/runtime/PipelineCycleRunner.kt	(no-coordinate)
-1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_AnimSteps,task570
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_AnimSteps
 1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_ContextOverride
 1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_Debug
 1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_PanicPlugged
 1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_PanicSensitivity
-1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_Scale,task592
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_Scale
 1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_SetupTitle
 1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_ThreshMidpoint
-1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_Throttle,task570
-1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt	%AAB_Scale,%AAB_ScalingUse,act10,task661
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	%AAB_Throttle
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	task570
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettings.kt	task592
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt	%AAB_Scale
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt	%AAB_ScalingUse
 1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt	(no-coordinate)
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt	act10
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/AabSettingsMapper.kt	task661
 1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/SettingsValidator.kt	(no-coordinate)
-1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/TaskerLegacyProfileSerializer.kt	%AAB_DefaultThrottle,%AAB_Throttle
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/TaskerLegacyProfileSerializer.kt	%AAB_DefaultThrottle
+1	app/src/main/kotlin/com/tideo/autobrightness/app/settings/TaskerLegacyProfileSerializer.kt	%AAB_Throttle
 1	app/src/main/kotlin/com/tideo/autobrightness/app/state/DraftSettingsViewModel.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/components/SettingsControls.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/graph/DimmingChart.kt	(no-coordinate)
@@ -167,62 +197,95 @@ TASKER_PROVENANCE_MANIFEST=$(
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements4
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ProfilesScreen.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/SuperDimmingScreen.kt	(no-coordinate)
-1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	%AAB_Test,act13,task38
-1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	task38,task655
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	%AAB_Test
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	act13
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	task38
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	task655
 2	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	(no-coordinate)
-2	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act10,task548,task661
-1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act16,task661
-3	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act28,prof759,task544,task545
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act10
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act16
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	act28
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	prof759
 1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task535
-1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task535,task544
 1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task543
-3	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task546
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task544
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task545
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task546
 1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task548
 1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt	task661
-1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	%AAB_ScalingUse,act10,task548,task661
-1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	%AAB_ThreshMidpoint,act39,task570
-1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	act26,task570
-1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	prof759,task545
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	%AAB_ScalingUse
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	%AAB_ThreshMidpoint
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	act10
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	act26
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	act39
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	prof759
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	task545
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	task548
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	task570
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessPolicyInput.kt	task661
 1	domain/src/main/kotlin/com/tideo/autobrightness/domain/circadian/SolarTimes.kt	(no-coordinate)
-1	domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt	L649,task38
-1	domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt	L659,task38
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt	L649
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt	L659
+1	domain/src/main/kotlin/com/tideo/autobrightness/domain/wizard/CurveSuggestionEngine.kt	task38
 4	domain/src/test/kotlin/com/tideo/autobrightness/domain/brightness/ProvenanceTest.kt	(no-coordinate)
-1	domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/TaskerReference.kt	L40429,L41085,task90
-1	platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/ScreenBrightnessController.kt	task554,task696
+1	domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/TaskerReference.kt	L40429
+1	domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/TaskerReference.kt	L41085
+1	domain/src/test/kotlin/com/tideo/autobrightness/domain/reference/TaskerReference.kt	task90
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/ScreenBrightnessController.kt	task554
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/ScreenBrightnessController.kt	task696
 1	platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/SecureDimmingController.kt	task650
-1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/BatteryStateReader.kt	prof763,task43
-1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/ForegroundAppMonitor.kt	prof762,task43
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/BatteryStateReader.kt	prof763
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/BatteryStateReader.kt	task43
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/ForegroundAppMonitor.kt	prof762
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/ForegroundAppMonitor.kt	task43
 1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/LocationReader.kt	prof765
-1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiInfoReader.kt	prof768,task43
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiInfoReader.kt	prof768
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiInfoReader.kt	task43
 1	platform/src/main/kotlin/com/tideo/autobrightness/platform/context/WifiSsidStrategies.kt	(no-coordinate)
-1	platform/src/main/kotlin/com/tideo/autobrightness/platform/observe/BrightnessObserver.kt	prof755,task567
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/observe/BrightnessObserver.kt	prof755
+1	platform/src/main/kotlin/com/tideo/autobrightness/platform/observe/BrightnessObserver.kt	task567
 1	platform/src/main/kotlin/com/tideo/autobrightness/platform/privilege/PrivilegeManager.kt	task378
 1	platform/src/main/kotlin/com/tideo/autobrightness/platform/sensor/LightSensorSource.kt	prof760
 1	platform/src/test/kotlin/com/tideo/autobrightness/platform/context/WifiSsidStrategyTest.kt	(no-coordinate)
 MANIFEST
 )
 
-tasker_provenance_records() { # <file>... -> "<path>\t<coordinates>" per marker line
+# -> "<count>\t<path>\t<key>", one line per (file, coordinate) pair.
+#
+# The key is ONE coordinate, not the marker's whole coordinate set, and that is the difference
+# between the contract this guard advertises and the one it used to enforce. Keyed on the exact set
+# with multiplicity, two edits that drop NOTHING both failed: enriching a marker (`task543` →
+# `task543 act7` destroys the old key) and merging two markers that cite the same coordinates (the
+# per-record count became a line-count floor). Both are edits this guard's own budget pressure asks
+# for, and "regenerate the manifest" as the remedy re-baselines all 59 records at once — which
+# silently ratifies anything else missing in the same branch, the DB-029 defect returning through
+# its own escape hatch. Per-coordinate keys mean a record fails when, and only when, a reference is
+# genuinely gone from that file.
+#
+# `count` is 1 for a real coordinate (presence, deduped per file) and a genuine per-file COUNT for
+# `(no-coordinate)` markers, which carry nothing to key on and can only be floored by quantity. The
+# header states that residue rather than implying those 15 are protected like the rest.
+tasker_provenance_records() { # <file>...
 	awk '
 	match($0, /\/\/ Tasker/) {
 		t = substr($0, RSTART)
 		n = split(t, w, /[^A-Za-z0-9_%]+/)
-		split("", seen); m = 0
+		m = 0
 		for (i = 1; i <= n; i++) {
 			k = w[i]
 			if (k ~ /^(task|prof|act|scene|elements)[0-9]+$/ || k ~ /^L[0-9]+$/ ||
 			    k ~ /^%AAB_[A-Za-z_]+$/) {
-				if (!(k in seen)) { seen[k] = 1; key[++m] = k }
+				tok[FILENAME SUBSEP k] = 1
+				m++
 			}
 		}
-		for (x = 1; x <= m; x++)
-			for (y = x + 1; y <= m; y++)
-				if (key[y] < key[x]) { tmp = key[x]; key[x] = key[y]; key[y] = tmp }
-		s = ""
-		for (x = 1; x <= m; x++) s = s (x == 1 ? "" : ",") key[x]
-		printf "%s\t%s\n", FILENAME, (m ? s : "(no-coordinate)")
+		if (m == 0) none[FILENAME]++
 	}
-	' "$@"
+	END {
+		for (kk in tok) { split(kk, a, SUBSEP); printf "1\t%s\t%s\n", a[1], a[2] }
+		for (f in none) printf "%d\t%s\t(no-coordinate)\n", none[f], f
+	}
+	' "$@" | LC_ALL=C sort -t'	' -k2,2 -k3,3
 }
 
 # Character-level Kotlin scan. Emits one record per file, with the PATH LAST:
@@ -444,8 +507,16 @@ if [ "${#files[@]}" -eq 0 ]; then
 fi
 # --- records mode: print the current tree's provenance manifest (for regenerating the constant) --
 if [ "$mode" = "records" ]; then
-	tasker_provenance_records "${files[@]}" | sort | uniq -c |
-		sed -e 's/^[[:space:]]*//' -e 's/^\([0-9][0-9]*\) /\1	/'
+	# The extractor already emits the manifest's exact three-field form, counted and sorted, so
+	# this mode is a straight passthrough. It used to pipe through `sort | uniq -c`, which now
+	# prepends a SECOND count column and produces a manifest the checker reads as unparsable.
+	tasker_provenance_records "${files[@]}"
+	# Read from the WORKING TREE, which is the one thing the manifest must not be baselined from.
+	# The header says to take it from the merge base; nothing here can enforce that, so it is said
+	# out loud at the moment someone is about to paste the output in. A ratchet read off a
+	# mid-change tree ratifies whatever that change already broke — the DB-029 incident exactly.
+	printf 'note: this is the WORKING TREE, not the merge base. Baseline the manifest from the merge base:\n  git worktree add --detach /tmp/mb <merge-base> && cp %s /tmp/mb/scripts/guards/ && (cd /tmp/mb && bash scripts/guards/comment-budget.sh --provenance-records)\n' \
+		"scripts/guards/comment-budget.sh" >&2
 	exit 0
 fi
 
@@ -487,9 +558,31 @@ recs=$(mktemp)
 trap 'rm -f "$report" "$recs"' EXIT
 tasker_provenance_records "${files[@]}" >"$recs"
 prov_total=$(wc -l <"$recs" | tr -d '[:space:]')
+# A manifest line that does not parse is a FAILURE, never a skipped line.
+#
+# It used to be dropped silently (`if (NF == 3 …)`), which made the cheapest bypass in this guard a
+# whitespace-only diff: delete a real marker, then convert that one manifest line's tabs to spaces,
+# and the guard printed `all 58 manifest record(s) intact` and exited 0. The record count fell by
+# one and nothing compared it to anything. It was reachable by accident too — any heredoc re-indent
+# or tab→space normalisation — and the fixture suite could not see it, because a manifest that
+# parses to zero records satisfies every case vacuously. This is the same doctrine the tracked-file
+# check above already applies: an input this cannot read means it checked NOTHING, and that is not
+# a pass.
+bad_manifest=$(printf '%s\n' "$TASKER_PROVENANCE_MANIFEST" | awk -F'\t' '
+	$0 == "" { next }
+	NF != 3 || $1 !~ /^[0-9]+$/ || $1 + 0 == 0 || $2 == "" || $3 == "" {
+		printf "line %d: %s\n", NR, $0
+	}
+')
+if [ -n "$bad_manifest" ]; then
+	printf 'comment budget: the provenance manifest has unparsable line(s) — each must be <count><TAB><path><TAB><coordinate>. A line this cannot read is silently not enforced, so this is a failure, not a skip. Usually tabs converted to spaces by an editor or a heredoc re-indent; regenerate with `scripts/guards/comment-budget.sh --provenance-records`.\n' >&2
+	printf '%s\n' "$bad_manifest" | sed 's/^/         /' >&2
+	fails=$((fails + 1))
+fi
+
 lost=$(printf '%s\n' "$TASKER_PROVENANCE_MANIFEST" | awk -F'\t' '
-	NR == FNR { if (NF == 3 && $1 != "") need[$2 FS $3] = $1 + 0; next }
-	{ have[$1 FS $2]++ }
+	NR == FNR { if (NF == 3 && $1 ~ /^[0-9]+$/) need[$2 FS $3] = $1 + 0; next }
+	{ have[$2 FS $3] += $1 }
 	END { for (k in need) if (have[k] + 0 < need[k]) printf "%d\t%d\t%s\n", need[k], have[k] + 0, k }
 ' - "$recs" | sort -t'	' -k3,3)
 if [ -n "$lost" ]; then
@@ -503,5 +596,5 @@ fi
 
 [ "$fails" = 0 ] || exit 1
 prov_records=$(printf '%s\n' "$TASKER_PROVENANCE_MANIFEST" | awk -F'\t' 'NF == 3 && $1 != ""' | wc -l | tr -d '[:space:]')
-printf 'comment budget:%s; no block over %s lines; %s Tasker provenance marker(s), all %s manifest record(s) intact\n' \
-	"$summary" "$COMMENT_BLOCK_MAX_LINES" "$prov_total" "$prov_records"
+printf 'comment budget:%s; no block over %s lines; all %s Tasker provenance record(s) intact (%s in the tree)\n' \
+	"$summary" "$COMMENT_BLOCK_MAX_LINES" "$prov_records" "$prov_total"
