@@ -22,32 +22,21 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Backs the Circadian screen's fixed date/location element (G2R-F39). Reads/writes the
- * [ExperimentPrefsStore] override and supplies the "live data" defaults (today + current location)
- * used when nothing is set. Separate from [DraftSettingsViewModel] because the override is scene-local
- * preview state, not a profile parameter — it never enters `AabSettings`/profiles/export.
- */
+/** G2R-F39: fixed date/location element. Scene-local preview state, not persisted as profile parameter. */
 class CircadianExtrasViewModel(application: Application) : AndroidViewModel(application) {
     private val store = ExperimentPrefsStore(application.experimentPrefsDataStore)
     private val location = AndroidLocationReader(application)
-    // D-120: the ipwho.is IP lookup (D-121) backs "Use current location" as an active last resort.
+    // D-120/D-121: ipwho.is IP lookup backs "Use current location" as active last resort
     private val geoIp = GeoIpLocationClient()
 
     val dateLocation: StateFlow<ExperimentDateLocation> = store.dateLocation
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExperimentDateLocation())
 
-    /** G3-F12 / D-105: whether the ipwho.is geo-IP fallback may run (privacy opt-IN, default off). */
+    /** D-105: geo-IP fallback opt-IN privacy gate (default off). */
     val geoIpEnabled: StateFlow<Boolean> = store.geoIpEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    /**
-     * D-110: freshness of the location backing the live circadian modifier, for the staleness hint. A
-     * pinned fixed location is never stale; a cached fix from a previous day is stale (with its age in
-     * days); no cached fix at all → the modifier is on the default windows (≈0.85) until a fix lands.
-     * Mirrors [com.tideo.autobrightness.app.runtime.CircadianWindowProvider.current]'s fallback chain so
-     * the UI hint matches what the pipeline actually uses.
-     */
+    /** D-110: location staleness hint; mirrors CircadianWindowProvider's fallback chain. */
     val circadianLocationStatus: StateFlow<CircadianLocationStatus> =
         store.dateLocation.combine(store.cachedSunLocation) { ov, cache ->
             val today = System.currentTimeMillis() / 1000L / 86_400L
@@ -64,23 +53,12 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
         viewModelScope.launch { store.setGeoIpEnabled(enabled) }
     }
 
-    /** Today as `YYYY-MM-DD` — the live-data date default shown when no fixed date is set. */
     fun today(): String = DATE_FORMAT.format(Date())
 
-    /** Best-effort last-known location as the lat/lon default; null if unavailable/no permission. */
     fun defaultLatLon(): Pair<Double, Double>? =
         location.lastKnownLocation()?.let { it.latitude to it.longitude }
 
-    /**
-     * Actively acquire a location for the "Use current location" button (G2R-F42 / D-120 / D-122). Rather
-     * than passively echoing whatever last-known fix another app happened to leave, this ACTIVELY requests
-     * a fresh fix ([LocationReader.activeFix] registers for live provider updates — the OS location
-     * indicator lights up — and waits for a real callback, using last-known only as a backup); and when
-     * none is available — no fix, or Location permission is missing/denied — it falls back to the ipwho.is
-     * IP lookup so the button still resolves an approximate location instead of giving up. The IP fallback
-     * runs ONLY when the user has opted into it (the same default-off privacy gate as the live circadian
-     * chain, D-105). Returns null when every active source is exhausted or declined.
-     */
+    /** G2R-F42/D-120/D-122: actively acquire fresh location (not passive last-known); fallback to ipwho.is if opted-in. */
     suspend fun freshLatLon(): Pair<Double, Double>? {
         (location.activeFix() as? LocationResult.Available)?.snapshot?.let {
             return it.latitude to it.longitude
@@ -91,10 +69,7 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
         return null
     }
 
-    /** Pin a fixed date and/or location (G2R-F39); null fields revert to live for that field. The fixed
-     *  date/location drive the LIVE circadian scaling (CircadianWindowProvider), not just the preview, so
-     *  re-apply the pipeline immediately — otherwise the new %AAB_ScaleDynamic only lands on the next light
-     *  change (prof760 drops steady-light cycles). */
+    /** G2R-F39: pin fixed date/location (null = revert to live). Re-apply pipeline to avoid steady-light drop. */
     fun set(date: String?, latitude: Double?, longitude: Double?) {
         viewModelScope.launch {
             store.set(date, latitude, longitude)
@@ -109,7 +84,6 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    /** Force the runtime to recompute brightness with the new circadian windows (gated on serviceEnabled). */
     private suspend fun reapplyIfRunning() {
         val enabled = getApplication<Application>().settingsDataStore.data.first().serviceEnabled
         if (enabled) AutoBrightnessRuntime.reapply(getApplication())

@@ -20,23 +20,21 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** Everything the Live Debug scene renders: the live pipeline snapshot + a few persisted figures. */
 data class LiveDebugUiState(
     val pipeline: PipelineState = PipelineState(),
     val serviceRunning: Boolean = false,
     val activeContext: String? = null,
     val minBrightness: Int = 0,
     val maxBrightness: Int = 255,
-    /** The GLOBAL %AAB_Debug category (G2R-F9) — the selector lives here, not on Misc. */
+    // G2R-F9: global %AAB_Debug category
     val debugLevel: Int = 0,
-    /** The GLOBAL %AAB_PanicSensitivity (0..10, D-116) — the slider lives here, like the debug category. */
+    // D-116: global %AAB_PanicSensitivity (0..10)
     val panicSensitivity: Int = 8,
     val panicRequiresPlugged: Boolean = false,
-    /** Whether the opt-in global-flash AccessibilityService is enabled (G2R-F50). */
+    // G2R-F50: global-flash AccessibilityService enabled
     val globalToastsEnabled: Boolean = false,
 )
 
-/** The handful of persisted figures the Live Debug scene reads (packed so `combine` stays ≤5 flows). */
 private data class LiveDebugSettings(
     val minBrightness: Int,
     val maxBrightness: Int,
@@ -45,21 +43,14 @@ private data class LiveDebugSettings(
     val panicRequiresPlugged: Boolean,
 )
 
-/**
- * Drives [com.tideo.autobrightness.app.ui.screens.LiveDebugScreen] (S12.6b, G2R-F6/F9). The live
- * `%AAB_*` runtime vars come from [LiveRuntimeState] (the service republishes the pipeline state
- * there); min/max + the global debug category come from the DataStore. [setDebugLevel] writes the
- * category straight to the DataStore — the selector is global, so it never goes through a per-profile
- * or per-screen draft (G2R-F9).
- */
+/** S12.6b, G2R-F6/F9: drives LiveDebugScreen. Live %AAB_* from LiveRuntimeState; settings from DataStore. */
 class LiveDebugViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
 
     private val settingsFlow = app.settingsDataStore.data
         .map { LiveDebugSettings(it.minBrightness, it.maxBrightness, it.debugLevel, it.panicSensitivity, it.panicRequiresPlugged) }
 
-    // Re-read on demand (the screen pokes this on resume) since enabling the AccessibilityService
-    // happens in system Settings, outside any DataStore/flow we observe (G2R-F50).
+    // G2R-F50: re-read on demand (system settings outside DataStore)
     private val globalToasts = MutableStateFlow(isGlobalToastServiceEnabled())
 
     val state: StateFlow<LiveDebugUiState> = combine(
@@ -85,39 +76,26 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
     fun setDebugLevel(level: Int) {
         viewModelScope.launch {
             app.settingsDataStore.updateData { it.copy(debugLevel = level) }
-            // Instant debug-off / instant-switch (G2R-F52): clear any flash on screen now, and push
-            // the new selection into the running pipeline immediately. The pipeline reads its settings
-            // through the ContextEngine's cached effective snapshot, so a bare DataStore write would
-            // not take effect until the next reapply — reapply() re-reads the fresh baseline.
+            // G2R-F52: instant debug-off/switch; reapply for pipeline pickup
             if (level == 0) AabFlash.cancel()
             if (app.settingsDataStore.data.first().serviceEnabled) AutoBrightnessRuntime.reapply(app)
         }
     }
 
-    /**
-     * Persist the GLOBAL %AAB_PanicSensitivity (0..10, D-116). Like [setDebugLevel] this writes straight
-     * to the DataStore — the slider is global, never a per-profile/draft value. The panic source reads
-     * the value via ContextEngine.effectiveSnapshot per arming, so no reapply() is needed.
-     */
+    /** D-116: persist global %AAB_PanicSensitivity (0..10). Global, never per-profile. */
     fun setPanicSensitivity(value: Int) {
         viewModelScope.launch {
             app.settingsDataStore.updateData { it.copy(panicSensitivity = value.coerceIn(0, 10)) }
         }
     }
 
-    /**
-     * DB-009 (%AAB_PanicPlugged, issue #110): restrict the panic gesture to external power.
-     *
-     * A global pref like the sensitivity beside it — never a profile field, because the gesture is a
-     * safety escape hatch and must not change because a context rule swapped profiles.
-     */
+    /** DB-009: %AAB_PanicPlugged (#110). Global pref (safety hatch must not vary by context). */
     fun setPanicRequiresPlugged(value: Boolean) {
         viewModelScope.launch {
             app.settingsDataStore.updateData { it.copy(panicRequiresPlugged = value) }
         }
     }
 
-    /** Re-poll whether the global-flash AccessibilityService is enabled (call on screen resume). */
     fun refreshGlobalToastStatus() {
         globalToasts.value = isGlobalToastServiceEnabled()
     }

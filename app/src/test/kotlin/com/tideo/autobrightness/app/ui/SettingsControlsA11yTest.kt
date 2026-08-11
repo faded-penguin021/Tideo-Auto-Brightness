@@ -18,13 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * A0 acceptance (D-156) — the S12.5b settings primitives are TalkBack-usable: every interactive
- * node announces a label, section headers are headings, and read-only label/value readouts merge
- * into one announcement. This is the worked template for the a11y backlog
- * (plans/a11y-diagnostics.md): render the unit's surface, then funnel it through the
- * [assertAllInteractiveNodesAreLabeled] gate plus targeted per-control assertions.
- */
+/** D-156: S12.5b settings primitives TalkBack-usability. */
 @RunWith(RobolectricTestRunner::class)
 class SettingsControlsA11yTest {
 

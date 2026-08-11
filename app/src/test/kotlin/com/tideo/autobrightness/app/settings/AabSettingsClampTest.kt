@@ -69,7 +69,6 @@ class AabSettingsClampTest {
         assertEquals(0.0, validated.thresholdMidpoint, "-Inf clamps to the midpoint min")
     }
 
-    // --- D-151 display-toggle profile fields -----------------------------------------------------
 
     @Test
     fun `night light temperature clamps into the sanity band but null stays null D151`() {

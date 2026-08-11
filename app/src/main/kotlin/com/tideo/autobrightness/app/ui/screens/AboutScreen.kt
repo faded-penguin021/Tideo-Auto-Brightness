@@ -16,12 +16,7 @@ import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 
-/**
- * AAB About scene (Tasker: sceneAAB About, extraction/scenes/about.md). The static "About & License"
- * page — banner, intro, acknowledgments, and the MIT license box. The Chart.js acknowledgment is
- * dropped (Chart.js is removed in the Kotlin rebuild; the charts are native Compose now). The in-scene
- * close button is replaced by the M3 back arrow (anonymous_handlers triage bucket (a)).
- */
+/** AAB About scene (Tasker sceneAAB About). Static "About & License" page. */
 @Composable
 fun AboutScreen(navController: NavHostController) {
     val context = LocalContext.current

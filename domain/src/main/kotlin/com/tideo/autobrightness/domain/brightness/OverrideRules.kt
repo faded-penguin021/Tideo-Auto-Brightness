@@ -1,39 +1,9 @@
 package com.tideo.autobrightness.domain.brightness
 
-/**
- * Pure decision logic for the manual-override detect / pause / resume state machine.
- *
- * Tasker sources: task567 "Manual Override" (XML L20525-L20885), task569 "Resume After Override"
- * (L20896-L20978), task561 "Process Overrides" (L19385-L19521), prof755 "Allow Override" gate.
- *
- * Platform responsibilities (S7/S9a): posting notifications, shell commands, QS-tile state, and
- * the ContentObserver that delivers observed brightness values. This object holds only pure
- * boolean/data decisions that require no Android APIs.
- *
- * See also: pipeline_spec.md §2 (Override detect / pause / resume state machine).
- */
+// Pure decision logic for manual-override detect/pause/resume. Sources: task567, task569, task561, prof755.
 object OverrideRules {
 
-    /**
-     * Decide whether an observed brightness change is a manual (external) override.
-     *
-     * Tasker: prof755 gate fires when `Service=On ∧ AutoBrightRunning=0 ∧ Manual_Override!~true
-     * ∧ Initializing!~true ∧ DetectOverrides!~Off`. task567 act8 then re-checks the same guard.
-     *
-     * The suppress-echo contract (task696/698 read-back): the pipeline registers the values it
-     * intends to write. An observed value outside the registered set — while not in a known
-     * pipeline write — is an external override.
-     *
-     * @param isServiceOn       Current %AAB_Service = On.
-     * @param isAutoRunning     Current %AutoBrightRunning = 1 (mid-pipeline write).
-     * @param isAlreadyPaused   Current %AAB_Manual_Override = true.
-     * @param isInitializing    Current %AAB_Initializing = true.
-     * @param detectOverrides   Current %AAB_DetectOverrides = On.
-     * @param observedValue     The brightness value observed from the system setting.
-     * @param expectedValues    The set of values the pipeline registered as self-writes; empty = no
-     *                          suppression (treat any change as external when other gates pass).
-     * @return                  True if this change should be treated as a manual override.
-     */
+    // Decide if an observed brightness change is external (task567/prof755). Check gates + suppress-echo (task696/698).
     fun isManualOverride(
         isServiceOn: Boolean,
         isAutoRunning: Boolean,

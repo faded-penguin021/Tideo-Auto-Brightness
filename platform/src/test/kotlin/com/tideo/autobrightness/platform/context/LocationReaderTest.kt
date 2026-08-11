@@ -19,11 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * H3 glue-seam audit: `LocationReader.activeFix` (D-120/D-122) had no test — the active
- * requestLocationUpdates acquisition, the null-island skip, the last-known BACKUP on timeout,
- * and the call-time permission recheck are all decided here.
- */
+/** H3 audit: LocationReader.activeFix (D-120/D-122) active acquisition, null-island skip, backup. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class LocationReaderTest {

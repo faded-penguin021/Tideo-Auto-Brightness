@@ -5,11 +5,7 @@ import com.tideo.autobrightness.domain.context.ContextRuleSpec
 import com.tideo.autobrightness.domain.context.LocationConstraint
 import com.tideo.autobrightness.domain.context.TimeRange
 
-/**
- * Maps the app/storage [ContextRule] (S8, mirrors Tasker's contexts.json schema) onto the pure
- * domain [ContextRuleSpec] consumed by `ContextOverrideResolver`. Keeps Android-free domain code
- * decoupled from the serialization model.
- */
+/** Map storage ContextRule onto domain ContextRuleSpec. */
 fun ContextRule.toSpec(): ContextRuleSpec = ContextRuleSpec(
     id = id,
     name = name,
@@ -23,25 +19,17 @@ fun ContextRule.toSpec(): ContextRuleSpec = ContextRuleSpec(
     days = triggers.days,
 )
 
-/**
- * Order rules for display by priority (highest first), matching the resolution precedence (G2R-F43,
- * D-014). Ties keep a stable, case-insensitive name order so the list doesn't reshuffle on edits.
- */
+/** Order rules by priority (highest first), matching resolution precedence (G2R-F43, D-014). */
 fun List<ContextRule>.byPriority(): List<ContextRule> =
     sortedWith(compareByDescending<ContextRule> { it.priority }.thenBy { it.name.lowercase() })
 
-/**
- * The cheap signal-token pre-filter (`%AAB_ContextCache`, contexts_spec §2.1): which signal types
- * any configured rule uses. Drives the watcher gates so we only run the full evaluator when a
- * relevant signal type is actually in play.
- */
+/** Signal-token pre-filter (%AAB_ContextCache): which signal types any rule uses. */
 data class ContextSignalTokens(
     val usesBattery: Boolean,
     val usesLocation: Boolean,
     val usesWifi: Boolean,
     val usesApps: Boolean,
     val usesTime: Boolean,
-    /** Deduplicated set of every app package referenced by any rule (task623 L93-103). */
     val appPackages: Set<String>,
 ) {
     companion object {

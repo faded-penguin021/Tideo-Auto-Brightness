@@ -38,25 +38,16 @@ object AutoBrightnessRuntime {
     // DA-018: resume context automation (run genuine evaluation, not just reapply).
     fun resumeContext(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_RESUME_CONTEXT)
 
-    /**
-     * D-157: full-stop panic from an external command (mirrors the notification's Reset button, which
-     * sends the same [AmbientMonitoringService.ACTION_PANIC]): restore brightness, drop dimming, tear
-     * the service down. Safe when not running — startForegroundService creates the instance, it panics
-     * and self-terminates (NOT_STICKY), exactly as the notification Reset does.
-     */
+    // D-157: full-stop panic from external command.
     fun panic(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_PANIC)
 
     private fun sendServiceAction(context: Context, action: String) {
         val appContext = context.applicationContext
         val intent = Intent(appContext, AmbientMonitoringService::class.java).setAction(action)
         try {
-            // minSdk 31 ≥ O, so startForegroundService is always available (S12.9a dead-branch removal).
-            // NOTE (D-140): this CREATES the service when it is not running — it is never a no-op —
-            // so control actions (pause/reapply) are validated in the service's onStartCommand.
             appContext.startForegroundService(intent)
         } catch (_: IllegalStateException) {
-            // Background-start restriction (the app is neither foreground nor exempt) — the action
-            // was user-initiated from UI that no longer exists; dropping it is the right outcome.
+            // Background-start restriction (app not foreground/exempt); drop action.
         }
     }
 
@@ -76,7 +67,6 @@ object AutoBrightnessRuntime {
             putExtra(AmbientMonitoringService.EXTRA_REASON, reason)
         }
         try {
-            // minSdk 31 ≥ O, so startForegroundService is always available (S12.9a dead-branch removal).
             appContext.startForegroundService(intent)
         } catch (error: ForegroundServiceStartNotAllowedException) {
             AppProcessScope.launch {

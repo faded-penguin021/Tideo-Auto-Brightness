@@ -126,9 +126,7 @@ fun ContextRulesSection(
         modifier = Modifier.fillMaxWidth().testTag("add_context_rule"),
     ) { Text(stringResource(R.string.contexts_add_rule)) }
 
-    // A saved per-app rule can't trigger without usage access (it has no way to read the foreground
-    // app). Surface it on the list too, not only inside the editor, so a rule that silently never
-    // fires explains itself.
+    // Per-app rules need usage access to fire; show prompt on list too.
     if (rules.any { !it.triggers.apps.isNullOrEmpty() } && !hasUsageAccess()) {
         UsageAccessPromptCard(
             messageRes = R.string.contexts_usage_warning,
@@ -150,16 +148,12 @@ fun ContextRulesSection(
         )
     }
 
-    // S12.9f: edit/add opens the per-rule editor in a modal. The editor owns its own scroll; Save/Cancel
-    // ride at the END of that scroll (not a sticky bar — see RuleEditor), so the host just provides the
-    // full-screen Surface.
+    // Edit/add opens in modal; editor owns its scroll, host provides full-screen Surface.
     val current = editing
     if (current != null) {
         Dialog(
             onDismissRequest = { editing = null },
-            // Edge-to-edge so the editor's top statusBarsPadding() positions the first field below the
-            // status bar. The BOTTOM is handled by scroll + padding inside RuleEditor, not insets — the
-            // dialog window never delivers a non-zero navigation-bar inset to its content here (D-098).
+            // Edge-to-edge; top inset positions field below status bar, bottom handled in RuleEditor (D-098).
             properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         ) {
             Surface(modifier = Modifier.fillMaxSize().testTag("rule_editor_modal"), tonalElevation = Dimens.cardElevationRaised) {
@@ -182,13 +176,11 @@ fun ContextRulesSection(
 
 @Composable
 private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit, isActive: Boolean = false) {
-    // S13c restyle (m3_audit §3 row 10): rule rows are elevated `AabCard`s. D-113: the rule currently
-    // in force gets a gold edge + "Active" tag (mirrors the Profiles list), and the target profile —
-    // the thing the rule switches TO — is rendered prominently in gold rather than buried in grey text.
+    // D-113: active rule gets gold edge + tag; target profile shown in gold.
     val cardModifier = Modifier.testTag("rule_${rule.id}").let {
         if (isActive) it.border(1.5.dp, AabGold, MaterialTheme.shapes.medium) else it
     }
-    // D-114: confirm before deleting a rule (Tasker prompted first).
+    // D-114: confirm before deleting.
     var confirmDelete by remember { mutableStateOf(false) }
     AabCard(
         cardModifier,
@@ -234,9 +226,7 @@ private fun RuleCard(rule: ContextRule, onEdit: () -> Unit, onDelete: () -> Unit
     }
 }
 
-// D-156: `internal` (not `private`) so the A6 a11y audit can render the rule editor directly — it
-// lives inside a full-screen `Dialog` (a second window), which `assertAllInteractiveNodesAreLabeled`'s
-// single-root walk can't reach. Behavior/test-tags unchanged.
+// D-156: `internal` so A6 a11y audit can render the editor (lives in a separate Dialog window).
 @Composable
 internal fun RuleEditor(
     rule: ContextRule,
@@ -252,9 +242,7 @@ internal fun RuleEditor(
 ) {
     var name by remember { mutableStateOf(rule.name) }
     var profile by remember { mutableStateOf(rule.profile) }
-    // D-113: priority is a 1–100 scale (higher wins), not 0..∞. Seed with the rule's REAL stored value
-    // (a legacy/unset 0 shows as 1) so a pre-existing out-of-range value — e.g. an old 150 — is shown
-    // truthfully rather than silently pre-capped; it is clamped to 1..100 only when the user saves.
+    // D-113: priority 1–100; seed with real value (legacy 0→1), clamp on save.
     var priorityText by remember { mutableStateOf(rule.priority.takeIf { it >= 1 }?.toString() ?: "1") }
     val priorityOverMax = (priorityText.trim().toIntOrNull() ?: 0) > 100
     var wifi by remember { mutableStateOf(rule.triggers.wifi?.joinToString(", ") ?: "") }
@@ -290,7 +278,6 @@ internal fun RuleEditor(
         val latV = lat.trim().toDoubleOrNull()
         val lonV = lon.trim().toDoubleOrNull()
         val radiusV = radius.trim().toDoubleOrNull()
-        // Each trigger is included only when its section is enabled (and has valid data).
         val triggers = ContextTriggers(
             apps = if (appsEnabled) selectedApps.value.takeIf { it.isNotEmpty() }?.toList() else null,
             wifi = if (wifiEnabled) {
@@ -313,29 +300,22 @@ internal fun RuleEditor(
             } else {
                 null
             },
-            // All 7 (or none) selected = "every day" → omit (G2R-F67).
             days = if (timeEnabled) selectedDays.value.takeIf { it.isNotEmpty() && it.size < 7 }?.sorted() else null,
         )
-        // Prompt for usage access on save if the rule targets apps and it is not granted.
         if (triggers.apps != null && !hasUsageAccess()) onRequestUsageAccess()
         onSave(
             rule.copy(
                 name = name,
                 profile = profile,
-                // D-113: clamp to the 1–100 scale (blank/invalid → 1, the lowest priority).
+                // D-113: clamp to 1–100.
                 priority = priorityText.trim().toIntOrNull()?.coerceIn(1, 100) ?: 1,
                 triggers = triggers,
             ),
         )
     }
 
-    // The editor is one scrollable field area with Save/Cancel at the END of the scroll (G3 owner finding
-    // — buttons stay at the bottom, not the top; an all-expanded form read as inferior to the Tasker
-    // editor). statusBarsPadding insets the first field below the status bar (the top inset IS delivered to
-    // this dialog window); imePadding shrinks the scroll viewport above the keyboard. The bottom is NOT
-    // inset-padded — the dialog window never delivers a navigation-bar inset to its content (D-098), so the
-    // earlier sticky bar kept clipping under the gesture pill; a trailing Spacer + scroll lets Save/Cancel
-    // always be scrolled fully clear of it instead.
+    // Editor: scrollable fields, Save/Cancel at end (not sticky bar). statusBarsPadding insets top,
+    // imePadding handles keyboard. Bottom not padded (D-098), trailing Spacer lets buttons scroll clear.
     Column(
         Modifier
             .fillMaxSize()
@@ -357,11 +337,7 @@ internal fun RuleEditor(
             )
 
             Text(stringResource(R.string.contexts_switch_profile), style = MaterialTheme.typography.labelMedium)
-            // D-114(b): emphasise the selected profile — gold + titleSmall (matching the rule card's
-            // "Loads <profile>") with a dropdown caret, so the chosen target stands out in the editor.
-            // The DropdownMenu MUST be wrapped in a Box with its anchor button (like ProfileCard's
-            // overflow): a bare DropdownMenu sibling in the scrolling Column has no anchor and floats
-            // down over the Triggers ("disconnected" menu, owner screenshot).
+            // D-114(b): emphasize selected profile in gold; wrap DropdownMenu in Box with anchor.
             Box {
                 OutlinedButton(onClick = { profileMenu = true }, modifier = Modifier.testTag("rule_profile")) {
                     Text(profile, style = MaterialTheme.typography.titleSmall, color = AabGold)
@@ -376,7 +352,6 @@ internal fun RuleEditor(
 
             OutlinedTextField(
                 value = priorityText,
-                // 1–100 scale: digits only, max 3 chars; the value is clamped to 1..100 on save.
                 onValueChange = { priorityText = it.filter(Char::isDigit).take(3) },
                 label = { Text(stringResource(R.string.contexts_priority_label)) },
                 singleLine = true,
@@ -406,8 +381,7 @@ internal fun RuleEditor(
                     modifier = Modifier.fillMaxWidth().testTag("rule_wifi"),
                 )
                 TextButton(
-                    // D-113: APPEND the current SSID to the comma-separated list (like Tasker), don't
-                    // replace it — a rule can match several networks. De-duped, case-sensitively.
+                    // D-113: APPEND SSID to list (not replace); a rule can match multiple networks.
                     onClick = {
                         onUseCurrentSsid { ssid ->
                             val existing = wifi.split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -421,8 +395,6 @@ internal fun RuleEditor(
             }
 
             TriggerSection(stringResource(R.string.contexts_trigger_time), timeEnabled, { timeEnabled = it }, "time") {
-                // G2R-F28: time inputs open the system TimePicker modal; SUNRISE/SUNSET tokens are kept
-                // as one-tap alternatives (the resolver accepts them, G2-F14).
                 Text(stringResource(R.string.contexts_time_window), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
@@ -434,15 +406,12 @@ internal fun RuleEditor(
                         TimeTokenRow("end", solarLabel) { endTime = it }
                     }
                 }
-                // G2R-F72: clear blanks both fields → on save timeRange becomes null (time-agnostic again).
                 if (startTime.isNotBlank() || endTime.isNotBlank()) {
                     TextButton(
                         onClick = { startTime = ""; endTime = "" },
                         modifier = Modifier.testTag("clear_time"),
                     ) { Text(stringResource(R.string.contexts_clear_time)) }
                 }
-                // Day-of-week picker (G2R-F67): overnight windows wrap; the resolver attributes the
-                // post-midnight tail to the previous day's membership (D-014).
                 Text(stringResource(R.string.contexts_days), style = MaterialTheme.typography.labelMedium)
                 DayPicker(selectedDays.value) { day ->
                     selectedDays.value = if (day in selectedDays.value) selectedDays.value - day else selectedDays.value + day
@@ -472,16 +441,12 @@ internal fun RuleEditor(
             }
 
             TriggerSection(stringResource(R.string.contexts_trigger_battery), batteryEnabled, { batteryEnabled = it }, "battery") {
-                // Owner finding: put this toggle on the LEFT (the section-enable switches are on the
-                // right) so it doesn't read as another section toggle.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    // D-156: the "only while charging" label is a sibling Text, so the switch node
-                    // announces nothing to TalkBack — name it (mirrors TriggerSection's toggle). NOT a
-                    // toggleable row: that would move the tap target and break the `rule_charging` click.
+                    // D-156: name the switch; sibling Text doesn't announce to TalkBack.
                     val onlyChargingLabel = stringResource(R.string.contexts_only_charging)
                     Switch(
                         checked = charging,
@@ -491,7 +456,6 @@ internal fun RuleEditor(
                     )
                     Text(onlyChargingLabel, style = MaterialTheme.typography.bodyMedium)
                 }
-                // Battery percentage window (G2R-F31). Either bound may be left blank for "any".
                 Text(stringResource(R.string.contexts_battery_pct), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -509,7 +473,6 @@ internal fun RuleEditor(
 
             if (apps.isNotEmpty()) {
                 TriggerSection(stringResource(R.string.contexts_trigger_apps), appsEnabled, { appsEnabled = it }, "apps") {
-                    // Per-app rules need usage access to read the foreground app (G2-F14): prompt when set.
                     if (selectedApps.value.isNotEmpty() && !hasUsageAccess()) {
                         UsageAccessPromptCard(
                             messageRes = R.string.contexts_usage_required,
@@ -524,10 +487,7 @@ internal fun RuleEditor(
                     }
                 }
             }
-            // Save/Cancel ride at the END of the scroll, not in a sticky bar: the dialog window never
-            // delivers a navigation-bar inset to its content (D-098), so a sticky bar can't reliably clear
-            // the gesture pill. Inline + a generous trailing Spacer means they can always be scrolled fully
-            // clear of it regardless of insets (the G3 owner finding — buttons at the bottom — is kept).
+            // Save/Cancel at end of scroll, not sticky (D-098); trailing Spacer clears gesture pill.
             Spacer(Modifier.height(8.dp))
             HorizontalDivider()
             Row(
@@ -543,13 +503,9 @@ internal fun RuleEditor(
                     modifier = Modifier.weight(1f).testTag("save_rule"),
                 ) { Text(stringResource(R.string.contexts_save_rule)) }
             }
-            // Clearance below the buttons so they always scroll past the gesture pill / 3-button bar,
-            // even though the dialog reports a zero bottom inset here (D-098).
             Spacer(Modifier.height(48.dp))
         }
     }
 }
 
-// TriggerSection / TimeField / TimeTokenRow / DayPicker / the usage-access card / the app picker
-// moved to ui/components/TriggerEditors.kt (D-150 Segment 4) — shared with the Privileged Display
-// schedule editor. Same behavior and test tags.
+// D-150: TriggerSection components moved to TriggerEditors.kt.

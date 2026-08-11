@@ -16,23 +16,9 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * DB-006 — why [GeoIpLocationClient.fetchGeoIp] runs its blocking request in a child coroutine.
- *
- * The security review disputed the claim that cancelling the geo-IP request disconnects it:
- * *"The completion handler may not interrupt the blocking call before the socket timeout."* This
- * test was written to check that claim and **confirmed it** — the original shape could not
- * interrupt the read at all, for a reason worth pinning down:
- *
- *   `Job.invokeOnCompletion` fires when a job COMPLETES. A job parked in an uninterruptible
- *   `read()` does not complete when you cancel it; it completes when the read returns. Registering
- *   the disconnect on the job that then does the blocking call therefore schedules the rescue behind
- *   the very wait it was meant to cut short.
- *
- * Both cases below run against a server that accepts and then says nothing, with a 30 s socket
- * timeout — so any assertion that passes inside a few seconds can only be explained by the socket
- * having been closed, not by the timeout expiring.
- */
+/** DB-006: fetchGeoIp child-coroutine structure justified by cancellation semantics.
+ * invokeOnCompletion on the blocked job can't interrupt read(); child structure fixes this.
+ * Server accepts then silent (30s timeout); any quick success = socket closed (not timeout). */
 class BlockingReadCancellationTest {
 
     /** A server that completes the TCP handshake and then never responds. */
@@ -64,14 +50,13 @@ class BlockingReadCancellationTest {
                 val connection = connectionTo(server)
                 val scope = CoroutineScope(Dispatchers.IO + Job())
                 val blocked = scope.launch {
-                    // The ORIGINAL shape: register on our own job, then block on it.
                     coroutineContext[Job]!!.invokeOnCompletion { cause ->
                         if (cause != null) connection.disconnect()
                     }
                     runCatching { connection.inputStream.use { it.read() } }
                     unblocked.countDown()
                 }
-                Thread.sleep(500) // let the read actually block
+                Thread.sleep(500)
                 blocked.cancel()
                 unblocked.await(5, TimeUnit.SECONDS)
                 scope.coroutineContext[Job]!!.cancel()
@@ -97,8 +82,6 @@ class BlockingReadCancellationTest {
                 val connection = connectionTo(server)
                 val outer = CoroutineScope(Dispatchers.IO + Job())
                 val job = outer.launch {
-                    // The SHIPPED shape: the blocking call is a child, the parent waits at a real
-                    // suspension point, and the socket is closed as that wait unwinds.
                     coroutineScope {
                         val request = async(Dispatchers.IO) {
                             connection.inputStream.use { it.read() }
@@ -112,7 +95,7 @@ class BlockingReadCancellationTest {
                 }
                 Thread.sleep(500)
                 job.cancel()
-                job.join() // returns only once the blocked child has actually been released
+                job.join()
             }
             elapsedMs = (System.nanoTime() - started) / 1_000_000
         } finally {

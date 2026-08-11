@@ -111,6 +111,7 @@ fun ToolsScreen(
         latestCrashLog = latestCrashLog,
         onBack = { navController.popBackStack() },
         // D-125: stash wizard fit as draft transform; user-driven preview (discarded on screen exit).
+        // Tasker's task38 → preview → task655; leaving the screen discards it. (Was: auto-draw a fitted
         onPreviewGraph = { result ->
             CurveSuggestionPreview.request { s ->
                 val cfg = CurveSuggestionEngine.applyToLiveCurve(result, s.toBrightnessCurveConfig())

@@ -47,7 +47,7 @@ fun AabSettings.toBrightnessCurveConfig(): BrightnessCurveConfig {
         offset = offset.toDouble(),
         taperMidpoint = scaleTaperMidpoint.toDouble(),
         taperSteepness = scaleTaperSteepness.toDouble(),
-        // D-036: %AAB_ScalingUse picks taper vs. linear; %AAB_Scale is linear multiplier.
+        // Tasker task661 act10/14 (D-036): %AAB_ScalingUse picks taper vs. linear; %AAB_Scale is linear multiplier.
         scalingUse = scalingEnabled,
         scale = scale.toDouble(),
     )
@@ -84,6 +84,7 @@ fun AabSettings.validate(): AabSettings {
         // DB-008 (issue #110): clamp SETPOINT to 65 (runtime always clamped; UI/persistence must agree).
         dimmingStrength = dimmingStrength.coerceIn(0, MAX_DIMMING_STRENGTH_SETPOINT),
         dimmingExponent = dimmingExponent.nanTo(d.dimmingExponent).coerceIn(0.5f, 5f),
+        // Tasker patched. Typing above 65 still corrected on save, as in Tasker.
         // Dimming threshold is brightness level (0..255), not percentage (old 0..100 was rebuild artifact).
         dimmingThreshold = dimmingThreshold.coerceIn(0, 255),
         // S12.9c #6: dimSpread is signed (−100..100), not 1..300 (old clamp blocked "boost in daylight").
