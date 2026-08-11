@@ -36,7 +36,7 @@ class ProfileApplierTest {
 
         val r = committed()
         assertNotEquals(3, r.minBrightness, "the profile's curve params applied")
-        assertTrue(r.contextOverride, "manual load latches context lock (G2R-F30)")
+        assertTrue(r.contextOverride, "a manual load latches the context lock (G2R-F30)")
         assertEquals(5, r.debugLevel, "debugLevel is global — a profile load must not change it")
         assertTrue(r.detectOverrides, "detectOverrides is global — preserved across a profile load")
     }

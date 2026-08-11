@@ -26,27 +26,15 @@ import kotlin.math.abs
 
 /**
  * Runtime context-override engine — the Kotlin rebuild of Tasker's 8 watcher profiles (prof762–768
- * + prof8) + task43 `_EvaluateContexts V2` orchestration (contexts_spec).
- *
- * The pure precedence/merge decision is delegated to the golden domain [ContextOverrideResolver];
- * this class owns the stateful glue the resolver brief leaves out:
- *  - PASS 1 per-caller cooldown debounce (contexts_spec §4 / task43 L31-57).
- *  - PASS 2 signal-change veto gates + `%AAB_ContextState` (task43 L183-248).
- *  - signal acquisition via the S7 readers (battery/wifi/foreground-app/location) + clock/solar.
- *  - applying the resolved override by swapping the **entire active profile** (contexts_spec §4 —
- *    NOT a scale/min/max tweak) and re-running Set Initial Brightness ([onProfileChanged]).
- *
- * Profile application WRITES THROUGH to the live settings store (D-170, replacing the in-memory
- * overlay): Tasker's `_ProfileManager LOAD_FILE` repopulates the live `%AAB_*` variables, so after
- * a context load every settings screen shows the loaded values. Before the FIRST override the
- * current settings are snapshotted to [baselineStore] (task626 `_ContextResume` / the
- * `%AAB_ProfileUser` revert file); the PASS 4 no-match revert restores that snapshot and clears it.
- * Rule→rule switches keep the original snapshot. Like Tasker's act17 skip, an evaluation that
- * resolves to the ALREADY-ACTIVE profile writes nothing — edits made while an override is active
- * live in the override set and are discarded by the revert (Tasker parity, accepted with D-170).
- *
- * Concurrency: every evaluation runs under [evalMutex] so the veto state and active-profile latch
- * stay consistent across the battery/wifi/app/time signal sources.
+ * + prof8) + task43 `_EvaluateContexts V2` orchestration (contexts_spec). Precedence/merge is
+ * delegated to the golden domain [ContextOverrideResolver]; this class owns the stateful glue:
+ * PASS 1 per-caller cooldown debounce (contexts_spec §4 / task43 L31-57), PASS 2 signal-change veto
+ * gates + `%AAB_ContextState` (task43 L183-248), S7 signal acquisition, and applying an override by
+ * swapping the **entire active profile** via [onProfileChanged].
+ * D-170: application writes through to the live settings store. The pre-first-override snapshot in
+ * [baselineStore] (task626 `_ContextResume`) is what PASS 4's no-match revert restores; rule→rule
+ * switches keep it, and resolving to the already-active profile writes nothing (Tasker act17 skip).
+ * Every evaluation runs under [evalMutex].
  */
 class ContextEngine(
     private val rulesProvider: suspend () -> List<ContextRule>,
@@ -647,23 +635,16 @@ interface ProfileCatalog {
 }
 
 /**
- * Overlay a context profile's parameter set onto the baseline. The fields swapped are Tasker
- * task626 `_ContextResume`'s 39-key snapshot (the LOAD_FILE parameter set) **plus ALL the
- * rebuild-only display-toggle fields (D-151/D-152: Night Light + temperature, daltonizer mode,
- * inversion, AOD, stay-awake-charging, HDR force-SDR — per-profile screen state, taken from the
- * loaded profile like the dimming fields)**; fields outside it (service enable, manual context
- * lock, debug level, setup title, schema version, and `detectOverrides`) are preserved from the
- * baseline.
+ * Overlay a context profile's parameter set onto the baseline: task626 `_ContextResume`'s 39-key
+ * snapshot, **plus the rebuild-only display-toggle fields (D-151/D-152: Night Light + temperature,
+ * daltonizer, inversion, AOD, stay-awake-charging, HDR force-SDR)**. Fields outside it (service
+ * enable, manual context lock, debug level, setup title, schema version, `detectOverrides`) are
+ * preserved from the baseline.
  *
- * `detectOverrides` (%AAB_DetectOverrides) is a GLOBAL reactivity preference, NOT one of task626's
- * curve/min-max/threshold/dimming snapshot keys (contexts_spec §4 enumerates the snapshot), so a
- * context profile swap must not silently turn manual-override detection off (G2-F8).
- *
- * S12.9c #1: these are six of the eight [com.tideo.autobrightness.app.settings.GlobalPrefs]
- * fields (panicSensitivity added D-116 — also a global pref, never a task626 snapshot key). The full
- * `copy(global = baseline.global)` is intentionally NOT used: GlobalPrefs also holds
- * `quickSettingsEnabled`/`notificationsEnabled`, which ARE in task626's per-profile snapshot and so
- * must come from the loaded profile, not the baseline.
+ * `%AAB_DetectOverrides` is a GLOBAL preference, not a task626 snapshot key, so a swap must never
+ * silently disable manual-override detection (G2-F8) — likewise panicSensitivity (D-116). A blanket
+ * `copy(global = baseline.global)` is therefore wrong: GlobalPrefs also holds
+ * `quickSettingsEnabled`/`notificationsEnabled`, which ARE per-profile (S12.9c #1).
  */
 internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSettings = profile.copy(
     serviceEnabled = baseline.serviceEnabled,

@@ -241,3 +241,41 @@ grep -n ">N</" $X | grep -v "<id>"     # e.g. <clickTask>517</clickTask>
 
 Extract the body with R2. Named tasks are never wired by id from scenes (they are invoked by name via
 Perform Task / scene-HTML `performTask('Name', pri)`).
+
+## R12 — Parse tree for `form3a` (task659 `_UpdateBrightnessFormulae`, code-547 DoMaths)
+
+The highest-risk transcription in the program, moved here from a comment in
+`TaskerReference.kt` so the derivation lives in one place (DB-028). The oracle cites this
+section; keep the two in step.
+
+XML L33337/L33347. The verbatim expression is:
+
+```
+(%aab_zone2end*(%AAB_MaxBright-(%aab_form2a+%aab_form2b*((%aab_zone2end-%aab_form2c)^0.33
+ -(%aab_zone1end-%aab_form2c)^0.33)))/%AAB_MaxBright)
+```
+
+Which transcribes to:
+
+```
+form2a = form1a * sqrt(zone1end)
+form3a = ( zone2end * ( MaxBright - ( form2a
+           + form2b * ( (zone2end-form2c)^0.33 - (zone1end-form2c)^0.33 ) ) ) / MaxBright )
+```
+
+Binding, and why it is not obvious: `*` and `/` are **left-associative with equal precedence**,
+so the whole thing groups as
+
+```
+( ( zone2end * INNER ) / MaxBright )     where
+  INNER = MaxBright - ( form2a + form2b * ( A - B ) )
+  A = (zone2end-form2c)^0.33 ,  B = (zone1end-form2c)^0.33
+```
+
+`^` (pow) binds tighter than `*`; the `-` inside parentheses is explicit. **No rounding** — this
+is a DoMaths action (D-002/D-027).
+
+**Cross-validation.** task663 block #2 (the plot-side copy) uses the SAME zone-2 anchor
+expression with `aab_zone1end` where 661 has `%AAB_Form2D`. `defaults_audit` confirms
+Form2D ≡ Zone1End, so 661 and 663 agree by construction — recorded in
+`parity_gaps.md §cross-validation`.

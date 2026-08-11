@@ -66,14 +66,13 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    /** DA-037: persisted disclosure bound, so process death cannot repeat an automatic lookup today. */
+    // DA-037: disclosure bound; prevents repeat lookup today.
     suspend fun readGeoIpAttemptDay(): Long? = dataStore.data.first()[GEO_IP_ATTEMPT_DAY]
 
     suspend fun writeGeoIpAttemptDay(day: Long) {
         dataStore.edit { it[GEO_IP_ATTEMPT_DAY] = day }
     }
 
-    /** Revert to live data (today + current location) — mirrors `_ExperimentClearDate`. */
     suspend fun clear() {
         dataStore.edit { prefs ->
             prefs.remove(DATE)
@@ -87,7 +86,6 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         val LAT = doublePreferencesKey("experiment_lat")
         val LON = doublePreferencesKey("experiment_lon")
         val GEO_IP = booleanPreferencesKey("geo_ip_fallback_enabled")
-        // D-103: persisted once-a-day resolved location.
         val SUN_LAT = doublePreferencesKey("sun_cached_lat")
         val SUN_LON = doublePreferencesKey("sun_cached_lon")
         val SUN_DAY = longPreferencesKey("sun_cached_day")
@@ -100,5 +98,4 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
     }
 }
 
-/** D-103: a persisted daily-resolved location (epoch-[day] it was acquired for). */
 data class CachedSunLocation(val latitude: Double, val longitude: Double, val day: Long)

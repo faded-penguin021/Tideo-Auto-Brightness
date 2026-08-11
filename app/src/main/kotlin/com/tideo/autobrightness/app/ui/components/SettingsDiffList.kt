@@ -20,12 +20,7 @@ import com.tideo.autobrightness.app.settings.changedCount
 import com.tideo.autobrightness.app.settings.displayRows
 import com.tideo.autobrightness.app.ui.theme.AabGold
 
-/**
- * The Tasker AAB Profile dashboard's "full list of every setting with its value, tuned values shown
- * yellow" (profile.md elements0; S12.7h / G2R-F38). Each row shows the setting label + value; any
- * value that differs from the factory default ([reference]) is rendered in theme gold and marked
- * bold — exactly the Tasker "changed-vs-default" highlight. A header summarises the count.
- */
+// Settings list with changed values highlighted in gold (S12.7h / G2R-F38).
 @Composable
 fun SettingsDiffList(
     settings: AabSettings,

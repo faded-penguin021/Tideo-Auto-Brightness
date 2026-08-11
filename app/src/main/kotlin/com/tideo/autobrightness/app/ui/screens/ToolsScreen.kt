@@ -161,12 +161,14 @@ fun ToolsScreen(
                 val result = ForceDarkController.apply(context, enabled)
                 forceDarkLive = result
                 forceDarkProbed = true
-                toast(when {
-                    result == enabled -> R.string.toast_force_dark_applied
-                    result == null && enabled -> R.string.toast_force_dark_pending
-                    result == null -> R.string.toast_force_dark_unreachable_off
-                    else -> R.string.toast_force_dark_failed
-                })
+                toast(
+                    when {
+                        result == enabled -> R.string.toast_force_dark_applied
+                        result == null && enabled -> R.string.toast_force_dark_pending
+                        result == null -> R.string.toast_force_dark_unreachable_off
+                        else -> R.string.toast_force_dark_failed
+                    },
+                )
             }
         },
     )
