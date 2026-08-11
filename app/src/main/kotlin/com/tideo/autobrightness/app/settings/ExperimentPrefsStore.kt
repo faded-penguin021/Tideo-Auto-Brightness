@@ -11,23 +11,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-/**
- * The Circadian "Experiment" fixed date + location override (experiment_settings.md elements37:
- * `%AAB_Date` / `%AAB_Latitude` / `%AAB_Longitude`, set by `_ExperimentSetDate`, cleared by
- * `_ExperimentClearDate`). When [isUnset] the app uses **live data** — today's date + the current
- * location — so the circadian curve previews "now"; setting a fixed date/location lets the user
- * preview any day/place (S12.7h / G2R-F39).
- */
+// Circadian "Experiment" fixed date/location override (G2R-F39); null fields use live data.
 data class ExperimentDateLocation(
     val date: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
 ) {
-    /** No fixed override stored → use live data (today + current location). */
     val isUnset: Boolean get() = date == null && latitude == null && longitude == null
 }
 
-/** Preferences-backed store for the Circadian fixed date/location override (G2R-F39). */
 class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
     val dateLocation: Flow<ExperimentDateLocation> = dataStore.data.map { prefs ->
         ExperimentDateLocation(
@@ -37,26 +29,13 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         )
     }
 
-    /**
-     * G3-F12 / D-105 (privacy): whether the IP-geolocation fallback (`ipwho.is`, HTTPS — D-121) may
-     * run as the LAST resort when no Android location fix is available and no fixed lat/lon is pinned
-     * (task90 act28). Default **off — opt-in** (D-105): a request to a third party is not made unless
-     * the user explicitly enables it. (Tasker called the geo-IP endpoint unconditionally; the toggle
-     * itself was already a deviation, G3-F12 — D-105 only flips its default from on to off.) When off,
-     * the app never contacts ipwho.is — circadian simply waits for an on-device fix.
-     */
+    // D-105: IP-geolocation fallback (ipwho.is, D-121); default off (opt-in).
     val geoIpEnabled: Flow<Boolean> = dataStore.data.map { it[GEO_IP] ?: false }
-
-    /** Opt in to (or back out of) the ipwho.is geo-IP location fallback (G3-F12 / D-105 / D-121). */
     suspend fun setGeoIpEnabled(enabled: Boolean) {
         dataStore.edit { it[GEO_IP] = enabled }
     }
 
-    /**
-     * Store a fixed override — mirrors `_ExperimentSetDate`. Date and location are **independent**
-     * (G2R-F39): a null field is removed (reverts to live for that field), so callers can pin a date
-     * only (live location), a location only (today's date), or both.
-     */
+    // Store fixed override; date/location independent. Null field reverts to live (G2R-F39).
     suspend fun set(date: String?, latitude: Double?, longitude: Double?) {
         dataStore.edit { prefs ->
             if (date != null) prefs[DATE] = date else prefs.remove(DATE)
@@ -65,16 +44,10 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    /**
-     * D-103: the once-a-day resolved location (Android fix or geo-IP), persisted so a cold start
-     * (process death / service restart after screen-on) reuses it immediately instead of falling back
-     * to the fixed `TimeContext` defaults until the async re-acquire lands. Mirrors Tasker's persisted
-     * `%AAB_SunLat`/`%AAB_SunLon` + `%AAB_SunLastDate`. [day] is epoch-days the fix was acquired for.
-     */
+    // D-103: persisted daily-resolved location; reused on cold start.
     suspend fun readCachedSunLocation(): CachedSunLocation? = cachedSunLocation.first()
 
-    /** D-110: the persisted once-a-day location as a reactive flow, so the UI staleness hint (Circadian
-     *  screen + dashboard) updates when a fresh fix is acquired. null when no fix has ever been cached. */
+    // D-110: cached location as reactive flow for UI staleness hint.
     val cachedSunLocation: Flow<CachedSunLocation?> = dataStore.data.map { prefs ->
         val lat = prefs[SUN_LAT]
         val lon = prefs[SUN_LON]
@@ -84,7 +57,6 @@ class ExperimentPrefsStore(private val dataStore: DataStore<Preferences>) {
         } else null
     }
 
-    /** Persist the daily-resolved location (D-103). */
     suspend fun writeCachedSunLocation(latitude: Double, longitude: Double, day: Long) {
         if (!validCoordinates(latitude, longitude)) return
         dataStore.edit { prefs ->

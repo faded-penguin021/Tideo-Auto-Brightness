@@ -24,8 +24,7 @@ class BrightnessObserverTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        // Pre-set brightness BEFORE the ContentObserver is registered so putInt doesn't fire
-        // the observer during setup. Tests call notifyChange() only (no putInt mid-test).
+        // Pre-set brightness before observer registration; tests use notifyChange() only
         Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 150)
         controller = AndroidScreenBrightnessController(context)
         observer = AndroidBrightnessObserver(context, controller)
@@ -38,8 +37,7 @@ class BrightnessObserverTest {
             observer.externalChanges().collect { received.add(it) }
         }
 
-        // Trigger registered observers via the public Android API (Robolectric intercepts).
-        // The null-handler ContentObserver is called synchronously by the shadow.
+        // Trigger observers via public Android API (Robolectric intercepts); ContentObserver called synchronously
         context.contentResolver.notifyChange(
             Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS), null
         )
@@ -56,12 +54,11 @@ class BrightnessObserverTest {
         }
         val uri = Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS)
 
-        // Self-write: controller.write records the marker; the notify must be filtered.
+        // Self-write: controller records marker; notify must be filtered
         controller.write(150)
         context.contentResolver.notifyChange(uri, null)
 
-        // External write to a different value: must be emitted. This guards against the
-        // filter test passing vacuously when the observer never fires at all.
+        // External write to different value; must be emitted (guards against vacuous pass)
         Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 42)
         context.contentResolver.notifyChange(uri, null)
 

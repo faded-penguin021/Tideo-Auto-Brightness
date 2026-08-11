@@ -112,8 +112,7 @@ class ProfileApplierTest {
 
     @Test
     fun resumeContextAutomation_clearsBaselineSnapshot_D170() = runBlocking {
-        // Resume = the current settings become the baseline the NEXT override snapshots (task626
-        // re-snapshot semantics); a residual snapshot from before the lock must be dropped.
+        // Resume: current settings become baseline for next override snapshots; drop residual
         seed(AabSettings(serviceEnabled = false, contextOverride = true))
         val store = DataStoreContextBaselineStore(app.contextBaselineDataStore)
         store.save(AabSettings(minBrightness = 3))
