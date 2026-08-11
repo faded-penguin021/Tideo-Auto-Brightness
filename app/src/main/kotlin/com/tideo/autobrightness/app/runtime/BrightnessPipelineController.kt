@@ -17,27 +17,10 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * The runtime auto-brightness pipeline ORCHESTRATOR: the Kotlin rebuild of the Tasker sensor →
- * brightness loop's state machine. S12.9e decomposed the original 596-LOC class — the per-event math
- * glue moved to [PipelineCycleRunner], the debug-flash surface to [PipelineDebugEmitter], and the
- * panic effect to [PanicHandler]; this file owns construction, start/stop, the event loop, the prof760
- * sensor gate, the [ControllerHook], and state exposure.
- *
- * Concurrency model (BINDING, D-027): the pipeline is serialized through a single consumer
- * coroutine. One [PipelineEvent] runs to completion — including its animation frames — before the
- * next is processed. Sensor ticks arriving while a cycle is in flight are **DROPPED, not queued**,
- * exactly as prof760's `%AAB_MainLoop != On` clause drops them in Tasker (a re-entry mutex, D-021),
- * implemented here as the [inCycle] busy flag. All durable runtime state lives in [state] and is
- * written ONLY from the consumer coroutine (via [PipelineRuntimeContext]); the sensor/observer
- * collectors signal it through [ControlEventGate], which also bounds the control backlog (DA-043).
- *
- * Pipeline sources (pipeline_spec.md):
- *   - prof760/task554 main loop      → [LightSensorSource] → gated → [PipelineEvent.SensorTick]
- *   - prof755/task567 override detect → [OverrideMonitor]  → [PipelineEvent.OverrideDetected]
- *   - lifecycle (screen on/off, pause/resume/panic) → events posted by the service
- *
- * The decision math is the golden-tested domain [BrightnessEngine]; this controller owns only the
- * Tasker runtime state machine and the animated writes (via [AnimationRunner]).
+ * Runtime auto-brightness pipeline orchestrator (BINDING, D-027): serialized through a single
+ * consumer coroutine. Sensor ticks arriving during a cycle are DROPPED (re-entry mutex [inCycle]).
+ * State is written ONLY from the consumer coroutine via [PipelineRuntimeContext].
+ * Pipeline sources: prof760 main loop, prof755 override detection, and lifecycle events.
  */
 class BrightnessPipelineController(
     private val lightSensor: LightSensorSource,
@@ -66,16 +49,10 @@ class BrightnessPipelineController(
     private val _state = MutableStateFlow(PipelineState())
     val state: StateFlow<PipelineState> = _state.asStateFlow()
 
-    // Cached so the per-sample prof760 gate does not hit DataStore on every reading. @Volatile (S12.9e
-    // audit, survivor #1): written by the consumer (start/runCycle/setInitial) and read on the SENSOR
-    // collector ([onSensorSample]) + the OBSERVER gate — cross-coroutine single-reference handoff, each
-    // read independently atomic; no compound invariant rides on it.
+    // @Volatile: written by consumer, read on SENSOR/OBSERVER collectors (cross-coroutine handoff).
     @Volatile private var cachedSettings: AabSettings? = null
 
-    // Post-init override-suppression deadline (S12.7a, F64): override detection is suppressed until
-    // `clock() >= this`. @Volatile (S12.9e audit, survivor #2): written by the consumer (setInitial via
-    // [armInitialSettle]) and read on the OBSERVER gate coroutine — a single monotonic Long, atomic.
-    // 0 = no window open.
+    // @Volatile: override suppression deadline, written by consumer, read on OBSERVER gate.
     @Volatile private var suppressOverrideUntilMs = 0L
 
     // %AAB_MainLoop re-entry mutex: true while a sensor cycle is claimed or running.

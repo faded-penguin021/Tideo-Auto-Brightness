@@ -16,16 +16,7 @@ import java.util.SimpleTimeZone
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * The real circadian ramp windows (seconds-of-day) for the dynamic-scale computation — morning/evening
- * transition bounds + sunlight duration + polar flag, the fields task90 Block #2 reads.
- *
- * **Frame:** UTC seconds-of-day — `SolarCalculator.buildScheduleWindows` derives them as
- * `riseEpochSec % 86400` etc., and the pipeline's `now` is `(currentTimeMillis/1000) % 86400`, also
- * UTC. This matches Tasker exactly: task90 act0 sets `%AAB_NowSS = %TIMES % 86400` and act59 sets the
- * windows from `%ss_* % 86400` — both UTC-seconds-of-day. `riseEpochSec` is tz-independent (the
- * `zoneOffset` cancels between `startOfDay` and `localHour`), so the ramp tracks the real sun.
- */
+/** Real circadian windows (seconds-of-day) for the dynamic-scale computation. UTC frame, task90 Block #2. */
 data class CircadianWindows(
     val morningStart: Double,
     val morningEnd: Double,
@@ -35,14 +26,7 @@ data class CircadianWindows(
     val isPolar: Boolean,
 )
 
-/**
- * D-110: freshness of the location backing the live circadian modifier, for the UI staleness hint.
- *
- * @param latitude/longitude the active location (null = none resolved yet → modifier uses defaults).
- * @param resolvedForDay epoch-day the active location was acquired for (null when none).
- * @param today epoch-day "now".
- * @param fixed true when a manual fixed lat/lon override is pinned (never "stale").
- */
+/** D-110: freshness of the location backing the live circadian modifier, for UI staleness hint. */
 data class CircadianLocationStatus(
     val latitude: Double? = null,
     val longitude: Double? = null,
@@ -50,81 +34,46 @@ data class CircadianLocationStatus(
     val today: Long = 0L,
     val fixed: Boolean = false,
 ) {
-    /** A location (fresh or cached) is available — the modifier tracks the real sun, not the defaults. */
     val hasLocation: Boolean get() = latitude != null && longitude != null
-    /** Whole days between the active location's acquisition day and today (0 = acquired today). */
     val ageDays: Long? get() = resolvedForDay?.let { (today - it).coerceAtLeast(0L) }
-    /** The cached location is from a previous day and isn't a pinned fixed location → show "stale". */
     val isStale: Boolean get() = !fixed && hasLocation && (ageDays ?: 0L) > 0L
 }
 
-/**
- * Supplies live [CircadianWindows] to the pipeline (G2R-F73). Before this, the pipeline fed
- * `TimeContext`'s **defaults** (a fixed 6–8am / 18–20pm UTC morning/evening) whenever no location was
- * known — and `lastKnownLocation()` is frequently null on a device that has not actively used GPS, so
- * the default eveningStart (18:00 UTC = 20:00 local @UTC+2) made the evening ramp fire ~1 h early
- * (the owner's "scale 1.025 at 20:58 local" — Gate 2 4th re-test). This now:
- *
- *  - **F73** computes the tz offset at the **target date instant** (DST-aware), so the live ramp uses
- *    today's current offset and a fixed winter date uses the winter offset; the UTC frame already
- *    matched Tasker (above), so the residual error was the missing location, not the math.
- *  - **F39** resolves the fixed Date and Location **independently** — either, both, or neither — so a
- *    date-only override (e.g. 21 Dec, live location) or a location-only override actually applies.
- *  - **F83** ports task90's once-a-day location acquisition (act5–41): **skip** when a fixed lat/lon
- *    is pinned; otherwise acquire from Android (last-known → fresh fix) and, failing that, fall back
- *    to **ipwho.is** geo-IP (act28, HTTPS D-121). The result is cached per day and re-acquired when the day rolls
- *    over (`%AAB_SunLastDate != %DATE`). Acquisition is async (it can hit the network); `current()`
- *    stays non-blocking and returns the old windows until the first fix lands.
- *
- * domain/ stays fenced: this only *calls* `SolarCalculator.compute`/`buildScheduleWindows`.
- */
+/** Supplies live [CircadianWindows] to the pipeline (G2R-F73). Features F73, F39, F83, D-121: DST-aware tz,
+ * independent date/location overrides, once-a-day location acquisition with geo-IP fallback (D-103 cache).
+ * domain/ stays fenced: only calls `SolarCalculator.compute`/`buildScheduleWindows`. */
 class CircadianWindowProvider(
     private val scope: CoroutineScope,
     overrideFlow: Flow<ExperimentDateLocation>,
     private val location: LocationReader,
-    // F83: ipwho.is geo-IP fallback (task90 act28, HTTPS D-121), injected as a suspend fn for testability.
+    // F83: ipwho.is geo-IP fallback (HTTPS D-121)
     private val geoIpFallback: suspend () -> LocationSnapshot?,
-    // D-103: load/save the once-a-day resolved location across process restarts (default no-op so
-    // existing tests that construct the provider directly keep their in-memory-only behavior).
+    // D-103: load/save once-a-day location across process restarts
     private val loadCachedLocation: suspend () -> CachedSunLocation? = { null },
     private val persistLocation: suspend (latitude: Double, longitude: Double, day: Long) -> Unit =
         { _, _, _ -> },
     private val loadGeoIpAttemptDay: suspend () -> Long? = { null },
     private val persistGeoIpAttemptDay: suspend (day: Long) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
-    // F73: offset at the TARGET instant, not "now" — covers DST and fixed dates in another season.
+    // F73: offset at the TARGET instant (DST-aware)
     private val tzOffsetForDate: (dateEpochSec: Long) -> Double = { dateEpochSec ->
         TimeZone.getDefault().getOffset(dateEpochSec * 1000L) / 3_600_000.0
     },
 ) {
-    // S12.9e volatile audit — these cross three coroutines (the overrideFlow collector, the async
-    // triggerAcquire launch, and current() on the pipeline consumer). Each holds a single independent
-    // value with no compound invariant between them (a stale read at worst recomputes one window or
-    // skips one cache hit, self-correcting next call), so @Volatile (visibility-only) is the right tool;
-    // the only multi-step action — the once-per-day acquire — is separately guarded by [acquiring].
+    // S12.9e volatile audit: cross three coroutines, single values with no compound invariant
     @Volatile private var override: ExperimentDateLocation = ExperimentDateLocation()
     @Volatile private var cacheKey: String? = null
     @Volatile private var cached: CircadianWindows? = null
 
-    // F83: the once-a-day acquired location (Android or geo-IP), keyed by the day it was acquired for.
+    // F83: once-a-day acquired location (Android or geo-IP), keyed by day
     @Volatile private var resolvedLoc: LocationSnapshot? = null
     @Volatile private var resolvedDay: Long = Long.MIN_VALUE
     @Volatile private var attemptedDay: Long = Long.MIN_VALUE
     @Volatile private var acquisitionReady = false
     private val acquiring = AtomicBoolean(false)
 
-    // D-110: fired when a location resolves AFTER construction (cache seed or a fresh acquire) so the
-    // pipeline recomputes immediately. Without this, a cold start in STABLE light set the initial
-    // brightness with the TimeContext defaults (scaleDynamic ≈ 0.85) BEFORE the async cache/geo-IP fix
-    // landed, and prof760 then dropped every steady-light cycle — so the circadian modifier stayed stuck
-    // at the default all morning while the chart (which reads last-known/representative location directly)
-    // looked correct. AppModule wires this to controller.reapply().
-    //
-    // Settable because the controller is built after this provider (the provider feeds it `current`), so
-    // the wiring is post-construction. The cache-seed launch is async and may resolve BEFORE the callback
-    // is wired; the setter therefore fires once immediately when a location already resolved, so the
-    // recompute is never lost to construction-vs-wiring ordering (either path triggers exactly one
-    // reapply).
+    // D-110: fired when a location resolves after construction (cache seed or fresh acquire) so pipeline recomputes.
+    // Settable post-construction; fires immediately if location already resolved.
     @Volatile private var _onWindowsRefreshed: () -> Unit = {}
     var onWindowsRefreshed: () -> Unit
         get() = _onWindowsRefreshed
@@ -133,14 +82,12 @@ class CircadianWindowProvider(
             if (resolvedLoc != null || acquisitionReady) value()
         }
 
-    /** D-110: the location backing the live circadian modifier + its freshness, for the UI staleness
-     *  hint. `resolvedForDay` is the epoch-day the active location was acquired for (null = no fix yet);
-     *  compare to today to show "cached N days ago". Updated on every [current] call. */
+    /** D-110: location backing the live circadian modifier + freshness for UI staleness hint. Updated on each [current] call. */
     @Volatile var status: CircadianLocationStatus = CircadianLocationStatus()
         private set
 
     init {
-        // F39 override drives the windows; invalidate the cache (and force a re-acquire) when it changes.
+        // F39: invalidate cache when override changes
         scope.launch {
             overrideFlow.collect {
                 if (it == override) return@collect
@@ -149,10 +96,7 @@ class CircadianWindowProvider(
                 resolvedDay = Long.MIN_VALUE
             }
         }
-        // D-103: seed the in-memory location from the persisted once-a-day fix so a cold start
-        // (process death / service restart after screen-on) returns the cached location immediately
-        // instead of falling back to TimeContext defaults. Don't clobber a fresher in-memory fix that
-        // a concurrent acquire may already have set. current() still re-acquires when the day rolls.
+        // D-103: seed from persisted location on cold start
         scope.launch {
             val cached = cancellableOrNull { loadCachedLocation() }
             val cachedSnapshot = cached?.let { LocationSnapshot(it.latitude, it.longitude) }
@@ -163,33 +107,29 @@ class CircadianWindowProvider(
             }
             cancellableOrNull { loadGeoIpAttemptDay() }?.let { attemptedDay = it }
             acquisitionReady = true
-            // Recompute from a cache, or re-enter current() now that the persisted attempt gate is known.
             onWindowsRefreshed()
         }
     }
 
-    /** Windows for the active location/date at [transitionFactor], or null when no location is known. */
+    /** Windows for active location/date at [transitionFactor], or null when no location is known. */
     fun current(transitionFactor: Double): CircadianWindows? {
         val ov = override
         val nowSec = clock() / 1000L
 
-        // F39: fixed Date is independent of fixed Location. No date override → today.
+        // F39: fixed Date independent of fixed Location
         val dateEpochSec = ov.date?.let { parseDateEpochSec(it, tzOffsetForDate(nowSec)) } ?: nowSec
         val tz = tzOffsetForDate(dateEpochSec)
         val day = dateEpochSec / 86_400L
 
         val todayDay = nowSec / 86_400L
         val loc: LocationSnapshot = if (ov.latitude != null && ov.longitude != null) {
-            // F83: fixed lat/lon → use it directly, skip all acquisition.
+            // F83: fixed lat/lon, skip acquisition
             status = CircadianLocationStatus(ov.latitude, ov.longitude, resolvedForDay = day, today = todayDay, fixed = true)
             LocationSnapshot(ov.latitude!!, ov.longitude!!)
         } else {
-            // F83: acquire (once a day, async) when we have no fix or the day rolled over.
+            // F83: acquire once a day when needed
             if (acquisitionReady && (resolvedLoc == null || resolvedDay != day)) triggerAcquire(day, todayDay)
-            // D-110: fall back to the last resolved location even when the day has rolled over and no
-            // fresh fix is available (location + geo-IP off) — recompute TODAY's windows with the cached
-            // coordinates instead of returning null → the default-window 0.85. status records the age so
-            // the UI can show "cached N days ago" until the user refreshes the fix.
+            // D-110: fall back to cached location when no fresh fix available
             val cachedLoc = resolvedLoc
             if (cachedLoc == null) {
                 status = CircadianLocationStatus(today = todayDay)
@@ -207,30 +147,26 @@ class CircadianWindowProvider(
         return windows
     }
 
-    // F83: task90 act5–41 acquisition order, async — Android last-known → fresh fix → ipwho.is.
+    // F83: task90 act5–41 acquisition order (last-known → fresh fix → geo-IP)
     private fun triggerAcquire(locationDay: Long, attemptDay: Long) {
         if (attemptedDay == attemptDay) return
         if (!acquiring.compareAndSet(false, true)) return
-        // DA-037: success or failure, bound automatic acquisition to once per real calendar day.
-        // The manual UI action remains separately user-triggered and can retry once per tap.
+        // DA-037: bound to once per calendar day
         attemptedDay = attemptDay
         scope.launch {
             try {
-                // Persist before any network work. Failure still leaves the in-process bound intact.
                 cancellableOrNull { persistGeoIpAttemptDay(attemptDay) }
                 val snap = location.lastKnownLocation()
                     ?: (cancellableOrNull { location.currentLocation() } as? LocationResult.Available)?.snapshot
                     ?: geoIpFallback()
-                // DA-037: every acquisition source is untrusted at this boundary. An invalid endpoint
-                // response or corrupt system/cache value must not replace the last safe circadian state.
+                // DA-037: validate all sources before accepting
                 if (snap != null && snap.hasValidCoordinates()) {
                     resolvedLoc = snap
                     resolvedDay = locationDay
-                    cacheKey = null // recompute windows with the freshly acquired location
-                    // D-103: persist so the next cold start reuses it before re-acquiring.
+                    cacheKey = null // recompute windows
+                    // D-103: persist for cold start
                     cancellableOrNull { persistLocation(snap.latitude, snap.longitude, locationDay) }
-                    // D-110: a fresh fix landed asynchronously — recompute so the modifier updates even
-                    // if the light is steady (no sensor cycle would otherwise call current() again).
+                    // D-110: signal recompute for async resolution
                     onWindowsRefreshed()
                 }
             } finally {
@@ -253,7 +189,7 @@ class CircadianWindowProvider(
     }
 
     companion object {
-        /** Pure: real solar windows for a location/date via the fenced domain math (JVM-testable). */
+        /** Real solar windows via fenced domain math (JVM-testable). */
         fun compute(
             lat: Double,
             lon: Double,
