@@ -37,7 +37,7 @@ data class ThresholdConfig(
     val threshDim: Double = 0.25,
     val threshBright: Double = 0.08,
     val threshSteepness: Double = 2.1,
-    // Tasker: task570 act39 %AAB_ThreshMidpoint = log10(%AAB_Zone2End) = log10(10000) = 4 (D-004/D-008)
+    // Tasker task570 act39: %AAB_ThreshMidpoint = log10(zone2End) (D-004/D-008)
     val threshMidpoint: Double = 4.0,
     val zone1End: Double = 35.0,
     val deltaFactor: Double = 1.8,
@@ -45,8 +45,7 @@ data class ThresholdConfig(
 
 data class BrightnessCurveConfig(
     val form1A: Double = 5.0,
-    // Derived continuity defaults (task659) for the default settings; the mapper recomputes
-    // them via BrightnessFormulae.deriveContinuityCoefficients. Exact = 5*sqrt(35), etc.
+    // Task659: derived continuity defaults; mapper recomputes via deriveContinuityCoefficients
     val form2A: Double = 29.58039891549808,
     val form2B: Double = 8.8,
     val form2C: Double = 18.0,
@@ -58,14 +57,13 @@ data class BrightnessCurveConfig(
     val offset: Double = 0.0,
     val taperMidpoint: Double = 190.0,
     val taperSteepness: Double = 0.075,
-    // Tasker task661 act10/14: %AAB_ScalingUse gates the taper (task548) vs. the linear
-    // `mapped * %AAB_Scale + %AAB_Offset` branch. %AAB_Scale is the static base multiplier.
+    // Tasker task661: %AAB_ScalingUse gates taper (task548) vs. linear scale+offset branch
     val scalingUse: Boolean = true,
     val scale: Double = 1.0,
 )
 
 data class AnimationConfig(
-    // Tasker: task570 act26/27/28: AAB_AnimSteps=20, AAB_MinWait=25ms, AAB_MaxWait=65ms (D-004/D-008)
+    // Tasker task570: AnimSteps=20, MinWait=25ms, MaxWait=65ms (D-004/D-008)
     val maxSteps: Int = 20,
     val minWaitMs: Long = 25,
     val maxWaitMs: Long = 65,

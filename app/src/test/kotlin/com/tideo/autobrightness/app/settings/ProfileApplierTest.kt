@@ -18,12 +18,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * D-157 U3: the VM-free [ProfileApplier] holds the `applyProfile` / `resumeContextAutomation` bodies
- * moved verbatim out of `SettingsViewModel` (which still passes UNMODIFIED — the equivalence check).
- * These pin the same profile-load semantics directly on the applier, the path the external receiver
- * shares.
- */
+/** D-157 U3: VM-free ProfileApplier holds `applyProfile`/`resumeContextAutomation` bodies from SettingsViewModel. */
 @RunWith(RobolectricTestRunner::class)
 class ProfileApplierTest {
     private val app: Application = ApplicationProvider.getApplicationContext()
@@ -34,14 +29,14 @@ class ProfileApplierTest {
 
     @Test
     fun applyProfile_appliesCurveAndLatchesLock_preservingGlobals() = runBlocking {
-        // serviceEnabled=false so no reapply intent is emitted; the DataStore write is what we assert.
+        // No reapply intent without serviceEnabled; assert DataStore write
         seed(AabSettings(serviceEnabled = false, debugLevel = 5, detectOverrides = true, minBrightness = 3))
 
-        applier.applyProfile("Battery Saver") // a built-in — falls back to DefaultProfiles.all when unseeded
+        applier.applyProfile("Battery Saver")
 
         val r = committed()
         assertNotEquals(3, r.minBrightness, "the profile's curve params applied")
-        assertTrue(r.contextOverride, "a manual load latches the context lock (G2R-F30)")
+        assertTrue(r.contextOverride, "manual load latches context lock (G2R-F30)")
         assertEquals(5, r.debugLevel, "debugLevel is global — a profile load must not change it")
         assertTrue(r.detectOverrides, "detectOverrides is global — preserved across a profile load")
     }
@@ -67,8 +62,7 @@ class ProfileApplierTest {
 
     @Test
     fun applyProfile_clearsBaselineSnapshot_D170() = runBlocking {
-        // A manual load makes the current settings authoritative: any pre-override baseline snapshot
-        // (task626 _ContextResume) is stale and must not be resurrected by a later context revert.
+        // Manual load makes current settings authoritative; drop pre-override baseline snapshot
         seed(AabSettings(serviceEnabled = false))
         val store = DataStoreContextBaselineStore(app.contextBaselineDataStore)
         store.save(AabSettings(minBrightness = 3))
@@ -80,9 +74,7 @@ class ProfileApplierTest {
 
     @Test
     fun applyProfile_recordsUserProfileName_DA018() = runBlocking {
-        // DA-018: a manual load is now %AAB_ProfileUser — the last manually-loaded profile, the target a
-        // later Resume / no-match reverts to. The NAME is persisted so the resolver fallback + the
-        // active-profile label match the loaded settings instead of collapsing to "Default".
+        // DA-018: manual load sets %AAB_ProfileUser (target for later Resume/no-match)
         seed(AabSettings(serviceEnabled = false))
         val store = DataStoreContextBaselineStore(app.contextBaselineDataStore)
 
@@ -93,9 +85,7 @@ class ProfileApplierTest {
 
     @Test
     fun resumeContextAutomation_routesToResumeContextAction_DA018() = runBlocking {
-        // DA-018: Resume drives the genuine re-evaluation verb (evaluate(RESUME) → Set Initial
-        // Brightness), NOT plain REAPPLY (which only republishes and left the store pinned to the loaded
-        // profile). serviceEnabled=true so the action is emitted.
+        // DA-018: Resume runs genuine re-evaluation (RESUME → Set Initial Brightness), not REAPPLY
         seed(AabSettings(serviceEnabled = true, contextOverride = true))
 
         applier.resumeContextAutomation()
@@ -110,7 +100,7 @@ class ProfileApplierTest {
 
     @Test
     fun resumeContextAutomation_leavesUserProfileNameIntact_DA018() = runBlocking {
-        // Resume reverts TO %AAB_ProfileUser, so it must not overwrite it (only a manual load sets it).
+        // Resume reverts to %AAB_ProfileUser; must not overwrite it
         seed(AabSettings(serviceEnabled = false, contextOverride = true))
         val store = DataStoreContextBaselineStore(app.contextBaselineDataStore)
         store.setUserProfileName("Outdoors")
