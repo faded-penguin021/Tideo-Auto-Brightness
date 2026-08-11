@@ -449,7 +449,7 @@
   `amh.conf`. The STATE and live-ledger preambles now name the key and let the ladder print the
   live value, removing the lockstep obligation instead of restating it.
 
-- DB-025: **Deleting a lockstep obligation is only safe once the copies are actually gone.** The
+- DB-025 [cited]: **Deleting a lockstep obligation is only safe once the copies are actually gone.** The
   5.1.0 prose change removed "keep in lockstep" from `amh.conf` and the ledger header and asserted
   no prose copy of `LEDGER_LINE_CAP` remained — while `1000` still stood twice in the RUNBOOK and
   in HARNESS_LOCAL. Nothing scans docs, so this traded a tripwire for a false all-clear: the next
@@ -465,7 +465,7 @@
   exceeding the cap, so a pass that STARTS below it is never landing-checked and can stop short in
   silence — as this upgrade's first pass did, at 9438 bytes against a 9216-byte floor.
 
-- DB-027: **A completeness claim about a guard is a drift class; scope it to named functions.**
+- DB-027 [cited]: **A completeness claim about a guard is a drift class; scope it to named functions.**
   AMH 5.2.0 closed the STATE preamble's list of machine-checked properties: a list that stops
   without saying it is complete leaves every prose rule after it reading in the same enforced
   voice — the shape of DB-026, where a sub-cap pass stopped short and nothing said so. Ours also

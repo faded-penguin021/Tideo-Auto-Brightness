@@ -125,13 +125,20 @@ zero-pending; tests green; TODO/FIXME and parity gaps zero. Live ledger: `LEDGER
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
 
 - 2026-08-11 — **Comment consolidation + a rail that holds it (DB-028).** The Kotlin was 18.7%
-  comment lines, much of it re-telling a ledger row verbatim; Conventions had decayed to "match
-  its comment density", telling each session to reproduce what it found. Prose moved to the `.md`
-  tier, code left carrying `D-NNN` pointers. New repo-local guard `comment-budget.sh` (fifth):
-  12-line cap on any contiguous comment block plus per-module line budgets, fail-closed, with a
-  `--hook` mode the Claude adapter runs on every `.kt` write so the cap lands on the edit rather
-  than in the end-of-session ladder run. Codex gets no equivalent — no post-edit hook — and
-  `HARNESS_LOCAL.md`'s adapter table says so. Fixture suite 24 → 39 cases.
+  comment lines (7620/40651), much of it re-telling a ledger row verbatim; Conventions had decayed
+  to "match its comment density", telling each session to reproduce what it found. Prose moved to
+  the `.md` tier, code left carrying `D-NNN` pointers — now 8.4% (3015), 215 files, every one
+  proved comment-only against the branch point. New repo-local guard `comment-budget.sh` (fifth):
+  12-line block cap + per-module budgets + a `// Tasker` provenance FLOOR (the guard's downward
+  pressure falls on provenance markers too, and the first pass deleted 12 of them), fail-closed,
+  with a `--hook` mode the Claude adapter runs on every `.kt` write. Codex gets no equivalent and
+  the adapter table says so. Fixture suite 24 → 56 cases. **The DA-005 pass found five real
+  defects**, two severe: the guard shipped mode 100644, so the hook the diff advertised exited 126
+  and never fired while every test stayed green; and a blank line reset the block run, so 36 lines
+  of narrative in three paragraphs — or one `/* */` containing one empty line — passed, falsifying
+  the "narrative does not fit in 12 lines" premise the rule rests on. Also: two drifted counts, and
+  a tag-exemption "tripwire" that only pinned one arbitrary tag. All fixed, each with a fixture that
+  bites; the case count now self-checks against the sentence stating it.
 
 - 2026-08-10 — **AMH upgraded 5.1.0 → 5.2.0 (DB-027).** MINOR, and no shipped script changed — the copy
   moved only the manifest's version banner, hashes identical. The whole entry is the seed

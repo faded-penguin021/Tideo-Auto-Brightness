@@ -79,14 +79,30 @@ session while drifting against every upstream release.
   grep for a leading slash: `//` inside a string is code, a raw string full of `//` lines is code,
   and block comments nest. The fixture suite's `cb-rawstring` case exists to fail the naive
   implementation, and does. It also runs as a `--hook` mode; see the adapter table below.
+
+  **Its one exemption, and what holds the line.** KDoc tag lines — `@param`, `@return`, `@throws`,
+  `@see`, `@sample`, and *only* those five — do not count toward the block cap, because a
+  seven-parameter KDoc cannot fit in 12 lines and counting them made deleting the parameter docs
+  the cheapest way to pass. That is the guard's only hole, and a hole nobody counts grows one
+  individually-reasonable entry at a time, which is precisely how the comment bloat happened.
+  So the boundary is pinned three ways: five cases assert each exempt tag passes, two behavioural
+  cases assert `@note` and `@property` still **fail**, and one case pins the exemption **regex
+  literal** so any change to the set turns it red whatever the new tag is. That literal pin exists
+  because the behavioural cases alone were not enough — the DA-005 pass widened the set to
+  `@property|@constructor|@receiver`, the three a Kotlin repo would actually reach for, and every
+  case stayed green. A prose claim of a tripwire that only covers one arbitrary tag is the
+  enforcement asymmetry this file warns about elsewhere. **None of this prevents a session from
+  widening the set** — it cannot; editing the guard and the fixtures together passes. What it buys
+  is that the widening cannot be silent or accidental: it must appear in the diff of two files
+  that are both in `RULE_FILES`, where the rule-review tripwire fires.
   Its third check is a **floor**, not a cap, and it is there because this guard is what endangers
   the thing it protects: `// Tasker` provenance markers are comments, so the budget's downward
   pressure falls on them too, and the first consolidation pass deleted four despite an explicit
   instruction not to. `ProvenanceTest` in `:domain` already floors provenance — but only for
-  `BrightnessEngine.kt`, one of the 26 files that carry markers. Everywhere else the constitution's
+  `BrightnessEngine.kt`, one of the 33 files that carry markers. Everywhere else the constitution's
   rule had nothing behind it. Counted the same way `ProvenanceTest` counts, so the two agree.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 42 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 56 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.

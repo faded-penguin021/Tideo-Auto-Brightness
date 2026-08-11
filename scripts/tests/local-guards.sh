@@ -424,6 +424,135 @@ else
 	bad "a bad argument must exit 3, never 2 — the ladder reads a WARN-less 2 from a repo-local guard as a broken guard; got rc=$RC"
 fi
 
+# --- the KDoc-tag exemption, and its BOUNDARY -----------------------------------------------
+#
+# `@param`/`@return`/`@throws`/`@see`/`@sample` lines do not count toward the block cap, because a
+# seven-parameter KDoc cannot fit in 12 lines and counting them made deleting the parameter docs
+# the cheapest way to pass.
+#
+# The cases below exist to make WIDENING that set expensive. The exemption is the guard's only
+# hole, and a hole nobody counts is one that grows an entry at a time — each addition individually
+# reasonable, exactly like the comment bloat this guard exists to stop. `unknown-tag` is the
+# load-bearing case: it fails the moment someone adds a sixth tag, so the widening cannot be
+# silent. It cannot PREVENT a session from editing both this file and the guard — nothing can —
+# but it forces the change to appear in the diff of two files that are both in RULE_FILES, where
+# a reviewer can see it and ask why.
+#
+# If you are here because this case went red: the question to answer in the STATE entry is not
+# "is this tag harmless" but "why does this narrative need to live in source rather than in the
+# .md tier", which is the whole subject of DB-028.
+
+cb_tagged_tree() { # <dir> <tag>
+	cb_tree "$1"
+	{
+		printf 'package x\n/**\n * Summary line.\n'
+		i=0
+		while [ "$i" -lt 20 ]; do
+			printf ' * %s p%s the parameter description\n' "$2" "$i"
+			i=$((i + 1))
+		done
+		printf ' */\nfun f() {}\n'
+	} >"$SANDBOX/$1/app/A.kt"
+}
+
+for tag in @param @return @throws @see @sample; do
+	dir="cb-tag-$(printf '%s' "$tag" | tr -d '@')"
+	cb_tagged_tree "$dir" "$tag"
+	run_cb "$dir" --file app/A.kt
+	expect_pass "20 $tag lines do not count toward the block cap"
+done
+
+# THE BOUNDARY. A tag outside the exempt set must still count, or the exemption is "any line
+# starting with @" and the cap is decorative.
+cb_tagged_tree cb-tag-unknown '@note'
+run_cb cb-tag-unknown --file app/A.kt
+expect_fail "a tag OUTSIDE the exempt set still counts" "over the 12-line cap"
+
+# The behavioural case above only fixtures ONE tag, so it does not fire for the additions a Kotlin
+# repo would actually reach for — the DA-005 pass widened the set to
+# `@property|@constructor|@receiver` and every case here stayed green. Pin the literal instead:
+# ANY change to the exempt set turns this red, whatever the new tag is.
+expected_tags='@(param|return|throws|see|sample)[[:space:]]'
+actual_tags=$(grep -oE '@\(param[^)]*\)\[\[:space:\]\]' "$ROOT/scripts/guards/comment-budget.sh" | head -1)
+if [ "$actual_tags" = "$expected_tags" ]; then
+	ok
+else
+	bad "the KDoc-tag exemption set changed (expected '$expected_tags', found '${actual_tags:-nothing}'). This is the guard's only hole; widening it needs a STATE entry answering why the narrative must live in source rather than the .md tier (DB-028), not just a passing suite."
+fi
+
+# ...and the pinned literal must actually be the one the scanner uses, or the pin guards a string
+# nobody reads. Kotlin's own @property is the probe: it is NOT exempt today.
+cb_tagged_tree cb-tag-property '@property'
+run_cb cb-tag-property --file app/A.kt
+expect_fail "@property is not exempt — the pinned set is the set in force" "over the 12-line cap"
+
+# Prose is never exempt, however it is indented.
+cb_tree cb-tag-prose
+{
+	printf 'package x\n/**\n'
+	i=0
+	while [ "$i" -lt 20 ]; do
+		printf ' * narrative about @param and how it works %s\n' "$i"
+		i=$((i + 1))
+	done
+	printf ' */\nfun f() {}\n'
+} >"$SANDBOX/cb-tag-prose/app/A.kt"
+run_cb cb-tag-prose --file app/A.kt
+expect_fail "prose merely MENTIONING @param is not exempt" "over the 12-line cap"
+
+# --- blank lines bridge a block; only CODE ends one ------------------------------------------
+#
+# Both cases below PASSED before the DA-005 review found them, and each defeats the guard's own
+# premise ("narrative does not fit in 12 lines"). A paragraph break is not an escape hatch.
+
+cb_tree cb-blank-blockcomment
+{
+	printf 'package x\n/*\n'
+	i=0
+	while [ "$i" -lt 10 ]; do printf ' * narrative %s\n' "$i"; i=$((i + 1)); done
+	printf '\n'
+	i=0
+	while [ "$i" -lt 10 ]; do printf ' * more narrative %s\n' "$i"; i=$((i + 1)); done
+	printf ' */\nval a = 1\n'
+} >"$SANDBOX/cb-blank-blockcomment/app/A.kt"
+run_cb cb-blank-blockcomment --file app/A.kt
+expect_fail "ONE block comment containing a blank line is still one block" "over the 12-line cap"
+
+cb_tree cb-blank-chunks
+{
+	printf 'package x\n'
+	c=1
+	while [ "$c" -lt 4 ]; do
+		i=0
+		while [ "$i" -lt 12 ]; do printf '// narrative %s-%s\n' "$c" "$i"; i=$((i + 1)); done
+		printf '\n'
+		c=$((c + 1))
+	done
+	printf 'val a = 1\n'
+} >"$SANDBOX/cb-blank-chunks/app/A.kt"
+run_cb cb-blank-chunks --file app/A.kt
+expect_fail "narrative split into blank-separated chunks is still one block" "over the 12-line cap"
+
+# The other direction: CODE between comments really does end a block, or every file with many
+# short comments would fail and the guard would be deleted within the week.
+cb_tree cb-blank-code
+printf 'package x\n// one\nval a = 1\n\n// two\nval b = 2\n\n// three\nval c = 3\n' \
+	>"$SANDBOX/cb-blank-code/app/A.kt"
+run_cb cb-blank-code --file app/A.kt
+expect_pass "comments separated by CODE are separate blocks"
+
+# --- the guard must be EXECUTABLE ------------------------------------------------------------
+#
+# .claude/settings.json invokes it as a bare path with no interpreter, so a missing exec bit makes
+# the PostToolUse hook exit 126 and the whole salience layer silently never fires — while the
+# ladder and every case in this file stay green, because both run it as `bash <path>`. It shipped
+# 100644 and the DA-005 pass caught it; nothing here could have. This case is the check.
+if [ -x "$ROOT/scripts/guards/comment-budget.sh" ]; then
+	ok
+else
+	bad "scripts/guards/comment-budget.sh is not executable — .claude/settings.json runs it as a bare path, so the PostToolUse hook exits 126 and never fires. chmod +x it (and commit the mode)."
+fi
+
 # --- module budget, via the whole-tree mode (needs a git tree) -------------------------------
 
 cb_git_tree() { # <dir> <budget> [tasker-floor, default 0]
@@ -512,6 +641,28 @@ run_cb cb-empty
 expect_fail "a tree with no tracked Kotlin fails rather than passing vacuously" "checked NOTHING"
 
 # =============================================================================
+# The case count stated in docs/HARNESS_LOCAL.md must match the count actually run.
+#
+# Drift incident: the change that added the comment-budget cases updated that sentence to "42"
+# while the suite ran 49, and nothing noticed — the number had been correct immediately before, so
+# this is a fact that WAS true and a diff made false. The DA-005 reviewer found it by running the
+# suite, which is the only way it could be found.
+#
+# It lives here rather than in doc-facts.sh because that guard is itself fixtured by this file:
+# doc-facts.sh running this suite would re-enter doc-facts.sh in a sandbox, and the recursion would
+# be bounded only by the sandbox happening to lack a copy of the suite. The count is known here for
+# free, at the one moment it is authoritative.
+#
+# `+ 1` counts this case itself, which has not been tallied yet at the point of comparison.
+stated=$(sed -n 's/.*fixture suite — \([0-9]\{1,\}\) cases.*/\1/p' "$ROOT/docs/HARNESS_LOCAL.md" | head -1)
+if [ -z "$stated" ]; then
+	bad "docs/HARNESS_LOCAL.md no longer states a fixture case count in the form 'fixture suite — N cases' — the sentence is the only place that number lives, so a reworded one drifts silently"
+elif [ "$stated" != "$((CASES + 1))" ]; then
+	bad "docs/HARNESS_LOCAL.md says $stated fixture cases; this suite runs $((CASES + 1)). Update the sentence in the same change that adds or removes a case."
+else
+	ok
+fi
+
 printf '\n'
 if [ "$FAILS" -gt 0 ]; then
 	printf 'repo-local guard fixtures: %d/%d case(s) FAILED\n' "$FAILS" "$CASES" >&2

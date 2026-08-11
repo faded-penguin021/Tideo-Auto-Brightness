@@ -54,7 +54,7 @@ COMMENT_BLOCK_MAX_LINES=12
 # WifiSsidStrategies) despite an explicit instruction not to.
 #
 # `ProvenanceTest` in :domain already floors this, but only for `BrightnessEngine.kt` — one file of
-# the 26 that carry markers. Everywhere else the rule was prose with nothing behind it. A budget
+# the 33 that carry markers. Everywhere else the rule was prose with nothing behind it. A budget
 # that pushes comment counts down while the only defence covers one file is a guard that erodes the
 # audit trail it was supposed to leave alone.
 #
@@ -74,10 +74,15 @@ COMMENT_BLOCK_MAX_LINES=12
 TASKER_PROVENANCE_FLOOR=68
 
 # Per-module comment-line ceilings. Set from the measured tree; see the header on why raising one
-# is a rule change. Keep these in lockstep with the row in docs/HARNESS_LOCAL.md.
-BUDGET_app=99999
-BUDGET_domain=99999
-BUDGET_platform=99999
+# is a rule change.
+#
+# These numbers live HERE and nowhere else, deliberately. An earlier draft of this comment told the
+# next reader to keep them "in lockstep with the row in docs/HARNESS_LOCAL.md" — a row that does not
+# exist, so the instruction was an invitation to CREATE the duplicate that DB-025 and DB-027 are
+# both about. If you find yourself restating one of these in prose, don't: name the key instead.
+BUDGET_app=2350
+BUDGET_domain=450
+BUDGET_platform=300
 
 MODULES='app domain platform'
 
@@ -89,7 +94,7 @@ MODULES='app domain platform'
 # why this is one awk over the whole file rather than a per-line pattern.
 scan_kotlin() { # <file>...
 	awk -v cap="$COMMENT_BLOCK_MAX_LINES" '
-	function reset() { depth = 0; raw = 0; str = ""; sp = 0; run = 0; runstart = 0; cl = 0; tl = 0 }
+	function reset() { depth = 0; raw = 0; str = ""; sp = 0; run = 0; gap = 0; runstart = 0; cl = 0; tl = 0 }
 	FNR == 1 { if (NR > 1) flush(); reset(); file = FILENAME }
 	{
 		tl++
@@ -141,13 +146,55 @@ scan_kotlin() { # <file>...
 			if (c != " " && c != "\t") hascode = 1
 			i++
 		}
+		# KDoc TAG lines (@param, @return, @throws, @see, @sample) count toward the module
+		# budget but NOT toward the block cap, and the run they sit in is not broken by them.
+		#
+		# The cap exists to stop NARRATIVE, and a tag list is not narrative: its form is fixed,
+		# one fact per line, and it grows with the signature rather than with how much an author
+		# felt like writing. A seven-parameter function documented properly cannot fit a
+		# `/** … */` into 12 lines, so counting tags made the honest KDoc the violation and
+		# deleting the parameter docs the fix — the guard would have been driving out exactly the
+		# documentation worth keeping. Found on the TaskerReference dim_progress oracle, where
+		# the @params are the %AAB_ variable mapping.
+		#
+		# This is not a hole a narrative can hide in: prose does not start with @, and any line
+		# that does not is still counted.
+		#
+		# The trailing boundary is spelled `[[:space:]]` rather than `\b`: gawk spells the word
+		# boundary `\y` and mawk has none at all, so `\b` matched nothing here and the exemption
+		# silently did not apply — a guard change that tests green because it never fired.
+		if (hasc && !hascode && $0 ~ /^[[:space:]]*\*?[[:space:]]*@(param|return|throws|see|sample)[[:space:]]/) {
+			cl++
+			next
+		}
+		# A BLANK line does not end a comment block; it bridges it. Only CODE ends one.
+		#
+		# This is the difference between a cap and a formatting preference. With blank lines
+		# ending the run, 36 lines of narrative written as three paragraphs separated by blank
+		# lines passed at rc=0, and so did a SINGLE `/* … */` comment of 21 narrative lines that
+		# happened to contain one empty line — one syntactic comment, obviously one block to any
+		# reader, silently uncapped. That falsifies the claim this guard is built on ("narrative
+		# does not fit in 12 lines, so it has to go to the .md"), and it was reachable by pressing
+		# Enter. Found by the DA-005 rule-review pass, not by any test here.
+		#
+		# Bridging blank lines are counted into the run, because a paragraph break is part of the
+		# narrative it separates. `gap` holds them until we know whether a comment or code comes
+		# next; code discards them, so trailing blank lines never inflate a block.
 		if (hasc && !hascode) {
 			cl++
-			if (run == 0) runstart = FNR
+			if (run == 0) {
+				runstart = FNR
+			} else {
+				run += gap
+			}
+			gap = 0
 			run++
+		} else if (!hasc && !hascode && run > 0) {
+			gap++
 		} else {
 			if (run > cap) printf "BLOCK %s %d %d\n", file, runstart, run
 			run = 0
+			gap = 0
 		}
 	}
 	function flush() {
