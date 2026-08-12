@@ -525,3 +525,12 @@
   Reachable by accident (any heredoc re-indent) and invisible to the fixtures, since a manifest
   parsing to zero records satisfies every case vacuously. The guard already applied the opposite
   doctrine to tracked files and simply did not apply it to its own data.
+
+- DB-034 [cited]: **A read method with no caller is a claim the UI is quietly making instead.**
+  Privileged Display rendered all seven toggles from the stored profile while the matching
+  `SecureDisplayController.read*` methods sat unused, so a Night Light flipped from the system tile
+  left the screen asserting the opposite — and the only-on-change diff never corrected it, its
+  desired state having never moved. Tasker's `_ShowPrivilegedScene` re-reads every key on open;
+  restored here, screen-only. Two fields stay app-owned: the circadian flag has no Android
+  counterpart, and while it is on the ticker owns the temperature key, so a read-back would freeze
+  one ramp sample as static. `[cited]`: `AabSettings.withDeviceSnapshot`.

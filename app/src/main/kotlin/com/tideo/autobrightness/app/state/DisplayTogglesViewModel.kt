@@ -56,6 +56,11 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     )
     val state: StateFlow<PrivilegedDisplayUiState> = _state.asStateFlow()
 
+    private val _deviceSnapshot = MutableStateFlow<DeviceDisplaySnapshot?>(null)
+
+    /** DB-034: last device read-back, or null below ELEVATED (the toggles do not compose there). */
+    val deviceSnapshot: StateFlow<DeviceDisplaySnapshot?> = _deviceSnapshot.asStateFlow()
+
     // Serializes device access: [io] is a thread POOL; prevent refresh/applyNow interleave (D-143).
     private val deviceLock = Mutex()
 
@@ -80,8 +85,23 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                         writeFailed = false,
                     )
                 }
+                _deviceSnapshot.value = readSnapshotLocked()
             }
         }
+    }
+
+    /** DB-034: reads need no grant (only writes are tier-gated), but below ELEVATED nothing renders. */
+    private fun readSnapshotLocked(): DeviceDisplaySnapshot? {
+        if (privilegeManager.currentTier() < Tier.ELEVATED) return null
+        return DeviceDisplaySnapshot(
+            nightLight = display.readNightLight(),
+            temperatureK = display.readNightLightTemperature(),
+            daltonizer = display.readDaltonizer(),
+            inversion = display.readInversion(),
+            alwaysOn = display.readAlwaysOnDisplay(),
+            stayAwake = display.readStayAwakePlugged(),
+            hdrForceSdr = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null,
+        )
     }
 
     /**

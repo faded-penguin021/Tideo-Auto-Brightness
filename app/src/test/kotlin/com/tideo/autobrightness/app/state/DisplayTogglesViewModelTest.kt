@@ -20,6 +20,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -101,6 +103,38 @@ class DisplayTogglesViewModelTest {
 
         vm.refresh() // leaving + returning; "the last change failed" is stale news
         assertFalse(vm.state.value.writeFailed)
+    }
+
+    @Test
+    fun deviceSnapshot_isNullBelowElevated_andReadsTheDeviceOnce() {
+        // DB-034: reads need no grant, but below ELEVATED the toggles never compose.
+        Settings.Secure.putInt(app.contentResolver, "accessibility_display_inversion_enabled", 1)
+        val vm = vm()
+        assertTrue(vm.state.value.tier < Tier.ELEVATED)
+        assertNull(vm.deviceSnapshot.value)
+
+        grantElevated()
+        vm.refresh()
+
+        val snapshot = assertNotNull(vm.deviceSnapshot.value)
+        assertTrue(snapshot.inversion, "the snapshot must report what the device actually reads")
+        assertFalse(snapshot.nightLight)
+    }
+
+    @Test
+    fun deviceSnapshot_tracksAnExternalChange() {
+        // The system quick-settings tile flipping Night Light while we were backgrounded.
+        grantElevated()
+        val vm = vm()
+        assertFalse(assertNotNull(vm.deviceSnapshot.value).nightLight)
+
+        Settings.Secure.putInt(app.contentResolver, "night_display_activated", 1)
+        Settings.Secure.putInt(app.contentResolver, "night_display_color_temperature", 2700)
+        vm.refresh()
+
+        val snapshot = assertNotNull(vm.deviceSnapshot.value)
+        assertTrue(snapshot.nightLight)
+        assertEquals(2700, snapshot.temperatureK)
     }
 
     @Test

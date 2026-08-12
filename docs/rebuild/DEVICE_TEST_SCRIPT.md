@@ -245,6 +245,15 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     — including a pre-existing residual (repeat after a force-stop mid-override: panic still
     clears it). Re-enable the service. **Expected:** the baseline's display fields re-assert on
     start — panic is an escape hatch, not a permanent opt-out.
+39a. **The screen shows the DEVICE, not the stored profile (DB-034).** With Privileged Display open,
+    flip Night Light (or color inversion) from the system quick-settings tile, then return to Tideo.
+    **Expected:** on resume the toggle shows the device's state, and Apply becomes available because
+    the draft now differs from the saved profile — the screen no longer asserts a value the device
+    does not hold. Now change a toggle WITHOUT applying, background the app and return.
+    **Expected:** your uncommitted edit survives — a read-back never overwrites a dirty draft.
+    Finally enable **Follow circadian scaling** + Apply, service ON, and reopen the screen.
+    **Expected:** the temperature slider still shows YOUR value, not the ramp's current Kelvin (the
+    ticker owns that key while tracking is on; reading it back would freeze one sample).
 
 ## 12. Accessibility — TalkBack & touch targets (D-156)
 

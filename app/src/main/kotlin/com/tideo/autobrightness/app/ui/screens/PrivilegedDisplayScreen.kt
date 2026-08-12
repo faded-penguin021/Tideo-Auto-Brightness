@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.state.DisplayTogglesViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
+import com.tideo.autobrightness.app.state.withDeviceSnapshot
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.DraftApplyBar
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -73,8 +75,15 @@ fun PrivilegedDisplayScreen(
     val draft by draftVm.draft.collectAsStateWithLifecycle()
     val dirty by draftVm.dirty.collectAsStateWithLifecycle()
     val committed by draftVm.committed.collectAsStateWithLifecycle()
+    val deviceSnapshot by vm.deviceSnapshot.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
+
+    // DB-034: show what the device actually reads, never over uncommitted edits.
+    LaunchedEffect(deviceSnapshot, dirty) {
+        val snapshot = deviceSnapshot
+        if (snapshot != null && !dirty) draftVm.edit { it.withDeviceSnapshot(snapshot) }
+    }
 
     // Re-probe on foreground return to catch external changes (adb grant, Shizuku, Night Light schedule).
     val lifecycleOwner = LocalLifecycleOwner.current

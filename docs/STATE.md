@@ -113,6 +113,12 @@ TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
 ## Changelog
 
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
+- 2026-08-12 — **Privileged Display shows the device, not the profile (DB-034).** The screen's draft
+  is seeded from a `SecureDisplayController` read-back on open and every resume — the seven `read*`
+  methods had no production caller, so an externally-flipped toggle left the UI asserting a value
+  the device did not hold and the only-on-change diff never noticed. Skipped while the draft is
+  dirty; temperature excluded while circadian tracking owns that key. Coordinator seeding
+  deliberately unchanged (its "seed must not write" invariant holds). Owner step: §11.39a.
 - 2026-08-11 — **Comment consolidation + the rail that holds it (DB-028…DB-033).** Kotlin comments
   18.7% → 8.4% (7620 → 3015 lines, 215 files), each proved comment-only against the branch point;
   prose moved to the `.md` tier with `D-NNN` pointers in code, and Conventions no longer says "match
