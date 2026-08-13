@@ -576,3 +576,12 @@
   differs from the profile"; only the first may block a re-merge, so the policy now compares against
   the draft it last produced. The gate had no test at any level — the suites covered the snapshot
   and the merge on either side. `[cited]`: `readBackDraft`.
+
+- DB-040 [cited]: **Fixing a state machine from the outside gets it wrong twice.** DB-039 moved the
+  read-back's gate off `dirty` but left three holes review found: whole-object equality read the
+  collector's background writes of `serviceEnabled`/`debugLevel` as user edits and froze tracking;
+  keying the effect on the snapshot alone never re-ran when the gate RE-opened, so Discard left the
+  screen stale as before; and the pre-seed draft is `AabSettings()` with `committed` defaulting to
+  it too, so the gate stood open on empty state and a merge could overwrite the profile. Fixed by
+  scoping equality to the owned fields, making read-and-write one `update`, and refusing before the
+  seed. `[cited]`: `mergeDeviceReadBack`.

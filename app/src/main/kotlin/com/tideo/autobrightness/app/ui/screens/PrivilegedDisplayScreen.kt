@@ -78,11 +78,12 @@ fun PrivilegedDisplayScreen(
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
 
-    // DB-034: show what the device actually reads, never over uncommitted edits. DB-039: keyed on
-    // the snapshot alone — `dirty` is what our own merge sets, so gating on it stopped the tracking
-    // after one change. StateFlow conflates equal snapshots, so this runs only on a real change.
-    LaunchedEffect(deviceSnapshot) {
-        vm.mergeReadBack(draft, committed)?.let { merged -> draftVm.edit { merged } }
+    // DB-034: show what the device actually reads, never over uncommitted edits. DB-040: keyed on
+    // everything the decision reads — the snapshot alone missed the gate RE-OPENING (Discard, or the
+    // post-seed epoch), which left the screen stale exactly as the original `dirty` gate did.
+    val epoch by draftVm.epoch.collectAsStateWithLifecycle()
+    LaunchedEffect(deviceSnapshot, draft, committed, epoch) {
+        deviceSnapshot?.let { draftVm.mergeDeviceReadBack(it) }
     }
 
     // Re-probe on foreground return to catch external changes (adb grant, Shizuku, Night Light schedule).

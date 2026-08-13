@@ -61,18 +61,6 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     /** DB-034: last device read-back, or null below ELEVATED (the toggles do not compose there). */
     val deviceSnapshot: StateFlow<DeviceDisplaySnapshot?> = _deviceSnapshot.asStateFlow()
 
-    // DB-039: the draft this VM last produced, so a user edit is distinguishable from our own write.
-    // Held here, not in a composable `remember`, so it survives rotation with the draft it describes.
-    private var lastMerged: AabSettings? = null
-
-    /**
-     * DB-039: the draft to apply for the current device snapshot, or null to leave it alone.
-     * Records what it returns, so the next call can tell "we wrote that" from "the user did".
-     */
-    fun mergeReadBack(draft: AabSettings, committed: AabSettings): AabSettings? {
-        val snapshot = _deviceSnapshot.value ?: return null
-        return readBackDraft(draft, committed, lastMerged, snapshot)?.also { lastMerged = it }
-    }
 
     // Serializes device access: [io] is a thread POOL; prevent refresh/applyNow interleave (D-143).
     private val deviceLock = Mutex()

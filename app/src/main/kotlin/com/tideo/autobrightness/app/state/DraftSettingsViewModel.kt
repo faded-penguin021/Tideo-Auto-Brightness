@@ -102,6 +102,27 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
 
     fun edit(transform: (AabSettings) -> AabSettings) = _draft.update(transform)
 
+    // DB-040: the draft this read-back last produced, so a user edit of a display field is
+    // distinguishable from our own write. Main-thread only (the screen's LaunchedEffect).
+    private var lastReadBack: AabSettings? = null
+
+    /**
+     * DB-039/DB-040: merge a Privileged Display device read-back into the draft, atomically.
+     * Refused before the seed — until epoch 1 the draft is `AabSettings()` defaults, and merging
+     * into those then having the seed overwrite them loses the read-back, while the reverse order
+     * would replace the user's whole profile with defaults. The gate and the write are one
+     * `update` so a concurrent user edit cannot be read-then-clobbered.
+     */
+    fun mergeDeviceReadBack(snapshot: DeviceDisplaySnapshot) {
+        if (!seeded) return
+        val committedNow = committed.value
+        _draft.update { current ->
+            readBackDraft(current, committedNow, lastReadBack, snapshot)
+                ?.also { lastReadBack = it }
+                ?: current
+        }
+    }
+
     fun deleteOverridePoint(point: OverridePoint) {
         viewModelScope.launch { appModule.overridePointStore.delete(point) }
     }

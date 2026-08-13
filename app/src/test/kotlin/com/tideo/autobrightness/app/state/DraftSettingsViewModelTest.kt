@@ -73,6 +73,84 @@ class DraftSettingsViewModelTest {
         return vm
     }
 
+    // --- DB-040: the Privileged Display device read-back, at the layer where the bugs lived ---
+
+    private fun deviceSnapshot(nightLight: Boolean = false, inversion: Boolean = false) =
+        DeviceDisplaySnapshot(
+            nightLight = nightLight,
+            temperatureK = null,
+            daltonizer = com.tideo.autobrightness.platform.display.DaltonizerMode.OFF,
+            inversion = inversion,
+            alwaysOn = false,
+            stayAwake = false,
+            hdrForceSdr = false,
+        )
+
+    @Test
+    fun readBack_isRefusedBeforeTheSeed_soDefaultsNeverReplaceTheProfile() {
+        // The snapshot comes from Settings.Secure binder reads and routinely beats the DataStore
+        // seed. Merging into the pre-seed AabSettings() defaults would either be discarded by the
+        // seed, or replace the user's whole profile with defaults + device values.
+        setBaseline(AabSettings(minBrightness = 42, nightLightEnabled = false))
+        val vm = DraftSettingsViewModel(app)
+
+        // No idle yet: the init collector has not run, so the draft is still AabSettings() defaults.
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
+        assertFalse(
+            vm.draft.value.nightLightEnabled,
+            "merging into pre-seed defaults is what makes the seed race destructive",
+        )
+
+        awaitVm(vm) { it.epoch.value >= 1 }
+        assertEquals(42, vm.draft.value.minBrightness, "the profile must survive the race")
+        // And once seeded the read-back works normally.
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
+        assertTrue(vm.draft.value.nightLightEnabled, "the read-back resumes after the seed")
+        assertEquals(42, vm.draft.value.minBrightness, "without discarding the profile")
+    }
+
+    @Test
+    fun readBack_tracksRepeatedDeviceChanges() {
+        setBaseline(AabSettings(nightLightEnabled = false))
+        val vm = seededVm()
+
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
+        assertTrue(vm.draft.value.nightLightEnabled, "first read-back shows the device")
+
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = false))
+        assertFalse(vm.draft.value.nightLightEnabled, "and so does the second (DB-039)")
+    }
+
+    @Test
+    fun readBack_survivesABackgroundGlobalFieldWrite() {
+        // The service/QS tile/context engine rewrite serviceEnabled, contextOverride, debugLevel and
+        // panicSensitivity into the draft. Those are not user edits and must not stop tracking.
+        setBaseline(AabSettings(nightLightEnabled = false, debugLevel = 0))
+        val vm = seededVm()
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
+
+        setBaseline(committed().copy(debugLevel = 8)) // Live Debug moves a GLOBAL field
+        idle()
+
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = false))
+        assertFalse(vm.draft.value.nightLightEnabled, "a background write is not a user edit")
+    }
+
+    @Test
+    fun readBack_refusesToClobberAUserEdit_thenResumesAfterDiscard() {
+        setBaseline(AabSettings(nightLightEnabled = false, inversionEnabled = false))
+        val vm = seededVm()
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
+
+        vm.edit { it.copy(inversionEnabled = true) } // the user touches a display field
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = false))
+        assertTrue(vm.draft.value.nightLightEnabled, "an uncommitted edit must not be clobbered")
+
+        vm.discard()
+        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = false))
+        assertFalse(vm.draft.value.nightLightEnabled, "after Discard the read-back resumes")
+    }
+
     @Test
     fun edit_marksDirty_thenDiscardReverts() {
         setBaseline(AabSettings(minBrightness = 10))

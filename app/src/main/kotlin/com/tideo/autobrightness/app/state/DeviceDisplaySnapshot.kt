@@ -34,11 +34,27 @@ fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings
 )
 
 /**
- * DB-039: the draft to show for [snapshot], or null to leave it alone. Gating on "draft differs from
- * the profile" cannot work — the read-back's own write makes it differ, so the guard would fire once
- * and refuse every later device change. What must block a re-merge is a USER edit, which is
- * [lastMerged]: the draft this returned last time. Equality with the profile covers the first
- * read-back and a Discard.
+ * DB-040: the eight fields the read-back owns. Comparisons must be scoped to these — the draft also
+ * carries global fields (`serviceEnabled`, `contextOverride`, `debugLevel`, `panicSensitivity`, …)
+ * that `DraftSettingsViewModel`'s collector rewrites from DataStore whenever the service, a context
+ * rule or the QS tile moves them. Whole-object equality reads those writes as a user edit.
+ */
+private fun AabSettings.displayFieldsEqual(other: AabSettings): Boolean =
+    nightLightEnabled == other.nightLightEnabled &&
+        nightLightTemperature == other.nightLightTemperature &&
+        nightLightCircadianEnabled == other.nightLightCircadianEnabled &&
+        daltonizerMode == other.daltonizerMode &&
+        inversionEnabled == other.inversionEnabled &&
+        alwaysOnDisplayEnabled == other.alwaysOnDisplayEnabled &&
+        stayAwakeChargingEnabled == other.stayAwakeChargingEnabled &&
+        hdrForceSdrEnabled == other.hdrForceSdrEnabled
+
+/**
+ * DB-039/DB-040: the draft to show for [snapshot], or null to leave it alone. Gating on "draft
+ * differs from the profile" cannot work — the read-back's own write makes it differ, so the guard
+ * fires once and refuses every later device change. What must block a re-merge is a USER edit of a
+ * display field, which is [lastMerged]: the draft this returned last time. Matching the profile
+ * covers the first read-back and a Discard.
  */
 fun readBackDraft(
     draft: AabSettings,
@@ -46,6 +62,8 @@ fun readBackDraft(
     lastMerged: AabSettings?,
     snapshot: DeviceDisplaySnapshot,
 ): AabSettings? {
-    if (draft != committed && draft != lastMerged) return null
+    val untouched = draft.displayFieldsEqual(committed) ||
+        (lastMerged != null && draft.displayFieldsEqual(lastMerged))
+    if (!untouched) return null
     return draft.withDeviceSnapshot(snapshot).takeIf { it != draft }
 }

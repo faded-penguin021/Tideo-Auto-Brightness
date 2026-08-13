@@ -134,6 +134,15 @@ Newest first; older clusters fold to one line. The cited ledger rows are the rec
   Declined with reasons: fuzzing, CII badge, Scorecard CI, SLSA provenance (real value, deferred as
   its own design). **Owner settings:** Dependabot **security** updates was OFF, now on — D-135
   assumes it, so gradle at limit 0 had no mechanism behind it; the rest were already correct.
+- 2026-08-14 — **The DB-039 fix was wrong in three new ways (DB-040).** An adversarial review of the
+  fix found: whole-object equality treated the draft collector's background writes (`serviceEnabled`,
+  `debugLevel`, `contextOverride`) as user edits and froze tracking; keying the effect on the
+  snapshot alone never re-ran when the gate re-opened, so **Discard** left the screen stale exactly
+  as the original bug did; and the pre-seed draft equals the `committed` default, so the gate stood
+  open on empty state — one interleaving could overwrite the seeded profile with defaults (data
+  loss). Now: equality scoped to the eight owned fields, merge is one atomic `update` inside
+  `DraftSettingsViewModel`, refused before the seed, effect keyed on everything it reads. Each fix
+  is pinned by a test verified to fail without it. **DB-039 as committed (98634cf) was not sound.**
 - 2026-08-14 — **The read-back's guard disabled itself after one change (DB-039).** Owner-reported
   defect in DB-034, caught before 1.9.0 is tagged: the merge gated on the draft matching the profile,
   but the merge is what makes them differ, so it fired once per screen entry and then refused every
