@@ -28,6 +28,11 @@
     <string name="notif_override_title">Manual override detected</string>
     <string name="notif_override_text">Auto Brightness paused — tap Resume to continue</string>
     <string name="flash_manual_override">Manual override — auto brightness paused</string>
+    <!-- DB-035: why an external control command did nothing (debug level 8 only) -->
+    <string name="flash_control_gate_off">Control command ignored — external control is off (Tools → Automation control)</string>
+    <string name="flash_control_name_missing">LOAD_PROFILE ignored — no \"name\" extra</string>
+    <string name="flash_control_profile_unknown">LOAD_PROFILE ignored — no profile named \"%1$s\"</string>
+    <string name="flash_control_resume_ignored">RESUME ignored — the service is switched off</string>
 
     <!-- Shared action / button labels -->
     <string name="action_resume">Resume</string>

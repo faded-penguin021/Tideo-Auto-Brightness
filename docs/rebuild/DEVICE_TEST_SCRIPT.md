@@ -301,6 +301,16 @@ reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation ap
 44. **`LOAD_PROFILE` + resume.** Send `LOAD_PROFILE` with `--es name "Night"` (a real saved profile).
     **Expected:** that profile loads and the manual lock latches (Dashboard shows the profile);
     `CONTEXTS_RESUME` clears it and hands control back to context rules. An unknown `name` is a no-op.
+44a. **Dropped commands explain themselves at level 8 (DB-035).** Set **Live Debug Info → Log Level**
+    to **8 — Context Automation**. With the automation toggle **OFF**, send any verb. **Expected:** a
+    flash naming the off toggle — and the command still does nothing (the flash must not weaken the
+    gate). Turn the toggle ON, then produce each remaining case: `LOAD_PROFILE` with no `--es name`;
+    `LOAD_PROFILE --es name "NoSuchProfile"` (the flash quotes the name back); and `RESUME` with the
+    master switch off. **Expected:** one flash each, and a verb that *works* (e.g. `REAPPLY`) flashes
+    nothing. Now set the level back to **0** and repeat the toggle-OFF send. **Expected:** silence —
+    the default configuration keeps D-157's "no side effect before the opt-in gate".
+    Deliberately unreported even at level 8: a mistyped action (refused before anything runs) and a
+    command dropped by the one-at-a-time admission gate.
 45. **`SERVICE_ON` while not running.** With the service OFF (but the toggle ON), send `SERVICE_ON`.
     **Expected:** it starts. If the device is aggressive about background starts and it does **not**
     start (Dashboard shows *degraded*), exempt Tideo from battery optimization and retry — it should

@@ -113,6 +113,20 @@ TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
 ## Changelog
 
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
+- 2026-08-13 — **Dropped control commands explain themselves (DB-035).** Four `ControlReceiver`
+  drops — gate off, `LOAD_PROFILE` missing/unknown name, `RESUME` while the master switch is off —
+  flash the reason at debug level 8 via the existing `ToastDebugSink`; `applyProfile` returns Boolean
+  so an unresolved name is distinguishable. Silent at every other level, so the default config keeps
+  D-157's pre-gate invariant; `SECURITY_REVIEW.md` row amended to the qualified form rather than left
+  overclaiming. Unknown-action and admission-gate drops stay silent (unbounded per broadcast).
+  Owner step: §13.44a. Also fixed a **pre-existing** flaky test found by the red ladder (DB-036):
+  `DraftSettingsViewModelTest` awaited the DataStore then asserted on the VM's `dirty`, which its
+  collector updates strictly later — failed ~2 of 3 runs under load, on a clean tree too.
+  Glue review raised 9 findings; the 4 should-fix are fixed (level checked before the work, hostile
+  `name` clamped, two docs corrected for overclaiming). **Left open as nits:** no test drives
+  `onReceive` itself, `SettingsViewModel`/`ProfilesContextsScreen` still ignore `applyProfile`'s new
+  Boolean and toast success unconditionally, and `awaitVm` makes the issue-#110 fixed-point assertion
+  eventually-consistent (catches a permanent-dirty regression, not a slow-converging one).
 - 2026-08-12 — **Privileged Display shows the device, not the profile (DB-034).** The screen's draft
   is seeded from a `SecureDisplayController` read-back on open and every resume — the seven `read*`
   methods had no production caller, so an externally-flipped toggle left the UI asserting a value

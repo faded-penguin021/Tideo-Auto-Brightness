@@ -49,6 +49,19 @@ class DraftSettingsViewModelTest {
         return committed()
     }
 
+    /**
+     * Idle + poll until [predicate] holds on the VM's own state (bounded ~1s). The store reaching a
+     * value does NOT mean the VM's `committed` collector has seen it, so anything derived from it —
+     * `dirty` above all — needs its own wait or the assertion races the collector.
+     */
+    private fun awaitVm(vm: DraftSettingsViewModel, predicate: (DraftSettingsViewModel) -> Boolean) {
+        repeat(100) {
+            idle()
+            if (predicate(vm)) return
+            Thread.sleep(10)
+        }
+    }
+
     private fun seededVm(): DraftSettingsViewModel {
         val vm = DraftSettingsViewModel(app)
         // Wait for init collector to seed; gate on epoch 0→1 (not draft == committed which may be true early).
@@ -220,6 +233,7 @@ class DraftSettingsViewModelTest {
             vm.draft.value.dimmingStrength,
             "the field must show 65 after Apply — showing 100 while 65 applies is issue #110",
         )
+        awaitVm(vm) { !it.dirty.value }
         assertFalse(vm.dirty.value, "Apply must be a fixed point: draft == committed afterwards")
     }
 

@@ -534,3 +534,20 @@
   restored here, screen-only. Two fields stay app-owned: the circadian flag has no Android
   counterpart, and while it is on the ticker owns the temperature key, so a read-back would freeze
   one ramp sample as static. `[cited]`: `AabSettings.withDeviceSnapshot`.
+
+- DB-035 [cited]: **A gate downstream of the work it authorises is not a gate.** Four `ControlReceiver`
+  drops now say why at debug level 8 — the gate-off case above all, the first-run mistake. Glue review
+  caught the level being read INSIDE the sink, after `flashDrop` had already read the settings store
+  and built a sink per rejected broadcast, while the comment claimed the default config was untouched;
+  the check moved ahead of the work. It also caught `LOAD_PROFILE`'s caller-chosen name reaching the
+  system-wide overlay unbounded — now 40 chars, control/bidi stripped. Unknown actions and in-flight
+  rejections stay silent: both precede DA-043's admission gate. `[cited]`: `ControlReceiver.flashDrop`.
+
+- DB-036: **Awaiting one async projection proves nothing about a second derived from it.**
+  `DraftSettingsViewModelTest` polled the DataStore until Apply's clamped value landed, then asserted
+  `dirty` was false — but `dirty` compares the draft against the VM's own `committed` StateFlow,
+  which its collector updates strictly after the store. The store reaching 65 says nothing about the
+  collector having seen it, so the assertion raced and failed on ~2 of 3 runs under container load
+  while passing on a warm machine. Discovered as a red ladder on an unrelated unit; it was never
+  this session's change. Fix: poll the VM's own state before asserting on it, not the store's.
+

@@ -16,8 +16,9 @@ class ProfileApplier(
     private val baselineStore = DataStoreContextBaselineStore(appContext.contextBaselineDataStore)
 
     // Apply a saved profile; preserve service/detectOverrides/debugLevel. Latch manual context lock (G2R-F30, D-014).
-    suspend fun applyProfile(name: String) {
-        val profile = (userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return).validate()
+    // DB-035: false = no such profile, so an external caller can be told rather than left guessing.
+    suspend fun applyProfile(name: String): Boolean {
+        val profile = (userProfiles.get(name) ?: DefaultProfiles.all[name] ?: return false).validate()
         baselineStore.clear()
         // DA-018: persist loaded profile as %AAB_ProfileUser (fallback for Resume/no-match).
         baselineStore.setUserProfileName(name)
@@ -32,6 +33,7 @@ class ProfileApplier(
         }
         LiveRuntimeState.setActiveProfile(name)
         if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(appContext)
+        return true
     }
 
     // DA-018: clear context lock and re-evaluate (G2R-F30). Route through resumeContext(), not reapply().

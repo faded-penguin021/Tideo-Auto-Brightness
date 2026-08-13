@@ -3,8 +3,12 @@ package com.tideo.autobrightness.app.control
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.annotation.StringRes
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
+import com.tideo.autobrightness.app.runtime.DebugCategory
+import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.runtime.goAsync
 import com.tideo.autobrightness.app.settings.ProfileApplier
 import com.tideo.autobrightness.app.storage.controlPrefsDataStore
@@ -42,9 +46,34 @@ class ControlReceiver : BroadcastReceiver() {
     /** D-157 security: gate check first, drop all when disabled. */
     internal suspend fun handle(appContext: Context, action: String, profileName: String? = null) {
         val enabled = ControlPrefsStore(appContext.controlPrefsDataStore).externalControlEnabled.first()
-        if (!enabled) return
+        if (!enabled) {
+            flashDrop(appContext, debugLevel(appContext), R.string.flash_control_gate_off)
+            return
+        }
         route(appContext, action, profileName)
     }
+
+    private suspend fun debugLevel(appContext: Context): Int =
+        appContext.settingsDataStore.data.first().debugLevel
+
+    /**
+     * DB-035: say why a command did nothing, in the CONTEXT_AUTOMATION debug level only. The level
+     * is checked before anything is built, so a rejected broadcast allocates nothing at level 0.
+     */
+    private fun flashDrop(appContext: Context, level: Int, @StringRes resId: Int, vararg args: Any) {
+        if (level != DebugCategory.CONTEXT_AUTOMATION.level) return
+        ToastDebugSink(appContext).emit(DebugCategory.CONTEXT_AUTOMATION, level) {
+            appContext.getString(resId, *args)
+        }
+    }
+
+    /**
+     * DB-035: the caller chooses this text and `AabFlash` may render it in the system-wide overlay,
+     * so cap it and drop control/bidi characters — an 8 KB or RTL-override "name" is not a label.
+     */
+    private fun String.forFlash(): String =
+        take(FLASH_ARG_MAX).map { if (it.isISOControl() || it in BIDI_CONTROLS) '�' else it }
+            .joinToString("")
 
     internal suspend fun route(appContext: Context, action: String, profileName: String? = null) {
         when (action) {
@@ -53,14 +82,29 @@ class ControlReceiver : BroadcastReceiver() {
             ACTION_SERVICE_TOGGLE -> setServiceEnabled(appContext) { current -> !current }
             ACTION_PAUSE -> AutoBrightnessRuntime.pause(appContext)
             // D-160: RESUME gated on serviceEnabled (D-140 zombie class).
-            ACTION_RESUME ->
-                if (appContext.settingsDataStore.data.first().serviceEnabled) {
+            ACTION_RESUME -> {
+                // One read serves both the gate and the drop reason (no TOCTOU between them).
+                val settings = appContext.settingsDataStore.data.first()
+                if (settings.serviceEnabled) {
                     AutoBrightnessRuntime.resume(appContext)
+                } else {
+                    flashDrop(appContext, settings.debugLevel, R.string.flash_control_resume_ignored)
                 }
+            }
             ACTION_REAPPLY -> AutoBrightnessRuntime.reapply(appContext)
             ACTION_PANIC -> AutoBrightnessRuntime.panic(appContext)
             // D-157 U3: LOAD_PROFILE latches context lock; CONTEXTS_RESUME clears it.
-            ACTION_LOAD_PROFILE -> profileName?.let { profileApplier(appContext).applyProfile(it) }
+            ACTION_LOAD_PROFILE ->
+                if (profileName == null) {
+                    flashDrop(appContext, debugLevel(appContext), R.string.flash_control_name_missing)
+                } else if (!profileApplier(appContext).applyProfile(profileName)) {
+                    flashDrop(
+                        appContext,
+                        debugLevel(appContext),
+                        R.string.flash_control_profile_unknown,
+                        profileName.forFlash(),
+                    )
+                }
             ACTION_CONTEXTS_RESUME -> profileApplier(appContext).resumeContextAutomation()
             else -> Unit
         }
@@ -105,6 +149,13 @@ class ControlReceiver : BroadcastReceiver() {
         )
 
         private val commandInFlight = AtomicBoolean(false)
+
+        // DB-035: bounds on caller-supplied flash text (LTR/RTL overrides + isolates).
+        private const val FLASH_ARG_MAX = 40
+        private val BIDI_CONTROLS = charArrayOf(
+            '‎', '‏', '‪', '‫', '‬', '‭', '‮',
+            '⁦', '⁧', '⁨', '⁩',
+        )
 
         internal fun tryAcquireCommand(): Boolean = commandInFlight.compareAndSet(false, true)
         internal fun releaseCommand() = commandInFlight.set(false)
