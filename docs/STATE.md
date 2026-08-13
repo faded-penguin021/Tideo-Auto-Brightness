@@ -134,6 +134,13 @@ Newest first; older clusters fold to one line. The cited ledger rows are the rec
   Declined with reasons: fuzzing, CII badge, Scorecard CI, SLSA provenance (real value, deferred as
   its own design). **Owner settings:** Dependabot **security** updates was OFF, now on — D-135
   assumes it, so gradle at limit 0 had no mechanism behind it; the rest were already correct.
+- 2026-08-14 — **The read-back's guard disabled itself after one change (DB-039).** Owner-reported
+  defect in DB-034, caught before 1.9.0 is tagged: the merge gated on the draft matching the profile,
+  but the merge is what makes them differ, so it fired once per screen entry and then refused every
+  later device change — the staleness DB-034 existed to end. The policy is now a pure
+  `readBackDraft` comparing against the draft it last produced (a user edit still blocks it; Discard
+  resumes it), with `lastMerged` in the VM so it survives rotation. It had **no test at any level**;
+  the new one fails against the old gate. §11.39a extended — one external change never caught this.
 - 2026-08-13 — **Panic confirms itself however it was triggered (DB-037).** `vibrateSos()` moved from
   the two gesture collectors into `panicAndStop()`, the path the gesture, the control intent and the
   notification's Reset button all share — the latter two reset the device silently before.

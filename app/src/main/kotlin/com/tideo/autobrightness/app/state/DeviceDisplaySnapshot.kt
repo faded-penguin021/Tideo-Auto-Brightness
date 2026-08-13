@@ -32,3 +32,20 @@ fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings
     stayAwakeChargingEnabled = snapshot.stayAwake,
     hdrForceSdrEnabled = snapshot.hdrForceSdr ?: hdrForceSdrEnabled,
 )
+
+/**
+ * DB-039: the draft to show for [snapshot], or null to leave it alone. Gating on "draft differs from
+ * the profile" cannot work — the read-back's own write makes it differ, so the guard would fire once
+ * and refuse every later device change. What must block a re-merge is a USER edit, which is
+ * [lastMerged]: the draft this returned last time. Equality with the profile covers the first
+ * read-back and a Discard.
+ */
+fun readBackDraft(
+    draft: AabSettings,
+    committed: AabSettings,
+    lastMerged: AabSettings?,
+    snapshot: DeviceDisplaySnapshot,
+): AabSettings? {
+    if (draft != committed && draft != lastMerged) return null
+    return draft.withDeviceSnapshot(snapshot).takeIf { it != draft }
+}

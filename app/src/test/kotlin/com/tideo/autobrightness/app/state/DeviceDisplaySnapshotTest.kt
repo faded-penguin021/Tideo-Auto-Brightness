@@ -5,6 +5,7 @@ import com.tideo.autobrightness.platform.display.DaltonizerMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -82,6 +83,65 @@ class DeviceDisplaySnapshotTest {
 
         assertTrue(on.hdrForceSdrEnabled)
         assertFalse(off.hdrForceSdrEnabled)
+    }
+
+    // --- DB-039: the re-merge policy. The bug was gating on "draft differs from profile", which the
+    // merge itself causes — it fired once and then refused every later device change.
+
+    @Test
+    fun `a second external change still reaches the draft`() {
+        // The reported sequence: profile has Night Light off, the device is externally on, then the
+        // system tile switches it off again while we are backgrounded.
+        val profile = AabSettings(nightLightEnabled = false)
+
+        val first = assertNotNull(
+            readBackDraft(profile, profile, null, snapshot(nightLight = true)),
+            "the first read-back must show the device",
+        )
+        assertTrue(first.nightLightEnabled)
+
+        // first != profile now — under the old !dirty gate this is where tracking died.
+        val second = assertNotNull(
+            readBackDraft(first, profile, first, snapshot(nightLight = false)),
+            "a device change after the first read-back must still reach the draft",
+        )
+        assertFalse(second.nightLightEnabled, "the screen must follow the device, not freeze")
+    }
+
+    @Test
+    fun `a user edit blocks the merge`() {
+        val profile = AabSettings(nightLightEnabled = false)
+        val merged = assertNotNull(readBackDraft(profile, profile, null, snapshot(nightLight = true)))
+        val edited = merged.copy(inversionEnabled = true) // the user touched something
+
+        assertNull(
+            readBackDraft(edited, profile, merged, snapshot(nightLight = false)),
+            "uncommitted edits must never be clobbered",
+        )
+    }
+
+    @Test
+    fun `discarding resumes tracking`() {
+        val profile = AabSettings(nightLightEnabled = false)
+        val merged = assertNotNull(readBackDraft(profile, profile, null, snapshot(nightLight = true)))
+        val edited = merged.copy(inversionEnabled = true)
+        assertNull(readBackDraft(edited, profile, merged, snapshot(nightLight = true)))
+
+        // Discard sets draft back to the committed profile.
+        assertNotNull(
+            readBackDraft(profile, profile, merged, snapshot(nightLight = true)),
+            "after Discard the draft is the profile again, so tracking must resume",
+        )
+    }
+
+    @Test
+    fun `a snapshot the draft already matches changes nothing`() {
+        val profile = AabSettings(nightLightEnabled = true)
+
+        assertNull(
+            readBackDraft(profile, profile, null, snapshot(nightLight = true)),
+            "no edit, no recomposition, when the device already agrees",
+        )
     }
 
     @Test

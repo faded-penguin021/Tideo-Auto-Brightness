@@ -45,7 +45,6 @@ import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.state.DisplayTogglesViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
-import com.tideo.autobrightness.app.state.withDeviceSnapshot
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.DraftApplyBar
 import com.tideo.autobrightness.app.ui.components.SectionHeader
@@ -79,10 +78,11 @@ fun PrivilegedDisplayScreen(
     val clipboard = LocalClipboardManager.current
     val toast = rememberToaster()
 
-    // DB-034: show what the device actually reads, never over uncommitted edits.
-    LaunchedEffect(deviceSnapshot, dirty) {
-        val snapshot = deviceSnapshot
-        if (snapshot != null && !dirty) draftVm.edit { it.withDeviceSnapshot(snapshot) }
+    // DB-034: show what the device actually reads, never over uncommitted edits. DB-039: keyed on
+    // the snapshot alone — `dirty` is what our own merge sets, so gating on it stopped the tracking
+    // after one change. StateFlow conflates equal snapshots, so this runs only on a real change.
+    LaunchedEffect(deviceSnapshot) {
+        vm.mergeReadBack(draft, committed)?.let { merged -> draftVm.edit { merged } }
     }
 
     // Re-probe on foreground return to catch external changes (adb grant, Shizuku, Night Light schedule).

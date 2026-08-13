@@ -567,3 +567,12 @@
   it: no-speculative-bumps reasoned about gradle constraints; an action SHA is a different object.
   Also Token-Permissions 0: top-level `contents: write` moved to job scope.
   `[cited]`: `.github/dependabot.yml`, `build.yml` Node-24 header.
+
+- DB-039 [cited]: **A guard the guarded action invalidates fires exactly once.** The Privileged
+  Display read-back (DB-034) merged only while the draft matched the stored profile — but the merge
+  writes device values INTO the draft, breaking its own precondition and refusing every later
+  snapshot. The screen tracked the device once per entry, then froze: the staleness DB-034 existed
+  to end, found by the owner. `dirty` conflated "the user has uncommitted edits" with "the draft
+  differs from the profile"; only the first may block a re-merge, so the policy now compares against
+  the draft it last produced. The gate had no test at any level — the suites covered the snapshot
+  and the merge on either side. `[cited]`: `readBackDraft`.

@@ -255,7 +255,11 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     flip Night Light (or color inversion) from the system quick-settings tile, then return to Tideo.
     **Expected:** on resume the toggle shows the device's state, and Apply becomes available because
     the draft now differs from the saved profile — the screen no longer asserts a value the device
-    does not hold. Now change a toggle WITHOUT applying, background the app and return.
+    does not hold. **Now flip the SAME toggle back from the tile and return again (DB-039).**
+    **Expected:** the screen follows a second time. One external change is not enough to test this:
+    the first read-back makes the draft differ from the profile, and the original gate refused every
+    change after that, so the feature worked exactly once per screen entry. Now change a toggle
+    WITHOUT applying, background the app and return.
     **Expected:** your uncommitted edit survives — a read-back never overwrites a dirty draft.
     Finally enable **Follow circadian scaling** + Apply, service ON, and reopen the screen.
     **Expected:** the temperature slider still shows YOUR value, not the ramp's current Kelvin (the
