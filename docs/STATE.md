@@ -61,8 +61,9 @@ one;** changes go to `amh.conf`, `scripts/guards/*.sh` or `scripts/verify.sh`. C
 `AGENTS.md` (rows before 2026-08-03 cite the old name). `docs/HARNESS_LOCAL.md` records every
 local deviation; the next upgrade reads it first.
 
-**Shipped: v1.8.2 (vc20)**, tagged, `main` carrying vc20. **Awaiting F-Droid** reproducible-build
-verification — the owner's to confirm. No plan files; parity checklist zero-pending; tests green;
+**Shipped: v1.8.2 (vc20)**, tagged, `main` carrying vc20, **F-Droid reproducible-build verified**
+(owner, 2026-08-13 — the first AGP 8.13.2 release built clean, no complaint about the bump, so
+DA-026's fallback was never needed). No plan files; parity checklist zero-pending; tests green;
 TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
 
 ## Owner queue
@@ -72,8 +73,9 @@ TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
 
 **Pending owner actions:**
 
-1. Confirm F-Droid reports 1.8.2 verified — the first AGP 8.13.2 release; RUNBOOK §6/DA-026 if it
-   differs. **Not observable from a session**; the owner settles it.
+1. Device-verify the Tasker-parity train on `claude/tasker-tideo-comparison-gdaxux`: **§11.39a**
+   (Privileged Display shows the device, DB-034) and **§13.44a** (drop reasons at debug level 8,
+   DB-035). **Not observable from a session** — no emulator/KVM. Unit 3 will add a §5 step.
 
 **Open questions:** (none)
 
