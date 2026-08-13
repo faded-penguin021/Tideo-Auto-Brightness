@@ -558,3 +558,12 @@
   leaving the user buzzed but never restored — it now follows the restore. The counter incremented
   before the vibrator null-check, so deleting the `vibrate()` call kept the test green. And nothing
   guarded re-entry: a double-tapped Reset ran the recovery twice. `[cited]`: `panicInFlight`.
+
+- DB-038 [cited]: **A pin is a snapshot; without a refresh path it decays into a claim nobody rechecks.**
+  Scorecard (v5.5.0, local) scored Pinned-Dependencies 0 — every action floated on a major tag, so a
+  moved tag silently changes what runs. All 39 call sites now pin the commit each `@vN` already
+  resolved to, annotated with its semver: immutability without an upgrade. The companion half makes
+  it survive — github-actions updates are on in Dependabot, amending D-135's scope, not reversing
+  it: no-speculative-bumps reasoned about gradle constraints; an action SHA is a different object.
+  Also Token-Permissions 0: top-level `contents: write` moved to job scope.
+  `[cited]`: `.github/dependabot.yml`, `build.yml` Node-24 header.

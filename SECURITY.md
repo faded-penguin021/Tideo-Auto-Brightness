@@ -7,8 +7,12 @@ fixes. There are no maintenance branches; a security fix ships as a new patch re
 
 ## Reporting a vulnerability
 
-Use GitHub's **private vulnerability reporting**: *Security → Report a vulnerability* on this
-repository. Please do not open a public issue for anything exploitable.
+Use GitHub's **private vulnerability reporting**:
+
+> **[Report a vulnerability privately →](https://github.com/faded-penguin021/Tideo-Auto-Brightness/security/advisories/new)**
+
+That is the *Security → Advisories → Report a vulnerability* form on this repository; the link goes
+straight to it. Please do not open a public issue for anything exploitable.
 
 This is a solo-maintained app; reports are handled best-effort, normally within a week.
 

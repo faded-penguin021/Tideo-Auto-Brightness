@@ -78,6 +78,11 @@ TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
    DB-035) and **§5.14a** (every panic entry point vibrates, exactly once, DB-037). **Not observable
    from a session** — no emulator/KVM.
 
+2. Confirm **private vulnerability reporting** is on (Settings → Code security). `SECURITY.md` now
+   links the advisory form directly, so a disabled toggle 404s the one path the policy names
+   (DB-038). Admin state is not observable from a session (`/protection` → 403). Details and the
+   deliberately-declined list: `SCORECARD_SETTINGS_TODO.md` — delete that file once worked through.
+
 **Open questions:** (none)
 
 **Owed reviews:** (none)
@@ -116,6 +121,20 @@ TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
 ## Changelog
 
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
+- 2026-08-13 — **Supply-chain pass against OpenSSF Scorecard v5.5.0 (DB-038).** All 39 action call
+  sites pinned to the commit their `@vN` already resolved to, annotated with the semver — pinning
+  for immutability, not an upgrade; github-actions version updates enabled in Dependabot so the
+  pins cannot rot (gradle stays security-only, D-135 unchanged). Top-level `contents: write` in
+  `release.yml`/`clean-dist.yml` and the two write scopes in `redirect-external-prs.yml` moved to
+  job scope. `gradle/actions/wrapper-validation` added to all five workflows that execute the
+  checked-in wrapper jar — the release and signing paths too, not just `build.yml` — as the control
+  standing in for a Binary-Artifacts finding we will not "fix": the jar has to stay.
+  `SECURITY.md` now links the advisory form directly. Local-mode Scorecard 6.6 → 9.0:
+  Pinned-Dependencies 0→10, Token-Permissions 0→10, Security-Policy 4→10. **Environment caveat:**
+  `--repo` mode is unusable here (the egress proxy blocks GraphQL, so every check aborts before it
+  runs), so host-backed checks rest on the owner's own authenticated scan, not this session's.
+  Declined: fuzzing, CII badge, a Scorecard CI workflow, SLSA provenance (each with a reason in
+  `SCORECARD_SETTINGS_TODO.md`). Owner step: queue item 2.
 - 2026-08-13 — **Panic confirms itself however it was triggered (DB-037).** `vibrateSos()` moved from
   the two gesture collectors into `panicAndStop()`, the path the gesture, the control intent and the
   notification's Reset button all share — the latter two reset the device silently before.
