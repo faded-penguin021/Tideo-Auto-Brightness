@@ -62,6 +62,12 @@ optional.
 
 14. Hold the phone **upside down** (charging port up) and **shake** vertically. **Expected:** an **S.O.S.
     vibration**, brightness forced to **maximum**, the service stops (full reset).
+14a. **Every panic entry point confirms (DB-037).** Repeat the reset twice more without the gesture:
+    once via the foreground notification's **Reset** action, and once via the intent surface
+    (`adb shell am broadcast -a com.tideo.autobrightness.control.PANIC -n com.tideo.autobrightness/.app.control.ControlReceiver`,
+    automation toggle ON — §13). **Expected:** the same S.O.S. vibration both times; before DB-037
+    only the gesture buzzed. Then fire the gesture once more and confirm it still vibrates **exactly
+    once** — the call moved to the shared path, so a leftover call site would double-buzz.
 15. **Grab the phone out of a pocket and turn the screen on normally** (do not deliberately invert+shake).
     **Expected:** panic does **NOT** fire — the 3 s post-wake grace + the stricter inversion threshold
     suppress the grab-to-wake false trigger.

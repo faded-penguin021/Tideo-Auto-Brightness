@@ -551,3 +551,10 @@
   while passing on a warm machine. Discovered as a red ladder on an unrelated unit; it was never
   this session's change. Fix: poll the VM's own state before asserting on it, not the store's.
 
+- DB-037 [cited]: **A confirmation emitted before the work it confirms can outlive it.** Panic's
+  S.O.S. sat in the two gesture collectors, so the control intent and notification Reset recovered
+  the device in silence. Sharing it via `panicAndStop` was the easy half; glue review found the rest.
+  Vibrating FIRST (Tasker A6 order) let a sibling DISABLE cancel the coroutine mid-`emergencyStop`,
+  leaving the user buzzed but never restored — it now follows the restore. The counter incremented
+  before the vibrator null-check, so deleting the `vibrate()` call kept the test green. And nothing
+  guarded re-entry: a double-tapped Reset ran the recovery twice. `[cited]`: `panicInFlight`.

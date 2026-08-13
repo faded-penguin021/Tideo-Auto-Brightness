@@ -74,8 +74,9 @@ TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
 **Pending owner actions:**
 
 1. Device-verify the Tasker-parity train on `claude/tasker-tideo-comparison-gdaxux`: **§11.39a**
-   (Privileged Display shows the device, DB-034) and **§13.44a** (drop reasons at debug level 8,
-   DB-035). **Not observable from a session** — no emulator/KVM. Unit 3 will add a §5 step.
+   (Privileged Display shows the device, DB-034), **§13.44a** (drop reasons at debug level 8,
+   DB-035) and **§5.14a** (every panic entry point vibrates, exactly once, DB-037). **Not observable
+   from a session** — no emulator/KVM.
 
 **Open questions:** (none)
 
@@ -115,6 +116,14 @@ TODO/FIXME and parity gaps zero. Live ledger: `LEDGER_B.md`.
 ## Changelog
 
 Newest first; older clusters fold to one line. The cited ledger rows are the record.
+- 2026-08-13 — **Panic confirms itself however it was triggered (DB-037).** `vibrateSos()` moved from
+  the two gesture collectors into `panicAndStop()`, the path the gesture, the control intent and the
+  notification's Reset button all share — the latter two reset the device silently before.
+  Glue review returned 10 findings (1 blocking); the fixes reshaped it: the buzz now follows
+  `emergencyStop()` rather than preceding it (a sibling DISABLE could cancel the recovery and leave
+  the user confirmed-but-unrestored), `panicInFlight` stops a double-tapped Reset running the whole
+  recovery twice, and the counter moved inside the vibrate success path — it previously stayed green
+  with the `vibrate()` call deleted. `ACTION_PANIC` gains its first tests. Owner step: §5.14a.
 - 2026-08-13 — **Dropped control commands explain themselves (DB-035).** Four `ControlReceiver`
   drops — gate off, `LOAD_PROFILE` missing/unknown name, `RESUME` while the master switch is off —
   flash the reason at debug level 8 via the existing `ToastDebugSink`; `applyProfile` returns Boolean

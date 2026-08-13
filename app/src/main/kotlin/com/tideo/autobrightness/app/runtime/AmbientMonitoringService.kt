@@ -60,6 +60,9 @@ class AmbientMonitoringService : Service() {
     private var panicJob: Job? = null
     // DB-009: watches %AAB_PanicPlugged so a toggle change re-evaluates the sensor gate at once.
     private var panicGateJob: Job? = null
+
+    // DB-037: panic runs at most once per instance; never reset — the service is stopping.
+    private val panicInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
     // D-157: outbound STATE_CHANGED publisher + cached opt-in flag for onDestroy's final event.
     private var stateEventJob: Job? = null
     // D-157: internal for testing; visible to onDestroy for the final off-state decision.
@@ -315,10 +318,7 @@ class AmbientMonitoringService : Service() {
         panicJob = scope.launch {
             // DB-011: wait for effective settings; %AAB_PanicPlugged is null until first context eval.
             contextEngine.effectiveFlow.filterNotNull().first()
-            panicSensor.events().collect {
-                vibrateSos()
-                panicAndStop()
-            }
+            panicSensor.events().collect { panicAndStop() }
         }
         startPanicGateWatcher()
     }
@@ -336,10 +336,7 @@ class AmbientMonitoringService : Service() {
                 .collect {
                     panicJob?.cancelAndJoin()
                     panicJob = scope.launch {
-                        panicSensor.events().collect {
-                            vibrateSos()
-                            panicAndStop()
-                        }
+                        panicSensor.events().collect { panicAndStop() }
                     }
                 }
         }
@@ -409,13 +406,17 @@ class AmbientMonitoringService : Service() {
         val profile: String?,
     )
 
-    /**
-     * task528 act0: S.O.S. morse pattern (code62 Vibrate Pattern).
-     */
-    private fun vibrateSos() {
+    /** DB-037 test seam: Robolectric's vibrator shadow records no waveform. Counts BUZZES, not
+     *  attempts — incremented only where the vibrator actually accepted the pattern. */
+    @Volatile internal var sosCount: Int = 0
+        private set
+
+    /** task528 act0: S.O.S. morse pattern (code62 Vibrate Pattern). */
+    internal fun vibrateSos() {
         val vibrator = getSystemService(android.os.Vibrator::class.java) ?: return
         runCatching {
             vibrator.vibrate(android.os.VibrationEffect.createWaveform(SOS_MORSE_PATTERN, -1))
+            sosCount++
         }
     }
 
@@ -425,7 +426,13 @@ class AmbientMonitoringService : Service() {
     }
 
     private suspend fun panicAndStop() {
+        // DB-037: one panic per instance. Double-tapping notification Reset used to run this twice
+        // concurrently — silently before, an audible double buzz once every path confirms.
+        if (!panicInFlight.compareAndSet(false, true)) return
         controller.emergencyStop() // restore 255 + drop dimming (task528)
+        // DB-037: confirm AFTER the restore, so the buzz cannot outlive a cancelled recovery — every
+        // later suspension point is cancellable by a sibling DISABLE. Still far ahead of stopSelf().
+        vibrateSos()
         // D-155: return display toggles to DEFAULTS; run before displayToggles.stop().
         displayToggles.panicReset()
         tearDownDisabled()

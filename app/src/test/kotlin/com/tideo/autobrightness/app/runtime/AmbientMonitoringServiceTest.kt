@@ -227,6 +227,48 @@ class AmbientMonitoringServiceTest {
         assertTrue(shadowOf(service).isStoppedBySelf, "REAPPLY on a not-running service must not start the pipeline (D-140)")
     }
 
+    // DB-037: panic confirms itself however it was triggered — the gesture already vibrated, the
+    // control intent and the notification's Reset button did not. D-155: PANIC is also exempt from
+    // the D-140 not-running gate that stops PAUSE/REAPPLY/RESUME_CONTEXT, so it runs here.
+    @Test
+    fun panicByIntent_vibratesSosOnce_andIsNotRefusedByTheNotRunningGate() {
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            assertEquals(0, service.sosCount)
+
+            val result = service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_PANIC), 0, 1)
+
+            assertEquals(android.app.Service.START_NOT_STICKY, result, "panic is a full stop")
+            // panicAndStop runs on Dispatchers.Default — idling the main looper proves nothing, and
+            // stopSelf() lands later still (after the DataStore write), so it needs its own wait.
+            waitUntil { service.sosCount == 1 }
+            waitUntil { shadowOf(service).isStoppedBySelf }
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    @Test
+    fun panic_twice_buzzesOnce() {
+        // Double-tapping the notification's Reset used to run the whole recovery twice; silent
+        // before, an audible double buzz once every path confirms.
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            val panic = Intent().setAction(AmbientMonitoringService.ACTION_PANIC)
+
+            service.onStartCommand(panic, 0, 1)
+            service.onStartCommand(panic, 0, 2)
+            waitUntil { service.sosCount >= 1 }
+            repeat(20) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(10) }
+
+            assertEquals(1, service.sosCount, "a second panic must be swallowed, not buzz again")
+        } finally {
+            controller.destroy()
+        }
+    }
+
     @Test
     fun resumeContext_whenPipelineNotRunning_stopsSelfInsteadOfStartingThePipeline() {
         // DA-018: RESUME_CONTEXT shares D-140 not-running gate; must not birth zombie FGS.
