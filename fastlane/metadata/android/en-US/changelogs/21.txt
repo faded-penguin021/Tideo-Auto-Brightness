@@ -1,0 +1,7 @@
+Diagnostics and reliability release.
+
+Privileged Display now reads the device's real state when you open or return to the screen, so toggles changed elsewhere no longer show a stale value.
+
+Emergency Reset and the panic control now vibrate the S.O.S. confirmation like the shake gesture does, instead of recovering the screen silently.
+
+At debug level 8, control commands that are ignored say why rather than failing quietly.
