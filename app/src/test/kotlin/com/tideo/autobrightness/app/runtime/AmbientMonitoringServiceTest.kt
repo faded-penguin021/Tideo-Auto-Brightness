@@ -227,8 +227,7 @@ class AmbientMonitoringServiceTest {
         assertTrue(shadowOf(service).isStoppedBySelf, "REAPPLY on a not-running service must not start the pipeline (D-140)")
     }
 
-    // DB-037: panic confirms itself however it was triggered — the gesture already vibrated, the
-    // control intent and the notification's Reset button did not. D-155: PANIC is also exempt from
+    // DB-037: panic confirms itself however it was triggered. D-155: PANIC is also exempt from
     // the D-140 not-running gate that stops PAUSE/REAPPLY/RESUME_CONTEXT, so it runs here.
     @Test
     fun panicByIntent_vibratesSosOnce_andIsNotRefusedByTheNotRunningGate() {

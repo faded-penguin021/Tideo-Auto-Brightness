@@ -72,8 +72,7 @@ class ControlReceiver : BroadcastReceiver() {
      * so cap it and drop control/bidi characters — an 8 KB or RTL-override "name" is not a label.
      */
     private fun String.forFlash(): String =
-        take(FLASH_ARG_MAX).map { if (it.isISOControl() || it in BIDI_CONTROLS) '�' else it }
-            .joinToString("")
+        filterNot { it.isISOControl() || it in BIDI_CONTROLS }.take(FLASH_ARG_MAX)
 
     internal suspend fun route(appContext: Context, action: String, profileName: String? = null) {
         when (action) {

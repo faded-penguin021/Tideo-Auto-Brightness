@@ -54,7 +54,8 @@ On a device (or OEM build) where the framework reports the feature unavailable:
    (e.g. gate the automation OFF, then broadcast `LOAD_PROFILE` with a caller-chosen name over
    ~40 chars or containing control/bidi characters):
    `adb shell am broadcast -a com.tideo.autobrightness.control.LOAD_PROFILE -n
-   com.tideo.autobrightness/.app.control.ControlReceiver --es profile "<long or odd name>"`.
+   com.tideo.autobrightness.debug/com.tideo.autobrightness.app.control.ControlReceiver --es name
+   "<long or odd name>"`.
    **Expected:** the debug log names the drop reason at level 8; the profile name reaching the
    system-wide overlay is truncated to 40 chars with control/bidi characters stripped.
 
@@ -64,7 +65,7 @@ On a device (or OEM build) where the framework reports the feature unavailable:
     service stop.
 11. Repeat via the foreground notification's **Reset** action, then via the intent surface:
     `adb shell am broadcast -a com.tideo.autobrightness.control.PANIC -n
-    com.tideo.autobrightness/.app.control.ControlReceiver` (automation toggle ON).
+    com.tideo.autobrightness.debug/com.tideo.autobrightness.app.control.ControlReceiver` (automation toggle ON).
     **Expected:** the same S.O.S. vibration both times — before DB-037 only the gesture buzzed.
 12. Fire the gesture once more. **Expected:** vibrates **exactly once**, not twice (checks for a
     leftover call site on the shared path).

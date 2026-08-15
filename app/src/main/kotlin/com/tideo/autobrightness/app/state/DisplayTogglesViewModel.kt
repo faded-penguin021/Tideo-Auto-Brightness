@@ -139,16 +139,18 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                         add(display.setHdrForceSdr(settings.hdrForceSdrEnabled))
                     }
                 }
-                if (display.hdrForceSdrAvailable && hdrState == null) {
-                    _deviceSnapshot.value = _deviceSnapshot.value?.copy(hdrForceSdr = null)
-                }
+                // DB-047: publish the post-write device truth; retaining the pre-Apply snapshot
+                // makes the draft merge immediately undo the visible toggle.
+                val snapshot = readSnapshotLocked()
                 _state.update {
                     it.copy(
-                        hdrAvailable = display.hdrForceSdrAvailable && hdrState != null,
-                        hdrPreferenceCustom = display.hdrForceSdrAvailable && hdrState == null,
+                        hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
+                        hdrPreferenceCustom = display.hdrForceSdrAvailable &&
+                            snapshot != null && snapshot.hdrForceSdr == null,
                         writeFailed = results.any { r -> r.isFailure },
                     )
                 }
+                _deviceSnapshot.value = snapshot
             }
         }
     }

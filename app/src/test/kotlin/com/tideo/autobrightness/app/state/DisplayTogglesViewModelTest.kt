@@ -108,6 +108,7 @@ class DisplayTogglesViewModelTest {
         assertEquals(0, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer", -999))
         assertEquals(1, Settings.Secure.getInt(resolver, "accessibility_display_inversion_enabled", -999))
         assertEquals(1, Settings.Secure.getInt(resolver, "doze_always_on", -999))
+        assertEquals(true, assertNotNull(vm.deviceSnapshot.value).nightLight)
         // null temperature = "device default": the key must stay unset.
         assertEquals(-999, Settings.Secure.getInt(resolver, "night_display_color_temperature", -999))
     }
