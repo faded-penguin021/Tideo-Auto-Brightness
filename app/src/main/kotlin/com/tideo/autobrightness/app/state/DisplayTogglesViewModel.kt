@@ -16,6 +16,7 @@ import com.tideo.autobrightness.platform.privilege.ShizukuGrantGateway
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,8 +68,11 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     val deviceSnapshot: StateFlow<DeviceDisplaySnapshot?> = _deviceSnapshot.asStateFlow()
 
 
-    // Serializes device access: [io] is a thread POOL; prevent refresh/applyNow interleave (D-143).
+    // DB-047: invocation-ordered device access with atomic stale-publication suppression.
     private val deviceLock = Mutex()
+    private val deviceScheduleLock = Any()
+    private var deviceRequestGeneration = 0L
+    private var deviceOperationTail: Job? = null
 
     init {
         // Live tier: in-app Shizuku/root grant flips screen from grant card to toggles without leaving.
@@ -82,21 +86,24 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     fun refresh() {
         privilegeManager.refresh()
         _state.update { it.copy(shizukuAvailability = privilegeManager.shizukuAvailability()) }
-        viewModelScope.launch(io) {
+        scheduleDeviceOperation { generation ->
             deviceLock.withLock {
                 val snapshot = readSnapshotLocked()
-                _state.update {
-                    it.copy(
-                        nightLightAutoMode = display.readNightLightAutoMode(),
-                        nightLightAvailable = display.nightLightAvailable,
-                        alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
-                        hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
-                        hdrPreferenceCustom = display.hdrForceSdrAvailable &&
-                            snapshot != null && snapshot.hdrForceSdr == null,
-                        writeFailed = false,
-                    )
+                val nightLightAutoMode = display.readNightLightAutoMode()
+                publishIfCurrent(generation) {
+                    _state.update {
+                        it.copy(
+                            nightLightAutoMode = nightLightAutoMode,
+                            nightLightAvailable = display.nightLightAvailable,
+                            alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
+                            hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
+                            hdrPreferenceCustom = display.hdrForceSdrAvailable &&
+                                snapshot != null && snapshot.hdrForceSdr == null,
+                            writeFailed = false,
+                        )
+                    }
+                    _deviceSnapshot.value = snapshot
                 }
-                _deviceSnapshot.value = snapshot
             }
         }
     }
@@ -120,7 +127,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
      * All fields idempotent; null temperature and unavailable HDR stay untouched.
      */
     fun applyNow(settings: AabSettings) {
-        viewModelScope.launch(io) {
+        scheduleDeviceOperation(invalidateSnapshot = true) { generation ->
             deviceLock.withLock {
                 val hdrState = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null
                 val results = buildList {
@@ -139,17 +146,42 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                         add(display.setHdrForceSdr(settings.hdrForceSdrEnabled))
                     }
                 }
-                if (display.hdrForceSdrAvailable && hdrState == null) {
-                    _deviceSnapshot.value = _deviceSnapshot.value?.copy(hdrForceSdr = null)
-                }
-                _state.update {
-                    it.copy(
-                        hdrAvailable = display.hdrForceSdrAvailable && hdrState != null,
-                        hdrPreferenceCustom = display.hdrForceSdrAvailable && hdrState == null,
-                        writeFailed = results.any { r -> r.isFailure },
-                    )
+                // DB-047: publish the post-write device truth; retaining the pre-Apply snapshot
+                // makes the draft merge immediately undo the visible toggle.
+                val snapshot = readSnapshotLocked()
+                publishIfCurrent(generation) {
+                    _state.update {
+                        it.copy(
+                            hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
+                            hdrPreferenceCustom = display.hdrForceSdrAvailable &&
+                                snapshot != null && snapshot.hdrForceSdr == null,
+                            writeFailed = results.any { r -> r.isFailure },
+                        )
+                    }
+                    _deviceSnapshot.value = snapshot
                 }
             }
+        }
+    }
+
+    private fun scheduleDeviceOperation(
+        invalidateSnapshot: Boolean = false,
+        operation: suspend (Long) -> Unit,
+    ) {
+        synchronized(deviceScheduleLock) {
+            val generation = ++deviceRequestGeneration
+            if (invalidateSnapshot) _deviceSnapshot.value = null
+            val predecessor = deviceOperationTail
+            deviceOperationTail = viewModelScope.launch(io) {
+                predecessor?.join()
+                operation(generation)
+            }
+        }
+    }
+
+    private fun publishIfCurrent(generation: Long, publication: () -> Unit) {
+        synchronized(deviceScheduleLock) {
+            if (generation == deviceRequestGeneration) publication()
         }
     }
 

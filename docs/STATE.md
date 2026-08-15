@@ -63,11 +63,18 @@ ledger: `LEDGER_B.md`.
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. Device-verify the Tasker-parity train: **§11.39a** (Privileged Display read-back, DB-034),
-   **§13.44a** (control drop reasons, DB-035), and **§5.14a** (panic vibration, DB-037). No
-   emulator/KVM is available locally.
-2. Device-verify supported Night Light/AOD behavior and the unavailable-feature hiding/no-write
-   safety boundary from DB-041…DB-043 and experimental Disable HDR behavior (DB-044/DB-045), including reboot/brief-blank caveats. No emulator/KVM locally.
+1. Device-retest **§11.39a** and **§13.44a** after DB-047. The first pass reproduced stale
+   post-Apply/external read-back and replacement-glyph sanitization; both now have regression tests.
+2. Investigate/retest **§5.14a step 12**: the owner observed two S.O.S. vibrations from a gesture.
+   Repository-wide Kotlin call-site coverage (`rg -n -i 'vibrat|sos|morse' app platform`) finds only
+   the shared `panicAndStop` call, and its per-service `panicInFlight` gate tests one buzz for repeat
+   admission. No second call was removed without an evidenced source.
+3. Device-verify the unavailable-feature hiding/no-write boundary from DB-041…DB-043 on hardware
+   that reports Night Light/AOD unavailable. OnePlus 13 reports Night Light available, so the first
+   pass could not exercise it.
+4. Complete experimental Disable HDR verification (DB-044/DB-045): record secure-setting read-back
+   and preservation after an unrelated Apply. The first pass saw no flicker/blanking and displayed
+   the custom/malformed preservation notice, but did not record those two state checks.
 
 Open questions and owed reviews: none.
 
@@ -91,6 +98,16 @@ branch protection and secret-scanning settings in DA-006/DA-041.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-15 — **Device-report fixes (DB-047).** Direct Privileged Display Apply now publishes a
+  post-write snapshot instead of letting stale pre-write read-back visually undo the toggle. Review
+  found that async startup still left the old snapshot mergeable while the draft advanced its Apply
+  epoch, and that an older refresh could republish OFF after invalidation. `applyNow` now invalidates
+  synchronously and request generations suppress superseded publications; controlled-dispatcher
+  tests hold the write pending and inject Apply during an older refresh read. Control diagnostics
+  remove control/bidi characters before their 40-character bound; the round script uses the debug
+  application/component and `name`
+  extra. Panic call-site audit found no gesture-local vibration in the surviving tree, so the
+  unexplained device-only double remains queued rather than receiving a speculative change.
 - 2026-08-15 — **Privileged Display capability safety + reviews (DB-041…DB-046).** Night Light and AOD now fail
   closed on their AOSP framework capability resources at the platform-controller boundary, so
   profile swaps, circadian ticks, direct Apply and panic cannot bypass the gate; unavailable UI is

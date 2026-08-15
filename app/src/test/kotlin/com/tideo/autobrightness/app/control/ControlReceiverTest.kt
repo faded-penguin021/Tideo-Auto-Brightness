@@ -153,13 +153,15 @@ class ControlReceiverTest {
     fun loadProfile_unknownName_isClampedAndStrippedBeforeDisplay() {
         // The caller picks this text and AabFlash may render it in the system-wide overlay.
         seed(AabSettings(debugLevel = DebugCategory.CONTEXT_AUTOMATION.level))
-        val hostile = "‮Enter your PIN‬" + "A".repeat(8_000)
+        val hostile = "‮Enter\n\u0000your PIN‬" + "A".repeat(8_000)
         val flashes = captureFlashes {
             runBlocking { receiver.route(application, ControlReceiver.ACTION_LOAD_PROFILE, hostile) }
         }
         val flash = flashes.single()
         assertTrue(flash.length < 200, "an 8 KB name must not reach the overlay verbatim")
         assertFalse(flash.contains('‮'), "bidi overrides must be stripped")
+        assertFalse(flash.contains('\n') || flash.contains('\u0000'), "ISO controls must be stripped")
+        assertFalse(flash.contains('�'), "stripped controls must not become replacement glyphs")
     }
 
     @Test
