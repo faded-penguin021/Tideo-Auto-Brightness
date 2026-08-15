@@ -41,7 +41,8 @@ data class PrivilegedDisplayUiState(
 
 /**
  * Privileged Display screen driver (D-149/D-152): grant card, tier, device facts.
- * [applyNow] writes directly when service is OFF; with it ON, Apply flows through coordinator.
+ * The screen's Apply enters at [applyDraft]: [applyNow] writes directly when the service is OFF;
+ * with it ON, Apply flows through the coordinator and only the read-back is invalidated (DB-048).
  */
 class DisplayTogglesViewModel @JvmOverloads constructor(
     application: Application,
@@ -120,6 +121,26 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             stayAwake = display.readStayAwakePlugged(),
             hdrForceSdr = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null,
         )
+    }
+
+    /**
+     * DB-048: the screen's Apply, both halves of D-152's split. With the service OFF this VM writes
+     * the device; with it ON the runtime coordinator does, later and with no completion signal to
+     * wait on. Either way the published snapshot describes the PRE-Apply device, so it must stop
+     * being mergeable before the draft epoch advances — otherwise DB-047's rollback simply moves to
+     * the service-ON path. The coordinator path re-reads on the next ON_RESUME, not here: a read
+     * scheduled now would race the coordinator's own write and republish the same stale truth.
+     */
+    fun applyDraft(settings: AabSettings, serviceEnabled: Boolean) {
+        if (serviceEnabled) invalidateDeviceSnapshot() else applyNow(settings)
+    }
+
+    /** DB-048: drop the snapshot and suppress any in-flight operation still holding an older one. */
+    private fun invalidateDeviceSnapshot() {
+        synchronized(deviceScheduleLock) {
+            deviceRequestGeneration++
+            _deviceSnapshot.value = null
+        }
     }
 
     /**

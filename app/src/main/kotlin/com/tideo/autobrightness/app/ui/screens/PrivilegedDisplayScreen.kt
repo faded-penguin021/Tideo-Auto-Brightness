@@ -109,8 +109,9 @@ fun PrivilegedDisplayScreen(
         draftDirty = dirty,
         onEditDraft = draftVm::edit,
         onApplyDraft = {
-            // D-152: service off → write directly; service on → reapply via coordinator.
-            if (!committed.serviceEnabled) vm.applyNow(draft.validate())
+            // D-152: service off → write directly; service on → reapply via coordinator. DB-048:
+            // both halves must invalidate the read-back before `apply` advances the epoch.
+            vm.applyDraft(draft.validate(), committed.serviceEnabled)
             draftVm.apply()
         },
         onDiscardDraft = draftVm::discard,

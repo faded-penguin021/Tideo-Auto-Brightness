@@ -280,25 +280,38 @@ class SecureDisplayControllerTest {
         Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "4, 2,1,3,3")
         assertEquals(true, modern.readHdrForceSdr())
 
-        listOf(Int.MIN_VALUE, -1, 2).forEach { malformedFlag ->
-            if (malformedFlag == Int.MIN_VALUE) {
-                Settings.Global.putString(
-                    context.contentResolver,
-                    "are_user_disabled_hdr_formats_allowed",
-                    null,
-                )
-            } else {
-                Settings.Global.putInt(
-                    context.contentResolver,
-                    "are_user_disabled_hdr_formats_allowed",
-                    malformedFlag,
-                )
-            }
+        listOf(-1, 2).forEach { malformedFlag ->
+            Settings.Global.putInt(
+                context.contentResolver,
+                "are_user_disabled_hdr_formats_allowed",
+                malformedFlag,
+            )
             Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "")
             assertNull(modern.readHdrForceSdr())
             Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "1,2,3,4")
             assertNull(modern.readHdrForceSdr())
         }
+    }
+
+    @Test
+    fun hdr_read_treatsAnUntouchedDeviceAsCanonicalOff_notACustomPreference() {
+        // DB-049: the rows do not exist until something writes them, which is the state of every
+        // stock Android 14+ device. Reading absent as unrepresentable hid the owner-retained
+        // control (DB-044) behind a notice claiming a custom preference the device does not have.
+        // The absent flag has a defined AOSP default (1 = user-disabled formats allowed), and an
+        // absent format list disables nothing, so the pair is HDR-not-disabled, not unknown.
+        val resolver = context.contentResolver
+        Settings.Global.putString(resolver, "are_user_disabled_hdr_formats_allowed", null)
+        Settings.Global.putString(resolver, "user_disabled_hdr_formats", null)
+        val modern = AndroidSecureDisplayController(
+            context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        )
+
+        assertEquals(false, modern.readHdrForceSdr())
+
+        // An absent flag still refuses to guess once a real disable list exists.
+        Settings.Global.putString(resolver, "user_disabled_hdr_formats", "1,2,3,4")
+        assertNull(modern.readHdrForceSdr())
     }
 
     @Test

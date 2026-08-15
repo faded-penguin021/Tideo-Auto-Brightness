@@ -24,25 +24,32 @@ class DisplayTogglesCoordinatorTest {
         override var nightLightAvailable = true
         override var alwaysOnDisplayAvailable = true
         val writes = mutableListOf<String>()
+        // DB-048: what the coordinator ASKED for, recorded before the capability gate. Without it a
+        // gated assertion only re-reads this fake's own `if`, and would still pass if the coordinator
+        // stopped calling the controller at all. The production gate is pinned in
+        // SecureDisplayControllerTest; this fake only stands in for it.
+        val attempts = mutableListOf<String>()
         private fun write(entry: String): Result<Unit> {
             writes += entry
             return Result.success(Unit)
         }
 
+        private fun gated(entry: String, available: Boolean): Result<Unit> {
+            attempts += entry
+            return if (available) write(entry) else Result.success(Unit)
+        }
+
         override fun readNightLight() = false
-        override fun setNightLight(on: Boolean) =
-            if (nightLightAvailable) write("nightLight=$on") else Result.success(Unit)
+        override fun setNightLight(on: Boolean) = gated("nightLight=$on", nightLightAvailable)
         override fun readNightLightTemperature(): Int? = null
-        override fun setNightLightTemperature(kelvin: Int) =
-            if (nightLightAvailable) write("temp=$kelvin") else Result.success(Unit)
+        override fun setNightLightTemperature(kelvin: Int) = gated("temp=$kelvin", nightLightAvailable)
         override fun readNightLightAutoMode() = NightLightAutoMode.MANUAL
         override fun readDaltonizer() = DaltonizerMode.OFF
         override fun setDaltonizer(mode: DaltonizerMode) = write("daltonizer=$mode")
         override fun readInversion() = false
         override fun setInversion(on: Boolean) = write("inversion=$on")
         override fun readAlwaysOnDisplay() = false
-        override fun setAlwaysOnDisplay(on: Boolean) =
-            if (alwaysOnDisplayAvailable) write("aod=$on") else Result.success(Unit)
+        override fun setAlwaysOnDisplay(on: Boolean) = gated("aod=$on", alwaysOnDisplayAvailable)
         override fun readStayAwakePlugged() = false
         override fun setStayAwakePlugged(on: Boolean) = write("stayAwake=$on")
         override var hdrForceSdrAvailable = true
@@ -222,6 +229,13 @@ class DisplayTogglesCoordinatorTest {
             assertTrue(
                 h.display.writes.none { it.startsWith("nightLight=") || it.startsWith("temp=") || it.startsWith("aod=") },
                 "capability-gated features must never reach a write: ${h.display.writes}",
+            )
+            // DB-048: and the suppression must be the CONTROLLER's, not a coordinator-local skip —
+            // otherwise this passes just as well on a build where the gate has been deleted.
+            assertTrue(
+                h.display.attempts.any { it.startsWith("nightLight=") } &&
+                    h.display.attempts.any { it.startsWith("aod=") },
+                "every path must still route through the gated setters: ${h.display.attempts}",
             )
         }
 

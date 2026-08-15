@@ -117,6 +117,59 @@ class DisplayTogglesViewModelTest {
         assertEquals(-999, Settings.Secure.getInt(resolver, "night_display_color_temperature", -999))
     }
 
+    // DB-048: the read-back rollback DB-047 fixed had a second half. With the service RUNNING the
+    // screen skips applyNow (the coordinator writes instead), so nothing invalidated the pre-Apply
+    // snapshot and the merge gate — reopened by Apply making draft == committed again — replayed it
+    // over the just-applied draft. Both halves of the D-152 split go through applyDraft now.
+    @Test
+    fun applyDraft_withTheServiceRunning_invalidatesTheStaleSnapshotAndLeavesTheWriteToTheCoordinator() {
+        grantElevated()
+        val vm = vm()
+        assertEquals(false, assertNotNull(vm.deviceSnapshot.value).nightLight)
+
+        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = true)
+
+        assertNull(
+            vm.deviceSnapshot.value,
+            "the pre-Apply OFF snapshot must stop being mergeable before the draft epoch advances",
+        )
+        assertEquals(
+            -999,
+            Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999),
+            "with the service running the coordinator owns the write, not this VM",
+        )
+    }
+
+    @Test
+    fun applyDraft_withTheServiceStopped_stillWritesTheDeviceDirectly() {
+        // The other half of the same branch: D-152's direct path must not be lost to the fix above.
+        grantElevated()
+        val vm = vm()
+
+        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = false)
+
+        assertEquals(1, Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999))
+        assertEquals(true, assertNotNull(vm.deviceSnapshot.value).nightLight)
+    }
+
+    @Test
+    fun applyDraft_withTheServiceRunning_suppressesAnOlderRefreshStillInFlight() {
+        grantElevated()
+        val controlledIo = StandardTestDispatcher(dispatcher.scheduler)
+        val vm = vm(io = controlledIo)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertNotNull(vm.deviceSnapshot.value)
+
+        vm.refresh() // reads the pre-Apply device, still pending on the controlled dispatcher
+        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = true)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(
+            vm.deviceSnapshot.value,
+            "a refresh scheduled before Apply must not republish the state Apply invalidated",
+        )
+    }
+
     @Test
     fun applyNow_invalidatesTheOldSnapshotBeforeItsAsyncWriteCanRun() {
         grantElevated()

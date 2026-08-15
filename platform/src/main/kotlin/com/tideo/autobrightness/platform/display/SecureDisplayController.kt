@@ -156,7 +156,8 @@ class AndroidSecureDisplayController(
 
     override fun readHdrForceSdr(): Boolean? {
         if (!hdrForceSdrAvailable) return null
-        val allowed = Settings.Global.getInt(resolver, KEY_HDR_FORMATS_ALLOWED, Int.MIN_VALUE)
+        // DB-049: absent is the AOSP default (1 = user-disabled formats allowed), not a custom row.
+        val allowed = Settings.Global.getInt(resolver, KEY_HDR_FORMATS_ALLOWED, HDR_FORMATS_ALLOWED_DEFAULT)
         val formats = Settings.Global.getString(resolver, KEY_HDR_DISABLED_FORMATS).orEmpty()
         if (allowed == 1 && formats.isBlank()) return false
         val parsed = formats.split(',').map { it.trim() }
@@ -196,6 +197,7 @@ class AndroidSecureDisplayController(
 
         const val KEY_HDR_DISABLED_FORMATS = "user_disabled_hdr_formats"
         const val KEY_HDR_FORMATS_ALLOWED = "are_user_disabled_hdr_formats_allowed"
+        const val HDR_FORMATS_ALLOWED_DEFAULT = 1
         const val ALL_HDR_FORMATS = "1,2,3,4"
         val ALL_HDR_FORMAT_SET = ALL_HDR_FORMATS.split(',').toSet()
     }

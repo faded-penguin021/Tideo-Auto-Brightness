@@ -65,6 +65,8 @@ ledger: `LEDGER_B.md`.
 
 1. Device-retest **§11.39a** and **§13.44a** after DB-047. The first pass reproduced stale
    post-Apply/external read-back and replacement-glyph sanitization; both now have regression tests.
+   Include the new **§11.39a step 8a**: DB-048 found DB-047's fix covered only the service-OFF Apply
+   path, so retest Apply with the service **running** as well as stopped.
 2. Investigate/retest **§5.14a step 12**: the owner observed two S.O.S. vibrations from a gesture.
    Repository-wide Kotlin call-site coverage (`rg -n -i 'vibrat|sos|morse' app platform`) finds only
    the shared `panicAndStop` call, and its per-service `panicInFlight` gate tests one buzz for repeat
@@ -74,7 +76,10 @@ ledger: `LEDGER_B.md`.
    pass could not exercise it.
 4. Complete experimental Disable HDR verification (DB-044/DB-045): record secure-setting read-back
    and preservation after an unrelated Apply. The first pass saw no flicker/blanking and displayed
-   the custom/malformed preservation notice, but did not record those two state checks.
+   the custom/malformed preservation notice, but did not record those two state checks. Add
+   **§11.32 step 4a** (DB-049): with both Global rows deleted the **switch** must appear, not the
+   preservation notice — the owner's device may already carry rows an older Tideo wrote, so clear
+   them first or the stock-device case goes untested. Both rows are `global`, not `secure`.
 
 Open questions and owed reviews: none.
 
@@ -98,6 +103,15 @@ branch protection and secret-scanning settings in DA-006/DA-041.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-15 — **Pre-merge review of the v1.9.0 train (DB-048/DB-049).** DB-047's read-back
+  invalidation only covered D-152's service-OFF Apply, so the same rollback survived on the
+  coordinator path; both halves now run through `applyDraft`. The HDR classifier read an absent
+  Global row as an unrepresentable custom preference, hiding the owner-retained Disable HDR control
+  behind a preservation notice on any device that had never written one — absent now reads as
+  AOSP's default. Also: a capability test whose fake supplied the gate it asserted, and three
+  device-script defects (the AOD gate named the Night Light resource, the HDR step wrote the
+  `secure` table the app never reads, and `screen_map` still described the `dirty` gate DB-039
+  removed).
 - 2026-08-15 — **Device-report fixes (DB-047).** Direct Privileged Display Apply now publishes a
   post-write snapshot instead of letting stale pre-write read-back visually undo the toggle. Review
   found that async startup still left the old snapshot mergeable while the draft advanced its Apply

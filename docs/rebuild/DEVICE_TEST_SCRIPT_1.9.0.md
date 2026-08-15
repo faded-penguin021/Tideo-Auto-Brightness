@@ -1,4 +1,4 @@
-# DEVICE_TEST_SCRIPT_1.9.0 — round script for the v1.9.0 train (DB-034…DB-046)
+# DEVICE_TEST_SCRIPT_1.9.0 — round script for the v1.9.0 train (DB-034…DB-049)
 
 **Ephemeral (D-155/DB-010).** Covers only what THIS unreleased train changed — not the full app.
 Numbered to match the corresponding step in the standing `DEVICE_TEST_SCRIPT.md` so results fold
@@ -14,8 +14,8 @@ On a device (or OEM build) where the framework reports the feature unavailable:
 
 1. Open **Menu → Privileged → Privileged Display**. **Expected:** the **Night Light** row is
    hidden entirely if `config_nightDisplayAvailable` is false; the **Always-on display** row is
-   hidden if `config_nightDisplayAvailable` is false OR `config_dozeComponent` is empty (AOD
-   requires both — DB-043's conjunction, not just the headline flag).
+   hidden if `config_dozeAlwaysOnDisplayAvailable` is false OR `config_dozeComponent` is empty
+   (AOD requires both — DB-043's conjunction, not just the headline flag).
 2. With a profile/context rule that *would* carry Night Light or AOD, trigger a profile swap,
    a circadian tick, direct Apply, and panic in turn. **Expected:** every path is a harmless
    no-op on the unsupported field — no write, no crash, no stale UI claiming an unsupported
@@ -27,16 +27,24 @@ On a device (or OEM build) where the framework reports the feature unavailable:
 ## §11.32 — Disable HDR (experimental, Android 14+) (DB-044/DB-045)
 
 4. **Menu → Privileged → Privileged Display → Disable HDR (experimental)** on. **Expected:**
-   read back `user_disabled_hdr_formats=1,2,3,4` and
-   `are_user_disabled_hdr_formats_allowed=0`. Off: `allowed` returns `1`, formats clears.
-   **Expected:** this is a stored-preference write, not Force-SDR — either direction may require
-   a reboot, and an HDR/display-mode transition may briefly blank the screen. Confirm both
-   caveats are visible to you as a real (if brief) UX event, not just documented.
-5. Externally set a **partial/malformed** `user_disabled_hdr_formats` row (e.g. `adb shell
-   settings put secure user_disabled_hdr_formats 2,3` with the allowed flag `1`), then open
-   Privileged Display. **Expected:** the switch is replaced by a custom-preference preservation
-   notice (not a Boolean guess) — and applying an unrelated field on this screen leaves that row
-   untouched rather than broadening it to the full disabled set.
+   `adb shell settings get global user_disabled_hdr_formats` → `1,2,3,4` and
+   `adb shell settings get global are_user_disabled_hdr_formats_allowed` → `0`. Off: `allowed`
+   returns `1`, formats clears. **Expected:** this is a stored-preference write, not Force-SDR —
+   either direction may require a reboot, and an HDR/display-mode transition may briefly blank
+   the screen. Confirm both caveats are visible to you as a real (if brief) UX event, not just
+   documented. Both rows live in the **global** table; `settings put secure` writes a different
+   table the app never reads, so a `secure` typo here silently tests nothing (DB-049).
+4a. **A device that has never had an HDR preference (DB-049).** Clear both rows
+   (`adb shell settings delete global user_disabled_hdr_formats` and
+   `adb shell settings delete global are_user_disabled_hdr_formats_allowed`), then reopen the
+   screen. **Expected:** the **switch** is shown, off — an untouched device is canonical off, not
+   a custom preference. Seeing the preservation notice here is the DB-049 regression.
+5. Externally set a **partial/malformed** row (`adb shell settings put global
+   user_disabled_hdr_formats 2,3` and `adb shell settings put global
+   are_user_disabled_hdr_formats_allowed 1`), then open Privileged Display. **Expected:** the
+   switch is replaced by a custom-preference preservation notice (not a Boolean guess) — and
+   applying an unrelated field on this screen leaves that row untouched rather than broadening it
+   to the full disabled set.
 
 ## §11.39a — Read-back tracks the device, not the stored profile (DB-034/DB-039)
 
@@ -47,6 +55,12 @@ On a device (or OEM build) where the framework reports the feature unavailable:
    **second** time — before DB-039 this worked exactly once per screen entry.
 8. Change a toggle WITHOUT applying, background the app, return. **Expected:** your uncommitted
    edit survives — read-back never overwrites a dirty draft.
+8a. **Apply does not undo itself, with the service RUNNING (DB-048).** Turn the service ON, open
+   Privileged Display, flip Night Light (or inversion) and **Apply**. **Expected:** the toggle
+   stays where you put it and the Apply bar goes away. A toggle that flips back a moment later —
+   and Apply becoming available again — is DB-047's rollback on the coordinator path: with the
+   service on the screen does not write the device itself, so nothing used to invalidate the
+   pre-Apply read-back. Repeat with the service OFF (the direct-write path) to cover both halves.
 
 ## §13.44a — Dropped commands explain themselves (DB-035)
 

@@ -639,3 +639,21 @@
   showed that overlay bounding worked but stripping did not: `forFlash` substituted U+FFFD and
   truncated before sanitizing. It now removes controls/bidi before the 40-character bound.
   `[cited]`: `DisplayTogglesViewModel.applyNow`, `ControlReceiver.forFlash`.
+
+- DB-048 [cited]: **Fixing one caller of a shared staleness bug leaves the other caller broken.**
+  DB-047 stopped the pre-Apply snapshot rolling the draft back, but only on D-152's service-OFF
+  path: invalidation lived inside `applyNow`, which the screen skips while the service runs. The
+  coordinator path kept publishing the pre-Apply read-back, and Apply reopened the merge gate by
+  making the draft equal the profile again, so the toggle flipped back as first reported. Both
+  halves now go through `applyDraft`; the coordinator path re-reads on resume, since a read
+  scheduled now would race its write. The capability test hid the same shape: its fake owned the
+  gate it asserted. `[cited]`: `DisplayTogglesViewModel.applyDraft`.
+
+- DB-049 [cited]: **An absent row is a defined default, not a custom preference to preserve.**
+  DB-045 classified every non-canonical HDR row as unrepresentable and DB-046 confirmed absent rows
+  land there, seeding the fixture rather than asking what absent means. But the Global rows do not
+  exist until something writes them — every stock Android 14+ device — so the control the owner
+  retained in DB-044 was hidden behind a notice claiming a custom preference the device did not
+  have, and only devices an older Tideo had written showed the switch. The flag now reads with
+  AOSP's documented default of 1; a real disable list still refuses to guess.
+  `[cited]`: `AndroidSecureDisplayController.readHdrForceSdr`.
