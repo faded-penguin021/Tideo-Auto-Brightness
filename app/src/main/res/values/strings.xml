@@ -655,7 +655,7 @@
     <string name="pd_hdr_help">Directly changes Android’s stored HDR-format preferences system-wide; it does not use the HDR conversion Force-SDR service API. Applying or clearing the change may require a reboot, and HDR or display-mode changes may briefly blank the screen.</string>
     <string name="pd_hdr_custom_preserved">Android contains a custom HDR-format preference that this on/off control cannot represent. Tideo will preserve it; change it in system settings.</string>
     <string name="pd_info_title">About these settings</string>
-    <string name="pd_info_body">These toggles write the standard AOSP settings keys directly — the same keys the system Settings app uses. On heavily skinned devices a key may be ignored or relocated; if a toggle does nothing there, that feature isn\'t controllable on this device. Changes stick like system-settings changes: they stay until changed again.</string>
+    <string name="pd_info_body">A Settings key alone does not prove a display feature is supported. Night Light and always-on display appear only when Android reports their framework capabilities. The remaining controls write stored system preferences directly; OEM behavior can vary, and experimental HDR changes may require a reboot. Changes remain until changed again.</string>
     <!-- Privileged Display profile fields (D-151/D-152, replaces the D-150 Schedules section). -->
     <string name="pd_profile_intro">Saved with your brightness profile — profiles and Contexts rules apply these too.</string>
     <string name="pd_profile_temp_clear">Use device temperature</string>
