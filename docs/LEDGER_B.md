@@ -634,7 +634,8 @@
 - DB-047 [cited]: **After a direct write, stale read-back is an active rollback of visible state.**
   Night Light wrote ON, then Compose immediately showed OFF: `applyNow` retained its pre-write
   snapshot, and Apply reopened the merge gate so stale OFF replaced the committed ON draft. Direct
-  Apply now reads and publishes device truth while still holding the lock. The same device pass
+  Apply now invalidates synchronously before its coroutine can yield; ordered operations plus
+  request generations stop older completions republishing stale truth. The same device pass
   showed that overlay bounding worked but stripping did not: `forFlash` substituted U+FFFD and
   truncated before sanitizing. It now removes controls/bidi before the 40-character bound.
   `[cited]`: `DisplayTogglesViewModel.applyNow`, `ControlReceiver.forFlash`.

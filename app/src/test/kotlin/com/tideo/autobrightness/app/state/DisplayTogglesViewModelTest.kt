@@ -7,10 +7,13 @@ import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
+import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -54,6 +57,7 @@ class DisplayTogglesViewModelTest {
     private fun vm(
         nightLightAvailable: Boolean = true,
         alwaysOnDisplayAvailable: Boolean = true,
+        io: CoroutineDispatcher = dispatcher,
     ): DisplayTogglesViewModel {
         val privileges = AndroidPrivilegeManager(app)
         return DisplayTogglesViewModel(
@@ -64,7 +68,7 @@ class DisplayTogglesViewModelTest {
                 nightLightAvailable = nightLightAvailable,
                 alwaysOnDisplayAvailable = alwaysOnDisplayAvailable,
             ),
-            io = dispatcher,
+            io = io,
         )
     }
 
@@ -111,6 +115,71 @@ class DisplayTogglesViewModelTest {
         assertEquals(true, assertNotNull(vm.deviceSnapshot.value).nightLight)
         // null temperature = "device default": the key must stay unset.
         assertEquals(-999, Settings.Secure.getInt(resolver, "night_display_color_temperature", -999))
+    }
+
+    @Test
+    fun applyNow_invalidatesTheOldSnapshotBeforeItsAsyncWriteCanRun() {
+        grantElevated()
+        val controlledIo = StandardTestDispatcher(dispatcher.scheduler)
+        val vm = vm(io = controlledIo)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(false, assertNotNull(vm.deviceSnapshot.value).nightLight)
+
+        vm.applyNow(AabSettings(nightLightEnabled = true))
+
+        assertNull(vm.deviceSnapshot.value, "the old OFF snapshot must be invalid before Apply advances the draft epoch")
+        assertEquals(
+            -999,
+            Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999),
+            "the controlled dispatcher must keep the device write pending",
+        )
+
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(true, assertNotNull(vm.deviceSnapshot.value).nightLight)
+    }
+
+    @Test
+    fun applyNow_suppressesAnOlderRefreshCompletionBeforeThePendingWrite() {
+        grantElevated()
+        val controlledIo = StandardTestDispatcher(dispatcher.scheduler)
+        val privileges = AndroidPrivilegeManager(app)
+        val realDisplay = AndroidSecureDisplayController(
+            app,
+            privileges,
+            nightLightAvailable = true,
+            alwaysOnDisplayAvailable = true,
+        )
+        var onAutoModeRead: (() -> Unit)? = null
+        var beforeNightLightWrite: (() -> Unit)? = null
+        val display = object : SecureDisplayController by realDisplay {
+            override fun readNightLightAutoMode(): NightLightAutoMode = realDisplay.readNightLightAutoMode().also {
+                onAutoModeRead?.invoke()
+            }
+
+            override fun setNightLight(on: Boolean): Result<Unit> {
+                beforeNightLightWrite?.invoke()
+                return realDisplay.setNightLight(on)
+            }
+        }
+        val vm = DisplayTogglesViewModel(app, privileges, display, controlledIo)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(false, assertNotNull(vm.deviceSnapshot.value).nightLight)
+
+        onAutoModeRead = {
+            onAutoModeRead = null
+            vm.applyNow(AabSettings(nightLightEnabled = true))
+        }
+        beforeNightLightWrite = {
+            assertNull(
+                vm.deviceSnapshot.value,
+                "the superseded refresh must not republish OFF after Apply invalidates it",
+            )
+        }
+
+        vm.refresh()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(true, assertNotNull(vm.deviceSnapshot.value).nightLight)
     }
 
     @Test

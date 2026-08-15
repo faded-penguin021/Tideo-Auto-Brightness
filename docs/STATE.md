@@ -99,11 +99,15 @@ branch protection and secret-scanning settings in DA-006/DA-041.
 Newest first; ledger rows are the durable detail.
 
 - 2026-08-15 — **Device-report fixes (DB-047).** Direct Privileged Display Apply now publishes a
-  post-write snapshot instead of letting stale pre-write read-back visually undo the toggle; control
-  diagnostics remove control/bidi characters before their 40-character bound; the round script uses
-  the debug application/component and `name` extra. Panic call-site audit found no gesture-local
-  vibration in the surviving tree, so the unexplained device-only double remains queued rather than
-  receiving a speculative change.
+  post-write snapshot instead of letting stale pre-write read-back visually undo the toggle. Review
+  found that async startup still left the old snapshot mergeable while the draft advanced its Apply
+  epoch, and that an older refresh could republish OFF after invalidation. `applyNow` now invalidates
+  synchronously and request generations suppress superseded publications; controlled-dispatcher
+  tests hold the write pending and inject Apply during an older refresh read. Control diagnostics
+  remove control/bidi characters before their 40-character bound; the round script uses the debug
+  application/component and `name`
+  extra. Panic call-site audit found no gesture-local vibration in the surviving tree, so the
+  unexplained device-only double remains queued rather than receiving a speculative change.
 - 2026-08-15 — **Privileged Display capability safety + reviews (DB-041…DB-046).** Night Light and AOD now fail
   closed on their AOSP framework capability resources at the platform-controller boundary, so
   profile swaps, circadian ticks, direct Apply and panic cannot bypass the gate; unavailable UI is
