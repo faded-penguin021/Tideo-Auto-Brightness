@@ -32,7 +32,9 @@ class PrivilegedDisplayScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private val elevated = PrivilegedDisplayUiState(tier = Tier.ELEVATED)
+    private val elevated = PrivilegedDisplayUiState(
+        tier = Tier.ELEVATED, nightLightAvailable = true, alwaysOnDisplayAvailable = true,
+    )
 
     private fun setDraftContent(
         state: PrivilegedDisplayUiState = elevated,
@@ -107,6 +109,18 @@ class PrivilegedDisplayScreenTest {
     fun elevated_hdrSection_hiddenWhenUnavailable() {
         setDraftContent(state = elevated.copy(hdrAvailable = false))
         compose.onNodeWithTag("switch_hdrForceSdr").assertDoesNotExist()
+    }
+
+    @Test
+    fun elevated_unsupportedNightLightAndAodControlsAreHidden() {
+        setDraftContent(
+            state = elevated.copy(nightLightAvailable = false, alwaysOnDisplayAvailable = false),
+        )
+        compose.onNodeWithTag("switch_nightLight").assertDoesNotExist()
+        compose.onNodeWithTag("slider_nightLightTemp").assertDoesNotExist()
+        compose.onNodeWithTag("switch_nightLightCircadian").assertDoesNotExist()
+        compose.onNodeWithTag("switch_alwaysOn").assertDoesNotExist()
+        compose.onNodeWithTag("switch_stayAwake").assertExists()
     }
 
     @Test

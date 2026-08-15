@@ -359,7 +359,7 @@
     <string name="onboarding_done">Done</string>
     <string name="onboarding_skip">Skip for now</string>
     <string name="onboarding_restricted_body">Installed outside the Play Store, Android may block the \"Modify system settings\" toggle below (and \"Usage access\", for per-app rules) — it looks greyed out or shows \"Restricted setting\". Tap it anyway; that usually shows the unlock prompt. If not, open App info → ⋮ menu → \"Allow restricted settings\", then return here.</string>
-    <string name="onboarding_elevated_body">Allows Tideo to change secure display settings used by super dimming and optional profile display toggles (Night Light, color correction/inversion, always-on display, stay-awake while charging, and force-SDR). Choose any one channel for the one-time WRITE_SECURE_SETTINGS grant; revoke it later with ADB or by uninstalling.</string>
+    <string name="onboarding_elevated_body">Allows Tideo to change secure display settings used by super dimming and supported profile display toggles (Night Light, color correction/inversion, always-on display, and stay-awake while charging). Choose any one channel for the one-time WRITE_SECURE_SETTINGS grant; revoke it later with ADB or by uninstalling.</string>
     <string name="onboarding_shizuku_prompt">Shizuku is installed but not running — start the Shizuku app, then return here.</string>
     <string name="onboarding_restricted_title">Heads up: restricted settings</string>
     <string name="onboarding_open_app_info">Open App info</string>

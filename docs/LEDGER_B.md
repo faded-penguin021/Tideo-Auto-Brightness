@@ -585,3 +585,11 @@
   it too, so the gate stood open on empty state and a merge could overwrite the profile. Fixed by
   scoping equality to the owned fields, making read-and-write one `update`, and refusing before the
   seed. `[cited]`: `mergeDeviceReadBack`.
+
+- DB-041 [cited]: **A backing Android Settings key does not establish feature support.** A real
+  black-screen failure followed a Night Display write on an OEM whose framework reports it
+  unavailable. The controller now fails closed on `config_nightDisplayAvailable` and
+  `config_dozeAlwaysOnDisplayAvailable`; unsupported writes are harmless no-ops across profiles,
+  circadian ticks, Apply and panic, and UI controls hide. Force SDR is disabled: AOSP
+  `DisplayManagerService` updates in-memory state/logical displays inside its binder methods but
+  does not observe these Global rows, so direct Settings writes cannot establish a live effect.

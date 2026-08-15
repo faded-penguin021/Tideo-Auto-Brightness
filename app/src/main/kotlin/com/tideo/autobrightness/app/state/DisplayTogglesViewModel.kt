@@ -28,6 +28,8 @@ import kotlinx.coroutines.sync.withLock
 data class PrivilegedDisplayUiState(
     val tier: Tier = Tier.NONE,
     val nightLightAutoMode: NightLightAutoMode = NightLightAutoMode.MANUAL,
+    val nightLightAvailable: Boolean = false,
+    val alwaysOnDisplayAvailable: Boolean = false,
     val hdrAvailable: Boolean = false,
     val adbCommand: String = "",
     val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
@@ -52,6 +54,8 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             tier = privilegeManager.currentTier(),
             adbCommand = privilegeManager.adbGrantInstruction(),
             shizukuAvailability = privilegeManager.shizukuAvailability(),
+            nightLightAvailable = display.nightLightAvailable,
+            alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
         ),
     )
     val state: StateFlow<PrivilegedDisplayUiState> = _state.asStateFlow()
@@ -82,6 +86,8 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                 _state.update {
                     it.copy(
                         nightLightAutoMode = display.readNightLightAutoMode(),
+                        nightLightAvailable = display.nightLightAvailable,
+                        alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
                         hdrAvailable = display.hdrForceSdrAvailable,
                         writeFailed = false,
                     )

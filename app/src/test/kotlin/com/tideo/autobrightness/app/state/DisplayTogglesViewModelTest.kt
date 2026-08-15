@@ -6,6 +6,8 @@ import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
+import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
+import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,7 +51,22 @@ class DisplayTogglesViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun vm() = DisplayTogglesViewModel(app, io = dispatcher)
+    private fun vm(
+        nightLightAvailable: Boolean = true,
+        alwaysOnDisplayAvailable: Boolean = true,
+    ): DisplayTogglesViewModel {
+        val privileges = AndroidPrivilegeManager(app)
+        return DisplayTogglesViewModel(
+            app,
+            privilegeManager = privileges,
+            display = AndroidSecureDisplayController(
+                app, privileges,
+                nightLightAvailable = nightLightAvailable,
+                alwaysOnDisplayAvailable = alwaysOnDisplayAvailable,
+            ),
+            io = dispatcher,
+        )
+    }
 
     private fun grantElevated() {
         Shadows.shadowOf(app).grantPermissions(Manifest.permission.WRITE_SECURE_SETTINGS)
@@ -93,6 +110,27 @@ class DisplayTogglesViewModelTest {
         assertEquals(1, Settings.Secure.getInt(resolver, "doze_always_on", -999))
         // null temperature = "device default": the key must stay unset.
         assertEquals(-999, Settings.Secure.getInt(resolver, "night_display_color_temperature", -999))
+    }
+
+    @Test
+    fun directApply_cannotBypassNightLightOrAodCapabilities() {
+        grantElevated()
+        val vm = vm(nightLightAvailable = false, alwaysOnDisplayAvailable = false)
+
+        vm.applyNow(
+            AabSettings(
+                nightLightEnabled = true,
+                nightLightTemperature = 2_700,
+                alwaysOnDisplayEnabled = true,
+            ),
+        )
+
+        assertFalse(vm.state.value.writeFailed)
+        assertFalse(vm.state.value.nightLightAvailable)
+        assertFalse(vm.state.value.alwaysOnDisplayAvailable)
+        assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999))
+        assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_color_temperature", -999))
+        assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "doze_always_on", -999))
     }
 
     @Test
