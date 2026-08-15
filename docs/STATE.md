@@ -67,7 +67,7 @@ ledger: `LEDGER_B.md`.
    **§13.44a** (control drop reasons, DB-035), and **§5.14a** (panic vibration, DB-037). No
    emulator/KVM is available locally.
 2. Device-verify supported Night Light/AOD behavior and the unavailable-feature hiding/no-write
-   safety boundary from DB-041/DB-042. Confirm Force SDR remains absent. No emulator/KVM locally.
+   safety boundary from DB-041…DB-043. Confirm Force SDR remains absent. No emulator/KVM locally.
 
 Open questions and owed reviews: none.
 
@@ -91,11 +91,13 @@ branch protection and secret-scanning settings in DA-006/DA-041.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-08-15 — **Privileged Display capability safety + adversarial review (DB-041/DB-042).** Night Light and AOD now fail
+- 2026-08-15 — **Privileged Display capability safety + reviews (DB-041…DB-043).** Night Light and AOD now fail
   closed on their AOSP framework capability resources at the platform-controller boundary, so
   profile swaps, circadian ticks, direct Apply and panic cannot bypass the gate; unavailable UI is
   hidden. Review restored authorization-before-capability result semantics and made unavailable
-  read-back fields nullable so hidden profile values survive unrelated Apply operations. Force SDR is disabled after the AOSP audit showed direct Global writes do not execute
+  read-back fields nullable so hidden profile values survive unrelated Apply operations. External
+  review added AOD's required ambient-display component gate, lookup truth-table tests, and corrected
+  the evidence boundary: the failure after a direct write is known; the affected OEM flag is not. Force SDR is disabled after the AOSP audit showed direct Global writes do not execute
   DisplayManagerService's live-state update path.
 - 2026-08-13..14 — **Read-back, diagnostics, panic and supply-chain train (DB-034…DB-040).** Device
   read-back now survives repeat changes, Discard, rotation and concurrent collector updates;

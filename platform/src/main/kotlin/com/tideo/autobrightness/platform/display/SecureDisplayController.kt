@@ -69,12 +69,8 @@ enum class DaltonizerMode(val value: Int) {
 class AndroidSecureDisplayController(
     private val context: Context,
     private val privilegeManager: PrivilegeManager,
-    override val nightLightAvailable: Boolean = context.frameworkBoolean(
-        "config_nightDisplayAvailable",
-    ),
-    override val alwaysOnDisplayAvailable: Boolean = context.frameworkBoolean(
-        "config_dozeAlwaysOnDisplayAvailable",
-    ),
+    override val nightLightAvailable: Boolean = context.frameworkDisplayCapabilities().nightLightAvailable,
+    override val alwaysOnDisplayAvailable: Boolean = context.frameworkDisplayCapabilities().alwaysOnDisplayAvailable,
 ) : SecureDisplayController {
     // DB-041: backing rows do not establish display-feature support or a live service update path.
     private val resolver: ContentResolver get() = context.contentResolver
@@ -178,7 +174,50 @@ class AndroidSecureDisplayController(
         elevatedWrite { if (available) write() }
 }
 
-private fun Context.frameworkBoolean(name: String): Boolean = runCatching {
-    val id = resources.getIdentifier(name, "bool", "android")
-    id != 0 && resources.getBoolean(id)
+private fun Context.frameworkBoolean(name: String): Boolean = frameworkBoolean(
+    name = name,
+    identifier = resources::getIdentifier,
+    read = resources::getBoolean,
+)
+
+private fun Context.frameworkString(name: String): String = frameworkString(
+    name = name,
+    identifier = resources::getIdentifier,
+    read = resources::getString,
+)
+
+internal fun frameworkBoolean(
+    name: String,
+    identifier: (String, String, String) -> Int,
+    read: (Int) -> Boolean,
+): Boolean = runCatching {
+    val id = identifier(name, "bool", "android")
+    id != 0 && read(id)
 }.getOrDefault(false)
+
+internal fun frameworkString(
+    name: String,
+    identifier: (String, String, String) -> Int,
+    read: (Int) -> String,
+): String = runCatching {
+    val id = identifier(name, "string", "android")
+    if (id == 0) "" else read(id)
+}.getOrDefault("")
+
+internal data class FrameworkDisplayCapabilities(
+    val nightLightAvailable: Boolean,
+    val alwaysOnDisplayAvailable: Boolean,
+)
+
+internal fun Context.frameworkDisplayCapabilities(): FrameworkDisplayCapabilities =
+    frameworkDisplayCapabilities(::frameworkBoolean, ::frameworkString)
+
+internal fun frameworkDisplayCapabilities(
+    booleanResource: (String) -> Boolean,
+    stringResource: (String) -> String,
+): FrameworkDisplayCapabilities = FrameworkDisplayCapabilities(
+    nightLightAvailable = booleanResource("config_nightDisplayAvailable"),
+    // DB-043: AOD requires both its feature flag and the ambient-display service.
+    alwaysOnDisplayAvailable = booleanResource("config_dozeAlwaysOnDisplayAvailable") &&
+        stringResource("config_dozeComponent").isNotEmpty(),
+)

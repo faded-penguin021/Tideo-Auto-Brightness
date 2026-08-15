@@ -43,7 +43,7 @@ decision logic are golden-tested against a transcription of the original Tasker 
 - **Context automation** can automatically load profiles based on: foreground app, time window, location,
   charging state, Wi-Fi SSID, or day of week, with priority-based conflict resolution.
 - **Live Debug scene**: a glass-box that shows relevant inputs and outputs.
-- **Emergency recovery**, a safety feature for when the screen is too dark, flip the phone upside-down and shake to force brightness to maximum. It also resets all privileged display toggles (grayscale, inversion, Night Light, …) to their defaults.
+- **Emergency recovery**, a safety feature for when the screen is too dark, flip the phone upside-down and shake to force brightness to maximum. It also resets all supported privileged display toggles to their defaults.
 - **Automation control (optional, off by default)**: an opt-in broadcast surface so apps like Tasker
   or MacroDroid can turn Tideo on/off, pause, reset, or load a profile, and react to its state
   changes. See **[Automation](docs/AUTOMATION.md)**.
@@ -130,7 +130,7 @@ The grant is detected the next time the screen turns on or when the app is opene
 
 ## Troubleshooting
 
-- **Stuck on a black/too-dark screen?** Flip the phone upside-down (charging port up) and shake it. The phone will emit an SOS vibration, force brightness to maximum, and reset the privileged display toggles (grayscale, inversion, Night Light, …) to defaults.
+- **Stuck on a black/too-dark screen?** Flip the phone upside-down (charging port up) and shake it. The phone will emit an SOS vibration, force brightness to maximum, and reset supported privileged display toggles to defaults.
 - **Service stops adapting after a while.** Aggressive OEM battery management may kill the foreground
   service. Exempt Tideo from battery optimization. Please see [dontkillmyapp.com][dkma] for device-specific
   steps.

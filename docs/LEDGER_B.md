@@ -600,3 +600,11 @@
   edit silently cleared the profile values. Snapshot booleans are now nullable capability sentinels,
   so read-back preserves unavailable fields. The same review also restored authorization-before-
   capability ordering: every setter rejects below ELEVATED before an unsupported no-op/failure.
+
+- DB-043 [cited]: **A component-backed capability is the conjunction, not its headline flag.**
+  DB-041 correctly requires framework capability gates but overclaimed that the reported failure's
+  OEM flag was known; only the direct Night Display write and failure were observed. Night Light
+  follows `config_nightDisplayAvailable`. AOD additionally requires a non-empty
+  `config_dozeComponent`, matching AOSP ambient-display availability while deliberately ignoring
+  its debug-property escape hatch. Missing/unreadable resources fail closed; pure lookup tests pin
+  the exact names and the AOD truth table.
