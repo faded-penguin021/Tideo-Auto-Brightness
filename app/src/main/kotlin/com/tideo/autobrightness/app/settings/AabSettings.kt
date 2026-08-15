@@ -70,7 +70,7 @@ data class AabSettings(
     val inversionEnabled: Boolean = false,
     val alwaysOnDisplayEnabled: Boolean = false,
     val stayAwakeChargingEnabled: Boolean = false,
-    // Android-14+ force-SDR (experimental). On older devices the field is inert: the coordinator
+    // Android-14+ HDR-format disabling (experimental). On older devices the field is inert: the coordinator
     // checks the controller's availability gate and never writes it.
     val hdrForceSdrEnabled: Boolean = false,
 )

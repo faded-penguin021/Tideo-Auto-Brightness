@@ -31,6 +31,7 @@ data class PrivilegedDisplayUiState(
     val nightLightAvailable: Boolean = false,
     val alwaysOnDisplayAvailable: Boolean = false,
     val hdrAvailable: Boolean = false,
+    val hdrPreferenceCustom: Boolean = false,
     val adbCommand: String = "",
     val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
     val grantMessage: String? = null,
@@ -83,16 +84,19 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
         _state.update { it.copy(shizukuAvailability = privilegeManager.shizukuAvailability()) }
         viewModelScope.launch(io) {
             deviceLock.withLock {
+                val snapshot = readSnapshotLocked()
                 _state.update {
                     it.copy(
                         nightLightAutoMode = display.readNightLightAutoMode(),
                         nightLightAvailable = display.nightLightAvailable,
                         alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
-                        hdrAvailable = display.hdrForceSdrAvailable,
+                        hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
+                        hdrPreferenceCustom = display.hdrForceSdrAvailable &&
+                            snapshot != null && snapshot.hdrForceSdr == null,
                         writeFailed = false,
                     )
                 }
-                _deviceSnapshot.value = readSnapshotLocked()
+                _deviceSnapshot.value = snapshot
             }
         }
     }
@@ -118,6 +122,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     fun applyNow(settings: AabSettings) {
         viewModelScope.launch(io) {
             deviceLock.withLock {
+                val hdrState = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null
                 val results = buildList {
                     add(display.setNightLight(settings.nightLightEnabled))
                     settings.nightLightTemperature?.let { add(display.setNightLightTemperature(it)) }
@@ -130,9 +135,20 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                     add(display.setInversion(settings.inversionEnabled))
                     add(display.setAlwaysOnDisplay(settings.alwaysOnDisplayEnabled))
                     add(display.setStayAwakePlugged(settings.stayAwakeChargingEnabled))
-                    if (display.hdrForceSdrAvailable) add(display.setHdrForceSdr(settings.hdrForceSdrEnabled))
+                    if (display.hdrForceSdrAvailable && hdrState != null) {
+                        add(display.setHdrForceSdr(settings.hdrForceSdrEnabled))
+                    }
                 }
-                _state.update { it.copy(writeFailed = results.any { r -> r.isFailure }) }
+                if (display.hdrForceSdrAvailable && hdrState == null) {
+                    _deviceSnapshot.value = _deviceSnapshot.value?.copy(hdrForceSdr = null)
+                }
+                _state.update {
+                    it.copy(
+                        hdrAvailable = display.hdrForceSdrAvailable && hdrState != null,
+                        hdrPreferenceCustom = display.hdrForceSdrAvailable && hdrState == null,
+                        writeFailed = results.any { r -> r.isFailure },
+                    )
+                }
             }
         }
     }

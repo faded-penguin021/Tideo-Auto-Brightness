@@ -10,7 +10,7 @@ Detection is a first-hit probe (`AndroidPrivilegeManager.detectTier`), highest-f
 
 | Tier | Preflight | Grants | Capability |
 |---|---|---|---|
-| **ELEVATED** | `checkSelfPermission(WRITE_SECURE_SETTINGS) == GRANTED` | one-time `pm grant` (ADB / Shizuku / root) | Full core pipeline **+ super dimming** (secure `reduce_bright_colors` via `Settings.Secure`) **+ the Privileged Display profile toggles** (D-149/D-151/D-152: supported Night Light/AOD, daltonizer/inversion, and stay-awake-charging). |
+| **ELEVATED** | `checkSelfPermission(WRITE_SECURE_SETTINGS) == GRANTED` | one-time `pm grant` (ADB / Shizuku / root) | Full core pipeline **+ super dimming** (secure `reduce_bright_colors` via `Settings.Secure`) **+ the Privileged Display profile toggles** (D-149/D-151/D-152/DB-044: supported Night Light/AOD, daltonizer/inversion, stay-awake-charging, and experimental HDR disabling on Android 14+). |
 | **BASIC** | `Settings.System.canWrite(context)` | user toggle on the "Modify system settings" screen | Full core pipeline (read sensor → curve → write `Settings.System` brightness + animation). No super dimming. |
 | **NONE** | neither | — | Degraded: UI + onboarding only; brightness writes throw `SecurityException` and are swallowed (G1-F1), so the app never crashes unprivileged. |
 

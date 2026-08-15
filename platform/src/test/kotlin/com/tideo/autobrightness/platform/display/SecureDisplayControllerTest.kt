@@ -2,6 +2,7 @@ package com.tideo.autobrightness.platform.display
 
 import android.Manifest
 import android.content.Context
+import android.os.Build
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
@@ -230,9 +231,9 @@ class SecureDisplayControllerTest {
     @Test
     fun hdr_unavailableBelowApi34_failsWithoutWriting() {
         grantElevated()
-        val old = AndroidSecureDisplayController(context, privilegeManager)
+        val old = AndroidSecureDisplayController(context, privilegeManager, sdkInt = 33)
         assertFalse(old.hdrForceSdrAvailable)
-        assertFalse(old.readHdrForceSdr())
+        assertNull(old.readHdrForceSdr())
         val result = old.setHdrForceSdr(true)
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is UnsupportedOperationException)
@@ -240,20 +241,68 @@ class SecureDisplayControllerTest {
     }
 
     @Test
-    fun hdr_forceSdr_isDisabledBecauseSettingsWritesDoNotUpdateLiveServiceState() {
+    fun hdr_disableFormats_roundTripsOnApi34() {
         grantElevated()
-        val modern = AndroidSecureDisplayController(context, privilegeManager)
-        assertFalse(modern.hdrForceSdrAvailable)
-        assertFalse(modern.readHdrForceSdr())
+        val modern = AndroidSecureDisplayController(
+            context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        )
+        assertTrue(modern.hdrForceSdrAvailable)
+        assertEquals(false, modern.readHdrForceSdr())
 
-        assertTrue(modern.setHdrForceSdr(true).isFailure)
-        assertEquals(-999, globalInt("are_user_disabled_hdr_formats_allowed"))
-        assertNull(Settings.Global.getString(context.contentResolver, "user_disabled_hdr_formats"))
+        assertTrue(modern.setHdrForceSdr(true).isSuccess)
+        assertEquals(0, globalInt("are_user_disabled_hdr_formats_allowed"))
+        assertEquals(
+            "1,2,3,4",
+            Settings.Global.getString(context.contentResolver, "user_disabled_hdr_formats"),
+        )
+        assertEquals(true, modern.readHdrForceSdr())
+
+        assertTrue(modern.setHdrForceSdr(false).isSuccess)
+        assertEquals(1, globalInt("are_user_disabled_hdr_formats_allowed"))
+        assertEquals("", Settings.Global.getString(context.contentResolver, "user_disabled_hdr_formats"))
+        assertEquals(false, modern.readHdrForceSdr())
+    }
+
+    @Test
+    fun hdr_read_preservesUnrepresentableRows_andAcceptsPermutedCompleteSet() {
+        val modern = AndroidSecureDisplayController(
+            context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        )
+        Settings.Global.putInt(context.contentResolver, "are_user_disabled_hdr_formats_allowed", 0)
+
+        Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "1,2")
+        assertNull(modern.readHdrForceSdr())
+        Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "garbage")
+        assertNull(modern.readHdrForceSdr())
+        Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "4, 2,1,3,3")
+        assertEquals(true, modern.readHdrForceSdr())
+
+        listOf(Int.MIN_VALUE, -1, 2).forEach { malformedFlag ->
+            if (malformedFlag == Int.MIN_VALUE) {
+                Settings.Global.putString(
+                    context.contentResolver,
+                    "are_user_disabled_hdr_formats_allowed",
+                    null,
+                )
+            } else {
+                Settings.Global.putInt(
+                    context.contentResolver,
+                    "are_user_disabled_hdr_formats_allowed",
+                    malformedFlag,
+                )
+            }
+            Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "")
+            assertNull(modern.readHdrForceSdr())
+            Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "1,2,3,4")
+            assertNull(modern.readHdrForceSdr())
+        }
     }
 
     @Test
     fun hdr_writeFailsWhenNotElevated_evenOnApi34() {
-        val modern = AndroidSecureDisplayController(context, privilegeManager)
+        val modern = AndroidSecureDisplayController(
+            context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        )
         val result = modern.setHdrForceSdr(true)
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is SecurityException)

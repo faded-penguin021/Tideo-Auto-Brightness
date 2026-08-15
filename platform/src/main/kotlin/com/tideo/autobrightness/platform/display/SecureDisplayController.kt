@@ -3,6 +3,7 @@ package com.tideo.autobrightness.platform.display
 import android.content.ContentResolver
 import android.content.Context
 import android.os.BatteryManager
+import android.os.Build
 import android.provider.Settings
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
@@ -34,9 +35,10 @@ interface SecureDisplayController {
     fun readStayAwakePlugged(): Boolean
     fun setStayAwakePlugged(on: Boolean): Result<Unit>
 
-    /** Disabled: this requires DisplayManager's service path, not direct Settings mutation. */
+    /** Experimental direct HDR-format Settings control on Android 14+. */
     val hdrForceSdrAvailable: Boolean
-    fun readHdrForceSdr(): Boolean
+    /** DB-045: null when unavailable or the stored HDR preference is not Boolean-representable. */
+    fun readHdrForceSdr(): Boolean?
     fun setHdrForceSdr(on: Boolean): Result<Unit>
 
     companion object {
@@ -69,6 +71,7 @@ enum class DaltonizerMode(val value: Int) {
 class AndroidSecureDisplayController(
     private val context: Context,
     private val privilegeManager: PrivilegeManager,
+    private val sdkInt: Int = Build.VERSION.SDK_INT,
     override val nightLightAvailable: Boolean = context.frameworkDisplayCapabilities().nightLightAvailable,
     override val alwaysOnDisplayAvailable: Boolean = context.frameworkDisplayCapabilities().alwaysOnDisplayAvailable,
 ) : SecureDisplayController {
@@ -148,12 +151,34 @@ class AndroidSecureDisplayController(
         )
     }
 
-    override val hdrForceSdrAvailable: Boolean = false
+    override val hdrForceSdrAvailable: Boolean
+        get() = sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
-    override fun readHdrForceSdr(): Boolean = false
+    override fun readHdrForceSdr(): Boolean? {
+        if (!hdrForceSdrAvailable) return null
+        val allowed = Settings.Global.getInt(resolver, KEY_HDR_FORMATS_ALLOWED, Int.MIN_VALUE)
+        val formats = Settings.Global.getString(resolver, KEY_HDR_DISABLED_FORMATS).orEmpty()
+        if (allowed == 1 && formats.isBlank()) return false
+        val parsed = formats.split(',').map { it.trim() }
+        if (parsed.any { it.toIntOrNull() == null }) return null
+        return if (allowed == 0 && parsed.toSet() == ALL_HDR_FORMAT_SET) true else null
+    }
 
-    override fun setHdrForceSdr(on: Boolean): Result<Unit> =
-        elevatedWrite { throw UnsupportedOperationException("Force SDR requires the DisplayManager service API") }
+    override fun setHdrForceSdr(on: Boolean): Result<Unit> {
+        return elevatedWrite {
+            if (!hdrForceSdrAvailable) {
+                throw UnsupportedOperationException("HDR format control needs Android 14+")
+            }
+            // DB-044 TODO: use DisplayManager if a safe, non-hidden live API becomes available.
+            if (on) {
+                Settings.Global.putString(resolver, KEY_HDR_DISABLED_FORMATS, ALL_HDR_FORMATS)
+                Settings.Global.putInt(resolver, KEY_HDR_FORMATS_ALLOWED, 0)
+            } else {
+                Settings.Global.putInt(resolver, KEY_HDR_FORMATS_ALLOWED, 1)
+                Settings.Global.putString(resolver, KEY_HDR_DISABLED_FORMATS, "")
+            }
+        }
+    }
 
     private companion object {
         const val KEY_NIGHT_DISPLAY_ACTIVATED = "night_display_activated"
@@ -168,6 +193,11 @@ class AndroidSecureDisplayController(
 
         const val STAY_ON_ANY_CHARGER = BatteryManager.BATTERY_PLUGGED_AC or
             BatteryManager.BATTERY_PLUGGED_USB or BatteryManager.BATTERY_PLUGGED_WIRELESS
+
+        const val KEY_HDR_DISABLED_FORMATS = "user_disabled_hdr_formats"
+        const val KEY_HDR_FORMATS_ALLOWED = "are_user_disabled_hdr_formats_allowed"
+        const val ALL_HDR_FORMATS = "1,2,3,4"
+        val ALL_HDR_FORMAT_SET = ALL_HDR_FORMATS.split(',').toSet()
     }
 
     private inline fun capabilityWrite(available: Boolean, crossinline write: () -> Unit): Result<Unit> =

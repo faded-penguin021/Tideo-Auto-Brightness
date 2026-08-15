@@ -237,6 +237,16 @@ fun PrivilegedDisplayContent(
                             help = R.string.pd_hdr_help, testTag = "switch_hdrForceSdr",
                         )
                     }
+                } else if (state.hdrPreferenceCustom) {
+                    SectionHeader(stringResource(R.string.pd_section_experimental), divider = true)
+                    AabCard {
+                        Text(
+                            stringResource(R.string.pd_hdr_custom_preserved),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("pd_hdr_custom_preserved"),
+                        )
+                    }
                 }
 
                 DraftApplyBar(dirty = draftDirty, onApply = onApplyDraft, onDiscard = onDiscardDraft)

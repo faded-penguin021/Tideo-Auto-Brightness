@@ -203,8 +203,11 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     - **Always-on display** (only shown when Android reports it available) on/off. **Expected:** AOD appears/disappears on the lock screen.
     - **Stay awake while charging** on, short screen timeout, charger in. **Expected:** the screen
       never sleeps while plugged (AC/USB/wireless); off + unplugged, normal timeout returns.
-    - **Force SDR is not exposed.** AOSP changes its live state through DisplayManager service APIs;
-      direct writes to the backing Settings rows do not demonstrate a live update (DB-041).
+    - **Disable HDR (experimental, Android 14+)** on → read back
+      `user_disabled_hdr_formats=1,2,3,4` and
+      `are_user_disabled_hdr_formats_allowed=0`; off → allowed returns `1` and formats clears.
+      This writes stored preferences, not Android's Force-SDR service API. Either direction may
+      require a reboot, and HDR/display-mode changes may briefly blank the screen (DB-044).
 33. **Profile carried by a context rule — engage AND baseline restore.** Keep the baseline's display
     fields all off/default. Set grayscale (+ Night Light) on Privileged Display, **save as a
     profile**, then restore your baseline values. Add a Contexts rule loading that profile (a time

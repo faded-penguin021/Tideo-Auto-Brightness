@@ -112,6 +112,15 @@ class PrivilegedDisplayScreenTest {
     }
 
     @Test
+    fun elevated_customHdrPreference_isExplainedWithoutEditableSwitch() {
+        setDraftContent(
+            state = elevated.copy(hdrAvailable = false, hdrPreferenceCustom = true),
+        )
+        compose.onNodeWithTag("switch_hdrForceSdr").assertDoesNotExist()
+        compose.onNodeWithTag("pd_hdr_custom_preserved").performScrollTo().assertExists()
+    }
+
+    @Test
     fun elevated_unsupportedNightLightAndAodControlsAreHidden() {
         setDraftContent(
             state = elevated.copy(nightLightAvailable = false, alwaysOnDisplayAvailable = false),

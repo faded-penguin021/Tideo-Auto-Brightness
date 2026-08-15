@@ -36,7 +36,9 @@ decision logic are golden-tested against a transcription of the original Tasker 
 - **Super dimming** (requires WRITE_SECURE_SETTINGS) can set brightness below the hardware floor and a PWM-flicker-aware software-dimming mode (locks hardware brightness to a user defined point and dims using Android's Extra Dim functionality).
 - **Privileged display toggles** (requires WRITE_SECURE_SETTINGS): Night Light with color
   temperature, grayscale / color correction, color inversion, always-on display, stay-awake while
-  charging. Night Light and always-on display are shown only when Android reports those features
+  charging, and **Disable HDR (experimental)** on Android 14+. The HDR control changes stored
+  format preferences rather than invoking Android’s Force-SDR service API; applying or clearing it
+  may require a reboot, and display-mode changes may briefly blank the screen. Night Light and always-on display are shown only when Android reports those features
   available. Like super dimming, these are profile settings: loading a profile applies them, and
   returning to your baseline restores its values.
 - **Profiles** are stored settings. Tideo ships with five built-in presets.

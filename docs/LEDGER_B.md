@@ -608,3 +608,19 @@
   `config_dozeComponent`, matching AOSP ambient-display availability while deliberately ignoring
   its debug-property escape hatch. Missing/unreadable resources fail closed; pure lookup tests pin
   the exact names and the AOD truth table.
+
+- DB-044 [cited]: **A non-live preference control must name what it is, not the service operation it
+  resembles.** Owner decision supersedes DB-041's temporary Force-SDR removal: Android-14+
+  `user_disabled_hdr_formats` control remains, renamed **Disable HDR (experimental)**. It does not
+  invoke DisplayManager's Force-SDR conversion API; apply or clear may require reboot, and an
+  HDR/display-mode transition may briefly blank the screen. This is correctness/expectation risk,
+  not evidence of Night Light's observed catastrophic failure. Migrate if a safe, non-hidden live
+  DisplayManager API becomes available.
+
+- DB-045 [cited]: **A Boolean editor must not normalize a state it cannot represent.** HDR read-back
+  treated any enforced nonblank format list as “all HDR disabled”; direct Apply could then broaden a
+  partial/malformed external preference to `1,2,3,4` while saving an unrelated field. Only canonical
+  off (allowed + blank) and canonical all-disabled (the complete set, order/whitespace/duplicates
+  ignored) now map to Boolean; other rows map to null and direct Apply preserves them. Explicit
+  profile transitions and panic remain intentional writes. UI replaces the switch with a custom-
+  preference preservation notice while the row is unrepresentable.

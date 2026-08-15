@@ -137,6 +137,42 @@ class DisplayTogglesViewModelTest {
     }
 
     @Test
+    fun directApply_preservesAnUnrepresentablePartialHdrPreference() {
+        grantElevated()
+        Settings.Global.putInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed", 0)
+        Settings.Global.putString(app.contentResolver, "user_disabled_hdr_formats", "1,2")
+        val vm = vm()
+        assertNull(assertNotNull(vm.deviceSnapshot.value).hdrForceSdr)
+        assertFalse(vm.state.value.hdrAvailable)
+        assertTrue(vm.state.value.hdrPreferenceCustom)
+
+        vm.applyNow(AabSettings(inversionEnabled = true, hdrForceSdrEnabled = false))
+
+        assertEquals("1,2", Settings.Global.getString(app.contentResolver, "user_disabled_hdr_formats"))
+        assertEquals(0, Settings.Global.getInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed"))
+        assertEquals(1, Settings.Secure.getInt(app.contentResolver, "accessibility_display_inversion_enabled"))
+    }
+
+    @Test
+    fun directApply_rechecksHdrAfterAnExternalChange_andPreservesTheNewCustomRow() {
+        grantElevated()
+        Settings.Global.putInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed", 1)
+        Settings.Global.putString(app.contentResolver, "user_disabled_hdr_formats", "")
+        val vm = vm()
+        assertEquals(false, assertNotNull(vm.deviceSnapshot.value).hdrForceSdr)
+
+        Settings.Global.putInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed", 0)
+        Settings.Global.putString(app.contentResolver, "user_disabled_hdr_formats", "1,2")
+        vm.applyNow(AabSettings(inversionEnabled = true, hdrForceSdrEnabled = false))
+
+        assertEquals("1,2", Settings.Global.getString(app.contentResolver, "user_disabled_hdr_formats"))
+        assertEquals(0, Settings.Global.getInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed"))
+        assertNull(assertNotNull(vm.deviceSnapshot.value).hdrForceSdr)
+        assertTrue(vm.state.value.hdrPreferenceCustom)
+        assertFalse(vm.state.value.hdrAvailable)
+    }
+
+    @Test
     fun refresh_clearsStaleWriteFailureBanner() {
         val vm = vm()
         vm.applyNow(AabSettings(nightLightEnabled = true)) // below ELEVATED → fails, banner up
