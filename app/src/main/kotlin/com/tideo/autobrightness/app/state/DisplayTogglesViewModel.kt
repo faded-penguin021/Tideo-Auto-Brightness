@@ -28,6 +28,8 @@ import kotlinx.coroutines.sync.withLock
 data class PrivilegedDisplayUiState(
     val tier: Tier = Tier.NONE,
     val nightLightAutoMode: NightLightAutoMode = NightLightAutoMode.MANUAL,
+    val nightLightAvailable: Boolean = false,
+    val alwaysOnDisplayAvailable: Boolean = false,
     val hdrAvailable: Boolean = false,
     val adbCommand: String = "",
     val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
@@ -52,6 +54,8 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             tier = privilegeManager.currentTier(),
             adbCommand = privilegeManager.adbGrantInstruction(),
             shizukuAvailability = privilegeManager.shizukuAvailability(),
+            nightLightAvailable = display.nightLightAvailable,
+            alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
         ),
     )
     val state: StateFlow<PrivilegedDisplayUiState> = _state.asStateFlow()
@@ -82,6 +86,8 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                 _state.update {
                     it.copy(
                         nightLightAutoMode = display.readNightLightAutoMode(),
+                        nightLightAvailable = display.nightLightAvailable,
+                        alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
                         hdrAvailable = display.hdrForceSdrAvailable,
                         writeFailed = false,
                     )
@@ -95,11 +101,11 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     private fun readSnapshotLocked(): DeviceDisplaySnapshot? {
         if (privilegeManager.currentTier() < Tier.ELEVATED) return null
         return DeviceDisplaySnapshot(
-            nightLight = display.readNightLight(),
+            nightLight = if (display.nightLightAvailable) display.readNightLight() else null,
             temperatureK = display.readNightLightTemperature(),
             daltonizer = display.readDaltonizer(),
             inversion = display.readInversion(),
-            alwaysOn = display.readAlwaysOnDisplay(),
+            alwaysOn = if (display.alwaysOnDisplayAvailable) display.readAlwaysOnDisplay() else null,
             stayAwake = display.readStayAwakePlugged(),
             hdrForceSdr = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null,
         )

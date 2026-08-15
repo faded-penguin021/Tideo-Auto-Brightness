@@ -2,7 +2,6 @@ package com.tideo.autobrightness.platform.display
 
 import android.Manifest
 import android.content.Context
-import android.os.Build
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
@@ -27,7 +26,11 @@ class SecureDisplayControllerTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         privilegeManager = AndroidPrivilegeManager(context)
-        controller = AndroidSecureDisplayController(context, privilegeManager)
+        controller = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = true,
+            alwaysOnDisplayAvailable = true,
+        )
     }
 
     private fun grantElevated() {
@@ -58,6 +61,24 @@ class SecureDisplayControllerTest {
         assertEquals(-999, secureInt("night_display_activated"))
         assertEquals(-999, secureInt("accessibility_display_daltonizer_enabled"))
         assertEquals(-999, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
+    }
+
+    @Test
+    fun unsupportedWrites_stillRejectCallersBelowElevated() {
+        val unavailable = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = false,
+            alwaysOnDisplayAvailable = false,
+        )
+
+        listOf(
+            unavailable.setNightLight(true),
+            unavailable.setNightLightTemperature(2_700),
+            unavailable.setAlwaysOnDisplay(true),
+        ).forEach { result ->
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is SecurityException)
+        }
     }
 
 
@@ -96,6 +117,23 @@ class SecureDisplayControllerTest {
 
         assertTrue(controller.setNightLightTemperature(99_999).isSuccess)
         assertEquals(10_000, controller.readNightLightTemperature())
+    }
+
+    @Test
+    fun nightLight_unavailable_isSuccessfulNoOp_forActivationAndTemperature() {
+        grantElevated()
+        val unavailable = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = false,
+            alwaysOnDisplayAvailable = true,
+        )
+
+        assertTrue(unavailable.setNightLight(true).isSuccess)
+        assertTrue(unavailable.setNightLightTemperature(2_700).isSuccess)
+        assertFalse(unavailable.readNightLight())
+        assertNull(unavailable.readNightLightTemperature())
+        assertEquals(-999, secureInt("night_display_activated"))
+        assertEquals(-999, secureInt("night_display_color_temperature"))
     }
 
     @Test
@@ -174,11 +212,25 @@ class SecureDisplayControllerTest {
         assertEquals(0, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
     }
 
+    @Test
+    fun alwaysOnDisplay_unavailable_isSuccessfulNoOp() {
+        grantElevated()
+        val unavailable = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = true,
+            alwaysOnDisplayAvailable = false,
+        )
+
+        assertTrue(unavailable.setAlwaysOnDisplay(true).isSuccess)
+        assertFalse(unavailable.readAlwaysOnDisplay())
+        assertEquals(-999, secureInt("doze_always_on"))
+    }
+
 
     @Test
     fun hdr_unavailableBelowApi34_failsWithoutWriting() {
         grantElevated()
-        val old = AndroidSecureDisplayController(context, privilegeManager, sdkInt = 33)
+        val old = AndroidSecureDisplayController(context, privilegeManager)
         assertFalse(old.hdrForceSdrAvailable)
         assertFalse(old.readHdrForceSdr())
         val result = old.setHdrForceSdr(true)
@@ -188,32 +240,20 @@ class SecureDisplayControllerTest {
     }
 
     @Test
-    fun hdr_forceSdr_roundTripsOnApi34() {
+    fun hdr_forceSdr_isDisabledBecauseSettingsWritesDoNotUpdateLiveServiceState() {
         grantElevated()
-        val modern = AndroidSecureDisplayController(
-            context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
-        )
-        assertTrue(modern.hdrForceSdrAvailable)
+        val modern = AndroidSecureDisplayController(context, privilegeManager)
+        assertFalse(modern.hdrForceSdrAvailable)
         assertFalse(modern.readHdrForceSdr())
 
-        assertTrue(modern.setHdrForceSdr(true).isSuccess)
-        assertEquals(0, globalInt("are_user_disabled_hdr_formats_allowed"))
-        assertEquals(
-            "1,2,3,4",
-            Settings.Global.getString(context.contentResolver, "user_disabled_hdr_formats"),
-        )
-        assertTrue(modern.readHdrForceSdr())
-
-        assertTrue(modern.setHdrForceSdr(false).isSuccess)
-        assertEquals(1, globalInt("are_user_disabled_hdr_formats_allowed"))
-        assertFalse(modern.readHdrForceSdr())
+        assertTrue(modern.setHdrForceSdr(true).isFailure)
+        assertEquals(-999, globalInt("are_user_disabled_hdr_formats_allowed"))
+        assertNull(Settings.Global.getString(context.contentResolver, "user_disabled_hdr_formats"))
     }
 
     @Test
     fun hdr_writeFailsWhenNotElevated_evenOnApi34() {
-        val modern = AndroidSecureDisplayController(
-            context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
-        )
+        val modern = AndroidSecureDisplayController(context, privilegeManager)
         val result = modern.setHdrForceSdr(true)
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is SecurityException)

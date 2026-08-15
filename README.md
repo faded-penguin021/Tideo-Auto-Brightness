@@ -36,13 +36,14 @@ decision logic are golden-tested against a transcription of the original Tasker 
 - **Super dimming** (requires WRITE_SECURE_SETTINGS) can set brightness below the hardware floor and a PWM-flicker-aware software-dimming mode (locks hardware brightness to a user defined point and dims using Android's Extra Dim functionality).
 - **Privileged display toggles** (requires WRITE_SECURE_SETTINGS): Night Light with color
   temperature, grayscale / color correction, color inversion, always-on display, stay-awake while
-  charging, and an experimental force-SDR mode (Android 14+). Like super dimming, these are profile settings: loading a profile applies them, and
+  charging. Night Light and always-on display are shown only when Android reports those features
+  available. Like super dimming, these are profile settings: loading a profile applies them, and
   returning to your baseline restores its values.
 - **Profiles** are stored settings. Tideo ships with five built-in presets.
 - **Context automation** can automatically load profiles based on: foreground app, time window, location,
   charging state, Wi-Fi SSID, or day of week, with priority-based conflict resolution.
 - **Live Debug scene**: a glass-box that shows relevant inputs and outputs.
-- **Emergency recovery**, a safety feature for when the screen is too dark, flip the phone upside-down and shake to force brightness to maximum. It also resets all privileged display toggles (grayscale, inversion, Night Light, …) to their defaults.
+- **Emergency recovery**, a safety feature for when the screen is too dark, flip the phone upside-down and shake to force brightness to maximum. It also resets all supported privileged display toggles to their defaults.
 - **Automation control (optional, off by default)**: an opt-in broadcast surface so apps like Tasker
   or MacroDroid can turn Tideo on/off, pause, reset, or load a profile, and react to its state
   changes. See **[Automation](docs/AUTOMATION.md)**.
@@ -109,7 +110,7 @@ Tideo uses two privilege tiers. The core functionalities only require **BASIC** 
 | Tier | Permission | Unlocks |
 |---|---|---|
 | **BASIC** | `WRITE_SETTINGS` (user-grantable, in-app) | Curve, animation, reactivity, circadian, contexts |
-| **ELEVATED** | `WRITE_SECURE_SETTINGS` (one-time `pm grant`) | Super dimming (Reduce Bright Colors below the floor) + the Privileged Display profile toggles (Night Light, color correction/inversion, AOD, stay-awake, force-SDR) |
+| **ELEVATED** | `WRITE_SECURE_SETTINGS` (one-time `pm grant`) | Super dimming (Reduce Bright Colors below the floor) + supported Privileged Display profile toggles (Night Light, color correction/inversion, AOD, stay-awake) |
 
 ### Granting ELEVATED privilege 
 
@@ -129,16 +130,15 @@ The grant is detected the next time the screen turns on or when the app is opene
 
 ## Troubleshooting
 
-- **Stuck on a black/too-dark screen?** Flip the phone upside-down (charging port up) and shake it. The phone will emit an SOS vibration, force brightness to maximum, and reset the privileged display toggles (grayscale, inversion, Night Light, …) to defaults.
+- **Stuck on a black/too-dark screen?** Flip the phone upside-down (charging port up) and shake it. The phone will emit an SOS vibration, force brightness to maximum, and reset supported privileged display toggles to defaults.
 - **Service stops adapting after a while.** Aggressive OEM battery management may kill the foreground
   service. Exempt Tideo from battery optimization. Please see [dontkillmyapp.com][dkma] for device-specific
   steps.
 - **Super dimming doesn't visibly darken** on some OEMs. A few vendors rename or relocate the `reduce_bright_colors` secure keys. That is not a Tideo bug. Enable
   *Live Debug* (debug level: Super Dimming Info) to see when it's on.
-- **A Privileged Display toggle does nothing** on some OEM skins. The toggles write the standard
-  AOSP settings keys (the same ones the stock Settings app uses); on some OEMs these toggles might fail silently. The AOSP feature simply isn't
-  controllable on your device. Known example: OxygenOS ignores the Night Light *temperature* key
-  (the switch works, the tint never changes — circadian temperature tracking is visually inert there too).
+- **A Settings key is not proof that a display feature is supported.** Tideo reproduces Android's
+  framework capability gates before exposing or writing Night Light and always-on display. Some
+  supported OEM implementations can still ignore Night Light temperature changes.
 - **Brightness range looks off.** Tideo normalizes the device's brightness range to a 0–255 scale. Some OEMs use different scales. The mapping is detected from `config_screenBrightnessSettingMaximum`.
 - **Context rules not firing.** For per-app rules, grant Usage Access when prompted; for location/Wi-Fi
   rules, grant and enable Location (unless you run Shizuku). Live Debug (set to Context Automation) shows the active context and any priority conflicts. Please note that this requires the Global Flashes to be enabled. 

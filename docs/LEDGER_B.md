@@ -585,3 +585,26 @@
   it too, so the gate stood open on empty state and a merge could overwrite the profile. Fixed by
   scoping equality to the owned fields, making read-and-write one `update`, and refusing before the
   seed. `[cited]`: `mergeDeviceReadBack`.
+
+- DB-041 [cited]: **A backing Android Settings key does not establish feature support.** A real
+  black-screen failure followed a Night Display write on an OEM whose framework reports it
+  unavailable. The controller now fails closed on `config_nightDisplayAvailable` and
+  `config_dozeAlwaysOnDisplayAvailable`; unsupported writes are harmless no-ops across profiles,
+  circadian ticks, Apply and panic, and UI controls hide. Force SDR is disabled: AOSP
+  `DisplayManagerService` updates in-memory state/logical displays inside its binder methods but
+  does not observe these Global rows, so direct Settings writes cannot establish a live effect.
+
+- DB-042 [cited]: **A safe read default can still erase an unsupported hidden field.** Capability-
+  gated reads returned `false` for Night Light/AOD; device read-back then copied those defaults into
+  the draft. Opening Privileged Display on an unsupported device and applying an unrelated visible
+  edit silently cleared the profile values. Snapshot booleans are now nullable capability sentinels,
+  so read-back preserves unavailable fields. The same review also restored authorization-before-
+  capability ordering: every setter rejects below ELEVATED before an unsupported no-op/failure.
+
+- DB-043 [cited]: **A component-backed capability is the conjunction, not its headline flag.**
+  DB-041 correctly requires framework capability gates but overclaimed that the reported failure's
+  OEM flag was known; only the direct Night Display write and failure were observed. Night Light
+  follows `config_nightDisplayAvailable`. AOD additionally requires a non-empty
+  `config_dozeComponent`, matching AOSP ambient-display availability while deliberately ignoring
+  its debug-property escape hatch. Missing/unreadable resources fail closed; pure lookup tests pin
+  the exact names and the AOD truth table.

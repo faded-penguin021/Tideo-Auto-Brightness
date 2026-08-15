@@ -21,6 +21,8 @@ import kotlin.test.assertTrue
 class DisplayTogglesCoordinatorTest {
 
     private class FakeSecureDisplay : SecureDisplayController {
+        override var nightLightAvailable = true
+        override var alwaysOnDisplayAvailable = true
         val writes = mutableListOf<String>()
         private fun write(entry: String): Result<Unit> {
             writes += entry
@@ -28,16 +30,19 @@ class DisplayTogglesCoordinatorTest {
         }
 
         override fun readNightLight() = false
-        override fun setNightLight(on: Boolean) = write("nightLight=$on")
+        override fun setNightLight(on: Boolean) =
+            if (nightLightAvailable) write("nightLight=$on") else Result.success(Unit)
         override fun readNightLightTemperature(): Int? = null
-        override fun setNightLightTemperature(kelvin: Int) = write("temp=$kelvin")
+        override fun setNightLightTemperature(kelvin: Int) =
+            if (nightLightAvailable) write("temp=$kelvin") else Result.success(Unit)
         override fun readNightLightAutoMode() = NightLightAutoMode.MANUAL
         override fun readDaltonizer() = DaltonizerMode.OFF
         override fun setDaltonizer(mode: DaltonizerMode) = write("daltonizer=$mode")
         override fun readInversion() = false
         override fun setInversion(on: Boolean) = write("inversion=$on")
         override fun readAlwaysOnDisplay() = false
-        override fun setAlwaysOnDisplay(on: Boolean) = write("aod=$on")
+        override fun setAlwaysOnDisplay(on: Boolean) =
+            if (alwaysOnDisplayAvailable) write("aod=$on") else Result.success(Unit)
         override fun readStayAwakePlugged() = false
         override fun setStayAwakePlugged(on: Boolean) = write("stayAwake=$on")
         override var hdrForceSdrAvailable = true
@@ -199,6 +204,26 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         assertTrue(h.display.writes.isEmpty(), "hdr must not be written when unavailable: ${h.display.writes}")
     }
+
+    @Test
+    fun unsupportedNightLightAndAod_cannotBeBypassedByProfilesTicksOrPanic() =
+        runTest(UnconfinedTestDispatcher()) {
+            val h = Harness(tickIntervalMs = 1_000L)
+            h.display.nightLightAvailable = false
+            h.display.alwaysOnDisplayAvailable = false
+            h.rampKelvin = 3_200
+            h.coordinator.start(backgroundScope)
+            h.effectiveFlow.value = baseline
+            h.effectiveFlow.value = circadianProfile.copy(alwaysOnDisplayEnabled = true)
+            runCurrent()
+            advanceTimeBy(1_100); runCurrent()
+            h.coordinator.panicReset()
+
+            assertTrue(
+                h.display.writes.none { it.startsWith("nightLight=") || it.startsWith("temp=") || it.startsWith("aod=") },
+                "capability-gated features must never reach a write: ${h.display.writes}",
+            )
+        }
 
     @Test
     fun unknownDaltonizerString_fallsBackToOff() = runTest(UnconfinedTestDispatcher()) {
