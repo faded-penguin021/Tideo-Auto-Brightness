@@ -593,3 +593,10 @@
   circadian ticks, Apply and panic, and UI controls hide. Force SDR is disabled: AOSP
   `DisplayManagerService` updates in-memory state/logical displays inside its binder methods but
   does not observe these Global rows, so direct Settings writes cannot establish a live effect.
+
+- DB-042 [cited]: **A safe read default can still erase an unsupported hidden field.** Capability-
+  gated reads returned `false` for Night Light/AOD; device read-back then copied those defaults into
+  the draft. Opening Privileged Display on an unsupported device and applying an unrelated visible
+  edit silently cleared the profile values. Snapshot booleans are now nullable capability sentinels,
+  so read-back preserves unavailable fields. The same review also restored authorization-before-
+  capability ordering: every setter rejects below ELEVATED before an unsupported no-op/failure.

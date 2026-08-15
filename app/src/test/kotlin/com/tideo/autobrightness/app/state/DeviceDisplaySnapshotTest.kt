@@ -13,11 +13,11 @@ import kotlin.test.assertTrue
 class DeviceDisplaySnapshotTest {
 
     private fun snapshot(
-        nightLight: Boolean = false,
+        nightLight: Boolean? = false,
         temperatureK: Int? = null,
         daltonizer: DaltonizerMode = DaltonizerMode.OFF,
         inversion: Boolean = false,
-        alwaysOn: Boolean = false,
+        alwaysOn: Boolean? = false,
         stayAwake: Boolean = false,
         hdrForceSdr: Boolean? = false,
     ) = DeviceDisplaySnapshot(nightLight, temperatureK, daltonizer, inversion, alwaysOn, stayAwake, hdrForceSdr)
@@ -83,6 +83,23 @@ class DeviceDisplaySnapshotTest {
 
         assertTrue(on.hdrForceSdrEnabled)
         assertFalse(off.hdrForceSdrEnabled)
+    }
+
+    @Test
+    fun `unavailable Night Light and AOD leave hidden profile fields untouched`() {
+        val stored = AabSettings(
+            nightLightEnabled = true,
+            nightLightTemperature = 2_700,
+            alwaysOnDisplayEnabled = true,
+        )
+
+        val merged = stored.withDeviceSnapshot(
+            snapshot(nightLight = null, temperatureK = null, alwaysOn = null),
+        )
+
+        assertTrue(merged.nightLightEnabled)
+        assertEquals(2_700, merged.nightLightTemperature)
+        assertTrue(merged.alwaysOnDisplayEnabled)
     }
 
     // --- DB-039: the re-merge policy. The bug was gating on "draft differs from profile", which the

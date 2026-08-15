@@ -101,11 +101,11 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     private fun readSnapshotLocked(): DeviceDisplaySnapshot? {
         if (privilegeManager.currentTier() < Tier.ELEVATED) return null
         return DeviceDisplaySnapshot(
-            nightLight = display.readNightLight(),
+            nightLight = if (display.nightLightAvailable) display.readNightLight() else null,
             temperatureK = display.readNightLightTemperature(),
             daltonizer = display.readDaltonizer(),
             inversion = display.readInversion(),
-            alwaysOn = display.readAlwaysOnDisplay(),
+            alwaysOn = if (display.alwaysOnDisplayAvailable) display.readAlwaysOnDisplay() else null,
             stayAwake = display.readStayAwakePlugged(),
             hdrForceSdr = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null,
         )

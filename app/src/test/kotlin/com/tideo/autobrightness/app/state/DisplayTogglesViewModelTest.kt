@@ -128,6 +128,9 @@ class DisplayTogglesViewModelTest {
         assertFalse(vm.state.value.writeFailed)
         assertFalse(vm.state.value.nightLightAvailable)
         assertFalse(vm.state.value.alwaysOnDisplayAvailable)
+        val snapshot = assertNotNull(vm.deviceSnapshot.value)
+        assertNull(snapshot.nightLight)
+        assertNull(snapshot.alwaysOn)
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999))
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_color_temperature", -999))
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "doze_always_on", -999))
@@ -156,7 +159,7 @@ class DisplayTogglesViewModelTest {
 
         val snapshot = assertNotNull(vm.deviceSnapshot.value)
         assertTrue(snapshot.inversion, "the snapshot must report what the device actually reads")
-        assertFalse(snapshot.nightLight)
+        assertEquals(false, snapshot.nightLight)
     }
 
     @Test
@@ -164,14 +167,14 @@ class DisplayTogglesViewModelTest {
         // The system quick-settings tile flipping Night Light while we were backgrounded.
         grantElevated()
         val vm = vm()
-        assertFalse(assertNotNull(vm.deviceSnapshot.value).nightLight)
+        assertEquals(false, assertNotNull(vm.deviceSnapshot.value).nightLight)
 
         Settings.Secure.putInt(app.contentResolver, "night_display_activated", 1)
         Settings.Secure.putInt(app.contentResolver, "night_display_color_temperature", 2700)
         vm.refresh()
 
         val snapshot = assertNotNull(vm.deviceSnapshot.value)
-        assertTrue(snapshot.nightLight)
+        assertEquals(true, snapshot.nightLight)
         assertEquals(2700, snapshot.temperatureK)
     }
 

@@ -157,7 +157,7 @@ class AndroidSecureDisplayController(
     override fun readHdrForceSdr(): Boolean = false
 
     override fun setHdrForceSdr(on: Boolean): Result<Unit> =
-        Result.failure(UnsupportedOperationException("Force SDR requires the DisplayManager service API"))
+        elevatedWrite { throw UnsupportedOperationException("Force SDR requires the DisplayManager service API") }
 
     private companion object {
         const val KEY_NIGHT_DISPLAY_ACTIVATED = "night_display_activated"
@@ -175,7 +175,7 @@ class AndroidSecureDisplayController(
     }
 
     private inline fun capabilityWrite(available: Boolean, crossinline write: () -> Unit): Result<Unit> =
-        if (available) elevatedWrite(write) else Result.success(Unit)
+        elevatedWrite { if (available) write() }
 }
 
 private fun Context.frameworkBoolean(name: String): Boolean = runCatching {

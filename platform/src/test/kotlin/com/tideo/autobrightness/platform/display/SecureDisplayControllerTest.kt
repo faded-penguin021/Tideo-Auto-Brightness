@@ -63,6 +63,24 @@ class SecureDisplayControllerTest {
         assertEquals(-999, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
     }
 
+    @Test
+    fun unsupportedWrites_stillRejectCallersBelowElevated() {
+        val unavailable = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = false,
+            alwaysOnDisplayAvailable = false,
+        )
+
+        listOf(
+            unavailable.setNightLight(true),
+            unavailable.setNightLightTemperature(2_700),
+            unavailable.setAlwaysOnDisplay(true),
+        ).forEach { result ->
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is SecurityException)
+        }
+    }
+
 
     @Test
     fun reads_workWithoutPrivilege_defaultingToOff() {
