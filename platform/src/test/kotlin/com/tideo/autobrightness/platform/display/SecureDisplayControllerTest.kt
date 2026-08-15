@@ -247,6 +247,9 @@ class SecureDisplayControllerTest {
             context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
         )
         assertTrue(modern.hdrForceSdrAvailable)
+        // DB-046: an absent row is unrepresentable, not canonical OFF; seed the state under test.
+        Settings.Global.putInt(context.contentResolver, "are_user_disabled_hdr_formats_allowed", 1)
+        Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "")
         assertEquals(false, modern.readHdrForceSdr())
 
         assertTrue(modern.setHdrForceSdr(true).isSuccess)

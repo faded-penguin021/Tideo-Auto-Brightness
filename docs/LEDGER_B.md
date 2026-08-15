@@ -624,3 +624,9 @@
   ignored) now map to Boolean; other rows map to null and direct Apply preserves them. Explicit
   profile transitions and panic remain intentional writes. UI replaces the switch with a custom-
   preference preservation notice while the row is unrepresentable.
+
+- DB-046 [cited]: **A test for a canonical state must create that state.** The HDR round-trip test
+  assumed missing Global rows meant OFF, while DB-045 deliberately classifies missing/malformed rows
+  as unrepresentable null. It passed only when another test leaked canonical OFF into shared
+  Robolectric Settings and failed in CI's order. The test now seeds flag `1` plus a blank list before
+  asserting OFF; production semantics stay unchanged.

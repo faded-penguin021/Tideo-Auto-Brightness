@@ -91,7 +91,7 @@ branch protection and secret-scanning settings in DA-006/DA-041.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-08-15 — **Privileged Display capability safety + reviews (DB-041…DB-045).** Night Light and AOD now fail
+- 2026-08-15 — **Privileged Display capability safety + reviews (DB-041…DB-046).** Night Light and AOD now fail
   closed on their AOSP framework capability resources at the platform-controller boundary, so
   profile swaps, circadian ticks, direct Apply and panic cannot bypass the gate; unavailable UI is
   hidden. Review restored authorization-before-capability result semantics and made unavailable
@@ -101,7 +101,8 @@ Newest first; ledger rows are the durable detail.
   Owner retained Android-14+ **Disable HDR (experimental)** as a stored-preference control (not the
   Force-SDR service API), with reboot and brief display-blank caveats (DB-044). Review then made
   partial/malformed external HDR preferences unrepresentable rather than normalizing them during
-  unrelated direct Apply (DB-045).
+  unrelated direct Apply (DB-045). CI then exposed a round-trip fixture that assumed absent HDR
+  rows meant OFF; it now seeds canonical OFF explicitly (DB-046).
 - 2026-08-13..14 — **Read-back, diagnostics, panic and supply-chain train (DB-034…DB-040).** Device
   read-back now survives repeat changes, Discard, rotation and concurrent collector updates;
   rejected controls explain themselves at debug level 8; every panic entry confirms once after
