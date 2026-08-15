@@ -1,7 +1,5 @@
-Diagnostics and reliability release.
+Reliability and safety release.
 
-Privileged Display now reads the device's real state when you open or return to the screen, so toggles changed elsewhere no longer show a stale value.
+Privileged Display now reads the device state and checks Android's Night Light and always-on display capabilities before writing. Disable HDR remains an Android 14+ experimental preference control; applying or clearing it may need a reboot, and display-mode changes may briefly blank the screen.
 
-Emergency Reset and the panic control now vibrate the S.O.S. confirmation like the shake gesture does, instead of recovering the screen silently.
-
-At debug level 8, control commands that are ignored say why rather than failing quietly.
+Emergency Reset now vibrates its S.O.S. confirmation. At debug level 8, ignored control commands say why.

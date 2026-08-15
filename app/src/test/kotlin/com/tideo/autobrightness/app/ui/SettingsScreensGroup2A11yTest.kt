@@ -108,7 +108,10 @@ class SettingsScreensGroup2A11yTest {
         compose.setContent {
             MaterialTheme {
                 PrivilegedDisplayContent(
-                    state = PrivilegedDisplayUiState(tier = Tier.ELEVATED, hdrAvailable = true),
+                    state = PrivilegedDisplayUiState(
+                        tier = Tier.ELEVATED, nightLightAvailable = true,
+                        alwaysOnDisplayAvailable = true, hdrAvailable = true,
+                    ),
                     onBack = {},
                 )
             }
@@ -121,7 +124,10 @@ class SettingsScreensGroup2A11yTest {
         compose.setContent {
             MaterialTheme {
                 PrivilegedDisplayContent(
-                    state = PrivilegedDisplayUiState(tier = Tier.ELEVATED, hdrAvailable = true),
+                    state = PrivilegedDisplayUiState(
+                        tier = Tier.ELEVATED, nightLightAvailable = true,
+                        alwaysOnDisplayAvailable = true, hdrAvailable = true,
+                    ),
                     onBack = {},
                 )
             }
@@ -137,7 +143,10 @@ class SettingsScreensGroup2A11yTest {
         compose.setContent {
             MaterialTheme {
                 PrivilegedDisplayContent(
-                    state = PrivilegedDisplayUiState(tier = Tier.ELEVATED, hdrAvailable = true),
+                    state = PrivilegedDisplayUiState(
+                        tier = Tier.ELEVATED, nightLightAvailable = true,
+                        alwaysOnDisplayAvailable = true, hdrAvailable = true,
+                    ),
                     onBack = {},
                 )
             }

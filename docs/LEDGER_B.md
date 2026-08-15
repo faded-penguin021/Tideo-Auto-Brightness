@@ -585,3 +585,42 @@
   it too, so the gate stood open on empty state and a merge could overwrite the profile. Fixed by
   scoping equality to the owned fields, making read-and-write one `update`, and refusing before the
   seed. `[cited]`: `mergeDeviceReadBack`.
+
+- DB-041 [cited]: **A backing Android Settings key does not establish feature support.** A real
+  black-screen failure followed a Night Display write on an OEM whose framework reports it
+  unavailable. The controller now fails closed on `config_nightDisplayAvailable` and
+  `config_dozeAlwaysOnDisplayAvailable`; unsupported writes are harmless no-ops across profiles,
+  circadian ticks, Apply and panic, and UI controls hide. Force SDR is disabled: AOSP
+  `DisplayManagerService` updates in-memory state/logical displays inside its binder methods but
+  does not observe these Global rows, so direct Settings writes cannot establish a live effect.
+
+- DB-042 [cited]: **A safe read default can still erase an unsupported hidden field.** Capability-
+  gated reads returned `false` for Night Light/AOD; device read-back then copied those defaults into
+  the draft. Opening Privileged Display on an unsupported device and applying an unrelated visible
+  edit silently cleared the profile values. Snapshot booleans are now nullable capability sentinels,
+  so read-back preserves unavailable fields. The same review also restored authorization-before-
+  capability ordering: every setter rejects below ELEVATED before an unsupported no-op/failure.
+
+- DB-043 [cited]: **A component-backed capability is the conjunction, not its headline flag.**
+  DB-041 correctly requires framework capability gates but overclaimed that the reported failure's
+  OEM flag was known; only the direct Night Display write and failure were observed. Night Light
+  follows `config_nightDisplayAvailable`. AOD additionally requires a non-empty
+  `config_dozeComponent`, matching AOSP ambient-display availability while deliberately ignoring
+  its debug-property escape hatch. Missing/unreadable resources fail closed; pure lookup tests pin
+  the exact names and the AOD truth table.
+
+- DB-044 [cited]: **A non-live preference control must name what it is, not the service operation it
+  resembles.** Owner decision supersedes DB-041's temporary Force-SDR removal: Android-14+
+  `user_disabled_hdr_formats` control remains, renamed **Disable HDR (experimental)**. It does not
+  invoke DisplayManager's Force-SDR conversion API; apply or clear may require reboot, and an
+  HDR/display-mode transition may briefly blank the screen. This is correctness/expectation risk,
+  not evidence of Night Light's observed catastrophic failure. Migrate if a safe, non-hidden live
+  DisplayManager API becomes available.
+
+- DB-045 [cited]: **A Boolean editor must not normalize a state it cannot represent.** HDR read-back
+  treated any enforced nonblank format list as “all HDR disabled”; direct Apply could then broaden a
+  partial/malformed external preference to `1,2,3,4` while saving an unrelated field. Only canonical
+  off (allowed + blank) and canonical all-disabled (the complete set, order/whitespace/duplicates
+  ignored) now map to Boolean; other rows map to null and direct Apply preserves them. Explicit
+  profile transitions and panic remain intentional writes. UI replaces the switch with a custom-
+  preference preservation notice while the row is unrepresentable.

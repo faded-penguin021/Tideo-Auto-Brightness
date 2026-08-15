@@ -190,7 +190,7 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     **Menu → Privileged → Privileged Display** change one field at a time and **Apply**; confirm the
     device reacts AND the system Settings UI agrees (a wrong key would be silently *created*, not
     rejected — visible agreement is the test):
-    - **Night Light** on, temperature slider near 2596 K. **Expected:** screen visibly warms;
+    - **Night Light** (only shown when Android reports it available) on, temperature slider near 2596 K. **Expected:** screen visibly warms;
       Settings → Display → Night Light shows ON with matching intensity. "Use device temperature"
       (unset) leaves the system's own preference untouched. ⚠️ **Known variance (2026-07-05,
       owner's OnePlus):** OxygenOS ignores `night_display_color_temperature` — the tint is the
@@ -200,13 +200,14 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     - **Color correction:** Grayscale, then Protanomaly/Deuteranomaly/Tritanomaly. **Expected:** the
       filter matches; Settings → Accessibility → Color correction shows the same mode.
     - **Color inversion** on/off. **Expected:** inverts; the Accessibility toggle agrees.
-    - **Always-on display** on/off. **Expected:** AOD appears/disappears on the lock screen.
+    - **Always-on display** (only shown when Android reports it available) on/off. **Expected:** AOD appears/disappears on the lock screen.
     - **Stay awake while charging** on, short screen timeout, charger in. **Expected:** the screen
       never sleeps while plugged (AC/USB/wireless); off + unplugged, normal timeout returns.
-    - **Force SDR** (visible only on Android 14+) on → **read back over adb:**
-      `adb shell settings get global user_disabled_hdr_formats` → `1,2,3,4` and
-      `adb shell settings get global are_user_disabled_hdr_formats_allowed` → `0`; an HDR video
-      plays without the HDR brightness boost. Off → allowed returns `1` and HDR plays again.
+    - **Disable HDR (experimental, Android 14+)** on → read back
+      `user_disabled_hdr_formats=1,2,3,4` and
+      `are_user_disabled_hdr_formats_allowed=0`; off → allowed returns `1` and formats clears.
+      This writes stored preferences, not Android's Force-SDR service API. Either direction may
+      require a reboot, and HDR/display-mode changes may briefly blank the screen (DB-044).
 33. **Profile carried by a context rule — engage AND baseline restore.** Keep the baseline's display
     fields all off/default. Set grayscale (+ Night Light) on Privileged Display, **save as a
     profile**, then restore your baseline values. Add a Contexts rule loading that profile (a time
@@ -247,7 +248,7 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
 39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
     Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
     **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to
-    **defaults** (color back, inversion off, Night Light off, AOD/stay-awake off, HDR re-allowed)
+    **defaults** (color back, inversion off, supported Night Light/AOD off, stay-awake off)
     — including a pre-existing residual (repeat after a force-stop mid-override: panic still
     clears it). Re-enable the service. **Expected:** the baseline's display fields re-assert on
     start — panic is an escape hatch, not a permanent opt-out.

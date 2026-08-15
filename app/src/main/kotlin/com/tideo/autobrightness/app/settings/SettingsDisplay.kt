@@ -82,7 +82,7 @@ private val FRIENDLY_LABELS: Map<String, String> = mapOf(
     "inversionEnabled" to "Color inversion",
     "alwaysOnDisplayEnabled" to "Always-on display",
     "stayAwakeChargingEnabled" to "Stay awake while charging",
-    "hdrForceSdrEnabled" to "Force SDR (disable HDR)",
+    "hdrForceSdrEnabled" to "Disable HDR (experimental)",
 )
 
 internal fun friendlyLabel(key: String, taskerVariable: String): String =

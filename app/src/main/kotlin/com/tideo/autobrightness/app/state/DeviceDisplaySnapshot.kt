@@ -5,15 +5,16 @@ import com.tideo.autobrightness.platform.display.DaltonizerMode
 
 /**
  * DB-034: what the seven Privileged Display keys actually read as on the device, so the screen can
- * show the device instead of asserting the stored profile. [hdrForceSdr] is null when the key is
- * unavailable (below API 34); [temperatureK] is null when Android holds no explicit value.
+ * show the device instead of asserting the stored profile. Nullable feature booleans mean Android
+ * reports that feature unavailable; [temperatureK] null means no explicit value when Night Light
+ * is available.
  */
 data class DeviceDisplaySnapshot(
-    val nightLight: Boolean,
+    val nightLight: Boolean?,
     val temperatureK: Int?,
     val daltonizer: DaltonizerMode,
     val inversion: Boolean,
-    val alwaysOn: Boolean,
+    val alwaysOn: Boolean?,
     val stayAwake: Boolean,
     val hdrForceSdr: Boolean?,
 )
@@ -24,11 +25,16 @@ data class DeviceDisplaySnapshot(
  * ticker owns the temperature key, so reading it would freeze one ramp sample into a static value.
  */
 fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings = copy(
-    nightLightEnabled = snapshot.nightLight,
-    nightLightTemperature = if (nightLightCircadianEnabled) nightLightTemperature else snapshot.temperatureK,
+    // DB-042: hidden, unsupported fields must not be erased by read-back.
+    nightLightEnabled = snapshot.nightLight ?: nightLightEnabled,
+    nightLightTemperature = if (snapshot.nightLight == null || nightLightCircadianEnabled) {
+        nightLightTemperature
+    } else {
+        snapshot.temperatureK
+    },
     daltonizerMode = snapshot.daltonizer.name,
     inversionEnabled = snapshot.inversion,
-    alwaysOnDisplayEnabled = snapshot.alwaysOn,
+    alwaysOnDisplayEnabled = snapshot.alwaysOn ?: alwaysOnDisplayEnabled,
     stayAwakeChargingEnabled = snapshot.stayAwake,
     hdrForceSdrEnabled = snapshot.hdrForceSdr ?: hdrForceSdrEnabled,
 )

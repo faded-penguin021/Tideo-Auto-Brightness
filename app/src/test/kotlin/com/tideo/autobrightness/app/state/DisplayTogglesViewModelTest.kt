@@ -6,6 +6,8 @@ import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
+import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
+import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,7 +51,22 @@ class DisplayTogglesViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun vm() = DisplayTogglesViewModel(app, io = dispatcher)
+    private fun vm(
+        nightLightAvailable: Boolean = true,
+        alwaysOnDisplayAvailable: Boolean = true,
+    ): DisplayTogglesViewModel {
+        val privileges = AndroidPrivilegeManager(app)
+        return DisplayTogglesViewModel(
+            app,
+            privilegeManager = privileges,
+            display = AndroidSecureDisplayController(
+                app, privileges,
+                nightLightAvailable = nightLightAvailable,
+                alwaysOnDisplayAvailable = alwaysOnDisplayAvailable,
+            ),
+            io = dispatcher,
+        )
+    }
 
     private fun grantElevated() {
         Shadows.shadowOf(app).grantPermissions(Manifest.permission.WRITE_SECURE_SETTINGS)
@@ -96,6 +113,66 @@ class DisplayTogglesViewModelTest {
     }
 
     @Test
+    fun directApply_cannotBypassNightLightOrAodCapabilities() {
+        grantElevated()
+        val vm = vm(nightLightAvailable = false, alwaysOnDisplayAvailable = false)
+
+        vm.applyNow(
+            AabSettings(
+                nightLightEnabled = true,
+                nightLightTemperature = 2_700,
+                alwaysOnDisplayEnabled = true,
+            ),
+        )
+
+        assertFalse(vm.state.value.writeFailed)
+        assertFalse(vm.state.value.nightLightAvailable)
+        assertFalse(vm.state.value.alwaysOnDisplayAvailable)
+        val snapshot = assertNotNull(vm.deviceSnapshot.value)
+        assertNull(snapshot.nightLight)
+        assertNull(snapshot.alwaysOn)
+        assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999))
+        assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_color_temperature", -999))
+        assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "doze_always_on", -999))
+    }
+
+    @Test
+    fun directApply_preservesAnUnrepresentablePartialHdrPreference() {
+        grantElevated()
+        Settings.Global.putInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed", 0)
+        Settings.Global.putString(app.contentResolver, "user_disabled_hdr_formats", "1,2")
+        val vm = vm()
+        assertNull(assertNotNull(vm.deviceSnapshot.value).hdrForceSdr)
+        assertFalse(vm.state.value.hdrAvailable)
+        assertTrue(vm.state.value.hdrPreferenceCustom)
+
+        vm.applyNow(AabSettings(inversionEnabled = true, hdrForceSdrEnabled = false))
+
+        assertEquals("1,2", Settings.Global.getString(app.contentResolver, "user_disabled_hdr_formats"))
+        assertEquals(0, Settings.Global.getInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed"))
+        assertEquals(1, Settings.Secure.getInt(app.contentResolver, "accessibility_display_inversion_enabled"))
+    }
+
+    @Test
+    fun directApply_rechecksHdrAfterAnExternalChange_andPreservesTheNewCustomRow() {
+        grantElevated()
+        Settings.Global.putInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed", 1)
+        Settings.Global.putString(app.contentResolver, "user_disabled_hdr_formats", "")
+        val vm = vm()
+        assertEquals(false, assertNotNull(vm.deviceSnapshot.value).hdrForceSdr)
+
+        Settings.Global.putInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed", 0)
+        Settings.Global.putString(app.contentResolver, "user_disabled_hdr_formats", "1,2")
+        vm.applyNow(AabSettings(inversionEnabled = true, hdrForceSdrEnabled = false))
+
+        assertEquals("1,2", Settings.Global.getString(app.contentResolver, "user_disabled_hdr_formats"))
+        assertEquals(0, Settings.Global.getInt(app.contentResolver, "are_user_disabled_hdr_formats_allowed"))
+        assertNull(assertNotNull(vm.deviceSnapshot.value).hdrForceSdr)
+        assertTrue(vm.state.value.hdrPreferenceCustom)
+        assertFalse(vm.state.value.hdrAvailable)
+    }
+
+    @Test
     fun refresh_clearsStaleWriteFailureBanner() {
         val vm = vm()
         vm.applyNow(AabSettings(nightLightEnabled = true)) // below ELEVATED → fails, banner up
@@ -118,7 +195,7 @@ class DisplayTogglesViewModelTest {
 
         val snapshot = assertNotNull(vm.deviceSnapshot.value)
         assertTrue(snapshot.inversion, "the snapshot must report what the device actually reads")
-        assertFalse(snapshot.nightLight)
+        assertEquals(false, snapshot.nightLight)
     }
 
     @Test
@@ -126,14 +203,14 @@ class DisplayTogglesViewModelTest {
         // The system quick-settings tile flipping Night Light while we were backgrounded.
         grantElevated()
         val vm = vm()
-        assertFalse(assertNotNull(vm.deviceSnapshot.value).nightLight)
+        assertEquals(false, assertNotNull(vm.deviceSnapshot.value).nightLight)
 
         Settings.Secure.putInt(app.contentResolver, "night_display_activated", 1)
         Settings.Secure.putInt(app.contentResolver, "night_display_color_temperature", 2700)
         vm.refresh()
 
         val snapshot = assertNotNull(vm.deviceSnapshot.value)
-        assertTrue(snapshot.nightLight)
+        assertEquals(true, snapshot.nightLight)
         assertEquals(2700, snapshot.temperatureK)
     }
 

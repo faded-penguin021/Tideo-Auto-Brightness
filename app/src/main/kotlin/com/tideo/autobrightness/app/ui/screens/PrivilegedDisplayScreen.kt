@@ -163,37 +163,39 @@ fun PrivilegedDisplayContent(
                     modifier = Modifier.testTag("pd_profile_intro"),
                 )
 
-                SectionHeader(stringResource(R.string.pd_section_night_light), divider = true)
-                AabCard {
-                    SwitchSettingRow(
-                        stringResource(R.string.pd_night_light_switch), draft.nightLightEnabled,
-                        { on -> onEditDraft { it.copy(nightLightEnabled = on) } },
-                        testTag = "switch_nightLight",
-                    )
-                    if (state.nightLightAutoMode != NightLightAutoMode.MANUAL) {
-                        Text(
-                            stringResource(R.string.pd_night_light_schedule_caveat),
-                            color = MaterialTheme.colorScheme.secondary,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.testTag("pd_schedule_caveat"),
+                if (state.nightLightAvailable) {
+                    SectionHeader(stringResource(R.string.pd_section_night_light), divider = true)
+                    AabCard {
+                        SwitchSettingRow(
+                            stringResource(R.string.pd_night_light_switch), draft.nightLightEnabled,
+                            { on -> onEditDraft { it.copy(nightLightEnabled = on) } },
+                            testTag = "switch_nightLight",
+                        )
+                        if (state.nightLightAutoMode != NightLightAutoMode.MANUAL) {
+                            Text(
+                                stringResource(R.string.pd_night_light_schedule_caveat),
+                                color = MaterialTheme.colorScheme.secondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("pd_schedule_caveat"),
+                            )
+                        }
+                        NightLightTemperatureSlider(
+                            kelvin = draft.nightLightTemperature,
+                            onCommit = { k -> onEditDraft { it.copy(nightLightTemperature = k) } },
+                        )
+                        if (draft.nightLightTemperature != null) {
+                            TextButton(
+                                onClick = { onEditDraft { it.copy(nightLightTemperature = null) } },
+                                modifier = Modifier.testTag("pd_temp_clear"),
+                            ) { Text(stringResource(R.string.pd_profile_temp_clear)) }
+                        }
+                        SwitchSettingRow(
+                            stringResource(R.string.pd_night_light_circadian), draft.nightLightCircadianEnabled,
+                            { on -> onEditDraft { it.copy(nightLightCircadianEnabled = on) } },
+                            help = R.string.pd_night_light_circadian_help,
+                            testTag = "switch_nightLightCircadian",
                         )
                     }
-                    NightLightTemperatureSlider(
-                        kelvin = draft.nightLightTemperature,
-                        onCommit = { k -> onEditDraft { it.copy(nightLightTemperature = k) } },
-                    )
-                    if (draft.nightLightTemperature != null) {
-                        TextButton(
-                            onClick = { onEditDraft { it.copy(nightLightTemperature = null) } },
-                            modifier = Modifier.testTag("pd_temp_clear"),
-                        ) { Text(stringResource(R.string.pd_profile_temp_clear)) }
-                    }
-                    SwitchSettingRow(
-                        stringResource(R.string.pd_night_light_circadian), draft.nightLightCircadianEnabled,
-                        { on -> onEditDraft { it.copy(nightLightCircadianEnabled = on) } },
-                        help = R.string.pd_night_light_circadian_help,
-                        testTag = "switch_nightLightCircadian",
-                    )
                 }
 
                 SectionHeader(stringResource(R.string.pd_section_color), divider = true)
@@ -212,11 +214,13 @@ fun PrivilegedDisplayContent(
 
                 SectionHeader(stringResource(R.string.pd_section_screen), divider = true)
                 AabCard {
-                    SwitchSettingRow(
-                        stringResource(R.string.pd_always_on), draft.alwaysOnDisplayEnabled,
-                        { on -> onEditDraft { it.copy(alwaysOnDisplayEnabled = on) } },
-                        testTag = "switch_alwaysOn",
-                    )
+                    if (state.alwaysOnDisplayAvailable) {
+                        SwitchSettingRow(
+                            stringResource(R.string.pd_always_on), draft.alwaysOnDisplayEnabled,
+                            { on -> onEditDraft { it.copy(alwaysOnDisplayEnabled = on) } },
+                            testTag = "switch_alwaysOn",
+                        )
+                    }
                     SwitchSettingRow(
                         stringResource(R.string.pd_stay_awake), draft.stayAwakeChargingEnabled,
                         { on -> onEditDraft { it.copy(stayAwakeChargingEnabled = on) } },
@@ -231,6 +235,16 @@ fun PrivilegedDisplayContent(
                             stringResource(R.string.pd_hdr_force_sdr), draft.hdrForceSdrEnabled,
                             { on -> onEditDraft { it.copy(hdrForceSdrEnabled = on) } },
                             help = R.string.pd_hdr_help, testTag = "switch_hdrForceSdr",
+                        )
+                    }
+                } else if (state.hdrPreferenceCustom) {
+                    SectionHeader(stringResource(R.string.pd_section_experimental), divider = true)
+                    AabCard {
+                        Text(
+                            stringResource(R.string.pd_hdr_custom_preserved),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("pd_hdr_custom_preserved"),
                         )
                     }
                 }

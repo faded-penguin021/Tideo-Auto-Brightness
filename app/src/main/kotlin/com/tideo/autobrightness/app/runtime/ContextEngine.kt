@@ -637,7 +637,7 @@ interface ProfileCatalog {
 /**
  * Overlay a context profile's parameter set onto the baseline: task626 `_ContextResume`'s 39-key
  * snapshot, **plus the rebuild-only display-toggle fields (D-151/D-152: Night Light + temperature,
- * daltonizer, inversion, AOD, stay-awake-charging, HDR force-SDR)**. Fields outside it (service
+ * daltonizer, inversion, AOD, stay-awake-charging, experimental HDR disabling)**. Fields outside it (service
  * enable, manual context lock, debug level, setup title, schema version, `detectOverrides`) are
  * preserved from the baseline.
  *

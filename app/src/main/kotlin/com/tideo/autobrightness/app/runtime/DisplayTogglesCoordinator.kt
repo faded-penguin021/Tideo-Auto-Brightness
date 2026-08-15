@@ -17,7 +17,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Applies display-toggle PROFILE fields (D-151/D-152: Night Light, temperature, daltonizer,
- * inversion, always-on display, stay-awake-charging, HDR force-SDR) to device via
+ * inversion, always-on display, stay-awake-charging, experimental HDR disabling) to device via
  * ELEVATED-gated [SecureDisplayController], idempotent and only-on-change (D-151 replaces D-150).
  *
  * Seed to baseline values without writing; service stop re-applies baseline; process death skips
