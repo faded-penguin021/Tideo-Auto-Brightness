@@ -364,7 +364,7 @@
     <string name="onboarding_restricted_title">Heads up: restricted settings</string>
     <string name="onboarding_open_app_info">Open App info</string>
     <string name="onboarding_granted">Granted ✓</string>
-    <string name="onboarding_elevated_title">3. Elevated access (optional)</string>
+    <string name="onboarding_elevated_title">4. Elevated access (optional)</string>
     <string name="onboarding_adb_label">ADB (from a computer):</string>
     <string name="onboarding_copy_command">Copy command</string>
     <string name="onboarding_use_shizuku">Use Shizuku</string>

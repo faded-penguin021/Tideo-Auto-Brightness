@@ -675,3 +675,12 @@
   that field. Owner-reported, present since it shipped. Format is now `Locale.US`; parse
   normalises `,`; the filter admits `,` instead of deleting it, which had turned a typed `52,37`
   into latitude `5237`. `[cited]`: `formatCoord`, `parseCoord`.
+
+- DB-052 [cited]: **A test that hopes for a race condition is a test that reports the weather.**
+  `readBack_isRefusedBeforeTheSeed` asserted the pre-seed refusal while doing nothing to hold the
+  seed off: `viewModelScope` is `Main.immediate`, so on the test thread the init collector can run
+  inline and finish seeding before the merge call, depending on whether DataStore answers from its
+  in-memory cache. It failed 2 runs in 3 under container load and passed warm — DB-036's lesson one
+  file over, with the precondition asserted in a comment. Now
+  `Dispatchers.setMain(StandardTestDispatcher())` holds the collector until the test advances it,
+  and `epoch == 0` pins the state under test. `[cited]`: `awaitVmOn`.

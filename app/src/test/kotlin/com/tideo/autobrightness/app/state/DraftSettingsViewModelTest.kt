@@ -5,9 +5,15 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.storage.settingsDataStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +27,7 @@ import kotlin.test.assertTrue
  * S12.5b acceptance: draft/preview → Apply model (G2-F1).
  * Edits mutate draft only; Apply commits to DataStore; Discard reverts to committed.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class DraftSettingsViewModelTest {
 
@@ -62,6 +69,19 @@ class DraftSettingsViewModelTest {
         }
     }
 
+    private fun awaitVmOn(
+        dispatcher: TestDispatcher,
+        vm: DraftSettingsViewModel,
+        predicate: (DraftSettingsViewModel) -> Boolean,
+    ) {
+        repeat(100) {
+            dispatcher.scheduler.advanceUntilIdle()
+            idle()
+            if (predicate(vm)) return
+            Thread.sleep(10)
+        }
+    }
+
     private fun seededVm(): DraftSettingsViewModel {
         val vm = DraftSettingsViewModel(app)
         // Wait for init collector to seed; gate on epoch 0→1 (not draft == committed which may be true early).
@@ -88,25 +108,32 @@ class DraftSettingsViewModelTest {
 
     @Test
     fun readBack_isRefusedBeforeTheSeed_soDefaultsNeverReplaceTheProfile() {
-        // The snapshot comes from Settings.Secure binder reads and routinely beats the DataStore
-        // seed. Merging into the pre-seed AabSettings() defaults would either be discarded by the
-        // seed, or replace the user's whole profile with defaults + device values.
+        // DB-040: a snapshot routinely beats the DataStore seed; merging into defaults loses either
+        // the read-back or the profile.
         setBaseline(AabSettings(minBrightness = 42, nightLightEnabled = false))
-        val vm = DraftSettingsViewModel(app)
+        // DB-052: viewModelScope is Main.immediate, so on the test thread the init collector could
+        // run inline and seed before the merge — the state under test, held open deterministically.
+        val main = StandardTestDispatcher()
+        Dispatchers.setMain(main)
+        try {
+            val vm = DraftSettingsViewModel(app)
+            assertEquals(0, vm.epoch.value, "the seed must still be pending; nothing else pins that")
 
-        // No idle yet: the init collector has not run, so the draft is still AabSettings() defaults.
-        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
-        assertFalse(
-            vm.draft.value.nightLightEnabled,
-            "merging into pre-seed defaults is what makes the seed race destructive",
-        )
+            vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
+            assertFalse(
+                vm.draft.value.nightLightEnabled,
+                "merging into pre-seed defaults is what makes the seed race destructive",
+            )
 
-        awaitVm(vm) { it.epoch.value >= 1 }
-        assertEquals(42, vm.draft.value.minBrightness, "the profile must survive the race")
-        // And once seeded the read-back works normally.
-        vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
-        assertTrue(vm.draft.value.nightLightEnabled, "the read-back resumes after the seed")
-        assertEquals(42, vm.draft.value.minBrightness, "without discarding the profile")
+            awaitVmOn(main, vm) { it.epoch.value >= 1 }
+            assertEquals(42, vm.draft.value.minBrightness, "the profile must survive the race")
+            // And once seeded the read-back works normally.
+            vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
+            assertTrue(vm.draft.value.nightLightEnabled, "the read-back resumes after the seed")
+            assertEquals(42, vm.draft.value.minBrightness, "without discarding the profile")
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     @Test
