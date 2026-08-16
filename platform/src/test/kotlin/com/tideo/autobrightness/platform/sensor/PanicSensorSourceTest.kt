@@ -278,4 +278,30 @@ class PanicSensorSourceTest {
         assertEquals(0, events.size, "a stale window must not fire after the sensor was released")
         job.cancel()
     }
+
+    // ---- Teardown: the gesture must not outlive the collector (1.9.0 device round D4) ----
+
+    @Test
+    fun cancellingTheCollector_releasesTheSensorAndTheGestureStopsFiring() {
+        // DB-050: the teardown every other case here assumes as cleanup, asserted.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        accelSensor()
+        sensitivity = 0
+        val events = mutableListOf<Unit>()
+        val scope = kotlinx.coroutines.CoroutineScope(UnconfinedTestDispatcher())
+        val job = scope.launch { source().events().collect { events += it } }
+        assertEquals(1, registeredListenerCount(), "the gesture is live while the collector runs")
+
+        job.cancel()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(0, registeredListenerCount(), "cancelling the collector must release the accelerometer")
+        upsideDownFrames(20)
+        assertEquals(0, events.size, "a torn-down source must not fire the gesture")
+
+        // A leaked state receiver would re-register the sensor on the next SCREEN_ON.
+        context.sendBroadcast(android.content.Intent(android.content.Intent.ACTION_SCREEN_ON))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals(0, registeredListenerCount(), "a released source must not re-arm on SCREEN_ON")
+    }
 }

@@ -63,16 +63,28 @@ ledger: `LEDGER_B.md`.
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. **The panic gesture stays armed after panic has torn the service down (1.9.0 round D4, FAIL).**
-   Supersedes the old double-S.O.S. item — the owner's report is NOT two buzzes per panic. Observed:
-   D3's intent PANIC fires and stops the service; a shake afterwards fires panic AGAIN, though
-   nothing should be listening. That also explains the 1.8.2 "double" without a second call site:
-   the sweep (`rg -n -i 'vibrat|sos|morse' app platform`) still finds exactly one `vibrateSos()`
-   caller, in `panicAndStop`, and `panicInFlight` is per-INSTANCE, so a second armed listener or a
-   second service instance buzzes once each and reads as a double. Mechanism unconfirmed — do not
-   assume which, and note `AmbientMonitoringService.onDestroy` cancelling `scope` is what should
-   have unregistered the sensor. Triage before the v1.9.0 tag; it is a panic-lifecycle defect on a
-   safety feature, so it gates the PR #117 merge recommendation.
+1. **A shake fired panic after panic had already stopped the service (1.9.0 round D4, FAIL) — the
+   armed listener is very likely in the OTHER installed variant.** Owner-observed: D3's intent PANIC
+   stops the service; a later shake fires panic again. Triage (2026-08-16) ruled the in-app paths
+   out rather than guessing: `AndroidPanicSensorSource` teardown is now pinned by
+   `cancellingTheCollector_releasesTheSensorAndTheGestureStopsFiring` — cancelling the collector
+   unregisters both sensor listeners AND the state receiver, the gesture stops firing, and a later
+   SCREEN_ON does not re-arm it (this was untested; every other case cancelled its job as cleanup
+   and asserted nothing after). `AmbientMonitoringService` is the only collector of that flow,
+   `onDestroy` cancels `panicJob` and `scope`, and a post-panic instance can only re-arm via
+   `ensureRunning()`, which needs `serviceEnabled=true` — panic sets it false. Decisive detail:
+   `panicInFlight` is per-INSTANCE and latches, so a second panic in the SAME instance is swallowed
+   silently. The buzz therefore proves a DIFFERENT instance ran panic, and the debug app has no path
+   to one. **D-128 is the precedent**: the owner runs a co-installed release build, D3's `-n` targets
+   the debug component only, so the release service is untouched and stays armed — and it fires
+   once per shake, which also explains the 1.8.2 "double" with a single `vibrateSos()` call site.
+   **Owner to discriminate** (device-only): `adb shell dumpsys activity services
+   com.tideo.autobrightness` (release) and `…debug` right after D3, or force-stop/uninstall the
+   release variant and redo D3→D4. If confirmed this is D-128's class — run ONE variant's service at
+   a time, docs-only, no code change. If the DEBUG service is still listed after D3, it is a real
+   teardown defect and the triage above is wrong somewhere; reopen from there. Until discriminated it
+   is unresolved, but it is no longer evidenced as a v1.9.0 regression and should not block PR #117
+   on its own.
 2. Device-verify §11.39a **C1/C2** (external change tracked twice): both BLOCKED in the 1.9.0 round —
    the owner's device exposes no system quick-settings tile for Night Light. Needs another
    out-of-band trigger for the same path (an `adb` write to `night_display_activated`, or the system
@@ -113,6 +125,14 @@ branch protection and secret-scanning settings in DA-006/DA-041.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-08-16 — **D4 triage: panic teardown pinned, gesture re-fire pushed outside the app.** The
+  1.9.0 round's one FAIL got a diagnostic, not a fix: a test now proves cancelling the panic-sensor
+  collector releases the accelerometer and the state receiver and that SCREEN_ON cannot re-arm it,
+  which was the untested invariant the whole teardown rests on. With the sole collector, the
+  per-instance `panicInFlight` latch and the `serviceEnabled=false` re-arm gate, no in-app path
+  produces the observed second buzz — D-128's co-installed release variant does. Owner queue item 1
+  carries the adb commands that settle it. Test-only; no runtime change.
 
 - 2026-08-15 — **Pre-merge review of the v1.9.0 train (DB-048/DB-049).** DB-047's read-back
   invalidation only covered D-152's service-OFF Apply, so the same rollback survived on the

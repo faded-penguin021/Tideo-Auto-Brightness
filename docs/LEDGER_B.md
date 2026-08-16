@@ -657,3 +657,12 @@
   have, and only devices an older Tideo had written showed the switch. The flag now reads with
   AOSP's documented default of 1; a real disable list still refuses to guess.
   `[cited]`: `AndroidSecureDisplayController.readHdrForceSdr`.
+
+- DB-050 [cited]: **A teardown every test uses as cleanup is a teardown no test asserts.** A shake
+  fired panic after an intent PANIC had stopped the service; the in-app case rests on `awaitClose`
+  releasing the accelerometer, which nothing checked — every `PanicSensorSourceTest` case ended
+  `job.cancel()` and asserted nothing after, so a leak was invisible at the layer that owns it.
+  Pinned, and it holds: cancel releases both listeners and the receiver, and SCREEN_ON cannot
+  re-arm. With `panicInFlight` per-INSTANCE making a repeat silent, a buzz proves a second
+  instance — D-128's co-installed variant, not this code.
+  `[cited]`: `PanicSensorSourceTest.cancellingTheCollector_releasesTheSensorAndTheGestureStopsFiring`.
