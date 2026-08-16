@@ -66,30 +66,19 @@ ledger: `LEDGER_B.md`.
 1. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
    device reports Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
    Needs hardware that reports them unavailable.
-2. Device location fix fails a few times before succeeding while geo-IP resolves instantly (owner,
-   out of script). The banner half of that report was a real defect and is fixed (DB-051). Triage of
-   the retry half found no defect in `AndroidLocationReader.activeFix`: both enabled providers are
-   registered together, every completion path releases them (now pinned by test), and it reports
-   Unavailable only when no fresh fix lands within 20 s AND there is no last-known fix at all — a
-   state that self-heals the moment one lands, which is the shape the owner described. Two candidate
-   mechanisms remain, and the Open question below discriminates them.
 
-Open questions and owed reviews:
+Open questions and owed reviews: none.
 
-- [2026-08-16] **When "Use current location" failed, which did you see?** (a) the coordinate fields
-  filled in but Set did nothing — then those failures were DB-051 and are already fixed, and nothing
-  is left here; or (b) the toast "Couldn't acquire a location" — then acquisition genuinely failed
-  and the likely cause is the second candidate: `activeFix` only registers GPS and NETWORK, and
-  gives up at once when a device reports both disabled (some OEM battery-saving location modes
-  expose only the fused provider), where the `currentLocation()` path it replaced in D-122 still
-  had a PASSIVE fallback. Recommendation: answer (a)/(b) before any change — adding a PASSIVE or
-  fused fallback to the active path is a real coverage gap but unevidenced on this device, and
-  D-122 chose the active path deliberately.
-
-Incoming: 1.9.0-debug/vc21 round (commit `7970765`) = **11 PASS / 1 FAIL / 3 BLOCKED**. A1/A2 pass,
+Incoming: **DB-051 is device-confirmed** (owner, 2026-08-16): the coordinate fields filled with
+comma-decimal values and Set did nothing, which is the reported "location fix fails a few times
+before it works" in full — acquisition had succeeded every time; only the write was refused. That
+retires the `activeFix` PASSIVE/fused coverage gap as unevidenced (recorded in DB-051, not fixed),
+and explains "geo-IP works instantly" as the 20 s on-device window running before the IP fallback,
+which is D-122's deliberate order. Earlier: 1.9.0-debug/vc21 round (commit `7970765`) = **11 PASS / 1 FAIL / 3 BLOCKED**. A1/A2 pass,
 so DB-048 and DB-049 are device-confirmed; B2/B3 pass, closing the DB-044/DB-045 state checks the
-queue had held (reboot/blank caveats not separately reported). FAIL is D4 (item 1); BLOCKED are
-items 2-3. Earlier: 1.8.2-debug was 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED; DB-011/012 fixed real
+queue had held (reboot/blank caveats not separately reported). Its one FAIL (D4) and two of its
+three BLOCKED are now owner-closed in Decided non-items; the third is the only open queue item.
+Earlier: 1.8.2-debug was 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED; DB-011/012 fixed real
 defects, DB-013 retired the damaging whole-device backup test, DB-012 records that
 `PrivilegeManager` instances share no process-wide cache. Owner confirmed Dependabot, branch
 protection and secret-scanning in DA-006/DA-041.
