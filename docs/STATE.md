@@ -63,53 +63,37 @@ ledger: `LEDGER_B.md`.
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. **A shake fired panic after panic had already stopped the service (1.9.0 round D4, FAIL) — the
-   armed listener is very likely in the OTHER installed variant.** Owner-observed: D3's intent PANIC
-   stops the service; a later shake fires panic again. Triage (2026-08-16) ruled the in-app paths
-   out rather than guessing: `AndroidPanicSensorSource` teardown is now pinned by
-   `cancellingTheCollector_releasesTheSensorAndTheGestureStopsFiring` — cancelling the collector
-   unregisters both sensor listeners AND the state receiver, the gesture stops firing, and a later
-   SCREEN_ON does not re-arm it (this was untested; every other case cancelled its job as cleanup
-   and asserted nothing after). `AmbientMonitoringService` is the only collector of that flow,
-   `onDestroy` cancels `panicJob` and `scope`, and a post-panic instance can only re-arm via
-   `ensureRunning()`, which needs `serviceEnabled=true` — panic sets it false. Decisive detail:
-   `panicInFlight` is per-INSTANCE and latches, so a second panic in the SAME instance is swallowed
-   silently. The buzz therefore proves a DIFFERENT instance ran panic, and the debug app has no path
-   to one. **D-128 is the precedent**: the owner runs a co-installed release build, D3's `-n` targets
-   the debug component only, so the release service is untouched and stays armed — and it fires
-   once per shake, which also explains the 1.8.2 "double" with a single `vibrateSos()` call site.
-   **Owner to discriminate** (device-only): `adb shell dumpsys activity services
-   com.tideo.autobrightness` (release) and `…debug` right after D3, or force-stop/uninstall the
-   release variant and redo D3→D4. If confirmed this is D-128's class — run ONE variant's service at
-   a time, docs-only, no code change. If the DEBUG service is still listed after D3, it is a real
-   teardown defect and the triage above is wrong somewhere; reopen from there. Until discriminated it
-   is unresolved, but it is no longer evidenced as a v1.9.0 regression and should not block PR #117
-   on its own.
-2. Device-verify §11.39a **C1/C2** (external change tracked twice): both BLOCKED in the 1.9.0 round —
-   the owner's device exposes no system quick-settings tile for Night Light. Needs another
-   out-of-band trigger for the same path (an `adb` write to `night_display_activated`, or the system
-   Settings screen) before DB-034/DB-039 can be called device-verified.
-3. Device-verify the unavailable-feature hiding/no-write boundary from DB-041…DB-043 on hardware
-   that reports Night Light/AOD unavailable. BLOCKED a second time in the 1.9.0 round (B1): the
-   owner's device reports the features available, so no pass so far could exercise it.
-4. **No-location banner never clears (owner, 1.9.0 round, out of script).** With a location set —
-   manually, by device location, or by geo-IP — the "no location" banner stays up. Reproduces on the
-   **latest release**, so it predates this train and is not a v1.9.0 regression. Second, separable
-   symptom: the device location fix fails several times before succeeding, while geo-IP resolves
-   instantly. Both unreproduced locally and untriaged.
+1. **D4 (1.9.0 round, FAIL): a shake fired panic after an intent PANIC had already stopped the
+   service.** Triage (DB-050) rules out every in-app path: teardown is now pinned by test (cancel
+   releases both listeners and the receiver; SCREEN_ON cannot re-arm), the service is the sole
+   collector, a post-panic instance can only re-arm via `ensureRunning()` which needs
+   `serviceEnabled=true`, and `panicInFlight` is per-INSTANCE — a same-instance repeat is silent,
+   so a buzz proves a second instance. That is D-128's class: the co-installed release build stays
+   armed because D3's `-n` targets the debug component only. It also explains the 1.8.2 "double"
+   with one `vibrateSos()` call site. **Owner to settle** (device-only): `adb shell dumpsys
+   activity services com.tideo.autobrightness` and `…debug` right after D3, or force-stop the
+   release variant and redo D3→D4. Release armed = D-128, docs-only. **Debug service still listed
+   after D3 = the triage is wrong and this reopens as a real teardown defect** — the only outcome
+   that should block PR #117.
+2. §11.39a C1/C2 BLOCKED: the device has no Night Light quick-settings tile. Needs another
+   out-of-band trigger (adb write to `night_display_activated`, or system Settings) before
+   DB-034/DB-039 count as device-verified.
+3. DB-041…DB-043's unavailable-feature boundary BLOCKED a second time (B1): the device reports
+   Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
+4. Device location fix fails several times before succeeding while geo-IP resolves instantly
+   (owner, out of script). The banner half of that report was a real defect and is fixed (DB-051);
+   this retry half is untriaged and unreproduced locally — `AndroidLocationReader.activeFix()` is
+   where to start.
 
 Open questions and owed reviews: none.
 
-Incoming: owner device round on **1.9.0-debug/vc21** (commit `7970765`, the short script) was
-**11 PASS / 1 FAIL / 3 BLOCKED**. Passing: A1 and A2 — the two gates this train's review added, so
-DB-048's service-ON Apply rollback and DB-049's stock-device HDR switch are both device-confirmed;
-B2/B3 (HDR round-trip and custom-row preservation after an unrelated Apply), which closes the
-DB-044/DB-045 state checks the queue had held open, though the reboot/blank caveats were not
-separately reported; C3/C4, D1/D2/D3/D5 and E. The single FAIL is D4, now queue item 1.
-Earlier: owner device pass on 1.8.2-debug was 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED; DB-011/012
-fixed real defects and DB-013 retired the damaging whole-device backup test. DB-012 still records
-that `PrivilegeManager` instances do not share a process-wide cache. Owner confirmed Dependabot,
-branch protection and secret-scanning settings in DA-006/DA-041.
+Incoming: 1.9.0-debug/vc21 round (commit `7970765`) = **11 PASS / 1 FAIL / 3 BLOCKED**. A1/A2 pass,
+so DB-048 and DB-049 are device-confirmed; B2/B3 pass, closing the DB-044/DB-045 state checks the
+queue had held (reboot/blank caveats not separately reported). FAIL is D4 (item 1); BLOCKED are
+items 2-3. Earlier: 1.8.2-debug was 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED; DB-011/012 fixed real
+defects, DB-013 retired the damaging whole-device backup test, DB-012 records that
+`PrivilegeManager` instances share no process-wide cache. Owner confirmed Dependabot, branch
+protection and secret-scanning in DA-006/DA-041.
 
 ## Decided non-items
 
@@ -126,52 +110,18 @@ branch protection and secret-scanning settings in DA-006/DA-041.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-08-16 — **D4 triage: panic teardown pinned, gesture re-fire pushed outside the app.** The
-  1.9.0 round's one FAIL got a diagnostic, not a fix: a test now proves cancelling the panic-sensor
-  collector releases the accelerometer and the state receiver and that SCREEN_ON cannot re-arm it,
-  which was the untested invariant the whole teardown rests on. With the sole collector, the
-  per-instance `panicInFlight` latch and the `serviceEnabled=false` re-arm gate, no in-app path
-  produces the observed second buzz — D-128's co-installed release variant does. Owner queue item 1
-  carries the adb commands that settle it. Test-only; no runtime change.
-
-- 2026-08-15 — **Pre-merge review of the v1.9.0 train (DB-048/DB-049).** DB-047's read-back
-  invalidation only covered D-152's service-OFF Apply, so the same rollback survived on the
-  coordinator path; both halves now run through `applyDraft`. The HDR classifier read an absent
-  Global row as an unrepresentable custom preference, hiding the owner-retained Disable HDR control
-  behind a preservation notice on any device that had never written one — absent now reads as
-  AOSP's default. Also: a capability test whose fake supplied the gate it asserted, and three
-  device-script defects (the AOD gate named the Night Light resource, the HDR step wrote the
-  `secure` table the app never reads, and `screen_map` still described the `dirty` gate DB-039
-  removed).
-- 2026-08-15 — **Device-report fixes (DB-047).** Direct Privileged Display Apply now publishes a
-  post-write snapshot instead of letting stale pre-write read-back visually undo the toggle. Review
-  found that async startup still left the old snapshot mergeable while the draft advanced its Apply
-  epoch, and that an older refresh could republish OFF after invalidation. `applyNow` now invalidates
-  synchronously and request generations suppress superseded publications; controlled-dispatcher
-  tests hold the write pending and inject Apply during an older refresh read. Control diagnostics
-  remove control/bidi characters before their 40-character bound; the round script uses the debug
-  application/component and `name`
-  extra. Panic call-site audit found no gesture-local vibration in the surviving tree, so the
-  unexplained device-only double remains queued rather than receiving a speculative change.
-- 2026-08-15 — **Privileged Display capability safety + reviews (DB-041…DB-046).** Night Light and AOD now fail
-  closed on their AOSP framework capability resources at the platform-controller boundary, so
-  profile swaps, circadian ticks, direct Apply and panic cannot bypass the gate; unavailable UI is
-  hidden. Review restored authorization-before-capability result semantics and made unavailable
-  read-back fields nullable so hidden profile values survive unrelated Apply operations. External
-  review added AOD's required ambient-display component gate, lookup truth-table tests, and corrected
-  the evidence boundary: the failure after a direct write is known; the affected OEM flag is not.
-  Owner retained Android-14+ **Disable HDR (experimental)** as a stored-preference control (not the
-  Force-SDR service API), with reboot and brief display-blank caveats (DB-044). Review then made
-  partial/malformed external HDR preferences unrepresentable rather than normalizing them during
-  unrelated direct Apply (DB-045). CI then exposed a round-trip fixture that assumed absent HDR
-  rows meant OFF; it now seeds canonical OFF explicitly (DB-046).
-- 2026-08-13..14 — **Read-back, diagnostics, panic and supply-chain train (DB-034…DB-040).** Device
-  read-back now survives repeat changes, Discard, rotation and concurrent collector updates;
-  rejected controls explain themselves at debug level 8; every panic entry confirms once after
-  recovery; action pins gained Dependabot refresh, scoped permissions and wrapper validation.
-- 2026-08-11 — **Comment consolidation and enforcement (DB-028…DB-033).** Kotlin prose moved to
-  docs; the local comment/provenance guard gained fail-closed, whitespace-safe fixtures through
-  three review passes.
+- 2026-08-11..16 — **v1.9.0/vc21 train (DB-028…DB-051).** Privileged Display now shows the device
+  instead of the stored profile and cannot write what the framework reports unsupported: device
+  read-back with a re-merge gate that survives repeat changes, Discard and background writes;
+  Night Light/AOD capability gates at the controller boundary with unavailable fields preserved,
+  not erased; **Disable HDR (experimental)** retained as an owner-decided stored-preference control
+  that preserves custom rows and reads an absent row as AOSP's default; Apply invalidates the
+  read-back on both the direct and coordinator paths. Panic confirms on every entry point, once.
+  Dropped control commands explain themselves at debug level 8, with caller text bounded and
+  sanitized. Repo tier: Kotlin prose moved to the `.md` tier behind a new fail-closed comment
+  budget, Actions pinned to SHAs with a Dependabot refresh path, workflow tokens scoped, wrapper
+  validated, AMH 4.1.0 → 5.2.0. Pre-merge review added DB-048/DB-049; the device round added the
+  D4 triage (DB-050) and the locale-formatted coordinate fix (DB-051).
 - 2026-06-23..08-10 — **v1.0.0 → v1.8.2 and AMH convergence (D-096…D-176,
   DA-001…DA-044, DB-001…DB-027).** Rebuild/release/glue gates, F-Droid, hardening, Tasker parity,
   security review, triage and AMH upgrades through 5.2.0.

@@ -271,8 +271,8 @@ fun CircadianDateLocationCard(
     val effLon = value.longitude ?: currentLatLon?.second
 
     var dateText by remember(effDate) { mutableStateOf(effDate) }
-    var latText by remember(effLat) { mutableStateOf(effLat?.let { "%.5f".format(it) } ?: "") }
-    var lonText by remember(effLon) { mutableStateOf(effLon?.let { "%.5f".format(it) } ?: "") }
+    var latText by remember(effLat) { mutableStateOf(effLat?.let { formatCoord(it) } ?: "") }
+    var lonText by remember(effLon) { mutableStateOf(effLon?.let { formatCoord(it) } ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
 
     AabCard {
@@ -299,18 +299,18 @@ fun CircadianDateLocationCard(
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
-            value = latText, onValueChange = { latText = it.filter { c -> c.isDigit() || c == '.' || c == '-' } },
+            value = latText, onValueChange = { latText = it.filter { c -> c.isDigit() || c == '.' || c == ',' || c == '-' } },
             label = { Text(stringResource(R.string.field_latitude)) }, singleLine = true,
             modifier = Modifier.weight(1f).testTag("exp_lat"),
         )
         OutlinedTextField(
-            value = lonText, onValueChange = { lonText = it.filter { c -> c.isDigit() || c == '.' || c == '-' } },
+            value = lonText, onValueChange = { lonText = it.filter { c -> c.isDigit() || c == '.' || c == ',' || c == '-' } },
             label = { Text(stringResource(R.string.field_longitude)) }, singleLine = true,
             modifier = Modifier.weight(1f).testTag("exp_lon"),
         )
     }
     OutlinedButton(
-        onClick = { onUseCurrentLocation { la, lo -> latText = "%.5f".format(la); lonText = "%.5f".format(lo) } },
+        onClick = { onUseCurrentLocation { la, lo -> latText = formatCoord(la); lonText = formatCoord(lo) } },
         modifier = Modifier.testTag("exp_use_location"),
     ) { Text(stringResource(R.string.action_use_current_location)) }
 
@@ -318,8 +318,8 @@ fun CircadianDateLocationCard(
         Button(
             onClick = {
                 // F39: date and location independent. Blank coords = date-only, valid coords = pin both.
-                val lat = latText.trim().toDoubleOrNull()
-                val lon = lonText.trim().toDoubleOrNull()
+                val lat = parseCoord(latText)
+                val lon = parseCoord(lonText)
                 val coordsBlank = latText.isBlank() && lonText.isBlank()
                 if (dateText.isNotBlank() && (coordsBlank || (lat != null && lon != null))) {
                     onSet(dateText.trim(), lat, lon)
@@ -379,7 +379,12 @@ private fun CircadianStaleBanner(status: com.tideo.autobrightness.app.runtime.Ci
     }
 }
 
-private fun fmtCoord(v: Double?): String = v?.let { "%.5f".format(it) } ?: "—"
+private fun fmtCoord(v: Double?): String = v?.let { formatCoord(it) } ?: "—"
+
+// DB-051: these coordinates are parsed back, so they are dot-decimal — never the default locale's.
+internal fun formatCoord(value: Double): String = String.format(Locale.US, "%.5f", value)
+
+internal fun parseCoord(text: String): Double? = text.trim().replace(',', '.').toDoubleOrNull()
 
 private val EXP_DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("UTC")

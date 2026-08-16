@@ -666,3 +666,12 @@
   re-arm. With `panicInFlight` per-INSTANCE making a repeat silent, a buzz proves a second
   instance — D-128's co-installed variant, not this code.
   `[cited]`: `PanicSensorSourceTest.cancellingTheCollector_releasesTheSensorAndTheGestureStopsFiring`.
+
+- DB-051 [cited]: **A number formatted for humans and parsed as data must not ask the locale.**
+  The circadian lat/lon field rendered with `"%.5f".format(v)` (default locale) and parsed with
+  `toDoubleOrNull()` (dot only), so in any comma-decimal locale the field showed `52,37021`, Set
+  parsed null, its `lat != null && lon != null` guard skipped the write entirely, and the
+  no-location banner never cleared — manual, device-fix and geo-IP alike, since all three land in
+  that field. Owner-reported, present since it shipped. Format is now `Locale.US`; parse
+  normalises `,`; the filter admits `,` instead of deleting it, which had turned a typed `52,37`
+  into latitude `5237`. `[cited]`: `formatCoord`, `parseCoord`.
