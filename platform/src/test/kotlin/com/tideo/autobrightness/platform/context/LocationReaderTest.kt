@@ -100,4 +100,38 @@ class LocationReaderTest {
         advanceUntilIdle()
         assertEquals(LocationResult.Unavailable, result.await())
     }
+
+    @Test
+    fun activeFix_registersBothEnabledProviders_andLeavesNoListenerBehind() = runTest {
+        shadowOf(lm).setProviderEnabled(LocationManager.GPS_PROVIDER, true)
+        shadowOf(lm).setProviderEnabled(LocationManager.NETWORK_PROVIDER, true)
+        val result = async(UnconfinedTestDispatcher(testScheduler)) { reader.activeFix(timeoutMs = 10_000) }
+
+        assertEquals(1, shadowOf(lm).getLocationUpdateListeners(LocationManager.GPS_PROVIDER).size)
+        assertEquals(1, shadowOf(lm).getLocationUpdateListeners(LocationManager.NETWORK_PROVIDER).size)
+
+        shadowOf(lm).simulateLocation(fix(LocationManager.NETWORK_PROVIDER, 51.5, -0.1))
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(LocationResult.Available(LocationSnapshot(51.5, -0.1)), result.await())
+        assertTrue(
+            shadowOf(lm).locationUpdateListeners.isEmpty(),
+            "a satisfied fix must release every provider it powered, or GPS stays on",
+        )
+    }
+
+    @Test
+    fun activeFix_timeout_alsoReleasesEveryProvider() = runTest {
+        shadowOf(lm).setProviderEnabled(LocationManager.GPS_PROVIDER, true)
+        shadowOf(lm).setProviderEnabled(LocationManager.NETWORK_PROVIDER, true)
+        val result = async(UnconfinedTestDispatcher(testScheduler)) { reader.activeFix(timeoutMs = 1_000) }
+
+        advanceUntilIdle()
+
+        assertEquals(LocationResult.Unavailable, result.await())
+        assertTrue(
+            shadowOf(lm).locationUpdateListeners.isEmpty(),
+            "giving up must release the providers too",
+        )
+    }
 }

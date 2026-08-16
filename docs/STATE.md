@@ -63,29 +63,28 @@ ledger: `LEDGER_B.md`.
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. **D4 (1.9.0 round, FAIL): a shake fired panic after an intent PANIC had already stopped the
-   service.** Triage (DB-050) rules out every in-app path: teardown is now pinned by test (cancel
-   releases both listeners and the receiver; SCREEN_ON cannot re-arm), the service is the sole
-   collector, a post-panic instance can only re-arm via `ensureRunning()` which needs
-   `serviceEnabled=true`, and `panicInFlight` is per-INSTANCE — a same-instance repeat is silent,
-   so a buzz proves a second instance. That is D-128's class: the co-installed release build stays
-   armed because D3's `-n` targets the debug component only. It also explains the 1.8.2 "double"
-   with one `vibrateSos()` call site. **Owner to settle** (device-only): `adb shell dumpsys
-   activity services com.tideo.autobrightness` and `…debug` right after D3, or force-stop the
-   release variant and redo D3→D4. Release armed = D-128, docs-only. **Debug service still listed
-   after D3 = the triage is wrong and this reopens as a real teardown defect** — the only outcome
-   that should block PR #117.
-2. §11.39a C1/C2 BLOCKED: the device has no Night Light quick-settings tile. Needs another
-   out-of-band trigger (adb write to `night_display_activated`, or system Settings) before
-   DB-034/DB-039 count as device-verified.
-3. DB-041…DB-043's unavailable-feature boundary BLOCKED a second time (B1): the device reports
-   Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
-4. Device location fix fails several times before succeeding while geo-IP resolves instantly
-   (owner, out of script). The banner half of that report was a real defect and is fixed (DB-051);
-   this retry half is untriaged and unreproduced locally — `AndroidLocationReader.activeFix()` is
-   where to start.
+1. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
+   device reports Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
+   Needs hardware that reports them unavailable.
+2. Device location fix fails a few times before succeeding while geo-IP resolves instantly (owner,
+   out of script). The banner half of that report was a real defect and is fixed (DB-051). Triage of
+   the retry half found no defect in `AndroidLocationReader.activeFix`: both enabled providers are
+   registered together, every completion path releases them (now pinned by test), and it reports
+   Unavailable only when no fresh fix lands within 20 s AND there is no last-known fix at all — a
+   state that self-heals the moment one lands, which is the shape the owner described. Two candidate
+   mechanisms remain, and the Open question below discriminates them.
 
-Open questions and owed reviews: none.
+Open questions and owed reviews:
+
+- [2026-08-16] **When "Use current location" failed, which did you see?** (a) the coordinate fields
+  filled in but Set did nothing — then those failures were DB-051 and are already fixed, and nothing
+  is left here; or (b) the toast "Couldn't acquire a location" — then acquisition genuinely failed
+  and the likely cause is the second candidate: `activeFix` only registers GPS and NETWORK, and
+  gives up at once when a device reports both disabled (some OEM battery-saving location modes
+  expose only the fused provider), where the `currentLocation()` path it replaced in D-122 still
+  had a PASSIVE fallback. Recommendation: answer (a)/(b) before any change — adding a PASSIVE or
+  fused fallback to the active path is a real coverage gap but unevidenced on this device, and
+  D-122 chose the active path deliberately.
 
 Incoming: 1.9.0-debug/vc21 round (commit `7970765`) = **11 PASS / 1 FAIL / 3 BLOCKED**. A1/A2 pass,
 so DB-048 and DB-049 are device-confirmed; B2/B3 pass, closing the DB-044/DB-045 state checks the
@@ -102,6 +101,12 @@ protection and secret-scanning in DA-006/DA-041.
   Action SHA pinning left this list when Dependabot supplied a refresh path (DB-038).
 - Privileged Display declines: per-toggle scheduling, persisted seed without real reports,
   grayscale quick action, refresh-rate/OEM keys and manual Extra Dim (D-150–152).
+- Panic re-firing after teardown (1.9.0 round D4) is closed by owner decision: likely the Tasker
+  Advanced_Auto_Brightness project, still installed and carrying its own prof769 panic gesture. That
+  is a third armed listener of the same D-128 class the DB-050 triage identified, and it fits the
+  1.8.2 "double" too. No code change; reopen only on a report from a device with no sibling armed.
+- §11.39a C1/C2 (external Night Light change tracked twice) is wontfix by owner decision: the
+  device exposes no Night Light quick-settings tile and the path is covered by unit tests.
 - Never repeat whole-device backup/restore verification: the previous `bmgr restore` damaged
   unrelated apps. The sanitizer stays unit-tested; callback invocation is accepted unverified
   residual (DB-013).
