@@ -63,27 +63,38 @@ ledger: `LEDGER_B.md`.
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. Device-retest **§11.39a** and **§13.44a** after DB-047. The first pass reproduced stale
-   post-Apply/external read-back and replacement-glyph sanitization; both now have regression tests.
-   Include the new **§11.39a step 8a**: DB-048 found DB-047's fix covered only the service-OFF Apply
-   path, so retest Apply with the service **running** as well as stopped.
-2. Investigate/retest **§5.14a step 12**: the owner observed two S.O.S. vibrations from a gesture.
-   Repository-wide Kotlin call-site coverage (`rg -n -i 'vibrat|sos|morse' app platform`) finds only
-   the shared `panicAndStop` call, and its per-service `panicInFlight` gate tests one buzz for repeat
-   admission. No second call was removed without an evidenced source.
+1. **The panic gesture stays armed after panic has torn the service down (1.9.0 round D4, FAIL).**
+   Supersedes the old double-S.O.S. item — the owner's report is NOT two buzzes per panic. Observed:
+   D3's intent PANIC fires and stops the service; a shake afterwards fires panic AGAIN, though
+   nothing should be listening. That also explains the 1.8.2 "double" without a second call site:
+   the sweep (`rg -n -i 'vibrat|sos|morse' app platform`) still finds exactly one `vibrateSos()`
+   caller, in `panicAndStop`, and `panicInFlight` is per-INSTANCE, so a second armed listener or a
+   second service instance buzzes once each and reads as a double. Mechanism unconfirmed — do not
+   assume which, and note `AmbientMonitoringService.onDestroy` cancelling `scope` is what should
+   have unregistered the sensor. Triage before the v1.9.0 tag; it is a panic-lifecycle defect on a
+   safety feature, so it gates the PR #117 merge recommendation.
+2. Device-verify §11.39a **C1/C2** (external change tracked twice): both BLOCKED in the 1.9.0 round —
+   the owner's device exposes no system quick-settings tile for Night Light. Needs another
+   out-of-band trigger for the same path (an `adb` write to `night_display_activated`, or the system
+   Settings screen) before DB-034/DB-039 can be called device-verified.
 3. Device-verify the unavailable-feature hiding/no-write boundary from DB-041…DB-043 on hardware
-   that reports Night Light/AOD unavailable. OnePlus 13 reports Night Light available, so the first
-   pass could not exercise it.
-4. Complete experimental Disable HDR verification (DB-044/DB-045): record secure-setting read-back
-   and preservation after an unrelated Apply. The first pass saw no flicker/blanking and displayed
-   the custom/malformed preservation notice, but did not record those two state checks. Add
-   **§11.32 step 4a** (DB-049): with both Global rows deleted the **switch** must appear, not the
-   preservation notice — the owner's device may already carry rows an older Tideo wrote, so clear
-   them first or the stock-device case goes untested. Both rows are `global`, not `secure`.
+   that reports Night Light/AOD unavailable. BLOCKED a second time in the 1.9.0 round (B1): the
+   owner's device reports the features available, so no pass so far could exercise it.
+4. **No-location banner never clears (owner, 1.9.0 round, out of script).** With a location set —
+   manually, by device location, or by geo-IP — the "no location" banner stays up. Reproduces on the
+   **latest release**, so it predates this train and is not a v1.9.0 regression. Second, separable
+   symptom: the device location fix fails several times before succeeding, while geo-IP resolves
+   instantly. Both unreproduced locally and untriaged.
 
 Open questions and owed reviews: none.
 
-Incoming: owner device pass on 1.8.2-debug was 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED; DB-011/012
+Incoming: owner device round on **1.9.0-debug/vc21** (commit `7970765`, the short script) was
+**11 PASS / 1 FAIL / 3 BLOCKED**. Passing: A1 and A2 — the two gates this train's review added, so
+DB-048's service-ON Apply rollback and DB-049's stock-device HDR switch are both device-confirmed;
+B2/B3 (HDR round-trip and custom-row preservation after an unrelated Apply), which closes the
+DB-044/DB-045 state checks the queue had held open, though the reboot/blank caveats were not
+separately reported; C3/C4, D1/D2/D3/D5 and E. The single FAIL is D4, now queue item 1.
+Earlier: owner device pass on 1.8.2-debug was 49 PASS / 5 FAIL / 2 BLOCKED / 3 SKIPPED; DB-011/012
 fixed real defects and DB-013 retired the damaging whole-device backup test. DB-012 still records
 that `PrivilegeManager` instances do not share a process-wide cache. Owner confirmed Dependabot,
 branch protection and secret-scanning settings in DA-006/DA-041.
