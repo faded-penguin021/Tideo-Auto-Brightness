@@ -127,7 +127,6 @@ class DraftSettingsViewModelTest {
 
             awaitVmOn(main, vm) { it.epoch.value >= 1 }
             assertEquals(42, vm.draft.value.minBrightness, "the profile must survive the race")
-            // And once seeded the read-back works normally.
             vm.mergeDeviceReadBack(deviceSnapshot(nightLight = true))
             assertTrue(vm.draft.value.nightLightEnabled, "the read-back resumes after the seed")
             assertEquals(42, vm.draft.value.minBrightness, "without discarding the profile")

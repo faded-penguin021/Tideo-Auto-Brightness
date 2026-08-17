@@ -11,7 +11,9 @@ import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.GeoIpLocationClient
+import com.tideo.autobrightness.platform.context.LocationReader
 import com.tideo.autobrightness.platform.context.LocationResult
+import com.tideo.autobrightness.platform.context.LocationSnapshot
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -23,11 +25,13 @@ import java.util.Date
 import java.util.Locale
 
 /** G2R-F39: fixed date/location element. Scene-local preview state, not persisted as profile parameter. */
-class CircadianExtrasViewModel(application: Application) : AndroidViewModel(application) {
-    private val store = ExperimentPrefsStore(application.experimentPrefsDataStore)
-    private val location = AndroidLocationReader(application)
+class CircadianExtrasViewModel @JvmOverloads constructor(
+    application: Application,
+    private val location: LocationReader = AndroidLocationReader(application),
     // D-120/D-121: ipwho.is IP lookup backs "Use current location" as active last resort
-    private val geoIp = GeoIpLocationClient()
+    private val geoIp: GeoIpLocationClient = GeoIpLocationClient(),
+) : AndroidViewModel(application) {
+    private val store = ExperimentPrefsStore(application.experimentPrefsDataStore)
 
     val dateLocation: StateFlow<ExperimentDateLocation> = store.dateLocation
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExperimentDateLocation())
@@ -60,13 +64,17 @@ class CircadianExtrasViewModel(application: Application) : AndroidViewModel(appl
 
     /** G2R-F42/D-120/D-122: actively acquire fresh location (not passive last-known); fallback to ipwho.is if opted-in. */
     suspend fun freshLatLon(): Pair<Double, Double>? {
-        (location.activeFix() as? LocationResult.Available)?.snapshot?.let {
-            return it.latitude to it.longitude
-        }
+        (location.activeFix() as? LocationResult.Available)?.snapshot?.let { return it.cacheAndPair() }
         if (store.geoIpEnabled.first()) {
-            geoIp.resolve()?.let { return it.latitude to it.longitude }
+            geoIp.resolve()?.let { return it.cacheAndPair() }
         }
         return null
+    }
+
+    // DB-054: an acquired location is the day's resolved location; typed coordinates are not.
+    private suspend fun LocationSnapshot.cacheAndPair(): Pair<Double, Double> {
+        store.writeCachedSunLocation(latitude, longitude, System.currentTimeMillis() / 1000L / 86_400L)
+        return latitude to longitude
     }
 
     /** G2R-F39: pin fixed date/location (null = revert to live). Re-apply pipeline to avoid steady-light drop. */

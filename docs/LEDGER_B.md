@@ -693,3 +693,12 @@
   resort. **`LocationManager.FUSED_PROVIDER` declined by the owner** — an AOSP constant, not the GMS
   client, so no dependency, but this ships on F-Droid to de-Googled devices where the platform fused
   provider is often absent. `[cited]`: `AndroidLocationReader.activeFix`.
+
+- DB-054 [cited]: **A location acquired in the UI was thrown away, so the app kept saying it had
+  none.** "Use current location" wrote only the fixed override, never the D-103 `cachedSunLocation`
+  the runtime populates — so clearing the coordinates to pin a date, or tapping Use live data, fell
+  straight back to "no location yet" seconds after a successful fix, and the sun maths lost it too.
+  Owner found it pinning 21 Dec. An acquired fix now goes to that cache — what the runtime would
+  have written for the day anyway. Typed coordinates deliberately do NOT: those name a place the
+  user asks about, not where the device is, and caching them would relocate the live curve.
+  `[cited]`: `CircadianExtrasViewModel.cacheAndPair`.
