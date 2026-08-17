@@ -74,18 +74,27 @@ ladder. Parity checklist and parity gaps are empty. Live ledger: `LEDGER_B.md`.
    Still open on that screen, and NOT touched by this fix: `ContextsScreen` parses lat/lon with a
    bare `toDoubleOrNull()` around its geofence editor, so DB-051's comma-decimal defect is latent
    there. Worth a pass on a comma-decimal locale.
-2. **Two `(no-coordinate)` provenance records were removed** (`ProfilesScreen.kt`, `MiscScreen.kt`)
+2. **`scripts/guards/format-args.sh` HAS NOT HAD A COMPLETED FRESH-CONTEXT REVIEW (DA-005).** The
+   first review reviewed a DIFFERENT guard: it found the crash mechanism asserted in the header was
+   wrong (`Resources.getString(int)` does not format; only the vararg overload does), so the guard
+   was rewritten wholesale — resolver set narrowed to `toast`, XML parse flattened, `formatted="false"`
+   honoured, scan moved to `git ls-files`. The second review, of that rewrite, **terminated on an
+   API 529 without producing a verdict** — it is not a pass, and nothing here should be read as one.
+   Owed before the train merges: one fresh-context review of `176f2d3`'s legislation, strongest
+   tier, no self-review. Its known-unreviewed surface is the rewrite listed above plus the manifest
+   deletions in item 3.
+3. **Two `(no-coordinate)` provenance records were removed** (`ProfilesScreen.kt`, `MiscScreen.kt`)
    after an audit of all 17. Both stood for a wrapped prose line whose "Tasker" was incidental —
    `// Tasker configs), grouped with…` and `// Tasker-style "adjusted to N"…`, hyphenated adjective
    and mid-sentence continuation, no coordinate, no ported logic. The other 15 were kept: they name
    a Tasker entity, quote Tasker source, or state Tasker behaviour the port must match. Manifest
    edited by exactly those two lines, never regenerated from a mid-change tree (DB-032). Overrule
    either call if you disagree — this is the one part of the change nothing can falsify mechanically.
-3. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
+4. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
    device reports Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
    Needs hardware that reports them unavailable.
 
-Open questions and owed reviews: none.
+Open questions: none. **Owed reviews: one** — queue item 2, the DA-005 review of `176f2d3`.
 
 Incoming: **the force-stop location defect is closed as no app defect** (owner, 2026-08-17): three
 stationary retries without a force stop returned 44 s, 23 s, 4 s — cold-GNSS warm-up, so the app-op
