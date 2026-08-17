@@ -55,22 +55,46 @@ adds super dimming and Privileged Display.
 
 Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. Shipped v1.8.2/vc20, F-Droid
 reproducible-build verified (owner, 2026-08-13). Branch carries unreleased v1.9.0/vc21.
-**NOT releasable, and PR #117 must not be merged** — one blocker, and it is not a ladder verdict:
-the DB-060 crash fix is device-unverified and the hold lifts on the owner's pass (item 1). Parity
-checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
+DB-060's crash is device-verified fixed (owner, 2026-08-17, no crash), so that hold is lifted — but
+**queue item 1 opened in its place and is untriaged**: Contexts location rules do not round-trip.
+Whether it blocks the tag is not yet known and one comparison against the tagged release settles it.
+Parity checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
+
+**Resuming cold?** The train itself is finished and green. Branch
+`claude/pr-116-branch-train-review-c4lo6i`, PR **#117** open against `main`, describing the whole
+train; #115 closed, #116 was intra-train. No agent work is half-done. **Start at queue item 1** —
+it is fresh owner input that nobody has read code for, and its tagged-release comparison decides
+whether #117 can merge. After that: item 2 is an owner judgement, then squash-merge #117, publish
+from the GitHub UI, and **delete `docs/rebuild/DEVICE_TEST_SCRIPT_1.9.0.md`** (ephemeral), folding
+its results into the standing script. Two rule-file edits landed without their DA-005 review and are
+flagged: the AGENTS.md sentence (DB-056) and `format-args.sh` (item 2). Do **not** re-open the
+closed force-stop location investigation — read the Incoming line and DB-051…DB-060 first; item 1 is
+a different screen and a different defect.
 
 ## Owner queue
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. **Device-verify the DB-060 crash fix on the Contexts screen specifically** — Contexts rule →
-   **Use current location** must toast "…up to 45 seconds…" and fill the fields instead of crashing.
-   Script step §8.24a. The circadian button passing proves nothing about it, which is exactly how
-   this shipped. The queue's old location-layer suspects were all wrong as causes; the
-   default-implementation worry is separately settled — `AndroidLocationReader` is the only
-   production implementation and overrides both new methods (`LocationReader.kt:182,198`), so only
-   test fakes take a default. Untouched and still latent on that screen: `ContextsScreen` parses
-   lat/lon with a bare `toDoubleOrNull()`, so DB-051's comma-decimal defect lives there.
+1. **Contexts location rules do not round-trip (owner, 2026-08-17, two observations, untriaged —
+   NOT investigated, NOT fixed).** Reported at the end of the session; no one has looked at the code.
+   (a) **Contexts shows lat/lon comma-separated while Circadian shows a dot.** DB-051 moved the
+   circadian field to `Locale.US` formatting plus comma-tolerant parsing; Contexts was deliberately
+   left alone, so it still formats with the default locale.
+   (b) **A saved location rule loses its location.** Create a rule with a location, save, reopen it
+   from the rules list: the **Location toggle is off**. Re-toggling it does **not** show the stored
+   coordinates. Separately, the **rules list does not display which coordinates a rule applies to**,
+   though it does show time and Wi-Fi.
+   **Strong lead, unverified:** these are likely one defect, and it is DB-051's mechanism on the
+   other screen — `ContextsScreen` parses lat/lon with a bare `toDoubleOrNull()` (dot-only) while
+   the field is filled locale-formatted (comma), so on a comma-decimal device the parse returns null
+   and the coordinates are never stored. That would explain the toggle being off on reopen and the
+   blank fields after re-toggling. **Do not treat that as established** — nobody has read the save
+   path; the list-display gap may be a third, separate thing.
+   **Decide first whether it blocks the tag:** the comma/dot *inconsistency* is new (circadian
+   moved), but Contexts' own behaviour is unchanged by this train, so (b) is probably pre-existing.
+   **Check the tagged release** — if a location rule round-trips there and not here, it is a
+   regression and blocks; if it fails there too, it is a pre-existing defect and 1.9.0 can ship
+   without it. That single comparison is the next action.
 2. **`format-args.sh` corrections are unreviewed legislation.** Three DA-005 rounds, each finding
    the last wrong: round 1 killed the asserted crash mechanism (single-arg `getString` does not
    format); round 2 died on an API 529 with no verdict; round 3 found the rewrite blind to
@@ -91,7 +115,9 @@ Incoming: the force-stop location defect is **closed as no app defect** (owner, 
 stationary retries at 44/23/4 s were cold-GNSS warm-up, and that curve became DB-059. Device rounds
 to date: 1.8.2-debug 49 PASS/5 FAIL/2 BLOCKED/3 SKIPPED; 1.9.0 `7970765` 11/1/3, whose FAIL and two
 BLOCKED are owner-closed below; `fc35a6e` and `036ec77` produced DB-054…DB-058; `12b5a21` produced
-DB-060. DB-051 device-confirmed 2026-08-16. Detail lives in the rows, not here.
+DB-060, whose fix the owner then **device-verified on the Contexts screen (2026-08-17, no crash)** —
+the regression that blocked the tag is closed. DB-051 device-confirmed 2026-08-16. Detail lives in
+the rows, not here.
 
 ## Decided non-items
 
