@@ -33,17 +33,34 @@ class CircadianExtrasViewModelTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val store = ExperimentPrefsStore(app.experimentPrefsDataStore)
 
-    private class FakeReader(private val result: LocationResult) : LocationReader {
+    private class FakeReader(
+        private val result: LocationResult,
+        private val recent: LocationSnapshot? = null,
+    ) : LocationReader {
+        var activeFixCalls = 0
+            private set
+        var requestedMaxAgeMs: Long? = null
+            private set
+
         override fun lastKnownLocation(): LocationSnapshot? = null
         override fun locationUpdates(minTimeMs: Long, minDistanceM: Float): Flow<LocationSnapshot> = flowOf()
         override suspend fun currentLocation(): LocationResult = result
-        override suspend fun activeFix(timeoutMs: Long): LocationResult = result
+        override suspend fun activeFix(timeoutMs: Long): LocationResult {
+            activeFixCalls++
+            return result
+        }
+
+        override fun lastKnownWithin(maxAgeMs: Long): LocationSnapshot? {
+            requestedMaxAgeMs = maxAgeMs
+            return recent
+        }
     }
 
     private fun vm(
         fix: LocationResult = LocationResult.Unavailable,
         geoIp: GeoIpLocationClient = GeoIpLocationClient { null },
-    ) = CircadianExtrasViewModel(app, FakeReader(fix), geoIp)
+        reader: FakeReader = FakeReader(fix),
+    ) = CircadianExtrasViewModel(app, reader, geoIp)
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
@@ -104,6 +121,29 @@ class CircadianExtrasViewModelTest {
         awaitValue({ runBlocking { store.dateLocation.first() } }) { it.latitude != null }
 
         assertNull(cached(), "a place the user asked about is not where the device is")
+    }
+
+    @Test
+    fun aRecentFixIsUsedAtOnce_withoutSpendingTheAcquisitionWindow() {
+        val reader = FakeReader(LocationResult.Unavailable, recent = LocationSnapshot(52.37021, 4.89707))
+        val model = vm(reader = reader)
+
+        val pair = runBlocking { model.freshLatLon() }
+        idle()
+
+        assertEquals(52.37021 to 4.89707, pair)
+        assertEquals(0, reader.activeFixCalls, "a recent fix must short-circuit the 45 s wait entirely")
+        assertEquals(60L * 60L * 1000L, reader.requestedMaxAgeMs, "an hour is the accepted staleness")
+        assertNotNull(cached(), "and it is still the day's location")
+    }
+
+    @Test
+    fun withNoRecentFix_theActiveAcquisitionStillRuns() {
+        val reader = FakeReader(LocationResult.Available(LocationSnapshot(1.0, 2.0)), recent = null)
+        val model = vm(reader = reader)
+
+        assertEquals(1.0 to 2.0, runBlocking { model.freshLatLon() })
+        assertEquals(1, reader.activeFixCalls, "nothing recent means the old path is the only path")
     }
 
     @Test

@@ -66,6 +66,8 @@ class CircadianExtrasViewModel @JvmOverloads constructor(
 
     /** G2R-F42/D-120/D-122: actively acquire fresh location (not passive last-known); fallback to ipwho.is if opted-in. */
     suspend fun freshLatLon(): Pair<Double, Double>? {
+        // DB-059: sun times move by seconds over kilometres, so a recent fix is already exact enough.
+        location.lastKnownWithin(RECENT_FIX_MAX_AGE_MS)?.let { return it.cacheAndPair() }
         (location.activeFix() as? LocationResult.Available)?.snapshot?.let { return it.cacheAndPair() }
         if (store.geoIpEnabled.first()) {
             geoIp.resolve()?.let { return it.cacheAndPair() }
@@ -101,5 +103,6 @@ class CircadianExtrasViewModel @JvmOverloads constructor(
 
     private companion object {
         val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        const val RECENT_FIX_MAX_AGE_MS = 60L * 60L * 1000L
     }
 }

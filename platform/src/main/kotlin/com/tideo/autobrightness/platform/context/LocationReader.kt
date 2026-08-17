@@ -47,6 +47,8 @@ interface LocationReader {
 
     fun locationServicesEnabled(): Boolean = true
 
+    fun lastKnownWithin(maxAgeMs: Long): LocationSnapshot? = null
+
     companion object {
         const val DEFAULT_MIN_TIME_MS = 30_000L
         const val DEFAULT_MIN_DISTANCE_M = 50f
@@ -174,6 +176,23 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         // BACKUP: last-known fix if active request produced nothing within timeout (D-122).
         val snapshot = fresh ?: bestLastKnown(lm)
         return snapshot?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
+    }
+
+    @SuppressLint("MissingPermission")
+    override fun lastKnownWithin(maxAgeMs: Long): LocationSnapshot? {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
+        val oldestAccepted = System.currentTimeMillis() - maxAgeMs
+        return try {
+            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+                .asSequence()
+                .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+                .filter { it.latitude != 0.0 || it.longitude != 0.0 }
+                .filter { it.time >= oldestAccepted }
+                .maxByOrNull { it.time }
+                ?.let { LocationSnapshot(it.latitude, it.longitude) }
+        } catch (_: SecurityException) {
+            null
+        }
     }
 
     override fun locationServicesEnabled(): Boolean = runCatching {

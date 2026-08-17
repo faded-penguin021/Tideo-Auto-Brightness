@@ -738,3 +738,12 @@
   `CircadianWindowProvider.cancellableOrNull` already held it. NOT the force-stop mechanism:
   cancellation ends the wait early; the owner timed the full budget.
   `[cited]`: `acquireCurrentLocation`.
+
+- DB-059 [cited]: **Accuracy the feature cannot use is latency the user pays for.** Three stationary
+  retries returned 44 s, 23 s, 4 s — closing the force-stop question as cold-GNSS warm-up, no app
+  defect. The owner's read of that curve was the real finding: sun times shift by seconds over
+  kilometres, so holding out for GNSS buys nothing a circadian curve can spend. The circadian button
+  now takes any last-known fix under an hour old and skips acquisition. This narrows D-122 rather
+  than reverting it — that refused a silent cache of unknown age, and the bound is the difference.
+  Contexts' geofence caller is untouched; a radius does need the real thing.
+  `[cited]`: `LocationReader.lastKnownWithin`.

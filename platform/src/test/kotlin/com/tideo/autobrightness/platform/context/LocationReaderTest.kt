@@ -18,6 +18,7 @@ import org.robolectric.Shadows.shadowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** H3 audit: LocationReader.activeFix (D-120/D-122) active acquisition, null-island skip, backup. */
@@ -134,6 +135,38 @@ class LocationReaderTest {
             shadowOf(lm).locationUpdateListeners.isEmpty(),
             "giving up must release the providers too",
         )
+    }
+
+    @Test
+    fun lastKnownWithin_takesTheNewestFreshFix_andRefusesAStaleOrNullIslandOne() {
+        val now = System.currentTimeMillis()
+        val hour = 60L * 60L * 1000L
+        shadowOf(lm).setLastKnownLocation(
+            LocationManager.NETWORK_PROVIDER,
+            fix(LocationManager.NETWORK_PROVIDER, 51.5, -0.1, time = now - 10 * 60 * 1000L),
+        )
+        shadowOf(lm).setLastKnownLocation(
+            LocationManager.GPS_PROVIDER,
+            fix(LocationManager.GPS_PROVIDER, 48.85, 2.35, time = now - 2 * 60 * 1000L),
+        )
+
+        assertEquals(LocationSnapshot(48.85, 2.35), reader.lastKnownWithin(hour), "newest wins")
+
+        shadowOf(lm).setLastKnownLocation(
+            LocationManager.GPS_PROVIDER,
+            fix(LocationManager.GPS_PROVIDER, 48.85, 2.35, time = now - 5 * hour),
+        )
+        assertEquals(
+            LocationSnapshot(51.5, -0.1),
+            reader.lastKnownWithin(hour),
+            "a fix older than the bound is not 'recent enough', however new it is relative to others",
+        )
+
+        shadowOf(lm).setLastKnownLocation(
+            LocationManager.NETWORK_PROVIDER,
+            fix(LocationManager.NETWORK_PROVIDER, 0.0, 0.0, time = now),
+        )
+        assertNull(reader.lastKnownWithin(hour), "null island is not a location, however fresh")
     }
 
     @Test
