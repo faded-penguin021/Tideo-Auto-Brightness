@@ -684,3 +684,12 @@
   file over, with the precondition asserted in a comment. Now
   `Dispatchers.setMain(StandardTestDispatcher())` holds the collector until the test advances it,
   and `epoch == 0` pins the state under test. `[cited]`: `awaitVmOn`.
+
+- DB-053 [cited]: **A replacement that drops a fallback is a regression wearing a feature's clothes.**
+  D-122 moved "Use current location" to the active `activeFix()`, but that path lists only GPS and
+  NETWORK and gave up before registering anything when both report disabled, where the path it
+  replaced still fell back to PASSIVE. Owner saw both shapes on device:
+  DB-051's refused write AND a genuine "Couldn't acquire a location". PASSIVE restored as the last
+  resort. **`LocationManager.FUSED_PROVIDER` declined by the owner** — an AOSP constant, not the GMS
+  client, so no dependency, but this ships on F-Droid to de-Googled devices where the platform fused
+  provider is often absent. `[cited]`: `AndroidLocationReader.activeFix`.

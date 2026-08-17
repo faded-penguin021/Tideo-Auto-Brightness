@@ -128,6 +128,7 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
             ?: return LocationResult.Unavailable
 
         // D-122: actively request NEW fix from enabled real providers. requestLocationUpdates powers sensors.
+        // DB-053: PASSIVE last resort, as currentLocation() and locationUpdates() already had.
         val providers = buildList {
             if (runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false)) {
                 add(LocationManager.GPS_PROVIDER)
@@ -135,7 +136,7 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
             if (runCatching { lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)) {
                 add(LocationManager.NETWORK_PROVIDER)
             }
-        }
+        }.ifEmpty { listOf(LocationManager.PASSIVE_PROVIDER) }
 
         val fresh = if (providers.isEmpty()) {
             null

@@ -134,4 +134,23 @@ class LocationReaderTest {
             "giving up must release the providers too",
         )
     }
+
+    @Test
+    fun activeFix_withNoRealProviderEnabled_stillListensPassively() {
+        runTest {
+            shadowOf(lm).setProviderEnabled(LocationManager.GPS_PROVIDER, false)
+            shadowOf(lm).setProviderEnabled(LocationManager.NETWORK_PROVIDER, false)
+            val result = async(UnconfinedTestDispatcher(testScheduler)) { reader.activeFix(timeoutMs = 10_000) }
+
+            assertEquals(
+                1,
+                shadowOf(lm).getLocationUpdateListeners(LocationManager.PASSIVE_PROVIDER).size,
+                "giving up before registering anything is what made this fail instantly",
+            )
+            shadowOf(lm).simulateLocation(fix(LocationManager.PASSIVE_PROVIDER, 35.68, 139.69))
+            shadowOf(Looper.getMainLooper()).idle()
+
+            assertEquals(LocationResult.Available(LocationSnapshot(35.68, 139.69)), result.await())
+        }
+    }
 }
