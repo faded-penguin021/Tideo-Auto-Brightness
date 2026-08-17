@@ -48,8 +48,8 @@ interface LocationReader {
     companion object {
         const val DEFAULT_MIN_TIME_MS = 30_000L
         const val DEFAULT_MIN_DISTANCE_M = 50f
-        /** Active "Use current location" path timeout for fresh GPS fix before last-known fallback. */
-        const val ACTIVE_FIX_TIMEOUT_MS = 20_000L
+        /** DB-055: cold-GPS budget before the last-known fallback; 20 s lost fixes this device lands at ~15 s. */
+        const val ACTIVE_FIX_TIMEOUT_MS = 45_000L
     }
 }
 

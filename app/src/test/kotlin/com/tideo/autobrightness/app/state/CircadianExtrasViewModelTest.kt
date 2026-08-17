@@ -51,8 +51,6 @@ class CircadianExtrasViewModelTest {
 
     private fun cached() = runBlocking { store.cachedSunLocation.first() }
 
-    // The VM's flows are dispatched on the Robolectric main looper, so blocking it to await one
-    // deadlocks: idle between reads instead of suspending on the flow.
     private fun <T> awaitValue(read: () -> T, predicate: (T) -> Boolean): T {
         repeat(100) {
             idle()
@@ -63,7 +61,6 @@ class CircadianExtrasViewModelTest {
         return read()
     }
 
-    // store.clear() drops only the override keys, so the cached sun location leaks between cases.
     @org.junit.Before
     fun reset() = runBlocking {
         app.experimentPrefsDataStore.edit { it.clear() }
@@ -89,7 +86,6 @@ class CircadianExtrasViewModelTest {
         runBlocking { model.freshLatLon() }
         idle()
 
-        // WhileSubscribed: with no collector the StateFlow never leaves its initial value.
         val subscription = CoroutineScope(Dispatchers.Main).launch {
             model.circadianLocationStatus.collect {}
         }

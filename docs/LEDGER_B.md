@@ -702,3 +702,12 @@
   have written for the day anyway. Typed coordinates deliberately do NOT: those name a place the
   user asks about, not where the device is, and caching them would relocate the live curve.
   `[cited]`: `CircadianExtrasViewModel.cacheAndPair`.
+
+- DB-055 [cited]: **A timeout sized for a warm fix fails intermittently on the devices this app
+  targets.** "Use current location" failing "a few times before it works" was never a latch — the
+  owner measured the successful case at ~15 s with the indicator lit, against a 20 s budget, so a
+  colder attempt fell out of the window and the force-stop that seemed to fix it was coincidence.
+  GPS-only hardware is the normal case here: a de-Googled phone has no network-location provider,
+  so the fast answer that makes 20 s look sufficient does not exist. Raised to 45 s; the last-known
+  backup and opt-in geo-IP fallback still run after it.
+  `[cited]`: `LocationReader.ACTIVE_FIX_TIMEOUT_MS`.

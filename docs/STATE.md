@@ -63,25 +63,17 @@ ledger: `LEDGER_B.md`.
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. **"Use current location" only succeeds on a freshly started process** (owner, retest A1): after
-   the app has been running a while it fails to fetch, and force-stopping then reopening makes it
-   work again. Unreproduced locally and no mechanism found by reading: `AndroidLocationReader` and
-   `GeoIpLocationClient` hold no per-process state, `activeFix` registers and releases cleanly on
-   every path (pinned by test), and the same round's B1–B3 all passed. So the latch is somewhere
-   else — candidates not yet excluded: the OS throttling repeat `requestLocationUpdates` from a
-   long-lived process, the composable's `rememberCoroutineScope` being cancelled under it, or a
-   permission/appop that degrades while backgrounded. **Next observation to take:** when it fails,
-   does the OS location indicator appear at all, how long before the toast, and does it also fail
-   right after a fresh launch if you first background the app for a minute? That separates
-   "never registered" from "registered but nothing delivered".
-2. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
+1. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
    device reports Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
    Needs hardware that reports them unavailable.
 
 Open questions and owed reviews: none.
 
-Incoming: retest round on `fc35a6e` — A2/A3(partial)/B1/B2/B3/C pass; A1 fails (queue item 1); A3/A4
-found DB-054, the acquired location never reaching the D-103 cache, now fixed. Earlier
+Incoming: retest round on `fc35a6e` — A2/B1/B2/B3/C pass. A3/A4 found DB-054, the acquired location
+never reaching the D-103 cache. A1's "only works after a force stop" resolved to DB-055 once the
+owner measured it: the indicator lights and the fix lands at ~15 s against a 20 s budget, so the
+restart correlation was coincidence and the timeout was simply too short for GPS-only hardware.
+Both fixed; neither is device-reverified yet. Earlier
 **DB-051 is device-confirmed** (owner, 2026-08-16): the coordinate fields filled with
 comma-decimal values and Set did nothing, which is the reported "location fix fails a few times
 before it works" in full — acquisition had succeeded every time; only the write was refused. That
