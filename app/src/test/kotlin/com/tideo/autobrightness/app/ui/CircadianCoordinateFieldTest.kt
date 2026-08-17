@@ -1,7 +1,7 @@
 package com.tideo.autobrightness.app.ui
 
-import com.tideo.autobrightness.app.ui.screens.formatCoord
-import com.tideo.autobrightness.app.ui.screens.parseCoord
+import com.tideo.autobrightness.app.ui.components.formatCoord
+import com.tideo.autobrightness.app.ui.components.parseCoord
 import java.util.Locale
 import kotlin.test.AfterTest
 import kotlin.test.Test

@@ -55,16 +55,17 @@ adds super dimming and Privileged Display.
 
 Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. Shipped v1.8.2/vc20, F-Droid
 reproducible-build verified (owner, 2026-08-13). Branch carries unreleased v1.9.0/vc21.
-DB-060's crash is device-verified fixed (owner, 2026-08-17, no crash), so that hold is lifted — but
-**queue item 1 opened in its place and is untriaged**: Contexts location rules do not round-trip.
-Whether it blocks the tag is not yet known and one comparison against the tagged release settles it.
+DB-060's crash is device-verified fixed (owner, 2026-08-17, no crash), so that hold is lifted. The
+Contexts location round-trip that opened in its place is **triaged and fixed (DB-061)**: the owner
+compared against the tagged release and saw the same failure, and `v1.8.2` carries the identical
+code, so it is pre-existing and does **not** block the tag. Nothing now blocks it.
 Parity checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
 
 **Resuming cold?** The train itself is finished and green. Branch
 `claude/pr-116-branch-train-review-c4lo6i`, PR **#117** open against `main`, describing the whole
-train; #115 closed, #116 was intra-train. No agent work is half-done. **Start at queue item 1** —
-it is fresh owner input that nobody has read code for, and its tagged-release comparison decides
-whether #117 can merge. After that: item 2 is an owner judgement, then squash-merge #117, publish
+train; #115 closed, #116 was intra-train. No agent work is half-done. Queue item 1 is fixed and
+needs only the owner's device check (it never blocked the tag). **Start at item 2** — an owner
+judgement on unreviewed legislation, and the last thing before the merge. Then squash-merge #117, publish
 from the GitHub UI, and **delete `docs/rebuild/DEVICE_TEST_SCRIPT_1.9.0.md`** (ephemeral), folding
 its results into the standing script. Two rule-file edits landed without their DA-005 review and are
 flagged: the AGENTS.md sentence (DB-056) and `format-args.sh` (item 2). Do **not** re-open the
@@ -75,26 +76,13 @@ a different screen and a different defect.
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. **Contexts location rules do not round-trip (owner, 2026-08-17, two observations, untriaged —
-   NOT investigated, NOT fixed).** Reported at the end of the session; no one has looked at the code.
-   (a) **Contexts shows lat/lon comma-separated while Circadian shows a dot.** DB-051 moved the
-   circadian field to `Locale.US` formatting plus comma-tolerant parsing; Contexts was deliberately
-   left alone, so it still formats with the default locale.
-   (b) **A saved location rule loses its location.** Create a rule with a location, save, reopen it
-   from the rules list: the **Location toggle is off**. Re-toggling it does **not** show the stored
-   coordinates. Separately, the **rules list does not display which coordinates a rule applies to**,
-   though it does show time and Wi-Fi.
-   **Strong lead, unverified:** these are likely one defect, and it is DB-051's mechanism on the
-   other screen — `ContextsScreen` parses lat/lon with a bare `toDoubleOrNull()` (dot-only) while
-   the field is filled locale-formatted (comma), so on a comma-decimal device the parse returns null
-   and the coordinates are never stored. That would explain the toggle being off on reopen and the
-   blank fields after re-toggling. **Do not treat that as established** — nobody has read the save
-   path; the list-display gap may be a third, separate thing.
-   **Decide first whether it blocks the tag:** the comma/dot *inconsistency* is new (circadian
-   moved), but Contexts' own behaviour is unchanged by this train, so (b) is probably pre-existing.
-   **Check the tagged release** — if a location rule round-trips there and not here, it is a
-   regression and blocks; if it fails there too, it is a pre-existing defect and 1.9.0 can ship
-   without it. That single comparison is the next action.
+1. **Contexts location round-trip — fixed (DB-061), awaiting device verification.** The lead held:
+   one defect, DB-051's mechanism on the other screen, and all three observations came from it.
+   `formatCoord`/`parseCoord` now live in `ui/components/Coordinates.kt` and are used by both
+   screens; the save path is a unit-testable `locationTriggerOf`; the rules list names the circle
+   instead of saying "near location". Pre-existing (v1.8.2 has the same three lines), so it never
+   blocked the tag. **Owner: on device, create a location rule, save, reopen it — the toggle should
+   still be on with the coordinates shown, and the list row should name them.**
 2. **`format-args.sh` corrections are unreviewed legislation.** Three DA-005 rounds, each finding
    the last wrong: round 1 killed the asserted crash mechanism (single-arg `getString` does not
    format); round 2 died on an API 529 with no verdict; round 3 found the rewrite blind to
@@ -138,6 +126,12 @@ the rows, not here.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-17 — **Contexts location rules round-trip (DB-061).** DB-051's fix went one screen deep:
+  the rule editor wrote the field with the default locale and read it back dot-only, so a
+  comma-decimal device parsed null and dropped the whole location trigger — the rule reopened with
+  the toggle off. Pre-existing (`v1.8.2` identical), so it never blocked the tag. The format/parse
+  pair moved to `ui/components/Coordinates.kt`; the save path became a unit-testable
+  `locationTriggerOf`; the rules list now names the circle instead of "near location".
 - 2026-08-17 — **Contexts "Use current location" crash fixed, and the class guarded (DB-060).**
   DB-057's new `%1$d` reached only the circadian caller, so the Contexts one toasted a formatted
   string with no arguments and `Toaster`'s VARARG `getString(resId, *formatArgs)` threw — the

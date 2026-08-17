@@ -756,3 +756,12 @@
   Three review rounds, three wrong guards: single-arg `getString` does not format, and the rewrite
   that stopped scanning it missed both shapes that DO crash.
   `[cited]`: `scripts/guards/format-args.sh`; only as wide as its resolvers.
+
+- DB-061 [cited]: **DB-051's fix went one screen deep, not one defect deep.** The Contexts rule
+  editor carried the identical mismatched pair — default-locale `"%.5f".format` in, dot-only
+  `toDoubleOrNull` out — but here the null dropped the WHOLE location trigger, not one coordinate:
+  the rule reopened with the toggle off and nothing to re-show, which reads as a storage bug
+  rather than a parse one. `git show v1.8.2:` has the same three lines, so pre-existing, not a
+  train regression. The pair now lives once in `ui/components/Coordinates.kt`; the save path became
+  a unit-testable `locationTriggerOf`. The list said "near location" for every rule and now names
+  the circle. `[cited]`: `locationTriggerOf`, `Coordinates.kt`.

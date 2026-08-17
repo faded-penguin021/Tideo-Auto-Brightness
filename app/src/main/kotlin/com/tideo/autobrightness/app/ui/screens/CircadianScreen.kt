@@ -49,6 +49,8 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
+import com.tideo.autobrightness.app.ui.components.formatCoord
+import com.tideo.autobrightness.app.ui.components.parseCoord
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.graph.CircadianScaleChart
 import com.tideo.autobrightness.platform.context.LocationReader
@@ -378,11 +380,6 @@ private fun CircadianStaleBanner(status: com.tideo.autobrightness.app.runtime.Ci
 }
 
 private fun fmtCoord(v: Double?): String = v?.let { formatCoord(it) } ?: "—"
-
-// DB-051: these coordinates are parsed back, so they are dot-decimal — never the default locale's.
-internal fun formatCoord(value: Double): String = String.format(Locale.US, "%.5f", value)
-
-internal fun parseCoord(text: String): Double? = text.trim().replace(',', '.').toDoubleOrNull()
 
 private val EXP_DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("UTC")

@@ -62,6 +62,9 @@ import com.tideo.autobrightness.app.ui.components.TimeField
 import com.tideo.autobrightness.app.ui.components.TimeTokenRow
 import com.tideo.autobrightness.app.ui.components.TriggerSection
 import com.tideo.autobrightness.app.ui.components.UsageAccessPromptCard
+import com.tideo.autobrightness.app.ui.components.coordText
+import com.tideo.autobrightness.app.ui.components.formatCoord
+import com.tideo.autobrightness.app.ui.components.parseCoord
 import com.tideo.autobrightness.app.ui.components.summary
 import com.tideo.autobrightness.app.ui.theme.Dimens
 import java.util.UUID
@@ -252,8 +255,8 @@ internal fun RuleEditor(
     val selectedDays = remember { mutableStateOf(rule.triggers.days?.toSet() ?: emptySet()) }
     var charging by remember { mutableStateOf(rule.triggers.battery?.onPower == true) }
     // Location window (G2R-F22): lat/lon/radius editor + "use current location".
-    var lat by remember { mutableStateOf(rule.triggers.location?.lat?.toString() ?: "") }
-    var lon by remember { mutableStateOf(rule.triggers.location?.lon?.toString() ?: "") }
+    var lat by remember { mutableStateOf(coordText(rule.triggers.location?.lat)) }
+    var lon by remember { mutableStateOf(coordText(rule.triggers.location?.lon)) }
     // G3 owner finding: radius defaults to 200 m (never blank); the user can still edit it.
     var radius by remember { mutableStateOf(rule.triggers.location?.radius?.let { it.toInt().toString() } ?: "200") }
     // Battery percentage window (G2R-F31, owner-reported): 0/100 means "any level" → omit the bound.
@@ -275,9 +278,6 @@ internal fun RuleEditor(
         val minPct = battMin.trim().toIntOrNull()?.coerceIn(0, 100)
         val maxPct = battMax.trim().toIntOrNull()?.coerceIn(0, 100)
         val hasBattery = batteryEnabled && (charging || minPct != null || maxPct != null)
-        val latV = lat.trim().toDoubleOrNull()
-        val lonV = lon.trim().toDoubleOrNull()
-        val radiusV = radius.trim().toDoubleOrNull()
         val triggers = ContextTriggers(
             apps = if (appsEnabled) selectedApps.value.takeIf { it.isNotEmpty() }?.toList() else null,
             wifi = if (wifiEnabled) {
@@ -290,11 +290,7 @@ internal fun RuleEditor(
             } else {
                 null
             },
-            location = if (locationEnabled && latV != null && lonV != null && radiusV != null && radiusV > 0) {
-                LocationTrigger(lat = latV, lon = lonV, radius = radiusV)
-            } else {
-                null
-            },
+            location = locationTriggerOf(locationEnabled, lat, lon, radius),
             timeRange = if (timeEnabled && startTime.isNotBlank() && endTime.isNotBlank()) {
                 listOf(startTime.trim(), endTime.trim())
             } else {
@@ -420,7 +416,7 @@ internal fun RuleEditor(
 
             TriggerSection(stringResource(R.string.contexts_trigger_location), locationEnabled, { locationEnabled = it }, "location") {
                 OutlinedButton(
-                    onClick = { onUseCurrentLocation { la, lo -> lat = "%.5f".format(la); lon = "%.5f".format(lo) } },
+                    onClick = { onUseCurrentLocation { la, lo -> lat = formatCoord(la); lon = formatCoord(lo) } },
                     modifier = Modifier.testTag("use_current_location"),
                 ) { Text(stringResource(R.string.action_use_current_location)) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -506,6 +502,20 @@ internal fun RuleEditor(
             Spacer(Modifier.height(48.dp))
         }
     }
+}
+
+// Null when off or the fields aren't a usable circle; split out of saveRule for a test (DB-061).
+internal fun locationTriggerOf(
+    enabled: Boolean,
+    latText: String,
+    lonText: String,
+    radiusText: String,
+): LocationTrigger? {
+    if (!enabled) return null
+    val lat = parseCoord(latText) ?: return null
+    val lon = parseCoord(lonText) ?: return null
+    val radius = parseCoord(radiusText)?.takeIf { it > 0 } ?: return null
+    return LocationTrigger(lat = lat, lon = lon, radius = radius)
 }
 
 // D-150: TriggerSection components moved to TriggerEditors.kt.
