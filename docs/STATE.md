@@ -56,14 +56,36 @@ adds super dimming and Privileged Display.
 
 Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. Shipped v1.8.2/vc20 and
 F-Droid reproducible-build verified (owner, 2026-08-13). The branch carries unreleased
-v1.9.0/vc21. Tests green before this session; parity checklist and parity gaps are empty. Live
-ledger: `LEDGER_B.md`.
+v1.9.0/vc21. **NOT releasable: Owner-queue item 1 is an open crash regression against the tagged
+release.** PR #117 is open and otherwise complete; do not merge it until that is resolved. Ladder
+green at `12b5a21`; parity checklist and parity gaps are empty. Live ledger: `LEDGER_B.md`.
 
 ## Owner queue
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
+1. **CRASH REGRESSION — BLOCKS THE v1.9.0 TAG AND PR #117 (owner, 2026-08-17).** Creating a
+   **Contexts rule** → **Use current location** **crashes the app**. The currently tagged GitHub
+   release does NOT crash, so this train introduced it. Reported at the very end of the session on
+   build `12b5a21`; not reproduced locally, no stack trace captured yet, and deliberately NOT
+   investigated — the owner filed it and stopped work.
+   **First thing to get:** the stack trace. `adb logcat -b crash` right after it happens, or
+   Settings → Developer options → bug report. Everything below is a suspect list, not a diagnosis.
+   **Why this train is the suspect:** five commits changed the location layer, and the Contexts
+   button shares `LocationReader` with the circadian one that got all the device testing —
+   `ContextsViewModel.currentLocation` was never exercised in any round. Changed here:
+   `activeFix`'s PASSIVE last resort (DB-053), the 45 s budget (DB-055), the new
+   `locationServicesEnabled()` early return (DB-057), and `lastKnownWithin()` (DB-059). The last two
+   are **new interface methods with default implementations**, so any other `LocationReader` in the
+   tree — including test fakes and anything Contexts constructs — silently takes the default rather
+   than failing to compile. That shape is worth checking first.
+   **Do not assume it is the same bug as the circadian path.** DB-051's locale parse was fixed only
+   in `CircadianScreen`; `ContextsScreen` still parses lat/lon with a bare `toDoubleOrNull()`
+   (around its geofence editor), which is a separate latent defect on the same screen and could
+   confuse a bisect. DB-059 deliberately left the Contexts caller on the active path.
+   **Verify the fix on the Contexts screen specifically** — the circadian button passing proves
+   nothing about it, which is exactly how this got missed.
+2. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
    device reports Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
    Needs hardware that reports them unavailable.
 
