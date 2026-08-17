@@ -960,7 +960,7 @@ expect_pass "a formatted string toasted WITH an argument passes"
 fa_tree fa-bare '<string name="wait">up to %1$d seconds</string>' \
 	'toast(R.string.wait)'
 run_guard fa-bare format-args
-expect_fail "a formatted string toasted with no arguments fails" "only argument"
+expect_fail "a formatted string toasted with no arguments fails" "NO format arguments"
 
 # Precision sits BETWEEN the positional index and the conversion, so `%1$.4f` does not match
 # `%[0-9]+\$[a-zA-Z]` — a first draft's regex missed it, and it is the form the sibling line at
@@ -968,7 +968,7 @@ expect_fail "a formatted string toasted with no arguments fails" "only argument"
 fa_tree fa-precision '<string name="fix">Location: %1$.4f, %2$.4f</string>' \
 	'toast(R.string.fix)'
 run_guard fa-precision format-args
-expect_fail "a positional specifier carrying a precision is still a specifier" "only argument"
+expect_fail "a positional specifier carrying a precision is still a specifier" "NO format arguments"
 
 # A `<string>` whose text wraps is invisible to a line-oriented XML parse, and that failure is
 # SILENT and OPEN: the name never enters the formatted set, so every bare toast of it passes. An
@@ -977,7 +977,7 @@ fa_tree fa-wrapped '<string name="stale">Sun position cached
         %1$d day(s) ago — turn Location on.</string>' \
 	'toast(R.string.stale)'
 run_guard fa-wrapped format-args
-expect_fail "a <string> element wrapped across lines is still parsed" "only argument"
+expect_fail "a <string> element wrapped across lines is still parsed" "NO format arguments"
 
 # The id can be chosen by an expression. Both branches are checked, because a DB-057-shaped edit
 # (add a specifier, update one branch) is exactly the incident again.
@@ -985,7 +985,7 @@ fa_tree fa-conditional '<string name="wait">up to %1$d seconds</string>
     <string name="off">Location is off</string>' \
 	'toast(if (servicesOn) R.string.wait else R.string.off)'
 run_guard fa-conditional format-args
-expect_fail "an id chosen by a conditional is still checked" "only argument"
+expect_fail "an id chosen by a conditional is still checked" "NO format arguments"
 
 fa_tree fa-mixed '<string name="close">Close</string>
     <string name="wait">up to %1$d seconds</string>' \
@@ -1003,20 +1003,76 @@ val shown = t.format(seconds)'
 run_guard fa-template format-args
 expect_pass "resolving a template and formatting it afterwards is not a finding"
 
-# `%%` is how a literal percent is written in an Android resource.
-fa_tree fa-escaped '<string name="pct">100%% brightness</string>
+# `%%` is the escape for a literal percent. The body here is `%%d` ON PURPOSE: `100%% brightness`
+# would pass whether or not the guard strips `%%`, because `% ` is not a specifier either way — an
+# inert fixture that pins nothing. `%%d` is only harmless if the stripping actually happens.
+fa_tree fa-escaped '<string name="pct">100%%d brightness</string>
     <string name="wait">up to %1$d seconds</string>' \
 	'toast(R.string.pct)'
 run_guard fa-escaped format-args
 expect_pass "an escaped literal percent is not a format specifier"
 
-# `formatted="false"` is Android's own opt-out for prose carrying a bare `%`; three strings in this
-# repo use it. Reading one as formatted fails the ladder on a string that is correct by contract.
-fa_tree fa-optout '<string name="spread" formatted="false">Scale spread (%, 1-100).</string>
+# `formatted="false"` is Android's own opt-out for prose carrying a bare `%`. Same trap as above:
+# the body must contain something the specifier regex WOULD match, or the case passes for the wrong
+# reason and the opt-out branch is dead code wearing a fixture.
+fa_tree fa-optout '<string name="spread" formatted="false">Use %d percent of the scale</string>
     <string name="wait">up to %1$d seconds</string>' \
 	'toast(R.string.spread)'
 run_guard fa-optout format-args
 expect_pass 'a formatted="false" string carrying a bare percent is not a specifier'
+
+# A second vararg resolver exists (ControlReceiver.flashDrop, DB-035) and takes the id as its THIRD
+# argument, so a pattern anchored on "id is the first thing after the paren" cannot see it.
+fa_tree fa-flashdrop '<string name="drop">Dropped %1$s</string>' \
+	'flashDrop(ctx, level, R.string.drop)'
+run_guard fa-flashdrop format-args
+expect_fail "a resolver taking the id as a later argument is still checked" "NO format arguments"
+
+# `f(id, emptyArray())` is zero format arguments too — the array spreads to nothing and String.format
+# still runs. CircadianScreen passes its toasts exactly this way, so missing it would leave the
+# DB-060 shape unguarded on the screen DB-057 edited.
+fa_tree fa-emptyarray '<string name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.wait, emptyArray())'
+run_guard fa-emptyarray format-args
+expect_fail "an explicit emptyArray() spread is zero arguments" "NO format arguments"
+
+# The counterpart risk: a pattern loose enough for the two cases above can run from one call's
+# opening paren into a LATER call's id and invent a finding. Both ids here are formatted; the first
+# is correctly supplied, the second is not passed to a resolver at all.
+fa_tree fa-crosstalk '<string name="haz">Has %1$d args</string>
+    <string name="innocent">Also %1$d here</string>' \
+	'fun g() { toast(R.string.haz, n); foo(R.string.innocent) }'
+run_guard fa-crosstalk format-args
+expect_pass "the scan does not run across call boundaries on a shared line"
+
+# `name` is not required to be the first attribute, and requiring it fails OPEN — the string never
+# enters the formatted set, so every bare call on it passes.
+fa_tree fa-attrorder '<string translatable="false" name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.wait)'
+run_guard fa-attrorder format-args
+expect_fail "a <string> whose name is not the first attribute is still parsed" "NO format arguments"
+
+# A commented-out resource is not a resource. Fail-closed direction, but a guard that fires on dead
+# XML is one the next session deletes.
+fa_tree fa-xmlcomment '<!-- <string name="ghost">%1$d ghosts</string> -->
+    <string name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.ghost)'
+run_guard fa-xmlcomment format-args
+expect_pass "a commented-out <string> is not classified as live"
+
+# Flags sit between the % and the conversion. A first draft admitted only `-0-9.,`, so `%+.2f` — the
+# natural spelling for a signed lux or brightness offset — was silently unformatted.
+fa_tree fa-flags '<string name="off">Offset %+.2f stops</string>' \
+	'toast(R.string.off)'
+run_guard fa-flags format-args
+expect_fail "a + flag between the %% and the conversion is still a specifier" "NO format arguments"
+
+# More than one offending file: the loop must report every hit, not stop at the first.
+fa_tree fa-multi '<string name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.wait)' \
+	'toast(R.string.wait)'
+run_guard fa-multi format-args
+expect_fail "a second offending file is reported too" "Other.kt"
 
 # DB-056 semantics: the guard reads tracked files, so an unstaged file is out of scope — the same
 # contract AGENTS.md states for every other guard, and the reason `git add` comes before verifying.

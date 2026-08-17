@@ -136,19 +136,24 @@ session while drifting against every upstream release.
   ladder's path. DB-060 is the incident — a string gained `%1$d` for one caller and the other
   caller, on a screen no device round had exercised, crashed the app against a tagged release that
   did not. Upstream cannot own this: it ships no Android resource scanner.
-  **It scans `toast()` and nothing else, and that narrowness is the design.** `Resources.getString(int)`
-  does not format — it is `getText(id).toString()`, and Compose's `stringResource(id)` delegates to
-  it, so resolving a `%1$d` string through either renders the template rather than throwing, and
-  `template.format(…)` afterwards is correct code this tree already contains. Only the vararg
-  overload formats, and it formats even when the vararg array is empty; `Toaster.invoke(resId,
-  vararg)` (D-131) is this repo's one route to it. A guard that also flagged `stringResource` would
-  fail the ladder on correct code, which is how a rule gets regenerated away. The first draft of
-  this guard made exactly that error, and asserted the wrong crash mechanism in its own diagnostic;
-  the DA-005 reviewer caught both. Its header states what it therefore does not catch (ids reaching
-  `toast` through a variable, multi-line call sites, plurals/string-arrays, wrong arg counts and
-  types past zero, translations).
+  **It scans the vararg resolvers and nothing else, and that narrowness is the design.**
+  `Resources.getString(int)` does not format — it is `getText(id).toString()`, and Compose's
+  `stringResource(id)` delegates to it, so resolving a `%1$d` string through either renders the
+  template rather than throwing, and `template.format(…)` afterwards is correct code this tree
+  already contains. Only the vararg overload formats, and it formats even when the array is empty.
+  **Two functions reach it here** — `Toaster.invoke(resId, vararg)` (D-131) and
+  `ControlReceiver.flashDrop` (DB-035) — and `RESOLVERS` must name every one; an unnamed wrapper is
+  a silent hole. A guard that also flagged `stringResource` would fail the ladder on correct code,
+  which is how a rule gets regenerated away.
+  **Three DA-005 rounds, each finding the last one wrong**, which is the honest provenance of this
+  guard: the first draft asserted the wrong crash mechanism and scanned three functions that cannot
+  produce it; the rewrite that fixed those was blind to `emptyArray()` spreads and to `flashDrop`
+  entirely, and shipped two fixture cases whose bodies could not fail either way. The corrections to
+  *that* have had no review. Its header states what it still does not catch (ids reaching a resolver
+  through a variable or a runtime-empty spread, multi-line call sites, plurals/string-arrays, the
+  space flag, wrong arg counts and types past zero, translations).
 
-`scripts/tests/local-guards.sh` is their fixture suite — 87 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 94 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.

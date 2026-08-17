@@ -84,6 +84,40 @@ On a device (or OEM build) where the framework reports the feature unavailable:
 12. Fire the gesture once more. **Expected:** vibrates **exactly once**, not twice (checks for a
     leftover call site on the shared path).
 
+## §8.24a — Contexts "Use current location" does not crash (DB-060) — **THE BLOCKER**
+
+This is the step the train was missing. Every location round tested the *circadian* button; none
+tested this one, which is how the crash reached you. Test this one specifically — the circadian
+button passing proves nothing about it.
+
+13. **Menu → Profiles → Contexts → add/edit a rule → location rule → Use current location.**
+    **Expected:** a toast reading *"Acquiring location — this can take up to 45 seconds…"* with the
+    number present, then either the coordinates filling the two fields plus a *"Location: 52.3702,
+    4.8952"* toast, or a plain failure toast. **Any crash here is the regression un-fixed.** Before
+    the fix the toast itself threw `MissingFormatArgumentException` — the string gained a `%1$d`
+    that only the circadian caller was passing — so the app died at the moment the toast was shown,
+    before acquisition even mattered.
+    If it does crash, `adb logcat -b crash` immediately and attach the trace; the frame to look for
+    is `Toaster.invoke`.
+14. **Regression check, circadian side.** **Menu → Circadian → Use current location.** **Expected:**
+    the same "up to 45 seconds" toast and a fix (or, per DB-059, an instant fill from a last-known
+    fix under an hour old). Both buttons now read the number from one shared constant, so a wrong or
+    missing number on *either* screen means the constant broke.
+15. **Location switched OFF, Contexts side.** Turn the system Location master switch off, then tap
+    **Use current location** in the Contexts rule editor. **Expected:** the "up to 45 seconds" toast,
+    then a *quick* failure (*"No location fix yet — try again in a moment"*) rather than a 45-second
+    hang — DB-057's early return does the work.
+    **Known imperfection, not a FAIL:** this screen still *promises* 45 seconds before failing fast,
+    where the circadian screen says *"Location is off — turn it on for a device fix…"* up front. The
+    targeted message was never wired to the Contexts caller. Log it if it bothers you and it becomes
+    a real item; it is cosmetic, not the blocker.
+16. **[opt] Comma-decimal locale (DB-051, latent — expected to FAIL).** Set the device language to
+    one using a comma decimal separator (e.g. Deutsch), then use the button and press **Set**.
+    **Expected result if the latent defect is real:** the fields fill but Set silently refuses,
+    because `ContextsScreen` still parses coordinates with a bare `toDoubleOrNull()`. This was fixed
+    in `CircadianScreen` only. Not part of the DB-060 fix and **not** a reason to hold the tag —
+    run it only if you want the defect confirmed before it gets its own change.
+
 ## Log any miss
 
 Log any FAIL/BLOCKED in `../STATE.md` → Owner queue with the step number above, not the master

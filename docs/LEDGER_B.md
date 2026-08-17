@@ -750,9 +750,9 @@
 
 - DB-060 [cited]: **Adding a format specifier to a string edits every call site, and the compiler
   is not told.** DB-057 gave `toast_acquiring_location` a `%1$d` and updated the circadian caller;
-  the Contexts one kept toasting it bare. `Toaster` routes through the VARARG `getString(resId,
-  *formatArgs)`, which formats even on an empty array, so it threw against a tagged release that
-  did not. Kotlin cannot see inside `strings.xml`, the toast tests assert on resource IDs and
-  discard the args, and no device round had pressed it. Single-arg `getString` and `stringResource`
-  do NOT format — believing they did put three innocent resolvers in the guard's first draft.
-  `[cited]`: `scripts/guards/format-args.sh`, on `toast()` alone.
+  the Contexts one kept toasting it bare, and `Toaster`'s VARARG `getString(resId, *formatArgs)`
+  formats even on an empty array — so it threw against a tagged release that did not. No layer could
+  see it: not Kotlin, not tests that discard the args, not a round that never pressed the button.
+  Three review rounds, three wrong guards: single-arg `getString` does not format, and the rewrite
+  that stopped scanning it missed both shapes that DO crash.
+  `[cited]`: `scripts/guards/format-args.sh`; only as wide as its resolvers.

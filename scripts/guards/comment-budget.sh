@@ -138,7 +138,7 @@ MODULES='app domain platform'
 #   * Coordinates are normalised, so `act10/14` and `act10/99` are the same record. A marker
 #     re-pointed at a different sub-action inside the same task is not detected.
 #   * A record with no recognised coordinate degenerates to "this file has N `// Tasker` mentions"
-#     — the old population check, scoped to one file. 15 of the 59 records are of this kind, and
+#     — the old population check, scoped to one file. 14 of the 83 records are of this kind, and
 #     four of those are in `ProvenanceTest.kt`, where the matched lines are prose ABOUT the marker
 #     syntax rather than markers. They are kept rather than hand-excluded because a hand-maintained
 #     exclusion list is a second thing to keep true; the cost is that rewording that test needs a
@@ -194,6 +194,7 @@ TASKER_PROVENANCE_MANIFEST=$(
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements20
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements31
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements4
+1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/SuperDimmingScreen.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	%AAB_Test
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	act13
