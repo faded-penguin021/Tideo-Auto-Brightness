@@ -64,7 +64,7 @@ class CircadianExtrasViewModel @JvmOverloads constructor(
 
     fun locationServicesOn(): Boolean = location.locationServicesEnabled()
 
-    /** G2R-F42/D-120/D-122: actively acquire fresh location (not passive last-known); fallback to ipwho.is if opted-in. */
+    /** G2R-F42/D-120/D-122: a recent fix if there is one, else acquire; ipwho.is last, if opted-in. */
     suspend fun freshLatLon(): Pair<Double, Double>? {
         // DB-059: sun times move by seconds over kilometres, so a recent fix is already exact enough.
         location.lastKnownWithin(RECENT_FIX_MAX_AGE_MS)?.let { return it.cacheAndPair() }

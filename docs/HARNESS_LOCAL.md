@@ -40,6 +40,7 @@ copy of everything upstream now owns. Our old ladder ran 11 numbered guards:
 | 6 — F-Droid changelog cap | **ours:** `scripts/guards/fdroid-changelog.sh` |
 | 11 — falsifiable doc-facts | **ours:** `scripts/guards/doc-facts.sh` |
 | 5 — citation *prefix→file* mapping | **ours:** `scripts/guards/ledger-prefix.sh` |
+| — no upstream rung — format-arg resolution | **ours:** `scripts/guards/format-args.sh` |
 
 We **gained** three rungs with no local predecessor: `guard_author_identity`,
 `guard_shipped_integrity` and `guard_repo_local`.
@@ -48,7 +49,7 @@ We **gained** three rungs with no local predecessor: `guard_author_identity`,
 the AMH repository now, and a stale local snapshot would read as authoritative to a future
 session while drifting against every upstream release.
 
-## The five repo-local guards, and why each is not upstream's job
+## The six repo-local guards, and why each is not upstream's job
 
 - **`fdroid-changelog.sh`** — F-Droid flags a `whatsNew` over 500 **characters**, and it measures
   codepoints, not bytes. `wc -c` rejects a legal note full of em dashes. Only the current
@@ -128,8 +129,26 @@ session while drifting against every upstream release.
   Regenerate with `scripts/guards/comment-budget.sh --provenance-records`, which is the guard's own
   extractor — so the manifest cannot be normalised differently from the checker that reads it — and
   baseline it from the merge base, never a tree that is mid-change.
+- **`format-args.sh`** — a string resource carrying a format specifier, passed to `toast()` as the
+  call's only argument, throws `MissingFormatArgumentException` when the toast is shown. Nothing
+  else in the tree can see it: the Kotlin compiler does not read `strings.xml`, the toast unit tests
+  assert on resource IDs and discard the args, and lint's `StringFormatInvalid` is not on the
+  ladder's path. DB-060 is the incident — a string gained `%1$d` for one caller and the other
+  caller, on a screen no device round had exercised, crashed the app against a tagged release that
+  did not. Upstream cannot own this: it ships no Android resource scanner.
+  **It scans `toast()` and nothing else, and that narrowness is the design.** `Resources.getString(int)`
+  does not format — it is `getText(id).toString()`, and Compose's `stringResource(id)` delegates to
+  it, so resolving a `%1$d` string through either renders the template rather than throwing, and
+  `template.format(…)` afterwards is correct code this tree already contains. Only the vararg
+  overload formats, and it formats even when the vararg array is empty; `Toaster.invoke(resId,
+  vararg)` (D-131) is this repo's one route to it. A guard that also flagged `stringResource` would
+  fail the ladder on correct code, which is how a rule gets regenerated away. The first draft of
+  this guard made exactly that error, and asserted the wrong crash mechanism in its own diagnostic;
+  the DA-005 reviewer caught both. Its header states what it therefore does not catch (ids reaching
+  `toast` through a variable, multi-line call sites, plurals/string-arrays, wrong arg counts and
+  types past zero, translations).
 
-`scripts/tests/local-guards.sh` is their fixture suite — 74 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 87 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -142,7 +161,7 @@ broken guard rather than a mild opinion. The contract is the **ladder's**: a wor
 calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
 `scripts/guards/*.sh` outside `scripts/ladder.sh`.
 
-**All five of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
+**All six of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
 secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
 — for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
 `comment-budget.sh` was the one real candidate for the warn tier and was refused it: a budget that

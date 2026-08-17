@@ -131,7 +131,7 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
     fun apply(raiseMaxBrightForCurve: Boolean = false) {
         // D-085: clamp fields on commit (same as SettingsStore/import/export).
         // D-169: raise MaxBright if curve needs it (D-052 blocks on form errors).
-        // Tasker force-fixes and flashes "adjusted to N" rather than blocking the save. form3A is now
+        // Tasker force-fixes and flashes "adjusted to N" rather than blocking the save.
         val fix = if (raiseMaxBrightForCurve) _draft.value.raiseMaxBrightnessForCurve() else MaxBrightnessFix(_draft.value, null)
         val requestedStrength = fix.settings.dimmingStrength
         val toCommit = fix.settings.validate()

@@ -14,9 +14,9 @@ import com.tideo.autobrightness.app.runtime.AabFlash
  * AAB-teal styling as runtime flashes and a new flash cancels the previous rather than stacking
  * (G2R-F51).
  *
- * D-131 (i18n): invoke with a **string-resource id** (+ optional format args) so toasts are
- * translatable. The [Context] is captured at creation, so the resId overload resolves even from a
- * non-composable lambda. The `String` overload is for already-resolved runtime text only —
+ * D-131 (i18n): invoke with a **string-resource id**, plus every format arg that string declares —
+ * one short throws at display time (DB-060). The [Context] is captured at creation, so the resId
+ * overload resolves from a non-composable lambda too. The `String` overload is for runtime text only —
  * `HardcodedStringCheckTest` forbids a hardcoded toast string.
  */
 class Toaster internal constructor(private val context: Context) : (String) -> Unit {

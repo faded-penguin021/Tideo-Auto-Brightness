@@ -191,11 +191,9 @@ TASKER_PROVENANCE_MANIFEST=$(
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/graph/DimmingChart.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CircadianScreen.kt	elements26
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CurveBrightnessScreen.kt	elements22
-1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements20
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements31
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/MiscScreen.kt	elements4
-1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ProfilesScreen.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/SuperDimmingScreen.kt	(no-coordinate)
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	%AAB_Test
 1	app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/ToolsScreen.kt	act13

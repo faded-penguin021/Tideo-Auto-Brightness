@@ -419,4 +419,5 @@ internal suspend fun acquireCurrentLocation(
     else toast(R.string.toast_acquire_location_failed, emptyArray())
 }
 
-private val ACTIVE_FIX_SECONDS: Int = (LocationReader.ACTIVE_FIX_TIMEOUT_MS / 1000L).toInt()
+/** The wait `toast_acquiring_location` promises. Shared with the Contexts caller (DB-060). */
+internal val ACTIVE_FIX_SECONDS: Int = (LocationReader.ACTIVE_FIX_TIMEOUT_MS / 1000L).toInt()

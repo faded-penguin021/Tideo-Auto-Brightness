@@ -360,7 +360,7 @@ fun ProfilesContextsScreen(
                 onUseCurrentLocation = { setLatLon ->
                     // G2R-F22/F42/D-122: recheck grant + actively acquire fresh fix with targeted message
                     scope.launch {
-                        toast(R.string.toast_acquiring_location)
+                        toast(R.string.toast_acquiring_location, ACTIVE_FIX_SECONDS)
                         when (val result = contextsVm.currentLocation()) {
                             is LocationResult.Available -> {
                                 setLatLon(result.snapshot.latitude, result.snapshot.longitude)

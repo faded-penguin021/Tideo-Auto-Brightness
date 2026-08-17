@@ -2,7 +2,7 @@
 # Fixture suite for the repo-local ladder guards under scripts/guards/.
 #
 # Yours, not shipped. The AMH's own scripts/test-ladder-guards.sh covers the SHIPPED ladder;
-# nothing upstream knows these guards exist, so without this file they are four scripts whose
+# nothing upstream knows these guards exist, so without this file they are six scripts whose
 # failure paths have never run (docs/HARNESS_LOCAL.md). scripts/verify.sh invokes it.
 #
 # Every case builds a throwaway tree and runs the real guard against it. The point is the
@@ -930,6 +930,113 @@ printf 'hello\n' >"$SANDBOX/cb-empty/app/notes.txt"
 git -C "$SANDBOX/cb-empty" add -A
 run_cb cb-empty
 expect_fail "a tree with no tracked Kotlin fails rather than passing vacuously" "checked NOTHING"
+
+# =============================================================================
+printf '\n· format-args\n'
+
+# <dir> <strings-body> [kotlin-body] [second-kotlin-body]. The guard scans `git ls-files`, so each
+# sandbox is a real repo with the sources staged — which is also what makes the untracked case below
+# expressible.
+fa_tree() {
+	local d=$SANDBOX/$1
+	mkdir -p "$d/app/src/main/res/values" "$d/app/src/main/kotlin"
+	{
+		printf '<resources>\n'
+		printf '%s\n' "$2"
+		printf '</resources>\n'
+	} >"$d/app/src/main/res/values/strings.xml"
+	[ -n "${3:-}" ] && printf '%s\n' "$3" >"$d/app/src/main/kotlin/Screen.kt"
+	[ -n "${4:-}" ] && printf '%s\n' "$4" >"$d/app/src/main/kotlin/Other.kt"
+	git -C "$d" init -q 2>/dev/null
+	git -C "$d" add -A 2>/dev/null
+}
+
+fa_tree fa-ok '<string name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.wait, ACTIVE_FIX_SECONDS)'
+run_guard fa-ok format-args
+expect_pass "a formatted string toasted WITH an argument passes"
+
+# THE case this guard exists for (DB-060): the string gained a specifier, one caller did not.
+fa_tree fa-bare '<string name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.wait)'
+run_guard fa-bare format-args
+expect_fail "a formatted string toasted with no arguments fails" "only argument"
+
+# Precision sits BETWEEN the positional index and the conversion, so `%1$.4f` does not match
+# `%[0-9]+\$[a-zA-Z]` — a first draft's regex missed it, and it is the form the sibling line at
+# the DB-060 crash site uses, so the miss would have been invisible.
+fa_tree fa-precision '<string name="fix">Location: %1$.4f, %2$.4f</string>' \
+	'toast(R.string.fix)'
+run_guard fa-precision format-args
+expect_fail "a positional specifier carrying a precision is still a specifier" "only argument"
+
+# A `<string>` whose text wraps is invisible to a line-oriented XML parse, and that failure is
+# SILENT and OPEN: the name never enters the formatted set, so every bare toast of it passes. An
+# IDE reflow or a translation round-trip is all it takes, and this tree has long `%1$d` strings.
+fa_tree fa-wrapped '<string name="stale">Sun position cached
+        %1$d day(s) ago — turn Location on.</string>' \
+	'toast(R.string.stale)'
+run_guard fa-wrapped format-args
+expect_fail "a <string> element wrapped across lines is still parsed" "only argument"
+
+# The id can be chosen by an expression. Both branches are checked, because a DB-057-shaped edit
+# (add a specifier, update one branch) is exactly the incident again.
+fa_tree fa-conditional '<string name="wait">up to %1$d seconds</string>
+    <string name="off">Location is off</string>' \
+	'toast(if (servicesOn) R.string.wait else R.string.off)'
+run_guard fa-conditional format-args
+expect_fail "an id chosen by a conditional is still checked" "only argument"
+
+fa_tree fa-mixed '<string name="close">Close</string>
+    <string name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.close)'
+run_guard fa-mixed format-args
+expect_pass "an UNformatted string toasted bare is not a finding"
+
+# THE false-positive class, and the reason `stringResource`/`getString` are not scanned:
+# `Resources.getString(int)` does not format, so resolving a template and formatting it afterwards
+# is correct code. A guard that failed the ladder here would be regenerated away by the next
+# session, which is how a rule stops meaning anything.
+fa_tree fa-template '<string name="wait">up to %1$d seconds</string>' \
+	'val t = stringResource(R.string.wait)
+val shown = t.format(seconds)'
+run_guard fa-template format-args
+expect_pass "resolving a template and formatting it afterwards is not a finding"
+
+# `%%` is how a literal percent is written in an Android resource.
+fa_tree fa-escaped '<string name="pct">100%% brightness</string>
+    <string name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.pct)'
+run_guard fa-escaped format-args
+expect_pass "an escaped literal percent is not a format specifier"
+
+# `formatted="false"` is Android's own opt-out for prose carrying a bare `%`; three strings in this
+# repo use it. Reading one as formatted fails the ladder on a string that is correct by contract.
+fa_tree fa-optout '<string name="spread" formatted="false">Scale spread (%, 1-100).</string>
+    <string name="wait">up to %1$d seconds</string>' \
+	'toast(R.string.spread)'
+run_guard fa-optout format-args
+expect_pass 'a formatted="false" string carrying a bare percent is not a specifier'
+
+# DB-056 semantics: the guard reads tracked files, so an unstaged file is out of scope — the same
+# contract AGENTS.md states for every other guard, and the reason `git add` comes before verifying.
+fa_tree fa-untracked '<string name="wait">up to %1$d seconds</string>'
+printf 'toast(R.string.wait)\n' >"$SANDBOX/fa-untracked/app/src/main/kotlin/Screen.kt"
+run_guard fa-untracked format-args
+expect_fail "an UNTRACKED offending file is not scanned, so the tree has no tracked Kotlin at all" "checked NOTHING"
+
+fa_tree fa-plain '<string name="close">Close</string>' \
+	'toast(R.string.close)'
+run_guard fa-plain format-args
+expect_fail "a strings.xml with no formatted string at all fails rather than passing vacuously" "checked NOTHING"
+
+fa_tree fa-nokt '<string name="wait">up to %1$d seconds</string>'
+run_guard fa-nokt format-args
+expect_fail "a tree with no tracked Kotlin fails rather than passing vacuously" "checked NOTHING"
+
+mkdir -p "$SANDBOX/fa-nostrings"
+run_guard fa-nostrings format-args
+expect_fail "a tree with no strings.xml fails rather than passing vacuously" "checked nothing"
 
 # =============================================================================
 # The case count stated in docs/HARNESS_LOCAL.md must match the count actually run.

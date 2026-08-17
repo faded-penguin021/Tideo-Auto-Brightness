@@ -56,36 +56,32 @@ adds super dimming and Privileged Display.
 
 Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. Shipped v1.8.2/vc20 and
 F-Droid reproducible-build verified (owner, 2026-08-13). The branch carries unreleased
-v1.9.0/vc21. **NOT releasable: Owner-queue item 1 is an open crash regression against the tagged
-release.** PR #117 is open and otherwise complete; do not merge it until that is resolved. Ladder
-green at `12b5a21`; parity checklist and parity gaps are empty. Live ledger: `LEDGER_B.md`.
+v1.9.0/vc21. **STILL NOT releasable, and PR #117 must not be merged**: the DB-060 crash is fixed in
+code but is device-unverified, and the hold lifts on the owner's pass (queue item 1), not on a green
+ladder. Parity checklist and parity gaps are empty. Live ledger: `LEDGER_B.md`.
 
 ## Owner queue
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. **CRASH REGRESSION — BLOCKS THE v1.9.0 TAG AND PR #117 (owner, 2026-08-17).** Creating a
-   **Contexts rule** → **Use current location** **crashes the app**. The currently tagged GitHub
-   release does NOT crash, so this train introduced it. Reported at the very end of the session on
-   build `12b5a21`; not reproduced locally, no stack trace captured yet, and deliberately NOT
-   investigated — the owner filed it and stopped work.
-   **First thing to get:** the stack trace. `adb logcat -b crash` right after it happens, or
-   Settings → Developer options → bug report. Everything below is a suspect list, not a diagnosis.
-   **Why this train is the suspect:** five commits changed the location layer, and the Contexts
-   button shares `LocationReader` with the circadian one that got all the device testing —
-   `ContextsViewModel.currentLocation` was never exercised in any round. Changed here:
-   `activeFix`'s PASSIVE last resort (DB-053), the 45 s budget (DB-055), the new
-   `locationServicesEnabled()` early return (DB-057), and `lastKnownWithin()` (DB-059). The last two
-   are **new interface methods with default implementations**, so any other `LocationReader` in the
-   tree — including test fakes and anything Contexts constructs — silently takes the default rather
-   than failing to compile. That shape is worth checking first.
-   **Do not assume it is the same bug as the circadian path.** DB-051's locale parse was fixed only
-   in `CircadianScreen`; `ContextsScreen` still parses lat/lon with a bare `toDoubleOrNull()`
-   (around its geofence editor), which is a separate latent defect on the same screen and could
-   confuse a bisect. DB-059 deliberately left the Contexts caller on the active path.
-   **Verify the fix on the Contexts screen specifically** — the circadian button passing proves
-   nothing about it, which is exactly how this got missed.
-2. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
+1. **Device-verify the DB-060 crash fix on the Contexts screen specifically** — Contexts rule →
+   **Use current location** must now toast "Acquiring location — this can take up to 45 seconds…"
+   and fill the fields instead of crashing. The circadian button passing proves nothing about it,
+   which is exactly how this shipped. The owner's stack trace named the cause outright
+   (`MissingFormatArgumentException` at `Toaster.kt:25`): DB-057's new `%1$d` reached only the
+   circadian caller. The location-layer suspects the queue listed (`activeFix` PASSIVE, the 45 s
+   budget, the new default interface methods) were all wrong and are retired.
+   Still open on that screen, and NOT touched by this fix: `ContextsScreen` parses lat/lon with a
+   bare `toDoubleOrNull()` around its geofence editor, so DB-051's comma-decimal defect is latent
+   there. Worth a pass on a comma-decimal locale.
+2. **Two `(no-coordinate)` provenance records were removed** (`ProfilesScreen.kt`, `MiscScreen.kt`)
+   after an audit of all 17. Both stood for a wrapped prose line whose "Tasker" was incidental —
+   `// Tasker configs), grouped with…` and `// Tasker-style "adjusted to N"…`, hyphenated adjective
+   and mid-sentence continuation, no coordinate, no ported logic. The other 15 were kept: they name
+   a Tasker entity, quote Tasker source, or state Tasker behaviour the port must match. Manifest
+   edited by exactly those two lines, never regenerated from a mid-change tree (DB-032). Overrule
+   either call if you disagree — this is the one part of the change nothing can falsify mechanically.
+3. DB-041…DB-043's unavailable-feature boundary is still unverified (B1 BLOCKED twice): the owner's
    device reports Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
    Needs hardware that reports them unavailable.
 
@@ -147,6 +143,12 @@ Newest first; ledger rows are the durable detail.
   budget, Actions pinned to SHAs with a Dependabot refresh path, workflow tokens scoped, wrapper
   validated, AMH 4.1.0 → 5.2.0. Pre-merge review added DB-048/DB-049; the device round added the
   D4 triage (DB-050) and the locale-formatted coordinate fix (DB-051).
+- 2026-08-17 — **The Contexts "Use current location" crash, and the guard that would have caught it
+  (DB-060).** The owner's stack trace resolved it in one hop: DB-057 added `%1$d` to
+  `toast_acquiring_location` and updated only the circadian caller, so the Contexts one resolved a
+  formatted string with no arguments and `Resources.getString` threw. The seconds constant is now
+  shared by both callers, and a new fail-closed `scripts/guards/format-args.sh` fails the ladder on
+  any formatted string resolved bare, tree-wide.
 - 2026-08-17 — **Location: the force-stop defect closed, and the latency behind it fixed
   (DB-057…DB-059).** The investigation could not name a mechanism and refused to guess; the owner's
   three stationary retries (44 s, 23 s, 4 s) then closed it as cold-GNSS warm-up with no app defect.

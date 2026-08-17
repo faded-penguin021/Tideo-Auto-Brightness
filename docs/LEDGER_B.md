@@ -712,7 +712,7 @@
   backup and opt-in geo-IP fallback still run after it.
   `[cited]`: `LocationReader.ACTIVE_FIX_TIMEOUT_MS`.
 
-- DB-056: **A guard that reads tracked files cannot see the file you just wrote.** A new test file
+- DB-056 [cited]: **A guard that reads tracked files cannot see the file you just wrote.** A new test file
   was still untracked when `scripts/ladder.sh` went green, so `comment-budget.sh` — which gathers
   through `git ls-files` — scored the tree without it. `git add` then made its four comment lines
   count, and CI failed on the push that green run had authorised. Not flakiness and not
@@ -747,3 +747,12 @@
   than reverting it — that refused a silent cache of unknown age, and the bound is the difference.
   Contexts' geofence caller is untouched; a radius does need the real thing.
   `[cited]`: `LocationReader.lastKnownWithin`.
+
+- DB-060 [cited]: **Adding a format specifier to a string edits every call site, and the compiler
+  is not told.** DB-057 gave `toast_acquiring_location` a `%1$d` and updated the circadian caller;
+  the Contexts one kept toasting it bare. `Toaster` routes through the VARARG `getString(resId,
+  *formatArgs)`, which formats even on an empty array, so it threw against a tagged release that
+  did not. Kotlin cannot see inside `strings.xml`, the toast tests assert on resource IDs and
+  discard the args, and no device round had pressed it. Single-arg `getString` and `stringResource`
+  do NOT format — believing they did put three innocent resolvers in the guard's first draft.
+  `[cited]`: `scripts/guards/format-args.sh`, on `toast()` alone.
