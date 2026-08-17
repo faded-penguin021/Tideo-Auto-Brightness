@@ -321,7 +321,8 @@
     <string name="toast_crash_log_copied">Crash log copied to clipboard</string>
     <string name="toast_fixed_datelocation">Fixed date/location set</string>
     <string name="toast_using_live_data">Using live data</string>
-    <string name="toast_acquiring_location">Acquiring location…</string>
+    <string name="toast_acquiring_location">Acquiring location — this can take up to %1$d seconds…</string>
+    <string name="toast_location_services_off">Location is off — turn it on for a device fix, or use the IP fallback below</string>
     <string name="toast_acquire_location_failed">Couldn\'t acquire a location — grant Location, or enable the IP fallback below, then try again</string>
     <string name="toast_folder_linked">Folder linked</string>
     <string name="toast_context_resumed">Context automation resumed</string>

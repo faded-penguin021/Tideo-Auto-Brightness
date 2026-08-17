@@ -17,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** H3 audit: LocationReader.activeFix (D-120/D-122) active acquisition, null-island skip, backup. */
@@ -136,8 +137,28 @@ class LocationReaderTest {
     }
 
     @Test
+    fun activeFix_withLocationServicesOff_givesUpAtOnceInsteadOfSpendingTheWindow() {
+        runTest {
+            shadowOf(lm).setLocationEnabled(false)
+            shadowOf(lm).setLastKnownLocation(
+                LocationManager.GPS_PROVIDER,
+                fix(LocationManager.GPS_PROVIDER, 10.0, 20.0),
+            )
+            val result = async(UnconfinedTestDispatcher(testScheduler)) { reader.activeFix(timeoutMs = 45_000) }
+
+            assertTrue(
+                shadowOf(lm).locationUpdateListeners.isEmpty(),
+                "nothing can deliver with the master switch off, so nothing should be registered",
+            )
+            assertEquals(LocationResult.Available(LocationSnapshot(10.0, 20.0)), result.await())
+            assertFalse(reader.locationServicesEnabled())
+        }
+    }
+
+    @Test
     fun activeFix_withNoRealProviderEnabled_stillListensPassively() {
         runTest {
+            shadowOf(lm).setLocationEnabled(true)
             shadowOf(lm).setProviderEnabled(LocationManager.GPS_PROVIDER, false)
             shadowOf(lm).setProviderEnabled(LocationManager.NETWORK_PROVIDER, false)
             val result = async(UnconfinedTestDispatcher(testScheduler)) { reader.activeFix(timeoutMs = 10_000) }

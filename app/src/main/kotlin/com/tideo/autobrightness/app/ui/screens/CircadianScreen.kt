@@ -51,6 +51,7 @@ import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.graph.CircadianScaleChart
+import com.tideo.autobrightness.platform.context.LocationReader
 import com.tideo.autobrightness.app.ui.graph.TaperChart
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -96,9 +97,12 @@ fun CircadianScreen(
         onUseLiveData = { extras.useLiveData(); toast(R.string.toast_using_live_data) },
         onUseCurrentLocation = { fill ->
             scope.launch {
-                // D-122: this now actively acquires a fresh fix (the OS location indicator appears) and can
-                // take a few seconds — tell the user it's working rather than appearing to hang.
-                toast(R.string.toast_acquiring_location)
+                // DB-057: name the wait, or the reason there will not be one.
+                if (extras.locationServicesOn()) {
+                    toast(R.string.toast_acquiring_location, ACTIVE_FIX_SECONDS)
+                } else {
+                    toast(R.string.toast_location_services_off)
+                }
                 val latLon = runCatching { extras.freshLatLon() }.getOrNull()
                 if (latLon != null) fill(latLon.first, latLon.second)
                 else toast(R.string.toast_acquire_location_failed)
@@ -399,3 +403,5 @@ private fun formatDateMillis(millis: Long): String = EXP_DATE_FORMAT.format(java
 /** Epoch seconds for the circadian charts: the fixed [date] (UTC midnight) if pinned, else now. */
 internal fun chartDateEpochSec(date: String?): Long =
     date?.let { parseDateMillis(it)?.div(1000L) } ?: (System.currentTimeMillis() / 1000L)
+
+private val ACTIVE_FIX_SECONDS: Int = (LocationReader.ACTIVE_FIX_TIMEOUT_MS / 1000L).toInt()

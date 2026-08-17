@@ -719,3 +719,12 @@
   environment: the local run was answering a different question. Stage before verifying. AGENTS.md
   claimed red-in-CI with green-locally "can only mean environment"; corrected in the same change,
   since that sentence is what stops the next reader suspecting their own index.
+
+- DB-057 [cited]: **Raising a timeout without saying so turns a fast failure into a silent hang.**
+  DB-055's 45 s budget made "Use current location" with Location switched OFF a 45-second wait
+  ending in a generic failure — the owner tried it deliberately and there was nothing to say the
+  master switch was the problem. Two halves: `activeFix` now returns immediately when
+  `isLocationEnabled` is false (nothing can deliver, so the window is pure wait; DB-053's PASSIVE
+  path still runs whenever services are on), and the toast names the wait, reading its number from
+  `ACTIVE_FIX_TIMEOUT_MS` so the promise cannot drift from the budget.
+  `[cited]`: `LocationReader.locationServicesEnabled`.

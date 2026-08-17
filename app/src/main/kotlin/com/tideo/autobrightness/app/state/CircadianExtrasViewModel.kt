@@ -62,6 +62,8 @@ class CircadianExtrasViewModel @JvmOverloads constructor(
     fun defaultLatLon(): Pair<Double, Double>? =
         location.lastKnownLocation()?.let { it.latitude to it.longitude }
 
+    fun locationServicesOn(): Boolean = location.locationServicesEnabled()
+
     /** G2R-F42/D-120/D-122: actively acquire fresh location (not passive last-known); fallback to ipwho.is if opted-in. */
     suspend fun freshLatLon(): Pair<Double, Double>? {
         (location.activeFix() as? LocationResult.Available)?.snapshot?.let { return it.cacheAndPair() }

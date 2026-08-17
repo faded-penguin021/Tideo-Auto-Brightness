@@ -45,6 +45,8 @@ interface LocationReader {
     /** ACTIVE one-shot for user-initiated "Use current location" buttons (D-122). Registers for live provider updates (powers GPS/network). Backup: last-known if no fresh fix within timeout. */
     suspend fun activeFix(timeoutMs: Long = ACTIVE_FIX_TIMEOUT_MS): LocationResult = currentLocation()
 
+    fun locationServicesEnabled(): Boolean = true
+
     companion object {
         const val DEFAULT_MIN_TIME_MS = 30_000L
         const val DEFAULT_MIN_DISTANCE_M = 50f
@@ -127,6 +129,11 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             ?: return LocationResult.Unavailable
 
+        // DB-057: with the master switch off nothing can deliver, so spending the window is pure wait.
+        if (!locationServicesEnabled()) {
+            return bestLastKnown(lm)?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
+        }
+
         // D-122: actively request NEW fix from enabled real providers. requestLocationUpdates powers sensors.
         // DB-053: PASSIVE last resort, as currentLocation() and locationUpdates() already had.
         val providers = buildList {
@@ -168,6 +175,10 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         val snapshot = fresh ?: bestLastKnown(lm)
         return snapshot?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
     }
+
+    override fun locationServicesEnabled(): Boolean = runCatching {
+        (context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager)?.isLocationEnabled ?: false
+    }.getOrDefault(false)
 
     private fun hasLocationPermission(): Boolean =
         context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
