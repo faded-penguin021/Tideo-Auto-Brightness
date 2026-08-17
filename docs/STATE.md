@@ -67,7 +67,31 @@ ledger: `LEDGER_B.md`.
    device reports Night Light/AOD available, so no pass yet could exercise the hidden/no-write case.
    Needs hardware that reports them unavailable.
 
-Open questions and owed reviews: none.
+Open questions and owed reviews:
+
+2. **(2026-08-17) Why "Use current location" times out until the app is force-stopped is NOT
+   determined**, and the `036ec77` round (two full 45 s timeouts stationary, then ~7 s after a
+   force stop) fits two mechanisms that its evidence cannot separate. Note both timeouts also
+   found NO last-known fix — `activeFix`'s backup returned nothing — so whatever it is denied the
+   cached answer too. **(A) Nothing app-side:** the GNSS was cold, the two 45 s sessions warmed it,
+   and the ~7 s success would have come with or without the restart — DB-055's story again.
+   **(B) The location APP-OP rather than the permission grant:** `checkSelfPermission` reads
+   GRANTED (so no permission toast, matching what was seen) while the op denies access, which
+   delivers no fixes AND makes `getLastKnownLocation` answer null; a force stop resets it. That is
+   the owner's "permissions not taking hold" sharpened, and it is reachable here — the app requests
+   `ACCESS_BACKGROUND_LOCATION`, so the grant dialog offers "Only this time".
+   **One observation settles it:** after two consecutive 45 s timeouts, retry a THIRD time
+   *without* force-stopping. Succeeds in ~7 s → (A), no app bug. Times out again at 45 s and then
+   succeeds right after a force stop → (B). If adb is to hand *during* a failure,
+   `adb shell cmd appops get com.tideo.autobrightness android:fine_location` reads it directly:
+   anything other than `allow` is (B), confirmed without the retry.
+   No code shipped for either — the (B) mitigation (name the appop and fail fast instead of
+   spending 45 s) waits on that reading. Excluded already, by reading and by test: a cancelled
+   `rememberCoroutineScope` (it ends the wait early, and the full budget elapsed — but it DID mask
+   the two outcomes behind one toast; fixed as DB-058 so the next round's evidence is readable),
+   listener accumulation in `activeFix` (released on every completion path), and the foreground
+   service's `locationUpdates()` (gated on a `[LOC]` context rule, one job, no re-registration
+   path — and had it been delivering, the last-known backup would have answered instantly).
 
 Incoming: retest round on `fc35a6e` — A2/B1/B2/B3/C pass. A3/A4 found DB-054, the acquired location
 never reaching the D-103 cache. A1's "only works after a force stop" resolved to DB-055 once the
@@ -121,6 +145,12 @@ Newest first; ledger rows are the durable detail.
   budget, Actions pinned to SHAs with a Dependabot refresh path, workflow tokens scoped, wrapper
   validated, AMH 4.1.0 → 5.2.0. Pre-merge review added DB-048/DB-049; the device round added the
   D4 triage (DB-050) and the locale-formatted coordinate fix (DB-051).
+- 2026-08-17 — **"Use current location" force-stop defect: investigated, not solved (DB-058).**
+  The mechanism is undetermined and the fork is in the Owner queue with the one device observation
+  that settles it. Shipped only what has a failure mode: the handler's
+  `runCatching { }.getOrNull()` swallowed `CancellationException`, so leaving the screen mid-fix
+  produced the same "Couldn't acquire a location" toast as a real timeout. Extracted as
+  `acquireCurrentLocation` and pinned by five cases; no `LocationReader` change.
 - 2026-06-23..08-10 — **v1.0.0 → v1.8.2 and AMH convergence (D-096…D-176,
   DA-001…DA-044, DB-001…DB-027).** Rebuild/release/glue gates, F-Droid, hardening, Tasker parity,
   security review, triage and AMH upgrades through 5.2.0.

@@ -728,3 +728,13 @@
   path still runs whenever services are on), and the toast names the wait, reading its number from
   `ACTIVE_FIX_TIMEOUT_MS` so the promise cannot drift from the budget.
   `[cited]`: `LocationReader.locationServicesEnabled`.
+
+- DB-058 [cited]: **A cancelled coroutine is not a failed one, and `runCatching` cannot tell.**
+  "Use current location" wrapped the acquisition in `runCatching { }.getOrNull()`, which catches
+  `CancellationException` too: leaving the screen mid-fix cancels the `rememberCoroutineScope`
+  launch, and the handler toasted "Couldn't acquire a location" - word for word what a real 45 s
+  timeout says. One message for two causes makes a device report unreadable, on the path under
+  investigation for the force-stop defect. Rethrown; sibling
+  `CircadianWindowProvider.cancellableOrNull` already held it. NOT the force-stop mechanism:
+  cancellation ends the wait early; the owner timed the full budget.
+  `[cited]`: `acquireCurrentLocation`.

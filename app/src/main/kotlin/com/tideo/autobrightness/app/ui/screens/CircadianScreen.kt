@@ -53,6 +53,7 @@ import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.graph.CircadianScaleChart
 import com.tideo.autobrightness.platform.context.LocationReader
 import com.tideo.autobrightness.app.ui.graph.TaperChart
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -97,15 +98,9 @@ fun CircadianScreen(
         onUseLiveData = { extras.useLiveData(); toast(R.string.toast_using_live_data) },
         onUseCurrentLocation = { fill ->
             scope.launch {
-                // DB-057: name the wait, or the reason there will not be one.
-                if (extras.locationServicesOn()) {
-                    toast(R.string.toast_acquiring_location, ACTIVE_FIX_SECONDS)
-                } else {
-                    toast(R.string.toast_location_services_off)
+                acquireCurrentLocation(extras::locationServicesOn, extras::freshLatLon, fill) { id, args ->
+                    toast(id, *args)
                 }
-                val latLon = runCatching { extras.freshLatLon() }.getOrNull()
-                if (latLon != null) fill(latLon.first, latLon.second)
-                else toast(R.string.toast_acquire_location_failed)
             }
         },
         geoIpEnabled = geoIpEnabled,
@@ -154,7 +149,6 @@ fun CircadianContent(
             // G2R-F81: Circadian (scaling) and Taper (compression) graphs above settings; use F39 fixed lat/lon if pinned.
             val chartLat = dateLocation.latitude ?: defaultLatLon?.first
             val chartLon = dateLocation.longitude ?: defaultLatLon?.second
-            // F39 fixed date drives chart; falls back to today.
             val chartDateSec = chartDateEpochSec(dateLocation.date)
             ChartPager(
                 listOf(
@@ -403,5 +397,26 @@ private fun formatDateMillis(millis: Long): String = EXP_DATE_FORMAT.format(java
 /** Epoch seconds for the circadian charts: the fixed [date] (UTC midnight) if pinned, else now. */
 internal fun chartDateEpochSec(date: String?): Long =
     date?.let { parseDateMillis(it)?.div(1000L) } ?: (System.currentTimeMillis() / 1000L)
+
+/** "Use current location": DB-057 names the wait up front, DB-058 keeps a cancelled fix from reporting failure. */
+internal suspend fun acquireCurrentLocation(
+    servicesOn: () -> Boolean,
+    freshLatLon: suspend () -> Pair<Double, Double>?,
+    fill: (Double, Double) -> Unit,
+    toast: (Int, Array<out Any>) -> Unit,
+) {
+    if (servicesOn()) toast(R.string.toast_acquiring_location, arrayOf(ACTIVE_FIX_SECONDS))
+    else toast(R.string.toast_location_services_off, emptyArray())
+
+    val latLon = try {
+        freshLatLon()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
+    if (latLon != null) fill(latLon.first, latLon.second)
+    else toast(R.string.toast_acquire_location_failed, emptyArray())
+}
 
 private val ACTIVE_FIX_SECONDS: Int = (LocationReader.ACTIVE_FIX_TIMEOUT_MS / 1000L).toInt()
