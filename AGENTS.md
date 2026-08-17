@@ -34,8 +34,9 @@ The Tasker source XML is in `docs/rebuild/extraction/_source/` (gitignored, 1.6 
 ## Verification
 
 **`scripts/ladder.sh`** is the whole of it — guards, then `scripts/verify.sh`, which holds the
-build/test/lint set. `--guards-only` for docs-only work. CI runs the same script, so red-in-CI
-with green-locally can only mean environment.
+build/test/lint set. `--guards-only` for docs-only work. CI runs the same script, so red-in-CI with
+green-locally means environment — or unstaged work: the guards read tracked files, so `git add`
+before you verify (DB-056).
 
 No KVM, so no emulator: verification is compile + JVM/Robolectric. **On-device behaviour is
 owner-verified** through the Owner queue and `docs/rebuild/DEVICE_TEST_SCRIPT.md`. Say in each

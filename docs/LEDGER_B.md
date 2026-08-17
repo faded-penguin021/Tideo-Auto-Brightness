@@ -711,3 +711,11 @@
   so the fast answer that makes 20 s look sufficient does not exist. Raised to 45 s; the last-known
   backup and opt-in geo-IP fallback still run after it.
   `[cited]`: `LocationReader.ACTIVE_FIX_TIMEOUT_MS`.
+
+- DB-056: **A guard that reads tracked files cannot see the file you just wrote.** A new test file
+  was still untracked when `scripts/ladder.sh` went green, so `comment-budget.sh` — which gathers
+  through `git ls-files` — scored the tree without it. `git add` then made its four comment lines
+  count, and CI failed on the push that green run had authorised. Not flakiness and not
+  environment: the local run was answering a different question. Stage before verifying. AGENTS.md
+  claimed red-in-CI with green-locally "can only mean environment"; corrected in the same change,
+  since that sentence is what stops the next reader suspecting their own index.
