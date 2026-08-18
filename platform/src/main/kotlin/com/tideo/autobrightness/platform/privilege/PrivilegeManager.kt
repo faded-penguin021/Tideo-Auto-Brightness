@@ -12,8 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.TimeUnit
 
 // Tasker: task378 _DetectPrivilege — first-hit probe: WRITE_SECURE → WRITE_SETTINGS → NONE.
-// D-016: ADB/Shizuku/root are GRANT channels only; elevated truth = checkPermission.
-// D-024: adbwp Tasker pref must NOT be read; BASIC = canWrite, ELEVATED = checkPermission.
 enum class Tier { NONE, BASIC, ELEVATED }
 
 interface PrivilegeManager {
@@ -22,22 +20,12 @@ interface PrivilegeManager {
     fun refresh()
     /** The ADB `pm grant` command — ALWAYS offered (the no-companion-app grant channel). */
     fun adbGrantInstruction(): String
-    /**
-     * The ADB `pm grant` command for `android.permission.DUMP` (D-130) — enables the no-Location SSID
-     * `dumpsys wifi` path for users without Shizuku/root who keep Location services off.
-     */
+    /** ADB `pm grant` for DUMP permission (D-130): no-Location SSID path. */
     fun dumpGrantInstruction(): String
     fun tryGrantViaRoot(): Boolean
-    /**
-     * Three-state Shizuku readiness so the UI can offer the one-tap grant (RUNNING), prompt to start
-     * the app (INSTALLED_NOT_RUNNING), or hide the Shizuku path entirely (NOT_INSTALLED). The ADB path
-     * is offered regardless of this value.
-     */
+    /** Three-state Shizuku readiness: RUNNING (one-tap grant), INSTALLED_NOT_RUNNING (start app), NOT_INSTALLED (hide). */
     fun shizukuAvailability(): ShizukuAvailability
-    /**
-     * Runs the Shizuku grant flow (permission request → user-service `pm grant`). [onResult] reports
-     * the outcome for the UI; on success the tier is refreshed before [onResult] fires.
-     */
+    /** Run Shizuku grant flow; report outcome via [onResult], refresh tier on success. */
     fun requestShizukuGrant(onResult: (ShizukuGrantGateway.Result) -> Unit)
     /** Intent for the BASIC grant: system "Modify system settings" screen for this app. */
     fun writeSettingsIntent(): Intent
@@ -89,7 +77,7 @@ class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
 
     override fun shizukuAvailability(): ShizukuAvailability = ShizukuGrantGateway.availability(context)
 
-    // S11 (D-032 closed): full Shizuku grant via a bound user service that execs `pm grant`.
+    // S11 (D-032): Shizuku grant via bound user service.
     override fun requestShizukuGrant(onResult: (ShizukuGrantGateway.Result) -> Unit) {
         ShizukuGrantGateway.requestGrant(context) { result ->
             if (result is ShizukuGrantGateway.Result.Success) refresh()

@@ -49,18 +49,19 @@ import com.tideo.autobrightness.app.ui.components.NumberSettingField
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
+import com.tideo.autobrightness.app.ui.components.formatCoord
+import com.tideo.autobrightness.app.ui.components.parseCoord
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.graph.CircadianScaleChart
+import com.tideo.autobrightness.platform.context.LocationReader
 import com.tideo.autobrightness.app.ui.graph.TaperChart
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
-/**
- * Circadian (Tasker AAB Experiment Settings + Experiment/Taper graphs). Renamed from "Dynamic Scale"
- * in S12.6a (G2R-F4) to match the Tasker name for the day/night curve scaling. Draft → Apply (S12.5b).
- */
+/** Circadian (Tasker AAB Experiment Settings + Experiment/Taper graphs); renamed for clarity (G2R-F4). */
 @Composable
 fun CircadianScreen(
     navController: NavHostController,
@@ -99,12 +100,9 @@ fun CircadianScreen(
         onUseLiveData = { extras.useLiveData(); toast(R.string.toast_using_live_data) },
         onUseCurrentLocation = { fill ->
             scope.launch {
-                // D-122: this now actively acquires a fresh fix (the OS location indicator appears) and can
-                // take a few seconds — tell the user it's working rather than appearing to hang.
-                toast(R.string.toast_acquiring_location)
-                val latLon = runCatching { extras.freshLatLon() }.getOrNull()
-                if (latLon != null) fill(latLon.first, latLon.second)
-                else toast(R.string.toast_acquire_location_failed)
+                acquireCurrentLocation(extras::locationServicesOn, extras::freshLatLon, fill) { id, args ->
+                    toast(id, *args)
+                }
             }
         },
         geoIpEnabled = geoIpEnabled,
@@ -150,17 +148,9 @@ fun CircadianContent(
 ) {
     DraftSettingsScaffold(stringResource(R.string.title_circadian), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
-            // G2R-F81: the two relevant graphs sit ABOVE the settings and are swiped between — the
-            // Circadian (scaling) curve and the Taper (compression) curve. S13 fills the chart slots.
-            // Gate-2(5th) obs: the scaling graph is just "Circadian" (Tasker AAB Experiment Graph), not
-            // "Experiment"; the separate "Circadian Dimming" graph lives on the Super Dimming screen.
-            // Resolve the chart's location: the F39 fixed lat/lon if pinned, else the live default. The
-            // day-scaling curve is drawn from the real solar windows for that place (representative
-            // fallback inside the chart when no fix exists yet).
+            // G2R-F81: Circadian (scaling) and Taper (compression) graphs above settings; use F39 fixed lat/lon if pinned.
             val chartLat = dateLocation.latitude ?: defaultLatLon?.first
             val chartLon = dateLocation.longitude ?: defaultLatLon?.second
-            // The F39 fixed date must drive the chart too (sunrise/sunset shift with the date) — without
-            // this the curve ignored the date picker and always plotted today. Falls back to today.
             val chartDateSec = chartDateEpochSec(dateLocation.date)
             ChartPager(
                 listOf(
@@ -188,9 +178,7 @@ fun CircadianContent(
                 ),
             )
 
-            // D-110: when dynamic scaling is on but the live location is stale or missing, the modifier
-            // is running on a day-old cached sun position (or the default windows) — surface that, with
-            // the cache age, and point the user at turning Location on briefly (or the IP fallback below).
+            // D-110: show staleness hint when location is stale or missing while scaling is on.
             if (draft.scalingEnabled && (locationStatus.isStale || !locationStatus.hasLocation)) {
                 CircadianStaleBanner(locationStatus)
             }
@@ -204,9 +192,7 @@ fun CircadianContent(
             // G2R-F82: scaling fields feed the Circadian graph; taper fields feed the Taper graph.
             GraphSettingsGroup(stringResource(R.string.graph_circadian)) {
                 SectionHeader(stringResource(R.string.circadian_scaling_header), divider = true)
-                // S13d owner fix: these used always-visible `helper=` text while every sibling settings
-                // screen surfaces its explanation behind the "ⓘ" reveal (`help=`). Made consistent —
-                // tap ⓘ to view the explanation here too.
+                // S13d: help text moved from always-visible to "ⓘ" reveal for consistency.
                 SwitchSettingRow(
                     stringResource(R.string.circadian_enable_scaling), draft.scalingEnabled,
                     { onEdit { s -> s.copy(scalingEnabled = it) } },
@@ -214,9 +200,7 @@ fun CircadianContent(
                     testTag = "switch_scalingEnabled",
                 )
                 NumberSettingField(
-                    // SAFETY: scale spread stays positive (1..100) — negative inverts the curve and can
-                    // push the scale multiplier to ≤0 (black screen). Only the super-dimming circadian
-                    // spread may go negative. Clamped on edit so the unsafe value never enters the draft.
+                    // SAFETY: scale spread clamped 1..100 (negative would invert curve, push multiplier ≤0).
                     stringResource(R.string.circadian_scale_spread), draft.scaleSpread, { onEdit { s -> s.copy(scaleSpread = it.toInt().coerceIn(1, 100)) } },
                     epoch = epoch, committed = committed.scaleSpread,
                     help = R.string.help_scale_spread, testTag = "field_scaleSpread",
@@ -231,7 +215,6 @@ fun CircadianContent(
                     epoch = epoch, committed = committed.scaleTransitionFactor, isInt = false,
                     help = R.string.help_scale_transition, testTag = "field_scaleTransitionFactor",
                 )
-                // task517/674: large transition factors make the graph non-sensical.
                 if (draft.scaleTransitionFactor > 0.5f) {
                     ErrorBanner(stringResource(R.string.circadian_err_transition), "error_scaleTransitionFactor")
                 }
@@ -246,7 +229,6 @@ fun CircadianContent(
                     committed = committed.scaleTaperMidpoint,
                     help = R.string.help_taper_midpoint, testTag = "slider_scaleTaperMidpoint",
                 )
-                // task689: taper midpoint cannot exceed current maximum brightness.
                 if (draft.scaleTaperMidpoint > draft.maxBrightness) {
                     ErrorBanner(stringResource(R.string.circadian_err_taper_midpoint), "error_scaleTaperMidpoint")
                 }
@@ -257,8 +239,6 @@ fun CircadianContent(
                 )
             }
 
-            // F39: fixed Date and/or Lat/Lon override — drives the live circadian scaling, not just a
-            // preview (experiment_settings.md elements35–37; _ExperimentSetDate/_ExperimentClearDate).
             CircadianDateLocationCard(
                 value = dateLocation,
                 todayDate = todayDate,
@@ -273,13 +253,7 @@ fun CircadianContent(
     }
 }
 
-/**
- * The Circadian "Date & location" element (experiment_settings.md elements35–37; G2R-F39). Lets the
- * user pin a fixed date + latitude/longitude to preview the circadian curve for any day/place
- * (`_ExperimentSetDate`), or revert to **live data** — today + the current location
- * (`_ExperimentClearDate`). When nothing is pinned the fields are pre-filled with those live defaults
- * so the screen always shows a concrete date/location.
- */
+/** Date & location element (G2R-F39): pin fixed date/lat/lon to preview circadian for any day/place, or revert to live data. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CircadianDateLocationCard(
@@ -292,23 +266,20 @@ fun CircadianDateLocationCard(
     geoIpEnabled: Boolean = false,
     onSetGeoIpEnabled: (Boolean) -> Unit = {},
 ) {
-    // Effective defaults shown when nothing is pinned: today + current location (G2R-F39).
     val effDate = value.date ?: todayDate
     val effLat = value.latitude ?: currentLatLon?.first
     val effLon = value.longitude ?: currentLatLon?.second
 
     var dateText by remember(effDate) { mutableStateOf(effDate) }
-    var latText by remember(effLat) { mutableStateOf(effLat?.let { "%.5f".format(it) } ?: "") }
-    var lonText by remember(effLon) { mutableStateOf(effLon?.let { "%.5f".format(it) } ?: "") }
+    var latText by remember(effLat) { mutableStateOf(effLat?.let { formatCoord(it) } ?: "") }
+    var lonText by remember(effLon) { mutableStateOf(effLon?.let { formatCoord(it) } ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    // S13c restyle (m3_audit §3 row 6): the inline date/location controls are grouped into an `AabCard`.
     AabCard {
     SectionHeader(stringResource(R.string.circadian_date_location_header), divider = true)
     Text(
         when {
             value.isUnset -> stringResource(R.string.circadian_status_live)
-            // F39: date and location pin independently — show whichever is fixed.
             value.latitude == null || value.longitude == null ->
                 stringResource(R.string.circadian_status_fixed_date, value.date ?: stringResource(R.string.circadian_live_word))
             else -> stringResource(
@@ -328,28 +299,27 @@ fun CircadianDateLocationCard(
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
-            value = latText, onValueChange = { latText = it.filter { c -> c.isDigit() || c == '.' || c == '-' } },
+            value = latText, onValueChange = { latText = it.filter { c -> c.isDigit() || c == '.' || c == ',' || c == '-' } },
             label = { Text(stringResource(R.string.field_latitude)) }, singleLine = true,
             modifier = Modifier.weight(1f).testTag("exp_lat"),
         )
         OutlinedTextField(
-            value = lonText, onValueChange = { lonText = it.filter { c -> c.isDigit() || c == '.' || c == '-' } },
+            value = lonText, onValueChange = { lonText = it.filter { c -> c.isDigit() || c == '.' || c == ',' || c == '-' } },
             label = { Text(stringResource(R.string.field_longitude)) }, singleLine = true,
             modifier = Modifier.weight(1f).testTag("exp_lon"),
         )
     }
     OutlinedButton(
-        onClick = { onUseCurrentLocation { la, lo -> latText = "%.5f".format(la); lonText = "%.5f".format(lo) } },
+        onClick = { onUseCurrentLocation { la, lo -> latText = formatCoord(la); lonText = formatCoord(lo) } },
         modifier = Modifier.testTag("exp_use_location"),
     ) { Text(stringResource(R.string.action_use_current_location)) }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = {
-                // F39: date and location are independent. Blank coords → date-only override (live
-                // location); valid coords → pin both. Date defaults to today, so it is always present.
-                val lat = latText.trim().toDoubleOrNull()
-                val lon = lonText.trim().toDoubleOrNull()
+                // F39: date and location independent. Blank coords = date-only, valid coords = pin both.
+                val lat = parseCoord(latText)
+                val lon = parseCoord(lonText)
                 val coordsBlank = latText.isBlank() && lonText.isBlank()
                 if (dateText.isNotBlank() && (coordsBlank || (lat != null && lon != null))) {
                     onSet(dateText.trim(), lat, lon)
@@ -362,9 +332,7 @@ fun CircadianDateLocationCard(
         }
     }
 
-    // G3-F12 / D-105 (privacy): the IP-geolocation fallback is the LAST resort in the location chain and
-    // makes an HTTPS request to ipwho.is (D-121). It is an explicit opt-IN (default OFF) — the app never
-    // contacts that server unless the user turns this on (circadian otherwise waits for an on-device fix).
+    // G3-F12 / D-105: IP-geolocation fallback is explicit opt-in (D-121 privacy); default OFF.
     SwitchSettingRow(
         label = stringResource(R.string.circadian_ip_fallback_label),
         checked = geoIpEnabled,
@@ -392,15 +360,7 @@ fun CircadianDateLocationCard(
     }
 }
 
-/**
- * D-110: amber hint shown on the Circadian screen when dynamic scaling is active but the location
- * backing the live modifier is stale (a cached fix from a previous day) or missing (default sun times).
- *
- * Coherent with the M3 audit (design/m3_audit.md §3 row 2): colour-semantic banners (stale/override) are
- * intentionally tinted `Card`s — NOT `AabCard` section containers — using the gold `secondary`-family
- * accent reserved for warnings/emphasis. Same `AabGold`/`AabOnGold` convention as the dashboard
- * `StaleBanner`/`CircadianStaleHint`, so the two staleness surfaces read identically.
- */
+/** D-110: amber staleness hint when location is stale/missing while scaling active. Uses gold card per M3 audit. */
 @Composable
 private fun CircadianStaleBanner(status: com.tideo.autobrightness.app.runtime.CircadianLocationStatus) {
     val text = if (status.isStale) {
@@ -419,7 +379,7 @@ private fun CircadianStaleBanner(status: com.tideo.autobrightness.app.runtime.Ci
     }
 }
 
-private fun fmtCoord(v: Double?): String = v?.let { "%.5f".format(it) } ?: "—"
+private fun fmtCoord(v: Double?): String = v?.let { formatCoord(it) } ?: "—"
 
 private val EXP_DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("UTC")
@@ -434,3 +394,27 @@ private fun formatDateMillis(millis: Long): String = EXP_DATE_FORMAT.format(java
 /** Epoch seconds for the circadian charts: the fixed [date] (UTC midnight) if pinned, else now. */
 internal fun chartDateEpochSec(date: String?): Long =
     date?.let { parseDateMillis(it)?.div(1000L) } ?: (System.currentTimeMillis() / 1000L)
+
+/** "Use current location": DB-057 names the wait up front, DB-058 keeps a cancelled fix from reporting failure. */
+internal suspend fun acquireCurrentLocation(
+    servicesOn: () -> Boolean,
+    freshLatLon: suspend () -> Pair<Double, Double>?,
+    fill: (Double, Double) -> Unit,
+    toast: (Int, Array<out Any>) -> Unit,
+) {
+    if (servicesOn()) toast(R.string.toast_acquiring_location, arrayOf(ACTIVE_FIX_SECONDS))
+    else toast(R.string.toast_location_services_off, emptyArray())
+
+    val latLon = try {
+        freshLatLon()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
+    if (latLon != null) fill(latLon.first, latLon.second)
+    else toast(R.string.toast_acquire_location_failed, emptyArray())
+}
+
+/** The wait `toast_acquiring_location` promises. Shared with the Contexts caller (DB-060). */
+internal val ACTIVE_FIX_SECONDS: Int = (LocationReader.ACTIVE_FIX_TIMEOUT_MS / 1000L).toInt()

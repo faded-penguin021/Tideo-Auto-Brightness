@@ -45,30 +45,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * A7 acceptance (D-156, final a11y unit). Motor-accessibility floor: every interactive node a user
- * taps must offer at least a [Dimens.touchTarget] (48 dp) touch area (Material minimum-interactive-size,
- * WCAG 2.5.5). The A0–A6 screens are compositions of the shared interactive primitives, so this gate
- * renders the primitive surfaces (A0 settings controls, A1 shared components, A2 chart pager) — which
- * between them exercise every distinct interactive node type — and asserts each hand-authored
- * clickable meets the floor. **All of them already pass, unmodified** — matching the plan's "M3
- * components mostly guarantee this; expect few fixes."
- *
- * **Scope of the automated gate — two documented, owner-verified carve-outs (guardrail 9):**
- *  1. The standard M3 **form primitives** (`Slider` / `Switch` / `Checkbox`) are excluded. Material
- *     reserves their 48 dp target via `minimumInteractiveComponentSize()` at *runtime* (pointer-input
- *     touch-slop expansion), but that expansion is **not reflected in Robolectric's
- *     `SemanticsNode.touchBoundsInRoot`** — here they report their drawn sizes (slider 44, switch
- *     52×32, checkbox …×22 dp), so a strict in-test floor would false-flag every unmodified Material
- *     control. [m3FormPrimitivesAreStandardMaterialControls] pins that they ARE those Role-tagged M3
- *     primitives (hence carry the runtime guarantee); their real tap area is owner-verified on-device.
- *  2. The [ChartPager] page dots (`chart_pager_dot_*`) are 8–10 dp position *indicators*, not the
- *     primary paging affordance — the 48 dp ‹ › arrows and horizontal swipe both step pages, and
- *     expanding N dots to 48 dp each would overflow the row.
- *
- * Both carve-outs are called out in DEVICE_TEST_SCRIPT §12 (real TalkBack + Switch Access, since no
- * emulator/KVM). Template: SettingsControlsA11yTest (A0).
- */
+/** D-156 (A7 a11y): motor-accessibility floor (48 dp touch area). Two carve-outs: M3 form primitives + chart pager dots. */
 @RunWith(RobolectricTestRunner::class)
 class TouchTargetsA11yTest {
 
@@ -137,19 +114,12 @@ class TouchTargetsA11yTest {
     @Test
     fun pagerArrowsMeetTheTouchTargetFloor() {
         renderPager()
-        // The primary paging affordances (the position dots are an accepted residual — see class doc).
+        // Test primary paging affordances; dots are excluded carve-out.
         compose.assertTouchFloor(compose.onNodeWithContentDescription("Previous chart"), Dimens.touchTarget)
         compose.assertTouchFloor(compose.onNodeWithContentDescription("Next chart"), Dimens.touchTarget)
     }
 
-    /**
-     * Carve-out 1 justification: the excluded form controls are the *stock* M3 primitives — each
-     * exposes the Role / SetProgress action that Material attaches together with its runtime
-     * `minimumInteractiveComponentSize()`. We assert that identity (not an in-test dp, which Robolectric
-     * under-reports); the real 48 dp tap area is verified on-device (DEVICE_TEST_SCRIPT §12). If a future
-     * change swaps one of these for a hand-rolled control, it loses the Role and this test fails loudly,
-     * forcing a re-run of the A7 judgement.
-     */
+    /** Carve-out 1: verify form controls are stock M3 (have Role/SetProgress). */
     @Test
     fun m3FormPrimitivesAreStandardMaterialControls() {
         compose.setContent {
@@ -173,12 +143,7 @@ class TouchTargetsA11yTest {
     }
 }
 
-/**
- * Asserts every hand-authored interactive node in the tree offers at least a 48 dp touch area.
- * Excludes the two documented carve-outs (see class doc): the `chart_pager_dot_*` indicators and the
- * stock M3 form primitives (`SetProgress` sliders, `Role.Switch` / `Role.Checkbox`), whose runtime
- * `minimumInteractiveComponentSize()` guarantee Robolectric's `touchBoundsInRoot` does not surface.
- */
+/** Assert hand-authored nodes meet 48 dp touch floor (excludes carve-outs: pager dots, M3 primitives). */
 private fun ComposeContentTestRule.assertInteractiveNodesMeetTouchFloor() {
     val interactive = SemanticsMatcher("hand-authored interactive node") { node ->
         val cfg = node.config
@@ -213,11 +178,7 @@ private fun ComposeContentTestRule.assertInteractiveNodesMeetTouchFloor() {
     }
 }
 
-/**
- * `assertTouchWidthIsAtLeast`/`…Height…` are not in this compose-ui-test BOM (only the `…IsEqualTo`
- * variants), so we read the tap area directly from [SemanticsNode.touchBoundsInRoot]. A ~0.5 px slack
- * absorbs the dp→px rounding.
- */
+/** Read tap area from touchBoundsInRoot (BOM lacks assertTouchWidthIsAtLeast). */
 private fun ComposeContentTestRule.assertTouchFloor(interaction: SemanticsNodeInteraction, min: Dp) {
     val node: SemanticsNode = interaction.fetchSemanticsNode()
     val touch = node.touchBoundsInRoot

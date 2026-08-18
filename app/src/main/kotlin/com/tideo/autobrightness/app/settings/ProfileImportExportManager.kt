@@ -23,9 +23,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Outcome of loading a profile file (S12.9c #3). Replaces the old silent
- * `runCatching{}.getOrElse{legacy}` so the caller can distinguish "loaded our format", "fell back to
- * the legacy Tasker parser" and "could not parse at all" — only the last is surfaced to the user.
+ * Outcome of loading a profile file (S12.9c #3): loaded our format, fell back to legacy Tasker parser, or failed.
  */
 sealed interface ProfileLoadResult {
     /** Parsed as our own [AabProfilePayload] export format. */
@@ -50,10 +48,8 @@ class ProfileImportExportManager(
     companion object {
         private const val TAG = "ProfileImport"
 
-        // DA-029: an allocation bound, NOT a schema constraint — a full pretty-printed AabSettings
-        // export is only a few KiB, and the slack is deliberate (future fields, fat legacy configs).
-        // Do not tighten it to "what a profile needs"; its job is to stop an untrusted SAF provider
-        // from driving an unbounded read on the import path.
+        // DA-029: allocation bound to stop untrusted SAF providers from unbounded reads.
+        // The slack allows for future fields and fat legacy configs.
         internal const val MAX_ENCODED_PROFILE_BYTES = 256 * 1024
 
         /**
@@ -79,12 +75,7 @@ class ProfileImportExportManager(
     }
 
     /**
-     * DA-044: encode first, then hand the bytes to a bounded IO-dispatcher write.
-     *
-     * The caller is a Compose activity-result callback running on `Dispatchers.Main.immediate`, and
-     * `openOutputStream`/`write` are synchronous calls into a **provider chosen by the user in the
-     * system file picker** — i.e. arbitrary third-party code. Doing that work on the caller's
-     * dispatcher let a slow or deliberately stalling provider block the UI thread outright.
+     * DA-044: encode first, then dispatch IO to avoid blocking the UI thread with untrusted providers.
      */
     suspend fun exportToDocument(uri: Uri, settings: AabSettings, resolver: ContentResolver = context.contentResolver) {
         val payload = json.encodeToString(
@@ -112,17 +103,8 @@ class ProfileImportExportManager(
     }
 
     /**
-     * DA-044: every provider call — query, open, read, decode — runs on [Dispatchers.IO] under a
-     * wall-clock bound, and cancellation stays cancellation.
-     *
-     * Two distinct hazards, two distinct mitigations. The 256 KiB cap (DA-029) bounds how much a
-     * lying provider can make us *allocate*; it does nothing about a provider that simply never
-     * returns from `read()`. [PROVIDER_TIMEOUT_MS] bounds how long the *caller* waits for that.
-     *
-     * Honest limit: a timeout unblocks the caller, not the thread. Android offers no way to abort a
-     * `read()` already inside a hostile provider's binder call, so that IO-dispatcher thread stays
-     * parked until the provider yields. What this buys is that the parked thread is a pooled IO
-     * thread instead of the UI thread, and that the user gets an error instead of a frozen screen.
+     * DA-044: all provider calls run on [Dispatchers.IO] under a wall-clock timeout.
+     * DA-029 caps allocation; [PROVIDER_TIMEOUT_MS] bounds the caller's wait.
      */
     suspend fun importFromDocument(uri: Uri, resolver: ContentResolver = context.contentResolver): ProfileLoadResult =
         withContext(Dispatchers.IO) {
@@ -144,9 +126,6 @@ class ProfileImportExportManager(
                         ?: ProfileLoadResult.ReadFailure
                 }
             } catch (timeout: TimeoutCancellationException) {
-                // Deliberately NOT a distinct result type: to the user "the file could not be read"
-                // and "the provider stopped responding" lead to the same next step, and the extra
-                // variant would fan out through every caller's when-branch for no decision.
                 Log.w(TAG, "Profile input timed out")
                 ProfileLoadResult.ReadFailure
             } catch (cancelled: CancellationException) {
@@ -162,11 +141,8 @@ class ProfileImportExportManager(
         }
 
     /**
-     * DA-029: read at most [MAX_ENCODED_PROFILE_BYTES] **plus one probe byte** and decode as strict
-     * UTF-8. The probe byte is what makes "exactly at the cap" and "one over" distinguishable — a
-     * read that stops at the cap cannot tell a full buffer from a truncated one. Strict decoding
-     * (REPORT, not the U+FFFD substitution `readText()` does) keeps "not a profile file" from
-     * arriving at the parser as a confusing syntax error.
+     * DA-029: read [MAX_ENCODED_PROFILE_BYTES] + one probe byte as strict UTF-8.
+     * Probe byte distinguishes full buffer from truncated; strict decoding prevents confusion.
      */
     internal fun readAndDecode(input: InputStream, declaredSize: Long? = null): ProfileLoadResult {
         if (declaredSize != null && declaredSize > MAX_ENCODED_PROFILE_BYTES) {
@@ -229,9 +205,7 @@ class ProfileImportExportManager(
         jsonAttempt.getOrNull()?.let { return ProfileLoadResult.Success(it) }
         val jsonError = jsonAttempt.exceptionOrNull()?.message ?: "JSON parse failed"
 
-        // A payload that identifies itself as the native format must never be reinterpreted as the
-        // deliberately tolerant legacy format. Otherwise a future/invalid native schema could turn
-        // into an all-default "successful" legacy import and bypass its schema decision.
+        // Native format payloads cannot fallback to legacy parser to prevent schema bypass.
         val nativeShape = runCatching {
             (json.parseToJsonElement(content) as? JsonObject)?.keys?.any { it == "schemaVersion" || it == "settings" }
         }.getOrNull() == true
@@ -255,7 +229,6 @@ class ProfileImportExportManager(
             .trim('.', '_', '-')
             .take(96)
         val base = normalized.ifBlank { "profile" }
-        // Names that normalize to the same visible stem get different private files.
         val suffix = if (base == trimmed) "" else "-${profileName.sha256Prefix()}"
         return "$base$suffix.json"
     }

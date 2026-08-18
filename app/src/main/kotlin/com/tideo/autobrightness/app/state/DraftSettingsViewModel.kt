@@ -29,53 +29,31 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/**
- * Per-screen draft editor backing the S12.5b parameter screens (Curve & Brightness, Misc, Reactivity,
- * Animation & Dimming, Dynamic Scale). This ports Tasker AAB's **temporary-preview → Apply** model
- * (G2-F1): edits mutate a local [draft] only, the screen's graph previews the draft live, and the
- * committed/active value stays available for the `[brackets]` indicator until **Apply** commits
- * draft → DataStore and forces an immediate pipeline re-evaluate (G2-F16). Back/Discard throws the
- * draft away (the VM is NavBackStackEntry-scoped, so leaving the screen discards automatically).
- *
- * Drafts are per-screen: each destination resolves its own instance via `viewModel()`, so screens do
- * not share a draft. The [epoch] counter is bumped on every (re)seed so seed-once text fields rebind
- * to the fresh draft value rather than re-seeding mid-keystroke (G2-F7).
- */
+// Per-screen draft editor: temp-preview mode with Apply/Discard (G2-F1). Epoch counter rebinds fields (G2-F7).
 class DraftSettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
     private val appModule = AppModule(application)
     private val privilegeManager: PrivilegeManager = appModule.privilegeManager
 
-    /** Recorded manual-override points (newest first) overlaid on the curve preview (G2R-F14). */
     val overridePoints: StateFlow<List<OverridePoint>> = appModule.overridePointStore.points()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** The committed/active settings (DataStore source of truth) shown in `[brackets]`. */
     val committed: StateFlow<AabSettings> = app.settingsDataStore.data
         .stateIn(viewModelScope, SharingStarted.Eagerly, AabSettings())
 
     private val _draft = MutableStateFlow(AabSettings())
-    /** The live, editable draft. Only this screen's edits mutate it (preview source). */
     val draft: StateFlow<AabSettings> = _draft.asStateFlow()
 
     private val _epoch = MutableStateFlow(0)
-    /** Draft-epoch counter — bumped on seed/discard so seed-once fields rebind (G2-F7). */
     val epoch: StateFlow<Int> = _epoch.asStateFlow()
 
     private var seeded = false
 
     init {
         viewModelScope.launch {
-            // Seed the draft once from the first committed snapshot; thereafter only re-sync the
-            // runtime/identity fields the parameter screens never edit, so [dirty] reflects only
-            // this screen's edits even if the service is toggled elsewhere while editing.
             app.settingsDataStore.data.collect { c ->
                 if (!seeded) {
-                    // D-125: if the Tools wizard requested a curve-suggestion PREVIEW on the way here,
-                    // apply it to the seed so the suggested values ride the SAME atomic epoch 0→1 that
-                    // populates the seed-once fields — previewing via a later edit raced the field
-                    // re-seed and left them showing the committed values. consume() is one-shot and a
-                    // no-op (returns null) for every screen/visit without a pending preview.
+                    // D-125: curve-suggestion preview applies to seed so values ride epoch 0→1.
                     val preview = CurveSuggestionPreview.consume()
                     _draft.value = preview?.invoke(c) ?: c
                     seeded = true
@@ -87,11 +65,8 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                             contextOverride = c.contextOverride,
                             schemaVersion = c.schemaVersion,
                             setupTitle = c.setupTitle,
-                            // debugLevel is GLOBAL (owned by the Live Debug scene, G2R-F9): track the
-                            // committed value so an open draft never re-commits a stale category.
+                            // GLOBAL fields: debugLevel (Live Debug scene, G2R-F9), panicSensitivity (D-116).
                             debugLevel = c.debugLevel,
-                            // panicSensitivity is likewise GLOBAL (Live Debug slider, D-116) — track it
-                            // so an open settings draft never re-commits a stale sensitivity.
                             panicSensitivity = c.panicSensitivity,
                         )
                     }
@@ -100,34 +75,23 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /** True when the draft differs from the committed settings (enables Apply/Discard + brackets). */
     val dirty: StateFlow<Boolean> = combine(_draft, committed) { d, c -> d != c }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** task583/707 advisory errors recomputed on the DRAFT so the preview reddens live. */
     val errors: StateFlow<List<FieldError>> = _draft
         .map { SettingsValidator.validate(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /**
-     * True when the draft carries a CRITICAL validation error (form2A<0, form3A<0, form2C>zone1End).
-     * The Apply button is disabled while one stands (G2R-F18 / owner-decision 2 / D-052) — a sanctioned
-     * deviation from Tasker's advisory-only model. Advisory warnings never block Apply.
-     */
+    // True if CRITICAL error; Apply disabled (D-052). Advisory warnings never block.
     val hasCriticalError: StateFlow<Boolean> = errors
         .map { list -> list.any { it.severity == Severity.CRITICAL } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    // D-169: when Apply auto-raises MaxBright to fit the curve (_SaveButtonMisc A9), emit the new
-    // value so the active screen can flash the Tasker-style "adjusted to N" confirmation (A15). A
-    // buffered SharedFlow (not StateFlow) so it is a one-shot event, replayed to no new collector.
+    // D-169: emit when Apply auto-raises MaxBright to fit curve; one-shot buffered SharedFlow.
     private val _maxBrightnessRaised = MutableSharedFlow<Int>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val maxBrightnessRaised: SharedFlow<Int> = _maxBrightnessRaised.asSharedFlow()
 
-    // DB-008 (_SaveButtonDimming A11, issue #110): Apply corrects a dimming-strength setpoint above
-    // MAX_DIMMING_STRENGTH_SETPOINT down to it. Announce it, because a value silently changing under
-    // the user is the same class of dishonesty as the field that used to show 100 while 65 applied.
-    // Same one-shot buffered SharedFlow contract as maxBrightnessRaised.
+    // DB-008: announce when Apply clamps dimming strength; one-shot buffered SharedFlow.
     private val _dimmingStrengthClamped = MutableSharedFlow<Int>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val dimmingStrengthClamped: SharedFlow<Int> = _dimmingStrengthClamped.asSharedFlow()
 
@@ -136,52 +100,46 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
 
     fun refreshTier() = privilegeManager.refresh()
 
-    /** Edit the draft only — nothing persists until [apply] (G2-F1 temporary preview). */
     fun edit(transform: (AabSettings) -> AabSettings) = _draft.update(transform)
 
-    /** Delete a recorded override training point (tap-to-delete on the curve chart, S12.7g / F36). */
+    // DB-040: the draft this read-back last produced, so a user edit of a display field is
+    // distinguishable from our own write. Main-thread only (the screen's LaunchedEffect).
+    private var lastReadBack: AabSettings? = null
+
+    /**
+     * DB-039/DB-040: merge a Privileged Display device read-back into the draft, atomically.
+     * Refused before the seed — until epoch 1 the draft is `AabSettings()` defaults, and merging
+     * into those then having the seed overwrite them loses the read-back, while the reverse order
+     * would replace the user's whole profile with defaults. The gate and the write are one
+     * `update` so a concurrent user edit cannot be read-then-clobbered.
+     */
+    fun mergeDeviceReadBack(snapshot: DeviceDisplaySnapshot) {
+        if (!seeded) return
+        val committedNow = committed.value
+        _draft.update { current ->
+            readBackDraft(current, committedNow, lastReadBack, snapshot)
+                ?.also { lastReadBack = it }
+                ?: current
+        }
+    }
+
     fun deleteOverridePoint(point: OverridePoint) {
         viewModelScope.launch { appModule.overridePointStore.delete(point) }
     }
 
-    /**
-     * Commit draft → DataStore and force an immediate pipeline re-evaluate (G2-F1/F16). The
-     * service/identity fields are preserved from the live committed value (never edited here), so an
-     * Apply cannot flip the master switch or the context lock.
-     */
+    // Commit draft → DataStore; service/identity fields preserved.
     fun apply(raiseMaxBrightForCurve: Boolean = false) {
-        // D-085 (S14 carry-forward): clamp out-of-range fields on commit so a parameter screen can
-        // never persist an unsafe value (e.g. maxBrightness 999, scale 0). This is the same per-field
-        // clamp every other persistence path already runs (SettingsStore, import/export, legacy); the
-        // draft Apply used to bypass it and write the raw draft straight to DataStore. Critical errors
-        // (form coefficients) still block Apply earlier via hasCriticalError.
-        // D-169 (_SaveButtonMisc A5–A11): if the curve leaves no zone-3 headroom (form3A < 0) and
-        // MaxBright is below 255, RAISE MaxBright to the minimum the curve needs before committing —
-        // Tasker force-fixes and flashes "adjusted to N" rather than blocking the save. form3A is now
-        // an ADVISORY (SettingsValidator), so it no longer trips hasCriticalError; the two remaining
-        // form errors (form2A<0, form2C>zone1End) still block Apply (D-052 stands for those).
-        // Only the MISC screen opts in — Tasker runs this in `_SaveButtonMisc` (the Misc scene save);
-        // the Curve scene save just reddens form3A (task583 advisory), never touching MaxBright.
+        // D-085: clamp fields on commit (same as SettingsStore/import/export).
+        // D-169: raise MaxBright if curve needs it (D-052 blocks on form errors).
+        // Tasker force-fixes and flashes "adjusted to N" rather than blocking the save.
         val fix = if (raiseMaxBrightForCurve) _draft.value.raiseMaxBrightnessForCurve() else MaxBrightnessFix(_draft.value, null)
-        // DB-008: remember what the user asked for, so the clamp below can be reported rather than
-        // applied silently. Read BEFORE validate(), which is what performs the correction.
         val requestedStrength = fix.settings.dimmingStrength
         val toCommit = fix.settings.validate()
-        // D-164: validate() may REWRITE the draft (NaN resets, per-field clamps, cross-field
-        // coercions like maxWaitMs ≥ minWaitMs — reachable from the Misc wait sliders). Snap the
-        // draft to the exact copy being committed so Apply is a FIXED POINT: dirty converges to
-        // false and every control shows the value that actually persisted, instead of a
-        // perpetually-dirty screen whose slider silently disagrees with the DataStore (the G3-F3
-        // failure class, which range-alignment alone cannot fix for cross-field rules). The epoch
-        // bump rebinds seed-once text fields to the snapped values (same contract as discard()).
+        // D-164: snap draft to validated copy so Apply is a fixed point; epoch rebinds fields.
         _draft.value = toCommit
         _epoch.update { it + 1 }
-        // A15: announce the auto-raise with the value that actually persisted (post-clamp).
         if (fix.raisedTo != null) _maxBrightnessRaised.tryEmit(toCommit.maxBrightness)
-        // DB-008 (A11): only when the value actually MOVED — announcing a correction that did not
-        // happen is precisely the misinformation issue #110 is about. (Tasker's A9 originally tested
-        // `> 64.999999999`, which fired at exactly 65 too; upstream has since moved it to
-        // `> 65.0000000001`, so the two agree.)
+        // DB-008: announce clamp only if value moved.
         if (toCommit.dimmingStrength < requestedStrength) {
             _dimmingStrengthClamped.tryEmit(toCommit.dimmingStrength)
         }
@@ -190,19 +148,14 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                 toCommit.copy(
                     serviceEnabled = current.serviceEnabled,
                     contextOverride = current.contextOverride,
-                    // debugLevel is owned by the Live Debug scene (G2R-F9), never a parameter screen.
                     debugLevel = current.debugLevel,
-                    // panicSensitivity is likewise owned by the Live Debug slider (D-116).
                     panicSensitivity = current.panicSensitivity,
                 )
             }
-            // UNLIMITED control event — takes effect even with no new sensor reading (G2-F16). Only
-            // when the master switch is on, so an Apply while disabled does not spin up the service.
             if (committedNow.serviceEnabled) AutoBrightnessRuntime.reapply(app)
         }
     }
 
-    /** Revert the draft to the committed values (Discard, or dirty-back confirmation). */
     fun discard() {
         _draft.value = committed.value
         _epoch.update { it + 1 }

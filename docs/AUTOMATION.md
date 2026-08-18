@@ -100,3 +100,29 @@ control is enabled.
 **Tasker:** a *Profile → Event → System → Intent Received* with action
 `com.tideo.autobrightness.event.STATE_CHANGED`; the extras arrive as local variables
 (`%enabled`, `%running`, `%paused`, `%profile`).
+
+---
+
+## Why did nothing happen?
+
+Dropped commands are silent by design. To see the reason, set **Live Debug Info → Log Level** to
+**8 — Context Automation**; Tideo then flashes why it ignored a command:
+
+| Flash | Cause |
+|---|---|
+| *external control is off* | The opt-in toggle is off — turn on **Tools → Automation control** |
+| *LOAD_PROFILE ignored — no "name" extra* | The action arrived without the `name` string extra |
+| *LOAD_PROFILE ignored — no profile named "X"* | No saved or built-in profile matches that name (check spelling and case) |
+| *RESUME ignored — the service is switched off* | `RESUME` never overrides the master switch (see the verb table above) |
+
+**This list is not exhaustive — other causes are still silent.** An action Tideo does not recognise
+is refused before anything else runs, so a mistyped action name produces nothing at all; check it
+against the table above first. A command sent while another is still being handled is dropped by the
+one-at-a-time admission gate — flood protection, not an error, so retry. And `PAUSE`, `REAPPLY`,
+`PANIC` and `CONTEXTS_RESUME` can each be dropped downstream when the service is not running or
+Android refuses the background start (see the reliability note above); those failures are not
+reported here either. If a verb does nothing and none of the flashes appear, check that the service
+is running and that Tideo is exempt from battery optimisation before suspecting the command itself.
+
+Set the level back to **0 — Off** when you are done: while it is 8, any app on the device can raise
+a toast by sending a control command.

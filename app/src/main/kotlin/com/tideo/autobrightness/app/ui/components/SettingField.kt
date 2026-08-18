@@ -4,16 +4,8 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
-/**
- * S13b — the unified settings-field surface (m3_audit §4 "Inconsistent field rendering"). It folds the
- * three S12.5b primitives — [NumberSettingField], [IntSliderSettingField], [SwitchSettingRow] — behind
- * one entry point keyed by a [SettingFieldSpec], so a screen lists its fields declaratively and the
- * draft/validation/long-press-help/`[committed]`-bracket behaviour stays uniform.
- *
- * **Behaviour-preserving:** [SettingField] *delegates* to the existing primitives unchanged — the
- * subtle draft-epoch / committed-bracket logic (G2-F7/F1) is NOT re-implemented, so the existing field
- * tests stay green. S13c migrates screens onto this spec list; the primitives remain the renderers.
- */
+/** S13b unified settings-field surface: folds three S12.5b primitives behind SettingFieldSpec
+ * for declarative screen lists. Behaviour-preserving: delegates to primitives (G2-F7/F1 logic untouched). */
 sealed class SettingFieldSpec {
     abstract val label: String
     @get:StringRes abstract val help: Int?
@@ -21,7 +13,6 @@ sealed class SettingFieldSpec {
     abstract val enabled: Boolean
     abstract val testTag: String
 
-    /** A free-text numeric (int or decimal) field — delegates to [NumberSettingField]. */
     data class Decimal(
         override val label: String,
         val value: Number,
@@ -36,7 +27,6 @@ sealed class SettingFieldSpec {
         override val testTag: String = label,
     ) : SettingFieldSpec()
 
-    /** A bounded integer slider — delegates to [IntSliderSettingField]. */
     data class Slider(
         override val label: String,
         val value: Int,
@@ -49,7 +39,6 @@ sealed class SettingFieldSpec {
         override val testTag: String = label,
     ) : SettingFieldSpec()
 
-    /** A labelled on/off switch — delegates to [SwitchSettingRow]. */
     data class Toggle(
         override val label: String,
         val checked: Boolean,
@@ -61,7 +50,6 @@ sealed class SettingFieldSpec {
     ) : SettingFieldSpec()
 }
 
-/** Renders a [SettingFieldSpec] via the matching S12.5b primitive (see [SettingFieldSpec]). */
 @Composable
 fun SettingField(spec: SettingFieldSpec, modifier: Modifier = Modifier) {
     when (spec) {

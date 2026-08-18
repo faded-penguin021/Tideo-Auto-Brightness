@@ -18,18 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * DA-043 — the downstream half of external-control admission.
- *
- * `ControlReceiver` admits one command at a time, but it releases that slot as soon as *routing*
- * finishes, and most verbs finish routing by posting an event. The bound the receiver provides is
- * therefore a bound on concurrent broadcast coroutines, not on the work they leave behind. These
- * tests exercise what a sequential flood actually does to the pipeline's queue.
- *
- * A **StandardTestDispatcher** on purpose: the consumer only runs when the test advances it, which
- * is the real-world condition being modelled — commands arriving faster than the pipeline drains
- * them (a cycle includes its animation frames, so draining is not instant).
- */
+// DA-043: downstream half of external-control admission; tests command flood handling in pipeline.
 @OptIn(ExperimentalCoroutinesApi::class)
 class ControlFloodBoundTest {
 

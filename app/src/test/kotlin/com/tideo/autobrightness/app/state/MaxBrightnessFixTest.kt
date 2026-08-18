@@ -5,11 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * D-169 — Tasker `_SaveButtonMisc` A5–A11: Apply RAISES MaxBright to the curve's minimum
- * (`min_req_bright`, the value at Zone 2 End) when the curve leaves no zone-3 headroom (form3A < 0)
- * and MaxBright < 255, instead of blocking the save. Only ever raises; the `< 255` gate is preserved.
- */
+/** D-169: Apply raises MaxBright to curve minimum (Zone 2 End) when form3A < 0 and < 255. */
 class MaxBrightnessFixTest {
 
     /** A steep zone-2 curve whose value at Zone 2 End is ~252 → form3A < 0 at MaxBright 150. */

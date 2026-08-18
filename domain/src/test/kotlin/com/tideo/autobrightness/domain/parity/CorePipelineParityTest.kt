@@ -15,15 +15,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
-/**
- * Parity harness: asserts the CURRENT production [BrightnessEngine] (and helpers) against the
- * committed golden vectors generated from [TaskerReference] (the Tasker oracle).
- *
- * Numeric tolerance is 1e-9; integer/string outputs are exact. All 7 gaps documented in
- * docs/rebuild/parity_gaps.md were closed in S5 — no active Ignore annotations remain. The
- * golden vectors and reference implementation are immutable fixtures (never edit them to
- * make tests pass; fix production code instead).
- */
+/** Parity harness: validates production BrightnessEngine against Tasker oracle golden vectors.
+ * Tolerance 1e-9 (numeric) / exact (integer/string). All 7 gaps closed in S5; fixtures immutable. */
 class CorePipelineParityTest {
 
     private val engine = BrightnessEngine()
@@ -39,7 +32,6 @@ class CorePipelineParityTest {
 
     private fun Map<String, String>.d(k: String): Double = getValue(k).toDouble()
 
-    // ---- smoothing (task535) -------------------------------------------------------------
     @Test
     fun smoothing_matchesEngine() {
         val mismatches = mutableListOf<String>()
@@ -80,7 +72,7 @@ class CorePipelineParityTest {
     fun absoluteThresholds_matchesEngine() {
         val mismatches = mutableListOf<String>()
         for (r in golden("threshold.csv")) {
-            // currentLux = par1 (for < 0.2 special-case and < 10 scale selector); lastRawLux separate
+            // currentLux = par1; lastRawLux separate
             val (low, high) = engine.absoluteThresholds(r.d("currentLux"), r.d("lastRawLux"), r.d("dynamicThreshold"))
             if (abs(low - r.d("threshAbsLow")) > tol || abs(high - r.d("threshAbsHigh")) > tol) {
                 mismatches += "lux=${r["currentLux"]} engine=($low,$high) ref=(${r["threshAbsLow"]},${r["threshAbsHigh"]})"
@@ -192,11 +184,7 @@ class CorePipelineParityTest {
         }
     }
 
-    /**
-     * Cross-validate task661 (runtime) vs task663 (plot-side copy) of the 3-zone mapping over the
-     * golden lux grid (D-002/D-027c). They must agree because Form2D ≡ Zone1End; any disagreement
-     * would be recorded in parity_gaps.md and re-derived from XML — never guessed.
-     */
+    /** Cross-validate task661 (runtime) vs task663 (plot) 3-zone mapping (D-002/D-027(c)). Must agree: Form2D ≡ Zone1End. */
     @Test
     fun mapping661VsPlot663_agree() {
         for (v in GoldenVectorGenerator.variants) {
@@ -210,7 +198,7 @@ class CorePipelineParityTest {
         }
     }
 
-    /** task663 block#2 zone math (verbatim), un-clamped, to mirror task661 for cross-validation. */
+    /** task663 block#2 zone math verbatim, un-clamped (cross-validation with task661). */
     private fun plot663Mapping(lux: Double, v: GoldenVectorGenerator.Variant): Double = when {
         lux < v.zone1End -> v.form1a * Math.sqrt(lux)
         lux < v.zone2End -> v.form2a + v.form2b * (Math.pow(lux - v.form2c, 0.33) - Math.pow(v.zone1End - v.form2c, 0.33))

@@ -4,11 +4,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/**
- * Guards the S12.9e decomposition of the once-596-LOC `BrightnessPipelineController`: the orchestrator
- * must stay an orchestrator (≤ [ORCHESTRATOR_MAX_LOC]), the cycle work / debug surface / panic effect
- * must remain in their own files, and none of the four may re-bloat back toward the monolith.
- */
+/** Guard S12.9e decomposition (596-LOC monolith split): orchestrator ≤ ORCHESTRATOR_MAX_LOC, no re-bloat. */
 class PipelineFileLayoutTest {
 
     private val runtimeDir = File("src/main/kotlin/com/tideo/autobrightness/app/runtime")
@@ -55,14 +51,7 @@ class PipelineFileLayoutTest {
     }
 
     private companion object {
-        // The guard catches RE-BLOAT — cycle/debug/panic logic creeping back into the orchestrator
-        // toward the old 596-LOC monolith. It is NOT meant to block a genuine new feature's wiring.
-        // 300 at the S12.9e split (file was 292). S14's prof759/task545 proximity damp added ~15 lines of
-        // irreducible orchestration (inject the source, a tracker field, start in startSensor, stop in
-        // the 3 teardown paths, the proximityNear reset) — AND its job lifecycle was extracted to its own
-        // ProximityTracker (the decomposition this guard encourages), so the cycle math stayed out. 310
-        // was the minimal honest bump for that. D-139 (emergencyStop cancel-and-join + its race
-        // provenance, one import) adds ~4 comment/wiring lines with zero cycle logic → 315.
+        // Guard catches RE-BLOAT (cycle/debug/panic creeping back), not new feature wiring. D-139: +4 wiring lines.
         const val ORCHESTRATOR_MAX_LOC = 315
     }
 }

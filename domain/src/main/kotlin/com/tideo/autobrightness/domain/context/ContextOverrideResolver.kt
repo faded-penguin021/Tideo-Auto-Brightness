@@ -1,40 +1,13 @@
 package com.tideo.autobrightness.domain.context
 
-/**
- * Pure decision engine for the context-override system — the Kotlin port of task43
- * `_EvaluateContexts V2` PASS 3 (match + rank) and PASS 4 (output + next wake time).
- *
- * Tasker: task43 `_EvaluateContexts V2` Java L12093 (`extraction/java/task43_1_evaluatecontexts-v2.java`),
- * semantics in `extraction/contexts_spec.md` §4.
- *
- * What is and isn't here:
- *  - PASS 1 (per-caller cooldown debounce) and PASS 2 (signal-change veto gates) are stateful,
- *    clock- and persisted-state-driven scheduling concerns → they live in the app-side ContextEngine.
- *  - PASS 3/4 are the precedence/merge matrix and are pure → here, with a 1:1 unit-test matrix.
- *  - The per-dimension trigger verdicts (time/day window incl. the overnight prev-day rule, time
- *    tokens, battery incl. the D-108 unknown sentinel, location haversine, wifi trim-compare,
- *    next-wake-time) live in [ContextMatching], shared with the display-rules resolver. This
- *    resolver keeps the precedence policy and the wake-time collection order.
- *
- * Precedence (contexts_spec §4, D-014): among matching rules, highest [ContextRuleSpec.priority]
- * wins; ties broken by higher specificity (# of trigger dimensions present on the match path);
- * remaining ties keep array order (first seen). `priority` defaults to 0.
- *
- * An override **swaps the entire active profile** (contexts_spec §4 "What an override actually
- * CHANGES") — it is not a scale/min/max modifier. The app layer loads the winning profile's full
- * parameter set; this resolver only names the winner.
- */
+/** Pure decision engine for context-override system (Kotlin port of task43 _EvaluateContexts V2 PASS 3/4).
+ * Precedence: D-014 priority > specificity > array order. D-108/D-014/contexts_spec §4 semantics.
+ * PASS 1/2 stateful scheduling live in ContextEngine; per-dimension verdicts live in ContextMatching. */
 object ContextOverrideResolver {
 
-    /**
-     * @param rules ordered rule list (array order is the final tie-break, faithful to contexts.json).
-     * @param signals the current environment snapshot (already resolved to LOCAL seconds-of-day etc.).
-     * @param overrideActive `%AAB_ContextOverride == "true"` — a manual context lock. When set, the
-     *   profile switch is skipped entirely (PASS 4 else branch) but wake times are still computed.
-     * @param userProfile `%AAB_ProfileUser` — the user's baseline profile name (no-match fallback).
-     * @param profileExists existence probe for the fallback profile file (act 433-437); when the
-     *   user's saved profile is gone the fallback collapses to "Default".
-     */
+    /** @param rules ordered list (array order is final tie-break). @param signals current environment snapshot.
+     * @param overrideActive manual context lock (%AAB_ContextOverride); skips profile switch but computes wake times.
+     * @param userProfile baseline profile (%AAB_ProfileUser); no-match fallback. */
     fun resolve(
         rules: List<ContextRuleSpec>,
         signals: ContextSignals,
@@ -62,7 +35,7 @@ object ContextOverrideResolver {
                 val start = ContextMatching.resolveTimeToken(range.start, signals)
                 val end = ContextMatching.resolveTimeToken(range.end, signals)
 
-                // wakeTimes collects EVERY rule's endpoints (before the match check) — task43 L341-342.
+                // wakeTimes collects all endpoints before match check (task43 L341-342)
                 wakeTimes.add(start)
                 wakeTimes.add(end)
 
@@ -110,7 +83,7 @@ object ContextOverrideResolver {
 
         val nextContextTime = ContextMatching.nextWakeTime(wakeTimes, signals.nowSecondsOfDay)
 
-        // PASS 4: when a manual context lock is active, skip the switch (only wake times refresh).
+        // PASS 4: manual lock active; skip switch (only wake times)
         if (overrideActive) {
             return ContextResolution(
                 targetProfile = null,
@@ -129,7 +102,7 @@ object ContextOverrideResolver {
             )
         }
 
-        // No match → fall back to the user's baseline profile; collapse to Default if it is gone.
+        // No match; fall back to user's baseline or Default if missing
         val fallback = userProfile.ifEmpty { "Default" }
         val target = if (profileExists(fallback)) fallback else "Default"
         return ContextResolution(

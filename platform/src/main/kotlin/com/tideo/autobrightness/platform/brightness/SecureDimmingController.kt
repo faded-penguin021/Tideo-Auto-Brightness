@@ -6,12 +6,10 @@ import android.provider.Settings
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.Tier
 
+/** SecureDimming controller (task650 _ApplyDimmingPrivileged): requires WRITE_SECURE_SETTINGS (ELEVATED tier). */
 // Tasker: task650 _ApplyDimmingPrivileged writes reduce_bright_colors_level/activated
-// via Settings.Secure (requires WRITE_SECURE_SETTINGS → ELEVATED tier).
 interface SecureDimmingController {
-    /** Write reduce_bright_colors_level (0–1000). Fails if tier < ELEVATED. */
     fun setLevel(level: Int): Result<Unit>
-    /** Write reduce_bright_colors_activated (0/1). Fails if tier < ELEVATED. */
     fun setActivated(on: Boolean): Result<Unit>
 }
 
@@ -25,7 +23,6 @@ class AndroidSecureDimmingController(
         if (privilegeManager.currentTier() < Tier.ELEVATED) {
             return Result.failure(SecurityException("WRITE_SECURE_SETTINGS not granted"))
         }
-        // Defensive: a revoked/stale grant can still throw SecurityException at write time.
         return runCatching {
             Settings.Secure.putInt(resolver, "reduce_bright_colors_level", level.coerceIn(0, 1000))
         }

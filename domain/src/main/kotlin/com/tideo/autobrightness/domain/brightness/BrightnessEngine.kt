@@ -13,23 +13,11 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 /*
- * ROUNDING-MODE CONTRACT (S12.9e header consolidation — comment-only, no behaviour change).
- *
- * Tideo's engine reproduces three DISTINCT rounding idioms from the source project, deliberately, so
- * its output is bit-for-bit identical to the golden vectors. The per-call `gap-0X` notes throughout
- * this file refer back to this table; do NOT "simplify" any of them to `kotlin.math.round`/`%.2f`:
- *
- *   1. `Math.round(x * 10^n) / 10^n`  — the project's `round3`/`roundN` idiom. `Math.round` ties
- *      toward +∞ (HALF_UP on the magnitude line), NOT banker's rounding. Used for smoothing deltas,
- *      thresholds, taper, and the final brightness `Math.round` (gap-01 R2, gap-02, gap-04 R1).
- *   2. `new BigDecimal(x).setScale(scale, HALF_UP)` — the EXACT-binary BigDecimal(double) constructor
- *      (not `BigDecimal.valueOf`), so the smoothed-lux 2-dp/0-dp rounding matches the source's
- *      String-free path (gap-01 R1, gap-02 R1). See [bigScale].
- *   3. NO clamping where the source omits it — `lux_alpha` is not clamped to [0,1] (gap-01 R2), the
- *      `^0.33` curve bases are not `coerceAtLeast`'d, and the post-curve value is not re-clamped to
- *      [min,max] inside the map step (gap-03 R2 / D-010a/b).
- *
- * These are immutable fixtures: production code conforms to the golden vectors, never the reverse.
+ * ROUNDING-MODE CONTRACT: Tideo reproduces three DISTINCT rounding idioms from the source project for bit-for-bit identity to golden vectors (D-028/D-030):
+ *   1. `Math.round(x * 10^n) / 10^n` (round3/roundN): ties toward +∞, NOT banker's rounding.
+ *   2. `new BigDecimal(x).setScale(scale, HALF_UP)`: exact-binary double constructor (not valueOf).
+ *   3. NO clamping where source omits it: lux_alpha not clamped to [0,1] (D-010(a)); ^0.33 bases not coerceAtLeast'd; post-curve not re-clamped (D-010(b)).
+ * Do NOT "simplify" to kotlin.math.round/%.2f — these are immutable fixtures for parity.
  */
 
 // Tasker task548 result: the final calculated brightness (round1) + the effective compressed
@@ -38,8 +26,7 @@ data class CompressedScaleResult(val calculatedBrightness: Double, val effective
 
 class BrightnessEngine {
     companion object {
-        // Tasker task544 act28/29 / prof759 / task545: the smoothing-alpha damp factor applied while the
-        // proximity sensor reads "near" (phone at the ear / covered).
+        // Tasker task544 act28/29 / prof759 / task545: smoothing-alpha damp factor when proximity reads "near" (phone at ear/covered).
         const val PROXIMITY_ALPHA_DAMP = 0.1
     }
 
@@ -65,7 +52,7 @@ class BrightnessEngine {
         val prevSmoothedLux = prev?.smoothedLux ?: input.lux
 
         val dynamicThreshold = dynamicThreshold(input.lux, prevSmoothedLux, input.thresholds)
-        // Tasker task546: par1 = current lux (gate + scale selector), lastRawLux = previous raw
+        // Tasker task546: par1 = current lux (gate + scale selector), lastRawLux = previous raw.
         val absThresholds = absoluteThresholds(input.lux, prev?.lastRawLux ?: input.lux, dynamicThreshold)
 
         val shouldUpdate = prev == null || input.lux <= absThresholds.first || input.lux >= absThresholds.second
@@ -76,7 +63,7 @@ class BrightnessEngine {
                 thresholdDynamicPercent = dynamicThreshold * 100.0,
                 deltaFactor = input.thresholds.deltaFactor,
                 zone1End = input.thresholds.zone1End,
-                // Tasker task544 act28/29: ×0.1 alpha damp while proximity is near (prof759/task545).
+                // Tasker task544 act28/29: ×0.1 damp while proximity near (prof759/task545).
                 luxAlphaDamp = if (input.proximityNear) PROXIMITY_ALPHA_DAMP else 1.0,
             )
         } else {
@@ -99,7 +86,7 @@ class BrightnessEngine {
                 effectiveScale = scaleDynamic,
             )
         }
-        // Tasker task661 act16-21: clamp to [MinBright, MaxBright] AFTER scaling; Math.round (ties toward +∞)
+        // Tasker task661 act16-21: clamp [MinBright, MaxBright] AFTER scaling; Math.round (ties toward +∞).
         val targetBrightness = Math.round(scaleResult.calculatedBrightness).toInt()
             .coerceIn(input.curve.minBrightness, input.curve.maxBrightness)
 
@@ -139,11 +126,10 @@ class BrightnessEngine {
     ): Pair<Double, Double> {
         val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
         val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
-        // Tasker task535: lux_alpha is NOT clamped to [0,1] (D-010a, gap-01 R2 fix). task544 then damps
-        // it ×luxAlphaDamp (0.1 when proximity is near) before the EMA + downstream consumers.
+        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)). task544 damps ×luxAlphaDamp before EMA.
         val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta)) * luxAlphaDamp
         val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
-        // Tasker task535: BigDecimal(raw).setScale(2|0, HALF_UP) — exact-binary BigDecimal (gap-01 R1 fix)
+        // Tasker task535: BigDecimal(raw).setScale(2|0, HALF_UP) — exact-binary constructor.
         val rounded = if (smoothed < zone1End) bigScale(smoothed, 2) else bigScale(smoothed, 0)
         return rounded to luxAlpha
     }
@@ -157,18 +143,18 @@ class BrightnessEngine {
     }
 
     fun absoluteThresholds(currentLux: Double, lastRawLux: Double, dynamicThreshold: Double): Pair<Double, Double> {
-        // Tasker task546: par1 < 0.2 → ("1","0","0.1") — special-case (gap-02 R2 fix)
+        // Tasker task546: par1 < 0.2 → ("1","0","0.1") special-case.
         if (currentLux < 0.2) return 0.0 to 0.1
         val dynamicPercent = dynamicThreshold * 100.0
         val low = lastRawLux * (1.0 - (dynamicPercent / 100.0))
         val high = lastRawLux * (1.0 + (dynamicPercent / 100.0))
-        // Tasker task546: BigDecimal HALF_UP, 2-dp if par1 < 10, else 0-dp (gap-02 R1 fix)
+        // Tasker task546: BigDecimal HALF_UP, 2-dp if par1 < 10, else 0-dp.
         val scale = if (currentLux < 10) 2 else 0
         return bigScale(low, scale) to bigScale(high, scale)
     }
 
     fun mapLuxToBrightness(smoothedLux: Double, cfg: BrightnessCurveConfig): Double {
-        // Tasker task661: NO coerceAtLeast on ^0.33 bases, NO clamp to [min,max] here (D-010b, gap-03 R2 fix)
+        // Tasker task661: NO coerceAtLeast on ^0.33 bases, NO clamp to [min,max] here (D-010(b)).
         return when {
             smoothedLux < cfg.zone1End -> cfg.form1A * sqrt(smoothedLux)
             smoothedLux < cfg.zone2End -> cfg.form2A + cfg.form2B * (
@@ -195,9 +181,7 @@ class BrightnessEngine {
         return CompressedScaleResult(roundN(mappedBrightness * effectiveScale + cfg.offset, 1), effectiveScale)
     }
 
-    // Tasker task661 act10-21: map → (ScalingUse ? task548 taper : mapped*Scale+Offset) → clamp
-    // to [MinBright, MaxBright] as doubles (the int round happens at the platform write). This is
-    // the unit the golden vector `calculated.csv` pins; evaluate() reuses the same branch.
+    // Tasker task661 act10-21: map → (ScalingUse ? task548 taper : mapped*Scale+Offset) → clamp to [MinBright, MaxBright]. This unit is in golden vector `calculated.csv`.
     fun calculatedBrightness(lux: Double, cfg: BrightnessCurveConfig, scaleDynamic: Double): Double {
         val mapped = mapLuxToBrightness(lux, cfg)
         val calc = if (cfg.scalingUse) {
@@ -225,7 +209,7 @@ class BrightnessEngine {
 
     fun calculateAnimation(alpha: Double, animation: AnimationConfig, cycleTimeMs: Double?): Triple<Int, Long, Long> {
         val clamped = alpha.coerceIn(0.0, 1.0)
-        // Tasker task543: Math.round (ties toward +∞), not kotlin.math.round (gap-04 R1 fix)
+        // Tasker task543: Math.round (ties toward +∞), not kotlin.math.round.
         val loops = Math.round(1.0 + clamped * (animation.maxSteps - 1.0)).toInt().coerceAtLeast(1)
         val rawWait = (1.0 - clamped) * (animation.maxWaitMs - animation.minWaitMs) + animation.minWaitMs
         val wait = Math.round(rawWait)
@@ -238,13 +222,13 @@ class BrightnessEngine {
 
     private fun round3(value: Double): Double = roundN(value, 3)
 
-    // Tasker idiom Math.round(v * factor) / factor — ties toward +∞ (not kotlin.math.round which ties-to-even)
+    // Tasker idiom Math.round(v * factor) / factor (ties toward +∞, not ties-to-even).
     private fun roundN(value: Double, digits: Int): Double {
         val factor = 10.0.pow(digits)
         return Math.round(value * factor).toDouble() / factor
     }
 
-    // Tasker idiom new BigDecimal(v).setScale(scale, ROUND_HALF_UP) — exact-binary double constructor
+    // Tasker idiom new BigDecimal(v).setScale(scale, ROUND_HALF_UP) — exact-binary constructor.
     private fun bigScale(v: Double, scale: Int): Double =
         BigDecimal(v).setScale(scale, RoundingMode.HALF_UP).toDouble()
 

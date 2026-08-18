@@ -10,29 +10,8 @@ object TaskerLegacyProfileSerializer {
     private val trueValues = setOf("true", "on", "1")
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    /**
-     * Decode a legacy Tasker AAB config into [AabSettings].
-     *
-     * Two on-disk formats are accepted:
-     *  1. The real Tasker AAB **nested JSON** written by task637 `_ProfileManager.performSave`
-     *     (XML L29365+) — a `{meta, general, misc, reactivity, circadian, superdimming}` object whose
-     *     keys are snake_case (`min_bright`, `z1_end`, …). This is what the on-device app saved to
-     *     `Download/AAB/configs/<name>.json`, i.e. the format the Profiles "Load" button must understand
-     *     (G2R-F70). task637 `performLoad` (L29490+) is the authority for the key→`%AAB_` mapping
-     *     ported below. The previous parser only handled `%AAB_Key=value` lines, so a real JSON config
-     *     parsed to all-defaults — the file "loaded" by name but no setting actually changed.
-     *  2. A flat `%AAB_Key = value` plaintext dump (older exports / hand-written fixtures).
-     *
-     * Derived coefficients form2A/form2D/form3A are NOT stored: task637 `performLoad` recomputes them
-     * from form1A/zone1End/form2B/form2C/maxBright, exactly as [derivedCoefficients] does at read-time.
-     */
-    /**
-     * Thrown when the input is structurally not an AAB profile at all (S12.9c #4): neither a JSON
-     * object nor any `%AAB_` key=value line. A *valid but empty* profile (e.g. `{}` or a config with no
-     * recognized fields) is NOT an error — it parses to the task570 defaults. This lets
-     * [ProfileImportExportManager] distinguish "garbage file" from "blank profile" and build a
-     * `ProfileLoadResult.TotalFailure` for the former.
-     */
+    /** Decode legacy Tasker AAB config (nested JSON from task637 or flat %AAB_Key=value; G2R-F70). */
+    /** Thrown for structurally invalid AAB profile (S12.9c #4). */
     class LegacyProfileParseException(message: String) : Exception(message)
 
     fun deserialize(raw: String): AabSettings {
@@ -54,18 +33,17 @@ object TaskerLegacyProfileSerializer {
         )
     }
 
-    /** Parse the nested Tasker AAB JSON config (task637 performSave/performLoad schema). */
     private fun deserializeJson(root: JsonObject): AabSettings {
         var s = AabSettings()
 
         (root["general"] as? JsonObject)?.let { g ->
             g.intRound("z1_end")?.let { s = s.copy(zone1End = it) }
             g.intRound("z2_end")?.let { s = s.copy(zone2End = it) }
-            // G2R-F70: form1a is a continuous double in Tasker (e.g. 5.833) — keep the decimal.
+            // G2R-F70: keep form1a as continuous double.
             g.dbl("form1a")?.let { s = s.copy(form1A = it) }
             g.flt("form2b")?.let { s = s.copy(form2B = it) }
             g.intRound("form2c")?.let { s = s.copy(form2C = it) }
-            // form2a/form2d/form3a are DERIVED (task637 performLoad recomputes them) — not stored.
+            // form2a/form2d/form3a: DERIVED (task637).
         }
         (root["misc"] as? JsonObject)?.let { m ->
             m.intRound("min_bright")?.let { s = s.copy(minBrightness = it) }
@@ -108,7 +86,6 @@ object TaskerLegacyProfileSerializer {
         return s.validate()
     }
 
-    /** Parse a flat `%AAB_Key = value` dump (older exports / fixtures). */
     private fun deserializeKeyValue(raw: String): AabSettings {
         val map = raw
             .lineSequence()
@@ -191,17 +168,13 @@ object TaskerLegacyProfileSerializer {
         }
     }
 
-    // G2R-F70: Tasker stores curve params (Form1A, Form2C, …) as continuous doubles
-    // (`String.valueOf(c_form1a)` → e.g. "6.834"); a key=value export therefore carries decimals for
-    // fields the rebuild models as Int. The old `toIntOrNull()` returned null on a decimal string, so
-    // the field silently kept its default — the "Form1A didn't stick" symptom. Round instead (matching
-    // the nested-JSON path's `intRound`). A plain integer string ("5") rounds to itself.
+    // G2R-F70: Tasker stores curve params as continuous doubles; round decimal strings.
     private fun String.asRoundedInt(): Int? = trim().toDoubleOrNull()?.takeIf { it.isFinite() }
         ?.let { Math.round(it).takeIf { rounded -> rounded in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt() }
     private fun String.asRoundedLong(): Long? = trim().toDoubleOrNull()?.takeIf { it.isFinite() }?.let { Math.round(it) }
 
-    // --- nested-JSON value readers (tolerant: numbers stored as JSON doubles, booleans as JSON bools
-    //     by performSave's getG/getI/getB, but accept "On"/"Off"/"1" string variants too) ---
+    // Nested-JSON value readers (tolerant of variants: doubles, booleans, "On"/"Off"/"1").
+
 
     private fun JsonObject.prim(key: String): JsonPrimitive? = this[key] as? JsonPrimitive
     private fun JsonObject.dbl(key: String): Double? = prim(key)?.doubleOrNull?.takeIf { it.isFinite() }

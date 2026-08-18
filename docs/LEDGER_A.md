@@ -96,7 +96,7 @@
   Guard 1 + its test fixtures (22 cases) + STATE preamble + harness prompt 3.1/3.4 updated
   in lockstep.
 
-- DA-005: **rule-review — harness legislation gets the fresh-context pass too
+- DA-005 [cited]: **rule-review — harness legislation gets the fresh-context pass too
   (owner-requested, 2026-07-19).** Rule changes had no review at all: guard LOGIC has a test
   suite, but the prose rules (CLAUDE.md, RUNBOOK protocols, ledger preambles, permission
   rails) had none, and a bad rule compounds — it manufactures defects in every future

@@ -1,9 +1,21 @@
-# SECURITY updates only (D-135). Version-update PRs are deliberately disabled
-# (open-pull-requests-limit: 0 is GitHub's documented "security only" pattern):
-# speculative dependency bumps were declined as wrong cost/benefit for a solo
-# F-Droid app (2026-06-29, STATE.md) — a bump happens on an advisory, not a cadence.
-# The "Dependabot security updates" + "Private vulnerability reporting" toggles
-# live in repo Settings → Code security and are owner-side.
+# Two ecosystems, two deliberately different policies (D-135, DB-038).
+#
+# gradle — SECURITY updates only. Version-update PRs stay disabled
+# (open-pull-requests-limit: 0 is GitHub's documented "security only" pattern): speculative
+# dependency bumps were declined as wrong cost/benefit for a solo F-Droid app (2026-06-29,
+# STATE.md) — a bump happens on an advisory, not a cadence.
+#
+# github-actions — version updates ENABLED, because the actions are pinned to commit SHAs
+# (DB-038). A SHA pin is immutable, which is the point: a moved tag can no longer change what
+# runs. The cost is that nothing about the pin tells you it has aged, so this is the control that
+# keeps pinning maintainable rather than a one-off snapshot. Dependabot updates commit-pinned
+# actions and rewrites the trailing `# vX.Y.Z` marker in the same line, so the pin and its
+# human-readable version stay in sync. This is a scope amendment to D-135, not a reversal: the
+# gradle rationale (no speculative bumps) is untouched, and an action SHA is a different object
+# from a library version constraint.
+#
+# The "Dependabot security updates" + "Private vulnerability reporting" toggles live in repo
+# Settings → Code security and are owner-side.
 version: 2
 updates:
   - package-ecosystem: "gradle"
@@ -15,4 +27,13 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    open-pull-requests-limit: 0
+    # Enough headroom for the ~10 distinct actions to be refreshed without Dependabot
+    # silently dropping updates; monthly cadence matches the gradle entry. Raising the
+    # interval to "weekly" is an owner maintenance-load call, not a security requirement.
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per batch instead of up to five: these are all first-party/well-known actions
+      # and reviewing them together is how the owner actually reads them.
+      github-actions:
+        patterns:
+          - "*"

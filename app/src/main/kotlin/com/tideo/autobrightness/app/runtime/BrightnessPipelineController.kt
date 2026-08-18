@@ -17,27 +17,10 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * The runtime auto-brightness pipeline ORCHESTRATOR: the Kotlin rebuild of the Tasker sensor →
- * brightness loop's state machine. S12.9e decomposed the original 596-LOC class — the per-event math
- * glue moved to [PipelineCycleRunner], the debug-flash surface to [PipelineDebugEmitter], and the
- * panic effect to [PanicHandler]; this file owns construction, start/stop, the event loop, the prof760
- * sensor gate, the [ControllerHook], and state exposure.
- *
- * Concurrency model (BINDING, D-027): the pipeline is serialized through a single consumer
- * coroutine. One [PipelineEvent] runs to completion — including its animation frames — before the
- * next is processed. Sensor ticks arriving while a cycle is in flight are **DROPPED, not queued**,
- * exactly as prof760's `%AAB_MainLoop != On` clause drops them in Tasker (a re-entry mutex, D-021),
- * implemented here as the [inCycle] busy flag. All durable runtime state lives in [state] and is
- * written ONLY from the consumer coroutine (via [PipelineRuntimeContext]); the sensor/observer
- * collectors signal it through [ControlEventGate], which also bounds the control backlog (DA-043).
- *
- * Pipeline sources (pipeline_spec.md):
- *   - prof760/task554 main loop      → [LightSensorSource] → gated → [PipelineEvent.SensorTick]
- *   - prof755/task567 override detect → [OverrideMonitor]  → [PipelineEvent.OverrideDetected]
- *   - lifecycle (screen on/off, pause/resume/panic) → events posted by the service
- *
- * The decision math is the golden-tested domain [BrightnessEngine]; this controller owns only the
- * Tasker runtime state machine and the animated writes (via [AnimationRunner]).
+ * Runtime auto-brightness pipeline orchestrator (BINDING, D-027): serialized through a single
+ * consumer coroutine. Sensor ticks arriving during a cycle are DROPPED (re-entry mutex [inCycle]).
+ * State is written ONLY from the consumer coroutine via [PipelineRuntimeContext].
+ * Pipeline sources: prof760 main loop, prof755 override detection, and lifecycle events.
  */
 class BrightnessPipelineController(
     private val lightSensor: LightSensorSource,
@@ -66,16 +49,10 @@ class BrightnessPipelineController(
     private val _state = MutableStateFlow(PipelineState())
     val state: StateFlow<PipelineState> = _state.asStateFlow()
 
-    // Cached so the per-sample prof760 gate does not hit DataStore on every reading. @Volatile (S12.9e
-    // audit, survivor #1): written by the consumer (start/runCycle/setInitial) and read on the SENSOR
-    // collector ([onSensorSample]) + the OBSERVER gate — cross-coroutine single-reference handoff, each
-    // read independently atomic; no compound invariant rides on it.
+    // @Volatile: written by consumer, read on SENSOR/OBSERVER collectors (cross-coroutine handoff).
     @Volatile private var cachedSettings: AabSettings? = null
 
-    // Post-init override-suppression deadline (S12.7a, F64): override detection is suppressed until
-    // `clock() >= this`. @Volatile (S12.9e audit, survivor #2): written by the consumer (setInitial via
-    // [armInitialSettle]) and read on the OBSERVER gate coroutine — a single monotonic Long, atomic.
-    // 0 = no window open.
+    // @Volatile: override suppression deadline, written by consumer, read on OBSERVER gate.
     @Volatile private var suppressOverrideUntilMs = 0L
 
     // %AAB_MainLoop re-entry mutex: true while a sensor cycle is claimed or running.
@@ -115,8 +92,7 @@ class BrightnessPipelineController(
     private var sensorJob: Job? = null
     private var overrideJob: Job? = null
 
-    // prof759/task545 proximity → %AAB_Proximity (the ×0.1 smoothing damp). Its job lifecycle lives in
-    // ProximityTracker so this stays an orchestrator (PipelineFileLayoutTest); written via atomic update.
+    // prof759/task545 proximity damp. Orchestrator only; lifecycle lives in ProximityTracker.
     private val proximityTracker = ProximityTracker(proximitySource, scope) { near ->
         _state.update { it.copy(proximityNear = near) }
     }
@@ -130,7 +106,7 @@ class BrightnessPipelineController(
     override fun overrideSuppressed(): Boolean = clock() < suppressOverrideUntilMs
     override fun postOverrideDetected(observed: Int) { postControl(PipelineEvent.OverrideDetected(observed)) }
 
-    /** Begin the pipeline: claim foreground state, start the consumer + sensor + observer flows. */
+    /** Start the pipeline and consumer/sensor/observer flows. */
     fun start() {
         if (consumerJob != null) return
         _state.update { it.copy(serviceOn = true) }
@@ -168,24 +144,14 @@ class BrightnessPipelineController(
     /** A context override swapped the active profile: re-apply the initial brightness (task43 act21). */
     override fun onContextChanged() { postControl(PipelineEvent.ContextChanged) }
 
-    /**
-     * A settings Apply / profile load committed new parameters: re-run the pipeline immediately
-     * (G2-F16). A control event — not subject to the drop-not-queue sensor mutex — reusing the
-     * context-swap path (re-read effective settings → Set Initial Brightness).
-     */
+    /** Re-run the pipeline after settings apply (G2-F16). */
     fun reapply() { postControl(PipelineEvent.ContextChanged) }
 
     // DA-043 bound; OverrideDetected carries a value, so it is capped but never folded.
     private fun postControl(event: PipelineEvent) = controlGate.admit(event, event !is PipelineEvent.OverrideDetected)
     internal val controlBacklog: ControlEventGate get() = controlGate // DA-043 counters (test seam)
 
-    /**
-     * prof769/task528 panic: restore a sane brightness, drop super dimming, and FULL STOP
-     * (%AAB_Service=Off, task528 act1-2); terminal, not pausable (G1-F4) — the service persists
-     * serviceEnabled=false and stops right after. D-139: the consumer is cancel-and-JOINED before
-     * the panic effect — a fire-and-forget cancel let an in-flight animation frame serialize its
-     * write AFTER the panic 255 (ledger row has the race anatomy).
-     */
+    /** prof769/task528 panic: restore brightness, drop dimming, stop everything (D-139). */
     suspend fun emergencyStop() {
         sensorJob?.cancel(); sensorJob = null
         overrideJob?.cancel(); overrideJob = null
@@ -204,29 +170,17 @@ class BrightnessPipelineController(
         proximityTracker.start()
     }
 
-    /**
-     * prof760 gate evaluation on the collector coroutine. Passing samples claim the [inCycle] mutex
-     * and enqueue a [PipelineEvent.SensorTick]; everything else is dropped here (never queued).
-     */
+    /** prof760 gate on collector: passing samples claim [inCycle] mutex, others are dropped. */
     private fun onSensorSample(lux: Double, accuracy: Int) {
-        // Sensor-collector path. The two PipelineState fields written here (lastSampleMs, throttleMs)
-        // come from the collector rather than the consumer; both are monotonic and MutableStateFlow
-        // .update is atomic (CAS retry), so they cannot corrupt or be lost against the consumer's
-        // snapshot writes.
         val now = clock()
         val settings = cachedSettings
         val s = _state.value
-        // Throttle Reinitialization watchdog (task566/prof754, G2R-F78 follow-up): run it on EVERY
-        // delivered sample, because in stable light prof760's dead-band gate drops every reading and no
-        // cycle ever runs — so the throttle would otherwise stay stuck at its last small value. A
-        // reading outside [ThreshAbsLow, ThreshAbsHigh] is a significant change; 10 s of only-in-band
-        // readings raises the throttle to the AnimSteps×MaxWait+10 ceiling (stops polling).
+        // Throttle Reinitialization watchdog (task566/prof754, G2R-F78).
         if (settings != null && s.threshAbsLow != null) {
             val significant = lux < (s.threshAbsLow ?: 0.0) || lux > (s.threshAbsHigh ?: 0.0)
             throttle.onSample(now, significant, throttle.ceiling(settings.animSteps, settings.maxWaitMs))
         }
-        // Record every delivered sample (live "last sample" age, G2R-F5) + the current throttle so the
-        // idle climb is visible in Live Debug without a cycle. MutableStateFlow.update is atomic.
+        // Record every delivered sample + current throttle (Live Debug visibility, G2R-F5).
         _state.update { it.copy(lastSampleMs = now, throttleMs = throttle.throttleMs) }
         if (settings == null || !settings.serviceEnabled) return
         val passes = ProfileGates.monitorAmbientLightGate(
@@ -271,16 +225,14 @@ class BrightnessPipelineController(
         _state.update { it.copy(paused = true, pausedByOverride = false) }
     }
 
-    /** prof761/task618 wake reinit. Post-hibernate the smoothing state is cleared, so setInitial
-     *  no-ops until the first fresh reading — task618 itself polls a FRESH sample on wake (act7-13);
-     *  task585 act13's throttle reset is unobservable here (lastAcceptedMs cleared), not mirrored. */
+    /** prof761/task618 wake reinit: clear smoothing state, start sensing, set initial brightness. */
     private suspend fun reinit() {
         val settings = settingsProvider().also { cachedSettings = it }
         startSensor()
         if (!_state.value.paused) cycleRunner.setInitialBrightness(settings)
     }
 
-    /** prof753/task585 hibernate: stop sensing and clear the runtime loop state. */
+    /** prof753/task585 hibernate: stop sensing, clear runtime state. */
     private fun hibernate() {
         sensorJob?.cancel(); sensorJob = null
         proximityTracker.stop()
@@ -300,11 +252,7 @@ class BrightnessPipelineController(
     }
 }
 
-/**
- * Sink for captured manual-override training points (task561 %AAB_Overrides). The runtime persists
- * each genuine override so the curve wizard + curve overlay have real input (G2R-F13). Kept as a
- * small interface so the controller stays unit-testable without a DataStore.
- */
+/** Sink for manual-override training points (task561 %AAB_Overrides, G2R-F13). */
 fun interface OverridePointSink {
     suspend fun record(lux: Double, brightness: Double)
 }

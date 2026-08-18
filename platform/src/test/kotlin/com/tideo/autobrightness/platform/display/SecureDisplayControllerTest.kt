@@ -27,7 +27,11 @@ class SecureDisplayControllerTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         privilegeManager = AndroidPrivilegeManager(context)
-        controller = AndroidSecureDisplayController(context, privilegeManager)
+        controller = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = true,
+            alwaysOnDisplayAvailable = true,
+        )
     }
 
     private fun grantElevated() {
@@ -39,7 +43,6 @@ class SecureDisplayControllerTest {
     private fun secureInt(key: String) = Settings.Secure.getInt(context.contentResolver, key, -999)
     private fun globalInt(key: String) = Settings.Global.getInt(context.contentResolver, key, -999)
 
-    // --- tier gate ---------------------------------------------------------------------------
 
     @Test
     fun writes_failWhenNotElevated_andWriteNothing() {
@@ -61,7 +64,24 @@ class SecureDisplayControllerTest {
         assertEquals(-999, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
     }
 
-    // --- reads need no privilege ---------------------------------------------------------------
+    @Test
+    fun unsupportedWrites_stillRejectCallersBelowElevated() {
+        val unavailable = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = false,
+            alwaysOnDisplayAvailable = false,
+        )
+
+        listOf(
+            unavailable.setNightLight(true),
+            unavailable.setNightLightTemperature(2_700),
+            unavailable.setAlwaysOnDisplay(true),
+        ).forEach { result ->
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is SecurityException)
+        }
+    }
+
 
     @Test
     fun reads_workWithoutPrivilege_defaultingToOff() {
@@ -74,7 +94,6 @@ class SecureDisplayControllerTest {
         assertFalse(controller.readStayAwakePlugged())
     }
 
-    // --- night light ---------------------------------------------------------------------------
 
     @Test
     fun nightLight_roundTrips() {
@@ -102,6 +121,23 @@ class SecureDisplayControllerTest {
     }
 
     @Test
+    fun nightLight_unavailable_isSuccessfulNoOp_forActivationAndTemperature() {
+        grantElevated()
+        val unavailable = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = false,
+            alwaysOnDisplayAvailable = true,
+        )
+
+        assertTrue(unavailable.setNightLight(true).isSuccess)
+        assertTrue(unavailable.setNightLightTemperature(2_700).isSuccess)
+        assertFalse(unavailable.readNightLight())
+        assertNull(unavailable.readNightLightTemperature())
+        assertEquals(-999, secureInt("night_display_activated"))
+        assertEquals(-999, secureInt("night_display_color_temperature"))
+    }
+
+    @Test
     fun nightLightAutoMode_mapsKnownValues() {
         grantElevated()
         Settings.Secure.putInt(context.contentResolver, "night_display_auto_mode", 1)
@@ -112,7 +148,6 @@ class SecureDisplayControllerTest {
         assertEquals(NightLightAutoMode.MANUAL, controller.readNightLightAutoMode())
     }
 
-    // --- daltonizer ----------------------------------------------------------------------------
 
     @Test
     fun daltonizer_grayscale_writesValueAndEnabled() {
@@ -156,7 +191,6 @@ class SecureDisplayControllerTest {
         assertEquals(DaltonizerMode.OFF, controller.readDaltonizer())
     }
 
-    // --- inversion / AOD / stay-awake ----------------------------------------------------------
 
     @Test
     fun inversion_alwaysOn_stayAwake_roundTrip() {
@@ -179,14 +213,27 @@ class SecureDisplayControllerTest {
         assertEquals(0, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
     }
 
-    // --- HDR force-SDR (API-gated) --------------------------------------------------------------
+    @Test
+    fun alwaysOnDisplay_unavailable_isSuccessfulNoOp() {
+        grantElevated()
+        val unavailable = AndroidSecureDisplayController(
+            context, privilegeManager,
+            nightLightAvailable = true,
+            alwaysOnDisplayAvailable = false,
+        )
+
+        assertTrue(unavailable.setAlwaysOnDisplay(true).isSuccess)
+        assertFalse(unavailable.readAlwaysOnDisplay())
+        assertEquals(-999, secureInt("doze_always_on"))
+    }
+
 
     @Test
     fun hdr_unavailableBelowApi34_failsWithoutWriting() {
         grantElevated()
         val old = AndroidSecureDisplayController(context, privilegeManager, sdkInt = 33)
         assertFalse(old.hdrForceSdrAvailable)
-        assertFalse(old.readHdrForceSdr())
+        assertNull(old.readHdrForceSdr())
         val result = old.setHdrForceSdr(true)
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is UnsupportedOperationException)
@@ -194,13 +241,16 @@ class SecureDisplayControllerTest {
     }
 
     @Test
-    fun hdr_forceSdr_roundTripsOnApi34() {
+    fun hdr_disableFormats_roundTripsOnApi34() {
         grantElevated()
         val modern = AndroidSecureDisplayController(
             context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
         )
         assertTrue(modern.hdrForceSdrAvailable)
-        assertFalse(modern.readHdrForceSdr())
+        // DB-046: an absent row is unrepresentable, not canonical OFF; seed the state under test.
+        Settings.Global.putInt(context.contentResolver, "are_user_disabled_hdr_formats_allowed", 1)
+        Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "")
+        assertEquals(false, modern.readHdrForceSdr())
 
         assertTrue(modern.setHdrForceSdr(true).isSuccess)
         assertEquals(0, globalInt("are_user_disabled_hdr_formats_allowed"))
@@ -208,11 +258,60 @@ class SecureDisplayControllerTest {
             "1,2,3,4",
             Settings.Global.getString(context.contentResolver, "user_disabled_hdr_formats"),
         )
-        assertTrue(modern.readHdrForceSdr())
+        assertEquals(true, modern.readHdrForceSdr())
 
         assertTrue(modern.setHdrForceSdr(false).isSuccess)
         assertEquals(1, globalInt("are_user_disabled_hdr_formats_allowed"))
-        assertFalse(modern.readHdrForceSdr())
+        assertEquals("", Settings.Global.getString(context.contentResolver, "user_disabled_hdr_formats"))
+        assertEquals(false, modern.readHdrForceSdr())
+    }
+
+    @Test
+    fun hdr_read_preservesUnrepresentableRows_andAcceptsPermutedCompleteSet() {
+        val modern = AndroidSecureDisplayController(
+            context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        )
+        Settings.Global.putInt(context.contentResolver, "are_user_disabled_hdr_formats_allowed", 0)
+
+        Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "1,2")
+        assertNull(modern.readHdrForceSdr())
+        Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "garbage")
+        assertNull(modern.readHdrForceSdr())
+        Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "4, 2,1,3,3")
+        assertEquals(true, modern.readHdrForceSdr())
+
+        listOf(-1, 2).forEach { malformedFlag ->
+            Settings.Global.putInt(
+                context.contentResolver,
+                "are_user_disabled_hdr_formats_allowed",
+                malformedFlag,
+            )
+            Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "")
+            assertNull(modern.readHdrForceSdr())
+            Settings.Global.putString(context.contentResolver, "user_disabled_hdr_formats", "1,2,3,4")
+            assertNull(modern.readHdrForceSdr())
+        }
+    }
+
+    @Test
+    fun hdr_read_treatsAnUntouchedDeviceAsCanonicalOff_notACustomPreference() {
+        // DB-049: the rows do not exist until something writes them, which is the state of every
+        // stock Android 14+ device. Reading absent as unrepresentable hid the owner-retained
+        // control (DB-044) behind a notice claiming a custom preference the device does not have.
+        // The absent flag has a defined AOSP default (1 = user-disabled formats allowed), and an
+        // absent format list disables nothing, so the pair is HDR-not-disabled, not unknown.
+        val resolver = context.contentResolver
+        Settings.Global.putString(resolver, "are_user_disabled_hdr_formats_allowed", null)
+        Settings.Global.putString(resolver, "user_disabled_hdr_formats", null)
+        val modern = AndroidSecureDisplayController(
+            context, privilegeManager, sdkInt = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        )
+
+        assertEquals(false, modern.readHdrForceSdr())
+
+        // An absent flag still refuses to guess once a real disable list exists.
+        Settings.Global.putString(resolver, "user_disabled_hdr_formats", "1,2,3,4")
+        assertNull(modern.readHdrForceSdr())
     }
 
     @Test

@@ -16,11 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/**
- * Backs the Tools screen's power-draw calibration (task524 `_CalibratePowerDraw`). Exposes the persisted
- * dataset for the `PowerDrawChart` and runs the [PowerDrawCalibrator] sweep. The host supplies
- * [calibrate]'s `setScreenBrightness` by driving its Activity window (no WRITE_SETTINGS needed).
- */
+/** Tools screen power-draw calibration (task524 CalibratePowerDraw). Exposes persisted dataset and runs sweep. */
 class PowerDrawViewModel(app: Application) : AndroidViewModel(app) {
     private val store = PowerDrawStore(app.powerDrawDataStore)
     private val meter = AndroidPowerMeter(app)

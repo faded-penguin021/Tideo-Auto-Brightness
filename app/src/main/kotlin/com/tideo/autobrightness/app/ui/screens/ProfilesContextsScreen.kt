@@ -72,17 +72,7 @@ import com.tideo.autobrightness.platform.context.LocationResult
 import com.tideo.autobrightness.platform.context.SsidResult
 import kotlinx.coroutines.launch
 
-/**
- * Unified **Profiles & Contexts** screen (S12.9f IA merge, D-070): the Tasker UX where a profile owns
- * its context rules and a rule targets a saved profile, folded onto one destination. The saved-profiles
- * surface ([ProfilesBody] — save/load/overwrite/delete/import/export/factory-restore, unchanged) sits
- * above a "Context rules" section ([ContextRulesSection]) listing the priority-ordered rules with their
- * target profile; editing a rule opens the full editor in a modal. Replaces the separate Profiles and
- * Contexts destinations.
- *
- * Hosts both [SettingsViewModel] (profiles) and [ContextsViewModel] (rules); no change to
- * `ContextEngine`/`ContextOverrideResolver` or any store. Plumbing only — S13c restyles.
- */
+/** D-070: unified Profiles & Contexts screen (S12.9f IA merge). Profiles UI above Context rules editor; no backend changes. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfilesContextsScreen(
@@ -94,25 +84,18 @@ fun ProfilesContextsScreen(
     val scope = rememberCoroutineScope()
     val toast = rememberToaster()
     val clipboard = LocalClipboardManager.current
-    // D-130: when "Use current SSID" can't read the name without Location, hold the lead sentence here
-    // to drive the help dialog (Shizuku/root/DUMP alternatives). Null = dialog hidden.
+    // D-130: hold SSID help lead for no-Location case (Shizuku/root/DUMP alternatives)
     var ssidHelp by remember { mutableStateOf<String?>(null) }
 
-    // --- Profiles side (SettingsViewModel) ---
     val settings by settingsVm.settings.collectAsStateWithLifecycle()
     val profiles by settingsVm.profiles.collectAsStateWithLifecycle()
-    // %AAB_CurrentActiveProfile — highlight the in-force profile in the list (owner: "seeing the active
-    // profile here is useful"), mirroring Tasker's "Active Profile: …" readout.
     val activeProfile by com.tideo.autobrightness.app.runtime.LiveRuntimeState.activeProfile.collectAsStateWithLifecycle()
-    // %AAB_ActiveContext — the winning rule's name, to emphasise the active rule in the Contexts modal.
     val activeContext by com.tideo.autobrightness.app.runtime.LiveRuntimeState.activeContext.collectAsStateWithLifecycle()
     val manager = remember { ProfileImportExportManager(context.applicationContext) }
     var status by remember { mutableStateOf<String?>(null) }
-    // S12.9c #3: a user-visible error card for an unreadable profile file (ProfileLoadResult.TotalFailure).
     var loadError by remember { mutableStateOf<String?>(null) }
 
-    // Apply a ProfileLoadResult: Success/LegacyFallback both apply the settings; TotalFailure shows the
-    // error card. Returns the toast status string.
+    // Apply ProfileLoadResult: Success/LegacyFallback apply settings; TotalFailure shows error card
     fun handleLoad(
         result: ProfileLoadResult,
         okMessage: String,
@@ -134,7 +117,7 @@ fun ProfilesContextsScreen(
         }
     }
 
-    // Previously-granted Download/AAB/configs tree (persisted SAF permission), if any.
+    // Persisted SAF permission for legacy configs tree, if any
     var legacyTree by remember {
         mutableStateOf(
             context.contentResolver.persistedUriPermissions.firstOrNull { it.isReadPermission }?.uri,
@@ -184,18 +167,15 @@ fun ProfilesContextsScreen(
     val profileNames by contextsVm.profileNames.collectAsStateWithLifecycle()
     var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
     LaunchedEffect(Unit) { apps = runCatching { contextsVm.installedApps() }.getOrDefault(emptyList()) }
-    // G2R-F68: resolve today's sunrise/sunset for the token labels (gold "Sunrise (06:42)").
+    // G2R-F68: resolve today's sunrise/sunset for token labels
     var solarLabel by remember { mutableStateOf<Pair<String, String>?>(null) }
     LaunchedEffect(Unit) { solarLabel = runCatching { contextsVm.solarTimes() }.getOrNull() }
 
-    // D-111 (owner): the Tasker information architecture — a STICKY Load / Save / Contexts action bar
-    // pinned under the app bar (it stays put while the list scrolls), with the built-in/saved profiles
-    // listed directly below it (no longer hidden behind a tab). Each top action opens its own modal,
-    // the way the rule editor already does. Replaces the scrolling Profiles/Rules SegmentedButton.
+    // D-111: sticky Load / Save / Contexts action bar (stays put while list scrolls)
     var showLoad by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
     var showContexts by remember { mutableStateOf(false) }
-    // G2R-F38 "Load Anyway" preview before applying a saved profile from the visible list.
+    // G2R-F38: preview before applying saved profile
     var previewProfile by remember { mutableStateOf<SavedProfile?>(null) }
     var showCurrentSettings by remember { mutableStateOf(false) }
 
@@ -203,8 +183,7 @@ fun ProfilesContextsScreen(
         scope.launch {
             status = runCatching {
                 handleLoad(manager.importFromDocument(entry.uri), context.getString(R.string.toast_loaded_entry, entry.name)) { imported ->
-                    // G2R-F44: register the legacy profile under its file name so it's selectable as a
-                    // context-rule target without a manual re-save, then apply it live.
+                    // G2R-F44: register legacy profile by file name for rule targeting
                     val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
                     settingsVm.saveImportedProfile(profileName, imported)
                     settingsVm.replaceAll(imported)
@@ -216,13 +195,13 @@ fun ProfilesContextsScreen(
 
     SettingsScaffold(stringResource(R.string.title_profiles_contexts), { navController.popBackStack() }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // STICKY action bar — pinned outside the scroll so Load/Save/Contexts stay reachable.
+            // Sticky action bar — pinned outside scroll
             ProfilesActionBar(
                 onLoad = { showLoad = true },
                 onSave = { showSave = true },
                 onContexts = { showContexts = true },
             )
-            // SCROLLING content: the resume banner + the saved/built-in profiles, directly visible.
+            // Scrolling content: resume banner + profiles
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -250,9 +229,9 @@ fun ProfilesContextsScreen(
         }
     }
 
-    // --- Modals (each top action opens its own, like the rule editor) ---
+    // Each top action opens its own modal
 
-    // Save: name the current settings as a new profile (gold changed-vs-default diff inside).
+    // Save: name current settings as new profile
     if (showSave) {
         SaveProfileDialog(
             currentSettings = settings,
@@ -261,7 +240,7 @@ fun ProfilesContextsScreen(
         )
     }
 
-    // Load & manage: import/legacy/restore/reset/export/view — the "load from elsewhere" + housekeeping.
+    // Load & manage: import/legacy/restore/reset/export/view
     if (showLoad) {
         LoadManageDialog(
             legacyEntries = legacyEntries,
@@ -276,7 +255,7 @@ fun ProfilesContextsScreen(
         )
     }
 
-    // Apply a saved profile picked from the visible list (preview then apply).
+    // Preview and apply saved profile
     previewProfile?.let { entry ->
         LoadProfileDialog(
             profile = entry,
@@ -289,7 +268,7 @@ fun ProfilesContextsScreen(
         CurrentSettingsDialog(settings = settings, onDismiss = { showCurrentSettings = false })
     }
 
-    // An unreadable-profile failure (ProfileLoadResult.TotalFailure).
+    // Show unreadable profile error
     loadError?.let { msg ->
         AlertDialog(
             onDismissRequest = { loadError = null },
@@ -303,8 +282,7 @@ fun ProfilesContextsScreen(
         )
     }
 
-    // D-130: "Use current SSID" couldn't read the name without Location — explain the no-Location
-    // alternatives (Shizuku/root, or a one-time ADB DUMP grant) so Wi-Fi rules aren't a dead end.
+    // D-130: explain SSID alternatives when Location unavailable
     ssidHelp?.let { lead ->
         val dumpCmd = remember { contextsVm.dumpGrantCommand() }
         AlertDialog(
@@ -354,7 +332,7 @@ fun ProfilesContextsScreen(
         )
     }
 
-    // Contexts: the full rule list + editor, in a full-screen modal (like the rule editor already is).
+    // Contexts: full rule list + editor in full-screen modal
     if (showContexts) {
         ContextsModal(onClose = { showContexts = false }) {
             ContextRulesSection(
@@ -367,10 +345,7 @@ fun ProfilesContextsScreen(
                 onDelete = { contextsVm.delete(it); toast(R.string.toast_rule_deleted) },
                 onUseCurrentSsid = { setSsid ->
                     scope.launch {
-                        // G2R-F22: targeted message per failure mode, not a blanket "Not connected".
-                        // D-130: the two Location-gated misses mean every no-Location strategy
-                        // (Shizuku/root/DUMP) also missed, so open the help dialog explaining the
-                        // alternatives instead of a dead-end toast.
+                        // G2R-F22: targeted message per failure mode; D-130: show help for no-Location
                         when (val result = contextsVm.currentSsid()) {
                             is SsidResult.Connected -> { setSsid(result.ssid); toast(R.string.toast_wifi_connected, result.ssid) }
                             SsidResult.NotOnWifi -> toast(R.string.toast_not_on_wifi)
@@ -383,11 +358,9 @@ fun ProfilesContextsScreen(
                     }
                 },
                 onUseCurrentLocation = { setLatLon ->
-                    // G2R-F22/F42/D-122: recheck the grant at call time + ACTIVELY acquire a fresh fix (the
-                    // OS location indicator appears; can take a few seconds — toast that it's working);
-                    // targeted message per outcome (no longer wrongly reports "not granted" after the grant).
+                    // G2R-F22/F42/D-122: recheck grant + actively acquire fresh fix with targeted message
                     scope.launch {
-                        toast(R.string.toast_acquiring_location)
+                        toast(R.string.toast_acquiring_location, ACTIVE_FIX_SECONDS)
                         when (val result = contextsVm.currentLocation()) {
                             is LocationResult.Available -> {
                                 setLatLon(result.snapshot.latitude, result.snapshot.longitude)
@@ -410,15 +383,7 @@ fun ProfilesContextsScreen(
     }
 }
 
-/**
- * D-111: the pinned Load / Save / Contexts action bar (m3_audit B5 `ActionButtonBar` pattern), matched
- * to the Tasker original — each action carries a leading icon and the three are visually distinct:
- * **Load** filled teal (primary, high-emphasis), **Save** tonal grey, **Contexts** teal-outlined. Sits
- * outside the scroll so it stays reachable while the profile list scrolls; each opens its own modal.
- *
- * The compact `contentPadding` (8 dp vs the M3 default 24 dp) + single-line labels keep "Contexts" on
- * one line at equal thirds — the default padding squeezed it onto two lines.
- */
+/** D-111: pinned Load / Save / Contexts action bar (m3_audit B5 pattern). Each opens its own modal. */
 @Composable
 private fun ProfilesActionBar(onLoad: () -> Unit, onSave: () -> Unit, onContexts: () -> Unit) {
     val pad = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
@@ -447,7 +412,6 @@ private fun ProfilesActionBar(onLoad: () -> Unit, onSave: () -> Unit, onContexts
     }
 }
 
-/** A leading 18 dp icon + single-line label, shared by the three action-bar buttons. */
 @Composable
 private fun ActionButtonContent(icon: Int, label: Int) {
     Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
@@ -455,12 +419,7 @@ private fun ActionButtonContent(icon: Int, label: Int) {
     Text(stringResource(label), maxLines = 1, softWrap = false)
 }
 
-/**
- * D-111: the "Load & manage" modal opened by the action bar's Load button — import a profile from a
- * file, (re)link the legacy Tasker folder and load its configs, plus the housekeeping actions
- * (restore factory / reset / export / view current). Saving lives in its own dialog (the Save button);
- * applying a saved profile is done from the visible list.
- */
+/** D-111: "Load & manage" modal (import/legacy/housekeeping). Saving/applying are separate. */
 @Composable
 private fun LoadManageDialog(
     legacyEntries: List<LegacyConfigEntry>,
@@ -520,19 +479,11 @@ private fun LoadManageDialog(
     )
 }
 
-/**
- * D-111: a full-screen modal host for the context-rules editor opened by the action bar's Contexts
- * button — a top bar (title + close) over the scrolling [ContextRulesSection]. Full-screen because the
- * rule list + editor is too tall for an AlertDialog.
- */
+/** D-111: full-screen modal host for context-rules editor (too tall for AlertDialog). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ContextsModal(onClose: () -> Unit, content: @Composable () -> Unit) {
-    // D-118: edge-to-edge so the modal's own insets apply (targetSdk 36 enforces edge-to-edge). The top
-    // is padded via statusBarsPadding() so the app bar clears the status bar; the BOTTOM is handled by a
-    // trailing Spacer at the end of the scroll, NOT a nav-bar inset — like the rule editor (D-098), this
-    // dialog window never delivers a non-zero navigation-bar inset to its content, so the last rule card
-    // used to sit clipped under the gesture pill / 3-button bar.
+    // D-118: edge-to-edge; bottom handled by trailing Spacer (D-098)
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -556,8 +507,7 @@ private fun ContextsModal(onClose: () -> Unit, content: @Composable () -> Unit) 
                     verticalArrangement = Arrangement.spacedBy(Dimens.fieldSpacing),
                 ) {
                     content()
-                    // Clearance below the last rule card so it always scrolls past the gesture pill /
-                    // 3-button bar, even though the dialog reports a zero bottom inset here (D-098/D-118).
+                    // Clearance for gesture pill / 3-button bar (D-098/D-118)
                     Spacer(Modifier.height(48.dp))
                 }
             }

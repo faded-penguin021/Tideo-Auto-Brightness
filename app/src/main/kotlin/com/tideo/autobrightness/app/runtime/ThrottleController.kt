@@ -1,43 +1,19 @@
 package com.tideo.autobrightness.app.runtime
 
 /**
- * The Tasker throttle window (`%AAB_Throttle`) + Throttle Reinitialization watchdog (task566 /
- * prof754), ported as a small stateful policy so the runtime [BrightnessPipelineController] can ask
- * "may a reading be accepted now?" and "what is the throttle after this cycle?" (G2R-F78).
- *
- * Tasker model:
- *  - The main-loop throttle gate (task544) drops sensor readings that arrive within `%AAB_Throttle`
- *    of the last accepted one.
- *  - After a brightness change, `%AAB_Throttle` is the **actual** animation duration the engine
- *    computed for this cycle (`loops*wait + 10 (+cycleTime)`, golden task543 — exposed as
- *    `BrightnessPolicyOutput.transitionDurationMs`). It is NOT floored at `MaxSteps*MaxWait+10`; that
- *    figure is only the watchdog ceiling. (The previous rebuild floored it at the setting, which
- *    happens to equal the ceiling at defaults, so the throttle always read `MaxSteps*MaxWait+10` — F78.)
- *  - When the brightness has not changed for ~10 s (the watchdog [idleMs]), prof754 → task566 pushes
- *    the throttle up to the **ceiling** `AnimSteps * MaxWait + 10` (task566 act0) so the sensor stops
- *    polling in unchanging light (battery). The next change resets it back to the actual duration.
- *
- * Concurrency: [onSample] runs on the sensor-collector coroutine while [onCycleComplete]/[seed] run on
- * the pipeline consumer (S12.8b'' moved the watchdog onto the sample path so it fires in stable light).
- * The two touched fields are plain Longs with no compound invariant between them, so the `@Volatile`
- * markers give the needed cross-thread visibility; a momentarily stale window self-corrects next sample
- * (see the field rationale + the S12.9e volatile audit). No lock is warranted.
+ * Tasker throttle window + reinitialization watchdog (task566/prof754, G2R-F78).
+ * Drops sensor readings within %AAB_Throttle of the last accepted one.
+ * After brightness changes, throttle = actual animation duration.
+ * After ~10s idle, throttle raises to ceiling to stop polling.
  */
 class ThrottleController(private val idleMs: Long = 10_000L) {
 
-    /**
-     * The throttle window currently in force (ms). Read by the gate; published to Live Debug.
-     * @Volatile (S12.9e audit): written from BOTH the sensor collector ([onSample]) and the consumer
-     * ([onCycleComplete]/[seed]) and read on either — a single Long with no compound invariant, so
-     * visibility-only volatility is sufficient (a momentarily stale window self-corrects next sample).
-     */
+    /** Throttle window (ms); @Volatile for cross-thread visibility. */
     @Volatile
     var throttleMs: Long = 0L
         private set
 
-    // TIMEMS of the last SIGNIFICANT change (a brightness write, or a sensor reading outside the
-    // absolute dead band); the watchdog measures idle time from here. Volatile because it is touched
-    // from both the sensor-collector ([onSample]) and the consumer ([onCycleComplete]) coroutines.
+    // TIMEMS of last significant change; watchdog measures idle time from here.
     @Volatile
     private var lastChangeMs: Long? = null
 
@@ -50,21 +26,7 @@ class ThrottleController(private val idleMs: Long = 10_000L) {
     /** task566 act0: the throttle ceiling = AnimSteps × MaxWait + 10 (ms). */
     fun ceiling(animSteps: Int, maxWaitMs: Int): Long = animSteps.toLong() * maxWaitMs + 10L
 
-    /**
-     * Throttle Reinitialization watchdog driven from EVERY delivered sensor sample (G2R-F78
-     * follow-up). The prof760 dead-band gate drops every reading in stable light, so no cycle (and no
-     * [onCycleComplete]) ever runs there — the watchdog therefore never fired and the throttle stayed
-     * stuck at the last small value (the owner's report). Running it on the sample path fixes that:
-     *
-     *  - a **significant** sample (lux below `%AAB_ThreshAbsLow` or above `%AAB_ThreshAbsHigh`) is a
-     *    real light change → re-anchor the idle timer;
-     *  - a **stable** sample (within the dead band) past the [idleMs] window → raise the throttle to
-     *    the `AnimSteps×MaxWait+10` ceiling (task566) so the sensor stops polling in unchanging light.
-     *
-     * @param now         monotonic clock
-     * @param significant true when the raw lux fell outside the absolute dead band this sample
-     * @param ceilingMs   the [ceiling] for the current settings
-     */
+    /** Throttle watchdog on every delivered sample (G2R-F78): re-anchor on significant changes, raise on idle. */
     fun onSample(now: Long, significant: Boolean, ceilingMs: Long) {
         if (significant) {
             lastChangeMs = now
@@ -74,15 +36,7 @@ class ThrottleController(private val idleMs: Long = 10_000L) {
         }
     }
 
-    /**
-     * Update the throttle after a cycle completes.
-     *
-     * @param now                monotonic clock
-     * @param brightnessChanged  true when this cycle actually wrote a new brightness
-     * @param actualThrottleMs   the engine's computed throttle this cycle
-     *                           (`BrightnessPolicyOutput.transitionDurationMs`, the actual steps×wait+10)
-     * @param ceilingMs          the [ceiling] for the current settings
-     */
+    /** Update throttle after cycle: use actual duration if brightness changed, else raise to ceiling if idle. */
     fun onCycleComplete(
         now: Long,
         brightnessChanged: Boolean,
@@ -90,13 +44,11 @@ class ThrottleController(private val idleMs: Long = 10_000L) {
         ceilingMs: Long,
     ) {
         if (brightnessChanged) {
-            // Effective throttle = the engine's actual animation duration (NO setting floor — F78).
-            throttleMs = actualThrottleMs.coerceAtLeast(0L)
+            throttleMs = actualThrottleMs.coerceAtLeast(0L) // No setting floor (F78)
             lastChangeMs = now
         } else {
             val since = lastChangeMs ?: now.also { lastChangeMs = it }
-            // task566 act7: after >10 s of no change, raise the throttle to the ceiling (stop polling).
-            if (now - since > idleMs) throttleMs = ceilingMs
+            if (now - since > idleMs) throttleMs = ceilingMs // task566 act7: stop polling
         }
     }
 }

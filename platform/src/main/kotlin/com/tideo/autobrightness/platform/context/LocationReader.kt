@@ -23,12 +23,7 @@ data class LocationSnapshot(
     val longitude: Double,
 )
 
-/**
- * Typed result for the one-shot "use current location" read (G2R-F42). The previous boolean/null
- * path conflated "permission missing" with "granted but no cached fix yet", so the editor wrongly
- * reported the permission as not granted (even right after the user granted it). This separates the
- * two so the UI can recheck/guide correctly.
- */
+/** Typed result for one-shot "use current location" read (G2R-F42). Separates missing-permission from no-fix. */
 sealed interface LocationResult {
     data class Available(val snapshot: LocationSnapshot) : LocationResult
     /** Neither COARSE nor FINE location permission is granted (rechecked at call time). */
@@ -41,41 +36,24 @@ interface LocationReader {
     /** Best last-known fix across providers, or null when none / unpermitted (legacy callers). */
     fun lastKnownLocation(): LocationSnapshot?
 
-    /**
-     * Continuous location updates for the context engine's "super smart location listener" (G2R-F45).
-     * Hosted in the foreground service scope so it survives the app being backgrounded (the previous
-     * on-demand `lastKnownLocation()` read died with the Activity → reverted to no-rule). Seeds with
-     * the best last-known fix, then emits real provider fixes; (0.0, 0.0) "null island" reads are
-     * filtered out (the bug behind the on-device `loc 0.0,0.0`). Closes (no emissions) when location
-     * permission is missing.
-     */
+    /** Continuous location updates for "super smart location listener" (G2R-F45). Hosted in foreground service scope. Seeds with last-known fix; filters null-island. */
     fun locationUpdates(minTimeMs: Long = DEFAULT_MIN_TIME_MS, minDistanceM: Float = DEFAULT_MIN_DISTANCE_M): Flow<LocationSnapshot>
 
-    /**
-     * One-shot read with a call-time permission recheck + a fresh fix (G2R-F42). Prefers a current
-     * fix; falls back to the best last-known. Distinguishes missing-permission from no-fix.
-     */
+    /** One-shot read with call-time permission recheck + fresh fix (G2R-F42). Prefers current; falls back to last-known. */
     suspend fun currentLocation(): LocationResult
 
-    /**
-     * ACTIVE one-shot acquisition for the user-initiated "Use current location" buttons (D-122). Unlike
-     * [currentLocation] — which calls `getCurrentLocation`, letting the OS satisfy the request from a
-     * recent cached fix (so the system location indicator never lights up and the value can be one
-     * another app set) — this REGISTERS for live provider updates, powering the GPS/network sensors (the
-     * OS location indicator appears) and waiting for the first genuinely fresh fix. The best last-known
-     * fix is used only as a BACKUP when no fresh fix arrives within [timeoutMs]. Distinguishes
-     * missing-permission from no-fix like [currentLocation].
-     *
-     * Default delegates to [currentLocation] so non-Android fakes need no change.
-     */
+    /** ACTIVE one-shot for user-initiated "Use current location" buttons (D-122). Registers for live provider updates (powers GPS/network). Backup: last-known if no fresh fix within timeout. */
     suspend fun activeFix(timeoutMs: Long = ACTIVE_FIX_TIMEOUT_MS): LocationResult = currentLocation()
+
+    fun locationServicesEnabled(): Boolean = true
+
+    fun lastKnownWithin(maxAgeMs: Long): LocationSnapshot? = null
 
     companion object {
         const val DEFAULT_MIN_TIME_MS = 30_000L
         const val DEFAULT_MIN_DISTANCE_M = 50f
-        /** GPS can take a while to converge; the active "Use current location" path waits up to this long
-         *  for a fresh fix before falling back to the last-known backup. */
-        const val ACTIVE_FIX_TIMEOUT_MS = 20_000L
+        /** DB-055: cold-GPS budget before the last-known fallback; 20 s lost fixes this device lands at ~15 s. */
+        const val ACTIVE_FIX_TIMEOUT_MS = 45_000L
     }
 }
 
@@ -86,8 +64,6 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         return bestLastKnown(lm)
     }
 
-    // MissingPermission: this is a library adapter; the consuming app declares ACCESS_FINE/COARSE_LOCATION
-    // and this guards with hasLocationPermission() + a SecurityException catch before any request.
     @SuppressLint("MissingPermission")
     override fun locationUpdates(minTimeMs: Long, minDistanceM: Float): Flow<LocationSnapshot> = callbackFlow {
         if (!hasLocationPermission()) { close(); return@callbackFlow }
@@ -95,7 +71,6 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         if (lm == null) { close(); return@callbackFlow }
 
         val listener = LocationListener { loc -> loc.toSnapshotOrNull()?.let { trySend(it) } }
-        // Seed immediately so a configured rule resolves without waiting for the first fresh fix.
         bestLastKnown(lm)?.let { trySend(it) }
 
         val providers = buildList {
@@ -117,10 +92,9 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         awaitClose { runCatching { lm.removeUpdates(listener) } }
     }
 
-    @SuppressLint("MissingPermission") // guarded by the hasLocationPermission() recheck below + SecurityException catch.
+    @SuppressLint("MissingPermission")
     override suspend fun currentLocation(): LocationResult {
-        // Recheck the grant at call time (G2R-F42): the grant may have just been awarded, and the
-        // OS permission propagation can lag a stale cached check.
+        // Recheck grant at call time (G2R-F42): grant may lag from cached checks.
         if (!hasLocationPermission()) return LocationResult.NeedsPermission
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             ?: return LocationResult.Unavailable
@@ -150,16 +124,20 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
         return snapshot?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
     }
 
-    @SuppressLint("MissingPermission") // guarded by the hasLocationPermission() recheck below + SecurityException catch.
+    @SuppressLint("MissingPermission")
     override suspend fun activeFix(timeoutMs: Long): LocationResult {
-        // Recheck the grant at call time (G2R-F42), same as currentLocation().
+        // Recheck grant at call time (G2R-F42).
         if (!hasLocationPermission()) return LocationResult.NeedsPermission
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             ?: return LocationResult.Unavailable
 
-        // D-122: actively request a NEW fix from every enabled real provider (GPS for accuracy, network
-        // for speed). requestLocationUpdates powers the sensors — so the OS location indicator appears —
-        // and delivers a freshly computed fix rather than `getCurrentLocation`'s possibly-cached value.
+        // DB-057: with the master switch off nothing can deliver, so spending the window is pure wait.
+        if (!locationServicesEnabled()) {
+            return bestLastKnown(lm)?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
+        }
+
+        // D-122: actively request NEW fix from enabled real providers. requestLocationUpdates powers sensors.
+        // DB-053: PASSIVE last resort, as currentLocation() and locationUpdates() already had.
         val providers = buildList {
             if (runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false)) {
                 add(LocationManager.GPS_PROVIDER)
@@ -167,7 +145,7 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
             if (runCatching { lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)) {
                 add(LocationManager.NETWORK_PROVIDER)
             }
-        }
+        }.ifEmpty { listOf(LocationManager.PASSIVE_PROVIDER) }
 
         val fresh = if (providers.isEmpty()) {
             null
@@ -195,18 +173,38 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
             }
         }
 
-        // BACKUP only: a last-known fix (possibly set by another app) is used if the active request
-        // produced nothing within the timeout — fine as a fallback, not the primary mechanism (D-122).
+        // BACKUP: last-known fix if active request produced nothing within timeout (D-122).
         val snapshot = fresh ?: bestLastKnown(lm)
         return snapshot?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
     }
+
+    @SuppressLint("MissingPermission")
+    override fun lastKnownWithin(maxAgeMs: Long): LocationSnapshot? {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
+        val oldestAccepted = System.currentTimeMillis() - maxAgeMs
+        return try {
+            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+                .asSequence()
+                .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+                .filter { it.latitude != 0.0 || it.longitude != 0.0 }
+                .filter { it.time >= oldestAccepted }
+                .maxByOrNull { it.time }
+                ?.let { LocationSnapshot(it.latitude, it.longitude) }
+        } catch (_: SecurityException) {
+            null
+        }
+    }
+
+    override fun locationServicesEnabled(): Boolean = runCatching {
+        (context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager)?.isLocationEnabled ?: false
+    }.getOrDefault(false)
 
     private fun hasLocationPermission(): Boolean =
         context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    /** Newest valid (non null-island) last-known fix across GPS/network/passive providers. */
-    @SuppressLint("MissingPermission") // wrapped in runCatching + SecurityException catch; app declares the perms.
+    /** Newest valid (non null-island) last-known fix across providers. */
+    @SuppressLint("MissingPermission")
     private fun bestLastKnown(lm: LocationManager): LocationSnapshot? = try {
         listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
             .asSequence()

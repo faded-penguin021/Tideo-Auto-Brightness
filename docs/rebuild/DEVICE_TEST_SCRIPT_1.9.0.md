@@ -1,0 +1,124 @@
+# DEVICE_TEST_SCRIPT_1.9.0 — round script for the v1.9.0 train (DB-034…DB-049)
+
+**Ephemeral (D-155/DB-010).** Covers only what THIS unreleased train changed — not the full app.
+Numbered to match the corresponding step in the standing `DEVICE_TEST_SCRIPT.md` so results fold
+back cleanly (append/extend, never renumber) and this file is **deleted** once v1.9.0 ships. Build
++ install the debug APK (`applicationIdSuffix=".debug"`, coexists with a release install per
+D-106 — run only one variant's service at a time, D-128).
+
+Legend: **[ELEVATED]** needs WRITE_SECURE_SETTINGS.
+
+## §11.32 — Night Light / AOD hide + fail closed when unsupported (DB-041…DB-043)
+
+On a device (or OEM build) where the framework reports the feature unavailable:
+
+1. Open **Menu → Privileged → Privileged Display**. **Expected:** the **Night Light** row is
+   hidden entirely if `config_nightDisplayAvailable` is false; the **Always-on display** row is
+   hidden if `config_dozeAlwaysOnDisplayAvailable` is false OR `config_dozeComponent` is empty
+   (AOD requires both — DB-043's conjunction, not just the headline flag).
+2. With a profile/context rule that *would* carry Night Light or AOD, trigger a profile swap,
+   a circadian tick, direct Apply, and panic in turn. **Expected:** every path is a harmless
+   no-op on the unsupported field — no write, no crash, no stale UI claiming an unsupported
+   value is set.
+3. On a device where the feature IS supported, confirm the row is shown and still behaves as
+   before (see §11.32 in the standing script for the full write+read-back check) — this train
+   must not regress the supported case while fixing the unsupported one.
+
+## §11.32 — Disable HDR (experimental, Android 14+) (DB-044/DB-045)
+
+4. **Menu → Privileged → Privileged Display → Disable HDR (experimental)** on. **Expected:**
+   `adb shell settings get global user_disabled_hdr_formats` → `1,2,3,4` and
+   `adb shell settings get global are_user_disabled_hdr_formats_allowed` → `0`. Off: `allowed`
+   returns `1`, formats clears. **Expected:** this is a stored-preference write, not Force-SDR —
+   either direction may require a reboot, and an HDR/display-mode transition may briefly blank
+   the screen. Confirm both caveats are visible to you as a real (if brief) UX event, not just
+   documented. Both rows live in the **global** table; `settings put secure` writes a different
+   table the app never reads, so a `secure` typo here silently tests nothing (DB-049).
+4a. **A device that has never had an HDR preference (DB-049).** Clear both rows
+   (`adb shell settings delete global user_disabled_hdr_formats` and
+   `adb shell settings delete global are_user_disabled_hdr_formats_allowed`), then reopen the
+   screen. **Expected:** the **switch** is shown, off — an untouched device is canonical off, not
+   a custom preference. Seeing the preservation notice here is the DB-049 regression.
+5. Externally set a **partial/malformed** row (`adb shell settings put global
+   user_disabled_hdr_formats 2,3` and `adb shell settings put global
+   are_user_disabled_hdr_formats_allowed 1`), then open Privileged Display. **Expected:** the
+   switch is replaced by a custom-preference preservation notice (not a Boolean guess) — and
+   applying an unrelated field on this screen leaves that row untouched rather than broadening it
+   to the full disabled set.
+
+## §11.39a — Read-back tracks the device, not the stored profile (DB-034/DB-039)
+
+6. With Privileged Display open, flip Night Light (or color inversion) from the system
+   quick-settings tile, return to Tideo. **Expected:** the toggle shows the device's actual
+   state and Apply becomes available.
+7. Flip the SAME toggle back from the tile and return again. **Expected:** the screen follows a
+   **second** time — before DB-039 this worked exactly once per screen entry.
+8. Change a toggle WITHOUT applying, background the app, return. **Expected:** your uncommitted
+   edit survives — read-back never overwrites a dirty draft.
+8a. **Apply does not undo itself, with the service RUNNING (DB-048).** Turn the service ON, open
+   Privileged Display, flip Night Light (or inversion) and **Apply**. **Expected:** the toggle
+   stays where you put it and the Apply bar goes away. A toggle that flips back a moment later —
+   and Apply becoming available again — is DB-047's rollback on the coordinator path: with the
+   service on the screen does not write the device itself, so nothing used to invalidate the
+   pre-Apply read-back. Repeat with the service OFF (the direct-write path) to cover both halves.
+
+## §13.44a — Dropped commands explain themselves (DB-035)
+
+9. Set **Live Debug Info → Log Level** to 8. Send a control broadcast that will be rejected
+   (e.g. gate the automation OFF, then broadcast `LOAD_PROFILE` with a caller-chosen name over
+   ~40 chars or containing control/bidi characters):
+   `adb shell am broadcast -a com.tideo.autobrightness.control.LOAD_PROFILE -n
+   com.tideo.autobrightness.debug/com.tideo.autobrightness.app.control.ControlReceiver --es name
+   "<long or odd name>"`.
+   **Expected:** the debug log names the drop reason at level 8; the profile name reaching the
+   system-wide overlay is truncated to 40 chars with control/bidi characters stripped.
+
+## §5.14a — Every panic entry point confirms exactly once (DB-037)
+
+10. Fire panic via the inversion gesture. **Expected:** S.O.S. vibration, max brightness,
+    service stop.
+11. Repeat via the foreground notification's **Reset** action, then via the intent surface:
+    `adb shell am broadcast -a com.tideo.autobrightness.control.PANIC -n
+    com.tideo.autobrightness.debug/com.tideo.autobrightness.app.control.ControlReceiver` (automation toggle ON).
+    **Expected:** the same S.O.S. vibration both times — before DB-037 only the gesture buzzed.
+12. Fire the gesture once more. **Expected:** vibrates **exactly once**, not twice (checks for a
+    leftover call site on the shared path).
+
+## §8.24a — Contexts "Use current location" does not crash (DB-060) — **THE BLOCKER**
+
+This is the step the train was missing. Every location round tested the *circadian* button; none
+tested this one, which is how the crash reached you. Test this one specifically — the circadian
+button passing proves nothing about it.
+
+13. **Menu → Profiles → Contexts → add/edit a rule → location rule → Use current location.**
+    **Expected:** a toast reading *"Acquiring location — this can take up to 45 seconds…"* with the
+    number present, then either the coordinates filling the two fields plus a *"Location: 52.3702,
+    4.8952"* toast, or a plain failure toast. **Any crash here is the regression un-fixed.** Before
+    the fix the toast itself threw `MissingFormatArgumentException` — the string gained a `%1$d`
+    that only the circadian caller was passing — so the app died at the moment the toast was shown,
+    before acquisition even mattered.
+    If it does crash, `adb logcat -b crash` immediately and attach the trace; the frame to look for
+    is `Toaster.invoke`.
+14. **Regression check, circadian side.** **Menu → Circadian → Use current location.** **Expected:**
+    the same "up to 45 seconds" toast and a fix (or, per DB-059, an instant fill from a last-known
+    fix under an hour old). Both buttons now read the number from one shared constant, so a wrong or
+    missing number on *either* screen means the constant broke.
+15. **Location switched OFF, Contexts side.** Turn the system Location master switch off, then tap
+    **Use current location** in the Contexts rule editor. **Expected:** the "up to 45 seconds" toast,
+    then a *quick* failure (*"No location fix yet — try again in a moment"*) rather than a 45-second
+    hang — DB-057's early return does the work.
+    **Known imperfection, not a FAIL:** this screen still *promises* 45 seconds before failing fast,
+    where the circadian screen says *"Location is off — turn it on for a device fix…"* up front. The
+    targeted message was never wired to the Contexts caller. Log it if it bothers you and it becomes
+    a real item; it is cosmetic, not the blocker.
+16. **[opt] Comma-decimal locale (DB-051, latent — expected to FAIL).** Set the device language to
+    one using a comma decimal separator (e.g. Deutsch), then use the button and press **Set**.
+    **Expected result if the latent defect is real:** the fields fill but Set silently refuses,
+    because `ContextsScreen` still parses coordinates with a bare `toDoubleOrNull()`. This was fixed
+    in `CircadianScreen` only. Not part of the DB-060 fix and **not** a reason to hold the tag —
+    run it only if you want the defect confirmed before it gets its own change.
+
+## Log any miss
+
+Log any FAIL/BLOCKED in `../STATE.md` → Owner queue with the step number above, not the master
+script's numbering, until this file is folded in and deleted.

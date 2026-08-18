@@ -53,7 +53,6 @@ class ScreenBrightnessControllerTest {
 
     @Test
     fun restoreMode_restoresPreviousMode() {
-        // Set automatic mode first, then force manual, then restore.
         Settings.System.putInt(
             context.contentResolver,
             Settings.System.SCREEN_BRIGHTNESS_MODE,
@@ -73,8 +72,7 @@ class ScreenBrightnessControllerTest {
     fun isSelfWrite_matchesLastWrite_repeatable() {
         controller.write(100)
         assertTrue(controller.isSelfWrite(100))
-        // %LastAAB semantics: marker is NOT consumed — delayed observer callbacks for
-        // earlier animation frames re-read the latest value and must still match.
+        // %LastAAB semantics: marker NOT consumed; delayed callbacks must still match.
         assertTrue(controller.isSelfWrite(100))
     }
 
@@ -106,7 +104,7 @@ class ScreenBrightnessControllerTest {
             Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
         )
         controller.forceManualMode()
-        controller.forceManualMode() // second call must not overwrite saved AUTOMATIC
+        controller.forceManualMode() // Must not overwrite saved AUTOMATIC.
         controller.restoreMode()
         val mode = Settings.System.getInt(
             context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, -1,
@@ -122,8 +120,7 @@ class ScreenBrightnessControllerTest {
             Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
         )
         controller.forceManualMode()
-        // Process death: a NEW controller instance (fresh in-memory state, same persisted prefs)
-        // must still know the user's pre-service mode.
+        // Process death: new instance must know pre-service mode (fresh state, same prefs).
         val afterRestart = AndroidScreenBrightnessController(context)
         afterRestart.restoreMode()
         val mode = Settings.System.getInt(
@@ -140,8 +137,7 @@ class ScreenBrightnessControllerTest {
             Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
         )
         controller.forceManualMode() // saves AUTOMATIC, device now MANUAL
-        // Process death + service restart: current mode is MANUAL (our own residue), so the
-        // restarted instance must keep the persisted AUTOMATIC, not re-save MANUAL over it.
+        // Process death: restarted instance must keep persisted AUTOMATIC, not re-save MANUAL.
         val afterRestart = AndroidScreenBrightnessController(context)
         afterRestart.forceManualMode()
         afterRestart.restoreMode()
@@ -153,8 +149,7 @@ class ScreenBrightnessControllerTest {
 
     @Test
     fun forceManualMode_freshStartWithNonManualMode_overwritesStalePersistedValue_D134() {
-        // A crash long ago left a stale persisted MANUAL; the user has since put the device in
-        // AUTOMATIC. A non-MANUAL current mode is unambiguously the user's choice and wins.
+        // Stale persisted MANUAL from crash; user now in AUTOMATIC. Non-MANUAL current mode wins.
         context.getSharedPreferences(
             AndroidScreenBrightnessController.PREFS_NAME, Context.MODE_PRIVATE,
         ).edit().putInt(

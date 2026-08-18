@@ -26,7 +26,6 @@ class PrivilegeManagerTest {
 
     @Test
     fun initialTier_isNotElevatedInRobolectric() {
-        // WRITE_SECURE_SETTINGS is never granted in the Robolectric sandbox.
         assertTrue(manager.currentTier() < Tier.ELEVATED)
     }
 
@@ -54,7 +53,7 @@ class PrivilegeManagerTest {
 
     @Test
     fun dumpGrantInstruction_containsPackageNameAndDumpPermission() {
-        // D-130: the no-Location SSID `dumpsys wifi` path is enabled by an ADB `pm grant` of DUMP.
+        // D-130: `dumpsys wifi` path enabled by ADB `pm grant` of DUMP.
         val instruction = manager.dumpGrantInstruction()
         assertTrue(instruction.contains(context.packageName))
         assertTrue(instruction.contains("android.permission.DUMP"))
@@ -72,15 +71,12 @@ class PrivilegeManagerTest {
 
     @Test
     fun shizukuAvailability_notInstalled_whenPackageAbsent() {
-        // No Shizuku manager app installed in the sandbox, and no live binder → NOT_INSTALLED.
         assertEquals(ShizukuAvailability.NOT_INSTALLED, manager.shizukuAvailability())
     }
 
     @Test
     fun shizukuAvailability_installedNotRunning_whenPackagePresentButBinderDead() {
-        // S12.9b G2R-F91: pingBinder() can't tell "not installed" from "installed but not running".
-        // With the manager app installed but no live binder (Robolectric), the state is the latter, so
-        // the UI can prompt "start Shizuku" instead of hiding the path.
+        // S12.9b G2R-F91: pingBinder() can't distinguish not-installed from installed-but-not-running.
         val app = ApplicationProvider.getApplicationContext<android.app.Application>()
         Shadows.shadowOf(app.packageManager).installPackage(
             PackageInfo().apply { packageName = ShizukuGrantGateway.SHIZUKU_PACKAGE },
@@ -90,7 +86,6 @@ class PrivilegeManagerTest {
 
     @Test
     fun adbGrantInstruction_isAlwaysOffered_regardlessOfShizuku() {
-        // The ADB channel is the no-companion-app path and must always be available.
         assertTrue(manager.adbGrantInstruction().isNotBlank())
         assertEquals(ShizukuAvailability.NOT_INSTALLED, manager.shizukuAvailability())
         assertTrue(manager.adbGrantInstruction().contains("WRITE_SECURE_SETTINGS"))

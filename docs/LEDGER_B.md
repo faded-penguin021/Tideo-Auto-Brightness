@@ -8,10 +8,22 @@
 > vectors are ground truth; if an entry conflicts with current code, trust the code and correct the
 > entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
+> **Keep new rows concise and at or below `LEDGER_ROW_CHAR_CAP`** in `amh.conf` — the key is
+> named here and deliberately not restated as a number, because nothing checks this preamble
+> against the config and a copied number goes stale the first time the cap moves. Read it from
+> `amh.conf`; the ladder prints it only on a run that has a new row to check, so it is not a
+> substitute. Counted with `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
+> byte per character and non-ASCII UTF-8 is charged by encoded bytes. Capture the durable lesson,
+> not the whole debugging narrative — the narrative stays in the commit and its PR body (which
+> survive the squash as the merged commit's message) and `docs/history/` is frozen (DB-010). But
+> the SEQUENCE of work does not survive: intermediate states inside a train are destroyed, so
+> anything a later session must be able to look up belongs in the row, not in the history around
+> it. Rows already present at HEAD are historical and exempt.
 >
-> **File cap & rollover.** THIS FILE holds at most **1000 lines**
-> (`LEDGER_LINE_CAP` in `amh.conf` — keep the two in lockstep). The FINAL row may finish past the cap, but no row
-> may ever START past it: when this file stands at more than 1000 lines, create
+> **File cap & rollover.** THIS FILE holds at most `LEDGER_LINE_CAP` lines from `amh.conf`,
+> named rather than restated for the same reason as the row cap above; the ladder prints the
+> live count against it on every run. The FINAL row may finish past the cap, but no row
+> may ever START past it: when this file stands at more than that many lines, create
 > **`LEDGER_C.md`** with this same header discipline and start numbering at **DC-001**.
 > The suffix advances as an odometer over A–Z without limit (`_Z` → `_AA`, `_AZ` → `_BA`,
 > `_ZZ` → `_AAA`). The volumes form a chain walked from `LEDGER.md`; a volume after a missing
@@ -385,7 +397,7 @@
   "is it stated elsewhere?" check and failed a "would a session do the wrong thing?" check. The
   first is the test an author can run; only a fresh reader can run the second.
 
-- DB-019: **An AMH upgrade has three independent version surfaces, and prose authority is not a
+- DB-019 [cited]: **An AMH upgrade has three independent version surfaces, and prose authority is not a
   substitute for the value.** At the 3.0.0 → 4.1.0 upgrade, `amh.conf` correctly named 3.0.0 and
   `docs/STATE.md` agreed, but the constitution only said that `amh.conf` was authoritative; it did
   not record a numeric version despite the upstream upgrade contract requiring one. The scripts
@@ -394,6 +406,8 @@
   version line, and STATE's working record. The release-template key diff is a separate required
   check: it exposed the deliberately unset `LEDGER_ROW_CHAR_CAP`, which remains on the shipped
   script's 2000-byte default rather than pretending every declared key was locally configured.
+  **Correction pointer (DB-022):** the same upgrade commit also removed three `[cited]` markers
+  this row does not mention; the version pair is now anchored in `scripts/guards/doc-facts.sh`.
 
 - DB-020: **The owner set `LEDGER_ROW_CHAR_CAP=750`, superseding DB-019's use of the shipped
   2000-byte default.** The smaller bound is deliberate: a ledger row should preserve one durable
@@ -407,3 +421,374 @@
   closed on unknown paths. Rename folding is disabled so both endpoints are classified. Prose only:
   if the build later consumes a known non-shipping path, reclassify it in the introducing PR.
   `[cited]`: `.github/workflows/release-preflight.yml`.
+
+- DB-022 [cited]: **When a guard stops seeing a true fact, change the fact's spelling, never the
+  record.** AMH 4.0.0 matches citations with `grep -w`, so the bare-suffixed form 25 comments
+  used for a lettered sub-item stopped resolving. Three of the ten parent rows were cited ONLY
+  that way, went stale, and upgrade commit `3949383` dropped their `[cited]` markers — deleting
+  the warning the marker exists to give, while code still depended on the rows. The other seven
+  survived only because a bare cite sat elsewhere. Sub-items are now `D-042(c)`, matched as a
+  whole word. `doc-facts.sh` fails the suffixed form, which no shipped rung can see. Supersedes
+  that commit's removal; DB-019 does not record it.
+
+- DB-023: **A repo-local guard's exit code became an interface, and the safe default is still to
+  fail closed.** AMH 4.2.0 gives `scripts/guards/*.sh` three verdicts: 0 passes, 2 with merged
+  output starting `WARN ` warns without turning the ladder red, anything else fails. The marker
+  is required because bash exits 2 on a syntax error and `grep`/`diff` on trouble, so an unmarked
+  2 stays a failure rather than a downgraded opinion. Reclassification is mechanical —
+  exit code plus prefix, never intent — so the upgrade check is `grep -rn 'exit 2' scripts/guards/`;
+  ours matched nothing and no verdict moved. All four stay fail-closed: the warn tier is for a rule
+  with unenumerated legitimate exceptions, and none of ours has any.
+
+- DB-024: **An explicitly set `amh.conf` key is what turns an upstream default change into a
+  no-op.** AMH 5.0.0 dropped the shipped `LEDGER_ROW_CHAR_CAP` default 2000 → 800 and called it a
+  MAJOR; this repo absorbed it without an edit because DB-020 had already set 750 explicitly.
+  Upgrade cost lands on keys left UNSET: `ladder.sh` assigns its defaults first and sources
+  `amh.conf` after, so an omitted key silently tracks upstream. The 5.1.0 corollary: prose
+  restating a configured number is a second, unchecked copy — nothing compares preamble text to
+  `amh.conf`. The STATE and live-ledger preambles now name the key and let the ladder print the
+  live value, removing the lockstep obligation instead of restating it.
+
+- DB-025 [cited]: **Deleting a lockstep obligation is only safe once the copies are actually gone.** The
+  5.1.0 prose change removed "keep in lockstep" from `amh.conf` and the ledger header and asserted
+  no prose copy of `LEDGER_LINE_CAP` remained — while `1000` still stood twice in the RUNBOOK and
+  in HARNESS_LOCAL. Nothing scans docs, so this traded a tripwire for a false all-clear: the next
+  session to move the cap would be told there was nothing else to update. De-numbering the copies
+  is what makes the claim true; where one copy must survive (HARNESS_LOCAL records what we set
+  versus stock), name it as the surviving one rather than denying it exists.
+
+- DB-026: **The STATE landing check fires on the CROSSING, not on the size of the edit.** Any edit
+  taking the file from above `STATE_WARN_KB` to at or below it must reach `STATE_COMPRESS_TO_KB`
+  — a five-byte typo fix at 14340 bytes hard-fails, and `STATE_EDIT_DELTA_BYTES` does not apply
+  because that branch is only reached while still above the cap. The escape is to fold more, never
+  to pad the file back up. Inverse trap: `ladder.sh` gates the whole check on the file at HEAD
+  exceeding the cap, so a pass that STARTS below it is never landing-checked and can stop short in
+  silence — as this upgrade's first pass did, at 9438 bytes against a 9216-byte floor.
+
+- DB-027: **A completeness claim about a guard is a drift class; scope it to named functions.**
+  AMH 5.2.0 closed the STATE preamble's list of machine-checked properties: a list that stops
+  without saying it is complete leaves every prose rule after it reading in the same enforced
+  voice — the shape of DB-026, where a sub-cap pass stopped short and nothing said so. Ours also
+  omitted a check it always had (repeated `##` headings). The closure is a claim about
+  `guard_state_size` and `guard_state_structure`, not a timeless "and nothing else": the script
+  upgrades independently of a seed we own forever and nothing compares the two, so the sentence
+  goes stale the first time upstream adds a rung. Named functions make that findable.
+
+- DB-028 [cited]: **A convention with no mechanical layer drifts until it inverts its own rule.**
+  `AGENTS.md` put durable prose in the `.md` tier with a `D-NNN` pointer in the code, and nothing
+  checked it: the tree reached 7620 comment lines against 40651 of Kotlin (18.7%), much of it
+  re-telling a ledger row verbatim — two copies of one lesson, the code copy the one nobody
+  updates. Conventions had by then decayed to "match its comment density", instructing each
+  session to reproduce the bloat it found. Fixed by `comment-budget.sh`: a 12-line cap on any
+  contiguous comment block plus a per-module line budget, failing closed. The cap is the
+  load-bearing half — narrative does not fit in 12 lines, so it must go to the `.md`.
+
+- DB-029 [cited]: **A guard that counts a population protects no member of it.** `comment-budget.sh`
+  floored `// Tasker` provenance at a tree-wide `grep -c` of 68 and claimed that defended the 33
+  files carrying markers. It defended none: delete a marker from one algorithm, add one anywhere
+  else, and the total is unchanged — the shape of a maintenance change that splits a ported path.
+  A count also cannot name what left. Fixed by making the unit a RECORD
+  keyed on file plus the Tasker source coordinates cited. Pin the load-bearing part and no more:
+  keying on marker TEXT would have gone red on 22 markers this branch legitimately reworded, and a
+  rule firing on every honest edit is regenerated by reflex until it means nothing.
+
+- DB-030: **A ceiling with no headroom makes deletion the only repair.** The comment budgets were
+  set to the measured tree, leaving `:platform` 9 lines — so a new adapter with ten lines of honest
+  KDoc could not land without deleting unrelated documentation, and the guard would drive out what
+  it wanted kept. Worse, the failure text said the fix was "NOT to raise the number" while the
+  guard's header and `HARNESS_LOCAL.md` both called that the intended reviewable adjustment. A
+  diagnostic that forbids what the documentation permits teaches the reader one of the two is lying
+  and they stop checking either. **A guard's remedy text is legislation, and drifts like any other
+  prose copy.**
+
+- DB-031: **A record format is an interface, and whitespace is what it loses.** The comment scanner
+  emitted `COUNT <file> <n> <m>` and every consumer read `$2` as the path and `$3` as a number, so
+  one tracked `Parser Fixtures.kt` would shift every field — the module sum scoring the file as
+  zero, the block diagnostic printing a filename fragment where the line number belonged. The
+  file-list handoff was already whitespace-safe; the guard's own output protocol threw it away.
+  Fixed by putting the numeric fields first and the **path last**, so each consumer takes a fixed
+  count of leading fields and treats the remainder as the path.
+
+- DB-032: **A floor keyed more tightly than its own contract fires on honest edits, and its escape
+  hatch then erases it.** The provenance manifest keyed each record on a marker's whole
+  coordinate SET with multiplicity, while the guard, `AGENTS.md` and its failure text all promised
+  "only DROPPING a reference fails". Two edits that drop nothing failed: enriching a marker
+  (`task543` → `task543 act7` destroys the key) and merging two markers citing the same
+  coordinates — both edits this guard's own cap and budget push you toward. The documented remedy,
+  regenerate, re-baselines all records at once and ratifies whatever else went missing. Fix: one
+  record per (file, coordinate); key a floor at the granularity its prose promises.
+
+- DB-033: **An input a guard cannot parse must fail, not be skipped — including its own constant.**
+  The manifest check dropped any line not matching three tab-separated fields, so the cheapest
+  bypass in the guard was a whitespace-only diff: delete a marker, convert that one manifest line's
+  tabs to spaces, and it printed "all N record(s) intact" and exited 0 with N quietly one lower.
+  Reachable by accident (any heredoc re-indent) and invisible to the fixtures, since a manifest
+  parsing to zero records satisfies every case vacuously. The guard already applied the opposite
+  doctrine to tracked files and simply did not apply it to its own data.
+
+- DB-034 [cited]: **A read method with no caller is a claim the UI is quietly making instead.**
+  Privileged Display rendered all seven toggles from the stored profile while the matching
+  `SecureDisplayController.read*` methods sat unused, so a Night Light flipped from the system tile
+  left the screen asserting the opposite — and the only-on-change diff never corrected it, its
+  desired state having never moved. Tasker's `_ShowPrivilegedScene` re-reads every key on open;
+  restored here, screen-only. Two fields stay app-owned: the circadian flag has no Android
+  counterpart, and while it is on the ticker owns the temperature key, so a read-back would freeze
+  one ramp sample as static. `[cited]`: `AabSettings.withDeviceSnapshot`.
+
+- DB-035 [cited]: **A gate downstream of the work it authorises is not a gate.** Four `ControlReceiver`
+  drops now say why at debug level 8 — the gate-off case above all, the first-run mistake. Glue review
+  caught the level being read INSIDE the sink, after `flashDrop` had already read the settings store
+  and built a sink per rejected broadcast, while the comment claimed the default config was untouched;
+  the check moved ahead of the work. It also caught `LOAD_PROFILE`'s caller-chosen name reaching the
+  system-wide overlay unbounded — now 40 chars, control/bidi stripped. Unknown actions and in-flight
+  rejections stay silent: both precede DA-043's admission gate. `[cited]`: `ControlReceiver.flashDrop`.
+
+- DB-036: **Awaiting one async projection proves nothing about a second derived from it.**
+  `DraftSettingsViewModelTest` polled the DataStore until Apply's clamped value landed, then asserted
+  `dirty` was false — but `dirty` compares the draft against the VM's own `committed` StateFlow,
+  which its collector updates strictly after the store. The store reaching 65 says nothing about the
+  collector having seen it, so the assertion raced and failed on ~2 of 3 runs under container load
+  while passing on a warm machine. Discovered as a red ladder on an unrelated unit; it was never
+  this session's change. Fix: poll the VM's own state before asserting on it, not the store's.
+
+- DB-037 [cited]: **A confirmation emitted before the work it confirms can outlive it.** Panic's
+  S.O.S. sat in the two gesture collectors, so the control intent and notification Reset recovered
+  the device in silence. Sharing it via `panicAndStop` was the easy half; glue review found the rest.
+  Vibrating FIRST (Tasker A6 order) let a sibling DISABLE cancel the coroutine mid-`emergencyStop`,
+  leaving the user buzzed but never restored — it now follows the restore. The counter incremented
+  before the vibrator null-check, so deleting the `vibrate()` call kept the test green. And nothing
+  guarded re-entry: a double-tapped Reset ran the recovery twice. `[cited]`: `panicInFlight`.
+
+- DB-038 [cited]: **A pin is a snapshot; without a refresh path it decays into a claim nobody rechecks.**
+  Scorecard (v5.5.0, local) scored Pinned-Dependencies 0 — every action floated on a major tag, so a
+  moved tag silently changes what runs. All 39 call sites now pin the commit each `@vN` already
+  resolved to, annotated with its semver: immutability without an upgrade. The companion half makes
+  it survive — github-actions updates are on in Dependabot, amending D-135's scope, not reversing
+  it: no-speculative-bumps reasoned about gradle constraints; an action SHA is a different object.
+  Also Token-Permissions 0: top-level `contents: write` moved to job scope.
+  `[cited]`: `.github/dependabot.yml`, `build.yml` Node-24 header.
+
+- DB-039 [cited]: **A guard the guarded action invalidates fires exactly once.** The Privileged
+  Display read-back (DB-034) merged only while the draft matched the stored profile — but the merge
+  writes device values INTO the draft, breaking its own precondition and refusing every later
+  snapshot. The screen tracked the device once per entry, then froze: the staleness DB-034 existed
+  to end, found by the owner. `dirty` conflated "the user has uncommitted edits" with "the draft
+  differs from the profile"; only the first may block a re-merge, so the policy now compares against
+  the draft it last produced. The gate had no test at any level — the suites covered the snapshot
+  and the merge on either side. `[cited]`: `readBackDraft`.
+
+- DB-040 [cited]: **Fixing a state machine from the outside gets it wrong twice.** DB-039 moved the
+  read-back's gate off `dirty` but left three holes review found: whole-object equality read the
+  collector's background writes of `serviceEnabled`/`debugLevel` as user edits and froze tracking;
+  keying the effect on the snapshot alone never re-ran when the gate RE-opened, so Discard left the
+  screen stale as before; and the pre-seed draft is `AabSettings()` with `committed` defaulting to
+  it too, so the gate stood open on empty state and a merge could overwrite the profile. Fixed by
+  scoping equality to the owned fields, making read-and-write one `update`, and refusing before the
+  seed. `[cited]`: `mergeDeviceReadBack`.
+
+- DB-041 [cited]: **A backing Android Settings key does not establish feature support.** A real
+  black-screen failure followed a Night Display write on an OEM whose framework reports it
+  unavailable. The controller now fails closed on `config_nightDisplayAvailable` and
+  `config_dozeAlwaysOnDisplayAvailable`; unsupported writes are harmless no-ops across profiles,
+  circadian ticks, Apply and panic, and UI controls hide. Force SDR is disabled: AOSP
+  `DisplayManagerService` updates in-memory state/logical displays inside its binder methods but
+  does not observe these Global rows, so direct Settings writes cannot establish a live effect.
+
+- DB-042 [cited]: **A safe read default can still erase an unsupported hidden field.** Capability-
+  gated reads returned `false` for Night Light/AOD; device read-back then copied those defaults into
+  the draft. Opening Privileged Display on an unsupported device and applying an unrelated visible
+  edit silently cleared the profile values. Snapshot booleans are now nullable capability sentinels,
+  so read-back preserves unavailable fields. The same review also restored authorization-before-
+  capability ordering: every setter rejects below ELEVATED before an unsupported no-op/failure.
+
+- DB-043 [cited]: **A component-backed capability is the conjunction, not its headline flag.**
+  DB-041 correctly requires framework capability gates but overclaimed that the reported failure's
+  OEM flag was known; only the direct Night Display write and failure were observed. Night Light
+  follows `config_nightDisplayAvailable`. AOD additionally requires a non-empty
+  `config_dozeComponent`, matching AOSP ambient-display availability while deliberately ignoring
+  its debug-property escape hatch. Missing/unreadable resources fail closed; pure lookup tests pin
+  the exact names and the AOD truth table.
+
+- DB-044 [cited]: **A non-live preference control must name what it is, not the service operation it
+  resembles.** Owner decision supersedes DB-041's temporary Force-SDR removal: Android-14+
+  `user_disabled_hdr_formats` control remains, renamed **Disable HDR (experimental)**. It does not
+  invoke DisplayManager's Force-SDR conversion API; apply or clear may require reboot, and an
+  HDR/display-mode transition may briefly blank the screen. This is correctness/expectation risk,
+  not evidence of Night Light's observed catastrophic failure. Migrate if a safe, non-hidden live
+  DisplayManager API becomes available.
+
+- DB-045 [cited]: **A Boolean editor must not normalize a state it cannot represent.** HDR read-back
+  treated any enforced nonblank format list as “all HDR disabled”; direct Apply could then broaden a
+  partial/malformed external preference to `1,2,3,4` while saving an unrelated field. Only canonical
+  off (allowed + blank) and canonical all-disabled (the complete set, order/whitespace/duplicates
+  ignored) now map to Boolean; other rows map to null and direct Apply preserves them. Explicit
+  profile transitions and panic remain intentional writes. UI replaces the switch with a custom-
+  preference preservation notice while the row is unrepresentable.
+
+- DB-046 [cited]: **A test for a canonical state must create that state.** The HDR round-trip test
+  assumed missing Global rows meant OFF, while DB-045 deliberately classifies missing/malformed rows
+  as unrepresentable null. It passed only when another test leaked canonical OFF into shared
+  Robolectric Settings and failed in CI's order. The test now seeds flag `1` plus a blank list before
+  asserting OFF; production semantics stay unchanged.
+
+- DB-047 [cited]: **After a direct write, stale read-back is an active rollback of visible state.**
+  Night Light wrote ON, then Compose immediately showed OFF: `applyNow` retained its pre-write
+  snapshot, and Apply reopened the merge gate so stale OFF replaced the committed ON draft. Direct
+  Apply now invalidates synchronously before its coroutine can yield; ordered operations plus
+  request generations stop older completions republishing stale truth. The same device pass
+  showed that overlay bounding worked but stripping did not: `forFlash` substituted U+FFFD and
+  truncated before sanitizing. It now removes controls/bidi before the 40-character bound.
+  `[cited]`: `DisplayTogglesViewModel.applyNow`, `ControlReceiver.forFlash`.
+
+- DB-048 [cited]: **Fixing one caller of a shared staleness bug leaves the other caller broken.**
+  DB-047 stopped the pre-Apply snapshot rolling the draft back, but only on D-152's service-OFF
+  path: invalidation lived inside `applyNow`, which the screen skips while the service runs. The
+  coordinator path kept publishing the pre-Apply read-back, and Apply reopened the merge gate by
+  making the draft equal the profile again, so the toggle flipped back as first reported. Both
+  halves now go through `applyDraft`; the coordinator path re-reads on resume, since a read
+  scheduled now would race its write. The capability test hid the same shape: its fake owned the
+  gate it asserted. `[cited]`: `DisplayTogglesViewModel.applyDraft`.
+
+- DB-049 [cited]: **An absent row is a defined default, not a custom preference to preserve.**
+  DB-045 classified every non-canonical HDR row as unrepresentable and DB-046 confirmed absent rows
+  land there, seeding the fixture rather than asking what absent means. But the Global rows do not
+  exist until something writes them — every stock Android 14+ device — so the control the owner
+  retained in DB-044 was hidden behind a notice claiming a custom preference the device did not
+  have, and only devices an older Tideo had written showed the switch. The flag now reads with
+  AOSP's documented default of 1; a real disable list still refuses to guess.
+  `[cited]`: `AndroidSecureDisplayController.readHdrForceSdr`.
+
+- DB-050 [cited]: **A teardown every test uses as cleanup is a teardown no test asserts.** A shake
+  fired panic after an intent PANIC had stopped the service; the in-app case rests on `awaitClose`
+  releasing the accelerometer, which nothing checked — every `PanicSensorSourceTest` case ended
+  `job.cancel()` and asserted nothing after, so a leak was invisible at the layer that owns it.
+  Pinned, and it holds: cancel releases both listeners and the receiver, and SCREEN_ON cannot
+  re-arm. With `panicInFlight` per-INSTANCE making a repeat silent, a buzz proves a second
+  instance — D-128's co-installed variant, not this code.
+  `[cited]`: `PanicSensorSourceTest.cancellingTheCollector_releasesTheSensorAndTheGestureStopsFiring`.
+
+- DB-051 [cited]: **A number formatted for humans and parsed as data must not ask the locale.**
+  The circadian lat/lon field rendered with `"%.5f".format(v)` (default locale) and parsed with
+  `toDoubleOrNull()` (dot only), so in any comma-decimal locale the field showed `52,37021`, Set
+  parsed null, its `lat != null && lon != null` guard skipped the write entirely, and the
+  no-location banner never cleared — manual, device-fix and geo-IP alike, since all three land in
+  that field. Owner-reported, present since it shipped. Format is now `Locale.US`; parse
+  normalises `,`; the filter admits `,` instead of deleting it, which had turned a typed `52,37`
+  into latitude `5237`. `[cited]`: `formatCoord`, `parseCoord`.
+
+- DB-052 [cited]: **A test that hopes for a race condition is a test that reports the weather.**
+  `readBack_isRefusedBeforeTheSeed` asserted the pre-seed refusal while doing nothing to hold the
+  seed off: `viewModelScope` is `Main.immediate`, so on the test thread the init collector can run
+  inline and finish seeding before the merge call, depending on whether DataStore answers from its
+  in-memory cache. It failed 2 runs in 3 under container load and passed warm — DB-036's lesson one
+  file over, with the precondition asserted in a comment. Now
+  `Dispatchers.setMain(StandardTestDispatcher())` holds the collector until the test advances it,
+  and `epoch == 0` pins the state under test. `[cited]`: `awaitVmOn`.
+
+- DB-053 [cited]: **A replacement that drops a fallback is a regression wearing a feature's clothes.**
+  D-122 moved "Use current location" to the active `activeFix()`, but that path lists only GPS and
+  NETWORK and gave up before registering anything when both report disabled, where the path it
+  replaced still fell back to PASSIVE. Owner saw both shapes on device:
+  DB-051's refused write AND a genuine "Couldn't acquire a location". PASSIVE restored as the last
+  resort. **`LocationManager.FUSED_PROVIDER` declined by the owner** — an AOSP constant, not the GMS
+  client, so no dependency, but this ships on F-Droid to de-Googled devices where the platform fused
+  provider is often absent. `[cited]`: `AndroidLocationReader.activeFix`.
+
+- DB-054 [cited]: **A location acquired in the UI was thrown away, so the app kept saying it had
+  none.** "Use current location" wrote only the fixed override, never the D-103 `cachedSunLocation`
+  the runtime populates — so clearing the coordinates to pin a date, or tapping Use live data, fell
+  straight back to "no location yet" seconds after a successful fix, and the sun maths lost it too.
+  Owner found it pinning 21 Dec. An acquired fix now goes to that cache — what the runtime would
+  have written for the day anyway. Typed coordinates deliberately do NOT: those name a place the
+  user asks about, not where the device is, and caching them would relocate the live curve.
+  `[cited]`: `CircadianExtrasViewModel.cacheAndPair`.
+
+- DB-055 [cited]: **A timeout sized for a warm fix fails intermittently on the devices this app
+  targets.** "Use current location" failing "a few times before it works" was never a latch — the
+  owner measured the successful case at ~15 s with the indicator lit, against a 20 s budget, so a
+  colder attempt fell out of the window and the force-stop that seemed to fix it was coincidence.
+  GPS-only hardware is the normal case here: a de-Googled phone has no network-location provider,
+  so the fast answer that makes 20 s look sufficient does not exist. Raised to 45 s; the last-known
+  backup and opt-in geo-IP fallback still run after it.
+  `[cited]`: `LocationReader.ACTIVE_FIX_TIMEOUT_MS`.
+
+- DB-056 [cited]: **A guard that reads tracked files cannot see the file you just wrote.** A new test file
+  was still untracked when `scripts/ladder.sh` went green, so `comment-budget.sh` — which gathers
+  through `git ls-files` — scored the tree without it. `git add` then made its four comment lines
+  count, and CI failed on the push that green run had authorised. Not flakiness and not
+  environment: the local run was answering a different question. Stage before verifying. AGENTS.md
+  claimed red-in-CI with green-locally "can only mean environment"; corrected in the same change,
+  since that sentence is what stops the next reader suspecting their own index.
+
+- DB-057 [cited]: **Raising a timeout without saying so turns a fast failure into a silent hang.**
+  DB-055's 45 s budget made "Use current location" with Location switched OFF a 45-second wait
+  ending in a generic failure — the owner tried it deliberately and there was nothing to say the
+  master switch was the problem. Two halves: `activeFix` now returns immediately when
+  `isLocationEnabled` is false (nothing can deliver, so the window is pure wait; DB-053's PASSIVE
+  path still runs whenever services are on), and the toast names the wait, reading its number from
+  `ACTIVE_FIX_TIMEOUT_MS` so the promise cannot drift from the budget.
+  `[cited]`: `LocationReader.locationServicesEnabled`.
+
+- DB-058 [cited]: **A cancelled coroutine is not a failed one, and `runCatching` cannot tell.**
+  "Use current location" wrapped the acquisition in `runCatching { }.getOrNull()`, which catches
+  `CancellationException` too: leaving the screen mid-fix cancels the `rememberCoroutineScope`
+  launch, and the handler toasted "Couldn't acquire a location" - word for word what a real 45 s
+  timeout says. One message for two causes makes a device report unreadable, on the path under
+  investigation for the force-stop defect. Rethrown; sibling
+  `CircadianWindowProvider.cancellableOrNull` already held it. NOT the force-stop mechanism:
+  cancellation ends the wait early; the owner timed the full budget.
+  `[cited]`: `acquireCurrentLocation`.
+
+- DB-059 [cited]: **Accuracy the feature cannot use is latency the user pays for.** Three stationary
+  retries returned 44 s, 23 s, 4 s — closing the force-stop question as cold-GNSS warm-up, no app
+  defect. The owner's read of that curve was the real finding: sun times shift by seconds over
+  kilometres, so holding out for GNSS buys nothing a circadian curve can spend. The circadian button
+  now takes any last-known fix under an hour old and skips acquisition. This narrows D-122 rather
+  than reverting it — that refused a silent cache of unknown age, and the bound is the difference.
+  Contexts' geofence caller is untouched; a radius does need the real thing.
+  `[cited]`: `LocationReader.lastKnownWithin`.
+
+- DB-060 [cited]: **Adding a format specifier to a string edits every call site, and the compiler
+  is not told.** DB-057 gave `toast_acquiring_location` a `%1$d` and updated the circadian caller;
+  the Contexts one kept toasting it bare, and `Toaster`'s VARARG `getString(resId, *formatArgs)`
+  formats even on an empty array — so it threw against a tagged release that did not. No layer could
+  see it: not Kotlin, not tests that discard the args, not a round that never pressed the button.
+  Three review rounds, three wrong guards: single-arg `getString` does not format, and the rewrite
+  that stopped scanning it missed both shapes that DO crash.
+  `[cited]`: `scripts/guards/format-args.sh`; only as wide as its resolvers.
+
+- DB-061 [cited]: **DB-051's fix went one screen deep, not one defect deep.** The Contexts rule
+  editor carried the identical mismatched pair — default-locale `"%.5f".format` in, dot-only
+  `toDoubleOrNull` out — but here the null dropped the WHOLE location trigger, not one coordinate:
+  the rule reopened with the toggle off and nothing to re-show, which reads as a storage bug
+  rather than a parse one. `git show v1.8.2:` has the same three lines, so pre-existing, not a
+  train regression. The pair now lives once in `ui/components/Coordinates.kt`; the save path became
+  a unit-testable `locationTriggerOf`. The list said "near location" for every rule and now names
+  the circle. `[cited]`: `locationTriggerOf`, `Coordinates.kt`.
+
+- DB-062 [cited]: **A tool that hides the change while it makes it costs review, even when it
+  works.** Owner objection to `python3 - <<EOF` edits: `Write`/`Edit` render a diff as the edit
+  happens, an interpreter heredoc shows a blob going in and nothing coming out, so whether it did
+  what it claimed is knowable only by reading the file back. Made an ADVISORY, not a ban — scripted
+  bulk edits are legitimate, so it blocks the session's first inline-Python write and passes the
+  rest, the mechanism the shipped guard already uses for dotenv reads. It could not go IN that
+  guard: shipped scripts are integrity-hashed, so it is a second `PreToolUse` hook beside it.
+  `[cited]`: `scripts/guards/python-edit.sh`, `.claude/settings.json`.
+
+- DB-063 [cited]: **A guard reviewed only by its author catches the shape its author imagined.**
+  DA-005 on DB-062, five of seven confirmed by running. Blind to `/usr/bin/python3 -c` and
+  `python3 -u -c` — the boundary class excluded `/`, and `-c` had to be adjacent — so it caught the
+  textbook form and nothing a session types. Worse, its greedy JSON capture ran past the command
+  into the sibling `description`, so a description merely MENTIONING Python blocked `git status` —
+  the false-positive shape that gets a rail deleted. Also: a marker with no session component, ops
+  whose remedy no harness tool offers, an empty override disarming it.
+  `[cited]`: `scripts/guards/python-edit.sh`.
+
+- DB-064 [cited]: **The commit that fixes a review is itself unreviewed legislation.** DA-005 on
+  DB-063's fixes found six more. It stripped `+x` from `local-guards.sh` — a mode is in no diff
+  hunk, `verify.sh` runs it via `bash` so CI stayed green, and only the bare spelling
+  `.claude/settings.json` pre-allows broke (rc=126). It re-asserted the per-SESSION claim the rest
+  of the commit corrected, in `AGENTS.md`, the most binding layer. `copy` being a prefix of
+  `copyfile`, the narrowed matcher silently dropped `shutil.copy(`/`copy2(`. The escaped-quote
+  fixture was Python-free — green against an extractor returning nothing.
+  `[cited]`: `scripts/guards/python-edit.sh`, `scripts/tests/local-guards.sh`.

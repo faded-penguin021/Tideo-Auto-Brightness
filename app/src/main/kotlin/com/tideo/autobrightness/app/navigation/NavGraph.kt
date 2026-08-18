@@ -24,12 +24,7 @@ import com.tideo.autobrightness.app.ui.screens.ToolsScreen
 import com.tideo.autobrightness.app.ui.screens.UserGuideScreen
 import com.tideo.autobrightness.platform.privilege.Tier
 
-/**
- * The navigation shell over the [AppRoute] target screen set. S12.6a makes [AppRoute.Menu] the home
- * hub and the start destination after onboarding; every other screen is reached from it and returns
- * to it (see [navigateTopLevel]). First-run routing sends the user to Onboarding when tier == NONE.
- * S13d filled the last destinations (About + User Guide); no placeholder screens remain.
- */
+/** Navigation shell: Menu hub (S12.6a), onboarding when tier == NONE. */
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
@@ -64,12 +59,7 @@ fun AppNavGraph(
     }
 }
 
-/**
- * Navigate to a top-level destination from the Menu hub (or the Dashboard's quick links), always
- * rooting the back stack at [AppRoute.Menu] so a back press from any settings/tool screen returns to
- * the Menu, never the Dashboard (S12.6a owner decision 1, G2R-F1). `launchSingleTop` avoids stacking
- * duplicates when re-selecting the current destination.
- */
+/** Top-level nav to Menu hub (S12.6a, G2R-F1). */
 fun NavHostController.navigateTopLevel(route: AppRoute) {
     navigate(route.route) {
         popUpTo(AppRoute.Menu.route) { inclusive = false }
@@ -77,13 +67,7 @@ fun NavHostController.navigateTopLevel(route: AppRoute) {
     }
 }
 
-/**
- * Finish onboarding (G2R-F57 + S13d/G2R-F80): drop Onboarding from the back stack (`popUpTo …
- * inclusive`) and land on the **User Guide** (the post-onboarding first-run destination) with the
- * [AppRoute.Menu] hub seeded beneath it. So the Guide's "Got it" / back returns to the Menu, and a
- * Back from the Menu then exits the app rather than returning to a half-finished setup. After first
- * run the app starts directly on the Menu (tier != NONE), so the Guide is shown only this once.
- */
+/** Finish onboarding → User Guide (G2R-F57, G2R-F80). */
 fun NavHostController.completeOnboarding() {
     navigate(AppRoute.Menu.route) {
         popUpTo(AppRoute.Onboarding.route) { inclusive = true }
@@ -92,7 +76,6 @@ fun NavHostController.completeOnboarding() {
     navigate(AppRoute.UserGuide.route) { launchSingleTop = true }
 }
 
-/** Start on Onboarding when tier == NONE (no brightness-write access), else the Menu hub. */
 @Composable
 private fun rememberStartDestination(): String {
     val context = LocalContext.current

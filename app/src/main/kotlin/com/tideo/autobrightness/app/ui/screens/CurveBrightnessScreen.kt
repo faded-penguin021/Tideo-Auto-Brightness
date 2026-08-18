@@ -40,9 +40,8 @@ import com.tideo.autobrightness.domain.wizard.OverridePoint
 internal fun List<FieldError>.forField(name: String): String? = firstOrNull { it.field == name }?.message
 
 /**
- * Curve & Brightness (Tasker AAB Brightness Settings scene, banner "General"). Edits the curve-zone
- * coefficients against a **draft** that the graph previews live; **Apply** commits + re-runs the
- * pipeline (S12.5b). Brightness range (min/max/offset/scale) moved to the Misc screen (G2-F2).
+ * Curve & Brightness screen: edit curve-zone coefficients with live graph preview.
+ * Apply commits and re-runs pipeline (S12.5b).
  */
 @Composable
 fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
@@ -56,15 +55,10 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = com.tideo.autobrightness.app.ui.components.rememberToaster()
 
-    // D-169: the Curve screen does NOT auto-raise MaxBright — like Tasker's curve scene it only reddens
-    // form3A (the ErrorBanner below). The MaxBright auto-raise + "adjusted to N" flash is Misc-only
-    // (Tasker _SaveButtonMisc), so no maxBrightnessRaised collector here.
+    // D-169: no MaxBright auto-raise on this screen (Misc-only, per Tasker parity).
 
-    // D-125: a wizard suggestion reaches this screen ONLY when the user ran the Tools wizard and tapped
-    // "Preview graph" — it is applied to this VM's draft during its initial seed (see
-    // DraftSettingsViewModel / CurveSuggestionPreview), so the fields show the suggested values with the
-    // current values in [brackets] and the live "Curve" traces the fit. Leaving discards the draft, so
-    // the line disappears on close. There is deliberately NO auto-fit at ≥ 9 override points anymore.
+    // D-125: wizard suggestion only shown after "Preview graph" in the Tools wizard.
+    // Seeded to this VM's draft with current values in [brackets]. Leaving discards the draft.
     CurveBrightnessContent(
         draft, committed, errors, epoch, dirty,
         onEdit = vm::edit, onApply = vm::apply, onDiscard = vm::discard,
@@ -87,18 +81,7 @@ fun CurveBrightnessScreen(navController: NavHostController, vm: DraftSettingsVie
     )
 }
 
-/**
- * task38 needs ≥ 9 **real, user-recorded** override points before it fits/suggests a curve. This is
- * the user-facing gate on the **Tools wizard** (G2R-F62): the domain engine has its own post-
- * ghost-injection ≥9 check, but ghost/synthetic priors must NOT count toward the gate the user sees —
- * the owner ran the wizard on just 7 real points and it still fired. [OverridePointStore] only holds
- * real points, so gating on its size is correct.
- *
- * D-125: this gates only the *wizard run*, never an auto-preview. The Curve & Brightness screen no
- * longer fits/draws a suggested curve just because ≥ 9 points exist — a suggestion appears there only
- * after the user runs the wizard and taps "Preview graph" (see
- * [com.tideo.autobrightness.app.state.CurveSuggestionPreview]).
- */
+// task38 curve fit gate (D-125): ≥9 real, user-recorded override points for wizard suggestion.
 internal const val MIN_FIT_POINTS = 9
 
 @Composable
@@ -121,19 +104,13 @@ fun CurveBrightnessContent(
     DraftSettingsScaffold(stringResource(R.string.title_curve_brightness), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             val curveConfig = draft.toBrightnessCurveConfig()
-            // D-125 / Tasker parity (task663 `ref_data`): the dashed gold reference is the HARDCODED
-            // baseline curve — the AabSettings defaults, i.e. 5·√lux; 29.58 + 8.8·(…); 255 − (2513/lux)·255
-            // — NOT the committed snapshot (corrects F69). So a previewed suggestion (or any edit) shows
-            // against the fixed reference, exactly like the Tasker graph: the live "Curve" (`new_data`,
-            // suggested/current) vs the hardcoded `ref_data`. It never moves with the draft or committed.
+            // D-125 / Tasker parity: dashed gold reference is hardcoded baseline (AabSettings defaults),
+            // not the committed snapshot. Never moves with draft or committed.
             val referenceConfig = remember { AabSettings().toBrightnessCurveConfig() }
-            // Gate-2(5th) obs: a 0-lux override (which can happen) would plot at/below the log x-axis
-            // floor (0.1) and be invisible/un-tappable — clamp the DISPLAYED lux up to 0.1 so it draws
-            // at the left edge. The recorded value is untouched (deletion matches against the original).
+            // Gate-2(5th) obs: clamp displayed lux to 0.1 for visibility; recorded value untouched.
             val overlay = remember(overridePoints) {
                 overridePoints.map { Offset(it.lux.toFloat().coerceAtLeast(0.1f), it.brightness.toFloat()) }
             }
-            // F36: tapping a recorded override dot raises a confirm dialog before deleting it.
             var pendingDelete by remember { mutableStateOf<OverridePoint?>(null) }
             BrightnessCurveChart(
                 curveConfig,
@@ -175,11 +152,8 @@ fun CurveBrightnessContent(
             // current smoothed lux + current brightness within the active min–max range.
             CurveBrightnessDiagnosticCardContent(live, committed.minBrightness, committed.maxBrightness)
 
-            // Labels + verbatim long-press help re-derived from extraction/scenes/brightness_settings.md
-            // (S12.6e, G2R-F19/F21). Tasker labels: "Zone 1 Scaling" (form1A), "Zone 2 Scaling" (form2B),
-            // "Zone 2 Offset" (form2C); zone-end fields keep the lux annotation.
-            // S13c restyle (m3_audit §3 row 3): the bare field stack is grouped into an `AabCard`; the
-            // derived continuity readout becomes a distinct gold `KeyValueRow` data-pop card (§4 B4).
+            // Labels from extraction/scenes/brightness_settings.md (S12.6e, G2R-F19/F21).
+            // S13c restyle: fields grouped in AabCard; continuity readout in separate gold KeyValueRow (m3_audit §3/4).
             AabCard {
                 SectionHeader(stringResource(R.string.curve_zones_header), divider = true)
                 NumberSettingField(
@@ -209,8 +183,7 @@ fun CurveBrightnessContent(
                 )
             }
 
-            // task659 live-derived continuity coefficients (task613/614/615 _UpdateBrightnessFormulae).
-            // G2R-F61: labelled as the zone-alignment hinge points (not bare "form2A/form3A" placeholders).
+            // task659 continuity coefficients (task613/614/615 _UpdateBrightnessFormulae), labeled as zone-alignment hinges (G2R-F61).
             AabCard {
                 SectionHeader(stringResource(R.string.curve_derived_header), divider = true)
                 val coeffs = draft.derivedCoefficients()
@@ -225,13 +198,9 @@ fun CurveBrightnessContent(
     }
 }
 
-/** Format a derived coefficient, guarding the NaN that an inverted zone range produces (G2-F6). */
 private fun Double.fmtCoeff(fmt: String): String = if (isNaN()) "—" else fmt.format(this)
 
-/**
- * Tap-to-delete confirmation for a recorded override point (F36): shows the captured lux/brightness
- * pair and confirms before removing it from [OverridePointStore].
- */
+/** Confirmation dialog for deleting a recorded override point (F36). */
 @Composable
 fun OverridePointDeleteDialog(point: OverridePoint, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(

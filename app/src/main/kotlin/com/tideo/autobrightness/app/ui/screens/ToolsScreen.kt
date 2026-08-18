@@ -73,8 +73,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Tools: curve wizard + power-draw calibration (Tasker Debug Scene + wizard). The debug-category
- * selector moved to the Misc screen (G2-F2). */
+/** Tools: curve wizard + power-draw calibration (Tasker Debug Scene + wizard). */
 @Composable
 fun ToolsScreen(
     navController: NavHostController,
@@ -94,10 +93,7 @@ fun ToolsScreen(
     val scope = rememberCoroutineScope()
     var showPrep by remember { mutableStateOf(false) }
 
-    // D-172: the force-dark card's LIVE prop state (`getprop debug.hwui.force_dark` via Shizuku,
-    // root fallback), probed once on entry and refreshed after each toggle. `probed=false` hides
-    // the status line until the first probe returns (the Shizuku bind can take up to 4 s), so
-    // "not reachable" is never shown while the probe is still in flight.
+    // D-172: probe force-dark state once and refresh after each toggle.
     val forceDarkEnabled by controlVm.forceDarkEnabled.collectAsStateWithLifecycle()
     var forceDarkLive by remember { mutableStateOf<Boolean?>(null) }
     var forceDarkProbed by remember { mutableStateOf(false) }
@@ -106,8 +102,7 @@ fun ToolsScreen(
         forceDarkProbed = true
     }
 
-    // D-158: the latest locally-captured crash trace, if any. Read once on entry — the app restarts
-    // after a crash, so re-opening Tools always re-reads the newest file from disk.
+    // D-158: latest locally-captured crash trace, re-read on each open.
     val crashStore = remember(context) { CrashLogStore.of(context) }
     val latestCrashLog = remember(crashStore) { crashStore.latest() }
 
@@ -115,12 +110,8 @@ fun ToolsScreen(
         recordedPoints = overridePoints,
         latestCrashLog = latestCrashLog,
         onBack = { navController.popBackStack() },
-        // D-125: stash the wizard's fit as a transient draft transform (curve → suggested), then jump to
-        // Curve & Brightness — whose VM applies it on its initial seed: suggested values in the fields,
-        // current values in [brackets], the fit traced against the hardcoded reference. User-driven, like
+        // D-125: stash wizard fit as draft transform; user-driven preview (discarded on screen exit).
         // Tasker's task38 → preview → task655; leaving the screen discards it. (Was: auto-draw a fitted
-        // line whenever ≥ 9 points existed.) The mapping mirrors "Apply suggestion" (onApplyWizard):
-        // continuous form1A lands exactly, the Int/Float fields round (task655); form2A/3A stay derived.
         onPreviewGraph = { result ->
             CurveSuggestionPreview.request { s ->
                 val cfg = CurveSuggestionEngine.applyToLiveCurve(result, s.toBrightnessCurveConfig())
@@ -135,16 +126,15 @@ fun ToolsScreen(
             navController.navigate(AppRoute.CurveBrightness.route)
         },
         onRunWizard = { overrides, tau ->
+            // G3-F17: τ from wizard control (default 0.001 = follow points).
             CurveSuggestionEngine.suggest(
-                // G3-F17: τ comes from the wizard control (default 0.001 = follow the recorded points).
                 CurveSuggestionInput(overrides, settings.toBrightnessCurveConfig(), tau = tau),
             )
         },
         onApplyWizard = { result ->
             val cfg = CurveSuggestionEngine.applyToLiveCurve(result, settings.toBrightnessCurveConfig())
             vm.update { s ->
-                // G2R-F70: the fitted curve params are continuous doubles; form1A keeps its decimal now
-                // (Double schema) — the wizard suggestion lands exactly. The remaining Int fields round.
+                // G2R-F70: form1A (Double) lands exactly; Int fields round.
                 s.copy(
                     form1A = cfg.form1A,
                     zone1End = Math.round(cfg.zone1End).toInt(),
@@ -164,8 +154,7 @@ fun ToolsScreen(
         forceDarkEnabled = forceDarkEnabled,
         forceDarkLiveState = forceDarkLive,
         forceDarkProbed = forceDarkProbed,
-        // D-172: persist the choice FIRST (so a Shizuku outage can't lose it — the service re-assert
-        // reads the store), then apply live and reflect the verified result in the status line.
+        // D-172: persist choice first, then apply and reflect verified result.
         onSetForceDarkEnabled = { enabled ->
             controlVm.setForceDarkEnabled(enabled)
             scope.launch {

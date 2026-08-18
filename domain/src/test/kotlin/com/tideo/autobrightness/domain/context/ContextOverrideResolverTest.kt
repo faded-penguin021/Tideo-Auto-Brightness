@@ -5,10 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Table-driven unit tests for [ContextOverrideResolver], mirroring contexts_spec §4 PASS 3/4 and the
- * precedence matrix (priority → specificity → array order) 1:1 against task43's Java.
- */
+// Table-driven unit tests for ContextOverrideResolver; precedence: priority → specificity → array order (task43).
 class ContextOverrideResolverTest {
 
     // Wed 2026-..; DAY_OF_WEEK 4 (Wednesday), 12:00 local, in Cinema wifi, 50% battery, unplugged.
@@ -74,9 +71,7 @@ class ContextOverrideResolverTest {
 
     @Test
     fun batteryUnknown_negativePercent_neverMatchesBatteryRule() {
-        // D-108: the service-start seed snapshot reports -1 ("no reading yet"). A max-only saver rule
-        // (battery <= 20, unplugged) must NOT match the sentinel — otherwise the Battery Saver profile
-        // flashes for one cycle before the real reading arrives. A real 0% (dead battery) still matches.
+        // D-108: -1 is "no reading yet"; must not match saver rules (prevents false flashes).
         val unknown = noon.copy(batteryPercent = -1)
         val saver = rule("sv", profile = "SAVER", battery = BatteryConstraint(max = 20))
         assertNull(ContextOverrideResolver.resolve(listOf(saver), unknown, userProfile = "MyProfile").activeContextName)
@@ -246,12 +241,7 @@ class ContextOverrideResolverTest {
         assertTrue(r.nextContextTime == "02.00" || r.nextContextTime == "03.00")
     }
 
-    // Owner report (2026-06-30): "Charging" (priority 81, time + on-power) vs "Low battery"
-    // (priority 80, battery 0-30%). At 15:17 while charging at 27% BOTH rules match; the higher
-    // priority (Charging, 81) must win regardless of specificity. Verifies priority is the primary
-    // key (specificity is only a same-priority tie-break) — Charging here also has HIGHER specificity
-    // (2 vs 1), so no ordering of priority/specificity could pick Low battery; if it ever loses, the
-    // bug is upstream (evaluation not re-running while both match), not in this resolver.
+    // Owner report: Charging (81) vs Low Battery (80); priority must win over specificity.
     @Test
     fun higherPriorityWins_evenWhenBothMatch_chargingOverLowBattery() {
         val signals = noon.copy(

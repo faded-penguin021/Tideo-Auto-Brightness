@@ -3,10 +3,7 @@ package com.tideo.autobrightness.domain.circadian
 import org.junit.Test
 import kotlin.test.assertEquals
 
-/**
- * NightLightTemperatureRamp (D-154): modifier −1 → night anchor, +1 → day anchor, linear in
- * between, defensive clamping. Anchors are arbitrary ints — the AOSP values are platform facts.
- */
+/** NightLightTemperatureRamp (D-154): modifier −1 → night anchor, +1 → day anchor, linear between, defensive clamping. */
 class NightLightTemperatureRampTest {
 
     @Test
@@ -35,8 +32,7 @@ class NightLightTemperatureRampTest {
 
     @Test
     fun invertedAnchors_stillClampToTheirRange() {
-        // A user may set a night anchor COOLER than the day anchor (odd but legal); the ramp
-        // then runs the other way and stays inside [day, night].
+        // User may set night anchor COOLER than day anchor (legal); ramp runs other way, stays inside [day, night].
         assertEquals(4000, NightLightTemperatureRamp.temperature(-1.0, nightKelvin = 4000, dayKelvin = 3000))
         assertEquals(3000, NightLightTemperatureRamp.temperature(1.0, nightKelvin = 4000, dayKelvin = 3000))
         assertEquals(3500, NightLightTemperatureRamp.temperature(0.0, nightKelvin = 4000, dayKelvin = 3000))

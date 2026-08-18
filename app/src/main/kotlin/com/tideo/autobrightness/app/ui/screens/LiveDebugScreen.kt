@@ -51,23 +51,18 @@ import com.tideo.autobrightness.app.ui.components.fmtAlpha
 import com.tideo.autobrightness.app.ui.components.fmtInt
 import com.tideo.autobrightness.app.ui.components.goldValue
 
-// %AAB_Debug 10 named categories, verbatim (D-023). Index == debugLevel. The labels live in
-// strings.xml as the `debug_labels` string-array (D-131 i18n); loaded via stringArrayResource in the
-// selector below.
+// %AAB_Debug 10 categories (D-023): verbatim labels from debug_labels string-array (D-131 i18n).
 
 /**
- * The **Live Debug Info** scene (S12.6b, G2R-F6): the Compose rebuild of the Tasker AAB Debug scene
- * (extraction/scenes/debug.md, XML L2583) — a glass-box readout of the live `%AAB_*` runtime vars
- * (gold-highlighted, the Tasker debug "strong" colour) grouped as in the original HTML dashboard, plus
- * the now-GLOBAL debug-category selector (moved off Misc, G2R-F9). Reached from the Menu hub.
+ * Live Debug Info scene (S12.6b, G2R-F6): glass-box readout of runtime vars, grouped as in Tasker original.
+ * Global debug-category selector (moved off Misc, G2R-F9). Reached from Menu hub.
  */
 @Composable
 fun LiveDebugScreen(navController: NavHostController, vm: LiveDebugViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // Re-poll the global-flash AccessibilityService enablement on resume (it is toggled in system
-    // Settings, outside any flow we observe — G2R-F50).
+    // Re-poll AccessibilityService enablement on resume (toggled in system Settings, G2R-F50).
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -115,7 +110,6 @@ fun LiveDebugContent(
                 .testTag("live_debug_screen"),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Core Metrics (debug.md HTML group 1): the smoothing + threshold + brightness figures.
             DiagnosticCard("Core Metrics", "debug_core_metrics") {
                 Metric("Smoothed lux", fmt(p.smoothedLux), "debug_smoothed_lux")
                 Metric("Raw lux", fmt(p.lastRawLux), "debug_raw_lux")
@@ -125,21 +119,18 @@ fun LiveDebugContent(
                 Metric("Target brightness", fmtInt(p.targetBrightness), "debug_target_bright")
             }
 
-            // Circadian & dimming scale (debug.md "Dimming Engine"): uncompressed vs taper-true scale.
             DiagnosticCard("Circadian & Scale", "debug_scale") {
                 Metric("Uncompressed scale", fmt(p.scaleDynamic, 3), "debug_scale_dynamic")
                 Metric("True (compressed) scale", fmt(p.scaleDynamicCompress, 3), "debug_scale_compress")
             }
 
-            // System Status (debug.md group 2): service / override / active rule.
             DiagnosticCard("System Status", "debug_system_status") {
                 Metric("Service", if (state.serviceRunning) "Running" else "Stopped", "debug_service")
                 Metric("Manual override", if (p.paused) "Paused" else "No", "debug_override")
                 Metric("Active rule", state.activeContext ?: "None", "debug_active_rule")
             }
 
-            // Performance & Timings (debug.md L19-23): luxAlpha, cycle total, reactivity cooldown
-            // (throttle), last animation (steps×wait) and last update — full Tasker parity (G2R-F29).
+            // Performance & Timings — full Tasker parity (G2R-F29).
             DiagnosticCard("Performance & Timings", "debug_performance") {
                 Metric("Smoothing α (LuxAlpha)", fmtAlpha(p.luxAlpha), "debug_lux_alpha")
                 Metric("Cycle time (ms)", fmt(p.cycleTimeMs, 0), "debug_cycle_time")
@@ -153,8 +144,7 @@ fun LiveDebugContent(
 
             GlobalFlashCard(state.globalToastsEnabled, onEnableGlobalToasts)
 
-            // %AAB_PanicSensitivity slider (D-116) — last on the scene, mirroring the Tasker Debug
-            // scene where it sits at the bottom and feeds _SetPanicSensitivity.
+            // %AAB_PanicSensitivity slider (D-116) — mirrors Tasker Debug scene placement.
             PanicSensitivityCard(
                 state.panicSensitivity,
                 onSetPanicSensitivity,
@@ -166,9 +156,8 @@ fun LiveDebugContent(
 }
 
 /**
- * The GLOBAL %AAB_PanicSensitivity slider (D-116), bottom of the Live Debug scene like the Tasker Debug
- * scene. 0..10 in unit steps; writes straight to the DataStore (a global pref, never a profile/draft).
- * 0 is pass-through (the panic fires with no shake requirement); higher needs a longer/harder shake.
+ * Global %AAB_PanicSensitivity slider (D-116): 0=pass-through, higher=longer/harder shake required.
+ * Writes directly to DataStore (global pref, not profile/draft).
  */
 @Composable
 private fun PanicSensitivityCard(
@@ -181,7 +170,6 @@ private fun PanicSensitivityCard(
         title = stringResource(R.string.title_panic_sensitivity),
         testTag = "panic_sensitivity_card",
     ) {
-        // Local slider position for smooth dragging; commit the rounded integer on change-end.
         var position by remember(current) { mutableFloatStateOf(current.toFloat()) }
         val level = position.roundToInt()
         val valueLabel = if (level == 0) {
@@ -205,14 +193,11 @@ private fun PanicSensitivityCard(
             stringResource(R.string.panic_sensitivity_help),
             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
         )
-        // DB-009 (%AAB_PanicPlugged, issue #110): opt-in restriction to external power. Off by
-        // default — the gesture is the way out of an unreadable screen, so it keeps working on
-        // battery unless the user deliberately narrows it.
+        // DB-009: opt-in external power restriction (issue #110). Off by default for usability.
         SwitchSettingRow(
             label = stringResource(R.string.panic_plugged_label),
             checked = requiresPlugged,
             onCheckedChange = onSetRequiresPlugged,
-            // The component carries its own helper line — no sibling Text (design coherence).
             helper = stringResource(R.string.panic_plugged_help),
             testTag = "switch_panicRequiresPlugged",
         )
@@ -220,10 +205,7 @@ private fun PanicSensitivityCard(
 }
 
 /**
- * Opt-in card for the system-wide flash overlay (G2R-F50). The debug/context flashes are
- * foreground-only by default; enabling the [com.tideo.autobrightness.app.runtime.AabToastAccessibilityService]
- * shows them over other apps. Presentation-only AccessibilityService (no content reading); degrades to
- * a foreground toast when off, so this is purely optional.
+ * Opt-in system-wide flash overlay (G2R-F50). Foreground-only by default; optional AccessibilityService.
  */
 @Composable
 private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
@@ -248,7 +230,6 @@ private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
     }
 }
 
-/** A `label: value` debug line with the live value highlighted gold (the Tasker debug strong colour). */
 @Composable
 private fun Metric(label: String, value: String, testTag: String) {
     DiagnosticLine(testTag) {
@@ -257,7 +238,6 @@ private fun Metric(label: String, value: String, testTag: String) {
     }
 }
 
-/** "steps×waitms" for the Live Debug "Last Animation" row, or "—" when no animation has run. */
 private fun animationLabel(steps: Int?, waitMs: Long?): String =
     if (steps != null && waitMs != null) "${steps}×${waitMs}ms" else "—"
 
@@ -273,16 +253,15 @@ private fun lastSampleLabel(ms: Long?, now: Long = System.currentTimeMillis()): 
 }
 
 /**
- * The %AAB_Debug 10-category selector (D-023), now a GLOBAL control on the Live Debug scene (G2R-F9):
- * it writes `debugLevel` straight to the DataStore (never via a profile/parameter draft), so loading a
- * profile or applying a parameter screen leaves the selected category untouched.
+ * %AAB_Debug 10-category selector (D-023): global control on Live Debug scene (G2R-F9).
+ * Writes directly to DataStore, not via profile/draft.
  */
 @Composable
 fun DebugLevelSelector(current: Int, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val debugLabels = stringArrayResource(R.array.debug_labels)
     // Anchor the menu to the button (Box wrapper) — a bare DropdownMenu sibling has no anchor and
-    // floats away from its trigger (D-114b, same fix as the rule-editor profile selector).
+    // floats away from its trigger (D-114(b), same fix as the rule-editor profile selector).
     Box {
         OutlinedButton(
             onClick = { expanded = true },

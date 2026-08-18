@@ -23,13 +23,7 @@ import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.rememberToaster
 
-/**
- * Misc / General (Tasker "AAB Misc Settings" scene). Re-adds the field grouping Tasker actually uses
- * (G2-F2): the brightness range (min/max as **sliders**, offset/scale as text), animation (steps +
- * min/max wait as **sliders**, derived throttle) and notifications. The debug-category selector moved
- * to the global Live Debug scene in S12.6b (G2R-F9). Slider ranges are the exact Tasker SliderElement
- * bounds (extraction/scenes/misc_settings.md).
- */
+/** Misc / General (Tasker AAB Misc Settings); brightness range, animation, notifications per G2-F2. */
 @Composable
 fun MiscScreen(navController: NavHostController, vm: DraftSettingsViewModel = viewModel()) {
     val draft by vm.draft.collectAsStateWithLifecycle()
@@ -47,7 +41,7 @@ fun MiscScreen(navController: NavHostController, vm: DraftSettingsViewModel = vi
     }
     MiscContent(
         draft, committed, errors, epoch, dirty,
-        // D-169: only the Misc save auto-raises MaxBright to fit the curve (Tasker _SaveButtonMisc).
+        // D-169: Misc save auto-raises MaxBright.
         onEdit = vm::edit, onApply = { vm.apply(raiseMaxBrightForCurve = true) }, onDiscard = vm::discard,
         onBack = { navController.popBackStack() },
         criticalError = criticalError,
@@ -89,9 +83,7 @@ fun MiscContent(
             // current throttle (ms) + current smoothing α.
             MiscDiagnosticCardContent(live)
 
-            // Labels + verbatim long-press help re-derived from extraction/scenes/misc_settings.md
-            // (S12.6e, G2R-F19/F21). S13c (m3_audit §3 row 7): the bare slider stack is grouped into
-            // labelled `AabCard` sections; derived readouts use the gold `KeyValueRow` data-pop (§4 B4).
+            // Labels from extraction/misc_settings.md (G2R-F19/F21); S13c groups into AabCard sections.
             AabCard {
                 SectionHeader(stringResource(R.string.misc_brightness_range), divider = true)
                 // Tasker Misc sliders: Min 0–75, Max 150–255 (misc_settings.md elements4/6).
@@ -112,9 +104,7 @@ fun MiscContent(
                     epoch = epoch, committed = committed.offset,
                     help = TaskerHelp.OFFSET, testTag = "field_offset",
                 )
-                // G2R-F60: when circadian (dynamic) scaling is on, the static Scale field is overridden by
-                // the runtime dynamic scale — Tasker shows it as a read-only "(auto)" derived value
-                // (%AAB_ScaleDynamicCompress, misc_settings.md scale_dynamic). Otherwise it stays editable.
+                // G2R-F60: when scaling on, show read-only "(auto)" dynamic scale; otherwise editable.
                 if (draft.scalingEnabled) {
                     KeyValueRow(
                         stringResource(R.string.misc_scale_auto),

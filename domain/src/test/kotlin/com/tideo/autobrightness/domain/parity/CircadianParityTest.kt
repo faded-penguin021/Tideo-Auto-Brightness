@@ -10,15 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
-/**
- * Parity tests for [SolarCalculator] and [DynamicScaleEngine] against committed golden vectors.
- *
- * Golden CSV generated from [TaskerReference.solarTimes] / [TaskerReference.dynamicScale]
- * (faithful ports of task90 Java blocks #1 and #2, XML L40429+L41085). Polar assertions
- * exercise the ≷1380-minute sunlight-duration threshold separately.
- *
- * Segment: S6.
- */
+// Golden-vector parity for [SolarCalculator] + [DynamicScaleEngine] (task90 Java blocks #1/#2).
 class CircadianParityTest {
 
     private val tol = 1e-9
@@ -39,7 +31,6 @@ class CircadianParityTest {
     @Test
     fun circadian_solarTimes_matchesGolden() {
         val mismatches = mutableListOf<String>()
-        // Check each unique (lat,lng,dateEpoch,tzOffset) combo — deduplicate to avoid n*16 assertions
         val seen = mutableSetOf<String>()
         for (r in golden("circadian.csv")) {
             val key = "${r["loc"]}_${r["date"]}"

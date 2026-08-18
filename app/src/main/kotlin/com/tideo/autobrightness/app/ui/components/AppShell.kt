@@ -34,21 +34,9 @@ import com.tideo.autobrightness.app.ui.theme.AabOnTeal
 import com.tideo.autobrightness.app.ui.theme.AabTeal
 import com.tideo.autobrightness.app.ui.theme.Dimens
 
-/**
- * The app shell chrome — the branded top bar and the Menu-screen building blocks. This is the
- * Compose rebuild of the Tasker **AAB Menu scene** (extraction/scenes/menu.md, XML L4462): a gold-sun
- * teal banner over grouped navigation "cards" (Profiles & Contexts hero / Settings / Info & Help).
- *
- * S12.6a (G2R-F1/F2): the S12.5a slide-over `AabNavDrawer` is promoted into a real
- * [com.tideo.autobrightness.app.ui.screens.MenuScreen] home destination — the canonical hub and the
- * back-target from every settings/tool screen. These shared pieces ([AabMenuBanner],
- * [AabSectionLabel]) render that screen; the top bar is reused by Menu/Dashboard.
- */
+/** S12.6a (G2R-F1/F2): app shell chrome. Branded top bar + Menu-screen building blocks. */
 
-/**
- * Branded center-aligned top bar. When [onBack] is non-null a back arrow is shown (the standard
- * up-navigation that returns to the Menu); pass null on the home/Menu screen for no nav icon.
- */
+/** Branded center-aligned top bar. [onBack] null on home/Menu for no nav icon. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AabTopBar(title: String, onBack: (() -> Unit)? = null) {
@@ -61,17 +49,11 @@ fun AabTopBar(title: String, onBack: (() -> Unit)? = null) {
                 }
             }
         },
-        // Owner feedback: the teal banner belongs to the Menu hub only (its gold-sun [AabMenuBanner]).
-        // Every other screen uses the default M3 surface app bar so the app reads coherently — Dashboard
-        // and Live Debug no longer carry a second teal header.
+        // Teal banner only for Menu hub; others use default M3 surface app bar
     )
 }
 
-/**
- * The teal brand banner — the one place identity lives (S13c' §08). A clean gold sun/aperture mark, the
- * wordmark in Plex Sans (SemiBold "Tideo" + Medium gold "Auto Brightness"), and a tracked Plex Mono
- * tagline — intentional, not a coloured bar.
- */
+/** Teal brand banner (S13c' §08). Gold sun/aperture, Plex Sans wordmark, Plex Mono tagline. */
 @Composable
 fun AabMenuBanner() {
     Row(
@@ -91,8 +73,7 @@ fun AabMenuBanner() {
         )
         Spacer(Modifier.width(Dimens.rowGapWide))
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.space1)) {
-            // The full wordmark reads on ONE line — "Tideo" white + "Auto Brightness" gold (owner
-            // feedback: the stacked two-line wordmark looked broken).
+            // Wordmark on one line: "Tideo" white + "Auto Brightness" gold
             Row {
                 Text(
                     stringResource(R.string.app_wordmark_primary) + " ",
@@ -116,7 +97,6 @@ fun AabMenuBanner() {
     }
 }
 
-/** A grouped-section divider + label, mirroring the menu scene's three HTML cards. */
 @Composable
 fun AabSectionLabel(text: String) {
     HorizontalDivider(Modifier.padding(top = 8.dp))

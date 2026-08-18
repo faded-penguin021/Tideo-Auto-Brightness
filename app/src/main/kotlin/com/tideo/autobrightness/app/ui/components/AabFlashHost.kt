@@ -27,15 +27,9 @@ import com.tideo.autobrightness.app.ui.theme.AabTeal
 import kotlinx.coroutines.delay
 
 /**
- * In-app, **tap-to-dismiss** flash surface (G2R-F88). Tasker lets you tap a flash to dismiss it; a
- * plain Android [android.widget.Toast] is non-interactive (clicks pass straight through), so an in-app
- * confirmation ("Applied", a debug flash while the app is foreground) could not be dismissed by tap.
- *
- * This host registers itself as the [AabFlash] foreground presenter while it is composed (app in the
- * foreground); flashes then render as a teal pill the user can tap to dismiss. It sits BELOW the global
- * Accessibility overlay in priority — when that opt-in overlay is enabled it takes flashes instead
- * (and is itself tap-to-dismiss). The plain Toast fallback is only used when neither surface exists
- * (e.g. a flash emitted while the app is backgrounded and the overlay is off).
+ * In-app tap-to-dismiss flash surface (G2R-F88).
+ * Registers as [AabFlash] foreground presenter while composed (app foreground).
+ * Falls back to Toast when neither this nor the global overlay exists.
  */
 @Composable
 fun AabFlashHost(content: @Composable () -> Unit) {
@@ -56,8 +50,8 @@ fun AabFlashHost(content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize()) {
         content()
         message?.let { text ->
-            // Auto-dismiss after the usual flash duration; re-armed whenever the text changes.
             LaunchedEffect(text) {
+                // Auto-dismiss after flash duration; re-arm on text change.
                 delay(FLASH_DURATION_MS)
                 if (message == text) message = null
             }
@@ -66,7 +60,6 @@ fun AabFlashHost(content: @Composable () -> Unit) {
     }
 }
 
-/** Stateless teal flash pill; tapping it invokes [onDismiss] (F88 tap-to-dismiss). */
 @Composable
 fun FlashPill(text: String, onDismiss: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
@@ -78,9 +71,7 @@ fun FlashPill(text: String, onDismiss: () -> Unit) {
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 80.dp, start = 24.dp, end = 24.dp)
                 .clickable { onDismiss() }
-                // D-156: the pill is an in-composition overlay (not a system Toast), so mark it a polite
-                // live region — TalkBack announces confirmations ("Applied") when it appears without
-                // stealing focus from the user's current control.
+                // D-156: polite live region for TalkBack; announces without stealing focus.
                 .semantics { liveRegion = LiveRegionMode.Polite }
                 .testTag("aab_flash"),
         ) {

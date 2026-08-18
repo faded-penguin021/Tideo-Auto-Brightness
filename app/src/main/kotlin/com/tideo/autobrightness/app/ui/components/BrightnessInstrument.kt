@@ -40,16 +40,8 @@ import com.tideo.autobrightness.app.ui.theme.AabDataCaption
 import com.tideo.autobrightness.app.ui.theme.AabMono
 import com.tideo.autobrightness.app.ui.theme.Dimens
 
-/**
- * S13c' §06 — the Dashboard **hero instrument**. One glance answers "what is my screen doing right now?":
- * a single large brightness readout (the applied 0–255 level in near-white Plex Mono), a thin teal track
- * that eases to the new value, and a status pill. All values already live on [DashboardUiState] — this is
- * composition, not new data. When the master switch is OFF the instrument greys out so on/off is
- * unmistakable. The switch stays one tap away (inline, top-right).
- *
- * Test contract preserved: the big number keeps `dashboard_brightness`, the status keeps
- * `dashboard_status`, the switch keeps `service_switch`.
- */
+/** S13c' §06 — Dashboard hero instrument: brightness readout, teal track, and status pill. Greys out
+ *  when off. Test contract: dashboard_brightness, dashboard_status, service_switch tags. */
 @Composable
 fun BrightnessInstrument(
     state: DashboardUiState,
@@ -59,15 +51,10 @@ fun BrightnessInstrument(
     val on = state.serviceEnabled
     val applied = state.currentBrightness ?: state.targetBrightness
     val target = state.targetBrightness
-    // D-156: the master on/off switch sits alone (the caption above reads "APPLIED BRIGHTNESS", not a
-    // label for it), so TalkBack would announce a nameless switch — give it an explicit label.
+    // D-156: explicit label for on/off switch.
     val serviceLabel = stringResource(R.string.a11y_service_toggle)
 
-    // Roll the big number to its new value instead of snapping (owner: "numbers changing"). G3-F5:
-    // the cycle now publishes the DESTINATION (targetBrightness) at the START of the on-device sweep
-    // (PipelineCycleRunner), so we animate toward `target` — the figure rolls DURING the transition
-    // rather than snapping after it settles. Falls back to the applied value before the first cycle.
-    // On first composition animateIntAsState initialises to that value (no spurious count-up from 0).
+    // G3-F5: animate toward target (destination published at sweep START), not applied.
     val displayValue = target ?: applied
     val animatedValue by animateIntAsState(
         targetValue = displayValue ?: 0,
@@ -75,7 +62,6 @@ fun BrightnessInstrument(
         label = "instrument_value",
     )
 
-    // Greyed out when off; near-white instrument readout when running.
     val numberColor by animateColorAsState(
         if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = tween(AabMotion.DURATION_MEDIUM),
@@ -96,7 +82,6 @@ fun BrightnessInstrument(
             StatusPill(state)
         }
 
-        // The big number: applied 0–255 level, tabular Plex Mono.
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 if (displayValue != null) animatedValue.toString() else "—",
@@ -133,11 +118,9 @@ private val AabDataDisplayLarge = androidx.compose.ui.text.TextStyle(
     fontFeatureSettings = "tnum",
 )
 
-/** The teal 0–255 track — the only chart-free visualisation on the Dashboard. Eases to its new value. */
 @Composable
 private fun BrightnessTrack(applied: Int?, target: Int?, enabled: Boolean) {
-    // G3-F5: ease toward the destination (target leads applied during a sweep) so the fill animates
-    // in step with the big number rather than after the cycle settles.
+    // G3-F5: ease toward destination in step with big number.
     val fraction = ((target ?: applied ?: 0).coerceIn(0, 255)) / 255f
     val animated by animateFloatAsState(
         targetValue = fraction,
@@ -167,10 +150,8 @@ private fun BrightnessTrack(applied: Int?, target: Int?, enabled: Boolean) {
     }
 }
 
-/** Status pill: a teal/gold/red dot + the existing status string (tagged `dashboard_status`). */
 @Composable
 private fun StatusPill(state: DashboardUiState) {
-    // Compact labels so the pill never wraps next to the "APPLIED BRIGHTNESS" caption (owner feedback).
     val (label, dot) = when {
         !state.serviceEnabled -> stringResource(R.string.dashboard_pill_off) to MaterialTheme.colorScheme.error
         !state.serviceRunning -> stringResource(R.string.dashboard_pill_starting) to MaterialTheme.colorScheme.secondary

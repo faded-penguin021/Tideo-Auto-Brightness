@@ -9,11 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * S12.9d backfill — the [OverrideMonitor] prof755/task567 gate over the platform brightness observer.
- * Observed external writes only surface as overrides when the gate is fully open (service on, auto not
- * running, not already paused, not initializing, detection enabled, settle window closed).
- */
+/** OverrideMonitor gate (prof755/task567): surface external writes only when gate fully open (S12.9d backfill). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class OverrideMonitorTest {
 
@@ -45,7 +41,6 @@ class OverrideMonitorTest {
 
     @Test
     fun autoRunning_dropsAll() = runTest {
-        // A write while the pipeline is mid-animation is our own, not a manual override.
         assertEquals(emptyList<Int>(), overridesFor(openGate.copy(autoRunning = true), 120))
     }
 

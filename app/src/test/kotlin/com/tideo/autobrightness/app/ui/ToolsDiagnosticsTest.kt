@@ -16,12 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * C1 acceptance (D-158). The Tools → Diagnostics row: with a captured crash it copies the trace to
- * the clipboard (the existing `%AAB_Test` copy pattern — clipboard, not a share intent); with none
- * it shows the "no crash reports" state and offers no copy button. The copy button is also funnelled
- * through the a11y gate, since C1 is an a11y-backlog unit.
- */
+// C1 acceptance (D-158): Tools → Diagnostics crash trace copy + a11y.
 @RunWith(RobolectricTestRunner::class)
 class ToolsDiagnosticsTest {
 

@@ -44,22 +44,11 @@ import com.tideo.autobrightness.app.settings.ContextTriggers
 import com.tideo.autobrightness.app.state.AppEntry
 import com.tideo.autobrightness.app.ui.theme.AabGold
 
-/**
- * Shared trigger-editor building blocks, extracted verbatim from `ContextsScreen`'s private
- * composables (D-150, for the since-removed display-schedule editor; D-151 deleted that second
- * consumer, so ContextsScreen is again the sole user — the extraction stays as the shared home
- * for any future rule editor). Behavior and test tags are unchanged — the ContextsScreen suites
- * are the proof.
- */
+/** Shared trigger-editor building blocks (D-150/D-151 extraction; ContextsScreen sole user). */
 
-/** Calendar.DAY_OF_WEEK index (1=Sun..7=Sat) → short label; the day picker maps positions to these. */
 internal val DAY_LABELS = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
-/**
- * A collapsible trigger block (G3 owner finding — mirror Tasker's "enable to reveal" gating). The
- * header carries the trigger [title] and an on/off [Switch] (`trigger_toggle_<key>`); the [content]
- * (its fields) is shown only while enabled, so the editor only displays what the rule actually uses.
- */
+/** Collapsible trigger block (G3 owner finding; enable to reveal). */
 @Composable
 fun TriggerSection(
     title: String,
@@ -73,14 +62,11 @@ fun TriggerSection(
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Owner finding: the trigger labels read a bit large — use the lighter body style.
             Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Switch(
                 checked = enabled,
                 onCheckedChange = onEnabledChange,
-                // D-156: the trigger [title] is a sibling Text, so the switch node itself announces
-                // nothing to TalkBack — label it. Deliberately NOT a toggleable row (that would move
-                // the tap target and break the `trigger_toggle_$key` performClick contract).
+                // D-156: label for TalkBack (title is sibling Text)
                 modifier = Modifier.testTag("trigger_toggle_$key")
                     .semantics { contentDescription = title },
             )
@@ -91,11 +77,7 @@ fun TriggerSection(
     }
 }
 
-/**
- * A tappable time field that opens the Material3 [TimePicker] modal (G2R-F28). Shows the current
- * value (an "HH:MM" time or a SUNRISE/SUNSET token); tapping opens the picker, seeded from the current
- * "HH:MM" when present. Replaces the previous free-text `OutlinedTextField`.
- */
+/** Tappable time field opening Material3 [TimePicker] modal (G2R-F28). Accepts HH:MM or SUNRISE/SUNSET tokens. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimeField(label: String, value: String, tag: String, onSet: (String) -> Unit) {
@@ -123,7 +105,6 @@ fun TimeField(label: String, value: String, tag: String, onSet: (String) -> Unit
     }
 }
 
-/** Parse an "HH:MM" string to (hour, minute), or null for blank/token values (SUNRISE/SUNSET). */
 private fun parseHhMm(value: String): Pair<Int, Int>? {
     val parts = value.trim().split(":")
     if (parts.size != 2) return null
@@ -132,14 +113,7 @@ private fun parseHhMm(value: String): Pair<Int, Int>? {
     return if (h in 0..23 && m in 0..59) h to m else null
 }
 
-/**
- * SUNRISE/SUNSET quick-insert tokens for a time field (the resolver accepts them, G2-F14). G2R-F68:
- * when today's resolved sunrise/sunset is known, show it in theme gold (e.g. "Sunrise (06:42)").
- *
- * G2R-F68 (UI bug): the tokens live inside a half-width From/To column, so "Sunset (22:00)" used to
- * char-wrap one letter per line. They are now stacked vertically (each gets the full column width)
- * with `maxLines = 1` / `softWrap = false` so the resolved-time label always renders on one line.
- */
+/** SUNRISE/SUNSET tokens for time fields (G2-F14). G2R-F68: show resolved time in gold (one-line layout). */
 @Composable
 fun TimeTokenRow(which: String, solarLabel: Pair<String, String>?, onPick: (String) -> Unit) {
     Column {
@@ -164,10 +138,7 @@ fun TimeTokenRow(which: String, solarLabel: Pair<String, String>?, onPick: (Stri
     }
 }
 
-/**
- * Day-of-week multi-select (G2R-F67): one filter chip per day, Calendar.DAY_OF_WEEK 1=Sun..7=Sat.
- * Wraps so all seven fit on narrow screens. None selected = every day.
- */
+/** Day-of-week multi-select (G2R-F67). None selected = every day. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DayPicker(selected: Set<Int>, onToggle: (Int) -> Unit) {
@@ -184,11 +155,7 @@ fun DayPicker(selected: Set<Int>, onToggle: (Int) -> Unit) {
     }
 }
 
-/**
- * The "app rules need usage access" error card (G2-F14): shown wherever an app-scoped rule exists
- * (or is being edited) without the usage-stats grant, with a button opening the system grant page.
- * Message + tags are parameters because the two Contexts placements use distinct wording/tags.
- */
+/** "App rules need usage access" error card (G2-F14). Parameterized for distinct Contexts placements. */
 @Composable
 fun UsageAccessPromptCard(
     @StringRes messageRes: Int,
@@ -214,10 +181,7 @@ fun UsageAccessPromptCard(
     }
 }
 
-/**
- * The launchable-apps multi-select for app-scoped rules (icon + label + checkbox per row,
- * `app_check_<package>`). G2R-F87: taller (still scrollable) so more apps are visible at once.
- */
+/** Launchable-apps multi-select for app-scoped rules. G2R-F87: taller column for more visibility. */
 @Composable
 fun AppPickerList(
     apps: List<AppEntry>,
@@ -233,8 +197,7 @@ fun AppPickerList(
                 Checkbox(
                     checked = entry.packageName in selected,
                     onCheckedChange = { checked -> onToggle(entry.packageName, checked) },
-                    // D-156: the app [label] is a sibling Text — name the checkbox so TalkBack reads
-                    // "<app>, checkbox" instead of an anonymous checkbox.
+                    // D-156: name checkbox for TalkBack (label is sibling Text)
                     modifier = Modifier.testTag("app_check_${entry.packageName}")
                         .semantics { contentDescription = entry.label },
                 )
@@ -251,7 +214,6 @@ fun AppPickerList(
     }
 }
 
-/** One-line trigger summary for a rule card (shared by the Contexts and Schedules lists). */
 internal fun ContextTriggers.summary(): String {
     val parts = buildList {
         apps?.takeIf { it.isNotEmpty() }?.let { add("${it.size} app(s)") }
@@ -259,7 +221,8 @@ internal fun ContextTriggers.summary(): String {
         timeRange?.takeIf { it.size == 2 }?.let { add("${it[0]}–${it[1]}") }
         days?.takeIf { it.isNotEmpty() }?.let { add(it.sorted().joinToString("") { d -> DAY_LABELS.getOrElse(d - 1) { "?" } }) }
         battery?.let { add(if (it.onPower == true) "charging" else if (it.onPower == false) "on battery" else "battery ${it.min}-${it.max}%") }
-        location?.let { add("near location") }
+        // DB-061: name the circle; "near location" read identically for every rule.
+        location?.let { add("near ${formatCoord(it.lat)}, ${formatCoord(it.lon)} (${it.radius.toInt()} m)") }
     }
     return if (parts.isEmpty()) "Always active" else parts.joinToString(" · ")
 }

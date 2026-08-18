@@ -140,7 +140,7 @@ mk() { # mk <name> -> prints the fixture path
 		LEDGER_DIR=docs
 		LEDGER_BASENAME=LEDGER
 		LEDGER_LINE_CAP=800
-		LEDGER_ROW_CHAR_CAP=2000
+		LEDGER_ROW_CHAR_CAP=800
 		CITATION_SCAN_PATHS='scripts'
 		CITATION_EXCLUDE=''
 		POISON_TOKENS='[skip ci]'
@@ -631,25 +631,25 @@ expect_fail "the rollover FAILURE reports the size too — that is the branch th
 
 
 d=$(mk ledger_row_char_under_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=2000/LEDGER_ROW_CHAR_CAP=120/' "$d/amh.conf"
+sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=120/' "$d/amh.conf"
 printf -- '- D-003: short enough.\n' >>"$d/docs/LEDGER.md"
 expect_pass_saying "a concise new ledger row under the byte-counted character cap passes" "$d" \
 	"checked 1 new ledger row(s) against LEDGER_ROW_CHAR_CAP=120"
 
 d=$(mk ledger_row_char_over_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=2000/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
+sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
 printf -- '- D-003: long row. %s\n' "$(filler 120)" >>"$d/docs/LEDGER.md"
 expect_fail "a new ledger row over the byte-counted character cap fails" "$d" \
 	"over LEDGER_ROW_CHAR_CAP=80"
 
 d=$(mk ledger_row_char_committed_over_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=2000/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
+sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
 printf -- '- D-003: committed long row. %s\n' "$(filler 120)" >>"$d/docs/LEDGER.md"
 (cd "$d" && git add amh.conf docs/LEDGER.md && git commit -qm long-ledger-history)
 expect_pass "an already committed over-cap ledger row is historical and exempt" "$d"
 
 d=$(mk ledger_row_char_superseded_pointer_existing)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=2000/LEDGER_ROW_CHAR_CAP=10/' "$d/amh.conf"
+sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=10/' "$d/amh.conf"
 printf -- '  Superseded by D-999.\n' >>"$d/docs/LEDGER.md"
 expect_pass "a sanctioned metadata-only supersession on an existing row is exempt" "$d"
 
@@ -871,6 +871,48 @@ d=$(mk guard_bad)
 printf '#!/usr/bin/env bash\necho "domain rule violated"\nexit 1\n' >"$d/scripts/guards/bad.sh"
 expect_fail "a failing repo-local guard fails the ladder" "$d" "domain rule violated"
 
+# The third verdict: exit 2 with a leading WARN marker is a warning, not a failure. It is
+# for a rule that is usually right and occasionally, legitimately, wrong — the case where
+# failing closed teaches the adopter to delete the guard instead of reading it.
+d=$(mk guard_warn)
+printf '#!/usr/bin/env bash\necho "WARN domain rule bent"\nexit 2\n' >"$d/scripts/guards/soft.sh"
+expect_warn "a repo-local guard can warn instead of failing" "$d" "domain rule bent"
+
+# ...and the marker is what separates a warning from a broken guard, because bash exits 2
+# on a syntax error too. Without the marker requirement this fixture's guard — which cannot
+# even parse — would report as a mild opinion and the ladder would stay green.
+d=$(mk guard_warn_unmarked)
+printf '#!/usr/bin/env bash\nif then fi\n' >"$d/scripts/guards/broken.sh"
+expect_fail "a guard that exits 2 without the marker is a failure, not a warning" "$d" \
+	"without the leading WARN marker"
+
+# A warning longer than one line must not reach the transcript at column zero. The ladder's
+# own verdict vocabulary lives there, so an unindented continuation lets a guard's output
+# render as the ladder's — `   ok    ...` inside a warning would read as a passing rung.
+d=$(mk guard_warn_multiline)
+printf '#!/usr/bin/env bash\nprintf "WARN first line\\n   ok    injected verdict\\n"\nexit 2\n' \
+	>"$d/scripts/guards/chatty.sh"
+out=$(run "$d")
+rc=$?
+if [ "$rc" -ne 0 ]; then
+	report no "a multi-line warning cannot forge a ladder verdict line" "expected exit 0, got $rc" "$out"
+elif ! grep -q '^   WARN  chatty.sh — first line$' <<<"$out"; then
+	report no "a multi-line warning cannot forge a ladder verdict line" "the warn line was not the guard's first line" "$out"
+elif grep -q '^   ok    injected verdict$' <<<"$out"; then
+	report no "a multi-line warning cannot forge a ladder verdict line" "the continuation printed at column zero" "$out"
+elif ! grep -q '^            ok    injected verdict$' <<<"$out"; then
+	report no "a multi-line warning cannot forge a ladder verdict line" "the continuation was dropped entirely" "$out"
+else
+	report ok "a multi-line warning cannot forge a ladder verdict line"
+fi
+
+# The marker is checked at the START of the output, not anywhere in it: a guard whose
+# failure text happens to quote the word must still fail.
+d=$(mk guard_warn_late_marker)
+printf '#!/usr/bin/env bash\necho "rule violated, and no WARN applies"\nexit 2\n' >"$d/scripts/guards/late.sh"
+expect_fail "the WARN marker counts only as the first thing printed" "$d" \
+	"without the leading WARN marker"
+
 # An extension point with nothing plugged into it. `rm -rf scripts/guards` used to leave
 # this rung printing NOTHING AT ALL — no header, no line, no count — and the ladder green,
 # which is indistinguishable from a set of guards that all passed. It stays a skip rather
@@ -1022,6 +1064,48 @@ if [ "$rc" -eq 2 ] && grep -qF "This command mentions \`.env\`" <<<"$out"; then
 	report ok "session-start rearms the one-time .env advisory"
 else
 	report no "session-start rearms the one-time .env advisory" "rc=$rc" "$out"
+fi
+
+# Every category of one-time advisory rearms, not just the one the reset was written for.
+# The destructive-command advisory makes the same session-local promise as the `.env` one,
+# and for as long as the bootstrap named a single category literally it kept that promise
+# only for `.env`: a container's first `rm -rf` spent the advisory for every later session.
+d=$(mk ss_rearms_destructive_advisory)
+out=$(cd "$d" && scripts/command-guard.sh --command 'rm -rf tmp/build' 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF "This destructive filesystem command" <<<"$out"; then
+	report ok "the first destructive command gets the advisory"
+else
+	report no "the first destructive command gets the advisory" "rc=$rc" "$out"
+fi
+if (cd "$d" && scripts/command-guard.sh --command 'rm -rf tmp/build' >/dev/null 2>&1); then
+	report ok "the second destructive command reaches normal rails"
+else
+	report no "the second destructive command reaches normal rails" "it was still blocked"
+fi
+(cd "$d" && env -u AMH_REMOTE bash scripts/session-start.sh >/dev/null 2>&1)
+out=$(cd "$d" && scripts/command-guard.sh --command 'rm -rf tmp/build' 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF "This destructive filesystem command" <<<"$out"; then
+	report ok "session-start rearms the one-time destructive advisory"
+else
+	report no "session-start rearms the one-time destructive advisory" "rc=$rc" "$out"
+fi
+
+# The rearm expands a pattern, and amh.conf is sourced before it runs — so an adopter's
+# `set -f` (or a GLOBIGNORE covering /tmp) would leave the pattern unexpanded and `rm -f`
+# would swallow the literal without a word. A rail switched off in silence by a config key
+# nobody connected to it is the same class of defect as the single-category reset itself.
+d=$(mk ss_rearms_advisory_under_noglob)
+printf 'set -f\n' >>"$d/amh.conf"
+(cd "$d" && scripts/command-guard.sh --command 'rm -rf tmp/build' >/dev/null 2>&1)
+(cd "$d" && env -u AMH_REMOTE bash scripts/session-start.sh >/dev/null 2>&1)
+out=$(cd "$d" && scripts/command-guard.sh --command 'rm -rf tmp/build' 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF "This destructive filesystem command" <<<"$out"; then
+	report ok "the rearm survives a noglob amh.conf"
+else
+	report no "the rearm survives a noglob amh.conf" "rc=$rc" "$out"
 fi
 
 # --- the protocol pointer names only documents that exist

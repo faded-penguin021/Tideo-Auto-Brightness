@@ -12,11 +12,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * G2R-F44: a legacy/imported profile registered via [UserProfileStore] (what the Profiles screen now
- * does on load) must be visible through [AppProfileCatalog] — the catalog the context-rule editor
- * reads — so it is selectable as a rule target without a manual re-save.
- */
+/** G2R-F44: legacy/imported profile registered via UserProfileStore must be visible through AppProfileCatalog (context-rule editor) without manual re-save. */
 class AppProfileCatalogTest {
 
     private class FakeDataStore<T>(initial: T) : DataStore<T> {

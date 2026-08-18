@@ -4,17 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/**
- * Storage model for the context-override rule system.
- *
- * Data classes mirror the exact JSON schema used by Tasker task623 `_ContextManager` and
- * task43 `_EvaluateContexts V2` for `contexts.json` interoperability. Engine logic is S10.
- *
- * Disk format: JSON array of [ContextRule] at Download/AAB/configs/contexts.json (Tasker interop).
- * Rebuild storage: DataStore or app-private JSON (path decided by S10).
- *
- * Tasker: contexts_spec.md §2.3 — schema verified against task43 PASS 3 reader + task623 writer.
- */
+/** Context-override rule schema (Tasker task623/task43 interop, contexts.json). */
 @Serializable
 data class ContextRule(
     /** Stable unique identifier for upsert/delete. */

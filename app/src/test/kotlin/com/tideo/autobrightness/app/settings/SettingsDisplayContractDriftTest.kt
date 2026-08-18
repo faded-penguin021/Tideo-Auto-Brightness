@@ -6,9 +6,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * S12.9c #2: [valueFor] is fail-fast — every [AabSettingsContract] key must resolve in its `when`, and
- * an unknown key throws instead of returning "". This guards against the contract and the extractor
- * drifting apart (a new contract row with no `valueFor` arm, or vice versa).
+ * S12.9c #2: valueFor fail-fast; every AabSettingsContract key must resolve; guards drift.
  */
 class SettingsDisplayContractDriftTest {
 
@@ -29,8 +27,7 @@ class SettingsDisplayContractDriftTest {
 
     @Test
     fun `contract key count matches the resolvable extractor arms`() {
-        // Resolving all contract keys must not throw; the count is the contract size (no orphan arms
-        // can be exercised from the contract, and no contract key can be missing an arm).
+        // Contract size = count of resolvable keys (no orphans, no missing arms).
         val resolved = AabSettingsContract.rules.count {
             runCatching { settings.valueFor(it.key) }.isSuccess
         }

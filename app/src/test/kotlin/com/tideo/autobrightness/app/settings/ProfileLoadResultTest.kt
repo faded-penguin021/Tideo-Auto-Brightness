@@ -12,11 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/**
- * S12.9c #3: profile loading reports a typed [ProfileLoadResult] across all three branches —
- * our export format (Success), the legacy Tasker parser (LegacyFallback), and unparseable input
- * (TotalFailure). Only TotalFailure surfaces a user-visible error (the Profiles & Contexts error card).
- */
+/** S12.9c #3: ProfileLoadResult typing across three branches (Success/LegacyFallback/TotalFailure). */
 @RunWith(RobolectricTestRunner::class)
 class ProfileLoadResultTest {
 

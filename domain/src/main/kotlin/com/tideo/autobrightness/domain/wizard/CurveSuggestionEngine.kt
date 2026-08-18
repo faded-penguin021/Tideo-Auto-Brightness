@@ -4,16 +4,8 @@ import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import java.util.Locale
 import kotlin.math.*
 
-/**
- * One user-recorded override point stored in %AAB_Overrides<N>.
- *
- * Encoding: `"lux,brightness[,weight[,kind]]"`.
- *  - 2-field: kind=1.0 (real, user-recorded)
- *  - 3-field: kind=2.0 (real, weighted)
- *  - 4-field: kind from parts[3] (3.0 = ghost/synthetic)
- *
- * Tasker: task38 Java Block #1, data loading L484–512.
- */
+/** Override point: `"lux,brightness[,weight[,kind]]"` stored in %AAB_Overrides<N>.
+ * Tasker: task38 Java Block #1, data loading L484–512. */
 data class OverridePoint(
     val lux: Double,
     val brightness: Double,
@@ -22,39 +14,16 @@ data class OverridePoint(
     val kind: Double = 1.0,
 )
 
-/**
- * Inputs for the curve-suggestion wizard.
- *
- * Tasker: task38 Java Block #1 gathers these via `tasker.getVariable(...)`.
- */
+/** Inputs for curve-suggestion wizard. Tasker: task38 Java Block #1 gathers via tasker.getVariable(...). */
 data class CurveSuggestionInput(
-    /** Training data (the user's manually-recorded override points). Must have ≥ 9. */
     val overrides: List<OverridePoint>,
-    /** Current active curve — used as benchmark and inertia anchor. */
     val currentCurve: BrightnessCurveConfig,
-    /**
-     * Inertia regularization strength. Higher τ = stronger pull toward the current curve; lower τ ⇒
-     * confidence `1 − exp(−weightedCount/τ) → 1` ⇒ the fit follows the recorded points.
-     *
-     * G3-F17 (Gate 3): the faithful default is **0.001**, not 4.0. In Tasker task38 act2 (547) always
-     * sets `%tau = 0.001` BEFORE the Java engine runs (task038_curve_wizard.md L27/L69: "the default
-     * for the Java engine's tau"), so the engine reads 0.001 every real run. The 4.0 in the Java
-     * header is only an unreachable fallback for an unset `%tau`. Defaulting to 4.0 over-damped every
-     * suggestion toward the current curve — the owner's "suggestion quality is poor". 0.001 ≈ 0 (the
-     * label recommends 0.001–5, never exactly 0, since τ is a divisor). All wizard goldens pass τ
-     * explicitly (4.0/1.0/2.0/8.0), so this default change touches no golden vector.
-     */
+    /** Inertia regularization: τ=0.001 → confidence 1−exp(−weightedCount/τ). G3-F17: faithful default 0.001. */
     val tau: Double = 0.001,
 )
 
-/**
- * Successful curve suggestion — all outputs of task38 Java Block #1.
- *
- * Integer fields (zone1End, zone2End, form2d) use `Math.round(double)` (ties toward +∞).
- * String fields (form1a … form3a) use `String.format("%.3f")` (Locale.US).
- *
- * Tasker: task38 Java Block #1, output writes L853–861.
- */
+/** Successful curve suggestion. Integers via Math.round (ties +∞); Strings via %.3f (Locale.US).
+ * Tasker: task38 Java Block #1, output writes L853–861. */
 data class CurveSuggestionResult(
     val zone1End: Long,
     val zone2End: Long,
@@ -65,24 +34,12 @@ data class CurveSuggestionResult(
     val form2d: Long,
     val form3a: String,
     val diagnosticsLog: String,
-    /** 4 human-readable quality lines (%suggest_r2_1..4). */
     val qualityLines: List<String>,
 )
 
-/**
- * Curve-suggestion engine — "AAB Curve Fitting Engine V43.8 (Confidence Fix)".
- *
- * Pure-domain, deterministic: no I/O, no randomness. Ported from task38 Java Block #1
- * (XML L9922–L10868) with Java semantics preserved:
- *  - `Math.round(double)` for integer zone ends (ties toward +∞)
- *  - `String.format(Locale.US, "%.3f", …)` for curve parameters
- *  - All numeric constants verbatim from the source
- *
- * Returns null if the override set has fewer than 9 entries after ghost injection,
- * or if no valid curve boundary was found (same as task38's `%suggest = "error"` path).
- *
- * Tasker: task38 "_SuggestCurveParameters V24 (Hybrid)". XML L9779–L10913.
- */
+/** AAB Curve Fitting Engine V43.8 (Confidence Fix). Pure-domain, deterministic.
+ * Ported from task38 Java Block #1 (L9922–L10868) preserving Math.round and String.format semantics.
+ * Tasker: task38 "_SuggestCurveParameters V24 (Hybrid)". XML L9779–L10913. */
 object CurveSuggestionEngine {
 
     /**
@@ -111,7 +68,6 @@ object CurveSuggestionEngine {
         log.append(String.format(Locale.US, "  Zone2End (current): %.1f\n", currentZone2end))
         log.append(String.format(Locale.US, "  MaxBright: %.1f\n\n", maxBright))
 
-        // Build sorted data points from override list
         val dataPoints: MutableList<DoubleArray> = mutableListOf()
         for (pt in input.overrides) {
             val dp = doubleArrayOf(pt.lux, pt.brightness.coerceIn(0.0, maxBright), pt.weight, pt.kind)
@@ -119,7 +75,6 @@ object CurveSuggestionEngine {
         }
         dataPoints.sortWith { a, b -> a[0].compareTo(b[0]) }
 
-        // Count real data and bins for ghost injection
         var realCount = 0
         val binsFilled = BooleanArray(5)
         for (pt in dataPoints) {
@@ -138,7 +93,6 @@ object CurveSuggestionEngine {
         var ghostWeight = 0.1 + (0.4 * (realCount / 50.0))
         if (ghostWeight > 0.5) ghostWeight = 0.5
 
-        // Current curve's zone-2 end point and form3a for ghost brightness evaluation
         val curTermD = safePowDelta(currentZone1end - currentForm2c, 0.33)
         val curYZ2 = currentForm2a + currentForm2b * (safePowDelta(currentZone2end - currentForm2c, 0.33) - curTermD)
         var curForm3a = if (maxBright > 0.01) currentZone2end * (maxBright - curYZ2) / maxBright else 0.0
@@ -164,7 +118,6 @@ object CurveSuggestionEngine {
         }
         if (ghostsAdded) dataPoints.sortWith { a, b -> a[0].compareTo(b[0]) }
 
-        // Global weight normalization: mean real weight → 1
         var sumRaw = 0.0; var cntRaw = 0
         for (pt in dataPoints) if (isRealDataPoint(pt)) { sumRaw += pt[2]; cntRaw++ }
         val meanRaw = if (cntRaw > 0) sumRaw / cntRaw else 1.0
@@ -227,12 +180,8 @@ object CurveSuggestionEngine {
 
             val dupIdx = (0 until topKZ1).firstOrNull { z1Scores[it] > -9998.0 && abs(z1Values[it] - tempForm2d) < 1e-9 } ?: -1
             if (dupIdx != -1) {
-                // Duplicate boundary found: update if the new split scores better, then bubble up.
                 if (combinedScore > z1Scores[dupIdx]) {
                     z1Scores[dupIdx] = combinedScore
-                    // Full bubble pass — t decrements every iteration, the swap is conditional. A
-                    // guard-on-swap while-loop would do at most ONE swap and collapse the top-K
-                    // shortlist to a 1–2 candidate window (DA-016).
                     // Tasker: task38 Java Block #1, Stage 1 top-K bubble-up L649–655.
                     for (t in dupIdx downTo 1) {
                         if (z1Scores[t] > z1Scores[t - 1]) {
@@ -242,7 +191,6 @@ object CurveSuggestionEngine {
                     }
                 }
             } else if (combinedScore > z1Scores[topKZ1 - 1]) {
-                // New boundary candidate: insert at the bottom slot and bubble up (full pass, DA-016).
                 z1Scores[topKZ1 - 1] = combinedScore; z1Values[topKZ1 - 1] = tempForm2d
                 // Tasker: task38 Java Block #1, Stage 1 top-K bubble-up L659–667.
                 for (t in topKZ1 - 1 downTo 1) {
@@ -523,14 +471,8 @@ object CurveSuggestionEngine {
         )
     }
 
-    /**
-     * Apply a suggestion to the current curve — task655 "_SetSuggestedVariables" logic.
-     *
-     * Re-derives form2a and form3a for C0 continuity instead of copying from the suggestion
-     * (task655 act10/27 re-compute them from the freshly-written live params).
-     *
-     * Tasker: task655 XML L32574–L32829.
-     */
+    /** Re-derive form2a and form3a for C0 continuity (task655 act10/27).
+     * Tasker: task655 XML L32574–L32829. */
     fun applyToLiveCurve(suggestion: CurveSuggestionResult, current: BrightnessCurveConfig): BrightnessCurveConfig {
         val form1a = suggestion.form1a.replace(',', '.').toDouble()
         val zone1End = suggestion.zone1End.toDouble()
@@ -539,13 +481,8 @@ object CurveSuggestionEngine {
         val zone2End = suggestion.zone2End.toDouble()
         val maxBright = current.maxBrightness.toDouble()
 
-        // task655 act10: form2a re-derived — form1a * sqrt(zone1end)
         val form2a = form1a * sqrt(zone1End)
-
-        // task655 act16-22: clamp form2c below zone1End
         if (form2c >= zone1End) form2c = zone1End
-
-        // task655 act26-27: form3a re-derived for C0 continuity at zone2End
         val termD = safePowDelta(zone1End - form2c, 0.33)
         val termX = safePowDelta(zone2End - form2c, 0.33)
         val yZ2End = form2a + form2b * (termX - termD)
@@ -561,8 +498,6 @@ object CurveSuggestionEngine {
             form3A = form3a,
         )
     }
-
-    // ---- Private helpers (faithful ports of Java inner methods) ----------------------------
 
     private fun safePowDelta(v: Double, p: Double): Double = maxOf(v, 1e-9).pow(p)
 

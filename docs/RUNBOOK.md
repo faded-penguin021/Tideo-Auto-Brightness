@@ -7,7 +7,7 @@ playbook that matches your task, read the reference docs it names, then do the w
 The migration narrative (segment briefs, gate findings) is frozen in `docs/history/` — consult it,
 don't extend it. The numbered deviations live in `docs/LEDGER.md`, a permanent append-only
 registry (never compress it; append the next number in the LIVE ledger file — base file closed
-at D-176; from `LEDGER_A.md`/DA-001 on, 1000 lines per file, final row may overflow,
+at D-176; from `LEDGER_A.md`/DA-001 on, `LEDGER_LINE_CAP` lines per file, final row may overflow,
 next row opens `_B.md`/DB-001, …; D-153/DA-001). **Code + golden
 vectors are ground truth**; where any doc disagrees with the code, trust the code (and fix the doc).
 
@@ -345,6 +345,20 @@ any moment (rate limit, window end, compaction).
    NOT be verified locally. On-device behavior stays owner-verified (`DEVICE_TEST_SCRIPT.md`);
    never imply a green ladder covers it. This is disclosure of real actions, not an
    attestation gate (the D-162 line holds).
+9. **Establish coverage before reporting an absence (AMH 5.1.0).** Before you report that
+   something does not exist or never happened, establish that the command you ran *could have
+   seen it*, and name an artifact that could have held the answer — naming the command that
+   already failed to see it discharges nothing. The shape to watch for is a local artifact read
+   and its answer reported as a property of the repository. The standing trap here is git under
+   this repo's `MERGE_MODE` (`amh.conf`): a squash merge lands a whole train of sessions as ONE
+   commit, so every INTERMEDIATE state and superseded branch is destroyed by design. `git log`
+   and `blame` therefore cannot answer "was this ever tried", "when did this change" or "what
+   did that session do" — the ledger, the `docs/STATE.md` changelog and `docs/history/` are what
+   survive. This does NOT extend to released states: tags and `git show <tag>:<path>` remain
+   valid evidence and §6 depends on them; likewise `git show HEAD:<path>`, which several ladder
+   rungs use. Prose-only, and the defect is the generalization drawn from a command's output —
+   no pre-execution rail can see a belief formed after the command returned. If a later session
+   finds a checkable slice of this, that check is welcome; what cannot be gated is the belief.
 
 ## Glue-review protocol (MANDATORY for `:platform` / `:app` runtime changes)
 
@@ -551,7 +565,7 @@ If this runbook lacks what you need for the task in front of you:
 1. Consult the live reference docs above (esp. `docs/LEDGER.md`) and the frozen
    `docs/history/` narrative.
 2. If you learn a durable fact future sessions need, record it as a new numbered deviation
-   in the live ledger file (1000-line cap + rollover, D-153/DA-001) and/or correct the relevant
+   in the live ledger file (`LEDGER_LINE_CAP` cap + rollover, D-153/DA-001) and/or correct the relevant
    reference doc — provenance-stamped, terse.
 3. If a playbook here is wrong, stale, or missing a case you just handled, **fix this RUNBOOK in
    the same change.** Treat the runbook as code: it should always reflect how changes are

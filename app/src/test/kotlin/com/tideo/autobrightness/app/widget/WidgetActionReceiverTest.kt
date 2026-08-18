@@ -11,11 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * D-147: the widget provider must stay exported for the system's APPWIDGET_UPDATE broadcasts, so a
- * co-installed app can always send it explicit intents — the custom state-changing button actions
- * (toggle/reset) must therefore not be actionable on it.
- */
+// D-147: exported provider block custom actions (toggle/reset) on co-installed apps.
 @RunWith(RobolectricTestRunner::class)
 class WidgetActionReceiverTest {
     private val application: Application = ApplicationProvider.getApplicationContext()
@@ -40,9 +36,4 @@ class WidgetActionReceiverTest {
         assertEquals(AmbientMonitoringService.ACTION_REAPPLY, intent.action)
     }
 
-    // NOT covered here: WidgetActionReceiver.toggle. Its enable path schedules the maintenance
-    // worker, and WorkManager cannot run under Robolectric without the androidx.work-testing
-    // artifact (declined as a new dependency, see the H3 MaintenanceWorker rationale in STATE.md).
-    // Writing the shared DataStore singleton from this test also polluted persisted serviceEnabled
-    // for later suites. The toggle body is the QS tile's shipped pattern, moved verbatim (D-147).
 }

@@ -16,34 +16,40 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * DisplayTogglesCoordinator (D-151): profile fields → device via the only-on-change apply path —
- * seed adopts the baseline without writing, profile swaps write per-field diffs, equal swaps write
- * nothing (manual/system changes stick), tier gate no-ops below ELEVATED, a null temperature is
- * never written, and stop() returns the toggles to the baseline's values (the resting state).
- */
+/** D-151: profile fields → device (only-on-change). Seed no-op, swaps write diffs, stop() returns to baseline. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DisplayTogglesCoordinatorTest {
 
-    /** In-memory device with a write log — the assertions are on WHICH writes happen. */
     private class FakeSecureDisplay : SecureDisplayController {
+        override var nightLightAvailable = true
+        override var alwaysOnDisplayAvailable = true
         val writes = mutableListOf<String>()
+        // DB-048: what the coordinator ASKED for, recorded before the capability gate. Without it a
+        // gated assertion only re-reads this fake's own `if`, and would still pass if the coordinator
+        // stopped calling the controller at all. The production gate is pinned in
+        // SecureDisplayControllerTest; this fake only stands in for it.
+        val attempts = mutableListOf<String>()
         private fun write(entry: String): Result<Unit> {
             writes += entry
             return Result.success(Unit)
         }
 
+        private fun gated(entry: String, available: Boolean): Result<Unit> {
+            attempts += entry
+            return if (available) write(entry) else Result.success(Unit)
+        }
+
         override fun readNightLight() = false
-        override fun setNightLight(on: Boolean) = write("nightLight=$on")
+        override fun setNightLight(on: Boolean) = gated("nightLight=$on", nightLightAvailable)
         override fun readNightLightTemperature(): Int? = null
-        override fun setNightLightTemperature(kelvin: Int) = write("temp=$kelvin")
+        override fun setNightLightTemperature(kelvin: Int) = gated("temp=$kelvin", nightLightAvailable)
         override fun readNightLightAutoMode() = NightLightAutoMode.MANUAL
         override fun readDaltonizer() = DaltonizerMode.OFF
         override fun setDaltonizer(mode: DaltonizerMode) = write("daltonizer=$mode")
         override fun readInversion() = false
         override fun setInversion(on: Boolean) = write("inversion=$on")
         override fun readAlwaysOnDisplay() = false
-        override fun setAlwaysOnDisplay(on: Boolean) = write("aod=$on")
+        override fun setAlwaysOnDisplay(on: Boolean) = gated("aod=$on", alwaysOnDisplayAvailable)
         override fun readStayAwakePlugged() = false
         override fun setStayAwakePlugged(on: Boolean) = write("stayAwake=$on")
         override var hdrForceSdrAvailable = true
@@ -66,7 +72,7 @@ class DisplayTogglesCoordinatorTest {
     ) {
         val display = FakeSecureDisplay()
         var tier = tier
-        /** The D-154 ramp Kelvin the fake "sun" currently yields; null = ramp not computable. */
+        // D-154: ramp Kelvin the fake "sun" yields; null = not computable
         var rampKelvin: Int? = null
         val baselineFlow = MutableStateFlow(baseline)
         val effectiveFlow = MutableStateFlow<AabSettings?>(null)
@@ -86,8 +92,7 @@ class DisplayTogglesCoordinatorTest {
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = baseline
         runCurrent()
-        // Service start is not a profile change: a default chain must never touch the device
-        // (the system Night Light schedule keeps working for non-users of the feature).
+        // Service start is not a profile change; must never touch device
         assertTrue(h.display.writes.isEmpty(), "seed must not write: ${h.display.writes}")
     }
 
@@ -98,7 +103,7 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = baseline
         h.effectiveFlow.value = nightProfile
         runCurrent()
-        // inversion is false in BOTH — it must not be written.
+        // inversion is false in both; must not write
         assertEquals(
             listOf("nightLight=true", "temp=2700", "daltonizer=GRAYSCALE"),
             h.display.writes,
@@ -113,8 +118,7 @@ class DisplayTogglesCoordinatorTest {
         h.display.writes.clear()
         h.effectiveFlow.value = baseline
         runCurrent()
-        // Baseline turns Night Light + grayscale back off; its null temperature means "no opinion"
-        // (the system treats the temperature as a persistent preference), so no temp write.
+        // Baseline turns Night Light off; null temp means "no opinion" (persistent system pref)
         assertEquals(listOf("nightLight=false", "daltonizer=OFF"), h.display.writes)
     }
 
@@ -122,8 +126,7 @@ class DisplayTogglesCoordinatorTest {
     fun equalSwap_writesNothing_soManualChangesStick() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness()
         h.coordinator.start(backgroundScope)
-        // Two different profiles with IDENTICAL display fields (e.g. Battery Saver → Outdoors,
-        // both defaults): no display write, so a manual/system toggle in between is not stomped.
+        // Two profiles with identical display fields: no write, so manual/system changes stick
         h.effectiveFlow.value = baseline
         h.effectiveFlow.value = baseline.copy(minBrightness = 42)
         runCurrent()
@@ -138,8 +141,7 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = nightProfile
         runCurrent()
         assertTrue(h.display.writes.isEmpty(), "below ELEVATED nothing is written: ${h.display.writes}")
-        // A later grant does NOT retroactively replay the skipped swap — only the next CHANGE
-        // asserts (the dimming coordinator's tier-gate semantics).
+        // Grant does not retroactively replay; only next change asserts
         h.tier = Tier.ELEVATED
         h.effectiveFlow.value = nightProfile.copy(inversionEnabled = true)
         runCurrent()
@@ -154,7 +156,7 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         h.display.writes.clear()
         h.coordinator.stop()
-        // D-151 resting state: a service stop mid-override re-applies the baseline (no latch).
+        // D-151: service stop re-applies baseline (no latch)
         assertEquals(listOf("nightLight=false", "daltonizer=OFF"), h.display.writes)
     }
 
@@ -173,15 +175,14 @@ class DisplayTogglesCoordinatorTest {
         val h = Harness()
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = baseline
-        // User edits the baseline profile (Apply on the Privileged Display profile section):
-        // reevaluate() republishes the new baseline as the effective settings.
+        // User edits baseline profile; reevaluate() republishes as effective
         val edited = baseline.copy(nightLightEnabled = true)
         h.baselineFlow.value = edited
         h.effectiveFlow.value = edited
         runCurrent()
         assertEquals(listOf("nightLight=true"), h.display.writes)
         h.display.writes.clear()
-        // The resting state followed the baseline edit: stop() has nothing to undo.
+        // Resting state tracks baseline edit; stop() has nothing to undo
         h.coordinator.stop()
         assertTrue(h.display.writes.isEmpty(), "resting state must track the live baseline")
     }
@@ -210,6 +211,33 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         assertTrue(h.display.writes.isEmpty(), "hdr must not be written when unavailable: ${h.display.writes}")
     }
+
+    @Test
+    fun unsupportedNightLightAndAod_cannotBeBypassedByProfilesTicksOrPanic() =
+        runTest(UnconfinedTestDispatcher()) {
+            val h = Harness(tickIntervalMs = 1_000L)
+            h.display.nightLightAvailable = false
+            h.display.alwaysOnDisplayAvailable = false
+            h.rampKelvin = 3_200
+            h.coordinator.start(backgroundScope)
+            h.effectiveFlow.value = baseline
+            h.effectiveFlow.value = circadianProfile.copy(alwaysOnDisplayEnabled = true)
+            runCurrent()
+            advanceTimeBy(1_100); runCurrent()
+            h.coordinator.panicReset()
+
+            assertTrue(
+                h.display.writes.none { it.startsWith("nightLight=") || it.startsWith("temp=") || it.startsWith("aod=") },
+                "capability-gated features must never reach a write: ${h.display.writes}",
+            )
+            // DB-048: and the suppression must be the CONTROLLER's, not a coordinator-local skip —
+            // otherwise this passes just as well on a build where the gate has been deleted.
+            assertTrue(
+                h.display.attempts.any { it.startsWith("nightLight=") } &&
+                    h.display.attempts.any { it.startsWith("aod=") },
+                "every path must still route through the gated setters: ${h.display.attempts}",
+            )
+        }
 
     @Test
     fun unknownDaltonizerString_fallsBackToOff() = runTest(UnconfinedTestDispatcher()) {
@@ -251,10 +279,10 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = circadianProfile
         runCurrent()
         h.display.writes.clear()
-        // Sun unchanged → the tick must be silent (no per-minute settings churn).
+        // Sun unchanged; tick must be silent (no churn)
         advanceTimeBy(61_000); runCurrent()
         assertTrue(h.display.writes.isEmpty(), "unchanged ramp must not rewrite: ${h.display.writes}")
-        // Sun moved → exactly one write per changed value.
+        // Sun moved; one write per change
         h.rampKelvin = 3_300
         advanceTimeBy(60_000); runCurrent()
         advanceTimeBy(60_000); runCurrent()
@@ -272,7 +300,7 @@ class DisplayTogglesCoordinatorTest {
         advanceTimeBy(61_000); runCurrent()
         assertTrue(h.display.writes.isEmpty(), "static profile must not tick: ${h.display.writes}")
 
-        // Tracking on but below ELEVATED → inert (the D-151 tier-gate semantics).
+        // Tracking on but below ELEVATED; inert (D-151 tier-gate)
         h.effectiveFlow.value = circadianProfile
         runCurrent()
         h.display.writes.clear()
@@ -281,7 +309,7 @@ class DisplayTogglesCoordinatorTest {
         advanceTimeBy(60_000); runCurrent()
         assertTrue(h.display.writes.isEmpty(), "below ELEVATED the tick must not write: ${h.display.writes}")
 
-        // Ramp not computable (null) → skip, no crash, no write.
+        // Ramp not computable (null); skip with no crash
         h.tier = Tier.ELEVATED
         h.rampKelvin = null
         advanceTimeBy(60_000); runCurrent()
@@ -296,9 +324,8 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = circadianProfile
         runCurrent()
         h.display.writes.clear()
-        // The static profile's 2700 equals the circadian profile's recorded anchor, but the DEVICE
-        // sits at the last ramp write (3400) — the diff must compare against what was written, not
-        // the profile-field history, or the temperature would stick at the ramp value forever.
+        // Static profile's 2700 equals anchor, but device sits at last ramp write (3400);
+        // diff vs what was written, not profile history
         h.effectiveFlow.value = circadianProfile.copy(nightLightCircadianEnabled = false)
         runCurrent()
         assertEquals(listOf("temp=2700"), h.display.writes)
@@ -312,8 +339,7 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = circadianProfile
         runCurrent()
         h.display.writes.clear()
-        // Baseline has a null temperature = "no opinion": per D-151 it never writes, so the last
-        // ramp value stays (a persistent system preference, like any other null-temp hand-off).
+        // Baseline null temp = "no opinion"; never writes, last ramp value persists
         h.effectiveFlow.value = baseline
         runCurrent()
         assertEquals(listOf("nightLight=false"), h.display.writes)
@@ -327,8 +353,7 @@ class DisplayTogglesCoordinatorTest {
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = baseline
         runCurrent()
-        // Even though tracking believes everything already IS default (post-death residuals are
-        // invisible to this process), panic writes every field — no diff, no temperature.
+        // Panic writes every field unconditionally (post-death residuals invisible)
         h.coordinator.panicReset()
         assertEquals(
             listOf(
@@ -348,8 +373,7 @@ class DisplayTogglesCoordinatorTest {
         h.display.writes.clear()
         h.coordinator.panicReset()
         h.display.writes.clear()
-        // onDestroy's stop() follows the panic teardown — it must find the coordinator stopped
-        // and write NOTHING (the baseline carries the values panic just cleared).
+        // stop() after panic must find coordinator stopped; write nothing
         h.coordinator.stop()
         assertTrue(h.display.writes.isEmpty(), "stop after panic must not re-apply the baseline: ${h.display.writes}")
     }
@@ -362,9 +386,7 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         h.coordinator.panicReset()
         h.display.writes.clear()
-        // Same-process re-enable: lastApplied stayed at DEFAULTS, so the restart's first
-        // effective emission (the baseline) DIFFERS and re-asserts the user's configuration —
-        // the panic is an escape hatch, not a permanent opt-out.
+        // Same-process re-enable: restart's first effective differs; re-asserts configuration
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = nightProfile
         runCurrent()
@@ -394,8 +416,7 @@ class DisplayTogglesCoordinatorTest {
 
     @Test
     fun daltonizerModeStrings_mirrorThePlatformEnum() {
-        // Drift guard: AabSettings.DALTONIZER_MODES is the platform-import-free mirror of
-        // DaltonizerMode — a rename/addition on either side must fail here.
+        // Drift guard: DALTONIZER_MODES mirrors platform DaltonizerMode
         assertEquals(DaltonizerMode.entries.map { it.name }.toSet(), DALTONIZER_MODES)
     }
 }

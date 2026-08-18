@@ -7,12 +7,7 @@ import java.io.ByteArrayInputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * G2R-F83 / D-121: the ipwho.is geo-IP fallback (task90 act28, now HTTPS). The HTTP fetch is injected so
- * the JSON parse and the failure paths are pure-JVM testable. ipwho.is returns
- * `{"success":true,...,"latitude":...,"longitude":...}` (or `{"success":false,"message":...}`), using the
- * full words `latitude`/`longitude` rather than ip-api.com's old `lat`/`lon`.
- */
+/** G2R-F83 / D-121: ipwho.is geo-IP fallback (task90 act28, HTTPS). */
 class GeoIpLocationClientTest {
 
     private val successBody = """

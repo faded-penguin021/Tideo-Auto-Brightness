@@ -10,13 +10,8 @@ import com.tideo.autobrightness.R
 import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
 
 /**
- * AAB Experiment / Circadian Graph (Tasker: task549 `_GenerateCircadianGraph V8`, feeds
- * %AAB_HTML_Graph4). The day-scaling preview shown on the Circadian screen ("Circadian" slot). Plots
- * the brightness-scaling multiplier across the day (`scaled_value = 1 + (spread/100)·modifier` = the
- * engine's `scaleDynamic`), highest by day — the inverse of the Circadian Dimming graph.
- *
- * Shares [circadianCurve] / [DynamicScaleEngine] with [CircadianDimmingChart]; this instance picks the
- * scale series and runs in the same UTC time-of-day frame with the five sun-event lines.
+ * Circadian Scale Graph (task549 `_GenerateCircadianGraph V8`).
+ * Day-scaling preview; shares circadianCurve with CircadianDimmingChart.
  */
 @Composable
 fun CircadianScaleChart(
@@ -45,7 +40,7 @@ fun CircadianScaleChart(
         xAxisLabel = stringResource(R.string.chart_time_utc),
         yAxisLabel = stringResource(R.string.chart_scale_x),
         xTickFormatter = ::hourToHhmm,
-        interactive = true, // scrub readout (owner: charts must stay interactive)
+        interactive = true, // charts must stay interactive for scrub readout
         contentDescription = stringResource(R.string.a11y_graph_circadian_scale),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,

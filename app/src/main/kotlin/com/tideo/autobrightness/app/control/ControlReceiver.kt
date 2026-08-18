@@ -3,8 +3,12 @@ package com.tideo.autobrightness.app.control
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.annotation.StringRes
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
+import com.tideo.autobrightness.app.runtime.DebugCategory
+import com.tideo.autobrightness.app.runtime.ToastDebugSink
 import com.tideo.autobrightness.app.runtime.goAsync
 import com.tideo.autobrightness.app.settings.ProfileApplier
 import com.tideo.autobrightness.app.storage.controlPrefsDataStore
@@ -13,46 +17,18 @@ import com.tideo.autobrightness.app.widget.DashboardWidgetProvider
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * D-157: the **exported** external-control surface for automation frameworks (Tasker / MacroDroid).
- *
- * Deliberately re-opens the class of surface D-147 closed (a third-party app can send these
- * broadcasts), but made safe by an **opt-in runtime gate**: [ControlPrefsStore.externalControlEnabled]
- * defaults OFF and is the receiver's **FIRST** check — while off, every action is ignored (the
- * OFF-ignores-everything property, pinned by a D-147-style negative test). There is no shared secret:
- * the exposed verbs are exactly what the notification / QS tile / widget already give the user, and no
- * data leaves the app, so a token would be pure friction in the Tasker/MacroDroid UIs (plan decision 1).
- *
- * Every verb maps onto an already-hardened path, with per-verb semantics while the service is not
- * running: [ACTION_PAUSE]/[ACTION_REAPPLY] are validated no-ops (the service-side D-140 zombie gates);
- * [ACTION_RESUME] is dropped HERE while `serviceEnabled=false` (D-160 — the service side is
- * deliberately ungated, F74) and otherwise resumes, restarting a system-killed service; [ACTION_PANIC]
- * always executes — it restores brightness + display defaults and stops (that is its purpose, D-155).
- *
- * Platform caveat: [ACTION_SERVICE_ON] arriving while the app is background-restricted may throw
- * `ForegroundServiceStartNotAllowedException` (API 31+ FGS launch rules); [AutoBrightnessRuntime.startMonitoring]
- * catches it and marks the service degraded (surfaced on the Dashboard). Users exempt Tideo from
- * battery optimization for reliable external enable (in-app help text, U4).
- */
+/** D-157: Exported external-control surface (Tasker/MacroDroid). Opt-in gate [ControlPrefsStore.externalControlEnabled].
+ * D-147/D-160: safe re-opening; D-155: PANIC always executes. Per-verb semantics while service not running.
+ * FGS caveat: API 31+ may throw ForegroundServiceStartNotAllowedException; caught and marked degraded. */
 class ControlReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        // DA-043: an unknown verb can do nothing, so it must not consume the process-wide admission
-        // slot on its way to doing nothing. Rejecting here means a flood of junk actions cannot make
-        // the receiver drop a legitimate command that arrives alongside it — and it costs an
-        // unauthenticated caller the DataStore read the gate check would otherwise perform.
+        // DA-043: reject unknown verbs before admission gate.
         if (action !in KNOWN_ACTIONS) return
-        // DA-039: this is an exported, caller-unrestricted receiver. DataStore serializes individual
-        // writes, but it does not bound the number of goAsync coroutines/PendingResults or serialize
-        // the later service/widget side effects. Admit one whole command at a time and drop overlap;
-        // explicit ON/OFF verbs let well-behaved automation converge on a retry without an unbounded
-        // in-process queue. This is a resource bound, not caller authentication.
+        // DA-039: serialize commands globally (resource bound, not auth).
         if (!commandInFlight.compareAndSet(false, true)) return
-        // Read the LOAD_PROFILE extra here (the intent is not passed further); a missing/blank name
-        // makes LOAD_PROFILE a no-op (ProfileApplier ignores an unknown name anyway).
         val profileName = runCatching { intent.getStringExtra(EXTRA_PROFILE_NAME) }.getOrNull()
-        // goAsync: the gate read is a DataStore lookup; keep the broadcast alive off the main thread.
         try {
             goAsync {
                 try {
@@ -62,47 +38,74 @@ class ControlReceiver : BroadcastReceiver() {
                 }
             }
         } catch (failure: Throwable) {
-            // The coroutine's finally owns normal/async release. If PendingResult acquisition or
-            // launch itself fails synchronously, the block never starts, so release here instead.
             commandInFlight.set(false)
             throw failure
         }
     }
 
-    /**
-     * The gate is the FIRST check (D-157 security property): read the opt-in flag and drop everything
-     * when it is off, BEFORE any verb touches settings or the service.
-     */
+    /** D-157 security: gate check first, drop all when disabled. */
     internal suspend fun handle(appContext: Context, action: String, profileName: String? = null) {
         val enabled = ControlPrefsStore(appContext.controlPrefsDataStore).externalControlEnabled.first()
-        if (!enabled) return
+        if (!enabled) {
+            flashDrop(appContext, debugLevel(appContext), R.string.flash_control_gate_off)
+            return
+        }
         route(appContext, action, profileName)
     }
 
-    /** Dispatch a verb onto its existing, already-hardened runtime path. Unknown actions are ignored. */
+    private suspend fun debugLevel(appContext: Context): Int =
+        appContext.settingsDataStore.data.first().debugLevel
+
+    /**
+     * DB-035: say why a command did nothing, in the CONTEXT_AUTOMATION debug level only. The level
+     * is checked before anything is built, so a rejected broadcast allocates nothing at level 0.
+     */
+    private fun flashDrop(appContext: Context, level: Int, @StringRes resId: Int, vararg args: Any) {
+        if (level != DebugCategory.CONTEXT_AUTOMATION.level) return
+        ToastDebugSink(appContext).emit(DebugCategory.CONTEXT_AUTOMATION, level) {
+            appContext.getString(resId, *args)
+        }
+    }
+
+    /**
+     * DB-035: the caller chooses this text and `AabFlash` may render it in the system-wide overlay,
+     * so cap it and drop control/bidi characters — an 8 KB or RTL-override "name" is not a label.
+     */
+    private fun String.forFlash(): String =
+        filterNot { it.isISOControl() || it in BIDI_CONTROLS }.take(FLASH_ARG_MAX)
+
     internal suspend fun route(appContext: Context, action: String, profileName: String? = null) {
         when (action) {
             ACTION_SERVICE_ON -> setServiceEnabled(appContext) { true }
             ACTION_SERVICE_OFF -> setServiceEnabled(appContext) { false }
             ACTION_SERVICE_TOGGLE -> setServiceEnabled(appContext) { current -> !current }
             ACTION_PAUSE -> AutoBrightnessRuntime.pause(appContext)
-            // D-160: an external RESUME must not resurrect a user-disabled service. The service-side
-            // ACTION_RESUME is deliberately NOT D-140-gated (F74: the notification Resume's contract is
-            // resurrect — its trigger, the paused-override notification, exists only while the service
-            // is enabled). This exported surface has no such precondition, so the same verb sent while
-            // `serviceEnabled=false` would start the pipeline against the persisted disable — the D-140
-            // zombie class. Gate at the surface; the notification path stays untouched.
-            ACTION_RESUME ->
-                if (appContext.settingsDataStore.data.first().serviceEnabled) {
+            // D-160: RESUME gated on serviceEnabled (D-140 zombie class).
+            ACTION_RESUME -> {
+                // One read serves both the gate and the drop reason (no TOCTOU between them).
+                val settings = appContext.settingsDataStore.data.first()
+                if (settings.serviceEnabled) {
                     AutoBrightnessRuntime.resume(appContext)
+                } else {
+                    flashDrop(appContext, settings.debugLevel, R.string.flash_control_resume_ignored)
                 }
+            }
             ACTION_REAPPLY -> AutoBrightnessRuntime.reapply(appContext)
             ACTION_PANIC -> AutoBrightnessRuntime.panic(appContext)
-            // Profile verbs reuse the exact ProfileApplier path the Profiles UI drives (D-157 U3):
-            // LOAD_PROFILE latches the manual context lock; CONTEXTS_RESUME clears it.
-            ACTION_LOAD_PROFILE -> profileName?.let { profileApplier(appContext).applyProfile(it) }
+            // D-157 U3: LOAD_PROFILE latches context lock; CONTEXTS_RESUME clears it.
+            ACTION_LOAD_PROFILE ->
+                if (profileName == null) {
+                    flashDrop(appContext, debugLevel(appContext), R.string.flash_control_name_missing)
+                } else if (!profileApplier(appContext).applyProfile(profileName)) {
+                    flashDrop(
+                        appContext,
+                        debugLevel(appContext),
+                        R.string.flash_control_profile_unknown,
+                        profileName.forFlash(),
+                    )
+                }
             ACTION_CONTEXTS_RESUME -> profileApplier(appContext).resumeContextAutomation()
-            else -> Unit // unknown action ignored
+            else -> Unit
         }
     }
 
@@ -110,12 +113,7 @@ class ControlReceiver : BroadcastReceiver() {
     private fun profileApplier(appContext: Context) =
         ProfileApplier(appContext, AppModule(appContext).userProfileStore)
 
-    /**
-     * Set `serviceEnabled` to `target(current)`, drive the runtime and repaint the widget — the
-     * `WidgetActionReceiver.toggle` shipped dance (D-147), parameterized by the target-state function
-     * (ON forces true, OFF forces false, TOGGLE flips). Copied, not shared: the tile/widget keep their
-     * own working code untouched (plan Design table).
-     */
+    /** D-147: toggle dance (ON=true, OFF=false, TOGGLE=flip). Tile/widget keep their own copies. */
     private suspend fun setServiceEnabled(appContext: Context, target: (Boolean) -> Boolean) {
         val newEnabled = appContext.settingsDataStore.updateData {
             it.copy(serviceEnabled = target(it.serviceEnabled))
@@ -135,11 +133,8 @@ class ControlReceiver : BroadcastReceiver() {
         const val ACTION_PANIC = "$NS.PANIC"
         const val ACTION_LOAD_PROFILE = "$NS.LOAD_PROFILE"
         const val ACTION_CONTEXTS_RESUME = "$NS.CONTEXTS_RESUME"
-
-        /** String extra on [ACTION_LOAD_PROFILE]: the saved/built-in profile name to load. */
         const val EXTRA_PROFILE_NAME = "name"
 
-        /** Every verb [route] can act on. Anything else is refused before the admission gate. */
         internal val KNOWN_ACTIONS = setOf(
             ACTION_SERVICE_ON,
             ACTION_SERVICE_OFF,
@@ -154,7 +149,13 @@ class ControlReceiver : BroadcastReceiver() {
 
         private val commandInFlight = AtomicBoolean(false)
 
-        /** Test seam for the process-wide admission bound; production uses the same atomic directly. */
+        // DB-035: bounds on caller-supplied flash text (LTR/RTL overrides + isolates).
+        private const val FLASH_ARG_MAX = 40
+        private val BIDI_CONTROLS = charArrayOf(
+            '‎', '‏', '‪', '‫', '‬', '‭', '‮',
+            '⁦', '⁧', '⁨', '⁩',
+        )
+
         internal fun tryAcquireCommand(): Boolean = commandInFlight.compareAndSet(false, true)
         internal fun releaseCommand() = commandInFlight.set(false)
     }

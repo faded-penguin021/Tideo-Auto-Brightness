@@ -45,11 +45,7 @@ import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * S12.5b acceptance for the parameter screens: validator red-errors render (task583/707), the
- * preview→Apply chrome works (committed `[bracket]` + Apply/Discard bar), and the slider-backed
- * fields are bounded (G2-F3/F13).
- */
+/** S12.5b: parameter screens with validator errors, preview/apply, and bounded sliders. */
 @RunWith(RobolectricTestRunner::class)
 class SettingsScreensTest {
 
@@ -114,14 +110,12 @@ class SettingsScreensTest {
                 )
             }
         }
-        // The grant link is shown when not ELEVATED.
         compose.onNodeWithTag("dimming_grant_link").performScrollTo().assertExists()
     }
 
     @Test
     fun superDimming_liveReadout_rendersRelAndAbs_G2RF58() {
-        // G2R-F58: the Super Dimming screen shows the live %AAB_DimmingCurrent (rel) / %AAB_DimmingDS
-        // (abs) at the current brightness.
+        // G2R-F58: the Super Dimming screen shows live dimmingCurrent (rel) / dimmingDS (abs).
         val seeded = PipelineState(dimmingCurrent = 12.3, dimmingDS = 45.6, lastAppliedBrightness = 8)
         compose.setContent {
             MaterialTheme {
@@ -138,8 +132,7 @@ class SettingsScreensTest {
 
     @Test
     fun inAppFlash_isTapToDismiss_G2RF88() {
-        // G2R-F88: the in-app flash renders as a tappable pill that dismisses on tap (a plain Toast,
-        // which passes clicks through, cannot). Tests the FlashPill wiring directly.
+        // G2R-F88: tappable pill that dismisses on tap (not a Toast which passes clicks through).
         var dismissed = false
         compose.setContent {
             MaterialTheme { FlashPill("Applied") { dismissed = true } }
@@ -151,8 +144,7 @@ class SettingsScreensTest {
 
     @Test
     fun misc_negativeLuxAlpha_isClampedToZeroInDisplay_G2RF86() {
-        // G2R-F86: a transient negative smoothing alpha shows as "0.000" (display clamp only; the
-        // engine value is intentionally left unclamped for parity, D-010a).
+        // G2R-F86: transient negative alpha shows as "0.000" (display clamp; engine value unclamped per D-010(a)).
         val seeded = PipelineState(throttleMs = 1310L, luxAlpha = -0.42)
         compose.setContent {
             MaterialTheme {
@@ -167,8 +159,7 @@ class SettingsScreensTest {
 
     @Test
     fun liveDebug_debugSelector_showsCurrentLabel_andRendersSeededMetrics() {
-        // S12.6b: the debug-category selector is now global on the Live Debug scene (G2R-F9), and the
-        // scene renders live %AAB_* values from a seeded PipelineState (G2R-F6).
+        // S12.6b: global debug-category selector (G2R-F9); renders seeded pipeline state (G2R-F6).
         val seeded = PipelineState(
             smoothedLux = 123.4, lastRawLux = 130.0, threshDynamic = 45.0,
             threshAbsLow = 10.0, threshAbsHigh = 800.0, scaleDynamic = 1.25,
@@ -189,8 +180,7 @@ class SettingsScreensTest {
 
     @Test
     fun reactivityDiagnosticCard_rendersThresholdAsPercent_andDeadZone() {
-        // G2R-F7 + G2R-F56: the Reactivity glass-box card surfaces the live dynamic threshold as a
-        // percentage (0.42 → "42%") plus the absolute dead zone.
+        // G2R-F7/F56: surfaces live dynamic threshold as % (0.42 → "42%") plus dead zone.
         val seeded = PipelineState(smoothedLux = 50.0, threshDynamic = 0.42, threshAbsLow = 5.0, threshAbsHigh = 600.0)
         compose.setContent {
             MaterialTheme { ReactivityDiagnosticCardContent(seeded) }
@@ -220,10 +210,7 @@ class SettingsScreensTest {
 
     @Test
     fun curveBrightness_liveReadout_showsPerceivedBrightness_whenPwmSensitiveFloors_D117() {
-        // D-117: in PWM-sensitive mode lastAppliedBrightness is the FLOORED hardware value (held at the
-        // dimming threshold) and targetBrightness is the un-floored PERCEIVED value. The live readout — like
-        // the Dashboard hero and the curve graph's "Now" line — must show the perceived value (33), not the
-        // hardware floor (88), so the number on screen matches what the user actually sees.
+        // D-117: PWM-sensitive mode: lastAppliedBrightness is floored hardware value; targetBrightness is perceived value. Readout shows perceived (33), not hardware floor (88).
         val seeded = PipelineState(smoothedLux = 123.4, lastAppliedBrightness = 88, targetBrightness = 33)
         compose.setContent {
             MaterialTheme {
@@ -240,21 +227,20 @@ class SettingsScreensTest {
 
     @Test
     fun curveBrightness_derivedCoefficients_useZoneAlignmentLabels_G2RF61() {
-        // G2R-F61: form2A/form3A are labelled as the zone-alignment hinge points, not bare placeholders.
+        // G2R-F61: form2A/form3A labeled as zone-alignment hinge points.
         compose.setContent {
             MaterialTheme {
                 CurveBrightnessContent(AabSettings(), AabSettings(), emptyList(), 0, false, {}, {}, {}, {})
             }
         }
         compose.onNodeWithTag("derived_form2A").performScrollTo().assertExists()
-        // S13c' §05: KeyValueRow keys render as tracked-uppercase instrument captions.
         compose.onNodeWithText("ZONE 2 ALIGNMENT", substring = true).assertExists()
         compose.onNodeWithText("ZONE 3 ALIGNMENT", substring = true).assertExists()
     }
 
     @Test
     fun misc_liveReadout_rendersThrottleAndAlpha_G2RF58() {
-        // G2R-F58: the Misc screen shows the Tasker current_throttle_and_alpha live readout.
+        // G2R-F58: Misc screen shows current_throttle_and_alpha live readout.
         val seeded = PipelineState(throttleMs = 1310L, luxAlpha = 0.421)
         compose.setContent {
             MaterialTheme {
@@ -272,8 +258,7 @@ class SettingsScreensTest {
 
     @Test
     fun misc_scaleBecomesAutoReadout_whenCircadianEnabled_G2RF60() {
-        // G2R-F60: with dynamic scaling on, the static Scale field is replaced by the read-only
-        // "(auto)" dynamic-scale readout; with it off the editable field is shown.
+        // G2R-F60: dynamic scaling on → read-only "(auto)" scale; off → editable field.
         val seeded = PipelineState(scaleDynamicCompress = 0.873)
         compose.setContent {
             MaterialTheme {
@@ -304,7 +289,7 @@ class SettingsScreensTest {
 
     @Test
     fun circadianDiagnosticCard_rendersUncompressedAndTrueScale() {
-        // G2R-F8: the Circadian glass-box card surfaces uncompressed vs true (compressed) scale.
+        // G2R-F8: Circadian glass-box card surfaces uncompressed vs true (compressed) scale.
         val seeded = PipelineState(scaleDynamic = 1.5, scaleDynamicCompress = 0.8, lastAppliedBrightness = 120)
         compose.setContent {
             MaterialTheme { CircadianDiagnosticCardContent(seeded, minBrightness = 10, maxBrightness = 255, timeLabel = "14:30") }
@@ -316,7 +301,7 @@ class SettingsScreensTest {
 
     @Test
     fun misc_committedBracket_shownWhenDraftDiffers() {
-        // Draft min = 42, committed (active) min = 10 → the slider shows the committed value [10].
+        // Draft min = 42, committed min = 10 → slider shows [10].
         compose.setContent {
             MaterialTheme {
                 MiscContent(
@@ -338,8 +323,7 @@ class SettingsScreensTest {
                 )
             }
         }
-        // misc_settings.md: Min brightness 0–75, Max brightness 150–255. Assert the bounds (the
-        // current value carries float-snap imprecision, so range/steps are the meaningful contract).
+        // Assert bounds: Min 0–75, Max 150–255 (float-snap imprecision, so range/steps are meaningful).
         compose.onNodeWithTag("slider_minBrightness").performScrollTo()
             .assert(rangeIs(0f..75f, steps = 74))
         compose.onNodeWithTag("slider_maxBrightness").performScrollTo()
@@ -354,7 +338,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_exposesSunriseTokensAndCurrentSsidHelper() {
-        // G2-F14: the rule editor must offer the SUNRISE/SUNSET tokens + a "use current SSID" helper.
+        // G2-F14: rule editor offers SUNRISE/SUNSET tokens + "use current SSID" helper.
         compose.setContent {
             MaterialTheme {
                 ContextsContent(
@@ -366,7 +350,6 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
-        // G3: enable the collapsible Wi-Fi + Time sections to reveal their fields.
         compose.onNodeWithTag("trigger_toggle_wifi").performScrollTo().performClick()
         compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
         compose.onNodeWithTag("use_current_ssid").performScrollTo().assertExists()
@@ -376,7 +359,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_promptsForUsageAccess_whenAppRuleLacksGrant() {
-        // G2-F14: editing a rule that targets an app while usage access is missing surfaces the prompt.
+        // G2-F14: rule targeting app without usage access surfaces prompt.
         val appRule = com.tideo.autobrightness.app.settings.ContextRule(
             id = "r1", name = "Cinema", profile = "Default",
             triggers = com.tideo.autobrightness.app.settings.ContextTriggers(apps = listOf("com.example")),
@@ -398,8 +381,7 @@ class SettingsScreensTest {
 
     @Test
     fun curveBrightness_criticalError_disablesApply() {
-        // G2R-F18/D-052: a CRITICAL curve error (form2A<0, from form1A<0) must disable Apply even while
-        // dirty. (form3A<0 dropped to ADVISORY in D-169 — it auto-raises MaxBright instead of blocking.)
+        // G2R-F18/D-052: CRITICAL curve error (form2A<0 from form1A<0) disables Apply even while dirty.
         val invalid = AabSettings(form1A = -1.0)
         val errors = SettingsValidator.validate(invalid)
         assertTrue(errors.any { it.severity == com.tideo.autobrightness.app.settings.Severity.CRITICAL })
@@ -419,7 +401,7 @@ class SettingsScreensTest {
 
     @Test
     fun reactivity_resetButton_rendersWhenProvided() {
-        // G2R-F17: each settings screen exposes a per-screen reset action.
+        // G2R-F17: per-screen reset action.
         var reset = false
         compose.setContent {
             MaterialTheme {
@@ -436,7 +418,7 @@ class SettingsScreensTest {
 
     @Test
     fun profiles_savedProfiles_render_withManageActions() {
-        // G2R-F15: saved profiles list with apply/overwrite/delete + save-as/restore actions.
+        // G2R-F15: profiles list with apply/overwrite/delete/save-as/restore.
         val profiles = listOf(
             com.tideo.autobrightness.app.settings.SavedProfile("Default", AabSettings(), builtIn = true),
             com.tideo.autobrightness.app.settings.SavedProfile("Mine", AabSettings()),
@@ -452,10 +434,8 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("apply_profile_Mine").performScrollTo().assertExists()
-        // S13c' §07-B: Overwrite/Delete moved behind a per-row overflow menu — open it to reach them.
         compose.onNodeWithTag("profile_menu_Default").performScrollTo().performClick()
         compose.onNodeWithTag("overwrite_profile_Default").assertExists()
-        // Owner (final pre-S14): manage/export actions live behind one collapsed toggle — open it first.
         compose.onNodeWithTag("manage_section").performScrollTo().performClick()
         compose.onNodeWithTag("save_profile_as").performScrollTo().assertExists()
         compose.onNodeWithTag("restore_factory").performScrollTo().assertExists()
@@ -463,7 +443,7 @@ class SettingsScreensTest {
 
     @Test
     fun profiles_deleteAndOverwrite_requireConfirmation_D114() {
-        // D-114: Tasker prompted before deleting or overwriting a profile — both must confirm first.
+        // D-114: delete/overwrite must confirm first (Tasker behavior).
         var deleted: String? = null
         var overwritten: String? = null
         val profiles = listOf(com.tideo.autobrightness.app.settings.SavedProfile("Mine", AabSettings()))
@@ -492,7 +472,7 @@ class SettingsScreensTest {
 
     @Test
     fun contexts_deleteRule_requiresConfirmation_D114() {
-        // D-114: deleting a context rule must confirm first (Tasker prompted).
+        // D-114: delete rule requires confirmation (Tasker behavior).
         var deleted: String? = null
         val rule = com.tideo.autobrightness.app.settings.ContextRule(
             id = "r1", name = "Cinema", profile = "Default",
@@ -514,7 +494,7 @@ class SettingsScreensTest {
 
     @Test
     fun profiles_contextLockBanner_offersResume() {
-        // G2R-F30: a manual profile load latches the context lock; the Profiles screen offers Resume.
+        // G2R-F30: manual profile load latches context lock; Profiles screen offers Resume.
         var resumed = false
         compose.setContent {
             MaterialTheme {
@@ -533,7 +513,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_exposesBatteryPercentageFields() {
-        // Owner finding (G2R-F31): the rule editor must offer a battery percentage from/to window.
+        // G2R-F31: rule editor offers battery percentage from/to window.
         compose.setContent {
             MaterialTheme {
                 ContextsContent(
@@ -543,7 +523,6 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
-        // G3: triggers are collapsible — enable Battery to reveal its fields.
         compose.onNodeWithTag("trigger_toggle_battery").performScrollTo().performClick()
         compose.onNodeWithTag("rule_batt_min").performScrollTo().assertExists()
         compose.onNodeWithTag("rule_batt_max").performScrollTo().assertExists()
@@ -551,8 +530,7 @@ class SettingsScreensTest {
 
     @Test
     fun reactivity_deltaFactorHelp_rendersVerbatimTaskerText() {
-        // G2R-F19/F21: tapping the "ⓘ" reveals the VERBATIM Tasker long-press help. The delta-factor
-        // help (task740) describes sensor smoothing — the case the owner flagged as mislabelled.
+        // G2R-F19/F21: tapping "ⓘ" reveals VERBATIM Tasker long-press help for delta-factor (task740 sensor smoothing).
         compose.setContent {
             MaterialTheme {
                 ReactivityContent(
@@ -568,7 +546,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_timeField_opensTimePickerModal() {
-        // G2R-F28: the From/To inputs open the Material3 TimePicker modal.
+        // G2R-F28: From/To inputs open Material3 TimePicker modal.
         compose.setContent {
             MaterialTheme {
                 ContextsContent(
@@ -585,8 +563,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_clearTime_nullsTimeRange_G2RF72() {
-        // G2R-F72: once a From/To time is set, the picker can only change it. "Clear time" blanks both
-        // fields so the saved rule's timeRange is null → the rule becomes time-agnostic again.
+        // G2R-F72: "Clear time" blanks both fields, nulling saved rule's timeRange (time-agnostic again).
         val rule = com.tideo.autobrightness.app.settings.ContextRule(
             id = "r1", name = "Evening", profile = "Default",
             triggers = com.tideo.autobrightness.app.settings.ContextTriggers(
@@ -603,16 +580,14 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
-        // The clear affordance is only shown when a time is set.
         compose.onNodeWithTag("clear_time").performScrollTo().performClick()
-        // Save/Cancel now ride at the end of the editor's scroll (D-098), so scroll to reach them.
         compose.onNodeWithTag("save_rule").performScrollTo().performClick()
         assertEquals(null, saved?.triggers?.timeRange, "Clear time must null the saved time range")
     }
 
     @Test
     fun contextEditor_useCurrentSsid_fillsField() {
-        // G2R-F22: "use current Wi-Fi" returns the SSID and fills the field.
+        // G2R-F22: "use current Wi-Fi" fills SSID field.
         compose.setContent {
             MaterialTheme {
                 ContextsContent(
@@ -630,7 +605,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_exposesLocationFields() {
-        // G2R-F22 (live location): lat/lon/radius editor + "use current location".
+        // G2R-F22: lat/lon/radius editor + "use current location" (live location).
         compose.setContent {
             MaterialTheme {
                 ContextsContent(
@@ -648,8 +623,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_triggersCollapsedByDefault_radiusDefaults200_G3() {
-        // G3 owner finding: a new rule starts with every trigger collapsed (only what's selected is
-        // shown); enabling Location reveals a radius pre-filled to 200 m, never blank.
+        // G3: new rule starts with triggers collapsed; Location radius pre-filled to 200 m.
         compose.setContent {
             MaterialTheme {
                 ContextsContent(
@@ -659,7 +633,6 @@ class SettingsScreensTest {
             }
         }
         compose.onNodeWithTag("add_context_rule").performClick()
-        // Collapsed by default → the Wi-Fi field is absent until its section is switched on.
         compose.onNodeWithTag("rule_wifi").assertDoesNotExist()
         compose.onNodeWithTag("trigger_toggle_location").performScrollTo().performClick()
         compose.onNodeWithTag("rule_radius").performScrollTo().assertTextContains("200", substring = true)
@@ -667,8 +640,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_dayPicker_savesSelectedDays_G2RF67() {
-        // G2R-F67: the rule editor exposes a day-of-week picker; the selection is persisted as
-        // Calendar.DAY_OF_WEEK values (Monday = 2).
+        // G2R-F67: rule editor exposes day-of-week picker; selection persisted as DAY_OF_WEEK (Monday = 2).
         var saved: com.tideo.autobrightness.app.settings.ContextRule? = null
         compose.setContent {
             MaterialTheme {
@@ -681,14 +653,13 @@ class SettingsScreensTest {
         compose.onNodeWithTag("add_context_rule").performClick()
         compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
         compose.onNodeWithTag("day_2").performScrollTo().performClick()
-        // Save/Cancel now ride at the end of the editor's scroll (D-098), so scroll to reach them.
         compose.onNodeWithTag("save_rule").performScrollTo().performClick()
         assertEquals(listOf(2), saved?.triggers?.days, "Monday must be saved as DAY_OF_WEEK 2")
     }
 
     @Test
     fun contextEditor_sunriseToken_showsResolvedTime_G2RF68() {
-        // G2R-F68: when today's solar times are known, the SUNRISE token shows the resolved time.
+        // G2R-F68: SUNRISE token shows resolved time when solar times are known.
         compose.setContent {
             MaterialTheme {
                 ContextsContent(
@@ -726,7 +697,7 @@ class SettingsScreensTest {
 
     @Test
     fun liveDebug_globalFlashCard_rendersStatusAndEnableButton() {
-        // G2R-F50: the opt-in global-flash card shows the enablement status + the Accessibility CTA.
+        // G2R-F50: opt-in global-flash card shows enablement status + Accessibility CTA.
         var enableClicked = false
         compose.setContent {
             MaterialTheme {
@@ -863,8 +834,7 @@ class SettingsScreensTest {
 
     @Test
     fun settingsDiffList_highlightsChangedFromDefault_G2RF38() {
-        // G2R-F38: the Tasker dashboard's full settings list — a tuned value (minBrightness 99) is
-        // flagged changed-vs-default; the summary counts it.
+        // G2R-F38: Tasker dashboard settings list flags changed-vs-default (minBrightness 99); summary counts it.
         compose.setContent {
             MaterialTheme { SettingsDiffList(AabSettings(minBrightness = 99)) }
         }
@@ -884,7 +854,7 @@ class SettingsScreensTest {
 
     @Test
     fun loadProfileDialog_showsDiffAndConfirms_G2RF38() {
-        // G2R-F38: the "Load Anyway" modal previews the profile's settings and Apply fires onConfirm.
+        // G2R-F38: "Load Anyway" modal previews profile settings; Apply fires onConfirm.
         var confirmed = false
         compose.setContent {
             MaterialTheme {
@@ -902,7 +872,7 @@ class SettingsScreensTest {
 
     @Test
     fun circadianDateLocationCard_defaultsToTodayAndCurrentLocation_G2RF39() {
-        // G2R-F39: when nothing is pinned, the fields default to today + the current location.
+        // G2R-F39: unpinned fields default to today + current location.
         compose.setContent {
             MaterialTheme {
                 CircadianDateLocationCard(
@@ -941,7 +911,7 @@ class SettingsScreensTest {
 
     @Test
     fun circadianDateLocationCard_setDateOnly_emitsNullCoords_G2RF39() {
-        // F39: a fixed date with blank coordinates pins the date only (live location) — coords null.
+        // F39: fixed date with blank coords pins date only (live location); coords null.
         var captured: Triple<String, Double?, Double?>? = null
         compose.setContent {
             MaterialTheme {
@@ -960,8 +930,7 @@ class SettingsScreensTest {
 
     @Test
     fun chartPager_rendersSlotsWithSwipeIndicator_G2RF81() {
-        // G2R-F81: a multi-graph screen pages between its relevant charts (dots per page) rather than
-        // stacking them vertically; the first chart renders above and the indicator shows each page.
+        // G2R-F81: multi-graph screen pages between relevant charts (dots per page), not vertical stack.
         compose.setContent {
             MaterialTheme {
                 ChartPager(
@@ -975,14 +944,12 @@ class SettingsScreensTest {
         compose.onNodeWithTag("chart_pager").assertExists()
         compose.onNodeWithTag("chart_pager_dot_0").assertExists()
         compose.onNodeWithTag("chart_pager_dot_1").assertExists()
-        // The first page's chart is visible above (the pager sits before any settings).
         compose.onNodeWithTag("chart_a").assertExists()
     }
 
     @Test
     fun reactivity_graphAboveSettings_andGroupedByGraph_G2RF81F82() {
-        // G2R-F81/F82: the reactivity screen hosts the chart pager (above the settings) and groups the
-        // threshold fields under the graph they feed.
+        // G2R-F81/F82: reactivity screen hosts chart pager above settings; groups threshold fields by graph.
         compose.setContent {
             MaterialTheme {
                 ReactivityContent(
@@ -998,7 +965,7 @@ class SettingsScreensTest {
 
     @Test
     fun superDimming_chartPagerRendersAboveSettings_G2RF81() {
-        // G2R-F81: the dimming chart now sits above the settings (it previously rendered at the bottom).
+        // G2R-F81: dimming chart sits above settings.
         compose.setContent {
             MaterialTheme {
                 SuperDimmingContent(
@@ -1013,8 +980,7 @@ class SettingsScreensTest {
 
     @Test
     fun contextEditor_sunsetToken_rendersResolvedTimeOnOneLine_G2RF68() {
-        // G2R-F68: the "Sunset (HH:MM)" token must render its full resolved-time label (the old layout
-        // char-wrapped it vertically). Asserting the whole string matches confirms it is not truncated.
+        // G2R-F68: "Sunset (HH:MM)" renders full resolved-time label on one line (no vertical wrap).
         compose.setContent {
             MaterialTheme {
                 ContextsContent(
@@ -1032,8 +998,7 @@ class SettingsScreensTest {
 
     @Test
     fun profilesContextsMerge_showsBothSurfaces_andEditsRuleInModal_S12_9f() {
-        // S12.9f (D-070): the merged Profiles & Contexts surface hosts the saved-profiles body AND the
-        // context-rules section; editing a rule opens the full editor in a modal (with all triggers).
+        // S12.9f (D-070): merged Profiles & Contexts surface hosts both; rule editing in modal.
         var savedRule: com.tideo.autobrightness.app.settings.ContextRule? = null
         val rule = com.tideo.autobrightness.app.settings.ContextRule(
             id = "r1", name = "Cinema", profile = "Movies",
@@ -1059,15 +1024,11 @@ class SettingsScreensTest {
             }
         }
 
-        // Both surfaces coexist on one screen: a saved profile card and a context-rule card.
         compose.onNodeWithTag("profile_Movies").performScrollTo().assertExists()
         compose.onNodeWithTag("rule_r1").performScrollTo().assertExists()
-
-        // Editing the rule opens the editor modal; saving routes back through onSave.
         compose.onNodeWithTag("edit_r1").performScrollTo().performClick()
         compose.onNodeWithTag("rule_editor_modal").assertExists()
         compose.onNodeWithTag("rule_name").performScrollTo().assertExists()
-        // Save/Cancel now ride at the end of the editor's scroll (D-098), so scroll to reach them.
         compose.onNodeWithTag("save_rule").performScrollTo().performClick()
         assertEquals("Cinema", savedRule?.name, "saving the rule in the modal routes through onSave")
     }

@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 object AutoBrightnessRuntime {
     fun bootstrap(context: Context) {
         scheduleMaintenance(context)
-        // S12.9e: process-scoped + supervised + logged, not a detached per-call CoroutineScope.
+        // S12.9e: process-scoped + supervised.
         AppProcessScope.launch {
             val settings = SettingsStore(context.settingsDataStore).readRawSettings()
             if (settings.serviceEnabled) {
@@ -32,43 +32,22 @@ object AutoBrightnessRuntime {
     /** Resume the live pipeline from the UI (mirrors the notification's Resume action). */
     fun resume(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_RESUME)
 
-    /**
-     * Force the live pipeline to re-evaluate now (settings Apply / profile load, G2-F16). A no-op
-     * when the service is not running — the next start picks up the committed settings anyway.
-     * (The no-op is enforced SERVICE-side, D-140: startForegroundService always CREATES the service,
-     * so the fresh instance detects that no pipeline is running and stops itself.)
-     */
+    // G2-F16: force re-evaluate now; no-op when service not running (D-140).
     fun reapply(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_REAPPLY)
 
-    /**
-     * DA-018: resume context automation (the Profiles "Resume" banner / external `CONTEXTS_RESUME`).
-     * Distinct from [reapply]: the service runs a GENUINE context evaluation (`evaluate(RESUME)`) so a
-     * currently-matching rule applies now and a no-match reverts to `%AAB_ProfileUser`, THEN Set Initial
-     * Brightness — the Tasker `_ContextResume` → evaluate contexts → Set Initial Brightness flow. Plain
-     * reapply only republishes the settings, leaving the store pinned to the manually-loaded profile.
-     * Same not-running contract as reapply (validated service-side, D-140).
-     */
+    // DA-018: resume context automation (run genuine evaluation, not just reapply).
     fun resumeContext(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_RESUME_CONTEXT)
 
-    /**
-     * D-157: full-stop panic from an external command (mirrors the notification's Reset button, which
-     * sends the same [AmbientMonitoringService.ACTION_PANIC]): restore brightness, drop dimming, tear
-     * the service down. Safe when not running — startForegroundService creates the instance, it panics
-     * and self-terminates (NOT_STICKY), exactly as the notification Reset does.
-     */
+    // D-157: full-stop panic from external command.
     fun panic(context: Context) = sendServiceAction(context, AmbientMonitoringService.ACTION_PANIC)
 
     private fun sendServiceAction(context: Context, action: String) {
         val appContext = context.applicationContext
         val intent = Intent(appContext, AmbientMonitoringService::class.java).setAction(action)
         try {
-            // minSdk 31 ≥ O, so startForegroundService is always available (S12.9a dead-branch removal).
-            // NOTE (D-140): this CREATES the service when it is not running — it is never a no-op —
-            // so control actions (pause/reapply) are validated in the service's onStartCommand.
             appContext.startForegroundService(intent)
         } catch (_: IllegalStateException) {
-            // Background-start restriction (the app is neither foreground nor exempt) — the action
-            // was user-initiated from UI that no longer exists; dropping it is the right outcome.
+            // Background-start restriction (app not foreground/exempt); drop action.
         }
     }
 
@@ -88,7 +67,6 @@ object AutoBrightnessRuntime {
             putExtra(AmbientMonitoringService.EXTRA_REASON, reason)
         }
         try {
-            // minSdk 31 ≥ O, so startForegroundService is always available (S12.9a dead-branch removal).
             appContext.startForegroundService(intent)
         } catch (error: ForegroundServiceStartNotAllowedException) {
             AppProcessScope.launch {

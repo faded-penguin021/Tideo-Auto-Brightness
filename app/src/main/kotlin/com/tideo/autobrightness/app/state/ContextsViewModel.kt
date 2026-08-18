@@ -40,13 +40,12 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
     private val location = AndroidLocationReader(application)
     private val foregroundApp = AndroidForegroundAppMonitor(application)
 
-    // Ordered by priority (highest first) to match the resolution model (G2R-F43, D-014), not by
-    // creation time; ties keep a stable name order so the list doesn't jump around.
+    // G2R-F43, D-014: ordered by priority (highest first), not creation time.
     val rules: StateFlow<List<ContextRule>> = store.rulesFlow()
         .map { it.byPriority() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Saved profile names a rule can switch to (built-ins + user profiles, G2R-F15/D-042c). */
+    /** Saved profile names a rule can switch to (built-ins + user profiles, G2R-F15/D-042(c)). */
     val profileNames: StateFlow<List<String>> = userProfiles.profilesFlow()
         .map { profiles -> profiles.map { it.name } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

@@ -9,13 +9,7 @@ import org.robolectric.Shadows.shadowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * H3 glue-seam audit: the UI/notification-mirror service-action dispatch had no test. These are
- * the intents the Dashboard buttons, the QS tile, and the notification actions all funnel
- * through — a wrong action string or component is invisible to every other suite.
- * (bootstrap/scheduleMaintenance are NOT covered here: WorkManager needs the work-testing
- * artifact, declined as a new dependency for a 6-line worker — see the H3 table in STATE.md.)
- */
+/** H3 glue-seam audit: service-action dispatch for Dashboard buttons, QS tile, notification actions. */
 @RunWith(RobolectricTestRunner::class)
 class AutoBrightnessRuntimeTest {
     private val application: Application = ApplicationProvider.getApplicationContext()

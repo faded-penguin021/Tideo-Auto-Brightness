@@ -39,12 +39,7 @@ import com.tideo.autobrightness.app.ui.graph.DimmingChart
 import com.tideo.autobrightness.app.settings.toDynamicScalingConfig
 import com.tideo.autobrightness.platform.privilege.Tier
 
-/**
- * Super Dimming (Tasker AAB Superdimming Settings + Color Filter). Renamed from "Animation & Dimming"
- * in S12.6a (G2R-F3) — its content is super dimming (ELEVATED) + PWM/software dimming after the
- * animation fields moved to Misc (G2-F2). Draft → Apply (S12.5b). Super dimming and PWM are
- * **mutually exclusive** (G2-F10); the circadian dim-spread field is gated on circadian scaling (G2-F11).
- */
+/** Super Dimming UI (super dimming + PWM mutually exclusive G2-F10; circadian spread gated on scaling G2-F11). */
 @Composable
 fun SuperDimmingScreen(
     navController: NavHostController,
@@ -59,14 +54,11 @@ fun SuperDimmingScreen(
     val criticalError by vm.hasCriticalError.collectAsStateWithLifecycle()
     val live by LiveRuntimeState.pipeline.collectAsStateWithLifecycle()
     val toast = rememberToaster()
-    // The Circadian Dimming chart shares the F39 fixed date/location override (Circadian screen) so it
-    // tracks the date too. Read-only here (no editor on this screen).
+    // Circadian chart shares F39 date/location override; read-only here.
     val dateLocation by extras.dateLocation.collectAsStateWithLifecycle()
     var defaultLatLon by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     LaunchedEffect(Unit) { defaultLatLon = runCatching { extras.defaultLatLon() }.getOrNull() }
-    // DB-008 (_SaveButtonDimming A11, issue #110): Apply clamps a strength setpoint above 65 down to
-    // it. Say so — the field then shows 65, and the user learns why rather than finding a number they
-    // did not type.
+    // DB-008: Apply clamps strength > 65 down; user learns why (not a typo).
     LaunchedEffect(vm) {
         vm.dimmingStrengthClamped.collect { toast(R.string.toast_dimming_strength_clamped, it) }
     }
@@ -116,9 +108,7 @@ fun SuperDimmingContent(
     DraftSettingsScaffold(stringResource(R.string.title_super_dimming), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
             val dimEnabled = tier == Tier.ELEVATED
-            // G2R-F81 + Gate-2(5th) obs: two relevant graphs sit ABOVE the settings and are swiped
-            // between — the lux→dim "Dimming curve" (AAB Dimming Graph) and the day/night "Circadian
-            // Dimming" spread graph (AAB Circadian Dimming Graph, re-homed here per D-026). S13 fills both.
+            // G2R-F81: dimming curve + circadian dimming graphs (D-026).
             ChartPager(
                 listOf(
                     ChartSlot(stringResource(R.string.sd_graph_dimming), "dimming_chart") {
@@ -145,10 +135,10 @@ fun SuperDimmingContent(
                 ),
             )
 
-            // G2R-F58 live readout: %AAB_DimmingCurrent (rel) / %AAB_DimmingDS (abs) at %AAB_CurrentBright.
+            // G2R-F58: live readout.
             SuperDimmingDiagnosticCardContent(live)
 
-            // G2R-F82: the super-dimming + PWM controls shape the lux→dim "Dimming curve" graph above.
+            // G2R-F82: super-dimming + PWM controls.
             GraphSettingsGroup(stringResource(R.string.sd_graph_dimming)) {
                 SectionHeader(stringResource(R.string.sd_header_super), divider = true)
                 if (tier != Tier.ELEVATED) {
@@ -162,9 +152,7 @@ fun SuperDimmingContent(
                         Text(stringResource(R.string.superdimming_setup_elevated))
                     }
                 }
-                // Labels + verbatim long-press help from extraction/scenes/superdimming_settings.md (S12.6e).
-                // task509/511 _DimmingUIToggle — ELEVATED-gated (secure reduce_bright_colors path, D-040a).
-                // Mutually exclusive with PWM/software dimming (G2-F10): enabling super dimming disables PWM.
+                // task509/511 _DimmingUIToggle — ELEVATED-gated (D-040(a); G2-F10: exclusive with PWM).
                 SwitchSettingRow(
                     stringResource(R.string.sd_use_super), draft.dimmingEnabled,
                     { on -> onEdit { s -> s.copy(dimmingEnabled = on, pwmSensitive = if (on) false else s.pwmSensitive) } },
@@ -192,14 +180,13 @@ fun SuperDimmingContent(
                     help = if (draft.pwmSensitive) TaskerHelp.PWM_THRESHOLD else TaskerHelp.DIMMING_THRESHOLD,
                     testTag = "field_dimmingThreshold",
                 )
-                // task513/610: threshold must not sit below minimum brightness.
+                // task513/610: threshold ≥ minBrightness.
                 if (draft.dimmingThreshold < draft.minBrightness) {
                     ErrorBanner(stringResource(R.string.sd_err_threshold), "error_dimmingThreshold")
                 }
 
                 SectionHeader(stringResource(R.string.sd_header_pwm), divider = true)
-                // Software dimming / PWM-sensitive — no ELEVATED needed (superdimming_settings.md note);
-                // mutually exclusive with super dimming (G2-F10).
+                // PWM-sensitive; exclusive with super dimming (G2-F10).
                 SwitchSettingRow(
                     stringResource(R.string.sd_use_pwm), draft.pwmSensitive,
                     { on -> onEdit { s -> s.copy(pwmSensitive = on, dimmingEnabled = if (on) false else s.dimmingEnabled) } },
@@ -213,10 +200,7 @@ fun SuperDimmingContent(
                 )
             }
 
-            // Gate-2(5th) obs: "Spread" is the CIRCADIAN dim-strength spread (task646 DimDynamic) — it
-            // drives the *Circadian Dimming* graph (how dim strength varies across the day), NOT the
-            // lux→dim curve, so it is grouped under that graph (matching Tasker). G2-F11: only effective
-            // when circadian scaling is on, so the field stays gated on it.
+            // task646 DimDynamic (circadian dimming spread); gated on scaling (G2-F11).
             GraphSettingsGroup(stringResource(R.string.sd_graph_circadian)) {
                 SectionHeader(stringResource(R.string.sd_header_circadian_spread), divider = true)
                 NumberSettingField(

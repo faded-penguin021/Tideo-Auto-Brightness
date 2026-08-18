@@ -3,12 +3,7 @@ package com.tideo.autobrightness.app.settings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * S12.9c #5: every typed-JSON DataStore declares a schema version constant, and each serializer's
- * `defaultValue` reflects the current schema. Documented in `docs/rebuild/architecture/datastore_map.md`.
- * (The `service_health` and `experiment_prefs` Preferences DataStores are schema-less key/value stores
- * and have no serializer to check — see the doc.)
- */
+// S12.9c #5: schema version matching (see datastore_map.md).
 class DataStoreSchemaVersionTest {
 
     @Test
@@ -32,7 +27,6 @@ class DataStoreSchemaVersionTest {
 
     @Test
     fun `context-baseline store is at schema v2 with an identity default`() {
-        // v2 (DA-018): added the persisted %AAB_ProfileUser name (userProfileName, default "Default").
         assertEquals(2, ContextBaseline.SCHEMA_VERSION)
         assertEquals(ContextBaseline(), ContextBaselineSerializer.defaultValue)
     }

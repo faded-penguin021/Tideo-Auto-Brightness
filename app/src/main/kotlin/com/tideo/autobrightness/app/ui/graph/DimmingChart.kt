@@ -13,14 +13,9 @@ import kotlin.math.max
 import kotlin.math.pow
 
 /**
- * AAB Dimming Graph (Tasker: task556 `_GenerateDimmingCurveGraph`, feeds %AAB_HTML_Graph6). Follows
- * the [BrightnessCurveChart] template — sample the domain super-dimming math over a brightness grid.
- *
- * - X-axis: target brightness level (linear, `minBright` → `max(dimmingThreshold, 15)`).
- * - Y-axis: dim progress percentage (0..100) + the strength-weighted dim shell.
- * - **Dim progress** (primary): `SoftwareDimming.dimProgress × 100` for `b < threshold`, else 0.
- * - **Dim shell** (gold): `dimmingStrength × dimProgress` — the applied dimming magnitude.
- * - **Reference** (dashed blue): `pow(1 − b/15, 2.5) × 100` for `b < 15` (dimming_graph.md ref curve).
+ * AAB Dimming Graph (task556 `_GenerateDimmingCurveGraph`).
+ * X: brightness linear; Y: dim% + strength-weighted shell + reference curve.
+ * S14: optional "Now" line when dimming is engaged.
  */
 @Composable
 fun DimmingChart(
@@ -29,8 +24,6 @@ fun DimmingChart(
     dimmingExponent: Double,
     dimmingStrength: Int,
     modifier: Modifier = Modifier,
-    // S14: the current applied brightness, shown as a "Now" line — but only when super-dimming is
-    // actually engaged (the caller passes null otherwise, so an inactive setting shows no marker).
     currentBrightness: Int? = null,
 ) {
     val xStart = minBrightness.toFloat()
@@ -56,18 +49,16 @@ fun DimmingChart(
         referencePoints += Offset(b, ref.toFloat())
     }
 
+    // Two y-axes (dimming_graph.md): LEFT = dim%, RIGHT = dim-shell magnitude.
     // Tasker's dimming graph has TWO y-axes (dimming_graph.md): LEFT = dim progress % (the user curve +
-    // the gold reference); RIGHT = the dim-shell magnitude (strength × progress, a different unit). The
-    // reference is ALWAYS the gold line (Tasker convention, user_guide.md §8).
     val series = listOf(
         ChartSeries(stringResource(R.string.chart_reference), referencePoints, AabGold, strokeWidthPx = 3f, dashed = true),
         ChartSeries(stringResource(R.string.chart_dim_shell), shellPoints, AabChartBlue, strokeWidthPx = 2f, onSecondaryAxis = true),
         ChartSeries(stringResource(R.string.chart_dim_pct), progressPoints, MaterialTheme.colorScheme.primary),
     )
-    // Right axis spans 0 → dimming strength (the shell's natural range, dim_ds = strength × progress).
+    // Right axis: 0 → dimming strength (shell natural range).
     val shellMax = dimmingStrength.toFloat().coerceAtLeast(1f)
 
-    // S14: live "Now" line at the current brightness (only supplied while dimming is engaged).
     val markers = currentBrightness?.let {
         listOf(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = stringResource(R.string.chart_now)))
     } ?: emptyList()
@@ -83,7 +74,7 @@ fun DimmingChart(
         xAxisLabel = stringResource(R.string.chart_brightness),
         yAxisLabel = stringResource(R.string.chart_dim_pct),
         showLegend = true,
-        interactive = true, // scrub readout (owner: charts must stay interactive)
+        interactive = true, // charts must stay interactive for scrub readout
         contentDescription = stringResource(R.string.a11y_graph_dimming, dimmingThreshold, dimmingStrength),
         modifier = modifier,
         gridColor = MaterialTheme.colorScheme.outlineVariant,

@@ -203,10 +203,8 @@ fun ProfilesBody(
         }
     }
 
-    // S13c' §07-C: the legacy Tasker import is a one-time migration, not a daily control — demote it to
-    // a collapsed expandable (closed by default) so it no longer dominates the first screenful. Owner:
-    // the single-file "Import a settings file" picker belongs here too (it loads Tideo exports AND legacy
-    // Tasker configs), grouped with the folder-link import rather than as a top-level button.
+    // S13c' §07-C: a one-time migration, not a daily control — hence collapsed, and hence the
+    // single-file picker sits in here (it loads Tideo exports too) rather than at top level.
     ExpandableSection(
         title = stringResource(R.string.legacy_import_header),
         expanded = showLegacy,

@@ -3,12 +3,12 @@
 A native Kotlin/Compose Android app: a feature-parity rebuild of the Tasker project
 `Advanced_Auto_Brightness_V3.3`, shipped at v1.0.0. Work now is maintenance.
 
-Maintenance runs on the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH);
-This constitution records **AMH 4.1.0**; `AMH_VERSION` in `amh.conf` is the authority on which
-release. **`docs/HARNESS_LOCAL.md` is the
-harness's own documentation** — which scripts are upstream's and unfixable locally, what each
-repo-local guard does, every `amh.conf` value that differs from stock. Read it before changing
-anything under `scripts/`.
+Maintenance runs on the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
+This constitution records **AMH 5.2.0**; `AMH_VERSION` in `amh.conf` is the authority on which
+release, and the two are moved together — `scripts/guards/doc-facts.sh` fails when they drift.
+**`docs/HARNESS_LOCAL.md` is the harness's own documentation** — which scripts are upstream's and
+unfixable locally, what each repo-local guard does and which verdict tier it uses, every
+`amh.conf` value that differs from stock. Read it before changing anything under `scripts/`.
 
 > **Ground truth: code + the golden test vectors.** Every document here describes the app
 > as-built and may drift. When a doc conflicts with the code, trust the code and fix the doc.
@@ -34,8 +34,10 @@ The Tasker source XML is in `docs/rebuild/extraction/_source/` (gitignored, 1.6 
 ## Verification
 
 **`scripts/ladder.sh`** is the whole of it — guards, then `scripts/verify.sh`, which holds the
-build/test/lint set. `--guards-only` for docs-only work. CI runs the same script, so red-in-CI
-with green-locally can only mean environment.
+build/test/lint set. `--guards-only` for docs-only work. CI runs the same script, so red-in-CI with
+green-locally means environment — or UNTRACKED work: the guards read tracked files, so `git add`
+before you verify (DB-056). An unstaged edit to an already-tracked file IS seen; a brand-new file
+is not, which is the shape that incident took.
 
 No KVM, so no emulator: verification is compile + JVM/Robolectric. **On-device behaviour is
 owner-verified** through the Owner queue and `docs/rebuild/DEVICE_TEST_SCRIPT.md`. Say in each
@@ -51,10 +53,27 @@ the point is that a bug found by one session teaches a different agent nine sess
   Grep it; never read a volume whole. Append to the live volume (`LEDGER_B.md`).
 - `docs/history/` — frozen. Consult, never edit.
 
+> **Establish coverage before you report an absence.** "It does not exist" and "it never
+> happened" are claims about your search until you can say what you searched and that it could
+> have contained the thing. Before reporting one, name an artifact that could have held the
+> answer — naming the command that already failed to see it discharges nothing. The recurring
+> trap is local git state under this repo's `MERGE_MODE` (see `amh.conf`): a squash merge lands
+> an entire train of sessions as ONE commit, so every INTERMEDIATE state and every superseded
+> branch is destroyed on purpose. `git log` therefore cannot answer "was this ever tried",
+> "when did this change" or "what did that session do" — the ledger, the `docs/STATE.md`
+> changelog and `docs/history/` are what survive. Released states are a different question and
+> git still answers it: tags and `git show <tag>:<path>` are evidence, and the release playbook
+> depends on them. Nothing enforces this; no pre-execution check can see a belief formed after
+> a command returns.
+
 Two mechanical contracts the ladder enforces, so get them right rather than discovering them:
 a row header must read ``- D-NNN[ [cited]]: …`` — any other shape is invisible to every parser in
 the tree (DB-015) — and a row cited from code carries `[cited]`, which you write and the ladder
-checks both ways.
+checks both ways. The ladder matches a citation as a **whole word**, so a sub-item is cited as
+`D-042(c)` — parenthesised, never a bare letter appended to the number. A bare-suffixed id
+resolves to nothing, so the ladder reports the row's marker as stale and the tempting fix is to
+delete a marker code still depends on (DB-022). `scripts/guards/doc-facts.sh` fails on the
+suffixed form, and on this file's AMH version drifting from `AMH_VERSION`.
 
 ## Architecture
 
@@ -72,9 +91,43 @@ SSID strategy and the force-dark toggle — not "grant-only". That count is mach
 
 ## Conventions
 
-Write code that reads like the code around it — match its naming, layout and comment density.
+Write code that reads like the code around it — match its naming and layout.
 minSdk 31, target/compile 36; no legacy branches below 31. No new dependency unless the change
 clearly warrants one.
+
+**Comments: the prose lives in the `.md` tier, the code carries the pointer.** A durable lesson
+belongs in its ledger row and an architecture narrative in `docs/rebuild/`; what stays in the
+source is one line naming the row — `// D-144: fresh-process UNKNOWN latch.` Re-telling a row in
+a comment creates a second copy to keep in sync, and the code copy is the one nobody updates.
+Keep a comment only if a competent Kotlin reader would be *surprised* without it; if it merely
+restates the code, delete it. Two things are exempt because they are load-bearing provenance, not
+narrative: the `// Tasker: task535 "Lux Smoothing (Java)" XML L15204` markers the section below
+mandates, and the `D-NNN` citations themselves — **never drop the last citation of a row from the
+code**, or its `[cited]` marker goes stale and the ladder fails.
+
+Which layer holds this: `scripts/guards/comment-budget.sh` caps any contiguous comment block at
+12 lines, holds a per-module comment-line budget, and floors the `// Tasker` markers against a
+manifest keyed on the **source coordinates** each one cites — one record per coordinate, so
+rewording a marker is free, adding a coordinate to one is free, and merging two markers that cite
+the same coordinates is free; dropping a `task`/`act`/`prof`/`scene`/`elements`/`L`/`%AAB_`
+reference from a file is what fails, naming the file that lost it. All
+three fail closed in the ladder and in CI; the Claude Code adapter runs the block cap as a
+`PostToolUse` hook, so a long block is reported on the edit that writes it. **Codex has neither
+hook** — its prefix rules cannot express this, so for that agent these paragraphs are the only
+layer standing. Raising a budget is legitimate and is a rule change, not housekeeping:
+`scripts/guards` is in `RULE_FILES` and the review protocol applies. The guard says the same where
+it fails, and that is deliberate — a diagnostic that forbade what this paragraph permits would just
+teach the reader to stop believing one of them.
+
+**Prefer `Write`/`Edit` over inline `python3 -c`/heredocs for editing files** (DB-062): those render
+a diff as the change happens, an interpreter blob does not, so a mistake in it is visible only by
+reading the file back. Not a ban — a scripted bulk edit is sometimes right. Which layer holds this:
+the Claude Code adapter blocks the FIRST such command per MARKER LIFETIME as a `PreToolUse`
+advisory and passes the rest — the marker has no session component, so in a long-lived container
+the block is spent by the first session that trips it and every later session passes unadvised
+(DB-063); **Codex has no pre-shell hook, so for that agent this paragraph is the only layer
+standing**, as with the comment budget above. Either way the paragraph, not the hook, is what
+binds you.
 
 **The one rule that overrides taste: Tasker semantics win.** Port behaviour exactly, including
 odd rounding and quirks that look like bugs; modernise the *how*, never the *what*. Mark ported

@@ -76,37 +76,28 @@ fun ReactivityContent(
 ) {
     DraftSettingsScaffold(stringResource(R.string.title_reactivity), dirty, onApply, onDiscard, onBack, criticalError, onReset) { padding ->
         SettingsColumn(padding) {
-            // G2R-F81: the relevant graphs sit ABOVE the settings, swiped between (no vertical stack).
-            // The smoothing-threshold fields feed the reactivity curve; Smoothing Δ feeds the alpha
-            // curve — the two graphs the user pages through here. S13 fills the chart slots.
+            // G2R-F81: graphs above settings, swiped (no vertical stack); S13 fills slots.
             ChartPager(
                 listOf(
                     ChartSlot(stringResource(R.string.react_graph_curve), "reactivity_chart") {
                         ReactivityChart(
                             draft.toThresholdConfig(), Modifier.testTag("reactivity_chart"),
-                            // Live "Now" line at the current smoothed lux (only while running).
                             currentLux = live.smoothedLux?.takeIf { live.serviceOn },
                         )
                     },
                     ChartSlot(stringResource(R.string.react_graph_alpha), "alpha_chart") {
                         AlphaResponseChart(
                             draft.deltaFactor.toDouble(), Modifier.testTag("alpha_chart"),
-                            // Live "Now" smoothing response (only while running).
                             currentAlpha = live.luxAlpha?.takeIf { live.serviceOn },
                         )
                     },
                 ),
             )
 
-            // Live glass-box readout: current dynamic threshold (as %, G2R-F56) + sensor dead zone (G2R-F7).
             ReactivityDiagnosticCardContent(live)
 
-            // Labels + verbatim long-press help re-derived from extraction/scenes/reactivity_settings.md
-            // (S12.6e, G2R-F19/F20/F21). The threshold fields are %aab_thresh*pc reactivity levels.
-            // G2R-F82: grouped + labelled by the graph they feed (the reactivity curve).
+            // G2R-F82: threshold fields grouped by graph (G2R-F19/F20/F21).
             GraphSettingsGroup(stringResource(R.string.react_graph_curve)) {
-                // These are the reactivity dead-zone levels (Dark/Dim/Bright), not smoothing — they shape
-                // the reactivity curve above, so name them for what they are (owner finding).
                 SectionHeader(stringResource(R.string.react_thresholds_header), divider = true)
                 NumberSettingField(
                     stringResource(R.string.react_dark), draft.thresholdDark, { onEdit { s -> s.copy(thresholdDark = it.toFloat()) } },
@@ -134,14 +125,8 @@ fun ReactivityContent(
                     help = TaskerHelp.CURVE_MID, testTag = "field_thresholdMidpoint",
                 )
             }
-            // G2R-F85: there is NO editable "Dynamic threshold" field — %AAB_ThreshDynamic is the
-            // COMPUTED adaptive dead-band for the current lux (task544), surfaced read-only in the live
-            // reactivity card above (which shows the value as a percentage, not the literal token →
-            // also closes G2R-F59). It was never an input; the seed in task570 act31 is runtime-only.
-            // G2R-F19/F20: "Delta factor" was mislabelled with a wrong help ("brightness only changes
-            // once lux exceeds this"). It is the SENSOR-SMOOTHING factor (%AAB_DeltaFactor, Misc scene
-            // "Smoothing Δ"): luxAlpha = 1 - exp(-deltaFactor·effectiveDelta) in BrightnessEngine — the
-            // binding was already correct, only the label/help were wrong. Fixed to the verbatim help.
+            // G2R-F85: %AAB_ThreshDynamic is computed only (task544), not editable.
+            // G2R-F19/F20: "Delta factor" (smoothing) help was wrong; fixed to task570 verbatim.
             GraphSettingsGroup(stringResource(R.string.react_graph_alpha)) {
                 SectionHeader(stringResource(R.string.react_smoothing_header), divider = true)
                 NumberSettingField(
@@ -151,10 +136,9 @@ fun ReactivityContent(
                 )
             }
 
-            // S13c restyle (m3_audit §3 row 4): the trailing bare switch stack is grouped into an `AabCard`.
+            // S13c restyle: switch stack grouped into AabCard (m3_audit §3 row 4).
             AabCard {
                 SectionHeader(stringResource(R.string.react_override_header), divider = true)
-                // task525/526 _OverrideToggle — DetectOverrides (Gate-1 G1-F2 deferral, surfaced in S12).
                 SwitchSettingRow(
                     stringResource(R.string.react_use_override), draft.detectOverrides,
                     { onEdit { s -> s.copy(detectOverrides = it) } },

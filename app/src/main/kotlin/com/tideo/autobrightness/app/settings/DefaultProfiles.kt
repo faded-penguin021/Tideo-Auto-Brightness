@@ -1,19 +1,12 @@
 package com.tideo.autobrightness.app.settings
 
 /**
- * Built-in brightness profiles seeded by Tasker task592 `_CreateDefaultProfiles`.
- *
- * All profiles start from [Default] (= task592's `getBaseProfile()`). Values that differ from
- * [AabSettings] constructor defaults (task570) are noted with their task592 source.
- *
- * Tasker: task592 "_CreateDefaultProfiles" Java L24133–L24360.
+ * Built-in brightness profiles; task592 "_CreateDefaultProfiles" Java L24133–L24360.
  */
 object DefaultProfiles {
 
-    // task592 getBaseProfile() — note: animation defaults differ from task570 init values.
-    // The D-151/D-152 display-toggle fields (nightLightEnabled/…/hdrForceSdrEnabled) stay at
-    // their AabSettings defaults in every built-in: task592 predates them and the defaults are
-    // the "leave the device alone" values, so built-in profile swaps never write a display toggle.
+    // task592 getBaseProfile(); animation defaults differ from task570 init.
+    // D-151/D-152: display-toggle fields stay at AabSettings defaults (leave device alone).
     val Default = AabSettings(
         animSteps = 50,            // task592: anim_steps 50 (task570 default is 20)
         minWaitMs = 5,             // task592: min_wait 5 (task570 default is 25)
@@ -23,8 +16,7 @@ object DefaultProfiles {
         // All other fields use AabSettings() defaults (matching task570 init values)
     )
 
-    // task592: max_bright 200, min_bright 1, scale 0.8, anim_steps 1, delta_factor 2.8;
-    // thresh dark/dim/bright all 0.5; circadian+superdimming off
+    // task592: min/max 1/200, scale 0.8, anim 1, delta 2.8, thresh dark/dim/bright 0.5.
     val BatterySaver = Default.copy(
         maxBrightness = 200,
         minBrightness = 1,
@@ -36,9 +28,7 @@ object DefaultProfiles {
         thresholdBright = 0.5f,
     )
 
-    // task592: anim_steps 50, min/max_wait 50/100, min/max_bright 20/255, delta_factor 0.5,
-    // throttle 5010; thresh_bright 0.3, thresh_dark 0.4; form1a 6, form2b 8.8;
-    // circadian off; superdimming ON (threshold 20)
+    // task592: anim 50, wait 50/100, bright 20/255, delta 0.5, thresh 0.3/0.4, form1a 6, dimming ON.
     val VideoStreaming = Default.copy(
         minWaitMs = 50,
         maxWaitMs = 100,
@@ -52,8 +42,7 @@ object DefaultProfiles {
         dimmingThreshold = 20,
     )
 
-    // task592: min_bright 25, offset 15, scale 1.15, anim_steps 10, min_wait 10, delta_factor 4;
-    // form1a 8, z1_end 55, z2_end 18000; superdimming off
+    // task592: min 25, offset 15, scale 1.15, anim 10, wait 10, delta 4, form1a 8, zones 55/18000.
     val Outdoors = Default.copy(
         minBrightness = 25,
         offset = 15,
@@ -66,8 +55,7 @@ object DefaultProfiles {
         zone2End = 18000,
     )
 
-    // task592: superdimming pwm_sensitive ON (enabled false), threshold 15;
-    // min_bright 1, min/max_wait 60/120, delta_factor 0.8, throttle 6010; thresh_dark 0.6; circadian off
+    // task592: min 1, wait 60/120, delta 0.8, pwm_sensitive ON, thresh_dark 0.6.
     val NightReading = Default.copy(
         minBrightness = 1,
         pwmSensitive = true,

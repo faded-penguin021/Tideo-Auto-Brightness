@@ -34,31 +34,15 @@ import com.tideo.autobrightness.app.ui.theme.AabDataCaption
 import com.tideo.autobrightness.app.ui.theme.AabDataDisplay
 import com.tideo.autobrightness.app.ui.theme.Dimens
 
-/**
- * S13b component library → **S13c' surface & data pass**. The reusable "Lego blocks" that replace the
- * per-screen ad-hoc compositions catalogued in `docs/rebuild/design/m3_audit.md`. Every value comes from
- * the S13a [Dimens] tokens / the frozen teal+gold `colorScheme` role-map — no raw brand recolouring.
- */
+/** S13c' component library: reusable blocks per m3_audit.md, values from Dimens tokens / frozen colorScheme. */
 
-/**
- * The surface ladder (S13c' §04). M3 tonal elevation on a dark theme only uniformly lightens, so 14
- * resting cards read as one mass. Instead each card declares **intent**, and depth comes from a 1px
- * hairline highlight + honest shadow rather than glow/bevel:
- *  - **[Resting]** — the default content card (ladder L1): hairline edge + soft shadow.
- *  - **[Hero]** — the single focal/instrument card per screen (L2): raised elevation + teal accent edge.
- *  - **[Well]** — a recessed diagnostic/log surface (the glass-box well): variant fill, reads "behind".
- */
+/** Surface ladder (S13c' §04): Resting (L1: hairline+shadow), Hero (L2: raised+teal edge), Well (recessed variant). */
 enum class AabCardVariant { Resting, Hero, Well }
 
-/** The 1px highlight that defines a card edge on the dark ladder (S13c' §04 — a neutral compositing
- *  highlight, NOT a brand colour; the frozen palette is untouched). */
+/** 1px neutral highlight for card edges (S13c' §04). */
 private val Hairline = Color.White.copy(alpha = 0.05f)
 
-/**
- * The single elevated section container (m3_audit §4 "No shared card style"). Every place a screen
- * groups settings/readouts becomes an [AabCard]; the [variant] picks where it sits on the surface
- * ladder. Medium shape, uniform [Dimens.cardPadding], and a [Dimens.fieldSpacing] vertical rhythm.
- */
+/** Elevated section container (m3_audit §4): groups settings/readouts; [variant] picks surface ladder position. */
 @Composable
 fun AabCard(
     modifier: Modifier = Modifier,
@@ -86,7 +70,6 @@ fun AabCard(
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = elevation),
     ) {
         if (variant == AabCardVariant.Hero) {
-            // L2 hero: a teal accent edge marks the one focal card per screen.
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                 Box(
                     Modifier
@@ -110,16 +93,7 @@ fun AabCard(
     }
 }
 
-/**
- * B4 → **S13c' readout line** (§05). The critical high-contrast data readout, recomposed as an
- * instrument line instead of a bolded sentence: a **tracked mono caption** above ([key]), then the big
- * **tabular gold value** ([value], the [AabDataDisplay] role), with the [unit] demoted to a small
- * `onSurfaceVariant` mark trailing the figure (a separate param so it never inherits gold). A subtle
- * `outlineVariant` bottom border closes the line.
- *
- * The value crossfades on change ([AabMotion.valueSpec]) so the glass box feels alive. The row keeps its
- * [testTag] and the value keeps `value_<testTag>` for the existing test contracts.
- */
+/** High-contrast data readout line (§05): tracked caption [key], gold [value], unit mark; crossfades on change. */
 @Composable
 fun KeyValueRow(
     key: String,
@@ -135,9 +109,7 @@ fun KeyValueRow(
             .fillMaxWidth()
             .padding(vertical = Dimens.space2)
             .testTag(testTag)
-            // D-156: key + value are one datum — merge them so TalkBack reads "<key>, <value>" as a
-            // single announcement (mirrors DerivedReadout). The row is not interactive, so this only
-            // groups the reading; `value_<testTag>` stays addressable via the unmerged tree.
+            // D-156: merge descendants so TalkBack reads as single announcement.
             .semantics(mergeDescendants = true) {},
     ) {
         Text(
@@ -176,11 +148,7 @@ fun KeyValueRow(
     }
 }
 
-/**
- * The shared empty-state placeholder (m3_audit §4): an optional [icon] above a muted [text], centered.
- * Replaces the scattered inline "no location yet / empty log / no profiles" hints with one consistent
- * surface (Circadian, Live Debug, Profiles/Contexts, Tools). Caller supplies the (i18n) [text].
- */
+/** Empty-state placeholder (m3_audit §4): optional [icon] above muted [text], centered. */
 @Composable
 fun EmptyState(
     text: String,

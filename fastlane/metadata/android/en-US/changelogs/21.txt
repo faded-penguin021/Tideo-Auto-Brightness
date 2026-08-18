@@ -1,0 +1,5 @@
+Reliability and safety release.
+
+Privileged Display now reads the device state and checks Android's Night Light and always-on display capabilities before writing. Disable HDR remains an Android 14+ experimental preference control; applying or clearing it may need a reboot, and display-mode changes may briefly blank the screen.
+
+Emergency Reset now vibrates its S.O.S. confirmation. At debug level 8, ignored control commands say why.

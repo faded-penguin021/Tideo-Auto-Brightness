@@ -6,11 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * S12.9c #1: AabSettings is decomposable into seven nested records, but the on-disk schema stays the
- * flat v3 JSON. This asserts that (a) a flat v3 JSON file loads into the nested group views, and
- * (b) re-encoding keeps the flat wire format (no nested keys) — i.e. wire compatibility is preserved.
- */
+/** S12.9c #1: nested record groups; flat v3 JSON wire format preserved. */
 class NestedSchemaRoundTripTest {
 
     private val json = Json { ignoreUnknownKeys = true }

@@ -12,26 +12,13 @@ import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 
 private val engine = BrightnessEngine()
 
-/**
- * AAB Taper Graph (Tasker: task657 `_GenerateCompressionGraph`, feeds %AAB_HTML_Graph5). Shows how the
- * day/night scale spread is tapered by the compression sigmoid as brightness approaches the extremes.
- *
- * Built on the [BrightnessCurveChart] template: for each brightness level the **effective** day and
- * night scale come straight from `BrightnessEngine.compressedDynamicScale` (the same taper math the
- * runtime applies), so the chart is the live function, not a transcription.
- *
- * - X-axis: mapped brightness level (linear, `minBright` → `maxBright`).
- * - Y-axis: effective scaling multiplier around 1.0 (>1 day boost, <1 night reduction).
- * - **Day** (primary): `compressedDynamicScale(b, 1 + spread/100).effectiveScale`.
- * - **Night** (gold): `compressedDynamicScale(b, 1 − spread/100).effectiveScale`.
- */
+/** AAB Taper Graph (Tasker task657, %AAB_HTML_Graph5). Day/night scale spread taper. */
 @Composable
 fun TaperChart(
     curve: BrightnessCurveConfig,
     scaleSpreadPercent: Int,
     modifier: Modifier = Modifier,
-    // S14: the current applied brightness, shown as a "Now" line — only supplied while circadian
-    // scaling is actually active (the caller passes null otherwise → no marker).
+    // S14: current applied brightness as "Now" line; null (scaling inactive) → no marker.
     currentBrightness: Int? = null,
 ) {
     val xStart = curve.minBrightness.toFloat()
@@ -48,20 +35,18 @@ fun TaperChart(
         nightPoints += Offset(b, engine.compressedDynamicScale(b.toDouble(), nightScale, curve).effectiveScale.toFloat())
     }
 
-    // Frame the y-axis around 1.0 with a little headroom (the 1.0 baseline is always visible).
+    // Y-axis framed around 1.0 with headroom.
     val ys = (dayPoints + nightPoints).map { it.y } + 1f
     val yMin = ys.min() - 0.05f
     val yMax = ys.max() + 0.05f
 
-    // Day = primary teal, Night = blue (gold is reserved for reference lines, Tasker convention).
     val series = listOf(
         ChartSeries(stringResource(R.string.chart_night), nightPoints, AabChartBlue, strokeWidthPx = 3f),
         ChartSeries(stringResource(R.string.chart_day), dayPoints, MaterialTheme.colorScheme.primary),
     )
 
     val markers = buildList {
-        add(ChartMarker(color = MaterialTheme.colorScheme.outline, y = 1f)) // the 1.0 no-scale baseline
-        // S14: live "Now" line at the current brightness (only supplied while scaling is active).
+        add(ChartMarker(color = MaterialTheme.colorScheme.outline, y = 1f)) // 1.0 baseline
         currentBrightness?.let {
             add(ChartMarker(color = MaterialTheme.colorScheme.error, x = it.toFloat().coerceIn(xStart, xEnd), label = stringResource(R.string.chart_now)))
         }

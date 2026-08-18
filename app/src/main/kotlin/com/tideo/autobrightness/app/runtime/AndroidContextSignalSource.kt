@@ -15,11 +15,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.Calendar
 
-/**
- * Android-backed [ContextSignalSource]: bridges the S7 platform readers into the engine and computes
- * the clock/calendar/solar fields the pure resolver needs (day-of-week, local seconds-of-day, and
- * SUNRISE/SUNSET as local seconds — task43 L62-80, L150-152).
- */
 class AndroidContextSignalSource(
     context: Context,
     private val battery: BatteryStateReader = AndroidBatteryStateReader(context.applicationContext),
@@ -54,8 +49,6 @@ class AndroidContextSignalSource(
         val nowSecs = cal.get(Calendar.HOUR_OF_DAY) * 3600 +
             cal.get(Calendar.MINUTE) * 60 + cal.get(Calendar.SECOND)
 
-        // lat/lon now come from the engine's live location listener (G2R-F45). 0.0,0.0 = no fix yet:
-        // fall back to last-known for the solar computation but report the (0,0) so the gate stays off.
         val haveFix = lat != 0.0 || lon != 0.0
         val solarLoc = if (haveFix) lat to lon else {
             runCatching { location.lastKnownLocation() }.getOrNull()?.let { it.latitude to it.longitude }
@@ -77,8 +70,6 @@ class AndroidContextSignalSource(
         )
     }
 
-    // SUNRISE/SUNSET as local seconds-of-day. Falls back to 06:00/18:00 (task43 L67/72) when no
-    // location is known or the solar computation fails (e.g. polar day/night sentinels).
     private fun solarLocalSeconds(lat: Double?, lon: Double?, epochSec: Long, offsetSecs: Long): Pair<Long, Long> {
         if (lat == null || lon == null) return DEFAULT_SUNRISE to DEFAULT_SUNSET
         return runCatching {

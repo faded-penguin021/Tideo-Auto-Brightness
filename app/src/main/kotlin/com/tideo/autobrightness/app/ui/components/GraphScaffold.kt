@@ -35,27 +35,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-/**
- * One swipeable chart page in a [ChartPager] (G2R-F81). [content] is the actual chart composable.
- * S12 passed a deferred placeholder here; **S13d swapped in the real charts** (the `ui.graph` chart
- * composables) for the same `title`/`testTag` without touching the pager or the host screen. The slot
- * list is the single coordination point between the host screens and the chart library.
- */
+/** One swipeable chart page in ChartPager (G2R-F81). Slot list is single coordination point between host screens and chart library. */
 class ChartSlot(
     val title: String,
     val testTag: String,
     val content: @Composable () -> Unit,
 )
 
-/**
- * Pager over a screen's **relevant graphs** (G2R-F81): the relevant graph sits **above** its settings,
- * and the user pages between related graphs rather than scrolling past a vertical stack.
- *
- * The charts themselves are **interactive** (drag-scrub readout — owner requirement), which consumes
- * the horizontal drag the pager would otherwise swipe on. So page navigation is by **tap**: ‹ › arrows
- * flanking the title + clickable page dots (`pagerState.userScrollEnabled=false`). A single-slot pager
- * renders just the chart. Carries the `chart_pager` test tag.
- */
+/** Pager over screen's relevant graphs (G2R-F81): graph sits above settings. Charts are interactive (drag-scrub). Page navigation by tap: arrows + dots. */
 @Composable
 fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
     if (slots.isEmpty()) return
@@ -88,7 +75,6 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
                 }
             }
         }
-        // userScrollEnabled=false: the interactive chart owns horizontal drags; pages change via taps.
         HorizontalPager(state = pagerState, userScrollEnabled = false) { page ->
             slots[page].content()
         }
@@ -100,8 +86,7 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
             ) {
                 slots.indices.forEach { i ->
                     val selected = i == pagerState.currentPage
-                    // A2 (D-156): the page dots are clickable but glyph-less — label each so TalkBack
-                    // announces which chart it jumps to (the audit gate flags an unlabeled clickable).
+                    // D-156: page dots labeled for TalkBack (audit requires labeled clickables).
                     val dotLabel = stringResource(R.string.a11y_chart_go_to, i + 1)
                     Surface(
                         shape = CircleShape,
@@ -120,8 +105,7 @@ fun ChartPager(slots: List<ChartSlot>, modifier: Modifier = Modifier) {
     }
 }
 
-/** A tappable page-step affordance for the [ChartPager] (swipe is consumed by the chart scrub).
- *  Uses a real Material chevron icon rather than a ‹ / › text glyph (UI-consistency: icons, not glyphs). */
+/** Tappable page-step affordance for ChartPager (swipe consumed by chart scrub). Uses Material chevron icon. */
 @Composable
 private fun PagerArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, contentDescription: String, testTag: String, onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.testTag(testTag)) {
@@ -129,11 +113,7 @@ private fun PagerArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, co
     }
 }
 
-/**
- * Subtly groups the settings that feed ONE graph and names which graph they affect (G2R-F82, pairs
- * with the [ChartPager]). An outlined card with a small caption ("Affects the {graph} graph") so the
- * user can see the link between a control and the chart above it. Carries a `group_<graph>` test tag.
- */
+/** Groups settings that feed one graph and names which graph they affect (G2R-F82, pairs with ChartPager). Outlined card with caption. */
 @Composable
 fun GraphSettingsGroup(
     graph: String,

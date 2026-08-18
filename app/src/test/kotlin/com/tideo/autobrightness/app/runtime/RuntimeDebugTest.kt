@@ -11,10 +11,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * S12.5c (G2-F15): the runtime debug sink Flashes a category only when the live debugLevel selects
- * it (the %AAB_Debug selector is single-valued, D-023). NoOp never surfaces anything.
- */
+/** Runtime debug sink: Flash category only when debugLevel selects it (D-023, G2-F15). */
 @RunWith(RobolectricTestRunner::class)
 class RuntimeDebugTest {
 
@@ -24,7 +21,6 @@ class RuntimeDebugTest {
     fun toastSink_emitsOnlyWhenLevelMatchesCategory() {
         val sink = ToastDebugSink(context)
 
-        // Active level 5 == SUPER_DIMMING → the matching category surfaces, others stay silent.
         sink.emit(DebugCategory.LIGHT_EVAL, activeLevel = 5) { "should not show" }
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertNull(ShadowToast.getLatestToast(), "non-matching category must not toast")
@@ -58,24 +54,19 @@ class RuntimeDebugTest {
     fun dynamicScaleGate_firesOnlyTwoMinIntoTransitionThenThrottles() {
         val gate = DynamicScaleDebugGate(delayMs = 120_000L, intervalMs = 120_000L)
 
-        // Transition in progress, but not yet 2 min in → silent.
         assertFalse(gate.shouldEmit(0L, transitionActive = true))
         assertFalse(gate.shouldEmit(60_000L, transitionActive = true))
-        // 2 min into the transition → first Flash.
         assertTrue(gate.shouldEmit(120_000L, transitionActive = true))
-        // Throttled: < 2 min since the last Flash.
         assertFalse(gate.shouldEmit(180_000L, transitionActive = true))
-        // 2 min later → next Flash.
         assertTrue(gate.shouldEmit(240_000L, transitionActive = true))
     }
 
     @Test
     fun dynamicScaleGate_neverFiresWithoutAnActiveTransition() {
         val gate = DynamicScaleDebugGate()
-        // "Not on every light change": when the scale isn't ramping the gate never opens, and a
-        // settled stretch resets the 2-min clock so the next ramp must wait again.
+        // Never emit without active transition; settled stretch resets 2-min clock.
         repeat(10) { i -> assertFalse(gate.shouldEmit(i * 200_000L, transitionActive = false)) }
-        assertFalse(gate.shouldEmit(2_000_000L, transitionActive = true)) // first cycle of a new ramp
+        assertFalse(gate.shouldEmit(2_000_000L, transitionActive = true))
     }
 
     // ---- F50/F51/F52: AabFlash cancel-previous + global presenter + instant cancel ----
@@ -92,8 +83,7 @@ class RuntimeDebugTest {
             AabFlash.show(context, "a")
             AabFlash.show(context, "b")
             AabFlash.cancel()
-            // Each show cancels (hides) the previous flash first (F51); the trailing hide is the
-            // explicit instant-off cancel (F52).
+            // Each show cancels previous (F51); trailing hide is explicit cancel (F52).
             assertEquals(listOf("hide", "show:a", "hide", "show:b", "hide"), events)
         } finally {
             AabFlash.register(null)

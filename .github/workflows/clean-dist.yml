@@ -15,8 +15,11 @@ on:
   push:
     branches: [main]
 
+# Read-only by default; the single job below re-grants `contents: write` at job scope. That is
+# least privilege made explicit — with one job today it does not change this run's effective
+# token, but a second job added here would no longer inherit write access.
 permissions:
-  contents: write  # needed to push the removal commit
+  contents: read
 
 concurrency:
   group: clean-dist-${{ github.ref }}
@@ -24,11 +27,13 @@ concurrency:
 
 jobs:
   clean:
+    permissions:
+      contents: write  # needed to push the removal commit
     runs-on: ubuntu-latest
     timeout-minutes: 10  # quick git op; cap a hang
     steps:
       - name: Checkout
-        uses: actions/checkout@v5  # node24 runtime (see build.yml node24 policy)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0 - node24 runtime (see build.yml node24 policy)
         with:
           fetch-depth: 0
 

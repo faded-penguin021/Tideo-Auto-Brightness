@@ -5,16 +5,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Round-trip test: audit-default values → key=value legacy string → AabSettings.
- *
- * Fixture is built from defaults_audit.md canonical values (task570 _Initialize AAB Defaults).
- * Verifies TaskerLegacyProfileSerializer.deserialize() correctly maps every %AAB_* variable
- * that it handles to the corresponding AabSettings field.
- */
+/** Round-trip test: audit-default values → legacy string → AabSettings (task570). */
 class LegacyImportRoundTripTest {
 
-    // Fixture built from defaults_audit.md / task570 canonical defaults
     private val auditDefaultsLegacy = """
         %AAB_Service = On
         %AAB_DetectOverrides = Off
@@ -131,10 +124,7 @@ class LegacyImportRoundTripTest {
         assertEquals(0.8f, s.scale, 0.001f)
     }
 
-    // G2R-F70: the REAL Tasker AAB config format is nested JSON (task637 _ProfileManager.performSave,
-    // XML L29365+), NOT %AAB_Key=value. Before the fix this parsed to all-defaults, so a legacy "Load"
-    // changed nothing on screen. Keys/defaults mirror performSave; values here are deliberately
-    // non-default so a defaults-only parse would fail every assertion.
+    // G2R-F70: REAL Tasker format is nested JSON (task637 _ProfileManager.performSave), not %AAB_Key=value.
     private val nestedJsonConfig = """
         {
           "meta": { "name": "Night", "version": "3.3", "timestamp": 1700000000000 },

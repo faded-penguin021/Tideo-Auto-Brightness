@@ -15,26 +15,7 @@ import kotlin.math.pow
 
 private val engine = BrightnessEngine()
 
-/**
- * THE chart template (Tasker: AAB Brightness Graph / task663 `_GenerateGraph`). Samples the domain
- * `mapLuxToBrightness` over a log-spaced lux grid and draws lux→brightness, on the reusable
- * [ChartCanvas].
- *
- * Series (S12.7g):
- *   - **Curve** (primary, solid) = the live [curve] = the draft the user is editing — it tracks edits.
- *     When the user previews a wizard suggestion it is loaded INTO that draft (D-125), so this line
- *     also *is* the suggested fit during a preview (no separate auto-drawn line).
- *   - **Reference** (gold, dashed) = the FIXED [referenceCurve] — the HARDCODED baseline curve (Tasker
- *     task663 `ref_data`: the AabSettings defaults), so a draft edit — or a previewed suggestion — shows
- *     *against* the fixed reference, like the Tasker graph (D-125, corrects F69's committed snapshot).
- *     It does NOT move with the draft or committed.
- *   - **Overrides** = the recorded manual-override points as tappable scatter dots (tap → delete, F36).
- *
- * **S13 / Haiku: copy this pattern exactly for the other six charts.** The recipe is: sample a domain
- * function over a grid → `List<Offset>` in data-space, wrap each line in a [ChartSeries], add markers/
- * scatter, hand it to [ChartCanvas] with the right [AxisScale] + ranges. Keep math here, not in
- * ChartCanvas.
- */
+/** Brightness curve chart (task663): curve, fixed reference, overrides (D-125, F36, F69). */
 @Composable
 fun BrightnessCurveChart(
     curve: BrightnessCurveConfig,
@@ -45,7 +26,7 @@ fun BrightnessCurveChart(
     referenceCurve: BrightnessCurveConfig? = null,
     onDeleteOverridePoint: ((Offset) -> Unit)? = null,
 ) {
-    // brightness_graph.md: the Tasker x-axis is 41 log-spaced lux values 0.1 → 100000 (F55).
+    // F55: log-spaced lux 0.1 → 100000.
     val minLux = 0.1f
     val maxLux = 100_000f
     val samples = 80
@@ -56,15 +37,11 @@ fun BrightnessCurveChart(
         Offset(lux, b.toFloat())
     }
 
-    // 1. live curve through mapLuxToBrightness, floored at minBrightness (G2-F4).
+    // Curve (G2-F4); fixed reference (D-125).
     val curvePoints = sample(curve)
-
-    // 2. FIXED reference = the hardcoded baseline curve (dashed gold), never the draft/committed (D-125).
     val referencePoints = referenceCurve?.let { sample(it) }
 
-    // D-125: there is no separate auto-drawn "Suggested" line. A wizard suggestion is previewed by
-    // loading it into the draft (the "Curve" line above), so it shows against the dashed "Reference"
-    // (committed) curve — the same two-line comparison, but only when the USER previews it.
+    // D-125: no separate suggested line; suggestion loaded into draft (preview against reference).
     val series = buildList {
         referencePoints?.let { add(ChartSeries(stringResource(R.string.chart_reference), it, AabGold, strokeWidthPx = 3f, dashed = true)) }
         add(ChartSeries(stringResource(R.string.chart_curve), curvePoints, MaterialTheme.colorScheme.primary))
@@ -106,7 +83,6 @@ fun BrightnessCurveChart(
     )
 }
 
-/** Log-spaced grid from [min] to [max] inclusive (shared sampling helper for chart instances). */
 internal fun logSpaced(min: Float, max: Float, count: Int): List<Float> {
     val lo = log10(min.coerceAtLeast(1e-3f))
     val hi = log10(max.coerceAtLeast(min))

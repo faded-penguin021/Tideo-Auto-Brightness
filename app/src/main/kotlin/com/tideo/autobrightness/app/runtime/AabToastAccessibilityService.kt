@@ -13,21 +13,8 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.TextView
 
-/**
- * Opt-in [AccessibilityService] that renders the AAB flash messages **system-wide** (G2R-F50).
- *
- * The Tasker original flashed its debug/context messages everywhere — over other apps, not just while
- * the AAB UI was foreground. Android blocks custom toast views from the background on API 30+, so a
- * foreground-only [android.widget.Toast] (the [AabFlash] fallback) cannot reproduce that. An
- * AccessibilityService can host a `TYPE_ACCESSIBILITY_OVERLAY` window that draws above other apps
- * without `SYSTEM_ALERT_WINDOW`, which is the mechanism here.
- *
- * The service is **purely a presentation surface**: it consumes no accessibility events and never
- * reads window content (`canRetrieveWindowContent=false`). It registers itself as the [AabFlash]
- * [AabFlash.Presenter] on connect and unregisters on unbind, so when the user has not enabled it the
- * app degrades gracefully to the foreground toast. Distribution is F-Droid/GitHub (not Play Store),
- * so the sensitive permission is acceptable per the owner answer (STATE.md, F50).
- */
+/** Opt-in AccessibilityService for system-wide AAB flash messages (G2R-F50, F88: tap-to-dismiss).
+ * Uses TYPE_ACCESSIBILITY_OVERLAY (no SYSTEM_ALERT_WINDOW). Purely presentation; degrades to Toast fallback. */
 class AabToastAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
@@ -56,11 +43,10 @@ class AabToastAccessibilityService : AccessibilityService() {
                 cornerRadius = dp(12).toFloat()
                 setColor(AAB_TEAL)
             }
-            // F88: tap the flash to dismiss it immediately (Tasker lets you tap a flash away).
+            // F88: tap-to-dismiss
             setOnClickListener { removeOverlay() }
         }
-        // NOTE (F88): the window is focusable-NOT but touchABLE so the tap-to-dismiss click lands; it
-        // is small + bottom-anchored, so it does not steal general input.
+        // Window: NOT focusable but touch-able for click; small + bottom-anchored, doesn't steal input.
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,

@@ -24,28 +24,17 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * G2R-F73 regression: the pipeline must feed the REAL sunrise/sunset ramp windows to the dynamic-scale
- * engine, not `TimeContext`'s fixed 6–8am-UTC defaults. Pure JVM — exercises the app-layer
- * [CircadianWindowProvider.compute] + the fenced domain [DynamicScaleEngine] only (domain untouched).
- *
- * Scenario: Edinburgh (55.95, −3.19), mid-June, device clock UTC+1 (BST). At **07:13 local = 06:13
- * UTC** the sun has been up for ~3h, so `%AAB_ScaleDynamic` should be in full daytime (> 1). The old
- * fixed windows treated 06–08 UTC (= 07–09 local) as "morning", so the ramp had barely started there
- * → scaleDynamic < 1 (the owner's bug).
- */
+/** G2R-F73 regression: real sunrise/sunset windows, not fixed 6–8am-UTC defaults. */
 class CircadianWindowProviderTest {
 
-    // Utrecht, NL — the owner's location (UTC+2 / CEST in June).
-    private val lat = 52.0907
+    private val lat = 52.0907 // Utrecht, NL
     private val lon = 5.1214
     private val tzOffsetHours = 2.0
     private val transitionFactor = 0.1
     private val scaleSpread = 15.0
     private val steepness = 6.0
 
-    // 08:13 local (CEST) == 06:13 UTC, as UTC seconds-of-day (the pipeline's `now` frame). This is the
-    // instant the owner saw scaleDynamic = 0.852.
+    // 08:13 local (CEST) == 06:13 UTC (pipeline's `now` frame).
     private val now0613Utc = (6 * 3600 + 13 * 60).toDouble()
 
     private fun midJuneEpochSec(): Long {
@@ -57,7 +46,7 @@ class CircadianWindowProviderTest {
 
     @Test
     fun utrecht_sunriseAndDaytimeScale_matchReality() {
-        // Sanity-anchor against a real-world almanac value: Utrecht sunrise on 2026-06-15 ≈ 05:18 local.
+        // Sanity-anchor: Utrecht sunrise ≈ 05:18 local.
         val solar = com.tideo.autobrightness.domain.circadian.SolarCalculator
             .compute(lat, lon, midJuneEpochSec(), tzOffsetHours)
         fun local(epochSec: Long): String {
@@ -70,7 +59,7 @@ class CircadianWindowProviderTest {
         val scale = scaleDynamicAt(
             now0613Utc, w.morningStart, w.morningEnd, w.eveningStart, w.eveningEnd, w.sunlightDurationMinutes,
         )
-        // Full daytime at 08:13 local → progress 1 → 1 + 15% = 1.15 (was 0.852 with the fixed windows).
+        // Full daytime → 1.15 (was 0.852 with fixed windows).
         assertTrue(kotlin.math.abs(scale - 1.15) < 1e-6, "expected 1.15 daytime scale, was $scale")
     }
 
@@ -92,7 +81,6 @@ class CircadianWindowProviderTest {
     @Test
     fun realWindows_giveDaytimeScale_at0813Local() {
         val w = CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), tzOffsetHours, transitionFactor)
-        // Morning ramp completes well before 06:13 UTC; evening is far later → full daytime.
         assertTrue(w.morningEnd < now0613Utc, "morningEnd ${w.morningEnd} should be before $now0613Utc")
         assertTrue(w.eveningStart > now0613Utc, "eveningStart ${w.eveningStart} should be after $now0613Utc")
 
@@ -104,7 +92,7 @@ class CircadianWindowProviderTest {
 
     @Test
     fun defaultWindows_reproduceTheBug_subUnityScale() {
-        // The pre-F73 behaviour: TimeContext defaults (6–8am / 18–20pm UTC, 720 min sunlight).
+        // Pre-F73: TimeContext fixed defaults (6–8am / 18–20pm UTC).
         val scale = scaleDynamicAt(
             now0613Utc, 6 * 3600.0, 8 * 3600.0, 18 * 3600.0, 20 * 3600.0, 720.0,
         )
@@ -131,7 +119,6 @@ class CircadianWindowProviderTest {
 
     @Test
     fun fixedDate_changesSunlightDuration_G2RF39() {
-        // A fixed 21-Dec date must produce a much shorter day than mid-June at the same location.
         val june = CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor)
         val dec = CircadianWindowProvider.compute(lat, lon, decEpochSec(), 1.0, transitionFactor)
         assertTrue(
@@ -144,7 +131,7 @@ class CircadianWindowProviderTest {
     fun fixedLocationOverride_appliesAndSkipsAcquisition_G2RF39_F83() = runTest {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         var geoIpCalled = false
-        val loc = FakeLocationReader() // would return null → forces fallback IF consulted
+        val loc = FakeLocationReader()
         val provider = CircadianWindowProvider(
             scope = scope,
             overrideFlow = MutableStateFlow(ExperimentDateLocation(date = "2025-12-21", latitude = lat, longitude = lon)),
@@ -157,7 +144,6 @@ class CircadianWindowProviderTest {
         assertNotNull(w, "fixed date+location yields windows directly")
         assertFalse(geoIpCalled, "fixed lat/lon must skip the geo-IP acquisition (task90 skip-when-fixed)")
         assertFalse(loc.lastKnownCalled, "fixed lat/lon must not consult Android location")
-        // Equivalent to the pure winter-solstice computation.
         assertEquals(CircadianWindowProvider.compute(lat, lon, decEpochSec(), 1.0, transitionFactor), w)
         scope.cancel()
     }
@@ -168,17 +154,15 @@ class CircadianWindowProviderTest {
         val loc = FakeLocationReader(lastKnown = LocationSnapshot(lat, lon))
         val provider = CircadianWindowProvider(
             scope = scope,
-            // date pinned, NO coords → live (last-known) location
             overrideFlow = MutableStateFlow(ExperimentDateLocation(date = "2025-12-21")),
             location = loc,
             geoIpFallback = { null },
-            clock = { midJuneEpochSec() * 1000L }, // "now" is June, but the fixed Dec date must win
+            clock = { midJuneEpochSec() * 1000L }, // Fixed Dec date wins over actual June
             tzOffsetForDate = { 1.0 },
         )
         val w = provider.current(transitionFactor)
         assertNotNull(w)
         assertTrue(loc.lastKnownCalled, "date-only override still acquires the live location")
-        // Windows reflect the FIXED Dec date (short day), not today's June.
         assertEquals(CircadianWindowProvider.compute(lat, lon, decEpochSec(), 1.0, transitionFactor), w)
         scope.cancel()
     }
@@ -188,16 +172,15 @@ class CircadianWindowProviderTest {
     @Test
     fun noAndroidFix_fallsBackToGeoIp_G2RF83() = runTest {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
-        val loc = FakeLocationReader() // no last-known, currentLocation Unavailable
+        val loc = FakeLocationReader()
         val provider = CircadianWindowProvider(
             scope = scope,
             overrideFlow = MutableStateFlow(ExperimentDateLocation()),
             location = loc,
-            geoIpFallback = { LocationSnapshot(lat, lon) }, // ipwho.is yields Utrecht
+            geoIpFallback = { LocationSnapshot(lat, lon) },
             clock = { midJuneEpochSec() * 1000L },
             tzOffsetForDate = { 2.0 },
         )
-        // The acquire launch runs inline (Unconfined) → first call already has the geo-IP fix.
         val w = provider.current(transitionFactor)
         assertNotNull(w, "geo-IP fallback supplies a location when Android has none")
         assertEquals(CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 2.0, transitionFactor), w)

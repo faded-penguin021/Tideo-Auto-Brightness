@@ -8,14 +8,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * S14: the task524 `_CalibratePowerDraw` orchestration. A fake [PowerMeter] whose current tracks the
- * last-set brightness makes every latch break immediately, so the whole sweep runs deterministically
- * with instant delays — no device needed.
- */
+/** S14: task524 `_CalibratePowerDraw` orchestration (deterministic with fake meter). */
 class PowerDrawCalibratorTest {
 
-    /** Idle (brightness 0) draws ~100 mA; +1 mA per brightness level. Reported in µA. */
     private class FakeMeter(
         private val hasSensor: Boolean = true,
         private val charging: Boolean = false,
@@ -34,7 +29,7 @@ class PowerDrawCalibratorTest {
         meter = meter,
         setScreenBrightness = { onSet(it) },
         delayMs = { /* instant */ },
-        clock = { 0L }, // the wait loop exits on the first changed reading, so the clock is irrelevant
+        clock = { 0L },
     )
 
     @Test
@@ -69,10 +64,9 @@ class PowerDrawCalibratorTest {
         assertEquals(PowerDrawCalibration.generateSteps().size + 1, samples.size, "baseline + one per step")
         assertEquals(0, samples.first().brightness)
         assertEquals(255, samples.last().brightness)
-        // Net-of-idle: the baseline point is zeroed and current rises with brightness.
+        // Net-of-idle: baseline zeroed, current rises with brightness.
         assertEquals(0.0, samples.first().currentMa, 1e-9)
         assertTrue(samples.last().currentMa > samples.first().currentMa, "current rises with brightness")
-        // The screen was actually ramped to 0 and driven to full at the last step.
         assertTrue(driven.contains(0), "ramped down to 0")
         assertTrue(driven.contains(255), "drove the final 255 step")
     }

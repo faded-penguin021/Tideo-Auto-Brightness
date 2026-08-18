@@ -29,12 +29,7 @@ class ForegroundAppMonitorTest {
 
     @Test
     fun foregroundPackage_retainsLastKnown_whenEventAgesOutOfWindow_D034f() = runTest {
-        // An app foregrounded longer than the 3 s query window has no RESUMED event inside it.
-        // The clock seam advances 60 s per poll, so poll 1 sees the event and poll 2's window is
-        // empty — the flow must keep reporting the last known package, not flip to null
-        // (D-034 f: a null here silently breaks every per-app context rule).
-        // ts strictly inside the first poll's (now-3000, now) window — the shadow's queryEvents
-        // excludes the endTime boundary.
+        // Aged-out event: poll 1 sees it, poll 2 doesn't. Must retain, not return null (D-034 f).
         shadowOf(usm).addEvent(resumedEvent("com.example.reader", 999_000L))
         var t = 1_000_000L
         val monitor = AndroidForegroundAppMonitor(context, clock = { t.also { t += 60_000L } })
@@ -42,8 +37,7 @@ class ForegroundAppMonitorTest {
         val emissions = monitor.foregroundPackage(intervalMs = 1L).take(2).toList()
 
         assertEquals(listOf("com.example.reader", "com.example.reader"), emissions)
-        // Non-vacuous: the same aged-out window on a FRESH flow (no last-known yet) is null,
-        // proving poll 2 above really found nothing and emitted the retained value.
+        // Prove poll 2 really found nothing: fresh flow on same window is null.
         val fresh = AndroidForegroundAppMonitor(context, clock = { 2_000_000L })
         assertEquals(listOf(null), fresh.foregroundPackage(intervalMs = 1L).take(1).toList())
     }

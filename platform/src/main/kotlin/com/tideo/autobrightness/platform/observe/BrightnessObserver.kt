@@ -23,15 +23,12 @@ class AndroidBrightnessObserver(
     private val uri: Uri = Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS)
 
     override fun externalChanges(): Flow<Int> = callbackFlow {
-        // null handler: onChange called on the ContentResolver caller thread.
-        // trySend is thread-safe in callbackFlow so no handler dispatch needed.
         val observer = object : ContentObserver(null) {
             override fun onChange(selfChange: Boolean) {
                 val raw = Settings.System.getInt(
                     context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1
                 )
                 if (raw >= 0 && !controller.isSelfWrite(raw)) {
-                    // Report domain-scale value so callers don't need device-range knowledge.
                     trySend(controller.read())
                 }
             }

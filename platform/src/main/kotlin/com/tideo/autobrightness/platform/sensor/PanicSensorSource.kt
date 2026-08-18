@@ -18,26 +18,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/**
- * Orientation detector for the prof769 "Panic (Reset)" STATE (D-021, D-116).
- *
- * The reworked panic (`tmp/Panic_profile_task.md`) gates on `Orientation [Is:Upside Down] ∧ Display
- * State [Is:On] ∧ %AAB_Proximity !~ Near` — the old significant-motion EVENT is gone; the shake is now
- * validated separately by [PanicShakeGate] inside a 10 s window. This class supplies the **upside-down**
- * half of that state from the accelerometer:
- *  - **Gravity** (a low-pass of the raw accelerometer) gives the device orientation. Android reads
- *    **+9.8 on whichever axis points up** at rest, so held upright `gravity.y ≈ +9.8`; held **upside
- *    down** (top edge down) `gravity.y ≈ −9.8`. Upside-down ≡ `gravity.y < −[upsideDownGravityY]` AND y
- *    is the dominant axis (|gy| ≥ |gx|, |gz|) — a phone lying flat or in landscape never qualifies.
- *  - [isUpsideDown] is the instantaneous (filtered) orientation; [onAccelerometer] returns the
- *    **sustained** orientation (held for [sustainedFrames] readings) so a transient flip during a shake
- *    the right way up cannot arm the gesture (G2R-F77 / S14: panic must fire ONLY when genuinely inverted).
- *  - [linearMagnitude] exposes the gravity-stripped acceleration magnitude so the Android source can run
- *    the shake gate off the bare accelerometer when the device has no `TYPE_LINEAR_ACCELERATION` sensor
- *    (mirrors the A2 Java high-pass fallback).
- *
- * Pure + frame-by-frame so the orientation timing is unit-testable without a [SensorManager].
- */
+/** Orientation detector for prof769 panic gesture (D-021, D-116): computes sustained upside-down state
+ * and gravity-stripped acceleration magnitude for shake detection. Pure state machine. */
 class PanicGestureDetector(
     // S14 (owner: panic too sensitive): require a committed inversion. gy < −8.0 ≈ within ~35° of fully
     // upside down (was −7.0 ≈ 44°), so a phone held at a casual downward angle does not count.
@@ -100,26 +82,8 @@ class PanicGestureDetector(
     }
 }
 
-/**
- * Re-arm latch for the panic shake window (task528 `_PanicButton`, D-021 / D-116).
- *
- * The prof769 trigger is a STATE (Upside-Down ∧ Display-On ∧ Proximity-not-Near). When it becomes true a
- * single 10 s [PanicShakeGate] window runs; whether that window fires the panic (a qualifying shake) or
- * **times out** (no shake), the gesture must NOT start another window until the phone leaves the
- * upside-down state and returns — exactly as a Tasker STATE only re-fires on re-entry ("the profile
- * won't trigger again until the phone is flipped straight and then upside-down again", `tmp/Tmp.md`).
- *
- * D-165: "leaves the upside-down state" must be a **sustained** straight spell ([rearmFrames]
- * consecutive non-inverted readings), not a single reading. The instantaneous orientation flickers
- * false during a vigorous same-axis shake — the exact artifact the 10 s window is already immune to
- * (see the window comment in [AndroidPanicSensorSource]) — and the α=0.9 gravity low-pass keeps it
- * false for ~5-6 readings after ONE strong spike even with the phone held stably inverted. A
- * single-reading clear therefore let "timed-out window → keep holding inverted → shake hard" re-open
- * a fresh window and fire a real panic without any flip straight, breaking the STATE re-entry contract.
- *
- * Pure state machine, clock-free: the Android source owns the orientation/display/proximity sensing and
- * the 10 s window; this only decides *whether a new window may start*.
- */
+/** Re-arm latch for panic gesture window (task528 `_PanicButton`, D-021, D-116, D-165).
+ * Clears only after [rearmFrames] consecutive non-inverted readings to avoid shake-induced flicker. */
 class PanicGate(
     // 25 readings ≈ 0.5 s at SENSOR_DELAY_GAME (~50 Hz): unreachable by shake/filter artifacts
     // (single-spike recovery is ~5-6 readings; oscillating shakes keep interrupting the streak),
@@ -166,35 +130,15 @@ interface PanicSensorSource {
     fun events(): Flow<Unit>
 }
 
-/**
- * Accelerometer-backed [PanicSensorSource] for the reworked prof769 (D-116).
- *
- * Registers `TYPE_ACCELEROMETER` for orientation (via [PanicGestureDetector]) and, when present,
- * `TYPE_LINEAR_ACCELERATION` for the shake magnitude (else it high-passes the accelerometer like the A2
- * Java fallback). When the armed state (sustained upside-down ∧ display-on ∧ proximity-not-near) becomes
- * true it opens a [windowMs] window driven by a fresh [PanicShakeGate]`(sensitivity())`:
- *  - sensitivity 0 ⇒ pass-through: fire immediately, no shake required;
- *  - shake reaches target within the window ⇒ fire;
- *  - window elapses with no qualifying shake ⇒ veto (no fire).
- * Either outcome consumes the gesture ([PanicGate]) so it cannot re-fire until the phone is flipped
- * straight and inverted again. All sensor/screen callbacks are delivered on a single looper, so the
- * window state is mutated single-threaded (no locks needed).
- */
+/** Accelerometer-backed source for prof769 panic gesture (D-116, DB-009, DB-011).
+ * Opens 10 s shake window when armed; closes and consumes on fire or timeout. Single-threaded via looper. */
 class AndroidPanicSensorSource(
     private val context: Context,
     /** Current `%AAB_PanicSensitivity` (0..10). Read per arming so a slider change takes effect at once. */
     private val sensitivity: () -> Int,
     /** Current `%AAB_Proximity ~ Near` — the gesture only arms while NOT near (covered/in-pocket = no panic). */
     private val isNear: () -> Boolean,
-    /**
-     * Current `%AAB_PanicPlugged` (DB-009, issue #110): when true the gesture only works on external
-     * power. Read at every registration AND arming decision, never cached.
-     *
-     * **Nullable on purpose (DB-011).** `null` means *not known yet* — the caller's effective-settings
-     * snapshot has not resolved. The caller must not collapse that into `false`: a fabricated default
-     * reads as "no restriction", which is precisely how a plugged-only gesture fired on battery
-     * (device report C4). Unknown is handled here, once, as fail-closed.
-     */
+    /** Requires plugged state (DB-009, DB-011, issue #110). `null` = unknown, handled fail-closed. */
     private val requiresPlugged: () -> Boolean? = { false },
     private val detector: PanicGestureDetector = PanicGestureDetector(),
     private val gate: PanicGate = PanicGate(),
@@ -218,52 +162,34 @@ class AndroidPanicSensorSource(
         // then flip it on the cheap SCREEN_ON/OFF protected broadcasts.
         val interactive = AtomicBoolean(power.isInteractive)
 
-        // DB-009: plugged state, seeded from the STICKY battery broadcast (registerReceiver(null, …)
-        // reads the last one without registering anything) and then maintained on the two explicit
-        // power-transition broadcasts. ACTION_BATTERY_CHANGED itself is deliberately NOT registered:
-        // it fires on every level/temperature tick, which is exactly the kind of always-on cost this
-        // gate exists to remove.
+        // DB-009: plugged state, seeded from sticky battery broadcast, maintained on power-transition
+        // broadcasts. ACTION_BATTERY_CHANGED not registered (fires on every level tick; gate removes that cost).
         val plugged = AtomicBoolean(
             context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 ?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
                 ?.let { it > 0 } ?: false,
         )
 
-        /**
-         * The `%AAB_PanicPlugged` half of "could this gesture fire right now" — resolved in ONE place
-         * for both the registration gate and the arming gate (DB-011).
-         *
-         * Unknown (`null`) is **fail-closed**: with no resolved settings snapshot we cannot tell
-         * whether the user asked for plugged-only, and guessing "no restriction" is exactly the
-         * failure the device pass found. Guessing the other way costs the gesture a few hundred ms at
-         * service start (the service now waits for that snapshot before collecting this flow at all),
-         * and it is re-evaluated on the next screen/power transition — it can never latch.
-         */
+        // DB-011: resolve plugged requirement once for both registration and arming gates. Unknown=fail-closed.
         fun pluggedRequirementMet(): Boolean = when (requiresPlugged()) {
             null -> false
             false -> true
             true -> plugged.get()
         }
 
-        // --- Window state (mutated only from sensor callbacks, all on one looper → single-threaded) ---
+        // Window state (mutated single-threaded from sensor callbacks on one looper).
         var windowActive = false
         var windowDeadline = 0L
         var shakeGate: PanicShakeGate? = null
-        // Latest shake magnitude: from the linear-accel sensor when present, else the detector's
-        // gravity-stripped accelerometer residual.
-        var shakeMagnitude = 0.0
+        var shakeMagnitude = 0.0  // From linear-accel sensor, else detector's gravity-stripped residual.
 
-        // Clear the in-flight window WITHOUT consuming the gesture. Used when the sensor is released
-        // (DB-009): releasing is not an outcome of the gesture, so it must not latch the
-        // consume-until-re-entry gate — doing so left the user needing a flip-straight-and-back after
-        // every screen-off, which a test caught immediately.
+        // Clear window without consuming gesture (DB-009): releasing must not latch the re-entry gate.
         fun resetWindow() {
             windowActive = false
             shakeGate = null
         }
 
-        // Both window OUTCOMES — a qualifying shake (fire) and the 10 s timeout (veto) — consume the
-        // gesture: it will not re-arm until the phone is flipped straight and inverted again (D-021).
+        // Both outcomes (fire or timeout) consume gesture; re-arm requires flip-straight-and-back (D-021, D-165).
         fun endWindow() {
             resetWindow()
             gate.consume()
@@ -274,20 +200,11 @@ class AndroidPanicSensorSource(
                 val now = clock()
                 val sustainedUpsideDown = detector.onAccelerometer(event.values[0], event.values[1], event.values[2])
                 if (linear == null) shakeMagnitude = detector.linearMagnitude
-                // DB-011: the plugged requirement gates ARMING, not just registration. The registration
-                // gate below is a battery optimisation and is only re-evaluated on broadcasts — so a
-                // decision taken under a stale or not-yet-known requirement stayed in force until the
-                // next screen/power transition, and a plugged-only gesture fired on battery (C4). The
-                // preconditions that make firing wrong are checked here, where firing happens.
+                // DB-011: check plugged requirement at ARM time, not just registration (battery gate re-evals on broadcasts).
                 val armed = sustainedUpsideDown && interactive.get() && !isNear() && pluggedRequirementMet()
 
                 if (windowActive) {
-                    // Faithful to the A2 Java: once armed, the 10 s window runs to completion and is NOT
-                    // re-gated on orientation. A vigorous up-and-down shake while inverted is along the
-                    // SAME axis as gravity, so it transiently disturbs the gravity-based `isUpsideDown`
-                    // estimate; abandoning the window on that flicker made up-down shakes self-cancel while
-                    // orthogonal left-right shakes survived (owner: "shake direction wrong"). The shake
-                    // magnitude is omnidirectional, so the window must not depend on shake direction.
+                    // A2 Java: window runs to completion, not re-gated on orientation (prevents shake-direction bias).
                     when {
                         // 10 s elapsed with no qualifying shake → veto (consume; needs a re-entry to re-arm).
                         now >= windowDeadline -> endWindow()
@@ -327,29 +244,14 @@ class AndroidPanicSensorSource(
             }
         }
 
-        // --- DB-009: register the accelerometer ONLY while the gesture could actually fire --------
-        //
-        // This is the structural difference from Tasker, and the reason it mattered. There, the
-        // profile's Orientation STATE does the watching (the platform's job, effectively free) and the
-        // A3 Java registers the accelerometer for at most the 10 s shake window. Here the orientation
-        // watch IS the trigger, so the listener was registered for the entire life of the service —
-        // SENSOR_DELAY_GAME, ~50 Hz, all day, including with the screen off, where the gesture cannot
-        // fire at all because arming requires `interactive`.
-        //
-        // The gate below is exactly the set of preconditions that are cheap to observe via broadcast
-        // and that make firing impossible while false:
-        //   - screen off        → arming already required `interactive`; nothing is lost.
-        //   - unplugged, when the user asked for plugged-only (A3's early veto, before it registers
-        //     its own listener).
-        // Everything else (orientation, proximity, shake) still needs the sensor to evaluate.
+        // DB-009: register accelerometer only while gesture could fire (structural difference from Tasker).
         var registered = false
         fun canFire(): Boolean = interactive.get() && pluggedRequirementMet()
         fun syncSensors() {
             val want = canFire()
             if (want == registered) return
             if (want) {
-                // SENSOR_DELAY_GAME (~50 Hz) matches the A2 Java's registration — fast enough to track
-                // a shake.
+                // SENSOR_DELAY_GAME (~50 Hz): matches A2 Java, fast enough for shake tracking.
                 sensorManager.registerListener(accelListener, accel, SensorManager.SENSOR_DELAY_GAME)
                 if (linear != null && linearListener != null) {
                     sensorManager.registerListener(linearListener, linear, SensorManager.SENSOR_DELAY_GAME)
@@ -357,11 +259,9 @@ class AndroidPanicSensorSource(
             } else {
                 sensorManager.unregisterListener(accelListener)
                 if (linearListener != null) sensorManager.unregisterListener(linearListener)
-                // A half-finished gesture must not survive the gap: drop the window and the filter
-                // state so the next registration starts from a clean, unseeded gravity estimate.
-                // resetWindow(), NOT endWindow() — see above.
+                // resetWindow() not endWindow(): releasing is not a gesture outcome, so don't latch re-entry gate.
                 resetWindow()
-                detector.reset()
+                detector.reset()  // Clean gravity estimate for next registration.
             }
             registered = want
         }

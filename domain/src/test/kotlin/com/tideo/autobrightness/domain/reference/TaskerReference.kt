@@ -15,25 +15,16 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
- * TASKER REFERENCE IMPLEMENTATION — the behavioral oracle for the rebuild.
- *
- * Each function is a faithful, line-by-line transcription of a single embedded Java block
- * (action code 474) or code-547 maths expression extracted in S1. Java semantics are preserved
- * EXACTLY — this is test-only code and MUST conform to Tasker, not to taste:
- *
- *  - `java.lang.Math.round(x)` (ties toward +infinity) where Tasker used `Math.round` — this
- *    differs from `kotlin.math.round` (which the production engine uses) on tie cases.
- *  - `BigDecimal(double).setScale(n, HALF_UP)` where Tasker used BigDecimal — note the
- *    `BigDecimal(double)` constructor uses the EXACT binary value of the double (parity-critical),
- *    not `BigDecimal.valueOf`.
- *  - String-formatted numbers where Tasker concatenated/printed.
- *  - NO clamping / coercion that Tasker did not perform (see D-010).
- *
- * Vectors generated from these functions are immutable fixtures: production code conforms to
- * THEM (S5+), never the other way round. Changing a reference function requires evidence the
- * extraction was wrong + a STATE.md entry.
- *
- * Segment: S4. Sources: docs/rebuild/extraction/java and extraction/tasks/task659/task661.
+ * TASKER REFERENCE IMPLEMENTATION — the behavioral oracle for the rebuild (S4; sources
+ * docs/rebuild/extraction/java and extraction/tasks/task659/task661). Each function transcribes one
+ * embedded Java block (action code 474) or code-547 maths expression line by line. Java semantics
+ * are preserved EXACTLY — test-only code that MUST conform to Tasker, not to taste:
+ * `java.lang.Math.round` (ties toward +infinity, differing on ties from the `kotlin.math.round`
+ * production uses); `BigDecimal(double).setScale(n, HALF_UP)`, whose constructor takes the EXACT
+ * binary value (parity-critical) rather than `BigDecimal.valueOf`; string-formatted numbers where
+ * Tasker printed; and NO clamping Tasker did not perform (D-010). Vectors generated here are
+ * immutable fixtures: production conforms to THEM (S5+), never the reverse — changing one needs
+ * evidence the extraction was wrong, plus a STATE.md entry.
  */
 object TaskerReference {
 
@@ -59,7 +50,7 @@ object TaskerReference {
 
     // ---- task535 "Lux Smoothing (Java)" --------------------------------------------------
     // Java L15205-L15248. %vars: %par1(raw lux), %par2(prev smoothed), %AAB_ThreshDynamic(percent),
-    // %AAB_DeltaFactor, %AAB_Zone1End. NOTE: lux_alpha is NOT clamped to [0,1] (D-010a).
+    // %AAB_DeltaFactor, %AAB_Zone1End. NOTE: lux_alpha is NOT clamped to [0,1] (D-010(a)).
     data class SmoothingResult(
         val smoothedLux: Double,
         val luxAlpha: Double,
@@ -143,17 +134,8 @@ object TaskerReference {
     //   form3a = ( zone2end * ( MaxBright - ( form2a
     //                + form2b * ( (zone2end-form2c)^0.33 - (zone1end-form2c)^0.33 ) ) ) / MaxBright )
     //
-    // Parse tree for form3a (verbatim XML:
-    //   (%aab_zone2end*(%AAB_MaxBright-(%aab_form2a+%aab_form2b*((%aab_zone2end-%aab_form2c)^0.33
-    //    -(%aab_zone1end-%aab_form2c)^0.33)))/%AAB_MaxBright) ):
-    //   `*` and `/` are left-associative, equal precedence ⇒
-    //     ( ( zone2end * INNER ) / MaxBright )   where
-    //     INNER = MaxBright - ( form2a + form2b * ( A - B ) )
-    //     A = (zone2end-form2c)^0.33 ,  B = (zone1end-form2c)^0.33
-    //   `^` (pow) binds tighter than `*`; `-` inside parens is explicit. NO rounding (DoMaths).
-    // Cross-validation: task663 block#2 (plot copy) uses the SAME zone-2 anchor expression with
-    // `aab_zone1end` in place of `%AAB_Form2D`; defaults_audit confirms Form2D ≡ Zone1End, so 661
-    // and 663 agree by construction (recorded in parity_gaps.md §cross-validation).
+    // The parse tree, the left-associativity that makes the grouping non-obvious, and the task663
+    // cross-validation are in docs/rebuild/XML_RECIPES.md §R12. Read it before touching this.
     data class ContinuityCoefficients(val form2a: Double, val form3a: Double)
 
     fun deriveContinuityCoefficients(
@@ -175,7 +157,7 @@ object TaskerReference {
     // ---- task661 "Map Lux to Brightness (Java) V2" — mapping maths (code-547) -------------
     // act4/6/8 (L33732/L33865/L33878), DoMaths. Condition uses %smoothed_lux; formula uses %par1;
     // in the pipeline smoothed_lux == par1, so a single `lux` argument is faithful.
-    // NO coerceAtLeast on the ^0.33 bases, NO clamp to [min,max] here (D-010b). Form2D ≡ Zone1End.
+    // NO coerceAtLeast on the ^0.33 bases, NO clamp to [min,max] here (D-010(b)). Form2D ≡ Zone1End.
     //
     //   lux < zone1End : form1a * sqrt(lux)
     //   lux < zone2End : form2a + form2b * ( (lux-form2c)^0.33 - (form2d-form2c)^0.33 )

@@ -14,13 +14,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * A4 acceptance (D-156). Renders the group-1 settings screens — Curve & Brightness, Reactivity,
- * Circadian, Super Dimming — under the [assertAllInteractiveNodesAreLabeled] gate, plus a heading
- * assertion per screen section so TalkBack users can jump section-to-section. The controls are the
- * A0 primitives (labeled sliders/switches) and text-carrying buttons, so no screen-local label
- * fixes were needed; this locks that in. Template: SettingsControlsA11yTest (A0) / SettingsScreensTest.
- */
+/** A4 acceptance (D-156): renders group-1 settings screens under assertAllInteractiveNodesAreLabeled gate
+ * plus heading assertions for TalkBack section jumps (A0 primitives; no screen-local fixes needed). */
 @RunWith(RobolectricTestRunner::class)
 class SettingsScreensA11yTest {
 
@@ -85,7 +80,6 @@ class SettingsScreensA11yTest {
 
     @Test
     fun circadian_allInteractiveNodesAreLabeled() {
-        // Default state renders every section incl. the date/location card and the geo-IP toggle.
         compose.setContent {
             MaterialTheme {
                 CircadianContent(

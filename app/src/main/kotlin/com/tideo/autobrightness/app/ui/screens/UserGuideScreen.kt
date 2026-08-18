@@ -21,15 +21,8 @@ import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.theme.AabBackgroundDark
 
-/**
- * AAB User Guide scene (Tasker: sceneAAB User Guide, extraction/scenes/user_guide.md). Tasker rendered
- * this as a styled **WebView/HTML** manual, so the rebuild does too — a static HTML document themed to
- * the AAB palette (teal headers, gold accents, dark surface) rendered in a `WebView` (no JS, no network,
- * no new dependency). The copy still comes from `strings.xml` (i18n preserved); only the markup is local.
- *
- * Shown from the Menu Info & Help group and once as the **post-onboarding first-run destination**
- * (G2R-F80) with the Menu seeded beneath, so "Got it" / Back return to the hub.
- */
+/** AAB User Guide scene (Tasker: sceneAAB User Guide): static HTML manual in WebView (no JS, no network).
+ * Shown from Menu Info & Help and as post-onboarding destination (G2R-F80). */
 @Composable
 fun UserGuideScreen(navController: NavHostController) {
     UserGuideContent(onBack = { navController.popBackStack() })
@@ -50,12 +43,9 @@ private val GUIDE_SECTIONS = listOf(
 
 @Composable
 fun UserGuideContent(onBack: () -> Unit) {
-    // No in-page banner: the teal brand banner belongs to the Menu only (owner finding). The scaffold's
-    // top bar already titles this screen "User Guide".
     val welcomeTitle = stringResource(R.string.guide_welcome_title)
     val welcomeBody = stringResource(R.string.guide_welcome_body)
     val outro = stringResource(R.string.guide_outro)
-    // The numbered sections only — Welcome is rendered specially (intro blockquote).
     val sections = GUIDE_SECTIONS.drop(1).map { (t, b) -> stringResource(t) to stringResource(b) }
     val html = remember(welcomeTitle, welcomeBody, sections, outro) {
         buildGuideHtml(welcomeTitle, welcomeBody, sections, outro)
@@ -82,12 +72,8 @@ fun UserGuideContent(onBack: () -> Unit) {
     }
 }
 
-/**
- * Assemble the AAB-themed HTML manual from the (already-i18n) section strings, mirroring Tasker's guide
- * design language: a teal banner, teal-accent section rules, **gold** emphasis, and dedicated **tip** and
- * **warning** callout boxes. Body markup conventions (from user_guide.md): `•` = bullet,
- * `**x**` = emphasis, a line starting `[TIP]` = a tip callout, `[WARN]` = a warning callout.
- */
+/** Assemble AAB-themed HTML manual from i18n section strings. Markup: • = bullet, **x** = emphasis,
+ * [TIP]/[WARN] = callout boxes (user_guide.md). */
 private fun buildGuideHtml(
     welcomeTitle: String,
     welcomeBody: String,

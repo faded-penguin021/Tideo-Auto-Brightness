@@ -13,12 +13,21 @@ on:
   pull_request_target:
     types: [opened, reopened]
 
+# Read-only by default; the `triage` job re-grants exactly the two write scopes it uses at job
+# scope (least privilege made explicit — a future second job here inherits nothing).
 permissions:
-  pull-requests: write
-  issues: write
+  contents: read
 
 jobs:
   triage:
+    permissions:
+      # Both kept, unchanged from the previous workflow-level grant: the script reaches a PR
+      # through the issues API (issues.createComment / issues.addLabels), and that pairing is
+      # served by pull-requests: write for a PR target and issues: write for the issues
+      # endpoints themselves. Narrowing to one of the two is a live-fire experiment on external
+      # contributors' PRs, so it is not folded into this permissions cleanup.
+      pull-requests: write
+      issues: write
     # Skip the maintainer's own PRs and bot PRs (e.g. Dependabot).
     if: >-
       github.event.pull_request.user.login != 'faded-penguin021' &&
@@ -27,7 +36,7 @@ jobs:
     timeout-minutes: 10  # single github-script comment + label; cap a hang
     steps:
       - name: Comment and label for triage
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
         with:
           script: |
             const pr = context.payload.pull_request;

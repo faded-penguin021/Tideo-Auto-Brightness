@@ -11,21 +11,9 @@ import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.app.ui.theme.AabTeal
 import com.tideo.autobrightness.domain.power.PowerDrawSample
 
-// S14: `PowerDrawSample` is now the canonical domain type (com.tideo.autobrightness.domain.power) so the
-// calibrator (task524 port) produces the exact rows this chart renders. Fields are accessed by name.
+// S14: canonical PowerDrawSample type fed by task524 calibrator.
 
-/**
- * AAB Power Draw Graph (Tasker: task524 `_CalibratePowerDraw`, feeds %AAB_HTML_Graph8). Unlike the
- * other charts this has no parametric formula — the data is *measured* at runtime by stepping the
- * screen through brightness levels and sampling battery current. Until samples exist this renders an
- * [EmptyState]; once measured it plots them on the [ChartCanvas] following the [BrightnessCurveChart]
- * template, with the **dual y-axis the Tasker Chart.js graph uses** (owner finding): Power on the left,
- * the real Current (mA) values on the right — NOT current rescaled onto the power axis.
- *
- * - X-axis: brightness level 0..255 (linear).
- * - **Power** (teal, left axis): measured screen power (W).
- * - **Current** (gold, dashed, right axis): measured current draw (mA), in its own real units.
- */
+/** Power Draw Graph (Tasker: task524 CalibratePowerDraw). Dual y-axis: Power (left, teal), Current (right, gold, dashed). */
 @Composable
 fun PowerDrawChart(
     samples: List<PowerDrawSample>,
@@ -44,7 +32,6 @@ fun PowerDrawChart(
 
     val series = listOf(
         ChartSeries(stringResource(R.string.chart_power_w), powerPoints, AabTeal),
-        // task524 chart: the Current dataset lives on its own right-hand mA axis (yAxisID 'y1').
         ChartSeries(stringResource(R.string.chart_current_ma), currentPoints, AabGold, strokeWidthPx = 2f, dashed = true, onSecondaryAxis = true),
     )
 

@@ -62,6 +62,12 @@ optional.
 
 14. Hold the phone **upside down** (charging port up) and **shake** vertically. **Expected:** an **S.O.S.
     vibration**, brightness forced to **maximum**, the service stops (full reset).
+14a. **Every panic entry point confirms (DB-037).** Repeat the reset twice more without the gesture:
+    once via the foreground notification's **Reset** action, and once via the intent surface
+    (`adb shell am broadcast -a com.tideo.autobrightness.control.PANIC -n com.tideo.autobrightness/.app.control.ControlReceiver`,
+    automation toggle ON — §13). **Expected:** the same S.O.S. vibration both times; before DB-037
+    only the gesture buzzed. Then fire the gesture once more and confirm it still vibrates **exactly
+    once** — the call moved to the shared path, so a leftover call site would double-buzz.
 15. **Grab the phone out of a pocket and turn the screen on normally** (do not deliberately invert+shake).
     **Expected:** panic does **NOT** fire — the 3 s post-wake grace + the stricter inversion threshold
     suppress the grab-to-wake false trigger.
@@ -184,7 +190,7 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     **Menu → Privileged → Privileged Display** change one field at a time and **Apply**; confirm the
     device reacts AND the system Settings UI agrees (a wrong key would be silently *created*, not
     rejected — visible agreement is the test):
-    - **Night Light** on, temperature slider near 2596 K. **Expected:** screen visibly warms;
+    - **Night Light** (only shown when Android reports it available) on, temperature slider near 2596 K. **Expected:** screen visibly warms;
       Settings → Display → Night Light shows ON with matching intensity. "Use device temperature"
       (unset) leaves the system's own preference untouched. ⚠️ **Known variance (2026-07-05,
       owner's OnePlus):** OxygenOS ignores `night_display_color_temperature` — the tint is the
@@ -194,13 +200,14 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     - **Color correction:** Grayscale, then Protanomaly/Deuteranomaly/Tritanomaly. **Expected:** the
       filter matches; Settings → Accessibility → Color correction shows the same mode.
     - **Color inversion** on/off. **Expected:** inverts; the Accessibility toggle agrees.
-    - **Always-on display** on/off. **Expected:** AOD appears/disappears on the lock screen.
+    - **Always-on display** (only shown when Android reports it available) on/off. **Expected:** AOD appears/disappears on the lock screen.
     - **Stay awake while charging** on, short screen timeout, charger in. **Expected:** the screen
       never sleeps while plugged (AC/USB/wireless); off + unplugged, normal timeout returns.
-    - **Force SDR** (visible only on Android 14+) on → **read back over adb:**
-      `adb shell settings get global user_disabled_hdr_formats` → `1,2,3,4` and
-      `adb shell settings get global are_user_disabled_hdr_formats_allowed` → `0`; an HDR video
-      plays without the HDR brightness boost. Off → allowed returns `1` and HDR plays again.
+    - **Disable HDR (experimental, Android 14+)** on → read back
+      `user_disabled_hdr_formats=1,2,3,4` and
+      `are_user_disabled_hdr_formats_allowed=0`; off → allowed returns `1` and formats clears.
+      This writes stored preferences, not Android's Force-SDR service API. Either direction may
+      require a reboot, and HDR/display-mode changes may briefly blank the screen (DB-044).
 33. **Profile carried by a context rule — engage AND baseline restore.** Keep the baseline's display
     fields all off/default. Set grayscale (+ Night Light) on Privileged Display, **save as a
     profile**, then restore your baseline values. Add a Contexts rule loading that profile (a time
@@ -241,10 +248,23 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
 39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
     Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
     **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to
-    **defaults** (color back, inversion off, Night Light off, AOD/stay-awake off, HDR re-allowed)
+    **defaults** (color back, inversion off, supported Night Light/AOD off, stay-awake off)
     — including a pre-existing residual (repeat after a force-stop mid-override: panic still
     clears it). Re-enable the service. **Expected:** the baseline's display fields re-assert on
     start — panic is an escape hatch, not a permanent opt-out.
+39a. **The screen shows the DEVICE, not the stored profile (DB-034).** With Privileged Display open,
+    flip Night Light (or color inversion) from the system quick-settings tile, then return to Tideo.
+    **Expected:** on resume the toggle shows the device's state, and Apply becomes available because
+    the draft now differs from the saved profile — the screen no longer asserts a value the device
+    does not hold. **Now flip the SAME toggle back from the tile and return again (DB-039).**
+    **Expected:** the screen follows a second time. One external change is not enough to test this:
+    the first read-back makes the draft differ from the profile, and the original gate refused every
+    change after that, so the feature worked exactly once per screen entry. Now change a toggle
+    WITHOUT applying, background the app and return.
+    **Expected:** your uncommitted edit survives — a read-back never overwrites a dirty draft.
+    Finally enable **Follow circadian scaling** + Apply, service ON, and reopen the screen.
+    **Expected:** the temperature slider still shows YOUR value, not the ramp's current Kelvin (the
+    ticker owns that key while tracking is on; reading it back would freeze one sample).
 
 ## 12. Accessibility — TalkBack & touch targets (D-156)
 
@@ -292,6 +312,16 @@ reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation ap
 44. **`LOAD_PROFILE` + resume.** Send `LOAD_PROFILE` with `--es name "Night"` (a real saved profile).
     **Expected:** that profile loads and the manual lock latches (Dashboard shows the profile);
     `CONTEXTS_RESUME` clears it and hands control back to context rules. An unknown `name` is a no-op.
+44a. **Dropped commands explain themselves at level 8 (DB-035).** Set **Live Debug Info → Log Level**
+    to **8 — Context Automation**. With the automation toggle **OFF**, send any verb. **Expected:** a
+    flash naming the off toggle — and the command still does nothing (the flash must not weaken the
+    gate). Turn the toggle ON, then produce each remaining case: `LOAD_PROFILE` with no `--es name`;
+    `LOAD_PROFILE --es name "NoSuchProfile"` (the flash quotes the name back); and `RESUME` with the
+    master switch off. **Expected:** one flash each, and a verb that *works* (e.g. `REAPPLY`) flashes
+    nothing. Now set the level back to **0** and repeat the toggle-OFF send. **Expected:** silence —
+    the default configuration keeps D-157's "no side effect before the opt-in gate".
+    Deliberately unreported even at level 8: a mistyped action (refused before anything runs) and a
+    command dropped by the one-at-a-time admission gate.
 45. **`SERVICE_ON` while not running.** With the service OFF (but the toggle ON), send `SERVICE_ON`.
     **Expected:** it starts. If the device is aggressive about background starts and it does **not**
     start (Dashboard shows *degraded*), exempt Tideo from battery optimization and retry — it should

@@ -14,9 +14,7 @@ data class AabSettings(
     val scale: Float = 1.0f,
     val zone1End: Int = 35,
     val zone2End: Int = 10_000,
-    // G2R-F70: %AAB_Form1A is a CONTINUOUS curve coefficient in Tasker (the wizard suggests e.g.
-    // 5.833); modelling it as Int silently rounded a loaded value (5.833 → 6). Stored as Double so the
-    // decimal survives a legacy load / wizard apply. Old int-encoded values read back transparently.
+    // G2R-F70: %AAB_Form1A continuous curve coefficient; stored as Double to preserve decimals
     val form1A: Double = 5.0,
     val form2B: Float = 8.8f,
     val form2C: Int = 18,
@@ -54,44 +52,25 @@ data class AabSettings(
     val notificationsEnabled: Boolean = true,
     // Tasker: %AAB_Debug; 10 named categories 0–9 (D-023)
     val debugLevel: Int = 0,
-    // Tasker: %AAB_PanicSensitivity — shake intensity/duration required to confirm a Panic (Reset)
-    // gesture (task528 _PanicButton A2). 0 = pass-through (no shake required); 10 = long vigorous
-    // shake. Default 8 (the Tasker A1 default when the var is unset). Global pref, not a profile
-    // parameter — like debugLevel. (D-116)
+    // Tasker: %AAB_PanicSensitivity — shake intensity for Panic gesture; 0=off, 10=vigorous (D-116)
     val panicSensitivity: Int = 8,
-    // Tasker: %AAB_ContextOverride — runtime "manual context lock" latch. When true, ALL context
-    // watchers are suppressed (contexts_spec §1.1 gate fires only when ContextOverride != true).
-    // The baseline/fresh-install default MUST be false or context switching never works (D-038).
-    // A saved override-profile stores true here; the baseline AabSettings does not.
+    // Tasker: %AAB_ContextOverride — manual context lock. Baseline must be false (D-038).
     val contextOverride: Boolean = false,
-    // Tasker: %AAB_PanicPlugged (_PanicButton A3, issue #110). Default OFF — the panic gesture is an
-    // escape hatch from an unreadable screen, so it must keep working on battery unless the user
-    // deliberately narrows it.
+    // Tasker: %AAB_PanicPlugged — panic gesture must work on battery (#110)
     val panicRequiresPlugged: Boolean = false,
     // Tasker: %AAB_SetupTitle; onboarding dialog title (D-008)
     val setupTitle: String = "Advanced Auto Brightness Setup",
-    // --- Privileged display toggles (rebuild-only, no Tasker source — D-151/D-152). ALL of the
-    // Privileged Display toggles are per-profile screen state, applied on profile change by
-    // DisplayTogglesCoordinator (ELEVATED-gated, no-op below; the super-dimming precedent:
-    // profile fields drive a secure feature). Defaults are the "leave the device alone" values:
-    // a profile chain that never edits them never writes.
+    // D-151/D-152: privileged display toggles (rebuild-only, per-profile, applied by DisplayTogglesCoordinator)
     val nightLightEnabled: Boolean = false,
-    // Night Light intensity in Kelvin; null = this profile has no temperature opinion (the device
-    // value — a persistent system preference — is left untouched). Written only when non-null.
     val nightLightTemperature: Int? = null,
-    // D-154: the temperature follows the circadian tanh modifier while the service runs (warmest
-    // at night — anchored on nightLightTemperature, or the AOSP default when null — relaxing to
-    // the AOSP max/weakest filter in daylight). While on, the ticker owns the temperature and
-    // manual temperature changes do NOT stick (unlike every other display field).
+    // D-154: temperature follows circadian modifier; manual changes don't stick while on
     val nightLightCircadianEnabled: Boolean = false,
-    // Color-correction mode: one of [DALTONIZER_MODES] ("OFF", "GRAYSCALE", or a correction
-    // matrix). Stored as a STRING enum name (the D-150 lesson): an unknown value from a newer
-    // schema validates back to "OFF" instead of failing the whole settings file.
+    // D-150: color-correction mode (STRING enum for schema forward-compatibility)
     val daltonizerMode: String = DALTONIZER_OFF,
     val inversionEnabled: Boolean = false,
     val alwaysOnDisplayEnabled: Boolean = false,
     val stayAwakeChargingEnabled: Boolean = false,
-    // Android-14+ force-SDR (experimental). On older devices the field is inert: the coordinator
+    // Android-14+ HDR-format disabling (experimental). On older devices the field is inert: the coordinator
     // checks the controller's availability gate and never writes it.
     val hdrForceSdrEnabled: Boolean = false,
 )
@@ -99,17 +78,11 @@ data class AabSettings(
 /** [AabSettings.daltonizerMode] value for "color correction off". */
 const val DALTONIZER_OFF = "OFF"
 
-/**
- * Valid [AabSettings.daltonizerMode] values — the name-for-name mirror of the platform
- * `DaltonizerMode` enum (kept platform-import-free here; `DisplayTogglesCoordinatorTest` guards
- * the two sets against drift). Anything else validates back to [DALTONIZER_OFF].
- */
+/** Valid [AabSettings.daltonizerMode] values (mirrors platform DaltonizerMode enum). */
 val DALTONIZER_MODES: Set<String> =
     setOf(DALTONIZER_OFF, "GRAYSCALE", "PROTANOMALY", "DEUTERANOMALY", "TRITANOMALY")
 
-// Schema v2: added animSteps, thresholdMidpoint, contextOverride, setupTitle; scale Float (was Int v1)
-// Schema v3: removed thresholdDynamic (G2R-F85) — it was never an input. The stale key is dropped on
-// read via the serializer's ignoreUnknownKeys; migration only bumps the version stamp.
+// v2: added animSteps/thresholdMidpoint/contextOverride/setupTitle; v3: removed thresholdDynamic (G2R-F85)
 const val CURRENT_SCHEMA_VERSION = 3
 
 enum class AabValueType {
@@ -121,11 +94,7 @@ enum class AabValueType {
     String,
 }
 
-/**
- * DB-008: the highest dimming-strength SETPOINT that may be persisted (_SaveButtonDimming A9-A12).
- * Matches the [com.tideo.autobrightness.domain.brightness.SoftwareDimming] runtime clamp, so the
- * number the user sees is the number that takes effect.
- */
+/** DB-008: highest dimming-strength SETPOINT (matches SoftwareDimming runtime clamp). */
 const val MAX_DIMMING_STRENGTH_SETPOINT = 65
 
 data class AabSettingRule(
@@ -166,7 +135,7 @@ object AabSettingsContract {
         AabSettingRule("%AAB_ThreshBright", "thresholdBright", AabValueType.Float, "0.08", "range 0.0..1.0"),
         AabSettingRule("%AAB_ThreshDark", "thresholdDark", AabValueType.Float, "0.3", "range 0.0..1.0"),
         AabSettingRule("%AAB_ThreshDim", "thresholdDim", AabValueType.Float, "0.25", "range 0.0..1.0"),
-        // %AAB_ThreshDynamic removed (G2R-F85): it is a computed runtime value, not a user setting.
+        // G2R-F85: ThreshDynamic removed (computed runtime value)
         AabSettingRule("%AAB_ThreshSteepness", "thresholdSteepness", AabValueType.Float, "2.1", "range 0.1..10.0"),
         AabSettingRule("%AAB_ThreshMidpoint", "thresholdMidpoint", AabValueType.Double, "4.0", "range 0.0..6.0 (derived=log10(zone2End))"),
         AabSettingRule("%AAB_ScalingUse", "scalingEnabled", AabValueType.Boolean, "false", "must be true|false"),
@@ -182,8 +151,7 @@ object AabSettingsContract {
         AabSettingRule("%AAB_PanicSensitivity", "panicSensitivity", AabValueType.Int, "8", "range 0..10"),
         AabSettingRule("%AAB_ContextOverride", "contextOverride", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_PanicPlugged", "panicRequiresPlugged", AabValueType.Boolean, "false", "must be true|false"),
-        // Rebuild-only display-toggle profile fields (D-151/D-152) — invented %AAB_ names, the
-        // D-116 panicSensitivity precedent (no Tasker source; the name exists for diff/export display).
+        // D-151/D-152: rebuild-only display-toggle fields (invented %AAB_ names, D-116 precedent)
         AabSettingRule("%AAB_NightLight", "nightLightEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_NightLightTemp", "nightLightTemperature", AabValueType.Int, "device default", "range 1000..10000, or unset = device default"),
         AabSettingRule("%AAB_NightLightCircadian", "nightLightCircadianEnabled", AabValueType.Boolean, "false", "must be true|false"),

@@ -34,5 +34,38 @@ if [ "${shizuku_sites:-0}" != "$shizuku_expected" ]; then
 	fails=$((fails + 1))
 fi
 
+# Fact (drift incident 3949383): the constitution's "a sub-item is cited as `D-042(c)`" — the
+# sub-item letter is parenthesised, never appended bare to the row number. The ladder matches
+# citations as whole words (AMH 4.0.0), so a bare-suffixed id resolves to NOTHING: the citation
+# rung stays green while the row loses its only pointer and its [cited] marker reads as stale.
+# That is not a failure the ladder can see, which is exactly why the rule needs an anchor here.
+# The forbidden spelling is deliberately not written out anywhere in this file — this guard
+# scans its own directory, and an illustrative example would fail it (the same trap that caught
+# an illustrative row header in a guard comment at 4698ce9).
+# Scope mirrors CITATION_SCAN_PATHS minus CITATION_EXCLUDE.
+suffixed=$(grep -rnE '\bD[A-Z]*-[0-9]+[a-z]\b' app domain platform .github scripts 2>/dev/null |
+	grep -v '^scripts/test-ladder-guards\.sh:' | grep -v '^scripts/tests/')
+if [ -n "$suffixed" ]; then
+	printf 'doc-fact drift: suffixed sub-item citation(s) found — the ladder matches citations as whole words, so these resolve to no ledger row and silently drop the row from the [cited] accounting. Write them as D-042(c) (DB-022):\n%s\n' \
+		"$suffixed" >&2
+	fails=$((fails + 1))
+fi
+
+# Fact (drift incident DB-019): the constitution states a numeric AMH version and amh.conf's
+# AMH_VERSION is the authority. Nothing upstream checks the pair, and DB-019 is the record of
+# them drifting apart across an upgrade — the constitution carried no version at all while
+# amh.conf said 3.0.0.
+conf_version=$(sed -n 's/^AMH_VERSION=\(.*\)$/\1/p' amh.conf | head -1)
+doc_version=$(sed -n 's/.*[Tt]his constitution records \*\*AMH \([0-9][0-9.]*\)\*\*.*/\1/p' AGENTS.md | head -1)
+if [ -z "$doc_version" ]; then
+	printf 'doc-fact drift: AGENTS.md states no "This constitution records **AMH <version>**" line, but the upgrade contract requires one (docs/UPGRADING.md step 7, DB-019)\n' >&2
+	fails=$((fails + 1))
+elif [ "$doc_version" != "$conf_version" ]; then
+	printf 'doc-fact drift: AGENTS.md records AMH %s but amh.conf sets AMH_VERSION=%s — amh.conf is the authority; move the two together (DB-019)\n' \
+		"$doc_version" "$conf_version" >&2
+	fails=$((fails + 1))
+fi
+
 [ "$fails" = 0 ] || exit 1
-printf 'Shizuku runtime sites = %s\n' "$shizuku_sites"
+printf 'Shizuku runtime sites = %s; sub-item citations parenthesised; constitution records AMH %s = AMH_VERSION\n' \
+	"$shizuku_sites" "$doc_version"

@@ -14,11 +14,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/**
- * S12.9e: the engine⇄controller construction cycle is broken by a [ControllerHookHolder] instead of a
- * `lateinit var controller`. These tests pin both halves — the holder's pre-assignment no-op semantics
- * and that [AppModule.createRuntime] actually wires the controller as the hook without a crash.
- */
+// S12.9e: ControllerHookHolder breaks the engine⇄controller construction cycle (no lateinit crash).
 @RunWith(RobolectricTestRunner::class)
 class AppModuleTest {
 

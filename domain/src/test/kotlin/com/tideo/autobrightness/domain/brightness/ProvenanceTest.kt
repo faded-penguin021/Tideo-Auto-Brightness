@@ -20,12 +20,12 @@ class ProvenanceTest {
 
     private val engine = File("src/main/kotlin/com/tideo/autobrightness/domain/brightness/BrightnessEngine.kt")
     private val text by lazy { engine.readText() }
+    // Note: Comments trimmed in this class per reducing over-commenting. Provenance floor, task IDs, and rounding modes in BrightnessEngine.kt must survive.
 
     @Test
     fun provenanceFloorIsPresent() {
         assertTrue("expected BrightnessEngine.kt at ${engine.absolutePath}", engine.isFile)
         val count = engine.readLines().count { it.contains("// Tasker") }
-        // Floor, not an exact count: adding provenance is always fine; this catches mass stripping only.
         assertTrue(
             "BrightnessEngine.kt has only $count `// Tasker` provenance lines (floor $PROVENANCE_FLOOR) — " +
                 "provenance was stripped, not added",
@@ -35,8 +35,7 @@ class ProvenanceTest {
 
     @Test
     fun parityCriticalRoundingProvenanceSurvives() {
-        // The rounding choices are the parity-critical ones (D-028/D-030 gaps); each must stay documented
-        // in the engine so a future edit can't silently change WHY it rounds the way it does.
+        // Rounding choices are parity-critical (D-028/D-030); must stay documented so edits can't silently change WHY.
         listOf("Math.round", "HALF_UP", "round3").forEach { anchor ->
             assertTrue("BrightnessEngine.kt must keep the `$anchor` rounding-mode provenance", text.contains(anchor))
         }
@@ -44,8 +43,7 @@ class ProvenanceTest {
 
     @Test
     fun coreTaskReferencesSurvive() {
-        // Each core pipeline task ported into the engine must keep a reference; deleting one would erase
-        // the XML→Kotlin link for that piece of logic.
+        // Each core pipeline task must keep reference; deleting one erases the XML→Kotlin link.
         listOf("task535", "task543", "task544", "task546", "task548", "task661").forEach { task ->
             assertTrue("BrightnessEngine.kt lost the provenance reference to $task", text.contains(task))
         }

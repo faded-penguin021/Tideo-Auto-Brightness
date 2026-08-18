@@ -46,16 +46,47 @@ ADAPTER_FILES=''
 say() { printf '%s\n' "$*"; }
 
 
-reset_dotenv_advisory() {
-	local slug uid state
+# Rearm the command guard's one-time advisories. Each is a per-session speed bump, and this
+# boot is what makes "one session" mean anything: the state file the guard writes under /tmp
+# outlives the session otherwise, so in a long-lived container the first warning of the
+# container's lifetime spends the advisory for every later session in the same repository.
+# The `.env` diagnostic states that scope in words; the destructive-command one does not, and
+# would silently have been once per container. Read command-guard.sh for what each says.
+#
+# The CATEGORY is a wildcard, deliberately. This function was written for `dotenv` alone and
+# named the category literally, so when the guard grew a second category the bootstrap kept
+# rearming exactly one of them and nothing said so: a list here is the same defect with an
+# extra step. The rest of the name is quoted, so only the category slot globs — a repository
+# path containing a glob character stays a literal rather than widening the pattern. That slot
+# is a greedy `*` that does not cross `/`, so the widest reach is another repository's file of
+# exactly this shape under /tmp, and erasing one of those is harmless: an advisory that rearms
+# early blocks one extra command and explains why, which is the direction this file is allowed
+# to fail in. Erasing one too FEW removes a rail in silence, which is why the pattern is wide.
+#
+# Globbing is forced on for the expansion rather than assumed. amh.conf is sourced above, it is
+# the adopter's file forever, and a `set -f` or `GLOBIGNORE` in it would leave the pattern
+# unexpanded — with `rm -f` swallowing the literal, that is a rail switched off in silence, the
+# same shape as the defect this function exists to fix. The no-match case still reaches `rm`
+# unexpanded, so the loop tests each entry exists rather than trusting the expansion.
+reset_command_guard_advisories() {
+	local slug uid f had_globignore old_globignore noglob=0
+	case $- in *f*) noglob=1 ;; esac
+	set +f
+	had_globignore=${GLOBIGNORE+x}
+	old_globignore=${GLOBIGNORE:-}
+	GLOBIGNORE=
 	slug=${ROOT//\//_}
 	slug=${slug// /_}
 	uid=${UID:-unknown}
-	state=/tmp/amh-command-guard-dotenv-advisory-$uid-$slug
-	rm -f -- "$state" 2>/dev/null || true
+	for f in /tmp/amh-command-guard-*-advisory-"$uid"-"$slug"; do
+		[ -e "$f" ] && rm -f -- "$f" 2>/dev/null
+	done
+	if [ -n "$had_globignore" ]; then GLOBIGNORE=$old_globignore; else unset GLOBIGNORE; fi
+	[ "$noglob" = 1 ] && set -f
+	return 0
 }
 
-reset_dotenv_advisory
+reset_command_guard_advisories
 
 say "── AMH session start ─────────────────────────────────────────"
 

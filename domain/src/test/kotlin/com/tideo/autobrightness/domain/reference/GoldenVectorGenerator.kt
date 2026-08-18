@@ -9,20 +9,7 @@ import java.io.File
 import kotlin.math.ln
 import kotlin.test.Test
 
-/**
- * Generates the committed golden CSV fixtures from [TaskerReference].
- *
- * The CSVs in `domain/src/test/resources/golden/` are the immutable parity oracle. To regenerate
- * them (only after an evidence-backed reference change, logged in STATE.md):
- *
- *     ./gradlew :domain:test -DregenGolden=1 --tests "*GoldenVectorGenerator*"
- *
- * then commit the changed CSVs. The [regenerateGoldenVectors] test is a no-op unless the
- * `regenGolden` system property is set, so normal `:domain:test` runs never touch the fixtures.
- *
- * Grid: log-spaced lux 0.01 → 120000 plus explicit boundary rows, crossed with ≥4 settings
- * variants (defaults + edge variants). Every CSV has ≥500 rows. Segment: S4.
- */
+/** Golden CSV fixtures oracle (domain/src/test/resources/golden/). Regen: -DregenGolden=1. */
 object GoldenVectorGenerator {
 
     /** A full curve/threshold settings variant; derived continuity coefficients via task659. */

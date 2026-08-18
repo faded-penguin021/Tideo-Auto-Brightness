@@ -11,20 +11,19 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
-/** On-disk row for the persisted dataset (the domain [PowerDrawSample] stays serialization-free). */
+/** On-disk row (domain PowerDrawSample stays serialization-free). */
 @Serializable
 private data class PowerSampleDto(val brightness: Int, val currentMa: Double, val powerW: Double)
 
 /**
- * Persists the measured task524 `_CalibratePowerDraw` dataset (Tasker `%data` / `%AAB_HTML_Graph8`).
- * The Tools `PowerDrawChart` renders [samples]; a calibration run [save]s a fresh set (overwrite).
+ * Persists task524 `_CalibratePowerDraw` dataset; samples rendered in PowerDrawChart.
  */
 class PowerDrawStore(private val dataStore: DataStore<Preferences>) {
     val samples: Flow<List<PowerDrawSample>> = dataStore.data.map { prefs ->
         prefs[DATA]?.let(::decode) ?: emptyList()
     }
 
-    /** True once a calibration has been recorded (the Tasker "Data Found" entry condition). */
+    /** True once calibration recorded (Tasker "Data Found" entry condition). */
     val hasData: Flow<Boolean> = dataStore.data.map { (it[DATA]?.length ?: 0) > 2 }
 
     suspend fun save(samples: List<PowerDrawSample>) {

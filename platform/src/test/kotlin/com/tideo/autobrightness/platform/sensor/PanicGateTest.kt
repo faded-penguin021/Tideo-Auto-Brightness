@@ -4,11 +4,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.Test
 
-/**
- * D-116 (reworked prof769): [PanicGate] is now the **re-arm latch** for the 10 s shake window. After a
- * window runs (fired OR timed out) the gesture must not start another until the phone is flipped straight
- * and inverted again — exactly like a Tasker STATE re-entry (`tmp/Tmp.md`). Pure state-machine tests.
- */
+/** D-116 (prof769): PanicGate re-arm latch (10s shake window state machine). */
 class PanicGateTest {
 
     @Test
@@ -20,7 +16,6 @@ class PanicGateTest {
     @Test
     fun doesNotArmWhenNotArmed() {
         val gate = PanicGate()
-        // e.g. proximity near, or display off, or not yet sustained-upside-down.
         assertFalse(gate.canArm(armed = false, upsideDown = true), "not-armed → no window")
     }
 
@@ -28,8 +23,7 @@ class PanicGateTest {
     fun afterConsume_doesNotReArmWhileStillUpsideDown() {
         val gate = PanicGate()
         assertTrue(gate.canArm(armed = true, upsideDown = true))
-        gate.consume() // a window ran (timeout or fire)
-        // Still held upside down (the timeout case): must NOT re-arm even though the condition holds.
+        gate.consume()
         assertFalse(gate.canArm(armed = true, upsideDown = true), "still inverted → latched, no re-arm")
         assertFalse(gate.canArm(armed = true, upsideDown = true), "stays latched across readings")
     }
@@ -39,8 +33,7 @@ class PanicGateTest {
         val gate = PanicGate()
         gate.canArm(armed = true, upsideDown = true)
         gate.consume()
-        // Flip straight: a SUSTAINED straight spell (≥ rearmFrames readings, D-165) clears the
-        // latch (but not armed in this orientation).
+        // D-165: sustained straight spell (≥ rearmFrames readings) clears latch.
         repeat(PanicGate.REARM_FRAMES) {
             assertFalse(gate.canArm(armed = false, upsideDown = false), "flipped straight: not armed yet")
         }

@@ -4,13 +4,7 @@ import com.tideo.autobrightness.domain.reference.TaskerReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Unit tests for [InitialBrightness.computeInitialLux].
- *
- * Cross-validates against [TaskerReference.setInitialBrightness] (the Tasker oracle).
- * Tie cases (0.5, 1.5, 2.345, -2.5) confirm Math.round semantics: ties round toward +∞,
- * differing from Kotlin's kotlin.math.round (rounds to even).
- */
+/** InitialBrightness.computeInitialLux vs TaskerReference (Math.round ties toward +∞). */
 class InitialBrightnessTest {
 
     @Test
