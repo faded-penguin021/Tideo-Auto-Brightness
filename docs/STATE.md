@@ -58,13 +58,12 @@ now that v1.9.0 has shipped. Do **not** re-open the closed force-stop investigat
 1. DB-041…DB-043's unavailable-feature boundary still unverified (B1 BLOCKED three times): every
    device to hand reports Night Light/AOD available, and the owner has no Samsung. Needs hardware
    reporting them unavailable — park it until such a device exists.
-2. **v1.9.1 device round — `docs/rebuild/DEVICE_TEST_SCRIPT_1.9.1.md`, debug APK delivered
-   2026-08-18.** §11a (stay-awake mask) is the one whose evidence is a number, not an impression;
-   §11b is read-only after DB-071 (its synthetic write was withdrawn) and §11e cannot be forced
-   from the UI. **Owner: run it and report per step; v1.9.1 does not ship before that.**
-   Context the round already has: on **v1.9.0** the owner measured 0 → 7 (Tideo) vs 15 (Developer
-   Options), and off→on returned 7 — DB-065 device-confirmed as a real defect in the released
-   build. §11a step 2 is the same measurement against the fix and must read 15.
+2. **v1.9.1 is ready to tag — the device round came back clean (owner, 2026-08-18).** §11a PASS:
+   the mask reads 15 where v1.9.0 gave 7, so DB-065 is device-verified fixed against a
+   device-confirmed defect. §11b SKIPPED, nothing to observe (both daltonizer keys read 0) and
+   synthesising the state is refused by DB-071. §11c step 11 PASS; step 12 withdrawn as unrunnable
+   (DB-072). §11d PASS. §11e not attempted, as expected. **Owner: publish v1.9.1/vc22 from the
+   GitHub UI when you want it out** — tagging is yours; nothing here blocks it.
 
 Open questions: none. Owed reviews: none.
 
@@ -75,7 +74,8 @@ note (one record removed, one removed then restored, 14 no-coordinate records) *
 Incoming: force-stop location defect **closed as no app defect** (owner, 2026-08-17), cold-GNSS
 warm-up → DB-059. Device rounds: 1.8.2-debug 49/5/2/3; 1.9.0 `7970765` 11/1/3, all owner-closed;
 `fc35a6e`/`036ec77` → DB-054…DB-058; `12b5a21` → DB-060, verified fixed 2026-08-17. DB-065
-confirmed on released 1.9.0: 0 → 7 via Tideo, 15 via Developer Options, off→on back to 7.
+confirmed on released 1.9.0 (0 → 7 via Tideo, 15 via Developer Options, off→on back to 7) and
+**verified fixed on 1.9.1-debug vc22** the same day; that round also produced DB-071 and DB-072.
 
 ## Decided non-items
 

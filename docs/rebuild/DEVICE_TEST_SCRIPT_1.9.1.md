@@ -80,10 +80,15 @@ skip a write the device does not need, so this only proves anything from an OFF 
     flicker or re-assert; nothing you set outside the app is overwritten. Practical check: leave
     Night Light ON in system Settings with the app's Night Light also ON, change only stay-awake,
     Apply — Night Light must not blink off/on.
-12. **The failure banner still works.** Revoke the grant
-    (`adb shell pm revoke com.tideo.autobrightness.debug android.permission.WRITE_SECURE_SETTINGS`),
-    change a field, Apply. **Expected:** the write-failed banner appears — the diff-write must not
-    swallow a permission failure. Re-grant afterwards.
+12. ~~**The failure banner still works.** Revoke the grant, change a field, Apply; expect the
+    write-failed banner.~~ **WITHDRAWN 2026-08-18 — not reachable, and the reason is the design
+    working (DB-072).** Revoking mid-round and returning to the app makes `refresh()` re-probe the
+    tier on ON_RESUME, so the screen replaces the toggles with the grant card (D-149's self-guard):
+    there is no Apply left to press. The run that found this is the evidence — grant card, correct
+    debug package name, no crash. What the step meant to check survives only as a RACE (grant lost
+    between opening the screen and tapping Apply), which cannot be staged by hand; it is covered by
+    `applyNowBelowElevated_surfacesFailure_andWritesNothing`. **Instead, confirm the recovery
+    path:** re-grant, reopen the screen, and the toggles come back with the device's values.
 
 ## §11d — Panic still resets everything (D-155 regression check) [ELEVATED]
 

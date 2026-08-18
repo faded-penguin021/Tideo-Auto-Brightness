@@ -852,3 +852,12 @@
   legality — `0`/`1`/`15` into `stay_on_while_plugged_in` is what AOSP's switch writes; `42` into
   a colour-transform key is what nothing writes. Unrepresentable-state behaviour stays
   unit-tested only, an unverified residual on device (the DB-013 shape).
+
+- DB-072: **A device step must be reachable in the UI it targets.** The v1.9.1 round asked the
+  owner to revoke WRITE_SECURE_SETTINGS, return to Privileged Display and Apply, expecting the
+  write-failed banner. Returning fires ON_RESUME → `refresh()` → tier re-probe, so D-149's
+  self-guard swaps the toggles for the grant card and there is no Apply to press. The step was
+  unrunnable, which the run proved by producing a correct grant card instead. The banner is
+  reachable only as a race (grant lost between screen open and Apply) — unit-tested, not
+  stageable by hand. Second script defect after DB-070: both are checks that could not fail,
+  written by the same session that wrote the code they were meant to test.
