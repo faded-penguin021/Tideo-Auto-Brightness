@@ -48,7 +48,7 @@ jobs:
     timeout-minutes: 30  # cap a hung build/sign step (GitHub's default is 360)
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # Build the TAGGED commit regardless of which event fired (required for workflow_dispatch,
           # explicit/safe for release + push).
@@ -70,7 +70,7 @@ jobs:
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699  # v4.0.1
 
       - name: Cache Gradle
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.gradle/caches
