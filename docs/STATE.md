@@ -88,12 +88,12 @@ a different screen and a different defect.
    format); round 2 died on an API 529 with no verdict; round 3 found the rewrite blind to
    `emptyArray()` spreads (`CircadianScreen.kt:409,419`) and to `flashDrop`, a second vararg
    resolver. All fixed and fixtured — but **those fixes had no review of their own.** Judge whether
-   that matters before the train merges. **Same status, larger surface: `python-edit.sh` (DB-062)** —
-   a new 228-line repo-local guard plus a second `PreToolUse` hook in `.claude/settings.json`,
-   committed with the DA-005 warning showing and no fresh-context review run. Its own ladder rung
-   passes (8 edit shapes matched, 10 legitimate uses passed, arming verified), but a rung the same
-   change wrote is not a review of it. Third unreviewed rule edit this train, with AGENTS.md
-   (DB-056); a reviewer can take all three in one pass.
+   that matters before the train merges. **`python-edit.sh` (DB-062) HAS now had its pass** — a
+   fresh-context DA-005 review found seven defects, five confirmed by running (DB-063). All fixed
+   and fixtured here, and the fixes are themselves further rule edits, so one short re-review closes
+   the loop. The reviewer's verdict on the other two: `format-args.sh` **stand**, AGENTS.md **stand**
+   with one precision note — the DB-056 incident was *untracked*, not *unstaged*, and an unstaged
+   change to a tracked file IS seen, so "untracked or unstaged" would be strictly truer.
 3. **Provenance manifest: one record removed, one restored.** `ProfilesScreen.kt`'s went because its
    only `// Tasker` line was wrapped prose this change deleted. `MiscScreen.kt`'s was removed and
    then **restored** — its marker is still in the tree and states Tasker behaviour the port matches,

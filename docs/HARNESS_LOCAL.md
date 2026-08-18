@@ -156,7 +156,8 @@ session while drifting against every upstream release.
 - **`python-edit.sh`** — the only one here that is not a ladder check at heart: a **pre-execution
   advisory** (DB-062), wired as a second `PreToolUse` hook beside the shipped command guard, which
   is integrity-hashed and so cannot host a repo-local rule. It blocks the FIRST inline-Python file
-  edit of a session and passes every later one, mirroring the shipped guard's own `.env` and
+  edit per marker lifetime — once per container in practice, since the marker lives in `/tmp` with no
+  session component (DB-063 F3) — and passes every later one, mirroring the shipped guard's `.env` and
   destructive advisories. The objection is opacity, not danger: `Write`/`Edit` render a diff as the
   change happens, while a `python3 - <<EOF` heredoc is only checkable afterwards by reading the file
   back. One block makes that a choice rather than a reflex. Its ladder mode runs the matcher
@@ -164,7 +165,7 @@ session while drifting against every upstream release.
   shows that. Its header states what it does not match (a script file, `sed -i` and friends,
   runtime-constructed commands, and every edit after the first).
 
-`scripts/tests/local-guards.sh` is their fixture suite — 106 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 108 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -255,10 +256,10 @@ dot-dir (`.claude/`, `.codex/`). A new one must:
 `$comment` field. A false coverage claim is what stops the next reader checking by hand. The two
 that exist today:
 
-| Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail |
-|---|---|---|---|---|---|
-| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | **no** — Codex has no repository-local session-start hook; run `scripts/session-start.sh` by hand | **no** — no pre-shell hook, so `scripts/command-guard.sh` is a script nobody calls and every Bash call is unjudged | **partial** — `amh.rules` prefix rules only; the policy has no path-glob operand, so nested `.env` and arbitrary `/proc/<pid>/environ` cannot be expressed | **no** | **no** — a prefix rule judges a shell command, not a file an edit tool wrote; `AGENTS.md` Conventions is the only layer standing |
+| Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail | Inline-Python rail |
+|---|---|---|---|---|---|---|
+| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | **no** — Codex has no repository-local session-start hook; run `scripts/session-start.sh` by hand | **no** — no pre-shell hook, so `scripts/command-guard.sh` is a script nobody calls and every Bash call is unjudged | **partial** — `amh.rules` prefix rules only; the policy has no path-glob operand, so nested `.env` and arbitrary `/proc/<pid>/environ` cannot be expressed | **no** | **no** — a prefix rule judges a shell command, not a file an edit tool wrote; `AGENTS.md` Conventions is the only layer standing | **no** — same missing pre-shell hook as the command rail; `AGENTS.md` Conventions is the only layer standing |
 
 **On the comment rail specifically.** The ladder guard is the coverage; the hook is only
 *salience*. A rule that lands solely in a ladder run arrives after the narrative is written and

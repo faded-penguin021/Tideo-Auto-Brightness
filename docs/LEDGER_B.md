@@ -774,3 +774,12 @@
   rest, the mechanism the shipped guard already uses for dotenv reads. It could not go IN that
   guard: shipped scripts are integrity-hashed, so it is a second `PreToolUse` hook beside it.
   `[cited]`: `scripts/guards/python-edit.sh`, `.claude/settings.json`.
+
+- DB-063 [cited]: **A guard reviewed only by its author catches the shape its author imagined.**
+  DA-005 on DB-062, five of seven confirmed by running. Blind to `/usr/bin/python3 -c` and
+  `python3 -u -c` — the boundary class excluded `/`, and `-c` had to be adjacent — so it caught the
+  textbook form and nothing a session types. Worse, its greedy JSON capture ran past the command
+  into the sibling `description`, so a description merely MENTIONING Python blocked `git status` —
+  the false-positive shape that gets a rail deleted. Also: a marker with no session component, ops
+  whose remedy no harness tool offers, an empty override disarming it.
+  `[cited]`: `scripts/guards/python-edit.sh`.

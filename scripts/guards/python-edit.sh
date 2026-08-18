@@ -9,8 +9,11 @@
 #
 # IT BLOCKS EXACTLY ONCE, then stays out of the way. Same mechanism and same rationale as the
 # shipped command guard's `.env` and destructive-command advisories: a marker file per repo and
-# uid under /tmp, so the FIRST inline-Python edit in a session is refused with an explanation and
-# every later one passes. That is deliberate, and it is the whole design — this is a speed bump
+# uid under /tmp. Once per MARKER LIFETIME, not once per session — the marker name has no session
+# component, so in a long-lived container the advisory is spent by the first session that trips it
+# and every later session passes unadvised (DB-063 F3). Delete the marker to re-arm. In a container
+# that starts with a clean /tmp the two coincide, which is what made the looser claim look true.
+# That is deliberate, and it is the whole design — this is a speed bump
 # aimed at the reflex, not a permission rail. Scripted bulk edits are a legitimate tool and the
 # session that genuinely needs one gets it by re-running the command.
 #
@@ -30,7 +33,13 @@
 #     goes through the DA-005 review like this one did.
 #   * Anything constructed at runtime — `eval`, base64, a command assembled from variables. Text
 #     at scan time is not code, and the shipped command guard's header makes the same admission.
-#   * The SECOND and later inline-Python edit in a session. By design, see above.
+#   * The SECOND and later inline-Python edit per marker lifetime. By design, see above.
+#   * Pure filesystem moves — `os.makedirs`, `os.rename`, `os.remove`, `shutil.move`. They were
+#     matched at first and should not have been (DB-063 F4): the remedy this advisory offers is
+#     `Edit`/`Write`, and the harness has no tool that makes a directory or deletes a file, so it
+#     blocked and then named a fix nobody could take. Destructive shell work is the shipped
+#     command guard's advisory, not this one. `shutil.copyfile`/`copytree` stay: they overwrite
+#     file CONTENT, which is the thing being protected.
 # So: this is an advisory that catches the common shape once. It is not a containment boundary,
 # and nothing here should be read as one.
 #
@@ -54,7 +63,7 @@ set -uo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-ADVICE='This command uses inline Python to edit a file. The harness supplies Write, Edit and MultiEdit, which show the change as a reviewable diff; an interpreter heredoc is opaque while it runs, so a mistake in it is only visible afterwards by reading the file back. Prefer Edit for a targeted replacement or Write for a whole file. The guard is stopping this ONCE so you can reconsider — if a scripted bulk edit is genuinely the right tool here, run the same command again and it will proceed; this advisory does not rearm during this session.'
+ADVICE='This command uses inline Python to edit a file. The harness supplies Write, Edit and MultiEdit, which show the change as a reviewable diff; an interpreter heredoc is opaque while it runs, so a mistake in it is only visible afterwards by reading the file back. Prefer Edit for a targeted replacement or Write for a whole file. The guard is stopping this ONCE so you can reconsider — if a scripted bulk edit is genuinely the right tool here, run the same command again and it will proceed; this advisory does not rearm until the marker under /tmp is cleared.'
 
 # --- the matcher ------------------------------------------------------------------------------
 
@@ -62,13 +71,17 @@ ADVICE='This command uses inline Python to edit a file. The harness supplies Wri
 is_python_inline_edit() { # <command>
 	local cmd=$1 src
 
-	# 1. A Python invocation at all. Word-boundary matched so `pythonic-notes.md` is prose.
-	printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_./-])(python|python3|python2|py)([[:space:]]|$)' || return 1
+	# 1. A Python invocation at all. Word-boundary matched so `pythonic-notes.md` is prose. `/` is
+	#    NOT a boundary character: excluding it let `/usr/bin/python3` and `.venv/bin/python`
+	#    through, which is the first spelling anyone reaches for (DB-063 F1).
+	printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_.-])(python|python3|python2|py)([[:space:]]|$)' || return 1
 
 	# 2. Inline source: `-c`, or a heredoc / pipe feeding the interpreter on stdin. Without one
 	#    of these the source lives in a file this matcher cannot see, and (see header) a
 	#    checked-in script is not what this advisory is aimed at.
-	printf '%s' "$cmd" | grep -Eq -- '(python|python3|python2|py)[[:space:]]+(-[[:alnum:]]*c|.*<<|-[[:space:]]*$|-[[:space:]])' ||
+	#    Interpreter flags may sit between the interpreter and `-c` (`-u`, `-B`, `-X utf8`), so the
+	#    inline-source token is not required to be adjacent (DB-063 F1).
+	printf '%s' "$cmd" | grep -Eq -- '(python|python3|python2|py)[[:space:]]+((-[[:alnum:]]+[[:space:]]+([[:alnum:]=.]+[[:space:]]+)?)*(-[[:alnum:]]*c|-[[:space:]]*$|-[[:space:]])|.*<<)' ||
 		printf '%s' "$cmd" | grep -Eq -- '\|[[:space:]]*(python|python3|python2|py)([[:space:]]|$)' || return 1
 
 	# 3. A write in the source text. Standard-stream writes are how a legitimate read-and-report
@@ -83,8 +96,7 @@ is_python_inline_edit() { # <command>
 		-e '\.write_text\(' \
 		-e '\.write_bytes\(' \
 		-e '\.truncate\(' \
-		-e 'shutil\.(copy|copyfile|copy2|move|copytree)' \
-		-e 'os\.(rename|replace|remove|unlink|rmdir|makedirs|mkdir)' \
+		-e 'shutil\.(copyfile|copytree)' \
 		-e 'inplace[[:space:]]*=[[:space:]]*True' \
 		-e '(json|yaml|toml)\.dump\(' \
 		-e 'Path\([^)]*\)\.write' ||
@@ -101,7 +113,9 @@ is_python_inline_edit() { # <command>
 # without touching the real marker.
 advisory_state_file() {
 	local slug uid
-	[ -n "${PYTHON_EDIT_ADVISORY_STATE+x}" ] && { printf '%s' "$PYTHON_EDIT_ADVISORY_STATE"; return 0; }
+	# DB-063 F7: `:-` not `+x`, so an exported-but-EMPTY override falls back to the real marker
+	# instead of returning "" and disarming the rail silently.
+	[ -n "${PYTHON_EDIT_ADVISORY_STATE:-}" ] && { printf '%s' "$PYTHON_EDIT_ADVISORY_STATE"; return 0; }
 	slug=${ROOT//\//_}
 	slug=${slug// /_}
 	uid=${UID:-unknown}
@@ -125,7 +139,15 @@ needs_advisory() { # <command>
 extract_command() { # fail open: print nothing if the payload is not what we expect
 	# No python3 here on purpose — a guard about reaching for Python should not need it to run,
 	# and the sed path is the one the shipped guard already falls back to.
-	printf '%s' "$1" | sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/p' | head -1
+	#
+	# DB-063 F2: the capture must stop at the END OF THE STRING, not the last quote on the line.
+	# A greedy `\(.*\)"` swallowed every sibling field, so the model-written `description` that
+	# follows `command` in the Bash payload was scanned as if it were the command — and a
+	# description merely MENTIONING Python blocked an unrelated command. `[^"\\]*(\\.[^"\\]*)*`
+	# consumes escaped quotes without running past the closing one.
+	printf '%s' "$1" |
+		sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"\([^"\\]*\(\\.[^"\\]*\)*\)".*/\1/p' |
+		head -1
 }
 
 if [ "${1:-}" = "--hook" ]; then
@@ -160,13 +182,17 @@ fi
 # is what the ladder rung does. Arming is bypassed with a throwaway state path per case, because
 # these cases test the MATCHER, not the one-time bookkeeping (which gets its own cases below).
 SELF_FAILS=0
+MATCHED=0
+PASSED=0
 matcher_says_yes() { # <label> <command>
+	MATCHED=$((MATCHED + 1))
 	if ! is_python_inline_edit "$2"; then
 		printf 'python-edit: matcher MISSED %s: %s\n' "$1" "$2" >&2
 		SELF_FAILS=$((SELF_FAILS + 1))
 	fi
 }
 matcher_says_no() { # <label> <command>
+	PASSED=$((PASSED + 1))
 	if is_python_inline_edit "$2"; then
 		printf 'python-edit: matcher FALSE POSITIVE on %s: %s\n' "$1" "$2" >&2
 		SELF_FAILS=$((SELF_FAILS + 1))
@@ -182,10 +208,18 @@ matcher_says_yes 'dash-c open-for-write' "python3 -c \"open('a.txt','w').write('
 matcher_says_yes 'pathlib write_text' "python3 -c 'from pathlib import Path; Path(\"a\").write_text(\"b\")'"
 matcher_says_yes 'fileinput inplace' "python -c 'import fileinput
 for l in fileinput.input(\"f\", inplace=True): print(l)'"
-matcher_says_yes 'shutil move' "python3 -c 'import shutil; shutil.move(\"a\",\"b\")'"
-matcher_says_yes 'os.replace' "python3 -c 'import os; os.replace(\"a\",\"b\")'"
+matcher_says_no 'shutil move is a filesystem op, not an edit (DB-063 F4)' "python3 -c 'import shutil; shutil.move(\"a\",\"b\")'"
+matcher_says_no 'os.replace is a filesystem op, not an edit (DB-063 F4)' "python3 -c 'import os; os.replace(\"a\",\"b\")'"
 matcher_says_yes 'piped inline source' "echo \"open('a','w').write('x')\" | python3"
 matcher_says_yes 'json dump' "python3 -c 'import json; json.dump(d, open(\"f\",\"w\"))'"
+
+# DB-063 F1: the two spellings the first matcher missed. An absolute path and an
+# interpreter flag before -c are what a real session types, so a guard blind to them was
+# advisory theatre against everything but the textbook form.
+matcher_says_yes 'absolute interpreter path' "/usr/bin/python3 -c \"open('a','w').write('x')\""
+matcher_says_yes 'venv-relative interpreter' ".venv/bin/python -c \"open('a','w').write('x')\""
+matcher_says_yes 'flag before -c' "python3 -u -c \"open('a','w').write('x')\""
+matcher_says_yes 'valued flag before -c' "python3 -X utf8 -c \"open('a','w').write('x')\""
 
 # Shapes that are NOT, and must stay quiet. These are the cases that decide whether the guard
 # survives contact with a real session.
@@ -224,5 +258,6 @@ if [ "$SELF_FAILS" -gt 0 ]; then
 	exit 1
 fi
 
-printf '8 edit shape(s) matched, 10 legitimate use(s) passed, one-time arming verified; pre-execution advisory (hook firing is not verifiable from here)\n'
+# DB-063 F6: counted, not typed — a hardcoded summary drifts the first time a fixture is added.
+printf '%s edit shape(s) matched, %s legitimate use(s) passed, one-time arming verified; pre-execution advisory (hook firing is not verifiable from here)\n' "$MATCHED" "$PASSED"
 exit 0

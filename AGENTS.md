@@ -118,6 +118,13 @@ layer standing. Raising a budget is legitimate and is a rule change, not houseke
 it fails, and that is deliberate — a diagnostic that forbade what this paragraph permits would just
 teach the reader to stop believing one of them.
 
+**Prefer `Write`/`Edit` over inline `python3 -c`/heredocs for editing files** (DB-062): those render
+a diff as the change happens, an interpreter blob does not, so a mistake in it is visible only by
+reading the file back. Not a ban — a scripted bulk edit is sometimes right. Which layer holds this:
+the Claude Code adapter blocks the session's FIRST such command as a `PreToolUse` advisory and
+passes the rest; **Codex has no pre-shell hook, so for that agent this paragraph is the only layer
+standing**, as with the comment budget above.
+
 **The one rule that overrides taste: Tasker semantics win.** Port behaviour exactly, including
 odd rounding and quirks that look like bugs; modernise the *how*, never the *what*. Mark ported
 logic with its source: `// Tasker: task535 "Lux Smoothing (Java)" XML L15204`.

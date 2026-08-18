@@ -1159,6 +1159,22 @@ OUT=$(printf 'not json at all' |
 RC=$?
 expect_pass "hook mode fails OPEN on an unparseable payload"
 
+# DB-063 F2: the payload carries a model-written `description` AFTER `command`. A greedy
+# capture ran to the last quote on the line and scanned that text as if it were the command,
+# so a description merely MENTIONING Python blocked an unrelated one. This is the
+# false-positive shape that gets a rail deleted rather than fixed.
+pe_state=$SANDBOX/pe-state-5
+OUT=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git status","description":"python3 -c open(x,w).write(y) equivalent"}}' |
+	PYTHON_EDIT_ADVISORY_STATE=$pe_state bash "$ROOT/scripts/guards/python-edit.sh" --hook 2>&1)
+RC=$?
+expect_pass "hook mode reads only the command field, not a sibling description"
+
+pe_state=$SANDBOX/pe-state-6
+OUT=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"echo \\"hi\\" && git status","description":"x"}}' |
+	PYTHON_EDIT_ADVISORY_STATE=$pe_state bash "$ROOT/scripts/guards/python-edit.sh" --hook 2>&1)
+RC=$?
+expect_pass "hook mode survives escaped quotes inside the command string"
+
 # THE case that decides whether the ladder mode is worth running: break the matcher in a copy and
 # the guard must go RED. Without this, the self-test is a script that grades its own homework.
 mkdir -p "$SANDBOX/pe-broken"
