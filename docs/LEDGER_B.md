@@ -810,3 +810,11 @@
   unrepresentable UNLESS the draft differs from the committed profile — the user's own pick, so
   the picker never goes dead as a bare HDR-style notice would leave it.
   `[cited]`: `platform/…/display/SecureDisplayController.kt`, `app/…/state/DisplayTogglesViewModel.kt`.
+
+- DB-067 [cited]: **`invokeOnCancellation` is not a `finally`.** `activeFix`'s `SecurityException`
+  path resumed normally, so the handler that removes the location listener never ran: providers
+  registered before the throw stayed powered for the process's life. Rare (a grant lost between
+  the entry recheck and the request) but unbounded, and every OTHER exit released. No JVM test
+  reaches it — Robolectric's `ShadowLocationManager` never throws from `requestLocationUpdates`
+  (probed) and the module has no mocking library — so it is proven by inspection.
+  `[cited]`: `platform/…/context/LocationReader.kt`.

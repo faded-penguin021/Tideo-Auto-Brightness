@@ -116,14 +116,12 @@ actually live — is unaffected either way. **Recommend recording under
    unrepresentable unless the draft differs from the committed profile (the user's own pick), so
    the picker still works. The screen shows a preservation notice under the chips.
    `daltonizer_enabledWithUnrecognizedValue_readsAsOff` was **replaced**, not supplemented.
-3. **Listener leak** — in `LocationReader.activeFix()`, remove updates before the
-   `SecurityException` path's `resume(null)`; `invokeOnCancellation` does not fire on a
-   normal resume.
-4. **Dead branch** — delete the unreachable `if (providers.isEmpty())` in `activeFix()`; the
-   preceding `.ifEmpty { listOf(PASSIVE_PROVIDER) }` makes it unreachable.
-5. **Test seam** — have `ControlReceiver.onReceive()` call `tryAcquireCommand()` /
-   `releaseCommand()` instead of touching `commandInFlight` directly, so the admission test
-   exercises production.
+3. **Listener leak** — **DONE (DB-067, 2026-08-18).** `activeFix()` removes updates on the
+   `SecurityException` path before `resume(null)`. Not JVM-testable: Robolectric's shadow never
+   throws from `requestLocationUpdates` (probed) and there is no mocking library to fake one.
+4. **Dead branch** — **DONE (2026-08-18).** The unreachable `if (providers.isEmpty())` is gone.
+5. **Test seam** — **DONE (2026-08-18).** `onReceive()` now calls `tryAcquireCommand()` /
+   `releaseCommand()`, so `ControlReceiverAdmissionTest` exercises the production pair.
 6. **Field-aware Apply (optional)** — `applyNow()` writes every field while
    `DisplayTogglesCoordinator.applyLocked()` already diff-writes. Worth closing the
    asymmetry, but it is a hardening measure, not a fix for items 1–2.

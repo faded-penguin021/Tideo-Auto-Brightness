@@ -136,7 +136,9 @@ Newest first; ledger rows are the durable detail.
   added. The review's canonical-7 test was **not** adopted — it would re-run DB-049. DB-066:
   `readDaltonizer()` normalized an unrecognized OEM mode to `OFF`, which an unrelated Apply then
   wrote; it now reads null, read-back preserves the stored mode, and the direct Apply writes only
-  the user's own pick. Its asserting test was replaced, per plan.
+  the user's own pick; its asserting test was replaced, per plan. Items 3–5: DB-067 (`activeFix`
+  leaked listeners on the `SecurityException` path), a dead branch, and `onReceive` now using the
+  admission pair its test drives.
 - 2026-08-18 — **The unreviewed-legislation loop is closed (DB-064).** DA-005 on DB-063's own fixes
   found six more, four confirmed by running: a stripped `+x` on `local-guards.sh` that only the
   pre-allowed bare invocation felt, an `AGENTS.md` paragraph re-asserting the per-session claim the
