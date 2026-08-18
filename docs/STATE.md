@@ -100,6 +100,11 @@ confirmed on released 1.9.0 (0 → 7 via Tideo, 15 via Developer Options, off→
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-18 — **RUNBOOK playbook 8 added: Dependabot upgrade / CI action bump.** Terse operational
+  playbook (self-adaptation, not legislation) capturing the SHA-pin + Token-Permissions rails from
+  the run-once/ephemeral Scorecard, the grouped-PR + gradle-security-only Dependabot policy, and
+  DB-038's proven decay (marker↔SHA drift on lines with trailing prose; prose Dependabot won't edit;
+  validate on the PR incl. fdroid-compat). Docs-only.
 - 2026-08-18 — **v1.9.0 released** (#117 squash-merged, tag `v1.9.0`), and this branch bumped to
   **v1.9.1/vc22** with `changelogs/22.txt` for the fixes below. Tagging stays an owner step and
   waits on the owner. Both ephemeral round scripts (1.9.0, 1.9.1) folded into the standing
