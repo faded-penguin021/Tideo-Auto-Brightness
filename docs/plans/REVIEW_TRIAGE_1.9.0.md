@@ -110,10 +110,12 @@ actually live — is unaffected either way. **Recommend recording under
    asserts 15, plus a test that an existing 15 survives a re-enable and one that any non-zero
    partial mask still reads as enabled. Both new assertions mutation-proved red against the
    old constant. The review's canonical-7 test was not adopted.
-2. **Daltonizer representability** — follow the DB-045/DB-042 pattern already in this file:
-   nullable/unrepresentable sentinel in `DeviceDisplaySnapshot`, preserve the stored value on
-   read-back, skip the write unless the user explicitly picked a mode. Requires **replacing**
-   `daltonizer_enabledWithUnrecognizedValue_readsAsOff`, not adding beside it.
+2. **Daltonizer representability** — **DONE (DB-066, 2026-08-18).** `readDaltonizer()` returns
+   null for enabled-but-unrecognized; `DeviceDisplaySnapshot.daltonizer` is nullable and
+   read-back preserves the stored mode; the direct Apply skips the write while the device is
+   unrepresentable unless the draft differs from the committed profile (the user's own pick), so
+   the picker still works. The screen shows a preservation notice under the chips.
+   `daltonizer_enabledWithUnrecognizedValue_readsAsOff` was **replaced**, not supplemented.
 3. **Listener leak** — in `LocationReader.activeFix()`, remove updates before the
    `SecurityException` path's `resume(null)`; `invokeOnCancellation` does not fire on a
    normal resume.

@@ -111,7 +111,7 @@ fun PrivilegedDisplayScreen(
         onApplyDraft = {
             // D-152: service off → write directly; service on → reapply via coordinator. DB-048:
             // both halves must invalidate the read-back before `apply` advances the epoch.
-            vm.applyDraft(draft.validate(), committed.serviceEnabled)
+            vm.applyDraft(draft.validate(), committed)
             draftVm.apply()
         },
         onDiscardDraft = draftVm::discard,
@@ -205,6 +205,7 @@ fun PrivilegedDisplayContent(
                         selected = DaltonizerMode.entries.firstOrNull { it.name == draft.daltonizerMode }
                             ?: DaltonizerMode.OFF,
                         onSelect = { mode -> onEditDraft { it.copy(daltonizerMode = mode.name) } },
+                        devicePreferenceCustom = state.daltonizerPreferenceCustom,
                     )
                     SwitchSettingRow(
                         stringResource(R.string.pd_inversion), draft.inversionEnabled,
@@ -356,7 +357,11 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class) // FlowRow wraps on narrow screens
 @Composable
-private fun DaltonizerPicker(selected: DaltonizerMode, onSelect: (DaltonizerMode) -> Unit) {
+private fun DaltonizerPicker(
+    selected: DaltonizerMode,
+    onSelect: (DaltonizerMode) -> Unit,
+    devicePreferenceCustom: Boolean = false,
+) {
     Column {
         Text(stringResource(R.string.pd_daltonizer_label), style = MaterialTheme.typography.bodyLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimens.space2)) {
@@ -368,6 +373,14 @@ private fun DaltonizerPicker(selected: DaltonizerMode, onSelect: (DaltonizerMode
                     modifier = Modifier.testTag("daltonizer_${mode.name.lowercase()}"),
                 )
             }
+        }
+        if (devicePreferenceCustom) {
+            Text(
+                stringResource(R.string.pd_daltonizer_custom_preserved),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("pd_daltonizer_custom_preserved"),
+            )
         }
     }
 }

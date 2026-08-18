@@ -22,7 +22,7 @@ interface SecureDisplayController {
 
     fun readNightLightAutoMode(): NightLightAutoMode
 
-    fun readDaltonizer(): DaltonizerMode
+    fun readDaltonizer(): DaltonizerMode?
     fun setDaltonizer(mode: DaltonizerMode): Result<Unit>
 
     fun readInversion(): Boolean
@@ -108,12 +108,12 @@ class AndroidSecureDisplayController(
         NightLightAutoMode.MANUAL
     }
 
-    override fun readDaltonizer(): DaltonizerMode {
+    override fun readDaltonizer(): DaltonizerMode? {
         val enabled = Settings.Secure.getInt(resolver, KEY_DALTONIZER_ENABLED, 0) == 1
         if (!enabled) return DaltonizerMode.OFF
         val value = Settings.Secure.getInt(resolver, KEY_DALTONIZER_VALUE, DaltonizerMode.GRAYSCALE.value)
-        // Unrecognized matrix (OEM extra): surface as OFF so UI can't claim an unsupported mode.
-        return DaltonizerMode.fromValue(value)?.takeIf { it != DaltonizerMode.OFF } ?: DaltonizerMode.OFF
+        // DB-066: an unrecognized matrix is unrepresentable, not OFF.
+        return DaltonizerMode.fromValue(value)?.takeIf { it != DaltonizerMode.OFF }
     }
 
     override fun setDaltonizer(mode: DaltonizerMode): Result<Unit> = elevatedWrite {

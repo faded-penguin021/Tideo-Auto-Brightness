@@ -801,3 +801,12 @@
   a compatibility reason. The v1.9.0 review prescribed the inverse — 7 canonical, 15
   unrepresentable — which is DB-049 again. Triage: `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
   `[cited]`: `platform/src/main/kotlin/com/tideo/autobrightness/platform/display/SecureDisplayController.kt`.
+
+- DB-066 [cited]: **A test can lock in the normalization DB-045 forbids.** `readDaltonizer()`
+  mapped enabled-with-an-unrecognized-value to `OFF`, so an unrelated Apply turned an OEM
+  correction mode off — with a named test and a comment asserting it, which is why review read it
+  as considered. The fix REPLACES that test. Read returns null; the snapshot field is nullable,
+  read-back preserves the stored mode (DB-042), and direct Apply skips the write while
+  unrepresentable UNLESS the draft differs from the committed profile — the user's own pick, so
+  the picker never goes dead as a bare HDR-style notice would leave it.
+  `[cited]`: `platform/…/display/SecureDisplayController.kt`, `app/…/state/DisplayTogglesViewModel.kt`.

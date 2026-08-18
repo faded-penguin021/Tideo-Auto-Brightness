@@ -184,11 +184,11 @@ class SecureDisplayControllerTest {
     }
 
     @Test
-    fun daltonizer_enabledWithUnrecognizedValue_readsAsOff() {
+    fun daltonizer_enabledWithUnrecognizedValue_readsAsUnrepresentable() {
         grantElevated()
         Settings.Secure.putInt(context.contentResolver, "accessibility_display_daltonizer", 42)
         Settings.Secure.putInt(context.contentResolver, "accessibility_display_daltonizer_enabled", 1)
-        assertEquals(DaltonizerMode.OFF, controller.readDaltonizer())
+        assertNull(controller.readDaltonizer())
     }
 
 

@@ -117,6 +117,38 @@ class DisplayTogglesViewModelTest {
         assertEquals(-999, Settings.Secure.getInt(resolver, "night_display_color_temperature", -999))
     }
 
+    @Test
+    fun applyNow_withAnUnrepresentableDeviceMode_preservesItWhenTheUserPickedNothing() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer", 42)
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer_enabled", 1)
+        val vm = vm()
+        assertTrue(vm.state.value.daltonizerPreferenceCustom)
+        assertNull(assertNotNull(vm.deviceSnapshot.value).daltonizer)
+
+        vm.applyNow(AabSettings(nightLightEnabled = true), committed = AabSettings())
+
+        assertEquals(42, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "night_display_activated", -999))
+    }
+
+    @Test
+    fun applyNow_withAnUnrepresentableDeviceMode_stillWritesTheUsersOwnPick() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer", 42)
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer_enabled", 1)
+        val vm = vm()
+
+        vm.applyNow(AabSettings(daltonizerMode = "GRAYSCALE"), committed = AabSettings())
+
+        assertEquals(0, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999))
+        assertFalse(vm.state.value.daltonizerPreferenceCustom)
+    }
+
     // DB-048: the read-back rollback DB-047 fixed had a second half. With the service RUNNING the
     // screen skips applyNow (the coordinator writes instead), so nothing invalidated the pre-Apply
     // snapshot and the merge gate — reopened by Apply making draft == committed again — replayed it
@@ -127,7 +159,7 @@ class DisplayTogglesViewModelTest {
         val vm = vm()
         assertEquals(false, assertNotNull(vm.deviceSnapshot.value).nightLight)
 
-        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = true)
+        vm.applyDraft(AabSettings(nightLightEnabled = true), AabSettings(serviceEnabled = true))
 
         assertNull(
             vm.deviceSnapshot.value,
@@ -146,7 +178,7 @@ class DisplayTogglesViewModelTest {
         grantElevated()
         val vm = vm()
 
-        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = false)
+        vm.applyDraft(AabSettings(nightLightEnabled = true), AabSettings(serviceEnabled = false))
 
         assertEquals(1, Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999))
         assertEquals(true, assertNotNull(vm.deviceSnapshot.value).nightLight)
@@ -161,7 +193,7 @@ class DisplayTogglesViewModelTest {
         assertNotNull(vm.deviceSnapshot.value)
 
         vm.refresh() // reads the pre-Apply device, still pending on the controlled dispatcher
-        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = true)
+        vm.applyDraft(AabSettings(nightLightEnabled = true), AabSettings(serviceEnabled = true))
         dispatcher.scheduler.advanceUntilIdle()
 
         assertNull(

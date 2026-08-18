@@ -33,6 +33,7 @@ data class PrivilegedDisplayUiState(
     val alwaysOnDisplayAvailable: Boolean = false,
     val hdrAvailable: Boolean = false,
     val hdrPreferenceCustom: Boolean = false,
+    val daltonizerPreferenceCustom: Boolean = false,
     val adbCommand: String = "",
     val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
     val grantMessage: String? = null,
@@ -100,6 +101,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                             hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
                             hdrPreferenceCustom = display.hdrForceSdrAvailable &&
                                 snapshot != null && snapshot.hdrForceSdr == null,
+                            daltonizerPreferenceCustom = snapshot != null && snapshot.daltonizer == null,
                             writeFailed = false,
                         )
                     }
@@ -131,8 +133,8 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
      * the service-ON path. The coordinator path re-reads on the next ON_RESUME, not here: a read
      * scheduled now would race the coordinator's own write and republish the same stale truth.
      */
-    fun applyDraft(settings: AabSettings, serviceEnabled: Boolean) {
-        if (serviceEnabled) invalidateDeviceSnapshot() else applyNow(settings)
+    fun applyDraft(settings: AabSettings, committed: AabSettings) {
+        if (committed.serviceEnabled) invalidateDeviceSnapshot() else applyNow(settings, committed)
     }
 
     /** DB-048: drop the snapshot and suppress any in-flight operation still holding an older one. */
@@ -144,22 +146,25 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     }
 
     /**
-     * Direct device write of display-toggle fields (D-152, service-OFF path).
-     * All fields idempotent; null temperature and unavailable HDR stay untouched.
+     * Direct device write of display-toggle fields (D-152, service-OFF path). Null temperature,
+     * unavailable HDR and a DB-066-unrepresentable mode (bar a [committed]-differing pick) stay put.
      */
-    fun applyNow(settings: AabSettings) {
+    fun applyNow(settings: AabSettings, committed: AabSettings = settings) {
         scheduleDeviceOperation(invalidateSnapshot = true) { generation ->
             deviceLock.withLock {
                 val hdrState = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null
+                val daltonizerState = display.readDaltonizer()
                 val results = buildList {
                     add(display.setNightLight(settings.nightLightEnabled))
                     settings.nightLightTemperature?.let { add(display.setNightLightTemperature(it)) }
-                    add(
-                        display.setDaltonizer(
-                            DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
-                                ?: DaltonizerMode.OFF,
-                        ),
-                    )
+                    if (daltonizerState != null || settings.daltonizerMode != committed.daltonizerMode) {
+                        add(
+                            display.setDaltonizer(
+                                DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
+                                    ?: DaltonizerMode.OFF,
+                            ),
+                        )
+                    }
                     add(display.setInversion(settings.inversionEnabled))
                     add(display.setAlwaysOnDisplay(settings.alwaysOnDisplayEnabled))
                     add(display.setStayAwakePlugged(settings.stayAwakeChargingEnabled))
@@ -176,6 +181,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                             hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
                             hdrPreferenceCustom = display.hdrForceSdrAvailable &&
                                 snapshot != null && snapshot.hdrForceSdr == null,
+                            daltonizerPreferenceCustom = snapshot != null && snapshot.daltonizer == null,
                             writeFailed = results.any { r -> r.isFailure },
                         )
                     }
