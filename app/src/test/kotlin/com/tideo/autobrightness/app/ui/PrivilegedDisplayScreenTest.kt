@@ -106,6 +106,19 @@ class PrivilegedDisplayScreenTest {
     }
 
     @Test
+    fun elevated_customDaltonizerPreference_isExplainedAndStillPickable() {
+        setDraftContent(state = elevated.copy(daltonizerPreferenceCustom = true))
+        compose.onNodeWithTag("pd_daltonizer_custom_preserved").performScrollTo().assertExists()
+        compose.onNodeWithTag("daltonizer_grayscale").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun elevated_noCustomDaltonizerPreference_showsNoNotice() {
+        setDraftContent()
+        compose.onNodeWithTag("pd_daltonizer_custom_preserved").assertDoesNotExist()
+    }
+
+    @Test
     fun elevated_hdrSection_hiddenWhenUnavailable() {
         setDraftContent(state = elevated.copy(hdrAvailable = false))
         compose.onNodeWithTag("switch_hdrForceSdr").assertDoesNotExist()

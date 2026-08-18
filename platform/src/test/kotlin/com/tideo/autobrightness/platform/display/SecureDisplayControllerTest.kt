@@ -191,6 +191,14 @@ class SecureDisplayControllerTest {
         assertNull(controller.readDaltonizer())
     }
 
+    @Test
+    fun daltonizer_enabledWithTheRecognizedOffValue_readsAsOff() {
+        grantElevated()
+        Settings.Secure.putInt(context.contentResolver, "accessibility_display_daltonizer", -1)
+        Settings.Secure.putInt(context.contentResolver, "accessibility_display_daltonizer_enabled", 1)
+        assertEquals(DaltonizerMode.OFF, controller.readDaltonizer())
+    }
+
 
     @Test
     fun inversion_alwaysOn_stayAwake_roundTrip() {

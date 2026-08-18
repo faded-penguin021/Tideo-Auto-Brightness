@@ -360,7 +360,7 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
 private fun DaltonizerPicker(
     selected: DaltonizerMode,
     onSelect: (DaltonizerMode) -> Unit,
-    devicePreferenceCustom: Boolean = false,
+    devicePreferenceCustom: Boolean,
 ) {
     Column {
         Text(stringResource(R.string.pd_daltonizer_label), style = MaterialTheme.typography.bodyLarge)

@@ -133,13 +133,20 @@ actually live — is unaffected either way. **Recommend recording under
   and `comment-budget.sh` reads source, so a new markdown file is out of scope.
 - `docs/STATE.md` is at 13 KB of a 14 KB soft cap — **do not** add to it here; that is why
   this plan lands in `docs/plans/`.
-- Full `scripts/ladder.sh` is expected to fail in this container on Robolectric artifact
-  fetches (network), matching what the review itself reported. That is environmental.
+- Full `scripts/ladder.sh` was expected to fail in this container on Robolectric artifact fetches
+  (network), matching what the review itself reported. **No longer true (2026-08-18):** it runs
+  green here, so a red rung is a finding, not the environment. The two standing WARNs are the
+  absent local `main` ref, which leaves the poison-token and author-identity rungs checking nothing.
 
 ## Scope
 
-Approved action is **only** committing this plan to `docs/plans/` on
-`claude/branch-review-verification-ok3lc6`. No production code, ledger, or STATE edits.
+As written, the approved action was **only** committing this plan to `docs/plans/` on
+`claude/branch-review-verification-ok3lc6` — no production code, ledger, or STATE edits.
+
+**Superseded 2026-08-18:** the owner then asked for the work items to be executed. Items 1–6 were
+implemented on `claude/first-work-item-plan-lqklk4` (DB-065…DB-069), one commit each, and carry
+their own DONE markers above. This section is kept for the record of what the plan itself was
+approved for; the DONE markers are the current state.
 
 ### Why the Dependabot action bumps are not adopted here
 

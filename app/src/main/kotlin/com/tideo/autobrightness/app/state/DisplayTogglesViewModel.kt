@@ -146,10 +146,11 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     }
 
     /**
-     * Direct device write of display-toggle fields (D-152, service-OFF path). DB-068: diff-written
-     * against the device; DB-066: an unrepresentable mode stays put bar a [committed]-differing pick.
+     * Direct device write (D-152, service-OFF path): DB-068 diff-written; DB-066 mode preserved.
      */
     fun applyNow(settings: AabSettings, committed: AabSettings = settings) {
+        // DB-069: what the draft would carry with no pick of its own — the seed, not the profile.
+        val unpickedDaltonizer = _deviceSnapshot.value?.daltonizer?.name ?: committed.daltonizerMode
         scheduleDeviceOperation(invalidateSnapshot = true) { generation ->
             deviceLock.withLock {
                 val device = readSnapshotLocked()
@@ -159,7 +160,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                 val writeDaltonizer = when {
                     device == null -> true
                     deviceDaltonizer != null -> deviceDaltonizer != daltonizerPick
-                    else -> settings.daltonizerMode != committed.daltonizerMode
+                    else -> settings.daltonizerMode != unpickedDaltonizer
                 }
                 val results = buildList {
                     if (device == null || (device.nightLight != null && device.nightLight != settings.nightLightEnabled)) {

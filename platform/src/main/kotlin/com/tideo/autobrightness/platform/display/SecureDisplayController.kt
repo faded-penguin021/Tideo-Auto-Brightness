@@ -112,8 +112,8 @@ class AndroidSecureDisplayController(
         val enabled = Settings.Secure.getInt(resolver, KEY_DALTONIZER_ENABLED, 0) == 1
         if (!enabled) return DaltonizerMode.OFF
         val value = Settings.Secure.getInt(resolver, KEY_DALTONIZER_VALUE, DaltonizerMode.GRAYSCALE.value)
-        // DB-066: an unrecognized matrix is unrepresentable, not OFF.
-        return DaltonizerMode.fromValue(value)?.takeIf { it != DaltonizerMode.OFF }
+        // DB-066: only an UNRECOGNIZED matrix is unrepresentable; -1 is the recognized OFF.
+        return DaltonizerMode.fromValue(value)
     }
 
     override fun setDaltonizer(mode: DaltonizerMode): Result<Unit> = elevatedWrite {

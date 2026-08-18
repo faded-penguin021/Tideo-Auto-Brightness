@@ -827,3 +827,19 @@
   below ELEVATED the read returns no snapshot, so every write is attempted precisely to let its
   tier failure reach `writeFailed`, which diffing against "no known state" would swallow.
   `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`.
+
+- DB-069 [cited]: **Deleting a fallback leaves the guard that was only correct beside it, and a
+  proxy for user intent breaks when something else writes the field.** Three, from the adversarial
+  pass over DB-065…DB-068. (a) `readDaltonizer()`'s surviving `takeIf { it != OFF }` routed the
+  RECOGNIZED `-1` into the unrepresentable branch — DB-049 again, from the fix honouring it. (b) "The user picked" read as draft ≠ committed profile, but DB-034's read-back seeds
+  the draft from the DEVICE, so a seeded mode clobbered the OEM mode the screen promised to
+  preserve; compare against the seed instead.
+  `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`.
+
+- DB-070: **A diff-write invalidates every device check written for the write it now skips.**
+  DB-068 made the direct Apply idempotent-by-diff; `readStayAwakePlugged()` is `mask != 0`, so on
+  a device where stay-awake is already on, Apply writes nothing and DB-065's prescribed check
+  ("Stay awake on, Apply, expect 15") passes identically against the OLD 7-constant code. It had
+  to become the off→on transition. The code is right — declining to broaden a partial mask is what
+  the v1.9.0 review asked for — but a check that cannot fail is worse than no check, because the
+  Owner queue records it as evidence. Third finding of the DB-069 pass.
