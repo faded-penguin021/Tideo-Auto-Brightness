@@ -843,3 +843,12 @@
   to become the off→on transition. The code is right — declining to broaden a partial mask is what
   the v1.9.0 review asked for — but a check that cannot fail is worse than no check, because the
   Owner queue records it as evidence. Third finding of the DB-069 pass.
+
+- DB-071: **Never ask the owner to write a value no AOSP path produces into a display key.** The
+  DB-066 round script told the owner to `settings put secure accessibility_display_daltonizer 42`
+  to reach the unrepresentable state. They declined, with cause: a Samsung has black-screened on an
+  unsupported key write, and a hand-written `reduce_bright_colors_level` left a OnePlus usable only
+  by blind-tapping the PIN through a dark screen after a reboot. The test is the value's own
+  legality — `0`/`1`/`15` into `stay_on_while_plugged_in` is what AOSP's switch writes; `42` into
+  a colour-transform key is what nothing writes. Unrepresentable-state behaviour stays
+  unit-tested only, an unverified residual on device (the DB-013 shape).

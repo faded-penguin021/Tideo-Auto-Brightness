@@ -19,6 +19,12 @@ The v1.9.0 defect you reproduced: Developer Options writes mask **15**, Tideo wr
 turning the toggle off and on again dropped dock stay-awake. **Order matters** — DB-068 makes Apply
 skip a write the device does not need, so this only proves anything from an OFF start.
 
+> **Why the adb writes here are safe** (DB-071's test, applied): every value this section writes —
+> `0`, `1`, `15` — is one AOSP's own Stay-awake control writes, into a **power** key, not a display
+> transform. The worst outcome is a screen that stays on while charging, undone by writing `0`. If
+> a step ever asks you to write a value no AOSP code path produces, that step is wrong — skip it
+> and say so.
+
 1. Put the device in the pre-state and confirm it:
    ```
    adb shell settings put global stay_on_while_plugged_in 0
@@ -42,36 +48,30 @@ skip a write the device does not need, so this only proves anything from an OFF 
 6. Sanity, on the phone rather than adb: with stay-awake ON and a short screen timeout, plug in a
    charger — the screen must stay on; unplug — it must time out normally.
 
-## §11b — An unrecognised colour-correction mode is preserved (DB-066/DB-069) [ELEVATED]
+## §11b — Unrecognised colour-correction mode (DB-066/DB-069) — READ-ONLY, do not synthesise
 
-Only reachable on a device whose OEM ships a correction mode outside AOSP's set
-(`-1, 0, 11, 12, 13`). If `adb shell settings get secure accessibility_display_daltonizer` never
-shows anything else, **simulate it** — that is a legitimate run of this step, not a shortcut:
+> **Do NOT write a synthetic value into `accessibility_display_daltonizer` (or any display key) to
+> reach this state.** An earlier draft of this script did; that is a device-damage class this
+> project has already been bitten by twice (DB-071) — a Samsung black-screened on an unsupported
+> key write, and a hand-written `reduce_bright_colors_level` left a OnePlus recoverable only by
+> blind-tapping through the lock screen after a reboot. **The preservation behaviour is verified by
+> unit tests only and is an accepted unverified residual on device.**
 
-```
-adb shell settings put secure accessibility_display_daltonizer 42
-adb shell settings put secure accessibility_display_daltonizer_enabled 1
-```
-
-7. Open Privileged Display. **Expected:** under the colour-correction chips, the note *"Android is
-   using a correction mode this app does not recognize…"*. No chip claims to be the active mode.
-8. Change something unrelated (Color inversion, or Night Light) → **Apply**.
+7. **Read-only observation, no writes.** On any device you already use:
    ```
-   adb shell settings get secure accessibility_display_daltonizer          # → 42, unchanged
-   adb shell settings get secure accessibility_display_daltonizer_enabled  # → 1, unchanged
+   adb shell settings get secure accessibility_display_daltonizer
+   adb shell settings get secure accessibility_display_daltonizer_enabled
    ```
-   **Expected:** both unchanged. On v1.9.0 this silently switched the mode off.
-9. Now pick **Grayscale** in the app → **Apply**. **Expected:** value `0`, enabled `1` — an explicit
-   pick still wins; only the *unasked* write is suppressed. The notice disappears on the next
-   screen open.
-10. **Regression guard for the fix's own bug (DB-069).** Restore the recognised "off" value:
-    ```
-    adb shell settings put secure accessibility_display_daltonizer -1
-    adb shell settings put secure accessibility_display_daltonizer_enabled 1
-    ```
-    Reopen the screen. **Expected:** the **Off** chip is selected and there is **no** preservation
-    notice — `-1` is a value the app knows, not a custom mode. (An intermediate build got this
-    wrong and showed the notice.)
+   If the value is one of `-1, 0, 11, 12, 13` (or the key is unset), this step is **SKIPPED —
+   nothing to observe**, which is the expected outcome on AOSP-faithful hardware.
+8. **Only if a device reports something else on its own** — an OEM correction mode you did not
+   write — then, and only then: open Privileged Display and confirm the note *"Android is using a
+   correction mode this app does not recognize…"* appears under the chips, and that changing an
+   unrelated field and applying leaves both keys as they were. Report the raw values before and
+   after. Do not create this state deliberately.
+9. **The chips themselves still need their ordinary check** — that part is safe, because every value
+   the app writes is one AOSP defines: pick Grayscale, then each correction mode, confirming the
+   screen changes and system Settings agrees (standing script §11 step 32 covers this in full).
 
 ## §11c — Apply writes only what differs (DB-068) [ELEVATED]
 

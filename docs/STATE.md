@@ -59,9 +59,9 @@ now that v1.9.0 has shipped. Do **not** re-open the closed force-stop investigat
    device to hand reports Night Light/AOD available, and the owner has no Samsung. Needs hardware
    reporting them unavailable — park it until such a device exists.
 2. **v1.9.1 device round — `docs/rebuild/DEVICE_TEST_SCRIPT_1.9.1.md`, debug APK delivered
-   2026-08-18.** §11a (stay-awake mask) and §11b (unrecognised correction mode) are the ones whose
-   evidence is a number, not an impression; §11e cannot be forced from the UI and is a soak
-   observation only. **Owner: run it and report per step; v1.9.1 does not ship before that.**
+   2026-08-18.** §11a (stay-awake mask) is the one whose evidence is a number, not an impression;
+   §11b is read-only after DB-071 (its synthetic write was withdrawn) and §11e cannot be forced
+   from the UI. **Owner: run it and report per step; v1.9.1 does not ship before that.**
    Context the round already has: on **v1.9.0** the owner measured 0 → 7 (Tideo) vs 15 (Developer
    Options), and off→on returned 7 — DB-065 device-confirmed as a real defect in the released
    build. §11a step 2 is the same measurement against the fix and must read 15.
@@ -92,6 +92,11 @@ confirmed on released 1.9.0: 0 → 7 via Tideo, 15 via Developer Options, off→
 - §11.39a C1/C2 (external Night Light tracked twice): wontfix — no tile on the device, unit-tested.
 - Never repeat whole-device backup/restore verification: `bmgr restore` damaged unrelated apps;
   callback invocation is accepted unverified residual (DB-013).
+- **Never synthesise an unsupported value in a display key on a real device** (DB-071): no
+  `settings put` of anything no AOSP path writes — daltonizer matrices, HDR format lists,
+  `reduce_bright_colors_level`. Two owner devices have been left needing blind recovery. The
+  unrepresentable-state paths (DB-045/DB-066) are unit-tested only; on-device they are an accepted
+  unverified residual, observed read-only if hardware ever produces the state by itself.
 
 ## Changelog
 
