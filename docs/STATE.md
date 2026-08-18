@@ -88,7 +88,12 @@ a different screen and a different defect.
    format); round 2 died on an API 529 with no verdict; round 3 found the rewrite blind to
    `emptyArray()` spreads (`CircadianScreen.kt:409,419`) and to `flashDrop`, a second vararg
    resolver. All fixed and fixtured — but **those fixes had no review of their own.** Judge whether
-   that matters before the train merges.
+   that matters before the train merges. **Same status, larger surface: `python-edit.sh` (DB-062)** —
+   a new 228-line repo-local guard plus a second `PreToolUse` hook in `.claude/settings.json`,
+   committed with the DA-005 warning showing and no fresh-context review run. Its own ladder rung
+   passes (8 edit shapes matched, 10 legitimate uses passed, arming verified), but a rung the same
+   change wrote is not a review of it. Third unreviewed rule edit this train, with AGENTS.md
+   (DB-056); a reviewer can take all three in one pass.
 3. **Provenance manifest: one record removed, one restored.** `ProfilesScreen.kt`'s went because its
    only `// Tasker` line was wrapped prose this change deleted. `MiscScreen.kt`'s was removed and
    then **restored** — its marker is still in the tree and states Tasker behaviour the port matches,
@@ -126,6 +131,12 @@ the rows, not here.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-17 — **Inline-Python edits get a one-time advisory (DB-062).** Owner-requested: `Write`/
+  `Edit` show a diff as the change happens, a `python3 - <<EOF` heredoc does not. New repo-local
+  `scripts/guards/python-edit.sh`, wired as a second `PreToolUse` hook (the shipped command guard is
+  integrity-hashed and cannot host a local rule); it blocks the first inline-Python file write of a
+  session and passes the rest, like the shipped `.env` advisory. Ladder mode runs its matcher
+  fixtures; 12 new cases in `local-guards.sh`.
 - 2026-08-17 — **Contexts location rules round-trip (DB-061).** DB-051's fix went one screen deep:
   the rule editor wrote the field with the default locale and read it back dot-only, so a
   comma-decimal device parsed null and dropped the whole location trigger — the rule reopened with

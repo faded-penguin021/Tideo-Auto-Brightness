@@ -1095,6 +1095,87 @@ run_guard fa-nostrings format-args
 expect_fail "a tree with no strings.xml fails rather than passing vacuously" "checked nothing"
 
 # =============================================================================
+# python-edit.sh — the inline-Python advisory (DB-062)
+# =============================================================================
+#
+# This guard carries its OWN matcher matrix in its ladder mode, and that is where the shape
+# coverage lives. What belongs here is the part its self-test cannot honestly check about itself:
+# that the ladder mode really does go red when the matcher regresses (a self-test that reports its
+# own health is worth nothing if a broken matcher still exits 0), and that the one-time arming
+# behaves across separate PROCESSES rather than within one.
+#
+# Each case gets its own state path, because a shared one would make these cases order-dependent —
+# and an order-dependent fixture is how a suite starts passing for the wrong reason.
+pe_run() { # <state-file> <args...>; sets RC and OUT
+	local state=$1
+	shift
+	OUT=$(PYTHON_EDIT_ADVISORY_STATE=$state bash "$ROOT/scripts/guards/python-edit.sh" "$@" 2>&1)
+	RC=$?
+}
+
+# The ladder mode passes on the real guard, and its summary must not claim more than it verifies.
+pe_run "$SANDBOX/pe-unused" # no args: fixture matrix
+expect_pass "python-edit ladder mode passes"
+if printf '%s' "$OUT" | grep -qF 'hook firing is not verifiable from here'; then
+	ok
+else
+	bad "python-edit's summary drops the admission that it cannot verify the hook fires: $OUT"
+fi
+
+# A write shape is advised against ONCE, then never again — across processes, which is the
+# property the /tmp marker exists for and the one a single-process self-test cannot demonstrate.
+pe_state=$SANDBOX/pe-state-1
+pe_run "$pe_state" --command "python3 -c \"open('a.kt','w').write('x')\""
+expect_fail "the first inline-Python edit is advised against" "stopping this ONCE"
+pe_run "$pe_state" --command "python3 -c \"open('a.kt','w').write('x')\""
+expect_pass "the same command passes on a second, separate invocation"
+pe_run "$pe_state" --command "python3 -c \"open('b.kt','w').write('y')\""
+expect_pass "a DIFFERENT inline-Python edit also passes once the advisory is spent"
+
+# Legitimate uses never arm it in the first place — verified by the state file still not
+# existing, not merely by the exit code, since exit 0 is also what a spent advisory returns.
+pe_state=$SANDBOX/pe-state-2
+pe_run "$pe_state" --command "python3 -c 'print(open(\"f.kt\").read())'"
+expect_pass "reading a file with Python is not advised against"
+pe_run "$pe_state" --command './gradlew :app:testDebugUnitTest'
+expect_pass "an unrelated command is not advised against"
+if [ -e "$pe_state" ]; then
+	bad "a read-only Python command consumed the one-time advisory — the next real edit would pass unadvised"
+else
+	ok
+fi
+
+# Hook mode: a PreToolUse payload blocks with exit 2, and anything unparseable fails OPEN. A rail
+# that bricks every Bash command when a payload shape changes is one the next session deletes.
+pe_state=$SANDBOX/pe-state-3
+OUT=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"python3 -c \"open(1,2).write(3)\""}}' |
+	PYTHON_EDIT_ADVISORY_STATE=$pe_state bash "$ROOT/scripts/guards/python-edit.sh" --hook 2>&1)
+RC=$?
+expect_fail "hook mode blocks a matching payload" "BLOCKED ONCE"
+
+pe_state=$SANDBOX/pe-state-4
+OUT=$(printf 'not json at all' |
+	PYTHON_EDIT_ADVISORY_STATE=$pe_state bash "$ROOT/scripts/guards/python-edit.sh" --hook 2>&1)
+RC=$?
+expect_pass "hook mode fails OPEN on an unparseable payload"
+
+# THE case that decides whether the ladder mode is worth running: break the matcher in a copy and
+# the guard must go RED. Without this, the self-test is a script that grades its own homework.
+mkdir -p "$SANDBOX/pe-broken"
+awk '{ print } /local cmd=\$1 src/ { print "\treturn 1" }' \
+	"$ROOT/scripts/guards/python-edit.sh" >"$SANDBOX/pe-broken/python-edit.sh"
+OUT=$(PYTHON_EDIT_ADVISORY_STATE=$SANDBOX/pe-broken-state bash "$SANDBOX/pe-broken/python-edit.sh" 2>&1)
+RC=$?
+expect_fail "a matcher with a write shape removed fails its own ladder rung" "fixture(s) failed"
+
+# The guard must be executable, like every other one here.
+if [ -x "$ROOT/scripts/guards/python-edit.sh" ]; then
+	ok
+else
+	bad "scripts/guards/python-edit.sh is not executable — the ladder runs it with bash, but the hook does not"
+fi
+
+# =============================================================================
 # The case count stated in docs/HARNESS_LOCAL.md must match the count actually run.
 #
 # Drift incident: the change that added the comment-budget cases updated that sentence to "42"

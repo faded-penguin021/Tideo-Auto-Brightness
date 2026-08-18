@@ -765,3 +765,12 @@
   train regression. The pair now lives once in `ui/components/Coordinates.kt`; the save path became
   a unit-testable `locationTriggerOf`. The list said "near location" for every rule and now names
   the circle. `[cited]`: `locationTriggerOf`, `Coordinates.kt`.
+
+- DB-062 [cited]: **A tool that hides the change while it makes it costs review, even when it
+  works.** Owner objection to `python3 - <<EOF` edits: `Write`/`Edit` render a diff as the edit
+  happens, an interpreter heredoc shows a blob going in and nothing coming out, so whether it did
+  what it claimed is knowable only by reading the file back. Made an ADVISORY, not a ban — scripted
+  bulk edits are legitimate, so it blocks the session's first inline-Python write and passes the
+  rest, the mechanism the shipped guard already uses for dotenv reads. It could not go IN that
+  guard: shipped scripts are integrity-hashed, so it is a second `PreToolUse` hook beside it.
+  `[cited]`: `scripts/guards/python-edit.sh`, `.claude/settings.json`.

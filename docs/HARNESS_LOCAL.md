@@ -49,7 +49,7 @@ We **gained** three rungs with no local predecessor: `guard_author_identity`,
 the AMH repository now, and a stale local snapshot would read as authoritative to a future
 session while drifting against every upstream release.
 
-## The six repo-local guards, and why each is not upstream's job
+## The seven repo-local guards, and why each is not upstream's job
 
 - **`fdroid-changelog.sh`** — F-Droid flags a `whatsNew` over 500 **characters**, and it measures
   codepoints, not bytes. `wc -c` rejects a legal note full of em dashes. Only the current
@@ -153,7 +153,18 @@ session while drifting against every upstream release.
   through a variable or a runtime-empty spread, multi-line call sites, plurals/string-arrays, the
   space flag, wrong arg counts and types past zero, translations).
 
-`scripts/tests/local-guards.sh` is their fixture suite — 94 cases, run by `scripts/verify.sh`.
+- **`python-edit.sh`** — the only one here that is not a ladder check at heart: a **pre-execution
+  advisory** (DB-062), wired as a second `PreToolUse` hook beside the shipped command guard, which
+  is integrity-hashed and so cannot host a repo-local rule. It blocks the FIRST inline-Python file
+  edit of a session and passes every later one, mirroring the shipped guard's own `.env` and
+  destructive advisories. The objection is opacity, not danger: `Write`/`Edit` render a diff as the
+  change happens, while a `python3 - <<EOF` heredoc is only checkable afterwards by reading the file
+  back. One block makes that a choice rather than a reflex. Its ladder mode runs the matcher
+  fixtures, because nothing inside the repo can verify the hook still *fires* — only a real command
+  shows that. Its header states what it does not match (a script file, `sed -i` and friends,
+  runtime-constructed commands, and every edit after the first).
+
+`scripts/tests/local-guards.sh` is their fixture suite — 106 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
