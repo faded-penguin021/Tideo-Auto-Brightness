@@ -14,13 +14,18 @@ more than the review's own framing, and its prescribed fix would codify a worse 
 
 The single approved action is committing this plan to `docs/plans/`.
 
-## Verification limits (state honestly in the commit)
+## Baseline: replayed and confirmed
 
-This container holds a **shallow clone: 50 commits, no tags**, and the review's baseline
-`d17387e` is not present. The diff range, the 283/13,882/9,265 stat counts, and the
-`git log`/`git diff --check` results **could not be replayed**. That is not evidence
-against the review — it reviewed a full clone. Every verdict below comes from reading the
-current worktree, which is where the claims are anyway.
+Initially unverifiable — the container held a shallow 50-commit clone with no tags, and the
+review's `d17387e` baseline was absent. After `git fetch --unshallow` the range replays and
+**the review's process claims check out exactly**:
+
+- `d17387e` **is** the `v1.8.2` tag.
+- `git diff --shortstat d17387e 618972c` = **283 files, 13,882 insertions, 9,265 deletions** —
+  precisely the counts reported.
+
+So the review measured what it said it measured, against the right baseline. The severity
+disagreements below are disagreements about *judgement*, not about its arithmetic.
 
 ## Verdicts
 
@@ -133,3 +138,38 @@ actually live — is unaffected either way. **Recommend recording under
 
 Approved action is **only** committing this plan to `docs/plans/` on
 `claude/branch-review-verification-ok3lc6`. No production code, ledger, or STATE edits.
+
+### Why the Dependabot action bumps are not adopted here
+
+`dependabot/github_actions/github-actions-8189b25dd7` (7 updates) was checked and **deliberately
+left on its own branch**. The supply-chain posture it exists to protect is intact:
+
+- All 12 actions remain **40-hex SHA pins** — zero reversions to tag refs, so Scorecard's
+  pinned-dependencies outcome holds.
+- All 6 changed SHAs **verify against their claimed upstream tags** (`git ls-remote`).
+- All 5 bumped majors declare `runs.using: node24`, satisfying build.yml's Node 24 policy.
+
+It is not adopted into this branch because this is a docs-only triage: merging CI supply-chain
+bumps here would put two unrelated review surfaces in one PR, and `dependabot.yml` deliberately
+groups these into a single PR "because reviewing them together is how the owner actually reads
+them". The bumps also need the workflows to actually *run* against them — particularly the
+F-Droid reproducibility job, which round-trips artifacts through
+`upload-artifact`/`download-artifact`, both bumped a major. That validation only happens on the
+Dependabot PR.
+
+**Two defects to fix on that PR before merging it** — both are DB-038's own predicted decay
+("a pin is a snapshot; without a refresh path it decays into a claim nobody rechecks"):
+
+1. `clean-dist.yml` — the SHA moved to v7.0.1's `3d3c42e5…` but the marker still reads
+   `# v5.1.0`. Dependabot's marker rewrite fails when trailing prose follows the version, which
+   this line has. The same SHA is labelled `v7.0.1` in four other files, and v5.1.0's real SHA
+   is `fbc6f399…` (the *old* pin), so the marker is provably the stale half.
+2. `build.yml` — the Node 24 policy block still names the **old** majors (`checkout@v5`,
+   `cache@v5`, `upload-artifact@v6`, `download-artifact@v7`, `github-script@v8`), every one of
+   which this PR bumps. That prose is load-bearing ("Do NOT downgrade any of these") and is now
+   factually wrong. Dependabot never edits prose.
+
+Worth noting: **no guard enforces marker↔SHA agreement.** Nothing in `scripts/guards/` or
+`scripts/ladder.sh` checks it, so `dependabot.yml`'s claim that the pin and its version marker
+"stay in sync" is empirically false for any line carrying a trailing comment. A small guard
+comparing each `uses:` SHA against its `# vX.Y.Z` marker would have caught defect 1 mechanically.
