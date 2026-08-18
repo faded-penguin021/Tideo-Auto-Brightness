@@ -118,6 +118,24 @@ class DisplayTogglesViewModelTest {
     }
 
     @Test
+    fun applyNow_writesOnlyTheFieldsTheDeviceDoesNotAlreadyAgreeWith() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Secure.putInt(resolver, "accessibility_display_inversion_enabled", 1)
+        val vm = vm()
+
+        vm.applyNow(AabSettings(nightLightEnabled = true, inversionEnabled = true))
+
+        assertEquals(1, Settings.Secure.getInt(resolver, "night_display_activated", -999))
+        assertEquals(
+            -999,
+            Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999),
+            "DB-068: a field the device already agrees with must not be rewritten",
+        )
+        assertFalse(vm.state.value.writeFailed)
+    }
+
+    @Test
     fun applyNow_withAnUnrepresentableDeviceMode_preservesItWhenTheUserPickedNothing() {
         grantElevated()
         val resolver = app.contentResolver

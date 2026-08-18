@@ -146,29 +146,41 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     }
 
     /**
-     * Direct device write of display-toggle fields (D-152, service-OFF path). Null temperature,
-     * unavailable HDR and a DB-066-unrepresentable mode (bar a [committed]-differing pick) stay put.
+     * Direct device write of display-toggle fields (D-152, service-OFF path). DB-068: diff-written
+     * against the device; DB-066: an unrepresentable mode stays put bar a [committed]-differing pick.
      */
     fun applyNow(settings: AabSettings, committed: AabSettings = settings) {
         scheduleDeviceOperation(invalidateSnapshot = true) { generation ->
             deviceLock.withLock {
-                val hdrState = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null
-                val daltonizerState = display.readDaltonizer()
+                val device = readSnapshotLocked()
+                val daltonizerPick = DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
+                    ?: DaltonizerMode.OFF
+                val deviceDaltonizer = device?.daltonizer
+                val writeDaltonizer = when {
+                    device == null -> true
+                    deviceDaltonizer != null -> deviceDaltonizer != daltonizerPick
+                    else -> settings.daltonizerMode != committed.daltonizerMode
+                }
                 val results = buildList {
-                    add(display.setNightLight(settings.nightLightEnabled))
-                    settings.nightLightTemperature?.let { add(display.setNightLightTemperature(it)) }
-                    if (daltonizerState != null || settings.daltonizerMode != committed.daltonizerMode) {
-                        add(
-                            display.setDaltonizer(
-                                DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
-                                    ?: DaltonizerMode.OFF,
-                            ),
-                        )
+                    if (device == null || (device.nightLight != null && device.nightLight != settings.nightLightEnabled)) {
+                        add(display.setNightLight(settings.nightLightEnabled))
                     }
-                    add(display.setInversion(settings.inversionEnabled))
-                    add(display.setAlwaysOnDisplay(settings.alwaysOnDisplayEnabled))
-                    add(display.setStayAwakePlugged(settings.stayAwakeChargingEnabled))
-                    if (display.hdrForceSdrAvailable && hdrState != null) {
+                    settings.nightLightTemperature?.let {
+                        if (device == null || device.temperatureK != it) add(display.setNightLightTemperature(it))
+                    }
+                    if (writeDaltonizer) add(display.setDaltonizer(daltonizerPick))
+                    if (device == null || device.inversion != settings.inversionEnabled) {
+                        add(display.setInversion(settings.inversionEnabled))
+                    }
+                    if (device == null || (device.alwaysOn != null && device.alwaysOn != settings.alwaysOnDisplayEnabled)) {
+                        add(display.setAlwaysOnDisplay(settings.alwaysOnDisplayEnabled))
+                    }
+                    if (device == null || device.stayAwake != settings.stayAwakeChargingEnabled) {
+                        add(display.setStayAwakePlugged(settings.stayAwakeChargingEnabled))
+                    }
+                    if (display.hdrForceSdrAvailable &&
+                        (device == null || (device.hdrForceSdr != null && device.hdrForceSdr != settings.hdrForceSdrEnabled))
+                    ) {
                         add(display.setHdrForceSdr(settings.hdrForceSdrEnabled))
                     }
                 }

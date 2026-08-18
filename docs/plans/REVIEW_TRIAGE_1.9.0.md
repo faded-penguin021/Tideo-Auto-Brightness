@@ -122,9 +122,9 @@ actually live — is unaffected either way. **Recommend recording under
 4. **Dead branch** — **DONE (2026-08-18).** The unreachable `if (providers.isEmpty())` is gone.
 5. **Test seam** — **DONE (2026-08-18).** `onReceive()` now calls `tryAcquireCommand()` /
    `releaseCommand()`, so `ControlReceiverAdmissionTest` exercises the production pair.
-6. **Field-aware Apply (optional)** — `applyNow()` writes every field while
-   `DisplayTogglesCoordinator.applyLocked()` already diff-writes. Worth closing the
-   asymmetry, but it is a hardening measure, not a fix for items 1–2.
+6. **Field-aware Apply (optional)** — **DONE (DB-068, 2026-08-18).** `applyNow()` diffs against a
+   device read taken under its own lock; capability-null fields are skipped, and below ELEVATED
+   (no snapshot) every write is still attempted so the tier failure reaches `writeFailed`.
 
 ## Verification
 

@@ -818,3 +818,12 @@
   reaches it — Robolectric's `ShadowLocationManager` never throws from `requestLocationUpdates`
   (probed) and the module has no mocking library — so it is proven by inspection.
   `[cited]`: `platform/…/context/LocationReader.kt`.
+
+- DB-068 [cited]: **Two apply paths for the same fields must write the same way.** The runtime
+  coordinator diff-wrote against `lastApplied` while the screen's direct Apply wrote all seven
+  fields every time, re-asserting six of them over whatever the device or another app had put
+  there. `applyNow` now diffs against a device read taken under the lock it writes in. Two shapes
+  to keep: a capability-null field (unavailable Night Light, AOD) is skipped, not diffed; and
+  below ELEVATED the read returns no snapshot, so every write is attempted precisely to let its
+  tier failure reach `writeFailed`, which diffing against "no known state" would swallow.
+  `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`.
