@@ -43,13 +43,12 @@ Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. **v1.9.0/vc
 (owner, 2026-08-18; #117 squash-merged, tag `v1.9.0` on `main`), and the owner's implicit ratify
 closed the DB-064 judgement call. Parity checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
 
-**Resuming cold?** `claude/first-work-item-plan-lqklk4` carries **v1.9.1/vc22**, not yet tagged: all
-six items of `docs/plans/REVIEW_TRIAGE_1.9.0.md` (DB-065…DB-070), one commit each, ladder green,
-adversarially reviewed, plus the version bump and `changelogs/22.txt`. Nothing is half-done; no
-review is owed. The owner has the 1.9.1 debug APK and
-`docs/rebuild/DEVICE_TEST_SCRIPT_1.9.1.md`; **v1.9.1 ships only after that round comes back.** Still
-owed here: fold `DEVICE_TEST_SCRIPT_1.9.0.md`'s steps into the standing script and delete it — due
-now that v1.9.0 has shipped. Do **not** re-open the closed force-stop investigation (DB-051…DB-060).
+**Resuming cold?** `claude/first-work-item-plan-lqklk4` carries **v1.9.1/vc22**, device-verified and
+**ready to tag**: all six items of `docs/plans/REVIEW_TRIAGE_1.9.0.md` (DB-065…DB-072), one commit
+each, ladder green, adversarially reviewed, version bumped, `changelogs/22.txt` written, PR open
+against `main`. Both ephemeral round scripts are folded into `DEVICE_TEST_SCRIPT.md` and deleted —
+**no ephemeral script is outstanding.** Nothing is half-done and no review is owed. Do **not**
+re-open the closed force-stop investigation (DB-051…DB-060).
 
 ## Owner queue
 
@@ -58,12 +57,11 @@ now that v1.9.0 has shipped. Do **not** re-open the closed force-stop investigat
 1. DB-041…DB-043's unavailable-feature boundary still unverified (B1 BLOCKED three times): every
    device to hand reports Night Light/AOD available, and the owner has no Samsung. Needs hardware
    reporting them unavailable — park it until such a device exists.
-2. **v1.9.1 is ready to tag — the device round came back clean (owner, 2026-08-18).** §11a PASS:
-   the mask reads 15 where v1.9.0 gave 7, so DB-065 is device-verified fixed against a
-   device-confirmed defect. §11b SKIPPED, nothing to observe (both daltonizer keys read 0) and
-   synthesising the state is refused by DB-071. §11c step 11 PASS; step 12 withdrawn as unrunnable
-   (DB-072). §11d PASS. §11e not attempted, as expected. **Owner: publish v1.9.1/vc22 from the
-   GitHub UI when you want it out** — tagging is yours; nothing here blocks it.
+2. **v1.9.1/vc22 — merge and publish. Owner:** squash-merge the open PR, then Draft a new release
+   with tag `v1.9.1` on `main`; `release.yml` builds, signs and pulls `changelogs/22.txt` in as
+   "What's new". The round is done (2026-08-18): stay-awake reads 15 where v1.9.0 gave 7, the
+   read-only daltonizer observation had nothing to observe, panic and diff-write PASS; the two
+   withdrawn steps became DB-071/DB-072.
 
 Open questions: none. Owed reviews: none.
 
@@ -104,7 +102,10 @@ Newest first; ledger rows are the durable detail.
 
 - 2026-08-18 — **v1.9.0 released** (#117 squash-merged, tag `v1.9.0`), and this branch bumped to
   **v1.9.1/vc22** with `changelogs/22.txt` for the fixes below. Tagging stays an owner step and
-  waits on the `DEVICE_TEST_SCRIPT_1.9.1.md` round.
+  waits on the owner. Both ephemeral round scripts (1.9.0, 1.9.1) folded into the standing
+  `DEVICE_TEST_SCRIPT.md` and deleted: the fold added the location-button and rule round-trip checks
+  (§8 24a/24b), stay-awake mask, HDR canonical-off/partial, read-only daltonizer, unsupported
+  Night Light/AOD (§11 32a–32d), and the two Apply-path checks (§11 39b/39c).
 - 2026-08-18 — **v1.9.1 triage items 1–6 done (DB-065…DB-070).** Stay-awake writes AOSP's full
   `AC|USB|WIRELESS|DOCK` mask instead of narrowing it to 7; an unrecognized daltonizer mode reads as
   unrepresentable rather than OFF and survives an unrelated Apply; `activeFix` releases its location
