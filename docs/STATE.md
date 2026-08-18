@@ -64,11 +64,11 @@ Parity checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
 **Resuming cold?** The train itself is finished and green. Branch
 `claude/pr-116-branch-train-review-c4lo6i`, PR **#117** open against `main`, describing the whole
 train; #115 closed, #116 was intra-train. No agent work is half-done. Queue item 1 is fixed and
-needs only the owner's device check (it never blocked the tag). **Start at item 2** — an owner
-judgement on unreviewed legislation, and the last thing before the merge. Then squash-merge #117, publish
+needs only the owner's device check (it never blocked the tag). Item 2's review loop is **closed**
+(DB-064); what is left there is the owner ratifying the call. Then squash-merge #117, publish
 from the GitHub UI, and **delete `docs/rebuild/DEVICE_TEST_SCRIPT_1.9.0.md`** (ephemeral), folding
-its results into the standing script. Two rule-file edits landed without their DA-005 review and are
-flagged: the AGENTS.md sentence (DB-056) and `format-args.sh` (item 2). Do **not** re-open the
+its results into the standing script. Every rule-file edit on this branch now has its DA-005 pass
+(DB-063, DB-064); no legislation is owed a review. Do **not** re-open the
 closed force-stop location investigation — read the Incoming line and DB-051…DB-060 first; item 1 is
 a different screen and a different defect.
 
@@ -83,17 +83,16 @@ a different screen and a different defect.
    instead of saying "near location". Pre-existing (v1.8.2 has the same three lines), so it never
    blocked the tag. **Owner: on device, create a location rule, save, reopen it — the toggle should
    still be on with the coordinates shown, and the list row should name them.**
-2. **`format-args.sh` corrections are unreviewed legislation.** Three DA-005 rounds, each finding
-   the last wrong: round 1 killed the asserted crash mechanism (single-arg `getString` does not
-   format); round 2 died on an API 529 with no verdict; round 3 found the rewrite blind to
-   `emptyArray()` spreads (`CircadianScreen.kt:409,419`) and to `flashDrop`, a second vararg
-   resolver. All fixed and fixtured — but **those fixes had no review of their own.** Judge whether
-   that matters before the train merges. **`python-edit.sh` (DB-062) HAS now had its pass** — a
-   fresh-context DA-005 review found seven defects, five confirmed by running (DB-063). All fixed
-   and fixtured here, and the fixes are themselves further rule edits, so one short re-review closes
-   the loop. The reviewer's verdict on the other two: `format-args.sh` **stand**, AGENTS.md **stand**
-   with one precision note — the DB-056 incident was *untracked*, not *unstaged*, and an unstaged
-   change to a tracked file IS seen, so "untracked or unstaged" would be strictly truer.
+2. **Unreviewed legislation — CLOSED (DB-064), nothing owed.** The re-review of DB-063's own fixes
+   ran and found six more (four confirmed by running): a stripped `+x`, an `AGENTS.md` paragraph
+   contradicting the guard, `shutil.copy(`/`copy2(` lost to a prefix collision, a vacuous fixture,
+   an unfixtured F7, dangling `DB-063 F<n>` sub-cites. All fixed here, each new fixture
+   mutation-proved. **This is where the regress stops** — DA-005's "one level of meta only": the
+   DB-064 fixes are not re-reviewed, by rule, not by omission. `format-args.sh` and the AGENTS.md
+   sentence were both **stand** verdicts, and the precision note is applied (the DB-056 incident was
+   *untracked*: an unstaged edit to a tracked file IS seen, since the guards `git ls-files` and then
+   read the worktree). Nothing here blocks the merge. **Owner: this is the judgement call to
+   ratify or overrule before squash-merging #117.**
 3. **Provenance manifest: one record removed, one restored.** `ProfilesScreen.kt`'s went because its
    only `// Tasker` line was wrapped prose this change deleted. `MiscScreen.kt`'s was removed and
    then **restored** — its marker is still in the tree and states Tasker behaviour the port matches,
@@ -102,7 +101,7 @@ a different screen and a different defect.
 4. DB-041…DB-043's unavailable-feature boundary still unverified (B1 BLOCKED twice): the owner's
    device reports Night Light/AOD available. Needs hardware reporting them unavailable.
 
-Open questions: none. Owed reviews: item 2.
+Open questions: none. Owed reviews: none (DA-005 one-level-of-meta closes item 2).
 
 Incoming: the force-stop location defect is **closed as no app defect** (owner, 2026-08-17) — three
 stationary retries at 44/23/4 s were cold-GNSS warm-up, and that curve became DB-059. Device rounds
@@ -131,11 +130,18 @@ the rows, not here.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-18 — **The unreviewed-legislation loop is closed (DB-064).** DA-005 on DB-063's own fixes
+  found six more, four confirmed by running: a stripped `+x` on `local-guards.sh` that only the
+  pre-allowed bare invocation felt, an `AGENTS.md` paragraph re-asserting the per-session claim the
+  same commit corrected elsewhere, `shutil.copy(`/`copy2(` dropped from the write matcher by a
+  prefix collision, a vacuous escaped-quote fixture, F7 with no fixture, and sub-numbered
+  `DB-063 F<n>` cites that resolve nowhere. All fixed; the four new/repaired fixtures were each
+  mutation-proved red. Suite 108 → 111. DA-005's one-level-of-meta rule stops the regress here.
 - 2026-08-17 — **Inline-Python edits get a one-time advisory (DB-062).** Owner-requested: `Write`/
   `Edit` show a diff as the change happens, a `python3 - <<EOF` heredoc does not. New repo-local
   `scripts/guards/python-edit.sh`, wired as a second `PreToolUse` hook (the shipped command guard is
-  integrity-hashed and cannot host a local rule); it blocks the first inline-Python file write of a
-  session and passes the rest, like the shipped `.env` advisory. Ladder mode runs its matcher
+  integrity-hashed and cannot host a local rule); it blocks the first inline-Python file write per
+  marker lifetime and passes the rest, like the shipped `.env` advisory. Ladder mode runs its matcher
   fixtures; 12 new cases in `local-guards.sh`.
 - 2026-08-17 — **Contexts location rules round-trip (DB-061).** DB-051's fix went one screen deep:
   the rule editor wrote the field with the default locale and read it back dot-only, so a

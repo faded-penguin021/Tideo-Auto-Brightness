@@ -35,8 +35,9 @@ The Tasker source XML is in `docs/rebuild/extraction/_source/` (gitignored, 1.6 
 
 **`scripts/ladder.sh`** is the whole of it — guards, then `scripts/verify.sh`, which holds the
 build/test/lint set. `--guards-only` for docs-only work. CI runs the same script, so red-in-CI with
-green-locally means environment — or unstaged work: the guards read tracked files, so `git add`
-before you verify (DB-056).
+green-locally means environment — or UNTRACKED work: the guards read tracked files, so `git add`
+before you verify (DB-056). An unstaged edit to an already-tracked file IS seen; a brand-new file
+is not, which is the shape that incident took.
 
 No KVM, so no emulator: verification is compile + JVM/Robolectric. **On-device behaviour is
 owner-verified** through the Owner queue and `docs/rebuild/DEVICE_TEST_SCRIPT.md`. Say in each
@@ -121,9 +122,12 @@ teach the reader to stop believing one of them.
 **Prefer `Write`/`Edit` over inline `python3 -c`/heredocs for editing files** (DB-062): those render
 a diff as the change happens, an interpreter blob does not, so a mistake in it is visible only by
 reading the file back. Not a ban — a scripted bulk edit is sometimes right. Which layer holds this:
-the Claude Code adapter blocks the session's FIRST such command as a `PreToolUse` advisory and
-passes the rest; **Codex has no pre-shell hook, so for that agent this paragraph is the only layer
-standing**, as with the comment budget above.
+the Claude Code adapter blocks the FIRST such command per MARKER LIFETIME as a `PreToolUse`
+advisory and passes the rest — the marker has no session component, so in a long-lived container
+the block is spent by the first session that trips it and every later session passes unadvised
+(DB-063); **Codex has no pre-shell hook, so for that agent this paragraph is the only layer
+standing**, as with the comment budget above. Either way the paragraph, not the hook, is what
+binds you.
 
 **The one rule that overrides taste: Tasker semantics win.** Port behaviour exactly, including
 odd rounding and quirks that look like bugs; modernise the *how*, never the *what*. Mark ported

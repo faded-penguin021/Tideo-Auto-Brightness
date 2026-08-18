@@ -11,7 +11,7 @@
 # shipped command guard's `.env` and destructive-command advisories: a marker file per repo and
 # uid under /tmp. Once per MARKER LIFETIME, not once per session — the marker name has no session
 # component, so in a long-lived container the advisory is spent by the first session that trips it
-# and every later session passes unadvised (DB-063 F3). Delete the marker to re-arm. In a container
+# and every later session passes unadvised (DB-063). Delete the marker to re-arm. In a container
 # that starts with a clean /tmp the two coincide, which is what made the looser claim look true.
 # That is deliberate, and it is the whole design — this is a speed bump
 # aimed at the reflex, not a permission rail. Scripted bulk edits are a legitimate tool and the
@@ -35,11 +35,15 @@
 #     at scan time is not code, and the shipped command guard's header makes the same admission.
 #   * The SECOND and later inline-Python edit per marker lifetime. By design, see above.
 #   * Pure filesystem moves — `os.makedirs`, `os.rename`, `os.remove`, `shutil.move`. They were
-#     matched at first and should not have been (DB-063 F4): the remedy this advisory offers is
+#     matched at first and should not have been (DB-063): the remedy this advisory offers is
 #     `Edit`/`Write`, and the harness has no tool that makes a directory or deletes a file, so it
 #     blocked and then named a fix nobody could take. Destructive shell work is the shipped
-#     command guard's advisory, not this one. `shutil.copyfile`/`copytree` stay: they overwrite
-#     file CONTENT, which is the thing being protected.
+#     command guard's advisory, not this one. The four content-overwriting copies stay —
+#     `shutil.copy`, `copy2`, `copyfile`, `copytree` — because they overwrite file CONTENT, which
+#     is the thing being protected. The first cut of that narrowing kept only the two longest
+#     spellings, and since `copy` is a prefix of `copyfile` the alternation silently dropped
+#     `shutil.copy(`/`copy2(` — the shorter, likelier forms (DB-064). The trailing `(` is what
+#     keeps `copymode`/`copystat`, which touch metadata and not content, out.
 # So: this is an advisory that catches the common shape once. It is not a containment boundary,
 # and nothing here should be read as one.
 #
@@ -73,14 +77,14 @@ is_python_inline_edit() { # <command>
 
 	# 1. A Python invocation at all. Word-boundary matched so `pythonic-notes.md` is prose. `/` is
 	#    NOT a boundary character: excluding it let `/usr/bin/python3` and `.venv/bin/python`
-	#    through, which is the first spelling anyone reaches for (DB-063 F1).
+	#    through, which is the first spelling anyone reaches for (DB-063).
 	printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_.-])(python|python3|python2|py)([[:space:]]|$)' || return 1
 
 	# 2. Inline source: `-c`, or a heredoc / pipe feeding the interpreter on stdin. Without one
 	#    of these the source lives in a file this matcher cannot see, and (see header) a
 	#    checked-in script is not what this advisory is aimed at.
 	#    Interpreter flags may sit between the interpreter and `-c` (`-u`, `-B`, `-X utf8`), so the
-	#    inline-source token is not required to be adjacent (DB-063 F1).
+	#    inline-source token is not required to be adjacent (DB-063).
 	printf '%s' "$cmd" | grep -Eq -- '(python|python3|python2|py)[[:space:]]+((-[[:alnum:]]+[[:space:]]+([[:alnum:]=.]+[[:space:]]+)?)*(-[[:alnum:]]*c|-[[:space:]]*$|-[[:space:]])|.*<<)' ||
 		printf '%s' "$cmd" | grep -Eq -- '\|[[:space:]]*(python|python3|python2|py)([[:space:]]|$)' || return 1
 
@@ -96,7 +100,7 @@ is_python_inline_edit() { # <command>
 		-e '\.write_text\(' \
 		-e '\.write_bytes\(' \
 		-e '\.truncate\(' \
-		-e 'shutil\.(copyfile|copytree)' \
+		-e 'shutil\.(copy|copy2|copyfile|copytree)\(' \
 		-e 'inplace[[:space:]]*=[[:space:]]*True' \
 		-e '(json|yaml|toml)\.dump\(' \
 		-e 'Path\([^)]*\)\.write' ||
@@ -113,7 +117,7 @@ is_python_inline_edit() { # <command>
 # without touching the real marker.
 advisory_state_file() {
 	local slug uid
-	# DB-063 F7: `:-` not `+x`, so an exported-but-EMPTY override falls back to the real marker
+	# DB-063: `:-` not `+x`, so an exported-but-EMPTY override falls back to the real marker
 	# instead of returning "" and disarming the rail silently.
 	[ -n "${PYTHON_EDIT_ADVISORY_STATE:-}" ] && { printf '%s' "$PYTHON_EDIT_ADVISORY_STATE"; return 0; }
 	slug=${ROOT//\//_}
@@ -140,7 +144,7 @@ extract_command() { # fail open: print nothing if the payload is not what we exp
 	# No python3 here on purpose — a guard about reaching for Python should not need it to run,
 	# and the sed path is the one the shipped guard already falls back to.
 	#
-	# DB-063 F2: the capture must stop at the END OF THE STRING, not the last quote on the line.
+	# DB-063: the capture must stop at the END OF THE STRING, not the last quote on the line.
 	# A greedy `\(.*\)"` swallowed every sibling field, so the model-written `description` that
 	# follows `command` in the Bash payload was scanned as if it were the command — and a
 	# description merely MENTIONING Python blocked an unrelated command. `[^"\\]*(\\.[^"\\]*)*`
@@ -208,12 +212,18 @@ matcher_says_yes 'dash-c open-for-write' "python3 -c \"open('a.txt','w').write('
 matcher_says_yes 'pathlib write_text' "python3 -c 'from pathlib import Path; Path(\"a\").write_text(\"b\")'"
 matcher_says_yes 'fileinput inplace' "python -c 'import fileinput
 for l in fileinput.input(\"f\", inplace=True): print(l)'"
-matcher_says_no 'shutil move is a filesystem op, not an edit (DB-063 F4)' "python3 -c 'import shutil; shutil.move(\"a\",\"b\")'"
-matcher_says_no 'os.replace is a filesystem op, not an edit (DB-063 F4)' "python3 -c 'import os; os.replace(\"a\",\"b\")'"
+matcher_says_no 'shutil move is a filesystem op, not an edit (DB-063)' "python3 -c 'import shutil; shutil.move(\"a\",\"b\")'"
+# DB-064: `copy` is a prefix of `copyfile`, so an alternation naming only the long spellings
+# matched neither short one. All four overwrite destination CONTENT; `copymode`/`copystat` do not.
+matcher_says_yes 'shutil copy overwrites content' "python3 -c 'import shutil; shutil.copy(\"a.kt\",\"b.kt\")'"
+matcher_says_yes 'shutil copy2 overwrites content' "python3 -c 'import shutil; shutil.copy2(\"a.kt\",\"b.kt\")'"
+matcher_says_yes 'shutil copyfile overwrites content' "python3 -c 'import shutil; shutil.copyfile(\"a.kt\",\"b.kt\")'"
+matcher_says_no 'shutil copymode touches metadata, not content' "python3 -c 'import shutil; shutil.copymode(\"a.kt\",\"b.kt\")'"
+matcher_says_no 'os.replace is a filesystem op, not an edit (DB-063)' "python3 -c 'import os; os.replace(\"a\",\"b\")'"
 matcher_says_yes 'piped inline source' "echo \"open('a','w').write('x')\" | python3"
 matcher_says_yes 'json dump' "python3 -c 'import json; json.dump(d, open(\"f\",\"w\"))'"
 
-# DB-063 F1: the two spellings the first matcher missed. An absolute path and an
+# DB-063: the two spellings the first matcher missed. An absolute path and an
 # interpreter flag before -c are what a real session types, so a guard blind to them was
 # advisory theatre against everything but the textbook form.
 matcher_says_yes 'absolute interpreter path' "/usr/bin/python3 -c \"open('a','w').write('x')\""
@@ -258,6 +268,6 @@ if [ "$SELF_FAILS" -gt 0 ]; then
 	exit 1
 fi
 
-# DB-063 F6: counted, not typed — a hardcoded summary drifts the first time a fixture is added.
+# DB-063: counted, not typed — a hardcoded summary drifts the first time a fixture is added.
 printf '%s edit shape(s) matched, %s legitimate use(s) passed, one-time arming verified; pre-execution advisory (hook firing is not verifiable from here)\n' "$MATCHED" "$PASSED"
 exit 0

@@ -783,3 +783,12 @@
   the false-positive shape that gets a rail deleted. Also: a marker with no session component, ops
   whose remedy no harness tool offers, an empty override disarming it.
   `[cited]`: `scripts/guards/python-edit.sh`.
+
+- DB-064 [cited]: **The commit that fixes a review is itself unreviewed legislation.** DA-005 on
+  DB-063's fixes found six more. It stripped `+x` from `local-guards.sh` — a mode is in no diff
+  hunk, `verify.sh` runs it via `bash` so CI stayed green, and only the bare spelling
+  `.claude/settings.json` pre-allows broke (rc=126). It re-asserted the per-SESSION claim the rest
+  of the commit corrected, in `AGENTS.md`, the most binding layer. `copy` being a prefix of
+  `copyfile`, the narrowed matcher silently dropped `shutil.copy(`/`copy2(`. The escaped-quote
+  fixture was Python-free — green against an extractor returning nothing.
+  `[cited]`: `scripts/guards/python-edit.sh`, `scripts/tests/local-guards.sh`.

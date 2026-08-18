@@ -1159,7 +1159,7 @@ OUT=$(printf 'not json at all' |
 RC=$?
 expect_pass "hook mode fails OPEN on an unparseable payload"
 
-# DB-063 F2: the payload carries a model-written `description` AFTER `command`. A greedy
+# DB-063: the payload carries a model-written `description` AFTER `command`. A greedy
 # capture ran to the last quote on the line and scanned that text as if it were the command,
 # so a description merely MENTIONING Python blocked an unrelated one. This is the
 # false-positive shape that gets a rail deleted rather than fixed.
@@ -1169,11 +1169,41 @@ OUT=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git status","des
 RC=$?
 expect_pass "hook mode reads only the command field, not a sibling description"
 
+# The escaped-quote half of F2, and it must be LOAD-BEARING (DB-064): the first version of
+# this case asserted a command with no Python in it, so it passed under any extractor — including
+# one returning nothing at all — and asserted nothing. The payload below carries escaped quotes
+# BEFORE the Python, so a naive `[^"]*` capture stops at the first `\"` and yields `echo \`, which
+# does not match and would let this through. Only an extractor that consumes escapes reaches the
+# write and blocks. Mutate the extractor and this case goes red.
 pe_state=$SANDBOX/pe-state-6
-OUT=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"echo \\"hi\\" && git status","description":"x"}}' |
+OUT=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"echo \"x\" && python3 -c \"open(\\\"a.kt\\\",\\\"w\\\").write(1)\"","description":"x"}}' |
 	PYTHON_EDIT_ADVISORY_STATE=$pe_state bash "$ROOT/scripts/guards/python-edit.sh" --hook 2>&1)
 RC=$?
-expect_pass "hook mode survives escaped quotes inside the command string"
+expect_fail "hook mode reads PAST escaped quotes to the inline edit behind them" "BLOCKED ONCE"
+
+# F7 had no fixture of its own (DB-064): reverting `:-` to `+x` disarms the rail completely —
+# an exported-but-empty override makes advisory_state_file print nothing and needs_advisory bail —
+# and nothing went red. Exercising the fallback means letting the guard compute the REAL marker
+# path, so the guard runs from a sandbox copy: its ROOT differs, so the /tmp marker it derives is
+# its own and the live one is untouched.
+pe_fallback_root=$SANDBOX/pe-fallback-root
+mkdir -p "$pe_fallback_root/scripts/guards"
+cp "$ROOT/scripts/guards/python-edit.sh" "$pe_fallback_root/scripts/guards/python-edit.sh"
+pe_fallback_marker="/tmp/amh-python-edit-advisory-${UID:-unknown}-$(printf '%s' "${pe_fallback_root//\//_}" | tr ' ' '_')"
+rm -f "$pe_fallback_marker"
+pe_edit_cmd="python3 -c \"open('a.kt','w').write('x')\""
+OUT=$(PYTHON_EDIT_ADVISORY_STATE= bash "$pe_fallback_root/scripts/guards/python-edit.sh" --command "$pe_edit_cmd" 2>&1)
+RC=$?
+expect_fail "an EMPTY state override falls back to the real marker instead of disarming" "stopping this ONCE"
+if [ -e "$pe_fallback_marker" ]; then
+	ok
+else
+	bad "the empty-override fallback did not create its marker — the advisory is not armed, it is off"
+fi
+OUT=$(PYTHON_EDIT_ADVISORY_STATE= bash "$pe_fallback_root/scripts/guards/python-edit.sh" --command "$pe_edit_cmd" 2>&1)
+RC=$?
+expect_pass "the fallback marker is then honoured on the next invocation"
+rm -f "$pe_fallback_marker"
 
 # THE case that decides whether the ladder mode is worth running: break the matcher in a copy and
 # the guard must go RED. Without this, the self-test is a script that grades its own homework.
@@ -1184,11 +1214,19 @@ OUT=$(PYTHON_EDIT_ADVISORY_STATE=$SANDBOX/pe-broken-state bash "$SANDBOX/pe-brok
 RC=$?
 expect_fail "a matcher with a write shape removed fails its own ladder rung" "fixture(s) failed"
 
-# The guard must be executable, like every other one here.
-if [ -x "$ROOT/scripts/guards/python-edit.sh" ]; then
+# Every guard AND this suite must be executable. python-edit.sh needs it because the ladder runs
+# it with bash but the PreToolUse hook does not; this suite needs it because .claude/settings.json
+# pre-allows the bare `scripts/tests/local-guards.sh` spelling, while verify.sh runs it through
+# `bash` — so a dropped mode bit breaks only the hand-run path and CI stays green (DB-064).
+# A file mode is not part of any diff hunk, which is exactly why it needs a check rather than eyes.
+pe_nonexec=""
+for f in "$ROOT"/scripts/guards/*.sh "$ROOT"/scripts/tests/*.sh; do
+	[ -x "$f" ] || pe_nonexec="$pe_nonexec ${f#"$ROOT"/}"
+done
+if [ -z "$pe_nonexec" ]; then
 	ok
 else
-	bad "scripts/guards/python-edit.sh is not executable — the ladder runs it with bash, but the hook does not"
+	bad "not executable:$pe_nonexec — a pre-allowed bare invocation of these exits 126, and running them through bash hides it"
 fi
 
 # =============================================================================

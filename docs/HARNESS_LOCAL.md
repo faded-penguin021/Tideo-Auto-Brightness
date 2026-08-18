@@ -157,7 +157,7 @@ session while drifting against every upstream release.
   advisory** (DB-062), wired as a second `PreToolUse` hook beside the shipped command guard, which
   is integrity-hashed and so cannot host a repo-local rule. It blocks the FIRST inline-Python file
   edit per marker lifetime — once per container in practice, since the marker lives in `/tmp` with no
-  session component (DB-063 F3) — and passes every later one, mirroring the shipped guard's `.env` and
+  session component (DB-063) — and passes every later one, mirroring the shipped guard's `.env` and
   destructive advisories. The objection is opacity, not danger: `Write`/`Edit` render a diff as the
   change happens, while a `python3 - <<EOF` heredoc is only checkable afterwards by reading the file
   back. One block makes that a choice rather than a reflex. Its ladder mode runs the matcher
@@ -165,7 +165,7 @@ session while drifting against every upstream release.
   shows that. Its header states what it does not match (a script file, `sed -i` and friends,
   runtime-constructed commands, and every edit after the first).
 
-`scripts/tests/local-guards.sh` is their fixture suite — 108 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 111 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
