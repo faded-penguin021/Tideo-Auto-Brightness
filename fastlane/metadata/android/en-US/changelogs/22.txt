@@ -1,0 +1,7 @@
+Fixes from a full review of the 1.9.0 release.
+
+Stay awake while charging now writes every charger type Android itself uses, dock included — before, turning it on could silently drop dock charging.
+
+A colour-correction mode this app does not recognise is now left alone instead of being switched off by an unrelated change, and the screen says so.
+
+Applying display settings now writes only what differs on the device.

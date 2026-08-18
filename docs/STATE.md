@@ -39,51 +39,43 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. Shipped v1.8.2/vc20, F-Droid
-reproducible-build verified (owner, 2026-08-13). Branch carries unreleased v1.9.0/vc21 and
-**nothing blocks the tag** — DB-060's crash is device-verified fixed, DB-061 is pre-existing in
-`v1.8.2`. Parity checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
+Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. **v1.9.0/vc21 is released**
+(owner, 2026-08-18; #117 squash-merged, tag `v1.9.0` on `main`), and the owner's implicit ratify
+closed the DB-064 judgement call. Parity checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
 
-**Resuming cold?** The v1.9.0 train is finished and green on
-`claude/pr-116-branch-train-review-c4lo6i`, PR **#117** open against `main` and describing the whole
-train (#115 closed, #116 intra-train). v1.9.1 work — for after that merge — sits on
-`claude/first-work-item-plan-lqklk4`: all six items of `docs/plans/REVIEW_TRIAGE_1.9.0.md` done
-(DB-065…DB-070), one commit each, ladder green, adversarially reviewed. Nothing is half-done; no
-review is owed. To ship v1.9.0: squash-merge #117, publish from the GitHub UI, then **delete
-`docs/rebuild/DEVICE_TEST_SCRIPT_1.9.0.md`** (ephemeral), folding its results into the standing
-script. Do **not** re-open the closed force-stop investigation — read DB-051…DB-060 first; queue
-item 1 is a different screen and a different defect.
+**Resuming cold?** `claude/first-work-item-plan-lqklk4` carries **v1.9.1/vc22**, not yet tagged: all
+six items of `docs/plans/REVIEW_TRIAGE_1.9.0.md` (DB-065…DB-070), one commit each, ladder green,
+adversarially reviewed, plus the version bump and `changelogs/22.txt`. Nothing is half-done; no
+review is owed. The owner has the 1.9.1 debug APK and
+`docs/rebuild/DEVICE_TEST_SCRIPT_1.9.1.md`; **v1.9.1 ships only after that round comes back.** Still
+owed here: fold `DEVICE_TEST_SCRIPT_1.9.0.md`'s steps into the standing script and delete it — due
+now that v1.9.0 has shipped. Do **not** re-open the closed force-stop investigation (DB-051…DB-060).
 
 ## Owner queue
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 
-1. **Contexts location round-trip — fixed (DB-061), awaiting device verification.** DB-051's
-   mechanism on the other screen; pre-existing in `v1.8.2`, so it never blocked the tag. **Owner: on
-   device, create a location rule, save, reopen it — the toggle should still be on with the
-   coordinates shown, and the list row should name them.**
-2. **Unreviewed legislation — CLOSED (DB-064), nothing owed.** DA-005's one-level-of-meta rule stops
-   the regress there, by rule and not omission. **Owner: the judgement call to ratify or overrule
-   before squash-merging #117.**
-3. **Provenance manifest: one record removed (`ProfilesScreen.kt` — its only `// Tasker` line was
-   wrapped prose the change deleted), one removed then restored (`MiscScreen.kt` — its marker is
-   still in the tree and states Tasker behaviour the port matches, the stated keep-criterion).**
-   14 no-coordinate records (an earlier "17" was wrong; it was 15). Hand-edited, never regenerated
-   from a mid-change tree (DB-032).
-4. DB-041…DB-043's unavailable-feature boundary still unverified (B1 BLOCKED twice): the owner's
-   device reports Night Light/AOD available. Needs hardware reporting them unavailable.
-5. **v1.9.1 device checks. Owner:** (a) stay-awake OFF on device, then enable Tideo's toggle and
-   Apply → `settings get global stay_on_while_plugged_in` reads **15** (DB-065). It must be the
-   off→on transition: DB-068's diff-write skips the write when the device already reads non-zero,
-   so an already-on device proves nothing. (b) on a device showing a non-AOSP color-correction
-   mode, the picker carries the preservation notice and an unrelated Apply leaves the mode alone
-   (DB-066/DB-069).
+1. DB-041…DB-043's unavailable-feature boundary still unverified (B1 BLOCKED three times): every
+   device to hand reports Night Light/AOD available, and the owner has no Samsung. Needs hardware
+   reporting them unavailable — park it until such a device exists.
+2. **v1.9.1 device round — `docs/rebuild/DEVICE_TEST_SCRIPT_1.9.1.md`, debug APK delivered
+   2026-08-18.** §11a (stay-awake mask) and §11b (unrecognised correction mode) are the ones whose
+   evidence is a number, not an impression; §11e cannot be forced from the UI and is a soak
+   observation only. **Owner: run it and report per step; v1.9.1 does not ship before that.**
+   Context the round already has: on **v1.9.0** the owner measured 0 → 7 (Tideo) vs 15 (Developer
+   Options), and off→on returned 7 — DB-065 device-confirmed as a real defect in the released
+   build. §11a step 2 is the same measurement against the fix and must read 15.
 
 Open questions: none. Owed reviews: none.
 
+Closed by the owner 2026-08-18: **DB-061** device-verified (location rule round-trips); the DB-064
+legislation call **ratified** (implicitly — v1.9.0 was merged and released); the provenance-manifest
+note (one record removed, one removed then restored, 14 no-coordinate records) **acknowledged**.
+
 Incoming: force-stop location defect **closed as no app defect** (owner, 2026-08-17), cold-GNSS
 warm-up → DB-059. Device rounds: 1.8.2-debug 49/5/2/3; 1.9.0 `7970765` 11/1/3, all owner-closed;
-`fc35a6e`/`036ec77` → DB-054…DB-058; `12b5a21` → DB-060, verified fixed 2026-08-17.
+`fc35a6e`/`036ec77` → DB-054…DB-058; `12b5a21` → DB-060, verified fixed 2026-08-17. DB-065
+confirmed on released 1.9.0: 0 → 7 via Tideo, 15 via Developer Options, off→on back to 7.
 
 ## Decided non-items
 
@@ -105,6 +97,9 @@ warm-up → DB-059. Device rounds: 1.8.2-debug 49/5/2/3; 1.9.0 `7970765` 11/1/3,
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-18 — **v1.9.0 released** (#117 squash-merged, tag `v1.9.0`), and this branch bumped to
+  **v1.9.1/vc22** with `changelogs/22.txt` for the fixes below. Tagging stays an owner step and
+  waits on the `DEVICE_TEST_SCRIPT_1.9.1.md` round.
 - 2026-08-18 — **v1.9.1 triage items 1–6 done (DB-065…DB-070).** Stay-awake writes AOSP's full
   `AC|USB|WIRELESS|DOCK` mask instead of narrowing it to 7; an unrecognized daltonizer mode reads as
   unrepresentable rather than OFF and survives an unrelated Apply; `activeFix` releases its location
