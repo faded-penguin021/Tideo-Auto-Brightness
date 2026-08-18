@@ -205,12 +205,28 @@ class SecureDisplayControllerTest {
 
         assertTrue(controller.setStayAwakePlugged(true).isSuccess)
         assertTrue(controller.readStayAwakePlugged())
-        // AC | USB | WIRELESS
-        assertEquals(7, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
+        assertEquals(15, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
 
         assertTrue(controller.setStayAwakePlugged(false).isSuccess)
         assertFalse(controller.readStayAwakePlugged())
         assertEquals(0, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
+    }
+
+    @Test
+    fun stayAwake_enableDoesNotDropDockBitFromTheAospMask() {
+        grantElevated()
+        Settings.Global.putInt(context.contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 15)
+        assertTrue(controller.readStayAwakePlugged())
+
+        assertTrue(controller.setStayAwakePlugged(true).isSuccess)
+        assertEquals(15, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
+    }
+
+    @Test
+    fun stayAwake_readsAnyNonZeroPartialMaskAsEnabled() {
+        grantElevated()
+        Settings.Global.putInt(context.contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 1)
+        assertTrue(controller.readStayAwakePlugged())
     }
 
     @Test

@@ -192,8 +192,10 @@ class AndroidSecureDisplayController(
 
         const val KEY_DOZE_ALWAYS_ON = "doze_always_on"
 
+        // DB-065: every bit AOSP's own Stay-awake switch sets, dock included.
         const val STAY_ON_ANY_CHARGER = BatteryManager.BATTERY_PLUGGED_AC or
-            BatteryManager.BATTERY_PLUGGED_USB or BatteryManager.BATTERY_PLUGGED_WIRELESS
+            BatteryManager.BATTERY_PLUGGED_USB or BatteryManager.BATTERY_PLUGGED_WIRELESS or
+            BatteryManager.BATTERY_PLUGGED_DOCK
 
         const val KEY_HDR_DISABLED_FORMATS = "user_disabled_hdr_formats"
         const val KEY_HDR_FORMATS_ALLOWED = "are_user_disabled_hdr_formats_allowed"

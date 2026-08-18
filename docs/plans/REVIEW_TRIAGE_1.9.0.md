@@ -105,9 +105,11 @@ actually live — is unaffected either way. **Recommend recording under
 
 ## v1.9.1 work items
 
-1. **Stay-awake mask** — add `BatteryManager.BATTERY_PLUGGED_DOCK` to `STAY_ON_ANY_CHARGER`
-   in `SecureDisplayController.kt`. Test: enabling writes 15, not 7. Do **not** adopt the
-   review's canonical-7 test.
+1. **Stay-awake mask** — **DONE (DB-065, 2026-08-18).** `BatteryManager.BATTERY_PLUGGED_DOCK`
+   added to `STAY_ON_ANY_CHARGER` in `SecureDisplayController.kt`; the round-trip test now
+   asserts 15, plus a test that an existing 15 survives a re-enable and one that any non-zero
+   partial mask still reads as enabled. Both new assertions mutation-proved red against the
+   old constant. The review's canonical-7 test was not adopted.
 2. **Daltonizer representability** — follow the DB-045/DB-042 pattern already in this file:
    nullable/unrepresentable sentinel in `DeviceDisplaySnapshot`, preserve the stored value on
    read-back, skip the write unless the user explicitly picked a mode. Requires **replacing**

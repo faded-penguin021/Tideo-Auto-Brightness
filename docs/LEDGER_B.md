@@ -792,3 +792,12 @@
   `copyfile`, the narrowed matcher silently dropped `shutil.copy(`/`copy2(`. The escaped-quote
   fixture was Python-free — green against an extractor returning nothing.
   `[cited]`: `scripts/guards/python-edit.sh`, `scripts/tests/local-guards.sh`.
+
+- DB-065 [cited]: **A Boolean over a bitmask must write every bit the platform's own switch
+  sets, or "enable" silently narrows what the user had.** `STAY_ON_ANY_CHARGER` was
+  `AC|USB|WIRELESS` = 7, predating `BATTERY_PLUGGED_DOCK`; AOSP's switch writes 15. Wherever
+  Developer Options → Stay awake was on, the read said enabled (`!= 0`) and any Apply rewrote 15
+  as 7, losing dock stay-awake with no UI to show it. minSdk 31, constant API 31: never
+  a compatibility reason. The v1.9.0 review prescribed the inverse — 7 canonical, 15
+  unrepresentable — which is DB-049 again. Triage: `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
+  `[cited]`: `platform/src/main/kotlin/com/tideo/autobrightness/platform/display/SecureDisplayController.kt`.

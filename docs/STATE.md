@@ -130,6 +130,11 @@ the rows, not here.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-18 — **Stay-awake no longer drops the dock bit (DB-065).** v1.9.1 item 1 of
+  `docs/plans/REVIEW_TRIAGE_1.9.0.md`. `STAY_ON_ANY_CHARGER` was 7 (`AC|USB|WIRELESS`); AOSP's own
+  switch writes 15, so any Apply narrowed a Developer-Options enable and silently lost dock
+  stay-awake. Constant now includes `BATTERY_PLUGGED_DOCK` (API 31, minSdk 31). The review's
+  canonical-7 test was **not** adopted — it would re-run DB-049.
 - 2026-08-18 — **The unreviewed-legislation loop is closed (DB-064).** DA-005 on DB-063's own fixes
   found six more, four confirmed by running: a stripped `+x` on `local-guards.sh` that only the
   pre-allowed bare invocation felt, an `AGENTS.md` paragraph re-asserting the per-session claim the
