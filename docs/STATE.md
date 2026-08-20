@@ -57,11 +57,6 @@ playbook 8 preserves the two resulting maintenance rails.
 1. DB-041…DB-043's unavailable-feature boundary still unverified (B1 BLOCKED three times): every
    device to hand reports Night Light/AOD available, and the owner has no Samsung. Needs hardware
    reporting them unavailable — park it until such a device exists.
-2. **Dependabot #118 — corrected, awaiting refreshed CI. Owner:** the branch is current with `main`;
-   the stale `clean-dist.yml` marker and Node-runtime policy prose are fixed, and every workflow
-   marker was checked against its tag's resolved commit. Require the refreshed `build` and full
-   `fdroid-compat` run to pass, then merge it as standalone CI maintenance.
-
 Open questions: none. Owed reviews: none.
 
 Closed by the owner 2026-08-18: **DB-061** device-verified (location rule round-trips); the DB-064
@@ -102,7 +97,8 @@ Newest first; ledger rows are the durable detail.
 - 2026-08-20 — **v1.9.1 released; Dependabot #118 corrected.** #119 was squash-merged and `v1.9.1`
   published from `main`, resolving its Owner-queue item. #118 was brought current with `main`; its
   stale checkout marker and three stale Node-runtime policy comments were corrected, and all action
-  marker/SHA pairs were resolved against their upstream tags. Refreshed CI is the remaining gate.
+  marker/SHA pairs were resolved against their upstream tags. The refreshed `build`, CodeQL,
+  preflight, and complete four-stage F-Droid compatibility workflows passed on the PR.
   The ephemeral Scorecard.dev score is not retained or rerun: its durable outputs remain playbook
   8's pinned-dependency and least-token-permission rails.
 - 2026-08-18 — **RUNBOOK playbook 8 added: Dependabot upgrade / CI action bump.** Terse operational
