@@ -20,9 +20,9 @@ name: F-Droid compatibility
 # build.yml still gates every PR.
 #
 # Node 24 runtime policy (see build.yml): every action pinned here is a major declaring
-# `runs.using: node24` — checkout@v5, setup-java@v5, setup-android@v4, cache@v5,
-# upload-artifact@v6, download-artifact@v7. In particular, download-artifact v6 still declares (DA-035)
-# `runs.using: node20`; v7 is its Node 24 migration. Do NOT downgrade any of them.
+# `runs.using: node24` — checkout@v7, setup-java@v5, setup-android@v4, cache@v6,
+# upload-artifact@v7, download-artifact@v8. In particular, download-artifact v6 still declares (DA-035)
+# `runs.using: node20`; v7 and later use Node 24. Do NOT downgrade any of them.
 on:
   pull_request:
     paths:

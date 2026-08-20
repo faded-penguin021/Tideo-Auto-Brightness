@@ -22,7 +22,7 @@ interface SecureDisplayController {
 
     fun readNightLightAutoMode(): NightLightAutoMode
 
-    fun readDaltonizer(): DaltonizerMode
+    fun readDaltonizer(): DaltonizerMode?
     fun setDaltonizer(mode: DaltonizerMode): Result<Unit>
 
     fun readInversion(): Boolean
@@ -108,12 +108,12 @@ class AndroidSecureDisplayController(
         NightLightAutoMode.MANUAL
     }
 
-    override fun readDaltonizer(): DaltonizerMode {
+    override fun readDaltonizer(): DaltonizerMode? {
         val enabled = Settings.Secure.getInt(resolver, KEY_DALTONIZER_ENABLED, 0) == 1
         if (!enabled) return DaltonizerMode.OFF
         val value = Settings.Secure.getInt(resolver, KEY_DALTONIZER_VALUE, DaltonizerMode.GRAYSCALE.value)
-        // Unrecognized matrix (OEM extra): surface as OFF so UI can't claim an unsupported mode.
-        return DaltonizerMode.fromValue(value)?.takeIf { it != DaltonizerMode.OFF } ?: DaltonizerMode.OFF
+        // DB-066: only an UNRECOGNIZED matrix is unrepresentable; -1 is the recognized OFF.
+        return DaltonizerMode.fromValue(value)
     }
 
     override fun setDaltonizer(mode: DaltonizerMode): Result<Unit> = elevatedWrite {
@@ -192,8 +192,10 @@ class AndroidSecureDisplayController(
 
         const val KEY_DOZE_ALWAYS_ON = "doze_always_on"
 
+        // DB-065: every bit AOSP's own Stay-awake switch sets, dock included.
         const val STAY_ON_ANY_CHARGER = BatteryManager.BATTERY_PLUGGED_AC or
-            BatteryManager.BATTERY_PLUGGED_USB or BatteryManager.BATTERY_PLUGGED_WIRELESS
+            BatteryManager.BATTERY_PLUGGED_USB or BatteryManager.BATTERY_PLUGGED_WIRELESS or
+            BatteryManager.BATTERY_PLUGGED_DOCK
 
         const val KEY_HDR_DISABLED_FORMATS = "user_disabled_hdr_formats"
         const val KEY_HDR_FORMATS_ALLOWED = "are_user_disabled_hdr_formats_allowed"

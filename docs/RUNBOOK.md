@@ -287,6 +287,34 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
 - **Record:** `STATE.md` Changelog line; if Android <N> forced a workaround, a `D-NN` row.
   If anything here was wrong/stale, fix this section in the same change.
 
+### 8. Dependabot upgrade / CI action bump
+- **When:** a Dependabot PR lands. **github-actions** is version-updates ON, **grouped into one PR**
+  (`groups: "*"`), monthly. **gradle is security-only** (`open-pull-requests-limit: 0`) — a gradle PR
+  appears only on an advisory; no speculative bumps (D-135). Read `.github/dependabot.yml` +
+  DB-038 first.
+- **Scorecard.dev is run-once/local (v5.5.0, ephemeral — not a CI gate).** Its recommendations
+  survive as the two rails below; honor them by hand — nothing re-checks them.
+  - **Pinned-Dependencies:** every `uses:` is a 40-hex **commit SHA** + trailing `# vX.Y.Z` marker.
+    **Never revert a pin to a tag ref** — a moved tag changes what runs and drops the score to 0.
+  - **Token-Permissions:** top-level `permissions:` stays minimal/read-only; elevate per-**job**,
+    never a top-level `contents: write`.
+- **Steps:**
+  1. Keep the grouped PR as **one** — grouped review is deliberate; don't split it.
+  2. **Verify each bumped line's marker↔SHA by hand — no guard checks it.** Dependabot rewrites
+     both, but its marker rewrite silently fails when **trailing prose follows the version** on the
+     `uses:` line, leaving a stale `# vX.Y.Z` on a moved SHA (DB-038 decay, hit twice). Resolve the
+     tag to its commit on GitHub: the pin must equal it and the marker must name it.
+  3. **Fix prose Dependabot can't touch** — it never edits comments. E.g. `build.yml`'s Node-24
+     policy block names the pinned majors ("Do NOT downgrade…") and goes factually wrong on a bump.
+     Update any such block in the **same** PR.
+  4. **Let CI run against the PR** — the bump is only validated by the workflows executing, above all
+     `fdroid-compat.yml`'s reproducibility job round-tripping `upload-`/`download-artifact`. Do **not**
+     cherry-pick action bumps onto an unrelated branch where those jobs never run.
+- **Avoid:** SHA→tag reversion; splitting the grouped PR; trusting the marker on any line with
+  trailing prose; merging before `build` **and** `fdroid-compat` are green; bumping gradle on a cadence.
+- **Acceptance:** full CI green on the PR. **Record:** STATE changelog line; a `D-NN` only if the
+  process itself changed.
+
 ## Session discipline (BINDING for every maintenance session — D-161)
 
 Structural rules replacing the retired model-tier policy: D-035 moved code segments to Opus after

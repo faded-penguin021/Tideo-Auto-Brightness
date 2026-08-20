@@ -15,7 +15,7 @@ class DeviceDisplaySnapshotTest {
     private fun snapshot(
         nightLight: Boolean? = false,
         temperatureK: Int? = null,
-        daltonizer: DaltonizerMode = DaltonizerMode.OFF,
+        daltonizer: DaltonizerMode? = DaltonizerMode.OFF,
         inversion: Boolean = false,
         alwaysOn: Boolean? = false,
         stayAwake: Boolean = false,
@@ -83,6 +83,14 @@ class DeviceDisplaySnapshotTest {
 
         assertTrue(on.hdrForceSdrEnabled)
         assertFalse(off.hdrForceSdrEnabled)
+    }
+
+    @Test
+    fun `an unrepresentable device correction mode leaves the stored field untouched`() {
+        val merged = AabSettings(daltonizerMode = "DEUTERANOMALY")
+            .withDeviceSnapshot(snapshot(daltonizer = null))
+
+        assertEquals("DEUTERANOMALY", merged.daltonizerMode)
     }
 
     @Test

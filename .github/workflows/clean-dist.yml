@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 10  # quick git op; cap a hang
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v5.1.0 - node24 runtime (see build.yml node24 policy)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1 - node24 runtime (see build.yml node24 policy)
         with:
           fetch-depth: 0
 

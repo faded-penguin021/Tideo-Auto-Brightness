@@ -5,6 +5,7 @@ import android.app.Application
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
 import com.tideo.autobrightness.platform.display.SecureDisplayController
@@ -117,6 +118,78 @@ class DisplayTogglesViewModelTest {
         assertEquals(-999, Settings.Secure.getInt(resolver, "night_display_color_temperature", -999))
     }
 
+    @Test
+    fun applyNow_writesOnlyTheFieldsTheDeviceDoesNotAlreadyAgreeWith() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Secure.putInt(resolver, "accessibility_display_inversion_enabled", 1)
+        val vm = vm()
+
+        vm.applyNow(AabSettings(nightLightEnabled = true, inversionEnabled = true))
+
+        assertEquals(1, Settings.Secure.getInt(resolver, "night_display_activated", -999))
+        assertEquals(
+            -999,
+            Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999),
+            "DB-068: a field the device already agrees with must not be rewritten",
+        )
+        assertFalse(vm.state.value.writeFailed)
+    }
+
+    @Test
+    fun applyNow_withAnUnrepresentableDeviceMode_preservesItWhenTheUserPickedNothing() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer", 42)
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer_enabled", 1)
+        val vm = vm()
+        assertTrue(vm.state.value.daltonizerPreferenceCustom)
+        assertNull(assertNotNull(vm.deviceSnapshot.value).daltonizer)
+
+        vm.applyNow(AabSettings(nightLightEnabled = true), committed = AabSettings())
+
+        assertEquals(42, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "night_display_activated", -999))
+    }
+
+    @Test
+    fun applyNow_treatsAReadBackSeededModeAsNoPick_evenWhenItDiffersFromTheProfile() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer", 12)
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer_enabled", 1)
+        val vm = vm()
+        assertEquals(DaltonizerMode.DEUTERANOMALY, assertNotNull(vm.deviceSnapshot.value).daltonizer)
+
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer", 42)
+        vm.applyNow(
+            AabSettings(daltonizerMode = "DEUTERANOMALY", nightLightEnabled = true),
+            committed = AabSettings(daltonizerMode = "OFF"),
+        )
+
+        assertEquals(
+            42,
+            Settings.Secure.getInt(resolver, "accessibility_display_daltonizer", -999),
+            "DB-069: the draft differs from the profile because the read-back seeded it, not the user",
+        )
+    }
+
+    @Test
+    fun applyNow_withAnUnrepresentableDeviceMode_stillWritesTheUsersOwnPick() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer", 42)
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer_enabled", 1)
+        val vm = vm()
+
+        vm.applyNow(AabSettings(daltonizerMode = "GRAYSCALE"), committed = AabSettings())
+
+        assertEquals(0, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer", -999))
+        assertEquals(1, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999))
+        assertFalse(vm.state.value.daltonizerPreferenceCustom)
+    }
+
     // DB-048: the read-back rollback DB-047 fixed had a second half. With the service RUNNING the
     // screen skips applyNow (the coordinator writes instead), so nothing invalidated the pre-Apply
     // snapshot and the merge gate — reopened by Apply making draft == committed again — replayed it
@@ -127,7 +200,7 @@ class DisplayTogglesViewModelTest {
         val vm = vm()
         assertEquals(false, assertNotNull(vm.deviceSnapshot.value).nightLight)
 
-        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = true)
+        vm.applyDraft(AabSettings(nightLightEnabled = true), AabSettings(serviceEnabled = true))
 
         assertNull(
             vm.deviceSnapshot.value,
@@ -146,7 +219,7 @@ class DisplayTogglesViewModelTest {
         grantElevated()
         val vm = vm()
 
-        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = false)
+        vm.applyDraft(AabSettings(nightLightEnabled = true), AabSettings(serviceEnabled = false))
 
         assertEquals(1, Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999))
         assertEquals(true, assertNotNull(vm.deviceSnapshot.value).nightLight)
@@ -161,7 +234,7 @@ class DisplayTogglesViewModelTest {
         assertNotNull(vm.deviceSnapshot.value)
 
         vm.refresh() // reads the pre-Apply device, still pending on the controlled dispatcher
-        vm.applyDraft(AabSettings(nightLightEnabled = true), serviceEnabled = true)
+        vm.applyDraft(AabSettings(nightLightEnabled = true), AabSettings(serviceEnabled = true))
         dispatcher.scheduler.advanceUntilIdle()
 
         assertNull(

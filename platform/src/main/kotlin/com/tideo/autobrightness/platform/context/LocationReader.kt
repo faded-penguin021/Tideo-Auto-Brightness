@@ -136,8 +136,7 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
             return bestLastKnown(lm)?.let { LocationResult.Available(it) } ?: LocationResult.Unavailable
         }
 
-        // D-122: actively request NEW fix from enabled real providers. requestLocationUpdates powers sensors.
-        // DB-053: PASSIVE last resort, as currentLocation() and locationUpdates() already had.
+        // D-122: request a NEW fix from enabled providers (powers sensors); DB-053: PASSIVE last resort.
         val providers = buildList {
             if (runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false)) {
                 add(LocationManager.GPS_PROVIDER)
@@ -147,28 +146,26 @@ class AndroidLocationReader(private val context: Context) : LocationReader {
             }
         }.ifEmpty { listOf(LocationManager.PASSIVE_PROVIDER) }
 
-        val fresh = if (providers.isEmpty()) {
-            null
-        } else {
-            withTimeoutOrNull(timeoutMs) {
-                suspendCancellableCoroutine<LocationSnapshot?> { cont ->
-                    val listener = object : LocationListener {
-                        override fun onLocationChanged(location: Location) {
-                            val snap = location.toSnapshotOrNull() ?: return // skip null-island, keep listening
-                            if (cont.isActive) {
-                                runCatching { lm.removeUpdates(this) }
-                                cont.resume(snap)
-                            }
+        val fresh = withTimeoutOrNull(timeoutMs) {
+            suspendCancellableCoroutine<LocationSnapshot?> { cont ->
+                val listener = object : LocationListener {
+                    override fun onLocationChanged(location: Location) {
+                        val snap = location.toSnapshotOrNull() ?: return // skip null-island, keep listening
+                        if (cont.isActive) {
+                            runCatching { lm.removeUpdates(this) }
+                            cont.resume(snap)
                         }
                     }
-                    cont.invokeOnCancellation { runCatching { lm.removeUpdates(listener) } }
-                    try {
-                        providers.forEach {
-                            lm.requestLocationUpdates(it, 0L, 0f, listener, Looper.getMainLooper())
-                        }
-                    } catch (_: SecurityException) {
-                        if (cont.isActive) cont.resume(null)
+                }
+                cont.invokeOnCancellation { runCatching { lm.removeUpdates(listener) } }
+                try {
+                    providers.forEach {
+                        lm.requestLocationUpdates(it, 0L, 0f, listener, Looper.getMainLooper())
                     }
+                } catch (_: SecurityException) {
+                    // DB-067: resuming normally never runs invokeOnCancellation, so release here.
+                    runCatching { lm.removeUpdates(listener) }
+                    if (cont.isActive) cont.resume(null)
                 }
             }
         }

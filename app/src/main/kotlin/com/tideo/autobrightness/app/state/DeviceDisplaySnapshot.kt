@@ -12,7 +12,7 @@ import com.tideo.autobrightness.platform.display.DaltonizerMode
 data class DeviceDisplaySnapshot(
     val nightLight: Boolean?,
     val temperatureK: Int?,
-    val daltonizer: DaltonizerMode,
+    val daltonizer: DaltonizerMode?,
     val inversion: Boolean,
     val alwaysOn: Boolean?,
     val stayAwake: Boolean,
@@ -32,7 +32,7 @@ fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings
     } else {
         snapshot.temperatureK
     },
-    daltonizerMode = snapshot.daltonizer.name,
+    daltonizerMode = snapshot.daltonizer?.name ?: daltonizerMode,
     inversionEnabled = snapshot.inversion,
     alwaysOnDisplayEnabled = snapshot.alwaysOn ?: alwaysOnDisplayEnabled,
     stayAwakeChargingEnabled = snapshot.stayAwake,

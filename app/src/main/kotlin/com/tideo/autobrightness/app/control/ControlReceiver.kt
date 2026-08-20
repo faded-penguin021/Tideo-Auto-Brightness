@@ -27,18 +27,18 @@ class ControlReceiver : BroadcastReceiver() {
         // DA-043: reject unknown verbs before admission gate.
         if (action !in KNOWN_ACTIONS) return
         // DA-039: serialize commands globally (resource bound, not auth).
-        if (!commandInFlight.compareAndSet(false, true)) return
+        if (!tryAcquireCommand()) return
         val profileName = runCatching { intent.getStringExtra(EXTRA_PROFILE_NAME) }.getOrNull()
         try {
             goAsync {
                 try {
                     handle(context.applicationContext, action, profileName)
                 } finally {
-                    commandInFlight.set(false)
+                    releaseCommand()
                 }
             }
         } catch (failure: Throwable) {
-            commandInFlight.set(false)
+            releaseCommand()
             throw failure
         }
     }
