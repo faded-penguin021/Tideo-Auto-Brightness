@@ -46,7 +46,8 @@ closed the DB-064 judgement call. Parity checklist and parity gaps empty. Live l
 **Resuming cold?** **v1.9.1/vc22 is released** (owner, 2026-08-20; #119 squash-merged and tag
 `v1.9.1` published from `main`). Both ephemeral device-round scripts are folded into
 `DEVICE_TEST_SCRIPT.md` and deleted — **no ephemeral device script is outstanding.** Nothing is
-half-done and no review is owed. Do **not** re-open the closed force-stop investigation
+half-done and no review is owed. Branch now carries unreleased **v1.9.2/vc23** for the AppOps
+compatibility cleanup below. Do **not** re-open the closed force-stop investigation
 (DB-051…DB-060). Scorecard.dev remains a run-once/local input, not a retained score or CI gate;
 playbook 8 preserves the two resulting maintenance rails.
 
@@ -101,7 +102,8 @@ Newest first; ledger rows are the durable detail.
   preflight, and complete four-stage F-Droid compatibility workflows passed on the PR.
   F-Droid vc21 exposed both remaining `unsafeCheckOpNoThrow` deprecation warnings (the platform
   monitor and onboarding's duplicate); one API-31-compatible helper now selects `checkOpNoThrow`
-  on API 36+, and a forced release compilation is warning-free at both former call sites.
+  on API 36+, and a forced release compilation is warning-free at both former call sites. Because
+  this changes shipped code after the v1.9.1 tag, release preflight correctly required v1.9.2/vc23.
   The ephemeral Scorecard.dev score is not retained or rerun: its durable outputs remain playbook
   8's pinned-dependency and least-token-permission rails.
 - 2026-08-18 — **RUNBOOK playbook 8 added: Dependabot upgrade / CI action bump.** Terse operational

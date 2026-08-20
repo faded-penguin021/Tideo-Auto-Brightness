@@ -1,0 +1,3 @@
+Keeps the usage-access permission check compatible with Android 12–15 while using Android 16's replacement API.
+
+This maintenance release removes the corresponding build warnings; app behavior is unchanged.
