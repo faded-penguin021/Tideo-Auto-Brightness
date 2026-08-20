@@ -43,12 +43,12 @@ Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. **v1.9.0/vc
 (owner, 2026-08-18; #117 squash-merged, tag `v1.9.0` on `main`), and the owner's implicit ratify
 closed the DB-064 judgement call. Parity checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
 
-**Resuming cold?** `claude/first-work-item-plan-lqklk4` carries **v1.9.1/vc22**, device-verified and
-**ready to tag**: all six items of `docs/plans/REVIEW_TRIAGE_1.9.0.md` (DB-065…DB-072), one commit
-each, ladder green, adversarially reviewed, version bumped, `changelogs/22.txt` written, PR open
-against `main`. Both ephemeral round scripts are folded into `DEVICE_TEST_SCRIPT.md` and deleted —
-**no ephemeral script is outstanding.** Nothing is half-done and no review is owed. Do **not**
-re-open the closed force-stop investigation (DB-051…DB-060).
+**Resuming cold?** **v1.9.1/vc22 is released** (owner, 2026-08-20; #119 squash-merged and tag
+`v1.9.1` published from `main`). Both ephemeral device-round scripts are folded into
+`DEVICE_TEST_SCRIPT.md` and deleted — **no ephemeral device script is outstanding.** Nothing is
+half-done and no review is owed. Do **not** re-open the closed force-stop investigation
+(DB-051…DB-060). Scorecard.dev remains a run-once/local input, not a retained score or CI gate;
+playbook 8 preserves the two resulting maintenance rails.
 
 ## Owner queue
 
@@ -57,11 +57,12 @@ re-open the closed force-stop investigation (DB-051…DB-060).
 1. DB-041…DB-043's unavailable-feature boundary still unverified (B1 BLOCKED three times): every
    device to hand reports Night Light/AOD available, and the owner has no Samsung. Needs hardware
    reporting them unavailable — park it until such a device exists.
-2. **v1.9.1/vc22 — merge and publish. Owner:** squash-merge the open PR, then Draft a new release
-   with tag `v1.9.1` on `main`; `release.yml` builds, signs and pulls `changelogs/22.txt` in as
-   "What's new". The round is done (2026-08-18): stay-awake reads 15 where v1.9.0 gave 7, the
-   read-only daltonizer observation had nothing to observe, panic and diff-write PASS; the two
-   withdrawn steps became DB-071/DB-072.
+2. **Dependabot #118 — correct before merging. Owner:** its action SHAs are pinned and its original
+   CI run passed, but Dependabot left the `clean-dist.yml` checkout marker at v5.1.0 after moving the
+   pin to v7.0.1, and the Node-runtime policy prose in `build.yml`, `fdroid-compat.yml`, and
+   `release-preflight.yml` still names the superseded action majors. Update that prose on the PR,
+   bring it current with `main`, and require the refreshed `build` and full `fdroid-compat` run to
+   pass. Merge it as CI maintenance rather than carrying it into an unrelated app release.
 
 Open questions: none. Owed reviews: none.
 
@@ -100,6 +101,12 @@ confirmed on released 1.9.0 (0 → 7 via Tideo, 15 via Developer Options, off→
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-20 — **v1.9.1 released; Dependabot #118 assessed.** #119 was squash-merged and `v1.9.1`
+  published from `main`, resolving its Owner-queue item. #118 is conflict-free and its original CI
+  run passed, but it retains one stale marker and three stale Node-runtime policy comments; correct
+  those, refresh against current `main`, and rerun CI before merging the maintenance change alone.
+  The ephemeral Scorecard.dev score is not retained or rerun: its durable outputs remain playbook
+  8's pinned-dependency and least-token-permission rails.
 - 2026-08-18 — **RUNBOOK playbook 8 added: Dependabot upgrade / CI action bump.** Terse operational
   playbook (self-adaptation, not legislation) capturing the SHA-pin + Token-Permissions rails from
   the run-once/ephemeral Scorecard, the grouped-PR + gradle-security-only Dependabot policy, and
