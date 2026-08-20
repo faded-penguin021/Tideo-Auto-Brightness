@@ -792,3 +792,72 @@
   `copyfile`, the narrowed matcher silently dropped `shutil.copy(`/`copy2(`. The escaped-quote
   fixture was Python-free — green against an extractor returning nothing.
   `[cited]`: `scripts/guards/python-edit.sh`, `scripts/tests/local-guards.sh`.
+
+- DB-065 [cited]: **A Boolean over a bitmask must write every bit the platform's own switch
+  sets, or "enable" silently narrows what the user had.** `STAY_ON_ANY_CHARGER` was
+  `AC|USB|WIRELESS` = 7, predating `BATTERY_PLUGGED_DOCK`; AOSP's switch writes 15. Wherever
+  Developer Options → Stay awake was on, the read said enabled (`!= 0`) and any Apply rewrote 15
+  as 7, losing dock stay-awake with no UI to show it. minSdk 31, constant API 31: never
+  a compatibility reason. The v1.9.0 review prescribed the inverse — 7 canonical, 15
+  unrepresentable — which is DB-049 again. Triage: `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
+  `[cited]`: `platform/src/main/kotlin/com/tideo/autobrightness/platform/display/SecureDisplayController.kt`.
+
+- DB-066 [cited]: **A test can lock in the normalization DB-045 forbids.** `readDaltonizer()`
+  mapped enabled-with-an-unrecognized-value to `OFF`, so an unrelated Apply turned an OEM
+  correction mode off — with a named test and a comment asserting it, which is why review read it
+  as considered. The fix REPLACES that test. Read returns null; the snapshot field is nullable,
+  read-back preserves the stored mode (DB-042), and direct Apply skips the write while
+  unrepresentable UNLESS the draft differs from the committed profile — the user's own pick, so
+  the picker never goes dead as a bare HDR-style notice would leave it.
+  `[cited]`: `platform/…/display/SecureDisplayController.kt`, `app/…/state/DisplayTogglesViewModel.kt`.
+
+- DB-067 [cited]: **`invokeOnCancellation` is not a `finally`.** `activeFix`'s `SecurityException`
+  path resumed normally, so the handler that removes the location listener never ran: providers
+  registered before the throw stayed powered for the process's life. Rare (a grant lost between
+  the entry recheck and the request) but unbounded, and every OTHER exit released. No JVM test
+  reaches it — Robolectric's `ShadowLocationManager` never throws from `requestLocationUpdates`
+  (probed) and the module has no mocking library — so it is proven by inspection.
+  `[cited]`: `platform/…/context/LocationReader.kt`.
+
+- DB-068 [cited]: **Two apply paths for the same fields must write the same way.** The runtime
+  coordinator diff-wrote against `lastApplied` while the screen's direct Apply wrote all seven
+  fields every time, re-asserting six of them over whatever the device or another app had put
+  there. `applyNow` now diffs against a device read taken under the lock it writes in. Two shapes
+  to keep: a capability-null field (unavailable Night Light, AOD) is skipped, not diffed; and
+  below ELEVATED the read returns no snapshot, so every write is attempted precisely to let its
+  tier failure reach `writeFailed`, which diffing against "no known state" would swallow.
+  `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`.
+
+- DB-069 [cited]: **Deleting a fallback leaves the guard that was only correct beside it, and a
+  proxy for user intent breaks when something else writes the field.** Three, from the adversarial
+  pass over DB-065…DB-068. (a) `readDaltonizer()`'s surviving `takeIf { it != OFF }` routed the
+  RECOGNIZED `-1` into the unrepresentable branch — DB-049 again, from the fix honouring it. (b) "The user picked" read as draft ≠ committed profile, but DB-034's read-back seeds
+  the draft from the DEVICE, so a seeded mode clobbered the OEM mode the screen promised to
+  preserve; compare against the seed instead.
+  `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`.
+
+- DB-070: **A diff-write invalidates every device check written for the write it now skips.**
+  DB-068 made the direct Apply idempotent-by-diff; `readStayAwakePlugged()` is `mask != 0`, so on
+  a device where stay-awake is already on, Apply writes nothing and DB-065's prescribed check
+  ("Stay awake on, Apply, expect 15") passes identically against the OLD 7-constant code. It had
+  to become the off→on transition. The code is right — declining to broaden a partial mask is what
+  the v1.9.0 review asked for — but a check that cannot fail is worse than no check, because the
+  Owner queue records it as evidence. Third finding of the DB-069 pass.
+
+- DB-071: **Never ask the owner to write a value no AOSP path produces into a display key.** The
+  DB-066 round script told the owner to `settings put secure accessibility_display_daltonizer 42`
+  to reach the unrepresentable state. They declined, with cause: a Samsung has black-screened on an
+  unsupported key write, and a hand-written `reduce_bright_colors_level` left a OnePlus usable only
+  by blind-tapping the PIN through a dark screen after a reboot. The test is the value's own
+  legality — `0`/`1`/`15` into `stay_on_while_plugged_in` is what AOSP's switch writes; `42` into
+  a colour-transform key is what nothing writes. Unrepresentable-state behaviour stays
+  unit-tested only, an unverified residual on device (the DB-013 shape).
+
+- DB-072: **A device step must be reachable in the UI it targets.** The v1.9.1 round asked the
+  owner to revoke WRITE_SECURE_SETTINGS, return to Privileged Display and Apply, expecting the
+  write-failed banner. Returning fires ON_RESUME → `refresh()` → tier re-probe, so D-149's
+  self-guard swaps the toggles for the grant card and there is no Apply to press. The step was
+  unrunnable, which the run proved by producing a correct grant card instead. The banner is
+  reachable only as a race (grant lost between screen open and Apply) — unit-tested, not
+  stageable by hand. Second script defect after DB-070: both are checks that could not fail,
+  written by the same session that wrote the code they were meant to test.

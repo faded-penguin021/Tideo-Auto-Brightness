@@ -646,11 +646,12 @@
     <string name="pd_daltonizer_protan">Protanomaly (red–green)</string>
     <string name="pd_daltonizer_deutan">Deuteranomaly (red–green)</string>
     <string name="pd_daltonizer_tritan">Tritanomaly (blue–yellow)</string>
+    <string name="pd_daltonizer_custom_preserved">Android is using a correction mode this app does not recognize. Tideo preserves it and leaves it alone until you pick a different mode above; you can also change it in system settings.</string>
     <string name="pd_inversion">Color inversion</string>
     <string name="pd_section_screen">Screen</string>
     <string name="pd_always_on">Always-on display</string>
     <string name="pd_stay_awake">Stay awake while charging</string>
-    <string name="pd_stay_awake_help">Keeps the screen on whenever a charger (AC, USB or wireless) is connected.</string>
+    <string name="pd_stay_awake_help">Keeps the screen on whenever a charger (AC, USB, wireless or dock) is connected.</string>
     <string name="pd_section_experimental">Experimental</string>
     <string name="pd_hdr_force_sdr">Disable HDR (experimental)</string>
     <string name="pd_hdr_help">Directly changes Android’s stored HDR-format preferences system-wide; it does not use the HDR conversion Force-SDR service API. Applying or clearing the change may require a reboot, and HDR or display-mode changes may briefly blank the screen.</string>

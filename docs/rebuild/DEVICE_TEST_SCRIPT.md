@@ -145,6 +145,23 @@ optional.
       com.tideo.autobrightness[.debug] android.permission.DUMP`), keep Location off, tap **Use current
       SSID** again. **Expected:** the field fills with the connected network name (resolved via in-process
       `dumpsys wifi`). With Shizuku or root instead, the same read succeeds via `cmd wifi status`.
+24a. **"Use current location", both callers (DB-057…DB-061).** In a Contexts **location rule** tap
+    **Use current location**. **Expected:** a toast reading *"Acquiring location — this can take up
+    to 45 seconds…"* with the number present, then the two fields filling plus a coordinates toast,
+    or a plain failure toast. **Any crash is a regression** — the toast itself once threw
+    `MissingFormatArgumentException` (DB-060); if it happens, `adb logcat -b crash` and look for
+    `Toaster.invoke`. Repeat on **Menu → Circadian → Use current location**: same number (one shared
+    constant, so a wrong number on either screen means the constant broke), and per DB-059 it may
+    fill instantly from a last-known fix under an hour old. Then turn the system Location master
+    switch **off** and tap the Contexts one again. **Expected:** a *quick* failure, not a 45-second
+    hang (DB-057). **Known cosmetic gap, not a FAIL:** the Contexts screen still promises 45 seconds
+    before failing fast, where Circadian says "Location is off…" up front.
+24b. **A location rule round-trips, in any locale (DB-051/DB-061).** Save a location rule, reopen it.
+    **Expected:** the toggle is still on, the coordinates are shown, and the rules list names the
+    circle rather than saying "near location". Repeat with the device language set to one using a
+    **comma decimal separator** (e.g. Deutsch). **Expected:** identical — the parse/format pair is
+    shared by both screens now. Before the fix, Set silently refused and the rule reopened with the
+    toggle off.
 25. Manually load a profile (Profiles). **Expected:** context automation **pauses** (Resume banner);
     screen off→on or Resume re-enables it.
     - **Resume re-evaluates, it does not reset (DA-018).** With a rule currently MATCHING, load a
@@ -202,12 +219,40 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     - **Color inversion** on/off. **Expected:** inverts; the Accessibility toggle agrees.
     - **Always-on display** (only shown when Android reports it available) on/off. **Expected:** AOD appears/disappears on the lock screen.
     - **Stay awake while charging** on, short screen timeout, charger in. **Expected:** the screen
-      never sleeps while plugged (AC/USB/wireless); off + unplugged, normal timeout returns.
+      never sleeps while plugged (AC/USB/wireless/dock); off + unplugged, normal timeout returns.
     - **Disable HDR (experimental, Android 14+)** on → read back
       `user_disabled_hdr_formats=1,2,3,4` and
       `are_user_disabled_hdr_formats_allowed=0`; off → allowed returns `1` and formats clears.
       This writes stored preferences, not Android's Force-SDR service API. Either direction may
       require a reboot, and HDR/display-mode changes may briefly blank the screen (DB-044).
+32a. **Stay awake writes AOSP's whole mask, and leaves a mask it did not set (DB-065/DB-068/DB-070).**
+    Start from OFF or this proves nothing — Apply skips a write the device does not need:
+    `adb shell settings put global stay_on_while_plugged_in 0`, toggle ON, Apply →
+    **Expected: `15`** (`AC|USB|WIRELESS|DOCK`), not 7. OFF + Apply → `0`; ON again → `15`. Then set
+    a partial mask by hand (`… put global stay_on_while_plugged_in 1` — a value AOSP's own switch
+    writes) and Apply with some *other* field changed. **Expected:** it stays `1`; an unrelated
+    Apply must not broaden a charger set you chose. Off→on is how you deliberately re-assert 15.
+32b. **HDR: an absent row is a default, a partial row is a preference (DB-045/DB-049).** With both
+    rows cleared (`adb shell settings delete global user_disabled_hdr_formats` and
+    `… delete global are_user_disabled_hdr_formats_allowed`), open the screen. **Expected:** the
+    **switch**, off — an untouched device is canonical off. A preservation notice here is the DB-049
+    regression. Now produce a *partial* disabled-format set — prefer **Developer options → Disable
+    HDR formats**, ticking one or two formats, over writing the row by hand. **Expected:** the
+    switch is replaced by a custom-preference notice, and applying an unrelated field leaves that
+    row untouched instead of broadening it to the full set.
+32c. **An unrecognised colour-correction mode is READ-ONLY territory (DB-066/DB-069/DB-071).**
+    **Never `settings put` a daltonizer value no AOSP path writes** — that class has black-screened
+    an owner device. Read only:
+    `adb shell settings get secure accessibility_display_daltonizer` (+ `…_enabled`). Values
+    `-1, 0, 11, 12, 13` or unset → **SKIP, nothing to observe**, the expected outcome on
+    AOSP-faithful hardware. *Only* if a device reports something else on its own: the chips carry a
+    preservation notice, an unrelated Apply leaves both keys untouched, and an explicit chip pick
+    still writes. Otherwise this behaviour is unit-tested only and an accepted unverified residual.
+32d. **Unsupported Night Light / AOD fail closed (DB-041…DB-043).** Needs hardware that reports the
+    feature unavailable — **BLOCKED on every device to hand**, so expect to skip. Where such a
+    device exists: the row is hidden entirely (AOD needs `config_dozeAlwaysOnDisplayAvailable` AND a
+    non-empty `config_dozeComponent`), and a profile swap, circadian tick, Apply and panic each
+    no-op on that field — no write, no crash, no UI claiming a value it cannot hold.
 33. **Profile carried by a context rule — engage AND baseline restore.** Keep the baseline's display
     fields all off/default. Set grayscale (+ Night Light) on Privileged Display, **save as a
     profile**, then restore your baseline values. Add a Contexts rule loading that profile (a time
@@ -228,6 +273,10 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     falls back to the 3-channel grant card; a context swap carrying display fields writes
     **nothing** (device toggles untouched; super dimming also inert — same grant). Re-grant →
     toggles assert again from the next change, no restart needed.
+    **Do not expect to reach the write-failed banner this way (DB-072):** returning to the app
+    re-probes the tier, so the grant card replaces the toggles before there is an Apply to press.
+    The banner needs the grant to die *between* opening the screen and applying — a race that
+    cannot be staged by hand, and is unit-tested instead.
 37. **D-151 accepted residual (process death mid-override).** With a context-loaded profile holding
     grayscale ON, kill the process: `adb shell am force-stop com.tideo.autobrightness`; let the rule's
     window lapse while the app is dead. **Expected:** grayscale REMAINS on the device — there is
@@ -265,6 +314,16 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     Finally enable **Follow circadian scaling** + Apply, service ON, and reopen the screen.
     **Expected:** the temperature slider still shows YOUR value, not the ramp's current Kelvin (the
     ticker owns that key while tracking is on; reading it back would freeze one sample).
+39b. **Apply does not undo itself, on either path (DB-047/DB-048).** Service **ON**: open Privileged
+    Display, flip Night Light (or inversion), **Apply**. **Expected:** the toggle stays where you put
+    it and the Apply bar goes away. A toggle that flips back a moment later — with Apply becoming
+    available again — is the read-back rollback: with the service on, the screen does not write the
+    device itself, so a pre-Apply snapshot that stayed mergeable replayed over your change. Repeat
+    with the service **OFF** (the direct-write path) to cover both halves.
+39c. **Apply writes only what differs (DB-068).** Service OFF. Leave Night Light ON in system
+    Settings *and* in the app, then change only stay-awake and Apply. **Expected:** Night Light does
+    not blink off/on and nothing you set outside the app is re-asserted — only the changed field is
+    written.
 
 ## 12. Accessibility — TalkBack & touch targets (D-156)
 
