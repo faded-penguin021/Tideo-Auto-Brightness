@@ -5,6 +5,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import kotlinx.coroutines.delay
@@ -25,15 +26,7 @@ class AndroidForegroundAppMonitor(
     // D-034 (b): clock seam for test time control (shadow clock can't move wall-clock).
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ForegroundAppMonitor {
-    override fun hasUsageAccessPermission(): Boolean {
-        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = appOps.unsafeCheckOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            context.packageName,
-        )
-        return mode == AppOpsManager.MODE_ALLOWED
-    }
+    override fun hasUsageAccessPermission(): Boolean = hasUsageStatsAccess(context)
 
     override fun usageAccessSettingsIntent(): Intent =
         Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
@@ -62,4 +55,23 @@ class AndroidForegroundAppMonitor(
         }
         return last
     }
+}
+
+@Suppress("DEPRECATION")
+fun hasUsageStatsAccess(context: Context): Boolean {
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+        appOps.checkOpNoThrow(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+        )
+    } else {
+        appOps.unsafeCheckOpNoThrow(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+        )
+    }
+    return mode == AppOpsManager.MODE_ALLOWED
 }

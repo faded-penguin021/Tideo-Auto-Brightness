@@ -94,11 +94,14 @@ confirmed on released 1.9.0 (0 → 7 via Tideo, 15 via Developer Options, off→
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-08-20 — **v1.9.1 released; Dependabot #118 corrected.** #119 was squash-merged and `v1.9.1`
+- 2026-08-20 — **v1.9.1 released; Dependabot #118 corrected; AppOps warning removed.** #119 was squash-merged and `v1.9.1`
   published from `main`, resolving its Owner-queue item. #118 was brought current with `main`; its
   stale checkout marker and three stale Node-runtime policy comments were corrected, and all action
   marker/SHA pairs were resolved against their upstream tags. The refreshed `build`, CodeQL,
   preflight, and complete four-stage F-Droid compatibility workflows passed on the PR.
+  F-Droid vc21 exposed both remaining `unsafeCheckOpNoThrow` deprecation warnings (the platform
+  monitor and onboarding's duplicate); one API-31-compatible helper now selects `checkOpNoThrow`
+  on API 36+, and a forced release compilation is warning-free at both former call sites.
   The ephemeral Scorecard.dev score is not retained or rerun: its durable outputs remain playbook
   8's pinned-dependency and least-token-permission rails.
 - 2026-08-18 — **RUNBOOK playbook 8 added: Dependabot upgrade / CI action bump.** Terse operational
