@@ -13,7 +13,7 @@ name: Release preflight
 # docs-only / workflow-only / test-only PR (like the one that added this file) SKIPS them. The skip-ci
 # token scan runs on every PR regardless.
 #
-# Node 24 runtime policy (see build.yml): checkout@v5 is a node24 major. Do NOT downgrade.
+# Node 24 runtime policy (see build.yml): checkout@v7 is a node24 major. Do NOT downgrade.
 on:
   pull_request:
 

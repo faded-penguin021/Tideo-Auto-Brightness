@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Pure, framework-free contract for DA-039's process-wide external-command admission bound. */
+/** Pure, framework-free contract for DA-039's admission bound — the pair `onReceive` itself uses. */
 class ControlReceiverAdmissionTest {
     @Test
     fun exportedCommands_allowOnlyOneInFlight_DA039() {
