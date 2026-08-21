@@ -1,12 +1,13 @@
 # STATE — project state & session memory
 
 > **Length guard (DA-004 hysteresis — read before editing).** Thresholds are `STATE_WARN_KB`,
-> `STATE_COMPRESS_TO_KB` and `STATE_HARD_KB` in `amh.conf`, deliberately **not** restated as
+> `STATE_COMPRESS_TO_KB`, `STATE_COMPRESS_TO_SENTENCES` and `STATE_HARD_KB` in `amh.conf`, deliberately **not** restated as
 > numbers here — nothing checks this prose against the config, so a copied number drifts the first
 > time a threshold moves. `scripts/ladder.sh` prints the caps whenever it reports the size.
 >
 > - Grow freely to the soft cap; **no trimming below it.** Above the hard cap the ladder fails.
-> - When the guard warns, run **ONE deep pass to the floor** — never to just under the soft cap. A
+> - When the guard warns, run **ONE deep pass to the floor** — never to just under the soft cap. The
+>   floor counts sentences, so shaving words cannot satisfy it; fold whole completed stages. A
 >   micro-trim re-arms the warning a session later; the wide band IS the debounce. The floor is a
 >   ceiling, not a target: landing short means folding MORE completed stages, not micro-trimming.
 > - Compression = collapse each completed stage into one Changelog line, fold changelog clusters,
@@ -39,7 +40,7 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-Harness AMH 5.2.0 (DB-027); upstream manifest scripts are immutable. **v1.9.0/vc21 is released**
+Harness AMH 9.1.0 (DB-073); upstream manifest scripts are immutable. **v1.9.0/vc21 is released**
 (owner, 2026-08-18; #117 squash-merged, tag `v1.9.0` on `main`), and the owner's implicit ratify
 closed the DB-064 judgement call. Parity checklist and parity gaps empty. Live ledger: `LEDGER_B.md`.
 
@@ -95,6 +96,11 @@ confirmed on released 1.9.0 (0 → 7 via Tideo, 15 via Developer Options, off→
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-21 — **Agentic Maintenance Harness upgraded 5.2.0 → 9.1.0 (DB-073).** Copied the
+  shipped scripts and manifest from the exact `amh-v9.1.0` tag; added sentence-based STATE and
+  ledger limits with the byte limit retained as a backstop; updated current constitution,
+  memory-tier and CI-triage prose; and reconciled the Claude/Codex adapters with the new secret,
+  lifecycle, review and publication rails.
 - 2026-08-20 — **v1.9.1 released; Dependabot #118 corrected; AppOps warning removed.** #119 was squash-merged and `v1.9.1`
   published from `main`, resolving its Owner-queue item. #118 was brought current with `main`; its
   stale checkout marker and three stale Node-runtime policy comments were corrected, and all action

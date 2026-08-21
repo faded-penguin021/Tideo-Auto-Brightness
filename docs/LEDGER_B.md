@@ -8,11 +8,13 @@
 > vectors are ground truth; if an entry conflicts with current code, trust the code and correct the
 > entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
-> **Keep new rows concise and at or below `LEDGER_ROW_CHAR_CAP`** in `amh.conf` — the key is
+> **Keep new rows concise and at or below `LEDGER_ROW_SENTENCE_CAP`** in `amh.conf`; the
+> sentence limit is the working bound, while `LEDGER_ROW_CHAR_CAP` is a byte backstop with
+> real headroom. The keys are
 > named here and deliberately not restated as a number, because nothing checks this preamble
-> against the config and a copied number goes stale the first time the cap moves. Read it from
-> `amh.conf`; the ladder prints it only on a run that has a new row to check, so it is not a
-> substitute. Counted with `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
+> against the config and a copied number goes stale the first time a cap moves. Read them from
+> `amh.conf`; a green ladder deliberately does not print the limits. Bytes are counted with
+> `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
 > byte per character and non-ASCII UTF-8 is charged by encoded bytes. Capture the durable lesson,
 > not the whole debugging narrative — the narrative stays in the commit and its PR body (which
 > survive the squash as the merged commit's message) and `docs/history/` is frozen (DB-010). But
@@ -861,3 +863,11 @@
   reachable only as a race (grant lost between screen open and Apply) — unit-tested, not
   stageable by hand. Second script defect after DB-070: both are checks that could not fail,
   written by the same session that wrote the code they were meant to test.
+
+- DB-073: **An AMH upgrade can cross several MAJOR releases even when the destination is one
+  tag, so every intervening Upgrading section is an ordered migration, not release notes to
+  sample.** The 5.2.0 → 9.1.0 move added sentence floors beside byte backstops, corrected CI
+  triage to account for commit/index/worktree inputs, moved historical upgrade narrative out of
+  the constitution, strengthened secret and publication rails, and added adapter hooks. The
+  shipped directory and manifest move as one unit; owned config, seeds, adapters and CI are
+  reconciled by hand while the tagged checkout still exists.

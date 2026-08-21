@@ -31,6 +31,7 @@ RELEASE_TAG_PREFIX=''
 STATE_FILE=docs/STATE.md
 STATE_WARN_KB=14
 STATE_COMPRESS_TO_KB=9
+STATE_COMPRESS_TO_SENTENCES=50
 REMOTE_FLAG=AMH_REMOTE
 # Both empty by default, which switches the runtime-inventory lines off entirely. Same
 # reasoning as MERGE_MODE and the release keys above: an adopter's amh.conf is theirs forever
@@ -88,6 +89,54 @@ reset_command_guard_advisories() {
 
 reset_command_guard_advisories
 
+# Install the git-native pre-push rail (P13) into .git/hooks/pre-push. Git invokes it on every
+# push regardless of which agent — or none — drives the shell, so it binds where a per-agent
+# pre-execution hook cannot: an agent whose harness runs no such hook still gets this one. It
+# is a guardrail, not a boundary — `--no-verify` skips it, and it sees git-CLI pushes only.
+#
+# NON-CLOBBERING by design (owner decision): write the wrapper only when no pre-push hook
+# exists, never touch a hook this script did not write, and step aside entirely when the adopter
+# manages hooks through core.hooksPath. Taking over someone else's pre-push lifecycle is a cost
+# the rail is not worth. `.git/hooks` is untracked and a fresh clone starts without it, which is
+# why this install lives in the boot sequence, not only in the one-time initializer. Every arm
+# fails OPEN: a boot step that cannot write a hook must not stop the session (P14).
+install_prepush_hook() {
+	git rev-parse --git-dir >/dev/null 2>&1 || return 0
+	if [ -n "$(git config --get core.hooksPath 2>/dev/null)" ]; then
+		say "· pre-push rail: core.hooksPath is set, so AMH leaves your hooks alone. To keep the"
+		say "  rail, chain \`scripts/command-guard.sh --pre-push\` into your own pre-push hook (P13)."
+		return 0
+	fi
+	local hooks_dir hook
+	hooks_dir=$(git rev-parse --git-path hooks 2>/dev/null)
+	[ -n "$hooks_dir" ] || hooks_dir="$(git rev-parse --git-dir 2>/dev/null)/hooks"
+	[ -n "$hooks_dir" ] || return 0
+	# `--git-path` returns a path relative to cwd; cwd is $ROOT here, but anchor it explicitly
+	# so a relative result is correct even if this ever runs from elsewhere (parity with amh-init).
+	case $hooks_dir in /*) ;; *) hooks_dir="$ROOT/$hooks_dir" ;; esac
+	hook="$hooks_dir/pre-push"
+	if [ -e "$hook" ]; then
+		grep -q 'AMH pre-push rail' "$hook" 2>/dev/null && return 0
+		say "· pre-push rail: a pre-push hook already exists ($hook) — left untouched. To add the"
+		say "  rail, chain \`scripts/command-guard.sh --pre-push\` into it (P13)."
+		return 0
+	fi
+	mkdir -p -- "$hooks_dir" 2>/dev/null || return 0
+	# The wrapper is written as literal text, so its `$root`/`$@` must NOT expand here.
+	# shellcheck disable=SC2016
+	{
+		printf '%s\n' '#!/usr/bin/env bash' \
+			'# AMH pre-push rail (P13) — installed by scripts/session-start.sh.' \
+			'# Git runs this on every push, whatever agent (or none) drives the shell.' \
+			'# A guardrail, not a boundary: --no-verify skips it. Delete this file to remove it.' \
+			'root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0' \
+			'[ -x "$root/scripts/command-guard.sh" ] || exit 0' \
+			'exec bash "$root/scripts/command-guard.sh" --pre-push "$@"'
+	} >"$hook" 2>/dev/null || return 0
+	chmod +x -- "$hook" 2>/dev/null
+	say "· pre-push rail: installed at $hook (git-native publication guard; --no-verify bypasses)."
+}
+
 say "── AMH session start ─────────────────────────────────────────"
 
 # 1. Toolchain bootstrap — remote/ephemeral containers only, gated on an explicit
@@ -130,6 +179,9 @@ case $REMOTE_FLAG in
 	fi
 	;;
 esac
+
+# 1b. Install the git-native pre-push rail (non-clobbering; see install_prepush_hook above).
+install_prepush_hook
 
 # 2. Branch check. The first misplaced commit is the expensive one.
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
@@ -232,7 +284,7 @@ if [ -f "$STATE_FILE" ]; then
 	warn_b=$((STATE_WARN_KB * 1024))
 	printf '· %s: %s KB of %s KB soft cap\n' "$STATE_FILE" "$((bytes / 1024))" "$STATE_WARN_KB"
 	if [ "$bytes" -gt "$warn_b" ]; then
-		say "    ⚠ over the soft cap — run ONE deep compression pass to ≤ ${STATE_COMPRESS_TO_KB} KB before adding to it."
+		say "    ⚠ over the soft cap — run ONE deep compression pass to ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${STATE_COMPRESS_TO_SENTENCES} sentences before adding to it."
 	fi
 else
 	say "· ⚠ $STATE_FILE is missing — working memory is where every session starts."

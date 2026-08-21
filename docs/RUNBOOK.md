@@ -534,6 +534,16 @@ this same script (D-166)**, so CI and local share one definition of verified —
 hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
 seconds.
 
+**Working-memory output.** The size rung reads the byte caps and both compression-floor keys
+from `amh.conf`, using the shipped default only for an omitted key. It names a threshold only
+when a verdict turns on it: a plain green size line names no cap, and a successful compression
+reports headroom below both the byte and sentence floors rather than printing either target.
+The two units are conjunctive: shaving words cannot clear the sentence floor, while
+repunctuating without freeing space cannot clear the byte floor. The boot banner still prints
+size against the soft cap, and a small edit above it still names `STATE_EDIT_DELTA_BYTES`, because
+those verdicts turn on those values. Read configured thresholds from `amh.conf`, and treat the
+guard functions as authority if this description drifts.
+
 The rungs individually (run the relevant subset until green; on-device behavior is
 owner-verified — no emulator, no KVM):
 
@@ -547,10 +557,11 @@ owner-verified — no emulator, no KVM):
 
 ## When CI fails on a PR (workflow vs code)
 
-The local ladder (above) and CI (`.github/workflows/build.yml`) run the *same* script —
-`build.yml` invokes `scripts/ladder.sh` (D-166) — so a green local tree usually means green CI.
-When CI is red but local is green, the failure is in the **environment/workflow**, not your code
-— diagnose before "fixing tests". Triage in this order:
+The local ladder and CI run the same script, but the commit, index and worktree are inputs too.
+A guard built on `git ls-files` may omit an untracked file; staging it after the local run changes
+the input CI receives and can turn local-green into CI-red without any environment difference.
+Read the failing log, reproduce the exact tree state CI checked, and stage new files before the
+local ladder when discovery is index-dependent. Then triage in this order:
 
 1. **Read the failing step's log** — distinguish the three kinds:
    - **Real failure** (a test assertion, a lint finding, a compile error): reproduce locally with the
