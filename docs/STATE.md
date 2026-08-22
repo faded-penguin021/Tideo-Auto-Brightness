@@ -96,6 +96,9 @@ confirmed on released 1.9.0 (0 → 7 via Tideo, 15 via Developer Options, off→
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-22 — **Constitution rewritten for natural, direct prose.** `AGENTS.md` retains the
+  existing AMH 9.1.0 rules, facts, citations and enforcement boundaries while replacing terse,
+  emphatic phrasing with complete sentences and clearer organization. No policy changed.
 - 2026-08-21 — **Agentic Maintenance Harness upgraded 5.2.0 → 9.1.0 (DB-073).** Copied the
   shipped scripts and manifest from the exact `amh-v9.1.0` tag; added sentence-based STATE and
   ledger limits with the byte limit retained as a backstop; updated current constitution,
