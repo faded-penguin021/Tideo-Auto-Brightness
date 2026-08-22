@@ -12,11 +12,11 @@ come from upstream and cannot be fixed locally, how each local guard works and w
 it uses, and every way this repository's `amh.conf` differs from the stock configuration.
 
 > This file describes the harness and project as they exist now. Every rule here is binding today,
-> and every inventory describes what exists today. Put superseded rules, adoption and upgrade narratives,
-> and records of version-specific approval in the live ledger named by `docs/STATE.md`, then add a
-> single pointer in the STATE changelog. Do not move a rule that still applies: that would repeal
-> it rather than tidy it. Moving material out of this file changes the legislation and requires
-> the rule-review protocol; the owner must approve a bulk move.
+> and every inventory describes what exists today. Put superseded rules, adoption and upgrade
+> narratives, and records of version-specific approval in the live ledger named by `docs/STATE.md`,
+> then add a single pointer in the STATE changelog. Do not move a rule that still applies; doing so
+> would repeal it rather than tidy it. Moving material out of this file changes the legislation
+> and requires the rule-review protocol; the owner must approve a bulk move.
 >
 > There is deliberately no byte limit on this file. The relevant question is whether the content
 > is current, not how long it is. A long constitution can be entirely current, while a short one
@@ -37,8 +37,8 @@ instead. The migration narrative in `docs/history/` is frozen.
 1. Run `scripts/session-start.sh` if the host does not provide a session-start hook. The script
    prints the remaining startup guidance.
 2. Read `docs/STATE.md`, including the Owner queue. Queue entries are claims about the world, not
-   established facts. Every observable claim must include the command that settles it. Run that command and
-   compare its output with the stated resolution; do not rely on its exit status alone. If the
+   established facts. Every observable claim must include the command that settles it. Run that
+   command and compare its output with the stated resolution; do not rely on its exit status alone. If the
    output shows that the item is resolved, delete it during this session instead of repeating it
    with a caveat.
 3. Open the relevant playbook in `docs/RUNBOOK.md` and read the reference documents it names.
@@ -97,8 +97,7 @@ The ladder enforces two ledger-format details:
   ladder checks the relationship in both directions.
 - Citations are matched as whole words. Cite a sub-item as `D-042(c)`, with parentheses. Never put
   a bare letter directly after an ID: that form resolves to nothing, can make the marker appear
-  stale, and may
-  tempt someone to remove a marker that the code still needs (DB-022).
+  stale, and may tempt someone to remove a marker that the code still needs (DB-022).
 
 `scripts/guards/doc-facts.sh` rejects the bare-suffix form and also checks that the AMH version in
 this file matches `AMH_VERSION`.
