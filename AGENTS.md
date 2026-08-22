@@ -4,11 +4,23 @@ A native Kotlin/Compose Android app: a feature-parity rebuild of the Tasker proj
 `Advanced_Auto_Brightness_V3.3`, shipped at v1.0.0. Work now is maintenance.
 
 Maintenance runs on the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
-This constitution records **AMH 5.2.0**; `AMH_VERSION` in `amh.conf` is the authority on which
+This constitution records **AMH 9.1.0**; `AMH_VERSION` in `amh.conf` is the authority on which
 release, and the two are moved together — `scripts/guards/doc-facts.sh` fails when they drift.
 **`docs/HARNESS_LOCAL.md` is the harness's own documentation** — which scripts are upstream's and
 unfixable locally, what each repo-local guard does and which verdict tier it uses, every
 `amh.conf` value that differs from stock. Read it before changing anything under `scripts/`.
+
+> **This file states the harness and the project as they are NOW.** Every rule here binds today
+> and every inventory names what exists today. Supersession history, adoption and upgrade
+> narratives, and per-version sanction records belong in the live ledger volume named by
+> `docs/STATE.md`, with one pointer line in the STATE changelog. A rule that still binds stays,
+> whatever its age; moving one is repeal, not tidying. Moving content out is legislation and
+> takes the rule-review protocol; a bulk relocation is an owner decision.
+>
+> **No byte cap governs this file, deliberately.** The defect here is kind, not size: a long
+> constitution may be wholly current and a short one may retain history. `RULE_FILES` raises an
+> advisory on an uncommitted change, but it is only a warning, is skipped in CI, and goes quiet
+> after commit. Reviewer attention is the enforcement; the warning only invokes the protocol.
 
 > **Ground truth: code + the golden test vectors.** Every document here describes the app
 > as-built and may drift. When a doc conflicts with the code, trust the code and fix the doc.
@@ -112,9 +124,10 @@ rewording a marker is free, adding a coordinate to one is free, and merging two 
 the same coordinates is free; dropping a `task`/`act`/`prof`/`scene`/`elements`/`L`/`%AAB_`
 reference from a file is what fails, naming the file that lost it. All
 three fail closed in the ladder and in CI; the Claude Code adapter runs the block cap as a
-`PostToolUse` hook, so a long block is reported on the edit that writes it. **Codex has neither
-hook** — its prefix rules cannot express this, so for that agent these paragraphs are the only
-layer standing. Raising a budget is legitimate and is a rule change, not housekeeping:
+`PostToolUse` hook, so a long block is reported on the edit that writes it. **Codex has no
+post-edit hook** — its shell hook and prefix rules cannot inspect a file an edit tool wrote, so
+for that agent these paragraphs are the only immediate layer standing. Raising a budget is
+legitimate and is a rule change, not housekeeping:
 `scripts/guards` is in `RULE_FILES` and the review protocol applies. The guard says the same where
 it fails, and that is deliberate — a diagnostic that forbade what this paragraph permits would just
 teach the reader to stop believing one of them.
@@ -125,8 +138,9 @@ reading the file back. Not a ban — a scripted bulk edit is sometimes right. Wh
 the Claude Code adapter blocks the FIRST such command per MARKER LIFETIME as a `PreToolUse`
 advisory and passes the rest — the marker has no session component, so in a long-lived container
 the block is spent by the first session that trips it and every later session passes unadvised
-(DB-063); **Codex has no pre-shell hook, so for that agent this paragraph is the only layer
-standing**, as with the comment budget above. Either way the paragraph, not the hook, is what
+(DB-063); Codex's pre-shell hook runs the shipped command guard but not this repo-local advisory,
+so for that agent this paragraph is the only layer standing. Either way the paragraph, not the
+hook, is what
 binds you.
 
 **The one rule that overrides taste: Tasker semantics win.** Port behaviour exactly, including
@@ -203,6 +217,11 @@ STATE and the ledger are. When the ladder says you are behind `main`, it has alr
 classify why; follow its verdict. Because superseded branches are deleted, verify one still exists
 before citing it in a doc: `git ls-remote --heads origin`. Don't open a PR unless asked; tagging and releasing are owner
 steps.
+
+Before creating or updating a PR, read `.github/pull_request_template.md` when it exists, use
+every applicable heading, and delete the rest. If no template exists, ask whether to add one
+rather than inventing a one-off layout. Under branch-train, describe the entire diff against the
+PR base, including earlier units carried by the train, not merely the current session's commits.
 
 ## Harness
 

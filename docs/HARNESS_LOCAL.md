@@ -1,7 +1,7 @@
 # HARNESS_LOCAL — what this repo adds on top of stock AMH
 
 This repository runs the **Agentic Maintenance Harness**
-([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v5.2.0**
+([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v9.1.0**
 under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.
@@ -200,7 +200,6 @@ you chose and why.
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |
 | `LEDGER_LINE_CAP` | `1000` (stock 800) | The base volume closed at D-176 and `_A.md` at exactly 1000 lines (D-153, DA-001). Since AMH 5.1.0 the volume headers and the RUNBOOK name the key instead of restating the number, so **this cell is the last prose copy** — it is the one that must move with `amh.conf`. |
-| `LEDGER_ROW_CHAR_CAP` | `750` (stock 800 since AMH 5.0.0, was 2000) | Owner-selected maintenance bound: enough for one durable lesson without allowing a ledger row to become a long debugging narrative. Already stricter than the 5.0.0 default, so that MAJOR was a no-op here. Historical committed rows are exempt. As above, this cell is the last prose copy of the number and must move with `amh.conf`. |
 | `STATE_REQUIRED_SECTIONS` | `+ ## Decided non-items` | Where declined work is recorded; losing it invites re-litigating settled questions (D-162, DA-021). |
 | `POISON_TOKENS` | `+ [no ci] [skip actions] [actions skip]` | D-115: `release-preflight.yml` enforces this wider set at PR time; the two must agree. |
 | `CITATION_SCAN_PATHS` | `+ scripts` | The repo-local guards and `verify.sh` depend on ledger rows exactly as the Kotlin does. Safe because the shipped scripts name upstream's rows as `AMH ledger row D004` — a form the guard does not read as a citation. |
@@ -259,7 +258,7 @@ that exist today:
 | Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail | Inline-Python rail |
 |---|---|---|---|---|---|---|
 | `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | **no** — Codex has no repository-local session-start hook; run `scripts/session-start.sh` by hand | **no** — no pre-shell hook, so `scripts/command-guard.sh` is a script nobody calls and every Bash call is unjudged | **partial** — `amh.rules` prefix rules only; the policy has no path-glob operand, so nested `.env` and arbitrary `/proc/<pid>/environ` cannot be expressed | **no** | **no** — a prefix rule judges a shell command, not a file an edit tool wrote; `AGENTS.md` Conventions is the only layer standing | **no** — same missing pre-shell hook as the command rail; `AGENTS.md` Conventions is the only layer standing |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | yes (SessionStart hook) | yes (PreToolUse → shipped command guard) | yes, with prefix rules as a static lower layer; their path vocabulary remains narrower than the hook | **no** | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — the PreToolUse hook runs only the shipped guard, not the repo-local advisory; `AGENTS.md` Conventions is the only layer standing |
 
 **On the comment rail specifically.** The ladder guard is the coverage; the hook is only
 *salience*. A rule that lands solely in a ladder run arrives after the narrative is written and

@@ -47,7 +47,10 @@ DEFAULT_BRANCH=main
 # script does not use is a claim it honours one — command-guard.sh and session-start.sh
 # are where the prefix lives.
 STATE_FILE=docs/STATE.md
+# The compression floor is BOTH of these, and a landing has to satisfy both: see
+# count_sentences for why one number cannot do this job alone.
 STATE_COMPRESS_TO_KB=9
+STATE_COMPRESS_TO_SENTENCES=50
 STATE_WARN_KB=14
 STATE_HARD_KB=16
 # Largest shrink above the soft cap that still counts as an ordinary edit rather than a
@@ -58,7 +61,9 @@ STATE_OWNER_QUEUE_SECTION='## Owner queue'
 LEDGER_DIR=docs
 LEDGER_BASENAME=LEDGER
 LEDGER_LINE_CAP=800
-LEDGER_ROW_CHAR_CAP=800
+LEDGER_ROW_SENTENCE_CAP=6
+# A backstop against runaway sentences, not the working limit — LEDGER_ROW_SENTENCE_CAP is.
+LEDGER_ROW_CHAR_CAP=2000
 CITATION_SCAN_PATHS='scripts .github'
 CITATION_EXCLUDE=''
 POISON_TOKENS='[skip ci]|[ci skip]'
@@ -84,6 +89,16 @@ fail() {
 	FAILS=$((FAILS + 1))
 }
 skip() { printf '   skip  %s\n' "$1"; }
+# NOT a verdict, and the distinction is load-bearing: `note` touches no counter, changes no
+# exit code, and nothing branches on it. The four above answer "did this check pass"; this one
+# reports something observed that no check is being made about. A run-receipt vocabulary was
+# refused once (AMH ledger row DA025) and this is not one — it adds no second answer to the
+# ladder's question, and if anything ever consumes a `note` line, it has become the thing that
+# was refused.
+# (`scripts/guards/adapter-set.sh` also defines a `note`, and there it ACCUMULATES failures.
+# Different file, different scope, no shared code — but the word is not free in this tree, so
+# do not read one from the other.)
+note() { printf '   note  %s\n' "$1"; }
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -101,24 +116,98 @@ upstream_ref() {
 #    self-reported attestation, which an agent can emit without doing the work.
 # =============================================================================
 
+# The second unit every AIM-POINT in this harness is bounded in, beside bytes.
+#
+# Bytes are continuous, and a continuous target can always be approached by shaving: drop an
+# adjective, tighten a clause, re-measure, repeat until the guard goes quiet. Two reported
+# instances, one shape — a ledger row drafted at 874 bytes against an 800-byte cap and
+# trimmed until it fit, and a state file shaved across a dozen edits to land 7 bytes under
+# its floor. Removing the threshold from green output (AMH ledger row DB040) did not reach
+# either one: the session measures its own draft, so the anchor is the cap itself and not
+# the report of it.
+#
+# Shaving words cannot move a sentence count. Removing a sentence can, which is a decision
+# about content and exactly the move the compression rules ask for. That is the whole of
+# what this unit buys, and it is deliberately NOT the claim that the count cannot be gamed:
+# rewriting `. T` to `; t` across a file halves it while removing nothing at all, verified
+# on this repository's own state file (85 → 41, zero bytes). So a sentence floor cannot
+# stand alone either, and the aim-points are bounded in BOTH units — the byte floor stops
+# the punctuation rewrite, which frees no space, and the sentence floor stops the shave,
+# which removes no content. Neither number is sufficient; together neither cheap move
+# passes. Bytes still stand alone where nobody aims: the soft and hard caps, which decide
+# WHEN to compress rather than how far, and the edit delta, which classifies a shrink
+# already made.
+#
+# The counter sees what it can see and deliberately UNDERCOUNTS. A terminator ends a
+# sentence only when what follows starts another one — a capital, a backtick, bold, a quote,
+# an opening paren — after any closing markup, and `e.g.`/`i.e.` are folded away first. A
+# missed sentence makes the guard lenient; a phantom one would red-line honest prose, and a
+# rule that rejects correct work gets deleted rather than obeyed. Markdown headings, table
+# rows and bare list fragments carry no terminator and so count as nothing, which is the
+# same leniency and not an oversight. CRLF line endings and sentences opening with non-ASCII
+# both fall the same way, toward a lower count.
+#
+# It returns non-zero rather than an empty string when awk produces no number, and every
+# caller turns that into a loud verdict. An empty count would flow into `[ "$n" -gt … ]`,
+# which errors to stderr and takes the ELSE branch — a green line reporting a measurement
+# nobody made, the AMH ledger row DC002 shape one layer out.
+count_sentences() { # <file> — the sentences awk can see, one number on stdout
+	local n
+	n=$(LC_ALL=C awk '
+		{ buf = buf $0 " " }
+		END {
+			gsub(/[Ee]\.[Gg]\./, "eg", buf)
+			gsub(/[Ii]\.[Ee]\./, "ie", buf)
+			# Common titles and initialisms are not sentence ends. Prefer an
+			# undercount here: a false boundary rejects honest prose, while a missed
+			# boundary merely leaves the byte half of the limit to do its job.
+			gsub(/(^|[ \t])(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|No)\./, " title", buf)
+			while (gsub(/[A-Z]\.[A-Z]\./, "initials", buf)) { }
+			# A sentinel so a terminator at end of file counts like any other.
+			buf = buf "X"
+			print gsub(/[.!?][*"`_)]*[ \t][ \t]*[A-Z*"`(]/, "", buf)
+		}
+	' "$1") || return 1
+	case $n in '' | *[!0-9]*) return 1 ;; esac
+	printf '%s' "$n"
+}
+
 guard_state_size() {
 	section "Working memory: $STATE_FILE size band (hysteresis)"
 	if [ ! -f "$STATE_FILE" ]; then
 		fail "$STATE_FILE is missing — it is protocol step 1 for every session"
 		return
 	fi
-	local cur warn_b hard_b comp_b prev shrank delta
+	local cur warn_b hard_b comp_b floor prev prev_file prev_s cur_s shrank delta
 	cur=$(wc -c <"$STATE_FILE")
 	warn_b=$((STATE_WARN_KB * 1024))
 	hard_b=$((STATE_HARD_KB * 1024))
 	comp_b=$((STATE_COMPRESS_TO_KB * 1024))
 
+	# Same loud fallback as the edit delta below, for the same reason: a malformed floor
+	# arriving from config must not decide anything quietly.
+	floor=$STATE_COMPRESS_TO_SENTENCES
+	case $floor in
+	'' | 0 | *[!0-9]*)
+		warn "STATE_COMPRESS_TO_SENTENCES='$floor' is not a positive sentence count — using 50. Fix it in amh.conf; a guard that reads a malformed threshold and carries on quietly is how a band gets widened by accident."
+		floor=50
+		;;
+	esac
+
 	if [ "$cur" -gt "$hard_b" ]; then
-		fail "$((cur / 1024)) KB exceeds the ${STATE_HARD_KB} KB hard cap — compress to ≤ ${STATE_COMPRESS_TO_KB} KB now"
+		fail "$((cur / 1024)) KB exceeds the ${STATE_HARD_KB} KB hard cap — compress to ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${floor} sentences now"
 	elif [ "$cur" -gt "$warn_b" ]; then
-		warn "$((cur / 1024)) KB is over the ${STATE_WARN_KB} KB soft cap — run ONE deep compression pass to ≤ ${STATE_COMPRESS_TO_KB} KB (not to just under the cap)"
+		warn "$((cur / 1024)) KB is over the ${STATE_WARN_KB} KB soft cap — run ONE deep compression pass to ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${floor} sentences (fold whole stages: the two floors together admit nothing else)"
 	else
-		ok "$((cur / 1024)) KB (soft cap ${STATE_WARN_KB} KB, hard ${STATE_HARD_KB} KB)"
+		# The green line prints the MEASUREMENT and no threshold, deliberately. A clean
+		# run that says "8 KB (soft cap 14 KB)" re-anchors the cap in the context of the
+		# agent who will next compress this file, and the number in front of you is the
+		# number you optimize toward: a reported instance shaved clauses across a dozen
+		# edits to land 7 bytes under the floor, having never considered 7 KB. Every
+		# verdict that TURNS ON a threshold still names it — the warn, both fails, and
+		# the landing line below — because a rejection must say what it rejected
+		# against. A pass rejects nothing, so it owes no number.
+		ok "$((cur / 1024)) KB, within the band"
 	fi
 
 	# Landing check. Size thresholds alone are Goodhart-able: a trim that stops short of
@@ -146,9 +235,14 @@ guard_state_size() {
 	# original hole, and nothing here touches it. Growth, and edits that start below the
 	# cap, never reach this check at all.
 	has_git || return
-	prev=$(git show "HEAD:$STATE_FILE" 2>/dev/null | wc -c)
+	# Materialised rather than piped, because the landing verdict needs the committed
+	# file's SENTENCE count as well as its size and one `git show` should answer both.
+	prev_file=$TMP/state-head
+	git show "HEAD:$STATE_FILE" >"$prev_file" 2>/dev/null || : >"$prev_file"
+	prev=$(wc -c <"$prev_file")
 	if [ "$prev" = "$cur" ]; then
-		prev=$(git show "HEAD~1:$STATE_FILE" 2>/dev/null | wc -c)
+		git show "HEAD~1:$STATE_FILE" >"$prev_file" 2>/dev/null || : >"$prev_file"
+		prev=$(wc -c <"$prev_file")
 	fi
 	[ "${prev:-0}" -gt 0 ] || return
 	[ "$prev" -gt "$warn_b" ] && [ "$cur" -lt "$prev" ] || return
@@ -167,25 +261,48 @@ guard_state_size() {
 		;;
 	esac
 
-	# Byte counts, not KB, in every verdict below. Integer KB rounds toward zero on both
-	# sides of a comparison, so the honest outcomes print as contradictions: a pass that
-	# lands at 9215 reads `landed at 8 KB (floor 9 KB)`, which an agent could answer by
-	# padding the file back, and a 14848-byte stop reads `stops short at 14 KB, still
-	# above the 14 KB soft cap`. Bytes are what the guard actually compared.
+	# Byte counts, not KB, wherever a verdict below reports a SIZE. Integer KB rounds toward
+	# zero on both sides of a comparison, so the honest outcome prints as a contradiction:
+	# a 14848-byte stop reads `stops short at 14 KB, still above the 14 KB soft cap`. Bytes
+	# are what the guard actually compared. The landing verdict reports neither, because
+	# what it compares is a sentence count.
 	if [ "$cur" -le "$warn_b" ]; then
 		# Branch 1 deliberately does NOT consult the shrink: once the file is back under
 		# the cap, how it got there does not matter — the floor is the floor. So the
 		# wording describes the CROSSING, and claims no classification the guard did not
 		# make. A one-byte deletion from 14337 lands here, and that is the owner's rule.
-		if [ "$cur" -gt "$comp_b" ]; then
-			fail "crossed below the soft cap but stops short at $cur bytes — the floor is $comp_b bytes (${STATE_COMPRESS_TO_KB} KB), and landing in the band re-arms the warning next session. Fold more completed stages into single Changelog lines or move content to the ledger — do not micro-trim."
+		#
+		# The floor is TWO conditions and a landing satisfies both, which is what puts
+		# "how it got there" partly back inside the guard's reach. A pass that shaved words
+		# to cross the cap arrives carrying every sentence it started with and fails on the
+		# sentence floor; a pass that rewrote `. T` to `; t` to halve the sentence count
+		# frees no space and fails on the byte floor. Either number alone is satisfiable by
+		# a move that removes nothing, and that is why neither stands here alone.
+		cur_s=$(count_sentences "$STATE_FILE") || {
+			fail "could not count the sentences in $STATE_FILE — this landing check judged NOTHING, and a green line here would say it had"
+			return
+		}
+		if [ "$cur" -gt "$comp_b" ] || [ "$cur_s" -gt "$floor" ]; then
+			fail "crossed below the soft cap but stops short at $cur bytes and $cur_s sentences — the floor is $comp_b bytes (${STATE_COMPRESS_TO_KB} KB) AND $floor sentences, and landing in the band re-arms the warning next session. Fold whole completed stages into single Changelog lines or move content to the ledger: trimming words moves the sentence count by nothing, and repunctuating moves no bytes."
 		else
-			ok "crossed below the soft cap and landed at $cur bytes, at or under the $comp_b-byte floor (from $prev bytes)"
+			# Reports the MARGIN, not the floor it was measured against. The landing
+			# line is the one an agent reads immediately after compressing, so the
+			# quantity it makes salient is the quantity the next pass aims at: "at or
+			# under the 50-sentence floor" teaches that the floor is the target, and
+			# landing ON it reads as a job well done. Headroom below the floor is the
+			# same fact without that pull. It is NOT a score to maximise either: a file
+			# gutted to stubs prints a big number and passes, and no guard can see the
+			# difference — the rule that governs it is the state file's own (fold whole
+			# completed stages; do not shave), and this line is a measurement, not a
+			# grade. The floor is still one addition away for anyone who wants it, and
+			# the fail branch beside this one names it outright.
+			prev_s=$(count_sentences "$prev_file") || prev_s='?'
+			ok "crossed below the soft cap and landed at $cur bytes and $cur_s sentences, $((comp_b - cur)) bytes and $((floor - cur_s)) sentences clear of the floor (from $prev bytes and $prev_s sentences)"
 		fi
 	elif [ "$shrank" -lt "$delta" ]; then
 		ok "edit above the soft cap (shrank $shrank bytes, under the $delta-byte edit delta); compression still owed"
 	else
-		fail "unfinished compression pass: shrank $shrank bytes, at or over the $delta-byte edit delta, and stopped at $cur bytes — still above the soft cap ($warn_b bytes), and the floor is $comp_b bytes. Fold more completed stages into single Changelog lines or move content to the ledger — do not micro-trim."
+		fail "unfinished compression pass: shrank $shrank bytes, at or over the $delta-byte edit delta, and stopped at $cur bytes — still above the soft cap ($warn_b bytes), and the floor is $comp_b bytes AND $floor sentences. Fold whole completed stages into single Changelog lines or move content to the ledger: trimming words moves the sentence count by nothing, and repunctuating moves no bytes."
 	fi
 }
 
@@ -338,14 +455,22 @@ extract_ledger_rows() { # <tree-dir> <rows-dir>
 }
 
 guard_new_ledger_row_lengths() {
-	local cap=${LEDGER_ROW_CHAR_CAP:-0} changed path suffix='' next checked=0 row id count
+	local cap=${LEDGER_ROW_CHAR_CAP:-0} sent_cap=${LEDGER_ROW_SENTENCE_CAP:-0}
+	local changed path suffix='' next checked=0 row id count sentences lengths=''
 	case $cap in
 		'' | *[!0-9]*)
 			fail "LEDGER_ROW_CHAR_CAP must be a non-negative integer, got '${LEDGER_ROW_CHAR_CAP:-}'"
 			return
 			;;
 	esac
-	[ "$cap" -gt 0 ] || return
+	case $sent_cap in
+		'' | *[!0-9]*)
+			fail "LEDGER_ROW_SENTENCE_CAP must be a non-negative integer, got '${LEDGER_ROW_SENTENCE_CAP:-}'"
+			return
+			;;
+	esac
+	# Either limit alone is a working configuration; both at zero switches the rung off.
+	[ "$cap" -gt 0 ] || [ "$sent_cap" -gt 0 ] || return
 	git rev-parse --verify -q HEAD >/dev/null 2>&1 || return
 	changed=$(git diff --name-only HEAD -- "$LEDGER_DIR" | awk -v dir="$LEDGER_DIR" -v base="$LEDGER_BASENAME" '
 		$0 == dir "/" base ".md" { found = 1 }
@@ -377,17 +502,39 @@ guard_new_ledger_row_lengths() {
 		id=${row##*/}
 		[ -f "$TMP/head-rows/$id" ] && continue
 		checked=$((checked + 1))
-		# Locale-stable character policy: count bytes with LC_ALL=C. For ordinary ASCII
-		# ledger prose that is one byte per character; UTF-8 non-ASCII text is charged by
-		# encoded bytes so the verdict is identical across host locales.
-		count=$(LC_ALL=C wc -c <"$row") || return
-		count=${count//[[:space:]]/}
-		if [ "$count" -gt "$cap" ]; then
-			fail "$id: new ledger row is $count byte-counted character(s), over LEDGER_ROW_CHAR_CAP=$cap — keep the durable lesson concise and shorten the draft before commit; historical committed rows and sanctioned metadata-only additions are exempt"
+		# The working limit, and the only one a draft is written toward. Over it, no
+		# amount of rewording helps: the row loses a whole sentence of narrative or it
+		# does not pass, which is the same instruction the ledger preamble gives in prose.
+		sentences=$(count_sentences "$row") || {
+			fail "$id: could not count the sentences in this new row — the rung judged NOTHING, and a green line here would say it had"
+			return
+		}
+		if [ "$sent_cap" -gt 0 ] && [ "$sentences" -gt "$sent_cap" ]; then
+			fail "$id: new ledger row runs to $sentences sentences, over LEDGER_ROW_SENTENCE_CAP=$sent_cap — cut a whole sentence of narrative, not words; trimming clauses moves this count by nothing. Historical committed rows and sanctioned metadata-only additions are exempt"
 			return
 		fi
+		# The backstop, in bytes, for the one shape the sentence cap cannot see: a row
+		# inside its sentence budget whose sentences run away. Locale-stable character
+		# policy — count bytes with LC_ALL=C. For ordinary ASCII ledger prose that is one
+		# byte per character; UTF-8 non-ASCII text is charged by encoded bytes so the
+		# verdict is identical across host locales.
+		count=$(LC_ALL=C wc -c <"$row") || return
+		count=${count//[[:space:]]/}
+		if [ "$cap" -gt 0 ] && [ "$count" -gt "$cap" ]; then
+			fail "$id: new ledger row is $count byte-counted character(s), over LEDGER_ROW_CHAR_CAP=$cap — that is the runaway backstop rather than the working limit, and $sentences sentence(s) reaching it means the narrative belongs in docs/history/ with a pointer from the state changelog, not that the wording needs tightening; historical committed rows and sanctioned metadata-only additions are exempt"
+			return
+		fi
+		lengths="$lengths $id=$sentences"
 	done
-	[ "$checked" -gt 0 ] && ok "checked $checked new ledger row(s) against LEDGER_ROW_CHAR_CAP=$cap"
+	# The counts themselves, and not the cap they cleared. "checked 2 rows against
+	# LEDGER_ROW_SENTENCE_CAP=6" re-anchors 6 on every clean run, and the byte lengths
+	# this line used to print were the anchor in their own right — the reported
+	# consequence was rows drafted long and trimmed to just fit, 828 and 805 in one
+	# session, where a three-sentence row stating the lesson tersely was the better
+	# artifact and never occurred to the author. A sentence count is the measurement an
+	# author cannot act on by shaving; the fail branches above still name the cap they
+	# turn on, because a rejection must say what it rejected against.
+	[ "$checked" -gt 0 ] && ok "checked $checked new ledger row(s) —${lengths} sentence(s)"
 }
 
 
@@ -492,7 +639,12 @@ guard_ledger_rollover() {
 	elif [ "$lines" -ge $((LEDGER_LINE_CAP * 9 / 10)) ]; then
 		warn "$live: $lines lines / ${size} KB, approaching the ${LEDGER_LINE_CAP}-line cap — the next rollover is near"
 	else
-		ok "$live: $lines/$LEDGER_LINE_CAP lines, ${size} KB (grep it; a volume is retrieval storage, not a read)"
+		# Lines and size, not lines-over-cap: this is the third green line to lose its
+		# threshold, and the one that most nearly escaped, because `800/2000 lines` reads
+		# as context rather than as an anchor. It is the same anchor. The warn branch
+		# above it fires at nine tenths and names the cap, which is the moment the number
+		# is load-bearing.
+		ok "$live: $lines lines, ${size} KB (grep it; a volume is retrieval storage, not a read)"
 	fi
 }
 
@@ -540,7 +692,7 @@ guard_citations() {
 	# volume is was the shape being fixed; the walk is shared so they cannot.
 	local f
 	while IFS= read -r f; do
-		sed -n 's/^- \(D[A-Z]*-[0-9]\+\)\( \[cited\]\)\?:.*/\1\2/p' "$f" >>"$rows.raw"
+		sed -E -n 's/^- (D[A-Z]*-[0-9]+)( \[cited\])?:.*/\1\2/p' "$f" >>"$rows.raw"
 	done < <(chain_volumes)
 	if [ -f "$rows.raw" ]; then
 		awk '{print $1}' "$rows.raw" | sort >"$rows"
@@ -1172,6 +1324,45 @@ advisories() {
 		set +f
 		if [ -n "$touched" ]; then
 			warn "uncommitted diff touches legislation:$touched — the rule-review protocol applies (fresh-context reviewer, strongest tier, no self-review fallback) BEFORE commit."
+		fi
+	fi
+
+	# Destructive advisories that fired and were never re-attempted. The rail blocks such a
+	# command once so the session spends a turn on the check; a session can also clear the
+	# prompt by dropping the deletion — renaming the target, say — and that route left no
+	# trace anywhere, which is how it became the cheap one. This line is the trace.
+	#
+	# It is deliberately NOT a warning and NOT a failure. Abandoning a deletion is a
+	# legitimate outcome — the advisory says so in as many words — and a rung that went
+	# amber every time an agent thought better of an `rm` would be noise inside a week.
+	# Nothing consumes this: it reports the rail's own state files, it cannot see whether
+	# anyone looked, and no guard, gate or decision procedure may read it as evidence that a
+	# check happened (P3, AMH ledger row D014). It is a sentence for whoever reads the transcript.
+	if [ -f scripts/command-guard.sh ]; then
+		local unresolved
+		unresolved=$(bash scripts/command-guard.sh --advisory-report 2>/dev/null)
+		if [ -n "$unresolved" ]; then
+			# The caveat rides on the LINE, not only in this comment: a transcript
+			# reader sees the output and never the source, and the sentence claims
+			# less than it appears to. The rail matches on command TEXT, so a
+			# re-attempt bundled with a second deletion is a different signature and
+			# leaves the first one listed even though it ran.
+			note "destructive advisories fired and never re-attempted under this exact text (a bundled or reworded rerun still counts as never):"
+			# The signature is the rail's identity for a target set: a command kind,
+			# then each operand `%q`-quoted and joined. Printed with the joiner
+			# trimmed, because this line is read by a person and the trailing `|`
+			# says nothing to one. Nothing parses it back.
+			printf '%s\n' "$unresolved" | sed -e 's/ *|$//' -e 's/^/         /'
+		fi
+		# The subagent rail's trace, printed separately because the heading above names
+		# destructive advisories and this is not one. Same bounded claim: a spawn was
+		# advised and went ahead. It does NOT say the spawns overlapped or that any was
+		# unnecessary — the rail cannot see either — and nothing reads this line
+		# (AMH ledger row D014).
+		local spawns
+		spawns=$(bash scripts/command-guard.sh --spawn-report 2>/dev/null)
+		if [ -n "$spawns" ] && [ "$spawns" != 0 ]; then
+			note "subagent spawns that proceeded past the advisory this session: $spawns (the rule permits ONE reviewer at a time, blocking; this line says a spawn went ahead, never that any two overlapped)"
 		fi
 	fi
 	[ "$WARNS" = 0 ] && ok "nothing to flag"
