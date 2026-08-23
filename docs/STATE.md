@@ -4,7 +4,14 @@
 > (`STATE_WARN_KB`, `STATE_COMPRESS_TO_KB`, `STATE_COMPRESS_TO_SENTENCES`, `STATE_HARD_KB`) and are
 > deliberately not copied here, because nothing would check the copy; `scripts/ladder.sh` prints
 > them with the size. The rules, with the reasoning behind each left in `guard_state_size` and
-> `guard_state_structure`, which are the authority and upgrade independently of this paragraph:
+> `guard_state_structure`, which are the authority and upgrade independently of this paragraph.
+> **Only the first and last bullets are checked by anything** — the size landing and the section
+> list. The middle three are prose you are asked to keep and no guard will catch you breaking:
+> nothing reads what a compression pass deleted, the landing check returns early unless the
+> PREVIOUS revision was already over the soft cap (so a trim below the cap is unmeasured, not
+> approved), and the queue is protected only by its heading still existing, never by its items
+> surviving. The structure checks run at EVERY size; only the size guard's landing half goes quiet
+> below the cap.
 >
 > - Grow freely to the soft cap, no trimming below it; above the hard cap the ladder fails.
 > - On a warning, run ONE deep pass to BOTH floors — never to just under the soft cap, and never by
@@ -41,25 +48,33 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
 
 > Protected by D-167. Test observable claims before restating them; preserve unresolved items.
 >
-> **Write every item in plain language — this section is exempt from the repo's house style
-> (DB-079, owner, 2026-08-23).** It is the one place an agent asks the owner to *do* something, so
-> the reader is a person deciding, not a maintainer reconstructing a rationale. Say what to do, on
+> **Write every item in plain language — this section is exempt from the terse, ledger-ID-first
+> register the rest of the tree is written in (DB-079, owner, 2026-08-23).** Its readers include a
+> person deciding what to do, not only a maintainer reconstructing a rationale. Say what to do, on
 > what, and what result would mean it worked. Put ledger IDs at the end as a reference, never as the
 > subject of a sentence. If an item cannot be understood without opening another file, rewrite it.
+> The exemption is about REGISTER and nothing else: it does not waive the observable-claim rule
+> (AGENTS.md — name the command that settles a claim) or D-167's date-stamped open questions, and
+> the section also carries leaked-credential entries and external-content escalations, which are
+> not requests to the owner at all.
 
 1. **Nothing to do — two checks are blocked on hardware.** The Android 12/12L Wi-Fi fix needs a
    phone that old and the owner has none (DB-074, §8 step 24). The unrecognised-colour-mode button
    only appears if a phone reports a mode Android does not know, and none do — never force one by
-   writing a fake value (DB-078, §11 32c, DB-071). Both stay unverified on purpose.
+   writing a fake value (DB-078's colour-mode half, §11 32c, DB-071). Both stay unverified on
+   purpose. DB-078's other half, the stay-awake button, is verified — see below.
 2. **Nothing to do — waiting on a Samsung.** Whether Night Light and always-on display fail safely
    when Android reports them unavailable; every phone to hand reports them available. Blocked three
    times already, so parked until such a device exists. (DB-041…DB-043.)
 
-Open questions: none. Owed reviews: this branch changes rule files (`docs/RUNBOOK.md`,
-`scripts/verify.sh`, `scripts/guards/`, `scripts/tests/`), so the rule-review protocol applies
-before merge. Answered 2026-08-23: the comment-budget increase is accepted on condition the source
-pointers stay terse, since the rule exists to stop prose living in two places; all thirteen are one
-line each.
+Open questions: none. Owed reviews: **done 2026-08-23** — the rule-review protocol ran on this
+branch's rule-file changes (fresh context, strongest tier) and its nine findings are triaged and
+fixed in the commit that carries this line. Answered 2026-08-23: the comment-budget increase is
+accepted on condition the source pointers stay terse, since the rule exists to stop prose living in
+two places. Counted after the review: fourteen new comment lines in thirteen blocks, twelve of them
+one line and one of them two (`git diff 5b46f88..HEAD -- 'app/**/*.kt' 'platform/**/*.kt' | grep
+-cE '^\+[[:space:]]*//'`) — and the re-baseline they justify covers 129 app lines, not 14, because
+the margin was already spent when they landed (DB-081).
 
 Closed 2026-08-23: the stay-awake fix is **device-verified on 1.9.2-debug vc23** (owner) — all three
 checks of §11 32a passed, so DB-077 and DB-078 are confirmed on hardware and the DB-065 dock bit now
@@ -87,12 +102,26 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 - **Never synthesise an unsupported value in a display key on a real device** (DB-071): no
   `settings put` of anything no AOSP path writes — daltonizer matrices, HDR format lists,
   `reduce_bright_colors_level`. Two owner devices have been left needing blind recovery. The
-  unrepresentable-state paths (DB-045/DB-066/DB-077) are unit-tested only; on-device they are an
-  accepted unverified residual, observed read-only if hardware ever produces the state by itself.
+  unrepresentable-state paths reachable ONLY by such a write (DB-045/DB-066) are unit-tested only;
+  on-device they are an accepted unverified residual, observed read-only if hardware ever produces
+  the state by itself. **DB-077 is not one of them** and this bullet must not be read as covering
+  it: `stay_on_while_plugged_in` at 7 is a mask Tideo itself wrote up to v1.9.0, so staging it is a
+  legal write AOSP produces, §11 32a tells the owner to do exactly that, and the check passed on
+  device (2026-08-23).
 
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-08-23 — **Rule review of the branch's legislation ran and its findings are fixed (DB-080,
+  DB-081).** A fresh-context reviewer at the strongest tier found nine; the load-bearing ones were
+  DB-074's lint fix landing in `verify.sh` only while both release workflows and the RUNBOOK still
+  linted `:app` alone, playbook 8 still saying "nothing re-checks them" about a rail that now has a
+  guard, the comment-budget re-baseline crediting this change for 129 lines of which 14 are its own,
+  the length-guard preamble losing the sentence that said which of its bullets no guard enforces,
+  and DB-077 filed under DB-071's never-synthesise residual although its state is a mask Tideo
+  itself wrote and the check passed on device. Prose-only fixes plus two workflow lines; no app
+  behaviour changed.
 
 - 2026-08-23 — **Post-v1.9.0 review: five findings fixed on the unreleased vc23 (DB-074…DB-078),
   and the Owner queue is plain-language by rule (DB-079).** `:platform` had never been linted,

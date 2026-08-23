@@ -43,9 +43,11 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      # Acceptance ladder (CLAUDE.md) — fail before we sign a broken build.
+      # Acceptance ladder (AGENTS.md) — fail before we sign a broken build.
+      # DB-080: this Gradle line is a COPY of scripts/verify.sh's. Both Android modules are linted
+      # here because a fix applied only there left the release gates linting :app alone (DB-074).
       - name: Test + lint
-        run: ./gradlew :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug --no-daemon
+        run: ./gradlew :domain:test :platform:test :app:testDebugUnitTest :platform:lintDebug :app:lintDebug --no-daemon
 
       - name: Decode keystore
         env:

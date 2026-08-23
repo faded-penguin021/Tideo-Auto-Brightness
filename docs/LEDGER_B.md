@@ -932,3 +932,22 @@
   wants to know what to do. Plain language is now the rule for that section and is stated in its own
   preamble, where the next session reads it before writing an item. The house style is not wrong
   elsewhere — the audience is what changed, and no guard can see a register mismatch.
+
+- DB-080 [cited]: **A verification set spelled out in four places is fixed in four places.** DB-074
+  added `:platform:lintDebug` to `scripts/verify.sh` and stopped there, while `release.yml`,
+  `release-signing.yml` and RUNBOOK's rungs-individually block each carried their own copy of the
+  same Gradle line with `:app:lintDebug` alone — so both release gates and every agent following
+  the RUNBOOK would still have shipped the unlinted `:platform`. The fix that closed a hole locally
+  left it open on the path that actually cuts releases. Before calling a gate fixed, grep the tree
+  for the command, not the module.
+  `[cited]`: `scripts/verify.sh`, `.github/workflows/release.yml`, `docs/RUNBOOK.md`.
+
+- DB-081 [cited]: **Re-baselining a budget that is already at its ceiling ratifies the growth it
+  cannot see, then mints a fresh margin on top.** At this branch's start the comment budget read
+  app=2403/2403 and platform=306/306 — the whole 5% margin spent by earlier v1.9.x work that never
+  had to justify a line of it, because the guard only speaks when the ceiling is crossed. The
+  re-baseline to 2417/314 was written up as the review's own new declarations, which are 14 of the
+  129 app lines it ratifies. A re-baseline is a ratchet, not a reset: say what the margin already
+  held before raising it, and measure the merge base with ITS copy of the guard, since the guard
+  resolves its root from `BASH_SOURCE` and will otherwise re-measure the current tree.
+  `[cited]`: `scripts/guards/comment-budget.sh`.

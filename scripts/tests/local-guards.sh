@@ -2,7 +2,7 @@
 # Fixture suite for the repo-local ladder guards under scripts/guards/.
 #
 # Yours, not shipped. The AMH's own scripts/test-ladder-guards.sh covers the SHIPPED ladder;
-# nothing upstream knows these guards exist, so without this file they are six scripts whose
+# nothing upstream knows these guards exist, so without this file they are eight scripts whose
 # failure paths have never run (docs/HARNESS_LOCAL.md). scripts/verify.sh invokes it.
 #
 # Every case builds a throwaway tree and runs the real guard against it. The point is the

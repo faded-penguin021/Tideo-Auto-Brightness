@@ -87,7 +87,7 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 - **Code:** the Compose screen in `:app`; settings via `AabSettings`/DataStore.
 - **Parity:** keep user-facing behavior/labels faithful; honor the scene→screen consolidation
   matrix rather than reintroducing one-scene-per-screen.
-- **Acceptance:** `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:lintDebug`.
+- **Acceptance:** `:app:testDebugUnitTest`, `:app:assembleDebug`, `:platform:lintDebug :app:lintDebug`.
 - **Record:** update `screen_map.md` + `PARITY_CHECKLIST.md` + `STATE.md`.
 
 ### 4. Bug fix
@@ -293,7 +293,9 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   appears only on an advisory; no speculative bumps (D-135). Read `.github/dependabot.yml` +
   DB-038 first.
 - **Scorecard.dev is run-once/local (v5.5.0, ephemeral — not a CI gate).** Its recommendations
-  survive as the two rails below; honor them by hand — nothing re-checks them.
+  survive as the two rails below. **Pinned-Dependencies** is now half-mechanised —
+  `scripts/guards/action-pins.sh` (DB-076) holds the shape checks named in step 2, and the tag↔SHA
+  claim itself stays yours. **Token-Permissions** is prose only: nothing re-checks it.
   - **Pinned-Dependencies:** every `uses:` is a 40-hex **commit SHA** + trailing `# vX.Y.Z` marker.
     **Never revert a pin to a tag ref** — a moved tag changes what runs and drops the score to 0.
   - **Token-Permissions:** top-level `permissions:` stays minimal/read-only; elevate per-**job**,
@@ -305,9 +307,14 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
      **trailing prose follows the version** on the `uses:` line, leaving a stale `# vX.Y.Z` on a
      moved SHA (DB-038 decay, hit twice). Which layer holds this: `scripts/guards/action-pins.sh`
      (DB-076) fails the ladder on a tag ref, an unlabelled pin, one SHA wearing two markers, and one
-     action+version resolving to two commits — the shape both DB-038 incidents took. It cannot check
-     the tag↔SHA claim itself, because that needs the network and the ladder is offline, so a pin
-     mislabelled **the same way everywhere** is still yours to catch here and nowhere else.
+     action+version resolving to two commits — the last two being the shape a failed marker rewrite
+     produces. It cannot check the tag↔SHA claim itself, because that needs the network and the
+     ladder is offline, so a pin mislabelled **the same way everywhere** is still yours to catch
+     here and nowhere else. Both cross-checks compare call sites against each other, so **an action
+     pinned at only one call site has no second opinion**, and step 2 is the only layer that sees a
+     stale marker on it at all. Which those are:
+     `grep -rhoE 'uses: *[^@ ]+@[0-9a-f]{40}' .github/workflows/ | sed 's/@.*//' | sort | uniq -c | sort -n`
+     (four of eleven, 2026-08-23).
   3. **Fix prose Dependabot can't touch** — it never edits comments. E.g. `build.yml`'s Node-24
      policy block names the pinned majors ("Do NOT downgrade…") and goes factually wrong on a bump.
      Update any such block in the **same** PR.
@@ -556,7 +563,10 @@ owner-verified — no emulator, no KVM):
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests
 ./gradlew :app:assembleDebug      # APK
-./gradlew :app:lintDebug          # lint (hard gate — no baseline; targeted suppressions in app/lint.xml)
+./gradlew :platform:lintDebug :app:lintDebug  # lint, BOTH Android modules (hard gate — no baseline;
+                                              # targeted suppressions in app/lint.xml). One module's
+                                              # gate is not a gate: AGP reports a library's findings
+                                              # only in that library's report (DB-074).
 ```
 
 ## When CI fails on a PR (workflow vs code)

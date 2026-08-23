@@ -79,14 +79,22 @@ COMMENT_BLOCK_MAX_LINES=12
 # policy that nothing computes and no number obeys is an accident with a name on it. Re-baseline by
 # updating MEASURED_* from a guard run; the ceilings follow.
 #
-# Re-baselined 2026-08-23 (DB-074…DB-078): app 2288 → 2417, platform 291 → 314. Not a narrative
-# landing in source — the v1.9.2 review added declarations that did not exist before (`readBounded`,
-# `overwriteDeviceField`, `PreservedDisplayField`, the `PreservedNotice` composable, a tri-state
-# `readStayAwakePlugged`, and their fixtures), and each carries a ONE-LINE `// DB-NNN:` pointer with
-# the prose in the row. The first repair was taken first and is most of the delta: the same change
-# was 38/16 lines over before its comments were cut back to pointers. Trimming the rest would mean
-# deleting the last code citation of a row, which the constitution forbids and the citation rung
-# fails on — so the two repairs are in tension here and the pointer wins.
+# Re-baselined 2026-08-23 (DB-074…DB-078): app 2288 → 2417, platform 291 → 314. Read the delta
+# honestly, because MEASURED_* is the count at the last re-baseline and NOT what the tree held when
+# this change started: at the branch point the guard already read app=2403/2403 and
+# platform=306/306, i.e. the 5% margin was fully spent by earlier v1.9.x work that never had to
+# justify it. Of the 129 app lines being ratified here, 14 are this change's (+8 platform of 23);
+# the other 115 are that silent growth, ratified now because a re-baseline cannot be partial. Those
+# 22 new lines are pointers, not narrative — the review added declarations that did not exist
+# before (`readBounded`, `overwriteDeviceField`, `PreservedDisplayField`, the `PreservedNotice`
+# composable, a tri-state `readStayAwakePlugged`, and their fixtures), each carrying a `// DB-NNN:`
+# pointer with the prose in the row; the same change was 38/16 lines over before its comments were
+# cut back to pointers, and trimming further would delete the last code citation of a row, which the
+# citation rung fails on. Settle both numbers before trusting this paragraph next time:
+#   git worktree add --detach /tmp/mb <merge-base> && bash /tmp/mb/scripts/guards/comment-budget.sh
+# (its OWN copy, not this one — the guard resolves its root from BASH_SOURCE, so running this file
+# against that tree silently re-measures THIS one). A re-baseline that lands on a spent margin mints
+# a fresh 5% on top of it, so it is a ratchet, not a reset: DB-081.
 COMMENT_BUDGET_MARGIN_PCT=5
 MEASURED_app=2417
 MEASURED_domain=436
