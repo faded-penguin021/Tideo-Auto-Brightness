@@ -182,3 +182,7 @@ Worth noting: **no guard enforces marker↔SHA agreement.** Nothing in `scripts/
 `scripts/ladder.sh` checks it, so `dependabot.yml`'s claim that the pin and its version marker
 "stay in sync" is empirically false for any line carrying a trailing comment. A small guard
 comparing each `uses:` SHA against its `# vX.Y.Z` marker would have caught defect 1 mechanically.
+
+**Superseded 2026-08-23 (DB-076):** that guard now exists as `scripts/guards/action-pins.sh`, and
+defect 1's exact shape is one of its fixtures. It checks marker self-consistency, not tag↔SHA
+resolution, which stays a hand step — RUNBOOK playbook 8 step 2 says which layer holds which.

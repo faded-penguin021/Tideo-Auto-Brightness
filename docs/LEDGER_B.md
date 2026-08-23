@@ -838,7 +838,8 @@
   preserve; compare against the seed instead.
   `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`.
 
-- DB-070: **A diff-write invalidates every device check written for the write it now skips.**
+- DB-070 [cited]: **A diff-write invalidates every device check written for the write it now
+  skips.**
   DB-068 made the direct Apply idempotent-by-diff; `readStayAwakePlugged()` is `mask != 0`, so on
   a device where stay-awake is already on, Apply writes nothing and DB-065's prescribed check
   ("Stay awake on, Apply, expect 15") passes identically against the OLD 7-constant code. It had
@@ -871,3 +872,55 @@
   the constitution, strengthened secret and publication rails, and added adapter hooks. The
   shipped directory and manifest move as one unit; owned config, seeds, adapters and CI are
   reconciled by hand while the tagged checkout still exists.
+
+- DB-074 [cited]: **A lint gate on one module is not a lint gate.** `verify.sh` ran
+  `:app:lintDebug` only, and AGP reports a library's findings in that library's report unless
+  `checkDependencies` is on, so every Android adapter in `:platform` had been unchecked since the
+  module existed — hiding two `NewApi` ERRORS on `InputStream.readNBytes`, API 33 against minSdk
+  31, which made the root and dumpsys SSID strategies dead on Android 12/12L (the
+  `catch (_: Throwable)` around them swallows the `NoSuchMethodError`, so it degrades silently
+  rather than crashing). No unit test could have caught it: Robolectric runs the host JVM's
+  `java.io`, where `readNBytes` resolves at every configured SDK. `:app` had the identical hazard
+  and handled it in `UserProfileStore`, because `:app` was linted.
+  `[cited]`: `platform/…/context/WifiSsidStrategies.kt`, `platform/build.gradle.kts`,
+  `scripts/verify.sh`.
+
+- DB-075 [cited]: **A deprecation can be un-deprecated, so re-read the stub before branching around
+  one.**
+  The v1.9.2 fix for F-Droid's `unsafeCheckOpNoThrow` warning branched on `SDK_INT >= BAKLAVA` to
+  pick `checkOpNoThrow` on API 36+, and its changelog called that "Android 16's replacement API".
+  It is the opposite: `checkOpNoThrow` predates minSdk, API 29 deprecated it in favour of
+  `unsafeCheckOpNoThrow`, and API 36 reverted that — `android-36/data/api-versions.xml` gives
+  `checkOpNoThrow` no `since` and no `deprecated`, while `unsafeCheckOpNoThrow` carries
+  `deprecated="36"`. One unconditional call compiles warning-free with no `@Suppress`, which also
+  stops a function-wide suppression from hiding the next deprecation.
+
+- DB-076 [cited]: **A rail with no guard decays at the rate its documentation is re-read.**
+  RUNBOOK playbook 8 said marker↔SHA agreement was hand-checked "no guard checks it", and DB-038's
+  predicted decay then shipped to a PR twice, caught by eye both times. `action-pins.sh` now fails
+  on a tag ref, an unlabelled pin, one SHA wearing two markers, and one action+version resolving to
+  two commits — the last two being the exact shape Dependabot produces when its marker rewrite hits
+  trailing prose. What it deliberately does NOT check is whether a marker names the right tag: that
+  needs the network and the ladder is offline, so a consistently-wrong label still passes and
+  playbook 8 step 2 remains the only layer that sees it.
+  `[cited]`: `scripts/guards/action-pins.sh`.
+
+- DB-077 [cited]: **A lossy read defeats a diff-write silently, and the two can ship in one
+  release.** DB-065 widened `STAY_ON_ANY_CHARGER` to include the dock bit; DB-068 made the direct
+  Apply diff-write. Together they cancelled: `readStayAwakePlugged()` was `mask != 0`, so a device
+  still carrying v1.9.0's own 7 read as "on", the diff skipped, and the dock bit never reached
+  anyone who had the toggle on before upgrading — while `pd_stay_awake_help` claimed dock coverage
+  regardless. DB-070 saw the diff-write half and rewrote the device check; the upgrade path was not
+  the case it was looking at. Stay-awake was the ONLY field whose read could not represent "the
+  device holds something we did not write", which HDR and daltonizer both already could.
+  `[cited]`: `platform/…/display/SecureDisplayController.kt`, `app/…/state/DeviceDisplaySnapshot.kt`.
+
+- DB-078 [cited]: **Preserving an unrepresentable state needs an exit, or the notice is a dead
+  end.** DB-069 decides "the user picked this" as draft ≠ seed, but the seed is what the control
+  DISPLAYS, so the one value that can never be written is the one already shown — and for the
+  daltonizer at a default profile that is OFF, the likeliest thing anyone wants to do about a mode
+  they do not recognise. The preservation notices now carry a button that writes that single field
+  directly, outside the draft/Apply path, which is also how the DB-077 dock bit reaches an upgraded
+  device. HDR gets the notice without the button on purpose: its notice REPLACES the switch, so
+  there is no visible value an overwrite could claim to write.
+  `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`, `app/…/ui/screens/PrivilegedDisplayScreen.kt`.

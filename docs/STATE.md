@@ -59,7 +59,16 @@ playbook 8 preserves the two resulting maintenance rails.
 1. DB-041…DB-043's unavailable-feature boundary still unverified (B1 BLOCKED three times): every
    device to hand reports Night Light/AOD available, and the owner has no Samsung. Needs hardware
    reporting them unavailable — park it until such a device exists.
-Open questions: none. Owed reviews: none.
+2. **DB-074's Android 12/12L SSID check is unverified and needs hardware at API 31 or 32.** No JVM
+   test can reach it (Robolectric runs the host `java.io`), so `:platform`'s lint gate is the only
+   layer behind the fix. §8 step 24 carries the check; skip it on API 33+, where it proves nothing.
+3. **DB-077/DB-078 want one device round on the unreleased vc23**, both reachable by hand and
+   neither needing unusual hardware: §11 32a (set `stay_on_while_plugged_in` to `7`, confirm the
+   notice, confirm an unrelated Apply preserves it, confirm the button writes `15`) and §11 32c's
+   new button, which stays a SKIP unless a device reports an unrecognised daltonizer on its own.
+Open questions: none. Owed reviews: the vc23 diff touches `RULE_FILES`
+(`docs/RUNBOOK.md`, `scripts/verify.sh`, `scripts/guards/`, `scripts/tests/`) — the rule-review
+protocol applies before merge, and the comment-budget re-baseline is the item to weigh.
 
 Closed by the owner 2026-08-18: **DB-061** device-verified (location rule round-trips); the DB-064
 legislation call **ratified** (implicitly — v1.9.0 was merged and released); the provenance-manifest
@@ -96,6 +105,18 @@ confirmed on released 1.9.0 (0 → 7 via Tideo, 15 via Developer Options, off→
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-23 — **Post-v1.9.0 review: five findings fixed on the unreleased vc23 (DB-074…DB-078).**
+  `:platform` had never been linted (`verify.sh` ran `:app:lintDebug` alone), which hid two `NewApi`
+  errors on `readNBytes` that left the root and dumpsys SSID strategies silently dead on Android
+  12/12L; the module is now gated and the read is hand-bounded. DB-065's dock bit had been cancelled
+  by DB-068's diff-write on every device already carrying v1.9.0's mask of 7, because
+  `readStayAwakePlugged()` could not distinguish it from this app's own — it is tri-state now, like
+  HDR and daltonizer, with a notice instead of a false claim of dock coverage. Both preserved-state
+  notices that sit beside a visible control gained a button that writes that one field directly,
+  which is the only route to a value the control already shows. `hasUsageStatsAccess` lost an SDK
+  branch built on a misread of the API-36 stubs, and `action-pins.sh` now mechanises the marker↔SHA
+  rails that RUNBOOK playbook 8 had only in prose. The comment budget was re-baselined for the new
+  declarations after the first repair took the overshoot from 38/16 lines to 14/8.
 - 2026-08-22 — **Constitution rewritten for natural, direct prose.** `AGENTS.md` retains the
   existing AMH 9.1.0 rules, facts, citations and enforcement boundaries while replacing terse,
   emphatic phrasing with complete sentences and clearer organization. No policy changed.

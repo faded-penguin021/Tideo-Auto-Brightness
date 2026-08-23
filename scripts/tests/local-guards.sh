@@ -1214,6 +1214,83 @@ OUT=$(PYTHON_EDIT_ADVISORY_STATE=$SANDBOX/pe-broken-state bash "$SANDBOX/pe-brok
 RC=$?
 expect_fail "a matcher with a write shape removed fails its own ladder rung" "fixture(s) failed"
 
+# =============================================================================
+printf '\n· action-pins\n'
+
+SHA_A=3d3c42e5aac5ba805825da76410c181273ba90b1
+SHA_B=fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+# <dir> then one "<file>|<uses-line-body>" per remaining argument.
+ap_tree() {
+	local d=$SANDBOX/$1
+	shift
+	rm -rf "$d"
+	mkdir -p "$d/.github/workflows"
+	local spec file body
+	for spec in "$@"; do
+		file=${spec%%|*}
+		body=${spec#*|}
+		if [ ! -f "$d/.github/workflows/$file" ]; then
+			printf 'name: %s\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n' \
+				"$file" >"$d/.github/workflows/$file"
+		fi
+		printf '      - uses: %s\n' "$body" >>"$d/.github/workflows/$file"
+	done
+}
+
+ap_tree ap-ok \
+	"build.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"codeql.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"codeql.yml|github/codeql-action/init@$SHA_B  # v4.37.7" \
+	"codeql.yml|github/codeql-action/analyze@$SHA_B  # v4.37.7"
+run_guard ap-ok action-pins
+expect_pass "consistent pins pass, and two sub-actions of one repo may share a SHA"
+
+# THE case this guard exists for, reproduced from the defect itself: Dependabot moved
+# clean-dist.yml's checkout SHA to v7.0.1's but its marker rewrite failed on the trailing prose,
+# leaving `# v5.1.0` on the new commit while four other files said v7.0.1 (DB-038 decay, v1.9.1
+# review). One SHA, two labels.
+ap_tree ap-stale-marker \
+	"build.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"clean-dist.yml|actions/checkout@$SHA_A  # v5.1.0 - node24 runtime (see build.yml)"
+run_guard ap-stale-marker action-pins
+expect_fail "one SHA carrying two version markers fails" "labelled with more than one version"
+
+# The mirror image: the marker agrees everywhere but one file kept the OLD commit, so a single
+# release claims two commits. Rule 3a cannot see this one — the labels match.
+ap_tree ap-split-sha \
+	"build.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"release.yml|actions/checkout@$SHA_B  # v7.0.1"
+run_guard ap-split-sha action-pins
+expect_fail "one action+version resolving to two commits fails" "more than one commit"
+
+ap_tree ap-tag-ref "build.yml|actions/checkout@v7"
+run_guard ap-tag-ref action-pins
+expect_fail "a tag ref instead of a commit SHA fails" "not a 40-hex commit SHA"
+
+ap_tree ap-unlabelled "build.yml|actions/checkout@$SHA_A"
+run_guard ap-unlabelled action-pins
+expect_fail "a SHA pin with no version marker fails" "no '# v<version>' marker"
+
+# A path inside the repository and a container image are not third-party supply chain, but a tree
+# holding ONLY those has nothing to say — so it must be loud, not a silent pass.
+ap_tree ap-local-only "build.yml|./.github/actions/setup" "build.yml|docker://alpine:3.20"
+run_guard ap-local-only action-pins
+expect_fail "a tree with no third-party uses: is reported, not passed" "checked nothing"
+
+rm -rf "$SANDBOX/ap-empty"
+mkdir -p "$SANDBOX/ap-empty/.github/workflows"
+run_guard ap-empty action-pins
+expect_fail "no workflow files at all is reported, not passed" "checked nothing"
+
+# Trailing prose after the version is legal — it is the shape Dependabot chokes on, not a defect
+# in the file — so the guard must read the leading token as the marker and not the whole comment.
+ap_tree ap-prose \
+	"build.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"clean-dist.yml|actions/checkout@$SHA_A  # v7.0.1 - node24 runtime (see build.yml node24 policy)"
+run_guard ap-prose action-pins
+expect_pass "a marker followed by prose is read as just the version"
+
 # Every guard AND this suite must be executable. python-edit.sh needs it because the ladder runs
 # it with bash but the PreToolUse hook does not; this suite needs it because .claude/settings.json
 # pre-allows the bare `scripts/tests/local-guards.sh` spelling, while verify.sh runs it through

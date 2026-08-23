@@ -14,6 +14,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows
 import org.robolectric.shadows.ShadowNetwork
 import org.robolectric.shadows.ShadowNetworkCapabilities
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -147,5 +149,41 @@ class WifiSsidStrategyTest {
         assertNull(normalizeSsid("<redacted>"))
         assertNull(normalizeSsid("\"\""))
         assertEquals("Real", normalizeSsid("\"Real\""))
+    }
+
+    // DB-074: these pin the hand-rolled loop; only :platform's lint gate catches a readNBytes.
+    @Test
+    fun readBounded_stopsAtTheLimitWithoutConsumingTheRest() {
+        val source = ByteArrayInputStream(ByteArray(100) { it.toByte() })
+
+        val head = source.readBounded(40)
+
+        assertEquals(40, head.size)
+        assertEquals(0.toByte(), head[0])
+        assertEquals(39.toByte(), head[39])
+        assertEquals(40, source.read(), "the limit must not over-read the stream")
+    }
+
+    @Test
+    fun readBounded_returnsEverythingWhenTheStreamEndsFirst() {
+        assertEquals(7, ByteArrayInputStream(ByteArray(7)).readBounded(4096).size)
+        assertEquals(0, ByteArrayInputStream(ByteArray(0)).readBounded(4096).size)
+    }
+
+    // A naive single read() reports one chunk as the whole of a process's output.
+    @Test
+    fun readBounded_keepsReadingAcrossPartialReads() {
+        val dribble = object : InputStream() {
+            private val data = "abcdefghij".toByteArray()
+            private var at = 0
+            override fun read(): Int = if (at < data.size) data[at++].toInt() else -1
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (at >= data.size) return -1
+                b[off] = data[at++]
+                return 1 // one byte per call, whatever was asked for
+            }
+        }
+
+        assertEquals("abcdefghij", dribble.readBounded(64).decodeToString())
     }
 }

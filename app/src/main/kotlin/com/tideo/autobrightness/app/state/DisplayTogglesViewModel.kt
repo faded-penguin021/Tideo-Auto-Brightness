@@ -34,11 +34,15 @@ data class PrivilegedDisplayUiState(
     val hdrAvailable: Boolean = false,
     val hdrPreferenceCustom: Boolean = false,
     val daltonizerPreferenceCustom: Boolean = false,
+    val stayAwakePreferenceCustom: Boolean = false,
     val adbCommand: String = "",
     val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
     val grantMessage: String? = null,
     val writeFailed: Boolean = false,
 )
+
+/** DB-078: preserved fields whose control stays visible, so an overwrite has something to show. */
+enum class PreservedDisplayField { DALTONIZER, STAY_AWAKE }
 
 /**
  * Privileged Display screen driver (D-149/D-152): grant card, tier, device facts.
@@ -92,20 +96,12 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             deviceLock.withLock {
                 val snapshot = readSnapshotLocked()
                 val nightLightAutoMode = display.readNightLightAutoMode()
-                publishIfCurrent(generation) {
-                    _state.update {
-                        it.copy(
-                            nightLightAutoMode = nightLightAutoMode,
-                            nightLightAvailable = display.nightLightAvailable,
-                            alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
-                            hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
-                            hdrPreferenceCustom = display.hdrForceSdrAvailable &&
-                                snapshot != null && snapshot.hdrForceSdr == null,
-                            daltonizerPreferenceCustom = snapshot != null && snapshot.daltonizer == null,
-                            writeFailed = false,
-                        )
-                    }
-                    _deviceSnapshot.value = snapshot
+                publish(generation, snapshot, writeFailed = false) {
+                    it.copy(
+                        nightLightAutoMode = nightLightAutoMode,
+                        nightLightAvailable = display.nightLightAvailable,
+                        alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
+                    )
                 }
             }
         }
@@ -154,8 +150,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
         scheduleDeviceOperation(invalidateSnapshot = true) { generation ->
             deviceLock.withLock {
                 val device = readSnapshotLocked()
-                val daltonizerPick = DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
-                    ?: DaltonizerMode.OFF
+                val daltonizerPick = settings.daltonizerPick()
                 val deviceDaltonizer = device?.daltonizer
                 val writeDaltonizer = when {
                     device == null -> true
@@ -176,7 +171,9 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                     if (device == null || (device.alwaysOn != null && device.alwaysOn != settings.alwaysOnDisplayEnabled)) {
                         add(display.setAlwaysOnDisplay(settings.alwaysOnDisplayEnabled))
                     }
-                    if (device == null || device.stayAwake != settings.stayAwakeChargingEnabled) {
+                    if (device == null ||
+                        (device.stayAwake != null && device.stayAwake != settings.stayAwakeChargingEnabled)
+                    ) {
                         add(display.setStayAwakePlugged(settings.stayAwakeChargingEnabled))
                     }
                     if (display.hdrForceSdrAvailable &&
@@ -187,22 +184,50 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                 }
                 // DB-047: publish the post-write device truth; retaining the pre-Apply snapshot
                 // makes the draft merge immediately undo the visible toggle.
-                val snapshot = readSnapshotLocked()
-                publishIfCurrent(generation) {
-                    _state.update {
-                        it.copy(
-                            hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
-                            hdrPreferenceCustom = display.hdrForceSdrAvailable &&
-                                snapshot != null && snapshot.hdrForceSdr == null,
-                            daltonizerPreferenceCustom = snapshot != null && snapshot.daltonizer == null,
-                            writeFailed = results.any { r -> r.isFailure },
-                        )
-                    }
-                    _deviceSnapshot.value = snapshot
-                }
+                publish(generation, readSnapshotLocked(), results.any { r -> r.isFailure })
             }
         }
     }
+
+    /** DB-078: overwrite ONE preserved field with what its control shows; Apply cannot reach it. */
+    fun overwriteDeviceField(field: PreservedDisplayField, settings: AabSettings) {
+        scheduleDeviceOperation(invalidateSnapshot = true) { generation ->
+            deviceLock.withLock {
+                val result = when (field) {
+                    PreservedDisplayField.DALTONIZER -> display.setDaltonizer(settings.daltonizerPick())
+                    PreservedDisplayField.STAY_AWAKE ->
+                        display.setStayAwakePlugged(settings.stayAwakeChargingEnabled)
+                }
+                publish(generation, readSnapshotLocked(), result.isFailure)
+            }
+        }
+    }
+
+    /** Everything the screen derives from a fresh read-back, in the one place all three writers use. */
+    private fun publish(
+        generation: Long,
+        snapshot: DeviceDisplaySnapshot?,
+        writeFailed: Boolean,
+        also: (PrivilegedDisplayUiState) -> PrivilegedDisplayUiState = { it },
+    ) {
+        publishIfCurrent(generation) {
+            _state.update {
+                also(it).copy(
+                    hdrAvailable = display.hdrForceSdrAvailable && snapshot?.hdrForceSdr != null,
+                    hdrPreferenceCustom = display.hdrForceSdrAvailable &&
+                        snapshot != null && snapshot.hdrForceSdr == null,
+                    daltonizerPreferenceCustom = snapshot != null && snapshot.daltonizer == null,
+                    stayAwakePreferenceCustom = snapshot != null && snapshot.stayAwake == null,
+                    writeFailed = writeFailed,
+                )
+            }
+            _deviceSnapshot.value = snapshot
+        }
+    }
+
+    /** Fallback for un-validated input, as `DisplayToggleState.of` does on the coordinator side. */
+    private fun AabSettings.daltonizerPick(): DaltonizerMode =
+        DaltonizerMode.entries.firstOrNull { it.name == daltonizerMode } ?: DaltonizerMode.OFF
 
     private fun scheduleDeviceOperation(
         invalidateSnapshot: Boolean = false,

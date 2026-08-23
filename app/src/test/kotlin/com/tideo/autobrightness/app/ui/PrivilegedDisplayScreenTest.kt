@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.state.PreservedDisplayField
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
 import com.tideo.autobrightness.app.ui.screens.PrivilegedDisplayContent
 import com.tideo.autobrightness.platform.display.DaltonizerMode
@@ -40,6 +41,7 @@ class PrivilegedDisplayScreenTest {
         state: PrivilegedDisplayUiState = elevated,
         initial: AabSettings = AabSettings(),
         onApply: () -> Unit = {},
+        onOverwrite: (PreservedDisplayField) -> Unit = {},
     ): () -> AabSettings {
         var draft = initial
         compose.setContent {
@@ -51,6 +53,7 @@ class PrivilegedDisplayScreenTest {
                     draftDirty = true,
                     onEditDraft = { transform -> draft = transform(draft) },
                     onApplyDraft = onApply,
+                    onOverwriteField = onOverwrite,
                 )
             }
         }
@@ -116,6 +119,50 @@ class PrivilegedDisplayScreenTest {
     fun elevated_noCustomDaltonizerPreference_showsNoNotice() {
         setDraftContent()
         compose.onNodeWithTag("pd_daltonizer_custom_preserved").assertDoesNotExist()
+    }
+
+    // DB-078: each preservation notice that sits beside a VISIBLE control offers a way out of it.
+    @Test
+    fun elevated_customDaltonizerPreference_offersAnOverwrite() {
+        var overwritten: PreservedDisplayField? = null
+        setDraftContent(
+            state = elevated.copy(daltonizerPreferenceCustom = true),
+            onOverwrite = { overwritten = it },
+        )
+
+        compose.onNodeWithTag("pd_daltonizer_custom_preserved_overwrite").performScrollTo().performClick()
+
+        assertEquals(PreservedDisplayField.DALTONIZER, overwritten)
+    }
+
+    @Test
+    fun elevated_customStayAwakePreference_isExplainedAndOffersAnOverwrite() {
+        var overwritten: PreservedDisplayField? = null
+        setDraftContent(
+            state = elevated.copy(stayAwakePreferenceCustom = true),
+            onOverwrite = { overwritten = it },
+        )
+
+        compose.onNodeWithTag("pd_stay_awake_custom_preserved").performScrollTo().assertExists()
+        compose.onNodeWithTag("switch_stayAwake").assertExists()
+        compose.onNodeWithTag("pd_stay_awake_custom_preserved_overwrite").performScrollTo().performClick()
+
+        assertEquals(PreservedDisplayField.STAY_AWAKE, overwritten)
+    }
+
+    @Test
+    fun elevated_noCustomStayAwakePreference_showsNoNotice() {
+        setDraftContent()
+        compose.onNodeWithTag("pd_stay_awake_custom_preserved").assertDoesNotExist()
+    }
+
+    // The HDR notice REPLACES its switch, so there is no visible value an overwrite could write.
+    @Test
+    fun elevated_customHdrPreference_showsTheNoticeWithoutAnOverwrite() {
+        setDraftContent(state = elevated.copy(hdrAvailable = false, hdrPreferenceCustom = true))
+
+        compose.onNodeWithTag("pd_hdr_custom_preserved").performScrollTo().assertExists()
+        compose.onNodeWithTag("pd_hdr_custom_preserved_overwrite").assertDoesNotExist()
     }
 
     @Test

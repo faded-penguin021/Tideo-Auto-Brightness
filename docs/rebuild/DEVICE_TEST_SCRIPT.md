@@ -145,6 +145,11 @@ optional.
       com.tideo.autobrightness[.debug] android.permission.DUMP`), keep Location off, tap **Use current
       SSID** again. **Expected:** the field fills with the connected network name (resolved via in-process
       `dumpsys wifi`). With Shizuku or root instead, the same read succeeds via `cmd wifi status`.
+      **Run this on Android 12 or 12L if you have one (DB-074):** both of those paths ran through an
+      API-33 call whose `NoSuchMethodError` was swallowed, so they returned nothing at all on API
+      31/32 while the Shizuku path kept working. A blank field there, with the grant in place, is
+      the regression. Nothing below API 33 is reachable from a JVM test — `:platform`'s lint gate,
+      not a fixture, is what stands behind this.
 24a. **"Use current location", both callers (DB-057…DB-061).** In a Contexts **location rule** tap
     **Use current location**. **Expected:** a toast reading *"Acquiring location — this can take up
     to 45 seconds…"* with the number present, then the two fields filling plus a coordinates toast,
@@ -225,13 +230,18 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
       `are_user_disabled_hdr_formats_allowed=0`; off → allowed returns `1` and formats clears.
       This writes stored preferences, not Android's Force-SDR service API. Either direction may
       require a reboot, and HDR/display-mode changes may briefly blank the screen (DB-044).
-32a. **Stay awake writes AOSP's whole mask, and leaves a mask it did not set (DB-065/DB-068/DB-070).**
-    Start from OFF or this proves nothing — Apply skips a write the device does not need:
-    `adb shell settings put global stay_on_while_plugged_in 0`, toggle ON, Apply →
-    **Expected: `15`** (`AC|USB|WIRELESS|DOCK`), not 7. OFF + Apply → `0`; ON again → `15`. Then set
-    a partial mask by hand (`… put global stay_on_while_plugged_in 1` — a value AOSP's own switch
-    writes) and Apply with some *other* field changed. **Expected:** it stays `1`; an unrelated
-    Apply must not broaden a charger set you chose. Off→on is how you deliberately re-assert 15.
+32a. **Stay awake writes AOSP's whole mask, and says so when the device holds another
+    (DB-065/DB-068/DB-070/DB-077/DB-078).** Start from OFF or this proves nothing — Apply skips a
+    write the device does not need: `adb shell settings put global stay_on_while_plugged_in 0`,
+    toggle ON, Apply → **Expected: `15`** (`AC|USB|WIRELESS|DOCK`), not 7. OFF + Apply → `0`.
+    Then set a mask this app does not write (`… put global stay_on_while_plugged_in 7` — what
+    Tideo itself wrote up to v1.9.0, so this is the state every upgrading device is in; `1` also
+    works) and reopen the screen. **Expected:** the switch reads ON *and* a notice appears under it
+    saying Android is set to a charger set this app did not write. Now Apply with some *other*
+    field changed. **Expected:** the mask stays as you set it — an unrelated Apply must not broaden
+    a charger set Tideo did not choose. Finally tap **Use Tideo's setting instead** on that notice.
+    **Expected:** the mask becomes `15` and the notice disappears, with no Apply needed. A notice
+    that never appears at `7` is the DB-077 regression; a button that needs Apply is DB-078's.
 32b. **HDR: an absent row is a default, a partial row is a preference (DB-045/DB-049).** With both
     rows cleared (`adb shell settings delete global user_disabled_hdr_formats` and
     `… delete global are_user_disabled_hdr_formats_allowed`), open the screen. **Expected:** the
@@ -246,8 +256,11 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     `adb shell settings get secure accessibility_display_daltonizer` (+ `…_enabled`). Values
     `-1, 0, 11, 12, 13` or unset → **SKIP, nothing to observe**, the expected outcome on
     AOSP-faithful hardware. *Only* if a device reports something else on its own: the chips carry a
-    preservation notice, an unrelated Apply leaves both keys untouched, and an explicit chip pick
-    still writes. Otherwise this behaviour is unit-tested only and an accepted unverified residual.
+    preservation notice, an unrelated Apply leaves both keys untouched, an explicit chip pick still
+    writes, and **Use Tideo's setting instead** on the notice writes the mode the chips currently
+    show without an Apply (DB-078 — that button is the only way to reach the already-selected chip,
+    which at a default profile is Off). Otherwise this behaviour is unit-tested only and an accepted
+    unverified residual.
 32d. **Unsupported Night Light / AOD fail closed (DB-041…DB-043).** Needs hardware that reports the
     feature unavailable — **BLOCKED on every device to hand**, so expect to skip. Where such a
     device exists: the row is hidden entirely (AOD needs `config_dozeAlwaysOnDisplayAvailable` AND a

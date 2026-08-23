@@ -300,10 +300,14 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
     never a top-level `contents: write`.
 - **Steps:**
   1. Keep the grouped PR as **one** — grouped review is deliberate; don't split it.
-  2. **Verify each bumped line's marker↔SHA by hand — no guard checks it.** Dependabot rewrites
-     both, but its marker rewrite silently fails when **trailing prose follows the version** on the
-     `uses:` line, leaving a stale `# vX.Y.Z` on a moved SHA (DB-038 decay, hit twice). Resolve the
-     tag to its commit on GitHub: the pin must equal it and the marker must name it.
+  2. **Resolve each bumped line's tag to its commit on GitHub, by hand.** The pin must equal it and
+     the marker must name it. Dependabot rewrites both, but its marker rewrite silently fails when
+     **trailing prose follows the version** on the `uses:` line, leaving a stale `# vX.Y.Z` on a
+     moved SHA (DB-038 decay, hit twice). Which layer holds this: `scripts/guards/action-pins.sh`
+     (DB-076) fails the ladder on a tag ref, an unlabelled pin, one SHA wearing two markers, and one
+     action+version resolving to two commits — the shape both DB-038 incidents took. It cannot check
+     the tag↔SHA claim itself, because that needs the network and the ladder is offline, so a pin
+     mislabelled **the same way everywhere** is still yours to catch here and nowhere else.
   3. **Fix prose Dependabot can't touch** — it never edits comments. E.g. `build.yml`'s Node-24
      policy block names the pinned majors ("Do NOT downgrade…") and goes factually wrong on a bump.
      Update any such block in the **same** PR.

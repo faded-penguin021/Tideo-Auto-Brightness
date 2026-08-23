@@ -5,7 +5,6 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import kotlinx.coroutines.delay
@@ -57,21 +56,13 @@ class AndroidForegroundAppMonitor(
     }
 }
 
-@Suppress("DEPRECATION")
+// DB-075: un-deprecated at compileSdk 36 and older than minSdk — no branch, no suppression.
 fun hasUsageStatsAccess(context: Context): Boolean {
     val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-    val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-        appOps.checkOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            context.packageName,
-        )
-    } else {
-        appOps.unsafeCheckOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            context.packageName,
-        )
-    }
+    val mode = appOps.checkOpNoThrow(
+        AppOpsManager.OPSTR_GET_USAGE_STATS,
+        Process.myUid(),
+        context.packageName,
+    )
     return mode == AppOpsManager.MODE_ALLOWED
 }

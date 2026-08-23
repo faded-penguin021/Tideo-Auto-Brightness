@@ -5,9 +5,10 @@ import com.tideo.autobrightness.platform.display.DaltonizerMode
 
 /**
  * DB-034: what the seven Privileged Display keys actually read as on the device, so the screen can
- * show the device instead of asserting the stored profile. Nullable feature booleans mean Android
- * reports that feature unavailable; [temperatureK] null means no explicit value when Night Light
- * is available.
+ * show the device instead of asserting the stored profile. A null is "no value this app can state":
+ * feature unavailable ([nightLight], [alwaysOn]), device holds something unrepresentable
+ * ([daltonizer] DB-066, [hdrForceSdr] DB-049, [stayAwake] DB-077), or no explicit
+ * value ([temperatureK]).
  */
 data class DeviceDisplaySnapshot(
     val nightLight: Boolean?,
@@ -15,7 +16,7 @@ data class DeviceDisplaySnapshot(
     val daltonizer: DaltonizerMode?,
     val inversion: Boolean,
     val alwaysOn: Boolean?,
-    val stayAwake: Boolean,
+    val stayAwake: Boolean?,
     val hdrForceSdr: Boolean?,
 )
 
@@ -35,7 +36,7 @@ fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings
     daltonizerMode = snapshot.daltonizer?.name ?: daltonizerMode,
     inversionEnabled = snapshot.inversion,
     alwaysOnDisplayEnabled = snapshot.alwaysOn ?: alwaysOnDisplayEnabled,
-    stayAwakeChargingEnabled = snapshot.stayAwake,
+    stayAwakeChargingEnabled = snapshot.stayAwake ?: stayAwakeChargingEnabled,
     hdrForceSdrEnabled = snapshot.hdrForceSdr ?: hdrForceSdrEnabled,
 )
 

@@ -78,10 +78,19 @@ COMMENT_BLOCK_MAX_LINES=12
 # count plus COMMENT_BUDGET_MARGIN_PCT", and nothing in the tree read the constant at all. A stated
 # policy that nothing computes and no number obeys is an accident with a name on it. Re-baseline by
 # updating MEASURED_* from a guard run; the ceilings follow.
+#
+# Re-baselined 2026-08-23 (DB-074…DB-078): app 2288 → 2417, platform 291 → 314. Not a narrative
+# landing in source — the v1.9.2 review added declarations that did not exist before (`readBounded`,
+# `overwriteDeviceField`, `PreservedDisplayField`, the `PreservedNotice` composable, a tri-state
+# `readStayAwakePlugged`, and their fixtures), and each carries a ONE-LINE `// DB-NNN:` pointer with
+# the prose in the row. The first repair was taken first and is most of the delta: the same change
+# was 38/16 lines over before its comments were cut back to pointers. Trimming the rest would mean
+# deleting the last code citation of a row, which the constitution forbids and the citation rung
+# fails on — so the two repairs are in tension here and the pointer wins.
 COMMENT_BUDGET_MARGIN_PCT=5
-MEASURED_app=2288
+MEASURED_app=2417
 MEASURED_domain=436
-MEASURED_platform=291
+MEASURED_platform=314
 for _m in app domain platform; do
 	eval "_meas=\$MEASURED_$_m"
 	# Integer ceiling: (x*pct + 99) / 100.

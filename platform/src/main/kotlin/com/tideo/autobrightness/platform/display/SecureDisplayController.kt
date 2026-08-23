@@ -32,7 +32,8 @@ interface SecureDisplayController {
     fun readAlwaysOnDisplay(): Boolean
     fun setAlwaysOnDisplay(on: Boolean): Result<Unit>
 
-    fun readStayAwakePlugged(): Boolean
+    /** null when the device holds a charger set this app did not write (DB-077). */
+    fun readStayAwakePlugged(): Boolean?
     fun setStayAwakePlugged(on: Boolean): Result<Unit>
 
     /** Experimental direct HDR-format Settings control on Android 14+. */
@@ -140,8 +141,13 @@ class AndroidSecureDisplayController(
         Settings.Secure.putInt(resolver, KEY_DOZE_ALWAYS_ON, if (on) 1 else 0)
     }
 
-    override fun readStayAwakePlugged(): Boolean =
-        Settings.Global.getInt(resolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0) != 0
+    // DB-077: `!= 0` here is what made the DB-068 diff skip a device holding v1.9.0's own mask.
+    override fun readStayAwakePlugged(): Boolean? =
+        when (Settings.Global.getInt(resolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0)) {
+            0 -> false
+            STAY_ON_ANY_CHARGER -> true
+            else -> null
+        }
 
     override fun setStayAwakePlugged(on: Boolean): Result<Unit> = elevatedWrite {
         Settings.Global.putInt(

@@ -49,7 +49,7 @@ We **gained** three rungs with no local predecessor: `guard_author_identity`,
 the AMH repository now, and a stale local snapshot would read as authoritative to a future
 session while drifting against every upstream release.
 
-## The seven repo-local guards, and why each is not upstream's job
+## The eight repo-local guards, and why each is not upstream's job
 
 - **`fdroid-changelog.sh`** — F-Droid flags a `whatsNew` over 500 **characters**, and it measures
   codepoints, not bytes. `wc -c` rejects a legal note full of em dashes. Only the current
@@ -165,7 +165,19 @@ session while drifting against every upstream release.
   shows that. Its header states what it does not match (a script file, `sed -i` and friends,
   runtime-constructed commands, and every edit after the first).
 
-`scripts/tests/local-guards.sh` is their fixture suite — 111 cases, run by `scripts/verify.sh`.
+- **`action-pins.sh`** — every `uses:` is a 40-hex commit SHA carrying a `# vX.Y.Z` marker, one SHA
+  never wears two markers, and one action+version never resolves to two commits (DB-076). Upstream
+  cannot own this: the AMH ships no CI-supply-chain opinion, and the Scorecard rails these encode
+  are this repository's own RUNBOOK playbook 8. **What it deliberately does not check is the thing
+  you would want most**: whether a marker names the tag its SHA really belongs to. That needs
+  `git ls-remote`, and the ladder is offline and deterministic, so a pin mislabelled *consistently*
+  passes here and playbook 8 step 2 — resolve the tag on GitHub by hand — remains the only layer
+  that sees it. What it does catch is the failure that actually happened, twice: Dependabot rewrites
+  a SHA but its marker rewrite fails silently on lines with trailing prose after the version
+  (DB-038), leaving the same commit labelled two ways across the tree. Both incidents were caught by
+  eye, on a PR, by a reviewer who happened to look.
+
+`scripts/tests/local-guards.sh` is their fixture suite — 119 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -178,9 +190,12 @@ broken guard rather than a mild opinion. The contract is the **ladder's**: a wor
 calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
 `scripts/guards/*.sh` outside `scripts/ladder.sh`.
 
-**All six of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
+**All eight of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
 secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
 — for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
+`action-pins.sh` joins them on the same test: a tag ref where a SHA belongs, an unlabelled pin and
+two markers on one commit are each wrong every time, and the one judgement call it might have
+wanted — is this marker the right *tag* — is the question it deliberately does not ask.
 `comment-budget.sh` was the one real candidate for the warn tier and was refused it: a budget that
 only warns is a budget the next session spends, and warn fatigue is the documented failure mode
 for exactly this shape of rule. The escape hatch is not a warning, it is the constants in the
