@@ -246,8 +246,9 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     rows cleared (`adb shell settings delete global user_disabled_hdr_formats` and
     `… delete global are_user_disabled_hdr_formats_allowed`), open the screen. **Expected:** the
     **switch**, off — an untouched device is canonical off. A preservation notice here is the DB-049
-    regression. Now produce a *partial* disabled-format set — prefer **Developer options → Disable
-    HDR formats**, ticking one or two formats, over writing the row by hand. **Expected:** the
+    regression. Now produce a *partial* disabled-format set through **Developer options → Disable
+    HDR formats**, ticking one or two formats — **never by writing the row by hand**, which is the
+    DB-071 ban and not a preference between two allowed routes. **Expected:** the
     switch is replaced by a custom-preference notice, and applying an unrelated field leaves that
     row untouched instead of broadening it to the full set.
 32c. **An unrecognised colour-correction mode is READ-ONLY territory (DB-066/DB-069/DB-071).**

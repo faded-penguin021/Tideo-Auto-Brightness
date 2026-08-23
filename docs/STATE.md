@@ -41,7 +41,9 @@ checklist and parity gaps empty.
 **Resuming cold?** **v1.9.1/vc22 is the newest release** (owner, 2026-08-20; tag on `main`), and
 this branch carries unreleased **v1.9.2/vc23** — the AppOps cleanup plus the post-v1.9.0 review
 fixes below, device-verified 2026-08-23. Nothing is half-done, no ephemeral device script is
-outstanding, and the owed rule review is done — vc23 is ready for a release PR. Do **not** re-open
+outstanding, and what stands between vc23 and a release PR is the rule-review obligation: every
+round so far is answered, and any further rule-file edit — this file's length-guard preamble and
+Decided non-items included — owes its own pass. Do **not** re-open
 the closed force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local
 input rather than a retained score or CI gate, its two surviving rails being RUNBOOK playbook 8's.
 
@@ -108,7 +110,9 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
   callback invocation is an accepted unverified residual (DB-013).
 - **Never synthesise an unsupported value in a display key on a real device** (DB-071): no
   `settings put` of anything no AOSP path writes — daltonizer matrices, HDR format lists,
-  `reduce_bright_colors_level`. Two owner devices have been left needing blind recovery. The
+  `reduce_bright_colors_level`. Two owner devices have been left needing blind recovery. The ban is
+  on writing the row yourself, not on the state: reaching one through a real settings UI is always
+  allowed, and where both are described, the UI is the only sanctioned route. The
   unrecognised-daltonizer path (DB-066) is unit-tested only and an accepted unverified residual:
   observe it read-only if a device ever reports such a mode by itself (§11 32c). DB-045's partial
   HDR row is NOT in that position — Developer options → Disable HDR formats produces it through a
