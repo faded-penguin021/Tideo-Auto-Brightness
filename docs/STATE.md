@@ -32,7 +32,8 @@ checklist and parity gaps empty.
 
 **Resuming cold?** **v1.9.1/vc22 is the newest release** (owner, 2026-08-20; tag on `main`), and
 this branch carries unreleased **v1.9.2/vc23** — the AppOps cleanup plus the post-v1.9.0 review
-fixes below. Nothing is half-done and no ephemeral device script is outstanding. Do **not** re-open
+fixes below, device-verified 2026-08-23. Nothing is half-done, no ephemeral device script is
+outstanding, and the only thing standing between vc23 and a release PR is the owed rule review. Do **not** re-open
 the closed force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local
 input rather than a retained score or CI gate, its two surviving rails being RUNBOOK playbook 8's.
 
@@ -46,18 +47,11 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
 > what, and what result would mean it worked. Put ledger IDs at the end as a reference, never as the
 > subject of a sentence. If an item cannot be understood without opening another file, rewrite it.
 
-1. **Test the stay-awake fix on any phone** — WAITING ON OWNER. Debug build `1.9.2-debug` (vc23)
-   sent 2026-08-23. Set the charger mask to the old value with
-   `adb shell settings put global stay_on_while_plugged_in 7`, open Privileged Display, and check
-   three things: a notice appears under the "Stay awake while charging" switch saying Android is set
-   to a charger set the app did not write; changing some *other* setting and tapping Apply leaves
-   the value at 7; tapping "Use Tideo's setting instead" changes it to 15 with no Apply. Full steps
-   are in `DEVICE_TEST_SCRIPT.md` §11 32a. (DB-077, DB-078.)
-2. **Nothing to do — two checks are blocked on hardware.** The Android 12/12L Wi-Fi fix needs a
+1. **Nothing to do — two checks are blocked on hardware.** The Android 12/12L Wi-Fi fix needs a
    phone that old and the owner has none (DB-074, §8 step 24). The unrecognised-colour-mode button
    only appears if a phone reports a mode Android does not know, and none do — never force one by
    writing a fake value (DB-078, §11 32c, DB-071). Both stay unverified on purpose.
-3. **Nothing to do — waiting on a Samsung.** Whether Night Light and always-on display fail safely
+2. **Nothing to do — waiting on a Samsung.** Whether Night Light and always-on display fail safely
    when Android reports them unavailable; every phone to hand reports them available. Blocked three
    times already, so parked until such a device exists. (DB-041…DB-043.)
 
@@ -66,6 +60,10 @@ Open questions: none. Owed reviews: this branch changes rule files (`docs/RUNBOO
 before merge. Answered 2026-08-23: the comment-budget increase is accepted on condition the source
 pointers stay terse, since the rule exists to stop prose living in two places; all thirteen are one
 line each.
+
+Closed 2026-08-23: the stay-awake fix is **device-verified on 1.9.2-debug vc23** (owner) — all three
+checks of §11 32a passed, so DB-077 and DB-078 are confirmed on hardware and the DB-065 dock bit now
+reaches a device upgrading from v1.9.0.
 
 Closed earlier: DB-061, the DB-064 legislation call, and the provenance-manifest note (owner,
 2026-08-18); the force-stop location defect, as no app defect (owner, 2026-08-17). Device rounds
@@ -104,6 +102,8 @@ Newest first; ledger rows are the durable detail.
   their own control showed, `hasUsageStatsAccess` branched on a misread of the API-36 stubs, and
   playbook 8's marker↔SHA rails had no guard. Comment budget re-baselined for the new declarations,
   after cutting the new comments to one-line pointers took the overshoot from 38/16 lines to 14/8.
+  The stay-awake half is owner-verified on device the same day; the rest is unit-tested or blocked
+  on hardware.
 - 2026-08-21..22 — **AMH upgraded 5.2.0 → 9.1.0 (DB-073) and the constitution rewritten in natural
   prose.** Shipped scripts and manifest copied from the exact `amh-v9.1.0` tag; sentence floors
   added beside the byte backstops; adapters reconciled with the new secret, lifecycle, review and
