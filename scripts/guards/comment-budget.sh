@@ -84,8 +84,10 @@ COMMENT_BLOCK_MAX_LINES=12
 # this change started: at the branch point the guard already read app=2403/2403 and
 # platform=306/306, i.e. the 5% margin was fully spent by earlier v1.9.x work that never had to
 # justify it. Of the 129 app lines being ratified here, 14 are this change's (+8 platform of 23);
-# the other 115 are that silent growth, ratified now because a re-baseline cannot be partial. Those
-# 22 new lines are pointers, not narrative — the review added declarations that did not exist
+# the other 115 are that silent growth, ratified now because a re-baseline cannot be partial. Every
+# number here is THIS guard's count, which includes KDoc and block comments — a `grep '^+ *//'` over
+# the same diff sees 14 lines in total, not 14 app, and the two must not be quoted for each other.
+# Those 22 new lines are pointers, not narrative — the review added declarations that did not exist
 # before (`readBounded`, `overwriteDeviceField`, `PreservedDisplayField`, the `PreservedNotice`
 # composable, a tri-state `readStayAwakePlugged`, and their fixtures), each carrying a `// DB-NNN:`
 # pointer with the prose in the row; the same change was 38/16 lines over before its comments were

@@ -4,8 +4,10 @@
 # A fresh container has an empty dependency cache, so the session's FIRST real ladder run pays
 # the whole download+compile+test cost serially — right when the agent wants a verdict. The
 # session-start hook launches this script detached (remote containers only), so that cost
-# overlaps the minutes the session spends reading STATE/RUNBOOK instead. It runs the same five
-# rungs as scripts/ladder.sh, so a later ladder run finds everything cached/up-to-date.
+# overlaps the minutes the session spends reading STATE/RUNBOOK instead. It runs the same tasks as
+# scripts/verify.sh's verification set, so a later ladder run finds everything cached/up-to-date —
+# DB-080: this is a COPY of that line, and the copies drift apart silently unless you grep for the
+# command whenever the set changes.
 #
 # Safe by construction: Gradle's own inter-process locking serializes this against any build
 # the session starts meanwhile (worst case equals today's cold cost); a failure here is
@@ -31,7 +33,8 @@ fi
 {
   echo "=== warm-gradle start $(date -u +%FT%TZ) ==="
   if nice -n 19 ./gradlew --quiet \
-      :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug; then
+      :domain:test :platform:test :app:testDebugUnitTest \
+      :platform:lintDebug :app:lintDebug :app:assembleDebug; then
     echo "=== warm-gradle DONE $(date -u +%FT%TZ) ==="
   else
     echo "=== warm-gradle FAILED $(date -u +%FT%TZ) (harmless: scripts/ladder.sh is the reporting authority) ==="

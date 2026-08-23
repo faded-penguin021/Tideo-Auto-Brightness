@@ -565,8 +565,9 @@ owner-verified — no emulator, no KVM):
 ./gradlew :app:assembleDebug      # APK
 ./gradlew :platform:lintDebug :app:lintDebug  # lint, BOTH Android modules (hard gate — no baseline;
                                               # targeted suppressions in app/lint.xml). One module's
-                                              # gate is not a gate: AGP reports a library's findings
-                                              # only in that library's report (DB-074).
+                                              # gate is not a gate: unless checkDependencies is on,
+                                              # AGP reports a library's findings only in that
+                                              # library's own report (DB-074).
 ```
 
 ## When CI fails on a PR (workflow vs code)

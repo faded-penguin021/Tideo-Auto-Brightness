@@ -933,14 +933,17 @@
   preamble, where the next session reads it before writing an item. The house style is not wrong
   elsewhere — the audience is what changed, and no guard can see a register mismatch.
 
-- DB-080 [cited]: **A verification set spelled out in four places is fixed in four places.** DB-074
+- DB-080 [cited]: **A verification set spelled out in five places is fixed in five places.** DB-074
   added `:platform:lintDebug` to `scripts/verify.sh` and stopped there, while `release.yml`,
-  `release-signing.yml` and RUNBOOK's rungs-individually block each carried their own copy of the
-  same Gradle line with `:app:lintDebug` alone — so both release gates and every agent following
-  the RUNBOOK would still have shipped the unlinted `:platform`. The fix that closed a hole locally
-  left it open on the path that actually cuts releases. Before calling a gate fixed, grep the tree
-  for the command, not the module.
-  `[cited]`: `scripts/verify.sh`, `.github/workflows/release.yml`, `docs/RUNBOOK.md`.
+  `release-signing.yml`, `warm-gradle.sh` and RUNBOOK's rungs-individually block and Acceptance
+  line each carried their own copy of the same Gradle line with `:app:lintDebug` alone — so both
+  release gates and every agent following the RUNBOOK would still have shipped the unlinted
+  `:platform`. The fix that closed a hole locally left it open on the path that actually cuts
+  releases. Grep the tree for the COMMAND, not the module, before calling a gate fixed: this row
+  first said "four places" and the fifth copy was found by the review that checked the row against
+  its own advice.
+  `[cited]`: `.github/workflows/release.yml`, `.github/workflows/release-signing.yml`,
+  `scripts/warm-gradle.sh`.
 
 - DB-081 [cited]: **Re-baselining a budget that is already at its ceiling ratifies the growth it
   cannot see, then mints a fresh margin on top.** At this branch's start the comment budget read
