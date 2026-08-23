@@ -933,15 +933,15 @@
   preamble, where the next session reads it before writing an item. The house style is not wrong
   elsewhere — the audience is what changed, and no guard can see a register mismatch.
 
-- DB-080 [cited]: **A verification set spelled out in five places is fixed in five places.** DB-074
-  added `:platform:lintDebug` to `scripts/verify.sh` and stopped there, while `release.yml`,
-  `release-signing.yml`, `warm-gradle.sh` and RUNBOOK's rungs-individually block and Acceptance
-  line each carried their own copy of the same Gradle line with `:app:lintDebug` alone — so both
-  release gates and every agent following the RUNBOOK would still have shipped the unlinted
-  `:platform`. The fix that closed a hole locally left it open on the path that actually cuts
-  releases. Grep the tree for the COMMAND, not the module, before calling a gate fixed: this row
-  first said "four places" and the fifth copy was found by the review that checked the row against
-  its own advice.
+- DB-080 [cited]: **A verification set is copied into more places than the one you fixed.** DB-074
+  added `:platform:lintDebug` to `scripts/verify.sh` and stopped there, leaving five other live
+  copies of the same Gradle line on `:app:lintDebug` alone: both release workflows (so a release
+  could still be cut from an unlinted `:platform`), `warm-gradle.sh`, and RUNBOOK's Acceptance line
+  and rungs-individually block. All six now lint both modules. Two exemptions, deliberate:
+  `CONTRIBUTING.md`'s copy stays `:app`-only because it is a translator's check for missing strings
+  and `:platform` has no resources, and `docs/history/` is frozen. The count in this row went
+  four → five → six as successive reviews re-ran the grep, which is the lesson: `git grep -n
+  lintDebug` for the COMMAND, not the module, and count copies rather than files.
   `[cited]`: `.github/workflows/release.yml`, `.github/workflows/release-signing.yml`,
   `scripts/warm-gradle.sh`.
 

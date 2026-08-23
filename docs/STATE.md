@@ -5,15 +5,14 @@
 > deliberately not copied here, because nothing would check the copy; `scripts/ladder.sh` prints
 > them with the size. The rules, with the reasoning behind each left in `guard_state_size` and
 > `guard_state_structure`, which are the authority and upgrade independently of this paragraph.
-> **Which of these a guard holds, and which are only asked of you.** Mechanised: the hard cap, the
-> section list, and the whole landing rule — `guard_state_size` runs when the PREVIOUS revision was
-> above the soft cap and this one is smaller, and then enforces BOTH floors and the
-> `STATE_EDIT_DELTA_BYTES` distinction, so a pass that stops short fails. Prose only, and no guard
-> will catch you breaking it: what a compression pass may delete (nothing reads the content), the
-> ban on trimming a file already under the cap (the guard returns early on it — silence, not
-> approval), and "never drop items while compressing" (the queue is protected by its heading
-> existing, never by its items surviving). The section checks run at EVERY size; only the landing
-> check depends on where the previous revision sat.
+> **Assume a guard is watching only where you have read that it is.** Some of the bullets below are
+> mechanised and some are prose nobody checks, the split is finer than a summary here can hold
+> without going stale, and it has been stated wrongly twice. So do not summarise it: read
+> `guard_state_size` and `guard_state_structure` when it matters which kind a rule is. Three that
+> are worth knowing without looking, because each is a way to pass while defeating the rule —
+> nothing reads WHAT a compression pass deleted, nothing sees a trim or a pad of a file that was
+> already under the cap, and the Owner queue is protected by its heading existing, never by its
+> items surviving.
 >
 > - Grow freely to the soft cap, no trimming below it; above the hard cap the ladder fails.
 > - On a warning, run ONE deep pass to BOTH floors — never to just under the soft cap, and never by
@@ -42,7 +41,7 @@ checklist and parity gaps empty.
 **Resuming cold?** **v1.9.1/vc22 is the newest release** (owner, 2026-08-20; tag on `main`), and
 this branch carries unreleased **v1.9.2/vc23** — the AppOps cleanup plus the post-v1.9.0 review
 fixes below, device-verified 2026-08-23. Nothing is half-done, no ephemeral device script is
-outstanding, and the only thing standing between vc23 and a release PR is the owed rule review. Do **not** re-open
+outstanding, and the owed rule review is done — vc23 is ready for a release PR. Do **not** re-open
 the closed force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local
 input rather than a retained score or CI gate, its two surviving rails being RUNBOOK playbook 8's.
 
@@ -70,10 +69,10 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
    when Android reports them unavailable; every phone to hand reports them available. Blocked three
    times already, so parked until such a device exists. (DB-041…DB-043.)
 
-Open questions: none. Owed reviews: the rule-review protocol ran twice on 2026-08-23 — once on the
-branch's rule-file changes (nine findings) and once on the commit that triaged them (eleven, three
-of them defects that triage introduced). Both sets are fixed. Any further rule-file edit on this
-branch owes its own pass before merge; nothing else is outstanding.
+Open questions: none. Owed reviews: the rule-review protocol ran on this branch's rule-file changes
+on 2026-08-23, and again on each round of fixes, because a triage commit that edits rule files owes
+a pass of its own. Every finding is fixed; the per-round counts and what each found are in those
+commit bodies. Any further rule-file edit here owes another pass before merge.
 
 Answered 2026-08-23: the comment-budget increase is accepted on condition the source pointers stay
 terse, since the rule exists to stop prose living in two places. Two numbers settle it, and they
@@ -110,13 +109,14 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 - **Never synthesise an unsupported value in a display key on a real device** (DB-071): no
   `settings put` of anything no AOSP path writes — daltonizer matrices, HDR format lists,
   `reduce_bright_colors_level`. Two owner devices have been left needing blind recovery. The
-  unrepresentable-state paths (DB-045/DB-066) are unit-tested only; on-device they are an accepted
-  unverified residual, reached only if hardware or a real settings UI produces the state — never by
-  synthesising one. **DB-077 is not one of them** and this bullet must not be read as covering it:
-  the state is `stay_on_while_plugged_in` at 7, the mask Tideo itself shipped up to v1.9.0, so
-  every upgrading device already holds it and staging it restores a real prior state rather than
-  inventing one. §11 32a tells the owner to do exactly that, and the check passed on device
-  (2026-08-23).
+  unrecognised-daltonizer path (DB-066) is unit-tested only and an accepted unverified residual:
+  observe it read-only if a device ever reports such a mode by itself (§11 32c). DB-045's partial
+  HDR row is NOT in that position — Developer options → Disable HDR formats produces it through a
+  real settings UI, which is what §11 32b has the owner do. **Nor is DB-077**, and this bullet must
+  not be read as covering it: `stay_on_while_plugged_in` at 7 is the mask Tideo itself shipped up
+  to v1.9.0, so a device upgrading with the toggle already on is holding it in the ordinary course,
+  and staging it reproduces a state this app produced rather than inventing one no software writes.
+  §11 32a tells the owner to do exactly that, and the check passed on device (2026-08-23).
 
 ## Changelog
 
