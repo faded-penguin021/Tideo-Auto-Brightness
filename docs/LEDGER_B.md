@@ -924,3 +924,11 @@
   device. HDR gets the notice without the button on purpose: its notice REPLACES the switch, so
   there is no visible value an overwrite could claim to write.
   `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`, `app/…/ui/screens/PrivilegedDisplayScreen.kt`.
+
+- DB-079: **The Owner queue is addressed to a person deciding, so it is exempt from the repo's
+  house style.** Asked what the queue needed, the owner could not tell what action was being
+  requested: the entries were written in the same dense, ledger-ID-first register as the rest of the
+  tree, which serves a maintainer reconstructing a rationale and actively fails a reader who just
+  wants to know what to do. Plain language is now the rule for that section and is stated in its own
+  preamble, where the next session reads it before writing an item. The house style is not wrong
+  elsewhere — the audience is what changed, and no guard can see a register mismatch.
