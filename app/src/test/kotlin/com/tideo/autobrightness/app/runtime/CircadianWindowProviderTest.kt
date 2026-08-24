@@ -167,6 +167,26 @@ class CircadianWindowProviderTest {
         scope.cancel()
     }
 
+    @Test
+    fun locationOnlyOverride_usesLiveDate_DB084() = runTest {
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val loc = FakeLocationReader()
+        val provider = CircadianWindowProvider(
+            scope = scope,
+            overrideFlow = MutableStateFlow(ExperimentDateLocation(latitude = lat, longitude = lon)),
+            location = loc,
+            geoIpFallback = { null },
+            clock = { midJuneEpochSec() * 1000L }, // no fixed date → today's June windows
+            tzOffsetForDate = { 1.0 },
+        )
+        val w = provider.current(transitionFactor)
+        assertNotNull(w, "fixed location with a live date yields windows")
+        assertFalse(loc.lastKnownCalled, "fixed lat/lon must not consult Android location")
+        assertEquals(CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 1.0, transitionFactor), w)
+        assertTrue(provider.status.fixed, "status reports the location as fixed")
+        scope.cancel()
+    }
+
     // ----- F83: geo-IP fallback when no Android fix is available -----
 
     @Test

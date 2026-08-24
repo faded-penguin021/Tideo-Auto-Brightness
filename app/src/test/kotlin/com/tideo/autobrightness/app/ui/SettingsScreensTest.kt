@@ -892,7 +892,7 @@ class SettingsScreensTest {
 
     @Test
     fun circadianDateLocationCard_setFixed_emitsDateAndCoords_G2RF39() {
-        var captured: Triple<String, Double?, Double?>? = null
+        var captured: Triple<String?, Double?, Double?>? = null
         compose.setContent {
             MaterialTheme {
                 CircadianDateLocationCard(
@@ -912,7 +912,7 @@ class SettingsScreensTest {
     @Test
     fun circadianDateLocationCard_setDateOnly_emitsNullCoords_G2RF39() {
         // F39: fixed date with blank coords pins date only (live location); coords null.
-        var captured: Triple<String, Double?, Double?>? = null
+        var captured: Triple<String?, Double?, Double?>? = null
         compose.setContent {
             MaterialTheme {
                 CircadianDateLocationCard(
@@ -924,8 +924,66 @@ class SettingsScreensTest {
                 )
             }
         }
+        // Picking a day is what pins the date; the picker opens on the displayed day.
+        compose.onNodeWithTag("exp_date_value").performClick()
+        compose.onNodeWithTag("exp_date_ok").performClick()
         compose.onNodeWithTag("exp_set").performClick()
         assertEquals(Triple("2026-06-15", null, null), captured)
+    }
+
+    @Test
+    fun circadianDateLocationCard_setLocationOnly_emitsNullDate_DB084() {
+        // DB-084: fixed location with a live date, as Tasker's picker allows.
+        var captured: Triple<String?, Double?, Double?>? = null
+        compose.setContent {
+            MaterialTheme {
+                CircadianDateLocationCard(
+                    value = ExperimentDateLocation(),
+                    todayDate = "2026-06-15",
+                    currentLatLon = 55.95 to -3.19, // prefills the coord fields
+                    onSet = { d, la, lo -> captured = Triple(d, la, lo) },
+                    onUseLiveData = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("exp_set").performClick()
+        assertEquals(Triple(null, 55.95, -3.19), captured)
+    }
+
+    @Test
+    fun circadianDateLocationCard_liveDateButton_unpinsDate_DB084() {
+        // DB-084: "Live date" releases a pinned date without touching the pinned coordinates.
+        var captured: Triple<String?, Double?, Double?>? = null
+        compose.setContent {
+            MaterialTheme {
+                CircadianDateLocationCard(
+                    value = ExperimentDateLocation(date = "2025-12-21", latitude = 51.5, longitude = 0.0),
+                    todayDate = "2026-06-15",
+                    currentLatLon = null,
+                    onSet = { d, la, lo -> captured = Triple(d, la, lo) },
+                    onUseLiveData = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("exp_date_live").performClick()
+        compose.onNodeWithTag("exp_set").performClick()
+        assertEquals(Triple(null, 51.5, 0.0), captured)
+    }
+
+    @Test
+    fun circadianDateLocationCard_locationOnlyStatus_saysLiveDate_DB084() {
+        compose.setContent {
+            MaterialTheme {
+                CircadianDateLocationCard(
+                    value = ExperimentDateLocation(latitude = 51.5, longitude = 0.0),
+                    todayDate = "2026-06-15",
+                    currentLatLon = null,
+                    onSet = { _, _, _ -> },
+                    onUseLiveData = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("exp_status").assertTextContains("live date", substring = true)
     }
 
     @Test

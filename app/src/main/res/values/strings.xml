@@ -492,8 +492,10 @@
 
     <!-- Circadian -->
     <string name="circadian_date">Date: %1$s</string>
+    <string name="circadian_date_live">Date: %1$s (live)</string>
     <string name="circadian_set_fixed">Set fixed</string>
     <string name="circadian_use_live_data">Use live data</string>
+    <string name="circadian_use_live_date">Live date</string>
     <string name="graph_circadian">Circadian</string>
     <string name="graph_taper">Taper</string>
     <string name="circadian_scaling_header">Circadian scaling</string>
@@ -510,9 +512,9 @@
     <string name="circadian_err_taper_midpoint">Taper midpoint cannot exceed maximum brightness.</string>
     <string name="circadian_status_live">Live data — today + current location.</string>
     <string name="circadian_status_fixed_date">Fixed date: %1$s (live location)</string>
+    <string name="circadian_status_fixed_location">Fixed location: %1$s, %2$s (live date)</string>
     <string name="circadian_status_fixed_full">Fixed: %1$s @ %2$s, %3$s</string>
     <string name="circadian_live_word">live</string>
-    <string name="circadian_today_word">today</string>
 
     <!-- Contexts (rule list + editor) -->
     <string name="contexts_intro">Switch to a different profile automatically based on the foreground app, Wi-Fi, time of day or charging state.</string>

@@ -978,3 +978,20 @@
   and with their lesson already written down: the trap is not carelessness but reaching for the
   symptom as reported rather than for the mechanism, so ask what the check does on a device that
   never shows the bug. The owner caught this one too.
+
+- DB-084 [cited]: **A store and a pipeline can support a combination that no UI control can
+  express.** `ExperimentPrefsStore` has held date and location as independent nullable fields since
+  S12.7h, `CircadianWindowProvider.current` resolves them independently (F39/F83), and
+  PARITY_CHECKLIST claimed all three combinations — yet the Circadian card's Set button took a
+  non-null `String` date and refused a blank one, so pinning a location always pinned that day's
+  date too, and only date-only and both were reachable. The cause was the control's shape: the
+  coordinates are text fields where blank means live, but the date is a button that always renders
+  a day, so "live" had no representation and the code read the rendered day as the user's choice;
+  live-vs-fixed now lives in its own `dateFixed` flag with a Live date button, the same three-state
+  reading the status line already printed. The lesson is that a claim of independent fields is a
+  claim about the WHOLE path, input control included; test the combinations at the UI level, not
+  only at the store and the provider, and be suspicious of any control whose default rendering is
+  indistinguishable from an unset value. Tasker's HTML picker (elements37, `_ExperimentSetDate`)
+  simply left `%AAB_Date` empty, which is why the owner could do this there and not here.
+  `[cited]`: `app/…/ui/screens/CircadianScreen.kt`, `app/…/ui/SettingsScreensTest.kt`,
+  `app/…/runtime/CircadianWindowProviderTest.kt`.

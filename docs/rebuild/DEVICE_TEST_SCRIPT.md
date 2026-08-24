@@ -147,6 +147,13 @@ optional.
     **Expected:** the scale multiplier tracks the real local sunrise/sunset (not a fixed UTC window).
 21. Set a **fixed date/location** (Experiment element). **Expected:** the curve + the live scaling shift
     to that day/place; "Use live data" reverts.
+21a. **Live date with a fixed location (DB-084).** From the state left by step 21, tap **Live date**,
+    then **Set fixed**. **Expected:** the status line reads "Fixed location: … (live date)" — not
+    "Fixed: <a date> @ …" — and the date button shows today with "(live)". Now enter a far-southern
+    location (Sydney, `-33.87` / `151.21`) and Set fixed again: sunrise/sunset on the curve jump to
+    Sydney's, and in northern-hemisphere summer the daylight window becomes the SHORT one, which is
+    only possible if today's date is still in play. Pinning a date as well (step 21) and clearing the
+    coordinate fields must still give the date-only case, so all three combinations are reachable.
 
 ## 8. Contexts (task43 + prof762–768)
 

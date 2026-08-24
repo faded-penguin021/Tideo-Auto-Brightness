@@ -140,7 +140,7 @@ fun CircadianContent(
     dateLocation: ExperimentDateLocation = ExperimentDateLocation(),
     todayDate: String = "",
     defaultLatLon: Pair<Double, Double>? = null,
-    onSetDateLocation: (String, Double?, Double?) -> Unit = { _, _, _ -> },
+    onSetDateLocation: (String?, Double?, Double?) -> Unit = { _, _, _ -> },
     onUseLiveData: () -> Unit = {},
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
     geoIpEnabled: Boolean = false,
@@ -260,7 +260,7 @@ fun CircadianDateLocationCard(
     value: ExperimentDateLocation,
     todayDate: String,
     currentLatLon: Pair<Double, Double>?,
-    onSet: (String, Double?, Double?) -> Unit,
+    onSet: (String?, Double?, Double?) -> Unit,
     onUseLiveData: () -> Unit,
     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
     geoIpEnabled: Boolean = false,
@@ -271,6 +271,8 @@ fun CircadianDateLocationCard(
     val effLon = value.longitude ?: currentLatLon?.second
 
     var dateText by remember(effDate) { mutableStateOf(effDate) }
+    // DB-084: blank coords mean "live location"; dateFixed is the date's equivalent, as the picker always shows a day.
+    var dateFixed by remember(value.date) { mutableStateOf(value.date != null) }
     var latText by remember(effLat) { mutableStateOf(effLat?.let { formatCoord(it) } ?: "") }
     var lonText by remember(effLon) { mutableStateOf(effLon?.let { formatCoord(it) } ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -282,9 +284,13 @@ fun CircadianDateLocationCard(
             value.isUnset -> stringResource(R.string.circadian_status_live)
             value.latitude == null || value.longitude == null ->
                 stringResource(R.string.circadian_status_fixed_date, value.date ?: stringResource(R.string.circadian_live_word))
+            value.date == null -> stringResource(
+                R.string.circadian_status_fixed_location,
+                fmtCoord(value.latitude), fmtCoord(value.longitude),
+            )
             else -> stringResource(
                 R.string.circadian_status_fixed_full,
-                value.date ?: stringResource(R.string.circadian_today_word),
+                value.date,
                 fmtCoord(value.latitude), fmtCoord(value.longitude),
             )
         },
@@ -292,10 +298,19 @@ fun CircadianDateLocationCard(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.testTag("exp_status"),
     )
-    OutlinedButton(
-        onClick = { showDatePicker = true },
-        modifier = Modifier.fillMaxWidth().testTag("exp_date_value"),
-    ) { Text(stringResource(R.string.circadian_date, dateText)) }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            onClick = { showDatePicker = true },
+            modifier = Modifier.weight(1f).testTag("exp_date_value"),
+        ) {
+            Text(stringResource(if (dateFixed) R.string.circadian_date else R.string.circadian_date_live, dateText))
+        }
+        TextButton(
+            onClick = { dateFixed = false; dateText = todayDate },
+            enabled = dateFixed,
+            modifier = Modifier.testTag("exp_date_live"),
+        ) { Text(stringResource(R.string.circadian_use_live_date)) }
+    }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
@@ -317,12 +332,13 @@ fun CircadianDateLocationCard(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = {
-                // F39: date and location independent. Blank coords = date-only, valid coords = pin both.
+                // F39: date and location independent — either side may stay live, as in Tasker's picker.
                 val lat = parseCoord(latText)
                 val lon = parseCoord(lonText)
                 val coordsBlank = latText.isBlank() && lonText.isBlank()
-                if (dateText.isNotBlank() && (coordsBlank || (lat != null && lon != null))) {
-                    onSet(dateText.trim(), lat, lon)
+                val date = dateText.trim().takeIf { dateFixed && it.isNotBlank() }
+                if ((coordsBlank || (lat != null && lon != null)) && (date != null || !coordsBlank)) {
+                    onSet(date, lat, lon)
                 }
             },
             modifier = Modifier.testTag("exp_set"),
@@ -348,7 +364,7 @@ fun CircadianDateLocationCard(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        state.selectedDateMillis?.let { dateText = formatDateMillis(it) }
+                        state.selectedDateMillis?.let { dateText = formatDateMillis(it); dateFixed = true }
                         showDatePicker = false
                     },
                     modifier = Modifier.testTag("exp_date_ok"),

@@ -75,6 +75,12 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
    #123 in a later session without the owner saying so first. The fix itself is done and verified;
    only the reply was ever in question. (DB-082.)
 
+4. **Please check on a phone: pinning a location while the date stays live.** On the Circadian
+   screen, tap "Live date" and then "Set fixed" with coordinates filled in. It worked if the status
+   line reads "Fixed location: … (live date)" rather than naming a date, and if entering Sydney
+   (`-33.87` / `151.21`) in northern summer makes the daylight window on the curve SHORT — a long
+   one would mean the date got pinned too. Full steps are §7 21a. (DB-084.)
+
 Open questions: none. Owed reviews: the rule-review protocol ran on this branch's rule-file changes
 on 2026-08-23, and again on each round of fixes, because a triage commit that edits rule files owes
 a pass of its own. Every finding is fixed; the per-round counts and what each found are in those
@@ -146,6 +152,12 @@ Newest first; ledger rows are the durable detail.
   itself wrote and the check passed on device. Prose-only fixes plus two workflow lines; no app
   behaviour changed.
 
+- 2026-08-24 — **Circadian: a fixed location with a live date is now settable (DB-084).** The store
+  and `CircadianWindowProvider` had always resolved date and location independently, but the card's
+  Set button took a non-null date and the date control had no "unset" rendering, so pinning a
+  location always pinned that day too — Tasker's picker allows it, which is how the owner noticed.
+  A `dateFixed` flag plus a "Live date" button gives the date the same three-state reading the
+  status line already printed. Owner device check is §7 21a; unit-tested at card and provider level.
 - 2026-08-24 — **Issue #123: false "manual override" pause on wake, fixed (DB-082).** `hibernate()`
   nulls both lux fields, so on screen-on `setInitialBrightness` returned at its first line and never
   reached `armInitialSettle` — the F64/D-126 settle window was armed on every transition except the
