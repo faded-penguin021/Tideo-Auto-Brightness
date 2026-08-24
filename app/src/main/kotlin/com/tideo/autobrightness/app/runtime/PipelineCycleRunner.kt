@@ -231,16 +231,20 @@ internal class PipelineCycleRunner(
         )
     }
 
-    /** task567: Manual Override settle (D-049 #1, G2R-F26/F71). Don't borrow throttle window. */
+    /**
+     * task567: Manual Override settle (D-049 #1, G2R-F26/F71). Don't borrow throttle window.
+     * DB-082: the settle window is re-checked HERE too, not only where the change is observed —
+     * observe → post → consume is asynchronous, so a change seen just before the window opened can
+     * still arrive at the commit inside it.
+     */
     suspend fun handleOverride(observed: Int) {
-        val s = ctx.stateValue
-        if (!OverrideRules.shouldCommitPause(s.serviceOn, s.autoRunning, s.paused, s.initializing)) return
+        if (!canPause(ctx.stateValue)) return
 
-        val settleMs = (s.cycleTimeMs?.toLong() ?: 0L).coerceAtLeast(0L)
+        val settleMs = (ctx.stateValue.cycleTimeMs?.toLong() ?: 0L).coerceAtLeast(0L)
         if (settleMs > 0) delay(settleMs)
 
         val s2 = ctx.stateValue
-        if (!OverrideRules.shouldCommitPause(s2.serviceOn, s2.autoRunning, s2.paused, s2.initializing)) return
+        if (!canPause(s2)) return
         val settled = brightness.read()
         // Settled to our last write → transient, not override (D-049 #1).
         if (s2.lastAppliedBrightness != null && settled == s2.lastAppliedBrightness) return
@@ -262,6 +266,10 @@ internal class PipelineCycleRunner(
     /** task618 block#1: Set Initial Brightness. */
     fun setInitialBrightness(settings: AabSettings) {
         val s = ctx.stateValue
+        // DB-082: arm BEFORE the lux guard and before the write. Below the guard it never armed on
+        // the one transition that needs it most — wake, where hibernate has just nulled both lux
+        // fields — and below the write it left the write's own echo unsuppressed.
+        ctx.armInitialSettle(clock() + INITIAL_SETTLE_MS)
         val lux = s.smoothedLux ?: s.lastRawLux ?: return
         ctx.update { it.copy(initializing = true) }
         try {
@@ -272,6 +280,7 @@ internal class PipelineCycleRunner(
             brightness.write(target)
             // F65: use un-floored target; F64: settle window.
             dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
+            // Re-arm from the END of the write so the full window covers the transition too.
             ctx.armInitialSettle(clock() + INITIAL_SETTLE_MS)
             ctx.update {
                 it.copy(
@@ -285,6 +294,9 @@ internal class PipelineCycleRunner(
         }
     }
 
+    private fun canPause(s: PipelineState): Boolean = !ctx.overrideSuppressed() &&
+        OverrideRules.shouldCommitPause(s.serviceOn, s.autoRunning, s.paused, s.initializing)
+
     /** task661 act22-26 / task698 step 3: hardware floor in PWM-sensitive mode (D-050, D-049 #4). */
     private fun applyPwmFloor(target: Int, settings: AabSettings): Int =
         if (settings.pwmSensitive && target < settings.dimmingThreshold) settings.dimmingThreshold else target
@@ -292,8 +304,8 @@ internal class PipelineCycleRunner(
     // Tasker round3 idiom: Math.round(x*1000)/1000 (ties toward +∞).
     private fun round3(value: Double): Double = Math.round(value * 1000.0) / 1000.0
 
-    private companion object {
-        // F64: settle window (1.5s).
+    internal companion object {
+        // F64: settle window (1.5s). Also armed on wake (DB-082) — one number, one place.
         const val INITIAL_SETTLE_MS = 1500L
     }
 }

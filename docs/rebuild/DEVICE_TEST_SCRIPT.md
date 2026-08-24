@@ -44,6 +44,13 @@ optional.
 9. Tap **Resume** (notification or Dashboard). **Expected:** auto control resumes from the current lux.
 10. Rapidly swing the light up/down during an animation. **Expected:** NO false "override" pause
     (the task567 settle re-read absorbs the pipeline's own multi-frame writes).
+10a. **No false pause on wake (DB-082, issue #123).** With Override Detection on, lock the screen,
+    wait ~10 s, and wake it — ten times, at different ambient levels, without touching the slider.
+    **Expected:** never a pause, a "manual override" notification, or a Resume card. This is the
+    user-reported symptom, and it is device-dependent: it needs an OEM that re-asserts
+    `SCREEN_BRIGHTNESS` on wake, so a clean run on one phone does not clear the others. Then repeat
+    once WITH a real slider drag a few seconds after waking. **Expected:** that one still pauses —
+    the wake window is 1.5 s, not a blanket amnesty.
 
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 

@@ -584,4 +584,60 @@ class BrightnessPipelineControllerTest {
         assertEquals(true, spy.lastDetectOverrides, "after the window, override detection resumes")
         scope.cancel()
     }
+
+    // DB-082, issue #123. Screen-off hibernate nulls smoothedLux AND lastRawLux, so on wake
+    // setInitialBrightness returns at its first line — and armInitialSettle sits BELOW that return,
+    // so the one transition where the framework re-asserts SCREEN_BRIGHTNESS is the one transition
+    // that arms no suppression at all. The stale self-write marker is from before the sleep, so the
+    // framework's wake write reads as external and pauses the pipeline the user never touched.
+    @Test
+    fun frameworkWriteOnWake_isNotAnOverride_DB082() = runTest {
+        val brightness = FakeBrightness()
+        val observer = FakeObserver()
+        var now = 1000L
+        val (controller, scope) = newController(
+            brightness = brightness, observer = observer, clock = { now },
+        )
+        controller.start()
+        advanceUntilIdle()
+
+        controller.onScreenOff()
+        advanceUntilIdle()
+        controller.onScreenOn()
+        advanceUntilIdle()
+
+        // The display comes back and the framework re-asserts its own brightness.
+        observer.flow.emit(200)
+        advanceUntilIdle()
+
+        assertTrue(
+            !controller.state.value.pausedByOverride,
+            "a wake-time framework write must not read as a manual override",
+        )
+        assertTrue(!controller.state.value.paused, "and must not pause the pipeline")
+        scope.cancel()
+    }
+
+    // The other half: suppression must not swallow a real override once the wake has settled.
+    @Test
+    fun genuineOverrideAfterTheWakeWindow_stillPauses_DB082() = runTest {
+        val brightness = FakeBrightness()
+        val observer = FakeObserver()
+        var now = 1000L
+        val (controller, scope) = newController(
+            brightness = brightness, observer = observer, clock = { now },
+        )
+        controller.start()
+        advanceUntilIdle()
+
+        controller.onScreenOn()
+        advanceUntilIdle()
+
+        now = 10_000L // well past the wake settle window
+        observer.flow.emit(200)
+        advanceUntilIdle()
+
+        assertTrue(controller.state.value.pausedByOverride, "a real slider move still pauses")
+        scope.cancel()
+    }
 }

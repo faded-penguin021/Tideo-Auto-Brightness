@@ -136,6 +136,13 @@ Newest first; ledger rows are the durable detail.
   itself wrote and the check passed on device. Prose-only fixes plus two workflow lines; no app
   behaviour changed.
 
+- 2026-08-24 — **Issue #123: false "manual override" pause on wake, fixed (DB-082).** `hibernate()`
+  nulls both lux fields, so on screen-on `setInitialBrightness` returned at its first line and never
+  reached `armInitialSettle` — the F64/D-126 settle window was armed on every transition except the
+  one where the framework re-asserts brightness itself, which then read as a slider move. The window
+  is now armed before the lux guard, again on the receiver thread at `onScreenOn()`, and re-checked
+  at commit in `handleOverride`. `main`'s AUTOMATION.md edit merged in. D-049 #2 (the single-latest
+  self-write marker) is still the deeper hole and is untouched.
 - 2026-08-23 — **Post-v1.9.0 review: five findings fixed on the unreleased vc23 (DB-074…DB-078),
   and the Owner queue is plain-language by rule (DB-079).** `:platform` had never been linted,
   hiding two `NewApi` errors on `readNBytes` that left the root and dumpsys SSID strategies silently

@@ -954,3 +954,16 @@
   held before raising it, and measure the merge base with ITS copy of the guard, since the guard
   resolves its root from `BASH_SOURCE` and will otherwise re-measure the current tree.
   `[cited]`: `scripts/guards/comment-budget.sh`.
+
+- DB-082 [cited]: **A guard armed as a side effect of the happy path is not armed on the path that
+  needs it** (issue #123, user-reported false pause after screen-on). `hibernate()` nulls
+  `smoothedLux` AND `lastRawLux`, so on wake `setInitialBrightness` returned at its first line —
+  and `armInitialSettle` sat BELOW that return, so the F64/D-126 settle window was armed on every
+  transition except the one where the framework re-asserts `SCREEN_BRIGHTNESS` itself. That write
+  met a self-write marker left over from before the sleep and read as a manual override. Three
+  moves: arm before the lux guard and before the write, arm again on the receiver thread in
+  `onScreenOn()` (the framework's write can precede our broadcast, and `reinit()` reads DataStore
+  first), and re-check the window at COMMIT in `handleOverride` because observe→post→consume is
+  asynchronous. This is D-049 #2/#3 reaching a user: the single-latest self-write marker is still
+  the weak part, and a grace window around our own writes remains the deeper fix.
+  `[cited]`: `app/…/runtime/PipelineCycleRunner.kt`, `app/…/runtime/BrightnessPipelineController.kt`.
