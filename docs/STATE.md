@@ -112,76 +112,18 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 ## Decided non-items
 
-- Repo/process declines: root changelog, speculative dependency bumps, standalone drift audit,
-  Gradle dependency verification, wider session-branch CI, the D-162/DA-021 triage sets. SHA pinning
-  left this list when Dependabot supplied a refresh path (DB-038).
-- Privileged Display declines: per-toggle scheduling, persisted seed without real reports, grayscale
-  quick action, refresh-rate/OEM keys, manual Extra Dim (D-150–152). `ContextsContent` stays
-  test-only — migrating its 13 test sites buys nothing and risks its a11y coverage.
-- Panic re-firing after teardown (1.9.0 D4): owner-closed as the still-installed Tasker project's
-  own prof769 gesture, a third armed listener of the D-128 class. Reopen only on a report from a
-  device with no sibling armed.
-- §11.39a C1/C2 (external Night Light tracked twice): wontfix — no tile on the device, unit-tested.
-- Never repeat whole-device backup/restore verification: `bmgr restore` damaged unrelated apps;
-  callback invocation is an accepted unverified residual (DB-013).
-- **Never synthesise an unsupported value in a display key on a real device** (DB-071): no
-  `settings put` of anything no AOSP path writes — daltonizer matrices, HDR format lists,
-  `reduce_bright_colors_level`. Two owner devices have been left needing blind recovery. The ban is
-  on writing the row yourself, not on the state: reaching one through a real settings UI is always
-  allowed, and where both are described, the UI is the only sanctioned route. The
-  unrecognised-daltonizer path (DB-066) is unit-tested only and an accepted unverified residual:
-  observe it read-only if a device ever reports such a mode by itself (§11 32c). DB-045's partial
-  HDR row is NOT in that position — Developer options → Disable HDR formats produces it through a
-  real settings UI, which is what §11 32b has the owner do. **Nor is DB-077**, and this bullet must
-  not be read as covering it: `stay_on_while_plugged_in` at 7 is the mask Tideo itself shipped up
-  to v1.9.0, so a device upgrading with the toggle already on is holding it in the ordinary course,
-  and staging it reproduces a state this app produced rather than inventing one no software writes.
-  §11 32a tells the owner to do exactly that, and the check passed on device (2026-08-23).
+- Declines remain: repo/process extras (DB-038), speculative Privileged Display controls
+  (D-150–152), the sibling Tasker panic gesture, §11.39a C1/C2, and destructive `bmgr restore`
+  verification (DB-013); retained plan: `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
+- **Never synthesise unsupported display values on a device** (DB-071); use a real settings UI.
+  DB-077 is exempt because mask 7 was written by Tideo v1.9.0 and §11 32a is device-verified.
 
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-08-23 — **Rule review of the branch's legislation ran and its findings are fixed (DB-080,
-  DB-081).** A fresh-context reviewer at the strongest tier found nine; the load-bearing ones were
-  DB-074's lint fix landing in `verify.sh` only while both release workflows and the RUNBOOK still
-  linted `:app` alone, playbook 8 still saying "nothing re-checks them" about a rail that now has a
-  guard, the comment-budget re-baseline crediting this change for 129 lines of which 14 are its own,
-  the length-guard preamble losing the sentence that said which of its bullets no guard enforces,
-  and DB-077 filed under DB-071's never-synthesise residual although its state is a mask Tideo
-  itself wrote and the check passed on device. Prose-only fixes plus two workflow lines; no app
-  behaviour changed.
-
-- 2026-08-24 — **Circadian: a fixed location with a live date is now settable (DB-084).** The store
-  and `CircadianWindowProvider` had always resolved date and location independently, but the card's
-  Set button took a non-null date and the date control had no "unset" rendering, so pinning a
-  location always pinned that day too — Tasker's picker allows it, which is how the owner noticed.
-  A `dateFixed` flag plus a "Live date" button gives the date the same three-state reading the
-  status line already printed. Owner device check is §7 21a; unit-tested at card and provider level.
-- 2026-08-24 — **Issue #123: false "manual override" pause on wake, fixed (DB-082).** `hibernate()`
-  nulls both lux fields, so on screen-on `setInitialBrightness` returned at its first line and never
-  reached `armInitialSettle` — the F64/D-126 settle window was armed on every transition except the
-  one where the framework re-asserts brightness itself, which then read as a slider move. The window
-  is now armed before the lux guard, again on the receiver thread at `onScreenOn()`, and re-checked
-  at commit in `handleOverride`. `main`'s AUTOMATION.md edit merged in. D-049 #2 (the single-latest
-  self-write marker) is still the deeper hole and is untouched.
-- 2026-08-23 — **Post-v1.9.0 review: five findings fixed on the unreleased vc23 (DB-074…DB-078),
-  and the Owner queue is plain-language by rule (DB-079).** `:platform` had never been linted,
-  hiding two `NewApi` errors on `readNBytes` that left the root and dumpsys SSID strategies silently
-  dead on Android 12/12L. DB-065's dock bit had been cancelled by DB-068's diff-write on every
-  device carrying v1.9.0's own mask of 7. The preserved-state notices could not write the value
-  their own control showed, `hasUsageStatsAccess` branched on a misread of the API-36 stubs, and
-  playbook 8's marker↔SHA rails had no guard. Comment budget re-baselined for the new declarations,
-  after cutting the new comments to one-line pointers took the overshoot from 38/16 lines to 14/8.
-  The stay-awake half is owner-verified on device the same day; the rest is unit-tested or blocked
-  on hardware.
-- 2026-08-21..22 — **AMH upgraded 5.2.0 → 9.1.0 (DB-073) and the constitution rewritten in natural
-  prose.** Shipped scripts and manifest copied from the exact `amh-v9.1.0` tag; sentence floors
-  added beside the byte backstops; adapters reconciled with the new secret, lifecycle, review and
-  publication rails. `AGENTS.md` kept every rule, fact, citation and enforcement boundary — no
-  policy changed.
-- 2026-06-23..08-20 — **v1.0.0 → v1.9.1 shipped (D-096…D-176, DA-001…DA-044, DB-001…DB-072).**
-  Rebuild, release and glue gates, F-Droid compatibility, hardening, Tasker parity, security review,
-  the Privileged Display device-truth rework, the v1.9.0 review triage, RUNBOOK playbook 8, and AMH
-  upgrades through 5.2.0. Per-item detail is in the ledger and
-  `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
+- 2026-08-24 — DB-084 added live date with fixed location; DB-082 fixed wake-settle handling.
+- 2026-08-23 — DB-074…DB-081 fixed review findings; DB-077 preservation now covers service-ON
+  profile/stop transitions while DB-078 remains the explicit overwrite path.
+- 2026-08-21..22 — DB-073 upgraded AMH 5.2.0 → 9.1.0 without changing policy.
+- 2026-06-23..08-20 — v1.0.0 → v1.9.1 shipped; durable detail is D-096…DB-072.

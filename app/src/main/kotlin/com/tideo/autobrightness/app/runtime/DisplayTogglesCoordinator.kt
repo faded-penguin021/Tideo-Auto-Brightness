@@ -147,7 +147,13 @@ class DisplayTogglesCoordinator(
         if (desired.daltonizer != last.daltonizer) display.setDaltonizer(desired.daltonizer)
         if (desired.inversion != last.inversion) display.setInversion(desired.inversion)
         if (desired.alwaysOn != last.alwaysOn) display.setAlwaysOnDisplay(desired.alwaysOn)
-        if (desired.stayAwake != last.stayAwake) display.setStayAwakePlugged(desired.stayAwake)
+        if (desired.stayAwake != last.stayAwake) {
+            // DB-077: normal transitions preserve masks only DB-078 or panic may replace.
+            val deviceStayAwake = display.readStayAwakePlugged()
+            if (deviceStayAwake != null && deviceStayAwake != desired.stayAwake) {
+                display.setStayAwakePlugged(desired.stayAwake)
+            }
+        }
         if (desired.hdrForceSdr != last.hdrForceSdr && display.hdrForceSdrAvailable) {
             display.setHdrForceSdr(desired.hdrForceSdr)
         }
