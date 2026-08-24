@@ -1,0 +1,386 @@
+From 4ff516439fe28fdfbf09e30aed516e7e943e585a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 24 Aug 2026 18:58:52 +0000
+Subject: [PATCH] fix(circadian): allow a live date with a fixed location
+ (DB-084)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The store and CircadianWindowProvider have always resolved the fixed date
+and the fixed location independently, but the Circadian card could only
+express two of the three combinations: its Set button took a non-null
+String date and refused a blank one, so pinning coordinates always pinned
+that day's date as well. The cause is the control's shape — the coordinate
+fields treat blank as "live", while the date is a button that always
+renders a day, so "live" had no representation and the rendered day was
+read as the user's choice. Tasker's picker simply left %AAB_Date empty,
+which is how the owner noticed.
+
+Live-vs-fixed now has its own dateFixed flag and a "Live date" button, and
+the status line gains the third reading it was already shaped for. No
+change to the store, the provider or the pipeline.
+
+Verified: scripts/ladder.sh green (build + JVM/Robolectric tests + guards).
+New unit tests cover location-only at the card and at the provider, and the
+date-only card test now pins its date through the picker. Not checkable
+locally: on-device behaviour — the owner's step is DEVICE_TEST_SCRIPT §7
+21a, queued in STATE.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01M3C39iBFkivNhTLKv6b4qw
+---
+ .../app/ui/screens/CircadianScreen.kt         | 38 ++++++++----
+ app/src/main/res/values/strings.xml           |  4 +-
+ .../runtime/CircadianWindowProviderTest.kt    | 20 ++++++
+ .../app/ui/SettingsScreensTest.kt             | 62 ++++++++++++++++++-
+ docs/LEDGER_B.md                              | 17 +++++
+ docs/STATE.md                                 | 12 ++++
+ docs/rebuild/DEVICE_TEST_SCRIPT.md            |  7 +++
+ docs/rebuild/PARITY_CHECKLIST.md              |  2 +-
+ .../metadata/android/en-US/changelogs/23.txt  |  2 +
+ 9 files changed, 149 insertions(+), 15 deletions(-)
+
+diff --git a/app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CircadianScreen.kt b/app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CircadianScreen.kt
+index 1a7d294..6eca2f0 100644
+--- a/app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CircadianScreen.kt
++++ b/app/src/main/kotlin/com/tideo/autobrightness/app/ui/screens/CircadianScreen.kt
+@@ -140,7 +140,7 @@ fun CircadianContent(
+     dateLocation: ExperimentDateLocation = ExperimentDateLocation(),
+     todayDate: String = "",
+     defaultLatLon: Pair<Double, Double>? = null,
+-    onSetDateLocation: (String, Double?, Double?) -> Unit = { _, _, _ -> },
++    onSetDateLocation: (String?, Double?, Double?) -> Unit = { _, _, _ -> },
+     onUseLiveData: () -> Unit = {},
+     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
+     geoIpEnabled: Boolean = false,
+@@ -260,7 +260,7 @@ fun CircadianDateLocationCard(
+     value: ExperimentDateLocation,
+     todayDate: String,
+     currentLatLon: Pair<Double, Double>?,
+-    onSet: (String, Double?, Double?) -> Unit,
++    onSet: (String?, Double?, Double?) -> Unit,
+     onUseLiveData: () -> Unit,
+     onUseCurrentLocation: ((Double, Double) -> Unit) -> Unit = {},
+     geoIpEnabled: Boolean = false,
+@@ -271,6 +271,8 @@ fun CircadianDateLocationCard(
+     val effLon = value.longitude ?: currentLatLon?.second
+ 
+     var dateText by remember(effDate) { mutableStateOf(effDate) }
++    // DB-084: blank coords mean "live location"; dateFixed is the date's equivalent, as the picker always shows a day.
++    var dateFixed by remember(value.date) { mutableStateOf(value.date != null) }
+     var latText by remember(effLat) { mutableStateOf(effLat?.let { formatCoord(it) } ?: "") }
+     var lonText by remember(effLon) { mutableStateOf(effLon?.let { formatCoord(it) } ?: "") }
+     var showDatePicker by remember { mutableStateOf(false) }
+@@ -282,9 +284,13 @@ fun CircadianDateLocationCard(
+             value.isUnset -> stringResource(R.string.circadian_status_live)
+             value.latitude == null || value.longitude == null ->
+                 stringResource(R.string.circadian_status_fixed_date, value.date ?: stringResource(R.string.circadian_live_word))
++            value.date == null -> stringResource(
++                R.string.circadian_status_fixed_location,
++                fmtCoord(value.latitude), fmtCoord(value.longitude),
++            )
+             else -> stringResource(
+                 R.string.circadian_status_fixed_full,
+-                value.date ?: stringResource(R.string.circadian_today_word),
++                value.date,
+                 fmtCoord(value.latitude), fmtCoord(value.longitude),
+             )
+         },
+@@ -292,10 +298,19 @@ fun CircadianDateLocationCard(
+         color = MaterialTheme.colorScheme.onSurfaceVariant,
+         modifier = Modifier.testTag("exp_status"),
+     )
+-    OutlinedButton(
+-        onClick = { showDatePicker = true },
+-        modifier = Modifier.fillMaxWidth().testTag("exp_date_value"),
+-    ) { Text(stringResource(R.string.circadian_date, dateText)) }
++    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++        OutlinedButton(
++            onClick = { showDatePicker = true },
++            modifier = Modifier.weight(1f).testTag("exp_date_value"),
++        ) {
++            Text(stringResource(if (dateFixed) R.string.circadian_date else R.string.circadian_date_live, dateText))
++        }
++        TextButton(
++            onClick = { dateFixed = false; dateText = todayDate },
++            enabled = dateFixed,
++            modifier = Modifier.testTag("exp_date_live"),
++        ) { Text(stringResource(R.string.circadian_use_live_date)) }
++    }
+ 
+     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+         OutlinedTextField(
+@@ -317,12 +332,13 @@ fun CircadianDateLocationCard(
+     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+         Button(
+             onClick = {
+-                // F39: date and location independent. Blank coords = date-only, valid coords = pin both.
++                // F39: date and location independent — either side may stay live, as in Tasker's picker.
+                 val lat = parseCoord(latText)
+                 val lon = parseCoord(lonText)
+                 val coordsBlank = latText.isBlank() && lonText.isBlank()
+-                if (dateText.isNotBlank() && (coordsBlank || (lat != null && lon != null))) {
+-                    onSet(dateText.trim(), lat, lon)
++                val date = dateText.trim().takeIf { dateFixed && it.isNotBlank() }
++                if ((coordsBlank || (lat != null && lon != null)) && (date != null || !coordsBlank)) {
++                    onSet(date, lat, lon)
+                 }
+             },
+             modifier = Modifier.testTag("exp_set"),
+@@ -348,7 +364,7 @@ fun CircadianDateLocationCard(
+             confirmButton = {
+                 TextButton(
+                     onClick = {
+-                        state.selectedDateMillis?.let { dateText = formatDateMillis(it) }
++                        state.selectedDateMillis?.let { dateText = formatDateMillis(it); dateFixed = true }
+                         showDatePicker = false
+                     },
+                     modifier = Modifier.testTag("exp_date_ok"),
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index b898315..1fe0002 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -492,8 +492,10 @@
+ 
+     <!-- Circadian -->
+     <string name="circadian_date">Date: %1$s</string>
++    <string name="circadian_date_live">Date: %1$s (live)</string>
+     <string name="circadian_set_fixed">Set fixed</string>
+     <string name="circadian_use_live_data">Use live data</string>
++    <string name="circadian_use_live_date">Live date</string>
+     <string name="graph_circadian">Circadian</string>
+     <string name="graph_taper">Taper</string>
+     <string name="circadian_scaling_header">Circadian scaling</string>
+@@ -510,9 +512,9 @@
+     <string name="circadian_err_taper_midpoint">Taper midpoint cannot exceed maximum brightness.</string>
+     <string name="circadian_status_live">Live data — today + current location.</string>
+     <string name="circadian_status_fixed_date">Fixed date: %1$s (live location)</string>
++    <string name="circadian_status_fixed_location">Fixed location: %1$s, %2$s (live date)</string>
+     <string name="circadian_status_fixed_full">Fixed: %1$s @ %2$s, %3$s</string>
+     <string name="circadian_live_word">live</string>
+-    <string name="circadian_today_word">today</string>
+ 
+     <!-- Contexts (rule list + editor) -->
+     <string name="contexts_intro">Switch to a different profile automatically based on the foreground app, Wi-Fi, time of day or charging state.</string>
+diff --git a/app/src/test/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProviderTest.kt b/app/src/test/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProviderTest.kt
+index 7f5490a..7c85d5b 100644
+--- a/app/src/test/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProviderTest.kt
++++ b/app/src/test/kotlin/com/tideo/autobrightness/app/runtime/CircadianWindowProviderTest.kt
+@@ -167,6 +167,26 @@ class CircadianWindowProviderTest {
+         scope.cancel()
+     }
+ 
++    @Test
++    fun locationOnlyOverride_usesLiveDate_DB084() = runTest {
++        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
++        val loc = FakeLocationReader()
++        val provider = CircadianWindowProvider(
++            scope = scope,
++            overrideFlow = MutableStateFlow(ExperimentDateLocation(latitude = lat, longitude = lon)),
++            location = loc,
++            geoIpFallback = { null },
++            clock = { midJuneEpochSec() * 1000L }, // no fixed date → today's June windows
++            tzOffsetForDate = { 1.0 },
++        )
++        val w = provider.current(transitionFactor)
++        assertNotNull(w, "fixed location with a live date yields windows")
++        assertFalse(loc.lastKnownCalled, "fixed lat/lon must not consult Android location")
++        assertEquals(CircadianWindowProvider.compute(lat, lon, midJuneEpochSec(), 1.0, transitionFactor), w)
++        assertTrue(provider.status.fixed, "status reports the location as fixed")
++        scope.cancel()
++    }
++
+     // ----- F83: geo-IP fallback when no Android fix is available -----
+ 
+     @Test
+diff --git a/app/src/test/kotlin/com/tideo/autobrightness/app/ui/SettingsScreensTest.kt b/app/src/test/kotlin/com/tideo/autobrightness/app/ui/SettingsScreensTest.kt
+index f1fbc1e..2bf1846 100644
+--- a/app/src/test/kotlin/com/tideo/autobrightness/app/ui/SettingsScreensTest.kt
++++ b/app/src/test/kotlin/com/tideo/autobrightness/app/ui/SettingsScreensTest.kt
+@@ -892,7 +892,7 @@ class SettingsScreensTest {
+ 
+     @Test
+     fun circadianDateLocationCard_setFixed_emitsDateAndCoords_G2RF39() {
+-        var captured: Triple<String, Double?, Double?>? = null
++        var captured: Triple<String?, Double?, Double?>? = null
+         compose.setContent {
+             MaterialTheme {
+                 CircadianDateLocationCard(
+@@ -912,7 +912,7 @@ class SettingsScreensTest {
+     @Test
+     fun circadianDateLocationCard_setDateOnly_emitsNullCoords_G2RF39() {
+         // F39: fixed date with blank coords pins date only (live location); coords null.
+-        var captured: Triple<String, Double?, Double?>? = null
++        var captured: Triple<String?, Double?, Double?>? = null
+         compose.setContent {
+             MaterialTheme {
+                 CircadianDateLocationCard(
+@@ -924,10 +924,68 @@ class SettingsScreensTest {
+                 )
+             }
+         }
++        // Picking a day is what pins the date; the picker opens on the displayed day.
++        compose.onNodeWithTag("exp_date_value").performClick()
++        compose.onNodeWithTag("exp_date_ok").performClick()
+         compose.onNodeWithTag("exp_set").performClick()
+         assertEquals(Triple("2026-06-15", null, null), captured)
+     }
+ 
++    @Test
++    fun circadianDateLocationCard_setLocationOnly_emitsNullDate_DB084() {
++        // DB-084: fixed location with a live date, as Tasker's picker allows.
++        var captured: Triple<String?, Double?, Double?>? = null
++        compose.setContent {
++            MaterialTheme {
++                CircadianDateLocationCard(
++                    value = ExperimentDateLocation(),
++                    todayDate = "2026-06-15",
++                    currentLatLon = 55.95 to -3.19, // prefills the coord fields
++                    onSet = { d, la, lo -> captured = Triple(d, la, lo) },
++                    onUseLiveData = {},
++                )
++            }
++        }
++        compose.onNodeWithTag("exp_set").performClick()
++        assertEquals(Triple(null, 55.95, -3.19), captured)
++    }
++
++    @Test
++    fun circadianDateLocationCard_liveDateButton_unpinsDate_DB084() {
++        // DB-084: "Live date" releases a pinned date without touching the pinned coordinates.
++        var captured: Triple<String?, Double?, Double?>? = null
++        compose.setContent {
++            MaterialTheme {
++                CircadianDateLocationCard(
++                    value = ExperimentDateLocation(date = "2025-12-21", latitude = 51.5, longitude = 0.0),
++                    todayDate = "2026-06-15",
++                    currentLatLon = null,
++                    onSet = { d, la, lo -> captured = Triple(d, la, lo) },
++                    onUseLiveData = {},
++                )
++            }
++        }
++        compose.onNodeWithTag("exp_date_live").performClick()
++        compose.onNodeWithTag("exp_set").performClick()
++        assertEquals(Triple(null, 51.5, 0.0), captured)
++    }
++
++    @Test
++    fun circadianDateLocationCard_locationOnlyStatus_saysLiveDate_DB084() {
++        compose.setContent {
++            MaterialTheme {
++                CircadianDateLocationCard(
++                    value = ExperimentDateLocation(latitude = 51.5, longitude = 0.0),
++                    todayDate = "2026-06-15",
++                    currentLatLon = null,
++                    onSet = { _, _, _ -> },
++                    onUseLiveData = {},
++                )
++            }
++        }
++        compose.onNodeWithTag("exp_status").assertTextContains("live date", substring = true)
++    }
++
+     @Test
+     fun chartPager_rendersSlotsWithSwipeIndicator_G2RF81() {
+         // G2R-F81: multi-graph screen pages between relevant charts (dots per page), not vertical stack.
+diff --git a/docs/LEDGER_B.md b/docs/LEDGER_B.md
+index da8f9f7..93efa7c 100644
+--- a/docs/LEDGER_B.md
++++ b/docs/LEDGER_B.md
+@@ -978,3 +978,20 @@
+   and with their lesson already written down: the trap is not carelessness but reaching for the
+   symptom as reported rather than for the mechanism, so ask what the check does on a device that
+   never shows the bug. The owner caught this one too.
++
++- DB-084 [cited]: **A store and a pipeline can support a combination that no UI control can
++  express.** `ExperimentPrefsStore` has held date and location as independent nullable fields since
++  S12.7h, `CircadianWindowProvider.current` resolves them independently (F39/F83), and
++  PARITY_CHECKLIST claimed all three combinations — yet the Circadian card's Set button took a
++  non-null `String` date and refused a blank one, so pinning a location always pinned that day's
++  date too, and only date-only and both were reachable. The cause was the control's shape: the
++  coordinates are text fields where blank means live, but the date is a button that always renders
++  a day, so "live" had no representation and the code read the rendered day as the user's choice;
++  live-vs-fixed now lives in its own `dateFixed` flag with a Live date button, the same three-state
++  reading the status line already printed. The lesson is that a claim of independent fields is a
++  claim about the WHOLE path, input control included; test the combinations at the UI level, not
++  only at the store and the provider, and be suspicious of any control whose default rendering is
++  indistinguishable from an unset value. Tasker's HTML picker (elements37, `_ExperimentSetDate`)
++  simply left `%AAB_Date` empty, which is why the owner could do this there and not here.
++  `[cited]`: `app/…/ui/screens/CircadianScreen.kt`, `app/…/ui/SettingsScreensTest.kt`,
++  `app/…/runtime/CircadianWindowProviderTest.kt`.
+diff --git a/docs/STATE.md b/docs/STATE.md
+index 5a01bd1..c5fb9a8 100644
+--- a/docs/STATE.md
++++ b/docs/STATE.md
+@@ -75,6 +75,12 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
+    #123 in a later session without the owner saying so first. The fix itself is done and verified;
+    only the reply was ever in question. (DB-082.)
+ 
++4. **Please check on a phone: pinning a location while the date stays live.** On the Circadian
++   screen, tap "Live date" and then "Set fixed" with coordinates filled in. It worked if the status
++   line reads "Fixed location: … (live date)" rather than naming a date, and if entering Sydney
++   (`-33.87` / `151.21`) in northern summer makes the daylight window on the curve SHORT — a long
++   one would mean the date got pinned too. Full steps are §7 21a. (DB-084.)
++
+ Open questions: none. Owed reviews: the rule-review protocol ran on this branch's rule-file changes
+ on 2026-08-23, and again on each round of fixes, because a triage commit that edits rule files owes
+ a pass of its own. Every finding is fixed; the per-round counts and what each found are in those
+@@ -146,6 +152,12 @@ Newest first; ledger rows are the durable detail.
+   itself wrote and the check passed on device. Prose-only fixes plus two workflow lines; no app
+   behaviour changed.
+ 
++- 2026-08-24 — **Circadian: a fixed location with a live date is now settable (DB-084).** The store
++  and `CircadianWindowProvider` had always resolved date and location independently, but the card's
++  Set button took a non-null date and the date control had no "unset" rendering, so pinning a
++  location always pinned that day too — Tasker's picker allows it, which is how the owner noticed.
++  A `dateFixed` flag plus a "Live date" button gives the date the same three-state reading the
++  status line already printed. Owner device check is §7 21a; unit-tested at card and provider level.
+ - 2026-08-24 — **Issue #123: false "manual override" pause on wake, fixed (DB-082).** `hibernate()`
+   nulls both lux fields, so on screen-on `setInitialBrightness` returned at its first line and never
+   reached `armInitialSettle` — the F64/D-126 settle window was armed on every transition except the
+diff --git a/docs/rebuild/DEVICE_TEST_SCRIPT.md b/docs/rebuild/DEVICE_TEST_SCRIPT.md
+index 93ad6d4..a9dd732 100644
+--- a/docs/rebuild/DEVICE_TEST_SCRIPT.md
++++ b/docs/rebuild/DEVICE_TEST_SCRIPT.md
+@@ -147,6 +147,13 @@ optional.
+     **Expected:** the scale multiplier tracks the real local sunrise/sunset (not a fixed UTC window).
+ 21. Set a **fixed date/location** (Experiment element). **Expected:** the curve + the live scaling shift
+     to that day/place; "Use live data" reverts.
++21a. **Live date with a fixed location (DB-084).** From the state left by step 21, tap **Live date**,
++    then **Set fixed**. **Expected:** the status line reads "Fixed location: … (live date)" — not
++    "Fixed: <a date> @ …" — and the date button shows today with "(live)". Now enter a far-southern
++    location (Sydney, `-33.87` / `151.21`) and Set fixed again: sunrise/sunset on the curve jump to
++    Sydney's, and in northern-hemisphere summer the daylight window becomes the SHORT one, which is
++    only possible if today's date is still in play. Pinning a date as well (step 21) and clearing the
++    coordinate fields must still give the date-only case, so all three combinations are reachable.
+ 
+ ## 8. Contexts (task43 + prof762–768)
+ 
+diff --git a/docs/rebuild/PARITY_CHECKLIST.md b/docs/rebuild/PARITY_CHECKLIST.md
+index 6cbc480..7ba5800 100644
+--- a/docs/rebuild/PARITY_CHECKLIST.md
++++ b/docs/rebuild/PARITY_CHECKLIST.md
+@@ -75,7 +75,7 @@ filled by S1/S2 during extraction.
+ | AAB Reactivity Settings | L6739 | Reactivity | ported (S12.5b — thresholds + DetectOverrides/trust; draft→Apply; chart slot S13; **S12.6e**: Tasker labels + verbatim help; "delta factor"→"Smoothing Δ" was a label bug not a wiring bug, G2R-F19/F20; **S12.7f**: live reactivity threshold shown as % (G2R-F56); **S12.8c (G2R-F85/F59)**: the bogus editable "Dynamic threshold" field REMOVED — %AAB_ThreshDynamic is the computed task544 output, surfaced read-only (as a %) in the live reactivity card only, never an input; **S12.8b**: charts in a `ChartPager` above the settings (Reactivity↔Alpha swipe) + per-graph `GraphSettingsGroup`, G2R-F81/F82) |
+ | AAB Superdimming Settings | L7533 | Super Dimming (renamed S12.6a/G2R-F3) | ported (S12.5b — ELEVATED-gated super dimming + PWM, mutually-exclusive (G2-F10), dim-spread gated on circadian (G2-F11); anim moved to Misc; chart slot S13; **S12.6e**: Tasker labels + verbatim help, G2R-F19/F21; **S12.8a**: live %AAB_DimmingCurrent/DimmingDS readout (G2R-F58); **S12.8b**: dimming chart moved ABOVE the settings into a `ChartPager` + `GraphSettingsGroup`, G2R-F81/F82; **S12.9b**: DimDynamic circadian-dimming modulation wired — the controller passes the cycle's `%AAB_ScaleDynamic` into `SuperDimmingCoordinator.apply`, which recovers task90's shared day/night modifier (`DimDynamic = 1 − (DimSpread/ScaleSpread)·(ScaleDynamic−1)`, task646 act7) so Spread (Circadian) suppresses/boosts super-dimming during daylight (G2R-F90, app-layer; `dimShell`/golden unchanged), closing the `dimDynamic=null` deferral D-040) |
+ | AAB Misc Settings | L4718 | Misc | ported (S12.5b — dedicated Misc screen, G2-F2: min/max sliders 0–75/150–255, offset/scale text, anim sliders + derived throttle, notifications + debug selector; **S12.6e**: Tasker labels + verbatim help, G2R-F19/F21; **S12.7f**: `current_throttle_and_alpha` live-readout card, G2R-F58; "Scale" → read-only "(auto)" dynamic-scale when circadian on, G2R-F60) |
+-| AAB Experiment Settings | L3334 | Circadian (renamed S12.6a/G2R-F4) | ported (S12.5b — scaling/taper + taper-midpoint slider 130–240 (G2-F13) + warnings; chart slot S13; **S12.7h**: fixed Date+Lat/Lon element (`_ExperimentSetDate`/`_ExperimentClearDate`, elements35–37) defaulting to today + current location, `ExperimentPrefsStore`, G2R-F39; **S12.8d**: NOT preview-only — the fixed Date and/or Location now drive the live circadian scaling [`CircadianWindowProvider`], resolved independently [date-only/loc-only/both]; **S12.8b**: charts in a `ChartPager` above the settings (Experiment↔Taper swipe) + per-graph `GraphSettingsGroup`, G2R-F81/F82) |
++| AAB Experiment Settings | L3334 | Circadian (renamed S12.6a/G2R-F4) | ported (S12.5b — scaling/taper + taper-midpoint slider 130–240 (G2-F13) + warnings; chart slot S13; **S12.7h**: fixed Date+Lat/Lon element (`_ExperimentSetDate`/`_ExperimentClearDate`, elements35–37) defaulting to today + current location, `ExperimentPrefsStore`, G2R-F39; **S12.8d**: NOT preview-only — the fixed Date and/or Location now drive the live circadian scaling [`CircadianWindowProvider`], resolved independently [date-only/loc-only/both] — loc-only was reachable only from v1.9.2, the Set button having required a date until DB-084; **S12.8b**: charts in a `ChartPager` above the settings (Experiment↔Taper swipe) + per-graph `GraphSettingsGroup`, G2R-F81/F82) |
+ | AAB Profile | L5724 | Profiles & Contexts (merged S12.9f) | ported (S12 — built-in profiles + reset + JSON/legacy import-export + context CRUD; reapply-on-load S12.5b; context-rule editor fidelity S12.5c — `<queries>` app list w/ icons, use-current-SSID, SUNRISE/SUNSET tokens, usage-access prompt, save/delete toasts; profile-load keeps DetectOverrides G2-F8. **S12.6d**: user-editable saved profiles + overwrite + factory restore, SAF folder legacy import, per-screen reset, manual-load context lock + Resume; **battery % from/to** added to the rule editor, G2R-F31. **S12.6e**: Wi-Fi SSID via suspend NetworkCallback→`SsidResult` w/ targeted messages, live location lat/lon/radius + "use current location", M3 TimePicker modal (G2R-F22/F28), runtime context-load toast (G2R-F25). **S12.7h**: full settings-list dashboard w/ gold changed-vs-default (profile.md elements0 — `SettingsDiffList`/`displayRows`) in the Load-Anyway modal + Save dialog + "View current settings"; G2R-F38. **S12.8c**: diff list uses friendly labels not raw `form1A` + excludes global/derived keys (G2R-F84); legacy load = task570 defaults THEN file diffs, decimal-encoded ints round not drop (Form1A sticks), G2R-F70. **S12.8b**: context rule editor — single-line SUNRISE/SUNSET tokens (G2R-F68) + taller app picker 220→400dp (G2R-F87). **S12.9f (D-070)**: Profiles + Contexts folded into ONE destination [`ProfilesContextsScreen`] mirroring the Tasker UX — the saved-profiles surface plus a "Context rules" section; per-rule editing moved into a modal [full-screen `Dialog`]; standalone Contexts route + screen removed. Behaviour-preserving plumbing; S13c restyles) |
+ | AAB Debug Scene | L2583 | LiveDebug | ported (S12.6b — rebuilt as the dedicated **Live Debug Info** scene: glass-box %AAB_* readout grouped per the debug.md HTML cards + the now-global 10-label debug selector, G2R-F6/F9; S12.5c selector drives runtime debug toasts G2-F15; %AAB_Test wizard report→clipboard stays on Tools, which keeps wizard + calibration entry; **S12.6e**: Performance & Timings card reaches Tasker parity — luxAlpha/cycle/throttle/last-animation(steps×wait)/last-update, G2R-F29) |
+ | AAB Color Filter | L2552 | Super Dimming | ported (S12 — PWM-sensitive + exponent rows; **S12.7e** surfaces the computed overlay hex via the `OVERLAY_PREVIEW` debug flash on the unprivileged fallback, G2R-F49; the actual overlay window still deferred, D-040) |
+diff --git a/fastlane/metadata/android/en-US/changelogs/23.txt b/fastlane/metadata/android/en-US/changelogs/23.txt
+index 0ad39a7..ee1830d 100644
+--- a/fastlane/metadata/android/en-US/changelogs/23.txt
++++ b/fastlane/metadata/android/en-US/changelogs/23.txt
+@@ -5,3 +5,5 @@ Reading the Wi-Fi network name without Location works again on Android 12 and 12
+ Stay awake while charging now says when Android is set to a different charger set than this app writes, and offers to replace it.
+ 
+ An unrecognized color-correction mode is still left alone, and the screen now offers to replace it.
++
++Circadian: pin a location and leave the date live.
+-- 
+2.43.0
+
