@@ -70,13 +70,10 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
 2. **Nothing to do — waiting on a Samsung.** Whether Night Light and always-on display fail safely
    when Android reports them unavailable; every phone to hand reports them available. Blocked three
    times already, so parked until such a device exists. (DB-041…DB-043.)
-3. **Decide whether to reply to issue #123, and what to say.** The fix is verified on the owner's
-   hardware, but only against an injected trigger — nobody has confirmed the reporter's phone hits
-   this same mechanism, and their description fits it without proving it. The options: ask them to
-   try a debug build before saying anything; reply that a wake-related false pause is fixed in the
-   next release and ask them to reopen if it persists; or say nothing until 1.9.2 ships.
-   Recommendation: the second, because it costs them nothing and the third leaves a bug report
-   looking ignored. An agent should not post to the tracker without the owner saying so. (DB-082.)
+3. **Nothing to do — issue #123 gets no reply.** Owner's decision, 2026-08-24: do not post to the
+   tracker. Nothing was posted. Do not re-raise this as an open question, and do not comment on
+   #123 in a later session without the owner saying so first. The fix itself is done and verified;
+   only the reply was ever in question. (DB-082.)
 
 Open questions: none. Owed reviews: the rule-review protocol ran on this branch's rule-file changes
 on 2026-08-23, and again on each round of fixes, because a triage commit that edits rule files owes
