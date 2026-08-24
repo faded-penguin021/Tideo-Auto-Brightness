@@ -44,13 +44,27 @@ optional.
 9. Tap **Resume** (notification or Dashboard). **Expected:** auto control resumes from the current lux.
 10. Rapidly swing the light up/down during an animation. **Expected:** NO false "override" pause
     (the task567 settle re-read absorbs the pipeline's own multi-frame writes).
-10a. **No false pause on wake (DB-082, issue #123).** With Override Detection on, lock the screen,
-    wait ~10 s, and wake it — ten times, at different ambient levels, without touching the slider.
-    **Expected:** never a pause, a "manual override" notification, or a Resume card. This is the
-    user-reported symptom, and it is device-dependent: it needs an OEM that re-asserts
-    `SCREEN_BRIGHTNESS` on wake, so a clean run on one phone does not clear the others. Then repeat
-    once WITH a real slider drag a few seconds after waking. **Expected:** that one still pauses —
-    the wake window is 1.5 s, not a blanket amnesty.
+10a. **No false pause on wake (DB-082, issue #123).** Override Detection on, service running, not
+    already paused. **Inject the trigger — do not wait for it.** The app cannot tell who wrote
+    `SCREEN_BRIGHTNESS`, so an `adb` write is the same event as the OEM's own wake write; waiting
+    for the OEM instead makes this a check that passes on any build (DB-083). Pick a value far from
+    the current one. Run the last two lines back-to-back so the write lands inside the 1.5 s window:
+
+    ```
+    adb shell input keyevent KEYCODE_SLEEP; sleep 3
+    adb shell input keyevent KEYCODE_WAKEUP
+    adb shell settings put system screen_brightness 200
+    ```
+
+    **Expected:** nothing — no pause, no notification, no Resume card. **Then the control, which is
+    the half that matters:** the same two commands with `sleep 5` between them. **Expected:** it
+    DOES pause, exactly as step 8. A build that stays quiet for both has not fixed the bug, it has
+    disabled override detection, which is the worse defect — treat a silent control as a FAIL.
+    Both directions were verified this way on 1.9.2-debug (owner, 2026-08-24).
+
+    Optional, and only on a device already known to re-assert brightness on wake: lock and wake ten
+    times touching nothing, expecting no pause. **On any other device this observes nothing** — it
+    passes whether the fix is present or absent, so record it as SKIPPED, never as evidence.
 
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 

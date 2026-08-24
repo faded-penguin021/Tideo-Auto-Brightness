@@ -70,6 +70,13 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
 2. **Nothing to do — waiting on a Samsung.** Whether Night Light and always-on display fail safely
    when Android reports them unavailable; every phone to hand reports them available. Blocked three
    times already, so parked until such a device exists. (DB-041…DB-043.)
+3. **Decide whether to reply to issue #123, and what to say.** The fix is verified on the owner's
+   hardware, but only against an injected trigger — nobody has confirmed the reporter's phone hits
+   this same mechanism, and their description fits it without proving it. The options: ask them to
+   try a debug build before saying anything; reply that a wake-related false pause is fixed in the
+   next release and ask them to reopen if it persists; or say nothing until 1.9.2 ships.
+   Recommendation: the second, because it costs them nothing and the third leaves a bug report
+   looking ignored. An agent should not post to the tracker without the owner saying so. (DB-082.)
 
 Open questions: none. Owed reviews: the rule-review protocol ran on this branch's rule-file changes
 on 2026-08-23, and again on each round of fixes, because a triage commit that edits rule files owes
@@ -84,6 +91,12 @@ each except one two-line block: `git diff 5b46f88..HEAD -- 'app/**/*.kt' 'platfo
 own measure the change adds 22 lines (app 2403 → 2417, platform 306 → 314) — while the re-baseline
 those justify ratifies 129 app lines, because the margin was already spent when they landed
 (DB-081).
+
+Closed 2026-08-24: the wake false-pause fix is **device-verified on 1.9.2-debug `a0d2650`** (owner),
+pre-fix and post-fix, using §2 10a's injected trigger — the pre-fix build pauses, the post-fix one
+does not, and the control (inject outside the window) still pauses on both. The owner then pointed
+out that 10a's original lock-and-wake wording could not fail on a device that never re-asserts
+brightness; rewritten, and the lesson is DB-083. Issue #123 is not yet answered — see below.
 
 Closed 2026-08-23: the stay-awake fix is **device-verified on 1.9.2-debug vc23** (owner) — all three
 checks of §11 32a passed, so DB-077 and DB-078 are confirmed on hardware and the DB-065 dock bit now

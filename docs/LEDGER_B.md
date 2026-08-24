@@ -967,3 +967,14 @@
   asynchronous. This is D-049 #2/#3 reaching a user: the single-latest self-write marker is still
   the weak part, and a grace window around our own writes remains the deeper fix.
   `[cited]`: `app/…/runtime/PipelineCycleRunner.kt`, `app/…/runtime/BrightnessPipelineController.kt`.
+
+- DB-083: **When a symptom is device-dependent, the falsifiable device check is the INJECTED
+  trigger, not the naturally-occurring one.** DB-082's first device step asked the owner to lock and
+  wake ten times and see no pause — which passes on any build if the OEM never re-asserts
+  `SCREEN_BRIGHTNESS`, and the owner's does not. The app cannot tell who wrote the key, so
+  `adb shell settings put system screen_brightness N` inside the window IS the OEM's write, and the
+  pair (inject inside the window → must not pause; inject outside it → must still pause) fails
+  honestly on every device. Third instance of a check that could not fail, after DB-070 and DB-072
+  and with their lesson already written down: the trap is not carelessness but reaching for the
+  symptom as reported rather than for the mechanism, so ask what the check does on a device that
+  never shows the bug. The owner caught this one too.
