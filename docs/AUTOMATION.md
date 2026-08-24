@@ -41,15 +41,10 @@ settings to safe values and then stops, which is exactly what a panic is for.
 
 ```bash
 # Load the "Night" profile
-adb shell am broadcast \
-  -a com.tideo.autobrightness.control.LOAD_PROFILE \
-  --es name "Night" \
-  -n com.tideo.autobrightness/.app.control.ControlReceiver
+adb shell am broadcast -a com.tideo.autobrightness.control.LOAD_PROFILE --es name "Night" -n com.tideo.autobrightness/.app.control.ControlReceiver
 
 # Turn the service off
-adb shell am broadcast \
-  -a com.tideo.autobrightness.control.SERVICE_OFF \
-  -n com.tideo.autobrightness/.app.control.ControlReceiver
+adb shell am broadcast -a com.tideo.autobrightness.control.SERVICE_OFF -n com.tideo.autobrightness/.app.control.ControlReceiver
 ```
 
 > **Debug builds** use the `com.tideo.autobrightness.debug` package in the `-n` component
