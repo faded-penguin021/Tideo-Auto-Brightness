@@ -40,8 +40,10 @@ checklist and parity gaps empty.
 
 **Resuming cold?** **v1.9.1/vc22 is the newest release** (owner, 2026-08-20; tag on `main`), and
 this branch carries unreleased **v1.9.2/vc23** — the AppOps cleanup plus the post-v1.9.0 review
-fixes below, device-verified 2026-08-23. Nothing is half-done, no ephemeral device script is
-outstanding, and what stands between vc23 and a release PR is the rule-review obligation: every
+fixes below, every one of them now device-verified (the last two on 2026-08-25). Nothing is
+half-done; the one ephemeral device script,
+`docs/rebuild/DEVICE_TEST_SCRIPT_1.9.2.md`, is fully ticked and retires at ship, not before. What
+stands between vc23 and a release PR is the rule-review obligation: every
 round so far is answered, and any further rule-file edit — this file's length-guard preamble and
 Decided non-items included — owes its own pass. Do **not** re-open
 the closed force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local
@@ -75,16 +77,10 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
    #123 in a later session without the owner saying so first. The fix itself is done and verified;
    only the reply was ever in question. (DB-082.)
 
-4. **Please check on a phone: pinning a location while the date stays live.** On the Circadian
-   screen, tap "Live date" and then "Set fixed" with coordinates filled in. It worked if the status
-   line reads "Fixed location: … (live date)" rather than naming a date, and if entering Sydney
-   (`-33.87` / `151.21`) in northern summer makes the daylight window on the curve SHORT — a long
-   one would mean the date got pinned too. Full steps are §7 21a. (DB-084.)
-
-Open questions: none. Owed reviews: the rule-review protocol ran on this branch's rule-file changes
-on 2026-08-23, and again on each round of fixes, because a triage commit that edits rule files owes
-a pass of its own. Every finding is fixed; the per-round counts and what each found are in those
-commit bodies. Any further rule-file edit here owes another pass before merge.
+Open questions: none. Owed reviews: a fresh pass on 2026-08-25 found two unresolved action-pins
+findings: `docker://` references bypass the promised immutable-reference rail, and valid quoted
+YAML `uses` keys bypass its parser. Fix both, add adversarial fixtures, and run another fresh pass
+before merge. Earlier rule-review rounds are answered; their counts are in their commit bodies.
 
 Answered 2026-08-23: the comment-budget increase is accepted on condition the source pointers stay
 terse, since the rule exists to stop prose living in two places. Two numbers settle it, and they
@@ -95,11 +91,21 @@ own measure the change adds 22 lines (app 2403 → 2417, platform 306 → 314) �
 those justify ratifies 129 app lines, because the margin was already spent when they landed
 (DB-081).
 
+Closed 2026-08-25: the last two unverified vc23 changes are **device-verified on 1.9.2-debug vc23**
+(owner), both as written in `docs/rebuild/DEVICE_TEST_SCRIPT_1.9.2.md` — DB-084's live date with a
+fixed location (§7 21a, including the Sydney short-window check and all three combinations), and the
+coordinator stay-awake path from `dfa0c8c`, where a profile switch onto a stay-awake-ON profile and a
+service stop both leave a custom `stay_on_while_plugged_in` mask alone, with the control confirming
+representable states are still written. That round script is now fully ticked; it stays until 1.9.2
+ships, when its section B folds into `DEVICE_TEST_SCRIPT.md` §11 as a new appended step (section A is
+already §7 21a) and the file is deleted (RUNBOOK §6, DB-010).
+
 Closed 2026-08-24: the wake false-pause fix is **device-verified on 1.9.2-debug `a0d2650`** (owner),
 pre-fix and post-fix, using §2 10a's injected trigger — the pre-fix build pauses, the post-fix one
 does not, and the control (inject outside the window) still pauses on both. The owner then pointed
 out that 10a's original lock-and-wake wording could not fail on a device that never re-asserts
-brightness; rewritten, and the lesson is DB-083. Issue #123 is not yet answered — see below.
+brightness; rewritten, and the lesson is DB-083. The owner decided issue #123 gets no reply — see
+the closed queue item.
 
 Closed 2026-08-23: the stay-awake fix is **device-verified on 1.9.2-debug vc23** (owner) — all three
 checks of §11 32a passed, so DB-077 and DB-078 are confirmed on hardware and the DB-065 dock bit now
@@ -112,9 +118,17 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 ## Decided non-items
 
-- Declines remain: repo/process extras (DB-038), speculative Privileged Display controls
-  (D-150–152), the sibling Tasker panic gesture, §11.39a C1/C2, and destructive `bmgr restore`
-  verification (DB-013); retained plan: `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
+- Repo/process declines remain: root changelog, speculative dependency bumps, standalone drift
+  audit, Gradle dependency verification, wider session-branch CI, and the D-162/DA-021 triage sets.
+  SHA pinning left this list when Dependabot supplied a refresh path (DB-038).
+- The superseded Privileged Display schedule and a persisted seed without real reports remain
+  declined (D-150–152), as do a grayscale quick action, refresh-rate/OEM keys, and manual Extra Dim.
+  The test-only
+  `ContextsContent` wrapper stays test-only: migrating its 13 test sites buys nothing and risks its
+  accessibility coverage (`docs/plans/REVIEW_TRIAGE_1.9.0.md`, `WAIT-MINOR-003`).
+- Panic re-firing after teardown remains declined as the sibling Tasker project's own gesture;
+  §11.39a C1/C2 remains wontfix; destructive `bmgr restore` verification must not be repeated
+  (DB-013). The retained triage detail is in `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
 - **Never synthesise unsupported display values on a device** (DB-071); use a real settings UI.
   DB-077 is exempt because mask 7 was written by Tideo v1.9.0 and §11 32a is device-verified.
 
@@ -122,6 +136,8 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-25 — DB-084 and the `dfa0c8c` coordinator stay-awake path device-verified on vc23; added
+  the ephemeral round script `DEVICE_TEST_SCRIPT_1.9.2.md`.
 - 2026-08-24 — DB-084 added live date with fixed location; DB-082 fixed wake-settle handling.
 - 2026-08-23 — DB-074…DB-081 fixed review findings; DB-077 preservation now covers service-ON
   profile/stop transitions while DB-078 remains the explicit overwrite path.
