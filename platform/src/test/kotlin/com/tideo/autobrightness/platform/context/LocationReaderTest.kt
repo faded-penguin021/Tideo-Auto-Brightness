@@ -44,6 +44,17 @@ class LocationReaderTest {
             this.time = time
         }
 
+    /**
+     * Registration count for one provider. `getLocationUpdateListeners` is deprecated with "do not
+     * test listeners", but that would delete the D-120/D-122/DB-067 leak guard below: a simulated
+     * fix proves a listener EXISTS, never that one was RELEASED. This carries the same count.
+     */
+    private fun registrations(provider: String) = shadowOf(lm).getLegacyLocationRequests(provider).size
+
+    private fun totalRegistrations() =
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+            .sumOf { registrations(it) }
+
     @Test
     fun activeFix_deliversTheFreshProviderFix() = runTest {
         shadowOf(lm).setProviderEnabled(LocationManager.GPS_PROVIDER, true)
@@ -73,7 +84,7 @@ class LocationReaderTest {
     @Test
     fun activeFix_timeout_fallsBackToBestLastKnown() = runTest {
         shadowOf(lm).setProviderEnabled(LocationManager.GPS_PROVIDER, true)
-        shadowOf(lm).setLastKnownLocation(LocationManager.GPS_PROVIDER, fix(LocationManager.GPS_PROVIDER, 10.0, 20.0))
+        shadowOf(lm).simulateLocation(fix(LocationManager.GPS_PROVIDER, 10.0, 20.0))
         val result = async(UnconfinedTestDispatcher(testScheduler)) { reader.activeFix(timeoutMs = 1_000) }
 
         advanceUntilIdle() // no fresh fix arrives; the virtual clock passes the timeout
@@ -109,15 +120,16 @@ class LocationReaderTest {
         shadowOf(lm).setProviderEnabled(LocationManager.NETWORK_PROVIDER, true)
         val result = async(UnconfinedTestDispatcher(testScheduler)) { reader.activeFix(timeoutMs = 10_000) }
 
-        assertEquals(1, shadowOf(lm).getLocationUpdateListeners(LocationManager.GPS_PROVIDER).size)
-        assertEquals(1, shadowOf(lm).getLocationUpdateListeners(LocationManager.NETWORK_PROVIDER).size)
+        assertEquals(1, registrations(LocationManager.GPS_PROVIDER))
+        assertEquals(1, registrations(LocationManager.NETWORK_PROVIDER))
 
         shadowOf(lm).simulateLocation(fix(LocationManager.NETWORK_PROVIDER, 51.5, -0.1))
         shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(LocationResult.Available(LocationSnapshot(51.5, -0.1)), result.await())
-        assertTrue(
-            shadowOf(lm).locationUpdateListeners.isEmpty(),
+        assertEquals(
+            0,
+            totalRegistrations(),
             "a satisfied fix must release every provider it powered, or GPS stays on",
         )
     }
@@ -131,8 +143,9 @@ class LocationReaderTest {
         advanceUntilIdle()
 
         assertEquals(LocationResult.Unavailable, result.await())
-        assertTrue(
-            shadowOf(lm).locationUpdateListeners.isEmpty(),
+        assertEquals(
+            0,
+            totalRegistrations(),
             "giving up must release the providers too",
         )
     }
@@ -141,19 +154,16 @@ class LocationReaderTest {
     fun lastKnownWithin_takesTheNewestFreshFix_andRefusesAStaleOrNullIslandOne() {
         val now = System.currentTimeMillis()
         val hour = 60L * 60L * 1000L
-        shadowOf(lm).setLastKnownLocation(
-            LocationManager.NETWORK_PROVIDER,
+        shadowOf(lm).simulateLocation(
             fix(LocationManager.NETWORK_PROVIDER, 51.5, -0.1, time = now - 10 * 60 * 1000L),
         )
-        shadowOf(lm).setLastKnownLocation(
-            LocationManager.GPS_PROVIDER,
+        shadowOf(lm).simulateLocation(
             fix(LocationManager.GPS_PROVIDER, 48.85, 2.35, time = now - 2 * 60 * 1000L),
         )
 
         assertEquals(LocationSnapshot(48.85, 2.35), reader.lastKnownWithin(hour), "newest wins")
 
-        shadowOf(lm).setLastKnownLocation(
-            LocationManager.GPS_PROVIDER,
+        shadowOf(lm).simulateLocation(
             fix(LocationManager.GPS_PROVIDER, 48.85, 2.35, time = now - 5 * hour),
         )
         assertEquals(
@@ -162,8 +172,7 @@ class LocationReaderTest {
             "a fix older than the bound is not 'recent enough', however new it is relative to others",
         )
 
-        shadowOf(lm).setLastKnownLocation(
-            LocationManager.NETWORK_PROVIDER,
+        shadowOf(lm).simulateLocation(
             fix(LocationManager.NETWORK_PROVIDER, 0.0, 0.0, time = now),
         )
         assertNull(reader.lastKnownWithin(hour), "null island is not a location, however fresh")
@@ -173,14 +182,12 @@ class LocationReaderTest {
     fun activeFix_withLocationServicesOff_givesUpAtOnceInsteadOfSpendingTheWindow() {
         runTest {
             shadowOf(lm).setLocationEnabled(false)
-            shadowOf(lm).setLastKnownLocation(
-                LocationManager.GPS_PROVIDER,
-                fix(LocationManager.GPS_PROVIDER, 10.0, 20.0),
-            )
+            shadowOf(lm).simulateLocation(fix(LocationManager.GPS_PROVIDER, 10.0, 20.0))
             val result = async(UnconfinedTestDispatcher(testScheduler)) { reader.activeFix(timeoutMs = 45_000) }
 
-            assertTrue(
-                shadowOf(lm).locationUpdateListeners.isEmpty(),
+            assertEquals(
+                0,
+                totalRegistrations(),
                 "nothing can deliver with the master switch off, so nothing should be registered",
             )
             assertEquals(LocationResult.Available(LocationSnapshot(10.0, 20.0)), result.await())
@@ -198,7 +205,7 @@ class LocationReaderTest {
 
             assertEquals(
                 1,
-                shadowOf(lm).getLocationUpdateListeners(LocationManager.PASSIVE_PROVIDER).size,
+                registrations(LocationManager.PASSIVE_PROVIDER),
                 "giving up before registering anything is what made this fail instantly",
             )
             shadowOf(lm).simulateLocation(fix(LocationManager.PASSIVE_PROVIDER, 35.68, 139.69))

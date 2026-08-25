@@ -38,16 +38,17 @@ adds super dimming and Privileged Display.
 Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LEDGER_B.md`; parity
 checklist and parity gaps empty.
 
-**Resuming cold?** **v1.9.1/vc22 is the newest release** (owner, 2026-08-20; tag on `main`), and
-this branch carries unreleased **v1.9.2/vc23** — the AppOps cleanup plus the post-v1.9.0 review
-fixes below, every one of them now device-verified (the last two on 2026-08-25). Nothing is
-half-done; the one ephemeral device script,
-`docs/rebuild/DEVICE_TEST_SCRIPT_1.9.2.md`, is fully ticked and retires at ship, not before. What
-stands between vc23 and a release PR is the rule-review obligation: every
-round so far is answered, and any further rule-file edit — this file's length-guard preamble and
-Decided non-items included — owes its own pass. Do **not** re-open
-the closed force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local
-input rather than a retained score or CI gate, its two surviving rails being RUNBOOK playbook 8's.
+**Resuming cold?** **v1.9.2/vc23 is the newest release** — tag `v1.9.2` → `c7c96dc` on `main`
+(`git ls-remote --tags origin` settles it), so the pre-ship framing this paragraph used to carry is
+discharged and every rule-review round is answered. This branch carries only the compiler-warning
+cleanup in the Changelog below, which is **test-only**: no `src/main` file changed, so it
+deliberately does **not** bump the version (RUNBOOK §6 — test changes do not manufacture a release
+bump) and rides along with whatever real fix ships next. **Now due, and nobody has done it:**
+`docs/rebuild/DEVICE_TEST_SCRIPT_1.9.2.md` is fully ticked and retires *at ship* — 1.9.2 has now
+shipped, so fold its section B into `DEVICE_TEST_SCRIPT.md` §11 as an appended step (section A is
+already §7 21a) and delete the round file (RUNBOOK §6, DB-010). Do **not** re-open the closed
+force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input rather
+than a retained score or CI gate, its two surviving rails being RUNBOOK playbook 8's.
 
 ## Owner queue
 
@@ -77,7 +78,24 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
    #123 in a later session without the owner saying so first. The fix itself is done and verified;
    only the reply was ever in question. (DB-082.)
 
-Open questions: none. Owed reviews: none. The two action-pins findings from the 2026-08-25 pass
+4. **The ledger is full and the next session cannot record anything — this needs a decision.**
+   `docs/LEDGER_B.md` stands at 1006 lines against the 1000-line cap, so *any* new row now starts
+   past it and fails the ladder. `./scripts/ladder.sh --guards-only` settles it: today it prints the
+   approaching-cap WARN, and it turns into a FAIL the moment a row is appended (this session hit
+   exactly that and dropped its row rather than ship the fix around it). Rolling over means creating
+   `docs/LEDGER_C.md` numbering from DC-001 and repointing AGENTS.md's live-volume line — a new
+   ledger preamble plus a constitution edit, which is legislation under the rule-review protocol
+   (RUNBOOK "Rule-review protocol"). That protocol allows **no self-review**, so this session parked
+   it here rather than reviewing its own legislation, per discipline 7(d). The fork, 2026-08-25:
+   **(a)** a session that can spawn a fresh-context reviewer does the rollover as its own small unit
+   — *recommended*, it is a mechanical change the LEDGER_B preamble already specifies step by step;
+   **(b)** the owner waives the review for this one diff and says so here, since the rollover is
+   spelled out in the preamble and invents no new rule; **(c)** leave it, and accept that no session
+   can add a ledger row until it is done. Recommendation: (a). What "worked" looks like:
+   `LEDGER_C.md` exists with DC-001, AGENTS.md names it as the live volume, and the ladder is green.
+
+Open questions: the ledger rollover above (item 4). Owed reviews: none by this session's diff —
+it touches no file in `RULE_FILES`. The two action-pins findings from the 2026-08-25 pass
 were fixed with adversarial fixtures: `docker://` references now require sha256 digests, and valid
 quoted YAML `uses` keys enter the same parser. Earlier rule-review rounds are answered; their
 counts are in their commit bodies.
@@ -136,6 +154,13 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-25 — Cleared all 46 test-only compiler warnings (deprecation, opt-in, redundancy) with no
+  `src/main` change and no version bump. Robolectric's replacements were taken where they exist, but
+  `getLocationUpdateListeners`' "do not test listeners" advice was NOT: it would have deleted the
+  D-120/D-122/DB-067 leak guard, so the non-deprecated `getLegacyLocationRequests` carries the same
+  count, re-proved by deleting `removeUpdates` and watching both leak tests fail. Sticky-broadcast
+  seeding and the `Notification.priority` read keep suppressions — neither has a replacement. No
+  ledger row: the live volume is full (see the Owner queue).
 - 2026-08-25 — Closed both action-pins review findings: container images require immutable sha256
   digests and quoted YAML `uses` keys can no longer bypass the guard (DB-085).
 - 2026-08-25 — DB-084 and the `dfa0c8c` coordinator stay-awake path device-verified on vc23; added
