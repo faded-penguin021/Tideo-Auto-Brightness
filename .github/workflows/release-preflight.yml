@@ -13,7 +13,7 @@ name: Release preflight
 # docs-only / workflow-only / test-only PR (like the one that added this file) SKIPS them. The skip-ci
 # token scan runs on every PR regardless.
 #
-# Node 24 runtime policy (see build.yml): checkout@v5 is a node24 major. Do NOT downgrade.
+# Node 24 runtime policy (see build.yml): checkout@v7 is a node24 major. Do NOT downgrade.
 on:
   pull_request:
 
@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 10  # pure shell + local git diff/log; runs in seconds
     steps:
       - name: Checkout (full history + tags)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # Need tag history to compare the PR's version against the latest released tag.
           fetch-depth: 0

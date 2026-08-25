@@ -175,6 +175,80 @@ class DisplayTogglesViewModelTest {
         )
     }
 
+    // DB-077/DB-078: 7 is the mask v1.9.0 wrote, and the diff used to read it as "already on".
+    @Test
+    fun applyNow_withAChargerSetItDidNotWrite_preservesIt_andTheNoticeCanReplaceIt() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Global.putInt(resolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 7)
+        val vm = vm()
+        assertTrue(vm.state.value.stayAwakePreferenceCustom)
+        assertNull(assertNotNull(vm.deviceSnapshot.value).stayAwake)
+
+        // An upgrading user's profile already has the toggle ON, so nothing about stay-awake is
+        // what they came to change.
+        vm.applyNow(AabSettings(stayAwakeChargingEnabled = true, nightLightEnabled = true))
+
+        assertEquals(
+            7,
+            Settings.Global.getInt(resolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, -999),
+            "DB-070: an unrelated Apply must not broaden a charger set this app did not write",
+        )
+
+        vm.overwriteDeviceField(
+            PreservedDisplayField.STAY_AWAKE,
+            AabSettings(stayAwakeChargingEnabled = true),
+        )
+
+        assertEquals(
+            15,
+            Settings.Global.getInt(resolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, -999),
+            "DB-078: the notice's button is the only route the dock bit has to an upgraded device",
+        )
+        assertFalse(vm.state.value.stayAwakePreferenceCustom)
+    }
+
+    // DB-078: DB-069 compares draft to seed, so the one mode Apply cannot write is the one shown.
+    @Test
+    fun overwriteDeviceField_clearsAnUnrepresentableModeThePickerCannotReach() {
+        grantElevated()
+        val resolver = app.contentResolver
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer", 42)
+        Settings.Secure.putInt(resolver, "accessibility_display_daltonizer_enabled", 1)
+        val vm = vm()
+        assertTrue(vm.state.value.daltonizerPreferenceCustom)
+
+        vm.applyNow(AabSettings(nightLightEnabled = true), committed = AabSettings())
+
+        assertEquals(
+            1,
+            Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999),
+            "DB-066: Apply alone still preserves it",
+        )
+
+        vm.overwriteDeviceField(PreservedDisplayField.DALTONIZER, AabSettings())
+
+        assertEquals(0, Settings.Secure.getInt(resolver, "accessibility_display_daltonizer_enabled", -999))
+        assertFalse(vm.state.value.daltonizerPreferenceCustom)
+    }
+
+    @Test
+    fun overwriteDeviceFieldBelowElevated_surfacesFailure_andWritesNothing() {
+        val vm = vm()
+        assertTrue(vm.state.value.tier < Tier.ELEVATED)
+
+        vm.overwriteDeviceField(
+            PreservedDisplayField.STAY_AWAKE,
+            AabSettings(stayAwakeChargingEnabled = true),
+        )
+
+        assertTrue(vm.state.value.writeFailed, "a tier-gated write must surface as writeFailed")
+        assertEquals(
+            -999,
+            Settings.Global.getInt(app.contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, -999),
+        )
+    }
+
     @Test
     fun applyNow_withAnUnrepresentableDeviceMode_stillWritesTheUsersOwnPick() {
         grantElevated()

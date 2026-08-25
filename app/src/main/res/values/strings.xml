@@ -492,8 +492,10 @@
 
     <!-- Circadian -->
     <string name="circadian_date">Date: %1$s</string>
+    <string name="circadian_date_live">Date: %1$s (live)</string>
     <string name="circadian_set_fixed">Set fixed</string>
     <string name="circadian_use_live_data">Use live data</string>
+    <string name="circadian_use_live_date">Live date</string>
     <string name="graph_circadian">Circadian</string>
     <string name="graph_taper">Taper</string>
     <string name="circadian_scaling_header">Circadian scaling</string>
@@ -510,9 +512,9 @@
     <string name="circadian_err_taper_midpoint">Taper midpoint cannot exceed maximum brightness.</string>
     <string name="circadian_status_live">Live data — today + current location.</string>
     <string name="circadian_status_fixed_date">Fixed date: %1$s (live location)</string>
+    <string name="circadian_status_fixed_location">Fixed location: %1$s, %2$s (live date)</string>
     <string name="circadian_status_fixed_full">Fixed: %1$s @ %2$s, %3$s</string>
     <string name="circadian_live_word">live</string>
-    <string name="circadian_today_word">today</string>
 
     <!-- Contexts (rule list + editor) -->
     <string name="contexts_intro">Switch to a different profile automatically based on the foreground app, Wi-Fi, time of day or charging state.</string>
@@ -646,12 +648,14 @@
     <string name="pd_daltonizer_protan">Protanomaly (red–green)</string>
     <string name="pd_daltonizer_deutan">Deuteranomaly (red–green)</string>
     <string name="pd_daltonizer_tritan">Tritanomaly (blue–yellow)</string>
-    <string name="pd_daltonizer_custom_preserved">Android is using a correction mode this app does not recognize. Tideo preserves it and leaves it alone until you pick a different mode above; you can also change it in system settings.</string>
+    <string name="pd_daltonizer_custom_preserved">Android is using a correction mode this app does not recognize. Tideo leaves it alone, so applying other changes will not disturb it.</string>
+    <string name="pd_use_tideo_setting">Use Tideo\'s setting instead</string>
     <string name="pd_inversion">Color inversion</string>
     <string name="pd_section_screen">Screen</string>
     <string name="pd_always_on">Always-on display</string>
     <string name="pd_stay_awake">Stay awake while charging</string>
     <string name="pd_stay_awake_help">Keeps the screen on whenever a charger (AC, USB, wireless or dock) is connected.</string>
+    <string name="pd_stay_awake_custom_preserved">Android is set to a charger set this app did not write, so the screen may not stay awake for every charger type listed above. Tideo leaves it alone, so applying other changes will not disturb it.</string>
     <string name="pd_section_experimental">Experimental</string>
     <string name="pd_hdr_force_sdr">Disable HDR (experimental)</string>
     <string name="pd_hdr_help">Directly changes Android’s stored HDR-format preferences system-wide; it does not use the HDR conversion Force-SDR service API. Applying or clearing the change may require a reboot, and HDR or display-mode changes may briefly blank the screen.</string>

@@ -25,6 +25,12 @@ android {
         jvmTarget = "17"
     }
 
+    lint {
+        // DB-074: `:app`'s gate never saw this module — AGP does not report library findings
+        // into an app report unless checkDependencies is on, so :platform needs its own.
+        abortOnError = true
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

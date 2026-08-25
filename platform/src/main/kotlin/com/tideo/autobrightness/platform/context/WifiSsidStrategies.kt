@@ -4,6 +4,8 @@ import android.content.Context
 import com.tideo.autobrightness.platform.privilege.ShizukuShell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
@@ -46,14 +48,14 @@ private suspend fun execShell(command: Array<String>): String? = withContext(Dis
         var readFailed = false
         val stdoutThread = thread(name = "aab-wifi-stdout") {
             try {
-                stdout = process.inputStream.use { it.readNBytes(OUTPUT_LIMIT + 1) }
+                stdout = process.inputStream.use { it.readBounded(OUTPUT_LIMIT + 1) }
             } catch (_: Throwable) {
                 readFailed = true
             }
         }
         val stderrThread = thread(name = "aab-wifi-stderr") {
             try {
-                stderrOverflow = process.errorStream.use { it.readNBytes(ERROR_LIMIT + 1).size > ERROR_LIMIT }
+                stderrOverflow = process.errorStream.use { it.readBounded(ERROR_LIMIT + 1).size > ERROR_LIMIT }
             } catch (_: Throwable) {
                 readFailed = true
             }
@@ -71,6 +73,20 @@ private suspend fun execShell(command: Array<String>): String? = withContext(Dis
     } catch (_: Throwable) {
         null
     }
+}
+
+/** DB-074: `readNBytes` is API 33 and minSdk is 31, so bound the read by hand. */
+internal fun InputStream.readBounded(limit: Int): ByteArray {
+    val buffer = ByteArrayOutputStream()
+    val chunk = ByteArray(DEFAULT_BUFFER_SIZE)
+    var remaining = limit
+    while (remaining > 0) {
+        val count = read(chunk, 0, minOf(chunk.size, remaining))
+        if (count < 0) break
+        buffer.write(chunk, 0, count)
+        remaining -= count
+    }
+    return buffer.toByteArray()
 }
 
 private const val COMMAND_TIMEOUT_SECONDS = 15L

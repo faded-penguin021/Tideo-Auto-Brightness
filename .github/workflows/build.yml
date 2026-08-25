@@ -6,8 +6,8 @@ name: Build
 #
 # Node 24 runtime policy (all workflows): GitHub deprecated the Node 20 action runtime — runners default
 # to Node 24 from 2026-06-16 and remove Node 20 on 2026-09-16. Every action used across these workflows is
-# a major that declares `runs.using: node24` (checkout@v5, setup-java@v5, setup-android@v4, cache@v5,
-# upload-artifact@v6, download-artifact@v7, wrapper-validation@v6; codeql-action@v4, github-script@v8,
+# a major that declares `runs.using: node24` (checkout@v7, setup-java@v5, setup-android@v4, cache@v6,
+# upload-artifact@v7, download-artifact@v8, wrapper-validation@v6; codeql-action@v4, github-script@v9,
 # action-gh-release@v3 in the sibling workflows). Do NOT downgrade any of these to a Node 20 major — it
 # reintroduces the deprecation warning and will hard-break after 2026-09-16.
 #
@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 30  # cap a hung Gradle daemon / SDK fetch (GitHub's default is 360)
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # Full history + all branches (cheap on this repo) so origin/main resolves. Two ladder
           # rungs diff against it — the poison-token scan (D-115) and the author-identity check —
@@ -82,7 +82,7 @@ jobs:
           packages: ''
 
       - name: Cache Gradle
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           # ~/.robolectric: the android-all jars Robolectric fetches at TEST RUNTIME live outside
           # ~/.gradle, so without this line every run re-downloads them from Maven Central.
@@ -118,7 +118,7 @@ jobs:
           done
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk

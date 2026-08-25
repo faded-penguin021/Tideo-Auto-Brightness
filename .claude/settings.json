@@ -26,6 +26,15 @@
             "command": "$CLAUDE_PROJECT_DIR/scripts/guards/python-edit.sh --hook"
           }
         ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/command-guard.sh --pre-task"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -101,7 +110,19 @@
       "Read(.env)",
       "Read(.env.*)",
       "Read(**/.env)",
-      "Read(**/.env.*)"
+      "Read(**/.env.*)",
+      "Read(id_rsa)",
+      "Read(**/id_rsa)",
+      "Read(id_dsa)",
+      "Read(**/id_dsa)",
+      "Read(id_ecdsa)",
+      "Read(**/id_ecdsa)",
+      "Read(id_ecdsa_sk)",
+      "Read(**/id_ecdsa_sk)",
+      "Read(id_ed25519)",
+      "Read(**/id_ed25519)",
+      "Read(id_ed25519_sk)",
+      "Read(**/id_ed25519_sk)"
     ]
   }
 }

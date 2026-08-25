@@ -1,7 +1,7 @@
 # HARNESS_LOCAL — what this repo adds on top of stock AMH
 
 This repository runs the **Agentic Maintenance Harness**
-([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v5.2.0**
+([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v9.1.0**
 under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.
@@ -49,7 +49,7 @@ We **gained** three rungs with no local predecessor: `guard_author_identity`,
 the AMH repository now, and a stale local snapshot would read as authoritative to a future
 session while drifting against every upstream release.
 
-## The seven repo-local guards, and why each is not upstream's job
+## The eight repo-local guards, and why each is not upstream's job
 
 - **`fdroid-changelog.sh`** — F-Droid flags a `whatsNew` over 500 **characters**, and it measures
   codepoints, not bytes. `wc -c` rejects a legal note full of em dashes. Only the current
@@ -165,7 +165,22 @@ session while drifting against every upstream release.
   shows that. Its header states what it does not match (a script file, `sed -i` and friends,
   runtime-constructed commands, and every edit after the first).
 
-`scripts/tests/local-guards.sh` is their fixture suite — 111 cases, run by `scripts/verify.sh`.
+- **`action-pins.sh`** — every remote action `uses:` is a 40-hex commit SHA carrying a `# vX.Y.Z`
+  marker, every `docker://` image is a 64-hex sha256 digest, quoted block-mapping `uses` keys are
+  included, while flow-style and multiline `uses`, explicit mapping keys, and escaped quoted keys
+  fail closed as noncanonical workflow syntax (DB-085). One SHA never wears two markers,
+  and one action+version never resolves to two commits (DB-076). Upstream
+  cannot own this: the AMH ships no CI-supply-chain opinion, and the Scorecard rails these encode
+  are this repository's own RUNBOOK playbook 8. **What it deliberately does not check is the thing
+  you would want most**: whether a marker names the tag its SHA really belongs to. That needs
+  `git ls-remote`, and the ladder is offline and deterministic, so a pin mislabelled *consistently*
+  passes here and playbook 8 step 2 — resolve the tag on GitHub by hand — remains the only layer
+  that sees it. What it does catch is the failure that actually happened, twice: Dependabot rewrites
+  a SHA but its marker rewrite fails silently on lines with trailing prose after the version
+  (DB-038), leaving the same commit labelled two ways across the tree. Both incidents were caught by
+  eye, on a PR, by a reviewer who happened to look.
+
+`scripts/tests/local-guards.sh` is their fixture suite — 137 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -178,9 +193,12 @@ broken guard rather than a mild opinion. The contract is the **ladder's**: a wor
 calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
 `scripts/guards/*.sh` outside `scripts/ladder.sh`.
 
-**All six of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
+**All eight of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
 secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
 — for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
+`action-pins.sh` joins them on the same test: a tag ref where a SHA belongs, an unlabelled pin and
+two markers on one commit are each wrong every time, and the one judgement call it might have
+wanted — is this marker the right *tag* — is the question it deliberately does not ask.
 `comment-budget.sh` was the one real candidate for the warn tier and was refused it: a budget that
 only warns is a budget the next session spends, and warn fatigue is the documented failure mode
 for exactly this shape of rule. The escape hatch is not a warning, it is the constants in the
@@ -200,7 +218,6 @@ you chose and why.
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |
 | `LEDGER_LINE_CAP` | `1000` (stock 800) | The base volume closed at D-176 and `_A.md` at exactly 1000 lines (D-153, DA-001). Since AMH 5.1.0 the volume headers and the RUNBOOK name the key instead of restating the number, so **this cell is the last prose copy** — it is the one that must move with `amh.conf`. |
-| `LEDGER_ROW_CHAR_CAP` | `750` (stock 800 since AMH 5.0.0, was 2000) | Owner-selected maintenance bound: enough for one durable lesson without allowing a ledger row to become a long debugging narrative. Already stricter than the 5.0.0 default, so that MAJOR was a no-op here. Historical committed rows are exempt. As above, this cell is the last prose copy of the number and must move with `amh.conf`. |
 | `STATE_REQUIRED_SECTIONS` | `+ ## Decided non-items` | Where declined work is recorded; losing it invites re-litigating settled questions (D-162, DA-021). |
 | `POISON_TOKENS` | `+ [no ci] [skip actions] [actions skip]` | D-115: `release-preflight.yml` enforces this wider set at PR time; the two must agree. |
 | `CITATION_SCAN_PATHS` | `+ scripts` | The repo-local guards and `verify.sh` depend on ledger rows exactly as the Kotlin does. Safe because the shipped scripts name upstream's rows as `AMH ledger row D004` — a form the guard does not read as a citation. |
@@ -259,7 +276,7 @@ that exist today:
 | Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail | Inline-Python rail |
 |---|---|---|---|---|---|---|
 | `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | **no** — Codex has no repository-local session-start hook; run `scripts/session-start.sh` by hand | **no** — no pre-shell hook, so `scripts/command-guard.sh` is a script nobody calls and every Bash call is unjudged | **partial** — `amh.rules` prefix rules only; the policy has no path-glob operand, so nested `.env` and arbitrary `/proc/<pid>/environ` cannot be expressed | **no** | **no** — a prefix rule judges a shell command, not a file an edit tool wrote; `AGENTS.md` Conventions is the only layer standing | **no** — same missing pre-shell hook as the command rail; `AGENTS.md` Conventions is the only layer standing |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | yes (SessionStart hook) | yes (PreToolUse → shipped command guard) | yes, with prefix rules as a static lower layer; their path vocabulary remains narrower than the hook | **no** | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — the PreToolUse hook runs only the shipped guard, not the repo-local advisory; `AGENTS.md` Conventions is the only layer standing |
 
 **On the comment rail specifically.** The ladder guard is the coverage; the hook is only
 *salience*. A rule that lands solely in a ladder run arrives after the narrative is written and

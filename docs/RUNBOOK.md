@@ -87,7 +87,7 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 - **Code:** the Compose screen in `:app`; settings via `AabSettings`/DataStore.
 - **Parity:** keep user-facing behavior/labels faithful; honor the scene→screen consolidation
   matrix rather than reintroducing one-scene-per-screen.
-- **Acceptance:** `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:lintDebug`.
+- **Acceptance:** `:app:testDebugUnitTest`, `:app:assembleDebug`, `:platform:lintDebug :app:lintDebug`.
 - **Record:** update `screen_map.md` + `PARITY_CHECKLIST.md` + `STATE.md`.
 
 ### 4. Bug fix
@@ -293,17 +293,29 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   appears only on an advisory; no speculative bumps (D-135). Read `.github/dependabot.yml` +
   DB-038 first.
 - **Scorecard.dev is run-once/local (v5.5.0, ephemeral — not a CI gate).** Its recommendations
-  survive as the two rails below; honor them by hand — nothing re-checks them.
-  - **Pinned-Dependencies:** every `uses:` is a 40-hex **commit SHA** + trailing `# vX.Y.Z` marker.
+  survive as the two rails below. **Pinned-Dependencies** is now half-mechanised —
+  `scripts/guards/action-pins.sh` (DB-076) holds the shape checks named in step 2, and the tag↔SHA
+  claim itself stays yours. **Token-Permissions** is prose only: nothing re-checks it.
+  - **Pinned-Dependencies:** every remote action `uses:` is a 40-hex **commit SHA** + trailing
+    `# vX.Y.Z` marker, and every `docker://` image is pinned to a 64-hex `sha256` digest.
     **Never revert a pin to a tag ref** — a moved tag changes what runs and drops the score to 0.
   - **Token-Permissions:** top-level `permissions:` stays minimal/read-only; elevate per-**job**,
     never a top-level `contents: write`.
 - **Steps:**
   1. Keep the grouped PR as **one** — grouped review is deliberate; don't split it.
-  2. **Verify each bumped line's marker↔SHA by hand — no guard checks it.** Dependabot rewrites
-     both, but its marker rewrite silently fails when **trailing prose follows the version** on the
-     `uses:` line, leaving a stale `# vX.Y.Z` on a moved SHA (DB-038 decay, hit twice). Resolve the
-     tag to its commit on GitHub: the pin must equal it and the marker must name it.
+  2. **Resolve each bumped line's tag to its commit on GitHub, by hand.** The pin must equal it and
+     the marker must name it. Dependabot rewrites both, but its marker rewrite silently fails when
+     **trailing prose follows the version** on the `uses:` line, leaving a stale `# vX.Y.Z` on a
+     moved SHA (DB-038 decay, hit twice). Which layer holds this: `scripts/guards/action-pins.sh`
+     (DB-076) fails the ladder on a tag ref, an unlabelled pin, one SHA wearing two markers, and one
+     action+version resolving to two commits — the last two being the shape a failed marker rewrite
+     produces. It cannot check the tag↔SHA claim itself, because that needs the network and the
+     ladder is offline, so a pin mislabelled **the same way everywhere** is still yours to catch
+     here and nowhere else. Both cross-checks compare call sites against each other, so **an action
+     pinned at only one call site has no second opinion**, and step 2 is the only layer that sees a
+     stale marker on it at all. Which those are:
+     `grep -rhoE 'uses: *[^@ ]+@[0-9a-f]{40}' .github/workflows/ | sed 's/@.*//' | sort | uniq -c | sort -n`
+     (four of eleven, 2026-08-23).
   3. **Fix prose Dependabot can't touch** — it never edits comments. E.g. `build.yml`'s Node-24
      policy block names the pinned majors ("Do NOT downgrade…") and goes factually wrong on a bump.
      Update any such block in the **same** PR.
@@ -534,6 +546,16 @@ this same script (D-166)**, so CI and local share one definition of verified —
 hand-maintained lockstep. `scripts/ladder.sh --guards-only` covers docs-only changes in
 seconds.
 
+**Working-memory output.** The size rung reads the byte caps and both compression-floor keys
+from `amh.conf`, using the shipped default only for an omitted key. It names a threshold only
+when a verdict turns on it: a plain green size line names no cap, and a successful compression
+reports headroom below both the byte and sentence floors rather than printing either target.
+The two units are conjunctive: shaving words cannot clear the sentence floor, while
+repunctuating without freeing space cannot clear the byte floor. The boot banner still prints
+size against the soft cap, and a small edit above it still names `STATE_EDIT_DELTA_BYTES`, because
+those verdicts turn on those values. Read configured thresholds from `amh.conf`, and treat the
+guard functions as authority if this description drifts.
+
 The rungs individually (run the relevant subset until green; on-device behavior is
 owner-verified — no emulator, no KVM):
 
@@ -542,15 +564,20 @@ owner-verified — no emulator, no KVM):
 ./gradlew :platform:test          # Robolectric adapter tests
 ./gradlew :app:testDebugUnitTest  # app unit + Robolectric tests
 ./gradlew :app:assembleDebug      # APK
-./gradlew :app:lintDebug          # lint (hard gate — no baseline; targeted suppressions in app/lint.xml)
+./gradlew :platform:lintDebug :app:lintDebug  # lint, BOTH Android modules (hard gate — no baseline;
+                                              # targeted suppressions in app/lint.xml). One module's
+                                              # gate is not a gate: unless checkDependencies is on,
+                                              # AGP reports a library's findings only in that
+                                              # library's own report (DB-074).
 ```
 
 ## When CI fails on a PR (workflow vs code)
 
-The local ladder (above) and CI (`.github/workflows/build.yml`) run the *same* script —
-`build.yml` invokes `scripts/ladder.sh` (D-166) — so a green local tree usually means green CI.
-When CI is red but local is green, the failure is in the **environment/workflow**, not your code
-— diagnose before "fixing tests". Triage in this order:
+The local ladder and CI run the same script, but the commit, index and worktree are inputs too.
+A guard built on `git ls-files` may omit an untracked file; staging it after the local run changes
+the input CI receives and can turn local-green into CI-red without any environment difference.
+Read the failing log, reproduce the exact tree state CI checked, and stage new files before the
+local ladder when discovery is index-dependent. Then triage in this order:
 
 1. **Read the failing step's log** — distinguish the three kinds:
    - **Real failure** (a test assertion, a lint finding, a compile error): reproduce locally with the

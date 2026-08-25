@@ -50,8 +50,12 @@ fi
 GRADLE_ARGS=()
 [ -n "${CI:-}${GITHUB_ACTIONS:-}" ] && GRADLE_ARGS=(--no-daemon --no-configuration-cache)
 
-step "domain + platform + app tests, lint (hard gate), debug APK"
-./gradlew :domain:test :platform:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug \
+# DB-074: BOTH Android modules are linted. `:app:lintDebug` alone left every Android adapter in
+# `:platform` unchecked — AGP reports a library's own findings only in that library's report — and
+# two NewApi errors sat there unseen. Adding a module means adding its lint task here.
+step "domain + platform + app tests, lint (hard gate, both Android modules), debug APK"
+./gradlew :domain:test :platform:test :app:testDebugUnitTest \
+	:platform:lintDebug :app:lintDebug :app:assembleDebug \
 	${GRADLE_ARGS[@]+"${GRADLE_ARGS[@]}"} || bad "Gradle verification set"
 
 if [ "$FAILS" -gt 0 ]; then

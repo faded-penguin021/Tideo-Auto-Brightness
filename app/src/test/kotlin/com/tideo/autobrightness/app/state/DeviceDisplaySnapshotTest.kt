@@ -18,7 +18,7 @@ class DeviceDisplaySnapshotTest {
         daltonizer: DaltonizerMode? = DaltonizerMode.OFF,
         inversion: Boolean = false,
         alwaysOn: Boolean? = false,
-        stayAwake: Boolean = false,
+        stayAwake: Boolean? = false,
         hdrForceSdr: Boolean? = false,
     ) = DeviceDisplaySnapshot(nightLight, temperatureK, daltonizer, inversion, alwaysOn, stayAwake, hdrForceSdr)
 
@@ -83,6 +83,14 @@ class DeviceDisplaySnapshotTest {
 
         assertTrue(on.hdrForceSdrEnabled)
         assertFalse(off.hdrForceSdrEnabled)
+    }
+
+    @Test
+    fun `a charger set the app did not write leaves the stored field untouched`() {
+        val merged = AabSettings(stayAwakeChargingEnabled = true)
+            .withDeviceSnapshot(snapshot(stayAwake = null))
+
+        assertTrue(merged.stayAwakeChargingEnabled)
     }
 
     @Test

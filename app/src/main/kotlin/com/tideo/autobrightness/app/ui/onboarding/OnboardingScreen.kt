@@ -1,13 +1,11 @@
 package com.tideo.autobrightness.app.ui.onboarding
 
 import android.Manifest
-import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Process
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -54,6 +52,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.AppModule
 import com.tideo.autobrightness.app.navigation.completeOnboarding
+import com.tideo.autobrightness.platform.context.hasUsageStatsAccess
 import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
 import com.tideo.autobrightness.platform.privilege.ShizukuGrantGateway
 import com.tideo.autobrightness.platform.privilege.Tier
@@ -391,13 +390,7 @@ private fun notificationsGranted(context: Context): Boolean {
 }
 
 private fun hasUsageAccess(context: Context): Boolean {
-    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-    val mode = appOps.unsafeCheckOpNoThrow(
-        AppOpsManager.OPSTR_GET_USAGE_STATS,
-        Process.myUid(),
-        context.packageName,
-    )
-    return mode == AppOpsManager.MODE_ALLOWED
+    return hasUsageStatsAccess(context)
 }
 
 private fun hasLocationPermission(context: Context): Boolean =

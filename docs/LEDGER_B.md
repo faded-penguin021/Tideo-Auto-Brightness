@@ -8,11 +8,13 @@
 > vectors are ground truth; if an entry conflicts with current code, trust the code and correct the
 > entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
-> **Keep new rows concise and at or below `LEDGER_ROW_CHAR_CAP`** in `amh.conf` — the key is
+> **Keep new rows concise and at or below `LEDGER_ROW_SENTENCE_CAP`** in `amh.conf`; the
+> sentence limit is the working bound, while `LEDGER_ROW_CHAR_CAP` is a byte backstop with
+> real headroom. The keys are
 > named here and deliberately not restated as a number, because nothing checks this preamble
-> against the config and a copied number goes stale the first time the cap moves. Read it from
-> `amh.conf`; the ladder prints it only on a run that has a new row to check, so it is not a
-> substitute. Counted with `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
+> against the config and a copied number goes stale the first time a cap moves. Read them from
+> `amh.conf`; a green ladder deliberately does not print the limits. Bytes are counted with
+> `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
 > byte per character and non-ASCII UTF-8 is charged by encoded bytes. Capture the durable lesson,
 > not the whole debugging narrative — the narrative stays in the commit and its PR body (which
 > survive the squash as the merged commit's message) and `docs/history/` is frozen (DB-010). But
@@ -836,7 +838,8 @@
   preserve; compare against the seed instead.
   `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`.
 
-- DB-070: **A diff-write invalidates every device check written for the write it now skips.**
+- DB-070 [cited]: **A diff-write invalidates every device check written for the write it now
+  skips.**
   DB-068 made the direct Apply idempotent-by-diff; `readStayAwakePlugged()` is `mask != 0`, so on
   a device where stay-awake is already on, Apply writes nothing and DB-065's prescribed check
   ("Stay awake on, Apply, expect 15") passes identically against the OLD 7-constant code. It had
@@ -861,3 +864,143 @@
   reachable only as a race (grant lost between screen open and Apply) — unit-tested, not
   stageable by hand. Second script defect after DB-070: both are checks that could not fail,
   written by the same session that wrote the code they were meant to test.
+
+- DB-073: **An AMH upgrade can cross several MAJOR releases even when the destination is one
+  tag, so every intervening Upgrading section is an ordered migration, not release notes to
+  sample.** The 5.2.0 → 9.1.0 move added sentence floors beside byte backstops, corrected CI
+  triage to account for commit/index/worktree inputs, moved historical upgrade narrative out of
+  the constitution, strengthened secret and publication rails, and added adapter hooks. The
+  shipped directory and manifest move as one unit; owned config, seeds, adapters and CI are
+  reconciled by hand while the tagged checkout still exists.
+
+- DB-074 [cited]: **A lint gate on one module is not a lint gate.** `verify.sh` ran
+  `:app:lintDebug` only, and AGP reports a library's findings in that library's report unless
+  `checkDependencies` is on, so every Android adapter in `:platform` had been unchecked since the
+  module existed — hiding two `NewApi` ERRORS on `InputStream.readNBytes`, API 33 against minSdk
+  31, which made the root and dumpsys SSID strategies dead on Android 12/12L (the
+  `catch (_: Throwable)` around them swallows the `NoSuchMethodError`, so it degrades silently
+  rather than crashing). No unit test could have caught it: Robolectric runs the host JVM's
+  `java.io`, where `readNBytes` resolves at every configured SDK. `:app` had the identical hazard
+  and handled it in `UserProfileStore`, because `:app` was linted.
+  `[cited]`: `platform/…/context/WifiSsidStrategies.kt`, `platform/build.gradle.kts`,
+  `scripts/verify.sh`.
+
+- DB-075 [cited]: **A deprecation can be un-deprecated, so re-read the stub before branching around
+  one.**
+  The v1.9.2 fix for F-Droid's `unsafeCheckOpNoThrow` warning branched on `SDK_INT >= BAKLAVA` to
+  pick `checkOpNoThrow` on API 36+, and its changelog called that "Android 16's replacement API".
+  It is the opposite: `checkOpNoThrow` predates minSdk, API 29 deprecated it in favour of
+  `unsafeCheckOpNoThrow`, and API 36 reverted that — `android-36/data/api-versions.xml` gives
+  `checkOpNoThrow` no `since` and no `deprecated`, while `unsafeCheckOpNoThrow` carries
+  `deprecated="36"`. One unconditional call compiles warning-free with no `@Suppress`, which also
+  stops a function-wide suppression from hiding the next deprecation.
+
+- DB-076 [cited]: **A rail with no guard decays at the rate its documentation is re-read.**
+  RUNBOOK playbook 8 said marker↔SHA agreement was hand-checked "no guard checks it", and DB-038's
+  predicted decay then shipped to a PR twice, caught by eye both times. `action-pins.sh` now fails
+  on a tag ref, an unlabelled pin, one SHA wearing two markers, and one action+version resolving to
+  two commits — the last two being the exact shape Dependabot produces when its marker rewrite hits
+  trailing prose. What it deliberately does NOT check is whether a marker names the right tag: that
+  needs the network and the ladder is offline, so a consistently-wrong label still passes and
+  playbook 8 step 2 remains the only layer that sees it.
+  `[cited]`: `scripts/guards/action-pins.sh`.
+
+- DB-077 [cited]: **A lossy read defeats a diff-write silently, and the two can ship in one
+  release.** DB-065 widened `STAY_ON_ANY_CHARGER` to include the dock bit; DB-068 made the direct
+  Apply diff-write. Together they cancelled: `readStayAwakePlugged()` was `mask != 0`, so a device
+  still carrying v1.9.0's own 7 read as "on", the diff skipped, and the dock bit never reached
+  anyone who had the toggle on before upgrading — while `pd_stay_awake_help` claimed dock coverage
+  regardless. DB-070 saw the diff-write half and rewrote the device check; the upgrade path was not
+  the case it was looking at. Stay-awake was the ONLY field whose read could not represent "the
+  device holds something we did not write", which HDR and daltonizer both already could.
+  `[cited]`: `platform/…/display/SecureDisplayController.kt`, `app/…/state/DeviceDisplaySnapshot.kt`.
+
+- DB-078 [cited]: **Preserving an unrepresentable state needs an exit, or the notice is a dead
+  end.** DB-069 decides "the user picked this" as draft ≠ seed, but the seed is what the control
+  DISPLAYS, so the one value that can never be written is the one already shown — and for the
+  daltonizer at a default profile that is OFF, the likeliest thing anyone wants to do about a mode
+  they do not recognise. The preservation notices now carry a button that writes that single field
+  directly, outside the draft/Apply path, which is also how the DB-077 dock bit reaches an upgraded
+  device. HDR gets the notice without the button on purpose: its notice REPLACES the switch, so
+  there is no visible value an overwrite could claim to write.
+  `[cited]`: `app/…/state/DisplayTogglesViewModel.kt`, `app/…/ui/screens/PrivilegedDisplayScreen.kt`.
+
+- DB-079: **The Owner queue is addressed to a person deciding, so it is exempt from the repo's
+  house style.** Asked what the queue needed, the owner could not tell what action was being
+  requested: the entries were written in the same dense, ledger-ID-first register as the rest of the
+  tree, which serves a maintainer reconstructing a rationale and actively fails a reader who just
+  wants to know what to do. Plain language is now the rule for that section and is stated in its own
+  preamble, where the next session reads it before writing an item. The house style is not wrong
+  elsewhere — the audience is what changed, and no guard can see a register mismatch.
+
+- DB-080 [cited]: **A verification set is copied into more places than the one you fixed.** DB-074
+  added `:platform:lintDebug` to `scripts/verify.sh` and stopped there, leaving five other live
+  copies of the same Gradle line on `:app:lintDebug` alone: both release workflows (so a release
+  could still be cut from an unlinted `:platform`), `warm-gradle.sh`, and RUNBOOK's Acceptance line
+  and rungs-individually block. All six now lint both modules. Two exemptions, deliberate:
+  `CONTRIBUTING.md`'s copy stays `:app`-only because it is a translator's check for missing strings
+  and `:platform` has no resources, and `docs/history/` is frozen. The count in this row went
+  four → five → six as successive reviews re-ran the grep, which is the lesson: `git grep -n
+  lintDebug` for the COMMAND, not the module, and count copies rather than files.
+  `[cited]`: `.github/workflows/release.yml`, `.github/workflows/release-signing.yml`,
+  `scripts/warm-gradle.sh`.
+
+- DB-081 [cited]: **Re-baselining a budget that is already at its ceiling ratifies the growth it
+  cannot see, then mints a fresh margin on top.** At this branch's start the comment budget read
+  app=2403/2403 and platform=306/306 — the whole 5% margin spent by earlier v1.9.x work that never
+  had to justify a line of it, because the guard only speaks when the ceiling is crossed. The
+  re-baseline to 2417/314 was written up as the review's own new declarations, which are 14 of the
+  129 app lines it ratifies. A re-baseline is a ratchet, not a reset: say what the margin already
+  held before raising it, and measure the merge base with ITS copy of the guard, since the guard
+  resolves its root from `BASH_SOURCE` and will otherwise re-measure the current tree.
+  `[cited]`: `scripts/guards/comment-budget.sh`.
+
+- DB-082 [cited]: **A guard armed as a side effect of the happy path is not armed on the path that
+  needs it** (issue #123, user-reported false pause after screen-on). `hibernate()` nulls
+  `smoothedLux` AND `lastRawLux`, so on wake `setInitialBrightness` returned at its first line —
+  and `armInitialSettle` sat BELOW that return, so the F64/D-126 settle window was armed on every
+  transition except the one where the framework re-asserts `SCREEN_BRIGHTNESS` itself. That write
+  met a self-write marker left over from before the sleep and read as a manual override. Three
+  moves: arm before the lux guard and before the write, arm again on the receiver thread in
+  `onScreenOn()` (the framework's write can precede our broadcast, and `reinit()` reads DataStore
+  first), and re-check the window at COMMIT in `handleOverride` because observe→post→consume is
+  asynchronous. This is D-049 #2/#3 reaching a user: the single-latest self-write marker is still
+  the weak part, and a grace window around our own writes remains the deeper fix.
+  `[cited]`: `app/…/runtime/PipelineCycleRunner.kt`, `app/…/runtime/BrightnessPipelineController.kt`.
+
+- DB-083: **When a symptom is device-dependent, the falsifiable device check is the INJECTED
+  trigger, not the naturally-occurring one.** DB-082's first device step asked the owner to lock and
+  wake ten times and see no pause — which passes on any build if the OEM never re-asserts
+  `SCREEN_BRIGHTNESS`, and the owner's does not. The app cannot tell who wrote the key, so
+  `adb shell settings put system screen_brightness N` inside the window IS the OEM's write, and the
+  pair (inject inside the window → must not pause; inject outside it → must still pause) fails
+  honestly on every device. Third instance of a check that could not fail, after DB-070 and DB-072
+  and with their lesson already written down: the trap is not carelessness but reaching for the
+  symptom as reported rather than for the mechanism, so ask what the check does on a device that
+  never shows the bug. The owner caught this one too.
+
+- DB-084 [cited]: **A store and a pipeline can support a combination that no UI control can
+  express.** `ExperimentPrefsStore` has held date and location as independent nullable fields since
+  S12.7h, `CircadianWindowProvider.current` resolves them independently (F39/F83), and
+  PARITY_CHECKLIST claimed all three combinations — yet the Circadian card's Set button took a
+  non-null `String` date and refused a blank one, so pinning a location always pinned that day's
+  date too, and only date-only and both were reachable. The cause was the control's shape: the
+  coordinates are text fields where blank means live, but the date is a button that always renders
+  a day, so "live" had no representation and the code read the rendered day as the user's choice;
+  live-vs-fixed now lives in its own `dateFixed` flag with a Live date button, the same three-state
+  reading the status line already printed. The lesson is that a claim of independent fields is a
+  claim about the WHOLE path, input control included; test the combinations at the UI level, not
+  only at the store and the provider, and be suspicious of any control whose default rendering is
+  indistinguishable from an unset value. Tasker's HTML picker (elements37, `_ExperimentSetDate`)
+  simply left `%AAB_Date` empty, which is why the owner could do this there and not here.
+  `[cited]`: `app/…/ui/screens/CircadianScreen.kt`, `app/…/ui/SettingsScreensTest.kt`,
+  `app/…/runtime/CircadianWindowProviderTest.kt`.
+
+- DB-085 [cited]: **A line-oriented policy guard must account for the configuration language's
+  equivalent spellings, not only the repository's current style.** The action-pin parser accepted
+  only an unquoted `uses` key and exempted every `docker://` reference, so valid quoted YAML keys
+  and movable container tags bypassed its immutable-reference rail. Quoted block keys now enter
+  the same parser and container images require a 64-hex sha256 digest. Flow-style and multiline
+  `uses`, explicit mapping keys, and escaped quoted keys fail closed as noncanonical workflow
+  syntax, leaving the reference checker one documented scalar form. Adversarial fixtures hold each
+  bypass. `[cited]`: `scripts/guards/action-pins.sh`.

@@ -1,0 +1,9 @@
+Fixes a false "paused because you changed the brightness" right after the screen turns on, when you had not touched the slider.
+
+Reading the Wi-Fi network name without Location works again on Android 12 and 12L.
+
+Stay awake while charging now says when Android is set to a different charger set than this app writes, and offers to replace it.
+
+An unrecognized color-correction mode is still left alone, and the screen now offers to replace it.
+
+Circadian: pin a location and leave the date live.

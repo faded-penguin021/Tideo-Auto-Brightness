@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.ui.screens
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -44,6 +45,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.state.DisplayTogglesViewModel
 import com.tideo.autobrightness.app.state.DraftSettingsViewModel
+import com.tideo.autobrightness.app.state.PreservedDisplayField
 import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.DraftApplyBar
@@ -115,6 +117,8 @@ fun PrivilegedDisplayScreen(
             draftVm.apply()
         },
         onDiscardDraft = draftVm::discard,
+        // DB-078: direct, not a draft edit — via Apply it would be as inert as the control.
+        onOverwriteField = { field -> vm.overwriteDeviceField(field, draft.validate()) },
     )
 }
 
@@ -130,6 +134,7 @@ fun PrivilegedDisplayContent(
     onEditDraft: ((AabSettings) -> AabSettings) -> Unit = {},
     onApplyDraft: () -> Unit = {},
     onDiscardDraft: () -> Unit = {},
+    onOverwriteField: (PreservedDisplayField) -> Unit = {},
 ) {
     // AOSP-keys / OEM-variance note behind ⓘ in top bar (always reachable).
     var showInfo by remember { mutableStateOf(false) }
@@ -206,6 +211,7 @@ fun PrivilegedDisplayContent(
                             ?: DaltonizerMode.OFF,
                         onSelect = { mode -> onEditDraft { it.copy(daltonizerMode = mode.name) } },
                         devicePreferenceCustom = state.daltonizerPreferenceCustom,
+                        onUseTideoSetting = { onOverwriteField(PreservedDisplayField.DALTONIZER) },
                     )
                     SwitchSettingRow(
                         stringResource(R.string.pd_inversion), draft.inversionEnabled,
@@ -228,6 +234,13 @@ fun PrivilegedDisplayContent(
                         { on -> onEditDraft { it.copy(stayAwakeChargingEnabled = on) } },
                         help = R.string.pd_stay_awake_help, testTag = "switch_stayAwake",
                     )
+                    if (state.stayAwakePreferenceCustom) {
+                        PreservedNotice(
+                            R.string.pd_stay_awake_custom_preserved,
+                            testTag = "pd_stay_awake_custom_preserved",
+                            onUseTideoSetting = { onOverwriteField(PreservedDisplayField.STAY_AWAKE) },
+                        )
+                    }
                 }
 
                 if (state.hdrAvailable) {
@@ -242,11 +255,10 @@ fun PrivilegedDisplayContent(
                 } else if (state.hdrPreferenceCustom) {
                     SectionHeader(stringResource(R.string.pd_section_experimental), divider = true)
                     AabCard {
-                        Text(
-                            stringResource(R.string.pd_hdr_custom_preserved),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.testTag("pd_hdr_custom_preserved"),
+                        // No button: this notice REPLACES the switch, so no value is visible.
+                        PreservedNotice(
+                            R.string.pd_hdr_custom_preserved,
+                            testTag = "pd_hdr_custom_preserved",
                         )
                     }
                 }
@@ -355,12 +367,37 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
     }
 }
 
+/** DB-078: preserved-state notice. Omit [onUseTideoSetting] only where the control is hidden. */
+@Composable
+private fun PreservedNotice(
+    @StringRes text: Int,
+    testTag: String,
+    onUseTideoSetting: (() -> Unit)? = null,
+) {
+    Column(Modifier.testTag(testTag)) {
+        Text(
+            stringResource(text),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (onUseTideoSetting != null) {
+            TextButton(
+                onClick = onUseTideoSetting,
+                modifier = Modifier.testTag("${testTag}_overwrite"),
+            ) {
+                Text(stringResource(R.string.pd_use_tideo_setting))
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class) // FlowRow wraps on narrow screens
 @Composable
 private fun DaltonizerPicker(
     selected: DaltonizerMode,
     onSelect: (DaltonizerMode) -> Unit,
     devicePreferenceCustom: Boolean,
+    onUseTideoSetting: () -> Unit,
 ) {
     Column {
         Text(stringResource(R.string.pd_daltonizer_label), style = MaterialTheme.typography.bodyLarge)
@@ -375,11 +412,10 @@ private fun DaltonizerPicker(
             }
         }
         if (devicePreferenceCustom) {
-            Text(
-                stringResource(R.string.pd_daltonizer_custom_preserved),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("pd_daltonizer_custom_preserved"),
+            PreservedNotice(
+                R.string.pd_daltonizer_custom_preserved,
+                testTag = "pd_daltonizer_custom_preserved",
+                onUseTideoSetting = onUseTideoSetting,
             )
         }
     }

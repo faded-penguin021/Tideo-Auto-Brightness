@@ -52,7 +52,9 @@ class BrightnessPipelineController(
     // @Volatile: written by consumer, read on SENSOR/OBSERVER collectors (cross-coroutine handoff).
     @Volatile private var cachedSettings: AabSettings? = null
 
-    // @Volatile: override suppression deadline, written by consumer, read on OBSERVER gate.
+    // @Volatile: override suppression deadline, read on the OBSERVER gate. Written by the consumer
+    // and, since DB-082, by the screen-on receiver thread — a single volatile long, no ordering
+    // between the two beyond "latest deadline wins", which is what the window wants anyway.
     @Volatile private var suppressOverrideUntilMs = 0L
 
     // %AAB_MainLoop re-entry mutex: true while a sensor cycle is claimed or running.
@@ -137,7 +139,16 @@ class BrightnessPipelineController(
 
     // Lifecycle entry points — the service posts these; they run in consumer order.
     fun onScreenOff() { postControl(PipelineEvent.ScreenOff) }
-    fun onScreenOn() { postControl(PipelineEvent.ScreenOn) }
+    /**
+     * DB-082 (issue #123): arm the settle window on the RECEIVER thread, before the event is even
+     * queued. `reinit()` reads settings from DataStore first, and the framework re-asserts
+     * SCREEN_BRIGHTNESS as the display comes back — that write lands in the gap, against a
+     * self-write marker left over from before the sleep, and reads as a manual override.
+     */
+    fun onScreenOn() {
+        armInitialSettle(clock() + PipelineCycleRunner.INITIAL_SETTLE_MS)
+        postControl(PipelineEvent.ScreenOn)
+    }
     fun pause() { postControl(PipelineEvent.Pause) }
     fun resume() { postControl(PipelineEvent.Resume) }
 

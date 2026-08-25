@@ -91,7 +91,7 @@ class SecureDisplayControllerTest {
         assertEquals(DaltonizerMode.OFF, controller.readDaltonizer())
         assertFalse(controller.readInversion())
         assertFalse(controller.readAlwaysOnDisplay())
-        assertFalse(controller.readStayAwakePlugged())
+        assertEquals(false, controller.readStayAwakePlugged())
     }
 
 
@@ -212,11 +212,11 @@ class SecureDisplayControllerTest {
         assertEquals(1, secureInt("doze_always_on"))
 
         assertTrue(controller.setStayAwakePlugged(true).isSuccess)
-        assertTrue(controller.readStayAwakePlugged())
+        assertEquals(true, controller.readStayAwakePlugged())
         assertEquals(15, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
 
         assertTrue(controller.setStayAwakePlugged(false).isSuccess)
-        assertFalse(controller.readStayAwakePlugged())
+        assertEquals(false, controller.readStayAwakePlugged())
         assertEquals(0, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
     }
 
@@ -224,17 +224,22 @@ class SecureDisplayControllerTest {
     fun stayAwake_enableDoesNotDropDockBitFromTheAospMask() {
         grantElevated()
         Settings.Global.putInt(context.contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 15)
-        assertTrue(controller.readStayAwakePlugged())
+        assertEquals(true, controller.readStayAwakePlugged())
 
         assertTrue(controller.setStayAwakePlugged(true).isSuccess)
         assertEquals(15, globalInt(Settings.Global.STAY_ON_WHILE_PLUGGED_IN))
     }
 
+    // DB-077 REPLACES `stayAwake_readsAnyNonZeroPartialMaskAsEnabled`: only 0 and 15 have an answer.
     @Test
-    fun stayAwake_readsAnyNonZeroPartialMaskAsEnabled() {
+    fun stayAwake_readsAMaskItDidNotWriteAsUnrepresentable() {
         grantElevated()
         Settings.Global.putInt(context.contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 1)
-        assertTrue(controller.readStayAwakePlugged())
+        assertNull(controller.readStayAwakePlugged())
+
+        // 7 = AC|USB|WIRELESS, the exact mask this app wrote up to and including v1.9.0.
+        Settings.Global.putInt(context.contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 7)
+        assertNull(controller.readStayAwakePlugged())
     }
 
     @Test

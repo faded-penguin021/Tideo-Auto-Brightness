@@ -24,6 +24,19 @@ FAILED=0
 SUITE_STARTED=$SECONDS
 REPORT_STARTED=$SECONDS
 SLOW_FIXTURE_SECONDS=${SLOW_FIXTURE_SECONDS:-10}
+
+# POSIX does not standardise `sed -i`, and BSD and GNU sed give it incompatible argument
+# syntax. Fixtures edit disposable files through an ordinary temporary output-and-writeback operation so
+# this shipped suite runs unchanged with either implementation.
+sed_in_place() { # <sed-expression> <file>
+	local expression=$1 file=$2 tmp
+	tmp="${file}.amh-sed.$$"
+	sed "$expression" "$file" >"$tmp" || {
+		rm -f "$tmp"
+		return 1
+	}
+	cat "$tmp" >"$file" && rm -f "$tmp"
+}
 slow_threshold_valid() { # <candidate> — bounded to integers every supported bash can compare
 	case $1 in
 		''|*[!0-9]*|??????????*) return 1 ;;
@@ -119,10 +132,10 @@ mk() { # mk <name> -> prints the fixture path
 	chmod +x "$d/scripts"/*.sh
 	# Ordinary fixtures exercise other guards. Patch only their disposable ladder copy so the
 	# expensive, independently fixtured rungs return loudly; the shipped ladder has no bypass.
-	sed -i '/^guard_rail_selftests() {/a\
+	sed_in_place '/^guard_rail_selftests() {/a\
 \tskip "scripts/command-guard.sh and scripts/redact.sh self-tests already covered by fixture suite"\
 \treturn' "$d/scripts/ladder.sh"
-	sed -i '/^guard_shipped_integrity() {/a\
+	sed_in_place '/^guard_shipped_integrity() {/a\
 \tskip "shipped-script manifest check already covered by fixture suite"\
 \treturn' "$d/scripts/ladder.sh"
 	cat >"$d/amh.conf" <<-'CONF'
@@ -132,6 +145,7 @@ mk() { # mk <name> -> prints the fixture path
 		REMOTE_FLAG=AMH_REMOTE
 		STATE_FILE=docs/STATE.md
 		STATE_COMPRESS_TO_KB=9
+		STATE_COMPRESS_TO_SENTENCES=50
 		STATE_WARN_KB=14
 		STATE_HARD_KB=16
 		STATE_EDIT_DELTA_BYTES=1024
@@ -140,7 +154,8 @@ mk() { # mk <name> -> prints the fixture path
 		LEDGER_DIR=docs
 		LEDGER_BASENAME=LEDGER
 		LEDGER_LINE_CAP=800
-		LEDGER_ROW_CHAR_CAP=800
+		LEDGER_ROW_SENTENCE_CAP=6
+		LEDGER_ROW_CHAR_CAP=2000
 		CITATION_SCAN_PATHS='scripts'
 		CITATION_EXCLUDE=''
 		POISON_TOKENS='[skip ci]'
@@ -211,7 +226,7 @@ mk_integrity() { # mk_integrity <name> -> prints a fixture path with a current m
 	# Restore the real integrity rung, but retain the fixture-only rail skip. Integrity cases
 	# are not rail cases; using mk_unmodified here reran command-guard's self-test ten times.
 	cp "$ROOT/scripts/ladder.sh" "$d/scripts/ladder.sh"
-	sed -i '/^guard_rail_selftests() {/a\
+	sed_in_place '/^guard_rail_selftests() {/a\
 \tskip "scripts/command-guard.sh and scripts/redact.sh self-tests already covered by fixture suite"\
 \treturn' "$d/scripts/ladder.sh"
 	write_manifest "$d"
@@ -332,6 +347,34 @@ verdict_line() { # <ladder output>
 # Asserts on the verdict line specifically, with an explicit checked-NOTHING branch: a run
 # that printed no verdict at all must be a failure and not a vacuous pass, which is the
 # hollow-guard case the runbook requires an arm for.
+expect_pass_not_saying() { # <name> <dir> <ERE the green output must NOT match> <fixed substring it MUST contain>
+	# The inverse of expect_pass_saying, and the only shape that can pin an ANTI-anchor: a
+	# rule saying "do not re-state the threshold on a pass" is satisfiable by prose and
+	# unfalsifiable without a fixture that fails when the number comes back. Compare 6.0.0's
+	# fixtures over what the destructive advisory must not claim.
+	#
+	# Two deliberate choices, both learned the hard way in review. The absent needle is an
+	# ERE, not a fixed string, so it can be written WITHOUT the fixture's configured value:
+	# `soft cap 14` passes the moment someone changes the fixture conf to 13 while the
+	# anchor is still printed — the DB-022 trap rebuilt inside the guard against it. And the
+	# fourth argument is the checked-NOTHING arm the runbook requires: an assertion about
+	# absence is satisfied by a rung that never ran, printed nothing, or was renamed out of
+	# existence, so the caller must also name a string the line positively has.
+	local out rc started=$SECONDS
+	out=$(run "$2")
+	rc=$?
+	FIXTURE_ELAPSED_SECONDS=$((SECONDS - started))
+	if [ "$rc" -ne 0 ]; then
+		report no "$1" "expected exit 0, got $rc" "$out"
+	elif ! grep -qF "$4" <<<"$out"; then
+		report no "$1" "checked NOTHING: the output never contained '$4', so the absence of '$3' proves nothing" "$out"
+	elif grep -qE "$3" <<<"$out"; then
+		report no "$1" "passed but the output re-stated '$3', which a green verdict must not do" "$out"
+	else
+		report ok "$1"
+	fi
+}
+
 expect_verdict() { # <name> <runner: run|run_full> <dir> <expected rc> <fixed substring>
 	local out rc line started=$SECONDS
 	out=$("$2" "$3")
@@ -414,6 +457,90 @@ akia_token() {
 printf 'ladder guard fixtures\n'
 timing_diagnostics_self_test
 
+# --- command-guard.sh: Codex PreToolUse payload -----------------------------
+d=$(mk codex_hook_payload)
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cat .env"}}' |
+	scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'prefer presence-only checks'; then
+	report ok "a forbidden Codex Bash payload is blocked with the instructive reason"
+else
+	report no "a forbidden Codex Bash payload is blocked with the instructive reason" "rc=$rc" "$out"
+fi
+
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"printf hello"}}' |
+	scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ]; then report ok "an allowed Codex Bash payload passes"; else report no "an allowed Codex Bash payload passes" "rc=$rc" "$out"; fi
+
+out=$(cd "$d" && printf '%s' '{not-json' | scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ]; then report ok "a malformed Codex payload fails open"; else report no "a malformed Codex payload fails open" "rc=$rc" "$out"; fi
+
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"command":"cat .env"}}' |
+	scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ]; then report ok "a non-Bash Codex payload fails open"; else report no "a non-Bash Codex payload fails open" "rc=$rc" "$out"; fi
+
+# The distributed baseline does not require Python. Hide it from command lookup and prove
+# the conservative coreutils fallback still enforces a straightforward Codex Bash payload.
+fallback_path="$d/no-python-bin"
+mkdir -p "$fallback_path"
+for tool in bash cat dirname git grep head sed; do
+	tool_path=$(command -v "$tool")
+	ln -s "$tool_path" "$fallback_path/$tool"
+done
+out=$(cd "$d" && printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cat .env"}}' |
+	env PATH="$fallback_path" scripts/command-guard.sh 2>&1)
+rc=$?
+if [ "$rc" -eq 2 ]; then report ok "a Codex Bash payload is guarded without Python"; else report no "a Codex Bash payload is guarded without Python" "rc=$rc" "$out"; fi
+
+# --- command-guard.sh: the git-native pre-push rail (P13) --------------------
+# The `--self-test` matrix stubs the ancestry seam; this exercises the REAL `git merge-base`
+# glue over real commits, which is the part a string-only self-test cannot see (P12). Every
+# assertion fails against a command-guard with no `--pre-push` mode: the old script prints
+# `usage:` and exits 2, so the ALLOW cases fail on the exit code and the BLOCK cases fail on
+# the banner text they check for — the old exit-2 is not the rail's block.
+d=$(mk prepush_rail)
+c1=$(git -C "$d" rev-parse HEAD)
+git -C "$d" commit -q --allow-empty -m prepush-c2
+c2=$(git -C "$d" rev-parse HEAD)
+git -C "$d" checkout -q -b prepush-div "$c1"
+git -C "$d" commit -q --allow-empty -m prepush-divergent
+cdiv=$(git -C "$d" rev-parse HEAD)
+PP_ZERO=0000000000000000000000000000000000000000
+pp_block() { # <name> <stdin line> — must exit 2 AND name the pre-push rail
+	local out rc
+	out=$(cd "$d" && printf '%s\n' "$2" | scripts/command-guard.sh --pre-push 2>&1)
+	rc=$?
+	if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'AMH pre-push rail'; then
+		report ok "$1"
+	else
+		report no "$1" "rc=$rc" "$out"
+	fi
+}
+pp_allow() { # <name> <stdin line> — must exit 0
+	local out rc
+	out=$(cd "$d" && printf '%s\n' "$2" | scripts/command-guard.sh --pre-push 2>&1)
+	rc=$?
+	if [ "$rc" -eq 0 ]; then report ok "$1"; else report no "$1" "rc=$rc" "$out"; fi
+}
+pp_block "pre-push blocks a push to the default branch" "refs/heads/session/x $c2 refs/heads/$DEFAULT_BRANCH_FIXTURE $c1"
+pp_block "pre-push blocks a non-fast-forward (force by effect)" "refs/heads/session/x $c1 refs/heads/session/x $c2"
+pp_block "pre-push blocks a divergent-history force" "refs/heads/session/x $cdiv refs/heads/session/x $c2"
+pp_block "pre-push blocks a branch deletion" "(delete) $PP_ZERO refs/heads/session/x $c2"
+pp_allow "pre-push allows a fast-forward of a session ref" "refs/heads/session/x $c2 refs/heads/session/x $c1"
+pp_allow "pre-push allows a fast-forward of an assigned claude/ ref (no prefix check)" "refs/heads/claude/assigned $c2 refs/heads/claude/assigned $c1"
+pp_allow "pre-push allows creating a new branch (remote sha zero)" "refs/heads/session/x $c2 refs/heads/session/x $PP_ZERO"
+# Fail-open on a malformed (incomplete) line, and the input is chosen so the fixture is not
+# hollow: this line's fields would make prepush_verdict BLOCK (a zero local sha reads as a
+# delete) if run_prepush did not skip it first — so deleting the `|| continue` fail-open flips
+# this case from allow to block, which is what makes it a real test of that branch.
+pp_allow "pre-push fails open on an incomplete line" "refs/heads/session/x $PP_ZERO"
+out=$(cd "$d" && printf '' | scripts/command-guard.sh --pre-push 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ]; then report ok "pre-push fails open on empty stdin"; else report no "pre-push fails open on empty stdin" "rc=$rc" "$out"; fi
+
 # --- baseline
 d=$(mk baseline)
 started=$SECONDS
@@ -474,17 +601,70 @@ state_bytes() { # <dir> <bytes> — leaves docs/STATE.md exactly <bytes> long
 	fi
 }
 
+# Countable sentences for the branches whose verdict turns on the floor. One per line,
+# each terminator followed by the next line's capital once the counter joins them.
+state_sentences() { # <n> — n sentences of fixture prose on stdout
+	local i=0
+	while [ "$i" -lt "$1" ]; do
+		printf 'Fixture sentence %s states a durable lesson and stops. \n' "$i"
+		i=$((i + 1))
+	done
+}
+
 # Branch 1 — a shrink that crosses from above the soft cap to below it must reach the
 # floor, not stop in the debounce band. This is the Goodhart hole the size thresholds
 # alone leave, and the branch split must not reopen it.
-d=$(mk state_landing_bad)
-state_bytes "$d" $((15 * 1024))
-(cd "$d" && git commit -qam "grow past the soft cap")
-head -c $((11 * 1024)) "$d/docs/STATE.md" >"$d/docs/STATE.tmp" && mv "$d/docs/STATE.tmp" "$d/docs/STATE.md"
+#
+# The floor is two conditions, so this branch takes three fixtures: one for each cheap move
+# that satisfies one condition while removing nothing, and one for a real pass. They share
+# a construction — a committed file of N sentences padded past the soft cap — so the
+# "compressed" file below is genuinely the committed one with words taken out of it, which
+# is what makes the word MICRO-TRIM in the first fixture's name true of what it does.
+state_grown() { # <dir> <sentences> — commit a file of <sentences> sentences past the cap
+	cp "$1/docs/STATE.md" "$1/base.md"
+	{ state_sentences "$2"; } >>"$1/docs/STATE.md"
+	cp "$1/docs/STATE.md" "$1/sentences.md"
+	state_bytes "$1" $((15 * 1024))
+	(cd "$1" && git commit -qam "grow past the soft cap")
+}
+
+# THE MICRO-TRIM CASE. The committed file carries 60 sentences and 15 KB; the landing keeps
+# every one of those sentences and throws away 14 KB of the padding around them. That is
+# the reflex in its purest form — a 93% cut by bytes, removing no content — and the byte
+# floor alone passed it, which is why the sentence floor stands beside it.
+d=$(mk state_landing_micro_trim)
+state_grown "$d" 60
+cp "$d/sentences.md" "$d/docs/STATE.md"
 # Greps branch 1's OWN wording, not the "stops short" both failing branches share: with the
 # shared phrase, rewriting branch 1's message in branch 3's words left the suite green, so
 # the fixture could not tell which branch had fired.
 expect_fail "micro-trim that crosses below the cap but misses the floor fails" "$d" "crossed below the soft cap but stops short"
+
+# THE REPUNCTUATION CASE, which is the same defect through the other floor. The body is
+# joined onto one line and every `. F` boundary rewritten to `; f`, so the sentence count
+# collapses to nearly nothing while not one byte is freed. Sized to sit BETWEEN the byte
+# floor and the soft cap, so the sentence half of the condition is satisfied and only the
+# byte half can reject it: delete that half and this fixture goes green.
+d=$(mk state_landing_repunctuated)
+state_grown "$d" 60
+{ cat "$d/base.md"; state_sentences 200 | tr '\n' ' ' | sed 's/\.  *F/; f/g'; } >"$d/docs/STATE.md"
+expect_fail "collapsing the sentence count without freeing bytes fails" "$d" "crossed below the soft cap but stops short"
+
+# The real pass, and the pair that proves the floors come from the config rather than from
+# constants: the same landing that fails above passes once both floors admit it.
+d=$(mk state_landing_floor_from_config)
+state_grown "$d" 60
+cp "$d/sentences.md" "$d/docs/STATE.md"
+sed_in_place 's/^STATE_COMPRESS_TO_SENTENCES=.*/STATE_COMPRESS_TO_SENTENCES=70/' "$d/amh.conf"
+sed_in_place 's/^STATE_COMPRESS_TO_KB=.*/STATE_COMPRESS_TO_KB=14/' "$d/amh.conf"
+expect_pass_saying "the configured floors decide the landing" "$d" "clear of the floor"
+
+# A malformed floor must be loud and must not silently decide the branch — the same
+# contract the edit delta below has, and for the same reason.
+d=$(mk state_floor_malformed)
+sed_in_place 's/^STATE_COMPRESS_TO_SENTENCES=.*/STATE_COMPRESS_TO_SENTENCES=9KB/' "$d/amh.conf"
+expect_warn "a malformed compression floor warns and falls back rather than deciding quietly" "$d" \
+	"is not a positive sentence count"
 
 # Branch 3 — the same hole one band higher: a compression pass that never crosses below
 # the cap. If the check only fired on a crossing, grow-to-15.5 / trim-to-14.2 would
@@ -520,7 +700,7 @@ expect_warn "a conf without the delta key falls back to the shipped default" "$d
 # Same 100-byte shrink, a delta of 64: it must now read as a compression pass. This is what
 # proves the value comes from the config rather than from a constant in the script.
 d=$(mk state_delta_configured)
-sed -i 's/^STATE_EDIT_DELTA_BYTES=.*/STATE_EDIT_DELTA_BYTES=64/' "$d/amh.conf"
+sed_in_place 's/^STATE_EDIT_DELTA_BYTES=.*/STATE_EDIT_DELTA_BYTES=64/' "$d/amh.conf"
 state_bytes "$d" $((15 * 1024))
 (cd "$d" && git commit -qam "grow past the soft cap")
 head -c $((15 * 1024 - 100)) "$d/docs/STATE.md" >"$d/docs/STATE.tmp" && mv "$d/docs/STATE.tmp" "$d/docs/STATE.md"
@@ -528,17 +708,35 @@ expect_fail "the configured delta decides the branch" "$d" "unfinished compressi
 
 # A malformed delta must be loud and must not silently decide the branch.
 d=$(mk state_delta_malformed)
-sed -i 's/^STATE_EDIT_DELTA_BYTES=.*/STATE_EDIT_DELTA_BYTES=1KB/' "$d/amh.conf"
+sed_in_place 's/^STATE_EDIT_DELTA_BYTES=.*/STATE_EDIT_DELTA_BYTES=1KB/' "$d/amh.conf"
 state_bytes "$d" $((15 * 1024))
 (cd "$d" && git commit -qam "grow past the soft cap")
 head -c $((15 * 1024 - 100)) "$d/docs/STATE.md" >"$d/docs/STATE.tmp" && mv "$d/docs/STATE.tmp" "$d/docs/STATE.md"
 expect_warn "a malformed delta warns and falls back rather than deciding quietly" "$d" "is not a positive byte count"
 
+# A real compression pass: the sentences go WITH the bytes, which is the only move that
+# satisfies both floors at once.
 d=$(mk state_landing_good)
-state_bytes "$d" $((15 * 1024))
-(cd "$d" && git commit -qam "grow past the soft cap")
-head -c $((5 * 1024)) "$d/docs/STATE.md" >"$d/docs/STATE.tmp" && mv "$d/docs/STATE.tmp" "$d/docs/STATE.md"
+state_grown "$d" 60
+{ cat "$d/base.md"; state_sentences 2; } >"$d/docs/STATE.md"
 expect_pass "compression landing on the floor passes" "$d"
+# Landing well under the floor reports the HEADROOM in both units, and the gradient it
+# teaches is the whole point: a line that answered "at or under the floor" would read
+# identically for a landing one sentence clear.
+expect_pass_saying "the landing line reports how far clear of the floor it landed" "$d" \
+	"clear of the floor"
+
+# --- Anti-anchor: a green verdict names no threshold ------------------------
+# Two reported Goodhart failures, one shape: the number a clean run prints becomes the
+# number the next session optimizes toward. An instance shaved STATE across a dozen edits
+# to land 7 bytes under the floor, and drafted ledger rows at 828 and 805 to trim them to
+# just fit — after copying "the cap is a maximum, not a target" into its own preamble by
+# hand. Prose lost to salience, so the anchor is removed from the lines that reject
+# nothing. These fixtures fail the moment a threshold returns to a pass.
+d=$(mk state_size_green_anchor)
+state_bytes "$d" $((5 * 1024))
+expect_pass_not_saying "a green STATE size verdict names no threshold" "$d" \
+	"soft cap|hard cap|hard [0-9]" "KB, within the band"
 
 # --- STATE structure
 d=$(mk state_section)
@@ -586,7 +784,7 @@ expect_warn "a deleted Owner queue warns" "$d" "Owner queue"
 
 # --- ledger rollover
 d=$(mk ledger_cap)
-sed -i 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
 printf -- '- D-003: past the cap.\n' >>"$d/docs/LEDGER.md"
 expect_fail "a row starting past the line cap fails" "$d" "past the"
 
@@ -597,6 +795,12 @@ expect_fail "a row starting past the line cap fails" "$d" "past the"
 d=$(mk ledger_bytes)
 expect_pass_saying "the passing rung reports the live volume's size, not just its lines" "$d" \
 	"KB (grep it; a volume is retrieval storage, not a read)"
+# …and reports the count without the cap beside it. `790/800 lines` reads as context rather
+# than as an anchor, which is exactly why it survived the first pass of this change: it is
+# the same number in the same place doing the same thing. The warn branch at nine tenths
+# still names the cap, and that is the verdict the number belongs to.
+expect_pass_not_saying "a green ledger cap verdict does not re-state the line cap" "$d" \
+	"[0-9]+/[0-9]+ lines|LEDGER_LINE_CAP" "lines,"
 
 # A REAL size, not just the literal around it. The fixture ledger is a few hundred bytes,
 # so every assertion above is equally satisfied by a script that hardcodes zero or measures
@@ -620,36 +824,157 @@ d=$(mk ledger_bytes_warn)
 # with no row able to start past it — derived, because a hardcoded number silently moves
 # into the FAIL branch the moment a shipped script cites one more row.
 ledger_lines=$(wc -l <"$d/docs/LEDGER.md")
-sed -i "s/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=$ledger_lines/" "$d/amh.conf"
+sed_in_place "s/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=$ledger_lines/" "$d/amh.conf"
 expect_warn "the approaching-cap warning reports the size too" "$d" "KB, approaching the ${ledger_lines}-line cap"
 
 d=$(mk ledger_bytes_fail)
-sed -i 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
 printf -- '- D-003: a row past the cap.\n' >>"$d/docs/LEDGER.md"
 expect_fail "the rollover FAILURE reports the size too — that is the branch that needs it" "$d" \
 	"KB), past the 4-line cap"
 
 
-d=$(mk ledger_row_char_under_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=120/' "$d/amh.conf"
-printf -- '- D-003: short enough.\n' >>"$d/docs/LEDGER.md"
-expect_pass_saying "a concise new ledger row under the byte-counted character cap passes" "$d" \
-	"checked 1 new ledger row(s) against LEDGER_ROW_CHAR_CAP=120"
+# The row caps. Every `sed` below matches `^KEY=` rather than the shipped value, so a
+# default that moves cannot turn a substitution into a silent no-op.
+d=$(mk ledger_row_under_cap)
+sed_in_place 's/^LEDGER_ROW_SENTENCE_CAP=.*/LEDGER_ROW_SENTENCE_CAP=3/' "$d/amh.conf"
+printf -- '- D-003: **Short enough.** Two sentences, and it stops.\n' >>"$d/docs/LEDGER.md"
+expect_pass_saying "a concise new ledger row reports its own sentence count, not the cap" "$d" \
+	"checked 1 new ledger row(s) — D-003=2 sentence(s)"
+expect_pass_not_saying "a green ledger-row verdict re-states neither row cap" "$d" \
+	"LEDGER_ROW_SENTENCE_CAP|LEDGER_ROW_CHAR_CAP|[0-9]+ byte" "checked 1 new ledger row(s) — D-003="
 
+# What the counter treats as a sentence boundary, pinned where an author can see it. Each
+# of these fixtures dies if ONE branch of the regex is removed, which the first draft of
+# this block did not manage: its `e.g.` was followed by a lowercase word, so the
+# abbreviation fold it claimed to pin was never reached and deleting the fold left the
+# suite green.
+#
+# Closers: markup and punctuation stand between the terminator and the space. Two fixtures,
+# because a single one using `**` leaves every other member of the class deletable — the
+# closer class shrank to `[*]*` and the suite stayed green until the quote case joined it.
+d=$(mk ledger_row_counting_closer)
+printf -- '- D-003: **Bold ends a sentence.** And a second one follows it.\n' >>"$d/docs/LEDGER.md"
+expect_pass_saying "a bold closer ends a sentence" "$d" "D-003=2 sentence(s)"
+
+d=$(mk ledger_row_counting_closer_quote)
+printf -- '- D-003: The rail said "it stops here." Then the row states its lesson.\n' >>"$d/docs/LEDGER.md"
+expect_pass_saying "a closing quote ends a sentence" "$d" "D-003=2 sentence(s)"
+
+# Openers other than a capital. Shrink the opener class to [A-Z] and this reads 1.
+d=$(mk ledger_row_counting_opener)
+# shellcheck disable=SC2016 # the backticks are markdown in the row's text, not a substitution
+printf -- '- D-003: A first sentence ends here. `split_words` opens the second one.\n' >>"$d/docs/LEDGER.md"
+expect_pass_saying "a backticked identifier opens a sentence" "$d" "D-003=2 sentence(s)"
+
+# The abbreviation fold, with a CAPITAL after `e.g.` so the terminator regex would split
+# there if the fold were gone. Delete either gsub and this reads 3.
+d=$(mk ledger_row_counting_abbrev)
+printf -- '- D-003: One sentence, e.g. This clause and i.e. That one stay inside it. A second sentence closes.\n' >>"$d/docs/LEDGER.md"
+expect_pass_saying "e.g. and i.e. do not end a sentence even before a capital" "$d" \
+	"D-003=2 sentence(s)"
+
+d=$(mk ledger_row_counting_titles)
+printf -- '- D-003: Dr. Smith records one sentence. U.S. Policy opens the second. E.G. This clause stays within it. A third sentence closes.\n' >>"$d/docs/LEDGER.md"
+expect_pass_saying "titles and initialisms do not create phantom sentences" "$d" \
+	"D-003=2 sentence(s)"
+
+# The no-config path must enforce the same shipped fallback as the configuration template.
+# A 1700-byte row is above the former 1600-byte fallback but below the adopted 2000-byte
+# backstop, and carries fewer than six sentences so no other row limit decides the verdict.
+d=$(mk ledger_row_default_cap_lockstep)
+rm "$d/amh.conf"
+printf -- '- D-003: One sentence. %*s\n' 1660 '' >>"$d/docs/LEDGER.md"
+expect_pass "the no-config ledger backstop matches the shipped 2000-byte default" "$d"
+
+# A count that cannot be produced at all is a FAILURE, never a quiet pass. The row is fine;
+# awk is what is missing, and the rung must say it judged nothing rather than print a
+# green line with a blank number in it.
+# The stub fails ONLY the sentence counter's program — matched on a string unique to it —
+# and passes every other awk call through. Hiding awk entirely was the blunt version and it
+# tests something else: half the ladder dies, the row rung never runs, and the arm under
+# test is never reached. A fixture has to fail for its own reason.
+d=$(mk ledger_row_counting_hollow)
+printf -- '- D-003: **Short.** It stops.\n' >>"$d/docs/LEDGER.md"
+mkdir -p "$d/stub-bin"
+real_awk=$(command -v awk)
+cat >"$d/stub-bin/awk" <<STUB
+#!/bin/sh
+case "\$*" in *'buf = buf "X"'*) exit 3 ;; esac
+exec $real_awk "\$@"
+STUB
+chmod +x "$d/stub-bin/awk"
+out=$(cd "$d" && env PATH="$d/stub-bin:$PATH" scripts/ladder.sh --guards-only 2>&1)
+rc=$?
+if [ "$rc" -ne 0 ] && grep -qF "judged NOTHING" <<<"$out"; then
+	report ok "a sentence count that cannot be produced fails loudly"
+else
+	report no "a sentence count that cannot be produced fails loudly" "rc=$rc" "$out"
+fi
+
+# The other half of hollow, and the one an exit status cannot catch: awk SUCCEEDS and
+# prints nothing. Without the non-numeric check the empty string reaches `[ "" -gt 6 ]`,
+# which writes an error to stderr and takes the else branch — a green rung reporting a
+# count nobody produced.
+d=$(mk ledger_row_counting_empty)
+printf -- '- D-003: **Short.** It stops.\n' >>"$d/docs/LEDGER.md"
+mkdir -p "$d/stub-bin"
+real_awk=$(command -v awk)
+cat >"$d/stub-bin/awk" <<STUB
+#!/bin/sh
+case "\$*" in *'buf = buf "X"'*) exit 0 ;; esac
+exec $real_awk "\$@"
+STUB
+chmod +x "$d/stub-bin/awk"
+out=$(cd "$d" && env PATH="$d/stub-bin:$PATH" scripts/ladder.sh --guards-only 2>&1)
+rc=$?
+if [ "$rc" -ne 0 ] && grep -qF "judged NOTHING" <<<"$out"; then
+	report ok "a sentence counter that succeeds and prints nothing fails loudly"
+else
+	report no "a sentence counter that succeeds and prints nothing fails loudly" "rc=$rc" "$out"
+fi
+
+# The micro-trim case, as a fixture rather than as advice. The same three sentences twice,
+# once stated at length and once shaved to a third of the bytes: under a byte cap the
+# second draft bought compliance, and under the sentence cap neither does. A row loses a
+# whole sentence or it does not pass.
+d=$(mk ledger_row_sentences_over_cap)
+sed_in_place 's/^LEDGER_ROW_SENTENCE_CAP=.*/LEDGER_ROW_SENTENCE_CAP=2/' "$d/amh.conf"
+printf -- '- D-003: **A finding that took three sentences to state.** The second sentence carries narrative nobody will need again. The third repeats it at greater length still.\n' >>"$d/docs/LEDGER.md"
+expect_fail "a new ledger row over the sentence cap fails" "$d" \
+	"over LEDGER_ROW_SENTENCE_CAP=2"
+
+d=$(mk ledger_row_sentences_shaved)
+sed_in_place 's/^LEDGER_ROW_SENTENCE_CAP=.*/LEDGER_ROW_SENTENCE_CAP=2/' "$d/amh.conf"
+printf -- '- D-003: **A finding.** The narrative. It repeats.\n' >>"$d/docs/LEDGER.md"
+expect_fail "shaving that row to a third of its bytes buys nothing" "$d" \
+	"over LEDGER_ROW_SENTENCE_CAP=2"
+
+# The sentence cap is read from the config like every other threshold, and a malformed one
+# fails loudly rather than switching the rung off — a cap that silently stops checking is
+# the shape AMH ledger row D019 is about.
+d=$(mk ledger_row_sentence_cap_malformed)
+sed_in_place 's/^LEDGER_ROW_SENTENCE_CAP=.*/LEDGER_ROW_SENTENCE_CAP=six/' "$d/amh.conf"
+printf -- '- D-003: **Short.** It stops.\n' >>"$d/docs/LEDGER.md"
+expect_fail "a malformed sentence cap fails rather than switching the rung off" "$d" \
+	"LEDGER_ROW_SENTENCE_CAP must be a non-negative integer"
+
+# The byte backstop, which is a different rule and says so in its own words. The filler row
+# carries no sentence at all, so nothing but the backstop can be firing here.
 d=$(mk ledger_row_char_over_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_ROW_CHAR_CAP=.*/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
 printf -- '- D-003: long row. %s\n' "$(filler 120)" >>"$d/docs/LEDGER.md"
 expect_fail "a new ledger row over the byte-counted character cap fails" "$d" \
-	"over LEDGER_ROW_CHAR_CAP=80"
+	"over LEDGER_ROW_CHAR_CAP=80 — that is the runaway backstop"
 
 d=$(mk ledger_row_char_committed_over_cap)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_ROW_CHAR_CAP=.*/LEDGER_ROW_CHAR_CAP=80/' "$d/amh.conf"
 printf -- '- D-003: committed long row. %s\n' "$(filler 120)" >>"$d/docs/LEDGER.md"
 (cd "$d" && git add amh.conf docs/LEDGER.md && git commit -qm long-ledger-history)
 expect_pass "an already committed over-cap ledger row is historical and exempt" "$d"
 
 d=$(mk ledger_row_char_superseded_pointer_existing)
-sed -i 's/^LEDGER_ROW_CHAR_CAP=800/LEDGER_ROW_CHAR_CAP=10/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_ROW_CHAR_CAP=.*/LEDGER_ROW_CHAR_CAP=10/' "$d/amh.conf"
 printf -- '  Superseded by D-999.\n' >>"$d/docs/LEDGER.md"
 expect_pass "a sanctioned metadata-only supersession on an existing row is exempt" "$d"
 
@@ -688,7 +1013,7 @@ add_chain() { # <fixture dir> <suffix>... — in order
 d=$(mk ledger_volume_past_z)
 add_chain "$d" {A..Z} AA
 expect_pass_saying "a two-letter volume is live once the chain reaches it" "$d" \
-	"docs/LEDGER_AA.md: 5/800 lines"
+	"docs/LEDGER_AA.md: 5 lines"
 
 # Membership is REACHABILITY, not spelling, and this is the case that settles it: an
 # all-capitals stray file satisfies every name-shaped rule (`[A-Z]+`, and LONG, so it wins
@@ -696,7 +1021,7 @@ expect_pass_saying "a two-letter volume is live once the chain reaches it" "$d" 
 # file nobody writes to and prints `ok` over a volume that is past its cap — one untracked
 # one-line file switching the guard off. The cap must still fire on the real live volume.
 d=$(mk ledger_volume_archive)
-sed -i 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
 add_volume "$d" A
 printf '# archived notes\n' >"$d/docs/LEDGER_ARCHIVE.md"
 expect_fail "an all-caps stray file does not become the live volume" "$d" \
@@ -715,13 +1040,13 @@ expect_warn "an unreachable volume-shaped file is named, not silently ignored" "
 # missing"; it is unreachable, and its rows are read by nothing.
 d=$(mk ledger_volume_gap)
 add_chain "$d" A C
-expect_pass_saying "the walk stops at the first gap" "$d" "docs/LEDGER_A.md: 5/800 lines"
+expect_pass_saying "the walk stops at the first gap" "$d" "docs/LEDGER_A.md: 5 lines"
 
 # The base volume is where the chain starts, so its absence is not "no ledger yet" — that
 # rendering is a skip, and a skip reads exactly like a pass. Citations are switched off in
 # this fixture so the verdict under test is the only one on trial.
 d=$(mk ledger_volume_no_base)
-sed -i "s/^CITATION_SCAN_PATHS=.*/CITATION_SCAN_PATHS=''/" "$d/amh.conf"
+sed_in_place "s/^CITATION_SCAN_PATHS=.*/CITATION_SCAN_PATHS=''/" "$d/amh.conf"
 add_volume "$d" A
 rm "$d/docs/LEDGER.md"
 expect_fail "a missing base volume with continuations fails instead of skipping" "$d" \
@@ -731,7 +1056,7 @@ expect_fail "a missing base volume with continuations fails instead of skipping"
 # `DAA-` row matched nothing, so the cap could not fire however long the volume grew —
 # the failure this whole scheme change exists to remove, and it was silent.
 d=$(mk ledger_volume_multiletter_cap)
-sed -i 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
 add_chain "$d" {A..Z} AA
 expect_fail "a multi-letter row past the cap fails instead of passing invisibly" "$d" \
 	"docs/LEDGER_AA.md: a row STARTS at line 5"
@@ -742,25 +1067,25 @@ expect_fail "a multi-letter row past the cap fails instead of passing invisibly"
 # dense because the rung will not call an unreachable file live — which is why the ZZ case
 # builds seven hundred volumes rather than one.
 d=$(mk ledger_next_base)
-sed -i 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
 printf -- '- D-003: past the cap.\n' >>"$d/docs/LEDGER.md"
 expect_fail "the base volume rolls to _A / DA-" "$d" \
 	"open docs/LEDGER_A.md, numbering from DA-001"
 
 d=$(mk ledger_next_z)
-sed -i 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
 add_chain "$d" {A..Z}
 expect_fail "Z rolls to AA, which is where the old scheme simply stopped" "$d" \
 	"open docs/LEDGER_AA.md, numbering from DAA-001"
 
 d=$(mk ledger_next_az)
-sed -i 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
 add_chain "$d" {A..Z} A{A..Z}
 expect_fail "AZ rolls to BA — the carry advances the letter to its left, not the length" "$d" \
 	"open docs/LEDGER_BA.md, numbering from DBA-001"
 
 d=$(mk ledger_next_zz)
-sed -i 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
+sed_in_place 's/^LEDGER_LINE_CAP=800/LEDGER_LINE_CAP=4/' "$d/amh.conf"
 add_chain "$d" {A..Z} {A..Z}{A..Z}
 expect_fail "ZZ rolls to AAA — a carry off the left end lengthens the suffix" "$d" \
 	"open docs/LEDGER_AAA.md, numbering from DAAA-001"
@@ -775,13 +1100,40 @@ printf '# see D-001\n' >"$d/scripts/thing.sh"
 expect_fail "a cited row without its [cited] marker fails" "$d" "not marked"
 
 d=$(mk cite_stale)
-sed -i 's/^- D-002:/- D-002 [cited]:/' "$d/docs/LEDGER.md"
+sed_in_place 's/^- D-002:/- D-002 [cited]:/' "$d/docs/LEDGER.md"
 expect_fail "a [cited] marker with no citation fails" "$d" "no longer cited"
 
 d=$(mk cite_ok)
 printf '# see D-001\n' >"$d/scripts/thing.sh"
-sed -i 's/^- D-001:/- D-001 [cited]:/' "$d/docs/LEDGER.md"
+sed_in_place 's/^- D-001:/- D-001 [cited]:/' "$d/docs/LEDGER.md"
 expect_pass "a citation with its marker passes" "$d"
+
+# GNU sed accepts escaped BRE `\+` and `\?` as extensions; BSD sed does not. Reject those
+# extensions in a shim on every host so the citation-row extractor stays on the shared ERE
+# syntax rather than waiting for the macOS job to rediscover the parse failure.
+d=$(mk cite_bsd_sed)
+printf '# see D-001\n' >"$d/scripts/thing.sh"
+sed_in_place 's/^- D-001:/- D-001 [cited]:/' "$d/docs/LEDGER.md"
+mkdir -p "$d/bsd-bin"
+real_sed=$(command -v sed)
+cat >"$d/bsd-bin/sed" <<-EOF
+	#!/usr/bin/env bash
+	for arg in "\$@"; do
+		case \$arg in *'\\+'*|*'\\?'*) exit 64 ;; esac
+	done
+	exec "$real_sed" "\$@"
+EOF
+chmod +x "$d/bsd-bin/sed"
+started=$SECONDS
+out=$(PATH="$d/bsd-bin:$PATH" run "$d")
+rc=$?
+FIXTURE_ELAPSED_SECONDS=$((SECONDS - started))
+if [ "$rc" -eq 0 ]; then
+	report ok "citation row extraction uses BSD/GNU-common sed syntax"
+else
+	report no "citation row extraction uses BSD/GNU-common sed syntax" \
+		"expected exit 0, got $rc" "$out"
+fi
 
 # A file name with a space, in the citation guard this time. `secret_spacey` existed
 # and this did not, so the word-split hole survived in one guard while being fixed in
@@ -804,7 +1156,7 @@ expect_fail "a multi-letter citation with no ledger row fails" "$d" "no such led
 
 d=$(mk cite_multiletter_ok)
 add_chain "$d" {A..Z} AA
-sed -i 's/^- DAA-001:/- DAA-001 [cited]:/' "$d/docs/LEDGER_AA.md"
+sed_in_place 's/^- DAA-001:/- DAA-001 [cited]:/' "$d/docs/LEDGER_AA.md"
 printf '# see DAA-001\n' >"$d/scripts/thing.sh"
 expect_pass "a multi-letter citation with its marker passes" "$d"
 
@@ -970,7 +1322,7 @@ mk_bootstrap() { # mk_bootstrap <dir> <exit-code>
 # naming — and `${!REMOTE_FLAG}` on it is a bad substitution: stderr, exit 0, no bootstrap,
 # no word about it. amh.conf documents the flag as free-form, so nothing was stopping it.
 d=$(mk ss_flag_invalid)
-sed -i 's/^REMOTE_FLAG=.*/REMOTE_FLAG=AMH-REMOTE/' "$d/amh.conf"
+sed_in_place 's/^REMOTE_FLAG=.*/REMOTE_FLAG=AMH-REMOTE/' "$d/amh.conf"
 mk_bootstrap "$d" 0
 out=$(cd "$d" && env AMH_REMOTE=1 bash scripts/session-start.sh 2>&1)
 # The whole banner, ⚠ and verdict word included — the fixture is asserting how LOUD the
@@ -1466,12 +1818,12 @@ d=$(mk_unmodified rail_regressed)
 # Mutate the fixture matrix itself, not the tail of the file: a function appended
 # after the dispatcher is defined too late to ever run, which is a mutation that
 # proves nothing.
-sed -i 's/^\tst_allowed .cat README.md./\tst_allowed "cat .env"/' "$d/scripts/command-guard.sh"
+sed_in_place 's/^\tst_allowed .cat README.md./\tst_allowed "cat .env"/' "$d/scripts/command-guard.sh"
 expect_runner_saying "a regressed rail self-test fails the ladder" run_rails "$d" 1 \
 	"self-test failed"
 
 d=$(mk_unmodified rail_noexec)
-sed -i 's/^\tst_allowed .cat README.md./\tst_allowed "cat .env"/' "$d/scripts/command-guard.sh"
+sed_in_place 's/^\tst_allowed .cat README.md./\tst_allowed "cat .env"/' "$d/scripts/command-guard.sh"
 chmod -x "$d/scripts/command-guard.sh"
 expect_runner_saying "a non-executable rail is still self-tested" run_rails "$d" 1 \
 	"self-test failed"
@@ -1599,7 +1951,7 @@ fi
 # because each is separately silent: printed unconditionally the line is FALSE for every
 # branch-per-change repo, and dropped entirely it is missing for every train.
 d=$(mk ss_merge_mode_train)
-sed -i 's/^MERGE_MODE=.*/MERGE_MODE=branch-train/' "$d/amh.conf"
+sed_in_place 's/^MERGE_MODE=.*/MERGE_MODE=branch-train/' "$d/amh.conf"
 out=$(cd "$d" && env -u AMH_REMOTE bash scripts/session-start.sh 2>&1)
 if grep -qF "merge mode: branch-train — main's history is squashed" <<<"$out"; then
 	report ok "a branch-train repo is told its default branch's log is not its past"
@@ -1800,7 +2152,7 @@ expect_warn "with no upstream ref the guard says it checked NOTHING" "$d" \
 # --- local advisories
 # Warn-only and skipped in CI, so `run()` can never reach them: assert on the text.
 d=$(mk advisory_rules)
-sed -i "s|^RULE_FILES=''|RULE_FILES='amh.conf'|" "$d/amh.conf"
+sed_in_place "s|^RULE_FILES=''|RULE_FILES='amh.conf'|" "$d/amh.conf"
 printf '\n# an uncommitted legislation edit\n' >>"$d/amh.conf"
 started=$SECONDS
 out=$(run_local "$d")
@@ -1827,8 +2179,45 @@ else
 	report no "an orphaned plan is coached toward archive-or-delete" "no archive-or-delete warning" "$out"
 fi
 
+# The abandoned-advisory line: the only visible consequence of clearing a destructive
+# prompt by dropping the deletion. Both directions matter — an advisory that was
+# re-attempted must NOT be listed, or the line degrades into "you used rm today" and
+# stops meaning anything. The state file is pointed at the fixture's own directory, so
+# this asserts the ladder's plumbing to the guard rather than whatever /tmp happens to hold.
+d=$(mk advisory_destructive_abandoned)
+started=$SECONDS
+# Driven through the HOOK path, not `--command`, because that is the only path where a pass
+# means the command runs next — and therefore the only one that records a re-attempt. Using
+# `--command` here would leave the resumed target listed, which is exactly what the rail now
+# says about an inspection: asking the guard about text twice is not doing anything twice.
+hook() { printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s"}}' "$1"; }
+out=$(cd "$d" && DESTRUCTIVE_ADVISORY_STATE="$d/dstate" bash -c '
+	h() { printf "{\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"$1\"}}"; }
+	h "rm -rf /tmp/fixture-abandoned" | scripts/command-guard.sh >/dev/null 2>&1
+	h "rm -rf /tmp/fixture-resumed"   | scripts/command-guard.sh >/dev/null 2>&1
+	h "rm -rf /tmp/fixture-resumed"   | scripts/command-guard.sh >/dev/null 2>&1
+	env -u CI scripts/ladder.sh --guards-only 2>&1')
+elapsed=$((SECONDS - started))
+FIXTURE_ELAPSED_SECONDS=$elapsed
+if ! grep -qF "never re-attempted under this exact text" <<<"$out"; then
+	report no "an abandoned destructive advisory is named in the ladder" "no note line" "$out"
+elif ! grep -qF "/tmp/fixture-abandoned" <<<"$out"; then
+	report no "an abandoned destructive advisory is named in the ladder" "the note omitted the abandoned target" "$out"
+elif grep -qF "/tmp/fixture-resumed" <<<"$out"; then
+	report no "an abandoned destructive advisory is named in the ladder" "the note listed a re-attempted target" "$out"
+elif grep -qE "(WARN|FAIL) +destructive advisories" <<<"$out"; then
+	report no "an abandoned destructive advisory is named in the ladder" "the line is a verdict; it must be a note" "$out"
+elif ! grep -qF "guards clean (0 warning(s))" <<<"$out"; then
+	# The label is not the property. `note` earns its place only by touching no counter,
+	# so this asserts the COUNT in the verdict line: a `note` that increments WARNS reads
+	# identically above and turns this fixture red — which the label check alone did not.
+	report no "an abandoned destructive advisory is named in the ladder" "the note moved the warning count" "$out"
+else
+	report ok "an abandoned destructive advisory is named in the ladder"
+fi
+
 d=$(mk advisory_ci)
-sed -i "s|^RULE_FILES=''|RULE_FILES='amh.conf'|" "$d/amh.conf"
+sed_in_place "s|^RULE_FILES=''|RULE_FILES='amh.conf'|" "$d/amh.conf"
 printf '\n# an uncommitted legislation edit\n' >>"$d/amh.conf"
 started=$SECONDS
 out=$(run "$d")

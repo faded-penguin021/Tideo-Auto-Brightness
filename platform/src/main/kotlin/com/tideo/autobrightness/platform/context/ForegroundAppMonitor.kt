@@ -25,15 +25,7 @@ class AndroidForegroundAppMonitor(
     // D-034 (b): clock seam for test time control (shadow clock can't move wall-clock).
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ForegroundAppMonitor {
-    override fun hasUsageAccessPermission(): Boolean {
-        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = appOps.unsafeCheckOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            context.packageName,
-        )
-        return mode == AppOpsManager.MODE_ALLOWED
-    }
+    override fun hasUsageAccessPermission(): Boolean = hasUsageStatsAccess(context)
 
     override fun usageAccessSettingsIntent(): Intent =
         Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
@@ -62,4 +54,15 @@ class AndroidForegroundAppMonitor(
         }
         return last
     }
+}
+
+// DB-075: un-deprecated at compileSdk 36 and older than minSdk — no branch, no suppression.
+fun hasUsageStatsAccess(context: Context): Boolean {
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val mode = appOps.checkOpNoThrow(
+        AppOpsManager.OPSTR_GET_USAGE_STATS,
+        Process.myUid(),
+        context.packageName,
+    )
+    return mode == AppOpsManager.MODE_ALLOWED
 }

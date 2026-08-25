@@ -2,7 +2,7 @@
 # Fixture suite for the repo-local ladder guards under scripts/guards/.
 #
 # Yours, not shipped. The AMH's own scripts/test-ladder-guards.sh covers the SHIPPED ladder;
-# nothing upstream knows these guards exist, so without this file they are six scripts whose
+# nothing upstream knows these guards exist, so without this file they are eight scripts whose
 # failure paths have never run (docs/HARNESS_LOCAL.md). scripts/verify.sh invokes it.
 #
 # Every case builds a throwaway tree and runs the real guard against it. The point is the
@@ -1213,6 +1213,174 @@ awk '{ print } /local cmd=\$1 src/ { print "\treturn 1" }' \
 OUT=$(PYTHON_EDIT_ADVISORY_STATE=$SANDBOX/pe-broken-state bash "$SANDBOX/pe-broken/python-edit.sh" 2>&1)
 RC=$?
 expect_fail "a matcher with a write shape removed fails its own ladder rung" "fixture(s) failed"
+
+# =============================================================================
+printf '\n· action-pins\n'
+
+SHA_A=3d3c42e5aac5ba805825da76410c181273ba90b1
+SHA_B=fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+# <dir> then one "<file>|<uses-line-body>" per remaining argument.
+ap_tree() {
+	local d=$SANDBOX/$1
+	shift
+	rm -rf "$d"
+	mkdir -p "$d/.github/workflows"
+	local spec file body
+	for spec in "$@"; do
+		file=${spec%%|*}
+		body=${spec#*|}
+		if [ ! -f "$d/.github/workflows/$file" ]; then
+			printf 'name: %s\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n' \
+				"$file" >"$d/.github/workflows/$file"
+		fi
+		printf '      - uses: %s\n' "$body" >>"$d/.github/workflows/$file"
+	done
+}
+
+ap_tree ap-ok \
+	"build.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"codeql.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"codeql.yml|github/codeql-action/init@$SHA_B  # v4.37.7" \
+	"codeql.yml|github/codeql-action/analyze@$SHA_B  # v4.37.7"
+run_guard ap-ok action-pins
+expect_pass "consistent pins pass, and two sub-actions of one repo may share a SHA"
+
+# THE case this guard exists for, reproduced from the defect itself: Dependabot moved
+# clean-dist.yml's checkout SHA to v7.0.1's but its marker rewrite failed on the trailing prose,
+# leaving `# v5.1.0` on the new commit while four other files said v7.0.1 (DB-038 decay, v1.9.1
+# review). One SHA, two labels.
+ap_tree ap-stale-marker \
+	"build.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"clean-dist.yml|actions/checkout@$SHA_A  # v5.1.0 - node24 runtime (see build.yml)"
+run_guard ap-stale-marker action-pins
+expect_fail "one SHA carrying two version markers fails" "labelled with more than one version"
+
+# The mirror image: the marker agrees everywhere but one file kept the OLD commit, so a single
+# release claims two commits. Rule 3a cannot see this one — the labels match.
+ap_tree ap-split-sha \
+	"build.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"release.yml|actions/checkout@$SHA_B  # v7.0.1"
+run_guard ap-split-sha action-pins
+expect_fail "one action+version resolving to two commits fails" "more than one commit"
+
+ap_tree ap-tag-ref "build.yml|actions/checkout@v7"
+run_guard ap-tag-ref action-pins
+expect_fail "a tag ref instead of a commit SHA fails" "not a 40-hex commit SHA"
+
+ap_tree ap-unlabelled "build.yml|actions/checkout@$SHA_A"
+run_guard ap-unlabelled action-pins
+expect_fail "a SHA pin with no version marker fails" "no '# v<version>' marker"
+
+# A path inside the repository is not third-party supply chain, but a tree holding ONLY local
+# actions has nothing to say — so it must be loud, not a silent pass.
+ap_tree ap-local-only "build.yml|./.github/actions/setup"
+run_guard ap-local-only action-pins
+expect_fail "a tree with no third-party uses: is reported, not passed" "checked nothing"
+
+ap_tree ap-docker-tag "build.yml|docker://alpine:3.20"
+run_guard ap-docker-tag action-pins
+expect_fail "a container image tag instead of an immutable digest fails" "not pinned to a sha256 image digest"
+
+DIGEST_A=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+ap_tree ap-docker-digest "build.yml|docker://alpine@sha256:$DIGEST_A"
+run_guard ap-docker-digest action-pins
+expect_pass "a container image pinned to a sha256 digest passes"
+
+# Quoted mapping keys are valid YAML and must not disappear from the guard's input set.
+ap_tree ap-quoted-key-tag "build.yml|actions/checkout@$SHA_A  # v7.0.1"
+sed -i "s/- uses:/- 'uses':/" "$SANDBOX/ap-quoted-key-tag/.github/workflows/build.yml"
+sed -i "s/@$SHA_A/@v7/" "$SANDBOX/ap-quoted-key-tag/.github/workflows/build.yml"
+run_guard ap-quoted-key-tag action-pins
+expect_fail "a quoted uses key with a tag ref is still checked" "not a 40-hex commit SHA"
+
+ap_tree ap-quoted-key-pin "build.yml|actions/checkout@$SHA_A  # v7.0.1"
+sed -i 's/- uses:/- "uses":/' "$SANDBOX/ap-quoted-key-pin/.github/workflows/build.yml"
+run_guard ap-quoted-key-pin action-pins
+expect_pass "a quoted uses key with a labelled SHA pin passes"
+
+ap_tree ap-flow-key "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- { uses: \1 }/' "$SANDBOX/ap-flow-key/.github/workflows/build.yml"
+run_guard ap-flow-key action-pins
+expect_fail "a flow-style uses mapping cannot bypass reference checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-later-key "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- { name: checkout, "uses": \1 }/' "$SANDBOX/ap-flow-later-key/.github/workflows/build.yml"
+run_guard ap-flow-later-key action-pins
+expect_fail "a later flow-style uses key cannot bypass reference checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-nested-prefix "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- { env: { MODE: test }, uses: \1 }/' "$SANDBOX/ap-flow-nested-prefix/.github/workflows/build.yml"
+run_guard ap-flow-nested-prefix action-pins
+expect_fail "a nested field before flow-style uses cannot bypass reference checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-split-sequence "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/-\n        { uses: \1 }/' "$SANDBOX/ap-flow-split-sequence/.github/workflows/build.yml"
+run_guard ap-flow-split-sequence action-pins
+expect_fail "a separately-laid-out flow mapping cannot bypass reference checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-separated-sequence "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/-\n        # checkout step\n\n        \&step\n        { uses: \1 }/' "$SANDBOX/ap-flow-separated-sequence/.github/workflows/build.yml"
+run_guard ap-flow-separated-sequence action-pins
+expect_fail "comments, blanks, and node properties cannot hide a split flow mapping" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-sequence-comment "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- \&step # checkout step\n        { uses: \1 }/' "$SANDBOX/ap-flow-sequence-comment/.github/workflows/build.yml"
+run_guard ap-flow-sequence-comment action-pins
+expect_fail "a sequence indicator comment cannot hide a split flow mapping" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-sequence-properties "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- \&step !!map # checkout step\n        { uses: \1 }/' "$SANDBOX/ap-flow-sequence-properties/.github/workflows/build.yml"
+run_guard ap-flow-sequence-properties action-pins
+expect_fail "multiple node properties cannot hide a split flow mapping" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-escaped-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- { "us\\u0065s": actions/checkout@v7 }|' "$SANDBOX/ap-flow-escaped-key/.github/workflows/build.yml"
+run_guard ap-flow-escaped-key action-pins
+expect_fail "an escaped uses key inside a flow mapping cannot bypass checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-multiline-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- uses:\n          actions/checkout@v7|' "$SANDBOX/ap-multiline-key/.github/workflows/build.yml"
+run_guard ap-multiline-key action-pins
+expect_fail "a multiline uses value cannot bypass reference checking" "has no same-line scalar reference"
+
+ap_tree ap-explicit-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- ? uses\n        : actions/checkout@v7|' "$SANDBOX/ap-explicit-key/.github/workflows/build.yml"
+run_guard ap-explicit-key action-pins
+expect_fail "an explicit YAML uses key cannot bypass reference checking" "explicit YAML mapping keys are not supported"
+
+ap_tree ap-compact-explicit-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- ? uses : actions/checkout@v7|' "$SANDBOX/ap-compact-explicit-key/.github/workflows/build.yml"
+run_guard ap-compact-explicit-key action-pins
+expect_fail "a compact explicit YAML uses key cannot bypass reference checking" "explicit YAML mapping keys are not supported"
+
+ap_tree ap-escaped-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses:|- "us\\u0065s":|' "$SANDBOX/ap-escaped-key/.github/workflows/build.yml"
+run_guard ap-escaped-key action-pins
+expect_fail "an escaped quoted YAML uses key cannot bypass reference checking" "escaped double-quoted YAML mapping keys are not supported"
+
+ap_tree ap-anchored-escaped-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses:|- \&step "us\\u0065s":|' "$SANDBOX/ap-anchored-escaped-key/.github/workflows/build.yml"
+run_guard ap-anchored-escaped-key action-pins
+expect_fail "an anchor before an escaped uses key cannot bypass checking" "escaped double-quoted YAML mapping keys are not supported"
+
+ap_tree ap-multiline-escaped-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- "us\\\n          es": actions/checkout@v7|' "$SANDBOX/ap-multiline-escaped-key/.github/workflows/build.yml"
+run_guard ap-multiline-escaped-key action-pins
+expect_fail "a multiline escaped uses key cannot bypass checking" "escaped double-quoted YAML mapping keys are not supported"
+
+rm -rf "$SANDBOX/ap-empty"
+mkdir -p "$SANDBOX/ap-empty/.github/workflows"
+run_guard ap-empty action-pins
+expect_fail "no workflow files at all is reported, not passed" "checked nothing"
+
+# Trailing prose after the version is legal — it is the shape Dependabot chokes on, not a defect
+# in the file — so the guard must read the leading token as the marker and not the whole comment.
+ap_tree ap-prose \
+	"build.yml|actions/checkout@$SHA_A  # v7.0.1" \
+	"clean-dist.yml|actions/checkout@$SHA_A  # v7.0.1 - node24 runtime (see build.yml node24 policy)"
+run_guard ap-prose action-pins
+expect_pass "a marker followed by prose is read as just the version"
 
 # Every guard AND this suite must be executable. python-edit.sh needs it because the ladder runs
 # it with bash but the PreToolUse hook does not; this suite needs it because .claude/settings.json

@@ -29,6 +29,7 @@ class DisplayTogglesCoordinatorTest {
         // stopped calling the controller at all. The production gate is pinned in
         // SecureDisplayControllerTest; this fake only stands in for it.
         val attempts = mutableListOf<String>()
+        var stayAwake: Boolean? = false
         private fun write(entry: String): Result<Unit> {
             writes += entry
             return Result.success(Unit)
@@ -50,8 +51,11 @@ class DisplayTogglesCoordinatorTest {
         override fun setInversion(on: Boolean) = write("inversion=$on")
         override fun readAlwaysOnDisplay() = false
         override fun setAlwaysOnDisplay(on: Boolean) = gated("aod=$on", alwaysOnDisplayAvailable)
-        override fun readStayAwakePlugged() = false
-        override fun setStayAwakePlugged(on: Boolean) = write("stayAwake=$on")
+        override fun readStayAwakePlugged() = stayAwake
+        override fun setStayAwakePlugged(on: Boolean): Result<Unit> {
+            stayAwake = on
+            return write("stayAwake=$on")
+        }
         override var hdrForceSdrAvailable = true
         override fun readHdrForceSdr() = false
         override fun setHdrForceSdr(on: Boolean) = write("hdr=$on")
@@ -200,6 +204,48 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         assertEquals(listOf("aod=true", "stayAwake=true", "hdr=true"), h.display.writes)
     }
+
+    @Test
+    fun stayAwakeChange_preservesAnUnrepresentableDeviceMask_DB077() =
+        runTest(UnconfinedTestDispatcher()) {
+            val h = Harness()
+            h.display.stayAwake = null // Android currently holds a mask such as legacy value 7.
+            h.coordinator.start(backgroundScope)
+            h.effectiveFlow.value = baseline
+            h.effectiveFlow.value = baseline.copy(stayAwakeChargingEnabled = true)
+            h.effectiveFlow.value = baseline
+            runCurrent()
+
+            assertTrue(h.display.writes.isEmpty(), "profile transitions must preserve the custom mask")
+        }
+
+    @Test
+    fun stop_preservesAnUnrepresentableStayAwakeMask_DB077() =
+        runTest(UnconfinedTestDispatcher()) {
+            val h = Harness()
+            h.coordinator.start(backgroundScope)
+            h.effectiveFlow.value = baseline.copy(stayAwakeChargingEnabled = true)
+            runCurrent()
+            h.display.writes.clear()
+            h.display.stayAwake = null
+
+            h.coordinator.stop()
+
+            assertTrue(h.display.writes.isEmpty(), "service stop must preserve the custom mask")
+        }
+
+    @Test
+    fun stayAwakeChange_diffWritesRepresentableDeviceStates_DB077() =
+        runTest(UnconfinedTestDispatcher()) {
+            val h = Harness()
+            h.coordinator.start(backgroundScope)
+            h.effectiveFlow.value = baseline
+            h.effectiveFlow.value = baseline.copy(stayAwakeChargingEnabled = true)
+            h.effectiveFlow.value = baseline
+            runCurrent()
+
+            assertEquals(listOf("stayAwake=true", "stayAwake=false"), h.display.writes)
+        }
 
     @Test
     fun hdrField_isInert_whenTheDeviceLacksHdrControl_D152() = runTest(UnconfinedTestDispatcher()) {
