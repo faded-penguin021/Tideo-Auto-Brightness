@@ -77,10 +77,10 @@ input rather than a retained score or CI gate, its two surviving rails being RUN
    #123 in a later session without the owner saying so first. The fix itself is done and verified;
    only the reply was ever in question. (DB-082.)
 
-Open questions: none. Owed reviews: a fresh pass on 2026-08-25 found two unresolved action-pins
-findings: `docker://` references bypass the promised immutable-reference rail, and valid quoted
-YAML `uses` keys bypass its parser. Fix both, add adversarial fixtures, and run another fresh pass
-before merge. Earlier rule-review rounds are answered; their counts are in their commit bodies.
+Open questions: none. Owed reviews: none. The two action-pins findings from the 2026-08-25 pass
+were fixed with adversarial fixtures: `docker://` references now require sha256 digests, and valid
+quoted YAML `uses` keys enter the same parser. Earlier rule-review rounds are answered; their
+counts are in their commit bodies.
 
 Answered 2026-08-23: the comment-budget increase is accepted on condition the source pointers stay
 terse, since the rule exists to stop prose living in two places. Two numbers settle it, and they
@@ -136,6 +136,8 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-25 — Closed both action-pins review findings: container images require immutable sha256
+  digests and quoted YAML `uses` keys can no longer bypass the guard (DB-085).
 - 2026-08-25 — DB-084 and the `dfa0c8c` coordinator stay-awake path device-verified on vc23; added
   the ephemeral round script `DEVICE_TEST_SCRIPT_1.9.2.md`.
 - 2026-08-24 — DB-084 added live date with fixed location; DB-082 fixed wake-settle handling.

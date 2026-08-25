@@ -296,7 +296,8 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   survive as the two rails below. **Pinned-Dependencies** is now half-mechanised —
   `scripts/guards/action-pins.sh` (DB-076) holds the shape checks named in step 2, and the tag↔SHA
   claim itself stays yours. **Token-Permissions** is prose only: nothing re-checks it.
-  - **Pinned-Dependencies:** every `uses:` is a 40-hex **commit SHA** + trailing `# vX.Y.Z` marker.
+  - **Pinned-Dependencies:** every remote action `uses:` is a 40-hex **commit SHA** + trailing
+    `# vX.Y.Z` marker, and every `docker://` image is pinned to a 64-hex `sha256` digest.
     **Never revert a pin to a tag ref** — a moved tag changes what runs and drops the score to 0.
   - **Token-Permissions:** top-level `permissions:` stays minimal/read-only; elevate per-**job**,
     never a top-level `contents: write`.

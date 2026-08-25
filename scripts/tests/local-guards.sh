@@ -1272,11 +1272,102 @@ ap_tree ap-unlabelled "build.yml|actions/checkout@$SHA_A"
 run_guard ap-unlabelled action-pins
 expect_fail "a SHA pin with no version marker fails" "no '# v<version>' marker"
 
-# A path inside the repository and a container image are not third-party supply chain, but a tree
-# holding ONLY those has nothing to say — so it must be loud, not a silent pass.
-ap_tree ap-local-only "build.yml|./.github/actions/setup" "build.yml|docker://alpine:3.20"
+# A path inside the repository is not third-party supply chain, but a tree holding ONLY local
+# actions has nothing to say — so it must be loud, not a silent pass.
+ap_tree ap-local-only "build.yml|./.github/actions/setup"
 run_guard ap-local-only action-pins
 expect_fail "a tree with no third-party uses: is reported, not passed" "checked nothing"
+
+ap_tree ap-docker-tag "build.yml|docker://alpine:3.20"
+run_guard ap-docker-tag action-pins
+expect_fail "a container image tag instead of an immutable digest fails" "not pinned to a sha256 image digest"
+
+DIGEST_A=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+ap_tree ap-docker-digest "build.yml|docker://alpine@sha256:$DIGEST_A"
+run_guard ap-docker-digest action-pins
+expect_pass "a container image pinned to a sha256 digest passes"
+
+# Quoted mapping keys are valid YAML and must not disappear from the guard's input set.
+ap_tree ap-quoted-key-tag "build.yml|actions/checkout@$SHA_A  # v7.0.1"
+sed -i "s/- uses:/- 'uses':/" "$SANDBOX/ap-quoted-key-tag/.github/workflows/build.yml"
+sed -i "s/@$SHA_A/@v7/" "$SANDBOX/ap-quoted-key-tag/.github/workflows/build.yml"
+run_guard ap-quoted-key-tag action-pins
+expect_fail "a quoted uses key with a tag ref is still checked" "not a 40-hex commit SHA"
+
+ap_tree ap-quoted-key-pin "build.yml|actions/checkout@$SHA_A  # v7.0.1"
+sed -i 's/- uses:/- "uses":/' "$SANDBOX/ap-quoted-key-pin/.github/workflows/build.yml"
+run_guard ap-quoted-key-pin action-pins
+expect_pass "a quoted uses key with a labelled SHA pin passes"
+
+ap_tree ap-flow-key "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- { uses: \1 }/' "$SANDBOX/ap-flow-key/.github/workflows/build.yml"
+run_guard ap-flow-key action-pins
+expect_fail "a flow-style uses mapping cannot bypass reference checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-later-key "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- { name: checkout, "uses": \1 }/' "$SANDBOX/ap-flow-later-key/.github/workflows/build.yml"
+run_guard ap-flow-later-key action-pins
+expect_fail "a later flow-style uses key cannot bypass reference checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-nested-prefix "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- { env: { MODE: test }, uses: \1 }/' "$SANDBOX/ap-flow-nested-prefix/.github/workflows/build.yml"
+run_guard ap-flow-nested-prefix action-pins
+expect_fail "a nested field before flow-style uses cannot bypass reference checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-split-sequence "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/-\n        { uses: \1 }/' "$SANDBOX/ap-flow-split-sequence/.github/workflows/build.yml"
+run_guard ap-flow-split-sequence action-pins
+expect_fail "a separately-laid-out flow mapping cannot bypass reference checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-separated-sequence "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/-\n        # checkout step\n\n        \&step\n        { uses: \1 }/' "$SANDBOX/ap-flow-separated-sequence/.github/workflows/build.yml"
+run_guard ap-flow-separated-sequence action-pins
+expect_fail "comments, blanks, and node properties cannot hide a split flow mapping" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-sequence-comment "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- \&step # checkout step\n        { uses: \1 }/' "$SANDBOX/ap-flow-sequence-comment/.github/workflows/build.yml"
+run_guard ap-flow-sequence-comment action-pins
+expect_fail "a sequence indicator comment cannot hide a split flow mapping" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-sequence-properties "build.yml|actions/checkout@v7"
+sed -i 's/- uses: \(.*\)/- \&step !!map # checkout step\n        { uses: \1 }/' "$SANDBOX/ap-flow-sequence-properties/.github/workflows/build.yml"
+run_guard ap-flow-sequence-properties action-pins
+expect_fail "multiple node properties cannot hide a split flow mapping" "flow-style YAML mappings are not supported"
+
+ap_tree ap-flow-escaped-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- { "us\\u0065s": actions/checkout@v7 }|' "$SANDBOX/ap-flow-escaped-key/.github/workflows/build.yml"
+run_guard ap-flow-escaped-key action-pins
+expect_fail "an escaped uses key inside a flow mapping cannot bypass checking" "flow-style YAML mappings are not supported"
+
+ap_tree ap-multiline-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- uses:\n          actions/checkout@v7|' "$SANDBOX/ap-multiline-key/.github/workflows/build.yml"
+run_guard ap-multiline-key action-pins
+expect_fail "a multiline uses value cannot bypass reference checking" "has no same-line scalar reference"
+
+ap_tree ap-explicit-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- ? uses\n        : actions/checkout@v7|' "$SANDBOX/ap-explicit-key/.github/workflows/build.yml"
+run_guard ap-explicit-key action-pins
+expect_fail "an explicit YAML uses key cannot bypass reference checking" "explicit YAML mapping keys are not supported"
+
+ap_tree ap-compact-explicit-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- ? uses : actions/checkout@v7|' "$SANDBOX/ap-compact-explicit-key/.github/workflows/build.yml"
+run_guard ap-compact-explicit-key action-pins
+expect_fail "a compact explicit YAML uses key cannot bypass reference checking" "explicit YAML mapping keys are not supported"
+
+ap_tree ap-escaped-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses:|- "us\\u0065s":|' "$SANDBOX/ap-escaped-key/.github/workflows/build.yml"
+run_guard ap-escaped-key action-pins
+expect_fail "an escaped quoted YAML uses key cannot bypass reference checking" "escaped double-quoted YAML mapping keys are not supported"
+
+ap_tree ap-anchored-escaped-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses:|- \&step "us\\u0065s":|' "$SANDBOX/ap-anchored-escaped-key/.github/workflows/build.yml"
+run_guard ap-anchored-escaped-key action-pins
+expect_fail "an anchor before an escaped uses key cannot bypass checking" "escaped double-quoted YAML mapping keys are not supported"
+
+ap_tree ap-multiline-escaped-key "build.yml|actions/checkout@v7"
+sed -i 's|- uses: actions/checkout@v7|- "us\\\n          es": actions/checkout@v7|' "$SANDBOX/ap-multiline-escaped-key/.github/workflows/build.yml"
+run_guard ap-multiline-escaped-key action-pins
+expect_fail "a multiline escaped uses key cannot bypass checking" "escaped double-quoted YAML mapping keys are not supported"
 
 rm -rf "$SANDBOX/ap-empty"
 mkdir -p "$SANDBOX/ap-empty/.github/workflows"

@@ -995,3 +995,12 @@
   simply left `%AAB_Date` empty, which is why the owner could do this there and not here.
   `[cited]`: `app/…/ui/screens/CircadianScreen.kt`, `app/…/ui/SettingsScreensTest.kt`,
   `app/…/runtime/CircadianWindowProviderTest.kt`.
+
+- DB-085 [cited]: **A line-oriented policy guard must account for the configuration language's
+  equivalent spellings, not only the repository's current style.** The action-pin parser accepted
+  only an unquoted `uses` key and exempted every `docker://` reference, so valid quoted YAML keys
+  and movable container tags bypassed its immutable-reference rail. Quoted block keys now enter
+  the same parser and container images require a 64-hex sha256 digest. Flow-style and multiline
+  `uses`, explicit mapping keys, and escaped quoted keys fail closed as noncanonical workflow
+  syntax, leaving the reference checker one documented scalar form. Adversarial fixtures hold each
+  bypass. `[cited]`: `scripts/guards/action-pins.sh`.

@@ -165,8 +165,11 @@ session while drifting against every upstream release.
   shows that. Its header states what it does not match (a script file, `sed -i` and friends,
   runtime-constructed commands, and every edit after the first).
 
-- **`action-pins.sh`** — every `uses:` is a 40-hex commit SHA carrying a `# vX.Y.Z` marker, one SHA
-  never wears two markers, and one action+version never resolves to two commits (DB-076). Upstream
+- **`action-pins.sh`** — every remote action `uses:` is a 40-hex commit SHA carrying a `# vX.Y.Z`
+  marker, every `docker://` image is a 64-hex sha256 digest, quoted block-mapping `uses` keys are
+  included, while flow-style and multiline `uses`, explicit mapping keys, and escaped quoted keys
+  fail closed as noncanonical workflow syntax (DB-085). One SHA never wears two markers,
+  and one action+version never resolves to two commits (DB-076). Upstream
   cannot own this: the AMH ships no CI-supply-chain opinion, and the Scorecard rails these encode
   are this repository's own RUNBOOK playbook 8. **What it deliberately does not check is the thing
   you would want most**: whether a marker names the tag its SHA really belongs to. That needs
@@ -177,7 +180,7 @@ session while drifting against every upstream release.
   (DB-038), leaving the same commit labelled two ways across the tree. Both incidents were caught by
   eye, on a PR, by a reviewer who happened to look.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 119 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 137 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
