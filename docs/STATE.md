@@ -43,12 +43,11 @@ checklist and parity gaps empty.
 discharged and every rule-review round is answered. This branch carries only the compiler-warning
 cleanup in the Changelog below, which is **test-only**: no `src/main` file changed, so it
 deliberately does **not** bump the version (RUNBOOK §6 — test changes do not manufacture a release
-bump) and rides along with whatever real fix ships next. **Now due, and nobody has done it:**
-`docs/rebuild/DEVICE_TEST_SCRIPT_1.9.2.md` is fully ticked and retires *at ship* — 1.9.2 has now
-shipped, so fold its section B into `DEVICE_TEST_SCRIPT.md` §11 as an appended step (section A is
-already §7 21a) and delete the round file (RUNBOOK §6, DB-010). Do **not** re-open the closed
-force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input rather
-than a retained score or CI gate, its two surviving rails being RUNBOOK playbook 8's.
+bump) and rides along with whatever real fix ships next. **No round script is alive** — 1.9.2 shipped,
+so `DEVICE_TEST_SCRIPT_1.9.2.md` was retired here (RUNBOOK §6, DB-010): its section B is now
+`DEVICE_TEST_SCRIPT.md` §11 step **39d** and section A was already §7 21a. Do **not** re-open the
+closed force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input
+rather than a retained score or CI gate, its two surviving rails being RUNBOOK playbook 8's.
 
 ## Owner queue
 
@@ -110,13 +109,13 @@ those justify ratifies 129 app lines, because the margin was already spent when 
 (DB-081).
 
 Closed 2026-08-25: the last two unverified vc23 changes are **device-verified on 1.9.2-debug vc23**
-(owner), both as written in `docs/rebuild/DEVICE_TEST_SCRIPT_1.9.2.md` — DB-084's live date with a
-fixed location (§7 21a, including the Sydney short-window check and all three combinations), and the
-coordinator stay-awake path from `dfa0c8c`, where a profile switch onto a stay-awake-ON profile and a
+(owner), both as written in the since-retired `DEVICE_TEST_SCRIPT_1.9.2.md` — DB-084's live date with
+a fixed location (§7 21a, including the Sydney short-window check and all three combinations), and the
+coordinator stay-awake path, where a profile switch onto a stay-awake-ON profile and a
 service stop both leave a custom `stay_on_while_plugged_in` mask alone, with the control confirming
-representable states are still written. That round script is now fully ticked; it stays until 1.9.2
-ships, when its section B folds into `DEVICE_TEST_SCRIPT.md` §11 as a new appended step (section A is
-already §7 21a) and the file is deleted (RUNBOOK §6, DB-010).
+representable states are still written. Both checks now live in `DEVICE_TEST_SCRIPT.md` — §7 21a and
+the new §11 **39d** — and the round script was deleted on 2026-08-25 when 1.9.2 shipped
+(RUNBOOK §6, DB-010).
 
 Closed 2026-08-24: the wake false-pause fix is **device-verified on 1.9.2-debug `a0d2650`** (owner),
 pre-fix and post-fix, using §2 10a's injected trigger — the pre-fix build pauses, the post-fix one
@@ -154,6 +153,9 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-25 — Retired the ephemeral round script now 1.9.2 has shipped: its coordinator stay-awake
+  check is `DEVICE_TEST_SCRIPT.md` §11 **39d** (section A was already §7 21a), and the file is
+  deleted (RUNBOOK §6, DB-010). No round script is alive.
 - 2026-08-25 — Cleared all 46 test-only compiler warnings (deprecation, opt-in, redundancy) with no
   `src/main` change and no version bump. Robolectric's replacements were taken where they exist, but
   `getLocationUpdateListeners`' "do not test listeners" advice was NOT: it would have deleted the

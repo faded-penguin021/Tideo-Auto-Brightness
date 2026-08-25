@@ -366,6 +366,26 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     Settings *and* in the app, then change only stay-awake and Apply. **Expected:** Night Light does
     not blink off/on and nothing you set outside the app is re-asserted — only the changed field is
     written.
+39d. **A charger set Tideo did not write survives a profile swap and a service stop (DB-077).**
+    Step 32a covers the Apply path; this is the **coordinator** path, which reads the device's
+    stay-awake state first and skips the write when the device is *already* on the side being asked
+    for — so a mask this app cannot represent (`7`, `1`, …) is left alone instead of being broadened
+    to `15`. The transition has to be **OFF → ON while the device already holds a custom mask**; an
+    ON → ON swap writes nothing on any build and so proves nothing. Prepare two saved profiles,
+    **P-off** (stay-awake OFF) and **P-on** (stay-awake ON). Master switch on, **P-off** active, then
+    put the device in the state every pre-v1.9.0 upgrade is in, behind the app's back:
+    `adb shell settings put global stay_on_while_plugged_in 7`. Switch to **P-on** and read back
+    `adb shell settings get global stay_on_while_plugged_in`. **Expected: `7`** — the device was
+    already staying awake, so nothing is written and the owner's charger set survives; **`15` is the
+    pre-fix regression.** Control, so that cannot pass vacuously: `… put global
+    stay_on_while_plugged_in 0`, switch to **P-off** and back to **P-on**. **Expected: `15`** — a
+    device that really is off still gets written, so the skip is conditional and not a dead branch.
+    Finally the service-stop path: with **P-on** active set `7` again and turn the **master switch
+    off** (baseline restore). **Expected:** the baseline's own stay-awake value decides — a
+    stay-awake-ON baseline leaves `7` untouched, a stay-awake-OFF baseline writes `0`; both are
+    correct, and what must not happen is `7` → `15`. Untouched on purpose: **Use Tideo's setting
+    instead** (DB-078) and panic reset still replace the mask outright, so an unexpected `15` is
+    worth blaming on an Apply or a panic before the coordinator.
 
 ## 12. Accessibility — TalkBack & touch targets (D-156)
 
