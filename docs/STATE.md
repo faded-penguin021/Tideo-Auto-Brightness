@@ -35,15 +35,18 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LEDGER_B.md`; parity
+Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LEDGER_C.md`; parity
 checklist and parity gaps empty.
 
 **Resuming cold?** **v1.9.2/vc23 is the newest release** — tag `v1.9.2` → `c7c96dc` on `main`
 (`git ls-remote --tags origin` settles it), so the pre-ship framing this paragraph used to carry is
-discharged and every rule-review round is answered. This branch carries only the compiler-warning
-cleanup in the Changelog below, which is **test-only**: no `src/main` file changed, so it
-deliberately does **not** bump the version (RUNBOOK §6 — test changes do not manufacture a release
-bump) and rides along with whatever real fix ships next. **No round script is alive** — 1.9.2 shipped,
+discharged and every rule-review round is answered. This branch now carries a real `src/main`
+change — the Graph Metrics debug restoration (DC-001) plus the LEDGER_C rollover — beside the earlier
+**test-only** compiler-warning cleanup, so the **next release must bump the version**: `versionCode`
+→ **24** (monotonic over vc23) and `versionName` off `1.9.2` by semver (RUNBOOK §6). Whether Graph
+Metrics reads as a **minor** (restored user-facing feature, visible only at debug level 7) or a
+**patch** (a miscategorisation fix) is the owner's call at release-cut; `release-preflight.yml` will
+require the bump plus a `fastlane` `changelogs/24.txt` when the train PR opens. **No round script is alive** — 1.9.2 shipped,
 so `DEVICE_TEST_SCRIPT_1.9.2.md` was retired here (RUNBOOK §6, DB-010): its section B is now
 `DEVICE_TEST_SCRIPT.md` §11 step **39d** and section A was already §7 21a. Do **not** re-open the
 closed force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input
@@ -77,27 +80,18 @@ rather than a retained score or CI gate, its two surviving rails being RUNBOOK p
    #123 in a later session without the owner saying so first. The fix itself is done and verified;
    only the reply was ever in question. (DB-082.)
 
-4. **The ledger is full and the next session cannot record anything — this needs a decision.**
-   `docs/LEDGER_B.md` stands at 1006 lines against the 1000-line cap, so *any* new row now starts
-   past it and fails the ladder. `./scripts/ladder.sh --guards-only` settles it: today it prints the
-   approaching-cap WARN, and it turns into a FAIL the moment a row is appended (this session hit
-   exactly that and dropped its row rather than ship the fix around it). Rolling over means creating
-   `docs/LEDGER_C.md` numbering from DC-001 and repointing AGENTS.md's live-volume line — a new
-   ledger preamble plus a constitution edit, which is legislation under the rule-review protocol
-   (RUNBOOK "Rule-review protocol"). That protocol allows **no self-review**, so this session parked
-   it here rather than reviewing its own legislation, per discipline 7(d). The fork, 2026-08-25:
-   **(a)** a session that can spawn a fresh-context reviewer does the rollover as its own small unit
-   — *recommended*, it is a mechanical change the LEDGER_B preamble already specifies step by step;
-   **(b)** the owner waives the review for this one diff and says so here, since the rollover is
-   spelled out in the preamble and invents no new rule; **(c)** leave it, and accept that no session
-   can add a ledger row until it is done. Recommendation: (a). What "worked" looks like:
-   `LEDGER_C.md` exists with DC-001, AGENTS.md names it as the live volume, and the ladder is green.
+Open questions: none. Owed reviews: the LEDGER_C rollover diff edits `AGENTS.md` (a `RULE_FILE`);
+the owner waived rule-review for it under the old item-4 option (b) (2026-08-26) — the rollover is
+the mechanical change the LEDGER_B preamble already specifies and invents no new rule. The two
+action-pins findings from the 2026-08-25 pass were fixed with adversarial fixtures: `docker://`
+references now require sha256 digests, and valid quoted YAML `uses` keys enter the same parser.
+Earlier rule-review rounds are answered; their counts are in their commit bodies.
 
-Open questions: the ledger rollover above (item 4). Owed reviews: none by this session's diff —
-it touches no file in `RULE_FILES`. The two action-pins findings from the 2026-08-25 pass
-were fixed with adversarial fixtures: `docker://` references now require sha256 digests, and valid
-quoted YAML `uses` keys enter the same parser. Earlier rule-review rounds are answered; their
-counts are in their commit bodies.
+Closed 2026-08-26: **the ledger is rolled over to `LEDGER_C.md`** (was the item-4 blocker) — the
+LEDGER_B cap left no room for a new row. `LEDGER_C.md` opens with DC-001 (empty volumes fail
+`ledger-prefix.sh`, so it ships with its first real row, the Graph Metrics restoration), AGENTS.md's
+live-volume line now names it, and the cap rung reads the new live volume. Owner-waived per option
+(b); no fresh-context rule-review was spawned (system-prompt no-spawn constraint).
 
 Answered 2026-08-23: the comment-budget increase is accepted on condition the source pointers stay
 terse, since the rule exists to stop prose living in two places. Two numbers settle it, and they
@@ -153,6 +147,14 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-26 — Restored Graph Metrics debug (%AAB_Debug 7) to timing chart (re)draws: `ChartCanvas`
+  now flashes each (re)generation under `GRAPH_METRICS`, deduped by a content signature so
+  scrub/recompose redraws don't spam; deleted the miscategorised `PipelineCycleRunner` cycle-time
+  emit (cycle time stays in `PipelineState.cycleTimeMs`). DC-001. Rolled the ledger to `LEDGER_C.md`
+  in the SAME commit — LEDGER_B hit the 1000-line cap so DC-001 had nowhere else to go, and an empty
+  volume fails `ledger-prefix.sh`, so the rollover cannot ship rows-less; repointed AGENTS.md's
+  live-volume line (owner-waived, old Owner-queue item 4 option b). Full ladder green; glue-review in
+  the commit body.
 - 2026-08-25 — Retired the ephemeral round script now 1.9.2 has shipped: its coordinator stay-awake
   check is `DEVICE_TEST_SCRIPT.md` §11 **39d** (section A was already §7 21a), and the file is
   deleted (RUNBOOK §6, DB-010). No round script is alive.

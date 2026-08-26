@@ -74,7 +74,7 @@ session much later.
 - `docs/STATE.md` is capacity-bounded working memory. Its preamble defines the length rule.
 - `docs/LEDGER*.md` is permanent, append-only memory. Never compress, delete, or renumber a row.
   Search the ledger instead of reading a whole volume, and append new entries to the live volume,
-  `docs/LEDGER_B.md`.
+  `docs/LEDGER_C.md`.
 - `docs/history/` is frozen archival material. Consult it, but do not edit it.
 
 Before saying that something does not exist or never happened, establish what evidence could have

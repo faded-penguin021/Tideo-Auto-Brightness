@@ -120,8 +120,9 @@ internal class PipelineCycleRunner(
             // F58: dimming live readout.
             val (dimCurrent, dimDS) = dimmingReadout(output.targetBrightness, settings, output.scaleDynamic)
 
+            // DC-001: cycle time is state (cycleTimeMs, Live Debug), not a Graph Metrics Flash —
+            // %AAB_Debug 7 times chart (re)draws (features_spec §4), not this pipeline timer.
             val cycleTotal = (clock() - cycleStart).toDouble()
-            debug.emit(DebugCategory.GRAPH_METRICS, settings.debugLevel) { "cycle ${cycleTotal.toInt()}ms" }
             // task566 / prof754: actual animation duration, not max steps×wait (G2R-F78).
             throttle.onCycleComplete(
                 now = now,
