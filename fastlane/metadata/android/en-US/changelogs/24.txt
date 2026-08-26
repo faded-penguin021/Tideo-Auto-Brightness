@@ -1,0 +1,1 @@
+Debug tools: the Graph Metrics level (Live Debug level 7) again times how long each graph takes to (re)draw, instead of reporting a pipeline timing that belonged elsewhere.

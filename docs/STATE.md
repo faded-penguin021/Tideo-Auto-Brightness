@@ -42,11 +42,9 @@ checklist and parity gaps empty.
 (`git ls-remote --tags origin` settles it), so the pre-ship framing this paragraph used to carry is
 discharged and every rule-review round is answered. This branch now carries a real `src/main`
 change — the Graph Metrics debug restoration (DC-001) plus the LEDGER_C rollover — beside the earlier
-**test-only** compiler-warning cleanup, so the **next release must bump the version**: `versionCode`
-→ **24** (monotonic over vc23) and `versionName` off `1.9.2` by semver (RUNBOOK §6). Whether Graph
-Metrics reads as a **minor** (restored user-facing feature, visible only at debug level 7) or a
-**patch** (a miscategorisation fix) is the owner's call at release-cut; `release-preflight.yml` will
-require the bump plus a `fastlane` `changelogs/24.txt` when the train PR opens. **No round script is alive** — 1.9.2 shipped,
+**test-only** compiler-warning cleanup, and is **bumped to `1.9.3` / vc24** (owner decided **patch**,
+2026-08-26 — a miscategorisation fix), with `fastlane/…/changelogs/24.txt`. The only behaviour not
+checkable without a device is the level-7 Graph Metrics flash (Owner queue item 4). **No round script is alive** — 1.9.2 shipped,
 so `DEVICE_TEST_SCRIPT_1.9.2.md` was retired here (RUNBOOK §6, DB-010): its section B is now
 `DEVICE_TEST_SCRIPT.md` §11 step **39d** and section A was already §7 21a. Do **not** re-open the
 closed force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input
@@ -79,6 +77,12 @@ rather than a retained score or CI gate, its two surviving rails being RUNBOOK p
    tracker. Nothing was posted. Do not re-raise this as an open question, and do not comment on
    #123 in a later session without the owner saying so first. The fix itself is done and verified;
    only the reply was ever in question. (DB-082.)
+
+4. **Verify the Graph Metrics debug flash on a device (1.9.3-debug vc24).** Set Live Debug to level 7
+   (Graph Metrics), open any graph screen (Curve, Reactivity, …), and confirm a `[Graph Metrics]
+   redraw X.Yms` flash on each (re)generation: editing a curve setting should re-flash; scrub-dragging
+   the graph should NOT (unchanged data is deduped). The JVM tests cover the dedupe and the level-7
+   gate; only the on-device flash is unverifiable locally (no emulator). (DC-001.)
 
 Open questions: none. Owed reviews: the LEDGER_C rollover diff edits `AGENTS.md` (a `RULE_FILE`);
 the owner waived rule-review for it under the old item-4 option (b) (2026-08-26) — the rollover is
@@ -147,6 +151,9 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-26 — Version bump to `1.9.3` / vc24 (patch, owner-decided — a miscategorisation fix), plus
+  `fastlane/…/changelogs/24.txt`; branch now release-ready. One on-device check pending (Owner queue
+  item 4).
 - 2026-08-26 — Restored Graph Metrics debug (%AAB_Debug 7) to timing chart (re)draws: `ChartCanvas`
   now flashes each (re)generation under `GRAPH_METRICS`, deduped by a content signature so
   scrub/recompose redraws don't spam; deleted the miscategorised `PipelineCycleRunner` cycle-time
