@@ -84,12 +84,15 @@ rather than a retained score or CI gate, its two surviving rails being RUNBOOK p
    the graph should NOT (unchanged data is deduped). The JVM tests cover the dedupe and the level-7
    gate; only the on-device flash is unverifiable locally (no emulator). (DC-001.)
 
-Open questions: none. Owed reviews: the LEDGER_C rollover diff edits `AGENTS.md` (a `RULE_FILE`);
-the owner waived rule-review for it under the old item-4 option (b) (2026-08-26) — the rollover is
-the mechanical change the LEDGER_B preamble already specifies and invents no new rule. The two
-action-pins findings from the 2026-08-25 pass were fixed with adversarial fixtures: `docker://`
-references now require sha256 digests, and valid quoted YAML `uses` keys enter the same parser.
-Earlier rule-review rounds are answered; their counts are in their commit bodies.
+Open questions: none. **Owed review — re-run once the account limit resets (~11:30pm UTC 2026-08-26):**
+the owner lifted the no-spawn rule and asked for a fresh-context glue+rule pass over `b462e56..HEAD`
+(includes the AGENTS.md live-volume repoint); it launched but died on the account session limit with
+no verdict. Interim cover: the in-context glue-review (commit `8d95efa` body) plus a spot-check that
+deleting the `GRAPH_METRICS` cycle-emit lost nothing — `cycleTimeMs` still renders as "Cycle time
+(ms)" in `LiveDebugScreen`. The two action-pins findings from the 2026-08-25 pass were fixed with
+adversarial fixtures: `docker://` references now require sha256 digests, and valid quoted YAML `uses`
+keys enter the same parser. Earlier rule-review rounds are answered; their counts are in their commit
+bodies.
 
 Closed 2026-08-26: **the ledger is rolled over to `LEDGER_C.md`** (was the item-4 blocker) — the
 LEDGER_B cap left no room for a new row. `LEDGER_C.md` opens with DC-001 (empty volumes fail
