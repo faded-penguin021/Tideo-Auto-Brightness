@@ -60,7 +60,10 @@ class AndroidScreenBrightnessController(
     @Volatile
     private var lastSelfWriteDevice: Int? = null
 
-    // DC-002: read on the observer thread; sound only while one write is in flight at a time.
+    // DC-002: an async provider echoes the REQUESTED raw after the read-back recorded the old one.
+    @Volatile
+    private var lastRequestedDevice: Int? = null
+
     @Volatile
     private var selfWriteInProgress: Boolean = false
 
@@ -79,22 +82,29 @@ class AndroidScreenBrightnessController(
     private fun writeRaw(raw: Int): Boolean =
         rawWrite?.invoke(raw) ?: Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, raw)
 
-    // DC-002: the read-back, never read()'s 128 default — a default must not read as acknowledged.
+    // DC-002: never read()'s 128 default — a default must not read as acknowledged. Limits: DC-003.
     private fun readRawOrNull(): Int? = runCatching {
         val seam = rawRead
         if (seam != null) seam()
         else Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, -1).takeIf { it >= 0 }
     }.getOrNull()
 
-    override fun read(): Int = toDomain(readRawOrNull() ?: 128)
+    override fun read(): Int {
+        val raw = Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, 128)
+        return toDomain(raw)
+    }
 
+    // DC-002: @Synchronized so the marker pair and the flag cannot interleave. Uncontended today.
+    @Synchronized
     override fun write(level: Int): BrightnessWriteResult {
         val requestedDomain = level.coerceIn(0, 255)
         val requestedRaw = toDevice(level)
         val previous = lastSelfWriteDevice
+        val previousRequested = lastRequestedDevice
         // DC-002: arm BEFORE putInt — the echo can be dispatched before the marker would exist.
         selfWriteInProgress = true
         lastSelfWriteDevice = requestedRaw
+        lastRequestedDevice = requestedRaw
         var keepMarker = false
         try {
             if (!writeRaw(requestedRaw)) return unlanded(requestedDomain, requestedRaw, WriteStatus.REFUSED)
@@ -116,7 +126,10 @@ class AndroidScreenBrightnessController(
         } catch (_: SecurityException) {
             return unlanded(requestedDomain, requestedRaw, WriteStatus.DENIED)
         } finally {
-            if (!keepMarker) lastSelfWriteDevice = previous
+            if (!keepMarker) {
+                lastSelfWriteDevice = previous
+                lastRequestedDevice = previousRequested
+            }
             selfWriteInProgress = false
         }
     }
@@ -156,11 +169,12 @@ class AndroidScreenBrightnessController(
         prefs.edit().remove(KEY_SAVED_MODE).commit()
     }
 
-    override fun isSelfWrite(rawDeviceValue: Int): Boolean =
-        selfWriteInProgress || rawDeviceValue == lastSelfWriteDevice
+    override fun isSelfWrite(rawDeviceValue: Int): Boolean = selfWriteInProgress ||
+        rawDeviceValue == lastSelfWriteDevice || rawDeviceValue == lastRequestedDevice
 
     override fun clearSelfWriteMarker() {
         lastSelfWriteDevice = null
+        lastRequestedDevice = null
     }
 
     companion object {

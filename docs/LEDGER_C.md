@@ -54,10 +54,26 @@
   rethrow. `WriteStatus.WRITTEN_UNACKNOWLEDGED` (putInt true, read-back failed) is deliberately not
   "failed" — `ok=false` would assert nothing moved — and keeps the REQUESTED raw as the marker so the
   write's own echo is still filtered, while `REFUSED` and `DENIED` restore the previous one; `DENIED`
-  stays distinct because it also says `WRITE_SETTINGS` is gone. Two bounded limits, accepted rather
-  than fixed: the read-back catches only SYNCHRONOUS normalization, so an OEM re-write arriving
-  milliseconds later still reads as external unless DC-004's deadband absorbs it, and
-  `selfWriteInProgress` classifies anything landing between `putInt` and its read-back as ours — a
-  microseconds-to-milliseconds blind spot, sound only while at most one brightness transaction is in
-  flight, which today holds because all four writers run on the serialized consumer (D-027).
-  `isOnScreenSelfWrite()` is deleted as it had no production caller.
+  stays distinct because it also says `WRITE_SETTINGS` is gone. `forceManualMode()` returns `putInt`'s
+  own Boolean, so a REFUSED mode write reports false as well as a denied one — deliberate, because the
+  caller wants to know whether MANUAL is actually in force, not merely that no exception was thrown.
+  `isSelfWrite` matches the acknowledged raw OR the requested raw, because a provider that applies
+  asynchronously echoes the requested value after the read-back has already recorded the pre-write
+  one; `write()` is `@Synchronized` so the marker pair and the flag cannot interleave (uncontended
+  today — the three pipeline writers share the serialized consumer, and `PanicHandler` is ordered
+  after it by `emergencyStop`'s `cancelAndJoin`, which is a different mechanism in a different file
+  and must not be mistaken for the consumer serialising it).
+
+- DC-003 [cited]: **What DC-002's read-back cannot do, recorded so it is not rediscovered as a bug.**
+  The read-back is corroboration, not proof of authorship: it catches only SYNCHRONOUS normalization,
+  so a provider that re-writes the key milliseconds later still reads as external, and if a foreign
+  write lands between our `putInt` and our read-back we adopt ITS value as the acknowledged marker,
+  so that override is filtered until our next write re-points the marker — a sharper cost than the
+  `selfWriteInProgress` flag's, which clears the instant the write returns, and there is no local
+  test that separates "the provider clamped our value" from "someone else wrote in that window".
+  `REFUSED` likewise assumes `putInt == false` stored nothing, so a provider that stores the value
+  and still returns false has its own echo read as external and pauses the pipeline. The cost of the
+  read-back is one extra binder read per WRITE, which on the animation path is per frame — up to
+  `animSteps` extra round-trips per sweep, on top of the band read `AnimationRunner` already does.
+  `isOnScreenSelfWrite()` is deleted as it had no production caller; D-049 stays cited from
+  `AnimationRunner` and `PipelineCycleRunner`.

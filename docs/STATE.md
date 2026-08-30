@@ -81,7 +81,21 @@ durable content still goes to the ledger and the Changelog.
    the graph should NOT (unchanged data is deduped). The JVM tests cover the dedupe and the level-7
    gate; only the on-device flash is unverifiable locally (no emulator). (DC-001.)
 
-Open questions: none. Everything raised through 2026-08-26 is closed and its detail is in the named
+Open questions — **[2026-08-30] When our write's read-back comes back changed, is that the OEM
+clamping us, or someone else writing in the same instant?** The app cannot tell, and the two want
+opposite handling. Treating it as the OEM (what the branch does now) is what stops the #126 false
+pauses; the cost is that a brightness change landing in the sub-millisecond gap between our `putInt`
+and our read-back is adopted as ours, so that one override is missed until the next cycle re-points
+the marker. Treating it as foreign instead would keep every override detectable but re-open #126,
+because a clamping device deviates by hundreds of raw units and no tolerance can admit that while
+excluding a slider move. Options: (a) keep it as built and accept one missed override in that window;
+(b) only adopt the read-back when it is within N raw units of what we asked for — needs a number
+nothing on hand justifies, and would not cover the suspected Oppo clamp; (c) wait for the change-7
+diagnostics from a real device before choosing. **Recommendation: (a) now, revisit under (c)** if the
+owner ever sees a missed override — the window is sub-millisecond and self-corrects next cycle,
+while #126 fires on ordinary use. Raised by the segment-B adversarial review; recorded as DC-003.
+
+Everything raised through 2026-08-26 is closed and its detail is in the named
 ledger rows: the LEDGER_C rollover, the comment-budget increase (DB-081), the action-pins findings
 (DB-085), the vc23 device rounds now folded into `DEVICE_TEST_SCRIPT.md` §7 21a and §11 39d
 (DB-084, DB-077, DB-078), the wake false-pause fix and its DB-083 lesson that a device check must be

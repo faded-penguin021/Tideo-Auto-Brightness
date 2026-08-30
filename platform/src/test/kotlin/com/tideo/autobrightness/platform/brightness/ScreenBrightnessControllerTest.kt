@@ -213,11 +213,23 @@ class ScreenBrightnessControllerTest {
         val oem = normalizing(store = { 3083 })
         val result = oem.write(255)
         assertEquals(WriteStatus.ACKNOWLEDGED, result.status)
+        assertEquals(255, result.requestedDomain)
         assertEquals(1023, result.requestedRaw)
         assertEquals(3083, result.acknowledgedRaw)
+        assertEquals(255, result.acknowledgedDomain)
         assertEquals(1023, result.deviceMax)
         assertTrue(oem.isSelfWrite(3083))
-        assertFalse(oem.isSelfWrite(1023), "the requested raw was never on screen")
+        // The requested raw stays matchable: a provider that applies asynchronously echoes it later.
+        assertTrue(oem.isSelfWrite(1023))
+        assertFalse(oem.isSelfWrite(77))
+    }
+
+    @Test
+    fun acknowledgedDomain_isTheStoredRawConverted_notTheRequestedDomain() {
+        val oem = normalizing(store = { 512 })
+        val result = oem.write(255)
+        assertEquals(255, result.requestedDomain)
+        assertEquals(128, result.acknowledgedDomain, "512/1023 → 128 in domain space")
     }
 
     @Test
@@ -287,12 +299,14 @@ class ScreenBrightnessControllerTest {
             },
             rawRead = { null },
         )
+        oem.write(70) // A prior landed write, so "keeps the requested raw" is pinned against it.
         val result = oem.write(140)
         assertEquals(WriteStatus.WRITTEN_UNACKNOWLEDGED, result.status)
         assertEquals(140, result.requestedDomain)
         assertNull(result.acknowledgedRaw)
         assertNull(result.acknowledgedDomain)
         assertTrue(oem.isSelfWrite(140), "the requested raw stays the marker when read-back fails")
+        assertFalse(oem.isSelfWrite(70), "the previous marker must not survive a landed write")
     }
 
     @Test
@@ -314,7 +328,7 @@ class ScreenBrightnessControllerTest {
     }
 
     @Test
-    fun isManualMode_readsTheMode_andForceManualModeReportsSuccess() {
+    fun isManualMode_readsTheMode_andForceManualModeLandsIt() {
         Settings.System.putInt(
             context.contentResolver,
             Settings.System.SCREEN_BRIGHTNESS_MODE,
