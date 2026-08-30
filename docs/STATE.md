@@ -21,9 +21,10 @@ Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LE
 rollover, a test-only warning cleanup, and the executed #126/#127 override-attribution work
 (DC-002…DC-009), whose plan `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` is **retained by owner
 instruction (2026-08-30)** rather than deleted at its final segment as playbook 5 would have it. All
-six segments landed and the durable content is in the ledger, but the 2026-08-30 device round left
-the Live Debug card and the device disagreeing about the brightness maximum — an open question
-below, and the reason §2 10b is re-opened. No round script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
+six segments landed and the durable content is in the ledger. The 2026-08-30 card/slider
+disagreement over the brightness maximum is **resolved — both numbers are right** (DC-017); what is
+still open is only whether the OEM rescales our write, which §2 10d reads, and §2 10b stays
+re-opened. No round script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
 force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input rather
 than a retained score or CI gate.
 
@@ -45,14 +46,16 @@ than a retained score or CI gate.
 2. **Nothing to do — issues #123, #126 and #127 get no reply.** Owner's decision (2026-08-24 for
    #123, carried forward by the plan); nothing was posted, and do not comment without the owner
    saying so first (DB-082).
-3. **Two device readings are left (1.10.0-debug vc24), and both feed the open question below.**
-   **§2 10d** is largely answered already by the card the owner read after 10c — `Requested →
-   acknowledged: 10 → 10`, `ACKNOWLEDGED`, `Device max: 255` against a system-slider maximum of
-   `4095` — so what remains is the same card at the TOP of the curve (bright room, or raise Min/Max
-   Brightness), to see whether the top goes flat as DC-014 predicts. **§2 10b must be re-run** per
-   the re-opening below, recording "Last override" after each half rather than only whether it
-   paused. **Change no conversion behaviour until the owner answers the open question** — the
-   deferred attribution trades (DC-003) and the rejection of auto-learning both still stand.
+3. **Two device readings are left (1.10.0-debug vc24).** **§2 10d** is now a SETTLED reading, not a
+   card reading: drive the top of the curve (bright room, or raise Min/Max Brightness), let it fully
+   settle, then `adb shell settings get system screen_brightness` and the same for
+   `screen_brightness_float`. About `4095`/`1.0` means the OEM rescales our 255-scale write and
+   nothing is capped; stuck near `255`/`0.06` means the top 94% of the panel really is unreachable.
+   Do **not** pair the card's "Current brightness" with the adb raw at one instant — that mixes
+   domain with provider units and separates nothing (DC-018). **§2 10b must be re-run** per the
+   re-opening below, recording "Last override" after each half rather than only whether it paused.
+   **Change no conversion behaviour until 10d is read** — the deferred attribution trades (DC-003)
+   and the rejection of auto-learning both still stand.
 
 4. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
    tests.** Nothing today covers `ChartCanvas` calling the sink, the sink being null below level 7, or
@@ -62,18 +65,18 @@ than a retained score or CI gate.
 
 Open questions:
 
-- **[2026-08-30] The Live Debug card and the app's actual behaviour disagree about the device
-  maximum — which one is wrong?** The 1.10.0-debug card reads `Device max: 255` and `Raw requested:
-  10` for domain 10, while the owner's system slider at maximum reads `4095` from `settings get
-  system screen_brightness` and reports that brightness and override detection both work normally,
-  as they always have. **Nothing is known to be broken for the user** — two consequences claimed
-  here earlier were withdrawn (DC-016) — but the numbers cannot both be right, and §2 10d is nothing
-  but a reading of that card. **First settle which it is, before anyone proposes a fix:** with the
-  service running, read the card's "Current brightness" and `settings get system screen_brightness`
-  at the same moment. Equal means the app really writes raw-identity; a ratio near 16 means only the
-  display is wrong. If it is the app, note that 1.9.2 behaves correctly, so this train would be the
-  regression and the answer is to find it, **not** to auto-learn the maximum, which stays a Decided
-  non-item (DC-014, DC-016).
+- **[2026-08-30, ANSWERED — no action] Card `Device max: 255` vs slider `4095` — which is wrong?**
+  Neither; see the changelog and DC-017/DC-018. Nothing to do beyond reading §2 10d.
+
+- **[2026-08-30] Adopt the `context.resources` hygiene fix for `deviceMax`, or leave it?**
+  `Resources.getSystem()` is documented as ignoring runtime resource overlays, which is exactly the
+  mechanism OEMs use to retune framework config, so on a phone that ships such an overlay Tideo
+  would convert against AOSP's 255 with no diagnostic. It is a **no-op on the owner's phone** (both
+  paths return 255 there), so this is latent-defect hygiene for other hardware, not a fix for
+  anything observed. Options: (a) switch to `context.resources` now; (b) leave it and record the
+  limitation; (c) switch and also surface both resolutions on the Live Debug card.
+  **Recommendation: (a) after §2 10d is read** — one line, strictly more correct, but it is a
+  conversion-path change and conversion is frozen until 10d lands (DC-019).
 
 **Device round 2026-08-30 (owner, 1.10.0-debug vc24).** **Graph Metrics flash: verified** — the
 owner reports the level-7 checks all fine, still the feature's only evidence until item 4 lands.
@@ -82,7 +85,9 @@ owner reports the level-7 checks all fine, still the feature's only evidence unt
 the run was not vacuous (DC-011…DC-013). **§2 10b: NOT passed — re-opened.** Its quiet half was
 explained here as quantisation on a 12-bit scale; the card then read `Device max: 255`, so the app
 converts on the identity branch and both `+20` injections were 20 domain apart. Far outside the
-deadband, so the quiet one is **unexplained, not correct** (DC-014). Re-run it reading "Last
+deadband, so the quiet one is **unexplained, not correct** (DC-014; DC-017 confirms the 255). The
+same round left a lead for 10d — its starting raw `161` = round(10 × 4095/255) exactly, which the
+identity branch cannot have written (DC-020). Re-run 10b reading "Last
 override" after each half: a fresh `DISMISSED_DRIFT` is the pass, a stale timestamp means the
 monitor dropped the event upstream (DC-015).
 
@@ -126,14 +131,21 @@ owed fresh-context review of `b462e56..HEAD` is discharged by this train's two a
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-08-30 — **The Live Debug card reads `Device max: 255` where the system slider reports 4095,
-  and that discrepancy is now the open question** — not a diagnosed defect. Two consequences claimed
-  from it were withdrawn on the owner's report that brightness and override detection both work
-  normally: the detection one was a reasoning error, since the pause test compares against Tideo's
-  own last write rather than a second user value (DC-016). **What does survive corrects the entry
-  below:** 10b's quiet half had been explained as quantisation on a 12-bit app scale, and the card
-  says the app is not converting on that scale, so the explanation is void either way and 10b is
-  re-opened as unexplained. 10c stands, confirmed on the card (DC-014, DC-015).
+- 2026-08-30 — **The card/slider disagreement is answered: both numbers are right, and this train is
+  cleared.** The owner's `cmd overlay lookup` returns 255 from android's default configuration with
+  no overlay entry, so `config_screenBrightnessSettingMaximum` really is 255 on that phone and
+  `deviceMax` reads it correctly; the 0–4095 range is an OEM-private scale unreachable by any
+  `Resources` object, and the discovery block is byte-identical to `v1.9.2`, so no regression is
+  possible (DC-017). The test DC-016 proposed for settling it was itself void — pairing the card's
+  DOMAIN "Current brightness" against the provider's RAW value cannot separate "app converts" from
+  "provider rescales", both giving a ratio near 16 — so §2 10d is rebuilt around a SETTLED
+  `screen_brightness` / `screen_brightness_float` reading (DC-018). Left open: whether to move
+  `deviceMax` to `context.resources`, a no-op here but real hygiene where an overlay exists (DC-019).
+- 2026-08-30 — Withdrew both consequences drawn from the `Device max: 255` reading, on the owner's
+  report that brightness and override detection both work normally; the detection one was a
+  reasoning error, since the pause test compares against Tideo's own last write rather than a second
+  user value (DC-016). What survived: 10b's quantisation explanation is void either way and 10b is
+  re-opened as unexplained, while 10c stands, confirmed on the card (DC-014, DC-015).
 - 2026-08-30 — **§2 10c passed too** (mode 1 + raw 4000, quiet). Recorded why that is attributable
   without the debug card — far outside the deadband, an OEM-cleared mode would have paused instead
   (DC-013) — and fixed the ordering trap it exposed: the pause latch is sticky and clears only on an

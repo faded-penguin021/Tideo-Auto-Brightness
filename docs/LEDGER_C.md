@@ -236,3 +236,51 @@
   until this is settled. Pair the two at one instant to settle it: the card's "Current brightness"
   against `settings get system screen_brightness`, where an equal pair means the app really is
   writing raw-identity and a ratio near 16 means only the display is wrong.
+
+- DC-017: **The device's `config_screenBrightnessSettingMaximum` really is 255, so `deviceMax` reads
+  it correctly and nothing about it regressed.** `adb shell cmd overlay lookup --verbose --user
+  current android android:integer/config_screenBrightnessSettingMaximum` (owner, 2026-08-30)
+  resolved to `255` from "the default configuration of android", the one other package in the stack
+  skipped for want of an entry — no runtime resource overlay touches this resource on that phone.
+  That kills both horns of the fork DC-016 left open: the Live Debug card is right, and the
+  discovery block is byte-identical between `v1.9.2` and this branch (`git show
+  v1.9.2:platform/src/main/kotlin/com/tideo/autobrightness/platform/brightness/ScreenBrightnessController.kt`),
+  so this train cannot have regressed it and 1.9.2 converted on the same identity branch. The
+  provider's 0–4095 range is therefore OEM-private and not derivable from this resource by ANY
+  `Resources` object, which also means "resolve it through `context.resources` instead" would return
+  the same 255 here. All that is left unsettled is whether the OEM normalizes Tideo's 255-scale
+  write on the way in, which §2 10d now reads directly.
+
+- DC-018: **A ratio cannot say who did the scaling, so DC-016's settling test could not settle
+  anything.** It paired the card's "Current brightness" (app domain 0–255) against `settings get
+  system screen_brightness` (provider raw) and read a ratio near 16 as proof that only the display
+  was wrong, but that same ratio is produced just as well by the app writing raw-identity and the
+  provider normalizing it afterwards — the two hypotheses the comparison existed to separate. Its
+  equal branch was sound and its ratio branch was not, which is enough to void it, and the card
+  already answers what it was asking: "Raw requested" and "Device max" come off the same
+  `BrightnessWriteResult` that `toDevice` produced, so `Raw requested: 10` for domain 10 IS the
+  identity branch, with no adb needed. The discriminator is a SETTLED provider reading rather than
+  an instantaneous pair — drive the top of the domain, let it settle, then read `screen_brightness`
+  and `screen_brightness_float`: about 4095 with a float near 1.0 means the OEM normalized our write
+  and there is no ceiling, while a value that stays near 255 with a float near 0.06 means the
+  ceiling is real. The general shape: where two mechanisms predict the same number, take the reading
+  where they predict different ones — here, after the provider has finished with the value.
+
+- DC-019: **`Resources.getSystem()` is documented as unaffected by runtime resource overlays, which
+  is exactly how OEMs retune framework config.** `deviceMax` resolves
+  `config_screenBrightnessSettingMaximum` through that global object, so on a phone that DOES ship
+  an RRO for it Tideo would convert against AOSP's 255 while the provider expects the overlaid
+  range, silently and with no diagnostic; `context.resources` is an application `Resources` and does
+  apply overlays. DC-017 establishes this is not the owner's phone's defect — no overlay exists
+  there and both paths return 255 — so switching is latent-defect hygiene for other hardware rather
+  than a fix for anything observed, and it stays frozen with every other conversion change until the
+  owner rules (STATE Open questions).
+
+- DC-020: **The 2026-08-30 round already carries a lead the identity branch cannot explain.** Its §2
+  10b starting raw, read straight from the provider while the app was driving the bottom of the
+  curve, was `161` — exactly round(10 × 4095/255) — at a level the Live Debug card reports the app
+  requesting as raw `10` on a `Device max: 255`. On the identity branch Tideo cannot have written
+  161, so either something else rescaled our write or the value predates it, and the first is
+  precisely the hypothesis DC-018's settled reading tests. It is a lead and not evidence: the 161
+  and the card reading were taken at different moments in the round, and the raw could equally be
+  slider residue from before the app last wrote.

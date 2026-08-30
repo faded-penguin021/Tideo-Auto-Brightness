@@ -83,12 +83,14 @@ optional.
     fault.
 
     **M is what the app converts with, which is not necessarily what the provider accepts (DC-014,
-    DC-016).** Read M off the card, then measure the provider's real range separately — drag the
+    DC-017).** Read M off the card, then measure the provider's real range separately — drag the
     system brightness slider to maximum and run `adb shell settings get system screen_brightness`.
-    On the owner's phone the card reads **255** while the slider reports **4095**, and which of the
-    two is wrong is an open question, not a diagnosed fault: the app behaves correctly for the user.
-    Where they disagree, these injections are in PROVIDER units while the deadband is in the app's,
-    so record both numbers before reading any result of this check.
+    On the owner's phone the card reads **255** while the slider reports **4095**, and **neither
+    number is wrong**: `cmd overlay lookup` confirms `config_screenBrightnessSettingMaximum` really
+    is 255 there with no overlay, so M is read correctly and the 0–4095 range is an OEM-private
+    scale that no `Resources` lookup can reach. Where the two disagree, these injections are in
+    PROVIDER units while the deadband is in the app's, so record both numbers before reading any
+    result of this check — a raw `+1` is not a domain `+1` in either direction.
 
     **Convert, do not step (DC-010).** Where M ≠ 255 a fixed raw offset is not a fixed domain
     distance, so never inject one. On a hypothetical M = 4095 device a domain step is 16.06 raw, so a
@@ -143,17 +145,32 @@ optional.
     range means the advertised maximum disagrees with what the provider stores, and the top of that
     user's curve is silently flat.** Report the three numbers; do not change any setting to "fix" it.
 
-    **Add two more numbers, and take the ceiling from the system rather than adb (DC-014, DC-016).**
-    Drag the system brightness slider to maximum, then `adb shell settings get system
-    screen_brightness`: that is the provider's real ceiling, and unlike an `adb settings put` — which
-    auto-brightness can overwrite and the provider can clamp — the system's own slider writes what
-    the platform believes its range to be. Then, with the service running, read the card's "Current
-    brightness" and `settings get system screen_brightness` **at the same moment**; that pair is what
-    says whether the app is converting or not. On the owner's phone (2026-08-30) the card read
-    `Device max: 255` against a slider maximum of 4095, **which is an unexplained disagreement and
-    not a known fault** — brightness and override detection both behave correctly for the user, so do
-    not report a conversion bug on the strength of the card alone, and note that this whole step
-    reads numbers the card supplies (STATE Owner queue).
+    **Take the ceiling from the system rather than adb (DC-014).** Drag the system brightness slider
+    to maximum, then `adb shell settings get system screen_brightness`: that is the provider's real
+    ceiling, and unlike an `adb settings put` — which auto-brightness can overwrite and the provider
+    can clamp — the system's own slider writes what the platform believes its range to be. On the
+    owner's phone (2026-08-30) that reads 4095 while the card reads `Device max: 255`, and DC-017
+    settles that **both are right**: the framework config really is 255 (no overlay), so the app
+    converts on the identity branch and the 0–4095 scale is OEM-private.
+
+    **The remaining question is whether the OEM normalizes our write, and only a SETTLED reading
+    answers it (DC-018).** Do NOT pair the card's "Current brightness" with `settings get system
+    screen_brightness` at one instant — the card is app DOMAIN and adb is provider RAW, and a ratio
+    near 16 is produced both by the app converting and by the provider rescaling an identity write,
+    so it separates nothing. Instead drive the top of the domain as above, let it **fully settle**
+    (several seconds after the sweep ends, no further cycle writing), then:
+
+    ```
+    adb shell settings get system screen_brightness
+    adb shell settings get system screen_brightness_float
+    ```
+
+    **Read it as:** settled int near **4095** with float near **1.0** — the OEM rescales Tideo's
+    255-scale write asynchronously, there is no top-of-curve ceiling, and the card's ACKNOWLEDGED
+    read-back is simply the pre-rescale echo. Settled int stuck near **255** with float near **0.06**
+    — the ceiling is real and the top 94% of the panel is unreachable. `screen_brightness_float` may
+    be absent on some builds (`null`); the int alone still separates the two. Report all the numbers
+    and change no setting to "fix" it.
 
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 
