@@ -21,8 +21,8 @@ Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LE
 rollover, a test-only warning cleanup, and the executed #126/#127 override-attribution work
 (DC-002…DC-009), whose plan `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` is **retained by owner
 instruction (2026-08-30)** rather than deleted at its final segment as playbook 5 would have it. All
-six segments landed, the durable content is in the ledger, and three non-blocking owner decisions
-are open below. No round script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
+six segments landed, the durable content is in the ledger, and two non-blocking items are open
+below after the 2026-08-30 device round. No round script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
 force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input rather
 than a retained score or CI gate.
 
@@ -44,22 +44,32 @@ than a retained score or CI gate.
 2. **Nothing to do — issues #123, #126 and #127 get no reply.** Owner's decision (2026-08-24 for
    #123, carried forward by the plan); nothing was posted, and do not comment without the owner
    saying so first (DB-082).
-3. **Verify the Graph Metrics debug flash on a device (1.10.0-debug vc24).** Live Debug level 7, any
-   graph screen: a `[Graph Metrics] redraw X.Yms` flash per (re)generation — editing a curve setting
-   re-flashes, scrub-dragging does NOT (deduped). Only the flash is unverifiable locally (DC-001).
-4. **Run device checks §2 10b–10d for the override work.** Each injects its trigger and has a
-   control, so a build quiet for BOTH halves has disabled detection, not fixed anything — fail it.
-   10b pins the ±1 deadband, 10c the adaptive-mode dismissal, 10d reads requested vs acknowledged at
-   the top of the curve. Read `deviceMax` off the new Live Debug card; 10b's commands take RAW values
-   while the app reports DOMAIN 0–255 (DC-002…DC-009).
+3. **Two override checks still need a device reading (1.10.0-debug vc24); §2 10b is done.** **10d
+   is the one that matters and has not been run:** Live Debug → **Brightness Writes** at the TOP of
+   the curve, then report "Requested → acknowledged", the write status and "Device max". It settles
+   both deferred attribution trades, because a requested value above the acknowledged one is exactly
+   the clamping device they are about. **10c** needs only the same card: after the mode write, "Last
+   override" must read `DISMISSED_MODE`, because the mode returning to `0` can also be the OEM's own
+   doing and then the check proves nothing (DC-011, DC-002…DC-009).
 
-5. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
+4. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
    tests.** Nothing today covers `ChartCanvas` calling the sink, the sink being null below level 7, or
    the signature dedupe suppressing a repeat draw; the one test that looks like it does passes
-   unchanged on `b462e56`, which is why item 3 is still the only evidence for the feature. Contained
-   Compose work, to be picked up as its own unit (DC-001).
+   unchanged on `b462e56`, which is why the owner's device observation below is still the feature's
+   only evidence. Contained Compose work, to be picked up as its own unit (DC-001).
 
 Open questions: none — the owner answered all three on 2026-08-30.
+
+**Device round closed 2026-08-30 (owner, 1.10.0-debug vc24).** The **Graph Metrics flash is
+verified** — the owner reports the level-7 checks all fine — which stays the feature's only evidence
+until item 4 lands. **§2 10b passed**, and more exactly than the script asked: on an M = 4095 panel
+the owner's two identical `+20` raw writes bracket the boundary, 161→181 being domain 10→11 (quiet,
+so the ±1 deadband is inclusive) and 181→201 being 11→13 (paused). Those two readings look
+contradictory and are not — the gap is quantisation, one domain step being 16.06 raw — and the check
+no longer injects raw offsets (DC-010). **10c's no-pause half is corroborated:** the screen returned
+to raw 161, exactly `round(10 × 4095 / 255)`, so the app was still driving and had not latched a
+pause; only the mode flip's attribution is outstanding, above. Normalization is certainly live — the
+observed deltas are arithmetically impossible at `deviceMax` 255, 1023 or 2047.
 
 **Decided 2026-08-30 (owner).** This train ships as a **minor**, `1.10.0` / vc24, now set in
 `app/build.gradle.kts`; `changelogs/24.txt` was already correct since the code did not move. The two
@@ -101,6 +111,12 @@ owed fresh-context review of `b462e56..HEAD` is discharged by this train's two a
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-30 — **Device round on 1.10.0-debug vc24 (owner):** Graph Metrics flash verified and §2 10b
+  passed; fixed the two checks the round broke. 10b injected RAW offsets to test a DOMAIN rule, so
+  its control quantised back inside the deadband at 28 start values on a 12-bit panel and would have
+  failed a correct build — it now converts to the domain value it wants (DC-010). 10c read the
+  brightness mode back as `0` as proof Tideo reclaimed it, which an OEM build can produce by itself,
+  so it now requires the `DISMISSED_MODE` disposition (DC-011). 10d is still unrun (Owner queue).
 - 2026-08-30 — Owner decided this train is a **minor**: `versionName` 1.9.3 → **1.10.0**, vc24
   unchanged, so `changelogs/24.txt` still applies. The two attribution trades and the Graph Metrics
   test gap are deferred by the owner pending a debug-APK round (Owner queue).

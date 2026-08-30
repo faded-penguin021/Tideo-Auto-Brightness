@@ -71,20 +71,30 @@ optional.
     RAW device values, while the app's `lastAppliedBrightness` is DOMAIN 0–255. Never type a domain
     number into these commands.
 
-    First read `deviceMax` from Live Debug → **Brightness Writes** → "Device max". That is
-    `config_screenBrightnessSettingMaximum`, the value Tideo actually converts with — **not** the
+    First read `deviceMax` from Live Debug → **Brightness Writes** → "Device max"; call it M. That
+    is `config_screenBrightnessSettingMaximum`, the value Tideo actually converts with — **not** the
     largest raw value the device will store, which may be smaller and is precisely the suspected
-    fault. One domain step = `round(deviceMax / 255)` raw. With the service running and one cycle
-    completed:
+    fault.
+
+    **Convert, do not step (DC-010).** A fixed raw offset is not a fixed domain distance, so never
+    inject one. At M = 4095 a domain step is 16.06 raw: a round `+20` lands 1 domain step from about
+    three quarters of the raw values and 2 from the rest, one step of `+16` quantises to 0 at 14 of
+    them and tests nothing, and even a doubled `+32` quantises back to 1 at 28 of them — which would
+    FAIL a correct build. Pick the raw value for the domain value you want. With the service running
+    and one cycle completed:
 
     ```
-    adb shell settings get system screen_brightness      # current raw, call it R
-    adb shell settings put system screen_brightness <R ± one step>
+    adb shell settings get system screen_brightness   # current raw, call it R
+    # d      = round(R × 255 / M)   <- the domain value the app sees
+    # raw(n) = round(n × M / 255)   <- the raw value that lands on domain n
+    adb shell settings put system screen_brightness <raw(d + 1)>
     ```
 
-    **Expected:** NO pause — one domain step is representational drift. **Then the control:** the
-    same command with **twice** that offset. **Expected:** it DOES pause. A build quiet for both has
-    disabled detection, not fixed anything — FAIL it.
+    **Expected:** NO pause — one domain step is representational drift and the ±1 deadband is
+    inclusive. **Then the control:** `raw(d + 2)`. **Expected:** it DOES pause. A build quiet for
+    both has disabled detection, not fixed anything — FAIL it. Both directions were verified on
+    1.10.0-debug vc24 (owner, 2026-08-30) on an M = 4095 panel, at domain 10 → 11 (quiet) and
+    11 → 13 (pause).
 10c. **Mode conflict dismisses instead of pausing (DC-006, issue #127).** Service running, override
     detection on.
 
@@ -94,8 +104,12 @@ optional.
     ```
 
     **Expected:** NO pause, no "manual override" notification, and the app flips the mode back —
-    `adb shell settings get system screen_brightness_mode` reads `0` within a cycle. **Control:**
-    with the mode already `0`, the same brightness write MUST pause as in step 8.
+    `adb shell settings get system screen_brightness_mode` reads `0` within a cycle. **That `0` does
+    not on its own prove Tideo did it (DC-011):** an OEM build may clear the mode on any manual
+    `screen_brightness` write, and then the expected observation arrives whether or not the reclaim
+    ran. Confirm the attribution on Live Debug → **Brightness Writes** → "Last override", which must
+    read `DISMISSED_MODE`. A `0` with no such disposition is SKIPPED, not passed. **Control:** with
+    the mode already `0`, the same brightness write MUST pause as in step 8.
 10d. **Normalization readout (diagnostic, not pass/fail).** Live Debug → **Brightness Writes**, at
     the TOP of the curve (bright room, or raise Min/Max Brightness so a high value is written). Let
     one cycle complete; this needs no override to have fired. Record "Requested → acknowledged",

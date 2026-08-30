@@ -166,3 +166,20 @@
   drift first dismissed the event as harmless and left the device in AUTOMATIC indefinitely, since
   `runCycle` only reclaims the mode when the target actually changes. Disposition reporting is
   unchanged — `DISMISSED_DRIFT` still wins — but the recovery no longer depends on it.
+
+- DC-010: **A device check injected in RAW units does not test the DOMAIN rule it is aimed at.**
+  §2 10b pinned the ±1 deadband with "one domain step" and "twice that offset" of raw, but on a
+  12-bit panel (`deviceMax` 4095, 16.06 raw per domain step) the doubled step quantises back to a
+  domain delta of 1 at 28 start values, which would have failed a correct build, while one step
+  quantises to 0 at 14 more and tests nothing. The check now converts — `raw(n) = round(n × M / 255)`
+  for the domain value it wants — so the injected distance is exactly 1 then 2. The same arithmetic
+  explains the 2026-08-30 round's headline oddity, two identical `+20` writes reading "no override"
+  then "override": 161→181 is domain 10→11 and 181→201 is 11→13, and both dispositions are correct.
+
+- DC-011: **A pass signal another actor can produce is not evidence, even when the check can fail.**
+  §2 10c read `screen_brightness_mode` back as `0` to show Tideo had reclaimed MANUAL, but an OEM
+  build may clear the mode on any manual `screen_brightness` write, so the expected observation can
+  arrive whether or not the reclaim ran — DB-083's shape (a check that cannot fail on a well-behaved
+  phone) one step along, since this one does fail on a device that never clears the mode and passes
+  vacuously on one that always does. The check now requires the `DISMISSED_MODE` disposition on the
+  Live Debug card as its attribution and records a bare `0` as SKIPPED.
