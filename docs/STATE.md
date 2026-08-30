@@ -21,9 +21,9 @@ Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LE
 rollover, a test-only warning cleanup, and the executed #126/#127 override-attribution work
 (DC-002…DC-009), whose plan `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` is **retained by owner
 instruction (2026-08-30)** rather than deleted at its final segment as playbook 5 would have it. All
-six segments landed and the durable content is in the ledger, but the 2026-08-30 device round found
-that the app converts brightness with the wrong device maximum — an open question below, and the
-reason §2 10b is re-opened. No round script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
+six segments landed and the durable content is in the ledger, but the 2026-08-30 device round left
+the Live Debug card and the device disagreeing about the brightness maximum — an open question
+below, and the reason §2 10b is re-opened. No round script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
 force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input rather
 than a retained score or CI gate.
 
@@ -62,18 +62,18 @@ than a retained score or CI gate.
 
 Open questions:
 
-- **[2026-08-30] Tideo converts with a maximum of 255 on a device whose range is 0–4095 — how should
-  it learn the real one?** `Resources.getSystem()` returned the AOSP default: the card reads `Device
-  max: 255` and `Raw requested: 10` for domain 10, while the owner's system slider at maximum reads
-  `4095` from `settings get system screen_brightness`. So the whole curve is written into the bottom
-  6.2% of the panel, and `toDomain` clamps everything above 255, leaving override detection blind
-  across the upper 94% of the slider (DC-014). This is a fork rather than a fix because
-  **auto-learning the device maximum is a Decided non-item**, rejected by the #126/#127 plan.
-  Options: **(a)** a user-set "device maximum" preference defaulting to the resolved value —
-  `deviceMaxOverride` is already a constructor parameter, so it is small and never guesses;
-  **(b)** derive it from the largest value the system itself has written; **(c)** leave it and accept
-  a 6% ceiling on this hardware. **Recommendation: (a)** — it fixes a user-visible ceiling without
-  the feedback loop the plan rejected, where (b) is auto-learning under another name. Not started.
+- **[2026-08-30] The Live Debug card and the app's actual behaviour disagree about the device
+  maximum — which one is wrong?** The 1.10.0-debug card reads `Device max: 255` and `Raw requested:
+  10` for domain 10, while the owner's system slider at maximum reads `4095` from `settings get
+  system screen_brightness` and reports that brightness and override detection both work normally,
+  as they always have. **Nothing is known to be broken for the user** — two consequences claimed
+  here earlier were withdrawn (DC-016) — but the numbers cannot both be right, and §2 10d is nothing
+  but a reading of that card. **First settle which it is, before anyone proposes a fix:** with the
+  service running, read the card's "Current brightness" and `settings get system screen_brightness`
+  at the same moment. Equal means the app really writes raw-identity; a ratio near 16 means only the
+  display is wrong. If it is the app, note that 1.9.2 behaves correctly, so this train would be the
+  regression and the answer is to find it, **not** to auto-learn the maximum, which stays a Decided
+  non-item (DC-014, DC-016).
 
 **Device round 2026-08-30 (owner, 1.10.0-debug vc24).** **Graph Metrics flash: verified** — the
 owner reports the level-7 checks all fine, still the feature's only evidence until item 4 lands.
@@ -126,13 +126,14 @@ owed fresh-context review of `b462e56..HEAD` is discharged by this train's two a
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-08-30 — **Found `deviceMax` resolving to 255 on the owner's 0–4095 device** — the system
-  slider at maximum reads 4095 while the card reads 255 — so Tideo writes its whole domain into the
-  bottom 6.2% of the panel and cannot see a slider move above raw 255. **This corrects the entry
-  below:** 10b's quiet half was explained as quantisation on a 12-bit app scale, but the app converts
-  at 255, so that injection was 20 domain out and its silence is unexplained — 10b is re-opened, 10c
-  stands (confirmed on the card). Raised the conversion fix as an owner fork, since auto-learning the
-  maximum is a Decided non-item (DC-014, DC-015).
+- 2026-08-30 — **The Live Debug card reads `Device max: 255` where the system slider reports 4095,
+  and that discrepancy is now the open question** — not a diagnosed defect. Two consequences claimed
+  from it were withdrawn on the owner's report that brightness and override detection both work
+  normally: the detection one was a reasoning error, since the pause test compares against Tideo's
+  own last write rather than a second user value (DC-016). **What does survive corrects the entry
+  below:** 10b's quiet half had been explained as quantisation on a 12-bit app scale, and the card
+  says the app is not converting on that scale, so the explanation is void either way and 10b is
+  re-opened as unexplained. 10c stands, confirmed on the card (DC-014, DC-015).
 - 2026-08-30 — **§2 10c passed too** (mode 1 + raw 4000, quiet). Recorded why that is attributable
   without the debug card — far outside the deadband, an OEM-cleared mode would have paused instead
   (DC-013) — and fixed the ordering trap it exposed: the pause latch is sticky and clears only on an

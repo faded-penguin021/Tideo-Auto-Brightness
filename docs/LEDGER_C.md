@@ -221,3 +221,18 @@
   adoption — and only the first is the check passing. §2 10b now records "Last override" and
   "Override seen" after each half, where a fresh `DISMISSED_DRIFT` is the pass and a stale or absent
   timestamp means the event was dropped upstream.
+
+- DC-016: **Both consequences DC-014 drew are withdrawn, and the detection one was a reasoning
+  error rather than a wrong device fact.** The pause test compares an observed value against Tideo's
+  OWN last write, never against a second user value, so even a read clamped to 255 still registers a
+  large delta against a baseline of 10 — override detection cannot go blind at high brightness by
+  that mechanism whatever `deviceMax` resolves to, and the owner confirms it never has. The 6.2%
+  ceiling is withdrawn on the owner's report that brightness works normally; the override history
+  spanning the full domain corroborates it for the SHIPPED app but not for this branch, being
+  v1.9.2 data on a persisted history. What survives is narrower and unresolved: the 1.10.0-debug
+  card reads `Device max: 255` and `Raw requested: 10` for domain 10 on a device whose provider
+  stores 4095 at full slider, so either the display is wrong or this train regressed a resolution
+  that worked in 1.9.2 — and §2 10d is nothing but a reading of that card, so it cannot be trusted
+  until this is settled. Pair the two at one instant to settle it: the card's "Current brightness"
+  against `settings get system screen_brightness`, where an equal pair means the app really is
+  writing raw-identity and a ratio near 16 means only the display is wrong.
