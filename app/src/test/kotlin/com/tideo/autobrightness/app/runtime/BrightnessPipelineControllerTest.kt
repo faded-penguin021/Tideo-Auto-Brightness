@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -117,6 +118,7 @@ class BrightnessPipelineControllerTest {
         brightness: ScreenBrightnessController = FakeBrightness(),
         observer: BrightnessObserver = FakeObserver(),
         clock: () -> Long,
+        animationRunner: AnimationRunner = AnimationRunner(brightness),
     ): Pair<BrightnessPipelineController, CoroutineScope> {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val controller = BrightnessPipelineController(
@@ -126,6 +128,7 @@ class BrightnessPipelineControllerTest {
             settingsProvider = { settings },
             scope = scope,
             clock = clock,
+            animationRunner = animationRunner,
         )
         return controller to scope
     }
@@ -558,10 +561,15 @@ class BrightnessPipelineControllerTest {
         private val brightness: ScreenBrightnessController,
     ) : AnimationRunner(brightness) {
         var lastDetectOverrides: Boolean? = null
-        override suspend fun animate(from: Int, to: Int, steps: Int, waitMs: Long, detectOverrides: Boolean): Result {
+        override suspend fun animate(
+            from: Int,
+            to: Int,
+            steps: Int,
+            waitMs: Long,
+            detectOverrides: Boolean,
+        ): AnimationOutcome {
             lastDetectOverrides = detectOverrides
-            brightness.write(to)
-            return Result.COMPLETED
+            return AnimationOutcome.Completed(brightness.write(to))
         }
     }
 
@@ -656,5 +664,192 @@ class BrightnessPipelineControllerTest {
 
         assertTrue(controller.state.value.pausedByOverride, "a real slider move still pauses")
         scope.cancel()
+    }
+
+    // --- DC-004 / DC-005 / DC-006 / DC-007 ---
+
+    // Change 4's deadband, pinned in BOTH directions: 1 domain step is representational drift, 2 is not.
+    @Test
+    fun settledWithinOneDomainStep_doesNotPause_butTwoDoes() = runTest {
+        for ((drift, shouldPause) in listOf(1 to false, 2 to true)) {
+            val sensor = FakeSensor()
+            val observer = FakeObserver()
+            val brightness = FakeBrightness()
+            val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+            controller.start()
+            sensor.flow.emit(sample(lux = 50.0))
+            advanceUntilIdle()
+
+            val applied = controller.state.value.lastAppliedBrightness!!
+            brightness.current = applied + drift
+            observer.flow.emit(applied + drift)
+            advanceUntilIdle()
+
+            assertEquals(
+                shouldPause, controller.state.value.paused,
+                "a $drift-step settled deviation: paused should be $shouldPause",
+            )
+            scope.cancel()
+        }
+    }
+
+    // #127: a non-MANUAL mode at commit time means Tideo no longer owns the mode it writes against.
+    @Test
+    fun nonManualModeAtCommit_dismissesAndRecovers_manualModePauses() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        brightness.manualMode = false
+        val forcedBefore = brightness.manualModeForced
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertFalse(controller.state.value.paused, "an ambiguous mode must not be labelled a manual override")
+        assertTrue(brightness.manualModeForced > forcedBefore, "the mode must be reclaimed")
+        assertEquals(
+            OverrideDisposition.DISMISSED_MODE,
+            controller.state.value.overrideDiagnostic?.disposition,
+        )
+        scope.cancel()
+    }
+
+    @Test
+    fun sameWriteWithManualMode_stillPauses() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        brightness.manualMode = true
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertTrue(controller.state.value.paused, "the control: MANUAL mode with the same write MUST pause")
+        assertEquals(OverrideDisposition.PAUSED, controller.state.value.overrideDiagnostic?.disposition)
+        scope.cancel()
+    }
+
+    // A mode recovery that FAILS still must not pause — pausing would print the misattribution this fixes.
+    @Test
+    fun failedModeRecovery_stillDoesNotPause_andIsRecorded() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        brightness.manualMode = false
+        brightness.forceManualSucceeds = false
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertFalse(controller.state.value.paused)
+        assertEquals(
+            OverrideDisposition.MODE_RECOVERY_FAILED,
+            controller.state.value.overrideDiagnostic?.disposition,
+        )
+        scope.cancel()
+    }
+
+    // DC-004: the baseline is what the provider ACKNOWLEDGED, not what we asked for.
+    @Test
+    fun lastAppliedBrightness_isTheAcknowledgedValue_notTheRequestedOne() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness(normalize = { it - 3 })
+        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val requested = brightness.writes.last()
+        assertEquals(requested - 3, controller.state.value.lastAppliedBrightness)
+        scope.cancel()
+    }
+
+    // DC-007: the continuous record must exist on a device that never fires an override at all.
+    @Test
+    fun lastBrightnessWrite_isPopulatedByAnOrdinaryCycle_withNoOverrideAnywhere() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness(normalize = { it - 3 })
+        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val write = controller.state.value.lastBrightnessWrite
+        assertNotNull(write, "device check 3 reads this without an override having fired")
+        assertEquals(brightness.writes.last(), write.requestedDomain)
+        assertEquals(brightness.writes.last() - 3, write.acknowledgedDomain)
+        assertNull(controller.state.value.overrideDiagnostic, "nothing was detected, so nothing is recorded")
+        scope.cancel()
+    }
+
+    // DC-007: the diagnostic reports the detector the EVENT carried, not a re-derivation.
+    @Test
+    fun observerRoute_recordsOBSERVER_asTheSource() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertEquals(OverrideSource.OBSERVER, controller.state.value.overrideDiagnostic?.source)
+        scope.cancel()
+    }
+
+    @Test
+    fun animationAbort_recordsANIMATION_BAND_andTheTriggeringRead() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(
+            sensor,
+            brightness,
+            clock = { 1000L },
+            animationRunner = OverridingAnimationRunner(brightness, trigger = 9),
+        )
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val diagnostic = controller.state.value.overrideDiagnostic
+        assertEquals(OverrideSource.ANIMATION_BAND, diagnostic?.source)
+        assertEquals(9, diagnostic?.observed, "the read that tripped the detector, not a later re-read")
+        scope.cancel()
+    }
+
+    /** Always aborts with [trigger] as the read that tripped the band detector. */
+    private class OverridingAnimationRunner(
+        private val brightness: ScreenBrightnessController,
+        private val trigger: Int,
+    ) : AnimationRunner(brightness) {
+        override suspend fun animate(
+            from: Int,
+            to: Int,
+            steps: Int,
+            waitMs: Long,
+            detectOverrides: Boolean,
+        ): AnimationOutcome {
+            val ack = brightness.write(to)
+            return AnimationOutcome.Overridden(ack, triggerObserved = trigger)
+        }
     }
 }

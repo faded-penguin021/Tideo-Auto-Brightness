@@ -77,3 +77,65 @@
   `animSteps` extra round-trips per sweep, on top of the band read `AnimationRunner` already does.
   `isOnScreenSelfWrite()` is deleted as it had no production caller; D-049 stays cited from
   `AnimationRunner` and `PipelineCycleRunner`.
+
+- DC-004 [cited]: **Both override detectors now consult what the provider acknowledged, and the
+  baseline records it (#126).** `AnimationRunner` was a second detector that read brightness directly
+  and consulted neither the observer nor the self-write marker, so on a device that normalizes our
+  writes out of the sweep band it aborted the sweep, `runCycle` returned before the `ctx.update` that
+  refreshes `lastAppliedBrightness`, and `handleOverride` then compared the settled value against the
+  PREVIOUS cycle's baseline and paused — a false pause with no foreign writer anywhere. `animate()`
+  now returns `AnimationOutcome.Completed|Overridden` carrying the latest ACKNOWLEDGED frame write and,
+  for the abort, the read that actually tripped the two-read detector (sealed, because "Overridden with
+  no triggering read" is unreachable); an out-of-band read counts toward the threshold only if it also
+  differs from `acknowledgedDomain`, which is exact-safe because a device that stored our frame reports
+  `toDomain` of the very raw the acknowledgement holds. `lastAppliedBrightness` is now set from the
+  acknowledgement at every write site — acknowledged wins, `WRITTEN_UNACKNOWLEDGED` records the
+  requested value as an explicit diagnosable assumption, and `REFUSED`/`DENIED` leave the previous
+  baseline because that is the truthful one when nothing landed. The band plus two-read debounce stays
+  authoritative for wrong-direction and overshoot, so this does not reinstate the D-054 exact-match
+  defect: the acknowledgement is an extra in-band condition ANDed in, never a replacement for the band.
+
+- DC-005 [cited]: **The override settle keeps `%AAB_CycleTime` only, and the commit guard gains a
+  one-step deadband.** The plan for #126 asked to restore D-049 #1's "fallback to throttle", on the
+  belief it was never implemented; it WAS, and D-062(2)/F71 deliberately removed it, because
+  `%AAB_Throttle` gates only the prof760 main loop while task567 act7 is a separate settle, and
+  `override_settleIsNotGatedByThrottleCooldown` pins that a 60 s cooldown must not delay a pause.
+  Reinstating it was therefore rejected against the evidence; what the wake path really needed is the
+  floor, since `hibernate()` nulls `cycleTimeMs` and `delay(0)` returns WITHOUT suspending, so the
+  re-read could share a dispatch with the event that asked for it — `MIN_SETTLE_MS = 1` is a yield
+  floor, not a settling estimate, and no larger number is defensible from anything on hand. The commit
+  comparison is now `abs(settled - lastApplied) <= 1` in domain space rather than exact: at the
+  reporter's scale one domain step is 12–16 raw units, so any round trip crossing a boundary paused
+  the pipeline. This is a deliberate deadband, not a formality — a persistent one-step deviation is
+  made undetectable on purpose, accepted because 1/255 is imperceptible and because the blindness is
+  bounded in MAGNITUDE, unlike a grace period, which is blind to a change of any size for its duration.
+
+- DC-006 [cited]: **A non-MANUAL brightness mode at commit time dismisses the override instead of
+  labelling it user input (#127).** `OverrideRules.shouldCommitPause` takes `isManualMode` (defaulting
+  to true, so the pre-settle gate stays state-only and a failed mode read fails toward pausing); when
+  it is false `handleOverride` calls `forceManualMode()` and returns without pausing, and the next
+  cycle re-establishes our brightness normally. The claim is deliberately narrow: a non-MANUAL mode
+  proves only that Tideo no longer owns the display mode it writes against — the user may have enabled
+  adaptive brightness themselves — so the event is AMBIGUOUS, which is not the same as proving the
+  framework wrote it. When the recovery itself fails the app still does not pause: pausing would print
+  "Manual Override Detected", the exact misattribution this exists to stop, and a failed mode write
+  means `WRITE_SETTINGS` is gone so the brightness writes are failing too — now checkable rather than
+  assumed, since `WriteStatus.DENIED` says the same thing and the diagnostic shows both. This is a
+  DEVIATION from Tasker (task567/prof755 never consult the mode) and adds a second mode-recovery site
+  beside `setInitialBrightness`, since `runCycle`'s sits inside `if (target != from)`.
+
+- DC-007 [cited]: **Two override diagnostics with different lifetimes, and the event now says which
+  detector fired.** Both detector paths converged on `OverrideDetected(observedBrightness)`, so nothing
+  downstream could tell the observer route from the animation abort and any recorded `source` would
+  have been a guess; the event now carries `OverrideSource{OBSERVER, ANIMATION_BAND}` through
+  `postOverrideDetected` and `handleOverride`, which also finally gives `observed` a use — the
+  parameter was dead, the function deciding entirely on the post-settle re-read. `lastBrightnessWrite`
+  is CONTINUOUS, written once per cycle that writes (not per frame — 50 state updates per sweep would
+  churn every Compose consumer), so requested-vs-acknowledged-vs-`deviceMax` is readable on a device
+  good enough never to fire an override at all, which is what the owner's device check asks for and
+  what a single event-scoped record cannot deliver. `overrideDiagnostic` is EVENT-scoped, written where
+  an override is detected or dismissed, and carries source, disposition, observed, settled, expected,
+  mode and the write in force. Two records rather than five loose nullables because `PipelineState` is
+  a coherent single-consumer snapshot and loose fields admit combinations that cannot occur; two rather
+  than one because collapsing them loses the normalization readout in exactly the well-behaved case.
+  They identify the mechanism CLASS, never the writer — nothing in the app can identify that.

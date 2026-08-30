@@ -984,7 +984,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   proposing to regenerate golden vectors. (Affects S12.7i; S13's circadian/experiment chart can reuse
   `CircadianWindowProvider.compute`.)
 
-- D-062: **(S12.7i) — F70/F71/F72 cleanup; two of the three were misdiagnosed in the original report.**
+- D-062 [cited]: **(S12.7i) — F70/F71/F72 cleanup; two of the three were misdiagnosed in the original report.**
   (1) **F70** ("legacy load doesn't apply") was NOT an apply-wiring gap — ProfilesScreen has called
   `vm.replaceAll(imported)` (commit + reapply) since S12.7c. The real bug: `TaskerLegacyProfileSerializer`
   only parsed `%AAB_Key=value` plaintext, but the on-device app saves **nested JSON** (task637

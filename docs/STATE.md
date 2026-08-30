@@ -38,17 +38,29 @@ revision 3), executing on `claude/override-detection-race-condition-mli9ia`. Seg
 sequentially and each ends ladder-green, committed and pushed.
 
 - [x] A — this checklist plus the owed DA-004 compression pass.
-- [ ] B — change 1: transactional `write()` returning `BrightnessWriteResult`, `selfWriteInProgress`,
+- [x] B — change 1: transactional `write()` returning `BrightnessWriteResult`, `selfWriteInProgress`,
       `isManualMode()`, `forceManualMode(): Boolean`, `isOnScreenSelfWrite()` deleted, OEM test seam.
-- [ ] C — changes 1b/2/7a: `AnimationOutcome`, acknowledged baselines, detector source on the event.
-- [ ] D — changes 3/4/5: settle-delay floor, ±1 commit deadband, mode-aware attribution in
-      `OverrideRules.shouldCommitPause`.
-- [ ] E — change 7b/7c: `lastBrightnessWrite`, `overrideDiagnostic`, one Live Debug card.
-- [ ] F — recording: ledger rows, `parity_gaps.md`, device checks, semver call, changelog.
+      Adversarial review triaged in a follow-up commit (DC-002, DC-003).
+- [x] C — changes 1b/2/3/4/5/7a and the two diagnostic state fields: `AnimationOutcome`, acknowledged
+      baselines, settle floor, ±1 commit deadband, mode-aware attribution (DC-004…DC-007). The plan's
+      segments C and D are merged: they rewrite the same two functions, and splitting them would leave
+      `handleOverride`'s new `source` parameter unused across a commit boundary.
+- [ ] E — change 7c: the Live Debug write/diagnostic card.
+- [ ] F — recording: `parity_gaps.md`, device checks, semver call, changelog. Ledger rows land with
+      the segment that cites them, not here — a citation must resolve at every commit.
 
 Change 6 is WITHDRAWN by the plan and `INITIAL_SETTLE_MS` stays 1500. The plan file is **retained by
 owner instruction (2026-08-30)**, not deleted at the final segment as playbook 5 would have it; its
 durable content still goes to the ledger and the Changelog.
+
+**One deviation from the approved plan, decided on evidence (DC-005).** Change 3 asked to restore
+D-049 #1's "settle fallback to throttle", believing it was never implemented. It was, and D-062(2)/F71
+removed it deliberately — `%AAB_Throttle` gates only the prof760 main loop while task567 act7 is a
+separate settle — and `override_settleIsNotGatedByThrottleCooldown` pins that a 60 s cooldown must not
+delay a pause. Reinstating it would have regressed Tasker parity and failed that test, so the settle
+keeps `%AAB_CycleTime` only and gains just the `MIN_SETTLE_MS = 1` yield floor, which is what the
+wake path actually needed. Not treated as an owner fork: there is a parity source and a test, and
+AGENTS.md says trust the code over a document that disagrees with it.
 
 ## Owner queue
 

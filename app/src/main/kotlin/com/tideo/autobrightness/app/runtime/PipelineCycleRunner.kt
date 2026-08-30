@@ -12,7 +12,9 @@ import com.tideo.autobrightness.domain.brightness.OverrideRules
 import com.tideo.autobrightness.domain.brightness.PreviousState
 import com.tideo.autobrightness.domain.brightness.SoftwareDimming
 import com.tideo.autobrightness.domain.brightness.TimeContext
+import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
+import com.tideo.autobrightness.platform.brightness.WriteStatus
 import kotlinx.coroutines.delay
 
 /** Single-writer accessor for [PipelineState] (D-027). */
@@ -29,7 +31,7 @@ internal interface PipelineRuntimeContext {
      *  our own brightness; its transition must not be mis-seen as a manual override — D-126). */
     fun overrideSuppressed(): Boolean
     /** Post a detected-override event back onto the consumer channel (mid-animation override). */
-    fun postOverrideDetected(observed: Int)
+    fun postOverrideDetected(observed: Int, source: OverrideSource)
 }
 
 /** Pipeline per-event math: Set Initial Brightness, runCycle, override settle, super-dimming readout (D-027). */
@@ -89,27 +91,38 @@ internal class PipelineCycleRunner(
             }
 
             val brightnessChanged = target != from
-            if (target != from) {
+            var writeResult: BrightnessWriteResult? = null
+            // Nothing written: `from` came from brightness.read(), so target already names the screen.
+            var applied: Int? = if (brightnessChanged) s.lastAppliedBrightness else target
+            if (brightnessChanged) {
                 brightness.forceManualMode()
                 // G3-F5: publish target early so dashboard animates during sweep (D-109: perceived, not floored).
                 ctx.update { it.copy(targetBrightness = perceived) }
                 if (settings.debugLevel == DebugCategory.SKIP_ANIMATIONS.level) {
-                    brightness.write(target)
+                    writeResult = brightness.write(target)
+                    applied = baselineAfter(writeResult, applied)
                     debug.emit(DebugCategory.SKIP_ANIMATIONS, settings.debugLevel) { "skip → $target" }
                 } else {
                     debug.emit(DebugCategory.ANIMATION_DETAILS, settings.debugLevel) {
                         "animate $from→$target in ${output.animationSteps}×${output.animationWaitMs}ms"
                     }
                     // D-126: suppress override detection during post-init/resume settle window (F64).
-                    val result = animationRunner.animate(
+                    val outcome = animationRunner.animate(
                         from = from,
                         to = target,
                         steps = output.animationSteps,
                         waitMs = output.animationWaitMs,
                         detectOverrides = settings.detectOverrides && !ctx.overrideSuppressed(),
                     )
-                    if (result == AnimationRunner.Result.OVERRIDDEN) {
-                        ctx.postOverrideDetected(brightness.read())
+                    writeResult = outcome.lastAcknowledged
+                    applied = baselineAfter(writeResult, applied)
+                    if (outcome is AnimationOutcome.Overridden) {
+                        // DC-004: refresh the baseline BEFORE posting, or handleOverride compares the
+                        // settled value against the PREVIOUS cycle's and pauses on our own sweep.
+                        val baseline = applied
+                        val write = writeResult
+                        ctx.update { it.copy(lastAppliedBrightness = baseline, lastBrightnessWrite = write) }
+                        ctx.postOverrideDetected(outcome.triggerObserved, OverrideSource.ANIMATION_BAND)
                         return
                     }
                 }
@@ -142,8 +155,9 @@ internal class PipelineCycleRunner(
                     scaleDynamic = output.scaleDynamic,
                     scaleDynamicCompress = output.scaleDynamicCompress,
                     scalingUse = settings.scalingEnabled,
-                    // lastAppliedBrightness = hardware (floored); targetBrightness = perceived (D-109).
-                    lastAppliedBrightness = target,
+                    // DC-004: what Android acknowledged, not what we asked for; perceived stays D-109.
+                    lastAppliedBrightness = applied,
+                    lastBrightnessWrite = writeResult ?: it.lastBrightnessWrite,
                     targetBrightness = perceived,
                     dimmingCurrent = dimCurrent,
                     dimmingDS = dimDS,
@@ -238,17 +252,37 @@ internal class PipelineCycleRunner(
      * observe → post → consume is asynchronous, so a change seen just before the window opened can
      * still arrive at the commit inside it.
      */
-    suspend fun handleOverride(observed: Int) {
+    suspend fun handleOverride(observed: Int, source: OverrideSource) {
         if (!canPause(ctx.stateValue)) return
 
-        val settleMs = (ctx.stateValue.cycleTimeMs?.toLong() ?: 0L).coerceAtLeast(0L)
-        if (settleMs > 0) delay(settleMs)
+        // DC-005: %AAB_CycleTime only — D-062(2)/F71 removed the throttle fallback on purpose, because
+        // %AAB_Throttle gates the prof760 main loop and task567 act7 is a separate settle. The floor
+        // is a yield, not a settling estimate: delay(0) never suspends.
+        val settleMs = (ctx.stateValue.cycleTimeMs?.toLong() ?: 0L).coerceAtLeast(MIN_SETTLE_MS)
+        delay(settleMs)
 
         val s2 = ctx.stateValue
         if (!canPause(s2)) return
         val settled = brightness.read()
-        // Settled to our last write → transient, not override (D-049 #1).
-        if (s2.lastAppliedBrightness != null && settled == s2.lastAppliedBrightness) return
+        val manualMode = brightness.isManualMode()
+
+        // Settled to what we actually put on screen → transient, not override (D-049 #1, DC-005).
+        if (OverrideRules.isRepresentationalDrift(settled, s2.lastAppliedBrightness)) {
+            recordDiagnostic(s2, source, OverrideDisposition.DISMISSED_DRIFT, observed, settled, manualMode)
+            return
+        }
+        // DC-006: the only operand left is the mode — the state gates passed in canPause above.
+        if (!OverrideRules.shouldCommitPause(
+                s2.serviceOn, s2.autoRunning, s2.paused, s2.initializing, manualMode,
+            )
+        ) {
+            val recovered = brightness.forceManualMode()
+            val disposition =
+                if (recovered) OverrideDisposition.DISMISSED_MODE
+                else OverrideDisposition.MODE_RECOVERY_FAILED
+            recordDiagnostic(s2, source, disposition, observed, settled, manualMode)
+            return
+        }
 
         val history = OverrideRules.recordOverridePoint(
             history = s2.overrideHistory,
@@ -259,10 +293,57 @@ internal class PipelineCycleRunner(
         )
         brightness.clearSelfWriteMarker()
         dimming.disengage()
+        val diagnostic = diagnosticOf(s2, source, OverrideDisposition.PAUSED, observed, settled, manualMode)
         // pausedByOverride: detected override (G2R-F35, D-044(c)).
-        ctx.update { it.copy(paused = true, pausedByOverride = true, overrideHistory = history) }
+        ctx.update {
+            it.copy(
+                paused = true,
+                pausedByOverride = true,
+                overrideHistory = history,
+                overrideDiagnostic = diagnostic,
+            )
+        }
         history.firstOrNull()?.let { (lux, bright) -> overrideSink.record(lux, bright) }
     }
+
+    private fun diagnosticOf(
+        s: PipelineState,
+        source: OverrideSource,
+        disposition: OverrideDisposition,
+        observed: Int,
+        settled: Int,
+        manualMode: Boolean,
+    ) = OverrideDiagnostic(
+        source = source,
+        disposition = disposition,
+        observed = observed,
+        settled = settled,
+        expected = s.lastAppliedBrightness,
+        manualMode = manualMode,
+        write = s.lastBrightnessWrite,
+        timestampMs = clock(),
+    )
+
+    private fun recordDiagnostic(
+        s: PipelineState,
+        source: OverrideSource,
+        disposition: OverrideDisposition,
+        observed: Int,
+        settled: Int,
+        manualMode: Boolean,
+    ) {
+        val diagnostic = diagnosticOf(s, source, disposition, observed, settled, manualMode)
+        ctx.update { it.copy(overrideDiagnostic = diagnostic) }
+    }
+
+    // DC-004: acknowledged wins; a write that landed unconfirmed records what we asked for; a write
+    // that landed nowhere leaves the previous baseline, which is the truthful one.
+    private fun baselineAfter(result: BrightnessWriteResult?, current: Int?): Int? =
+        when (result?.status) {
+            WriteStatus.ACKNOWLEDGED -> result.acknowledgedDomain
+            WriteStatus.WRITTEN_UNACKNOWLEDGED -> result.requestedDomain
+            else -> current
+        }
 
     /** task618 block#1: Set Initial Brightness. */
     fun setInitialBrightness(settings: AabSettings) {
@@ -278,14 +359,16 @@ internal class PipelineCycleRunner(
             val target = applyPwmFloor(output.targetBrightness, settings)
             val perceived = output.targetBrightness
             brightness.forceManualMode()
-            brightness.write(target)
+            val result = brightness.write(target)
             // F65: use un-floored target; F64: settle window.
             dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
             // Re-arm from the END of the write so the full window covers the transition too.
             ctx.armInitialSettle(clock() + INITIAL_SETTLE_MS)
             ctx.update {
                 it.copy(
-                    lastAppliedBrightness = target,    // actual hardware write (floored)
+                    // DC-004: acknowledged hardware write (floored), not the requested target.
+                    lastAppliedBrightness = baselineAfter(result, it.lastAppliedBrightness),
+                    lastBrightnessWrite = result,
                     targetBrightness = perceived,      // perceived read-out (D-109)
                     lastAcceptedMs = clock(),
                 )
@@ -308,5 +391,9 @@ internal class PipelineCycleRunner(
     internal companion object {
         // F64: settle window (1.5s). Also armed on wake (DB-082) — one number, one place.
         const val INITIAL_SETTLE_MS = 1500L
+
+        // DC-005: the re-read must never share a dispatch with the event that asked for it —
+        // delay(0) returns without suspending. A yield floor, not a settling estimate.
+        const val MIN_SETTLE_MS = 1L
     }
 }

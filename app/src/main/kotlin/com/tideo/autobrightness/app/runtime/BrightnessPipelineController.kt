@@ -106,7 +106,9 @@ class BrightnessPipelineController(
     override fun cacheSettings(settings: AabSettings) { cachedSettings = settings }
     override fun armInitialSettle(untilMs: Long) { suppressOverrideUntilMs = untilMs }
     override fun overrideSuppressed(): Boolean = clock() < suppressOverrideUntilMs
-    override fun postOverrideDetected(observed: Int) { postControl(PipelineEvent.OverrideDetected(observed)) }
+    override fun postOverrideDetected(observed: Int, source: OverrideSource) {
+        postControl(PipelineEvent.OverrideDetected(observed, source))
+    }
 
     /** Start the pipeline and consumer/sensor/observer flows. */
     fun start() {
@@ -118,7 +120,7 @@ class BrightnessPipelineController(
         }
         overrideJob = scope.launch {
             overrideMonitor.overrides().collect { observed ->
-                postControl(PipelineEvent.OverrideDetected(observed))
+                postControl(PipelineEvent.OverrideDetected(observed, OverrideSource.OBSERVER))
             }
         }
         startSensor()
@@ -224,7 +226,8 @@ class BrightnessPipelineController(
             PipelineEvent.ScreenOn -> reinit()
             PipelineEvent.Pause -> pauseInternal()
             PipelineEvent.Resume -> cycleRunner.resume()
-            is PipelineEvent.OverrideDetected -> cycleRunner.handleOverride(event.observedBrightness)
+            is PipelineEvent.OverrideDetected ->
+                cycleRunner.handleOverride(event.observedBrightness, event.source)
             PipelineEvent.ContextChanged -> cycleRunner.reapplyProfile()
         }
     }
