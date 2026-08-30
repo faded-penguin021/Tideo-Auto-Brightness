@@ -97,21 +97,31 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
   vectors (never edit a golden vector to pass; changing one needs proof the extraction was
   wrong + a `STATE.md` entry) → run the ladder → **glue-review protocol** (below) if the fix
   touches `:platform`/runtime glue.
+- **Plan handoff:** when the owner approves a plan that a DIFFERENT session will execute, persist it
+  under playbook 5's Multi-session plan rules below — all of them, including the STATE segment
+  checklist and the deletion precondition. A fix small enough to do in the approving session needs no
+  file. No guard enforces any of this: the ladder's `PLAN_DIR` advisory only WARNs when a plan file is
+  not referenced from `STATE.md`, and it does not run in CI.
 - **Record:** `STATE.md` (and `parity_gaps.md` if it was a parity gap).
 
 ### 5. Tasker-independent feature (rare — no parity source)
 - No golden reference exists; still obey the coding conventions in `CLAUDE.md` and add tests.
   The **glue-review protocol** (below) applies to any `:platform`/runtime glue it adds.
 - **Multi-session features** (pattern proven by Privileged Display, D-149–D-152): persist an
-  owner-approved execution plan as `docs/rebuild/plans/<name>.md` and mirror a segment checklist
-  in `STATE.md` Active work. Segments run **sequentially** (D-133) and each ends SHIPPABLE:
+  owner-approved execution plan in the directory named by `PLAN_DIR` in `amh.conf` (today
+  `docs/plans/`), which also holds retained triage docs such as `REVIEW_TRIAGE_1.9.0.md`. The two are
+  not governed alike: an execution plan is deleted at its final segment (below), while a triage doc
+  that `STATE.md` **Decided non-items** or a ledger row still points at is retained until nothing
+  points at it. Mirror a segment checklist in `STATE.md` `## Active work`, creating that section if it
+  is absent. Segments run **sequentially** (D-133) and each ends SHIPPABLE:
   ladder green → STATE Changelog line → commit → push. A follow-up session bases its branch on
   the unmerged predecessor (`git checkout -B <new> origin/<old>`), else latest main. Treat the
   plan as provisional — the owner may pivot it mid-feature (D-151 replaced an entire
   already-on-branch segment; per-segment checkpoints are what made that removal cheap). At the
   final segment **delete the plan file**: its durable content must by then live in `STATE.md`
-  Changelog lines + ledger rows. Code comments cite `D-NN`, never the plan file (it dies; the
-  ledger doesn't).
+  Changelog lines + ledger rows — that precondition is the rule, so a tree carrying no plan file means
+  every plan landed, not that one went missing. Code comments cite `D-NN`, never the plan file (it
+  dies; the ledger doesn't).
 - **Record:** note the deviation-from-Tasker explicitly in `STATE.md`.
 
 ### 6. Cutting a release / version bump
@@ -247,7 +257,7 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
   `PACKAGE_USAGE_STATS`, exported boot receiver, app widget, QS tile, accessibility overlay,
   edge-to-edge enforcement, predictive back, package visibility `<queries>`, 16 KB page size.
   Mark each row **no-op / config-only / code change / blocker**; put the matrix in `STATE.md`
-  Active work. Every "code change"/"blocker" row gets a sub-task before flipping targetSdk.
+  `## Active work`, creating that section if it is absent. Every "code change"/"blocker" row gets a sub-task before flipping targetSdk.
 - **Install the SDK platform** (fresh containers ship only the current one):
   `sdkmanager "platforms;android-<N>" "build-tools;<N>.0.0"`.
 - **Commit 1 — `compileSdk` only** (keep `targetSdk` one behind). Bump `compileSdk` in

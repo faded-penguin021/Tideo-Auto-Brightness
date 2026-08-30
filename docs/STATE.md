@@ -154,6 +154,9 @@ through 1.9.1-debug vc22 are all owner-closed and their findings are ledger rows
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-30 — Owner-approved #126/#127 override plan recorded as
+  `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md`; another session executes it. No code change. RUNBOOK
+  4/5 now give plans one home and cover cross-session handoff.
 - 2026-08-26 — Version bump to `1.9.3` / vc24 (patch, owner-decided — a miscategorisation fix), plus
   `fastlane/…/changelogs/24.txt`; branch now release-ready. One on-device check pending (Owner queue
   item 4).
