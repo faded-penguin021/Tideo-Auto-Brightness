@@ -57,7 +57,8 @@ internal class PipelineCycleRunner(
 
     /** task569 Resume After Override: re-establish the initial brightness and clear the pause latch. */
     suspend fun resume() {
-        ctx.update { it.copy(paused = false, pausedByOverride = false) }
+        // DC-008: the diagnostic describes the override being resumed FROM, so it dies with the pause.
+        ctx.update { it.copy(paused = false, pausedByOverride = false, overrideDiagnostic = null) }
         setInitialBrightness(settingsProvider().also { ctx.cacheSettings(it) })
     }
 
@@ -114,14 +115,21 @@ internal class PipelineCycleRunner(
                         waitMs = output.animationWaitMs,
                         detectOverrides = settings.detectOverrides && !ctx.overrideSuppressed(),
                     )
-                    writeResult = outcome.lastAcknowledged
+                    // DC-008: the LAST frame of any status, so the baseline rule matches its siblings.
+                    writeResult = outcome.lastResult
                     applied = baselineAfter(writeResult, applied)
                     if (outcome is AnimationOutcome.Overridden) {
-                        // DC-004: refresh the baseline BEFORE posting, or handleOverride compares the
-                        // settled value against the PREVIOUS cycle's and pauses on our own sweep.
+                        // DC-004: refresh the baseline BEFORE posting, or handleOverride compares
+                        // against the PREVIOUS cycle's and pauses on our own sweep (DC-008: never
+                        // null out the continuous write record while doing so).
                         val baseline = applied
                         val write = writeResult
-                        ctx.update { it.copy(lastAppliedBrightness = baseline, lastBrightnessWrite = write) }
+                        ctx.update {
+                            it.copy(
+                                lastAppliedBrightness = baseline,
+                                lastBrightnessWrite = write ?: it.lastBrightnessWrite,
+                            )
+                        }
                         ctx.postOverrideDetected(outcome.triggerObserved, OverrideSource.ANIMATION_BAND)
                         return
                     }
@@ -263,24 +271,32 @@ internal class PipelineCycleRunner(
 
         val s2 = ctx.stateValue
         if (!canPause(s2)) return
+        // DC-008: the monitor gates on this but the commit did not (the sibling-gate class).
+        if (!settingsProvider().detectOverrides) return
         val settled = brightness.read()
         val manualMode = brightness.isManualMode()
+
+        // DC-009: reclaim BEFORE the drift branch, or a framework value inside the deadband is
+        // dismissed as harmless and the device stays in AUTOMATIC.
+        val recovered = if (manualMode) true else reclaimManualMode()
 
         // Settled to what we actually put on screen → transient, not override (D-049 #1, DC-005).
         if (OverrideRules.isRepresentationalDrift(settled, s2.lastAppliedBrightness)) {
             recordDiagnostic(s2, source, OverrideDisposition.DISMISSED_DRIFT, observed, settled, manualMode)
             return
         }
-        // DC-006: the only operand left is the mode — the state gates passed in canPause above.
-        if (!OverrideRules.shouldCommitPause(
-                s2.serviceOn, s2.autoRunning, s2.paused, s2.initializing, manualMode,
-            )
-        ) {
-            val recovered = brightness.forceManualMode()
+        if (!manualMode) {
             val disposition =
                 if (recovered) OverrideDisposition.DISMISSED_MODE
                 else OverrideDisposition.MODE_RECOVERY_FAILED
             recordDiagnostic(s2, source, disposition, observed, settled, manualMode)
+            return
+        }
+        // The state gates were re-checked above; the mode is the only other operand (DC-006).
+        if (!OverrideRules.shouldCommitPause(
+                s2.serviceOn, s2.autoRunning, s2.paused, s2.initializing, manualMode,
+            )
+        ) {
             return
         }
 
@@ -306,6 +322,12 @@ internal class PipelineCycleRunner(
         history.firstOrNull()?.let { (lux, bright) -> overrideSink.record(lux, bright) }
     }
 
+    // DC-009: the mode flip's own brightness re-assert must be suppressed like any of our writes.
+    private fun reclaimManualMode(): Boolean {
+        ctx.armInitialSettle(clock() + INITIAL_SETTLE_MS)
+        return brightness.forceManualMode()
+    }
+
     private fun diagnosticOf(
         s: PipelineState,
         source: OverrideSource,
@@ -313,16 +335,7 @@ internal class PipelineCycleRunner(
         observed: Int,
         settled: Int,
         manualMode: Boolean,
-    ) = OverrideDiagnostic(
-        source = source,
-        disposition = disposition,
-        observed = observed,
-        settled = settled,
-        expected = s.lastAppliedBrightness,
-        manualMode = manualMode,
-        write = s.lastBrightnessWrite,
-        timestampMs = clock(),
-    )
+    ) = s.buildOverrideDiagnostic(source, disposition, observed, settled, manualMode, clock())
 
     private fun recordDiagnostic(
         s: PipelineState,
@@ -335,15 +348,6 @@ internal class PipelineCycleRunner(
         val diagnostic = diagnosticOf(s, source, disposition, observed, settled, manualMode)
         ctx.update { it.copy(overrideDiagnostic = diagnostic) }
     }
-
-    // DC-004: acknowledged wins; a write that landed unconfirmed records what we asked for; a write
-    // that landed nowhere leaves the previous baseline, which is the truthful one.
-    private fun baselineAfter(result: BrightnessWriteResult?, current: Int?): Int? =
-        when (result?.status) {
-            WriteStatus.ACKNOWLEDGED -> result.acknowledgedDomain
-            WriteStatus.WRITTEN_UNACKNOWLEDGED -> result.requestedDomain
-            else -> current
-        }
 
     /** task618 block#1: Set Initial Brightness. */
     fun setInitialBrightness(settings: AabSettings) {

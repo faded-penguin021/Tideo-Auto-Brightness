@@ -145,6 +145,57 @@ class AnimationRunnerTest {
         assertNull(result.lastAcknowledged, "a REFUSED frame says nothing about what is on screen")
     }
 
+    // DC-008: a provider that applies our write a frame LATE, which the DC-004 equality alone missed.
+    @Test
+    fun laggingProviderThatAppliesAFrameLate_doesNotTripTheDetector() = runTest {
+        val fake = LaggingBrightness(offset = 40)
+        val runner = AnimationRunner(fake, sleep = { fake.settle() })
+        val result = runner.animate(from = 0, to = 100, steps = 20, waitMs = 5, detectOverrides = true)
+        assertIs<AnimationOutcome.Completed>(result)
+        assertEquals(20, fake.writes.size, "no frame should have been skipped")
+    }
+
+    @Test
+    fun laggingProvider_stillTripsOnAGenuinelyForeignValue() = runTest {
+        val fake = LaggingBrightness(offset = 40)
+        val runner = AnimationRunner(fake, sleep = { fake.settle(); fake.foreign = 250 })
+        val result = runner.animate(from = 0, to = 100, steps = 20, waitMs = 5, detectOverrides = true)
+        assertIs<AnimationOutcome.Overridden>(result)
+    }
+
+    @Test
+    fun unacknowledgedFrames_areStillReportedAsTheLastResult() = runTest {
+        val fake = RefusingBrightness()
+        val runner = AnimationRunner(fake, sleep = {})
+        val result = runner.animate(from = 0, to = 100, steps = 4, waitMs = 0, detectOverrides = false)
+        assertNull(result.lastAcknowledged)
+        assertEquals(WriteStatus.REFUSED, result.lastResult?.status, "the caller still needs the status")
+    }
+
+    /**
+     * Stores `requested + offset`, but only makes it visible on the NEXT write — so the read-back
+     * inside `write()` sees the previous frame's value, exactly like an asynchronous provider.
+     */
+    private class LaggingBrightness(private val offset: Int) : ScreenBrightnessController {
+        val writes = mutableListOf<Int>()
+        var foreign: Int? = null
+        private var visible = 0
+        private var pending: Int? = null
+        /** The write lands here — AFTER its own read-back, BEFORE the next band read. */
+        fun settle() { pending?.let { visible = it }; pending = null }
+        override fun read(): Int = foreign ?: visible
+        override fun write(level: Int): BrightnessWriteResult {
+            pending = level + offset
+            writes += level
+            return ackWrite(level, visible) // the read-back still sees the PREVIOUS value
+        }
+        override fun forceManualMode() = true
+        override fun restoreMode() = Unit
+        override fun isManualMode() = true
+        override fun isSelfWrite(rawDeviceValue: Int) = false
+        override fun clearSelfWriteMarker() = Unit
+    }
+
     /** Every write is REFUSED, so no frame is ever acknowledged. */
     private class RefusingBrightness : ScreenBrightnessController {
         override fun read(): Int = 0

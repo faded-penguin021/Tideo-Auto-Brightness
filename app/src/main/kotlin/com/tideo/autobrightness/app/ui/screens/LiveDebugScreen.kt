@@ -233,25 +233,26 @@ private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
     }
 }
 
-/**
- * DC-007: the continuous write record, plus the last override event when one exists. The card
- * identifies a MECHANISM CLASS — a clamp, a refusal, a mode conflict, which detector fired — and
- * never the writer, which nothing in the app can establish.
- */
+/** DC-007: identifies a mechanism CLASS — clamp, refusal, mode conflict — never the writer. */
 @Composable
 private fun BrightnessWriteCard(p: PipelineState) {
-    val write = p.lastBrightnessWrite ?: return
+    val write = p.lastBrightnessWrite
+    val diagnostic = p.overrideDiagnostic
+    // DC-008: either half stands alone; gating on the write record hid the diagnostic.
+    if (write == null && diagnostic == null) return
     DiagnosticCard("Brightness Writes", "debug_write_card") {
-        Metric(
-            "Requested → acknowledged",
-            "${write.requestedDomain} → ${write.acknowledgedDomain ?: "—"}",
-            "debug_write_roundtrip",
-        )
-        Metric("Write status", write.status.name, "debug_write_status")
-        Metric("Raw requested", write.requestedRaw.toString(), "debug_write_raw")
-        // The value Tideo converts with — one domain step is round(deviceMax / 255) raw.
-        Metric("Device max", write.deviceMax.toString(), "debug_write_device_max")
-        p.overrideDiagnostic?.let { d ->
+        write?.let {
+            Metric(
+                "Requested → acknowledged",
+                "${it.requestedDomain} → ${it.acknowledgedDomain ?: "—"}",
+                "debug_write_roundtrip",
+            )
+            Metric("Write status", it.status.name, "debug_write_status")
+            Metric("Raw requested", it.requestedRaw.toString(), "debug_write_raw")
+            // The value Tideo converts with — one domain step is round(deviceMax / 255) raw.
+            Metric("Device max", it.deviceMax.toString(), "debug_write_device_max")
+        }
+        diagnostic?.let { d ->
             Metric("Last override", "${d.disposition.name} (${d.source.name})", "debug_override_disposition")
             Metric(
                 "Observed / settled / expected",
@@ -259,6 +260,7 @@ private fun BrightnessWriteCard(p: PipelineState) {
                 "debug_override_values",
             )
             Metric("Mode at commit", if (d.manualMode) "Manual" else "Not manual", "debug_override_mode")
+            Metric("Override seen", lastSampleLabel(d.timestampMs), "debug_override_age")
         }
     }
 }

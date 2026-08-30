@@ -139,3 +139,30 @@
   a coherent single-consumer snapshot and loose fields admit combinations that cannot occur; two rather
   than one because collapsing them loses the normalization readout in exactly the well-behaved case.
   They identify the mechanism CLASS, never the writer — nothing in the app can identify that.
+
+- DC-008 [cited]: **The band detector's self-explanation now shifts with the provider, not just the
+  last acknowledgement — the DC-004 exact match only covered a SYNCHRONOUS device.** With a provider
+  that applies a write a frame late, the read-back inside `write()` returns the PREVIOUS frame's
+  value, so every band read differed from the acknowledgement by one frame step and every sweep on a
+  normalizing device still tripped — the #126 shape surviving its own fix, and an asymmetric sibling
+  gate against `isSelfWrite`, which this train had already taught to match a set. The band is now
+  SHIFTED by `acknowledgedDomain - requestedDomain` of the latest acknowledged frame, which explains
+  a clamped range and a lagging one alike and is exactly today's band on a device that stores what it
+  is given. Four sibling defects went with it: `AnimationOutcome` carries `lastResult` (any status),
+  so a sweep of unacknowledged or refused frames follows the same baseline rule as the two direct
+  write sites instead of freezing the baseline; the abort path no longer null-clobbers
+  `lastBrightnessWrite`; `hibernate()` nulls `lastAppliedBrightness`, because a stale non-null
+  baseline is neither treated as unknown nor true of the screen, which is what made the wake path's
+  second event pause; and the commit re-checks `detectOverrides` after the settle, which the monitor
+  gated but the commit did not.
+
+- DC-009 [cited]: **Reclaiming MANUAL is itself a brightness event, and it must be ordered and
+  suppressed like one.** Flipping the mode back makes many OEM builds re-assert `SCREEN_BRIGHTNESS`;
+  that write is not one of ours, so it returned as a NEW override which — the mode now being MANUAL —
+  passed the very gate that had just dismissed the first one, handing #127 back one event later.
+  `reclaimManualMode()` therefore arms the F64/DB-082 settle window before `forceManualMode()`, as
+  every other Tideo-initiated transition does. The reclamation also had to move BEFORE the drift
+  check: the framework's own auto-brightness frequently lands within the ±1 deadband, so ordering
+  drift first dismissed the event as harmless and left the device in AUTOMATIC indefinitely, since
+  `runCycle` only reclaims the mode when the target actually changes. Disposition reporting is
+  unchanged — `DISMISSED_DRIFT` still wins — but the recovery no longer depends on it.

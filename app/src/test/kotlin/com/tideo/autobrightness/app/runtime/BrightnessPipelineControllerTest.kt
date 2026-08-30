@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.runtime
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
+import com.tideo.autobrightness.platform.brightness.WriteStatus
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSample
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
@@ -41,6 +42,7 @@ class BrightnessPipelineControllerTest {
     /** [normalize] models an OEM that stores something other than what we asked for. */
     private class FakeBrightness(
         private val normalize: (Int) -> Int = { it },
+        private val status: WriteStatus = WriteStatus.ACKNOWLEDGED,
     ) : ScreenBrightnessController {
         val writes = mutableListOf<Int>()
         var current = 0
@@ -55,7 +57,8 @@ class BrightnessPipelineControllerTest {
             current = stored
             lastWrite = stored
             writes += level
-            return ackWrite(level, stored)
+            return if (status == WriteStatus.ACKNOWLEDGED) ackWrite(level, stored)
+            else unlandedWrite(level, status)
         }
         override fun forceManualMode(): Boolean {
             manualModeForced++
@@ -833,6 +836,26 @@ class BrightnessPipelineControllerTest {
         val diagnostic = controller.state.value.overrideDiagnostic
         assertEquals(OverrideSource.ANIMATION_BAND, diagnostic?.source)
         assertEquals(9, diagnostic?.observed, "the read that tripped the detector, not a later re-read")
+        // DC-004: without the pre-post baseline refresh this PAUSES, so pin the disposition too.
+        assertEquals(brightness.current, controller.state.value.lastAppliedBrightness)
+        assertEquals(OverrideDisposition.DISMISSED_DRIFT, diagnostic?.disposition)
+        assertFalse(controller.state.value.paused, "our own aborted sweep must not pause the pipeline")
+        scope.cancel()
+    }
+
+    // DC-008: unconfirmed frames must follow the same baseline rule as the direct-write path.
+    @Test
+    fun animatedCycleWithUnacknowledgedFrames_recordsTheRequestedBaseline() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness(status = WriteStatus.WRITTEN_UNACKNOWLEDGED)
+        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val st = controller.state.value
+        assertEquals(brightness.writes.last(), st.lastAppliedBrightness, "requested is the only estimate")
+        assertEquals(WriteStatus.WRITTEN_UNACKNOWLEDGED, st.lastBrightnessWrite?.status)
         scope.cancel()
     }
 

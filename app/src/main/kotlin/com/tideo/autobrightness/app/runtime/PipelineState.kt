@@ -58,8 +58,7 @@ data class PipelineState(
     val lastAppliedBrightness: Int? = null,
     // D-109: perceived brightness (un-floored); darkened by secure layer if needed.
     val targetBrightness: Int? = null,
-    // DC-007: continuous (every cycle that writes), so requested-vs-acknowledged is readable on a
-    // device that never fires an override at all.
+    // DC-007: continuous, so it is readable on a device that never fires an override.
     val lastBrightnessWrite: BrightnessWriteResult? = null,
     // DC-007: event-scoped, written where an override is detected OR dismissed.
     val overrideDiagnostic: OverrideDiagnostic? = null,
