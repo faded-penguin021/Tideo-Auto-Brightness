@@ -284,3 +284,42 @@
   precisely the hypothesis DC-018's settled reading tests. It is a lead and not evidence: the 161
   and the card reading were taken at different moments in the round, and the raw could equally be
   slider residue from before the app last wrote.
+
+- DC-021: **The best remaining explanation is that the 0–4095 scale lives BELOW the app-facing
+  Settings API rather than inside Tideo.** On that reading OxygenOS keeps AOSP's 0–255 contract for
+  `Settings.System.SCREEN_BRIGHTNESS` as apps see it and stores a 12-bit value underneath, so
+  Tideo's identity branch is right and the shell's `settings get` reports the stored scale rather
+  than the app's — domain 10 written, 10 read back, 161 in the shell. It accounts for everything
+  observed at once: the card, the slider, the byte-identical 1.9.2 behaviour, and the absence of the
+  per-cycle re-sweep the rival model requires, since a `read()` returning 161 against a target of 10
+  would re-animate every cycle forever and the owner reports none. It also rehabilitates DC-010's
+  arithmetic while relocating its attribution — the 10b injections were 1 and 3 domain apart, not
+  the 20 DC-014 computed, because the shell's 181 and 201 reach the app as 11 and 13. **It stays a
+  hypothesis:** every reading so far is consistent with it and none is consistent ONLY with it, and
+  §2 10d driven at the top of the domain is what separates it from a real ceiling.
+
+- DC-022: **A model that explains a quiet half is still not a reading of it, so §2 10b stays
+  re-opened.** DC-021 predicts the observed quiet-then-pause exactly and it is tempting to call 10b
+  passed on the strength of that fit, but DC-015 already names why the inference is unavailable: a
+  quiet half is `handleOverride` judging the value and the monitor never delivering it wearing one
+  face, and the fit is equally good either way. Marking it passed would certify a check that may
+  never have run, to save one observation the re-run takes anyway — "Last override" after each half,
+  where a fresh `DISMISSED_DRIFT` is the pass. What DC-021 does change is the framing: DC-014's
+  "unexplained, not correct" overstated it, because a correct build now has a natural account of
+  that silence, and the re-run decides between the account and the drop.
+
+- DC-023: **`deviceMax`, `requestedRaw` and `acknowledgedRaw` all name hardware, and every one of
+  them is an app-facing Settings API value.** `deviceMax` is `config_screenBrightnessSettingMaximum`
+  and the other two bracket `Settings.System.SCREEN_BRIGHTNESS`, so `settingsApiMax`,
+  `requestedSettingValue` and `readBackSettingValue` — with the Live Debug labels moving to
+  "Settings API max" and "Settings value requested" — describe what the code actually reads
+  whichever way DC-021 resolves; this is a naming defect in its own right, not a consequence of the
+  hypothesis, and the present names are what made DC-014 read a provider number as the app's. It is
+  deferred to AFTER the round rather than taken now, because §2 10b and 10d cite those two card
+  labels verbatim and the owner would be reading a script that no longer matches the APK in hand.
+
+- DC-024: **`screen_brightness_float` does not exist on the owner's device** — `settings get system
+  screen_brightness_float` returns `null` (owner, 2026-08-30), so the float half of §2 10d's reading
+  is dead there and the settled integer alone carries the verdict. Consistent with DC-021, where the
+  OEM has replaced the platform float path with its own 12-bit integer rather than layering on it,
+  though a missing setting is weak evidence for anything on its own.

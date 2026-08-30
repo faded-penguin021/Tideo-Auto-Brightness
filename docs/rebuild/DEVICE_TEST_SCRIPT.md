@@ -153,24 +153,39 @@ optional.
     settles that **both are right**: the framework config really is 255 (no overlay), so the app
     converts on the identity branch and the 0–4095 scale is OEM-private.
 
-    **The remaining question is whether the OEM normalizes our write, and only a SETTLED reading
-    answers it (DC-018).** Do NOT pair the card's "Current brightness" with `settings get system
-    screen_brightness` at one instant — the card is app DOMAIN and adb is provider RAW, and a ratio
-    near 16 is produced both by the app converting and by the provider rescaling an identity write,
-    so it separates nothing. Instead drive the top of the domain as above, let it **fully settle**
-    (several seconds after the sweep ends, no further cycle writing), then:
+    **The remaining question is whether the scale below the app API rescales our write, and only a
+    SETTLED reading answers it (DC-018, DC-021).** Do NOT pair the card's "Current brightness" with
+    `settings get system screen_brightness` at one instant — the card is app DOMAIN and adb is the
+    stored value, and a ratio near 16 is produced both by the app converting and by the layer below
+    it rescaling an identity write, so it separates nothing.
+
+    **TIDEO must be what put the brightness at the top — this is the whole step (2026-08-30).** A
+    reading taken after dragging the system slider to maximum measures the slider, not the app, and
+    one was mistaken for a result once already. So: service running, override detection on, **not
+    paused**, then force the top from the app side (bright room, or raise Min/Max Brightness), let
+    the sweep end and **fully settle** for several seconds, touch nothing, and record what drove it.
+    Then read both the card and:
 
     ```
     adb shell settings get system screen_brightness
-    adb shell settings get system screen_brightness_float
     ```
 
-    **Read it as:** settled int near **4095** with float near **1.0** — the OEM rescales Tideo's
-    255-scale write asynchronously, there is no top-of-curve ceiling, and the card's ACKNOWLEDGED
-    read-back is simply the pre-rescale echo. Settled int stuck near **255** with float near **0.06**
-    — the ceiling is real and the top 94% of the panel is unreachable. `screen_brightness_float` may
-    be absent on some builds (`null`); the int alone still separates the two. Report all the numbers
-    and change no setting to "fix" it.
+    **The record to fill in**, and what the pair means:
+
+    | Field | Source | Expected under DC-021 | Expected if the ceiling is real |
+    |---|---|---|---|
+    | Requested → acknowledged | card | `255 → 255` | `255 → 255` |
+    | Write status | card | `ACKNOWLEDGED` | `ACKNOWLEDGED` |
+    | Device max | card | `255` | `255` |
+    | Raw requested | card | `255` | `255` |
+    | Settled stored value | adb | **≈ 4095** | **≈ 255** |
+
+    Only the last row moves, and it is the verdict. **≈ 4095:** the 0–4095 scale sits below the app
+    API, Tideo's whole 0–255 domain reaches the whole panel, and the card's five 255s are the normal,
+    correct record of that — not a 6.2% ceiling. **≈ 255:** the ceiling is real and the top 94% of
+    the panel is unreachable. `screen_brightness_float` is **`null` on the owner's device** (DC-024),
+    so do not wait on it; where it does exist, ≈1.0 and ≈0.06 corroborate the two columns. Report
+    every number and change no setting to "fix" it.
 
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 
