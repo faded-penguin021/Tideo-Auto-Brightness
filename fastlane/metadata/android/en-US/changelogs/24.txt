@@ -1,1 +1,3 @@
-Debug tools: the Graph Metrics level (Live Debug level 7) again times how long each graph takes to (re)draw, instead of reporting a pipeline timing that belonged elsewhere.
+Fixes false "Manual Override Detected" pauses on devices whose display driver stores a slightly different brightness than the app asked for. The app now tracks what Android actually stored, tolerates one step of rounding drift, and treats a change made while adaptive brightness is on as ambiguous rather than as your input.
+
+Debug tools: Graph Metrics (Live Debug level 7) again times graph redraws, and a new Brightness Writes card shows requested vs stored values.

@@ -45,9 +45,10 @@ sequentially and each ends ladder-green, committed and pushed.
       baselines, settle floor, ±1 commit deadband, mode-aware attribution (DC-004…DC-007). The plan's
       segments C and D are merged: they rewrite the same two functions, and splitting them would leave
       `handleOverride`'s new `source` parameter unused across a commit boundary.
-- [ ] E — change 7c: the Live Debug write/diagnostic card.
-- [ ] F — recording: `parity_gaps.md`, device checks, semver call, changelog. Ledger rows land with
-      the segment that cites them, not here — a citation must resolve at every commit.
+- [x] E — change 7c: the Live Debug **Brightness Writes** card.
+- [x] F — recording: `parity_gaps.md` dev-01/dev-02, device checks §2 10b–10d, `changelogs/24.txt`,
+      semver put to the owner below. Ledger rows landed with the segment that cites them, not here —
+      a citation must resolve at every commit.
 
 Change 6 is WITHDRAWN by the plan and `INITIAL_SETTLE_MS` stays 1500. The plan file is **retained by
 owner instruction (2026-08-30)**, not deleted at the final segment as playbook 5 would have it; its
@@ -93,7 +94,18 @@ AGENTS.md says trust the code over a document that disagrees with it.
    the graph should NOT (unchanged data is deduped). The JVM tests cover the dedupe and the level-7
    gate; only the on-device flash is unverifiable locally (no emulator). (DC-001.)
 
-Open questions — **[2026-08-30] When our write's read-back comes back changed, is that the OEM
+Open questions — **[2026-08-30] Is 1.9.3 still a patch, or should this train ship as 1.10.0?** The
+2026-08-26 patch call covered only the Graph Metrics fix. Since then this branch has added a new
+user-facing Live Debug card (**Brightness Writes**) and changed behaviour on the pause path: some
+brightness changes that used to pause the pipeline now do not. RUNBOOK §6 says pick the highest
+category that applies, and a new user-facing surface reads as **minor**. Options: (a) `1.10.0` /
+vc24 — matches §6 as written; (b) keep `1.9.3` / vc24 on the grounds that the card is a diagnostic
+inside an existing debug screen and the rest is a bug fix. **Recommendation: (a).** The pause-path
+change is what a user would notice, and §6 exists to stop patch being the reflex. Nothing is blocked
+either way — `versionCode` is 24 under both, so `changelogs/24.txt` is already correct and only
+`versionName` in `app/build.gradle.kts` would move. Left at `1.9.3` pending the owner (D-167 7(c)).
+
+**[2026-08-30] When our write's read-back comes back changed, is that the OEM
 clamping us, or someone else writing in the same instant?** The app cannot tell, and the two want
 opposite handling. Treating it as the OEM (what the branch does now) is what stops the #126 false
 pauses; the cost is that a brightness change landing in the sub-millisecond gap between our `putInt`
@@ -136,10 +148,16 @@ able to fail on a well-behaved phone, and every earlier round through vc22 (DB-0
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-30 — **Executed the #126/#127 override-attribution plan** (DC-002…DC-007). `write()` is a
+  transaction reporting what Android STORED; both detectors and the baseline now use that
+  acknowledgement; the commit guard gained a ±1 domain deadband and a `MIN_SETTLE_MS` yield floor; a
+  non-MANUAL mode dismisses and reclaims instead of pausing (Tasker deviation, `parity_gaps.md`
+  dev-01/dev-02); `OverrideDetected` carries its detector source; and Live Debug gained a
+  **Brightness Writes** card. The plan's change 3 was NOT implemented as written — see Active work.
+  Device checks are §2 10b–10d. Semver is an open question below.
 - 2026-08-30 — Owner-approved #126/#127 override plan recorded as
-  `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` and now executing here; RUNBOOK 4/5 give plans one home
-  and cover cross-session handoff. Added the `## Active work` segment checklist and ran the DA-004
-  compression pass it owed.
+  `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md`; RUNBOOK 4/5 give plans one home and cover cross-session
+  handoff. Added the `## Active work` segment checklist and ran the DA-004 compression pass it owed.
 - 2026-08-26 — Version bump to `1.9.3` / vc24 (patch, owner-decided — a miscategorisation fix) plus
   `fastlane/…/changelogs/24.txt`; one on-device check pending (Owner queue item 4).
 - 2026-08-26 — Restored Graph Metrics debug (%AAB_Debug 7) to timing chart (re)draws, deduped by a

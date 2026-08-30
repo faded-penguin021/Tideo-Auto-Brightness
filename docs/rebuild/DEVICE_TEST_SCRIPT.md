@@ -66,6 +66,43 @@ optional.
     times touching nothing, expecting no pause. **On any other device this observes nothing** — it
     passes whether the fix is present or absent, so record it as SKIPPED, never as evidence.
 
+10b. **The deadband boundary (DC-005, issue #126).** Injected, so it fails on a device that never
+    shows the bug. **Mind the coordinate systems:** `settings put system screen_brightness` takes
+    RAW device values, while the app's `lastAppliedBrightness` is DOMAIN 0–255. Never type a domain
+    number into these commands.
+
+    First read `deviceMax` from Live Debug → **Brightness Writes** → "Device max". That is
+    `config_screenBrightnessSettingMaximum`, the value Tideo actually converts with — **not** the
+    largest raw value the device will store, which may be smaller and is precisely the suspected
+    fault. One domain step = `round(deviceMax / 255)` raw. With the service running and one cycle
+    completed:
+
+    ```
+    adb shell settings get system screen_brightness      # current raw, call it R
+    adb shell settings put system screen_brightness <R ± one step>
+    ```
+
+    **Expected:** NO pause — one domain step is representational drift. **Then the control:** the
+    same command with **twice** that offset. **Expected:** it DOES pause. A build quiet for both has
+    disabled detection, not fixed anything — FAIL it.
+10c. **Mode conflict dismisses instead of pausing (DC-006, issue #127).** Service running, override
+    detection on.
+
+    ```
+    adb shell settings put system screen_brightness_mode 1
+    adb shell settings put system screen_brightness <a clearly different raw value>
+    ```
+
+    **Expected:** NO pause, no "manual override" notification, and the app flips the mode back —
+    `adb shell settings get system screen_brightness_mode` reads `0` within a cycle. **Control:**
+    with the mode already `0`, the same brightness write MUST pause as in step 8.
+10d. **Normalization readout (diagnostic, not pass/fail).** Live Debug → **Brightness Writes**, at
+    the TOP of the curve (bright room, or raise Min/Max Brightness so a high value is written). Let
+    one cycle complete; this needs no override to have fired. Record "Requested → acknowledged",
+    the status, and "Device max". **A requested value above the acknowledged one at the top of the
+    range means the advertised maximum disagrees with what the provider stores, and the top of that
+    user's curve is silently flat.** Report the three numbers; do not change any setting to "fix" it.
+
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 
 11. Turn the screen off, wait ~10 s, turn it on. **Expected:** sensing resumes; an initial brightness is
