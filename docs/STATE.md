@@ -16,7 +16,7 @@ adds super dimming and Privileged Display.
 Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LEDGER_C.md`.
 
 **Resuming cold?** **v1.9.2/vc23 is the newest release** — tag `v1.9.2` → `c7c96dc` on `main`
-(`git ls-remote --tags origin` settles it). This branch is at **`1.9.3` / vc24** with
+(`git ls-remote --tags origin` settles it). This branch is at **`1.10.0` / vc24** with
 `fastlane/…/changelogs/24.txt`, carrying the Graph Metrics restoration (DC-001), the LEDGER_C
 rollover, a test-only warning cleanup, and the executed #126/#127 override-attribution work
 (DC-002…DC-009), whose plan `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` is **retained by owner
@@ -44,7 +44,7 @@ than a retained score or CI gate.
 2. **Nothing to do — issues #123, #126 and #127 get no reply.** Owner's decision (2026-08-24 for
    #123, carried forward by the plan); nothing was posted, and do not comment without the owner
    saying so first (DB-082).
-3. **Verify the Graph Metrics debug flash on a device (1.9.3-debug vc24).** Live Debug level 7, any
+3. **Verify the Graph Metrics debug flash on a device (1.10.0-debug vc24).** Live Debug level 7, any
    graph screen: a `[Graph Metrics] redraw X.Yms` flash per (re)generation — editing a curve setting
    re-flashes, scrub-dragging does NOT (deduped). Only the flash is unverifiable locally (DC-001).
 4. **Run device checks §2 10b–10d for the override work.** Each injects its trigger and has a
@@ -53,29 +53,25 @@ than a retained score or CI gate.
    the top of the curve. Read `deviceMax` off the new Live Debug card; 10b's commands take RAW values
    while the app reports DOMAIN 0–255 (DC-002…DC-009).
 
-Open questions, all raised 2026-08-30 and none blocking:
+5. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
+   tests.** Nothing today covers `ChartCanvas` calling the sink, the sink being null below level 7, or
+   the signature dedupe suppressing a repeat draw; the one test that looks like it does passes
+   unchanged on `b462e56`, which is why item 3 is still the only evidence for the feature. Contained
+   Compose work, to be picked up as its own unit (DC-001).
 
-- **Patch or minor?** This train adds a user-facing Live Debug card and changes the pause path, and
-  RUNBOOK §6 says take the highest category that applies. Options: (a) `1.10.0`; (b) keep `1.9.3` as
-  diagnostic-plus-bugfix. **Recommendation (a)** — the pause-path change is what a user notices.
-  `versionCode` is 24 either way, so only `versionName` moves; left at `1.9.3` pending you.
-- **A foreign write landing between our `putInt` and its read-back is adopted as ours**, so that one
-  override is missed until the next cycle re-points the marker. Not fully fixable — a clamping device
-  deviates by hundreds of raw units, so no tolerance admits the clamp while excluding a slider move.
-  Options: (a) keep it; (b) adopt only within N raw units, a number nothing justifies which would not
-  cover the suspected clamp; (c) decide from 10d. **Recommendation (a), revisit under (c)** — the
-  window is sub-millisecond and self-corrects, while #126 fires on ordinary use (DC-003).
-- **On a clamping device every cycle re-sweeps forever.** `runCycle` compares the engine's target
-  against `brightness.read()`, which never agree where the provider stores something else, so each
-  cycle sweeps without changing the screen — pre-existing, no wrong pause (the deadband holds), but
-  permanent on the reported hardware and a battery cost. Options: (a) leave it and let the new card
-  report it, the plan's own choice when it rejected auto-learning the device maximum; (b) skip the
-  sweep when the target's last write was acknowledged at the value already on screen; (c) decide from
-  10d. **Recommendation (a) now, (b) if 10d confirms a clamp** — (b) needs its own change and tests.
+Open questions: none — the owner answered all three on 2026-08-30.
 
-Also: the Graph Metrics wiring has **no test** — nothing covers `ChartCanvas` calling the sink, the
-null sink off level 7, or the dedupe — so item 3 is its only evidence. Adding those Compose tests is
-contained work, left undone here as outside the #126/#127 plan.
+**Decided 2026-08-30 (owner).** This train ships as a **minor**, `1.10.0` / vc24, now set in
+`app/build.gradle.kts`; `changelogs/24.txt` was already correct since the code did not move. The two
+attribution trades are **deferred until the owner has tested the debug APK**, and are deliberately
+left as built until then: (a) a foreign write landing between our `putInt` and its read-back is
+adopted as ours, so that one override is missed until the next cycle re-points the marker — not fully
+fixable, since a clamping device deviates by hundreds of raw units and no tolerance admits the clamp
+while excluding a slider move (DC-003); and (b) on a clamping device `runCycle` compares the target
+against a normalized `read()`, so every cycle re-sweeps without changing the screen — pre-existing, no
+wrong pause (the deadband holds), but permanent on such hardware and a battery cost. Device check 10d
+is what settles both. Do not "fix" either speculatively; the plan rejected auto-learning the device
+maximum for the same reason.
 
 Everything raised through 2026-08-26 is closed, its detail in the named rows — the LEDGER_C
 rollover, DB-081, DB-085, the vc23 device rounds now in `DEVICE_TEST_SCRIPT.md` §7 21a and §11 39d
@@ -105,6 +101,9 @@ owed fresh-context review of `b462e56..HEAD` is discharged by this train's two a
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-30 — Owner decided this train is a **minor**: `versionName` 1.9.3 → **1.10.0**, vc24
+  unchanged, so `changelogs/24.txt` still applies. The two attribution trades and the Graph Metrics
+  test gap are deferred by the owner pending a debug-APK round (Owner queue).
 - 2026-08-30 — **Executed the #126/#127 override-attribution plan** across six segments
   (DC-002…DC-009). `write()` is a transaction reporting what Android STORED; both detectors and the
   baseline use that acknowledgement, the animation band shifting by the provider's normalization

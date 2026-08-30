@@ -121,7 +121,7 @@ These are places where the shipped app knowingly departs from the Tasker source.
 rows above, they are not defects awaiting a fix — each was argued and accepted, and the ledger row
 carries the reasoning.
 
-### dev-01 — override commit consults `SCREEN_BRIGHTNESS_MODE` (DC-006, 1.9.3)
+### dev-01 — override commit consults `SCREEN_BRIGHTNESS_MODE` (DC-006, 1.10.0)
 
 task567 / prof755 decide a manual override from the observed brightness alone; they never look at
 the brightness mode. Tideo now does: if the mode is not MANUAL when the pause would commit,
@@ -137,7 +137,7 @@ does not pause, for the same reason.
 Tasker had no equivalent situation to model: it ran as the only writer on a device the user had
 configured for it. Reported as issue #127.
 
-### dev-02 — the commit guard tolerates ±1 domain unit (DC-005, 1.9.3)
+### dev-02 — the commit guard tolerates ±1 domain unit (DC-005, 1.10.0)
 
 task567 act8 re-reads and compares for equality. Tideo compares with a one-domain-unit deadband,
 because on a device whose raw range is 3000+ one domain step is 12–16 raw units and any round trip
