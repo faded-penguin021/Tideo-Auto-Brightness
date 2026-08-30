@@ -82,12 +82,21 @@ optional.
     largest raw value the device will store, which may be smaller and is precisely the suspected
     fault.
 
-    **Convert, do not step (DC-010).** A fixed raw offset is not a fixed domain distance, so never
-    inject one. At M = 4095 a domain step is 16.06 raw: a round `+20` lands 1 domain step from about
-    three quarters of the raw values and 2 from the rest, one step of `+16` quantises to 0 at 14 of
-    them and tests nothing, and even a doubled `+32` quantises back to 1 at 28 of them — which would
-    FAIL a correct build. Pick the raw value for the domain value you want. With the service running
-    and one cycle completed:
+    **M is what the app converts with, which is not necessarily what the provider accepts (DC-014).**
+    Read M off the card, then measure the provider's real range separately — drag the system
+    brightness slider to maximum and run `adb shell settings get system screen_brightness`. On the
+    owner's phone the card reads **255** while the slider reports **4095**: the app resolved the AOSP
+    default and drives the whole curve inside the bottom 6% of the panel. Where the two disagree,
+    these injections are in PROVIDER units while the deadband is in the app's, so record both numbers
+    before reading any result of this check.
+
+    **Convert, do not step (DC-010).** Where M ≠ 255 a fixed raw offset is not a fixed domain
+    distance, so never inject one. On a hypothetical M = 4095 device a domain step is 16.06 raw, so a
+    round `+20` lands 1 domain step from about three quarters of the raw values and 2 from the rest,
+    a single step of `+16` quantises to 0 at 14 of them and tests nothing, and even a doubled `+32`
+    quantises back to 1 at 28 of them — which would FAIL a correct build. Pick the raw value for the
+    domain value you want; at M = 255 the conversion is the identity and `raw(n) = n`. With the
+    service running and one cycle completed:
 
     ```
     adb shell settings get system screen_brightness   # current raw, call it R
@@ -98,9 +107,15 @@ optional.
 
     **Expected:** NO pause — one domain step is representational drift and the ±1 deadband is
     inclusive. **Then the control:** `raw(d + 2)`. **Expected:** it DOES pause. A build quiet for
-    both has disabled detection, not fixed anything — FAIL it. Both directions were verified on
-    1.10.0-debug vc24 (owner, 2026-08-30) on an M = 4095 panel, at domain 10 → 11 (quiet) and
-    11 → 13 (pause).
+    both has disabled detection, not fixed anything — FAIL it.
+
+    **Record the disposition after each half, not just whether it paused (DC-015).** Live Debug →
+    **Brightness Writes** → "Last override" and "Override seen". A quiet half is two different
+    events wearing one face: a fresh `DISMISSED_DRIFT` means `handleOverride` ran and judged it,
+    while a stale or absent timestamp means the monitor never delivered the event at all — a closed
+    gate, the F64/DB-082 settle window, or the DC-003 self-write adoption. Only the first is this
+    check passing. **NOT yet verified on a device:** the 2026-08-30 round was read under a wrong M
+    and is being re-run (STATE Owner queue).
 10c. **Mode conflict dismisses instead of pausing (DC-006, issue #127).** Service running, override
     detection on, and **not already paused** — check "Manual override" as in 10b (DC-012).
 
@@ -127,6 +142,16 @@ optional.
     the status, and "Device max". **A requested value above the acknowledged one at the top of the
     range means the advertised maximum disagrees with what the provider stores, and the top of that
     user's curve is silently flat.** Report the three numbers; do not change any setting to "fix" it.
+
+    **Add a fourth number, and take it from the system, not from adb (DC-014).** Drag the system
+    brightness slider to maximum, then `adb shell settings get system screen_brightness`. This is the
+    provider's real ceiling, and it is the one number the app cannot get wrong by misreading a
+    resource: an `adb settings put` can be clamped or overwritten by auto-brightness, whereas the
+    system's own slider writes what the platform believes its range to be. **"Device max" below this
+    is the defect, not a rounding question** — Tideo then converts with the smaller number, its whole
+    0–255 domain lands inside the low end of the panel, and `toDomain` clamps everything above the
+    advertised max to 255, so override detection goes blind across the rest of the slider. On the
+    owner's phone (2026-08-30) the card read 255 against a slider maximum of 4095.
 
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 

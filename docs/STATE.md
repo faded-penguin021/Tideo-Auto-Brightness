@@ -21,8 +21,9 @@ Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LE
 rollover, a test-only warning cleanup, and the executed #126/#127 override-attribution work
 (DC-002…DC-009), whose plan `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` is **retained by owner
 instruction (2026-08-30)** rather than deleted at its final segment as playbook 5 would have it. All
-six segments landed, the durable content is in the ledger, and two non-blocking items are open
-below after the 2026-08-30 device round. No round script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
+six segments landed and the durable content is in the ledger, but the 2026-08-30 device round found
+that the app converts brightness with the wrong device maximum — an open question below, and the
+reason §2 10b is re-opened. No round script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
 force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input rather
 than a retained score or CI gate.
 
@@ -44,26 +45,14 @@ than a retained score or CI gate.
 2. **Nothing to do — issues #123, #126 and #127 get no reply.** Owner's decision (2026-08-24 for
    #123, carried forward by the plan); nothing was posted, and do not comment without the owner
    saying so first (DB-082).
-3. **One device check is left — §2 10d, which the owner runs the day after 2026-08-30 on
-   1.10.0-debug vc24.** Everything else in the override round is done. **A session receiving this
-   result needs no context beyond this item.** The owner reports three numbers off Live Debug →
-   **Brightness Writes**, read at the TOP of the curve (a bright room, or raise Min/Max Brightness so
-   a high value gets written) after one cycle completes: "Requested → acknowledged", "Write status"
-   and "Device max". The panel is 12-bit, so expect a device max near 4095.
-
-   **What the numbers mean.** Requested equal to acknowledged means the provider stores what Tideo
-   asks for, and both deferred attribution trades close as not applying to this hardware. **Requested
-   above acknowledged at the top of the range is the finding:** the advertised maximum disagrees with
-   what the provider stores, the top of the user's curve is silently flat, and both trades are live —
-   (a) a foreign write landing between our `putInt` and its read-back is adopted as ours, and (b)
-   `runCycle` re-sweeps every cycle without changing the screen. **Do not "fix" either speculatively
-   and do not auto-learn the device maximum:** the plan rejected that, the owner deferred both
-   deliberately, and a feedback loop against an OEM clamp is worse than the bug. Record the numbers
-   and put any proposed change to the owner first (DC-003, DC-002…DC-009).
-
-   **While that screen is open, one free glance closes 10c outright:** "Last override" should read
-   `DISMISSED_MODE`. 10c already passed on the outcome alone (below), so this only removes its one
-   remaining caveat — it is not a blocker (DC-011, DC-013).
+3. **Two device readings are left (1.10.0-debug vc24), and both feed the open question below.**
+   **§2 10d** is largely answered already by the card the owner read after 10c — `Requested →
+   acknowledged: 10 → 10`, `ACKNOWLEDGED`, `Device max: 255` against a system-slider maximum of
+   `4095` — so what remains is the same card at the TOP of the curve (bright room, or raise Min/Max
+   Brightness), to see whether the top goes flat as DC-014 predicts. **§2 10b must be re-run** per
+   the re-opening below, recording "Last override" after each half rather than only whether it
+   paused. **Change no conversion behaviour until the owner answers the open question** — the
+   deferred attribution trades (DC-003) and the rejection of auto-learning both still stand.
 
 4. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
    tests.** Nothing today covers `ChartCanvas` calling the sink, the sink being null below level 7, or
@@ -71,22 +60,31 @@ than a retained score or CI gate.
    unchanged on `b462e56`, which is why the owner's device observation below is still the feature's
    only evidence. Contained Compose work, to be picked up as its own unit (DC-001).
 
-Open questions: none — the owner answered all three on 2026-08-30.
+Open questions:
 
-**Device round closed 2026-08-30 (owner, 1.10.0-debug vc24).** The **Graph Metrics flash is
-verified** — the owner reports the level-7 checks all fine — which stays the feature's only evidence
-until item 4 lands. **§2 10b passed**, and more exactly than the script asked: on an M = 4095 panel
-the owner's two identical `+20` raw writes bracket the boundary, 161→181 being domain 10→11 (quiet,
-so the ±1 deadband is inclusive) and 181→201 being 11→13 (paused). Those two readings look
-contradictory and are not — the gap is quantisation, one domain step being 16.06 raw — and the check
-no longer injects raw offsets (DC-010). **§2 10c passed** on a second run the same day: mode 1 plus
-raw 4000 — domain 249, far outside the deadband — was quiet. At that distance the outcome is
-self-attributing (DC-013): had the OEM cleared the mode itself, Tideo would have read MANUAL, failed
-the drift test and PAUSED, so the DC-011 confound is answered without the card. The one way that run
-could be vacuous is a pipeline still paused from 10b's control, since the latch is sticky (DC-012);
-against that, the screen had earlier returned to raw 161, exactly `round(10 × 4095 / 255)`, so the
-app was driving and unpaused. Normalization is certainly live — the observed deltas are
-arithmetically impossible at `deviceMax` 255, 1023 or 2047.
+- **[2026-08-30] Tideo converts with a maximum of 255 on a device whose range is 0–4095 — how should
+  it learn the real one?** `Resources.getSystem()` returned the AOSP default: the card reads `Device
+  max: 255` and `Raw requested: 10` for domain 10, while the owner's system slider at maximum reads
+  `4095` from `settings get system screen_brightness`. So the whole curve is written into the bottom
+  6.2% of the panel, and `toDomain` clamps everything above 255, leaving override detection blind
+  across the upper 94% of the slider (DC-014). This is a fork rather than a fix because
+  **auto-learning the device maximum is a Decided non-item**, rejected by the #126/#127 plan.
+  Options: **(a)** a user-set "device maximum" preference defaulting to the resolved value —
+  `deviceMaxOverride` is already a constructor parameter, so it is small and never guesses;
+  **(b)** derive it from the largest value the system itself has written; **(c)** leave it and accept
+  a 6% ceiling on this hardware. **Recommendation: (a)** — it fixes a user-visible ceiling without
+  the feedback loop the plan rejected, where (b) is auto-learning under another name. Not started.
+
+**Device round 2026-08-30 (owner, 1.10.0-debug vc24).** **Graph Metrics flash: verified** — the
+owner reports the level-7 checks all fine, still the feature's only evidence until item 4 lands.
+**§2 10c: passed**, and confirmed on the card rather than inferred — `Last override: DISMISSED_MODE
+(OBSERVER)`, `Mode at commit: Not manual`, `Manual override: No`, so the pipeline was not paused and
+the run was not vacuous (DC-011…DC-013). **§2 10b: NOT passed — re-opened.** Its quiet half was
+explained here as quantisation on a 12-bit scale; the card then read `Device max: 255`, so the app
+converts on the identity branch and both `+20` injections were 20 domain apart. Far outside the
+deadband, so the quiet one is **unexplained, not correct** (DC-014). Re-run it reading "Last
+override" after each half: a fresh `DISMISSED_DRIFT` is the pass, a stale timestamp means the
+monitor dropped the event upstream (DC-015).
 
 **Decided 2026-08-30 (owner).** This train ships as a **minor**, `1.10.0` / vc24, now set in
 `app/build.gradle.kts`; `changelogs/24.txt` was already correct since the code did not move. The two
@@ -128,6 +126,13 @@ owed fresh-context review of `b462e56..HEAD` is discharged by this train's two a
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-30 — **Found `deviceMax` resolving to 255 on the owner's 0–4095 device** — the system
+  slider at maximum reads 4095 while the card reads 255 — so Tideo writes its whole domain into the
+  bottom 6.2% of the panel and cannot see a slider move above raw 255. **This corrects the entry
+  below:** 10b's quiet half was explained as quantisation on a 12-bit app scale, but the app converts
+  at 255, so that injection was 20 domain out and its silence is unexplained — 10b is re-opened, 10c
+  stands (confirmed on the card). Raised the conversion fix as an owner fork, since auto-learning the
+  maximum is a Decided non-item (DC-014, DC-015).
 - 2026-08-30 — **§2 10c passed too** (mode 1 + raw 4000, quiet). Recorded why that is attributable
   without the debug card — far outside the deadband, an OEM-cleared mode would have paused instead
   (DC-013) — and fixed the ordering trap it exposed: the pause latch is sticky and clears only on an

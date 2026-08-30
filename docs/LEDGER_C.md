@@ -200,3 +200,24 @@
   while the pause outcome is not. Quiet at a NEARBY value stays worthless, since the deadband
   dismisses it under either explanation, which is why the injected distance is now load-bearing and
   said so in the step.
+
+- DC-014: **`deviceMax` resolved 255 on a device whose provider range is 0–4095, and that
+  supersedes DC-010's account of the 2026-08-30 round.** `Resources.getSystem().getInteger(
+  config_screenBrightnessSettingMaximum)` returned the AOSP default rather than the vendor's value;
+  the owner's system slider at maximum reads `4095` from `settings get system screen_brightness`,
+  while the Live Debug card reads `Device max: 255` and `Raw requested: 10` for domain 10 — the
+  `deviceMax == 255` identity branch of `toDevice`/`toDomain`. Two consequences: the whole 0–255
+  domain is written into the bottom 6.2% of the panel, and `toDomain` clamps every provider value
+  above 255 to 255, so a slider move anywhere in the upper 94% of the range reads as a domain delta
+  of 0 and is dismissed as drift. DC-010 read the panel's 12-bit depth as the app's M and explained
+  the round's two `+20` results as quantisation; the app converts at 255, so those injections were
+  20 domain apart, both far outside the deadband, and the first one's silence is unexplained rather
+  than correct. The rule DC-010 states still holds wherever M ≠ 255 — what was wrong was verifying
+  the number the hardware has instead of the number the code uses.
+
+- DC-015: **A quiet injection is two different events wearing one face.** A check that records only
+  "did it pause" cannot separate `handleOverride` running and judging the value from the monitor
+  never delivering it — a closed gate, the F64/DB-082 settle window, or the DC-003 self-write
+  adoption — and only the first is the check passing. §2 10b now records "Last override" and
+  "Override seen" after each half, where a fresh `DISMISSED_DRIFT` is the pass and a stale or absent
+  timestamp means the event was dropped upstream.
