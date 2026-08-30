@@ -183,3 +183,20 @@
   phone) one step along, since this one does fail on a device that never clears the mode and passes
   vacuously on one that always does. The check now requires the `DISMISSED_MODE` disposition on the
   Live Debug card as its attribution and records a bare `0` as SKIPPED.
+
+- DC-012: **The pause latch is sticky, so a check that pauses disarms every check after it.**
+  `OverrideMonitor` drops an observed change when `isAlreadyPaused`, and only an explicit Resume
+  (notification action or UI) clears `paused` — no timeout, no cycle, no screen-off does. §2 10b's
+  control pauses deliberately, so running 10b then 10c in order leaves the pipeline paused and 10c
+  observes nothing while reporting exactly the quiet its pass condition asks for. Both checks now
+  open by requiring System Status → "Manual override" to read `No`. The general shape: a suite whose
+  steps mutate the state their successors gate on must re-establish that state per step, not once.
+
+- DC-013: **A confounded pass signal is often separable by a second observable the check already
+  has.** DC-011 called §2 10c unattributable because the OEM can clear `screen_brightness_mode`
+  itself, but the check's other observable settles it when the injected value is far outside the ±1
+  deadband: if the OEM had cleared the mode first, Tideo would read MANUAL, fail the drift test and
+  PAUSE, so quiet at that distance can only be the mode branch — the mode readback is confounded
+  while the pause outcome is not. Quiet at a NEARBY value stays worthless, since the deadband
+  dismisses it under either explanation, which is why the injected distance is now load-bearing and
+  said so in the step.

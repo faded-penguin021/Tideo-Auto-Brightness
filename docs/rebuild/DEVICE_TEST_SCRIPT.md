@@ -71,6 +71,12 @@ optional.
     RAW device values, while the app's `lastAppliedBrightness` is DOMAIN 0–255. Never type a domain
     number into these commands.
 
+    **Start each injection unpaused (DC-012).** Live Debug → System Status → "Manual override" must
+    read `No`; if it reads `Paused`, Resume from the notification first. The latch is sticky — only
+    an explicit Resume clears it — and a paused pipeline drops every injected event, so any later
+    check passes vacuously. This one's own control pauses on purpose, so re-check between the two
+    halves and before 10c.
+
     First read `deviceMax` from Live Debug → **Brightness Writes** → "Device max"; call it M. That
     is `config_screenBrightnessSettingMaximum`, the value Tideo actually converts with — **not** the
     largest raw value the device will store, which may be smaller and is precisely the suspected
@@ -96,20 +102,25 @@ optional.
     1.10.0-debug vc24 (owner, 2026-08-30) on an M = 4095 panel, at domain 10 → 11 (quiet) and
     11 → 13 (pause).
 10c. **Mode conflict dismisses instead of pausing (DC-006, issue #127).** Service running, override
-    detection on.
+    detection on, and **not already paused** — check "Manual override" as in 10b (DC-012).
 
     ```
     adb shell settings put system screen_brightness_mode 1
-    adb shell settings put system screen_brightness <a clearly different raw value>
+    adb shell settings put system screen_brightness <a raw value far outside the deadband>
     ```
 
     **Expected:** NO pause, no "manual override" notification, and the app flips the mode back —
     `adb shell settings get system screen_brightness_mode` reads `0` within a cycle. **That `0` does
     not on its own prove Tideo did it (DC-011):** an OEM build may clear the mode on any manual
     `screen_brightness` write, and then the expected observation arrives whether or not the reclaim
-    ran. Confirm the attribution on Live Debug → **Brightness Writes** → "Last override", which must
-    read `DISMISSED_MODE`. A `0` with no such disposition is SKIPPED, not passed. **Control:** with
-    the mode already `0`, the same brightness write MUST pause as in step 8.
+    ran. **The distance is what separates them (DC-013)** — do not use a nearby value. Far outside
+    the ±1 deadband the two explanations predict opposite outcomes: had the OEM cleared the mode
+    first, Tideo would read MANUAL, fail the drift test and PAUSE. So a quiet run at that distance
+    can only be the mode branch, and Live Debug → **Brightness Writes** → "Last override" reading
+    `DISMISSED_MODE` confirms it directly. A quiet run at a NEARBY value proves nothing either way
+    (the deadband would dismiss it regardless) — record that as SKIPPED. **Control:** with the mode
+    already `0`, the same brightness write MUST pause as in step 8. Verified on 1.10.0-debug vc24
+    (owner, 2026-08-30): mode 1 + raw 4000 on an M = 4095 panel, quiet.
 10d. **Normalization readout (diagnostic, not pass/fail).** Live Debug → **Brightness Writes**, at
     the TOP of the curve (bright room, or raise Min/Max Brightness so a high value is written). Let
     one cycle complete; this needs no override to have fired. Record "Requested → acknowledged",

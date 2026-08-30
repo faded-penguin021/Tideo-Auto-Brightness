@@ -44,13 +44,26 @@ than a retained score or CI gate.
 2. **Nothing to do — issues #123, #126 and #127 get no reply.** Owner's decision (2026-08-24 for
    #123, carried forward by the plan); nothing was posted, and do not comment without the owner
    saying so first (DB-082).
-3. **Two override checks still need a device reading (1.10.0-debug vc24); §2 10b is done.** **10d
-   is the one that matters and has not been run:** Live Debug → **Brightness Writes** at the TOP of
-   the curve, then report "Requested → acknowledged", the write status and "Device max". It settles
-   both deferred attribution trades, because a requested value above the acknowledged one is exactly
-   the clamping device they are about. **10c** needs only the same card: after the mode write, "Last
-   override" must read `DISMISSED_MODE`, because the mode returning to `0` can also be the OEM's own
-   doing and then the check proves nothing (DC-011, DC-002…DC-009).
+3. **One device check is left — §2 10d, which the owner runs the day after 2026-08-30 on
+   1.10.0-debug vc24.** Everything else in the override round is done. **A session receiving this
+   result needs no context beyond this item.** The owner reports three numbers off Live Debug →
+   **Brightness Writes**, read at the TOP of the curve (a bright room, or raise Min/Max Brightness so
+   a high value gets written) after one cycle completes: "Requested → acknowledged", "Write status"
+   and "Device max". The panel is 12-bit, so expect a device max near 4095.
+
+   **What the numbers mean.** Requested equal to acknowledged means the provider stores what Tideo
+   asks for, and both deferred attribution trades close as not applying to this hardware. **Requested
+   above acknowledged at the top of the range is the finding:** the advertised maximum disagrees with
+   what the provider stores, the top of the user's curve is silently flat, and both trades are live —
+   (a) a foreign write landing between our `putInt` and its read-back is adopted as ours, and (b)
+   `runCycle` re-sweeps every cycle without changing the screen. **Do not "fix" either speculatively
+   and do not auto-learn the device maximum:** the plan rejected that, the owner deferred both
+   deliberately, and a feedback loop against an OEM clamp is worse than the bug. Record the numbers
+   and put any proposed change to the owner first (DC-003, DC-002…DC-009).
+
+   **While that screen is open, one free glance closes 10c outright:** "Last override" should read
+   `DISMISSED_MODE`. 10c already passed on the outcome alone (below), so this only removes its one
+   remaining caveat — it is not a blocker (DC-011, DC-013).
 
 4. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
    tests.** Nothing today covers `ChartCanvas` calling the sink, the sink being null below level 7, or
@@ -66,10 +79,14 @@ until item 4 lands. **§2 10b passed**, and more exactly than the script asked: 
 the owner's two identical `+20` raw writes bracket the boundary, 161→181 being domain 10→11 (quiet,
 so the ±1 deadband is inclusive) and 181→201 being 11→13 (paused). Those two readings look
 contradictory and are not — the gap is quantisation, one domain step being 16.06 raw — and the check
-no longer injects raw offsets (DC-010). **10c's no-pause half is corroborated:** the screen returned
-to raw 161, exactly `round(10 × 4095 / 255)`, so the app was still driving and had not latched a
-pause; only the mode flip's attribution is outstanding, above. Normalization is certainly live — the
-observed deltas are arithmetically impossible at `deviceMax` 255, 1023 or 2047.
+no longer injects raw offsets (DC-010). **§2 10c passed** on a second run the same day: mode 1 plus
+raw 4000 — domain 249, far outside the deadband — was quiet. At that distance the outcome is
+self-attributing (DC-013): had the OEM cleared the mode itself, Tideo would have read MANUAL, failed
+the drift test and PAUSED, so the DC-011 confound is answered without the card. The one way that run
+could be vacuous is a pipeline still paused from 10b's control, since the latch is sticky (DC-012);
+against that, the screen had earlier returned to raw 161, exactly `round(10 × 4095 / 255)`, so the
+app was driving and unpaused. Normalization is certainly live — the observed deltas are
+arithmetically impossible at `deviceMax` 255, 1023 or 2047.
 
 **Decided 2026-08-30 (owner).** This train ships as a **minor**, `1.10.0` / vc24, now set in
 `app/build.gradle.kts`; `changelogs/24.txt` was already correct since the code did not move. The two
@@ -111,6 +128,11 @@ owed fresh-context review of `b462e56..HEAD` is discharged by this train's two a
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-08-30 — **§2 10c passed too** (mode 1 + raw 4000, quiet). Recorded why that is attributable
+  without the debug card — far outside the deadband, an OEM-cleared mode would have paused instead
+  (DC-013) — and fixed the ordering trap it exposed: the pause latch is sticky and clears only on an
+  explicit Resume, so 10b's control disarms 10c and every later injected check unless the tester
+  re-checks "Manual override" first (DC-012). Only 10d is left.
 - 2026-08-30 — **Device round on 1.10.0-debug vc24 (owner):** Graph Metrics flash verified and §2 10b
   passed; fixed the two checks the round broke. 10b injected RAW offsets to test a DOMAIN rule, so
   its control quantised back inside the deadband at 28 start values on a 12-bit panel and would have
