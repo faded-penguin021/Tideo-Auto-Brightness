@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSample
@@ -36,17 +37,33 @@ class BrightnessPipelineControllerTest {
         override fun externalChanges(): Flow<Int> = flow
     }
 
-    private class FakeBrightness : ScreenBrightnessController {
+    /** [normalize] models an OEM that stores something other than what we asked for. */
+    private class FakeBrightness(
+        private val normalize: (Int) -> Int = { it },
+    ) : ScreenBrightnessController {
         val writes = mutableListOf<Int>()
         var current = 0
         var modeRestores = 0
+        var manualModeForced = 0
+        var manualMode = true
+        var forceManualSucceeds = true
         private var lastWrite: Int? = null
         override fun read(): Int = current
-        override fun write(level: Int) { current = level; lastWrite = level; writes += level }
-        override fun forceManualMode() = Unit
+        override fun write(level: Int): BrightnessWriteResult {
+            val stored = normalize(level)
+            current = stored
+            lastWrite = stored
+            writes += level
+            return ackWrite(level, stored)
+        }
+        override fun forceManualMode(): Boolean {
+            manualModeForced++
+            if (forceManualSucceeds) manualMode = true
+            return forceManualSucceeds
+        }
         override fun restoreMode() { modeRestores++ }
+        override fun isManualMode(): Boolean = manualMode
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
-        override fun isOnScreenSelfWrite(): Boolean = current == lastWrite
         override fun clearSelfWriteMarker() { lastWrite = null }
     }
 

@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.runtime
 
+import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
@@ -8,17 +9,26 @@ import org.junit.Test
 
 class AnimationRunnerTest {
 
-    private class FakeBrightness : ScreenBrightnessController {
+    /** [normalize] models an OEM that stores something other than what we asked for. */
+    private class FakeBrightness(
+        private val normalize: (Int) -> Int = { it },
+    ) : ScreenBrightnessController {
         val writes = mutableListOf<Int>()
         var current = 0
         var overrideRead: Int? = null
         private var lastWrite: Int? = null
         override fun read(): Int = overrideRead ?: current
-        override fun write(level: Int) { current = level; lastWrite = level; writes += level }
-        override fun forceManualMode() = Unit
+        override fun write(level: Int): BrightnessWriteResult {
+            val stored = normalize(level)
+            current = stored
+            lastWrite = stored
+            writes += level
+            return ackWrite(level, stored)
+        }
+        override fun forceManualMode() = true
         override fun restoreMode() = Unit
+        override fun isManualMode() = true
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
-        override fun isOnScreenSelfWrite(): Boolean = read() == lastWrite
         override fun clearSelfWriteMarker() { lastWrite = null }
     }
 

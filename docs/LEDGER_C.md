@@ -42,3 +42,22 @@
   `graphSignature` so scrub/recompose redraws with unchanged inputs are not re-timed. The
   miscategorised pipeline emit is deleted; cycle time stays in `PipelineState.cycleTimeMs` (Live Debug).
   Faithful to Tasker task663 `_GenerateGraph`'s render toasts (D-023).
+
+- DC-002 [cited]: **The self-write marker now records what Android STORED, not what we asked for
+  (#126/#127).** `write()` assigned the marker after `putInt` returned, ignored `putInt`'s Boolean and
+  demanded exact equality, so an OEM that clamps or quantizes made every one of our own writes look
+  external, an echo dispatched before the marker existed was unfilterable, and a refused write was
+  indistinguishable from a successful one. It is now a transaction returning `BrightnessWriteResult`
+  (requested, acknowledged, the `deviceMax` THIS write converted with, status): the marker is armed
+  before `putInt` and moved to the read-back value on success, `@Volatile selfWriteInProgress` covers
+  the gap, and `finally` restores the previous marker and clears the flag on every exit including the
+  rethrow. `WriteStatus.WRITTEN_UNACKNOWLEDGED` (putInt true, read-back failed) is deliberately not
+  "failed" — `ok=false` would assert nothing moved — and keeps the REQUESTED raw as the marker so the
+  write's own echo is still filtered, while `REFUSED` and `DENIED` restore the previous one; `DENIED`
+  stays distinct because it also says `WRITE_SETTINGS` is gone. Two bounded limits, accepted rather
+  than fixed: the read-back catches only SYNCHRONOUS normalization, so an OEM re-write arriving
+  milliseconds later still reads as external unless DC-004's deadband absorbs it, and
+  `selfWriteInProgress` classifies anything landing between `putInt` and its read-back as ours — a
+  microseconds-to-milliseconds blind spot, sound only while at most one brightness transaction is in
+  flight, which today holds because all four writers run on the serialized consumer (D-027).
+  `isOnScreenSelfWrite()` is deleted as it had no production caller.
