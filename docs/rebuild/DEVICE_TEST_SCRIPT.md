@@ -77,33 +77,26 @@ optional.
     check passes vacuously. This one's own control pauses on purpose, so re-check between the two
     halves and before 10c.
 
-    First read `deviceMax` from Live Debug → **Brightness Writes** → "Device max"; call it M. That
-    is `config_screenBrightnessSettingMaximum`, the value Tideo actually converts with — **not** the
-    largest raw value the device will store, which may be smaller and is precisely the suspected
-    fault.
+    **Two scales, and the shell is not on the app's (DC-025).** The card's "Device max" (call it M)
+    is `config_screenBrightnessSettingMaximum`, the app-facing maximum Tideo converts with, and it
+    reads **255** on the owner's phone. What `adb settings get/put` speaks is the STORED scale,
+    whose ceiling (call it S) is **4095** there — the same setting key, a different scale, with the
+    conversion sitting below the app API. Both numbers are right (DC-017, DC-025). Measure S rather
+    than assuming it equals M: drag the system brightness slider to maximum, then `adb shell
+    settings get system screen_brightness`. A shell value V reaches the app as domain
+    round(V × 255 / S), so a raw `+1` is not a domain `+1` and M is not what you inject with.
 
-    **M is what the app converts with, which is not necessarily what the provider accepts (DC-014,
-    DC-017).** Read M off the card, then measure the provider's real range separately — drag the
-    system brightness slider to maximum and run `adb shell settings get system screen_brightness`.
-    On the owner's phone the card reads **255** while the slider reports **4095**, and **neither
-    number is wrong**: `cmd overlay lookup` confirms `config_screenBrightnessSettingMaximum` really
-    is 255 there with no overlay, so M is read correctly and the 0–4095 range is an OEM-private
-    scale that no `Resources` lookup can reach. Where the two disagree, these injections are in
-    PROVIDER units while the deadband is in the app's, so record both numbers before reading any
-    result of this check — a raw `+1` is not a domain `+1` in either direction.
-
-    **Convert, do not step (DC-010).** Where M ≠ 255 a fixed raw offset is not a fixed domain
-    distance, so never inject one. On a hypothetical M = 4095 device a domain step is 16.06 raw, so a
-    round `+20` lands 1 domain step from about three quarters of the raw values and 2 from the rest,
-    a single step of `+16` quantises to 0 at 14 of them and tests nothing, and even a doubled `+32`
-    quantises back to 1 at 28 of them — which would FAIL a correct build. Pick the raw value for the
-    domain value you want; at M = 255 the conversion is the identity and `raw(n) = n`. With the
-    service running and one cycle completed:
+    **Convert, do not step (DC-010).** A fixed raw offset is not a fixed domain distance wherever
+    S ≠ 255, so never inject one. At S = 4095 a domain step is 16.06 raw: a round `+20` lands 1
+    domain step from about three quarters of the raw values and 2 from the rest, a single `+16`
+    quantises to 0 at 14 of them and tests nothing, and even a doubled `+32` quantises back to 1 at
+    28 of them — which would FAIL a correct build. Pick the raw value for the domain value you want.
+    With the service running and one cycle completed:
 
     ```
-    adb shell settings get system screen_brightness   # current raw, call it R
-    # d      = round(R × 255 / M)   <- the domain value the app sees
-    # raw(n) = round(n × M / 255)   <- the raw value that lands on domain n
+    adb shell settings get system screen_brightness   # current stored value, call it R
+    # d      = round(R × 255 / S)   <- the domain value the app sees   (S = 4095 here)
+    # raw(n) = round(n × S / 255)   <- the stored value that lands on domain n
     adb shell settings put system screen_brightness <raw(d + 1)>
     ```
 
@@ -116,8 +109,9 @@ optional.
     events wearing one face: a fresh `DISMISSED_DRIFT` means `handleOverride` ran and judged it,
     while a stale or absent timestamp means the monitor never delivered the event at all — a closed
     gate, the F64/DB-082 settle window, or the DC-003 self-write adoption. Only the first is this
-    check passing. **NOT yet verified on a device:** the 2026-08-30 round was read under a wrong M
-    and is being re-run (STATE Owner queue).
+    check passing. **NOT yet verified on a device:** the 2026-08-30 round injected on the wrong
+    scale — its `+20` was 1 and 3 domain apart, not 20 — and is being re-run (DC-025, STATE Owner
+    queue).
 10c. **Mode conflict dismisses instead of pausing (DC-006, issue #127).** Service running, override
     detection on, and **not already paused** — check "Manual override" as in 10b (DC-012).
 
@@ -137,55 +131,41 @@ optional.
     `DISMISSED_MODE` confirms it directly. A quiet run at a NEARBY value proves nothing either way
     (the deadband would dismiss it regardless) — record that as SKIPPED. **Control:** with the mode
     already `0`, the same brightness write MUST pause as in step 8. Verified on 1.10.0-debug vc24
-    (owner, 2026-08-30): mode 1 + raw 4000 on an M = 4095 panel, quiet.
-10d. **Normalization readout (diagnostic, not pass/fail).** Live Debug → **Brightness Writes**, at
-    the TOP of the curve (bright room, or raise Min/Max Brightness so a high value is written). Let
-    one cycle complete; this needs no override to have fired. Record "Requested → acknowledged",
-    the status, and "Device max". **A requested value above the acknowledged one at the top of the
-    range means the advertised maximum disagrees with what the provider stores, and the top of that
-    user's curve is silently flat.** Report the three numbers; do not change any setting to "fix" it.
+    (owner, 2026-08-30): mode 1 + shell value 4000, which is domain ≈ 249 on the S = 4095 stored
+    scale (DC-025) — quiet, with `Last override: DISMISSED_MODE (OBSERVER)` on the card confirming
+    the branch directly rather than by inference.
+10d. **Normalization readout (diagnostic, not pass/fail). ANSWERED on the owner's phone — re-run
+    only on new hardware (DC-025).** Live Debug → **Brightness Writes**, at the TOP of the curve
+    (bright room, or raise Min/Max Brightness so a high value is written). **A requested value above
+    the acknowledged one at the top of the range means the advertised maximum disagrees with what
+    the provider stores, and the top of that user's curve is silently flat.** Report the numbers; do
+    not change any setting to "fix" it.
 
-    **Take the ceiling from the system rather than adb (DC-014).** Drag the system brightness slider
-    to maximum, then `adb shell settings get system screen_brightness`: that is the provider's real
-    ceiling, and unlike an `adb settings put` — which auto-brightness can overwrite and the provider
-    can clamp — the system's own slider writes what the platform believes its range to be. On the
-    owner's phone (2026-08-30) that reads 4095 while the card reads `Device max: 255`, and DC-017
-    settles that **both are right**: the framework config really is 255 (no overlay), so the app
-    converts on the identity branch and the 0–4095 scale is OEM-private.
+    **TIDEO must be what put the brightness at the top — this is the whole step.** A reading taken
+    after dragging the system slider to maximum measures the slider, not the app, and one was
+    mistaken for a result once already (2026-08-30). So: service running, override detection on,
+    **not paused**, force the top from the app side, let the sweep end and **fully settle** for
+    several seconds, touch nothing, then read the card and `adb shell settings get system
+    screen_brightness`. Do NOT instead pair the card's "Current brightness" with that value at one
+    instant: a ratio near 16 is produced both by the app converting and by the layer below it
+    rescaling an identity write, so it separates nothing (DC-018). `screen_brightness_float` is
+    `null` here (DC-024), so do not wait on it; where it exists, ≈1.0 and ≈0.06 corroborate.
 
-    **The remaining question is whether the scale below the app API rescales our write, and only a
-    SETTLED reading answers it (DC-018, DC-021).** Do NOT pair the card's "Current brightness" with
-    `settings get system screen_brightness` at one instant — the card is app DOMAIN and adb is the
-    stored value, and a ratio near 16 is produced both by the app converting and by the layer below
-    it rescaling an identity write, so it separates nothing.
+    **The reading (owner, 2026-08-31, 1.10.0-debug vc24), Tideo driving at raw lux 2061.5:**
 
-    **TIDEO must be what put the brightness at the top — this is the whole step (2026-08-30).** A
-    reading taken after dragging the system slider to maximum measures the slider, not the app, and
-    one was mistaken for a result once already. So: service running, override detection on, **not
-    paused**, then force the top from the app side (bright room, or raise Min/Max Brightness), let
-    the sweep end and **fully settle** for several seconds, touch nothing, and record what drove it.
-    Then read both the card and:
-
-    ```
-    adb shell settings get system screen_brightness
-    ```
-
-    **The record to fill in**, and what the pair means:
-
-    | Field | Source | Expected under DC-021 | Expected if the ceiling is real |
+    | Field | Source | Read | If the ceiling were real |
     |---|---|---|---|
     | Requested → acknowledged | card | `255 → 255` | `255 → 255` |
     | Write status | card | `ACKNOWLEDGED` | `ACKNOWLEDGED` |
     | Device max | card | `255` | `255` |
     | Raw requested | card | `255` | `255` |
-    | Settled stored value | adb | **≈ 4095** | **≈ 255** |
+    | Settled stored value | adb | **4095** | ≈ `255` |
 
-    Only the last row moves, and it is the verdict. **≈ 4095:** the 0–4095 scale sits below the app
-    API, Tideo's whole 0–255 domain reaches the whole panel, and the card's five 255s are the normal,
-    correct record of that — not a 6.2% ceiling. **≈ 255:** the ceiling is real and the top 94% of
-    the panel is unreachable. `screen_brightness_float` is **`null` on the owner's device** (DC-024),
-    so do not wait on it; where it does exist, ≈1.0 and ≈0.06 corroborate the two columns. Report
-    every number and change no setting to "fix" it.
+    Only the last row moves, and it was the verdict: **4095 — the 0–4095 scale sits below the app
+    API**, Tideo's whole 0–255 domain reaches the whole panel, and the card's five 255s are the
+    normal, correct record of that, not a 6.2% ceiling. The app's own read-back returned 255 for the
+    same key the shell read as 4095, so the two callers see different scales. The owner's ruling on
+    that reality is DC-026: no code fix, and every adb check converts with S (see 10b).
 
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 

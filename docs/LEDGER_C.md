@@ -323,3 +323,32 @@
   is dead there and the settled integer alone carries the verdict. Consistent with DC-021, where the
   OEM has replaced the platform float path with its own 12-bit integer rather than layering on it,
   though a missing setting is weak evidence for anything on its own.
+
+- DC-025: **Read: the 0–4095 scale sits BELOW the app-facing Settings API, so DC-021 is the
+  device's behaviour and not a hypothesis, and nothing is capped.** §2 10d run as written on
+  1.10.0-debug vc24 (owner, 2026-08-31) with Tideo driving the top and nothing touched — raw lux
+  2061.5, `Service: Running`, `Manual override: No`, `Target brightness: 255` — the card read
+  `Requested → acknowledged: 255 → 255`, `ACKNOWLEDGED`, `Raw requested: 255`, `Device max: 255`,
+  while the settled `adb shell settings get system screen_brightness` read **4095** (three samples
+  at 4095, one transient 3019 ≈ domain 188 between them; `screen_brightness_float` still `null`,
+  DC-024). That pair separates the two models where DC-018's ratio could not: the app's own
+  read-back of `SCREEN_BRIGHTNESS` returned 255 for the same key the shell read as 4095, so the two
+  callers are seeing different scales, and a real 6.2% ceiling would instead have left the stored
+  value near 255 with the panel dim. Consequences: the identity branch is correct and Tideo's whole
+  0–255 domain reaches the whole panel; the card's five 255s are the right record of that; DC-014's
+  "20 domain apart" stays void; and DC-003(b)'s per-cycle re-sweep cannot arise here, because
+  `read()` returns the app scale and matches the target. **Not discharged by this:** §2 10b, which
+  still needs "Last override" read after each half (DC-015, DC-022).
+
+- DC-026: **The owner's ruling — no fix; the split scale is the device's reality and the workaround
+  is where the effort goes** (2026-08-31, "if we fix this it reeks of 'but does it work in theory'").
+  Nothing in the conversion path changes: `deviceMax` keeps `Resources.getSystem()`, so DC-019's
+  overlay switch is declined as hardening for hardware nobody has, joining auto-learning the device
+  maximum in the rejected set, and DC-003's two trades stay as built. What the reading does change
+  is every DEVICE CHECK that goes through adb: `settings get/put system screen_brightness` speaks
+  the stored 12-bit scale on this phone while the app speaks 0–255, so measure the SHELL's own
+  ceiling and convert with that (S = 4095 here), never with the card's `Device max`, which is the
+  app-facing maximum and need not equal it. §2 10b's "at M = 255 the conversion is the identity and
+  `raw(n) = n`" was exactly that mistake — it would have injected two more domain-adjacent values
+  and re-read the same silence — and is rewritten to S. DC-010's rule survives unchanged: pick the
+  raw value for the domain value you want; only the scale it converts with was wrong.
