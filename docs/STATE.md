@@ -18,16 +18,15 @@ Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LE
 **Resuming cold?** **v1.9.2/vc23 is the newest release** — tag `v1.9.2` → `c7c96dc` on `main`
 (`git ls-remote --tags origin` settles it). This branch is at **`1.10.0` / vc24** with
 `fastlane/…/changelogs/24.txt`, carrying the Graph Metrics restoration (DC-001), the LEDGER_C
-rollover, a test-only warning cleanup, and the executed #126/#127 override-attribution work
-(DC-002…DC-009), whose plan `docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` is **retained by owner
-instruction (2026-08-30)** rather than deleted at its final segment as playbook 5 would have it. All
-six segments landed and the durable content is in the ledger. The brightness-maximum question is
-**closed: both numbers were right, and §2 10d read on 2026-08-31 puts the 12-bit scale BELOW the
-app-facing Settings API** (DC-017, DC-025). The owner ruled **no fix — accept it and work around
-it** (DC-026), so the conversion path is frozen as built and only §2 10b is still owed. No round
-script is alive (RUNBOOK §6, DB-010). Do **not** re-open the closed
-force-stop investigation (DB-051…DB-060), and treat Scorecard.dev as a run-once local input rather
-than a retained score or CI gate.
+rollover and the executed #126/#127 override-attribution work (DC-002…DC-009), whose plan
+`docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` is **retained by owner instruction** rather than deleted
+at its final segment as playbook 5 would have it. **The train is complete and nothing is owed on a
+device:** §2 10b, 10c and 10d have all been read on 1.10.0-debug
+vc24, the brightness-maximum question is closed with the 12-bit scale BELOW the app-facing Settings
+API, and the owner ruled no fix, so the conversion path is frozen as built (DC-011…DC-013,
+DC-025…DC-028). No round script is alive (RUNBOOK §6, DB-010), the closed force-stop investigation
+stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input, not a retained score or
+CI gate.
 
 ## Owner queue
 
@@ -40,66 +39,49 @@ than a retained score or CI gate.
 > external-content escalations land here too.
 
 1. **Nothing to do — three checks are blocked on hardware.** The Android 12/12L Wi-Fi fix needs a
-   phone that old and the owner has none (DB-074, §8 24); the unrecognised-colour-mode button only
-   appears if a phone reports a mode Android does not know, and none do, so never force one by
-   writing a fake value (§11 32c, DB-071, DB-078); and Night Light / always-on display failing safely
-   needs a Samsung, every phone to hand reporting them available (DB-041…DB-043).
+   phone that old (DB-074, §8 24); the unrecognised-colour-mode button needs a phone reporting a mode
+   Android does not know, and a fake value must never be written to force one (§11 32c, DB-071,
+   DB-078); Night Light / always-on failing safely needs a Samsung, every phone to hand reporting
+   them available (DB-041…DB-043).
 2. **Nothing to do — issues #123, #126 and #127 get no reply.** Owner's decision (2026-08-24 for
    #123, carried forward by the plan); nothing was posted, and do not comment without the owner
    saying so first (DB-082).
-3. **One device reading is left — re-run §2 10b (1.10.0-debug vc24), and mind the scale.** `adb
-   settings put system screen_brightness` speaks the phone's STORED 12-bit scale (ceiling 4095)
-   while the app sees 0–255, so inject `raw(n) = round(n × 4095 / 255)` — never a raw `+1` or `+20`,
-   which is what made the 2026-08-30 round unreadable (DC-025). Start each half unpaused ("Manual
-   override" must read `No`) and record **"Last override"** after each: a fresh `DISMISSED_DRIFT` is
-   the pass, a stale timestamp means the monitor dropped the event upstream. DC-021 predicting the
-   quiet half is not a reading of it (DC-022). The step carries the arithmetic.
-
-4. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
-   tests.** Nothing today covers `ChartCanvas` calling the sink, the sink being null below level 7, or
-   the signature dedupe suppressing a repeat draw; the one test that looks like it does passes
-   unchanged on `b462e56`, which is why the owner's device observation below is still the feature's
-   only evidence. Contained Compose work, to be picked up as its own unit (DC-001).
+3. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
+   tests.** Nothing covers `ChartCanvas` calling the sink, the sink being null below level 7, or the
+   signature dedupe suppressing a repeat draw, and the one test that looks like it does passes
+   unchanged on `b462e56` — which is why the owner's device sighting is the feature's only evidence.
+   Contained Compose work, its own unit (DC-001).
 
 Open questions:
 
 - **[2026-08-31] The rename half of the deferred cleanup — take it, or drop it with the other
-  half?** The no-fix ruling declines (i), moving `deviceMax` to `context.resources`, as hardening
-  for hardware nobody has (DC-019, DC-026). That leaves (ii): rename `deviceMax`/`requestedRaw`/
-  `acknowledgedRaw` to `settingsApiMax`/`requestedSettingValue`/`readBackSettingValue`, with the
-  Live Debug labels becoming "Settings API max" and "Settings value requested". It changes no
-  behaviour; it makes the names say what 10d proved they are — app-facing Settings API values, not
-  hardware — and that misreading is what produced DC-014 (DC-023). **Recommendation: take it, but
-  after §2 10b is re-run**, since 10b cites the present card labels verbatim and the owner would
-  otherwise be holding a script that no longer matches the APK.
+  half?** The no-fix ruling already declined (i), moving `deviceMax` to `context.resources`, as
+  hardening for hardware nobody has (DC-019, DC-026). That leaves (ii): rename `deviceMax`/
+  `requestedRaw`/`acknowledgedRaw` to `settingsApiMax`/`requestedSettingValue`/
+  `readBackSettingValue`, with the Live Debug labels becoming "Settings API max" and "Settings value
+  requested" — no behaviour change, just names that say what 10d proved they are, app-facing
+  Settings API values rather than hardware, which is the misreading that produced DC-014 (DC-023).
+  **Recommendation: take it, and the hold is discharged** — the only reason to wait was that §2 10b
+  cited the present card labels verbatim, and 10b passed (DC-027).
 
-**Device rounds (owner, 1.10.0-debug vc24).** **2026-08-31 — §2 10d read.** With Tideo driving the
-top at raw lux 2061.5 and nothing touched, the settled `screen_brightness` was **`4095`** while the
-card read `255 → 255`, `ACKNOWLEDGED`, `Raw requested: 255`, `Device max: 255`: the app's own
-read-back returned 255 for the key the shell read as 4095, which a real 6.2% ceiling cannot produce.
-So the 12-bit scale sits below the app API, the whole domain reaches the panel, and DC-021 is
-behaviour rather than hypothesis (DC-025). **2026-08-30 — Graph Metrics flash verified** (level-7
-checks all fine; still the feature's only evidence until item 4 lands) and **§2 10c passed**,
-confirmed on the card rather than inferred — `Last override: DISMISSED_MODE (OBSERVER)`, `Mode at
-commit: Not manual`, `Manual override: No` (DC-011…DC-013). **§2 10b stays re-opened:** its two
-`+20` injections were 1 and 3 domain apart, not 20, so DC-014's "unexplained" quiet half is void —
-but a model that predicts a silence is not a reading of it (DC-015, DC-020…DC-022).
+**Device rounds (owner, 1.10.0-debug vc24), all now closed** — readings in the rows, checks in
+`DEVICE_TEST_SCRIPT.md` §2. 2026-08-31: **10b passed** on the shell ceiling (S = 4095), `raw(d+1)`
+quiet with a fresh `DISMISSED_DRIFT (OBSERVER)` against a `raw(d+2)` control that paused, plus that
+same quiet injection **pausing on v1.9.2** — as a build with no deadband must, and kept as the
+negative control that stops this being a check the phone can never fail (DB-083, DC-027, DC-028).
+Also 2026-08-31: **10d read**, the stored value settling at `4095` under Tideo while the card read
+five 255s (DC-025). 2026-08-30: the Graph Metrics flash verified and **10c passed** on the card
+rather than by inference (DC-011…DC-013).
 
-**Decided (owner).** 2026-08-30: this train ships as a **minor**, `1.10.0` / vc24, now set in
-`app/build.gradle.kts`; `changelogs/24.txt` was already correct since the code did not move.
-2026-08-31, on the 10d reading: **no fix — the split scale is the device's reality, so work around
-it rather than engineer for it.** The conversion path therefore stays exactly as built: (a) a
-foreign write landing between our `putInt` and its read-back is still adopted as ours, missing that
-one override until the next cycle re-points the marker (DC-003), and (b) the per-cycle re-sweep it
-warned of needs a CLAMPING device, which this phone is not — `read()` returns the app scale and
-matches the target (DC-025). Auto-learning the device maximum and the `context.resources` move are
-both declined (DC-019, DC-026).
+**Decided (owner).** This train ships as a **minor**, `1.10.0` / vc24, set in `app/build.gradle.kts`
+(2026-08-30). On the 10d reading: **no fix — the split scale is the device's reality, so work around
+it rather than engineer for it**, which freezes the conversion path as built, declines auto-learning
+the device maximum and the `context.resources` move, and leaves DC-003's two trades standing
+(DC-026).
 
-Everything raised through 2026-08-26 is closed, its detail in the named rows — the LEDGER_C
-rollover, DB-081, DB-085, the vc23 device rounds now in `DEVICE_TEST_SCRIPT.md` §7 21a and §11 39d
-(DB-084, DB-077, DB-078), the wake false-pause fix with its DB-083 lesson that a device check must
-be able to fail on a well-behaved phone, and every earlier round through vc22 (DB-054…DB-072). The
-owed fresh-context review of `b462e56..HEAD` is discharged by this train's two adversarial passes
+Everything raised through 2026-08-26 is closed in DB-054…DB-085 and DC-001, including the vc22 and
+vc23 rounds now folded into `DEVICE_TEST_SCRIPT.md` and the wake false-pause fix that taught DB-083.
+The owed fresh-context review of `b462e56..HEAD` is discharged by this train's two adversarial passes
 (commit bodies, DC-003/DC-008/DC-009).
 
 ## Decided non-items
@@ -110,8 +92,8 @@ owed fresh-context review of `b462e56..HEAD` is discharged by this train's two a
 - Still declined: the superseded Privileged Display schedule and a persisted seed without real
   reports (D-150–152), a grayscale quick action, refresh-rate/OEM keys, manual Extra Dim, panic
   re-firing after teardown, §11.39a C1/C2 as wontfix, and repeating the destructive `bmgr restore`
-  verification (DB-013). The test-only `ContextsContent` wrapper stays test-only — migrating its 13
-  sites buys nothing and risks its accessibility coverage; that and the rest of the triage are in
+  verification (DB-013). The test-only `ContextsContent` wrapper stays test-only, since migrating its
+  13 sites buys nothing and risks accessibility coverage; the rest of the triage is in
   `docs/plans/REVIEW_TRIAGE_1.9.0.md` (`WAIT-MINOR-003`).
 - **Never synthesise unsupported display values on a device** (DB-071); use a real settings UI.
   DB-077 is exempt because mask 7 was written by Tideo v1.9.0 and §11 32a is device-verified.
@@ -125,45 +107,23 @@ owed fresh-context review of `b462e56..HEAD` is discharged by this train's two a
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-08-31 — **§2 10d read, and the brightness-maximum question closes: the 0–4095 scale sits
-  BELOW the app-facing Settings API.** Tideo driving the top settled the stored value at `4095`
-  while the card read `255 → 255 ACKNOWLEDGED`, `Raw requested: 255`, `Device max: 255` — the app's
-  own read-back returning 255 for the key the shell read as 4095, which a real 6.2% ceiling could
-  not produce, so nothing is capped and DC-003's clamping-device re-sweep cannot arise here
-  (DC-025). Owner ruled **no fix**: the split scale is the device's reality, the conversion path is
-  frozen as built, and the effort goes into the workaround — §2 10b now injects on the SHELL ceiling
-  (`raw(n) = round(n × 4095 / 255)`), the mistake that made the 2026-08-30 round unreadable, and
-  `context.resources` is declined alongside auto-learning (DC-026).
-- 2026-08-30 — **How that question arose, and its first answer.** `cmd overlay lookup` returned 255
-  from android's default configuration with no overlay, so `config_screenBrightnessSettingMaximum`
-  really is 255, `deviceMax` reads it correctly and the discovery block is byte-identical to
-  `v1.9.2`, making a regression impossible (DC-017). The vc24 round that raised it verified the
-  Graph Metrics flash and passed §2 10c (mode 1 + a far-away value, quiet — an OEM-cleared mode
-  would have paused instead, DC-013), and broke two checks: 10b injected RAW offsets to test a
-  DOMAIN rule (DC-010) and 10c read a bare mode `0` an OEM can produce by itself (DC-011), while
-  exposing the sticky pause latch that disarms every check after a pause (DC-012). Reading `Device
-  max: 255` off the card then drew two consequences, both withdrawn (DC-014…DC-016), and 10d was
-  rebuilt around a SETTLED reading because a ratio near 16 fits both hypotheses (DC-018…DC-024).
-- 2026-08-30 — Owner decided this train is a **minor**: `versionName` 1.9.3 → **1.10.0**, vc24
-  unchanged, so `changelogs/24.txt` still applies. The two attribution trades and the Graph Metrics
-  test gap are deferred by the owner pending a debug-APK round (Owner queue).
-- 2026-08-30 — **Executed the #126/#127 override-attribution plan** across six segments
-  (DC-002…DC-009). `write()` is a transaction reporting what Android STORED; both detectors and the
-  baseline use that acknowledgement, the animation band shifting by the provider's normalization
-  offset so a clamping OR lagging device is explained; the commit guard gained a ±1 domain deadband
-  and a `MIN_SETTLE_MS` yield floor; a non-MANUAL mode is reclaimed and dismissed, not labelled user
-  input (Tasker deviation, `parity_gaps.md` dev-01/dev-02); `OverrideDetected` carries
-  its detector source; Live Debug gained a **Brightness Writes** card; device checks are §2 10b–10d.
-  Change 3 was NOT implemented as written — it asked to restore a settle fallback to the throttle,
-  which D-062(2)/F71 had removed deliberately and a test pins, so only the yield floor landed
-  (DC-005). Two adversarial reviews ran, the second finding a band-detector blocker and four sibling
-  defects (DC-008/DC-009).
+- 2026-08-30..31 — **The #126/#127 override-attribution train, executed and now fully read on a
+  device (DC-002…DC-028).** `write()` became a transaction reporting what Android STORED, used by
+  both detectors, the baseline and the animation band's normalization shift; the commit guard gained
+  a ±1 domain deadband and a `MIN_SETTLE_MS` yield floor; a non-MANUAL mode is reclaimed and
+  dismissed rather than labelled user input (`parity_gaps.md` dev-01/dev-02);
+  `OverrideDetected` carries its detector source; and Live Debug gained a **Brightness Writes** card
+  with checks §2 10b–10d. Change 3 did NOT land as written, since restoring a settle fallback to the
+  throttle would undo D-062(2)/F71 (DC-005), and two adversarial reviews ran, the second finding a
+  band-detector blocker and four siblings (DC-008/DC-009). The device rounds then cost more than the
+  code — two checks written against the wrong coordinate system, a sticky pause latch disarming every
+  check after a pause, two consequences drawn off the card and withdrawn — until 10d settled it: the
+  0–4095 scale sits BELOW the app-facing Settings API, nothing is capped, the owner ruled **no fix**,
+  and the rebuilt 10b passed with its v1.9.2 negative control (DC-010…DC-028).
 - 2026-08-26 — Bumped to `1.9.3` / vc24 with `fastlane/…/changelogs/24.txt`, restored Graph Metrics
   debug (%AAB_Debug 7) to chart (re)draws deduped by a content signature, deleted the miscategorised
   `PipelineCycleRunner` cycle-time emit, and rolled the ledger to `LEDGER_C.md` in the SAME commit
   (DC-001).
-- 2026-08-23..25 — Retired the round script once 1.9.2 shipped, cleared all 46 test-only compiler
-  warnings with no `src/main` change, and fixed DB-074…DB-085 (action pins, live date with fixed
-  location, wake-settle handling, review findings).
-- 2026-06-23..08-22 — v1.0.0 → v1.9.1 shipped and DB-073 upgraded AMH 5.2.0 → 9.1.0 without changing
-  policy; durable detail is D-096…DB-073.
+- 2026-06-23..08-25 — v1.0.0 → v1.9.2 shipped, DB-073 upgraded AMH 5.2.0 → 9.1.0 without changing
+  policy, the round script was retired, all 46 test-only compiler warnings cleared with no
+  `src/main` change, and DB-074…DB-085 fixed; durable detail is D-096…DB-085.

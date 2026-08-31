@@ -109,9 +109,22 @@ optional.
     events wearing one face: a fresh `DISMISSED_DRIFT` means `handleOverride` ran and judged it,
     while a stale or absent timestamp means the monitor never delivered the event at all — a closed
     gate, the F64/DB-082 settle window, or the DC-003 self-write adoption. Only the first is this
-    check passing. **NOT yet verified on a device:** the 2026-08-30 round injected on the wrong
-    scale — its `+20` was 1 and 3 domain apart, not 20 — and is being re-run (DC-025, STATE Owner
-    queue).
+    check passing. **PASSED on 1.10.0-debug vc24 (owner, 2026-08-31), both halves converted with
+    S = 4095 (DC-027).** `raw(d + 1)`: stored `1092` → domain 68 → injected `1108` = domain 69;
+    quiet, with `Manual override: No`, `Last override: DISMISSED_DRIFT (OBSERVER)` and
+    `Observed / settled / expected: 69 / 69 / 68`. Control `raw(d + 2)`: stored `931` → domain 58 →
+    injected `964` = domain 60; it paused, with the notification and `60 / 60 / 58`. `Mode at
+    commit` read `Manual` in both halves, so the first was dismissed by the drift rule and not by
+    10c's mode branch. The 2026-08-30 round is superseded: it injected on the wrong scale, its two
+    `+20` offsets landing 1 and 3 domain apart (DC-010, DC-025).
+
+    **Negative control — v1.9.2 is the known-failing build (DC-028).** The same `raw(d + 1)`
+    injection on v1.9.2/vc23, same phone and same conversion, IS detected as a manual override and
+    pauses (owner, 2026-08-31), seen as the notification rather than a disposition since the
+    Brightness Writes card postdates that release. Expected — the shipped build has no
+    `isRepresentationalDrift`, so one step is not in `expectedValues` — and worth having, because
+    it is what stops this injected step from being a check a well-behaved phone can never fail
+    (DB-083). Re-run it against v1.9.2 if a future build's quiet half is ever in doubt.
 10c. **Mode conflict dismisses instead of pausing (DC-006, issue #127).** Service running, override
     detection on, and **not already paused** — check "Manual override" as in 10b (DC-012).
 

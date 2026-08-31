@@ -352,3 +352,38 @@
   `raw(n) = n`" was exactly that mistake — it would have injected two more domain-adjacent values
   and re-read the same silence — and is rewritten to S. DC-010's rule survives unchanged: pick the
   raw value for the domain value you want; only the scale it converts with was wrong.
+
+- DC-027: **§2 10b passes on a device — one domain step is dismissed as drift, two steps still
+  pause, and the quiet half was JUDGED rather than dropped.** Re-run on 1.10.0-debug vc24 (owner,
+  2026-08-31), both injections converted on the shell's own ceiling as DC-026 requires (S = 4095)
+  and each read off the Brightness Writes card. `raw(d + 1)`: stored `1092` → domain 68 → injected
+  `1108` = domain 69; no pause, `Manual override: No`, `Last override: DISMISSED_DRIFT (OBSERVER)`,
+  `Observed / settled / expected: 69 / 69 / 68`, `Requested → acknowledged: 68 → 68 ACKNOWLEDGED`;
+  control `raw(d + 2)`: stored `931` → domain 58 → injected `964` = domain 60, and it paused, with
+  the notification and `60 / 60 / 58`. That is the reading DC-015 and DC-022 held the check open
+  for, discriminating on three axes at once: the disposition names the drift branch, so
+  `handleOverride` ran and judged the event rather than a closed gate, the F64/DB-082 settle window
+  or DC-003's self-write adoption swallowing it upstream; `Mode at commit: Manual` in both halves
+  separates it from 10c's `DISMISSED_MODE`, which needs `Not manual` (DC-013); and the control
+  pausing excludes the detection-disabled build the step exists to fail. The card's "Override seen"
+  age line sat below the fold in both captures, so freshness rests instead on each
+  observed/expected pair matching its own injection exactly — the same discrimination DC-015 asked
+  the timestamp for. Incidentally the round reproduces DC-025 away from the ceiling, the shell
+  reading `1092` and `931` where the card read domain 68 and 58 (ratios 16.06 and 16.05 against
+  S/M = 16.06), and it closes the last owed reading of the #126/#127 train.
+
+- DC-028: **Expected from the code, and worth recording for exactly that reason — the same
+  within-deadband injection 1.10.0 dismisses PAUSES v1.9.2, which is 10b's negative control.** The
+  shipped build has no deadband (`git show v1.9.2:…/OverrideRules.kt` has no
+  `isRepresentationalDrift`, so a one-step foreign write is simply absent from `expectedValues` and
+  `isManualOverride` returns true), so the owner's 2026-08-31 back-to-back run — same phone, same
+  conversion, S = 4095 — confirms a prediction rather than discovering anything, and it showed up
+  as the notification and paused state because the Brightness Writes card postdates v1.9.2. What it
+  buys is the one thing a passing run cannot give an injected check by itself: 10b opens by
+  admitting it "fails on a device that never shows the bug", DB-083's lesson is that a device check
+  must be able to fail on a well-behaved phone, and one injection yielding opposite outcomes on two
+  builds is what makes the pass mean something. It corroborates DC-027's quiet half from the other
+  side — the write is demonstrably detectable on this hardware and this arithmetic — though the
+  `DISMISSED_DRIFT` disposition stays the direct evidence, since this train also moved the settle
+  path (DC-005) and the two builds are therefore not identical upstream. Keep v1.9.2 as the
+  known-failing baseline for future 10b runs (DC-005, DC-027).
