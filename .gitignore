@@ -20,3 +20,17 @@ captures/
 # Tasker source project — kept out of the tree (1.6 MB); owner picks LFS-vs-ignore at PR review (S12.9a).
 # Reference recipes live in docs/rebuild/XML_RECIPES.md.
 docs/rebuild/extraction/_source/Advanced_Auto_Brightness_V3.3.prj_9.xml
+
+# Credentials — file-kind cover for the value-shape scan in scripts/guards/staged-secrets.sh.
+# That guard reads staged blobs for secret SHAPES; these rules keep whole credential FILES from
+# being staged at all. The two are complementary: neither subsumes the other.
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+*.p12
+*.pepk
+google-services.json
+.env
+.env.*
+secrets.properties
