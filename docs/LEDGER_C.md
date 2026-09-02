@@ -387,3 +387,40 @@
   `DISMISSED_DRIFT` disposition stays the direct evidence, since this train also moved the settle
   path (DC-005) and the two builds are therefore not identical upstream. Keep v1.9.2 as the
   known-failing baseline for future 10b runs (DC-005, DC-027).
+
+- DC-029: **A `redact.sh --self-test` failure on Windows is a checkout defect, not a regression, and
+  the repair needs a forced re-checkout that `git checkout-index -f -a` does not give.** Git for
+  Windows sets `core.autocrlf=true` in its SYSTEM config, so this worktree held CRLF while the index
+  held LF — `git show HEAD:scripts/redact.sh` carried 0 CR bytes against 611 in the file on disk —
+  and the redactor, which compares bytes rather than lines, was diffing its filtered stream against a
+  CRLF copy of itself. Installing the seed `.gitattributes` and running `git add --renormalize .`
+  both leave that worktree untouched; only deleting the governed files and restoring them with `git
+  checkout -- .` converts them, because `checkout-index` skips what it considers unchanged.
+  Renormalisation moved just two blobs, so the harness files were already LF in the index and this
+  was never a content problem, and `*.bat text eol=crlf` keeps the Gradle wrapper CRLF on disk while
+  normalising it in the index. AMH 14.0.0's own `redact.sh` fixes the same false failure a second way
+  with a `--baseline` comparison, and both were taken because the attributes file is what stops every
+  other byte-comparing rung from relapsing. This upgrade carried scripts and version surfaces only:
+  the hand-applied seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 rewrites binding rules across
+  `RULE_FILES`, and the owner directed in session that it land as its own reviewed unit, which is
+  why the version advanced ahead of the policy migration it names.
+
+- DC-030 [cited]: **Working memory stopped caching release standing, and the replacement is a repo-local
+  session add-on rather than a deletion.** AMH 14.0.0 makes working memory tree-relative, but
+  striking `docs/STATE.md`'s "v1.9.2 is the newest release" sentence without replacing it only moves
+  the cost onto whoever resumes cold, so `scripts/session-facts.sh` computes the same facts at every
+  session start — tree `versionName`/`versionCode`, the newest `v*` tag on origin, and whether this
+  version is released — where staleness is impossible by construction. The shipped banner's own
+  release line was rejected for the job because it reads the version from the FIRST LINE of
+  `VERSION_FILE`, and this project's version lives inside `app/build.gradle.kts`, so setting that key
+  would have created a second source of truth free to drift from the build. The script is
+  deliberately absent from `scripts/MANIFEST.sha256` and unshipped, with `scripts/bootstrap.sh` as
+  the precedent, and it always exits 0, degrading to an explicit UNKNOWN plus the settling command
+  both when origin is unreachable and when no `timeout` exists to bound the probe — a bootstrap that
+  blocks a session over a network hiccup is worse than one that says it could not look. Only Claude
+  Code runs it, since its hook lives in `.claude/settings.json` and Codex was not observed to fire
+  any repository hook on 0.152.1, so for Codex this is prose in `docs/HARNESS_LOCAL.md` and nothing
+  more. The completed override-attribution plan was deleted
+  rather than archived once 14.0.0 withdrew the retained-in-place exception it had been kept under,
+  leaving no redirect or tombstone, while the device results it sat beside stay in STATE as an
+  explicitly dated observation rather than as current truth.

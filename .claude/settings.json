@@ -1,6 +1,7 @@
 {
   "$comment": "AMH adapter for Claude Code — wiring only, no logic. All behaviour lives in the constitution and scripts/. Layers this adapter provides: the instructive pre-execution command guard (scripts/command-guard.sh, which reads the PreToolUse payload on stdin — no flag), static deny rails, pre-allowed verification commands, and the comment-budget block cap as a PostToolUse hook. It does NOT provide output redaction: Claude Code has no output-filter hook, so scripts/redact.sh stays available for manual piping and is what the ladder's secret scan and scripts/guards/staged-secrets.sh use. The SessionStart hook translates Claude Code's own CLAUDE_CODE_REMOTE=true into the neutral AAB_REMOTE=1 that amh.conf names — vendor env vars are the adapter's job, never the shipped scripts'. The owner mirrors the hardest rails server-side (branch protection, secret-scanning push protection); these rules bind only agents that load them.",
   "$comment_pythonedit": "The second PreToolUse hook is a REPO-LOCAL advisory (DB-062), not part of the shipped rail: scripts/command-guard.sh is integrity-hashed and immutable, so a local pre-execution rule is added beside it rather than inside it. It blocks the first inline-Python file edit per marker lifetime — once per container in practice, the marker being in /tmp with no session component (DB-063) — and passes every later one, mirroring the shipped guard's own .env and destructive advisories — the owner's objection is that an interpreter heredoc is opaque while it runs when Write/Edit would show a diff, and one block is enough to make that a choice rather than a reflex. Hooks in this array are independent: exit 2 from either blocks, so this one cannot weaken the shipped guard. Its ladder rung runs its matcher fixtures; nothing inside the repo can verify the hook still FIRES, only a real command shows that.",
+  "$comment_sessionfacts": "The second SessionStart hook is a REPO-LOCAL add-on (DC-030), not part of the shipped bootstrap: scripts/session-facts.sh is not in scripts/MANIFEST.sha256 and the harness does not ship it. AMH 14.0.0 forbids working memory from caching world-controlled status — released, tagged, merged, remote branches — so docs/STATE.md names no release number and this prints the same facts live instead, where staleness is impossible. It is deliberately NOT the shipped banner's VERSION_FILE/RELEASE_TAG_PREFIX release line: that reads a version off a file's first line, and this project's version lives in app/build.gradle.kts, so pointing it at a new VERSION file would add a second source of truth that can drift from the build. The hook always exits 0 and degrades to 'release status UNKNOWN' with the settling command when origin is unreachable. Codex never runs it — codex 0.152.1 loads only ~/.codex/config.toml, so .codex/config.toml hooks do not fire at all.",
   "$comment_posttooluse": "The PostToolUse hook is SALIENCE, not coverage. scripts/guards/comment-budget.sh is a ladder guard and the ladder is what actually gates the tree; running its block cap here as well means a 13-line comment block is reported on the edit that writes it rather than in a ladder run at the end of the session, by which point the prose is written and rewriting it is rework. It cannot block — PostToolUse fires after the tool has run — and it exits 2 because that is the one exit code for which Claude Code feeds a hook's stderr back to the model. It stays silent when it cannot parse its payload or the path is not .kt: a hook that fires spuriously on every edit is one the next session deletes. Nothing can verify from inside the repo that this hook still fires; only a real edit shows that.",
   "hooks": {
     "SessionStart": [
@@ -9,6 +10,10 @@
           {
             "type": "command",
             "command": "bash -c 'if [ \"$CLAUDE_CODE_REMOTE\" = true ]; then export AAB_REMOTE=1; fi; exec \"$CLAUDE_PROJECT_DIR/scripts/session-start.sh\"'"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/session-facts.sh\""
           }
         ]
       }
@@ -55,6 +60,7 @@
       "Bash(scripts/ladder.sh --guards-only)",
       "Bash(scripts/verify.sh)",
       "Bash(scripts/session-start.sh)",
+      "Bash(scripts/session-facts.sh)",
       "Bash(scripts/bootstrap.sh)",
       "Bash(scripts/test-ladder-guards.sh)",
       "Bash(scripts/tests/local-guards.sh)",

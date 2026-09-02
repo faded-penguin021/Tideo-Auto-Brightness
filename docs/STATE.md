@@ -13,20 +13,26 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-Harness AMH 9.1.0 (DB-073), upstream manifest scripts immutable; live ledger `LEDGER_C.md`.
+Harness AMH 14.0.0 (DC-029), upstream manifest scripts immutable; live ledger `LEDGER_C.md`.
 
-**Resuming cold?** **v1.9.2/vc23 is the newest release** — tag `v1.9.2` → `c7c96dc` on `main`
-(`git ls-remote --tags origin` settles it). This branch is at **`1.10.0` / vc24** with
-`fastlane/…/changelogs/24.txt`, carrying the Graph Metrics restoration (DC-001), the LEDGER_C
-rollover and the executed #126/#127 override-attribution work (DC-002…DC-009), whose plan
-`docs/plans/OVERRIDE_ATTRIBUTION_1.9.3.md` is **retained by owner instruction** rather than deleted
-at its final segment as playbook 5 would have it. **The train is complete and nothing is owed on a
-device:** §2 10b, 10c and 10d have all been read on 1.10.0-debug
-vc24, the brightness-maximum question is closed with the 12-bit scale BELOW the app-facing Settings
-API, and the owner ruled no fix, so the conversion path is frozen as built (DC-011…DC-013,
-DC-025…DC-028). No round script is alive (RUNBOOK §6, DB-010), the closed force-stop investigation
-stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input, not a retained score or
-CI gate.
+**Resuming cold?** Release standing is NOT recorded here. The session banner computes it live —
+this tree's `versionName`/`versionCode`, the newest `v*` tag on origin, and whether this version is
+released — via `scripts/session-facts.sh` (DC-030); settle it by hand with
+`git ls-remote --tags --refs origin 'refs/tags/v*'`. This file was written to AMH 14.0.0's
+tree-relative practice, but that rule is NOT yet legislation here: its binding restatement in
+`AGENTS.md`, `docs/RUNBOOK.md` and this file's own length-guard preamble is part of the seed prose
+still owed (see Changelog). Until that lands, `AMH_VERSION` names 14.0.0 while the binding rules are
+9.1.0-era, and nothing stops a later session re-caching a release number.
+
+This branch carries the Graph Metrics restoration (DC-001), the LEDGER_C rollover, and the executed
+#126/#127 override-attribution work (DC-002…DC-009); its plan was deleted at completion by owner
+decision, as the lifecycle requires. **Read on a device on 2026-08-31** against 1.10.0-debug vc24,
+§2 10b, 10c and 10d all passed and the brightness-maximum question closed with the 12-bit scale
+BELOW the app-facing Settings API; the owner ruled no fix, so the conversion path is frozen as
+built (DC-011…DC-013, DC-025…DC-028). That is a dated observation, not a standing guarantee — a
+later build owes its own run. No round script is alive (RUNBOOK §6, DB-010), the closed force-stop
+investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input, not a
+retained score or CI gate.
 
 ## Owner queue
 
@@ -79,6 +85,29 @@ it rather than engineer for it**, which freezes the conversion path as built, de
 the device maximum and the `context.resources` move, and leaves DC-003's two trades standing
 (DC-026).
 
+4. **Decide whether `AGENTS.md` still claims a Codex rail that does not run (2026-09-02, DC-030).**
+   The Conventions section says "Codex's pre-shell hook runs the shipped command guard" and refers to
+   "its shell hook". On codex CLI 0.152.1 neither declared hook was observed to fire: run
+   `codex doctor` in this repo and read the Configuration block — it names `~/.codex/config.toml` as
+   the only config source and lists no project layer — then run
+   `codex exec -s read-only -c windows.sandbox="unelevated" "print hello"` and grep the output for
+   the `AMH session start` banner, which `scripts/session-start.sh` prints unconditionally. If the
+   banner is absent, those two sentences overstate the rail. Changing them is a constitution edit, so
+   it is yours, not a session's. `docs/HARNESS_LOCAL.md` already records the observation and its
+   limits. Note the honest ceiling: no repository check can prove a hook fired, so the fix is wording
+   scoped to what was measured, not a new claim in the other direction.
+5. **The local ladder cannot go green on this Windows ARM64 laptop, and that is the host, not the
+   tree (2026-09-02).** `:platform`'s Robolectric tests fail 120/145 with
+   `UnsatisfiedLinkError: no conscrypt_openjdk_jni-windows-aarch_64` — conscrypt publishes no native
+   for Windows on ARM. `:domain` (the golden vectors), compilation, lint and every guard pass; only
+   the Android adapter tests are unrunnable. Settle it with
+   `./gradlew :platform:testDebugUnitTest --offline` and read the first `<failure>` in
+   `platform/build/test-results/testDebugUnitTest/*.xml`. Options: (a) run the ladder under WSL2,
+   where conscrypt does ship `linux-aarch_64`; (b) run it in a `linux/amd64` container to match CI
+   exactly, at a large speed cost under emulation; (c) accept CI as the authority for this rung and
+   rely on `build.yml`. Recommendation: (a) for day-to-day, because it also removes the CRLF class
+   of problems, with CI remaining the gate that decides.
+
 Everything raised through 2026-08-26 is closed in DB-054…DB-085 and DC-001, including the vc22 and
 vc23 rounds now folded into `DEVICE_TEST_SCRIPT.md` and the wake false-pause fix that taught DB-083.
 The owed fresh-context review of `b462e56..HEAD` is discharged by this train's two adversarial passes
@@ -106,6 +135,13 @@ The owed fresh-context review of `b462e56..HEAD` is discharged by this train's t
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-02 — **Harness upgraded AMH 9.1.0 → 14.0.0 (DC-029).** Shipped scripts and manifest
+  copied, `.gitattributes` installed and the tree renormalised to fix a Windows CRLF false failure
+  in `redact.sh --self-test`, version surfaces moved in `amh.conf`/`AGENTS.md`/this file/
+  `HARNESS_LOCAL.md`, `ADAPTER_FILES` corrected, and the generated duplicate `ci.yml` deleted in
+  favour of `build.yml`. The hand-applied seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 is
+  **still owed** and is the next harness unit — it rewrites `RULE_FILES` prose and lands separately.
 
 - 2026-08-30..31 — **The #126/#127 override-attribution train, executed and now fully read on a
   device (DC-002…DC-028).** `write()` became a transaction reporting what Android STORED, used by

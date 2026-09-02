@@ -5,7 +5,7 @@ Tideo Auto Brightness is a native Kotlin/Compose Android app. It recreates the T
 now in maintenance.
 
 Maintenance uses the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
-This constitution records **AMH 9.1.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
+This constitution records **AMH 14.0.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
 and the version here must change with it; `scripts/guards/doc-facts.sh` fails on a mismatch.
 Before changing anything in `scripts/`, read `docs/HARNESS_LOCAL.md`. It explains which scripts
 come from upstream and cannot be fixed locally, how each local guard works and which verdict tier

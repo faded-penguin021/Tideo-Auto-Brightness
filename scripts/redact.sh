@@ -16,6 +16,10 @@
 # Usage:
 #   cmd 2>&1 | redact.sh          filter
 #   redact.sh --classes           list the classes recognised (tokens, plus the key block)
+#   redact.sh --baseline          the same stages with NO substitutions — the bytes an
+#                                 unredacted stream has after this platform's sed. Compare
+#                                 filtered output against THIS, never against the raw file:
+#                                 sed is not byte-transparent everywhere (see `baseline`)
 #   redact.sh --self-test         fixture matrix (tokens are generated at runtime,
 #                                 never stored — a stored literal would itself be a
 #                                 secret-shaped string in the tree)
@@ -248,6 +252,25 @@ build_sed_script() {
 # opens and the body prints — which is the bug this stage exists to fix.
 filter() { redact_key_blocks | sed -E -f <(build_sed_script); }
 
+# The filter's own baseline: the SAME two `sed` stages, with a script that holds no commands
+# at all. Output is therefore what an unredacted stream looks like after this platform's sed
+# has copied it — no substitution, no range, nothing this file's patterns could have done.
+#
+# It exists because `sed` is not byte-transparent everywhere, and a caller comparing this
+# filter's output against the RAW file is silently asserting that it is. The GNU sed shipped
+# with Git for Windows (MSYS2) rewrites CRLF to LF even for a script that matches nothing, so
+# on a Windows checkout — where `core.autocrlf=true` is the installer's own default — every
+# text file differed from its own filtered stream, and the ladder's secret scan, which is
+# defined as "any byte this filter changed is a credential", reported one in all 529 of them
+# (AMH ledger row DC030). Nothing was wrong with the patterns; the newline handling underneath
+# them was never the filter's to promise.
+#
+# So the promise is narrowed to one this file can actually keep: the filter changes nothing
+# that these same stages do not change on ANY input. Compare against this, and what remains is
+# redaction. That is weaker than byte-exactness with the file on disk, deliberately — a claim
+# that only holds on some platforms is worth less than a smaller one that holds on all of them.
+baseline() { sed -E -f /dev/null | sed -E -f /dev/null; }
+
 list_classes() {
 	local class regex
 	while IFS=$'\t' read -r class regex; do
@@ -277,9 +300,14 @@ rand_alnum() { rand_class 'A-Za-z0-9' "$1"; }
 rand_upper() { rand_class 'A-Z0-9' "$1"; }
 
 # shellcheck disable=SC2094 # "$1" is opened twice for READING only — the filter's stdin
-# and cmp's operand. SC2094 warns about a read/write pair; nothing here writes it, and
+# and the baseline's. SC2094 warns about a read/write pair; nothing here writes it, and
 # comparing a file against its own filtered stream is the whole point of the check.
-clean_under_filter() { filter <"$1" | cmp -s - "$1"; }
+#
+# Against the BASELINE and not the file itself: on a platform whose sed rewrites line
+# endings, this comparison is what made redact.sh fail its own self-test on its own bytes
+# while nothing about its patterns was wrong (AMH ledger row DC030). See `baseline` above for
+# what the check still promises.
+clean_under_filter() { filter <"$1" | cmp -s - <(baseline <"$1"); }
 
 ST_FAILS=0
 
@@ -315,10 +343,45 @@ st_redacted() {
 }
 
 st_untouched() { # <label> <text> — ordinary output must pass through byte-identical
-	local label=$1 text=$2 out
-	out=$(printf '%s\n' "$text" | filter)
-	if [ "$out" != "$text" ]; then
+	local label=$1 text=$2
+	# Compared with `cmp`, not with `$(...)`. Command substitution strips trailing newlines
+	# from both sides before the comparison, so this assertion — the one that claims
+	# ordinary output passes through BYTE-IDENTICAL — could not see a filter that mangled
+	# line endings at all, which is the class of defect that made every file on a CRLF
+	# checkout read as a credential (AMH ledger row DC030). An assertion that cannot fail on
+	# the thing it names is worse than none, because it is counted as coverage. Against the
+	# baseline, so what it now asserts is filter/baseline parity — see `st_crlf` below for
+	# why that is the strongest claim either of them can make.
+	if ! printf '%s\n' "$text" | filter | cmp -s - <(printf '%s\n' "$text" | baseline); then
 		printf 'SELF-TEST FAIL: %s was mangled by the filter\n' "$label" >&2
+		ST_FAILS=$((ST_FAILS + 1))
+	fi
+}
+
+# CRLF input at the byte level, which no `st_untouched` case can express: its argument is a
+# single line and the `printf '%s\n'` that feeds it decides the ending.
+#
+# Be exact about what this can catch, because the honest answer is narrower than "the CRLF
+# defect" and overstating it here would repeat the mistake it was written for (AMH ledger row
+# DC030). Both sides run the same sed stages, so a platform that mangles line endings mangles
+# BOTH and the comparison cancels. What it fails on is the filter gaining a stage the baseline
+# does not have — parity, not transparency. The platform defect itself is only visible from
+# outside this file, in the ladder's fixture, which runs the scan under a sed that drops CR.
+crlf_sample() { printf 'ordinary line\r\nsecond line, no credential here\r\n'; }
+
+st_crlf() {
+	if ! crlf_sample | filter | cmp -s - <(crlf_sample | baseline); then
+		printf 'SELF-TEST FAIL: CRLF input is not byte-identical under the filter\n' >&2
+		ST_FAILS=$((ST_FAILS + 1))
+	fi
+	# ...and the other half, because the fix must not buy transparency with a blind spot: a
+	# token on a CRLF line still gets redacted. The assertion is ABSENCE rather than
+	# `st_redacted`'s exact equality, because whether the CR itself survives is the
+	# platform's business and this fixture is deliberately not the one that decides it.
+	local token
+	token="AKIA$(rand_upper 16)"
+	if printf 'lead %s trail\r\n' "$token" | filter | grep -qF "$token"; then
+		printf 'SELF-TEST FAIL: a token on a CRLF line survived redaction\n' >&2
 		ST_FAILS=$((ST_FAILS + 1))
 	fi
 }
@@ -578,6 +641,10 @@ self_test() {
 		ST_FAILS=$probe_before
 	fi
 
+	# Line endings, at the byte level. Every fixture above is fed one `printf '%s\n'` line,
+	# so none of them can see what the filter does to a CR.
+	st_crlf
+
 	# The filter must be clean under itself: its own patterns must not look like
 	# tokens, or the ladder's tree scan would flag this very file forever.
 	#
@@ -603,9 +670,10 @@ self_test() {
 case "${1:-}" in
 "") filter ;;
 --classes) list_classes ;;
+--baseline) baseline ;;
 --self-test) self_test ;;
 *)
-	printf 'usage: %s [--classes|--self-test]\n' "$0" >&2
+	printf 'usage: %s [--classes|--baseline|--self-test]\n' "$0" >&2
 	exit 2
 	;;
 esac
