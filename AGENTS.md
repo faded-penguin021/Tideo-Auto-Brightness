@@ -7,6 +7,20 @@ now in maintenance.
 Maintenance uses the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
 This constitution records **AMH 14.0.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
 and the version here must change with it; `scripts/guards/doc-facts.sh` fails on a mismatch.
+
+**The shipped scripts are AMH 14.0.0; the binding prose is AMH 9.1.0.** An upgrade has two halves,
+and `4e22273` landed only the first by owner direction: the hand-applied seed prose for 9.2.0 and
+MAJORs 10.0.0…14.0.0 is still owed, so rules stated in this file, `docs/RUNBOOK.md` and
+`docs/STATE.md` remain 9.1.0-era until that unit lands. Read the version pair as what it is — a
+tree running new scripts under old rules — rather than as a claim that every 14.0.0 rule binds here.
+`AMH_PROSE_VERSION` in `amh.conf` carries the same fact for machines: `doc-facts.sh` warns on every
+run while the two keys disagree, and fails if this disclosure goes missing before the prose lands.
+It tests for that by matching the literal sentence **"the binding prose is AMH `<AMH_PROSE_VERSION>`"**
+above, so that clause is load-bearing text, not a turn of phrase — rewording it turns the branch red
+exactly as deleting it does. Say the rest however you like. `docs/HARNESS_LOCAL.md` "Upgrading" reads
+the upstream changelog forward from that key rather than from `AMH_VERSION`, where the owed notes
+would be invisible. Delete this paragraph and set the two keys equal in the same commit that lands
+the prose, never before (DC-031).
 Before changing anything in `scripts/`, read `docs/HARNESS_LOCAL.md`. It explains which scripts
 come from upstream and cannot be fixed locally, how each local guard works and which verdict tier
 it uses, and every way this repository's `amh.conf` differs from the stock configuration.
@@ -269,9 +283,13 @@ constitution refer to this file.
 
 Never edit a script listed in `scripts/MANIFEST.sha256`. The ladder hashes those upstream files,
 and a local edit would turn every later upgrade into a merge. Put repository-specific changes in
-`amh.conf`, `scripts/guards/*.sh`, or `scripts/verify.sh`. If a necessary change fits none of those
-locations, the harness lacks an extension point; raise the issue upstream rather than patching a
-shipped script locally.
+`amh.conf`, `scripts/guards/*.sh`, `scripts/verify.sh`, `scripts/tests/local-guards.sh` (the
+repo-local guards' fixture suite, which `verify.sh` runs), or an unshipped repo-local script —
+`scripts/bootstrap.sh` and `scripts/session-facts.sh` are the two that exist. Every one of them is
+listed in `RULE_FILES`, so the rule-review tripwire covers the whole set. Adding a script to that
+last category is itself a rule change: name it in `RULE_FILES` and in `docs/HARNESS_LOCAL.md`'s
+split table in the same commit. If a necessary change fits none of these locations, the harness
+lacks an extension point; raise the issue upstream rather than patching a shipped script locally.
 
 Document agent-adapter wiring in `docs/HARNESS_LOCAL.md`, including an honest account of which
 rails each adapter actually provides. An agent without a pre-execution hook has no command rail:

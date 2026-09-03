@@ -424,3 +424,17 @@
   rather than archived once 14.0.0 withdrew the retained-in-place exception it had been kept under,
   leaving no redirect or tombstone, while the device results it sat beside stay in STATE as an
   explicitly dated observation rather than as current truth.
+
+- DC-031 [cited]: **A disclosure is only as durable as the tier it is stored in, and a caveat in
+  working memory does not qualify a claim in a permanent one.** `4e22273` set `AMH_VERSION=14.0.0`
+  while the binding prose stayed 9.1.0-era, and recorded that honestly — in `docs/STATE.md`, which
+  is compressible, and in a ledger row, which is search-not-read storage; the false-by-omission
+  half sat in `amh.conf`, permanent and guard-checked, where `doc-facts.sh` actively affirmed the
+  version pairing because both surfaces agreed on the new number. The repair is a second key,
+  `AMH_PROSE_VERSION`, next to the claim it qualifies: the guard warns while the two differ and
+  FAILS if `AGENTS.md` drops its disclosure paragraph first, so the debt cannot outlive its
+  statement, and `docs/HARNESS_LOCAL.md` now reads the upstream changelog forward from that key
+  rather than from `AMH_VERSION`, where notes owed from before the bump were invisible to the
+  repo's own documented upgrade procedure. Warn, not fail: the split was owner-directed and a red
+  branch for its duration is how a rule gets deleted instead of obeyed.
+  `[cited]`: `scripts/guards/doc-facts.sh`.

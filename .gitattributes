@@ -22,3 +22,16 @@ docs/LEDGER*.md         text eol=lf
 
 # Windows batch files are CRLF by convention; the Gradle wrapper ships that way.
 *.bat                   text eol=crlf
+
+# --- Ours, on top of the seed -----------------------------------------------
+#
+# `*.sh` above pins every harness script, but the ONE executable the verification rung actually
+# runs is not a `.sh`: `scripts/verify.sh` invokes `./gradlew`. Under `core.autocrlf=true` that
+# file checks out CRLF, and a CR in the shebang is fatal to real Linux bash — Git Bash's MSYS
+# runtime tolerates it, which is why the Windows host that motivated this file never hit it. The
+# recommended move to WSL2 (Owner queue) is exactly where it would start failing.
+gradlew                 text eol=lf
+
+# `python3 scripts/fdroid-check.py` never uses the shebang and CPython reads CRLF source fine,
+# so this is not the same defect — it is the same class, pinned before it becomes one.
+*.py                    text eol=lf

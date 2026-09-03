@@ -16,6 +16,12 @@ GRADLE=app/build.gradle.kts
 version=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$GRADLE" | head -1)
 code=$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$GRADLE" | head -1)
 
+# The ahead/behind line used to hardcode `origin/main` — the one value in this script that
+# amh.conf already parameterises. Parsed, not sourced: this needs one key out of 29, and
+# sourcing would let an unrelated assignment shadow a variable here.
+default_branch=$(sed -n 's/^DEFAULT_BRANCH=\(.*\)$/\1/p' amh.conf 2>/dev/null | head -1)
+default_branch=${default_branch:-main}
+
 say ''
 say '── live facts (computed now; STATE.md deliberately caches none of this) ──'
 
@@ -70,11 +76,12 @@ else
 fi
 
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-if [ -n "$branch" ] && git rev-parse --verify --quiet origin/main >/dev/null 2>&1; then
-	ahead=$(git rev-list --count origin/main..HEAD 2>/dev/null)
-	behind=$(git rev-list --count HEAD..origin/main 2>/dev/null)
+base=origin/$default_branch
+if [ -n "$branch" ] && git rev-parse --verify --quiet "$base" >/dev/null 2>&1; then
+	ahead=$(git rev-list --count "$base..HEAD" 2>/dev/null)
+	behind=$(git rev-list --count "HEAD..$base" 2>/dev/null)
 	if [ -n "$ahead" ] && [ -n "$behind" ]; then
-		say "· branch $branch: $ahead ahead / $behind behind origin/main (as last fetched; a shallow clone undercounts)"
+		say "· branch $branch: $ahead ahead / $behind behind $base (as last fetched; a shallow clone undercounts)"
 	fi
 fi
 

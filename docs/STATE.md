@@ -21,8 +21,12 @@ released — via `scripts/session-facts.sh` (DC-030); settle it by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`. This file was written to AMH 14.0.0's
 tree-relative practice, but that rule is NOT yet legislation here: its binding restatement in
 `AGENTS.md`, `docs/RUNBOOK.md` and this file's own length-guard preamble is part of the seed prose
-still owed (see Changelog). Until that lands, `AMH_VERSION` names 14.0.0 while the binding rules are
-9.1.0-era, and nothing stops a later session re-caching a release number.
+still owed (see Changelog). The split itself no longer depends on this file to stay known:
+`AMH_PROSE_VERSION=9.1.0` in `amh.conf` carries it against `AMH_VERSION=14.0.0`, `doc-facts.sh`
+warns every run while they differ and fails if `AGENTS.md` drops its disclosure, and
+`HARNESS_LOCAL.md` "Upgrading" reads the changelog forward from the prose key so the owed notes
+stay reachable (DC-031). Still true and unguarded: nothing stops a later session re-caching a
+release number.
 
 This branch carries the Graph Metrics restoration (DC-001), the LEDGER_C rollover, and the executed
 #126/#127 override-attribution work (DC-002…DC-009); its plan was deleted at completion by owner
@@ -107,6 +111,16 @@ the device maximum and the `context.resources` move, and leaves DC-003's two tra
    exactly, at a large speed cost under emulation; (c) accept CI as the authority for this rung and
    rely on `build.yml`. Recommendation: (a) for day-to-day, because it also removes the CRLF class
    of problems, with CI remaining the gate that decides.
+6. **BLOCKING — the DC-031 rule changes are committed UNREVIEWED; DA-005 is owed (2026-09-03).**
+   Two fresh-context attempts failed in the session environment, not in the tree: one died in a
+   container restart, one deadlocked 40+ minutes taking no further tool rounds; `codex` is not
+   installed, so the `.codex` reviewer was unavailable too. DA-005 has no self-review fallback and
+   the session authored the diff, so it is parked rather than self-certified. Run the DA-005
+   checklist from a session that can hold a fresh context, against `git diff 4e22273..HEAD`; test
+   above all that `HARNESS_LOCAL.md` "Upgrading" really reads forward from `AMH_PROSE_VERSION`, that
+   `doc-facts.sh` warns at 2 and fails at 1 on the right branches, and that no prose claims
+   enforcement the tree lacks. **Do not merge PR #128 first.** Ladder green and 8 new fixtures pass,
+   but green is not the review (DC-031).
 
 Everything raised through 2026-08-26 is closed in DB-054…DB-085 and DC-001, including the vc22 and
 vc23 rounds now folded into `DEVICE_TEST_SCRIPT.md` and the wake false-pause fix that taught DB-083.
@@ -135,6 +149,15 @@ The owed fresh-context review of `b462e56..HEAD` is discharged by this train's t
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-03 — **The 14.0.0 version claim got a durable disclosure and a guard (DC-031).** Review of
+  `4e22273` found the owed seed prose was recorded only in compressible working memory while the
+  claim it qualified sat in `amh.conf`, and that `HARNESS_LOCAL.md` "Upgrading" sent the next
+  upgrade session forward from `AMH_VERSION` — past the very notes still owed. Added
+  `AMH_PROSE_VERSION`, a `doc-facts.sh` warn/fail tier with 8 fixtures, the `AGENTS.md` disclosure
+  paragraph whose literal sentence the guard matches, the widened extension-point list, and
+  `gradlew`/`*.py` eol pins. **Landed WITHOUT its DA-005 rule review — see Owner queue 6**; seed
+  prose itself is still owed and unchanged as the next unit.
 
 - 2026-09-02 — **Harness upgraded AMH 9.1.0 → 14.0.0 (DC-029).** Shipped scripts and manifest
   copied, `.gitattributes` installed and the tree renormalised to fix a Windows CRLF false failure

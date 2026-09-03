@@ -37,6 +37,20 @@ run_guard() { # <sandbox-subdir> <guard-name>
 expect_pass() { # <label>
 	[ "$RC" = 0 ] && ok || bad "$1 — expected pass, got rc=$RC: $OUT"
 }
+expect_rc() { # <label> <exact rc> [substring the output must contain]
+	# expect_fail accepts ANY non-zero rc, which cannot tell a WARN (2) from a FAIL (1). Where the
+	# tier IS the behaviour under test, assert the code itself: a guard that failed when it meant
+	# to warn holds a branch red, and one that warned when it meant to fail lets the tree ship.
+	if [ "$RC" != "$2" ]; then
+		bad "$1 — expected rc=$2, got rc=$RC: $OUT"
+		return
+	fi
+	if [ -n "${3:-}" ] && ! printf '%s' "$OUT" | grep -qF -- "$3"; then
+		bad "$1 — rc=$2 as expected but the output never mentions '$3': $OUT"
+		return
+	fi
+	ok
+}
 expect_fail() { # <label> [substring the diagnostic must contain]
 	if [ "$RC" = 0 ]; then
 		bad "$1 — expected FAIL, guard passed: $OUT"
@@ -170,6 +184,56 @@ shizuku_tree df-ver-absent 2
 printf '`AMH_VERSION` in `amh.conf` is the authority on which release.\n' >"$SANDBOX/df-ver-absent/AGENTS.md"
 run_guard df-ver-absent doc-facts
 expect_fail "a constitution stating no version fails rather than passing vacuously" "states no"
+
+# The prose-version pair (DC-031). AMH_VERSION names the shipped scripts, AMH_PROSE_VERSION the
+# rules the tree actually follows; a split upgrade makes them differ. Every branch is fixtured
+# because the TIER is the design: warn keeps an owner-directed split legal, fail is what stops the
+# disclosure being dropped while the debt stands, and silence is what must happen once it is paid.
+shizuku_tree df-prose-warn 2
+printf 'AMH_VERSION=4.1.0\nAMH_PROSE_VERSION=3.0.0\n' >"$SANDBOX/df-prose-warn/amh.conf"
+printf 'This constitution records **AMH 4.1.0**; the binding prose is AMH 3.0.0.\n' \
+	>"$SANDBOX/df-prose-warn/AGENTS.md"
+run_guard df-prose-warn doc-facts
+expect_rc "keys differing WITH the disclosure warns, and does not fail" 2 "seed prose owed"
+
+# The warn line must lead the merged stream: the ladder reads `WARN ` only at position 0, so a
+# summary printed first would silently demote this to an ordinary pass.
+case $OUT in
+WARN\ *) ok ;;
+*) bad "the WARN marker must be the first thing printed, got: $OUT" ;;
+esac
+
+# The whole point of the key: the warning names the version to read the changelog FORWARD from,
+# because AMH_VERSION has already advanced past the notes nobody applied.
+expect_rc "the warning names the prose version as the changelog starting point" 2 "forward from 3.0.0"
+
+shizuku_tree df-prose-undisclosed 2
+printf 'AMH_VERSION=4.1.0\nAMH_PROSE_VERSION=3.0.0\n' >"$SANDBOX/df-prose-undisclosed/amh.conf"
+run_guard df-prose-undisclosed doc-facts
+expect_rc "keys differing WITHOUT the disclosure FAILS, not warns" 1 "carries no \"binding prose is AMH 3.0.0\" disclosure"
+
+# A disclosure naming the WRONG version is not a disclosure. Without this case the guard could be
+# satisfied by any stale paragraph left over from an earlier split.
+shizuku_tree df-prose-stale 2
+printf 'AMH_VERSION=4.1.0\nAMH_PROSE_VERSION=3.0.0\n' >"$SANDBOX/df-prose-stale/amh.conf"
+printf 'This constitution records **AMH 4.1.0**; the binding prose is AMH 2.0.0.\n' \
+	>"$SANDBOX/df-prose-stale/AGENTS.md"
+run_guard df-prose-stale doc-facts
+expect_rc "a disclosure naming a DIFFERENT prose version does not satisfy the requirement" 1 "carries no"
+
+shizuku_tree df-prose-equal 2
+printf 'AMH_VERSION=4.1.0\nAMH_PROSE_VERSION=4.1.0\n' >"$SANDBOX/df-prose-equal/amh.conf"
+run_guard df-prose-equal doc-facts
+expect_pass "keys EQUAL passes silently — nothing owed, no disclosure required"
+case $OUT in
+*"seed prose owed"*) bad "equal keys must not warn: $OUT" ;;
+*) ok ;;
+esac
+
+# Absent is the stock state, and every adopter without a split upgrade is in it.
+shizuku_tree df-prose-absent 2
+run_guard df-prose-absent doc-facts
+expect_pass "AMH_PROSE_VERSION absent entirely passes — the key is ours and optional"
 
 # =============================================================================
 printf '· ledger-prefix\n'

@@ -180,7 +180,7 @@ session while drifting against every upstream release.
   (DB-038), leaving the same commit labelled two ways across the tree. Both incidents were caught by
   eye, on a PR, by a reviewer who happened to look.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 137 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 145 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -214,6 +214,7 @@ you chose and why.
 
 | Key | Ours | Why |
 |---|---|---|
+| `AMH_PROSE_VERSION` | `9.1.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION`'s `14.0.0` for the shipped scripts: `4e22273` landed the file copy and left the seed prose owed. The **Upgrading** section below reads the changelog forward from this key, which is the reason it exists; `doc-facts.sh` warns while the two differ and fails if `AGENTS.md` drops its disclosure paragraph first. Delete the paragraph and set the two equal in the commit that lands the prose (DC-031). |
 | `BRANCH_PREFIX` | `claude` | Session branches are `claude/<codename>`, named in each session's directive. |
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |
@@ -226,7 +227,7 @@ you chose and why.
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
 | `REQUIRED_TOOLS` | `bash git java` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. The session banner reports availability; nothing consumes the states. |
 | `ADAPTER_FILES` | the Claude and Codex adapter paths | Names every adapter this repository ships. `configured` reports file presence, not that an integration or hook actually ran. |
-| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,verify.sh}` | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. |
+| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}` | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. |
 
 ## Adapter and CI notes
 
@@ -351,8 +352,17 @@ variables the harness will not assume.
 ## Upgrading
 
 Follow `docs/UPGRADING.md` in the AMH repository. In short: clone the target tag, read
-`harness/CHANGELOG.md` forward from `AMH_VERSION` in `amh.conf`, copy
-`harness/templates/scripts/*` (the **whole** directory — the manifest lives beside the scripts
-it hashes), apply the changelog's Upgrading notes by hand, and drive `scripts/ladder.sh` green.
+`harness/CHANGELOG.md` forward from **`AMH_PROSE_VERSION`** in `amh.conf` — not from
+`AMH_VERSION` — copy `harness/templates/scripts/*` (the **whole** directory — the manifest lives
+beside the scripts it hashes), apply the changelog's Upgrading notes by hand, and drive
+`scripts/ladder.sh` green.
+
+Read forward from the **prose** key because that is the one naming rules this tree actually
+follows. The two keys are equal whenever nothing is owed, so on an ordinary upgrade this reads
+exactly as it always did. They differ only while a split upgrade is outstanding, and then
+`AMH_VERSION` has already advanced past notes nobody applied: starting there skips them silently,
+and no guard can catch it, because reading a changelog is not something a check can observe. This
+is the sole reason the second key exists (DC-031). Set both equal in the commit that lands the
+owed prose.
 A new guard failing on something that was always there is a finding, not upgrade damage: fix
 the finding, never weaken the guard. Then re-check every row of the tables above.

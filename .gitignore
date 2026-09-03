@@ -32,5 +32,8 @@ signing.properties
 *.pepk
 google-services.json
 .env
+# Deliberately un-negated: `.env.*` also covers a `.env.example`, and nothing here needs one.
+# A committed template would be a file that LOOKS ignored while being tracked, in the one
+# directory where that misreading is expensive. If a real need appears, force-add it explicitly.
 .env.*
 secrets.properties
