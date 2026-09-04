@@ -193,7 +193,7 @@ broken guard rather than a mild opinion. The contract is the **ladder's**: a wor
 calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
 `scripts/guards/*.sh` outside `scripts/ladder.sh`.
 
-**All eight of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
+**Seven of the eight fail closed, deliberately, and `doc-facts.sh` carries the one warn branch.** A codepoint count over F-Droid's hard cap, a
 secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
 — for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
 `action-pins.sh` joins them on the same test: a tag ref where a SHA belongs, an unlabelled pin and
@@ -204,11 +204,17 @@ only warns is a budget the next session spends, and warn fatigue is the document
 for exactly this shape of rule. The escape hatch is not a warning, it is the constants in the
 guard's own header — raising one is visible in the diff and trips the rule-review tripwire, which
 is the reviewable version of the same flexibility.
-`doc-facts.sh` is the interesting one: its anchors are deliberate approximations and *can* fire on
-a true claim (a fifth file naming `ShizukuShell` without being a runtime dependency site, per that
-guard's own header). It stays fail-closed anyway, because reconciling the prose against the code
-is the work the anchor exists to force. Choose the tier when you add a guard, and say here which
-you chose and why.
+`doc-facts.sh` is the interesting one, and it is the only guard here that uses both tiers. Its
+drift anchors are deliberate approximations and *can* fire on a true claim (a fifth file naming
+`ShizukuShell` without being a runtime dependency site, per that guard's own header). They stay
+fail-closed anyway, because reconciling the prose against the code is the work the anchor exists
+to force. Its one **warn** branch is the `AMH_PROSE_VERSION` split (DC-031): while the two version
+keys differ and `AGENTS.md` discloses the gap, the guard prints a leading `WARN ` and exits 2, so
+the debt stays audible on every run without holding the branch red for the duration of a state the
+owner deliberately chose — failing closed there is how a rule gets deleted instead of obeyed. That
+branch is *not* an exception to the fail-closed rule: drop the disclosure paragraph, or let it name
+a different version, and the same guard exits 1. Choose the tier when you add a guard, and say here
+which you chose and why.
 
 ## Every `amh.conf` value that differs from stock
 
@@ -227,7 +233,7 @@ you chose and why.
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
 | `REQUIRED_TOOLS` | `bash git java` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. The session banner reports availability; nothing consumes the states. |
 | `ADAPTER_FILES` | the Claude and Codex adapter paths | Names every adapter this repository ships. `configured` reports file presence, not that an integration or hook actually ran. |
-| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04, DC-034) as the list's only doc: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032). |
+| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04; recorded in the STATE changelog), the fourth doc in the list and the first that is neither constitution nor playbook: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032, DC-034). |
 
 ## Adapter and CI notes
 

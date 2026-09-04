@@ -487,3 +487,19 @@
   so this is a widened claim and not merely a refreshed one. The durable half: a version-scoped
   observation is the honest form and it also has a shelf life, so the scope is a re-measurement owed,
   not a sentence licensed to age quietly into a false one.
+
+- DC-035: **A guard that gains a tier silently falsifies the prose that inventoried the old one.**
+  `845bb75` gave `doc-facts.sh` a legitimate warn branch for the disclosed `AMH_PROSE_VERSION`
+  split, and left `docs/HARNESS_LOCAL.md` asserting "All eight of ours fail closed" and, three
+  sentences later, that `doc-facts.sh` "stays fail-closed anyway" — a claim the same commit made
+  false, in the file whose whole job is recording how this repo differs from stock. It landed
+  because that commit shipped WITHOUT its DA-005 review: two fresh-context attempts died in the
+  session environment and `codex` was absent, so it was parked in the Owner queue rather than
+  self-certified, which was the correct call and is why the defect survived to be found rather than
+  buried. The owed review, run here over `4e22273..HEAD`, returned NOT CLEAN and caught it as
+  prose/guard lockstep drift plus enforcement asymmetry, along with two lower findings in this
+  unit's own work — an "only doc in the list" claim contradicted by `docs/RUNBOOK.md`, and an owner
+  decision cited to DC-034, a row that records a different thing. The durable half: the inventory
+  sentence, not the guard, is the fragile artifact — any prose that counts or classifies guards is
+  a lockstep obligation of every future guard edit, and the tripwire only fires on the files
+  `RULE_FILES` names, which is why `docs/HARNESS_LOCAL.md` was added to it in this same unit.

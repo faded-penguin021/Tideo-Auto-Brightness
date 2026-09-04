@@ -97,16 +97,14 @@ the device maximum and the `context.resources` move, and leaves DC-003's two tra
    with it, both now on: Developer Mode plus `MSYS=winsymlinks:nativestrict`, without which Git
    Bash's `ln -s` silently writes a copy, and a real `python3` ahead of the Microsoft Store alias,
    which otherwise answers `command -v` and exits 0 without running Python.
-5. **BLOCKING — the DC-031 rule changes are committed UNREVIEWED; DA-005 is owed (2026-09-03).**
-   Two fresh-context attempts failed in the session environment, not in the tree: one died in a
-   container restart, one deadlocked 40+ minutes taking no further tool rounds; `codex` is not
-   installed, so the `.codex` reviewer was unavailable too. DA-005 has no self-review fallback and
-   the session authored the diff, so it is parked rather than self-certified. Run the DA-005
-   checklist from a session that can hold a fresh context, against `git diff 4e22273..HEAD`; test
-   above all that `HARNESS_LOCAL.md` "Upgrading" really reads forward from `AMH_PROSE_VERSION`, that
-   `doc-facts.sh` warns at 2 and fails at 1 on the right branches, and that no prose claims
-   enforcement the tree lacks. **Do not merge PR #128 first.** Ladder green and 8 new fixtures pass,
-   but green is not the review (DC-031).
+5. **Nothing to do — the DA-005 review owed on the DC-031 commit is discharged, and it was NOT
+   clean (2026-09-04, DC-035).** Run over `4e22273..HEAD` by a fresh-context Codex reviewer, now
+   that `codex` is installed here. It confirmed the two things the item asked about — `Upgrading`
+   really reads forward from `AMH_PROSE_VERSION`, and `doc-facts.sh` warns at 2 and fails at 1 with
+   fixtures pinning both — and found the contradiction nobody had: `HARNESS_LOCAL.md` still said all
+   eight repo-local guards fail closed, which `845bb75` had made false. Fixed in the same unit, with
+   two lower findings in this session's own work. The PR #128 hold is lifted on this ground alone;
+   the branch is otherwise unchanged.
 
 Everything raised through 2026-08-26 is closed in DB-054…DB-085 and DC-001, including the vc22 and
 vc23 rounds now folded into `DEVICE_TEST_SCRIPT.md` and the wake false-pause fix that taught DB-083.
