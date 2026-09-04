@@ -1,0 +1,37 @@
+# AMH — line endings for the files the harness reads byte-for-byte.
+#
+# Git for Windows sets `core.autocrlf=true` in its SYSTEM config when it installs, so a repo
+# with no .gitattributes hands every text file to the worktree with CRLF endings the index
+# never had. The harness notices, because several of its rungs compare or parse bytes rather
+# than lines: the secret scan compares a file against its own filtered stream, the integrity
+# rung reads filenames out of `scripts/MANIFEST.sha256`, and `amh.conf` is sourced by bash,
+# where a trailing CR becomes part of the value.
+#
+# Deliberately narrow. These are the paths AMH installs and reads; what the rest of your tree
+# does with line endings stays your decision, and this file is yours to extend. Note that it
+# governs future checkouts only: a worktree that is already CRLF stays that way until you
+# renormalise it (`git add --renormalize .`, or a fresh clone).
+*.sh                    text eol=lf
+amh.conf                text eol=lf
+scripts/MANIFEST.sha256 text eol=lf
+AGENTS.md               text eol=lf
+CLAUDE.md               text eol=lf
+docs/STATE.md           text eol=lf
+docs/RUNBOOK.md         text eol=lf
+docs/LEDGER*.md         text eol=lf
+
+# Windows batch files are CRLF by convention; the Gradle wrapper ships that way.
+*.bat                   text eol=crlf
+
+# --- Ours, on top of the seed -----------------------------------------------
+#
+# `*.sh` above pins every harness script, but the ONE executable the verification rung actually
+# runs is not a `.sh`: `scripts/verify.sh` invokes `./gradlew`. Under `core.autocrlf=true` that
+# file checks out CRLF, and a CR in the shebang is fatal to real Linux bash — Git Bash's MSYS
+# runtime tolerates it, which is why the Windows host that motivated this file never hit it. The
+# recommended move to WSL2 (Owner queue) is exactly where it would start failing.
+gradlew                 text eol=lf
+
+# `python3 scripts/fdroid-check.py` never uses the shebang and CPython reads CRLF source fine,
+# so this is not the same defect — it is the same class, pinned before it becomes one.
+*.py                    text eol=lf

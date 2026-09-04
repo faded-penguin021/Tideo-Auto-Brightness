@@ -47,13 +47,13 @@ DEFAULT_BRANCH=main
 # script does not use is a claim it honours one — command-guard.sh and session-start.sh
 # are where the prefix lives.
 STATE_FILE=docs/STATE.md
-# The compression floor is BOTH of these, and a landing has to satisfy both: see
+# The pair of post-action ceilings comprises BOTH of these, and a landing has to satisfy both: see
 # count_sentences for why one number cannot do this job alone.
 STATE_COMPRESS_TO_KB=9
 STATE_COMPRESS_TO_SENTENCES=50
 STATE_WARN_KB=14
 STATE_HARD_KB=16
-# Largest shrink above the soft cap that still counts as an ordinary edit rather than a
+# Largest shrink above the compression trigger that still counts as an ordinary edit rather than a
 # compression pass that stopped short. See guard_state_size for why this exists.
 STATE_EDIT_DELTA_BYTES=1024
 STATE_REQUIRED_SECTIONS='## Project|## Current state|## Changelog'
@@ -62,7 +62,7 @@ LEDGER_DIR=docs
 LEDGER_BASENAME=LEDGER
 LEDGER_LINE_CAP=800
 LEDGER_ROW_SENTENCE_CAP=6
-# A backstop against runaway sentences, not the working limit — LEDGER_ROW_SENTENCE_CAP is.
+# A second rejection boundary that catches pathologically dense sentences.
 LEDGER_ROW_CHAR_CAP=2000
 CITATION_SCAN_PATHS='scripts .github'
 CITATION_EXCLUDE=''
@@ -122,7 +122,7 @@ upstream_ref() {
 # adjective, tighten a clause, re-measure, repeat until the guard goes quiet. Two reported
 # instances, one shape — a ledger row drafted at 874 bytes against an 800-byte cap and
 # trimmed until it fit, and a state file shaved across a dozen edits to land 7 bytes under
-# its floor. Removing the threshold from green output (AMH ledger row DB040) did not reach
+# its ceiling. Removing the threshold from green output (AMH ledger row DB040) did not reach
 # either one: the session measures its own draft, so the anchor is the cap itself and not
 # the report of it.
 #
@@ -130,11 +130,11 @@ upstream_ref() {
 # about content and exactly the move the compression rules ask for. That is the whole of
 # what this unit buys, and it is deliberately NOT the claim that the count cannot be gamed:
 # rewriting `. T` to `; t` across a file halves it while removing nothing at all, verified
-# on this repository's own state file (85 → 41, zero bytes). So a sentence floor cannot
-# stand alone either, and the aim-points are bounded in BOTH units — the byte floor stops
-# the punctuation rewrite, which frees no space, and the sentence floor stops the shave,
+# on this repository's own state file (85 → 41, zero bytes). So a sentence ceiling cannot
+# stand alone either, and the aim-points are bounded in BOTH units — the byte ceiling stops
+# the punctuation rewrite, which frees no space, and the sentence ceiling stops the shave,
 # which removes no content. Neither number is sufficient; together neither cheap move
-# passes. Bytes still stand alone where nobody aims: the soft and hard caps, which decide
+# passes. Bytes still stand alone where nobody aims: the soft and rejection boundarys, which decide
 # WHEN to compress rather than how far, and the edit delta, which classifies a shrink
 # already made.
 #
@@ -178,32 +178,32 @@ guard_state_size() {
 		fail "$STATE_FILE is missing — it is protocol step 1 for every session"
 		return
 	fi
-	local cur warn_b hard_b comp_b floor prev prev_file prev_s cur_s shrank delta
+	local cur warn_b hard_b comp_b ceiling prev prev_file prev_s cur_s shrank delta
 	cur=$(wc -c <"$STATE_FILE")
 	warn_b=$((STATE_WARN_KB * 1024))
 	hard_b=$((STATE_HARD_KB * 1024))
 	comp_b=$((STATE_COMPRESS_TO_KB * 1024))
 
-	# Same loud fallback as the edit delta below, for the same reason: a malformed floor
+	# Same loud fallback as the edit delta below, for the same reason: a malformed ceiling
 	# arriving from config must not decide anything quietly.
-	floor=$STATE_COMPRESS_TO_SENTENCES
-	case $floor in
+	ceiling=$STATE_COMPRESS_TO_SENTENCES
+	case $ceiling in
 	'' | 0 | *[!0-9]*)
-		warn "STATE_COMPRESS_TO_SENTENCES='$floor' is not a positive sentence count — using 50. Fix it in amh.conf; a guard that reads a malformed threshold and carries on quietly is how a band gets widened by accident."
-		floor=50
+		warn "STATE_COMPRESS_TO_SENTENCES='$ceiling' is not a positive sentence count — using 50. Fix it in amh.conf; a guard that reads a malformed threshold and carries on quietly is how a band gets widened by accident."
+		ceiling=50
 		;;
 	esac
 
 	if [ "$cur" -gt "$hard_b" ]; then
-		fail "$((cur / 1024)) KB exceeds the ${STATE_HARD_KB} KB hard cap — compress to ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${floor} sentences now"
+		fail "$((cur / 1024)) KB crosses the ${STATE_HARD_KB} KB rejection boundary; post-action ceilings require ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${ceiling} sentences"
 	elif [ "$cur" -gt "$warn_b" ]; then
-		warn "$((cur / 1024)) KB is over the ${STATE_WARN_KB} KB soft cap — run ONE deep compression pass to ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${floor} sentences (fold whole stages: the two floors together admit nothing else)"
+		warn "$((cur / 1024)) KB crosses the ${STATE_WARN_KB} KB compression trigger; post-action ceilings require ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${ceiling} sentences"
 	else
 		# The green line prints the MEASUREMENT and no threshold, deliberately. A clean
-		# run that says "8 KB (soft cap 14 KB)" re-anchors the cap in the context of the
+		# run that says "8 KB (compression trigger 14 KB)" re-anchors the cap in the context of the
 		# agent who will next compress this file, and the number in front of you is the
 		# number you optimize toward: a reported instance shaved clauses across a dozen
-		# edits to land 7 bytes under the floor, having never considered 7 KB. Every
+		# edits to land 7 bytes under the post-action ceilings, having never considered 7 KB. Every
 		# verdict that TURNS ON a threshold still names it — the warn, both fails, and
 		# the landing line below — because a rejection must say what it rejected
 		# against. A pass rejects nothing, so it owes no number.
@@ -211,9 +211,9 @@ guard_state_size() {
 	fi
 
 	# Landing check. Size thresholds alone are Goodhart-able: a trim that stops short of
-	# the floor passes and re-arms the warning a session later. Compare against the
+	# the post-action ceilings passes and re-arms the warning a session later. Compare against the
 	# committed size and require a compression, once started, to actually LAND on the
-	# floor.
+	# ceiling.
 	#
 	# "Any shrink above the cap IS a compression pass" was the first form of that, and it
 	# is wrong in the other direction: it failed a 15-byte deletion twice, once for fixing
@@ -221,13 +221,13 @@ guard_state_size() {
 	# time was to pad the file back. So judge the shrink's SIZE and whether it CROSSES
 	# the cap, in three branches:
 	#
-	#   1. crosses from above the cap to at or below it — must land on the floor. This is
+	#   1. crosses from above the cap to at or below it — must land on the post-action ceilings. This is
 	#      the original hole verbatim and stays closed.
 	#   2. stays above the cap and is smaller than the edit delta — an ordinary edit.
 	#      Allowed; the size warning above is still armed, so the compression is still owed.
 	#   3. stays above the cap and reaches the delta — a compression pass that stopped
 	#      short, which is the grow-to-15.5 / trim-to-14.2 loop the debounce exists to
-	#      prevent. Must reach the floor.
+	#      prevent. Must reach the post-action ceilings.
 	#
 	# The delta sits in a wide empty gap: no plausible ordinary edit runs to 1 KB, and no
 	# real compression pass on a file this size comes in under about 5 KB. It is the SHRINK
@@ -263,46 +263,46 @@ guard_state_size() {
 
 	# Byte counts, not KB, wherever a verdict below reports a SIZE. Integer KB rounds toward
 	# zero on both sides of a comparison, so the honest outcome prints as a contradiction:
-	# a 14848-byte stop reads `stops short at 14 KB, still above the 14 KB soft cap`. Bytes
+	# a 14848-byte stop reads `stops short at 14 KB, still above the 14 KB compression trigger`. Bytes
 	# are what the guard actually compared. The landing verdict reports neither, because
 	# what it compares is a sentence count.
 	if [ "$cur" -le "$warn_b" ]; then
 		# Branch 1 deliberately does NOT consult the shrink: once the file is back under
-		# the cap, how it got there does not matter — the floor is the floor. So the
+		# the cap, how it got there does not matter — the post-action ceilings are the post-action ceilings. So the
 		# wording describes the CROSSING, and claims no classification the guard did not
 		# make. A one-byte deletion from 14337 lands here, and that is the owner's rule.
 		#
-		# The floor is TWO conditions and a landing satisfies both, which is what puts
+		# The pair of post-action ceilings comprises TWO conditions and a landing satisfies both, which is what puts
 		# "how it got there" partly back inside the guard's reach. A pass that shaved words
 		# to cross the cap arrives carrying every sentence it started with and fails on the
-		# sentence floor; a pass that rewrote `. T` to `; t` to halve the sentence count
-		# frees no space and fails on the byte floor. Either number alone is satisfiable by
+		# sentence ceiling; a pass that rewrote `. T` to `; t` to halve the sentence count
+		# frees no space and fails on the byte ceiling. Either number alone is satisfiable by
 		# a move that removes nothing, and that is why neither stands here alone.
 		cur_s=$(count_sentences "$STATE_FILE") || {
 			fail "could not count the sentences in $STATE_FILE — this landing check judged NOTHING, and a green line here would say it had"
 			return
 		}
-		if [ "$cur" -gt "$comp_b" ] || [ "$cur_s" -gt "$floor" ]; then
-			fail "crossed below the soft cap but stops short at $cur bytes and $cur_s sentences — the floor is $comp_b bytes (${STATE_COMPRESS_TO_KB} KB) AND $floor sentences, and landing in the band re-arms the warning next session. Fold whole completed stages into single Changelog lines or move content to the ledger: trimming words moves the sentence count by nothing, and repunctuating moves no bytes."
+		if [ "$cur" -gt "$comp_b" ] || [ "$cur_s" -gt "$ceiling" ]; then
+			fail "compression result is $cur bytes and $cur_s sentences — post-action ceilings require ≤ $comp_b bytes (${STATE_COMPRESS_TO_KB} KB) AND ≤ $ceiling sentences"
 		else
-			# Reports the MARGIN, not the floor it was measured against. The landing
+			# Reports the MARGIN, not the post-action ceilings it was measured against. The landing
 			# line is the one an agent reads immediately after compressing, so the
 			# quantity it makes salient is the quantity the next pass aims at: "at or
-			# under the 50-sentence floor" teaches that the floor is the target, and
-			# landing ON it reads as a job well done. Headroom below the floor is the
+			# under the 50-sentence ceiling" teaches that the post-action ceilings are the target, and
+			# landing ON it reads as a job well done. Headroom below the post-action ceilings are the
 			# same fact without that pull. It is NOT a score to maximise either: a file
 			# gutted to stubs prints a big number and passes, and no guard can see the
 			# difference — the rule that governs it is the state file's own (fold whole
 			# completed stages; do not shave), and this line is a measurement, not a
-			# grade. The floor is still one addition away for anyone who wants it, and
+			# grade. The configured ceilings remain one addition away for anyone who wants it, and
 			# the fail branch beside this one names it outright.
 			prev_s=$(count_sentences "$prev_file") || prev_s='?'
-			ok "crossed below the soft cap and landed at $cur bytes and $cur_s sentences, $((comp_b - cur)) bytes and $((floor - cur_s)) sentences clear of the floor (from $prev bytes and $prev_s sentences)"
+			ok "crossed below the compression trigger and landed at $cur bytes and $cur_s sentences, $((comp_b - cur)) bytes and $((ceiling - cur_s)) sentences below the post-action ceilings (from $prev bytes and $prev_s sentences)"
 		fi
 	elif [ "$shrank" -lt "$delta" ]; then
-		ok "edit above the soft cap (shrank $shrank bytes, under the $delta-byte edit delta); compression still owed"
+		ok "edit above the compression trigger (shrank $shrank bytes, below the $delta-byte edit-delta trigger); compression still owed"
 	else
-		fail "unfinished compression pass: shrank $shrank bytes, at or over the $delta-byte edit delta, and stopped at $cur bytes — still above the soft cap ($warn_b bytes), and the floor is $comp_b bytes AND $floor sentences. Fold whole completed stages into single Changelog lines or move content to the ledger: trimming words moves the sentence count by nothing, and repunctuating moves no bytes."
+		fail "unfinished compression pass: shrank $shrank bytes, crossing the $delta-byte edit-delta trigger, and stopped at $cur bytes — still above the compression trigger ($warn_b bytes); post-action ceilings require ≤ $comp_b bytes AND ≤ $ceiling sentences"
 	fi
 }
 
@@ -502,26 +502,25 @@ guard_new_ledger_row_lengths() {
 		id=${row##*/}
 		[ -f "$TMP/head-rows/$id" ] && continue
 		checked=$((checked + 1))
-		# The working limit, and the only one a draft is written toward. Over it, no
-		# amount of rewording helps: the row loses a whole sentence of narrative or it
-		# does not pass, which is the same instruction the ledger preamble gives in prose.
+		# A rejection boundary, never a desired size. Counting sentences discourages
+		# word-by-word shaving; a row near it probably contains narrative or multiple lessons.
 		sentences=$(count_sentences "$row") || {
 			fail "$id: could not count the sentences in this new row — the rung judged NOTHING, and a green line here would say it had"
 			return
 		}
 		if [ "$sent_cap" -gt 0 ] && [ "$sentences" -gt "$sent_cap" ]; then
-			fail "$id: new ledger row runs to $sentences sentences, over LEDGER_ROW_SENTENCE_CAP=$sent_cap — cut a whole sentence of narrative, not words; trimming clauses moves this count by nothing. Historical committed rows and sanctioned metadata-only additions are exempt"
+			fail "$id: new ledger row runs to $sentences sentences, crossing rejection boundary LEDGER_ROW_SENTENCE_CAP=$sent_cap; historical committed rows and sanctioned metadata-only additions are exempt"
 			return
 		fi
-		# The backstop, in bytes, for the one shape the sentence cap cannot see: a row
-		# inside its sentence budget whose sentences run away. Locale-stable character
+		# The second rejection boundary, in bytes, catches pathologically dense sentences
+		# that the sentence count cannot see. Locale-stable character
 		# policy — count bytes with LC_ALL=C. For ordinary ASCII ledger prose that is one
 		# byte per character; UTF-8 non-ASCII text is charged by encoded bytes so the
 		# verdict is identical across host locales.
 		count=$(LC_ALL=C wc -c <"$row") || return
 		count=${count//[[:space:]]/}
 		if [ "$cap" -gt 0 ] && [ "$count" -gt "$cap" ]; then
-			fail "$id: new ledger row is $count byte-counted character(s), over LEDGER_ROW_CHAR_CAP=$cap — that is the runaway backstop rather than the working limit, and $sentences sentence(s) reaching it means the narrative belongs in docs/history/ with a pointer from the state changelog, not that the wording needs tightening; historical committed rows and sanctioned metadata-only additions are exempt"
+			fail "$id: new ledger row is $count byte-counted character(s), crossing rejection boundary LEDGER_ROW_CHAR_CAP=$cap; historical committed rows and sanctioned metadata-only additions are exempt"
 			return
 		fi
 		lengths="$lengths $id=$sentences"
@@ -635,15 +634,11 @@ guard_ledger_rollover() {
 		# suffix and a rollover that gets one of them wrong is not caught by anything.
 		suffix=$(volume_suffix "$live")
 		next=$(next_volume_suffix "$suffix")
-		fail "$live: a row STARTS at line $last_row (${size} KB), past the ${LEDGER_LINE_CAP}-line cap — open $LEDGER_DIR/${LEDGER_BASENAME}_$next.md, numbering from D$next-001 (rows are never moved or renumbered)"
-	elif [ "$lines" -ge $((LEDGER_LINE_CAP * 9 / 10)) ]; then
-		warn "$live: $lines lines / ${size} KB, approaching the ${LEDGER_LINE_CAP}-line cap — the next rollover is near"
+		fail "$live: a row starts at line $last_row (${size} KB measured), crossing the ${LEDGER_LINE_CAP}-line rollover boundary — open $LEDGER_DIR/${LEDGER_BASENAME}_$next.md, numbering from D$next-001 (rows are never moved or renumbered)"
 	else
 		# Lines and size, not lines-over-cap: this is the third green line to lose its
 		# threshold, and the one that most nearly escaped, because `800/2000 lines` reads
-		# as context rather than as an anchor. It is the same anchor. The warn branch
-		# above it fires at nine tenths and names the cap, which is the moment the number
-		# is load-bearing.
+		# as context rather than as an anchor. It is the same anchor.
 		ok "$live: $lines lines, ${size} KB (grep it; a volume is retrieval storage, not a read)"
 	fi
 }
@@ -721,7 +716,27 @@ guard_citations() {
 		# pattern changes what the text around it MEANS, this file included.) Whole-word
 		# matching also closes the same trap one letter down, where `XL-003` used to
 		# yield a citation to L-003 (AMH ledger row DB004(g)); that one shipped.
-		xargs -0 grep -hwoE 'D[A-Z]*-[0-9]+' <"$scan_files" 2>/dev/null | sort -u >"$cited"
+		#
+		# `-I` is not an optimization. A binary file whose bytes happen to match makes
+		# grep print `Binary file <path> matches` INSTEAD of the match — and which stream
+		# it prints that on is version-dependent: stderr on grep >= 3.5, which the
+		# redirection below already discards, but STDOUT on <= 3.4, and Git for Windows
+		# ships 3.0. There the notice lands in `$cited` as a citation token no ledger row
+		# can ever resolve, and the rung fails naming a font file. Same class as the sed
+		# assumption in AMH ledger row DC030: a shipped guard depending on a third-party
+		# tool's behaviour that only holds on the platform the fixtures run on. `-I`
+		# settles it in every version — a binary file is not a citation site — and it is
+		# what the secret scan already uses to decide the same question.
+		#
+		# `LC_ALL=C` is half of that flag, not decoration beside it. Grep before 3.5 — the
+		# versions `-I` is here for — also calls a file binary on an ENCODING ERROR in the
+		# current locale, so under a UTF-8 locale a Latin-1 file in the scan paths would be
+		# skipped: its citations would vanish, an unmarked row would then pass, and a
+		# `[cited]` marker whose only site was that file would fail as stale. That is scope
+		# drift of exactly the kind the `set -f` above exists to stop. Under `C` the
+		# question is the NUL byte on every host and locale, which is how the secret scan
+		# and `shipped-citations.sh` both ask it.
+		LC_ALL=C xargs -0 grep -I -hwoE 'D[A-Z]*-[0-9]+' <"$scan_files" 2>/dev/null | sort -u >"$cited"
 	fi
 
 	local unresolved missing_marker stale_marker
@@ -773,6 +788,24 @@ guard_secret_shapes() {
 		fail "scripts/redact.sh did not redact a generated test token — the filter is empty, broken or pass-through, and this scan would report green on everything"
 		return
 	fi
+	# ...and a second control, for the second thing this scan now depends on. A difference
+	# between the filter's output and the file is only a credential if everything else in
+	# the filter is byte-transparent, and `sed` — which is what the filter is built out of —
+	# is not, on every platform: the MSYS2 build shipped with Git for Windows rewrites CRLF
+	# to LF for a script that matches nothing at all (AMH ledger row DC030). `--baseline`
+	# runs the same stages with no substitutions, so it carries that newline handling and no
+	# redaction, and the comparison below can subtract one from the other. If it is missing
+	# — an older redact.sh beside a newer ladder — there is nothing to subtract, so this
+	# control establishes that the mode EXISTS and emits its input. It is deliberately not
+	# the whole check: one canary proves one class, and a baseline that redacted some other
+	# class would sail through it. What proves the baseline reproduced a particular file is
+	# the per-file comparison below, which runs on that file's own bytes. Refusing to scan
+	# is the honest verdict for both: this rung is the repo's whole secret defence, and
+	# "I did not manage to look" must never render as clean (AMH ledger row DC002).
+	if ! printf 'x %s x\n' "$canary" | bash scripts/redact.sh --baseline 2>/dev/null | grep -qF "$canary"; then
+		fail "scripts/redact.sh has no working --baseline mode, so this scan cannot tell a redaction from the platform's own newline handling and did NOT scan this tree. The copy of redact.sh beside this ladder is older than it or broken — re-run the harness's init script to restore the matching pair."
+		return
+	fi
 	local list=$TMP/files.nul hits=0
 	if has_git; then
 		git ls-files -co --exclude-standard -z >"$list"
@@ -781,7 +814,7 @@ guard_secret_shapes() {
 	fi
 	# NUL-separated: a word-split list silently skips names with spaces or non-ASCII
 	# characters, and a scan with a silent hole is worse than no scan.
-	local f pos cmperr=$TMP/cmp.err
+	local f pos cmperr=$TMP/cmp.err base=$TMP/redact.base
 	while IFS= read -r -d '' f; do
 		[ -f "$f" ] || continue
 		LC_ALL=C grep -qI . "$f" 2>/dev/null || continue # text files only
@@ -793,8 +826,38 @@ guard_secret_shapes() {
 		# nothing in this pipeline writes "$f", and comparing a file against its own
 		# filtered stream is precisely what the scan is.
 		pos=$(bash scripts/redact.sh <"$f" 2>/dev/null | cmp - "$f" 2>"$cmperr")
+		# A difference is a SUSPICION, not yet a finding. The byte-exact comparison above
+		# holds only where every stage of the filter is byte-transparent, and on a Windows
+		# checkout it is not: with `core.autocrlf=true` — Git for Windows's own installer
+		# default — the worktree is CRLF, MSYS2's sed drops the CR, and this rung reported a
+		# credential in every text file in the tree, its own shipped scripts included
+		# (AMH ledger row DC030). So re-compare against the baseline, which is the same
+		# stages with nothing to substitute. Done only for a file that already differed, so
+		# the exact comparison stays the fast path and a tree on a transparent platform pays
+		# nothing for the second.
+		if [ -s "$cmperr" ] || [ -n "$pos" ]; then
+			bash scripts/redact.sh --baseline <"$f" >"$base" 2>/dev/null
+			# The baseline is now standing in for the file, so it has to EARN that: it must
+			# reproduce this file's own bytes apart from carriage returns, which is the one
+			# difference the platform is allowed to make. Without this arm the subtraction
+			# cancels anything the stages do to BOTH streams — a sed that truncates its
+			# output truncates the baseline identically, the two agree, and the rung prints
+			# a green over bytes it never read. That is the same fail-open the truncation
+			# arm below exists to refuse, and it is why the tolerance is named (`\r`) rather
+			# than inherited from whatever the tool happens to do.
+			if ! LC_ALL=C tr -d '\r' <"$base" | cmp -s - <(LC_ALL=C tr -d '\r' <"$f"); then
+				fail "scripts/redact.sh --baseline did not reproduce $f apart from line endings, so the filter's own stages are altering or dropping this file's bytes and NOTHING here scanned it. A filter whose stages rewrite content cannot be told apart from one that redacted something — fix the filter or the sed it runs on; a green from this rung would be a green over bytes nobody read."
+				hits=$((hits + 1))
+				continue
+			fi
+			pos=$(bash scripts/redact.sh <"$f" 2>/dev/null | cmp - "$base" 2>"$cmperr")
+		fi
 		if [ -s "$cmperr" ]; then
-			fail "scripts/redact.sh did not filter all of $f ($(tr -d '\n' <"$cmperr")) — a truncated stream reads as clean"
+			# `cmp`'s own text names whichever operand it read, which is the scratch
+			# baseline rather than anything the reader has. Say which stream that was.
+			local why
+			why=$(tr -d '\n' <"$cmperr")
+			fail "scripts/redact.sh did not filter all of $f (${why//"$base"/the baseline stream}) — a truncated stream reads as clean"
 			hits=$((hits + 1))
 			continue
 		fi
@@ -828,7 +891,15 @@ guard_poison_tokens() {
 	fi
 	while IFS= read -r tok; do
 		[ -n "$tok" ] || continue
-		if printf '%s' "$msgs" | grep -qF -- "$tok"; then
+		# A here-string, NOT `printf ... | grep -q`. `grep -q` exits at its first match;
+		# with bytes still pending the writer takes EPIPE, and under `pipefail` that
+		# becomes the pipeline's status — so a token found EARLY in a long enough set of
+		# messages reads as absent and this rung fails OPEN, silently. Commit messages are
+		# inherently multi-line, so unlike the payload case size alone is enough here: at
+		# ~64 KB of `git log` output a token in the newest commit is simply not reported.
+		# A here-string's writer is not a pipeline member and never reaches `PIPESTATUS`
+		# (AMH ledger row DC034, DC035).
+		if grep -qF -- "$tok" <<<"$msgs"; then
 			fail "commit message contains '$tok' — a squash merge would fold it onto $DEFAULT_BRANCH, and force-push is forbidden, so it is permanent until merge"
 			hits=$((hits + 1))
 		fi
@@ -1106,9 +1177,20 @@ guard_shipped_integrity() {
 		warn "neither sha256sum nor shasum is on PATH, so $manifest was NOT verified — this rung checked NOTHING. Install coreutils (or Perl's shasum) if you want the shipped scripts covered here."
 		return
 	fi
-	local line n=0 checked=0 bad=0 covers_self=0 want rest file got
+	local line n=0 checked=0 bad=0 covers_self=0 want rest file got eol
 	while IFS= read -r line || [ -n "$line" ]; do
 		n=$((n + 1))
+		# A CRLF checkout — the default on Windows, where the installer sets
+		# `core.autocrlf=true` system-wide — hands every line a trailing CR, and this rung
+		# was the one place it could not be shrugged off. The hash field comes FIRST, so it
+		# still measured 64 characters and the corruption check below stayed quiet; only the
+		# filename was polluted, and the rung went on to report five shipped scripts as
+		# deleted and to tell the reader to re-run the init script to restore files that
+		# were present all along — a true hash comparison wrapped in a false account of what
+		# was checked, which the note below says is the one thing this rung must never do
+		# (AMH ledger row DC030). Stripping it is unambiguous: a filename cannot contain a
+		# CR, and a hash field is hex.
+		line=${line%$'\r'}
 		case $line in '' | '#'*) continue ;; esac
 		# sha256sum's own format: `<hash>  <path>`, with `*` marking binary mode. Parsed
 		# rather than trusted — a manifest this cannot read is a manifest that checked
@@ -1146,7 +1228,19 @@ guard_shipped_integrity() {
 		fi
 		got=$(amh_sha256 "$tool" "$file")
 		if [ "$got" != "$want" ]; then
-			fail "$file does not match the hash the harness published for it. If you edited it: the change belongs in amh.conf, in a guard under scripts/guards/, or in scripts/verify.sh — re-running the harness's init script puts the shipped copy back. If you upgraded by copying *.sh by hand: copy $manifest out of the same directory too, or this rung reports every new script as edited."
+			# Ask Git about the affected path instead of inspecting its bytes with another
+			# text-mode tool. `ls-files --eol` reports the worktree representation Git
+			# actually established, and prints nothing for an untracked file.
+			eol=''
+			has_git && eol=$(git ls-files --eol -- "$file" 2>/dev/null)
+			case $eol in
+			*' w/crlf '*)
+				fail "$file does not match the hash the harness published for it, and Git reports a CRLF worktree for this tracked file. Line-ending conversion may have changed this byte-bound artifact. Retain or restore the harness-provided .gitattributes, re-normalize and re-check out the affected file, and only then re-run the harness's init script or this ladder."
+				;;
+			*)
+				fail "$file does not match the hash the harness published for it. If you edited it: the change belongs in amh.conf, in a guard under scripts/guards/, or in scripts/verify.sh — re-running the harness's init script puts the shipped copy back. If you upgraded by copying *.sh by hand: copy $manifest out of the same directory too, or this rung reports every new script as edited."
+				;;
+			esac
 			bad=$((bad + 1))
 		fi
 	done <"$manifest"

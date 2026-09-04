@@ -130,6 +130,9 @@ fun LiveDebugContent(
                 Metric("Active rule", state.activeContext ?: "None", "debug_active_rule")
             }
 
+            // DC-007: requested vs acknowledged vs deviceMax, readable without an override firing.
+            BrightnessWriteCard(p)
+
             // Performance & Timings — full Tasker parity (G2R-F29).
             DiagnosticCard("Performance & Timings", "debug_performance") {
                 Metric("Smoothing α (LuxAlpha)", fmtAlpha(p.luxAlpha), "debug_lux_alpha")
@@ -226,6 +229,38 @@ private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
             modifier = Modifier.fillMaxWidth().testTag("global_flash_enable"),
         ) {
             Text(if (enabled) "Open Accessibility settings" else "Enable in Accessibility settings")
+        }
+    }
+}
+
+/** DC-007: identifies a mechanism CLASS — clamp, refusal, mode conflict — never the writer. */
+@Composable
+private fun BrightnessWriteCard(p: PipelineState) {
+    val write = p.lastBrightnessWrite
+    val diagnostic = p.overrideDiagnostic
+    // DC-008: either half stands alone; gating on the write record hid the diagnostic.
+    if (write == null && diagnostic == null) return
+    DiagnosticCard("Brightness Writes", "debug_write_card") {
+        write?.let {
+            Metric(
+                "Requested → acknowledged",
+                "${it.requestedDomain} → ${it.acknowledgedDomain ?: "—"}",
+                "debug_write_roundtrip",
+            )
+            Metric("Write status", it.status.name, "debug_write_status")
+            Metric("Raw requested", it.requestedRaw.toString(), "debug_write_raw")
+            // The value Tideo converts with — one domain step is round(deviceMax / 255) raw.
+            Metric("Device max", it.deviceMax.toString(), "debug_write_device_max")
+        }
+        diagnostic?.let { d ->
+            Metric("Last override", "${d.disposition.name} (${d.source.name})", "debug_override_disposition")
+            Metric(
+                "Observed / settled / expected",
+                "${d.observed} / ${d.settled} / ${d.expected ?: "—"}",
+                "debug_override_values",
+            )
+            Metric("Mode at commit", if (d.manualMode) "Manual" else "Not manual", "debug_override_mode")
+            Metric("Override seen", lastSampleLabel(d.timestampMs), "debug_override_age")
         }
     }
 }

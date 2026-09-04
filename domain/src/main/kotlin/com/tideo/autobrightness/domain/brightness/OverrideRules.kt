@@ -23,18 +23,31 @@ object OverrideRules {
     }
 
     // Decide if override (pause) condition still valid after re-check delay (task567 act8).
+    // DC-006: [isManualMode] is a deliberate deviation — task567/prof755 never consult the mode.
+    // A non-MANUAL mode means Tideo no longer owns the mode it writes against, so the event is
+    // ambiguous rather than user input. Defaults to true: the pre-settle gate is state-only, and a
+    // failed mode read must fail toward pausing.
     fun shouldCommitPause(
         isServiceOn: Boolean,
         isAutoRunning: Boolean,
         isAlreadyPaused: Boolean,
         isInitializing: Boolean,
+        isManualMode: Boolean = true,
     ): Boolean {
         if (!isServiceOn) return false
         if (isAutoRunning) return false
         if (isAlreadyPaused) return false
         if (isInitializing) return false
+        if (!isManualMode) return false
         return true
     }
+
+    // DC-005: one domain step is representational drift, not a user adjustment. Deliberately blind to
+    // a persistent ≤1-step deviation; bounded in MAGNITUDE, unlike a time-based grace period.
+    fun isRepresentationalDrift(settled: Int, lastApplied: Int?): Boolean =
+        lastApplied != null && kotlin.math.abs(settled - lastApplied) <= DOMAIN_DRIFT_TOLERANCE
+
+    const val DOMAIN_DRIFT_TOLERANCE = 1
 
     // Record override point (lux, brightness) capped at maxEntries (task561, newest-first).
     fun recordOverridePoint(

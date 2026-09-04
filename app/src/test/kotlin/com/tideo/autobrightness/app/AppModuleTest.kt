@@ -46,13 +46,10 @@ class AppModuleTest {
             assertNotNull(graph.panicSensor, "createRuntime must build a panic sensor")
             // S14: the graph exposes the shared tier source so the service can refresh it on resume.
             assertNotNull(graph.privilegeManager, "createRuntime must expose the privilege manager")
-            // The controller is the ControllerHook the engine fires through (no lateinit cycle).
-            assertTrue(
-                graph.controller is ControllerHook,
-                "the pipeline controller must implement ControllerHook so the engine can drive it",
-            )
+            // Typed binding, not `is`: the compiler proves the engine can drive the controller.
+            val controllerHook: ControllerHook = graph.controller
             // Wiring sanity: a fresh holder pointed at this controller fires it without throwing.
-            val holder = ControllerHookHolder().apply { hook = graph.controller as ControllerHook }
+            val holder = ControllerHookHolder().apply { hook = controllerHook }
             assertSame(graph.controller, holder.hook)
             holder.fire()
         } finally {

@@ -11,8 +11,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.SensorEventBuilder
 import org.robolectric.shadows.ShadowSensor
-import org.robolectric.shadows.ShadowSensorManager
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -54,18 +54,18 @@ class PanicSensorSourceTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
     }
 
-    private fun accelSensor(): Sensor {
-        val sensor = ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)
-        shadowOf(sensorManager).addSensor(sensor)
-        return sensor
+    private val accelerometer: Sensor = ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)
+
+    private fun accelSensor() {
+        shadowOf(sensorManager).addSensor(accelerometer)
     }
 
     /** Feed one raw accelerometer sample (device-frame m/s²) to the registered listener. */
     private fun sample(x: Float, y: Float, z: Float) {
-        val event = ShadowSensorManager.createSensorEvent(3, Sensor.TYPE_ACCELEROMETER)
-        event.values[0] = x
-        event.values[1] = y
-        event.values[2] = z
+        val event = SensorEventBuilder.newBuilder()
+            .setSensor(accelerometer)
+            .setValues(floatArrayOf(x, y, z))
+            .build()
         shadowOf(sensorManager).sendSensorEventToListeners(event)
     }
 

@@ -66,6 +66,120 @@ optional.
     times touching nothing, expecting no pause. **On any other device this observes nothing** — it
     passes whether the fix is present or absent, so record it as SKIPPED, never as evidence.
 
+10b. **The deadband boundary (DC-005, issue #126).** Injected, so it fails on a device that never
+    shows the bug. **Mind the coordinate systems:** `settings put system screen_brightness` takes
+    RAW device values, while the app's `lastAppliedBrightness` is DOMAIN 0–255. Never type a domain
+    number into these commands.
+
+    **Start each injection unpaused (DC-012).** Live Debug → System Status → "Manual override" must
+    read `No`; if it reads `Paused`, Resume from the notification first. The latch is sticky — only
+    an explicit Resume clears it — and a paused pipeline drops every injected event, so any later
+    check passes vacuously. This one's own control pauses on purpose, so re-check between the two
+    halves and before 10c.
+
+    **Two scales, and the shell is not on the app's (DC-025).** The card's "Device max" (call it M)
+    is `config_screenBrightnessSettingMaximum`, the app-facing maximum Tideo converts with, and it
+    reads **255** on the owner's phone. What `adb settings get/put` speaks is the STORED scale,
+    whose ceiling (call it S) is **4095** there — the same setting key, a different scale, with the
+    conversion sitting below the app API. Both numbers are right (DC-017, DC-025). Measure S rather
+    than assuming it equals M: drag the system brightness slider to maximum, then `adb shell
+    settings get system screen_brightness`. A shell value V reaches the app as domain
+    round(V × 255 / S), so a raw `+1` is not a domain `+1` and M is not what you inject with.
+
+    **Convert, do not step (DC-010).** A fixed raw offset is not a fixed domain distance wherever
+    S ≠ 255, so never inject one. At S = 4095 a domain step is 16.06 raw: a round `+20` lands 1
+    domain step from about three quarters of the raw values and 2 from the rest, a single `+16`
+    quantises to 0 at 14 of them and tests nothing, and even a doubled `+32` quantises back to 1 at
+    28 of them — which would FAIL a correct build. Pick the raw value for the domain value you want.
+    With the service running and one cycle completed:
+
+    ```
+    adb shell settings get system screen_brightness   # current stored value, call it R
+    # d      = round(R × 255 / S)   <- the domain value the app sees   (S = 4095 here)
+    # raw(n) = round(n × S / 255)   <- the stored value that lands on domain n
+    adb shell settings put system screen_brightness <raw(d + 1)>
+    ```
+
+    **Expected:** NO pause — one domain step is representational drift and the ±1 deadband is
+    inclusive. **Then the control:** `raw(d + 2)`. **Expected:** it DOES pause. A build quiet for
+    both has disabled detection, not fixed anything — FAIL it.
+
+    **Record the disposition after each half, not just whether it paused (DC-015).** Live Debug →
+    **Brightness Writes** → "Last override" and "Override seen". A quiet half is two different
+    events wearing one face: a fresh `DISMISSED_DRIFT` means `handleOverride` ran and judged it,
+    while a stale or absent timestamp means the monitor never delivered the event at all — a closed
+    gate, the F64/DB-082 settle window, or the DC-003 self-write adoption. Only the first is this
+    check passing. **PASSED on 1.10.0-debug vc24 (owner, 2026-08-31), both halves converted with
+    S = 4095 (DC-027).** `raw(d + 1)`: stored `1092` → domain 68 → injected `1108` = domain 69;
+    quiet, with `Manual override: No`, `Last override: DISMISSED_DRIFT (OBSERVER)` and
+    `Observed / settled / expected: 69 / 69 / 68`. Control `raw(d + 2)`: stored `931` → domain 58 →
+    injected `964` = domain 60; it paused, with the notification and `60 / 60 / 58`. `Mode at
+    commit` read `Manual` in both halves, so the first was dismissed by the drift rule and not by
+    10c's mode branch. The 2026-08-30 round is superseded: it injected on the wrong scale, its two
+    `+20` offsets landing 1 and 3 domain apart (DC-010, DC-025).
+
+    **Negative control — v1.9.2 is the known-failing build (DC-028).** The same `raw(d + 1)`
+    injection on v1.9.2/vc23, same phone and same conversion, IS detected as a manual override and
+    pauses (owner, 2026-08-31), seen as the notification rather than a disposition since the
+    Brightness Writes card postdates that release. Expected — the shipped build has no
+    `isRepresentationalDrift`, so one step is not in `expectedValues` — and worth having, because
+    it is what stops this injected step from being a check a well-behaved phone can never fail
+    (DB-083). Re-run it against v1.9.2 if a future build's quiet half is ever in doubt.
+10c. **Mode conflict dismisses instead of pausing (DC-006, issue #127).** Service running, override
+    detection on, and **not already paused** — check "Manual override" as in 10b (DC-012).
+
+    ```
+    adb shell settings put system screen_brightness_mode 1
+    adb shell settings put system screen_brightness <a raw value far outside the deadband>
+    ```
+
+    **Expected:** NO pause, no "manual override" notification, and the app flips the mode back —
+    `adb shell settings get system screen_brightness_mode` reads `0` within a cycle. **That `0` does
+    not on its own prove Tideo did it (DC-011):** an OEM build may clear the mode on any manual
+    `screen_brightness` write, and then the expected observation arrives whether or not the reclaim
+    ran. **The distance is what separates them (DC-013)** — do not use a nearby value. Far outside
+    the ±1 deadband the two explanations predict opposite outcomes: had the OEM cleared the mode
+    first, Tideo would read MANUAL, fail the drift test and PAUSE. So a quiet run at that distance
+    can only be the mode branch, and Live Debug → **Brightness Writes** → "Last override" reading
+    `DISMISSED_MODE` confirms it directly. A quiet run at a NEARBY value proves nothing either way
+    (the deadband would dismiss it regardless) — record that as SKIPPED. **Control:** with the mode
+    already `0`, the same brightness write MUST pause as in step 8. Verified on 1.10.0-debug vc24
+    (owner, 2026-08-30): mode 1 + shell value 4000, which is domain ≈ 249 on the S = 4095 stored
+    scale (DC-025) — quiet, with `Last override: DISMISSED_MODE (OBSERVER)` on the card confirming
+    the branch directly rather than by inference.
+10d. **Normalization readout (diagnostic, not pass/fail). ANSWERED on the owner's phone — re-run
+    only on new hardware (DC-025).** Live Debug → **Brightness Writes**, at the TOP of the curve
+    (bright room, or raise Min/Max Brightness so a high value is written). **A requested value above
+    the acknowledged one at the top of the range means the advertised maximum disagrees with what
+    the provider stores, and the top of that user's curve is silently flat.** Report the numbers; do
+    not change any setting to "fix" it.
+
+    **TIDEO must be what put the brightness at the top — this is the whole step.** A reading taken
+    after dragging the system slider to maximum measures the slider, not the app, and one was
+    mistaken for a result once already (2026-08-30). So: service running, override detection on,
+    **not paused**, force the top from the app side, let the sweep end and **fully settle** for
+    several seconds, touch nothing, then read the card and `adb shell settings get system
+    screen_brightness`. Do NOT instead pair the card's "Current brightness" with that value at one
+    instant: a ratio near 16 is produced both by the app converting and by the layer below it
+    rescaling an identity write, so it separates nothing (DC-018). `screen_brightness_float` is
+    `null` here (DC-024), so do not wait on it; where it exists, ≈1.0 and ≈0.06 corroborate.
+
+    **The reading (owner, 2026-08-31, 1.10.0-debug vc24), Tideo driving at raw lux 2061.5:**
+
+    | Field | Source | Read | If the ceiling were real |
+    |---|---|---|---|
+    | Requested → acknowledged | card | `255 → 255` | `255 → 255` |
+    | Write status | card | `ACKNOWLEDGED` | `ACKNOWLEDGED` |
+    | Device max | card | `255` | `255` |
+    | Raw requested | card | `255` | `255` |
+    | Settled stored value | adb | **4095** | ≈ `255` |
+
+    Only the last row moves, and it was the verdict: **4095 — the 0–4095 scale sits below the app
+    API**, Tideo's whole 0–255 domain reaches the whole panel, and the card's five 255s are the
+    normal, correct record of that, not a 6.2% ceiling. The app's own read-back returned 255 for the
+    same key the shell read as 4095, so the two callers see different scales. The owner's ruling on
+    that reality is DC-026: no code fix, and every adb check converts with S (see 10b).
+
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 
 11. Turn the screen off, wait ~10 s, turn it on. **Expected:** sensing resumes; an initial brightness is
@@ -366,6 +480,26 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     Settings *and* in the app, then change only stay-awake and Apply. **Expected:** Night Light does
     not blink off/on and nothing you set outside the app is re-asserted — only the changed field is
     written.
+39d. **A charger set Tideo did not write survives a profile swap and a service stop (DB-077).**
+    Step 32a covers the Apply path; this is the **coordinator** path, which reads the device's
+    stay-awake state first and skips the write when the device is *already* on the side being asked
+    for — so a mask this app cannot represent (`7`, `1`, …) is left alone instead of being broadened
+    to `15`. The transition has to be **OFF → ON while the device already holds a custom mask**; an
+    ON → ON swap writes nothing on any build and so proves nothing. Prepare two saved profiles,
+    **P-off** (stay-awake OFF) and **P-on** (stay-awake ON). Master switch on, **P-off** active, then
+    put the device in the state every pre-v1.9.0 upgrade is in, behind the app's back:
+    `adb shell settings put global stay_on_while_plugged_in 7`. Switch to **P-on** and read back
+    `adb shell settings get global stay_on_while_plugged_in`. **Expected: `7`** — the device was
+    already staying awake, so nothing is written and the owner's charger set survives; **`15` is the
+    pre-fix regression.** Control, so that cannot pass vacuously: `… put global
+    stay_on_while_plugged_in 0`, switch to **P-off** and back to **P-on**. **Expected: `15`** — a
+    device that really is off still gets written, so the skip is conditional and not a dead branch.
+    Finally the service-stop path: with **P-on** active set `7` again and turn the **master switch
+    off** (baseline restore). **Expected:** the baseline's own stay-awake value decides — a
+    stay-awake-ON baseline leaves `7` untouched, a stay-awake-OFF baseline writes `0`; both are
+    correct, and what must not happen is `7` → `15`. Untouched on purpose: **Use Tideo's setting
+    instead** (DB-078) and panic reset still replace the mask outright, so an unexpected `15` is
+    worth blaming on an Apply or a panic before the coordinator.
 
 ## 12. Accessibility — TalkBack & touch targets (D-156)
 

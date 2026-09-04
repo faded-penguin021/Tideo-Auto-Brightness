@@ -19,6 +19,10 @@ class PowerMeterTest {
     private val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
     private val meter = AndroidPowerMeter(context)
 
+    // Sticky seeding has no non-deprecated route; see BatteryStateReaderTest.seedBattery.
+    @Suppress("DEPRECATION")
+    private fun seedBattery(intent: Intent) = context.sendStickyBroadcast(intent)
+
     @Test
     fun readCurrentRaw_usesCurrentNow_whenNonZero() {
         shadowOf(batteryManager).setLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW, -350_000L)
@@ -56,15 +60,13 @@ class PowerMeterTest {
 
     @Test
     fun readVoltageVolts_convertsMillivoltsFromStickyBroadcast() {
-        context.sendStickyBroadcast(
-            Intent(Intent.ACTION_BATTERY_CHANGED).putExtra(BatteryManager.EXTRA_VOLTAGE, 3850),
-        )
+        seedBattery(Intent(Intent.ACTION_BATTERY_CHANGED).putExtra(BatteryManager.EXTRA_VOLTAGE, 3850))
         assertEquals(3.85, meter.readVoltageVolts(), 1e-9)
     }
 
     @Test
     fun readVoltageVolts_missingExtraReadsZero() {
-        context.sendStickyBroadcast(Intent(Intent.ACTION_BATTERY_CHANGED))
+        seedBattery(Intent(Intent.ACTION_BATTERY_CHANGED))
         assertEquals(0.0, meter.readVoltageVolts(), 1e-9)
     }
 }

@@ -1,24 +1,37 @@
 package com.tideo.autobrightness.app.runtime
 
+import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
+import com.tideo.autobrightness.platform.brightness.WriteStatus
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.Test
 
 class AnimationRunnerTest {
 
-    private class FakeBrightness : ScreenBrightnessController {
+    /** [normalize] models an OEM that stores something other than what we asked for. */
+    private class FakeBrightness(
+        private val normalize: (Int) -> Int = { it },
+    ) : ScreenBrightnessController {
         val writes = mutableListOf<Int>()
         var current = 0
         var overrideRead: Int? = null
         private var lastWrite: Int? = null
         override fun read(): Int = overrideRead ?: current
-        override fun write(level: Int) { current = level; lastWrite = level; writes += level }
-        override fun forceManualMode() = Unit
+        override fun write(level: Int): BrightnessWriteResult {
+            val stored = normalize(level)
+            current = stored
+            lastWrite = stored
+            writes += level
+            return ackWrite(level, stored)
+        }
+        override fun forceManualMode() = true
         override fun restoreMode() = Unit
+        override fun isManualMode() = true
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
-        override fun isOnScreenSelfWrite(): Boolean = read() == lastWrite
         override fun clearSelfWriteMarker() { lastWrite = null }
     }
 
@@ -27,7 +40,7 @@ class AnimationRunnerTest {
         val fake = FakeBrightness()
         val runner = AnimationRunner(fake, sleep = {})
         val result = runner.animate(from = 0, to = 100, steps = 4, waitMs = 5, detectOverrides = false)
-        assertEquals(AnimationRunner.Result.COMPLETED, result)
+        assertIs<AnimationOutcome.Completed>(result)
         assertEquals(4, fake.writes.size)
         assertEquals(100, fake.writes.last())
         assertTrue(fake.writes.zipWithNext().all { (a, b) -> b >= a })
@@ -49,7 +62,7 @@ class AnimationRunnerTest {
             if (fake.writes.size == 1) fake.overrideRead = 240
         })
         val result = runner.animate(from = 0, to = 100, steps = 5, waitMs = 5, detectOverrides = true)
-        assertEquals(AnimationRunner.Result.OVERRIDDEN, result)
+        assertIs<AnimationOutcome.Overridden>(result)
         // Aborted early — did not run all 5 frames.
         assertTrue(fake.writes.size < 5)
     }
@@ -59,7 +72,7 @@ class AnimationRunnerTest {
         val fake = FakeBrightness()
         val runner = AnimationRunner(fake, sleep = { fake.overrideRead = 240 })
         val result = runner.animate(from = 0, to = 100, steps = 5, waitMs = 5, detectOverrides = false)
-        assertEquals(AnimationRunner.Result.COMPLETED, result)
+        assertIs<AnimationOutcome.Completed>(result)
         assertEquals(5, fake.writes.size)
     }
 
@@ -69,7 +82,7 @@ class AnimationRunnerTest {
         val fake = FakeBrightness()
         val runner = AnimationRunner(fake, sleep = {})
         val result = runner.animate(from = 0, to = 100, steps = 4, waitMs = 5, detectOverrides = true)
-        assertEquals(AnimationRunner.Result.COMPLETED, result)
+        assertIs<AnimationOutcome.Completed>(result)
         assertEquals(4, fake.writes.size)
         assertEquals(100, fake.writes.last())
     }
@@ -80,7 +93,7 @@ class AnimationRunnerTest {
         val fake = FakeBrightness()
         val runner = AnimationRunner(fake, sleep = { if (fake.writes.size >= 1) fake.overrideRead = 255 })
         val result = runner.animate(from = 200, to = 50, steps = 6, waitMs = 5, detectOverrides = true)
-        assertEquals(AnimationRunner.Result.OVERRIDDEN, result)
+        assertIs<AnimationOutcome.Overridden>(result)
         assertTrue(fake.writes.size < 6)
     }
 
@@ -94,7 +107,103 @@ class AnimationRunnerTest {
             fake.overrideRead = if (sleeps == 1) 250 else null
         })
         val result = runner.animate(from = 0, to = 100, steps = 5, waitMs = 5, detectOverrides = true)
-        assertEquals(AnimationRunner.Result.COMPLETED, result)
+        assertIs<AnimationOutcome.Completed>(result)
         assertEquals(5, fake.writes.size)
+    }
+
+    // --- DC-004: acknowledged-write awareness ---
+
+    // The #126 headline at the AnimationRunner level: an OEM that stores our frames well OUTSIDE the
+    // sweep band must not read as an override. Without the acknowledgement check this returns Overridden.
+    @Test
+    fun normalizedFramesFarOutsideTheBand_doNotTripTheDetector_126() = runTest {
+        val fake = FakeBrightness(normalize = { it + 40 })
+        val runner = AnimationRunner(fake, sleep = {})
+        val result = runner.animate(from = 0, to = 100, steps = 50, waitMs = 5, detectOverrides = true)
+        assertIs<AnimationOutcome.Completed>(result)
+        assertEquals(50, fake.writes.size, "no frame should have been skipped")
+        assertEquals(140, result.lastAcknowledged?.acknowledgedDomain)
+    }
+
+    // Same fixture, but the value on screen is FOREIGN: it must still trip, and report the read that did it.
+    @Test
+    fun foreignValueOutsideTheBand_stillTrips_andReportsTheTriggeringRead() = runTest {
+        val fake = FakeBrightness(normalize = { it + 40 })
+        val runner = AnimationRunner(fake, sleep = { fake.overrideRead = 7 })
+        val result = runner.animate(from = 200, to = 100, steps = 6, waitMs = 5, detectOverrides = true)
+        val overridden = assertIs<AnimationOutcome.Overridden>(result)
+        assertEquals(7, overridden.triggerObserved, "the read that tripped it, not a later re-read")
+        assertTrue(fake.writes.size < 6, "aborted early")
+    }
+
+    @Test
+    fun unacknowledgedFrames_neverBecomeTheAcknowledgement() = runTest {
+        val fake = RefusingBrightness()
+        val runner = AnimationRunner(fake, sleep = {})
+        val result = runner.animate(from = 0, to = 100, steps = 4, waitMs = 0, detectOverrides = false)
+        assertIs<AnimationOutcome.Completed>(result)
+        assertNull(result.lastAcknowledged, "a REFUSED frame says nothing about what is on screen")
+    }
+
+    // DC-008: a provider that applies our write a frame LATE, which the DC-004 equality alone missed.
+    @Test
+    fun laggingProviderThatAppliesAFrameLate_doesNotTripTheDetector() = runTest {
+        val fake = LaggingBrightness(offset = 40)
+        val runner = AnimationRunner(fake, sleep = { fake.settle() })
+        val result = runner.animate(from = 0, to = 100, steps = 20, waitMs = 5, detectOverrides = true)
+        assertIs<AnimationOutcome.Completed>(result)
+        assertEquals(20, fake.writes.size, "no frame should have been skipped")
+    }
+
+    @Test
+    fun laggingProvider_stillTripsOnAGenuinelyForeignValue() = runTest {
+        val fake = LaggingBrightness(offset = 40)
+        val runner = AnimationRunner(fake, sleep = { fake.settle(); fake.foreign = 250 })
+        val result = runner.animate(from = 0, to = 100, steps = 20, waitMs = 5, detectOverrides = true)
+        assertIs<AnimationOutcome.Overridden>(result)
+    }
+
+    @Test
+    fun unacknowledgedFrames_areStillReportedAsTheLastResult() = runTest {
+        val fake = RefusingBrightness()
+        val runner = AnimationRunner(fake, sleep = {})
+        val result = runner.animate(from = 0, to = 100, steps = 4, waitMs = 0, detectOverrides = false)
+        assertNull(result.lastAcknowledged)
+        assertEquals(WriteStatus.REFUSED, result.lastResult?.status, "the caller still needs the status")
+    }
+
+    /**
+     * Stores `requested + offset`, but only makes it visible on the NEXT write — so the read-back
+     * inside `write()` sees the previous frame's value, exactly like an asynchronous provider.
+     */
+    private class LaggingBrightness(private val offset: Int) : ScreenBrightnessController {
+        val writes = mutableListOf<Int>()
+        var foreign: Int? = null
+        private var visible = 0
+        private var pending: Int? = null
+        /** The write lands here — AFTER its own read-back, BEFORE the next band read. */
+        fun settle() { pending?.let { visible = it }; pending = null }
+        override fun read(): Int = foreign ?: visible
+        override fun write(level: Int): BrightnessWriteResult {
+            pending = level + offset
+            writes += level
+            return ackWrite(level, visible) // the read-back still sees the PREVIOUS value
+        }
+        override fun forceManualMode() = true
+        override fun restoreMode() = Unit
+        override fun isManualMode() = true
+        override fun isSelfWrite(rawDeviceValue: Int) = false
+        override fun clearSelfWriteMarker() = Unit
+    }
+
+    /** Every write is REFUSED, so no frame is ever acknowledged. */
+    private class RefusingBrightness : ScreenBrightnessController {
+        override fun read(): Int = 0
+        override fun write(level: Int) = unlandedWrite(level, WriteStatus.REFUSED)
+        override fun forceManualMode() = true
+        override fun restoreMode() = Unit
+        override fun isManualMode() = true
+        override fun isSelfWrite(rawDeviceValue: Int) = false
+        override fun clearSelfWriteMarker() = Unit
     }
 }

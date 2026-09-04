@@ -69,6 +69,26 @@ say() { printf '%s\n' "$*"; }
 # unexpanded — with `rm -f` swallowing the literal, that is a rail switched off in silence, the
 # same shape as the defect this function exists to fix. The no-match case still reaches `rm`
 # unexpanded, so the loop tests each entry exists rather than trusting the expansion.
+#
+# The `.resumed` sibling is named EXPLICITLY, and this is the one place the paragraph above does
+# not apply. The guard writes an advisory state file for every category, and for TWO of them —
+# destructive and subagent — a `.resumed` ledger of the advisories a session went ahead with; the
+# other categories never gain one. For as long as this loop stopped at
+# `$slug` it deleted the state and never the sibling, so the reports built on `.resumed` spanned
+# every session that shared the container: `--spawn-report` counted spawns from sessions long
+# gone, and `--advisory-report` went SILENT about a deletion abandoned this session whenever the
+# same command text had been resumed in an earlier one. That is the report's whole job, so the
+# sibling has to go the way the state file does.
+#
+# Widening the pattern to `"$slug"*` would have reached it, and is refused: the wide-is-safe
+# argument above holds for the state file, where an early rearm costs one extra prompt, and
+# INVERTS for `.resumed`, where erasing a neighbouring repository's copy destroys the record of
+# what that repository's sessions did. `/home/user/AMH*` also matches `/home/user/AMH-fork`.
+# So the two names are enumerated instead. A new sibling suffix in the guard needs a new entry
+# here; that coupling is the price of not globbing WIDER across repository boundaries. It narrows
+# that reach rather than closing it: the category slot is still a greedy `*`, so a neighbouring
+# repository whose path embeds this exact shape stays reachable. Contrived, and not a reason to
+# widen — but the absolute would be false.
 reset_command_guard_advisories() {
 	local slug uid f had_globignore old_globignore noglob=0
 	case $- in *f*) noglob=1 ;; esac
@@ -79,7 +99,8 @@ reset_command_guard_advisories() {
 	slug=${ROOT//\//_}
 	slug=${slug// /_}
 	uid=${UID:-unknown}
-	for f in /tmp/amh-command-guard-*-advisory-"$uid"-"$slug"; do
+	for f in /tmp/amh-command-guard-*-advisory-"$uid"-"$slug" \
+		/tmp/amh-command-guard-*-advisory-"$uid"-"$slug".resumed; do
 		[ -e "$f" ] && rm -f -- "$f" 2>/dev/null
 	done
 	if [ -n "$had_globignore" ]; then GLOBIGNORE=$old_globignore; else unset GLOBIGNORE; fi
@@ -282,9 +303,9 @@ fi
 if [ -f "$STATE_FILE" ]; then
 	bytes=$(wc -c <"$STATE_FILE")
 	warn_b=$((STATE_WARN_KB * 1024))
-	printf '· %s: %s KB of %s KB soft cap\n' "$STATE_FILE" "$((bytes / 1024))" "$STATE_WARN_KB"
+	printf '· %s: %s KB measured; compression trigger is %s KB\n' "$STATE_FILE" "$((bytes / 1024))" "$STATE_WARN_KB"
 	if [ "$bytes" -gt "$warn_b" ]; then
-		say "    ⚠ over the soft cap — run ONE deep compression pass to ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${STATE_COMPRESS_TO_SENTENCES} sentences before adding to it."
+		say "    ⚠ compression trigger crossed — run ONE deep compression pass; post-action ceilings require ≤ ${STATE_COMPRESS_TO_KB} KB AND ≤ ${STATE_COMPRESS_TO_SENTENCES} sentences before adding to it."
 	fi
 else
 	say "· ⚠ $STATE_FILE is missing — working memory is where every session starts."

@@ -2,7 +2,7 @@
 
 This repository runs the **Agentic Maintenance Harness**
 ([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v9.1.0**
-under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
+and upgraded to **amh-v14.0.0**, under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.
 
@@ -17,7 +17,7 @@ any of it.
 | | Files | Rule |
 |---|---|---|
 | **Shipped** | `scripts/{ladder,session-start,command-guard,redact,test-ladder-guards}.sh`, `scripts/MANIFEST.sha256` | **Never edit.** Parameter-free, they read `amh.conf` at runtime. The ladder's integrity rung hashes them against the manifest every run, so a local edit is reported rather than discovered a year later by whoever upgrades. |
-| **Ours** | `amh.conf`, `scripts/verify.sh`, `scripts/guards/*.sh`, `scripts/bootstrap.sh`, `scripts/tests/local-guards.sh` | The extension points. Everything repo-specific goes in one of these — if a change fits none of them, the harness is missing an extension point; raise it upstream rather than carrying a local patch. |
+| **Ours** | `amh.conf`, `scripts/verify.sh`, `scripts/guards/*.sh`, `scripts/bootstrap.sh`, `scripts/session-facts.sh`, `scripts/tests/local-guards.sh` | The extension points. Everything repo-specific goes in one of these — if a change fits none of them, the harness is missing an extension point; raise it upstream rather than carrying a local patch. |
 | **Ours (prose)** | `AGENTS.md`, `CLAUDE.md`, `docs/{STATE,RUNBOOK,LEDGER*}.md`, `docs/history/` | Seeded once, ours thereafter. Upgrades arrive as hand-applied notes, never a re-sync. |
 | **Ours (config)** | `.github/workflows/*`, `.claude/settings.json`, `.codex/*` | Written only when absent. Diff each against its upstream template on an upgrade and take what applies. |
 
@@ -180,7 +180,7 @@ session while drifting against every upstream release.
   (DB-038), leaving the same commit labelled two ways across the tree. Both incidents were caught by
   eye, on a PR, by a reviewer who happened to look.
 
-`scripts/tests/local-guards.sh` is their fixture suite — 137 cases, run by `scripts/verify.sh`.
+`scripts/tests/local-guards.sh` is their fixture suite — 145 cases, run by `scripts/verify.sh`.
 Nothing upstream knows these guards exist, so without it their failure paths never execute. Its
 negative cases are the point: each was checked by mutating the guard it covers and confirming
 exactly one case turns red.
@@ -193,7 +193,7 @@ broken guard rather than a mild opinion. The contract is the **ladder's**: a wor
 calling a guard directly still reads any non-zero as failure, which is why nothing here invokes
 `scripts/guards/*.sh` outside `scripts/ladder.sh`.
 
-**All eight of ours fail closed, deliberately.** A codepoint count over F-Droid's hard cap, a
+**Seven of the eight fail closed, deliberately, and `doc-facts.sh` carries the one warn branch.** A codepoint count over F-Droid's hard cap, a
 secret in the index and a misfiled ledger prefix are wrong every time they fire, so the warn tier
 — for a rule with legitimate exceptions nobody has enumerated — does not apply to them.
 `action-pins.sh` joins them on the same test: a tag ref where a SHA belongs, an unlabelled pin and
@@ -204,16 +204,24 @@ only warns is a budget the next session spends, and warn fatigue is the document
 for exactly this shape of rule. The escape hatch is not a warning, it is the constants in the
 guard's own header — raising one is visible in the diff and trips the rule-review tripwire, which
 is the reviewable version of the same flexibility.
-`doc-facts.sh` is the interesting one: its anchors are deliberate approximations and *can* fire on
-a true claim (a fifth file naming `ShizukuShell` without being a runtime dependency site, per that
-guard's own header). It stays fail-closed anyway, because reconciling the prose against the code
-is the work the anchor exists to force. Choose the tier when you add a guard, and say here which
-you chose and why.
+`doc-facts.sh` is the interesting one, and it is the only guard here that uses both tiers. Its
+drift anchors are deliberate approximations and *can* fire on a true claim (a fifth file naming
+`ShizukuShell` without being a runtime dependency site, per that guard's own header). They stay
+fail-closed anyway, because reconciling the prose against the code is the work the anchor exists
+to force. Its one **warn** branch is the `AMH_PROSE_VERSION` split (DC-031), dormant while the keys
+are equal as they are today: while the two version
+keys differ and `AGENTS.md` discloses the gap, the guard prints a leading `WARN ` and exits 2, so
+the debt stays audible on every run without holding the branch red for the duration of a state the
+owner deliberately chose — failing closed there is how a rule gets deleted instead of obeyed. That
+branch is *not* an exception to the fail-closed rule: drop the disclosure paragraph, or let it name
+a different version, and the same guard exits 1. Choose the tier when you add a guard, and say here
+which you chose and why.
 
 ## Every `amh.conf` value that differs from stock
 
 | Key | Ours | Why |
 |---|---|---|
+| `AMH_PROSE_VERSION` | `14.0.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — `4e22273` landed the file copy and DC-036 landed the owed seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
 | `BRANCH_PREFIX` | `claude` | Session branches are `claude/<codename>`, named in each session's directive. |
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |
@@ -226,7 +234,7 @@ you chose and why.
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
 | `REQUIRED_TOOLS` | `bash git java` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. The session banner reports availability; nothing consumes the states. |
 | `ADAPTER_FILES` | the Claude and Codex adapter paths | Names every adapter this repository ships. `configured` reports file presence, not that an integration or hook actually ran. |
-| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,verify.sh}` | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. |
+| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04; recorded in the STATE changelog), the fourth doc in the list and the first that is neither constitution nor playbook: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032, DC-034). |
 
 ## Adapter and CI notes
 
@@ -252,6 +260,43 @@ carries this repo's JDK/SDK/cache setup.
 **`scripts/bootstrap.sh`** holds the Android SDK setup and the background Gradle warm-up
 (D-173), and runs only when `AAB_REMOTE=1` — never implicitly on a developer machine.
 
+**`scripts/session-facts.sh`** is the second repo-local script the harness does not ship, and it
+exists because of a rule rather than a toolchain (DC-030). AMH 14.0.0 makes working memory
+tree-relative, so `docs/STATE.md` may no longer record which release is newest or whether this
+version is tagged. Striking that sentence and stopping there would just hand the question to
+whoever resumes cold, so this script answers it live at every session start: the tree's
+`versionName`/`versionCode` read straight from `app/build.gradle.kts`, the newest `v*` tag on
+`origin`, whether this version is released, and the branch's position against `origin/main`.
+
+The shipped banner already has a release line, driven by `VERSION_FILE` and `RELEASE_TAG_PREFIX`,
+and both are deliberately left empty: it reads the version from the **first line** of a file, and
+this project's version lives inside `app/build.gradle.kts`. Setting them would have meant creating
+a `VERSION` file — a second source of truth, free to drift from the build the release actually
+ships. Reading the build file is the narrower answer.
+
+It always exits 0 and degrades to an explicit `release status UNKNOWN`, plus the command that
+settles it, in two distinct cases: `origin` unreachable, and no `timeout` binary available. The
+second case **skips the probe entirely** rather than running it unbounded — the promise is that the
+hook cannot stall a session, and an unbounded network call cannot keep that promise. Reachability is
+judged by exit status alone, so a reachable origin with no tags reports "no `vX.Y.Z` tag exists yet",
+which is a different fact from "could not reach origin"; conflating those two was a real bug caught
+in review.
+
+Two limits stated rather than implied: "newest tag" ranks plain `vMAJOR.MINOR.PATCH` only, so a
+pre-release tag is ignored for ranking (the released/unreleased test for the current version is an
+exact ref match and handles any string); and the ahead/behind counts read the locally fetched
+`origin/main`, so a shallow clone undercounts them.
+
+**Only Claude Code runs it** — the hook is in `.claude/settings.json`, and Codex was not observed to
+fire any repository hook (see the adapter table above), so for Codex this paragraph is the whole
+of it.
+
+It **is** in `RULE_FILES`. The first draft left it out on the grounds that it only reports and
+binds no one; the rule-review pass rejected that, and correctly. What it prints is the release
+guidance every session reads before deciding whether a version is safe to work on, so wording that
+drifts changes what agents believe while producing no advisory at all. Reporting is not the same as
+harmless.
+
 ## Adding an agent adapter
 
 `AGENTS.md` is the constitution for every agent; an adapter is wiring only, and lives in a
@@ -275,8 +320,8 @@ that exist today:
 
 | Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail | Inline-Python rail |
 |---|---|---|---|---|---|---|
-| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | yes (SessionStart hook) | yes (PreToolUse → shipped command guard) | yes, with prefix rules as a static lower layer; their path vocabulary remains narrower than the hook | **no** | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — the PreToolUse hook runs only the shipped guard, not the repo-local advisory; `AGENTS.md` Conventions is the only layer standing |
+| `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation; a second hook runs the repo-local `scripts/session-facts.sh`) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | declared; **not observed to fire** on codex 0.152.1 or 0.153.2 — see below | declared; **not observed to fire** on either version, which would leave `command-guard.sh` an uncalled script for Codex | yes — the `.rules` prefix policy is loaded (`--ignore-rules` exists to skip it); its path vocabulary is narrower than a hook's | **no** | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — `AGENTS.md` Conventions is the only layer standing |
 
 **On the comment rail specifically.** The ladder guard is the coverage; the hook is only
 *salience*. A rule that lands solely in a ladder run arrives after the narrative is written and
@@ -288,6 +333,34 @@ is one the next session deletes, and the ladder still covers the tree either way
 detect that the hook stopped firing — `configured` in the session banner means a file is present,
 never that a hook ran.
 
+**On the Codex adapter's hooks — declared, but not observed to fire (DC-030).** `.codex/config.toml`
+declares a `SessionStart` and a `PreToolUse` hook. On codex CLI 0.152.1, 2026-09-02, neither was
+observed to run: `codex doctor` reports its `config.toml` as `~/.codex/config.toml` and lists no
+project-level layer, and `scripts/session-start.sh` prints its banner unconditionally yet that
+banner appeared in none of roughly ten `codex exec` runs inside this repository. **Re-measured on
+codex CLI 0.153.2, 2026-09-04, with the same result** (DC-034): `codex doctor`'s Configuration block
+still names `~/.codex/config.toml` as the sole `config.toml` and lists no project layer, and the
+banner appeared in none of four `codex exec -s read-only` runs here. That second reading was taken
+on Linux aarch64 rather than the Windows host of the first, so the two together also rule out a
+Windows-only quirk — but they are two observations, not a proof, and the ceiling below is unchanged. The table above
+claimed `yes` for both rails before anyone measured.
+
+Read the strength of that claim exactly. It is an **observation on one version**, not a proof: no
+repository check can tell a hook invocation from a manual one, which is why `AGENTS.md` says an
+agent's rails cannot be detected from inside the tree at all. What the tree does prove is only that
+the hooks are declared. Project execpolicy `.rules` files *are* loaded — `codex exec --ignore-rules`
+exists precisely to skip them — so `.codex/rules/amh.rules` is real either way. Re-measure on a
+version bump; upstream may add project-config support at any time.
+
+`AGENTS.md` stated the opposite in its Conventions section until 2026-09-02 — that "Codex's
+pre-shell hook runs the shipped command guard" and that it has a shell hook. Reconciling those
+sentences was a change to the constitution, so it waited on the owner, who directed it; they now
+describe a hook that is declared and was not observed to fire, scoped to the version measured, and
+Owner-queue item 4 closed with that edit. The adapter comments in `.codex/config.toml` and
+`.claude/settings.json` were corrected in the same unit — the second of them in the opposite
+direction, having claimed the hooks "do not fire at all", which this file's own paragraph above
+forbids anyone from claiming.
+
 **An agent with no pre-execution hook has no command rail at all.** `scripts/command-guard.sh` is
 then a script nobody calls, and the constitution's prose is the only layer standing. No check can
 detect this: telling a hook invocation from a manual one needs vendor-specific environment
@@ -296,8 +369,17 @@ variables the harness will not assume.
 ## Upgrading
 
 Follow `docs/UPGRADING.md` in the AMH repository. In short: clone the target tag, read
-`harness/CHANGELOG.md` forward from `AMH_VERSION` in `amh.conf`, copy
-`harness/templates/scripts/*` (the **whole** directory — the manifest lives beside the scripts
-it hashes), apply the changelog's Upgrading notes by hand, and drive `scripts/ladder.sh` green.
+`harness/CHANGELOG.md` forward from **`AMH_PROSE_VERSION`** in `amh.conf` — not from
+`AMH_VERSION` — copy `harness/templates/scripts/*` (the **whole** directory — the manifest lives
+beside the scripts it hashes), apply the changelog's Upgrading notes by hand, and drive
+`scripts/ladder.sh` green.
+
+Read forward from the **prose** key because that is the one naming rules this tree actually
+follows. The two keys are equal whenever nothing is owed, so on an ordinary upgrade this reads
+exactly as it always did. They differ only while a split upgrade is outstanding, and then
+`AMH_VERSION` has already advanced past notes nobody applied: starting there skips them silently,
+and no guard can catch it, because reading a changelog is not something a check can observe. This
+is the sole reason the second key exists (DC-031). Set both equal in the commit that lands the
+owed prose.
 A new guard failing on something that was always there is a finding, not upgrade damage: fix
 the finding, never weaken the guard. Then re-check every row of the tables above.

@@ -5,8 +5,21 @@ Tideo Auto Brightness is a native Kotlin/Compose Android app. It recreates the T
 now in maintenance.
 
 Maintenance uses the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
-This constitution records **AMH 9.1.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
+This constitution records **AMH 14.0.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
 and the version here must change with it; `scripts/guards/doc-facts.sh` fails on a mismatch.
+
+Both halves of that upgrade have now landed: `4e22273` copied the shipped scripts, and the
+hand-applied seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 followed, so `AMH_PROSE_VERSION` and
+`AMH_VERSION` in `amh.conf` are equal again and `doc-facts.sh` is silent on the pair. Should they
+ever diverge, that key names the version whose rules this tree's prose actually follows, and the
+guard requires a disclosure sentence here for as long as the gap stands.
+The disclosure it requires is a literal sentence — **"the binding prose is AMH
+`<AMH_PROSE_VERSION>`"** — so if a future split upgrade reopens the gap, that clause is
+load-bearing text rather than a turn of phrase: rewording it turns the branch red exactly as
+omitting it does. Say the rest however you like. `docs/HARNESS_LOCAL.md` "Upgrading" reads the
+upstream changelog forward from `AMH_PROSE_VERSION` rather than from `AMH_VERSION`, where notes
+owed from before a bump would be invisible; set the two equal only in the commit that lands the
+prose, never before (DC-031, DC-036).
 Before changing anything in `scripts/`, read `docs/HARNESS_LOCAL.md`. It explains which scripts
 come from upstream and cannot be fixed locally, how each local guard works and which verdict tier
 it uses, and every way this repository's `amh.conf` differs from the stock configuration.
@@ -27,6 +40,9 @@ it uses, and every way this repository's `amh.conf` differs from the stock confi
 
 Code and the golden test vectors are the source of truth. Documents describe the app as built and
 can drift. If documentation disagrees with the code, trust the code and correct the documentation.
+**The append-only ledger is the exception** (AMH 10.0.0): its rows are immutable, so a stale row is
+never edited in place — write a new row and append one pointer line to the old one. Without this
+carve-out the two rules contradict each other, since the ledger is a document.
 
 The Tasker source XML is stored in `docs/rebuild/extraction/_source/` (gitignored, 1.6 MB and about
 41,000 lines). Never read the entire file into context. Follow `docs/rebuild/XML_RECIPES.md`
@@ -40,12 +56,18 @@ instead. The migration narrative in `docs/history/` is frozen.
    established facts. Every observable claim must include the command that settles it. Run that
    command and compare its output with the stated resolution; do not rely on its exit status alone. If the
    output shows that the item is resolved, delete it during this session instead of repeating it
-   with a caveat.
+   with a caveat. The same caution reaches `Current state`: it is tree-relative by rule, but a
+   legacy sentence about the world — merged, tagged, released, CI, branch protection — may predate
+   that rule, so check one against a live source before acting on it or repeating it.
 3. Open the relevant playbook in `docs/RUNBOOK.md` and read the reference documents it names.
 4. Work in small, checkpointed units as required by RUNBOOK **Session discipline** (D-161).
 5. Run `scripts/ladder.sh` until it is green. Never leave the branch red.
-6. Update `docs/STATE.md`. If the runbook did not cover the work you just completed, improve the
-   runbook in the same change.
+6. Update `docs/STATE.md` with what stays true of the checked-out tree, honouring RUNBOOK
+   **Working-memory compression** — which holds both its length rules and the rule on what may sit
+   in `Current state` at all. Never cache world-controlled status (merged, tagged, released, PR/CI,
+   deployments, remote branches, forge settings) as current truth: point at the live probe, route it
+   to the Owner queue, or keep it as an observation scoped in the sentence to when it was seen. If
+   the runbook did not cover the work you just completed, improve the runbook in the same change.
 7. Push with `git push -u origin <your-session-branch>`.
 
 ## Verification
@@ -74,7 +96,7 @@ session much later.
 - `docs/STATE.md` is capacity-bounded working memory. Its preamble defines the length rule.
 - `docs/LEDGER*.md` is permanent, append-only memory. Never compress, delete, or renumber a row.
   Search the ledger instead of reading a whole volume, and append new entries to the live volume,
-  `docs/LEDGER_B.md`.
+  `docs/LEDGER_C.md`.
 - `docs/history/` is frozen archival material. Consult it, but do not edit it.
 
 Before saying that something does not exist or never happened, establish what evidence could have
@@ -152,9 +174,10 @@ a coordinate to it, or combining markers that cite the same coordinates is allow
 affected file. All three checks fail closed in the ladder and CI.
 
 The Claude Code adapter also runs the block limit after an edit through a `PostToolUse` hook, so it
-reports an overlong block immediately. Codex has no post-edit hook: its shell hook and prefix rules
-cannot inspect a file written by an edit tool. For Codex, this prose is therefore the only immediate
-layer, although the full-tree ladder guard still provides eventual enforcement.
+reports an overlong block immediately. Codex has no post-edit hook, and neither its declared shell
+hook nor its prefix rules could inspect a file written by an edit tool. For Codex, this prose is
+therefore the only immediate layer, although the full-tree ladder guard still provides eventual
+enforcement.
 
 Increasing a comment budget is permitted, but it is a rule change rather than routine cleanup.
 Because `scripts/guards` appears in `RULE_FILES`, the review protocol applies. The guard's failure
@@ -168,9 +191,13 @@ file is read back. This is a preference, not a ban; a scripted bulk edit can be 
 The Claude Code adapter makes this preference noticeable by blocking the first matching command
 per marker lifetime with a `PreToolUse` advisory, then allowing later matches. The marker has no
 session component, so in a long-lived container the first session spends the advisory and later
-sessions do not see it (DB-063). Codex's pre-shell hook runs the shipped command guard but not this
-repository-specific advisory, so the prose is the only layer for Codex. In every adapter, the prose
-is the binding rule; the hook is only a reminder.
+sessions do not see it (DB-063). The Codex adapter declares a pre-shell hook for the shipped command
+guard and never for this repository-specific advisory — and on codex CLI 0.152.1 and 0.153.2 that
+hook was not observed to fire at all, since `codex doctor` names `~/.codex/config.toml` as the only
+config source and no project layer, leaving this repository's `.codex/config.toml` unloaded (DC-030,
+DC-034; the measurements and their limits are in `docs/HARNESS_LOCAL.md`). Its `.rules` prefix rails are a separate
+layer and do load. Either way the prose is the only layer for Codex. In every adapter, the prose is
+the binding rule; the hook is only a reminder.
 
 Tasker semantics override coding taste. Preserve the original behaviour exactly, including unusual
 rounding and quirks that resemble bugs. Modernise the implementation, not its meaning. Mark ported
@@ -239,7 +266,12 @@ it.
 ## Git
 
 Work only on the assigned session branch, named `claude/<codename>` according to `BRANCH_PREFIX` in
-`amh.conf`. Push with `git push -u origin <branch>`. Retry a push only for network errors, at most
+`amh.conf`. **This clause is the enforcement** (AMH 10.1.0): the push rail stopped checking the
+branch namespace, because it cannot tell a name the harness assigned from one an agent invented,
+and the old check rejected correctly-assigned branches. What the rail still denies is what it can
+actually read — `main` in every spelling, force, deletion, a tag push, and a second ref — so an
+explicitly named off-convention branch is now stopped by this sentence and by the reviewer, not by
+a block. Push with `git push -u origin <branch>`. Retry a push only for network errors, at most
 four times, using delays of 2, 4, 8, and 16 seconds. A non-fast-forward rejection is not a network
 error and needs a different resolution. Never force-push or push to `main`. The sole exception is
 a leaked-credential history rewrite, which the owner performs.
@@ -269,9 +301,13 @@ constitution refer to this file.
 
 Never edit a script listed in `scripts/MANIFEST.sha256`. The ladder hashes those upstream files,
 and a local edit would turn every later upgrade into a merge. Put repository-specific changes in
-`amh.conf`, `scripts/guards/*.sh`, or `scripts/verify.sh`. If a necessary change fits none of those
-locations, the harness lacks an extension point; raise the issue upstream rather than patching a
-shipped script locally.
+`amh.conf`, `scripts/guards/*.sh`, `scripts/verify.sh`, `scripts/tests/local-guards.sh` (the
+repo-local guards' fixture suite, which `verify.sh` runs), or an unshipped repo-local script —
+`scripts/bootstrap.sh` and `scripts/session-facts.sh` are the two that exist. Every one of them is
+listed in `RULE_FILES`, so the rule-review tripwire covers the whole set. Adding a script to that
+last category is itself a rule change: name it in `RULE_FILES` and in `docs/HARNESS_LOCAL.md`'s
+split table in the same commit. If a necessary change fits none of these locations, the harness
+lacks an extension point; raise the issue upstream rather than patching a shipped script locally.
 
 Document agent-adapter wiring in `docs/HARNESS_LOCAL.md`, including an honest account of which
 rails each adapter actually provides. An agent without a pre-execution hook has no command rail:

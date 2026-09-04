@@ -33,6 +33,11 @@ import com.tideo.autobrightness.app.ui.screens.SuperDimmingContent
 import com.tideo.autobrightness.app.ui.screens.ContextsContent
 import com.tideo.autobrightness.app.ui.components.FlashPill
 import com.tideo.autobrightness.app.ui.screens.CurveBrightnessContent
+import com.tideo.autobrightness.app.runtime.OverrideDiagnostic
+import com.tideo.autobrightness.app.runtime.OverrideDisposition
+import com.tideo.autobrightness.app.runtime.OverrideSource
+import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
+import com.tideo.autobrightness.platform.brightness.WriteStatus
 import com.tideo.autobrightness.app.ui.screens.LiveDebugContent
 import com.tideo.autobrightness.app.ui.screens.MiscContent
 import com.tideo.autobrightness.app.ui.screens.ReactivityContent
@@ -176,6 +181,56 @@ class SettingsScreensTest {
         compose.onNodeWithText("Debug: Light Eval Thresholds").performScrollTo().assertExists()
         compose.onNodeWithTag("debug_smoothed_lux").performScrollTo().assertExists()
         compose.onNodeWithText("123.4", substring = true).performScrollTo().assertExists()
+    }
+
+    // DC-007: the write card must render WITHOUT an override having fired (owner device check 3).
+    @Test
+    fun liveDebug_writeCard_rendersRequestedVsAcknowledged_withNoOverride() {
+        val seeded = PipelineState(
+            lastAppliedBrightness = 250,
+            lastBrightnessWrite = BrightnessWriteResult(
+                requestedDomain = 255, requestedRaw = 4014, acknowledgedRaw = 3083,
+                acknowledgedDomain = 196, deviceMax = 4095, status = WriteStatus.ACKNOWLEDGED,
+            ),
+        )
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(pipeline = seeded, serviceRunning = true),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("debug_write_roundtrip").performScrollTo().assertExists()
+        compose.onNodeWithText("255 \u2192 196", substring = true).performScrollTo().assertExists()
+        // deviceMax is what Tideo converts with, so the owner can derive one domain step from it.
+        compose.onNodeWithText("4095", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithTag("debug_override_disposition").assertDoesNotExist()
+    }
+
+    @Test
+    fun liveDebug_writeCard_rendersTheOverrideDispositionWhenOneExists() {
+        val seeded = PipelineState(
+            lastBrightnessWrite = BrightnessWriteResult(255, 255, 255, 255, 255, WriteStatus.ACKNOWLEDGED),
+            overrideDiagnostic = OverrideDiagnostic(
+                source = OverrideSource.ANIMATION_BAND,
+                disposition = OverrideDisposition.DISMISSED_MODE,
+                observed = 7, settled = 9, expected = 200, manualMode = false,
+                write = null, timestampMs = 0L,
+            ),
+        )
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(pipeline = seeded, serviceRunning = true),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("debug_override_disposition").performScrollTo().assertExists()
+        compose.onNodeWithText("DISMISSED_MODE", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("ANIMATION_BAND", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("7 / 9 / 200", substring = true).performScrollTo().assertExists()
     }
 
     @Test

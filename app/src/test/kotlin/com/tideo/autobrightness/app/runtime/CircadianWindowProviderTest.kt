@@ -8,6 +8,7 @@ import com.tideo.autobrightness.platform.context.LocationReader
 import com.tideo.autobrightness.platform.context.LocationResult
 import com.tideo.autobrightness.platform.context.LocationSnapshot
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** G2R-F73 regression: real sunrise/sunset windows, not fixed 6–8am-UTC defaults. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class CircadianWindowProviderTest {
 
     private val lat = 52.0907 // Utrecht, NL

@@ -1,7 +1,9 @@
 package com.tideo.autobrightness.app.ui.graph
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.Test
@@ -46,5 +48,33 @@ class ChartCanvasTest {
         val pts = listOf(Offset(0f, 0f), Offset(100f, 100f), Offset(200f, 50f))
         assertEquals(1, nearestIndex(pts, Offset(105f, 95f), maxDist = 20f))
         assertEquals(-1, nearestIndex(pts, Offset(500f, 500f), maxDist = 20f))
+    }
+
+    // DC-001: Graph Metrics (re)draw dedupe — equal inputs must not re-time; a real data change must.
+    @Test
+    fun graphSignature_stableForEqualInputs_changesWhenPointsChange() {
+        val a = listOf(ChartSeries("s", listOf(Offset(0f, 0f), Offset(1f, 2f)), Color.Red))
+        val b = listOf(ChartSeries("s", listOf(Offset(0f, 0f), Offset(1f, 2f)), Color.Red))
+        val sigA = graphSignature(a, 0f..1f, 0f..2f, emptyList(), null)
+        assertEquals(sigA, graphSignature(b, 0f..1f, 0f..2f, emptyList(), null),
+            "equal inputs must yield the same signature (an unchanged redraw is not a regeneration)")
+
+        val moved = listOf(ChartSeries("s", listOf(Offset(0f, 0f), Offset(1f, 3f)), Color.Red))
+        assertNotEquals(sigA, graphSignature(moved, 0f..1f, 0f..2f, emptyList(), null),
+            "a changed data point must change the signature (a real regeneration)")
+    }
+
+    @Test
+    fun graphSignature_ignoresScatterOnTapLambda() {
+        val pts = listOf(Offset(1f, 1f))
+        // Two scatters differing only by a fresh onTap lambda (what a recompose produces); the
+        // signature keys on points, so this must not read as a regeneration.
+        val s1 = ChartScatter(pts, Color.Blue, onTap = { })
+        val s2 = ChartScatter(pts, Color.Blue, onTap = { })
+        val series = listOf(ChartSeries("s", listOf(Offset(0f, 0f)), Color.Red))
+        assertEquals(
+            graphSignature(series, 0f..1f, 0f..1f, emptyList(), s1.points),
+            graphSignature(series, 0f..1f, 0f..1f, emptyList(), s2.points),
+        )
     }
 }

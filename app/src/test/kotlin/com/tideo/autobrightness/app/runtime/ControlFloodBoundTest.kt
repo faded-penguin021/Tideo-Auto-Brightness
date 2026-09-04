@@ -33,11 +33,11 @@ class ControlFloodBoundTest {
     private class NoOpBrightness : ScreenBrightnessController {
         private var value = 128
         override fun read(): Int = value
-        override fun write(level: Int) { value = level }
-        override fun forceManualMode() = Unit
+        override fun write(level: Int) = ackWrite(level).also { value = level }
+        override fun forceManualMode() = true
         override fun restoreMode() = Unit
+        override fun isManualMode() = true
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = false
-        override fun isOnScreenSelfWrite(): Boolean = false
         override fun clearSelfWriteMarker() = Unit
     }
 
