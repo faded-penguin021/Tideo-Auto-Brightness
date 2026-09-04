@@ -438,3 +438,52 @@
   repo's own documented upgrade procedure. Warn, not fail: the split was owner-directed and a red
   branch for its duration is how a rule gets deleted instead of obeyed.
   `[cited]`: `scripts/guards/doc-facts.sh`.
+- DC-032: **`AGENTS.md` promised a Codex command rail nobody had measured, and the mandatory review
+  found the same defect in two adapter files plus the opposite overclaim in a third.** The
+  Conventions section said "Codex's pre-shell hook runs the shipped command guard"; on codex 0.152.1
+  no declared hook was observed to fire, so the owner directed the constitution edit and it now says
+  declared-but-not-observed, scoped to the version, because no repository check can tell a hook
+  invocation from a manual one. The rule review returned NOT CLEAN with three lockstep findings, none
+  of them inside the edited hunk: `.codex/config.toml` still said the hooks "run",
+  `.claude/settings.json` said they "do not fire at all", and `docs/HARNESS_LOCAL.md` still called the
+  reconciliation an open Owner-queue item. The `settings.json` line is the instructive one — an
+  overclaim in the opposite direction, forbidden by the very paragraph it contradicted, written by the
+  same session that later fixed it, which is how a rule edit fixes one end of a sentence and breaks
+  the other. All three were corrected in this unit and a tree-wide grep found no fourth. A second
+  rule review was started and then voided unused: DA-005 permits one level of meta and withholds the
+  author rationale from the reviewer, and re-running a rule diff until its verdict turns CLEAN is
+  Goodhart against the gate the protocol exists to defend.
+
+- DC-033: **The `:platform` suite was recorded as unrunnable on this host on reasoning that fitted
+  every piece of evidence and still had the wrong variable.** Robolectric failed 120 of 145 with
+  `UnsatisfiedLinkError: no conscrypt_openjdk_jni-windows-aarch_64`, which is true — conscrypt
+  publishes no native for Windows on ARM — but that is a property of the JVM, not of the laptop: an
+  x86_64 JDK runs under Windows-on-ARM emulation, reports `os.arch=amd64`, loads the
+  `windows-x86_64` native, and takes the same suite to 145/145 with no source change. Temurin 21 x64
+  is also CI's exact vendor, version and architecture, so the fix moves this environment toward the
+  runner rather than away from it, and closes a JDK-vendor difference that was a reproducible-artifact
+  risk and not only a verdict one. Two Git-Bash gaps travelled with it: without Developer Mode plus
+  `MSYS=winsymlinks:nativestrict` an `ln -s` silently writes a copy, and the Microsoft Store `python3`
+  alias answers `command -v` and exits 0 without running Python, so any probe for it gets a false
+  positive. The WSL2 route the owner had chosen is no longer needed. The durable half is the shape of
+  the error rather than its content — "the artifact does not exist for this platform" was a true
+  sentence and still the wrong conclusion, because the platform was a variable and had been read as a
+  constant.
+
+- DC-034: **The Codex hook finding was written scoped to one version, and the version moved before
+  the unit that wrote it was committed.** DC-030/DC-032 deliberately pinned "not observed to fire"
+  to codex 0.152.1 and told the next reader to re-measure on a version bump — the honest form of a
+  claim no repository check can settle. The bump arrived immediately: the local CLI is 0.153.2, so
+  four rule files were asserting a measurement about a version nobody here runs, which reads as
+  current fact rather than as history and is the drift the scoping was supposed to prevent. Fixed by
+  measuring again rather than by editing the numeral: on 0.153.2 `codex doctor`'s Configuration block
+  still names `~/.codex/config.toml` as the sole `config.toml` with no project layer, and the
+  unconditional `AMH session start` banner appeared in none of four `codex exec -s read-only` runs.
+  `AGENTS.md`, `.codex/config.toml`, `.claude/settings.json` and the `docs/HARNESS_LOCAL.md` table and
+  paragraph now name both versions, while the DC-030 and DC-032 rows keep 0.152.1 alone, because a
+  ledger row records what was measured when it was written and rewriting it would forge the history
+  that makes the second reading worth anything — and that second reading lands on Linux aarch64 where
+  the first was Windows, retiring the Windows-only-quirk hypothesis nobody had been able to exclude,
+  so this is a widened claim and not merely a refreshed one. The durable half: a version-scoped
+  observation is the honest form and it also has a shelf life, so the scope is a re-measurement owed,
+  not a sentence licensed to age quietly into a false one.

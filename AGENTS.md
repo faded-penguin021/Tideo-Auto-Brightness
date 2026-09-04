@@ -166,9 +166,10 @@ a coordinate to it, or combining markers that cite the same coordinates is allow
 affected file. All three checks fail closed in the ladder and CI.
 
 The Claude Code adapter also runs the block limit after an edit through a `PostToolUse` hook, so it
-reports an overlong block immediately. Codex has no post-edit hook: its shell hook and prefix rules
-cannot inspect a file written by an edit tool. For Codex, this prose is therefore the only immediate
-layer, although the full-tree ladder guard still provides eventual enforcement.
+reports an overlong block immediately. Codex has no post-edit hook, and neither its declared shell
+hook nor its prefix rules could inspect a file written by an edit tool. For Codex, this prose is
+therefore the only immediate layer, although the full-tree ladder guard still provides eventual
+enforcement.
 
 Increasing a comment budget is permitted, but it is a rule change rather than routine cleanup.
 Because `scripts/guards` appears in `RULE_FILES`, the review protocol applies. The guard's failure
@@ -182,9 +183,13 @@ file is read back. This is a preference, not a ban; a scripted bulk edit can be 
 The Claude Code adapter makes this preference noticeable by blocking the first matching command
 per marker lifetime with a `PreToolUse` advisory, then allowing later matches. The marker has no
 session component, so in a long-lived container the first session spends the advisory and later
-sessions do not see it (DB-063). Codex's pre-shell hook runs the shipped command guard but not this
-repository-specific advisory, so the prose is the only layer for Codex. In every adapter, the prose
-is the binding rule; the hook is only a reminder.
+sessions do not see it (DB-063). The Codex adapter declares a pre-shell hook for the shipped command
+guard and never for this repository-specific advisory — and on codex CLI 0.152.1 and 0.153.2 that
+hook was not observed to fire at all, since `codex doctor` names `~/.codex/config.toml` as the only
+config source and no project layer, leaving this repository's `.codex/config.toml` unloaded (DC-030,
+DC-034; the measurements and their limits are in `docs/HARNESS_LOCAL.md`). Its `.rules` prefix rails are a separate
+layer and do load. Either way the prose is the only layer for Codex. In every adapter, the prose is
+the binding rule; the hook is only a reminder.
 
 Tasker semantics override coding taste. Preserve the original behaviour exactly, including unusual
 rounding and quirks that resemble bugs. Modernise the implementation, not its meaning. Mark ported

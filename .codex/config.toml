@@ -1,6 +1,9 @@
 # Codex adapter for the AMH. Wiring only: behavioral policy lives in AGENTS.md
-# and scripts/. Hooks run the agent-neutral session bootstrap and command guard;
-# the static lower command-policy layer remains .codex/rules/amh.rules.
+# and scripts/. The hooks below DECLARE the agent-neutral session bootstrap and command guard; on
+# codex 0.152.1 and 0.153.2 neither was observed to fire, `codex doctor` naming only
+# ~/.codex/config.toml as a config source on both (DC-030, DC-034, docs/HARNESS_LOCAL.md — an
+# observation on the versions measured, not a proof). Re-measure on a version bump. The static lower command-policy layer, .codex/rules/amh.rules, is
+# loaded either way, so it is the rail you can actually count on here.
 #
 # There is no post-edit hook, so the comment budget the Claude adapter runs on every .kt write
 # (scripts/guards/comment-budget.sh --hook) has no equivalent here: a prefix rule judges a shell

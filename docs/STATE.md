@@ -89,29 +89,15 @@ it rather than engineer for it**, which freezes the conversion path as built, de
 the device maximum and the `context.resources` move, and leaves DC-003's two trades standing
 (DC-026).
 
-4. **Decide whether `AGENTS.md` still claims a Codex rail that does not run (2026-09-02, DC-030).**
-   The Conventions section says "Codex's pre-shell hook runs the shipped command guard" and refers to
-   "its shell hook". On codex CLI 0.152.1 neither declared hook was observed to fire: run
-   `codex doctor` in this repo and read the Configuration block — it names `~/.codex/config.toml` as
-   the only config source and lists no project layer — then run
-   `codex exec -s read-only -c windows.sandbox="unelevated" "print hello"` and grep the output for
-   the `AMH session start` banner, which `scripts/session-start.sh` prints unconditionally. If the
-   banner is absent, those two sentences overstate the rail. Changing them is a constitution edit, so
-   it is yours, not a session's. `docs/HARNESS_LOCAL.md` already records the observation and its
-   limits. Note the honest ceiling: no repository check can prove a hook fired, so the fix is wording
-   scoped to what was measured, not a new claim in the other direction.
-5. **The local ladder cannot go green on this Windows ARM64 laptop, and that is the host, not the
-   tree (2026-09-02).** `:platform`'s Robolectric tests fail 120/145 with
-   `UnsatisfiedLinkError: no conscrypt_openjdk_jni-windows-aarch_64` — conscrypt publishes no native
-   for Windows on ARM. `:domain` (the golden vectors), compilation, lint and every guard pass; only
-   the Android adapter tests are unrunnable. Settle it with
-   `./gradlew :platform:testDebugUnitTest --offline` and read the first `<failure>` in
-   `platform/build/test-results/testDebugUnitTest/*.xml`. Options: (a) run the ladder under WSL2,
-   where conscrypt does ship `linux-aarch_64`; (b) run it in a `linux/amd64` container to match CI
-   exactly, at a large speed cost under emulation; (c) accept CI as the authority for this rung and
-   rely on `build.yml`. Recommendation: (a) for day-to-day, because it also removes the CRLF class
-   of problems, with CI remaining the gate that decides.
-6. **BLOCKING — the DC-031 rule changes are committed UNREVIEWED; DA-005 is owed (2026-09-03).**
+4. **Nothing to do — set `JAVA_HOME` to an x86_64 JDK before the ladder on a Windows-on-ARM host
+   (2026-09-02, DC-033).** Not a preference: on an aarch64 JVM the `:platform` Robolectric suite
+   fails 120 of 145 for a native conscrypt does not publish, and on an x86_64 JVM under Windows's
+   emulation the same suite is 145/145. Temurin 21 x64 is also CI's exact vendor, version and
+   architecture, so it is the closer environment as well as the working one. Two host settings ride
+   with it, both now on: Developer Mode plus `MSYS=winsymlinks:nativestrict`, without which Git
+   Bash's `ln -s` silently writes a copy, and a real `python3` ahead of the Microsoft Store alias,
+   which otherwise answers `command -v` and exits 0 without running Python.
+5. **BLOCKING — the DC-031 rule changes are committed UNREVIEWED; DA-005 is owed (2026-09-03).**
    Two fresh-context attempts failed in the session environment, not in the tree: one died in a
    container restart, one deadlocked 40+ minutes taking no further tool rounds; `codex` is not
    installed, so the `.codex` reviewer was unavailable too. DA-005 has no self-review fallback and
@@ -125,7 +111,11 @@ the device maximum and the `context.resources` move, and leaves DC-003's two tra
 Everything raised through 2026-08-26 is closed in DB-054…DB-085 and DC-001, including the vc22 and
 vc23 rounds now folded into `DEVICE_TEST_SCRIPT.md` and the wake false-pause fix that taught DB-083.
 The owed fresh-context review of `b462e56..HEAD` is discharged by this train's two adversarial passes
-(commit bodies, DC-003/DC-008/DC-009).
+(commit bodies, DC-003/DC-008/DC-009). The two items raised on 2026-09-02 are also closed: the owner
+directed the `AGENTS.md` Codex-rail reconciliation, which landed with the two adapter comments it
+contradicted (DC-032), and the local-ladder question dissolved rather than being decided — the cause
+was the JVM's architecture, not the host, so the WSL2 option the owner had picked is no longer needed
+(DC-033, standing instruction above).
 
 ## Decided non-items
 
@@ -150,14 +140,31 @@ The owed fresh-context review of `b462e56..HEAD` is discharged by this train's t
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-04 — **The Codex hook finding re-measured on 0.153.2, before its own unit was committed
+  (DC-034).** The version-scoped wording DC-032 had just landed already named a version nobody here
+  runs. Measuring again rather than editing the numeral gave the same result — sole `config.toml` at
+  `~/.codex/config.toml`, no banner in four `codex exec` runs — and, being taken on Linux where the
+  first was Windows, it also retires the Windows-only-quirk hypothesis. Both versions are now named
+  in `AGENTS.md`, the two adapter comments and the `HARNESS_LOCAL` table; the earlier ledger rows keep
+  0.152.1 alone, since they record what was measured when they were written. `docs/HARNESS_LOCAL.md`
+  joined `RULE_FILES` in the same unit (owner, 2026-09-04): it holds the most detailed form of this
+  claim and the adapter coverage table, and the tripwire had not covered it.
+
 - 2026-09-03 — **The 14.0.0 version claim got a durable disclosure and a guard (DC-031).** Review of
   `4e22273` found the owed seed prose was recorded only in compressible working memory while the
   claim it qualified sat in `amh.conf`, and that `HARNESS_LOCAL.md` "Upgrading" sent the next
   upgrade session forward from `AMH_VERSION` — past the very notes still owed. Added
   `AMH_PROSE_VERSION`, a `doc-facts.sh` warn/fail tier with 8 fixtures, the `AGENTS.md` disclosure
   paragraph whose literal sentence the guard matches, the widened extension-point list, and
-  `gradlew`/`*.py` eol pins. **Landed WITHOUT its DA-005 rule review — see Owner queue 6**; seed
+  `gradlew`/`*.py` eol pins. **Landed WITHOUT its DA-005 rule review — see Owner queue 5**; seed
   prose itself is still owed and unchanged as the next unit.
+
+- 2026-09-02 — **The Codex rail wording reconciled and the local ladder recovered (DC-032, DC-033).**
+  `AGENTS.md` stopped claiming a Codex pre-shell hook that runs; the rule review found the same claim
+  in `.codex/config.toml` and the opposite overclaim in `.claude/settings.json`, and all three now say
+  declared-but-not-observed, scoped to the version measured. Separately, the `:platform` suite that
+  had been called unrunnable here went 145/145 on an x86_64 JDK: the missing conscrypt native was a
+  property of the JVM, not of the laptop.
 
 - 2026-09-02 — **Harness upgraded AMH 9.1.0 → 14.0.0 (DC-029).** Shipped scripts and manifest
   copied, `.gitattributes` installed and the tree renormalised to fix a Windows CRLF false failure

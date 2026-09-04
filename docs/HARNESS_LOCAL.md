@@ -227,7 +227,7 @@ you chose and why.
 | `VERSION_FILE` | empty | This repo's version is a Kotlin DSL assignment in `app/build.gradle.kts`, not the first line of a plain file, so the release-window banner cannot read it. `release-preflight.yml` (D-124) enforces the version invariants instead. |
 | `REQUIRED_TOOLS` | `bash git java` | The ladder and its fixture suites are shell/Git programs, while the Android verification set requires the JVM. The session banner reports availability; nothing consumes the states. |
 | `ADAPTER_FILES` | the Claude and Codex adapter paths | Names every adapter this repository ships. `configured` reports file presence, not that an integration or hook actually ran. |
-| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}` | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. |
+| `RULE_FILES` | `+ CLAUDE.md`, `scripts/{guards,tests,bootstrap.sh,session-facts.sh,verify.sh}`, **`docs/HARNESS_LOCAL.md`** | A repo-local guard is legislation exactly as a shipped one is, and `CLAUDE.md` must never diverge from the constitution it points at. The list must name every extension point `AGENTS.md` **Harness** admits, unshipped repo-local scripts included, or the rule-review tripwire has a hole exactly where local authority is widest. **This file** joined by owner decision (2026-09-04, DC-034) as the list's only doc: it is the authority on which scripts may never be edited, the adapter table saying which rails actually run, and this very table — the last prose copy of `LEDGER_LINE_CAP`. It went uncovered through two units that corrected the Codex-rail claim everywhere else while the most detailed statement of it sat here (DC-032). |
 
 ## Adapter and CI notes
 
@@ -314,7 +314,7 @@ that exist today:
 | Adapter | Bootstrap | Command rail | Deny rails | Output redaction | Comment rail | Inline-Python rail |
 |---|---|---|---|---|---|---|
 | `.claude/settings.json` | yes (SessionStart hook, with the remote-flag translation; a second hook runs the repo-local `scripts/session-facts.sh`) | yes (PreToolUse, stdin payload) | yes | **no** — Claude Code has no output-filter hook, so `scripts/redact.sh` is manual-pipe only and is what the ladder's secret scan uses | yes (PostToolUse on `Edit\|Write\|MultiEdit` → `comment-budget.sh --hook`, block cap only) | yes (second PreToolUse hook → `python-edit.sh --hook`, first match only) |
-| `.codex/config.toml` + `.codex/rules/amh.rules` | declared; **not observed to fire** on codex 0.152.1 — see below | declared; **not observed to fire** on 0.152.1, which would leave `command-guard.sh` an uncalled script for Codex | yes — the `.rules` prefix policy is loaded (`--ignore-rules` exists to skip it); its path vocabulary is narrower than a hook's | **no** | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — `AGENTS.md` Conventions is the only layer standing |
+| `.codex/config.toml` + `.codex/rules/amh.rules` | declared; **not observed to fire** on codex 0.152.1 or 0.153.2 — see below | declared; **not observed to fire** on either version, which would leave `command-guard.sh` an uncalled script for Codex | yes — the `.rules` prefix policy is loaded (`--ignore-rules` exists to skip it); its path vocabulary is narrower than a hook's | **no** | **no** — neither a shell hook nor a prefix rule can judge a file an edit tool wrote; `AGENTS.md` Conventions is the immediate layer | **no** — `AGENTS.md` Conventions is the only layer standing |
 
 **On the comment rail specifically.** The ladder guard is the coverage; the hook is only
 *salience*. A rule that lands solely in a ladder run arrives after the narrative is written and
@@ -330,7 +330,12 @@ never that a hook ran.
 declares a `SessionStart` and a `PreToolUse` hook. On codex CLI 0.152.1, 2026-09-02, neither was
 observed to run: `codex doctor` reports its `config.toml` as `~/.codex/config.toml` and lists no
 project-level layer, and `scripts/session-start.sh` prints its banner unconditionally yet that
-banner appeared in none of roughly ten `codex exec` runs inside this repository. The table above
+banner appeared in none of roughly ten `codex exec` runs inside this repository. **Re-measured on
+codex CLI 0.153.2, 2026-09-04, with the same result** (DC-034): `codex doctor`'s Configuration block
+still names `~/.codex/config.toml` as the sole `config.toml` and lists no project layer, and the
+banner appeared in none of four `codex exec -s read-only` runs here. That second reading was taken
+on Linux aarch64 rather than the Windows host of the first, so the two together also rule out a
+Windows-only quirk — but they are two observations, not a proof, and the ceiling below is unchanged. The table above
 claimed `yes` for both rails before anyone measured.
 
 Read the strength of that claim exactly. It is an **observation on one version**, not a proof: no
@@ -340,9 +345,14 @@ the hooks are declared. Project execpolicy `.rules` files *are* loaded — `code
 exists precisely to skip them — so `.codex/rules/amh.rules` is real either way. Re-measure on a
 version bump; upstream may add project-config support at any time.
 
-`AGENTS.md` currently states the opposite in its Conventions section — that "Codex's pre-shell hook
-runs the shipped command guard" and that it has a shell hook. Reconciling those sentences is a
-change to the constitution, so it is an Owner-queue item rather than something this file settles.
+`AGENTS.md` stated the opposite in its Conventions section until 2026-09-02 — that "Codex's
+pre-shell hook runs the shipped command guard" and that it has a shell hook. Reconciling those
+sentences was a change to the constitution, so it waited on the owner, who directed it; they now
+describe a hook that is declared and was not observed to fire, scoped to the version measured, and
+Owner-queue item 4 closed with that edit. The adapter comments in `.codex/config.toml` and
+`.claude/settings.json` were corrected in the same unit — the second of them in the opposite
+direction, having claimed the hooks "do not fire at all", which this file's own paragraph above
+forbids anyone from claiming.
 
 **An agent with no pre-execution hook has no command rail at all.** `scripts/command-guard.sh` is
 then a script nobody calls, and the constitution's prose is the only layer standing. No check can
