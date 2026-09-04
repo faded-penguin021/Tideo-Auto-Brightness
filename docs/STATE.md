@@ -1,9 +1,16 @@
 # STATE — project state & session memory
 
-> **Length guard (DA-004).** `guard_state_size` and `guard_state_structure` are the authority — read
-> them, not a summary. On a warning run ONE deep pass to BOTH floors, folding whole completed stages;
-> shaving words cannot meet the sentence floor. Nothing reads WHAT a pass deleted, and the Owner queue
-> is protected only by its heading, so compress an item's prose, never drop it.
+> **Length guard (DA-004).** Thresholds are in `amh.conf`; the rules for compressing this file are
+> `docs/RUNBOOK.md` → **Working-memory compression**, and they bind whether or not you follow this
+> pointer. Fold completed narrative when its stage completes; retain only current state, unresolved
+> owner items, immediate operational gotchas and concise changelog pointers.
+>
+> **Tree-relative.** That same section says what may be in `Current state` at all — the Changelog
+> and ledger pointers are historical storage and are exempt: it records what stays true of the
+> checked-out tree, never world-controlled status (merged, tagged, released, PR and CI state,
+> deployments, remote branches, forge settings) as current truth. Point at a live probe instead of
+> storing its last answer, route an unresolved external action to the Owner queue, and scope a
+> retained past observation to when it was observed. Prose-only — no guard judges it.
 
 ## Project
 
@@ -13,13 +20,21 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
+<!--
+Write what a fresh clone of THIS COMMIT would still find true. Test each sentence: would it hold
+tomorrow, under another branch name, after forge state had moved? If not, it belongs at a live
+probe, in the Owner queue, or scoped as a dated observation — not here as fact. Do not write
+"released", "tagged", "merged", "CI is green" or "protection is configured" as current state.
+Name the live ledger VOLUME, never its latest row id — every append moves that.
+-->
+
 Harness AMH 14.0.0 (DC-029), upstream manifest scripts immutable; live ledger `LEDGER_C.md`.
 
 **Resuming cold?** Release standing is NOT recorded here — the session banner computes it live via
 `scripts/session-facts.sh` (DC-030), settled by hand with
-`git ls-remote --tags --refs origin 'refs/tags/v*'`. Shipped scripts run 14.0.0 while the binding
-prose is still 9.1.0-era; `amh.conf`, `doc-facts.sh` and `HARNESS_LOCAL.md` "Upgrading" carry that
-split themselves, so it no longer depends on this file (DC-031). Unguarded still: nothing stops a
+`git ls-remote --tags --refs origin 'refs/tags/v*'`. Scripts and binding prose are both AMH 14.0.0
+now that the owed seed prose has landed, so `AMH_PROSE_VERSION` equals `AMH_VERSION` and
+`doc-facts.sh` is quiet on the pair (DC-031, DC-036). Unguarded still: nothing stops a
 later session re-caching a release number.
 
 This branch carries Graph Metrics (DC-001), the LEDGER_C rollover, the executed #126/#127
@@ -33,7 +48,11 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input, not
 
 ## Owner queue
 
-> Protected by D-167. Test observable claims before restating them; preserve unresolved items.
+> **Protected section (D-167).** Never delete it, and never silently drop items during compression
+> — a ladder guard warns if the header vanishes. Items leave only when done, answered or triaged;
+> then delete the item and record the outcome as a Changelog line or a ledger row. How to test an
+> item before restating it, and why every session's final message must:
+> `docs/RUNBOOK.md` → **Session discipline** 7.
 >
 > **Plain language here — exempt from the tree's terse, ledger-ID-first register (DB-079, owner,
 > 2026-08-23)** because a person decides from it: say what to do, on what, what result means it
@@ -107,6 +126,15 @@ DC-001…DC-035.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-04 — **The owed AMH seed prose for 9.2.0…14.0.0 landed; both version keys are 14.0.0
+  (DC-036).** RUNBOOK gained the **Working-memory compression** section 9.2.0 created and this tree
+  had never had — carrying 11.0.0's fold-by-lifecycle rule, 12.0.0's ban on counter-only rewrites,
+  13.0.0's threshold vocabulary and 14.0.0's tree-relative content rule — and `docs/STATE.md`'s
+  preamble became the pointer to it. The four ledger preambles took 10.0.0 immutability with its
+  `Corrected by`/`Superseded by` pointers and the 10.3.0 `[cited]` carve-out, plus 14.0.0 **Paths in
+  rows**; `AGENTS.md` gained the ledger exception to its ground-truth rule, the 14.0.0 state
+  reading/writing steps and 10.1.0's note that the branch clause, not the push rail, is now the
+  enforcement; and Session discipline 5 took the plan-path citation ban.
 - 2026-09-02..04 — **The harness train: AMH 9.1.0 → 14.0.0, its prose-debt guard, and the Codex
   rail (DC-029…DC-035).** Shipped scripts and manifest copied with `.gitattributes` against a
   Windows CRLF false failure; `AMH_PROSE_VERSION` plus a `doc-facts.sh` warn/fail tier and 8 fixtures
@@ -114,8 +142,8 @@ Newest first; ledger rows are the durable detail.
   measured on 0.152.1 and 0.153.2 and reworded to declared-but-not-observed across `AGENTS.md` and
   both adapters, with `docs/HARNESS_LOCAL.md` added to `RULE_FILES` (owner); the `:platform` suite
   called unrunnable here went 145/145 on an x86_64 JDK; and the DA-005 review owed on `845bb75`
-  returned NOT CLEAN, catching a fail-closed claim that commit had falsified. Seed prose for 9.2.0
-  and MAJORs 10.0.0…14.0.0 is **still owed** and is the next harness unit.
+  returned NOT CLEAN, catching a fail-closed claim that commit had falsified. The seed prose this
+  train left owed was landed by DC-036, above.
 - 2026-06-23..08-31 — **v1.0.0 → v1.9.2 shipped, then the #126/#127 override-attribution train
   executed and fully read on a device (D-096…DC-028).** `write()` became a transaction reporting what
   Android STORED, used by both detectors, the baseline and the animation band; the commit guard

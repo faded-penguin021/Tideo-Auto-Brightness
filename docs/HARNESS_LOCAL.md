@@ -208,7 +208,8 @@ is the reviewable version of the same flexibility.
 drift anchors are deliberate approximations and *can* fire on a true claim (a fifth file naming
 `ShizukuShell` without being a runtime dependency site, per that guard's own header). They stay
 fail-closed anyway, because reconciling the prose against the code is the work the anchor exists
-to force. Its one **warn** branch is the `AMH_PROSE_VERSION` split (DC-031): while the two version
+to force. Its one **warn** branch is the `AMH_PROSE_VERSION` split (DC-031), dormant while the keys
+are equal as they are today: while the two version
 keys differ and `AGENTS.md` discloses the gap, the guard prints a leading `WARN ` and exits 2, so
 the debt stays audible on every run without holding the branch red for the duration of a state the
 owner deliberately chose — failing closed there is how a rule gets deleted instead of obeyed. That
@@ -220,7 +221,7 @@ which you chose and why.
 
 | Key | Ours | Why |
 |---|---|---|
-| `AMH_PROSE_VERSION` | `9.1.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION`'s `14.0.0` for the shipped scripts: `4e22273` landed the file copy and left the seed prose owed. The **Upgrading** section below reads the changelog forward from this key, which is the reason it exists; `doc-facts.sh` warns while the two differ and fails if `AGENTS.md` drops its disclosure paragraph first. Delete the paragraph and set the two equal in the commit that lands the prose (DC-031). |
+| `AMH_PROSE_VERSION` | `14.0.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — `4e22273` landed the file copy and DC-036 landed the owed seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
 | `BRANCH_PREFIX` | `claude` | Session branches are `claude/<codename>`, named in each session's directive. |
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |

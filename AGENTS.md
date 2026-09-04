@@ -8,19 +8,18 @@ Maintenance uses the [Agentic Maintenance Harness](https://github.com/faded-peng
 This constitution records **AMH 14.0.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
 and the version here must change with it; `scripts/guards/doc-facts.sh` fails on a mismatch.
 
-**The shipped scripts are AMH 14.0.0; the binding prose is AMH 9.1.0.** An upgrade has two halves,
-and `4e22273` landed only the first by owner direction: the hand-applied seed prose for 9.2.0 and
-MAJORs 10.0.0…14.0.0 is still owed, so rules stated in this file, `docs/RUNBOOK.md` and
-`docs/STATE.md` remain 9.1.0-era until that unit lands. Read the version pair as what it is — a
-tree running new scripts under old rules — rather than as a claim that every 14.0.0 rule binds here.
-`AMH_PROSE_VERSION` in `amh.conf` carries the same fact for machines: `doc-facts.sh` warns on every
-run while the two keys disagree, and fails if this disclosure goes missing before the prose lands.
-It tests for that by matching the literal sentence **"the binding prose is AMH `<AMH_PROSE_VERSION>`"**
-above, so that clause is load-bearing text, not a turn of phrase — rewording it turns the branch red
-exactly as deleting it does. Say the rest however you like. `docs/HARNESS_LOCAL.md` "Upgrading" reads
-the upstream changelog forward from that key rather than from `AMH_VERSION`, where the owed notes
-would be invisible. Delete this paragraph and set the two keys equal in the same commit that lands
-the prose, never before (DC-031).
+Both halves of that upgrade have now landed: `4e22273` copied the shipped scripts, and the
+hand-applied seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 followed, so `AMH_PROSE_VERSION` and
+`AMH_VERSION` in `amh.conf` are equal again and `doc-facts.sh` is silent on the pair. Should they
+ever diverge, that key names the version whose rules this tree's prose actually follows, and the
+guard requires a disclosure sentence here for as long as the gap stands.
+The disclosure it requires is a literal sentence — **"the binding prose is AMH
+`<AMH_PROSE_VERSION>`"** — so if a future split upgrade reopens the gap, that clause is
+load-bearing text rather than a turn of phrase: rewording it turns the branch red exactly as
+omitting it does. Say the rest however you like. `docs/HARNESS_LOCAL.md` "Upgrading" reads the
+upstream changelog forward from `AMH_PROSE_VERSION` rather than from `AMH_VERSION`, where notes
+owed from before a bump would be invisible; set the two equal only in the commit that lands the
+prose, never before (DC-031, DC-036).
 Before changing anything in `scripts/`, read `docs/HARNESS_LOCAL.md`. It explains which scripts
 come from upstream and cannot be fixed locally, how each local guard works and which verdict tier
 it uses, and every way this repository's `amh.conf` differs from the stock configuration.
@@ -41,6 +40,9 @@ it uses, and every way this repository's `amh.conf` differs from the stock confi
 
 Code and the golden test vectors are the source of truth. Documents describe the app as built and
 can drift. If documentation disagrees with the code, trust the code and correct the documentation.
+**The append-only ledger is the exception** (AMH 10.0.0): its rows are immutable, so a stale row is
+never edited in place — write a new row and append one pointer line to the old one. Without this
+carve-out the two rules contradict each other, since the ledger is a document.
 
 The Tasker source XML is stored in `docs/rebuild/extraction/_source/` (gitignored, 1.6 MB and about
 41,000 lines). Never read the entire file into context. Follow `docs/rebuild/XML_RECIPES.md`
@@ -54,12 +56,18 @@ instead. The migration narrative in `docs/history/` is frozen.
    established facts. Every observable claim must include the command that settles it. Run that
    command and compare its output with the stated resolution; do not rely on its exit status alone. If the
    output shows that the item is resolved, delete it during this session instead of repeating it
-   with a caveat.
+   with a caveat. The same caution reaches `Current state`: it is tree-relative by rule, but a
+   legacy sentence about the world — merged, tagged, released, CI, branch protection — may predate
+   that rule, so check one against a live source before acting on it or repeating it.
 3. Open the relevant playbook in `docs/RUNBOOK.md` and read the reference documents it names.
 4. Work in small, checkpointed units as required by RUNBOOK **Session discipline** (D-161).
 5. Run `scripts/ladder.sh` until it is green. Never leave the branch red.
-6. Update `docs/STATE.md`. If the runbook did not cover the work you just completed, improve the
-   runbook in the same change.
+6. Update `docs/STATE.md` with what stays true of the checked-out tree, honouring RUNBOOK
+   **Working-memory compression** — which holds both its length rules and the rule on what may sit
+   in `Current state` at all. Never cache world-controlled status (merged, tagged, released, PR/CI,
+   deployments, remote branches, forge settings) as current truth: point at the live probe, route it
+   to the Owner queue, or keep it as an observation scoped in the sentence to when it was seen. If
+   the runbook did not cover the work you just completed, improve the runbook in the same change.
 7. Push with `git push -u origin <your-session-branch>`.
 
 ## Verification
@@ -258,7 +266,12 @@ it.
 ## Git
 
 Work only on the assigned session branch, named `claude/<codename>` according to `BRANCH_PREFIX` in
-`amh.conf`. Push with `git push -u origin <branch>`. Retry a push only for network errors, at most
+`amh.conf`. **This clause is the enforcement** (AMH 10.1.0): the push rail stopped checking the
+branch namespace, because it cannot tell a name the harness assigned from one an agent invented,
+and the old check rejected correctly-assigned branches. What the rail still denies is what it can
+actually read — `main` in every spelling, force, deletion, a tag push, and a second ref — so an
+explicitly named off-convention branch is now stopped by this sentence and by the reviewer, not by
+a block. Push with `git push -u origin <branch>`. Retry a push only for network errors, at most
 four times, using delays of 2, 4, 8, and 16 seconds. A non-fast-forward rejection is not a network
 error and needs a different resolution. Never force-push or push to `main`. The sole exception is
 a leaked-credential history rewrite, which the owner performs.

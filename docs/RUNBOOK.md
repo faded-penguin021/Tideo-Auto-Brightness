@@ -359,7 +359,24 @@ any moment (rate limit, window end, compaction).
    pass behind you. Delegate the pass itself to a fresh-context subagent where the harness
    supports one (DA-003) — accountability for triaging its findings stays with the session.
 5. **Multi-unit work** uses the playbook-5 persisted-plan pattern (plan file + STATE checklist)
-   so any session can resume the backlog mid-stream.
+   so any session can resume the backlog mid-stream. At the end, move a completed plan worth
+   retaining whole to `docs/history/` — this repository has that archive tier, and it is frozen,
+   so an archived plan is a historical record and never permanent memory — otherwise delete it.
+   Its durable outcomes live in changelog lines and ledger rows either way. **No ledger row may
+   cite a plan's PATH** (AMH 10.4.0) — not in backticks, not as a link, not as a bare filename. A
+   plan is provisional context, not permanent evidence, so the citation dies the moment the plan
+   retires, inside a row that can never be repaired. Record what the plan DELIVERED in the row and
+   name the plan in prose if you must, in a form no path guard resolves. **A legacy citation does
+   NOT pin its plan** (AMH 14.0.0, withdrawing the earlier retained-in-place exception): a row's
+   immutability covers its text, not the lifetime or location of a file it names, so the row keeps
+   its historical wording and the plan completes archive-or-delete like any other, leaving no
+   redirect, tombstone or symlink. `docs/LEDGER_B.md` carries one such legacy citation; the plan it
+   names is retained for its live triage content, not for that citation, which is why it stays.
+   **All of this is prose-only.** This repository ships no path-reference guard and nothing scans
+   ledger rows for plan paths — the ladder's `PLAN_DIR` rung only WARNs when a plan file is not
+   referenced from `docs/STATE.md`, which is a different question — so the rule-review pass is the
+   whole enforcement. Upstream's reference repository checks this in its own append-only guard; we
+   do not have one, and this sentence exists so nobody reads the rule as gated.
 6. **Recovery — bounded, with a stop condition (DA-012).** If the unit in flight has gone
    wrong, do not flail forward: reset the working tree to the last green checkpoint (`git
    status` first, then `git reset --hard HEAD` and a careful `git clean` of files you created),
@@ -386,10 +403,24 @@ any moment (rate limit, window end, compaction).
    `STATE.md ## Owner queue` → **Open questions** — date-stamped `[YYYY-MM-DD]` (age is the
    owner's triage cue, DA-006), the fork, the options, and your
    recommendation with reasons — then end the unit and move to independent work (or end the
-   session). A session's **final chat message restates the Owner queue** so the owner sees
-   pending items without opening STATE. Routine engineering judgment inside a unit's stated
+   session). Genuinely unsure whether something is a fork? Treat it as one: the entry already
+   carries your recommendation, so escalation costs the owner one read while a wrong guess can
+   cost a segment. Routine engineering judgment inside a unit's stated
    scope is NOT a fork — this rule is for decisions the owner would want to make, not cover for
    avoiding decisions the agent should make.
+
+   **Testing a queue item, and the final message (AMH 9.2.0, folded here from the STATE
+   preamble).** A session's **final chat message restates the Owner queue** so the owner sees
+   pending items without opening STATE — **each item tested first, never copied forward.** Run the
+   command an item carries and read its OUTPUT against the resolution the item states, never its
+   exit status: a check written to detect the unresolved condition exits 0 exactly when the item
+   is still open. An item the output shows resolved is done in this session — delete it and record
+   the outcome as a changelog line or a ledger row, rather than restating it with a caveat. An item
+   with no check is restated as **unverified**, naming who settles it; carrying a check is
+   deliberately NOT required, because an item that needs one will get one, "the owner says so" is a
+   check the way a checkbox is evidence, and the absence is information rather than an omission.
+   Nothing enforces any of this and nothing may — a gate that consumes "I checked" is a self-report
+   (the D-162 line again).
 8. **Verification disclosure (D-175).** Every commit body states what was actually verified
    (which ladder rungs/tests ran — for docs-only units, `--guards-only`) and names what could
    NOT be verified locally. On-device behavior stays owner-verified (`DEVICE_TEST_SCRIPT.md`);
@@ -580,6 +611,102 @@ owner-verified — no emulator, no KVM):
                                               # AGP reports a library's findings only in that
                                               # library's own report (DB-074).
 ```
+
+## Working-memory compression
+
+The rules for compressing `docs/STATE.md` (AMH 9.2.0, rewritten by 11.0.0/12.0.0/13.0.0/14.0.0).
+They live **here** rather than in the file they govern, and the placement is the point: these rules
+change only under the rule-review protocol, while the byte cap on `docs/STATE.md` exists to force
+*volatile* content out. A block of permanent rules sitting inside that cap spends the budget every
+pass is fighting for, and it cannot itself be compressed — folding a live rule is repeal. Measured
+here rather than assumed: the preamble this section replaced was ~1,050 bytes of a 9,216-byte
+ceiling.
+
+**Relocating a live rule is legislation, not tidying — and the destination decides whether it is
+repeal.** This runbook is read on demand and every playbook routes into it, so a rule here still
+reaches the session that needs it. The ledger and `docs/history/` do not: they are retrieval
+storage nobody reads whole, and a live rule there binds nothing. This repository has **no**
+documentation-navigation guard, so the pointer left behind in `docs/STATE.md` is prose only —
+said plainly rather than implying a check we do not have; `doc-facts.sh` is an anchor guard and
+does not read this heading. Moving any further passage out of working memory stays the owner's
+call, one grant at a time.
+
+**Threshold vocabulary (AMH 13.0.0).** The words are load-bearing and each names a different
+behaviour: `STATE_WARN_KB` and `STATE_EDIT_DELTA_BYTES` are **triggers**; `STATE_HARD_KB`,
+`LEDGER_ROW_SENTENCE_CAP` and `LEDGER_ROW_CHAR_CAP` are **rejection boundaries**;
+`STATE_COMPRESS_TO_KB` and `STATE_COMPRESS_TO_SENTENCES` are **post-action ceilings**;
+`LEDGER_LINE_CAP` is a **rollover boundary**; and the live ledger volume's byte size is
+**measurement only** — reported every run, never judged. There is no ledger warning band; 13.0.0
+removed it. Every one of these lives in `amh.conf` and is deliberately **not** restated here as a
+number: nothing checks this prose against the config, so a copied number drifts silently the first
+time a threshold moves. `docs/HARNESS_LOCAL.md` carries the one sanctioned prose copy of
+`LEDGER_LINE_CAP`, and that row is a lockstep obligation.
+
+**When to compress.** Compress by lifecycle, not by file size: once a stage is complete, fold its
+narrative and route its durable lessons **even below the compression trigger** (AMH 11.0.0). The
+trigger only makes a pass mandatory before further substantive work; the rejection boundary remains
+a byte-only failure boundary. A typo fix above the trigger is allowed and still owes the pass.
+Boundaries determine when machinery intervenes, not how much content an author should produce.
+
+**How far.** After compression, keep only current state, unresolved Owner-queue items, immediate
+operational gotchas, and concise Changelog pointers. The configured byte and sentence values are
+post-compression acceptance ceilings, satisfied **together**, not retention goals. There is no
+reward for keeping text because space remains, no preferred landing size, and no need to add,
+preserve or reshape content to approach either ceiling. A substantially smaller file is equally
+successful — and often better — when it retains everything live.
+
+**What a passing counter does and does not establish (AMH 12.0.0).** Passing the paired byte and
+sentence checks establishes only that the file or row is not obviously oversized. It is **not** an
+authoring-quality verdict: it says nothing about concision, correct scope, information quality, or
+whether a compression pass actually succeeded. A successful guard verdict reports the measured
+property and nothing more.
+
+**Counter-only rewrites are forbidden (AMH 12.0.0).** Do not merge sentences, repunctuate, remove
+useful qualifiers, or otherwise rewrite text *solely* to move a counter. The sentence ceiling exists
+precisely so that word-by-word shaving cannot satisfy the guard — shaving words cannot move a
+sentence count, and a pass that repunctuated `. T` into `; t` to halve one would be gaming the gate
+rather than compressing the file. Approaching either boundary is a **classification signal**, not an
+editing target: material near one probably contains narrative or several lessons, and should be
+split, reduced to its durable conclusion, or routed out with a concise pointer.
+
+**How.** Decide each fold by whether the stage is complete, never by proximity to a number.
+Collapse completed stages into concise Changelog pointers, fold changelog clusters, move durable
+lessons into the append-only ledger before deleting their narrative, and retain only immediate
+operational gotchas. Never shave clauses until the guard goes quiet, and never cut text into
+another file — that is not compression, it is the relocation the second paragraph makes the
+owner's call. **Project**, **Current state** and **Owner queue** must always survive a pass:
+compress an Owner-queue item's prose, never drop an open one — closing them is the owner's call.
+
+**What may be in `Current state` at all — the content rule beside the size rule (AMH 14.0.0).**
+Compression decides how much survives; this decides what is eligible. Three categories, and only
+the first is unqualified truth here:
+
+1. **Repository-controlled** — true of the checked-out tree until another repository change alters
+   it: the version the tree declares, implemented behaviour, tracked active work, and the live
+   ledger **volume** — the volume, never its latest row id, which every append moves and no
+   sentence follows. This is what `Current state` is for.
+2. **World-controlled** — can change with no change to the tree: whether a branch merged, whether a
+   remote tag or release exists, PR and CI status, deployments, remote branches, forge protection
+   settings. Never cached here as current truth.
+3. **Historical observation** — a past external fact kept because it is still useful, scoped in the
+   sentence to when or where it was observed so it cannot read as present status. This repository's
+   device-round readings are the standing example.
+
+Apply the test before writing a sentence: *would it still be accurate if this same commit were
+cloned tomorrow, under another branch name, after forge state had moved?* If not, route it. Where a
+live probe already computes the fact, point at the probe rather than copying its output —
+`scripts/session-facts.sh` is ours, and it is why no release number is cached here (DC-030). Where a
+session cannot inspect the setting (branch protection, a remote's configuration), state the
+expectation or the unresolved owner action without claiming to have observed it. Where the
+resolution is an external action, it belongs in the Owner queue with its check, not here.
+
+Two limits, so this is not read wider than it is. The scope is `Current state`; it does not reach
+the Changelog or the ledger pointers, which are historical storage by construction — a dated line
+calling a train unreleased records when it was written, and no session owes a re-validation of what
+a past row said. And it is **prose-only**: no guard reads a State sentence for temporal validity,
+none is proposed, and none should be — the discriminator is meaning, which is what this harness
+refuses to build gates on. Do not add one, and do not make startup grep this file for forbidden
+phrases.
 
 ## When CI fails on a PR (workflow vs code)
 

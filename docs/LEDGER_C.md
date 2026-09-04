@@ -5,12 +5,33 @@
 > cap). Code comments and docs cite entries as bare `DC-0NN` and must always resolve here, so no
 > entry may ever be deleted or summarized away. **Append new maintenance deviations as DC-001,
 > DC-002, … at the bottom** — one continuous sequence, never restart numbering. Code + golden
-> vectors are ground truth; if an entry conflicts with current code, trust the code and correct the
-> entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
+> vectors are ground truth; an entry that conflicts with current code is historical, and the code
+> settles present behaviour. **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
-> **Keep new rows concise and at or below `LEDGER_ROW_SENTENCE_CAP`** in `amh.conf`; the
-> sentence limit is the working bound, while `LEDGER_ROW_CHAR_CAP` is a byte backstop with
-> real headroom. The keys are
+>
+> **Rows are immutable (AMH 10.0.0).** The ` [cited]` marker is metadata and may be synchronized in
+> place — the citation rung requires it to track the citation set in BOTH directions, so any
+> append-only guard must permit adding AND dropping it (AMH 10.3.0). Otherwise correct a detail with
+> a new row and append `Corrected by <ID>.` to the old row, or replace its whole conclusion with a
+> new row and append `Superseded by <ID>.` The first pointer is final; which verb is honest is the
+> reviewer's call, not a guard's.
+>
+> **Paths in rows (AMH 14.0.0).** A row's immutability covers its text, not the lifetime or location
+> of a file it names. A new path reference must resolve in the tree where the row is authored; a
+> committed row's target may later move or disappear, and that drift leaves the historical text
+> alone. A new path that does not resolve, and any citation of a plan's path (RUNBOOK **Session
+> discipline** 5), are both forbidden — and both are **prose-only here**: this repository ships no
+> path-reference guard and nothing scans rows for plan paths, so the rule-review pass is the whole
+> enforcement.
+>
+> **Boundaries determine when machinery intervenes, not how much content an author should produce
+> (AMH 12.0.0/13.0.0).** `LEDGER_ROW_SENTENCE_CAP` and `LEDGER_ROW_CHAR_CAP` are rejection
+> boundaries for new rows; `LEDGER_LINE_CAP` is a rollover boundary; this volume's byte size is
+> measurement only, reported and never judged. Crossing a rejection boundary rejects the row;
+> passing one proves no more than the absence of obvious oversizing, and is not a verdict on
+> concision, scope or quality. Never merge sentences, repunctuate, or drop useful qualifiers solely
+> to move a counter; nearing a boundary is a classification signal, so split the material or reduce
+> it to its durable conclusion. The keys are
 > named here and deliberately not restated as a number, because nothing checks this preamble
 > against the config and a copied number goes stale the first time a cap moves. Read them from
 > `amh.conf`; a green ladder deliberately does not print the limits. Bytes are counted with
@@ -503,3 +524,18 @@
   sentence, not the guard, is the fragile artifact — any prose that counts or classifies guards is
   a lockstep obligation of every future guard edit, and the tripwire only fires on the files
   `RULE_FILES` names, which is why `docs/HARNESS_LOCAL.md` was added to it in this same unit.
+
+- DC-036: **The owed AMH seed prose landed, and the biggest thing missing was a section that had
+  never existed here at all.** 9.2.0 relocated the working-memory rules out of `docs/STATE.md` into a
+  RUNBOOK **Working-memory compression** section, and this tree skipped that release, so for four
+  MAJORs the rules kept spending the very budget they exist to protect and every later rewrite of
+  them — 11.0.0's fold-by-lifecycle, 12.0.0's ban on counter-only rewrites, 13.0.0's threshold
+  vocabulary, 14.0.0's tree-relative content rule — had no destination to land in. Applying the
+  final 14.0.0 wording per section rather than replaying six versions of each is what made the unit
+  tractable, since the later MAJORs supersede the earlier ones outright. The rest was smaller and
+  the same shape: the ledger preambles still promised "trust the code and correct the entry" that
+  10.0.0 replaced with immutable rows plus `Corrected by`/`Superseded by` pointers and the `[cited]`
+  marker carve-out, the constitution had no ledger exception to its own ground-truth rule, and the
+  branch clause never said that 10.1.0 made it the enforcement rather than the push rail. The
+  durable half: a skipped MINOR is not a smaller debt than a skipped MAJOR — 9.2.0 moved where a
+  rule lives, and everything downstream assumed the move had happened.
