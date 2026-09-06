@@ -87,6 +87,12 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input, not
    still claimed all eight repo-local guards fail closed after `845bb75` made that false, fixed here
    with two lower findings of this session's own. The PR #128 hold is lifted on this ground alone.
 
+6. **Backlog, NOT for this train — extract the 29 hardcoded diagnostic-card labels the widened i18n
+   ratchet surfaced (DC-040).** They are titles and labels on the Live Debug and diagnostic cards
+   that predate the wider check, frozen at 29 by `WRAPPER_CEILING` in `HardcodedStringCheckTest`;
+   the ceiling may only fall. Settles it: `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'`
+   — green means the debt has not grown, not that it is gone.
+
 Open questions:
 
 - **[2026-08-31] The rename half of the deferred cleanup — take it, or drop it with the other
@@ -125,6 +131,16 @@ DC-001…DC-035.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-06 — **A fresh-context review of the PR #128 diff, and the four fixes it earned
+  (DC-037…DC-041).** The settle-window gate now sits AFTER the suspending settings read instead of
+  before it; `OverrideDiagnostic` carries `modeRecovered`, so a failed mode reclaim under the
+  deadband stops reading as a healthy drift; the Brightness Writes card renders the write the EVENT
+  captured, not only the continuous one that outlives it; and the i18n ratchet gained a second check
+  over this repo's own `DiagnosticCard(`/`Metric(` wrappers, which had hidden the whole card's
+  labels — 12 extracted here, the 29 it surfaced elsewhere frozen and queued. The refused-tail
+  baseline the same review found is **ruled no-change** (owner, 2026-09-06): DC-008 stands and a
+  test now pins it.
 
 - 2026-09-04 — **The owed AMH seed prose for 9.2.0…14.0.0 landed; both version keys are 14.0.0
   (DC-036).** RUNBOOK gained the **Working-memory compression** section 9.2.0 created and this tree

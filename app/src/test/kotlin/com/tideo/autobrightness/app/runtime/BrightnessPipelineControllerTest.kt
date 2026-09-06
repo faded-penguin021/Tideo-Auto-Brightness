@@ -859,6 +859,109 @@ class BrightnessPipelineControllerTest {
         scope.cancel()
     }
 
+    @Test
+    fun overrideArrivingWhileTheSettingsReadSuspends_seesTheWakeWindow_andDoesNotPause() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        var armOnNextRead = false
+        lateinit var controller: BrightnessPipelineController
+        controller = BrightnessPipelineController(
+            lightSensor = sensor,
+            brightness = brightness,
+            brightnessObserver = observer,
+            settingsProvider = {
+                if (armOnNextRead) { armOnNextRead = false; controller.onScreenOn() }
+                settings
+            },
+            scope = scope,
+            clock = { 1000L },
+        )
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        armOnNextRead = true
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertFalse(controller.state.value.paused, "the window was armed before the commit gate ran")
+        assertNull(controller.state.value.overrideDiagnostic, "nothing was committed, so nothing is recorded")
+        scope.cancel()
+    }
+
+    @Test
+    fun driftDismissalWithAFailedModeReclaim_recordsTheReclaimOutcome() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val baseline = controller.state.value.lastAppliedBrightness!!
+        brightness.manualMode = false
+        brightness.forceManualSucceeds = false
+        brightness.current = baseline + 1
+        observer.flow.emit(baseline + 1)
+        advanceUntilIdle()
+
+        val diagnostic = controller.state.value.overrideDiagnostic
+        assertEquals(OverrideDisposition.DISMISSED_DRIFT, diagnostic?.disposition)
+        assertEquals(false, diagnostic?.modeRecovered, "the disposition cannot say the mode is still AUTOMATIC")
+        scope.cancel()
+    }
+
+    @Test
+    fun animationThatLandsFramesThenRefuses_keepsThePreviousBaseline() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        var nowMs = 1000L
+        val runner = LandThenRefuseAnimationRunner(brightness)
+        val (controller, scope) =
+            newController(sensor, brightness, clock = { nowMs }, animationRunner = runner)
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+        val baseline = controller.state.value.lastAppliedBrightness
+
+        runner.armed = true
+        nowMs += 600_000L
+        sensor.flow.emit(sample(lux = 400.0))
+        advanceUntilIdle()
+
+        assertEquals(
+            baseline,
+            controller.state.value.lastAppliedBrightness,
+            "DC-041: the refused tail wins over the landed frames — DC-008 rules, and the owner kept it",
+        )
+        assertEquals(WriteStatus.REFUSED, controller.state.value.lastBrightnessWrite?.status)
+        scope.cancel()
+    }
+
+    private class LandThenRefuseAnimationRunner(
+        private val brightness: ScreenBrightnessController,
+    ) : AnimationRunner(brightness) {
+        var armed = false
+        override suspend fun animate(
+            from: Int,
+            to: Int,
+            steps: Int,
+            waitMs: Long,
+            detectOverrides: Boolean,
+        ): AnimationOutcome {
+            if (!armed) return super.animate(from, to, steps, waitMs, detectOverrides)
+            val landed = brightness.write((from + to) / 2)
+            return AnimationOutcome.Completed(
+                lastAcknowledged = landed,
+                lastResult = unlandedWrite(to, WriteStatus.REFUSED),
+            )
+        }
+    }
+
     /** Always aborts with [trigger] as the read that tripped the band detector. */
     private class OverridingAnimationRunner(
         private val brightness: ScreenBrightnessController,

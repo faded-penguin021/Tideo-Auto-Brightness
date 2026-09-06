@@ -17,6 +17,8 @@ data class OverrideDiagnostic(
     val settled: Int,
     val expected: Int?,
     val manualMode: Boolean,
+    /** DC-038: reclaim outcome — null when the mode was already MANUAL and none was attempted. */
+    val modeRecovered: Boolean?,
     val write: BrightnessWriteResult?,
     val timestampMs: Long,
 )

@@ -269,27 +269,32 @@ internal class PipelineCycleRunner(
         val settleMs = (ctx.stateValue.cycleTimeMs?.toLong() ?: 0L).coerceAtLeast(MIN_SETTLE_MS)
         delay(settleMs)
 
+        // DC-008: the monitor gates on this but the commit did not (the sibling-gate class).
+        // DC-037: this read SUSPENDS, so the state gates below it must stay below it.
+        if (!settingsProvider().detectOverrides) return
+
         val s2 = ctx.stateValue
         if (!canPause(s2)) return
-        // DC-008: the monitor gates on this but the commit did not (the sibling-gate class).
-        if (!settingsProvider().detectOverrides) return
         val settled = brightness.read()
         val manualMode = brightness.isManualMode()
 
         // DC-009: reclaim BEFORE the drift branch, or a framework value inside the deadband is
         // dismissed as harmless and the device stays in AUTOMATIC.
         val recovered = if (manualMode) true else reclaimManualMode()
+        val modeRecovered = if (manualMode) null else recovered
 
         // Settled to what we actually put on screen → transient, not override (D-049 #1, DC-005).
         if (OverrideRules.isRepresentationalDrift(settled, s2.lastAppliedBrightness)) {
-            recordDiagnostic(s2, source, OverrideDisposition.DISMISSED_DRIFT, observed, settled, manualMode)
+            recordDiagnostic(
+                s2, source, OverrideDisposition.DISMISSED_DRIFT, observed, settled, manualMode, modeRecovered,
+            )
             return
         }
         if (!manualMode) {
             val disposition =
                 if (recovered) OverrideDisposition.DISMISSED_MODE
                 else OverrideDisposition.MODE_RECOVERY_FAILED
-            recordDiagnostic(s2, source, disposition, observed, settled, manualMode)
+            recordDiagnostic(s2, source, disposition, observed, settled, manualMode, modeRecovered)
             return
         }
         // The state gates were re-checked above; the mode is the only other operand (DC-006).
@@ -309,7 +314,8 @@ internal class PipelineCycleRunner(
         )
         brightness.clearSelfWriteMarker()
         dimming.disengage()
-        val diagnostic = diagnosticOf(s2, source, OverrideDisposition.PAUSED, observed, settled, manualMode)
+        val diagnostic =
+            diagnosticOf(s2, source, OverrideDisposition.PAUSED, observed, settled, manualMode, null)
         // pausedByOverride: detected override (G2R-F35, D-044(c)).
         ctx.update {
             it.copy(
@@ -335,7 +341,8 @@ internal class PipelineCycleRunner(
         observed: Int,
         settled: Int,
         manualMode: Boolean,
-    ) = s.buildOverrideDiagnostic(source, disposition, observed, settled, manualMode, clock())
+        modeRecovered: Boolean?,
+    ) = s.buildOverrideDiagnostic(source, disposition, observed, settled, manualMode, modeRecovered, clock())
 
     private fun recordDiagnostic(
         s: PipelineState,
@@ -344,8 +351,9 @@ internal class PipelineCycleRunner(
         observed: Int,
         settled: Int,
         manualMode: Boolean,
+        modeRecovered: Boolean?,
     ) {
-        val diagnostic = diagnosticOf(s, source, disposition, observed, settled, manualMode)
+        val diagnostic = diagnosticOf(s, source, disposition, observed, settled, manualMode, modeRecovered)
         ctx.update { it.copy(overrideDiagnostic = diagnostic) }
     }
 

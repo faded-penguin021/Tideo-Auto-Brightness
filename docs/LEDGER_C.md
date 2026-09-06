@@ -539,3 +539,51 @@
   branch clause never said that 10.1.0 made it the enforcement rather than the push rail. The
   durable half: a skipped MINOR is not a smaller debt than a skipped MAJOR — 9.2.0 moved where a
   rule lives, and everything downstream assumed the move had happened.
+
+- DC-037 [cited]: **A gate taken before a suspending read is a gate taken against a stale world.**
+  `handleOverride` re-checked `canPause` after its settle `delay`, then read settings from DataStore
+  — a suspension of unbounded length — and committed the pause on the snapshot from before it, so a
+  wake landing mid-read armed the settle window and got paused anyway, and the queued
+  reinitialization then skipped its initial brightness because the pipeline was paused. The fix is
+  ordering, not a new check: the settings read moved above the snapshot so the existing gate is the
+  last thing between the suspension and the commit. The class generalizes past this call — DB-082
+  already learned it for observe→post→consume, and every `suspend` boundary inside a decision path
+  invalidates whatever was read before it.
+
+- DC-038 [cited]: **A disposition that several paths can produce cannot also carry the reason.**
+  DC-009 put the mode reclaim before the drift branch, which is correct, but the drift branch then
+  returns `DISMISSED_DRIFT` whether the reclaim succeeded, failed, or was never attempted — so a
+  device left in AUTOMATIC after `forceManualMode()` returned false looked exactly like a healthy
+  one-step drift on the card. `OverrideDiagnostic` now carries `modeRecovered`, three-valued
+  (null = the mode was already MANUAL, so nothing was attempted), and the card renders the row only
+  when a reclaim actually happened. Found by an adversarial reviewer reading the diff, not by a
+  test: no assertion existed that could tell the two events apart.
+
+- DC-039 [cited]: **A record captured with an event is worthless if the view reads the live one
+  instead.** The Brightness Writes card showed `lastBrightnessWrite` — the continuous record, which
+  the next cycle overwrites — beside an override diagnostic that had captured its OWN write at
+  detection time, so by the time anyone read the card the write that explained the disposition was
+  gone and a newer unrelated one sat in its place. The captured field had no reader at all, which is
+  the tell: a field written and never read is either dead or a bug, and this one was the second.
+  The card now renders both, the event's write inside the event's block.
+
+- DC-040 [cited]: **A ratchet only sees the sinks it enumerates, and a wrapper composable is a
+  sink.** `HardcodedStringCheckTest` matched literals passed to `Text(`, `toast(` and
+  `contentDescription`, so a whole new card's title and eleven labels landed hardcoded through this
+  repo's own `DiagnosticCard(` and `Metric(` wrappers without the i18n gate noticing — the check was
+  green because the literals had moved one call deeper, not because they had been extracted. A
+  second ratchet now covers the wrapper sinks and the `Text(if …)` shape, frozen at the 29
+  pre-existing diagnostic-card labels it surfaced, with the original zero-ceiling check untouched so
+  D-131's zero is not quietly renegotiated. The glue reviewer then found the widened check still
+  line-based, which made wrapping a call an escape from it, so the wrapper scan spans line breaks
+  while the original stays per-line — moving BOTH would have redefined what that measured zero
+  means, and the three multiline `Text(` templates it turns up are interpolation glue, not labels.
+
+- DC-041 [cited]: **An animation that lands frames and then refuses keeps the PREVIOUS baseline —
+  ruled, then pinned.** DC-008 made the baseline follow the last frame of ANY status so the rule
+  matches its siblings; the consequence, found by review, is that acknowledged mid-sweep frames are
+  discarded when the tail is REFUSED, leaving `lastAppliedBrightness` describing a screen state that
+  is two writes old. The owner ruled DC-008 stands (2026-09-06): the alternative baseline tracks
+  frames the tail contradicts, and no device round has ever produced the mixed-status sequence. What
+  changed is the evidence, not the code — a test now pins the behaviour as chosen rather than
+  leaving it as an untested consequence, so the next reader meets a decision instead of a surprise.

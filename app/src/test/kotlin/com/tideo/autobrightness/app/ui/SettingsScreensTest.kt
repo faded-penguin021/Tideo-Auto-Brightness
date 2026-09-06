@@ -216,7 +216,7 @@ class SettingsScreensTest {
                 source = OverrideSource.ANIMATION_BAND,
                 disposition = OverrideDisposition.DISMISSED_MODE,
                 observed = 7, settled = 9, expected = 200, manualMode = false,
-                write = null, timestampMs = 0L,
+                modeRecovered = true, write = null, timestampMs = 0L,
             ),
         )
         compose.setContent {
@@ -231,6 +231,55 @@ class SettingsScreensTest {
         compose.onNodeWithText("DISMISSED_MODE", substring = true).performScrollTo().assertExists()
         compose.onNodeWithText("ANIMATION_BAND", substring = true).performScrollTo().assertExists()
         compose.onNodeWithText("7 / 9 / 200", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun liveDebug_writeCard_rendersTheOverridesOwnWrite_notOnlyTheLatestOne() {
+        val seeded = PipelineState(
+            lastBrightnessWrite = BrightnessWriteResult(200, 3212, 3212, 200, 4095, WriteStatus.ACKNOWLEDGED),
+            overrideDiagnostic = OverrideDiagnostic(
+                source = OverrideSource.OBSERVER,
+                disposition = OverrideDisposition.DISMISSED_DRIFT,
+                observed = 69, settled = 69, expected = 68, manualMode = true,
+                modeRecovered = null,
+                write = BrightnessWriteResult(100, 1606, 1573, 98, 4095, WriteStatus.ACKNOWLEDGED),
+                timestampMs = 0L,
+            ),
+        )
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(pipeline = seeded, serviceRunning = true),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("debug_override_write").performScrollTo().assertExists()
+        compose.onNodeWithText("100 → 98", substring = true).performScrollTo()
+            .assertExists()  // DC-039
+        compose.onNodeWithTag("debug_override_reclaim").assertDoesNotExist()
+    }
+
+    @Test
+    fun liveDebug_writeCard_rendersAFailedModeReclaimOnADismissedDriftEvent() {
+        val seeded = PipelineState(
+            overrideDiagnostic = OverrideDiagnostic(
+                source = OverrideSource.OBSERVER,
+                disposition = OverrideDisposition.DISMISSED_DRIFT,
+                observed = 101, settled = 101, expected = 100, manualMode = false,
+                modeRecovered = false, write = null, timestampMs = 0L,
+            ),
+        )
+        compose.setContent {
+            MaterialTheme {
+                LiveDebugContent(
+                    state = LiveDebugUiState(pipeline = seeded, serviceRunning = true),
+                    onSelectDebug = {}, onBack = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("debug_override_reclaim").performScrollTo().assertExists()
+        compose.onNodeWithText("Failed", substring = true).performScrollTo().assertExists()
     }
 
     @Test

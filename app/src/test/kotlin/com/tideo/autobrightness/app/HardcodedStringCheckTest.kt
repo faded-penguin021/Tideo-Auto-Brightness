@@ -17,29 +17,56 @@ class HardcodedStringCheckTest {
     private val userFacingLiteral =
         Regex("""(Text|toast)\(\s*"|contentDescription\s*=\s*"""")
 
+    private val wrapperLabelLiteral =
+        Regex("""(Metric|DiagnosticCard)\(\s*"|Text\(\s*if[^"\n]*"""")
+
     companion object {
         private const val CEILING = 0
+
+        private const val WRAPPER_CEILING = 29
     }
+
+    private fun countLiterals(pattern: Regex, wrapped: Boolean): Map<String, Int> {
+        assertTrue("expected UI sources at ${uiRoot.absolutePath}", uiRoot.isDirectory)
+        val perFile = mutableMapOf<String, Int>()
+        uiRoot.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
+            val lines = file.readLines().map { it.substringBefore("//") }
+            val count =
+                if (wrapped) pattern.findAll(lines.joinToString("\n")).count()
+                else lines.sumOf { pattern.findAll(it).count() }
+            if (count > 0) perFile[file.path] = count
+        }
+        return perFile
+    }
+
+    private fun breakdown(perFile: Map<String, Int>) =
+        perFile.entries.sortedByDescending { it.value }.joinToString("\n") { "  ${it.value}\t${it.key}" }
 
     @Test
     fun uiTextLiteralsDoNotExceedRatchet() {
-        assertTrue("expected UI sources at ${uiRoot.absolutePath}", uiRoot.isDirectory)
-
-        val perFile = mutableMapOf<String, Int>()
-        uiRoot.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
-            val count = file.readLines().sumOf { raw ->
-                val line = raw.substringBefore("//")
-                userFacingLiteral.findAll(line).count()
-            }
-            if (count > 0) perFile[file.path] = count
-        }
+        val perFile = countLiterals(userFacingLiteral, wrapped = false)
         val total = perFile.values.sum()
 
         assertTrue(
             "Hardcoded user-facing UI literals rose to $total (ceiling $CEILING). Extract new user-" +
                 "facing strings into strings.xml via stringResource() / the resId toast() overload. Breakdown:\n" +
-                perFile.entries.sortedByDescending { it.value }.joinToString("\n") { "  ${it.value}\t${it.key}" },
+                breakdown(perFile),
             total <= CEILING,
+        )
+    }
+
+    @Test
+    fun wrapperLabelLiteralsDoNotExceedRatchet() {
+        val perFile = countLiterals(wrapperLabelLiteral, wrapped = true)
+        val total = perFile.values.sum()
+
+        assertTrue(
+            "DC-040: hardcoded labels in wrapper composables rose to $total (ceiling $WRAPPER_CEILING). A " +
+                "title or label passed to Metric()/DiagnosticCard(), or a literal inside Text(if …), is " +
+                "as unlocalized as one passed to Text() — use stringResource(). Lower the ceiling when " +
+                "you extract the remaining ones; never raise it. This scan spans line breaks, so " +
+                "wrapping the call is not an escape. Breakdown:\n" + breakdown(perFile),
+            total <= WRAPPER_CEILING,
         )
     }
 

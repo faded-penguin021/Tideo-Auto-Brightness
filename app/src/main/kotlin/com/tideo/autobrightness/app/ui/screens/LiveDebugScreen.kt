@@ -240,27 +240,49 @@ private fun BrightnessWriteCard(p: PipelineState) {
     val diagnostic = p.overrideDiagnostic
     // DC-008: either half stands alone; gating on the write record hid the diagnostic.
     if (write == null && diagnostic == null) return
-    DiagnosticCard("Brightness Writes", "debug_write_card") {
+    val dash = stringResource(R.string.debug_write_absent)
+    DiagnosticCard(stringResource(R.string.debug_write_title), "debug_write_card") {
         write?.let {
             Metric(
-                "Requested → acknowledged",
-                "${it.requestedDomain} → ${it.acknowledgedDomain ?: "—"}",
+                stringResource(R.string.debug_write_roundtrip),
+                "${it.requestedDomain} → ${it.acknowledgedDomain ?: dash}",
                 "debug_write_roundtrip",
             )
-            Metric("Write status", it.status.name, "debug_write_status")
-            Metric("Raw requested", it.requestedRaw.toString(), "debug_write_raw")
+            Metric(stringResource(R.string.debug_write_status), it.status.name, "debug_write_status")
+            Metric(stringResource(R.string.debug_write_raw), it.requestedRaw.toString(), "debug_write_raw")
             // The value Tideo converts with — one domain step is round(deviceMax / 255) raw.
-            Metric("Device max", it.deviceMax.toString(), "debug_write_device_max")
+            Metric(stringResource(R.string.debug_write_device_max), it.deviceMax.toString(), "debug_write_device_max")
         }
         diagnostic?.let { d ->
-            Metric("Last override", "${d.disposition.name} (${d.source.name})", "debug_override_disposition")
             Metric(
-                "Observed / settled / expected",
-                "${d.observed} / ${d.settled} / ${d.expected ?: "—"}",
+                stringResource(R.string.debug_override_disposition),
+                "${d.disposition.name} (${d.source.name})",
+                "debug_override_disposition",
+            )
+            Metric(
+                stringResource(R.string.debug_override_values),
+                "${d.observed} / ${d.settled} / ${d.expected ?: dash}",
                 "debug_override_values",
             )
-            Metric("Mode at commit", if (d.manualMode) "Manual" else "Not manual", "debug_override_mode")
-            Metric("Override seen", lastSampleLabel(d.timestampMs), "debug_override_age")
+            Metric(
+                stringResource(R.string.debug_override_write),
+                d.write?.let { w -> "${w.requestedDomain} → ${w.acknowledgedDomain ?: dash} (${w.status.name})" }
+                    ?: dash,
+                "debug_override_write",
+            )
+            Metric(
+                stringResource(R.string.debug_override_mode),
+                stringResource(if (d.manualMode) R.string.debug_mode_manual else R.string.debug_mode_not_manual),
+                "debug_override_mode",
+            )
+            d.modeRecovered?.let { ok ->
+                Metric(
+                    stringResource(R.string.debug_override_reclaim),
+                    stringResource(if (ok) R.string.debug_reclaim_ok else R.string.debug_reclaim_failed),
+                    "debug_override_reclaim",
+                )
+            }
+            Metric(stringResource(R.string.debug_override_age), lastSampleLabel(d.timestampMs), "debug_override_age")
         }
     }
 }

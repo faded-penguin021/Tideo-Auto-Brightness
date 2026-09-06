@@ -477,6 +477,25 @@
 
     <!-- Live Debug -->
     <string name="livedebug_current">Debug: %1$s</string>
+
+    <!-- Live Debug: Brightness Writes card (DC-007). "Requested → acknowledged" is domain 0–255. -->
+    <string name="debug_write_title">Brightness Writes</string>
+    <string name="debug_write_roundtrip">Requested → acknowledged</string>
+    <string name="debug_write_status">Write status</string>
+    <string name="debug_write_raw">Raw requested</string>
+    <string name="debug_write_device_max">Device max</string>
+    <string name="debug_override_disposition">Last override</string>
+    <string name="debug_override_values">Observed / settled / expected</string>
+    <string name="debug_override_write">Write at override</string>
+    <string name="debug_override_mode">Mode at commit</string>
+    <string name="debug_override_reclaim">Mode reclaim</string>
+    <string name="debug_override_age">Override seen</string>
+    <string name="debug_mode_manual">Manual</string>
+    <string name="debug_mode_not_manual">Not manual</string>
+    <string name="debug_reclaim_ok">Recovered</string>
+    <string name="debug_reclaim_failed">Failed</string>
+    <!-- Placeholder for a value the pipeline has not produced yet — punctuation, not translatable. -->
+    <string name="debug_write_absent" translatable="false">—</string>
     <string-array name="debug_labels">
         <item>Off</item>
         <item>Skip Animations</item>

@@ -10,6 +10,7 @@ internal fun PipelineState.buildOverrideDiagnostic(
     observed: Int,
     settled: Int,
     manualMode: Boolean,
+    modeRecovered: Boolean?,
     timestampMs: Long,
 ) = OverrideDiagnostic(
     source = source,
@@ -18,6 +19,7 @@ internal fun PipelineState.buildOverrideDiagnostic(
     settled = settled,
     expected = lastAppliedBrightness,
     manualMode = manualMode,
+    modeRecovered = modeRecovered,
     write = lastBrightnessWrite,
     timestampMs = timestampMs,
 )
