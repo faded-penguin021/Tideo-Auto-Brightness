@@ -145,6 +145,9 @@ Newest first; ledger rows are the durable detail.
   labels — 12 extracted here, the 29 it surfaced elsewhere frozen and queued. The refused-tail
   baseline the same review found is **ruled no-change** (owner, 2026-09-06): DC-008 stands and a
   test now pins it.
+  Verification note: `be2819a` was committed with guards only — this container had no JDK. The
+  suite has since run, on an x86_64 JVM under emulation: **670 tests, 0 failures**, all five new
+  tests among them, `scripts/ladder.sh` green at `1ed370c`.
 
 - 2026-09-04 — **The owed AMH seed prose for 9.2.0…14.0.0 landed; both version keys are 14.0.0
   (DC-036).** RUNBOOK gained the **Working-memory compression** section 9.2.0 created and this tree
