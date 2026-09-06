@@ -73,13 +73,17 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input, not
    signature dedupe suppressing a repeat draw, and the one test that looks like it does passes
    unchanged on `b462e56` — which is why the owner's device sighting is the feature's only evidence.
    Contained Compose work, its own unit (DC-001).
-4. **Nothing to do — set `JAVA_HOME` to an x86_64 JDK before the ladder on a Windows-on-ARM host
-   (2026-09-02, DC-033).** Not a preference: an aarch64 JVM fails 120 of 145 `:platform` Robolectric
-   tests for a native conscrypt does not publish, an x86_64 JVM under emulation is 145/145, and
-   Temurin 21 x64 is CI's exact vendor, version and architecture. Two host settings ride with it,
+4. **Nothing to do — set `JAVA_HOME` to an x86_64 JDK before the ladder on any ARM host
+   (2026-09-02, revised 2026-09-06, DC-033).** Not a preference: an aarch64 JVM fails 120 of
+   145 `:platform` Robolectric tests for a native conscrypt does not publish, an x86_64 JVM
+   under emulation is 145/145, and Temurin 21 x64 is CI's exact vendor, version and
+   architecture. Two host settings ride with it,
    both now on: Developer Mode plus `MSYS=winsymlinks:nativestrict`, without which `ln -s` silently
    writes a copy, and a real `python3` ahead of the Microsoft Store alias, which otherwise answers
    `command -v` and exits 0 without running Python.
+   The aarch64 Linux container inside that laptop is the same rule with a different native: Robolectric
+   refuses to run at all there (325 of 670 `:app` tests), and `aapt2` ships x86_64-only, so it also needs
+   `libc6-amd64-cross` and `QEMU_LD_PREFIX=/usr/x86_64-linux-gnu`. `.orch/LOCAL_LADDER.md` has both hosts.
 5. **Nothing to do — the DA-005 review owed on `845bb75` is discharged, and it was NOT clean
    (2026-09-04, DC-035).** A fresh-context Codex reviewer over `4e22273..HEAD` confirmed what the
    item asked — `Upgrading` reads forward from `AMH_PROSE_VERSION`, `doc-facts.sh` warns at 2 and
