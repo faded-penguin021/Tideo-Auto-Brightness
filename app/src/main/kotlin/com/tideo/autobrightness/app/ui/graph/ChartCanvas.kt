@@ -129,6 +129,12 @@ fun ChartCanvas(
 
     var scrubPx by remember { mutableStateOf<Float?>(null) }
 
+    // Tasker: task663 "_GenerateGraph" — D-023 Graph Metrics (%AAB_Debug 7), DC-001: time each
+    // (re)generation. Deduped by content signature so scrub/recompose redraws are not re-timed; null
+    // off this debug level → no timing work. Plain holder (not State): mutating it never recomposes.
+    val graphMetrics = LocalGraphMetricsSink.current
+    val lastGraphSig = remember { intArrayOf(Int.MIN_VALUE) }
+
     Column(modifier = modifier.fillMaxWidth()) {
         if (showLegend) ChartLegend(series.filter { it.inLegend }, scatter, labelColor)
 
@@ -173,6 +179,7 @@ fun ChartCanvas(
         }
 
         Canvas(modifier = canvasModifier) {
+            val drawStartNanos = if (graphMetrics != null) System.nanoTime() else 0L
             val plotLeft = leftPad
             val plotRight = size.width - rightPad
             val plotTop = topPad
@@ -286,6 +293,14 @@ fun ChartCanvas(
                     }
                 }
                 drawReadoutBox(measurer, readoutStyle, lines, px, plotLeft, plotRight, plotTop, gridColor, axisColor)
+            }
+
+            if (graphMetrics != null) {
+                val sig = graphSignature(series, xRange, yRange, markers, scatter?.points)
+                if (sig != lastGraphSig[0]) {
+                    lastGraphSig[0] = sig
+                    graphMetrics.onChartDrawn((System.nanoTime() - drawStartNanos) / 1_000_000.0)
+                }
             }
         }
     }
@@ -484,6 +499,24 @@ internal fun nearestIndex(points: List<Offset>, target: Offset, maxDist: Float):
         }
     }
     return best
+}
+
+// D-023/DC-001: content signature of a chart's plotted inputs — equal inputs ⇒ equal value, so a
+// redraw with unchanged data (scrub, recompose) is not re-timed. Excludes ChartScatter.onTap: a fresh
+// lambda each recompose would defeat the dedupe, so scatter contributes only its points.
+internal fun graphSignature(
+    series: List<ChartSeries>,
+    xRange: ClosedFloatingPointRange<Float>,
+    yRange: ClosedFloatingPointRange<Float>,
+    markers: List<ChartMarker>,
+    scatterPoints: List<Offset>?,
+): Int {
+    var h = series.hashCode()
+    h = 31 * h + xRange.hashCode()
+    h = 31 * h + yRange.hashCode()
+    h = 31 * h + markers.hashCode()
+    h = 31 * h + (scatterPoints?.hashCode() ?: 0)
+    return h
 }
 
 private fun formatTick(v: Float): String =

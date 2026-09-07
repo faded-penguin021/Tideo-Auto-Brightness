@@ -13,9 +13,14 @@ import kotlin.test.assertTrue
 class SettingsBackupSanitizerTest {
 
     private val json = Json { prettyPrint = true }
+    private val lenientJson = Json { ignoreUnknownKeys = true }
+    private val allFieldsJson = Json { encodeDefaults = true }
 
     private fun encodeDefaults(overrides: AabSettings.() -> AabSettings = { this }) =
         json.encodeToString(AabSettings.serializer(), AabSettings().overrides())
+
+    private fun decode(restored: String) =
+        lenientJson.decodeFromString(AabSettings.serializer(), restored)
 
     @Test
     fun restoredSettings_neverClaimTheServiceWasRunning() {
@@ -23,8 +28,7 @@ class SettingsBackupSanitizerTest {
 
         val restored = SettingsBackupSanitizer.sanitize(backedUp)!!
 
-        val settings = Json { ignoreUnknownKeys = true }
-            .decodeFromString(AabSettings.serializer(), restored)
+        val settings = decode(restored)
         assertEquals(false, settings.serviceEnabled)
         assertEquals(false, settings.contextOverride)
     }
@@ -37,8 +41,7 @@ class SettingsBackupSanitizerTest {
 
         val restored = SettingsBackupSanitizer.sanitize(backedUp)!!
 
-        val settings = Json { ignoreUnknownKeys = true }
-            .decodeFromString(AabSettings.serializer(), restored)
+        val settings = decode(restored)
         assertEquals(7, settings.minBrightness)
         assertEquals(201, settings.maxBrightness)
         assertEquals(33, settings.dimmingThreshold)
@@ -66,12 +69,10 @@ class SettingsBackupSanitizerTest {
 
         assertEquals(
             false,
-            Json { ignoreUnknownKeys = true }
-                .decodeFromString(AabSettings.serializer(), restored).serviceEnabled,
+            decode(restored).serviceEnabled,
             "an absent serviceEnabled restored as the default `true`",
         )
-        assertEquals(10, Json { ignoreUnknownKeys = true }
-            .decodeFromString(AabSettings.serializer(), restored).minBrightness)
+        assertEquals(10, decode(restored).minBrightness)
     }
 
     @Test
@@ -84,8 +85,7 @@ class SettingsBackupSanitizerTest {
     @Test
     fun everyResetTargetIsARealSettingsField() {
         // Guard against rename silently turning reset into no-op.
-        val allFields = Json { encodeDefaults = true }
-            .encodeToString(AabSettings.serializer(), AabSettings())
+        val allFields = allFieldsJson.encodeToString(AabSettings.serializer(), AabSettings())
         val fields = json.parseToJsonElement(allFields).jsonObject
         for (field in SettingsBackupSanitizer.RUNTIME_FIELD_RESETS.keys) {
             assertTrue(field in fields, "$field is not a field of AabSettings any more")

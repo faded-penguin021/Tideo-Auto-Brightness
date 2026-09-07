@@ -1,7 +1,9 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
+import com.tideo.autobrightness.platform.brightness.WriteStatus
 import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSample
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
@@ -18,6 +20,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -36,17 +39,35 @@ class BrightnessPipelineControllerTest {
         override fun externalChanges(): Flow<Int> = flow
     }
 
-    private class FakeBrightness : ScreenBrightnessController {
+    /** [normalize] models an OEM that stores something other than what we asked for. */
+    private class FakeBrightness(
+        private val normalize: (Int) -> Int = { it },
+        private val status: WriteStatus = WriteStatus.ACKNOWLEDGED,
+    ) : ScreenBrightnessController {
         val writes = mutableListOf<Int>()
         var current = 0
         var modeRestores = 0
+        var manualModeForced = 0
+        var manualMode = true
+        var forceManualSucceeds = true
         private var lastWrite: Int? = null
         override fun read(): Int = current
-        override fun write(level: Int) { current = level; lastWrite = level; writes += level }
-        override fun forceManualMode() = Unit
+        override fun write(level: Int): BrightnessWriteResult {
+            val stored = normalize(level)
+            current = stored
+            lastWrite = stored
+            writes += level
+            return if (status == WriteStatus.ACKNOWLEDGED) ackWrite(level, stored)
+            else unlandedWrite(level, status)
+        }
+        override fun forceManualMode(): Boolean {
+            manualModeForced++
+            if (forceManualSucceeds) manualMode = true
+            return forceManualSucceeds
+        }
         override fun restoreMode() { modeRestores++ }
+        override fun isManualMode(): Boolean = manualMode
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastWrite
-        override fun isOnScreenSelfWrite(): Boolean = current == lastWrite
         override fun clearSelfWriteMarker() { lastWrite = null }
     }
 
@@ -100,6 +121,7 @@ class BrightnessPipelineControllerTest {
         brightness: ScreenBrightnessController = FakeBrightness(),
         observer: BrightnessObserver = FakeObserver(),
         clock: () -> Long,
+        animationRunner: AnimationRunner = AnimationRunner(brightness),
     ): Pair<BrightnessPipelineController, CoroutineScope> {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val controller = BrightnessPipelineController(
@@ -109,6 +131,7 @@ class BrightnessPipelineControllerTest {
             settingsProvider = { settings },
             scope = scope,
             clock = clock,
+            animationRunner = animationRunner,
         )
         return controller to scope
     }
@@ -541,10 +564,15 @@ class BrightnessPipelineControllerTest {
         private val brightness: ScreenBrightnessController,
     ) : AnimationRunner(brightness) {
         var lastDetectOverrides: Boolean? = null
-        override suspend fun animate(from: Int, to: Int, steps: Int, waitMs: Long, detectOverrides: Boolean): Result {
+        override suspend fun animate(
+            from: Int,
+            to: Int,
+            steps: Int,
+            waitMs: Long,
+            detectOverrides: Boolean,
+        ): AnimationOutcome {
             lastDetectOverrides = detectOverrides
-            brightness.write(to)
-            return Result.COMPLETED
+            return AnimationOutcome.Completed(brightness.write(to))
         }
     }
 
@@ -639,5 +667,371 @@ class BrightnessPipelineControllerTest {
 
         assertTrue(controller.state.value.pausedByOverride, "a real slider move still pauses")
         scope.cancel()
+    }
+
+    // --- DC-004 / DC-005 / DC-006 / DC-007 ---
+
+    // Change 4's deadband, pinned in BOTH directions: 1 domain step is representational drift, 2 is not.
+    @Test
+    fun settledWithinOneDomainStep_doesNotPause_butTwoDoes() = runTest {
+        for ((drift, shouldPause) in listOf(1 to false, 2 to true)) {
+            val sensor = FakeSensor()
+            val observer = FakeObserver()
+            val brightness = FakeBrightness()
+            val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+            controller.start()
+            sensor.flow.emit(sample(lux = 50.0))
+            advanceUntilIdle()
+
+            val applied = controller.state.value.lastAppliedBrightness!!
+            brightness.current = applied + drift
+            observer.flow.emit(applied + drift)
+            advanceUntilIdle()
+
+            assertEquals(
+                shouldPause, controller.state.value.paused,
+                "a $drift-step settled deviation: paused should be $shouldPause",
+            )
+            scope.cancel()
+        }
+    }
+
+    // #127: a non-MANUAL mode at commit time means Tideo no longer owns the mode it writes against.
+    @Test
+    fun nonManualModeAtCommit_dismissesAndRecovers_manualModePauses() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        brightness.manualMode = false
+        val forcedBefore = brightness.manualModeForced
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertFalse(controller.state.value.paused, "an ambiguous mode must not be labelled a manual override")
+        assertTrue(brightness.manualModeForced > forcedBefore, "the mode must be reclaimed")
+        assertEquals(
+            OverrideDisposition.DISMISSED_MODE,
+            controller.state.value.overrideDiagnostic?.disposition,
+        )
+        scope.cancel()
+    }
+
+    @Test
+    fun sameWriteWithManualMode_stillPauses() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        brightness.manualMode = true
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertTrue(controller.state.value.paused, "the control: MANUAL mode with the same write MUST pause")
+        assertEquals(OverrideDisposition.PAUSED, controller.state.value.overrideDiagnostic?.disposition)
+        scope.cancel()
+    }
+
+    // A mode recovery that FAILS still must not pause — pausing would print the misattribution this fixes.
+    @Test
+    fun failedModeRecovery_stillDoesNotPause_andIsRecorded() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        brightness.manualMode = false
+        brightness.forceManualSucceeds = false
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertFalse(controller.state.value.paused)
+        assertEquals(
+            OverrideDisposition.MODE_RECOVERY_FAILED,
+            controller.state.value.overrideDiagnostic?.disposition,
+        )
+        scope.cancel()
+    }
+
+    // DC-004: the baseline is what the provider ACKNOWLEDGED, not what we asked for.
+    @Test
+    fun lastAppliedBrightness_isTheAcknowledgedValue_notTheRequestedOne() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness(normalize = { it - 3 })
+        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val requested = brightness.writes.last()
+        assertEquals(requested - 3, controller.state.value.lastAppliedBrightness)
+        scope.cancel()
+    }
+
+    // DC-007: the continuous record must exist on a device that never fires an override at all.
+    @Test
+    fun lastBrightnessWrite_isPopulatedByAnOrdinaryCycle_withNoOverrideAnywhere() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness(normalize = { it - 3 })
+        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val write = controller.state.value.lastBrightnessWrite
+        assertNotNull(write, "device check 3 reads this without an override having fired")
+        assertEquals(brightness.writes.last(), write.requestedDomain)
+        assertEquals(brightness.writes.last() - 3, write.acknowledgedDomain)
+        assertNull(controller.state.value.overrideDiagnostic, "nothing was detected, so nothing is recorded")
+        scope.cancel()
+    }
+
+    // DC-007: the diagnostic reports the detector the EVENT carried, not a re-derivation.
+    @Test
+    fun observerRoute_recordsOBSERVER_asTheSource() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertEquals(OverrideSource.OBSERVER, controller.state.value.overrideDiagnostic?.source)
+        scope.cancel()
+    }
+
+    @Test
+    fun animationAbort_recordsANIMATION_BAND_andTheTriggeringRead() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(
+            sensor,
+            brightness,
+            clock = { 1000L },
+            animationRunner = OverridingAnimationRunner(brightness, trigger = 9),
+        )
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val diagnostic = controller.state.value.overrideDiagnostic
+        assertEquals(OverrideSource.ANIMATION_BAND, diagnostic?.source)
+        assertEquals(9, diagnostic?.observed, "the read that tripped the detector, not a later re-read")
+        // DC-004: without the pre-post baseline refresh this PAUSES, so pin the disposition too.
+        assertEquals(brightness.current, controller.state.value.lastAppliedBrightness)
+        assertEquals(OverrideDisposition.DISMISSED_DRIFT, diagnostic?.disposition)
+        assertFalse(controller.state.value.paused, "our own aborted sweep must not pause the pipeline")
+        scope.cancel()
+    }
+
+    // DC-008: unconfirmed frames must follow the same baseline rule as the direct-write path.
+    @Test
+    fun animatedCycleWithUnacknowledgedFrames_recordsTheRequestedBaseline() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness(status = WriteStatus.WRITTEN_UNACKNOWLEDGED)
+        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val st = controller.state.value
+        assertEquals(brightness.writes.last(), st.lastAppliedBrightness, "requested is the only estimate")
+        assertEquals(WriteStatus.WRITTEN_UNACKNOWLEDGED, st.lastBrightnessWrite?.status)
+        scope.cancel()
+    }
+
+    @Test
+    fun overrideArrivingWhileTheSettingsReadSuspends_seesTheWakeWindow_andDoesNotPause() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        var armOnNextRead = false
+        lateinit var controller: BrightnessPipelineController
+        controller = BrightnessPipelineController(
+            lightSensor = sensor,
+            brightness = brightness,
+            brightnessObserver = observer,
+            settingsProvider = {
+                if (armOnNextRead) { armOnNextRead = false; controller.onScreenOn() }
+                settings
+            },
+            scope = scope,
+            clock = { 1000L },
+        )
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        armOnNextRead = true
+        brightness.current = 42
+        observer.flow.emit(42)
+        advanceUntilIdle()
+
+        assertFalse(controller.state.value.paused, "the window was armed before the commit gate ran")
+        assertNull(controller.state.value.overrideDiagnostic, "nothing was committed, so nothing is recorded")
+        scope.cancel()
+    }
+
+    @Test
+    fun driftDismissalWithAFailedModeReclaim_recordsTheReclaimOutcome() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { 1000L })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val baseline = controller.state.value.lastAppliedBrightness!!
+        brightness.manualMode = false
+        brightness.forceManualSucceeds = false
+        brightness.current = baseline + 1
+        observer.flow.emit(baseline + 1)
+        advanceUntilIdle()
+
+        val diagnostic = controller.state.value.overrideDiagnostic
+        assertEquals(OverrideDisposition.DISMISSED_DRIFT, diagnostic?.disposition)
+        assertEquals(false, diagnostic?.modeRecovered, "the disposition cannot say the mode is still AUTOMATIC")
+        scope.cancel()
+    }
+
+    @Test
+    fun animationThatLandsFramesThenRefuses_keepsThePreviousBaseline() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        var nowMs = 1000L
+        val runner = LandThenRefuseAnimationRunner(brightness)
+        val (controller, scope) =
+            newController(sensor, brightness, clock = { nowMs }, animationRunner = runner)
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+        val baseline = controller.state.value.lastAppliedBrightness
+
+        runner.armed = true
+        nowMs += 600_000L
+        sensor.flow.emit(sample(lux = 400.0))
+        advanceUntilIdle()
+
+        assertEquals(
+            baseline,
+            controller.state.value.lastAppliedBrightness,
+            "DC-041: the refused tail wins over the landed frames — DC-008 rules, and the owner kept it",
+        )
+        assertEquals(WriteStatus.REFUSED, controller.state.value.lastBrightnessWrite?.status)
+        scope.cancel()
+    }
+
+    @Test
+    fun anOverrideAdmittedBeforeScreenOff_doesNotCommitAfterIt() = runTest {
+        val brightness = FakeBrightness()
+        val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = FakeSensor(), brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = { settings }, scope = scope, clock = { 1_000L },
+        )
+        controller.start()
+
+        controller.onScreenOff()
+        brightness.current = 200
+        controller.postOverrideDetected(200, OverrideSource.OBSERVER)
+        advanceUntilIdle()
+
+        assertFalse(controller.state.value.paused, "an override queued before sleep must not commit after it")
+        scope.cancel()
+    }
+
+    @Test
+    fun hibernateStopsOverrideDetection_andWakeRestartsIt() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        var now = 1_000L
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { now })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        controller.onScreenOff()
+        advanceUntilIdle()
+
+        brightness.current = 200
+        observer.flow.emit(200)
+        advanceUntilIdle()
+        assertFalse(
+            controller.state.value.paused,
+            "a framework write while hibernated is not an override (task585)",
+        )
+        assertNull(controller.state.value.overrideDiagnostic, "no override event should be recorded")
+
+        controller.onScreenOn()
+        advanceUntilIdle()
+        now = 10_000L // past the DB-082 wake settle window
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val applied = controller.state.value.lastAppliedBrightness!!
+        brightness.current = applied + 40
+        observer.flow.emit(applied + 40)
+        advanceUntilIdle()
+        assertTrue(controller.state.value.paused, "after wake a real slider move must pause again")
+        scope.cancel()
+    }
+
+    private class LandThenRefuseAnimationRunner(
+        private val brightness: ScreenBrightnessController,
+    ) : AnimationRunner(brightness) {
+        var armed = false
+        override suspend fun animate(
+            from: Int,
+            to: Int,
+            steps: Int,
+            waitMs: Long,
+            detectOverrides: Boolean,
+        ): AnimationOutcome {
+            if (!armed) return super.animate(from, to, steps, waitMs, detectOverrides)
+            val landed = brightness.write((from + to) / 2)
+            return AnimationOutcome.Completed(
+                lastAcknowledged = landed,
+                lastResult = unlandedWrite(to, WriteStatus.REFUSED),
+            )
+        }
+    }
+
+    /** Always aborts with [trigger] as the read that tripped the band detector. */
+    private class OverridingAnimationRunner(
+        private val brightness: ScreenBrightnessController,
+        private val trigger: Int,
+    ) : AnimationRunner(brightness) {
+        override suspend fun animate(
+            from: Int,
+            to: Int,
+            steps: Int,
+            waitMs: Long,
+            detectOverrides: Boolean,
+        ): AnimationOutcome {
+            val ack = brightness.write(to)
+            return AnimationOutcome.Overridden(ack, triggerObserved = trigger)
+        }
     }
 }

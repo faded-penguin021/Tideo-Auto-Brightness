@@ -5,15 +5,35 @@
 > cap). Code comments and docs cite entries as bare `DB-0NN` and must always resolve here, so no
 > entry may ever be deleted or summarized away. **Append new maintenance deviations as DB-001,
 > DB-002, … at the bottom** — one continuous sequence, never restart numbering. Code + golden
-> vectors are ground truth; if an entry conflicts with current code, trust the code and correct the
-> entry (don't delete it). **Search before appending (DA-006):** grep the ledger files for the topic
+> vectors are ground truth; an entry that conflicts with current code is historical, and the code
+> settles present behaviour. **Search before appending (DA-006):** grep the ledger files for the topic
 > first — extend or cite an existing row rather than append a near-duplicate.
-> **Keep new rows concise and at or below `LEDGER_ROW_SENTENCE_CAP`** in `amh.conf`; the
-> sentence limit is the working bound, while `LEDGER_ROW_CHAR_CAP` is a byte backstop with
-> real headroom. The keys are
+>
+> **Rows are immutable (AMH 10.0.0).** The ` [cited]` marker is metadata and may be synchronized in
+> place — the citation rung requires it to track the citation set in BOTH directions, so any
+> append-only guard must permit adding AND dropping it (AMH 10.3.0). Otherwise correct a detail with
+> a new row and append `Corrected by <ID>.` to the old row, or replace its whole conclusion with a
+> new row and append `Superseded by <ID>.` The first pointer is final; which verb is honest is the
+> reviewer's call, not a guard's.
+>
+> **Paths in rows (AMH 14.0.0).** A row's immutability covers its text, not the lifetime or location
+> of a file it names. A new path reference must resolve in the tree where the row is authored; a
+> committed row's target may later move or disappear, and that drift leaves the historical text
+> alone. A new path that does not resolve, and any citation of a plan's path (RUNBOOK **Session
+> discipline** 5), are both forbidden — and both are **prose-only here**: this repository ships no
+> path-reference guard and nothing scans rows for plan paths, so the rule-review pass is the whole
+> enforcement. The legacy plan citation below does not pin the plan it names.
+>
+> **Boundaries determine when machinery intervenes, not how much content an author should produce
+> (AMH 12.0.0/13.0.0).** `LEDGER_ROW_SENTENCE_CAP` and `LEDGER_ROW_CHAR_CAP` are rejection
+> boundaries for new rows; `LEDGER_LINE_CAP` is a rollover boundary; this volume's byte size is
+> measurement only, reported and never judged. The keys are
 > named here and deliberately not restated as a number, because nothing checks this preamble
-> against the config and a copied number goes stale the first time a cap moves. Read them from
-> `amh.conf`; a green ladder deliberately does not print the limits. Bytes are counted with
+> against the config and a copied number goes stale the first time a cap moves. Crossing a rejection
+> boundary rejects the row; passing one proves no more than the absence of obvious oversizing, and
+> is not a verdict on concision, scope or quality. Never merge sentences, repunctuate, or drop
+> useful qualifiers solely to move a counter; nearing a boundary is a classification signal, so
+> split the material or reduce it to its durable conclusion. Bytes are counted with
 > `LC_ALL=C` over the whole row, line breaks included, so ASCII is one
 > byte per character and non-ASCII UTF-8 is charged by encoded bytes. Capture the durable lesson,
 > not the whole debugging narrative — the narrative stays in the commit and its PR body (which

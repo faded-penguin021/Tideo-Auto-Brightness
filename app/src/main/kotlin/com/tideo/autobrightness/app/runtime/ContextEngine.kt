@@ -232,10 +232,9 @@ class ContextEngine(
      * would go stale unobserved — an app rule re-added later (rulesFlow → evaluate(RESUME), which
      * bypasses every PASS-2 veto) must only match a FRESH emission. The screen-off pause
      * ([onScreenOff]) deliberately does NOT clear: the last foreground app legitimately holds while
-     * the display is off, exactly like the wifi/location listeners riding across screen-off.
+     * the display is off — which is why the clear is NOT gated on a live [appJob] (DC-043).
      */
     private fun stopAppPoll() {
-        if (appJob == null) return
         appJob?.cancel(); appJob = null
         signalSnapshot.update { it.copy(app = "") }
     }
