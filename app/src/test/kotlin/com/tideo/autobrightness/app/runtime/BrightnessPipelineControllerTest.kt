@@ -942,6 +942,62 @@ class BrightnessPipelineControllerTest {
         scope.cancel()
     }
 
+    @Test
+    fun anOverrideAdmittedBeforeScreenOff_doesNotCommitAfterIt() = runTest {
+        val brightness = FakeBrightness()
+        val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = FakeSensor(), brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = { settings }, scope = scope, clock = { 1_000L },
+        )
+        controller.start()
+
+        controller.onScreenOff()
+        brightness.current = 200
+        controller.postOverrideDetected(200, OverrideSource.OBSERVER)
+        advanceUntilIdle()
+
+        assertFalse(controller.state.value.paused, "an override queued before sleep must not commit after it")
+        scope.cancel()
+    }
+
+    @Test
+    fun hibernateStopsOverrideDetection_andWakeRestartsIt() = runTest {
+        val sensor = FakeSensor()
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        var now = 1_000L
+        val (controller, scope) = newController(sensor, brightness, observer, clock = { now })
+        controller.start()
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        controller.onScreenOff()
+        advanceUntilIdle()
+
+        brightness.current = 200
+        observer.flow.emit(200)
+        advanceUntilIdle()
+        assertFalse(
+            controller.state.value.paused,
+            "a framework write while hibernated is not an override (task585)",
+        )
+        assertNull(controller.state.value.overrideDiagnostic, "no override event should be recorded")
+
+        controller.onScreenOn()
+        advanceUntilIdle()
+        now = 10_000L // past the DB-082 wake settle window
+        sensor.flow.emit(sample(lux = 50.0))
+        advanceUntilIdle()
+
+        val applied = controller.state.value.lastAppliedBrightness!!
+        brightness.current = applied + 40
+        observer.flow.emit(applied + 40)
+        advanceUntilIdle()
+        assertTrue(controller.state.value.paused, "after wake a real slider move must pause again")
+        scope.cancel()
+    }
+
     private class LandThenRefuseAnimationRunner(
         private val brightness: ScreenBrightnessController,
     ) : AnimationRunner(brightness) {

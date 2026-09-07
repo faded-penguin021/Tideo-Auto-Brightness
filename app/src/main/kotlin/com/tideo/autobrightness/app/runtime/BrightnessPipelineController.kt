@@ -118,11 +118,7 @@ class BrightnessPipelineController(
             cachedSettings = settingsProvider().also { throttle.seed(it.throttleDefaultMs) }
             controlGate.consumeEach { handle(it) }
         }
-        overrideJob = scope.launch {
-            overrideMonitor.overrides().collect { observed ->
-                postControl(PipelineEvent.OverrideDetected(observed, OverrideSource.OBSERVER))
-            }
-        }
+        startOverrideDetection()
         startSensor()
     }
 
@@ -175,6 +171,17 @@ class BrightnessPipelineController(
         _state.value = PipelineState(serviceOn = false)
     }
 
+    @Synchronized
+    private fun startOverrideDetection() {
+        if (overrideJob?.isActive == true) return
+        overrideJob = scope.launch {
+            overrideMonitor.overrides().collect { observed ->
+                postControl(PipelineEvent.OverrideDetected(observed, OverrideSource.OBSERVER))
+            }
+        }
+    }
+
+    @Synchronized
     private fun startSensor() {
         if (sensorJob?.isActive == true) return
         sensorJob = scope.launch {
@@ -208,7 +215,7 @@ class BrightnessPipelineController(
         if (!passes) return
         // Re-entry mutex: claim the cycle slot, or drop. Cleared when the cycle completes.
         if (!inCycle.compareAndSet(false, true)) return
-        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux, accuracy))) {
+        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux))) {
             inCycle.set(false)
         }
     }
@@ -242,18 +249,22 @@ class BrightnessPipelineController(
     /** prof761/task618 wake reinit: clear smoothing state, start sensing, set initial brightness. */
     private suspend fun reinit() {
         val settings = settingsProvider().also { cachedSettings = it }
+        _state.update { it.copy(hibernated = false) }
         startSensor()
+        startOverrideDetection()
         if (!_state.value.paused) cycleRunner.setInitialBrightness(settings)
     }
 
-    /** prof753/task585 hibernate: stop sensing, clear runtime state. */
+    /** prof753/task585 hibernate: stop sensing and Allow Override, clear runtime state (DC-042). */
     private fun hibernate() {
         sensorJob?.cancel(); sensorJob = null
+        overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
         inCycle.set(false)
         dimming.disengage() // task585: drop super dimming when the display goes off
         _state.update {
             it.copy(
+                hibernated = true,
                 smoothedLux = null,
                 lastRawLux = null,
                 lastAcceptedMs = null,

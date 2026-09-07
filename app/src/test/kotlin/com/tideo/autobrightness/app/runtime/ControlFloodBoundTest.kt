@@ -123,6 +123,21 @@ class ControlFloodBoundTest {
     }
 
     @Test
+    fun theAdmissionCapIsExactlyMaxPending() {
+        runTest {
+            val (controller, scope) = newController()
+            controller.start()
+
+            // OverrideDetected never coalesces (DA-043), so every rejection here is the cap's.
+            repeat(200) { controller.postOverrideDetected(it, OverrideSource.OBSERVER) }
+
+            assertEquals(64, controller.controlBacklog.pendingCount, "the cap must admit exactly 64")
+            assertEquals(136, controller.controlBacklog.droppedCount, "every event past the cap drops")
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun aDrainedQueueAcceptsTheSameVerbAgain() {
         runTest {
             val (controller, scope) = newController()

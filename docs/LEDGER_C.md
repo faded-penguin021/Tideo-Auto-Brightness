@@ -587,3 +587,58 @@
   frames the tail contradicts, and no device round has ever produced the mixed-status sequence. What
   changed is the evidence, not the code — a test now pins the behaviour as chosen rather than
   leaving it as an untested consequence, so the next reader meets a decision instead of a surprise.
+
+- DC-042 [cited]: **A detector that outlives the thing it detects against will fire on the
+  framework.** `hibernate()` stopped the sensor and cleared the runtime state but left the prof755
+  override collector running, and the gate it consults carries no screen operand — so with the
+  display off `serviceOn` was still true, `autoRunning` had been cleared by the cycle's own exit,
+  and the gate passed. DC-008 nulls `lastAppliedBrightness` across a sleep, which removes the one
+  operand that could have dismissed the write as drift, so a framework brightness change during
+  sleep committed a pause the user never asked for and met on wake. task585 already said so: it
+  disables **Allow Override** alongside Monitor Ambient Light. The collector is now started and
+  stopped with the display, and the wake half is tested too — a lifecycle fix that only stops
+  something is one sleep away from disabling the feature permanently.
+
+- DC-043 [cited]: **A mitigation guarded by a condition its sibling path already satisfies is not
+  a mitigation.** D-163 clears the foreground-app snapshot when the rule-gated poll stops, so a
+  package cannot match a rule re-added later; the clear sat behind `if (appJob == null) return`.
+  `onScreenOff()` nulls that same job while deliberately KEEPING the snapshot — a legitimate
+  difference, since the display being off does not make the last app wrong. The two combine into a
+  hole: sleep, delete the last app rule, re-add it while still asleep, and the stale package
+  matches, because with no poll running nothing will ever refresh it. The early return conflated
+  "no poll is running" with "there is nothing to clean up". Reaching for a cheap guard on a cleanup
+  path is the shape to distrust — enumerate who else can satisfy it first (the D-142 sibling rule,
+  applied to the guard rather than to the gate).
+
+- DC-044 [cited]: **Publish-then-book is a race whenever the consumer is someone else.** The
+  admission gate sent the event onto the channel and only then incremented `pending` and set
+  `lastType`; the consumer decrements and clears on dequeue. Producers here are binder threads, so
+  the consumer could dequeue and release a claim before the producer had made it, leaving a drained
+  queue marked with a pending type — after which the duplicate filter suppressed every further
+  event of that type, silently. The capacity check was check-then-act for the same reason and could
+  admit past its own bound. Both are now increment-then-check with rollback on a failed send: book
+  first, publish second, undo if publication fails. **The interleaving is argued from the code, not
+  pinned by a test** — a single-threaded test cannot observe it; what the new test pins is the cap
+  boundary the rewrite touches, which is where an off-by-one would land.
+
+- DC-045 [cited]: **A field consumed before admission does not need to ride along after it.**
+  `SensorTick` carried `accuracy` into the pipeline, but the prof760 gate reads accuracy at the
+  collector and drops the sample before any tick is constructed, so every reader downstream had a
+  value whose only possible answer was "it passed". No consumer ever read it. Removed. DC-039 met
+  the same shape from the other side and is the reason to look: a field written and never read is
+  either dead or a bug, and the two are told apart by asking whether anything COULD have wanted it.
+
+- DC-046 [cited]: **Stopping a producer does not retract what it already handed over, and adding a
+  second caller to a start helper makes it a concurrency question.** Both halves came from the
+  mandatory glue review of DC-042, and both are defects in that fix rather than in the code it
+  repaired. First: hibernate cancels the override collector, but an event admitted just before the
+  queued `ScreenOff` is still in the channel, and `handleOverride` consulted no display state — so
+  the pause DC-042 set out to prevent still committed, one event later. The commit gate now carries
+  a `hibernated` operand, checked on both sides of the settle delay; cancelling a producer is never
+  the whole story while a queue sits between it and the consumer. Second: DC-042 gave
+  `startOverrideDetection` a second call site, and check-then-launch-then-assign is unsynchronized —
+  `start()` and a queued `ScreenOn` reaching `reinit()` on the consumer dispatcher could both see a
+  null job, launch two collectors, and orphan one, which then detects through the sleep that
+  cancelled its replacement. Both helpers are `@Synchronized` now, `startSensor` included: it had
+  the identical shape and only one caller, which is what "enumerate the siblings" (D-142) means when
+  the sibling is a race rather than a gate.

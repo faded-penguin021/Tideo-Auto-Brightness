@@ -26,10 +26,11 @@ data class OverrideDiagnostic(
 /** Tasker runtime state holder (pipeline_spec.md §5). All writes from pipeline coroutine only. */
 data class PipelineState(
     val serviceOn: Boolean = false,
-    // Atomic snapshot (D-027): serviceOn/autoRunning/paused/initializing.
+    // Atomic snapshot (D-027): serviceOn/autoRunning/paused/initializing/hibernated (DC-046).
     val autoRunning: Boolean = false,
     val initializing: Boolean = false,
     val paused: Boolean = false,
+    val hibernated: Boolean = false,
     // G2R-F35: detected manual override (drives high-priority notification).
     val pausedByOverride: Boolean = false,
     // prof759/task545: proximity damps smoothing alpha ×0.1.
@@ -71,8 +72,8 @@ data class PipelineState(
 
 /** Events serialized through the single pipeline consumer (one runs to completion, D-027). */
 sealed interface PipelineEvent {
-    /** A gated light-sensor reading that passed prof760; carries raw lux + accuracy. */
-    data class SensorTick(val lux: Double, val accuracy: Int) : PipelineEvent
+    /** A light-sensor reading that already passed the prof760 gate, accuracy included (DC-045). */
+    data class SensorTick(val lux: Double) : PipelineEvent
 
     /** Display OFF → hibernate (prof753 / task585). */
     data object ScreenOff : PipelineEvent

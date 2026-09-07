@@ -297,14 +297,6 @@ internal class PipelineCycleRunner(
             recordDiagnostic(s2, source, disposition, observed, settled, manualMode, modeRecovered)
             return
         }
-        // The state gates were re-checked above; the mode is the only other operand (DC-006).
-        if (!OverrideRules.shouldCommitPause(
-                s2.serviceOn, s2.autoRunning, s2.paused, s2.initializing, manualMode,
-            )
-        ) {
-            return
-        }
-
         val history = OverrideRules.recordOverridePoint(
             history = s2.overrideHistory,
             lux = s2.smoothedLux ?: 0.0,
@@ -390,7 +382,7 @@ internal class PipelineCycleRunner(
         }
     }
 
-    private fun canPause(s: PipelineState): Boolean = !ctx.overrideSuppressed() &&
+    private fun canPause(s: PipelineState): Boolean = !ctx.overrideSuppressed() && !s.hibernated &&
         OverrideRules.shouldCommitPause(s.serviceOn, s.autoRunning, s.paused, s.initializing)
 
     /** task661 act22-26 / task698 step 3: hardware floor in PWM-sensitive mode (D-050, D-049 #4). */
