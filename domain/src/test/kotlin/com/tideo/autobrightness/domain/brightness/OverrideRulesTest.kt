@@ -238,4 +238,55 @@ class OverrideRulesTest {
         assertEquals(50.0, history[0].first, 1e-9, "newest (lux=50) at index 0")
         assertEquals(1.0, history[49].first, 1e-9, "oldest surviving entry is lux=1 (lux=0 was dropped)")
     }
+
+    // --- DC-005 / DC-006 ---
+
+    @Test
+    fun shouldCommitPause_nonManualMode_doesNotCommit() {
+        val gates = { manual: Boolean ->
+            OverrideRules.shouldCommitPause(
+                isServiceOn = true, isAutoRunning = false, isAlreadyPaused = false,
+                isInitializing = false, isManualMode = manual,
+            )
+        }
+        assertTrue(gates(true), "MANUAL mode: the state gates alone decide")
+        assertFalse(gates(false), "a non-MANUAL mode makes the event ambiguous (DC-006)")
+    }
+
+    @Test
+    fun shouldCommitPause_defaultsToManual_soThePreSettleGateIsStateOnly() {
+        assertTrue(
+            OverrideRules.shouldCommitPause(
+                isServiceOn = true, isAutoRunning = false, isAlreadyPaused = false,
+                isInitializing = false,
+            ),
+        )
+    }
+
+    @Test
+    fun shouldCommitPause_modeCannotRescueAFailedStateGate() {
+        assertFalse(
+            OverrideRules.shouldCommitPause(
+                isServiceOn = false, isAutoRunning = false, isAlreadyPaused = false,
+                isInitializing = false, isManualMode = true,
+            ),
+        )
+    }
+
+    @Test
+    fun isRepresentationalDrift_absorbsOneDomainStep_butNotTwo() {
+        assertTrue(OverrideRules.isRepresentationalDrift(settled = 100, lastApplied = 100))
+        assertTrue(OverrideRules.isRepresentationalDrift(settled = 101, lastApplied = 100))
+        assertTrue(OverrideRules.isRepresentationalDrift(settled = 99, lastApplied = 100))
+        assertFalse(OverrideRules.isRepresentationalDrift(settled = 102, lastApplied = 100))
+        assertFalse(OverrideRules.isRepresentationalDrift(settled = 98, lastApplied = 100))
+    }
+
+    @Test
+    fun isRepresentationalDrift_withNoBaseline_isNotDrift() {
+        assertFalse(
+            OverrideRules.isRepresentationalDrift(settled = 100, lastApplied = null),
+            "a baseline that was never established must not dismiss an override (D-108 class)",
+        )
+    }
 }

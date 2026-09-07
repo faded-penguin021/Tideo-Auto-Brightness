@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import kotlin.test.assertEquals
 import org.junit.Test
@@ -11,11 +12,11 @@ class PanicHandlerTest {
         val calls = mutableListOf<String>()
         val brightness = object : ScreenBrightnessController {
             override fun read() = 0
-            override fun write(level: Int) { calls += "brightness:$level"; error("provider") }
-            override fun forceManualMode() { calls += "manual"; error("provider") }
+            override fun write(level: Int): BrightnessWriteResult { calls += "brightness:$level"; error("provider") }
+            override fun forceManualMode(): Boolean { calls += "manual"; error("provider") }
             override fun restoreMode() { calls += "restore"; error("provider") }
+            override fun isManualMode() = true
             override fun isSelfWrite(rawDeviceValue: Int) = false
-            override fun isOnScreenSelfWrite() = false
             override fun clearSelfWriteMarker() = Unit
         }
         val dimming = object : DimmingCoordinator {

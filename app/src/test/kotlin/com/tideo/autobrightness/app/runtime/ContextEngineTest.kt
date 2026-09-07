@@ -659,6 +659,49 @@ class ContextEngineTest {
     }
 
     @Test
+    fun appPollStop_clearsStaleForegroundApp_evenAfterScreenOff_DC043() = runTest {
+        var now = 0L
+        val rulesFlow = MutableStateFlow<List<ContextRule>>(listOf(videoStreamingRule))
+        val src = PassThroughSource()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { rulesFlow.value },
+            rulesFlow = rulesFlow,
+            settingsProvider = { baseline },
+            settingsWriter = { it(baseline) },
+            baselineStore = FakeBaselineStore(),
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { now },
+        )
+        engine.start(scope)
+        advanceUntilIdle()
+
+        now = 10_000L
+        src.appFlow.emit("com.netflix.mediaclient")
+        advanceUntilIdle()
+        assertEquals("Cinema", engine.activeContext.value, "foreground app matches the rule")
+
+        now = 20_000L
+        engine.onScreenOff()
+        advanceUntilIdle()
+
+        now = 30_000L
+        rulesFlow.value = emptyList()
+        advanceUntilIdle()
+
+        now = 40_000L
+        rulesFlow.value = listOf(videoStreamingRule)
+        advanceUntilIdle()
+        assertNull(
+            engine.activeContext.value,
+            "a package last seen before the rule was deleted must not match it on re-add",
+        )
+        scope.cancel()
+    }
+
+    @Test
     fun ruleEditWithinGeneralCooldown_appliesImmediately_D141() = runTest {
         // D-141: rule changes apply immediately, run as RESUME (cooldown 0).
         var now = 0L

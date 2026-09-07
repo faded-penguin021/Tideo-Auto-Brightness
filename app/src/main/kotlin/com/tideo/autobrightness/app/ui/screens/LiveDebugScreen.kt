@@ -130,6 +130,9 @@ fun LiveDebugContent(
                 Metric("Active rule", state.activeContext ?: "None", "debug_active_rule")
             }
 
+            // DC-007: requested vs acknowledged vs settingsApiMax, readable without an override firing.
+            BrightnessWriteCard(p)
+
             // Performance & Timings — full Tasker parity (G2R-F29).
             DiagnosticCard("Performance & Timings", "debug_performance") {
                 Metric("Smoothing α (LuxAlpha)", fmtAlpha(p.luxAlpha), "debug_lux_alpha")
@@ -226,6 +229,60 @@ private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
             modifier = Modifier.fillMaxWidth().testTag("global_flash_enable"),
         ) {
             Text(if (enabled) "Open Accessibility settings" else "Enable in Accessibility settings")
+        }
+    }
+}
+
+/** DC-007: identifies a mechanism CLASS — clamp, refusal, mode conflict — never the writer. */
+@Composable
+private fun BrightnessWriteCard(p: PipelineState) {
+    val write = p.lastBrightnessWrite
+    val diagnostic = p.overrideDiagnostic
+    // DC-008: either half stands alone; gating on the write record hid the diagnostic.
+    if (write == null && diagnostic == null) return
+    val dash = stringResource(R.string.debug_write_absent)
+    DiagnosticCard(stringResource(R.string.debug_write_title), "debug_write_card") {
+        write?.let {
+            Metric(
+                stringResource(R.string.debug_write_roundtrip),
+                "${it.requestedDomain} → ${it.acknowledgedDomain ?: dash}",
+                "debug_write_roundtrip",
+            )
+            Metric(stringResource(R.string.debug_write_status), it.status.name, "debug_write_status")
+            Metric(stringResource(R.string.debug_write_requested_value), it.requestedSettingValue.toString(), "debug_write_requested_value")
+            // The value Tideo converts with — one domain step is round(settingsApiMax / 255) (DC-048).
+            Metric(stringResource(R.string.debug_write_settings_api_max), it.settingsApiMax.toString(), "debug_write_settings_api_max")
+        }
+        diagnostic?.let { d ->
+            Metric(
+                stringResource(R.string.debug_override_disposition),
+                "${d.disposition.name} (${d.source.name})",
+                "debug_override_disposition",
+            )
+            Metric(
+                stringResource(R.string.debug_override_values),
+                "${d.observed} / ${d.settled} / ${d.expected ?: dash}",
+                "debug_override_values",
+            )
+            Metric(
+                stringResource(R.string.debug_override_write),
+                d.write?.let { w -> "${w.requestedDomain} → ${w.acknowledgedDomain ?: dash} (${w.status.name})" }
+                    ?: dash,
+                "debug_override_write",
+            )
+            Metric(
+                stringResource(R.string.debug_override_mode),
+                stringResource(if (d.manualMode) R.string.debug_mode_manual else R.string.debug_mode_not_manual),
+                "debug_override_mode",
+            )
+            d.modeRecovered?.let { ok ->
+                Metric(
+                    stringResource(R.string.debug_override_reclaim),
+                    stringResource(if (ok) R.string.debug_reclaim_ok else R.string.debug_reclaim_failed),
+                    "debug_override_reclaim",
+                )
+            }
+            Metric(stringResource(R.string.debug_override_age), lastSampleLabel(d.timestampMs), "debug_override_age")
         }
     }
 }

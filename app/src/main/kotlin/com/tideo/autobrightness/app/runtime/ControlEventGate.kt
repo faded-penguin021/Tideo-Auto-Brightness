@@ -21,17 +21,21 @@ internal class ControlEventGate(private val maxPending: Int = MAX_PENDING_CONTRO
     val pendingCount: Int get() = pending.get()
     val droppedCount: Int get() = dropped.get()
 
-    /** Offer event, honouring both layers. coalescible=false for value-carrying events. */
+    /** Offer event; books before publishing (DC-044). coalescible=false for value-carrying events. */
     fun admit(event: PipelineEvent, coalescible: Boolean): Boolean {
         val type = event::class.java
         if (coalescible && lastType.get() == type) return false
-        if (pending.get() >= maxPending) {
+        if (pending.incrementAndGet() > maxPending) {
+            pending.decrementAndGet()
             dropped.incrementAndGet()
             return false
         }
-        if (events.trySend(event).isFailure) return false
-        pending.incrementAndGet()
         lastType.set(type)
+        if (events.trySend(event).isFailure) {
+            pending.decrementAndGet()
+            lastType.compareAndSet(type, null)
+            return false
+        }
         return true
     }
 

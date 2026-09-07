@@ -112,3 +112,35 @@ Two systemic causes account for all gaps, both already foreseen (risk register #
 and asserts equality at `1e-9`. They agree by construction: task661's zone-2 upper anchor is
 `%AAB_Form2D`, which `defaults_audit.md` (D-008/D-025) confirms is the derived value `≡ Zone1End`,
 exactly what task663 hard-codes. No disagreement found → nothing to re-derive from XML.
+
+---
+
+## Maintenance-era deviations (deliberate, not gaps to close)
+
+These are places where the shipped app knowingly departs from the Tasker source. Unlike the S4→S5
+rows above, they are not defects awaiting a fix — each was argued and accepted, and the ledger row
+carries the reasoning.
+
+### dev-01 — override commit consults `SCREEN_BRIGHTNESS_MODE` (DC-006, 1.10.0)
+
+task567 / prof755 decide a manual override from the observed brightness alone; they never look at
+the brightness mode. Tideo now does: if the mode is not MANUAL when the pause would commit,
+`handleOverride` calls `forceManualMode()` and dismisses the event instead of pausing.
+
+The justification is narrow and worth restating precisely, because it is easy to overstate: a
+non-MANUAL mode does **not** prove the framework's adaptive controller wrote the value. The user may
+have enabled adaptive brightness themselves, or the OEM may have restored it. What it proves is that
+Tideo no longer owns the display mode it writes against, which makes the event **ambiguous** — and an
+ambiguous event must not be labelled "Manual Override Detected". A recovery that itself fails still
+does not pause, for the same reason.
+
+Tasker had no equivalent situation to model: it ran as the only writer on a device the user had
+configured for it. Reported as issue #127.
+
+### dev-02 — the commit guard tolerates ±1 domain unit (DC-005, 1.10.0)
+
+task567 act8 re-reads and compares for equality. Tideo compares with a one-domain-unit deadband,
+because on a device whose raw range is 3000+ one domain step is 12–16 raw units and any round trip
+crossing a boundary paused the pipeline. The cost is stated rather than hidden: a persistent
+deviation of ≤1 domain unit is deliberately undetectable. It is bounded in magnitude, which a
+time-based grace period would not be.

@@ -106,7 +106,9 @@ class BrightnessPipelineController(
     override fun cacheSettings(settings: AabSettings) { cachedSettings = settings }
     override fun armInitialSettle(untilMs: Long) { suppressOverrideUntilMs = untilMs }
     override fun overrideSuppressed(): Boolean = clock() < suppressOverrideUntilMs
-    override fun postOverrideDetected(observed: Int) { postControl(PipelineEvent.OverrideDetected(observed)) }
+    override fun postOverrideDetected(observed: Int, source: OverrideSource) {
+        postControl(PipelineEvent.OverrideDetected(observed, source))
+    }
 
     /** Start the pipeline and consumer/sensor/observer flows. */
     fun start() {
@@ -116,11 +118,7 @@ class BrightnessPipelineController(
             cachedSettings = settingsProvider().also { throttle.seed(it.throttleDefaultMs) }
             controlGate.consumeEach { handle(it) }
         }
-        overrideJob = scope.launch {
-            overrideMonitor.overrides().collect { observed ->
-                postControl(PipelineEvent.OverrideDetected(observed))
-            }
-        }
+        startOverrideDetection()
         startSensor()
     }
 
@@ -173,6 +171,17 @@ class BrightnessPipelineController(
         _state.value = PipelineState(serviceOn = false)
     }
 
+    @Synchronized
+    private fun startOverrideDetection() {
+        if (overrideJob?.isActive == true) return
+        overrideJob = scope.launch {
+            overrideMonitor.overrides().collect { observed ->
+                postControl(PipelineEvent.OverrideDetected(observed, OverrideSource.OBSERVER))
+            }
+        }
+    }
+
+    @Synchronized
     private fun startSensor() {
         if (sensorJob?.isActive == true) return
         sensorJob = scope.launch {
@@ -206,7 +215,7 @@ class BrightnessPipelineController(
         if (!passes) return
         // Re-entry mutex: claim the cycle slot, or drop. Cleared when the cycle completes.
         if (!inCycle.compareAndSet(false, true)) return
-        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux, accuracy))) {
+        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux))) {
             inCycle.set(false)
         }
     }
@@ -224,7 +233,8 @@ class BrightnessPipelineController(
             PipelineEvent.ScreenOn -> reinit()
             PipelineEvent.Pause -> pauseInternal()
             PipelineEvent.Resume -> cycleRunner.resume()
-            is PipelineEvent.OverrideDetected -> cycleRunner.handleOverride(event.observedBrightness)
+            is PipelineEvent.OverrideDetected ->
+                cycleRunner.handleOverride(event.observedBrightness, event.source)
             PipelineEvent.ContextChanged -> cycleRunner.reapplyProfile()
         }
     }
@@ -239,24 +249,31 @@ class BrightnessPipelineController(
     /** prof761/task618 wake reinit: clear smoothing state, start sensing, set initial brightness. */
     private suspend fun reinit() {
         val settings = settingsProvider().also { cachedSettings = it }
+        _state.update { it.copy(hibernated = false) }
         startSensor()
+        startOverrideDetection()
         if (!_state.value.paused) cycleRunner.setInitialBrightness(settings)
     }
 
-    /** prof753/task585 hibernate: stop sensing, clear runtime state. */
+    /** prof753/task585 hibernate: stop sensing and Allow Override, clear runtime state (DC-042). */
     private fun hibernate() {
         sensorJob?.cancel(); sensorJob = null
+        overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
         inCycle.set(false)
         dimming.disengage() // task585: drop super dimming when the display goes off
         _state.update {
             it.copy(
+                hibernated = true,
                 smoothedLux = null,
                 lastRawLux = null,
                 lastAcceptedMs = null,
                 threshAbsLow = null,
                 threshAbsHigh = null,
                 cycleTimeMs = null,
+                // DC-008: UNKNOWN, not stale, across a sleep (lastBrightnessWrite survives — it is
+                // the continuous diagnostic).
+                lastAppliedBrightness = null,
                 proximityNear = false,
             )
         }

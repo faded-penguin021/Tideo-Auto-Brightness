@@ -45,7 +45,24 @@ class RuntimeDebugTest {
         assertEquals(1, DebugCategory.SKIP_ANIMATIONS.level)
         assertEquals(5, DebugCategory.SUPER_DIMMING.level)
         assertEquals(6, DebugCategory.OVERLAY_PREVIEW.level)
+        assertEquals(7, DebugCategory.GRAPH_METRICS.level)
         assertEquals(9, DebugCategory.CONTEXT_LOCATION.level)
+    }
+
+    // DC-001: Graph Metrics is the chart-render category, flashed only when the selector is on 7.
+    @Test
+    fun toastSink_graphMetrics_emitsRenderTimeOnlyAtLevelSeven() {
+        val sink = ToastDebugSink(context)
+
+        sink.emit(DebugCategory.GRAPH_METRICS, activeLevel = 3) { "redraw 1.0ms" }
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertNull(ShadowToast.getLatestToast(), "Graph Metrics must not flash on another level")
+
+        sink.emit(DebugCategory.GRAPH_METRICS, activeLevel = DebugCategory.GRAPH_METRICS.level) { "redraw 1.0ms" }
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val text = ShadowToast.getTextOfLatestToast()
+        assertTrue(text.contains("redraw 1.0ms"), "matching level flashes the render time: $text")
+        assertTrue(text.contains("Graph Metrics"), "flash is labelled with the category: $text")
     }
 
     // ---- F48: Dynamic Scale debug timing gate (~2 min into a transition, never per light change) ----

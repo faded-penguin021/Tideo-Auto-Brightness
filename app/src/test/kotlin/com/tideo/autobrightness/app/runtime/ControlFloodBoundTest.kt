@@ -33,11 +33,11 @@ class ControlFloodBoundTest {
     private class NoOpBrightness : ScreenBrightnessController {
         private var value = 128
         override fun read(): Int = value
-        override fun write(level: Int) { value = level }
-        override fun forceManualMode() = Unit
+        override fun write(level: Int) = ackWrite(level).also { value = level }
+        override fun forceManualMode() = true
         override fun restoreMode() = Unit
+        override fun isManualMode() = true
         override fun isSelfWrite(rawDeviceValue: Int): Boolean = false
-        override fun isOnScreenSelfWrite(): Boolean = false
         override fun clearSelfWriteMarker() = Unit
     }
 
@@ -118,6 +118,21 @@ class ControlFloodBoundTest {
             advanceUntilIdle()
 
             assertTrue(controller.state.value.paused, "the final Pause was swallowed by coalescing")
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun theAdmissionCapIsExactlyMaxPending() {
+        runTest {
+            val (controller, scope) = newController()
+            controller.start()
+
+            // OverrideDetected never coalesces (DA-043), so every rejection here is the cap's.
+            repeat(200) { controller.postOverrideDetected(it, OverrideSource.OBSERVER) }
+
+            assertEquals(64, controller.controlBacklog.pendingCount, "the cap must admit exactly 64")
+            assertEquals(136, controller.controlBacklog.droppedCount, "every event past the cap drops")
             scope.cancel()
         }
     }

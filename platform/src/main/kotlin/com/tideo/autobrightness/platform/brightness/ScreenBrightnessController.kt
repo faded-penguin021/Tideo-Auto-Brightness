@@ -5,29 +5,44 @@ import android.content.Context
 import android.content.res.Resources
 import android.provider.Settings
 
+// DC-002: WRITTEN_UNACKNOWLEDGED is not a failure, and DENIED is not REFUSED.
+enum class WriteStatus { ACKNOWLEDGED, WRITTEN_UNACKNOWLEDGED, REFUSED, DENIED }
+
+/** One write and what the provider stored; `acknowledged*` non-null only when ACKNOWLEDGED (DC-002). */
+data class BrightnessWriteResult(
+    val requestedDomain: Int,
+    val requestedSettingValue: Int,
+    val readBackSettingValue: Int?,
+    val acknowledgedDomain: Int?,
+    val settingsApiMax: Int,
+    val status: WriteStatus,
+)
+
 // Tasker: task696/698 write Settings.System.SCREEN_BRIGHTNESS; task554 reads it back.
 // Domain 0–255 (Tasker parity); device range may differ.
 interface ScreenBrightnessController {
     fun read(): Int
-    fun write(level: Int)
-    fun forceManualMode()
+    fun write(level: Int): BrightnessWriteResult
+    fun forceManualMode(): Boolean
     fun restoreMode()
+    fun isManualMode(): Boolean
     /** True if raw device value equals last write (task567 self-write vs override). */
     fun isSelfWrite(rawDeviceValue: Int): Boolean
-    /** True if on-screen value is last self-write in device space (immune to D-049 round-trip drift). */
-    fun isOnScreenSelfWrite(): Boolean
     fun clearSelfWriteMarker()
 }
 
 class AndroidScreenBrightnessController(
     private val context: Context,
-    deviceMaxOverride: Int? = null,
+    settingsApiMaxOverride: Int? = null,
+    // Test seam (DC-002): Robolectric stores what it is given; normalization/refusal/read-back failure need one.
+    private val rawWrite: ((Int) -> Boolean)? = null,
+    private val rawRead: (() -> Int?)? = null,
 ) : ScreenBrightnessController {
     private val resolver: ContentResolver get() = context.contentResolver
 
     // Falls back to 255 if absent (standard Tasker parity).
-    private val deviceMax: Int by lazy {
-        deviceMaxOverride ?: run {
+    private val settingsApiMax: Int by lazy {
+        settingsApiMaxOverride ?: run {
             val id = Resources.getSystem().getIdentifier(
                 "config_screenBrightnessSettingMaximum", "integer", "android"
             )
@@ -45,36 +60,84 @@ class AndroidScreenBrightnessController(
     @Volatile
     private var lastSelfWriteDevice: Int? = null
 
+    // DC-002: an async provider echoes the REQUESTED raw after the read-back recorded the old one.
+    @Volatile
+    private var lastRequestedDevice: Int? = null
+
+    @Volatile
+    private var selfWriteInProgress: Boolean = false
+
     private fun toDevice(domainLevel: Int): Int {
         val clamped = domainLevel.coerceIn(0, 255)
-        return if (deviceMax == 255) clamped
-        else Math.round(clamped.toDouble() / 255.0 * deviceMax).toInt()
+        return if (settingsApiMax == 255) clamped
+        else Math.round(clamped.toDouble() / 255.0 * settingsApiMax).toInt()
     }
 
     private fun toDomain(deviceLevel: Int): Int {
-        val clamped = deviceLevel.coerceIn(0, deviceMax)
-        return if (deviceMax == 255) clamped
-        else Math.round(clamped.toDouble() / deviceMax * 255.0).toInt()
+        val clamped = deviceLevel.coerceIn(0, settingsApiMax)
+        return if (settingsApiMax == 255) clamped
+        else Math.round(clamped.toDouble() / settingsApiMax * 255.0).toInt()
     }
+
+    private fun writeRaw(raw: Int): Boolean =
+        rawWrite?.invoke(raw) ?: Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, raw)
+
+    // DC-002: never read()'s 128 default — a default must not read as acknowledged. Limits: DC-003.
+    private fun readRawOrNull(): Int? = runCatching {
+        val seam = rawRead
+        if (seam != null) seam()
+        else Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, -1).takeIf { it >= 0 }
+    }.getOrNull()
 
     override fun read(): Int {
         val raw = Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, 128)
         return toDomain(raw)
     }
 
-    override fun write(level: Int) {
-        val device = toDevice(level)
-        // Swallow SecurityException for unprivileged installs (no crash); update marker on success.
-        when (val error = runCatching {
-            Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, device)
-        }.exceptionOrNull()) {
-            null -> lastSelfWriteDevice = device
-            is SecurityException -> Unit
-            else -> throw error
+    // DC-002: @Synchronized so the marker pair and the flag cannot interleave. Uncontended today.
+    @Synchronized
+    override fun write(level: Int): BrightnessWriteResult {
+        val requestedDomain = level.coerceIn(0, 255)
+        val requestedSettingValue = toDevice(level)
+        val previous = lastSelfWriteDevice
+        val previousRequested = lastRequestedDevice
+        // DC-002: arm BEFORE putInt — the echo can be dispatched before the marker would exist.
+        selfWriteInProgress = true
+        lastSelfWriteDevice = requestedSettingValue
+        lastRequestedDevice = requestedSettingValue
+        var keepMarker = false
+        try {
+            if (!writeRaw(requestedSettingValue)) return unlanded(requestedDomain, requestedSettingValue, WriteStatus.REFUSED)
+            val readBackSettingValue = readRawOrNull() ?: run {
+                // DC-002: keep the requested raw — it is the likeliest thing on screen.
+                keepMarker = true
+                return unlanded(requestedDomain, requestedSettingValue, WriteStatus.WRITTEN_UNACKNOWLEDGED)
+            }
+            lastSelfWriteDevice = readBackSettingValue
+            keepMarker = true
+            return BrightnessWriteResult(
+                requestedDomain = requestedDomain,
+                requestedSettingValue = requestedSettingValue,
+                readBackSettingValue = readBackSettingValue,
+                acknowledgedDomain = toDomain(readBackSettingValue),
+                settingsApiMax = settingsApiMax,
+                status = WriteStatus.ACKNOWLEDGED,
+            )
+        } catch (_: SecurityException) {
+            return unlanded(requestedDomain, requestedSettingValue, WriteStatus.DENIED)
+        } finally {
+            if (!keepMarker) {
+                lastSelfWriteDevice = previous
+                lastRequestedDevice = previousRequested
+            }
+            selfWriteInProgress = false
         }
     }
 
-    override fun forceManualMode() {
+    private fun unlanded(requestedDomain: Int, requestedSettingValue: Int, status: WriteStatus) =
+        BrightnessWriteResult(requestedDomain, requestedSettingValue, null, null, settingsApiMax, status)
+
+    override fun forceManualMode(): Boolean =
         runCatching {
             val current = Settings.System.getInt(
                 resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
@@ -88,8 +151,14 @@ class AndroidScreenBrightnessController(
                 resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
                 Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
             )
-        }.exceptionOrNull()?.let { if (it !is SecurityException) throw it }
-    }
+        }.getOrElse { if (it is SecurityException) false else throw it }
+
+    override fun isManualMode(): Boolean = runCatching {
+        Settings.System.getInt(
+            resolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
+            Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+        ) == Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+    }.getOrDefault(true)
 
     override fun restoreMode() {
         savedMode()?.let {
@@ -100,15 +169,12 @@ class AndroidScreenBrightnessController(
         prefs.edit().remove(KEY_SAVED_MODE).commit()
     }
 
-    override fun isSelfWrite(rawDeviceValue: Int): Boolean = rawDeviceValue == lastSelfWriteDevice
-
-    override fun isOnScreenSelfWrite(): Boolean {
-        val raw = Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, -1)
-        return raw >= 0 && raw == lastSelfWriteDevice
-    }
+    override fun isSelfWrite(rawDeviceValue: Int): Boolean = selfWriteInProgress ||
+        rawDeviceValue == lastSelfWriteDevice || rawDeviceValue == lastRequestedDevice
 
     override fun clearSelfWriteMarker() {
         lastSelfWriteDevice = null
+        lastRequestedDevice = null
     }
 
     companion object {

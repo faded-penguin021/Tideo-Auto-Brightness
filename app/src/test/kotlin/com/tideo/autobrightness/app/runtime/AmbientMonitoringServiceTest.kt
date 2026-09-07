@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.Looper
+import androidx.core.app.NotificationCompat
 import androidx.test.core.app.ApplicationProvider
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import kotlinx.coroutines.CompletableDeferred
@@ -133,10 +134,10 @@ class AmbientMonitoringServiceTest {
     @Test
     fun onStartCommand_postsForegroundNotification() {
         // ACTION_START: D-140 stops service on PAUSE, so assertions ride the real start action.
-        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        val intent = Intent().setAction(AmbientMonitoringService.ACTION_START)
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java, intent).create()
         try {
-            val intent = Intent().setAction(AmbientMonitoringService.ACTION_START)
-            val service = controller.withIntent(intent).startCommand(0, 0).get()
+            val service = controller.startCommand(0, 0).get()
 
             val notification = shadowOf(service).lastForegroundNotification
             assertNotNull(notification, "service should post a foreground notification")
@@ -155,7 +156,10 @@ class AmbientMonitoringServiceTest {
 
         val nm = service.getSystemService(NotificationManager::class.java)
         val notif = shadowOf(nm).allNotifications.last()
-        assertEquals(android.app.Notification.PRIORITY_HIGH, notif.priority, "override alert is high-priority")
+        // NotificationCompat has no priority getter, so the read stays on the framework field.
+        @Suppress("DEPRECATION")
+        val priority = notif.priority
+        assertEquals(NotificationCompat.PRIORITY_HIGH, priority, "override alert is high-priority")
         val actions = notif.actions?.map { it.title.toString() } ?: emptyList()
         assertTrue(actions.contains("Resume"), "override alert offers a Resume action (F40)")
         assertTrue(
@@ -190,10 +194,10 @@ class AmbientMonitoringServiceTest {
     @Test
     fun ongoingNotification_hasNoPauseAction() {
         // ACTION_START for D-140.
-        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        val intent = Intent().setAction(AmbientMonitoringService.ACTION_START)
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java, intent).create()
         try {
-            val intent = Intent().setAction(AmbientMonitoringService.ACTION_START)
-            val service = controller.withIntent(intent).startCommand(0, 0).get()
+            val service = controller.startCommand(0, 0).get()
 
             val notification = shadowOf(service).lastForegroundNotification
             assertNotNull(notification)
@@ -376,11 +380,9 @@ class AmbientMonitoringServiceTest {
 
     @Test
     fun lifecycle_createStartDestroy_doesNotThrow() {
-        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
-        controller
-            .withIntent(Intent().setAction(AmbientMonitoringService.ACTION_PAUSE))
-            .startCommand(0, 0)
-            .get()
+        val intent = Intent().setAction(AmbientMonitoringService.ACTION_PAUSE)
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java, intent).create()
+        controller.startCommand(0, 0).get()
         controller.destroy()
     }
 }

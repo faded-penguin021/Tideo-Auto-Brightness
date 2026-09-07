@@ -66,6 +66,42 @@ elif [ "$doc_version" != "$conf_version" ]; then
 	fails=$((fails + 1))
 fi
 
+# Fact (drift incident 4e22273): an upgrade has two halves — a file copy of the shipped scripts,
+# and the hand-applied seed prose that rewrites binding rules across RULE_FILES — and they can
+# land in separate commits. That commit shipped AMH_VERSION=14.0.0 while AGENTS.md, the RUNBOOK
+# and STATE still carried 9.1.0-era rules. Nothing could see it: the version-pair fact above
+# passes precisely BECAUSE both surfaces agree on the new number, so the only anchor in this area
+# affirmed the pairing. The disclosure lived in docs/STATE.md alone — compressible working memory,
+# which a later compression pass is free to drop — while the claim it qualifies sat in amh.conf,
+# permanent and guard-checked. This anchor moves the disclosure to the same side as the claim.
+#
+# AMH_PROSE_VERSION (ours) names the version whose binding prose the tree actually follows.
+# Absent, or equal to AMH_VERSION, nothing is owed and this is silent. Different, and AGENTS.md
+# MUST disclose the gap — that requirement is the enforcement; the warning is what keeps the debt
+# audible on every run until it is paid. The warn tier is deliberate: the split is a legitimate
+# owner-directed state, and failing closed would hold the branch red for as long as the owner
+# wants it to stand, which is how a rule gets deleted rather than obeyed (DC-031).
+prose_version=$(sed -n 's/^AMH_PROSE_VERSION=\(.*\)$/\1/p' amh.conf | head -1)
+prose_owed=''
+if [ -n "$prose_version" ] && [ -n "$conf_version" ] && [ "$prose_version" != "$conf_version" ]; then
+	if grep -qF "binding prose is AMH $prose_version" AGENTS.md; then
+		prose_owed="seed prose owed — amh.conf runs AMH $conf_version but the binding prose is AMH $prose_version. Read harness/CHANGELOG.md forward from $prose_version, NOT from AMH_VERSION (docs/HARNESS_LOCAL.md \"Upgrading\"), and set AMH_PROSE_VERSION=$conf_version in the commit that lands it."
+	else
+		printf 'doc-fact drift: amh.conf sets AMH_PROSE_VERSION=%s against AMH_VERSION=%s, so seed prose is owed — but AGENTS.md carries no "binding prose is AMH %s" disclosure. The constitution then claims AMH %s with nothing saying which of its rules that version does not yet describe: false by omission, in the permanent tier (4e22273, DC-031)\n' \
+			"$prose_version" "$conf_version" "$prose_version" "$conf_version" >&2
+		fails=$((fails + 1))
+	fi
+fi
+
 [ "$fails" = 0 ] || exit 1
-printf 'Shizuku runtime sites = %s; sub-item citations parenthesised; constitution records AMH %s = AMH_VERSION\n' \
-	"$shizuku_sites" "$doc_version"
+
+summary="Shizuku runtime sites = $shizuku_sites; sub-item citations parenthesised; constitution records AMH $doc_version = AMH_VERSION"
+
+# The ladder reads the MERGED stream and takes `WARN ` only at its very start, so nothing —
+# including the summary — may print ahead of it.
+if [ -n "$prose_owed" ]; then
+	printf 'WARN %s\n' "$prose_owed"
+	printf '%s\n' "$summary"
+	exit 2
+fi
+printf '%s\n' "$summary"

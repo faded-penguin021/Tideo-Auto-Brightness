@@ -8,7 +8,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -171,7 +173,7 @@ class ScreenBrightnessControllerTest {
 
     @Test
     fun oemNormalization_roundTripIsIdentity_for1023Max() {
-        val oem = AndroidScreenBrightnessController(context, deviceMaxOverride = 1023)
+        val oem = AndroidScreenBrightnessController(context, settingsApiMaxOverride = 1023)
         for (domain in intArrayOf(0, 1, 99, 100, 128, 254, 255)) {
             oem.write(domain)
             assertEquals(domain, oem.read(), "round-trip failed for domain=$domain")
@@ -180,7 +182,7 @@ class ScreenBrightnessControllerTest {
 
     @Test
     fun oemNormalization_writeScalesToDeviceRange() {
-        val oem = AndroidScreenBrightnessController(context, deviceMaxOverride = 1023)
+        val oem = AndroidScreenBrightnessController(context, settingsApiMaxOverride = 1023)
         oem.write(255)
         val raw = Settings.System.getInt(
             context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1,
@@ -194,5 +196,146 @@ class ScreenBrightnessControllerTest {
         assertEquals(255, controller.read())
         controller.write(-5)
         assertEquals(0, controller.read())
+    }
+
+    /** DC-002: an OEM that stores [store] of what we asked for; reads stay real. */
+    private fun normalizing(store: (Int) -> Int, settingsApiMax: Int = 1023) =
+        AndroidScreenBrightnessController(
+            context,
+            settingsApiMaxOverride = settingsApiMax,
+            rawWrite = { raw ->
+                Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, store(raw))
+            },
+        )
+
+    @Test
+    fun normalizedWrite_marksTheSTOREDValue_soTheEchoIsASelfWrite() {
+        val oem = normalizing(store = { 3083 })
+        val result = oem.write(255)
+        assertEquals(WriteStatus.ACKNOWLEDGED, result.status)
+        assertEquals(255, result.requestedDomain)
+        assertEquals(1023, result.requestedSettingValue)
+        assertEquals(3083, result.readBackSettingValue)
+        assertEquals(255, result.acknowledgedDomain)
+        assertEquals(1023, result.settingsApiMax)
+        assertTrue(oem.isSelfWrite(3083))
+        // The requested raw stays matchable: a provider that applies asynchronously echoes it later.
+        assertTrue(oem.isSelfWrite(1023))
+        assertFalse(oem.isSelfWrite(77))
+    }
+
+    @Test
+    fun acknowledgedDomain_isTheStoredRawConverted_notTheRequestedDomain() {
+        val oem = normalizing(store = { 512 })
+        val result = oem.write(255)
+        assertEquals(255, result.requestedDomain)
+        assertEquals(128, result.acknowledgedDomain, "512/1023 → 128 in domain space")
+    }
+
+    @Test
+    fun callbackDuringPutInt_isASelfWrite_selfWriteInProgress() {
+        var seenMidWrite: Boolean? = null
+        lateinit var oem: AndroidScreenBrightnessController
+        oem = AndroidScreenBrightnessController(
+            context,
+            settingsApiMaxOverride = 255,
+            rawWrite = { raw ->
+                seenMidWrite = oem.isSelfWrite(9999)
+                Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
+            },
+        )
+        oem.write(100)
+        assertEquals(true, seenMidWrite)
+        assertFalse(oem.isSelfWrite(9999), "the in-progress flag must not survive the write")
+    }
+
+    @Test
+    fun refusedWrite_restoresThePreviousMarker_andReportsREFUSED() {
+        var refuse = false
+        val oem = AndroidScreenBrightnessController(
+            context,
+            settingsApiMaxOverride = 255,
+            rawWrite = { raw ->
+                if (refuse) false
+                else Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
+            },
+        )
+        oem.write(70)
+        refuse = true
+        val result = oem.write(200)
+        assertEquals(WriteStatus.REFUSED, result.status)
+        assertNull(result.readBackSettingValue)
+        assertNull(result.acknowledgedDomain)
+        assertTrue(oem.isSelfWrite(70), "a refused write must leave the previous marker in place")
+        assertFalse(oem.isSelfWrite(200))
+    }
+
+    @Test
+    fun deniedWrite_reportsDENIED_andRestoresThePreviousMarker() {
+        var deny = false
+        val oem = AndroidScreenBrightnessController(
+            context,
+            settingsApiMaxOverride = 255,
+            rawWrite = { raw ->
+                if (deny) throw SecurityException("WRITE_SETTINGS revoked")
+                Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
+            },
+        )
+        oem.write(70)
+        deny = true
+        val result = oem.write(200)
+        assertEquals(WriteStatus.DENIED, result.status)
+        assertNull(result.readBackSettingValue)
+        assertTrue(oem.isSelfWrite(70))
+    }
+
+    @Test
+    fun writtenButUnacknowledged_keepsTheREQUESTEDMarker_soItsOwnEchoIsStillFiltered() {
+        val oem = AndroidScreenBrightnessController(
+            context,
+            settingsApiMaxOverride = 255,
+            rawWrite = { raw ->
+                Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
+            },
+            rawRead = { null },
+        )
+        oem.write(70) // A prior landed write, so "keeps the requested raw" is pinned against it.
+        val result = oem.write(140)
+        assertEquals(WriteStatus.WRITTEN_UNACKNOWLEDGED, result.status)
+        assertEquals(140, result.requestedDomain)
+        assertNull(result.readBackSettingValue)
+        assertNull(result.acknowledgedDomain)
+        assertTrue(oem.isSelfWrite(140), "the requested raw stays the marker when read-back fails")
+        assertFalse(oem.isSelfWrite(70), "the previous marker must not survive a landed write")
+    }
+
+    @Test
+    fun unexpectedThrowable_isRethrown_andLeavesNoPoisonedMarker() {
+        var explode = false
+        val oem = AndroidScreenBrightnessController(
+            context,
+            settingsApiMaxOverride = 255,
+            rawWrite = { raw ->
+                if (explode) throw IllegalStateException("provider")
+                Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, raw)
+            },
+        )
+        oem.write(70)
+        explode = true
+        assertFailsWith<IllegalStateException> { oem.write(200) }
+        assertFalse(oem.isSelfWrite(4242), "selfWriteInProgress must not survive the rethrow")
+        assertTrue(oem.isSelfWrite(70), "the previous marker must be restored")
+    }
+
+    @Test
+    fun isManualMode_readsTheMode_andForceManualModeLandsIt() {
+        Settings.System.putInt(
+            context.contentResolver,
+            Settings.System.SCREEN_BRIGHTNESS_MODE,
+            Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
+        )
+        assertFalse(controller.isManualMode())
+        assertTrue(controller.forceManualMode())
+        assertTrue(controller.isManualMode())
     }
 }
