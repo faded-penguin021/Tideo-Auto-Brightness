@@ -62,16 +62,8 @@ is a run-once local input, not a score or CI gate.
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
    not grown, not that it is gone.
 
-Open questions:
-
-- **[2026-08-31] The rename half of the deferred cleanup — take it, or drop it with the other
-  half?** The no-fix ruling already declined (i), moving `deviceMax` to `context.resources`
-  (DC-019, DC-026). That leaves (ii): rename `deviceMax`/`requestedRaw`/`acknowledgedRaw` to
-  `settingsApiMax`/`requestedSettingValue`/`readBackSettingValue`, with Live Debug labels becoming
-  "Settings API max" and "Settings value requested" — no behaviour change, just names that say what
-  10d proved they are, which is the misreading that produced DC-014 (DC-023).
-  **Recommendation: take it, and the hold is discharged** — the only reason to wait was that §2 10b
-  cited the present labels verbatim, and 10b passed (DC-027).
+Open questions: none. Both stood answered on 2026-09-07 — the teardown join asymmetry accepted as
+it is (DC-047), the rename taken (DC-048).
 
 **Decided (owner).** This train ships as a **minor**, `1.10.0` / vc24 (2026-08-30,
 `app/build.gradle.kts`).
@@ -129,6 +121,13 @@ Newest first; ledger rows are the durable detail.
   behaviour stays owner-verified. The queue item carrying the discharged `845bb75` DA-005 review
   left the queue in the same session, tested rather than restated: `HARNESS_LOCAL.md` now reads
   "Seven of the eight fail closed", so the contradiction DC-035 caught is gone from the tree.
+- 2026-09-07 — **Both open questions answered: the teardown race accepted, the rename taken
+  (DC-047, DC-048).** `stop()` still cancels without joining and DC-047 records why that is a
+  decision rather than an oversight, since the next reader will meet it beside an
+  `emergencyStop()` that does join. The rename landed in full — `settingsApiMax`,
+  `requestedSettingValue`, `readBackSettingValue`, the two Live Debug labels and their resource
+  keys, and §2's check table — proven behaviour-neutral by reversing the substitution and getting
+  all five files back byte-identical, with a light glue-review pass CLEAN.
 - 2026-09-07 — **The owner cleared four queue items; one backlog item remains.** The three
   hardware-blocked checks are unexecutable for good and are now a decided non-item rather than a
   standing ask; the no-reply rule on #123/#126/#127 moved to the same section as the standing rule

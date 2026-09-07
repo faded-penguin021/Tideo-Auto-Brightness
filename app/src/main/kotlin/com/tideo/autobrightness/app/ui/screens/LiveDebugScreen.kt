@@ -130,7 +130,7 @@ fun LiveDebugContent(
                 Metric("Active rule", state.activeContext ?: "None", "debug_active_rule")
             }
 
-            // DC-007: requested vs acknowledged vs deviceMax, readable without an override firing.
+            // DC-007: requested vs acknowledged vs settingsApiMax, readable without an override firing.
             BrightnessWriteCard(p)
 
             // Performance & Timings — full Tasker parity (G2R-F29).
@@ -249,9 +249,9 @@ private fun BrightnessWriteCard(p: PipelineState) {
                 "debug_write_roundtrip",
             )
             Metric(stringResource(R.string.debug_write_status), it.status.name, "debug_write_status")
-            Metric(stringResource(R.string.debug_write_raw), it.requestedRaw.toString(), "debug_write_raw")
-            // The value Tideo converts with — one domain step is round(deviceMax / 255) raw.
-            Metric(stringResource(R.string.debug_write_device_max), it.deviceMax.toString(), "debug_write_device_max")
+            Metric(stringResource(R.string.debug_write_requested_value), it.requestedSettingValue.toString(), "debug_write_requested_value")
+            // The value Tideo converts with — one domain step is round(settingsApiMax / 255) (DC-048).
+            Metric(stringResource(R.string.debug_write_settings_api_max), it.settingsApiMax.toString(), "debug_write_settings_api_max")
         }
         diagnostic?.let { d ->
             Metric(

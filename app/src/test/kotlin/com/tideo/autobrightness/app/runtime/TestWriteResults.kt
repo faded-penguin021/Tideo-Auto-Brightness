@@ -5,7 +5,7 @@ import com.tideo.autobrightness.platform.brightness.WriteStatus
 
 /**
  * An ACKNOWLEDGED write of domain [level] that the provider stored as domain [stored].
- * Domain-space only (deviceMax 255), so raw == domain and the fixture cannot conflate the two —
+ * Domain-space only (settingsApiMax 255), so raw == domain and the fixture cannot conflate the two —
  * a fake that needs a device range must build [BrightnessWriteResult] itself.
  */
 internal fun ackWrite(level: Int, stored: Int = level) =

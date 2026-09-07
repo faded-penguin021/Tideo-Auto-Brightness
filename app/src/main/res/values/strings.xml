@@ -482,8 +482,8 @@
     <string name="debug_write_title">Brightness Writes</string>
     <string name="debug_write_roundtrip">Requested → acknowledged</string>
     <string name="debug_write_status">Write status</string>
-    <string name="debug_write_raw">Raw requested</string>
-    <string name="debug_write_device_max">Device max</string>
+    <string name="debug_write_requested_value">Settings value requested</string>
+    <string name="debug_write_settings_api_max">Settings API max</string>
     <string name="debug_override_disposition">Last override</string>
     <string name="debug_override_values">Observed / settled / expected</string>
     <string name="debug_override_write">Write at override</string>

@@ -189,8 +189,8 @@ class SettingsScreensTest {
         val seeded = PipelineState(
             lastAppliedBrightness = 250,
             lastBrightnessWrite = BrightnessWriteResult(
-                requestedDomain = 255, requestedRaw = 4014, acknowledgedRaw = 3083,
-                acknowledgedDomain = 196, deviceMax = 4095, status = WriteStatus.ACKNOWLEDGED,
+                requestedDomain = 255, requestedSettingValue = 4014, readBackSettingValue = 3083,
+                acknowledgedDomain = 196, settingsApiMax = 4095, status = WriteStatus.ACKNOWLEDGED,
             ),
         )
         compose.setContent {
@@ -203,7 +203,7 @@ class SettingsScreensTest {
         }
         compose.onNodeWithTag("debug_write_roundtrip").performScrollTo().assertExists()
         compose.onNodeWithText("255 \u2192 196", substring = true).performScrollTo().assertExists()
-        // deviceMax is what Tideo converts with, so the owner can derive one domain step from it.
+        // settingsApiMax is what Tideo converts with, so the owner can derive one domain step from it.
         compose.onNodeWithText("4095", substring = true).performScrollTo().assertExists()
         compose.onNodeWithTag("debug_override_disposition").assertDoesNotExist()
     }

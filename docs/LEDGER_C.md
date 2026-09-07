@@ -655,3 +655,17 @@
   torn-down flag this session. No test pins this: the interleaving is not deterministically
   reproducible in a unit test, so the record IS the evidence, and a later session that rediscovers
   the asymmetry should read this row rather than fix it unasked.
+
+- DC-048 [cited]: **Three identifiers named hardware and none of them held it; the names are now
+  what 10d proved (owner, 2026-09-07).** `deviceMax`, `requestedRaw` and `acknowledgedRaw` became
+  `settingsApiMax`, `requestedSettingValue` and `readBackSettingValue`, with the Live Debug labels
+  becoming "Settings API max" and "Settings value requested". DC-023 identified the misnaming and
+  DC-014 is what it already cost — a session read `Device max: 255` as the panel's ceiling on a
+  device whose provider range is 0–4095, and reasoned from it. The hold was never doubt about the
+  names: §2 10b quoted the old labels verbatim, so renaming mid-check would have invalidated the
+  check, and 10b passing released it (DC-027). Behaviour-neutrality was established mechanically
+  rather than by reading — reversing the substitution reproduces all five files byte-identically to
+  their previous revision — and the string resource KEYS moved with their values, since a key named
+  `debug_write_device_max` holding "Settings API max" rebuilds the very confusion being removed.
+  The ledger's older rows keep the old identifiers: they are immutable and they are accurate about
+  the code that existed when they were written.

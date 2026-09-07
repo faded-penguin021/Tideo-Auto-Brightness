@@ -11,10 +11,10 @@ enum class WriteStatus { ACKNOWLEDGED, WRITTEN_UNACKNOWLEDGED, REFUSED, DENIED }
 /** One write and what the provider stored; `acknowledged*` non-null only when ACKNOWLEDGED (DC-002). */
 data class BrightnessWriteResult(
     val requestedDomain: Int,
-    val requestedRaw: Int,
-    val acknowledgedRaw: Int?,
+    val requestedSettingValue: Int,
+    val readBackSettingValue: Int?,
     val acknowledgedDomain: Int?,
-    val deviceMax: Int,
+    val settingsApiMax: Int,
     val status: WriteStatus,
 )
 
@@ -33,7 +33,7 @@ interface ScreenBrightnessController {
 
 class AndroidScreenBrightnessController(
     private val context: Context,
-    deviceMaxOverride: Int? = null,
+    settingsApiMaxOverride: Int? = null,
     // Test seam (DC-002): Robolectric stores what it is given; normalization/refusal/read-back failure need one.
     private val rawWrite: ((Int) -> Boolean)? = null,
     private val rawRead: (() -> Int?)? = null,
@@ -41,8 +41,8 @@ class AndroidScreenBrightnessController(
     private val resolver: ContentResolver get() = context.contentResolver
 
     // Falls back to 255 if absent (standard Tasker parity).
-    private val deviceMax: Int by lazy {
-        deviceMaxOverride ?: run {
+    private val settingsApiMax: Int by lazy {
+        settingsApiMaxOverride ?: run {
             val id = Resources.getSystem().getIdentifier(
                 "config_screenBrightnessSettingMaximum", "integer", "android"
             )
@@ -69,14 +69,14 @@ class AndroidScreenBrightnessController(
 
     private fun toDevice(domainLevel: Int): Int {
         val clamped = domainLevel.coerceIn(0, 255)
-        return if (deviceMax == 255) clamped
-        else Math.round(clamped.toDouble() / 255.0 * deviceMax).toInt()
+        return if (settingsApiMax == 255) clamped
+        else Math.round(clamped.toDouble() / 255.0 * settingsApiMax).toInt()
     }
 
     private fun toDomain(deviceLevel: Int): Int {
-        val clamped = deviceLevel.coerceIn(0, deviceMax)
-        return if (deviceMax == 255) clamped
-        else Math.round(clamped.toDouble() / deviceMax * 255.0).toInt()
+        val clamped = deviceLevel.coerceIn(0, settingsApiMax)
+        return if (settingsApiMax == 255) clamped
+        else Math.round(clamped.toDouble() / settingsApiMax * 255.0).toInt()
     }
 
     private fun writeRaw(raw: Int): Boolean =
@@ -98,33 +98,33 @@ class AndroidScreenBrightnessController(
     @Synchronized
     override fun write(level: Int): BrightnessWriteResult {
         val requestedDomain = level.coerceIn(0, 255)
-        val requestedRaw = toDevice(level)
+        val requestedSettingValue = toDevice(level)
         val previous = lastSelfWriteDevice
         val previousRequested = lastRequestedDevice
         // DC-002: arm BEFORE putInt — the echo can be dispatched before the marker would exist.
         selfWriteInProgress = true
-        lastSelfWriteDevice = requestedRaw
-        lastRequestedDevice = requestedRaw
+        lastSelfWriteDevice = requestedSettingValue
+        lastRequestedDevice = requestedSettingValue
         var keepMarker = false
         try {
-            if (!writeRaw(requestedRaw)) return unlanded(requestedDomain, requestedRaw, WriteStatus.REFUSED)
-            val acknowledgedRaw = readRawOrNull() ?: run {
+            if (!writeRaw(requestedSettingValue)) return unlanded(requestedDomain, requestedSettingValue, WriteStatus.REFUSED)
+            val readBackSettingValue = readRawOrNull() ?: run {
                 // DC-002: keep the requested raw — it is the likeliest thing on screen.
                 keepMarker = true
-                return unlanded(requestedDomain, requestedRaw, WriteStatus.WRITTEN_UNACKNOWLEDGED)
+                return unlanded(requestedDomain, requestedSettingValue, WriteStatus.WRITTEN_UNACKNOWLEDGED)
             }
-            lastSelfWriteDevice = acknowledgedRaw
+            lastSelfWriteDevice = readBackSettingValue
             keepMarker = true
             return BrightnessWriteResult(
                 requestedDomain = requestedDomain,
-                requestedRaw = requestedRaw,
-                acknowledgedRaw = acknowledgedRaw,
-                acknowledgedDomain = toDomain(acknowledgedRaw),
-                deviceMax = deviceMax,
+                requestedSettingValue = requestedSettingValue,
+                readBackSettingValue = readBackSettingValue,
+                acknowledgedDomain = toDomain(readBackSettingValue),
+                settingsApiMax = settingsApiMax,
                 status = WriteStatus.ACKNOWLEDGED,
             )
         } catch (_: SecurityException) {
-            return unlanded(requestedDomain, requestedRaw, WriteStatus.DENIED)
+            return unlanded(requestedDomain, requestedSettingValue, WriteStatus.DENIED)
         } finally {
             if (!keepMarker) {
                 lastSelfWriteDevice = previous
@@ -134,8 +134,8 @@ class AndroidScreenBrightnessController(
         }
     }
 
-    private fun unlanded(requestedDomain: Int, requestedRaw: Int, status: WriteStatus) =
-        BrightnessWriteResult(requestedDomain, requestedRaw, null, null, deviceMax, status)
+    private fun unlanded(requestedDomain: Int, requestedSettingValue: Int, status: WriteStatus) =
+        BrightnessWriteResult(requestedDomain, requestedSettingValue, null, null, settingsApiMax, status)
 
     override fun forceManualMode(): Boolean =
         runCatching {

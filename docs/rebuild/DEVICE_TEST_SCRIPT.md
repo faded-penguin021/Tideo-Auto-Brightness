@@ -77,7 +77,7 @@ optional.
     check passes vacuously. This one's own control pauses on purpose, so re-check between the two
     halves and before 10c.
 
-    **Two scales, and the shell is not on the app's (DC-025).** The card's "Device max" (call it M)
+    **Two scales, and the shell is not on the app's (DC-025).** The card's "Settings API max" (call it M)
     is `config_screenBrightnessSettingMaximum`, the app-facing maximum Tideo converts with, and it
     reads **255** on the owner's phone. What `adb settings get/put` speaks is the STORED scale,
     whose ceiling (call it S) is **4095** there — the same setting key, a different scale, with the
@@ -170,8 +170,8 @@ optional.
     |---|---|---|---|
     | Requested → acknowledged | card | `255 → 255` | `255 → 255` |
     | Write status | card | `ACKNOWLEDGED` | `ACKNOWLEDGED` |
-    | Device max | card | `255` | `255` |
-    | Raw requested | card | `255` | `255` |
+    | Settings API max | card | `255` | `255` |
+    | Settings value requested | card | `255` | `255` |
     | Settled stored value | adb | **4095** | ≈ `255` |
 
     Only the last row moves, and it was the verdict: **4095 — the 0–4095 scale sits below the app
