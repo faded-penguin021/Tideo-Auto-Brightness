@@ -72,11 +72,7 @@ is a run-once local input, not a score or CI gate.
    of 670 `:app` on Robolectric, and `aapt2` is x86_64-only underneath both. `.orch/LOCAL_LADDER.md`
    carries both hosts, the two Windows shell settings that ride along, and the container's
    `libc6-amd64-cross` + `QEMU_LD_PREFIX=/usr/x86_64-linux-gnu`.
-5. **Nothing to do — the DA-005 review owed on `845bb75` is discharged, and it was NOT clean
-   (2026-09-04, DC-035).** A fresh-context Codex reviewer confirmed what the item asked and caught
-   a contradiction nobody had: `HARNESS_LOCAL.md` still claimed all eight repo-local guards fail
-   closed after `845bb75` made that false, fixed there with two lower findings.
-6. **Backlog, NOT for this train — extract the 29 hardcoded diagnostic-card labels the widened i18n
+5. **Backlog, NOT for this train — extract the 29 hardcoded diagnostic-card labels the widened i18n
    ratchet surfaced (DC-040).** Frozen at 29 by `WRAPPER_CEILING` in `HardcodedStringCheckTest`; the
    ceiling may only fall. Settles it:
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
@@ -137,7 +133,9 @@ Newest first; ledger rows are the durable detail.
   x86_64 JVM under emulation, with the DC-042, DC-043 and DC-046 tests each shown to FAIL against
   their unfixed code. `theAdmissionCapIsExactlyMaxPending` deliberately does not discriminate and
   pins a boundary instead, DC-044's interleaving is reasoned rather than pinned, and on-device
-  behaviour stays owner-verified.
+  behaviour stays owner-verified. The queue item carrying the discharged `845bb75` DA-005 review
+  left the queue in the same session, tested rather than restated: `HARNESS_LOCAL.md` now reads
+  "Seven of the eight fail closed", so the contradiction DC-035 caught is gone from the tree.
 - 2026-09-06 — **A fresh-context review of the PR #128 diff and the four fixes it earned
   (DC-037…DC-041).** The settle-window gate moved after the suspending settings read;
   `OverrideDiagnostic` carries `modeRecovered`; the Brightness Writes card renders the write the
