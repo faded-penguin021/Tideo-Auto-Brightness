@@ -56,23 +56,7 @@ is a run-once local input, not a score or CI gate.
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **Nothing to do — three checks are blocked on hardware.** The Android 12/12L Wi-Fi fix needs a
-   phone that old (DB-074, §8 24); the unrecognised-colour-mode button needs a phone reporting a
-   mode Android does not know, and a fake value must never be written to force one (§11 32c,
-   DB-071, DB-078); Night Light / always-on failing safely needs a Samsung (DB-041…DB-043).
-2. **Nothing to do — issues #123, #126 and #127 get no reply.** Owner's decision (2026-08-24 for
-   #123, carried forward); do not comment without the owner saying so first (DB-082).
-3. **Backlog, owner-approved 2026-08-30 but NOT for this train — give the Graph Metrics wiring real
-   tests.** Nothing covers `ChartCanvas` calling the sink, the sink being null below level 7, or the
-   signature dedupe suppressing a repeat draw, which is why the owner's device sighting is the
-   feature's only evidence. Contained Compose work, its own unit (DC-001).
-4. **Nothing to do — set `JAVA_HOME` to an x86_64 JDK before the ladder on any ARM host
-   (2026-09-02, revised 2026-09-06, DC-033).** An ARM JVM asks for natives nobody publishes for ARM:
-   Windows-on-ARM fails 120 of 145 `:platform` on conscrypt, the aarch64 Linux container fails 325
-   of 670 `:app` on Robolectric, and `aapt2` is x86_64-only underneath both. `.orch/LOCAL_LADDER.md`
-   carries both hosts, the two Windows shell settings that ride along, and the container's
-   `libc6-amd64-cross` + `QEMU_LD_PREFIX=/usr/x86_64-linux-gnu`.
-5. **Backlog, NOT for this train — extract the 29 hardcoded diagnostic-card labels the widened i18n
+1. **Backlog, NOT for this train — extract the 29 hardcoded diagnostic-card labels the widened i18n
    ratchet surfaced (DC-040).** Frozen at 29 by `WRAPPER_CEILING` in `HardcodedStringCheckTest`; the
    ceiling may only fall. Settles it:
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
@@ -105,6 +89,22 @@ Open questions:
 
 ## Decided non-items
 
+- **Issues #123, #126 and #127 get no reply, and no issue gets one unasked** (owner, 2026-08-24 for
+  #123, re-confirmed 2026-09-07; DB-082). Nothing was posted. This is the standing rule, not a
+  pending item: never comment on a forge issue without the owner saying so first.
+- **Three device checks will never be executed (owner, 2026-09-07).** The Android 12/12L Wi-Fi fix
+  (DB-074, §8 24), the unrecognised-colour-mode button (§11 32c, DB-071, DB-078) and Night Light /
+  always-on failing safely (DB-041…DB-043) each need hardware the owner does not have and does not
+  expect to get. They are unverified by construction, not pending: do not re-raise them as queue
+  items, and do not synthesise a fake value to force any of them (DB-071).
+- **Graph Metrics is owner-tested and works (owner, 2026-09-07); its automated wiring tests are
+  declined.** Nothing covers `ChartCanvas` calling the sink, the sink being null below level 7, or
+  the dedupe suppressing a repeat draw — `ChartCanvasTest` exercises `graphSignature`'s maths only.
+  The owner's device testing is the evidence, and that is accepted as sufficient (DC-001).
+- **The x86_64-JDK-on-ARM rule is a local host concern and is not tracked here (owner, 2026-09-07).**
+  It belongs to whichever machine runs the ladder, not to the tree. `.orch/LOCAL_LADDER.md` carries
+  both hosts and their setup; DC-033 keeps the measurement and the reasoning error behind it, and
+  the session banner reports the JDK it finds.
 - Repo/process declines: root changelog, speculative dependency bumps, standalone drift audit,
   Gradle dependency verification, wider session-branch CI, the D-162/DA-021 triage sets (DB-038).
 - Still declined: the superseded Privileged Display schedule and a persisted seed without real
@@ -136,6 +136,13 @@ Newest first; ledger rows are the durable detail.
   behaviour stays owner-verified. The queue item carrying the discharged `845bb75` DA-005 review
   left the queue in the same session, tested rather than restated: `HARNESS_LOCAL.md` now reads
   "Seven of the eight fail closed", so the contradiction DC-035 caught is gone from the tree.
+- 2026-09-07 — **The owner cleared four queue items; one backlog item remains.** The three
+  hardware-blocked checks are unexecutable for good and are now a decided non-item rather than a
+  standing ask; the no-reply rule on #123/#126/#127 moved to the same section as the standing rule
+  it always was; Graph Metrics is owner-tested and working, so its automated wiring tests are
+  declined and the device testing is the accepted evidence; and the x86_64-JDK rule left the tree as
+  a local host concern, kept in `.orch/LOCAL_LADDER.md` with DC-033 holding the reasoning. Only the
+  29-label i18n backlog is still queued.
 - 2026-09-06 — **A fresh-context review of the PR #128 diff and the four fixes it earned
   (DC-037…DC-041).** The settle-window gate moved after the suspending settings read;
   `OverrideDiagnostic` carries `modeRecovered`; the Brightness Writes card renders the write the
