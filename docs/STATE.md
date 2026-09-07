@@ -121,6 +121,11 @@ Newest first; ledger rows are the durable detail.
   behaviour stays owner-verified. The queue item carrying the discharged `845bb75` DA-005 review
   left the queue in the same session, tested rather than restated: `HARNESS_LOCAL.md` now reads
   "Seven of the eight fail closed", so the contradiction DC-035 caught is gone from the tree.
+- 2026-09-07 — **DC-042 is device-confirmed in both directions, and it SHIPPED (DC-049).** Sleep,
+  write `screen_brightness` over adb, wake: the 1.9.2 release pauses, `c550b5f` does not. Landed as
+  check 10e, whose control half is the old build itself — the one thing that distinguishes a fixed
+  build from one that has quietly stopped detecting overrides. `changelogs/24.txt` now says so to
+  users, since the pause was reachable by anyone whose OEM writes brightness during sleep.
 - 2026-09-07 — **Both open questions answered: the teardown race accepted, the rename taken
   (DC-047, DC-048).** `stop()` still cancels without joining and DC-047 records why that is a
   decision rather than an oversight, since the next reader will meet it beside an

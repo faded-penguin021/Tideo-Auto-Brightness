@@ -669,3 +669,14 @@
   `debug_write_device_max` holding "Settings API max" rebuilds the very confusion being removed.
   The ledger's older rows keep the old identifiers: they are immutable and they are accurate about
   the code that existed when they were written.
+
+- DC-049: **DC-042 shipped — the owner reproduced it on the 1.9.2 release and confirmed the fix on
+  1.10.0-debug (2026-09-07).** Sleep the screen, write `screen_brightness` from adb, wake: 1.9.2
+  pauses with a manual-override notification, `c550b5f` does not. Three things follow. The defect
+  was a real user-facing bug in released code, not a theoretical hole found by reading — anyone on
+  1.9.2 whose OEM or another app touches brightness during sleep meets a pause they did not cause.
+  What makes it evidence rather than a demo is the CONTROL: an old build failing the same sequence
+  rules out the quiet-because-detection-is-broken failure mode 10a warns about, and no amount of
+  green CI could have supplied that half. Nothing mechanical pointed at it — no crash, no failing
+  test, no red rung — so what found it was an audit reading eight files for rot, and check 10e now
+  holds the reproduction.

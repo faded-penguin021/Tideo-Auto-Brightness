@@ -180,6 +180,32 @@ optional.
     same key the shell read as 4095, so the two callers see different scales. The owner's ruling on
     that reality is DC-026: no code fix, and every adb check converts with S (see 10b).
 
+10e. **No pause from a write made while the screen is OFF (DC-042, DC-046).** The sibling of 10a:
+    that one covers the write that lands just after wake, this one the write that lands during
+    sleep. task585 disables Allow Override with the display, so nothing written between sleep and
+    wake is a user adjustment. Override Detection on, service running, "Manual override" reading
+    `No` before you start (DC-012). Inject with a STORED-scale value (10b): `2000` suits S = 4095
+    on the owner's phone; convert for any other device.
+
+    ```
+    adb shell settings get system screen_brightness        # note it, to restore after
+    adb shell settings get system screen_brightness_mode
+    adb shell input keyevent KEYCODE_SLEEP
+    adb shell settings put system screen_brightness 2000
+    adb shell settings get system screen_brightness        # confirm the write landed
+    adb shell input keyevent KEYCODE_WAKEUP
+    ```
+
+    **Expected:** nothing on wake — no pause, no notification, no Resume card. **The control is a
+    build without the fix**, where the same sequence DOES pause: run it against 1.9.2 (or any
+    pre-DC-042 build) and watch it fail. Without that half a quiet build proves nothing, exactly as
+    in 10a — and here the quiet-because-broken failure mode is real, since disabling override
+    detection outright would also produce silence. Step 8 is the standing proof that detection
+    still works at all; re-run it after this check if you did not run the control.
+
+    Verified both directions by the owner, 2026-09-07: **1.9.2 release pauses, 1.10.0-debug vc24
+    (`c550b5f`) does not.** That makes DC-042 a defect that SHIPPED, not one caught in review.
+
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 
 11. Turn the screen off, wait ~10 s, turn it on. **Expected:** sensing resumes; an initial brightness is
