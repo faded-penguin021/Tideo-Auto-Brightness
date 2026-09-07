@@ -64,17 +64,6 @@ is a run-once local input, not a score or CI gate.
 
 Open questions:
 
-- **[2026-09-07] Teardown does not join the consumer before its compensating writes — which
-  contract should change?** `stop()` cancels `consumerJob` then immediately calls
-  `dimming.disengage()` and `brightness.restoreMode()`, while the sibling `emergencyStop()` joins
-  first; cancellation is cooperative, so a running cycle can reapply dimming or force manual mode
-  after the cleanup meant to undo it (D-139's own class). `stop()` cannot simply follow the sibling
-  because its primary caller is `AmbientMonitoringService.onDestroy()`, which is not a suspend
-  context and where `runBlocking` can hold the main thread for a whole animation. Options: (a) a
-  `suspend stopAndJoin()` for the suspend callers only, fixing the minority of sites; (b) a
-  torn-down flag the cycle's write path checks, making the writes no-ops; (c) accept it, since
-  `onDestroy()` cancels the scope moments later. **Recommendation: (b)** — it covers every call
-  site without changing the teardown contract or risking an ANR. Found by the DC-042…DC-046 audit.
 - **[2026-08-31] The rename half of the deferred cleanup — take it, or drop it with the other
   half?** The no-fix ruling already declined (i), moving `deviceMax` to `context.resources`
   (DC-019, DC-026). That leaves (ii): rename `deviceMax`/`requestedRaw`/`acknowledgedRaw` to
@@ -89,6 +78,10 @@ Open questions:
 
 ## Decided non-items
 
+- **The `stop()`/`emergencyStop()` join asymmetry stays as it is (owner, 2026-09-07; DC-047).**
+  Ordinary teardown cancels the consumer without joining and then undoes its effects, so a late
+  write can survive the cleanup. Accepted rather than fixed: `onDestroy()` cannot suspend, and the
+  alternatives were declined. Read DC-047 before "fixing" it — it is a decision, not an oversight.
 - **Issues #123, #126 and #127 get no reply, and no issue gets one unasked** (owner, 2026-08-24 for
   #123, re-confirmed 2026-09-07; DB-082). Nothing was posted. This is the standing rule, not a
   pending item: never comment on a forge issue without the owner saying so first.

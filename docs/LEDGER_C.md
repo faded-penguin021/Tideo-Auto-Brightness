@@ -642,3 +642,16 @@
   cancelled its replacement. Both helpers are `@Synchronized` now, `startSensor` included: it had
   the identical shape and only one caller, which is what "enumerate the siblings" (D-142) means when
   the sibling is a race rather than a gate.
+
+- DC-047: **Ordinary teardown does not join the pipeline consumer before undoing its effects, and
+  the owner accepts that (2026-09-07).** `stop()` cancels `consumerJob` and immediately calls
+  `dimming.disengage()` and `brightness.restoreMode()`; cancellation is cooperative, so a
+  non-suspending segment of a running cycle can reapply dimming or force manual mode after the
+  cleanup meant to undo it. That is D-139's class, and the sibling `emergencyStop()` already joins
+  for exactly this reason — the asymmetry is real, not an oversight of analysis. It stays because
+  the fix has no cheap shape: `AmbientMonitoringService.onDestroy()` is the primary caller, is not
+  a suspend context, and `runBlocking` there can hold the main thread for a whole animation, which
+  trades a rare stuck-dim screen for an ANR. The owner declined both the partial join and the
+  torn-down flag this session. No test pins this: the interleaving is not deterministically
+  reproducible in a unit test, so the record IS the evidence, and a later session that rediscovers
+  the asymmetry should read this row rather than fix it unasked.
