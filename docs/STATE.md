@@ -108,6 +108,19 @@ it is (DC-047), the rename taken (DC-048).
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-07 — **The monthly grouped github-actions bump, checked by hand and its prose repaired
+  (PR #129).** Four updates over five workflows: `setup-java` 5.7.0 -> 6.0.0 at all five call sites,
+  `codeql-action/init` and `/analyze` 4.37.7 -> 4.37.9, `action-gh-release` 3.0.2 -> 3.0.3. Every
+  bumped tag was resolved to its commit against the forge and equals the pin, which is the one layer
+  `action-pins.sh` cannot reach; three of the four are single-call-site, so nothing else would have
+  caught a stale marker on them. The `setup-java` major is inert here — the ESM migration is not
+  user-facing, `jdkFile` keeps an alias we never used, and the Zulu -> Azul switch only touches
+  `distribution: zulu` while all five sites use temurin — and `node24` was read from `action.yml` at
+  the pinned SHA itself. The Node 24 policy blocks in `build.yml` and `fdroid-compat.yml` still said
+  `setup-java@v5`, the RUNBOOK 8 step 3 failure exactly, and now say v6. `docs/RUNBOOK.md` carries
+  the same stale major in its CI-triage example; it is a rule file, so that correction is owed
+  separately rather than smuggled in here.
+
 - 2026-09-07 — **A scoped rot audit of the runtime pipeline core (DC-042…DC-046).** A fresh-context
   reviewer was pointed at eight named runtime files rather than at the repository, and found
   override detection left armed across hibernate, a D-163 clear gated on a condition `onScreenOff()`
