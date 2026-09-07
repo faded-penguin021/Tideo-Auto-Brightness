@@ -117,9 +117,11 @@ Newest first; ledger rows are the durable detail.
   user-facing, `jdkFile` keeps an alias we never used, and the Zulu -> Azul switch only touches
   `distribution: zulu` while all five sites use temurin — and `node24` was read from `action.yml` at
   the pinned SHA itself. The Node 24 policy blocks in `build.yml` and `fdroid-compat.yml` still said
-  `setup-java@v5`, the RUNBOOK 8 step 3 failure exactly, and now say v6. `docs/RUNBOOK.md` carries
-  the same stale major in its CI-triage example; it is a rule file, so that correction is owed
-  separately rather than smuggled in here.
+  `setup-java@v5`, the RUNBOOK 8 step 3 failure exactly, and now say v6. A second reviewer caught
+  the same stale major in `docs/RUNBOOK.md`'s CI-triage example, which a first pass had wrongly
+  filed as cosmetic; that line now names no major at all, since its claim was always about JDK 17
+  versus 21 and the action version was incidental decay bait. That edit touches a rule file, so the
+  mandatory DA-005 review ran on it and returned CLEAN across all six bug classes.
 
 - 2026-09-07 — **A scoped rot audit of the runtime pipeline core (DC-042…DC-046).** A fresh-context
   reviewer was pointed at eight named runtime files rather than at the repository, and found

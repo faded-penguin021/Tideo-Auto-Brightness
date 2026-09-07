@@ -722,7 +722,7 @@ local ladder when discovery is index-dependent. Then triage in this order:
    - **Toolchain/environment mismatch** (CI runner differs from local): the symptom is a failure that
      does **not** reproduce locally. Fix the *workflow*, not the code. Known examples:
      - **JDK version** — Robolectric 4.16+ needs **JDK 21** to run SDK-36 tests; all workflows pin
-       `java-version: '21'`. A `setup-java@v5` with 17 throws `initializationError` /
+       `java-version: '21'`. A `setup-java` pinned to 17 throws `initializationError` /
        `targetSdkVersion > maxSdkVersion` only in CI. Bump the workflow JDK in lockstep with any
        Robolectric/targetSdk change (RUNBOOK §7).
      - **SDK/build-tools** — CI relies on AGP fetching the compile SDK on demand; a new `compileSdk`
