@@ -2,7 +2,8 @@
 
 This repository runs the **Agentic Maintenance Harness**
 ([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v9.1.0**
-and upgraded to **amh-v14.0.0**, under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
+and upgraded to **amh-v14.1.0** — whose shipped scripts are copied and whose one hand-applied step,
+the Claude adapter's hook shell pin, is outstanding (DC-050) — under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.
 
@@ -221,7 +222,7 @@ which you chose and why.
 
 | Key | Ours | Why |
 |---|---|---|
-| `AMH_PROSE_VERSION` | `14.0.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — `4e22273` landed the file copy and DC-036 landed the owed seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
+| `AMH_PROSE_VERSION` | `14.1.0` (no stock key) | **Ours entirely.** The version whose binding prose the tree follows, against `AMH_VERSION` for the shipped scripts. The two are **equal today** — `4e22273` landed the file copy and DC-036 landed the owed seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 — so `doc-facts.sh` is silent on the pair. The key stays because the **Upgrading** section below reads the changelog forward from it, which is the reason it exists; while the two differ the guard warns every run and fails if `AGENTS.md` drops its disclosure sentence first. Set them equal only in the commit that lands the prose (DC-031, DC-036). |
 | `BRANCH_PREFIX` | `claude` | Session branches are `claude/<codename>`, named in each session's directive. |
 | `MERGE_MODE` | `branch-train` | DA-002: branches are cut from the newest session branch, superseded ones deleted unmerged, only the final superset squash-merged. |
 | `REMOTE_FLAG` | `AAB_REMOTE` | Pre-existing neutral flag (D-176). See the adapter note below. |

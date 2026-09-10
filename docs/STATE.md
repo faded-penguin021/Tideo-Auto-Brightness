@@ -24,9 +24,10 @@ probe, in the Owner queue, or scoped as a dated observation — not here as fact
 Name the live ledger VOLUME, never its latest row id — every append moves that.
 -->
 
-Harness AMH 14.0.0 (DC-029), upstream manifest scripts immutable; live ledger `LEDGER_C.md`.
-Scripts and binding prose are both 14.0.0, so `AMH_PROSE_VERSION` equals `AMH_VERSION` and
-`doc-facts.sh` is quiet on the pair (DC-031, DC-036).
+Harness AMH 14.1.0 (DC-029), upstream manifest scripts immutable; live ledger `LEDGER_C.md`.
+Scripts and binding prose are both 14.1.0, so `AMH_PROSE_VERSION` equals `AMH_VERSION` and
+`doc-facts.sh` is quiet on the pair (DC-031, DC-036). 14.1.0's hand step, the adapter hook shell
+pin, is unapplied (DC-050).
 
 **Resuming cold?** Release standing is NOT recorded here — the session banner computes it live via
 `scripts/session-facts.sh` (DC-030), settled by hand with
@@ -61,6 +62,16 @@ is a run-once local input, not a score or CI gate.
    ceiling may only fall. Settles it:
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
    not grown, not that it is gone.
+
+2. **Add `"shell": "bash"` to the six hook entries in `.claude/settings.json`, or decide not to
+   (AMH 14.1.0, DC-050).** This session could not: the auto-mode permission classifier refused
+   every edit to that file, by both the Bash and the Edit tool. All six, not the template's three:
+   the extra hooks are `.sh` paths taking the same Windows route. Value exactly `"bash"` — a wrong
+   VALUE fails the enum and drops the hook entry, where a wrong KEY is merely stripped. Inert on
+   Linux and checked by no rung, so nothing will remind you; it matters only on Windows without Git
+   Bash. Settles it: `python3 -c 'import json;json.load(open(".claude/settings.json"))'` silent and
+   `grep -c '"shell": "bash"' .claude/settings.json` printing 6. Declining is fine —
+   record it under Decided non-items.
 
 Open questions: none. Both stood answered on 2026-09-07 — the teardown join asymmetry accepted as
 it is (DC-047), the rename taken (DC-048).
@@ -107,6 +118,11 @@ it is (DC-047), the rename taken (DC-048).
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-10 — **AMH 14.0.0 -> 14.1.0.** One MINOR step. No shipped script changed behaviour: only the
+  manifest's version header moved, the five scripts being byte-identical. No new
+  `amh.conf` key, so this tree leaves none to a script default. Its one
+  hand step, the Claude adapter hook shell pin, is unapplied and unguarded — Owner queue 2 (DC-050).
 
 - 2026-09-07 — **The monthly grouped github-actions bump, checked by hand and its prose repaired
   (PR #129).** Four updates over five workflows: `setup-java` 5.7.0 -> 6.0.0 at all five call sites,

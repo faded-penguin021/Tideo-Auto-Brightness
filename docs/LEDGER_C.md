@@ -680,3 +680,19 @@
   green CI could have supplied that half. Nothing mechanical pointed at it — no crash, no failing
   test, no red rung — so what found it was an audit reading eight files for rot, and check 10e now
   holds the reproduction.
+
+- DC-050: **AMH 14.1.0's only hand step — the Claude adapter's `"shell": "bash"` hook pin — is owed,
+  not applied (2026-09-10).** The release adds the field to every shipped hook so that a host
+  without Git Bash cannot route a hook to the Git for Windows file association, where the script
+  runs detached under a windowed launcher with a terminal's tty on stdin and the caller reads rc=0
+  and zero bytes — a broken hook that is silent where every other one is loud. It is not applied
+  here because `.claude/settings.json` is an owner-owned adapter file and this session's auto-mode
+  permission classifier refused every edit to it, by the Bash and the Edit tool alike. Nothing
+  detects that absence: the upstream changelog says no ladder rung checks the pin, and on this
+  Linux container it is inert anyway, so the branch is green with the step undone and only Owner
+  queue item 2 carries it. Two bounds on copying it later, both from the 14.1.0 entry: a misspelled
+  KEY is stripped with the hook entry left standing, while an invalid VALUE fails the enum and
+  drops the entry outright, so the string must be exactly `"bash"`. That the field is understood at
+  all was read from the changelog — it names the shipped schema at 2.1.100 and this host runs
+  2.1.267 — and not observed here, which is the same evidence tier the release itself claims for
+  the loud-failure case nobody has run.
