@@ -2,8 +2,9 @@
 
 This repository runs the **Agentic Maintenance Harness**
 ([`faded-penguin021/AMH`](https://github.com/faded-penguin021/AMH)), adopted at **amh-v9.1.0**
-and upgraded to **amh-v14.1.0** — whose shipped scripts are copied and whose one hand-applied step,
-the Claude adapter's hook shell pin, is outstanding (DC-050) — under the `full` profile. `AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
+and upgraded to **amh-v14.1.0** in full — shipped scripts copied, and the one hand-applied step,
+the Claude adapter's hook shell pin, applied (DC-051) — under the `full` profile.
+`AGENTS.md` is the constitution, `docs/STATE.md` the working memory,
 `docs/LEDGER*.md` the permanent registry, `docs/RUNBOOK.md` the playbooks, `scripts/ladder.sh`
 the one verification entrypoint.
 

@@ -16,18 +16,14 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-<!--
-Write what a fresh clone of THIS COMMIT would still find true. Test each sentence: would it hold
-tomorrow, under another branch name, after forge state had moved? If not, it belongs at a live
-probe, in the Owner queue, or scoped as a dated observation — not here as fact. Do not write
-"released", "tagged", "merged", "CI is green" or "protection is configured" as current state.
-Name the live ledger VOLUME, never its latest row id — every append moves that.
--->
+<!-- Fresh-clone truth only: never world-controlled status (released, tagged, merged, CI,
+protection). Name the live ledger VOLUME, never its latest row id. Rules: docs/RUNBOOK.md ->
+Working-memory compression. -->
 
 Harness AMH 14.1.0 (DC-029), upstream manifest scripts immutable; live ledger `LEDGER_C.md`.
 Scripts and binding prose are both 14.1.0, so `AMH_PROSE_VERSION` equals `AMH_VERSION` and
 `doc-facts.sh` is quiet on the pair (DC-031, DC-036). 14.1.0's hand step, the adapter hook shell
-pin, is unapplied (DC-050).
+pin, is applied (DC-051).
 
 **Resuming cold?** Release standing is NOT recorded here — the session banner computes it live via
 `scripts/session-facts.sh` (DC-030), settled by hand with
@@ -37,11 +33,11 @@ release number; that gap is unguarded.
 This branch carries Graph Metrics (DC-001), the LEDGER_C rollover, the executed #126/#127
 override-attribution work (DC-002…DC-028), the harness units DC-029…DC-036 and the runtime rot
 audit DC-042…DC-046. Device rounds on 1.10.0-debug vc24 are **all closed**, the owner having ruled
-no fix on the 0–4095 scale that sits below the app-facing Settings API, which freezes the
-conversion path as built; readings are in the rows and the checks in `DEVICE_TEST_SCRIPT.md` §2, and
-a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083). No round script is alive
-(RUNBOOK §6, DB-010), the force-stop investigation stays closed (DB-051…DB-060), and Scorecard.dev
-is a run-once local input, not a score or CI gate.
+no fix on the 0–4095 scale beneath the app-facing Settings API, which freezes the conversion path
+as built; readings are in the rows, the checks in `DEVICE_TEST_SCRIPT.md` §2, and a later build
+owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083). No round script is alive (RUNBOOK §6,
+DB-010), the force-stop investigation stays closed (DB-051…DB-060), and Scorecard.dev is a
+run-once local input, not a score or CI gate.
 
 ## Owner queue
 
@@ -63,16 +59,6 @@ is a run-once local input, not a score or CI gate.
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
    not grown, not that it is gone.
 
-2. **Add `"shell": "bash"` to the six hook entries in `.claude/settings.json`, or decide not to
-   (AMH 14.1.0, DC-050).** This session could not: the auto-mode permission classifier refused
-   every edit to that file, by both the Bash and the Edit tool. All six, not the template's three:
-   the extra hooks are `.sh` paths taking the same Windows route. Value exactly `"bash"` — a wrong
-   VALUE fails the enum and drops the hook entry, where a wrong KEY is merely stripped. Inert on
-   Linux and checked by no rung, so nothing will remind you; it matters only on Windows without Git
-   Bash. Settles it: `python3 -c 'import json;json.load(open(".claude/settings.json"))'` silent and
-   `grep -c '"shell": "bash"' .claude/settings.json` printing 6. Declining is fine —
-   record it under Decided non-items.
-
 Open questions: none. Both stood answered on 2026-09-07 — the teardown join asymmetry accepted as
 it is (DC-047), the rename taken (DC-048).
 
@@ -83,24 +69,22 @@ it is (DC-047), the rename taken (DC-048).
 
 - **The `stop()`/`emergencyStop()` join asymmetry stays as it is (owner, 2026-09-07; DC-047).**
   Ordinary teardown cancels the consumer without joining and then undoes its effects, so a late
-  write can survive the cleanup. Accepted rather than fixed: `onDestroy()` cannot suspend, and the
-  alternatives were declined. Read DC-047 before "fixing" it — it is a decision, not an oversight.
+  write can survive the cleanup; `onDestroy()` cannot suspend and the alternatives were declined.
+  Read DC-047 before "fixing" it — a decision, not an oversight.
 - **Issues #123, #126 and #127 get no reply, and no issue gets one unasked** (owner, 2026-08-24 for
-  #123, re-confirmed 2026-09-07; DB-082). Nothing was posted. This is the standing rule, not a
-  pending item: never comment on a forge issue without the owner saying so first.
+  #123, re-confirmed 2026-09-07; DB-082). Nothing was posted. Standing rule, not a pending item.
 - **Three device checks will never be executed (owner, 2026-09-07).** The Android 12/12L Wi-Fi fix
   (DB-074, §8 24), the unrecognised-colour-mode button (§11 32c, DB-071, DB-078) and Night Light /
-  always-on failing safely (DB-041…DB-043) each need hardware the owner does not have and does not
-  expect to get. They are unverified by construction, not pending: do not re-raise them as queue
-  items, and do not synthesise a fake value to force any of them (DB-071).
+  always-on failing safely (DB-041…DB-043) each need hardware the owner does not have. Unverified
+  by construction, not pending: do not re-raise them, and do not synthesise a fake value to force
+  one (DB-071).
 - **Graph Metrics is owner-tested and works (owner, 2026-09-07); its automated wiring tests are
-  declined.** Nothing covers `ChartCanvas` calling the sink, the sink being null below level 7, or
-  the dedupe suppressing a repeat draw — `ChartCanvasTest` exercises `graphSignature`'s maths only.
-  The owner's device testing is the evidence, and that is accepted as sufficient (DC-001).
-- **The x86_64-JDK-on-ARM rule is a local host concern and is not tracked here (owner, 2026-09-07).**
-  It belongs to whichever machine runs the ladder, not to the tree. `.orch/LOCAL_LADDER.md` carries
-  both hosts and their setup; DC-033 keeps the measurement and the reasoning error behind it, and
-  the session banner reports the JDK it finds.
+  declined.** Nothing covers `ChartCanvas` calling the sink, the null sink below level 7, or the
+  dedupe suppressing a repeat draw — `ChartCanvasTest` covers `graphSignature`'s maths only, and
+  the device testing is the accepted evidence (DC-001).
+- **The x86_64-JDK-on-ARM rule is a local host concern, not tracked here (owner, 2026-09-07).** It
+  belongs to whichever machine runs the ladder; `.orch/LOCAL_LADDER.md` carries both hosts, DC-033
+  keeps the measurement and the reasoning error, and the banner reports the JDK it finds.
 - Repo/process declines: root changelog, speculative dependency bumps, standalone drift audit,
   Gradle dependency verification, wider session-branch CI, the D-162/DA-021 triage sets (DB-038).
 - Still declined: the superseded Privileged Display schedule and a persisted seed without real
@@ -119,71 +103,30 @@ it is (DC-047), the rename taken (DC-048).
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-09-10 — **AMH 14.0.0 -> 14.1.0.** One MINOR step. No shipped script changed behaviour: only the
-  manifest's version header moved, the five scripts being byte-identical. No new
-  `amh.conf` key, so this tree leaves none to a script default. Its one
-  hand step, the Claude adapter hook shell pin, is unapplied and unguarded — Owner queue 2 (DC-050).
-
-- 2026-09-07 — **The monthly grouped github-actions bump, checked by hand and its prose repaired
-  (PR #129).** Four updates over five workflows: `setup-java` 5.7.0 -> 6.0.0 at all five call sites,
-  `codeql-action/init` and `/analyze` 4.37.7 -> 4.37.9, `action-gh-release` 3.0.2 -> 3.0.3. Every
-  bumped tag was resolved to its commit against the forge and equals the pin, which is the one layer
-  `action-pins.sh` cannot reach; three of the four are single-call-site, so nothing else would have
-  caught a stale marker on them. The `setup-java` major is inert here — the ESM migration is not
-  user-facing, `jdkFile` keeps an alias we never used, and the Zulu -> Azul switch only touches
-  `distribution: zulu` while all five sites use temurin — and `node24` was read from `action.yml` at
-  the pinned SHA itself. The Node 24 policy blocks in `build.yml` and `fdroid-compat.yml` still said
-  `setup-java@v5`, the RUNBOOK 8 step 3 failure exactly, and now say v6. A second reviewer caught
-  the same stale major in `docs/RUNBOOK.md`'s CI-triage example, which a first pass had wrongly
-  filed as cosmetic; that line now names no major at all, since its claim was always about JDK 17
-  versus 21 and the action version was incidental decay bait. That edit touches a rule file, so the
-  mandatory DA-005 review ran on it and returned CLEAN across all six bug classes.
-
-- 2026-09-07 — **A scoped rot audit of the runtime pipeline core (DC-042…DC-046).** A fresh-context
-  reviewer was pointed at eight named runtime files rather than at the repository, and found
-  override detection left armed across hibernate, a D-163 clear gated on a condition `onScreenOff()`
-  already satisfies, an admission gate publishing before it booked, and two dead members; the
-  mandatory glue review then returned NOT CLEAN on that fix and earned DC-046. The
-  `stop()`/`emergencyStop()` join asymmetry it also found is an Open question above, not a fix.
-  Verification: full ladder green — `:app` 674, `:platform` 290, `:domain` 116, 0 failures, on an
-  x86_64 JVM under emulation, with the DC-042, DC-043 and DC-046 tests each shown to FAIL against
-  their unfixed code. `theAdmissionCapIsExactlyMaxPending` deliberately does not discriminate and
-  pins a boundary instead, DC-044's interleaving is reasoned rather than pinned, and on-device
-  behaviour stays owner-verified. The queue item carrying the discharged `845bb75` DA-005 review
-  left the queue in the same session, tested rather than restated: `HARNESS_LOCAL.md` now reads
-  "Seven of the eight fail closed", so the contradiction DC-035 caught is gone from the tree.
-- 2026-09-07 — **DC-042 is device-confirmed in both directions, and it SHIPPED (DC-049).** Sleep,
-  write `screen_brightness` over adb, wake: the 1.9.2 release pauses, `c550b5f` does not. Landed as
-  check 10e, whose control half is the old build itself — the one thing that distinguishes a fixed
-  build from one that has quietly stopped detecting overrides. `changelogs/24.txt` now says so to
-  users, since the pause was reachable by anyone whose OEM writes brightness during sleep.
-- 2026-09-07 — **Both open questions answered: the teardown race accepted, the rename taken
-  (DC-047, DC-048).** `stop()` still cancels without joining and DC-047 records why that is a
-  decision rather than an oversight, since the next reader will meet it beside an
-  `emergencyStop()` that does join. The rename landed in full — `settingsApiMax`,
-  `requestedSettingValue`, `readBackSettingValue`, the two Live Debug labels and their resource
-  keys, and §2's check table — proven behaviour-neutral by reversing the substitution and getting
-  all five files back byte-identical, with a light glue-review pass CLEAN.
-- 2026-09-07 — **The owner cleared four queue items; one backlog item remains.** The three
-  hardware-blocked checks are unexecutable for good and are now a decided non-item rather than a
-  standing ask; the no-reply rule on #123/#126/#127 moved to the same section as the standing rule
-  it always was; Graph Metrics is owner-tested and working, so its automated wiring tests are
-  declined and the device testing is the accepted evidence; and the x86_64-JDK rule left the tree as
-  a local host concern, kept in `.orch/LOCAL_LADDER.md` with DC-033 holding the reasoning. Only the
-  29-label i18n backlog is still queued.
-- 2026-09-06 — **A fresh-context review of the PR #128 diff and the four fixes it earned
-  (DC-037…DC-041).** The settle-window gate moved after the suspending settings read;
-  `OverrideDiagnostic` carries `modeRecovered`; the Brightness Writes card renders the write the
-  EVENT captured; and the i18n ratchet gained a second check over this repo's own wrapper
-  composables, 12 labels extracted and 29 frozen. The refused-tail baseline is **ruled no-change**
-  (owner, 2026-09-06): DC-008 stands and a test pins it.
-- 2026-09-02..04 — **The harness train AMH 9.1.0 → 14.0.0, its prose-debt guard and the Codex rail
-  (DC-029…DC-036).** Shipped scripts and manifest copied; `AMH_PROSE_VERSION` plus a `doc-facts.sh`
-  warn/fail tier carried the scripts-ahead-of-prose split until the owed seed prose landed and
-  closed it; the Codex hook claim was measured on 0.152.1/0.153.2 and reworded to
-  declared-but-not-observed; and the DA-005 review owed on `845bb75` returned NOT CLEAN.
+- 2026-09-10 — **AMH 14.0.0 -> 14.1.0.** One MINOR step; no shipped script changed behaviour and
+  the release declares no new `amh.conf` key. Its one hand step, the Claude adapter hook shell pin,
+  was applied by the owner after the agent was refused the edit, and is unguarded either way
+  (DC-050, DC-051).
+- 2026-09-07 — **PR #129: the monthly grouped github-actions bump, checked by hand.** Every bumped
+  tag was resolved to its pin against the forge, the one layer `action-pins.sh` cannot reach, and
+  the `setup-java` major proved inert here; the stale `@v5` policy blocks and the RUNBOOK
+  CI-triage example were repaired, that rule-file edit earning a CLEAN DA-005 review.
+- 2026-09-07 — **The runtime rot audit, its device confirmation, and the queue clear-out
+  (DC-042…DC-049).** A fresh-context reviewer over eight named runtime files found override
+  detection armed across hibernate, a redundant D-163 gate, an admission gate publishing before it
+  booked, and two dead members; DC-042 was then reproduced on the 1.9.2 release and confirmed fixed
+  on 1.10.0-debug, landing as check 10e with the old build as its control. Both open questions
+  closed — the teardown join asymmetry accepted (DC-047), the hardware-misnaming rename taken and
+  proved behaviour-neutral (DC-048) — and four queue items became decided non-items.
+- 2026-09-06 — **PR #128's fresh-context review and its four fixes (DC-037…DC-041).** The
+  settle-window gate moved after the suspending settings read, `OverrideDiagnostic` gained
+  `modeRecovered`, the Brightness Writes card renders the EVENT's write, and the i18n ratchet gained
+  a wrapper-composable check with 29 labels frozen.
+- 2026-09-02..04 — **The harness train AMH 9.1.0 -> 14.0.0 (DC-029…DC-036).** Scripts and manifest
+  copied, with `AMH_PROSE_VERSION` and a `doc-facts.sh` warn/fail tier carrying the
+  scripts-ahead-of-prose split until the owed seed prose closed it.
 - 2026-06-23..08-31 — **v1.0.0 → v1.9.2 shipped, then the #126/#127 override-attribution train
-  executed and fully read on a device (D-096…DC-028).** `write()` became a transaction reporting
-  what Android STORED, feeding both detectors, the baseline and the animation band; the commit guard
-  gained a ±1 domain deadband and a `MIN_SETTLE_MS` floor; and Live Debug gained the Brightness
-  Writes card that checks §2 10b–10d read from.
+  executed and read on a device (D-096…DC-028).** `write()` became a transaction reporting what
+  Android STORED, feeding both detectors, the baseline and the animation band; the commit guard
+  gained a ±1 domain deadband and a `MIN_SETTLE_MS` floor; Live Debug gained the Brightness Writes
+  card that §2 10b–10d read from.

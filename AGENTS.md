@@ -11,11 +11,11 @@ and the version here must change with it; `scripts/guards/doc-facts.sh` fails on
 Both halves of the 9.1.0 -> 14.0.0 upgrade landed: `4e22273` copied the shipped scripts, and the
 hand-applied seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 followed, so `AMH_PROSE_VERSION` and
 `AMH_VERSION` in `amh.conf` are equal again and `doc-facts.sh` is silent on the pair. The 14.1.0
-step on top of that changed no seed prose, so it reopens no gap and the keys advanced together.
-One 14.1.0 upgrade note is outstanding and this file does not pretend otherwise: the Claude
-adapter's hook shell pin is not applied. Nothing mechanical will report that — the version keys are
-equal, so `doc-facts.sh` is satisfied — which is why it is carried as DC-050 and as Owner queue item
-2 in `docs/STATE.md` until it is applied or declined. Should they
+step on top of that changed no seed prose, so it reopens no gap and the keys advanced together, and
+its one hand-applied note — the Claude adapter's hook shell pin — is applied (DC-050, DC-051).
+Nothing mechanical reports on that pin either way: the version keys are equal, so `doc-facts.sh` is
+satisfied whether or not the adapter carries it, which is why the record is prose here rather than a
+rung. Should they
 ever diverge, that key names the version whose rules this tree's prose actually follows, and the
 guard requires a disclosure sentence here for as long as the gap stands.
 The disclosure it requires is a literal sentence — **"the binding prose is AMH

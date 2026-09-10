@@ -696,3 +696,17 @@
   all was read from the changelog — it names the shipped schema at 2.1.100 and this host runs
   2.1.267 — and not observed here, which is the same evidence tier the release itself claims for
   the loud-failure case nobody has run.
+  Superseded by DC-051.
+
+- DC-051: **The 14.1.0 hook shell pin is applied; the owner ran the edit the agent was refused
+  (2026-09-10).** All six `"type": "command"` entries in `.claude/settings.json` now carry
+  `"shell": "bash"` — the upstream template pins three, and this adapter's session-facts,
+  python-edit and comment-budget hooks are the other three, each a `.sh` path that would take the
+  same Windows route. Verified by parse and count, not by eye: `json.load` succeeds and six entries
+  are pinned out of six, which is the check that distinguishes a good value from a bad one, since an
+  invalid VALUE drops the whole hook entry while an unknown KEY is merely stripped. What made this
+  a two-party job is worth keeping: `.claude/settings.json` is the file that defines the agent's own
+  rails, so this session's auto-mode classifier refused every edit to it by every tool — correctly,
+  and the remedy was a shell command the owner ran, not a wider permission. The pin remains
+  unobserved where it matters: this host runs bash already, so what is verified is the config's
+  shape, never the Windows behaviour it exists for. Supersedes DC-050.
