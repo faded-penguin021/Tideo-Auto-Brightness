@@ -39,6 +39,15 @@ owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083). No round script is 
 DB-010), the force-stop investigation stays closed (DB-051…DB-060), and Scorecard.dev is a
 run-once local input, not a score or CI gate.
 
+## Active work
+
+**Real-device E2E suite** — plan `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13,
+Sol- and Astra-reviewed). No device mutation before S4's recovery contract is Sol-reviewed.
+
+- [x] S0 plan · [ ] S1 decision + scaffolding · [ ] S2 command/UI boundary · [ ] S3 effects,
+  journal, recovery · [ ] S4 hook + scenarios · [ ] S5 read-only preflight · [ ] S6 install + smoke
+  · [ ] S7 suites by effect order · [ ] S8 triage extra · [ ] S9 close-out (delete the plan)
+
 ## Owner queue
 
 > **Protected section (D-167).** Never delete it, and never silently drop items during compression
@@ -102,6 +111,11 @@ it is (DC-047), the rename taken (DC-048).
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-13 — **Real-device E2E suite planned (S0).** Owner-approved plan for an adb +
+  uiautomator2 suite over `DEVICE_TEST_SCRIPT.md`, mobile-use as offline triage, Artemis rejected;
+  a gpt-6-astra second pass added identity-bound conflict-aware recovery, an effect inventory and a
+  UI allowlist. No code yet.
 
 - 2026-09-10 — **AMH 14.0.0 -> 14.1.0.** One MINOR step; no shipped script changed behaviour and
   the release declares no new `amh.conf` key. Its one hand step, the Claude adapter hook shell pin,
