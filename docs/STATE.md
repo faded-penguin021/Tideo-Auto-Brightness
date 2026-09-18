@@ -112,6 +112,14 @@ it is (DC-047), the rename taken (DC-048).
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-18 — **The two release workflows now set up their runner the way `build.yml` does.**
+  `release-signing.yml` and `release.yml` alone omitted `packages: ''`, so each run pulled the
+  obsolete `tools` package and with it the Android Emulator — the large flaky download that once
+  failed CI with `Error on ZipFile unknown archive` — for jobs that never start one. Both also ran
+  the full test set while caching only `~/.gradle`, re-fetching Robolectric's android-all jars from
+  Maven Central every run; `~/.robolectric` is now cached as in `build.yml`. Surfaced by the
+  rolling-beans fork applying the same guard to a workflow of its own; the fix here is this tree's.
+
 - 2026-09-18 — **`android:backupAgent` named a class that does not exist; fix cherry-picked from a
   fork.** The manifest said `.backup.SettingsBackupAgent` while the agent lives at
   `.app.backup.SettingsBackupAgent` — a namespace-relative name AGP does not validate, so it fails

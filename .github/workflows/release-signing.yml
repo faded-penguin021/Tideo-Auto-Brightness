@@ -33,13 +33,20 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699  # v4.0.1
+        with:
+          # Same guard as build.yml: the default `tools` install drags in the Android Emulator,
+          # a large flaky download this job never uses.
+          packages: ''
 
       - name: Cache Gradle
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
+          # ~/.robolectric: the android-all jars Robolectric fetches at TEST RUNTIME live outside
+          # ~/.gradle, so without this line every run re-downloads them from Maven Central.
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            ~/.robolectric
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
