@@ -1,0 +1,1 @@
+Fixes settings backup and restore, which had been broken since 1.8.2: the app pointed Android at a backup component that did not exist, so your settings were not being saved to or recovered from a backup.

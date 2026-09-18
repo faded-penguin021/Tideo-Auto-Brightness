@@ -68,31 +68,36 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
    not grown, not that it is gone.
 
-Open questions:
+2. **[2026-09-18] Tag v1.10.1 when you are ready — the bump is done, tagging is yours.**
+   `app/build.gradle.kts` now says 1.10.1 / vc25 and `changelogs/25.txt` exists; RUNBOOK §6 keeps
+   tagging and publishing with you. Before tagging, §6 wants a green `fdroid-compat.yml` on the
+   release commit (Actions → F-Droid compatibility → Run workflow if none has run), and it carries a
+   one-shot DA-026 check owed by the first release after the AGP 8.13.2 bump. Settles it:
+   `git ls-remote --tags --refs origin 'refs/tags/v1.10.1'` — a hit means it is done and this item
+   can go.
 
-2. **[2026-09-18] Was backup wholly broken on v1.8.2…v1.9.2, and does that reopen the declined
-   `bmgr restore` check (DB-013)?** The fix landed this session (DC-052) restores a path that
-   plausibly never ran at all on four shipped releases, rather than half-ran. Options: (a) run one
-   `bmgr backupnow` + restore on a 1.10.0 build to see backup produce data where the old build
-   produced none — this is the destructive check declined as DB-013, so it is your call, not a
-   re-raise; (b) accept it unverified and let the next device round cover it; (c) treat the
-   pre-fix behaviour as unknowable and only confirm the new build works. Recommend (a) scoped to
-   one comparison: it is the only option that says which of the two blast radii was real, and the
-   answer decides how strongly the next release's changelog should put it. Settles it:
-   `adb shell bmgr backupnow com.tideo.autobrightness` and read whether it transfers data.
+Open questions: none.
 
-3. **[2026-09-18] The backup fix owes a changelog line at the next version bump.** vc24 is the
-   SHIPPED v1.10.0, so `changelogs/24.txt` must not claim it — this fix is not in it. The line
-   belongs to `changelogs/25.txt`, which does not exist until you bump (RUNBOOK §6; tagging and
-   releasing are owner tasks). Suggested, 45 of the 500 codepoints:
-   `Fixes backup and restore, broken since 1.8.2.` — reword if the device check above narrows what
-   was actually broken. Settles it: `ls fastlane/metadata/android/en-US/changelogs/25.txt`.
+**Decided (owner).** The override-attribution train shipped as a **minor**, `1.10.0` / vc24
+(2026-08-30), and is tagged. The tree now sits at `1.10.1` / vc25, a **patch** (2026-09-18,
+owner-authorised bump) opened by the backup fix.
 
-**Decided (owner).** This train ships as a **minor**, `1.10.0` / vc24 (2026-08-30,
-`app/build.gradle.kts`).
+**This train is expected to stay patch-level, and vc25 is its ONE bump (owner, 2026-09-18).** The
+train's real subject is the real-device E2E suite below; the E2E work is test tooling and ships
+nothing, so it moves no version field on its own, and bugs it surfaces are expected to be patch
+fixes. So a later session lands those fixes by appending a line to `changelogs/25.txt` — it does
+NOT bump again per fix and does NOT create `26.txt`. Re-open the question only if something
+surfaced is genuinely minor (a new user-facing capability) or major (breaking), per RUNBOOK §6's
+"pick the highest that applies"; then say so rather than bumping quietly.
 
 ## Decided non-items
 
+- **The pre-fix backup blast radius will not be measured (owner, 2026-09-18; DC-052).** Whether
+  v1.8.2…v1.9.2 backed up nothing at all, or backed up and only skipped the restore-side sanitizer,
+  needs `bmgr` work on the owner's device; the owner declines it, having lost app data to a command
+  of that family before. Sits with DB-013, the already-declined destructive `bmgr restore` check.
+  The fix itself is verified statically — the class the manifest names now exists — and the
+  changelog wording holds under either reading. Do not re-raise it or propose a `bmgr` command.
 - **No regression test guards `android:backupAgent` (owner, 2026-09-18; DC-052).** A test asserting
   the manifest attribute resolves to a real class was written, then dropped on the owner's call
   ("YAGNI"). Nothing else reads that attribute, and neither AGP nor lint validates it, so the same
@@ -132,6 +137,13 @@ Open questions:
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-18 — **Bumped to 1.10.1 / vc25 with `changelogs/25.txt`.** A patch opened by the backup
+  fix, bumped on the owner's say-so because vc24 is the shipped v1.10.0 and a released changelog must
+  not claim a fix it does not carry. It is this train's only bump: later fixes append to `25.txt`
+  (see Decided). Tagging stays the owner's (RUNBOOK §6), and the device question will not be
+  answered — the owner declines `bmgr` work on their hardware, so the pre-fix blast radius stays
+  unknown and the changelog line is worded to hold either way.
 
 - 2026-09-18 — **The Robolectric cache path was wrong in every workflow that had one, `build.yml`
   included.** `~/.robolectric` caches nothing: Robolectric resolves the android-all jars through its
