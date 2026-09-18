@@ -112,6 +112,14 @@ it is (DC-047), the rename taken (DC-048).
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-18 — **`android:backupAgent` named a class that does not exist; fix cherry-picked from a
+  fork.** The manifest said `.backup.SettingsBackupAgent` while the agent lives at
+  `.app.backup.SettingsBackupAgent` — a namespace-relative name AGP does not validate, so it fails
+  only on a real restore, taking `onRestoreFinished()` and with it the sanitizer half of the backup
+  control in `SECURITY_REVIEW.md`. Carried over as `rolling-beans`' own commit (address swapped for
+  their forge alias, the only change `AUTHOR_EMAIL_ALLOW` left available). No regression test: the
+  owner declined one, so nothing stops the typo returning.
+
 - 2026-09-13 — **Real-device E2E suite planned (S0).** Owner-approved plan for an adb +
   uiautomator2 suite over `DEVICE_TEST_SCRIPT.md`, mobile-use as offline triage, Artemis rejected;
   a gpt-6-astra second pass added identity-bound conflict-aware recovery, an effect inventory and a
