@@ -41,12 +41,14 @@ jobs:
       - name: Cache Gradle
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
-          # ~/.robolectric: the android-all jars Robolectric fetches at TEST RUNTIME live outside
-          # ~/.gradle, so without this line every run re-downloads them from Maven Central.
+          # The android-all jars Robolectric fetches at TEST RUNTIME live outside ~/.gradle, so
+          # they need their own path here. It is ~/.m2/repository/org/robolectric, NOT
+          # ~/.robolectric: Robolectric resolves them through its own Maven resolver into ~/.m2.
+          # Caching the wrong path still reports a cache hit while re-downloading ~340 MB.
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ~/.robolectric
+            ~/.m2/repository/org/robolectric
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 

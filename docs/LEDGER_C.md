@@ -710,3 +710,14 @@
   and the remedy was a shell command the owner ran, not a wider permission. The pin remains
   unobserved where it matters: this host runs bash already, so what is verified is the config's
   shape, never the Windows behaviour it exists for. Supersedes DC-050.
+
+- DC-052: **A namespace-relative class name in the manifest is validated by nothing, so it
+  fails first on a device (2026-09-18).** `android:backupAgent` read `.backup.SettingsBackupAgent`
+  while the class sits at `.app.backup.SettingsBackupAgent`; AGP expands such a name against the
+  `namespace`, never checks that it resolves, and lint does not either, so the branch stayed green
+  from `d17387e` (1.8.2/vc20) through v1.9.2 — four releases. The framework loads the declared agent
+  by name for backup as well as restore, so the likely blast radius is the whole backup path for
+  those builds, not just `onRestoreFinished()` and its sanitizer; that half of it is unconfirmed
+  because no device check has run. Every other relative name in that manifest resolves, checked by
+  hand. The fix came from a fork (`rolling-beans`, cherry-picked); no test guards it, the owner
+  having declined one, so the same typo can return silently.

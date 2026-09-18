@@ -68,14 +68,35 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
    not grown, not that it is gone.
 
-Open questions: none. Both stood answered on 2026-09-07 — the teardown join asymmetry accepted as
-it is (DC-047), the rename taken (DC-048).
+Open questions:
+
+2. **[2026-09-18] Was backup wholly broken on v1.8.2…v1.9.2, and does that reopen the declined
+   `bmgr restore` check (DB-013)?** The fix landed this session (DC-052) restores a path that
+   plausibly never ran at all on four shipped releases, rather than half-ran. Options: (a) run one
+   `bmgr backupnow` + restore on a 1.10.0 build to see backup produce data where the old build
+   produced none — this is the destructive check declined as DB-013, so it is your call, not a
+   re-raise; (b) accept it unverified and let the next device round cover it; (c) treat the
+   pre-fix behaviour as unknowable and only confirm the new build works. Recommend (a) scoped to
+   one comparison: it is the only option that says which of the two blast radii was real, and the
+   answer decides how strongly the next release's changelog should put it. Settles it:
+   `adb shell bmgr backupnow com.tideo.autobrightness` and read whether it transfers data.
+
+3. **[2026-09-18] The backup fix owes a changelog line at the next version bump.** vc24 is the
+   SHIPPED v1.10.0, so `changelogs/24.txt` must not claim it — this fix is not in it. The line
+   belongs to `changelogs/25.txt`, which does not exist until you bump (RUNBOOK §6; tagging and
+   releasing are owner tasks). Suggested, 45 of the 500 codepoints:
+   `Fixes backup and restore, broken since 1.8.2.` — reword if the device check above narrows what
+   was actually broken. Settles it: `ls fastlane/metadata/android/en-US/changelogs/25.txt`.
 
 **Decided (owner).** This train ships as a **minor**, `1.10.0` / vc24 (2026-08-30,
 `app/build.gradle.kts`).
 
 ## Decided non-items
 
+- **No regression test guards `android:backupAgent` (owner, 2026-09-18; DC-052).** A test asserting
+  the manifest attribute resolves to a real class was written, then dropped on the owner's call
+  ("YAGNI"). Nothing else reads that attribute, and neither AGP nor lint validates it, so the same
+  typo can return silently. A decision, not an oversight — do not re-add it unasked.
 - **The `stop()`/`emergencyStop()` join asymmetry stays as it is (owner, 2026-09-07; DC-047).**
   Ordinary teardown cancels the consumer without joining and then undoes its effects, so a late
   write can survive the cleanup; `onDestroy()` cannot suspend and the alternatives were declined.
@@ -112,21 +133,31 @@ it is (DC-047), the rename taken (DC-048).
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-18 — **The Robolectric cache path was wrong in every workflow that had one, `build.yml`
+  included.** `~/.robolectric` caches nothing: Robolectric resolves the android-all jars through its
+  own Maven resolver into `~/.m2`, so all three workflows reported a cache hit while re-downloading
+  ~340 MB per run. Now `~/.m2/repository/org/robolectric`, proved in this container by putting the
+  jars there by hand and watching the failing tests pass. `3cb62a7`'s body and the changelog line it
+  landed with both asserted the `~/.robolectric` fix worked; that claim was wrong when written and
+  this entry supersedes it. Note the three workflows still share one cache key, so whichever runs
+  first decides what is stored.
+
 - 2026-09-18 — **The two release workflows now set up their runner the way `build.yml` does.**
   `release-signing.yml` and `release.yml` alone omitted `packages: ''`, so each run pulled the
   obsolete `tools` package and with it the Android Emulator — the large flaky download that once
-  failed CI with `Error on ZipFile unknown archive` — for jobs that never start one. Both also ran
-  the full test set while caching only `~/.gradle`, re-fetching Robolectric's android-all jars from
-  Maven Central every run; `~/.robolectric` is now cached as in `build.yml`. Surfaced by the
+  failed CI with `Error on ZipFile unknown archive` — for jobs that never start one. Surfaced by the
   rolling-beans fork applying the same guard to a workflow of its own; the fix here is this tree's.
+  Neither workflow runs on a PR, so nothing exercises these edits before a real release.
 
 - 2026-09-18 — **`android:backupAgent` named a class that does not exist; fix cherry-picked from a
   fork.** The manifest said `.backup.SettingsBackupAgent` while the agent lives at
-  `.app.backup.SettingsBackupAgent` — a namespace-relative name AGP does not validate, so it fails
-  only on a real restore, taking `onRestoreFinished()` and with it the sanitizer half of the backup
-  control in `SECURITY_REVIEW.md`. Carried over as `rolling-beans`' own commit (address swapped for
-  their forge alias, the only change `AUTHOR_EMAIL_ALLOW` left available). No regression test: the
-  owner declined one, so nothing stops the typo returning.
+  `.app.backup.SettingsBackupAgent` — a namespace-relative name AGP does not validate, shipped from
+  1.8.2/vc20 through v1.9.2. The framework loads the declared agent by name for backup as well as
+  restore, so the probable blast radius is the whole backup path on those four releases, not just
+  `onRestoreFinished()` and the sanitizer half of the `SECURITY_REVIEW.md` control; unconfirmed,
+  and the Owner queue carries the device question. Carried over as `rolling-beans`' own commit
+  (address swapped for their forge alias, the only change `AUTHOR_EMAIL_ALLOW` left available).
+  Lesson in DC-052.
 
 - 2026-09-13 — **Real-device E2E suite planned (S0).** Owner-approved plan for an adb +
   uiautomator2 suite over `DEVICE_TEST_SCRIPT.md`, mobile-use as offline triage, Artemis rejected;
