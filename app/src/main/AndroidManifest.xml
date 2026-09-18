@@ -51,7 +51,7 @@
     <application
         android:name=".app.AabApplication"
         android:allowBackup="true"
-        android:backupAgent=".backup.SettingsBackupAgent"
+        android:backupAgent=".app.backup.SettingsBackupAgent"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="${appLabel}"
