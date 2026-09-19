@@ -2825,6 +2825,7 @@ the permanent registry — never compress or remove them.
   (D-048 policy, no code): **OxygenOS ignores `night_display_color_temperature`** (the tint is
   fixed regardless of the Kelvin value), so the temperature slider and the D-154 circadian
   tracking are visually inert on OnePlus devices; noted in DEVICE_TEST_SCRIPT §11 + README.
+  Corrected by DC-053.
 
 - D-156 [cited]: **A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
   (A0; plan `plans/a11y-diagnostics.md`, owner-approved 2026-07-06; opens 1.8.0/vc18).**

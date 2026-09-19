@@ -721,3 +721,21 @@
   because no device check has run. Every other relative name in that manifest resolves, checked by
   hand. The fix came from a fork (`rolling-beans`, cherry-picked); no test guards it, the owner
   having declined one, so the same typo can return silently.
+
+- DC-053: **OxygenOS does not *ignore* `night_display_color_temperature` — it does not OBSERVE
+  it; temperature is accepted only through `ColorDisplayManager` (re-tested 2026-09-19, owner's
+  OnePlus 13 / Android 16).** An external write lands and is acknowledged (`SettingsShellCmd:
+  putForUser(… key=night_display_color_temperature, value=3000)`, and `settings get` returns
+  3000), emits no `ColorDisplay*` log line at all, and leaves `dumpsys color_display` reporting
+  its own diverged `Color temp: 3730` — the service, not the key, drives the panel. The Settings
+  UI is stock AOSP (`NightDisplaySettings` + `NightDisplayIntensityPreferenceController`), so
+  only the observer wiring differs: a Tasker write applies while that screen is foregrounded and
+  does nothing otherwise, and write-then-bounce-activation fails because activation re-applies
+  service state rather than the key. This rules out every Tideo-side explanation — a circadian
+  ticker overwrite, a substituted default anchor, a suppressed `capabilityWrite` — since adb and
+  Tasker bypass Tideo entirely and still produce nothing. D-048's disposition is unchanged
+  (documented, not branched): `ColorDisplayManager` is `@SystemApi`, absent from the API 35
+  `android.jar`, and `cmd color_display` exposes no temperature setter, so no supported path
+  exists for a normal app or for shell. Reading the key still returns the true value until
+  something writes it externally, so a read-side "resolve device default from the device" fix
+  stays correct on this hardware; corrects the mechanism stated in D-155's closing note.
