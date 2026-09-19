@@ -1,12 +1,8 @@
 # STATE — project state & session memory
 
-> **Length guard (DA-004).** Thresholds are in `amh.conf`; the compression rules are
-> `docs/RUNBOOK.md` → **Working-memory compression**, and they bind whether or not you follow this
-> pointer. That section also says what may sit in `Current state` at all: what stays true of the
-> checked-out tree, never world-controlled status (merged, tagged, released, PR/CI, deployments,
-> remote branches, forge settings) as current truth. Point at a live probe, route an external
-> action to the Owner queue, or scope a past observation to when it was seen. The Changelog and
-> ledger pointers are historical storage and are exempt. Prose-only — no guard judges it.
+> **Length guard (DA-004).** Thresholds are in `amh.conf`; the compression rules, and the rule for
+> what may sit in `Current state` at all, are `docs/RUNBOOK.md` → **Working-memory compression**,
+> and they bind whether or not you follow this pointer. Prose-only — no guard judges it.
 
 ## Project
 
@@ -16,37 +12,29 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-<!-- Fresh-clone truth only: never world-controlled status (released, tagged, merged, CI,
-protection). Name the live ledger VOLUME, never its latest row id. Rules: docs/RUNBOOK.md ->
-Working-memory compression. -->
-
-Harness AMH 14.1.0 (DC-029), upstream manifest scripts immutable; live ledger `LEDGER_C.md`.
-Scripts and binding prose are both 14.1.0, so `AMH_PROSE_VERSION` equals `AMH_VERSION` and
-`doc-facts.sh` is quiet on the pair (DC-031, DC-036). 14.1.0's hand step, the adapter hook shell
-pin, is applied (DC-051).
+Harness AMH 14.1.0 (DC-029), upstream manifest scripts immutable; live ledger `LEDGER_C.md`;
+`AMH_PROSE_VERSION` equals `AMH_VERSION` so `doc-facts.sh` is quiet on the pair (DC-031, DC-036),
+and 14.1.0's one hand step, the adapter hook shell pin, is applied (DC-051).
 
 **Resuming cold?** Release standing is NOT recorded here — the session banner computes it live via
 `scripts/session-facts.sh` (DC-030), settled by hand with
-`git ls-remote --tags --refs origin 'refs/tags/v*'`. Nothing stops a later session re-caching a
-release number; that gap is unguarded.
+`git ls-remote --tags --refs origin 'refs/tags/v*'`; a later session re-caching a release number is
+unguarded.
 
-This branch carries Graph Metrics (DC-001), the LEDGER_C rollover, the executed #126/#127
-override-attribution work (DC-002…DC-028), the harness units DC-029…DC-036 and the runtime rot
-audit DC-042…DC-046. Device rounds on 1.10.0-debug vc24 are **all closed**, the owner having ruled
-no fix on the 0–4095 scale beneath the app-facing Settings API, which freezes the conversion path
-as built; readings are in the rows, the checks in `DEVICE_TEST_SCRIPT.md` §2, and a later build
-owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083). No round script is alive (RUNBOOK §6,
-DB-010), the force-stop investigation stays closed (DB-051…DB-060), and Scorecard.dev is a
-run-once local input, not a score or CI gate.
+This branch carries Graph Metrics (DC-001), the `LEDGER_C` rollover, the executed #126/#127
+override-attribution work (DC-002…DC-028), the harness units (DC-029…DC-036), the runtime rot
+audit (DC-042…DC-046) and the OxygenOS night-light mechanism rows (DC-053, DC-054). Device rounds
+on 1.10.0-debug vc24 are **all closed** — the owner ruled no fix on the 0–4095 scale beneath the
+app-facing Settings API, freezing the conversion path as built, and a later build owes its own run
+(DC-011…DC-013, DC-025…DC-028, DB-083; checks in `DEVICE_TEST_SCRIPT.md` §2). No round script is
+alive (RUNBOOK §6, DB-010), the force-stop investigation stays closed (DB-051…DB-060), and
+Scorecard.dev is a run-once local input.
 
 ## Active work
 
 **Real-device E2E suite** — plan `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13,
-Sol- and Astra-reviewed). No device mutation before S4's recovery contract is Sol-reviewed.
-
-- [x] S0 plan · [ ] S1 decision + scaffolding · [ ] S2 command/UI boundary · [ ] S3 effects,
-  journal, recovery · [ ] S4 hook + scenarios · [ ] S5 read-only preflight · [ ] S6 install + smoke
-  · [ ] S7 suites by effect order · [ ] S8 triage extra · [ ] S9 close-out (delete the plan)
+Sol- and Astra-reviewed). No device mutation before S4's recovery contract is Sol-reviewed. S0
+(the plan) is done; S1–S9 are open and named in the plan, which S9 deletes.
 
 ## Owner queue
 
@@ -68,68 +56,57 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
    not grown, not that it is gone.
 
-2. **[2026-09-18] Tag v1.10.1 when you are ready — the bump is done, tagging is yours.**
-   `app/build.gradle.kts` now says 1.10.1 / vc25 and `changelogs/25.txt` exists; RUNBOOK §6 keeps
-   tagging and publishing with you. Before tagging, §6 wants a green `fdroid-compat.yml` on the
-   release commit (Actions → F-Droid compatibility → Run workflow if none has run), and it carries a
-   one-shot DA-026 check owed by the first release after the AGP 8.13.2 bump. Settles it:
+2. **[2026-09-18] Tag v1.10.1 when you are ready — the bump is done, tagging is yours.** Before
+   tagging, RUNBOOK §6 wants a green `fdroid-compat.yml` on the release commit (Actions → F-Droid
+   compatibility → Run workflow if none has run) and carries a one-shot DA-026 check owed by the
+   first release after the AGP 8.13.2 bump. Settles it:
    `git ls-remote --tags --refs origin 'refs/tags/v1.10.1'` — a hit means it is done and this item
    can go.
 
-Open questions: none.
+Open questions:
 
-**Decided (owner).** The override-attribution train shipped as a **minor**, `1.10.0` / vc24
-(2026-08-30), and is tagged. The tree now sits at `1.10.1` / vc25, a **patch** (2026-09-18,
-owner-authorised bump) opened by the backup fix.
+- **[2026-09-19] Should Tideo set Night Light temperature through `ColorDisplayManager` instead of
+  the secure setting?** It would fix OxygenOS, where the service ignores the key (DC-053), and shell
+  holds the permission the call needs (DC-054). Against: `CONTROL_DISPLAY_COLOR_TRANSFORMS` is not
+  `pm grant`-able, so unlike today's one-time grant it needs Shizuku bound at runtime, every tick;
+  it is a hidden signature that can move between releases, and root and shell may differ. Options:
+  (a) leave D-048 as is, (b) prove it with an `app_process` spike first, (c) adopt it as the primary
+  path with the settings write as fallback. Recommendation: (b) — it is a throwaway script and
+  decides whether (c) is even real.
 
-**This train is expected to stay patch-level, and vc25 is its ONE bump (owner, 2026-09-18).** The
-train's real subject is the real-device E2E suite below; the E2E work is test tooling and ships
-nothing, so it moves no version field on its own, and bugs it surfaces are expected to be patch
-fixes. So a later session lands those fixes by appending a line to `changelogs/25.txt` — it does
-NOT bump again per fix and does NOT create `26.txt`. Re-open the question only if something
-surfaced is genuinely minor (a new user-facing capability) or major (breaking), per RUNBOOK §6's
-"pick the highest that applies"; then say so rather than bumping quietly.
+**This train stays patch-level, and vc25 is its ONE bump (owner, 2026-09-18).** The
+override-attribution train shipped as a **minor**, `1.10.0` / vc24 (2026-08-30); the tree now sits
+at `1.10.1` / vc25, a **patch** opened by the backup fix. The train's real subject is the E2E suite
+above, which is test tooling and ships nothing, so it moves no version field and its bugs are
+expected to be patch fixes: land them by appending to `changelogs/25.txt`, NOT by bumping again per
+fix and NOT by creating `26.txt`. Re-open only if something surfaced is genuinely minor (a new
+user-facing capability) or major (breaking), per RUNBOOK §6's "pick the highest that applies", and
+say so rather than bumping quietly.
 
 ## Decided non-items
 
-- **The pre-fix backup blast radius will not be measured (owner, 2026-09-18; DC-052).** Whether
-  v1.8.2…v1.9.2 backed up nothing at all, or backed up and only skipped the restore-side sanitizer,
-  needs `bmgr` work on the owner's device; the owner declines it, having lost app data to a command
-  of that family before. Sits with DB-013, the already-declined destructive `bmgr restore` check.
-  The fix itself is verified statically — the class the manifest names now exists — and the
-  changelog wording holds under either reading. Do not re-raise it or propose a `bmgr` command.
-- **No regression test guards `android:backupAgent` (owner, 2026-09-18; DC-052).** A test asserting
-  the manifest attribute resolves to a real class was written, then dropped on the owner's call
-  ("YAGNI"). Nothing else reads that attribute, and neither AGP nor lint validates it, so the same
-  typo can return silently. A decision, not an oversight — do not re-add it unasked.
-- **The `stop()`/`emergencyStop()` join asymmetry stays as it is (owner, 2026-09-07; DC-047).**
-  Ordinary teardown cancels the consumer without joining and then undoes its effects, so a late
-  write can survive the cleanup; `onDestroy()` cannot suspend and the alternatives were declined.
-  Read DC-047 before "fixing" it — a decision, not an oversight.
-- **Issues #123, #126 and #127 get no reply, and no issue gets one unasked** (owner, 2026-08-24 for
-  #123, re-confirmed 2026-09-07; DB-082). Nothing was posted. Standing rule, not a pending item.
-- **Three device checks will never be executed (owner, 2026-09-07).** The Android 12/12L Wi-Fi fix
-  (DB-074, §8 24), the unrecognised-colour-mode button (§11 32c, DB-071, DB-078) and Night Light /
-  always-on failing safely (DB-041…DB-043) each need hardware the owner does not have. Unverified
-  by construction, not pending: do not re-raise them, and do not synthesise a fake value to force
-  one (DB-071).
-- **Graph Metrics is owner-tested and works (owner, 2026-09-07); its automated wiring tests are
-  declined.** Nothing covers `ChartCanvas` calling the sink, the null sink below level 7, or the
-  dedupe suppressing a repeat draw — `ChartCanvasTest` covers `graphSignature`'s maths only, and
-  the device testing is the accepted evidence (DC-001).
-- **The x86_64-JDK-on-ARM rule is a local host concern, not tracked here (owner, 2026-09-07).** It
-  belongs to whichever machine runs the ladder; `.orch/LOCAL_LADDER.md` carries both hosts, DC-033
-  keeps the measurement and the reasoning error, and the banner reports the JDK it finds.
-- Repo/process declines: root changelog, speculative dependency bumps, standalone drift audit,
-  Gradle dependency verification, wider session-branch CI, the D-162/DA-021 triage sets (DB-038).
-- Still declined: the superseded Privileged Display schedule and a persisted seed without real
-  reports (D-150–152), a grayscale quick action, refresh-rate/OEM keys, manual Extra Dim, panic
-  re-firing after teardown, §11.39a C1/C2 as wontfix, the destructive `bmgr restore` re-verification
-  (DB-013), and migrating the test-only `ContextsContent` wrapper; the rest of that triage is in
-  `docs/plans/REVIEW_TRIAGE_1.9.0.md` (`WAIT-MINOR-003`).
-- **Never synthesise unsupported display values on a device** (DB-071); use a real settings UI.
-  DB-077 is exempt because mask 7 was written by Tideo v1.9.0 and §11 32a is device-verified.
-- Rejected by the #126/#127 plan, not to be reintroduced: keying wake behaviour on
+- **Both backup-fix questions are closed (owner, 2026-09-18; DC-052)** — the pre-fix blast radius
+  will not be measured, needing `bmgr` work the owner declines, and no regression test guards
+  `android:backupAgent`, one having been dropped as YAGNI; propose neither.
+- **The `stop()`/`emergencyStop()` join asymmetry stays** (owner, 2026-09-07; DC-047).
+- **Issues #123, #126 and #127 get no reply, and no issue gets one unasked** (owner, 2026-08-24,
+  re-confirmed 2026-09-07; DB-082) — a standing rule, and nothing was posted.
+- **Three device checks will never be executed (owner, 2026-09-07)** — the Android 12/12L Wi-Fi fix
+  (DB-074), the unrecognised-colour-mode button (DB-071, DB-078) and Night Light / always-on failing
+  safely (DB-041…DB-043) all need hardware the owner lacks.
+- **Graph Metrics is owner-tested; its automated wiring tests are declined** (owner, 2026-09-07;
+  DC-001).
+- **The x86_64-JDK-on-ARM rule is a local host concern** (owner, 2026-09-07; DC-033,
+  `.orch/LOCAL_LADDER.md`).
+- Still declined: root changelog, speculative dependency bumps, standalone drift audit, Gradle
+  dependency verification, wider session-branch CI, the D-162/DA-021 triage sets (DB-038), the
+  superseded Privileged Display schedule and a persisted seed without real reports (D-150–152), a
+  grayscale quick action, refresh-rate/OEM keys, manual Extra Dim, panic re-firing after teardown,
+  §11.39a C1/C2 as wontfix, the destructive `bmgr restore` re-verification (DB-013), and migrating
+  the test-only `ContextsContent` wrapper; the rest is in `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
+- **Never synthesise unsupported display values on a device** (DB-071) — use a real settings UI;
+  DB-077 is exempt, mask 7 having been written by Tideo v1.9.0.
+- Rejected by the #126/#127 plan and not to be reintroduced: keying wake behaviour on
   `ACTION_USER_PRESENT`/unlock (owner, 2026-08-30), a larger fixed or blanket settle window, wake
   baseline adoption, a recent-write token set (D-034/D-051(d)), and auto-learning the device
   maximum.
@@ -138,68 +115,23 @@ surfaced is genuinely minor (a new user-facing capability) or major (breaking), 
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-09-18 — **Bumped to 1.10.1 / vc25 with `changelogs/25.txt`.** A patch opened by the backup
-  fix, bumped on the owner's say-so because vc24 is the shipped v1.10.0 and a released changelog must
-  not claim a fix it does not carry. It is this train's only bump: later fixes append to `25.txt`
-  (see Decided). Tagging stays the owner's (RUNBOOK §6), and the device question will not be
-  answered — the owner declines `bmgr` work on their hardware, so the pre-fix blast radius stays
-  unknown and the changelog line is worded to hold either way.
-
-- 2026-09-18 — **The Robolectric cache path was wrong in every workflow that had one, `build.yml`
-  included.** `~/.robolectric` caches nothing: Robolectric resolves the android-all jars through its
-  own Maven resolver into `~/.m2`, so all three workflows reported a cache hit while re-downloading
-  ~340 MB per run. Now `~/.m2/repository/org/robolectric`, proved in this container by putting the
-  jars there by hand and watching the failing tests pass. `3cb62a7`'s body and the changelog line it
-  landed with both asserted the `~/.robolectric` fix worked; that claim was wrong when written and
-  this entry supersedes it. Note the three workflows still share one cache key, so whichever runs
-  first decides what is stored.
-
-- 2026-09-18 — **The two release workflows now set up their runner the way `build.yml` does.**
-  `release-signing.yml` and `release.yml` alone omitted `packages: ''`, so each run pulled the
-  obsolete `tools` package and with it the Android Emulator — the large flaky download that once
-  failed CI with `Error on ZipFile unknown archive` — for jobs that never start one. Surfaced by the
-  rolling-beans fork applying the same guard to a workflow of its own; the fix here is this tree's.
-  Neither workflow runs on a PR, so nothing exercises these edits before a real release.
-
-- 2026-09-18 — **`android:backupAgent` named a class that does not exist; fix cherry-picked from a
-  fork.** The manifest said `.backup.SettingsBackupAgent` while the agent lives at
-  `.app.backup.SettingsBackupAgent` — a namespace-relative name AGP does not validate, shipped from
-  1.8.2/vc20 through v1.9.2. The framework loads the declared agent by name for backup as well as
-  restore, so the probable blast radius is the whole backup path on those four releases, not just
-  `onRestoreFinished()` and the sanitizer half of the `SECURITY_REVIEW.md` control; unconfirmed,
-  and the Owner queue carries the device question. Carried over as `rolling-beans`' own commit
-  (address swapped for their forge alias, the only change `AUTHOR_EMAIL_ALLOW` left available).
-  Lesson in DC-052.
-
-- 2026-09-13 — **Real-device E2E suite planned (S0).** Owner-approved plan for an adb +
-  uiautomator2 suite over `DEVICE_TEST_SCRIPT.md`, mobile-use as offline triage, Artemis rejected;
-  a gpt-6-astra second pass added identity-bound conflict-aware recovery, an effect inventory and a
-  UI allowlist. No code yet.
-
-- 2026-09-10 — **AMH 14.0.0 -> 14.1.0.** One MINOR step; no shipped script changed behaviour and
-  the release declares no new `amh.conf` key. Its one hand step, the Claude adapter hook shell pin,
-  was applied by the owner after the agent was refused the edit, and is unguarded either way
-  (DC-050, DC-051).
-- 2026-09-07 — **PR #129: the monthly grouped github-actions bump, checked by hand.** Every bumped
-  tag was resolved to its pin against the forge, the one layer `action-pins.sh` cannot reach, and
-  the `setup-java` major proved inert here; the stale `@v5` policy blocks and the RUNBOOK
-  CI-triage example were repaired, that rule-file edit earning a CLEAN DA-005 review.
-- 2026-09-07 — **The runtime rot audit, its device confirmation, and the queue clear-out
-  (DC-042…DC-049).** A fresh-context reviewer over eight named runtime files found override
-  detection armed across hibernate, a redundant D-163 gate, an admission gate publishing before it
-  booked, and two dead members; DC-042 was then reproduced on the 1.9.2 release and confirmed fixed
-  on 1.10.0-debug, landing as check 10e with the old build as its control. Both open questions
-  closed — the teardown join asymmetry accepted (DC-047), the hardware-misnaming rename taken and
-  proved behaviour-neutral (DC-048) — and four queue items became decided non-items.
-- 2026-09-06 — **PR #128's fresh-context review and its four fixes (DC-037…DC-041).** The
-  settle-window gate moved after the suspending settings read, `OverrideDiagnostic` gained
-  `modeRecovered`, the Brightness Writes card renders the EVENT's write, and the i18n ratchet gained
-  a wrapper-composable check with 29 labels frozen.
-- 2026-09-02..04 — **The harness train AMH 9.1.0 -> 14.0.0 (DC-029…DC-036).** Scripts and manifest
-  copied, with `AMH_PROSE_VERSION` and a `doc-facts.sh` warn/fail tier carrying the
-  scripts-ahead-of-prose split until the owed seed prose closed it.
+- 2026-09-19 — **OxygenOS night-light mechanism pinned, and the shell route found open**
+  (DC-053, DC-054). `ColorDisplayService` does not observe `night_display_color_temperature` there,
+  so Tideo's writes land in the settings table while the service's state diverges; shell does hold
+  `CONTROL_DISPLAY_COLOR_TRANSFORMS`, so a Shizuku-proxied `ColorDisplayManager` call is a live but
+  unimplemented route — see the Owner queue.
+- 2026-09-18 — **The backup-agent fix, the bump to 1.10.1 / vc25, and two CI corrections.**
+  `android:backupAgent` had named a class that does not exist since 1.8.2/vc20, fixed from the
+  `rolling-beans` fork (DC-052), opening this train's one bump with `changelogs/25.txt`. The
+  Robolectric cache path was also wrong in every workflow — the resolver writes `~/.m2`, not
+  `~/.robolectric`, so all three reported a hit while re-downloading ~340 MB, and they still share
+  one key — and the two release workflows now drop the obsolete `tools` package as `build.yml`
+  does, neither running on a PR.
+- 2026-09-13 — **Real-device E2E suite planned (S0)** — see Active work.
+- 2026-09-10 — **AMH 14.0.0 → 14.1.0**, whose only hand step the owner applied (DC-050, DC-051).
+- 2026-09-07 — **PR #129's hand-checked actions bump; the runtime rot audit, its device
+  confirmation and the queue clear-out (DC-042…DC-049).**
+- 2026-09-02..06 — **The harness train AMH 9.1.0 → 14.0.0 (DC-029…DC-036), and PR #128's
+  fresh-context review with its four fixes (DC-037…DC-041).**
 - 2026-06-23..08-31 — **v1.0.0 → v1.9.2 shipped, then the #126/#127 override-attribution train
-  executed and read on a device (D-096…DC-028).** `write()` became a transaction reporting what
-  Android STORED, feeding both detectors, the baseline and the animation band; the commit guard
-  gained a ±1 domain deadband and a `MIN_SETTLE_MS` floor; Live Debug gained the Brightness Writes
-  card that §2 10b–10d read from.
+  executed and read on a device (D-096…DC-028).**

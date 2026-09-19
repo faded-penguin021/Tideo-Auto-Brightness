@@ -739,3 +739,22 @@
   exists for a normal app or for shell. Reading the key still returns the true value until
   something writes it externally, so a read-side "resolve device default from the device" fix
   stays correct on this hardware; corrects the mechanism stated in D-155's closing note.
+  Corrected by DC-054.
+
+- DC-054: **Shell holds `CONTROL_DISPLAY_COLOR_TRANSFORMS` (`granted=true`), so a Shizuku-proxied
+  reflection call to `ColorDisplayManager.setNightDisplayColorTemperature()` is a LIVE route on
+  OxygenOS — DC-053's "no supported path exists for a normal app or for shell" overstates the
+  closure (2026-09-19, owner's OnePlus 13).** That clause was inferred from `cmd color_display`
+  exposing no temperature setter, which proves only that no shell COMMAND exists and never that
+  shell lacks the permission; `pm dump com.android.shell` settles it, and since Shizuku runs at
+  shell UID the `@SystemApi` absence from the API 35 `android.jar` is a compile-time obstacle that
+  reflection passes. The manager is the very path DC-053 showed the Settings UI uses and the panel
+  honours, so this would genuinely fix the variance rather than mask its symptom. Unproven
+  end-to-end: a permission grant is not a successful call, and this is a modified service whose
+  observer wiring already departs from AOSP, so an `app_process` reflection spike at shell UID
+  would settle it without touching Tideo. Nothing is implemented and D-048's disposition still
+  stands — what changed is its PREMISE, since "documented, not branched" rested on nothing being
+  possible, while the costs are unchanged: a vendor-conditional branch, a hidden signature that can
+  shift between releases with no compile-time warning, tier-dependent behaviour (root passes checks
+  shell may not), and a call outside `SecureDisplayController`'s documented-settings discipline.
+  Corrects DC-053.
