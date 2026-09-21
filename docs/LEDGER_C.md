@@ -758,3 +758,17 @@
   shift between releases with no compile-time warning, tier-dependent behaviour (root passes checks
   shell may not), and a call outside `SecureDisplayController`'s documented-settings discipline.
   Corrects DC-053.
+
+- DC-055 [cited]: **"Device default" is a policy, not a value, and the read-back was converting one
+  into the other (2026-09-21; AAB issue 15).** `withDeviceSnapshot` guarded the temperature
+  read-back only while `nightLightCircadianEnabled`, so the instant circadian went off the guard
+  opened and the next read-back copied `snapshot.temperatureK` — whatever Kelvin the D-154 ramp had
+  last written — into a `nightLightTemperature` the user had deliberately left null; re-enabling
+  circadian then took that sample as the night anchor, and each off/on cycle ratcheted it toward
+  the 4082 K day endpoint. A null setpoint now never adopts a device number, which is the honest
+  reading of the null contract the rest of the app already keeps — D-151's "no temperature opinion,
+  leave the device's persistent preference alone", `DisplayTogglesViewModel` writing nothing for
+  null, `SettingsDisplay` rendering it "device default" — so a Kelvin changed in Android Settings
+  deliberately no longer reaches the draft while the profile delegates. The reporter root-caused
+  this themselves; it is milder than it reads, since `readBackDraft` reaches only the DRAFT and the
+  capture persists only once the user presses Apply.

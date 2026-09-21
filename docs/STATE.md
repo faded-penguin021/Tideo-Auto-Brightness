@@ -85,6 +85,11 @@ say so rather than bumping quietly.
 
 ## Decided non-items
 
+- **No migration resets an already-snowballed `nightLightTemperature` (owner, 2026-09-21;
+  DC-055).** A stored Kelvin cannot be told apart from a setpoint the user genuinely chose, so a
+  blanket reset to null would discard real choices while missing contaminated profiles that
+  currently have circadian off. DC-055 stops the capture; an affected user clears it with the
+  screen's existing "device default" button. Do not propose a one-shot reset.
 - **Both backup-fix questions are closed (owner, 2026-09-18; DC-052)** — the pre-fix blast radius
   will not be measured, needing `bmgr` work the owner declines, and no regression test guards
   `android:backupAgent`, one having been dropped as YAGNI; propose neither.
@@ -114,6 +119,12 @@ say so rather than bumping quietly.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-21 — **The Night-Light snowball is closed (DC-055).** A null `nightLightTemperature`
+  ("device default") no longer adopts a device number on read-back, so the D-154 ramp's own last
+  sample can no longer be frozen into the profile and ratcheted toward 4082 K on each circadian
+  off/on cycle. Reported against v1.10.0 as the bug comment on AAB issue 15; `changelogs/25.txt`
+  carries the user-facing line.
 
 - 2026-09-19 — **OxygenOS night-light mechanism pinned, and the shell route found open**
   (DC-053, DC-054). `ColorDisplayService` does not observe `night_display_color_temperature` there,

@@ -21,14 +21,16 @@ data class DeviceDisplaySnapshot(
 )
 
 /**
- * DB-034: merge a device read-back into a draft. Two fields are deliberately not device-sourced —
- * `nightLightCircadianEnabled` has no Android counterpart, and while it is on the coordinator's
- * ticker owns the temperature key, so reading it would freeze one ramp sample into a static value.
+ * DB-034: merge a device read-back into a draft. Three fields are never device-sourced:
+ * `nightLightCircadianEnabled` has no Android counterpart; the temperature key is the ticker's
+ * while circadian is on; and a null one delegates to the device rather than tracking it (DC-055).
  */
 fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings = copy(
     // DB-042: hidden, unsupported fields must not be erased by read-back.
     nightLightEnabled = snapshot.nightLight ?: nightLightEnabled,
-    nightLightTemperature = if (snapshot.nightLight == null || nightLightCircadianEnabled) {
+    nightLightTemperature = if (
+        nightLightTemperature == null || snapshot.nightLight == null || nightLightCircadianEnabled
+    ) {
         nightLightTemperature
     } else {
         snapshot.temperatureK
