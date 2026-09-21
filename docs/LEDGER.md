@@ -2807,6 +2807,7 @@ the permanent registry — never compress or remove them.
   first differing swap — the seed still adopts without writing. `applyNow` (service off) stays
   static-only: tracking is a runtime feature (stated in the help text). Folds into the
   unreleased 1.7.0/vc17 (`17.txt` +1 line); DEVICE_TEST_SCRIPT §11 step 38.
+  Corrected by DC-056.
 
 - D-155 [cited]: **Panic (Reset) also returns the privileged display toggles to their DEFAULTS (owner
   on-device finding on the 1.7.0 branch build: panic persisted the privileged keys).** The
@@ -2826,6 +2827,7 @@ the permanent registry — never compress or remove them.
   fixed regardless of the Kelvin value), so the temperature slider and the D-154 circadian
   tracking are visually inert on OnePlus devices; noted in DEVICE_TEST_SCRIPT §11 + README.
   Corrected by DC-053.
+  Corrected by DC-056 on the temperature clause.
 
 - D-156 [cited]: **A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
   (A0; plan `plans/a11y-diagnostics.md`, owner-approved 2026-07-06; opens 1.8.0/vc18).**

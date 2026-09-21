@@ -30,6 +30,8 @@ class DisplayTogglesCoordinatorTest {
         // SecureDisplayControllerTest; this fake only stands in for it.
         val attempts = mutableListOf<String>()
         var stayAwake: Boolean? = false
+        var deviceTemp: Int? = null
+        var failTemperatureWrites = false
         private fun write(entry: String): Result<Unit> {
             writes += entry
             return Result.success(Unit)
@@ -42,8 +44,14 @@ class DisplayTogglesCoordinatorTest {
 
         override fun readNightLight() = false
         override fun setNightLight(on: Boolean) = gated("nightLight=$on", nightLightAvailable)
-        override fun readNightLightTemperature(): Int? = null
-        override fun setNightLightTemperature(kelvin: Int) = gated("temp=$kelvin", nightLightAvailable)
+        override fun readNightLightTemperature(): Int? = deviceTemp
+        override fun setNightLightTemperature(kelvin: Int): Result<Unit> {
+            if (failTemperatureWrites) {
+                attempts += "temp=$kelvin"
+                return Result.failure(SecurityException("refused"))
+            }
+            return gated("temp=$kelvin", nightLightAvailable)
+        }
         override fun readNightLightAutoMode() = NightLightAutoMode.MANUAL
         override fun readDaltonizer() = DaltonizerMode.OFF
         override fun setDaltonizer(mode: DaltonizerMode) = write("daltonizer=$mode")
@@ -78,6 +86,8 @@ class DisplayTogglesCoordinatorTest {
         var tier = tier
         // D-154: ramp Kelvin the fake "sun" yields; null = not computable
         var rampKelvin: Int? = null
+        var anchorGiven: Int? = null
+        var storedAnchor: Int? = null
         val baselineFlow = MutableStateFlow(baseline)
         val effectiveFlow = MutableStateFlow<AabSettings?>(null)
         val coordinator = DisplayTogglesCoordinator(
@@ -85,7 +95,12 @@ class DisplayTogglesCoordinatorTest {
             baselineFlow = baselineFlow,
             display = display,
             tierProvider = { this.tier },
-            circadianTemperature = { this.rampKelvin },
+            circadianTemperature = { _, nightKelvin ->
+                anchorGiven = nightKelvin
+                this.rampKelvin
+            },
+            readAnchor = { this.storedAnchor },
+            writeAnchor = { this.storedAnchor = it },
             tickIntervalMs = tickIntervalMs,
         )
     }
@@ -378,17 +393,214 @@ class DisplayTogglesCoordinatorTest {
     }
 
     @Test
-    fun leavingCircadian_forANoOpinionProfile_leavesTheTemperatureAlone_D154() = runTest(UnconfinedTestDispatcher()) {
+    fun leavingCircadian_forANoOpinionProfile_putsTheDevicesOwnKelvinBack_DC056() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness()
+        h.display.deviceTemp = 1_500 // what the user had set before Tideo touched the key
         h.rampKelvin = 3_400
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = circadianProfile
         runCurrent()
         h.display.writes.clear()
-        // Baseline null temp = "no opinion"; never writes, last ramp value persists
         h.effectiveFlow.value = baseline
         runCurrent()
-        assertEquals(listOf("nightLight=false"), h.display.writes)
+        assertEquals(listOf("nightLight=false", "temp=1500"), h.display.writes)
+        assertEquals(null, h.storedAnchor, "releasing the key must clear the persisted anchor")
+    }
+
+
+    private val deviceDefaultProfile = circadianProfile.copy(nightLightTemperature = null)
+
+    @Test
+    fun aNullSetpoint_anchorsTheRampToTheDevicesOwnKelvin_notAConstant_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        assertEquals(1_500, h.anchorGiven)
+        assertEquals(1_500, h.storedAnchor, "taking the key over must record what it displaced")
+    }
+
+    @Test
+    fun anExplicitSetpoint_stillAnchorsTheRamp_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile // setpoint 2700
+        runCurrent()
+        assertEquals(2_700, h.anchorGiven, "an explicit setpoint outranks the device")
+    }
+
+    @Test
+    fun aGenuinelyUnsetKey_fallsBackToTheFrameworkDefault_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = null // the key has never been written on this device
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        assertEquals(SecureDisplayController.NIGHT_LIGHT_DEFAULT_K, h.anchorGiven)
+    }
+
+    @Test
+    fun aSurvivingAnchor_isReusedRatherThanResampledFromTheRamp_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.storedAnchor = 1_500
+        h.display.deviceTemp = 3_400
+        h.rampKelvin = 3_300
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        assertEquals(1_500, h.anchorGiven, "the anchor outlives the process that captured it")
+    }
+
+    @Test
+    fun repeatedCircadianCycles_doNotRatchetTheAnchor_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 4_000 // daytime: the ramp sits near the day endpoint
+        h.coordinator.start(backgroundScope)
+        repeat(3) {
+            h.effectiveFlow.value = deviceDefaultProfile
+            runCurrent()
+            h.effectiveFlow.value = deviceDefaultProfile.copy(nightLightCircadianEnabled = false)
+            runCurrent()
+        }
+        assertEquals(1_500, h.anchorGiven, "the anchor must not drift toward the day endpoint")
+    }
+
+    @Test
+    fun stop_handsTheKeyBack_evenWhenTheBaselineStillAsksForARamp_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(baseline = deviceDefaultProfile)
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        advanceTimeBy(61_000); runCurrent()
+        assertEquals(listOf("temp=3400"), h.display.writes)
+        h.display.writes.clear()
+        h.coordinator.stop()
+        assertEquals(listOf("temp=1500"), h.display.writes)
+        assertEquals(null, h.storedAnchor)
+    }
+
+    @Test
+    fun aSurvivingAnchor_isRestored_evenWhenTheProfileMatchesTheSeededAssumption_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(baseline = nightProfile)
+        h.storedAnchor = 1_500
+        h.display.deviceTemp = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        assertEquals(listOf("temp=2700"), h.display.writes)
+        assertEquals(null, h.storedAnchor)
+    }
+
+    @Test
+    fun aFailedRestore_keepsTheAnchorForTheNextAttempt_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        h.display.failTemperatureWrites = true
+        h.effectiveFlow.value = baseline
+        runCurrent()
+        assertEquals(1_500, h.storedAnchor, "a restore that did not land must not surrender the key")
+
+        h.display.failTemperatureWrites = false
+        h.display.writes.clear()
+        h.effectiveFlow.value = baseline.copy(inversionEnabled = true)
+        runCurrent()
+        assertTrue(h.display.writes.contains("temp=1500"), "the retry must land: ${h.display.writes}")
+        assertEquals(null, h.storedAnchor)
+    }
+
+    @Test
+    fun panic_putsTheDisplacedKelvinBack_DC056_revisingD155() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        h.display.writes.clear()
+        h.coordinator.panicReset()
+        assertEquals("temp=1500", h.display.writes.getOrNull(1))
+        assertEquals("nightLight=false", h.display.writes.getOrNull(0))
+        assertEquals(null, h.storedAnchor, "panic must not strand the anchor")
+    }
+
+    @Test
+    fun aFailedRestore_doesNotLetTheStaticWriteFakeTheHandover_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        h.display.failTemperatureWrites = true
+        h.display.writes.clear()
+        h.effectiveFlow.value = nightProfile // static 2700: the fall-through would write it
+        runCurrent()
+        assertTrue(
+            h.display.writes.none { it.startsWith("temp=") },
+            "a second attempt must not stand in for the restore: ${h.display.writes}",
+        )
+        assertEquals(1_500, h.storedAnchor, "the key is still ours until the restore lands")
+    }
+
+    @Test
+    fun leavingCircadian_forANightLightBeingSwitchedOn_restoresBeforeEnabling_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile.copy(nightLightEnabled = false)
+        runCurrent()
+        advanceTimeBy(61_000); runCurrent() // the ticker takes the key over
+        h.display.writes.clear()
+        h.effectiveFlow.value = baseline.copy(nightLightEnabled = true)
+        runCurrent()
+        assertEquals(
+            listOf("temp=1500", "nightLight=true"),
+            h.display.writes,
+            "enabling first would show the ramp sample before the restore landed",
+        )
+    }
+
+    @Test
+    fun anUnwritableKey_isNotTreatedAsRestored_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        h.display.nightLightAvailable = false // a capability or ROM change under us
+        h.effectiveFlow.value = baseline
+        runCurrent()
+        assertEquals(1_500, h.storedAnchor, "a successful no-op is not a restore")
+    }
+
+    @Test
+    fun belowElevated_releasingKeepsTheAnchorPending_DC056() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        h.tier = Tier.BASIC
+        h.display.writes.clear()
+        h.effectiveFlow.value = baseline
+        runCurrent()
+        assertTrue(h.display.writes.isEmpty(), "nothing is writable below ELEVATED: ${h.display.writes}")
+        assertEquals(1_500, h.storedAnchor, "an anchor that could not be restored must not be lost")
     }
 
     // --- D-155: panic resets the privileged display keys to DEFAULTS ---

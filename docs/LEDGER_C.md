@@ -772,3 +772,25 @@
   deliberately no longer reaches the draft while the profile delegates. The reporter root-caused
   this themselves; it is milder than it reads, since `readBackDraft` reaches only the DRAFT and the
   capture persists only once the user presses Apply.
+
+- DC-056 [cited]: **The circadian night anchor is the DEVICE's Kelvin, and owning the key is now
+  explicit state that outlives the process (2026-09-21; AAB issue 15).** `AppModule` resolved a
+  null `nightLightTemperature` to the constant `NIGHT_LIGHT_DEFAULT_K` (2850), so a user sitting
+  at 1500 K got a 2850 K night while `readNightLightTemperature()` went uncalled — null meant
+  "leave the device alone" everywhere except the one path that most needed to know what the device
+  held. The anchor is read once per ownership period and kept in its own `display_prefs` store, not
+  an `AabSettings` field, because it is a device fact while `AabSettings` is the per-profile record
+  that is exported, Tasker-serialised and context-merged; per-tick reads were never an option,
+  since after the first write the device returns the ramp's own sample and the anchor would walk.
+  `anchorK != null` IS that ownership, so release puts the displaced value back before surrendering
+  it — unconditionally, `deviceTempK` being an assumption at seed rather than a record of a write;
+  only once the write succeeds, with the static write suppressed while the key is still ours and an
+  unwritable key never mistaken for a restored one, since an anchor that could not be restored is
+  the one thing that must not be dropped; bracketing the enable flag on the side that cannot show
+  the stale sample; and, acquiring, persisted before the claim, so a cancellation between the two
+  loses the claim rather than the record. This revises two clauses whose premise moved: D-154's
+  null hand-off left the last ramp sample on the device, and D-155 wrote no temperature on panic —
+  both right while Tideo had no record of what it displaced, both now restoring it (owner decided
+  the panic half, 2026-09-21). Unverified by
+  construction: awaiting the store inside `stop()`'s `runBlocking` adds storage latency to
+  `onDestroy`, and no test pins that or a cancellation landing inside the clear.

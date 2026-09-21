@@ -36,6 +36,14 @@ Scorecard.dev is a run-once local input.
 Sol- and Astra-reviewed). No device mutation before S4's recovery contract is Sol-reviewed. S0
 (the plan) is done; S1–S9 are open and named in the plan, which S9 deletes.
 
+**Circadian + Night Light fix** — plan `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md` (owner fix spec,
+2026-09-21; Astra chose the anchor's home, Sol reviewed both units). The issue is
+`faded-penguin021/AdvancedAutoBrightness#15`, not a Tideo issue — a bare `#15` resolves wrongly.
+
+- [x] N1 F1+F2, the reported bug (DC-055, DC-056) · [ ] N2 F4, the hardcoded AOSP Kelvin bounds
+  · [ ] N3 F5, daytime activation — BLOCKED on device evidence, ship no guess · [ ] N4 close-out
+  (delete the plan). F3 needs no code and is not a segment.
+
 ## Owner queue
 
 > **Protected section (D-167).** Never delete it, and never silently drop items during compression
@@ -64,6 +72,20 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
    can go.
 
 Open questions:
+
+- **[2026-09-21] Should the reporter of AAB issue 15 get a reply, and may we ask them for two
+  outputs?** DB-082's standing rule is that no issue gets a reply unasked, so nothing has been
+  posted. A draft reply is in the Night Light plan: it answers their direct question (their reading
+  of "Device default" was right for the static path, wrong for the circadian one — that divergence
+  was the bug), confirms the two findings they root-caused, corrects their Scale Spread premise,
+  and tells them the feature they originally requested already exists (Circadian scaling OFF +
+  "Follow circadian scaling" ON). Two things only they can supply: the three
+  `cmd overlay lookup config_nightDisplayColorTemperature{Min,Max,Default}` values, which decide
+  whether their 686 K floor is a real resource value or a reading of the 0–100 % intensity slider
+  and so size F4's blast radius; and `settings get secure night_display_auto_mode`, which says
+  whether AOSP's own service is a third party in the F5 activation fight. Options: (a) stay silent
+  per DB-082, (b) reply and ask, (c) ask for the two outputs only. Recommendation: (b) — N3 is
+  blocked without their evidence, and they filed a correct, well-diagnosed report.
 
 - **[2026-09-19] Should Tideo set Night Light temperature through `ColorDisplayManager` instead of
   the secure setting?** It would fix OxygenOS, where the service ignores the key (DC-053), and shell
@@ -119,6 +141,12 @@ say so rather than bumping quietly.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-21 — **The circadian night anchor is the device's own Kelvin (DC-056).** A null
+  setpoint no longer resolves to the 2850 K constant; the device is read once when the ramp takes
+  the temperature key, kept in a `display_prefs` store across process death, and put back when the
+  ramp lets go — on a profile swap, on service stop and, by owner decision, on panic. Revises the
+  D-154 and D-155 clauses whose premise was that Tideo had no record of the displaced value.
 
 - 2026-09-21 — **The Night-Light snowball is closed (DC-055).** A null `nightLightTemperature`
   ("device default") no longer adopts a device number on read-back, so the D-154 ramp's own last

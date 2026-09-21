@@ -16,10 +16,12 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.settings.DataStoreContextBaselineStore
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
+import com.tideo.autobrightness.app.settings.NightLightAnchorStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
 import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.contextRulesDataStore
+import com.tideo.autobrightness.app.storage.displayPrefsDataStore
 import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -55,6 +57,7 @@ class AppModule(context: Context) {
     // Recorded override points (G2R-F13/F14).
     val overridePointStore: OverridePointStore = OverridePointStore(appContext.overridePointsDataStore)
     val userProfileStore: UserProfileStore = UserProfileStore(appContext.userProfilesDataStore)
+    val nightLightAnchorStore: NightLightAnchorStore = NightLightAnchorStore(appContext.displayPrefsDataStore)
 
     fun createRuntime(scope: CoroutineScope): RuntimeGraph {
         val brightness = AndroidScreenBrightnessController(appContext)
@@ -128,7 +131,7 @@ class AppModule(context: Context) {
             display = AndroidSecureDisplayController(appContext, privilegeManager),
             tierProvider = { privilegeManager.currentTier() },
             // D-154: circadian-ramp Kelvin with real solar windows or TimeContext defaults (F73).
-            circadianTemperature = { s ->
+            circadianTemperature = { s, nightKelvin ->
                 val nowSecOfDay = ((System.currentTimeMillis() / 1000L) % 86_400L).toDouble()
                 val w = circadianWindows.current(s.scaleTransitionFactor.toDouble())
                 val defaults = TimeContext(secondsOfDay = nowSecOfDay)
@@ -147,10 +150,13 @@ class AppModule(context: Context) {
                 ).modifier
                 NightLightTemperatureRamp.temperature(
                     modifier = modifier,
-                    nightKelvin = s.nightLightTemperature
-                        ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K,
+                    nightKelvin = nightKelvin,
                     dayKelvin = SecureDisplayController.NIGHT_LIGHT_MAX_K,
                 )
+            },
+            readAnchor = nightLightAnchorStore::read,
+            writeAnchor = { kelvin ->
+                if (kelvin != null) nightLightAnchorStore.write(kelvin) else nightLightAnchorStore.clear()
             },
         )
 
