@@ -17,6 +17,8 @@ Reported against v1.10.0. Reporter's environment: Pixel 8 Pro / GrapheneOS / And
 ## Segments
 
 - [x] **N1 — F1 + F2, the reported bug.** Shipped as DC-055 (read-back) and DC-056 (anchor).
+  JVM-verified only; the settings-row confirmation below is still **owed** and needs a debug build
+  installed on a device (the owner offered one, 2026-09-21; nothing was installed).
 - [ ] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.**
 - [ ] **N3 — F5: daytime activation.** BLOCKED on device evidence; do not ship a guess.
 - [ ] **N4 — close-out.** Delete this file once N2 and N3 are settled and the reply question
