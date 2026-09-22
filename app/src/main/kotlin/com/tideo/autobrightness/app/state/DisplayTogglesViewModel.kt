@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
+import com.tideo.autobrightness.app.runtime.NightLightTemperatureRoute
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
 import com.tideo.autobrightness.platform.display.DaltonizerMode
@@ -17,6 +18,7 @@ import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +41,7 @@ data class PrivilegedDisplayUiState(
     val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
     val grantMessage: String? = null,
     val writeFailed: Boolean = false,
+    val nightLightNeedsShizuku: Boolean = false,
 )
 
 /** DB-078: preserved fields whose control stays visible, so an overwrite has something to show. */
@@ -55,6 +58,9 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     private val display: SecureDisplayController =
         AndroidSecureDisplayController(application, privilegeManager),
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val temperatureRoute: NightLightTemperatureRoute =
+        AppModule(application).nightLightTemperatureRoute(display),
+    keyNotHonoured: Flow<Boolean> = AppModule(application).nightLightVerdictStore.notHonouredFlow,
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(
@@ -80,10 +86,21 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     private var deviceRequestGeneration = 0L
     private var deviceOperationTail: Job? = null
 
+    @Volatile private var keyIgnored = false
+
+    private fun PrivilegedDisplayUiState.withShizukuNeed() =
+        copy(nightLightNeedsShizuku = keyIgnored && shizukuAvailability != ShizukuAvailability.RUNNING)
+
     init {
         // Live tier: in-app Shizuku/root grant flips screen from grant card to toggles without leaving.
         viewModelScope.launch {
             privilegeManager.tierFlow().collect { tier -> _state.update { it.copy(tier = tier) } }
+        }
+        viewModelScope.launch {
+            keyNotHonoured.collect { ignored ->
+                keyIgnored = ignored
+                _state.update { it.withShizukuNeed() }
+            }
         }
         refresh()
     }
@@ -91,7 +108,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     /** Re-probe tier and device facts; clear lingering write-failure banner. */
     fun refresh() {
         privilegeManager.refresh()
-        _state.update { it.copy(shizukuAvailability = privilegeManager.shizukuAvailability()) }
+        _state.update { it.copy(shizukuAvailability = privilegeManager.shizukuAvailability()).withShizukuNeed() }
         scheduleDeviceOperation { generation ->
             deviceLock.withLock {
                 val snapshot = readSnapshotLocked()
@@ -162,7 +179,9 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                         add(display.setNightLight(settings.nightLightEnabled))
                     }
                     settings.nightLightTemperature?.let {
-                        if (device == null || device.temperatureK != it) add(display.setNightLightTemperature(it))
+                        if (device == null || device.temperatureK != it || keyIgnored) {
+                            add(temperatureRoute.write(it, probe = false))
+                        }
                     }
                     if (writeDaltonizer) add(display.setDaltonizer(daltonizerPick))
                     if (device == null || device.inversion != settings.inversionEnabled) {

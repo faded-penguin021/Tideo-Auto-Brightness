@@ -11,7 +11,7 @@ import rikka.shizuku.Shizuku
 import kotlin.concurrent.thread
 import kotlin.coroutines.resume
 
-/** Privileged operations via Shizuku (S12.7d, G2R-F41). Wi-Fi status or force-dark only; null on failure. */
+/** Privileged operations via Shizuku (S12.7d, G2R-F41). Wi-Fi status, force-dark or Night Light Kelvin only; null on failure. */
 object ShizukuShell {
     private const val BIND_TIMEOUT_MS = 4_000L
 
@@ -34,7 +34,15 @@ object ShizukuShell {
         it.setForceDark(enabled)
     }
 
-    private suspend fun call(context: Context, operation: (IShizukuUserService) -> String?): String? {
+    suspend fun readNightDisplayTemperature(context: Context): Int? = call(context) {
+        it.readNightDisplayTemperature().takeIf { kelvin -> kelvin > 0 }
+    }
+
+    suspend fun setNightDisplayTemperature(context: Context, kelvin: Int): Int? = call(context) {
+        it.setNightDisplayTemperature(kelvin).takeIf { result -> result > 0 }
+    }
+
+    private suspend fun <T : Any> call(context: Context, operation: (IShizukuUserService) -> T?): T? {
         if (!isUsable()) return null
         val appContext = context.applicationContext
         val args = Shizuku.UserServiceArgs(
@@ -42,7 +50,7 @@ object ShizukuShell {
         )
             .processNameSuffix("aab_shell")
             .debuggable(false)
-            .version(2)
+            .version(3)
 
         return withTimeoutOrNull(BIND_TIMEOUT_MS) {
             suspendCancellableCoroutine { cont ->

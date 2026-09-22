@@ -794,3 +794,22 @@
   the panic half, 2026-09-21). Unverified by
   construction: awaiting the store inside `stop()`'s `runBlocking` adds storage latency to
   `onDestroy`, and no test pins that or a cancellation landing inside the clear.
+
+- DC-057 [cited]: **Night Light Kelvin also goes through the `color_display` binder, but only on a
+  build observed to ignore `night_display_color_temperature` (owner, 2026-09-22, the refined option
+  (c) of the 2026-09-19 question; revises D-048's "documented, not branched").** Every write still
+  lands in the secure setting first; `NightLightTemperatureRoute` adds the service write only after
+  a passive probe — settle 750 ms after a Kelvin the app was writing anyway, check the key still
+  holds it, read `getNightDisplayColorTemperature()` — mismatches on two distinct Kelvins, a verdict
+  persisted with a probe version and `Build.FINGERPRINT`, while HONOURED stays in memory, drops back
+  to probing on any mismatch and is re-checked every 30 min (DC-053's open Settings screen makes the
+  key observed while it is open). The gate is behaviour, not brand; the call is reflection inside
+  the privileged process only — the Shizuku user service bound per operation, or root `app_process`
+  running `ColorDisplayCli`, one failed `su` disabling root for the process — chosen by gpt-6-astra
+  over a sentinel probe, a ramp-long binding and dropping root. On a NOT_HONOURED build an
+  unreachable service FAILS the write and makes the device Kelvin unreadable, so `deviceTempK`
+  advances only on a landed write, the DC-056 anchor is neither read from the stale key nor dropped
+  unrestored, teardown never probes and bounds root at 3 s, and the screen says Shizuku is needed
+  instead of showing an inert slider. Owner-confirmed on the OnePlus 13 (2026-09-22): Tideo now
+  moves the panel's Night Light temperature, and `app_process` `get` at shell UID returns the
+  service's Kelvin; a false NOT_HONOURED costs only a redundant, harmless service write.

@@ -143,8 +143,11 @@ The app has two privilege tiers:
   root. It adds super dimming and the Privileged Display toggles. After the grant, secure writes go
   directly through `Settings.Secure` or `Settings.Global`; they do not use a binder.
 
-Shizuku is also an optional runtime dependency in exactly two places: the Wi-Fi SSID strategy that
-does not require Location, and the force-dark toggle. It is not only a grant mechanism. The count
+Shizuku is also an optional runtime dependency in exactly three places: the Wi-Fi SSID strategy that
+does not require Location, the force-dark toggle, and the Night Light temperature fallback for a
+build whose display service does not observe the Kelvin key (DC-057) — the one secure-settings
+write that can also go through a binder, and only after that build has been observed ignoring the
+key. It is not only a grant mechanism. The count
 is anchored in `scripts/guards/doc-facts.sh`; if it changes, update both the claim and the constant.
 
 ## Conventions

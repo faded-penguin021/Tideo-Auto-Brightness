@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
+import com.tideo.autobrightness.app.runtime.NightLightTemperatureRoute
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
@@ -14,6 +15,7 @@ import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -61,15 +63,18 @@ class DisplayTogglesViewModelTest {
         io: CoroutineDispatcher = dispatcher,
     ): DisplayTogglesViewModel {
         val privileges = AndroidPrivilegeManager(app)
+        val display = AndroidSecureDisplayController(
+            app, privileges,
+            nightLightAvailable = nightLightAvailable,
+            alwaysOnDisplayAvailable = alwaysOnDisplayAvailable,
+        )
         return DisplayTogglesViewModel(
             app,
             privilegeManager = privileges,
-            display = AndroidSecureDisplayController(
-                app, privileges,
-                nightLightAvailable = nightLightAvailable,
-                alwaysOnDisplayAvailable = alwaysOnDisplayAvailable,
-            ),
+            display = display,
             io = io,
+            temperatureRoute = NightLightTemperatureRoute(display),
+            keyNotHonoured = flowOf(false),
         )
     }
 

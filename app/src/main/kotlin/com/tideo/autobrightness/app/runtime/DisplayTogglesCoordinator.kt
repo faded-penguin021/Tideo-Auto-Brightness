@@ -36,6 +36,7 @@ class DisplayTogglesCoordinator(
     private val readAnchor: suspend () -> Int? = { null },
     private val writeAnchor: suspend (Int?) -> Unit = {},
     private val tickIntervalMs: Long = 60_000L,
+    private val temperatureRoute: NightLightTemperatureRoute = NightLightTemperatureRoute(display),
 ) {
     private val applyMutex = Mutex()
 
@@ -96,7 +97,7 @@ class DisplayTogglesCoordinator(
         job?.cancel(); job = null
         runBlocking {
             applyMutex.withLock {
-                resting?.let { applyLocked(DisplayToggleState.of(it), it) }
+                resting?.let { applyLocked(DisplayToggleState.of(it), it, probe = false) }
                 releaseAnchorLocked(resting)
             }
         }
@@ -125,9 +126,10 @@ class DisplayTogglesCoordinator(
         }
     }
 
-    private suspend fun acquireAnchorLocked(): Int {
+    private suspend fun acquireAnchorLocked(): Int? {
         anchorK?.let { return it }
-        val kelvin = display.readNightLightTemperature() ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K
+        val kelvin = temperatureRoute.readDeviceKelvin().getOrElse { return null }
+            ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K
         writeAnchor(kelvin)
         anchorK = kelvin
         return kelvin
@@ -137,7 +139,7 @@ class DisplayTogglesCoordinator(
         val anchor = anchorK ?: return true
         if (tierProvider() < Tier.ELEVATED || !display.nightLightAvailable) return false
         val target = settings?.nightLightTemperature ?: anchor
-        if (display.setNightLightTemperature(target).isFailure) return false
+        if (temperatureRoute.write(target, probe = false).isFailure) return false
         deviceTempK = target
         writeAnchor(null)
         anchorK = null
@@ -145,7 +147,7 @@ class DisplayTogglesCoordinator(
     }
 
     /** Diff-write [desired] against [lastApplied]. Caller holds [applyMutex]. */
-    private suspend fun applyLocked(desired: DisplayToggleState, settings: AabSettings) {
+    private suspend fun applyLocked(desired: DisplayToggleState, settings: AabSettings, probe: Boolean = true) {
         val last = lastApplied
         lastApplied = desired
         if (last == null || desired == last) {
@@ -162,20 +164,21 @@ class DisplayTogglesCoordinator(
         if (switching && !desired.nightLight) display.setNightLight(false)
         val released = desired.circadianTemp || releaseAnchorLocked(settings)
         if (switching && desired.nightLight) display.setNightLight(true)
-        // D-154: circadian writes current ramp on swap; static writes non-null anchor.
-        // Both diff against deviceTempK to avoid stale ramp sticking.
+        // D-154: both paths diff against deviceTempK, which advances only on a write that landed.
         if (desired.circadianTemp) {
-            val anchor = acquireAnchorLocked()
-            circadianTemperature(settings, settings.nightLightTemperature ?: anchor)?.let { kelvin ->
-                if (kelvin != deviceTempK) display.setNightLightTemperature(kelvin)
+            val kelvin = acquireAnchorLocked()?.let { anchor ->
+                circadianTemperature(settings, settings.nightLightTemperature ?: anchor)
+            }
+            if (kelvin != null && (kelvin == deviceTempK || temperatureRoute.write(kelvin, probe).isSuccess)) {
                 deviceTempK = kelvin
             }
         } else if (released) {
             val temperature = desired.temperatureK
-            if (temperature != null && temperature != deviceTempK) {
-                display.setNightLightTemperature(temperature)
+            if (temperature == null || temperature == deviceTempK ||
+                temperatureRoute.write(temperature, probe).isSuccess
+            ) {
+                deviceTempK = temperature
             }
-            deviceTempK = temperature
         }
         if (desired.daltonizer != last.daltonizer) display.setDaltonizer(desired.daltonizer)
         if (desired.inversion != last.inversion) display.setInversion(desired.inversion)
@@ -197,12 +200,9 @@ class DisplayTogglesCoordinator(
         val settings = latestEffective ?: return
         if (!settings.nightLightCircadianEnabled) return
         if (tierProvider() < Tier.ELEVATED) return
-        val anchor = acquireAnchorLocked() // the tick acquires too: a grant can arrive after the swap
+        val anchor = acquireAnchorLocked() ?: return // the tick acquires too: a grant can arrive after the swap
         val kelvin = circadianTemperature(settings, settings.nightLightTemperature ?: anchor) ?: return
-        if (kelvin != deviceTempK) {
-            display.setNightLightTemperature(kelvin)
-            deviceTempK = kelvin
-        }
+        if (kelvin != deviceTempK && temperatureRoute.write(kelvin).isSuccess) deviceTempK = kelvin
     }
 
     private data class DisplayToggleState(

@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app
 
 import android.content.Context
+import android.os.Build
 import com.tideo.autobrightness.app.runtime.AndroidContextSignalSource
 import com.tideo.autobrightness.app.runtime.AppProfileCatalog
 import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
@@ -8,6 +9,7 @@ import com.tideo.autobrightness.app.runtime.ContextEngine
 import com.tideo.autobrightness.app.runtime.ControllerHookHolder
 import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.DisplayTogglesCoordinator
+import com.tideo.autobrightness.app.runtime.NightLightTemperatureRoute
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
@@ -17,6 +19,7 @@ import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.settings.DataStoreContextBaselineStore
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.app.settings.NightLightAnchorStore
+import com.tideo.autobrightness.app.settings.NightLightVerdictStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
 import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.storage.contextBaselineDataStore
@@ -34,6 +37,7 @@ import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessContr
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.GeoIpLocationClient
+import com.tideo.autobrightness.platform.display.AndroidNightDisplayServiceBridge
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
@@ -58,6 +62,15 @@ class AppModule(context: Context) {
     val overridePointStore: OverridePointStore = OverridePointStore(appContext.overridePointsDataStore)
     val userProfileStore: UserProfileStore = UserProfileStore(appContext.userProfilesDataStore)
     val nightLightAnchorStore: NightLightAnchorStore = NightLightAnchorStore(appContext.displayPrefsDataStore)
+    val nightLightVerdictStore: NightLightVerdictStore =
+        NightLightVerdictStore(appContext.displayPrefsDataStore, Build.FINGERPRINT)
+
+    fun nightLightTemperatureRoute(display: SecureDisplayController) = NightLightTemperatureRoute(
+        display = display,
+        bridge = AndroidNightDisplayServiceBridge(appContext),
+        isNotHonoured = nightLightVerdictStore::isNotHonoured,
+        markNotHonoured = nightLightVerdictStore::markNotHonoured,
+    )
 
     fun createRuntime(scope: CoroutineScope): RuntimeGraph {
         val brightness = AndroidScreenBrightnessController(appContext)
@@ -125,10 +138,11 @@ class AppModule(context: Context) {
         )
 
         // D-151: display-toggle profile fields applied on profile change.
+        val secureDisplay = AndroidSecureDisplayController(appContext, privilegeManager)
         val displayToggles = DisplayTogglesCoordinator(
             effectiveFlow = contextEngine.effectiveFlow,
             baselineFlow = appContext.settingsDataStore.data,
-            display = AndroidSecureDisplayController(appContext, privilegeManager),
+            display = secureDisplay,
             tierProvider = { privilegeManager.currentTier() },
             // D-154: circadian-ramp Kelvin with real solar windows or TimeContext defaults (F73).
             circadianTemperature = { s, nightKelvin ->
@@ -158,6 +172,7 @@ class AppModule(context: Context) {
             writeAnchor = { kelvin ->
                 if (kelvin != null) nightLightAnchorStore.write(kelvin) else nightLightAnchorStore.clear()
             },
+            temperatureRoute = nightLightTemperatureRoute(secureDisplay),
         )
 
         return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager, displayToggles)

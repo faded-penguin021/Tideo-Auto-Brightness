@@ -19,7 +19,7 @@ android {
         // Per-version history is NOT kept here — see the docs/STATE.md Changelog, docs/LEDGER.md, and
         // fastlane/.../changelogs/<versionCode>.txt.
         versionCode = 25
-        versionName = "1.10.1"
+        versionName = "1.11.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 

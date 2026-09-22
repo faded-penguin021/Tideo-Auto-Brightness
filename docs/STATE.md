@@ -64,11 +64,12 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
    `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt has
    not grown, not that it is gone.
 
-2. **[2026-09-18] Tag v1.10.1 when you are ready — the bump is done, tagging is yours.** Before
+2. **[2026-09-18, retargeted 2026-09-22] Tag v1.11.0 when you are ready — the version is set,
+   tagging is yours.** v1.10.1 was never tagged, so it is superseded rather than skipped. Before
    tagging, RUNBOOK §6 wants a green `fdroid-compat.yml` on the release commit (Actions → F-Droid
    compatibility → Run workflow if none has run) and carries a one-shot DA-026 check owed by the
    first release after the AGP 8.13.2 bump. Settles it:
-   `git ls-remote --tags --refs origin 'refs/tags/v1.10.1'` — a hit means it is done and this item
+   `git ls-remote --tags --refs origin 'refs/tags/v1.11.0'` — a hit means it is done and this item
    can go.
 
 Open questions:
@@ -87,23 +88,13 @@ Open questions:
   per DB-082, (b) reply and ask, (c) ask for the two outputs only. Recommendation: (b) — N3 is
   blocked without their evidence, and they filed a correct, well-diagnosed report.
 
-- **[2026-09-19] Should Tideo set Night Light temperature through `ColorDisplayManager` instead of
-  the secure setting?** It would fix OxygenOS, where the service ignores the key (DC-053), and shell
-  holds the permission the call needs (DC-054). Against: `CONTROL_DISPLAY_COLOR_TRANSFORMS` is not
-  `pm grant`-able, so unlike today's one-time grant it needs Shizuku bound at runtime, every tick;
-  it is a hidden signature that can move between releases, and root and shell may differ. Options:
-  (a) leave D-048 as is, (b) prove it with an `app_process` spike first, (c) adopt it as the primary
-  path with the settings write as fallback. Recommendation: (b) — it is a throwaway script and
-  decides whether (c) is even real.
-
-**This train stays patch-level, and vc25 is its ONE bump (owner, 2026-09-18).** The
-override-attribution train shipped as a **minor**, `1.10.0` / vc24 (2026-08-30); the tree now sits
-at `1.10.1` / vc25, a **patch** opened by the backup fix. The train's real subject is the E2E suite
-above, which is test tooling and ships nothing, so it moves no version field and its bugs are
-expected to be patch fixes: land them by appending to `changelogs/25.txt`, NOT by bumping again per
-fix and NOT by creating `26.txt`. Re-open only if something surfaced is genuinely minor (a new
-user-facing capability) or major (breaking), per RUNBOOK §6's "pick the highest that applies", and
-say so rather than bumping quietly.
+**This train is a minor, `1.11.0`, and vc25 is still its ONE bump (owner, 2026-09-22).** The
+override-attribution train shipped as `1.10.0` / vc24 (2026-08-30). This train opened at `1.10.1` /
+vc25 as a patch for the backup fix; DC-057 is a new capability, so the owner re-opened it as a
+minor, and since `1.10.1` never shipped it became `1.11.0` on the same unshipped vc25 rather than
+a second bump. The E2E suite is test tooling and ships nothing, so it moves no version field: land
+further user-facing fixes by editing `changelogs/25.txt` (500-character cap), NOT by bumping per
+fix and NOT by creating `26.txt`. Re-open only for something genuinely major, and say so.
 
 ## Decided non-items
 
@@ -141,6 +132,12 @@ say so rather than bumping quietly.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-22 — **Night Light Kelvin reaches the display service where the key is ignored
+  (DC-057).** Owner answered the `ColorDisplayManager` question with the refined (c): the secure
+  setting stays the write, and a build observed to ignore it also gets the Kelvin through the
+  `color_display` binder via Shizuku or root. Shizuku runtime uses are now three. Owner-confirmed
+  on the OnePlus 13; the owner ruled it a minor, so the unshipped vc25 became `1.11.0`.
 
 - 2026-09-21 — **The circadian night anchor is the device's own Kelvin (DC-056).** A null
   setpoint no longer resolves to the 2850 K constant; the device is read once when the ramp takes

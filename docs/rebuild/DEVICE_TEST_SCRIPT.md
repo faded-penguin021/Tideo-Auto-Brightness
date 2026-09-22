@@ -384,9 +384,26 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
       Settings → Display → Night Light shows ON with matching intensity. "Use device temperature"
       (unset) leaves the system's own preference untouched. ⚠️ **Known variance (2026-07-05,
       owner's OnePlus):** OxygenOS ignores `night_display_color_temperature` — the tint is the
-      same regardless of the Kelvin value (the switch itself works). The slider and step 38's
-      circadian tracking are then visually inert on that device (D-048: documented, not branched;
-      the write still lands in the settings table — verify over adb if desired).
+      same regardless of the Kelvin value (the switch itself works). Precisely: the service does
+      not observe the key, so the write lands in the settings table and the service's state
+      diverges (DC-053). Since DC-057, with **Shizuku running**, Tideo detects this after two
+      Kelvin changes and then also sets the service directly, so the slider and step 38 should
+      work there; without Shizuku the screen shows a red "Start Shizuku" note instead. Run the
+      spike below once per OS build before trusting it.
+
+      **DC-057 spike (Night Light ON, system Settings closed, debug build installed):**
+      ```sh
+      APK=$(adb shell pm path com.tideo.autobrightness.debug | head -1 | cut -d: -f2 | tr -d '\r')
+      CLI="CLASSPATH=$APK app_process /system/bin com.tideo.autobrightness.platform.privilege.ColorDisplayCli"
+      adb shell "$CLI get"
+      adb shell settings put secure night_display_color_temperature 3000
+      adb shell "$CLI get"
+      adb shell "$CLI set 2700"
+      ```
+      **Expected:** the first `get` prints a Kelvin (exit 0 — shell can reach the service); the
+      second does **not** print 3000 on OxygenOS (the getter tells an ignored key apart — if it
+      prints 3000 the automatic detection cannot work there); `set 2700` prints 2700 **and the
+      panel visibly warms**. Any "exit 1" or no visible change: the fallback is dead on this build.
     - **Color correction:** Grayscale, then Protanomaly/Deuteranomaly/Tritanomaly. **Expected:** the
       filter matches; Settings → Accessibility → Color correction shows the same mode.
     - **Color inversion** on/off. **Expected:** inverts; the Accessibility toggle agrees.

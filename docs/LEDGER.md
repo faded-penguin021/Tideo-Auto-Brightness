@@ -2828,6 +2828,7 @@ the permanent registry — never compress or remove them.
   tracking are visually inert on OnePlus devices; noted in DEVICE_TEST_SCRIPT §11 + README.
   Corrected by DC-053.
   Corrected by DC-056 on the temperature clause.
+  Corrected by DC-057 on the OxygenOS variance: now branched, behind observed behaviour.
 
 - D-156 [cited]: **A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
   (A0; plan `plans/a11y-diagnostics.md`, owner-approved 2026-07-06; opens 1.8.0/vc18).**

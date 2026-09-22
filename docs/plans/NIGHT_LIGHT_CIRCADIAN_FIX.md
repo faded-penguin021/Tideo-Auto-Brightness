@@ -209,8 +209,9 @@ adb shell settings get secure night_display_color_temperature
 adb shell dumpsys color_display | grep -iA3 'night display'
 ```
 
-Reopening the `ColorDisplayManager`/Shizuku route is a **separate owner Open question in STATE**
-and is not part of this plan.
+The `ColorDisplayManager`/Shizuku route was reopened by the owner on 2026-09-22 and landed as
+DC-057, outside this plan's segments. Once its spike passes (STATE Owner queue), the panel on the
+OnePlus should follow the ramp with Shizuku running, and device checks there become visual again.
 
 ## Session setup that cost time — reuse it
 

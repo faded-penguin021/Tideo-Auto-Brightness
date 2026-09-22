@@ -1,3 +1,5 @@
-Fixes settings backup and restore, broken since 1.8.2: the app pointed Android at a backup component that did not exist, so your settings were neither saved to nor recovered from a backup.
+Night Light temperature and circadian scaling now take effect on devices whose display ignores the setting, such as OnePlus/OxygenOS, when Shizuku or root is available.
 
-Fixes Night Light circadian scaling anchoring its night end to a fixed 2850 K instead of your own temperature, and a temperature left on "device default" turning into a number that drifted warmer on each off/on cycle. Your own value is now put back when the ramp stops driving it.
+Fixes circadian Night Light anchoring to a fixed 2850 K instead of your own temperature, and "device default" drifting warmer on each off/on cycle.
+
+Fixes settings backup and restore, broken since 1.8.2.
