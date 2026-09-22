@@ -180,7 +180,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                     }
                     settings.nightLightTemperature?.let {
                         if (device == null || device.temperatureK != it || keyIgnored) {
-                            add(temperatureRoute.write(it, probe = false))
+                            add(temperatureRoute.write(it))
                         }
                     }
                     if (writeDaltonizer) add(display.setDaltonizer(daltonizerPick))

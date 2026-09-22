@@ -137,7 +137,8 @@ Newest first; ledger rows are the durable detail.
   (DC-057).** Owner answered the `ColorDisplayManager` question with the refined (c): the secure
   setting stays the write, and a build observed to ignore it also gets the Kelvin through the
   `color_display` binder via Shizuku or root. Shizuku runtime uses are now three. Owner-confirmed
-  on the OnePlus 13; the owner ruled it a minor, so the unshipped vc25 became `1.11.0`.
+  on the OnePlus 13; the owner ruled it a minor, so the unshipped vc25 became `1.11.0`. DC-058
+  fixes the two gaps the PR-time check found: main-thread teardown and the service-off Apply.
 
 - 2026-09-21 — **The circadian night anchor is the device's own Kelvin (DC-056).** A null
   setpoint no longer resolves to the 2850 K constant; the device is read once when the ramp takes

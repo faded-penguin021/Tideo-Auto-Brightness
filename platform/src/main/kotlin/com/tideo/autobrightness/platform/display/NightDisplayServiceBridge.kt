@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.platform.display
 
 import android.content.Context
+import android.os.Looper
 import com.tideo.autobrightness.platform.privilege.ColorDisplayCli
 import com.tideo.autobrightness.platform.privilege.ShizukuShell
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +27,9 @@ class AndroidNightDisplayServiceBridge(context: Context) : NightDisplayServiceBr
     }
 
     override suspend fun setKelvin(kelvin: Int, quick: Boolean): Int? = mutex.withLock {
-        ShizukuShell.setNightDisplayTemperature(appContext, kelvin)
-            ?: rootCli(if (quick) QUICK_ROOT_TIMEOUT_SECONDS else ROOT_TIMEOUT_SECONDS, "set", kelvin.toString())
+        val bindCallbackBlocked = quick && Looper.myLooper() == Looper.getMainLooper()
+        val shizuku = if (bindCallbackBlocked) null else ShizukuShell.setNightDisplayTemperature(appContext, kelvin)
+        shizuku ?: rootCli(if (quick) QUICK_ROOT_TIMEOUT_SECONDS else ROOT_TIMEOUT_SECONDS, "set", kelvin.toString())
     }
 
     private suspend fun rootCli(timeoutSeconds: Long, vararg args: String): Int? = withContext(Dispatchers.IO) {

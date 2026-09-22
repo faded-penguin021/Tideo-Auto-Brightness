@@ -813,3 +813,12 @@
   instead of showing an inert slider. Owner-confirmed on the OnePlus 13 (2026-09-22): Tideo now
   moves the panel's Night Light temperature, and `app_process` `get` at shell UID returns the
   service's Kelvin; a false NOT_HONOURED costs only a redundant, harmless service write.
+
+- DC-058: **Shizuku cannot answer inside a main-thread `runBlocking`, and the service-off Apply
+  must probe too (2026-09-22, gpt-6-astra PR-time check of DC-057).** Shizuku 13.1.5 posts
+  `bindUserService`'s connection callback to the main looper, so DC-057's teardown restore —
+  `stop()`'s `runBlocking` inside `onDestroy` — would sit out the 4 s bind timeout and then fail;
+  a teardown write on the main thread now skips Shizuku and goes straight to root (3 s), else fails
+  fast, which keeps the DC-056 anchor for the next run to restore. Separately, the service-off Apply
+  passed `probe = false`, so a user who only ever pressed Apply would never earn the fallback; it
+  now probes like the coordinator's writes, `probe = false` being reserved for teardown.
