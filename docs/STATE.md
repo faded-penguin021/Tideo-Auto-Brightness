@@ -50,7 +50,8 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
 - [x] R0 plan · [ ] R1 notification overwrite · [ ] R2 startup race · [ ] R3 diagnostics · [ ] R4
   health surfaces · [ ] R5 restore Tasker's dead-band (F-E) · [ ] R6 pending-latest slot (needs
   the rule-review pass) · [ ] R7 settling path (Tasker check first) · [ ] R8 close-out (ledger rows,
-  delete the plan).
+  delete the plan). R6 and R7 wait on the #132 reporter's "Trust low-accuracy sensor" answer (plan
+  §5 gate, F-F).
 
 ## Owner queue
 
@@ -127,6 +128,13 @@ fix and NOT by creating `26.txt`. Re-open only for something genuinely major, an
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-23 — **Light-stall plan, Sol review folded in.** Restoring Tasker's dead-band (R5) does
+  not by itself continue an unfinished drop: Tasker's profile gate rejects an unchanged reading
+  first, so the settling path (R7) is a new policy. R5 now needs a distinct no-write act19 stop
+  and must not require α ≥ 0. R2 is registration-after-load only, and R6 gained control-event
+  ordering tests. New F-F: a low-accuracy reading is rejected and a later accuracy recovery never
+  re-admits it. The owner asked the #132 reporter whether "Trust low-accuracy sensor" stops the
+  freezes, and that answer now gates R6 and R7.
 - 2026-09-23 — **Owner answers; F-E found.** The AAB issue 15 reporter was answered by the owner
   personally, so that question is closed and there is no draft to send. Light-stall Q1: keep the
   newest reading, as long as Tideo never chases ghosts (flicker under trees). Q2: settle, after

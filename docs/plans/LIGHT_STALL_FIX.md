@@ -8,7 +8,8 @@
 >
 > Analysis by Opus. Two gpt-6-astra review passes (2026-09-23) are folded in, with Astra's
 > corrections applied in place and §3 listing the claims they withdrew. F-E comes from an owner
-> lead.
+> lead. A gpt-5.6-sol review (2026-09-23) is folded in the same way: F-E item 4, R2, R5, R6 and R7
+> were corrected, and its withdrawn claims joined §3.
 
 ## 1. Reports and scope
 
@@ -67,7 +68,7 @@ and `platform/.../sensor/`, so they describe the reporter's build.
 2. **No continuation path exists (Astra).** There are two dead-band gates:
    - the **outer gate**, `ProfileGates.monitorAmbientLightGate` (`:21`), checks raw lux against the
      *stored* thresholds using strict `<` and `>`;
-   - the **inner gate**, `BrightnessEngine.evaluate` (`:56-57`), recomputes the band around the
+   - the **inner gate**, `BrightnessEngine.evaluate` (`:56-58`), recomputes the band around the
      *previous processed* raw value and skips smoothing (`α = 0`, smoothed retained) inside it.
 
    Re-feeding the same reading therefore does nothing. After a drop to 10 lx the recomputed band is
@@ -77,7 +78,7 @@ and `platform/.../sensor/`, so they describe the reporter's build.
    `|raw − S|/(S + 1) = dynamicThreshold`. For raw 0 and a threshold of 0.3 that is S ≈ 0.43 lx.
    Rounding can halt progress earlier, and below that point the unclamped α (D-010(a)) goes
    **negative**.
-4. **The proximity damp** (`α × 0.1` while "near", `%AAB_Proximity`, `BrightnessEngine.kt:30`) makes
+4. **The proximity damp** (`α × 0.1` while "near", `%AAB_Proximity`, applied at `BrightnessEngine.kt:67`) makes
    every leftover larger. The AOC logged "Device appears to be covered" at each re-activation in
    both #132 logs.
 
@@ -109,8 +110,8 @@ candidate for capture 1 only.
 ### F-D — The health surfaces cannot tell "steady" from "stuck". Confidence: high
 
 - **The dashboard banner** goes STALE after 10 s without a publish (`LiveRuntimeState.kt:17-25`), and
-  publishing happens only when pipeline state changes (`AmbientMonitoringService.kt:271`), so steady
-  light raises it. **An independent heartbeat would prove only that the heartbeat runs; it must not
+  publishing happens only when controller state, the active context or the manual override changes
+  (`AmbientMonitoringService.kt:264-271`), so steady light raises it. **An independent heartbeat would prove only that the heartbeat runs; it must not
   certify sensor delivery or cycle progress (Astra).**
 - **The `onTaskRemoved` watchdog** (`armStalenessWatchdog`, `:593`) resets `LiveRuntimeState` after
   5 s without a publish, which steady light satisfies. A running service can then show as stopped on
@@ -122,7 +123,8 @@ candidate for capture 1 only.
 Owner lead, 2026-09-23: "luxAlpha can go negative in Tideo; I never saw that in Tasker". Tasker's
 flow, from `pipeline_spec.md` §1–§6 and the extracted Java:
 
-- task554 act1 sets `%AAB_LastRawLux` to the **current** reading (`task554_1…txt:16`). Only after
+- task554 act1 sets `%AAB_LastRawLux` to the **current** reading, BigDecimal-rounded to three
+  decimals (`task554_1…txt:27-30`). Only after
   that does act2 run task544.
 - task544 act19 **stops** if `relative_change < dynamic_threshold`, where
   `relative_change = round3(|par1 − SmoothedLux| / (SmoothedLux + 1))`. The comparison is against
@@ -147,27 +149,44 @@ Tideo's `BrightnessEngine.evaluate` has neither piece:
    back in the sun: the band is 70–130 and the return is dropped, so the screen stays dim in
    sunlight. No sensor fault or timing race is involved. A drop to under 0.2 lx escapes the trap,
    because the `< 0.2` special case uses the current reading.
-4. **It also produces F-B's retry trap.** Astra's "inner gate blocks the retry" is this band. Under
-   Tasker's act19, a repeat event at the same reading is still smoothed as long as it differs
-   enough from *smoothed* lux, and it stops at Tasker's own hysteresis point (`relative_change` <
-   threshold). α therefore never goes negative when the gate and the smoothing use the same
-   threshold, as Tideo's do (`dynamicThreshold * 100`, D-036 Finding 7).
+4. **It does not cure F-B's retry trap (Sol).** Once task546 centres the stored band on the current
+   reading, an identical repeat reading lies inside it, so prof760's outer gate
+   (`profiles.md:40-48`) rejects it before task554/task544 run. On an on-change sensor the repeat
+   does not even arrive. **As far as prof760 goes, Tasker shows F-B's stall too.** The Q2 check
+   still has to establish whether anything else re-ran the main loop. Where act19 *does* run, it
+   removes the routine negative α: it stops wherever `effective_delta` would be negative under the
+   same threshold, and Tideo's gate and smoothing share one (`dynamicThreshold * 100`, D-036
+   Finding 7).
 
 **How it slipped through.** The golden vectors cover smoothing, thresholds and mapping in isolation.
 Which gate runs, and where the band is centred, sits in `evaluate`, which only
 `BrightnessEngineContractTest` covers. D-039(a) took the engine's `shouldUpdate` as the oracle
 without comparing it to act19. The ledger records no decision to diverge.
 
-**Caveat.** Tasker is not entirely free of negative α. Its task535 subtracts `%AAB_ThreshDynamic`,
+**Caveat.** Tasker is not entirely free of negative α (`parity_gaps.md:35`). Its task535 subtracts `%AAB_ThreshDynamic`,
 which in the smoothing path was last written by the *previous* cycle's task546 (act35 runs after
 act25), so a threshold that fell between cycles can still give a small negative α. That is rare,
 consistent with the owner never observing it.
 
+### F-F — A low-accuracy reading is rejected, and recovered accuracy never re-admits it. Confidence: medium as a mechanism; attribution open
+
+- prof760's first stage drops any reading with `accuracy ≤ 1` unless "Trust low-accuracy sensor"
+  is on (`ProfileGates.kt:20`, `BrightnessPipelineController.kt:207-208`).
+- `LightSensorSource`'s `onAccuracyChanged` is a no-op (`LightSensorSource.kt:39`). On an on-change
+  sensor, accuracy can recover without the value changing, so no new event arrives and the rejected
+  reading is never evaluated. A toggle re-registers the sensor and gets a fresh initial event,
+  which matches #132's "toggle fixes it".
+- It fits the Pixel's AOC reporting "Device appears to be covered" at each re-activation in both
+  logs, **if** the sensor marks those readings low-accuracy. Neither log records accuracy.
+- **Asked on #132 (owner, 2026-09-23): does enabling the setting stop the freezes?** This answer
+  decides the shape of the fix (§5, gate before R6).
+
 ### H1 — The sensor path goes quiet while still enabled. Open
 
-In both #132 logs the ALS stays enabled at the HAL until the toggle's `Enable = 0`. That means
-Tideo's registration was never dropped; it does **not** prove events were delivered through
-Tideo's callback and flow. **Neither log contains the stall's onset:** the last samples fall 2–4 min
+In both #132 logs the ALS stays enabled at the HAL until the toggle's `Enable = 0`. HAL enablement
+does not name the client, so it is **consistent with** Tideo's registration surviving without
+proving it (Sol), and it says nothing about delivery through Tideo's callback and flow. The logs
+are the attachments on Tideo #132; they are not stored in this repository. **Neither log contains the stall's onset:** the last samples fall 2–4 min
 before each log starts.
 
 ## 3. Claims withdrawn during review (do not reintroduce)
@@ -187,7 +206,12 @@ before each log starts.
 - **"Capture 1 is fully explained."** It is consistent with F-B, nothing more.
 - **"Runtime-only means no parity decision."** A continuation or completion policy changes
   behaviour, wherever the code lives.
-- **"The failure is inherited from Tasker."** Unverified; see Q2.
+- **"The failure is inherited from Tasker."** Unverified; see Q2. prof760 alone would not continue
+  it, though (F-E item 4).
+- **"Under act19, an unchanged repeat reading keeps smoothing until act19 stops it."** prof760
+  rejects it first (F-E item 4). A continuation that re-enters task544 is a new policy, not parity.
+- **"α ≥ 0 on every smoothed row" as a parity test.** Tasker's task535 subtracts the previous
+  cycle's stored threshold, so faithful parity can yield a small negative α (F-E caveat).
 
 ## 4. Owner decisions — both answered 2026-09-23
 
@@ -230,6 +254,18 @@ comment budgets were exactly full at `64be441` (2538/2538 and 330/330), so a run
 offset any comment it adds. Raising a budget is a rule change (`comment-budget.sh`, rule-review
 protocol).
 
+**Gate before R6 — the #132 accuracy answer (F-F).** R1, R2, R3 and R5 stand whatever the reporter
+says: they fix confirmed defects or restore parity. R3 must count accuracy rejections as their
+own reason either way.
+
+- **If the setting stops the freezes:** F-F is #132's cause. The fix is a small one: re-admit the
+  last rejected reading when `onAccuracyChanged` reports accuracy > 1. That is a new policy with its
+  own row and test. Re-scope R6 and R7 before starting them: they would fix real mechanisms that
+  #132 no longer demonstrates, and their cost (the D-027 departure, a new settling policy) needs a
+  fresh case. R4 stays.
+- **If it does not:** F-F is ruled out for #132, and R6 and R7 proceed as written.
+- **No answer:** R6 and R7 wait for R3's diagnostics from the reporter instead.
+
 - [x] **R0 — this plan.**
 - [ ] **R1 — F-A, the notification overwrite.** No fork.
   - **Change:** when the pipeline is already running, build the `startForeground` notification
@@ -237,40 +273,58 @@ protocol).
     updater uses. Preserve the paused state and its actions. Correct the `MaintenanceWorker`
     comment.
   - **Tests:** a repeated start with an unchanged model and no later sensor event leaves the posted
-    text at `Lux … → brightness …`; the paused variant keeps its title and actions; a first start
-    (not running) still posts the monitoring text.
-- [ ] **R2 — F-C's startup race only.** No fork: it reorders startup and queues nothing. Load
-  settings before registering the sensor, or keep the initial reading until they load.
-  - **Test:** an initial event delivered before settings resolve is evaluated.
+    text at `Lux … → brightness …` and keeps the active-context subtext (`:528`); the paused
+    variant keeps its title and actions; a first start (not running) still posts the monitoring
+    text.
+- [ ] **R2 — F-C's startup race only.** No fork: it reorders startup and queues nothing. Register
+  the sensor only after `cachedSettings` has loaded. Holding an early reading until settings load
+  would be deferred work, which belongs to R6 and its D-027 rule review, so R2 does not do it (Sol).
+  - **Tests:** registration happens after settings resolve, and the first event after
+    registration is evaluated.
 - [ ] **R3 — Diagnostics (Astra), shipped before R5–R7** so a reporter can separate lost delivery,
   a dropped final reading and an unfinished cycle from one screenshot. In Live Debug show:
   - the actual sensor callback: value, accuracy, sensor timestamp and arrival time;
   - collector receipt, plus admitted, deferred and rejected counts with the last rejection reason
-    (accuracy, dead band, mutex, cooldown, settings not loaded);
+    (accuracy, dead band, mutex, cooldown, settings not loaded), and the last `onAccuracyChanged`
+    value and time (F-F);
   - the current cycle stage and start time, and the last completed cycle.
 
   Labels must be string resources: the hardcoded-string ceiling in `HardcodedStringCheckTest` may
-  only fall.
+  only fall. **R5 and R6 each revise this taxonomy (Sol):** R5 adds a distinct act19 stop, and R6
+  turns busy and cooldown drops into deferred or replaced work. Each of those segments states which
+  counter a reading now lands in, so R4's banner never reads an ambiguous signal.
 - [ ] **R4 — F-D, the health surfaces.** No parity source; the owner approves the wording.
   - Drive the banner from R3's signals, not a heartbeat.
   - Decide whether to clear runtime state by service-instance ownership and lifecycle instead of
     publish recency.
-  - **Test:** a running service in steady light past 5 s after `onTaskRemoved` keeps its state.
+  - **Tests:** a running service in steady light past 5 s after `onTaskRemoved` keeps its state; the
+    banner distinguishes steady delivery, absent callbacks, rejected callbacks and an unfinished
+    cycle, with one test each.
 - [ ] **R5 — F-E, restore Tasker's dead-band.** This restores parity, so it needs no fork (playbook
   2/4). It does change behaviour users know, so it gets a `changelogs/25.txt` line.
   - **Change:** in `BrightnessEngine.evaluate`, add task544 act19 (`relative_change` against
     smoothed lux, stopping below `dynamic_threshold`) before smoothing, and centre
-    `absoluteThresholds` on the **current** reading, as task554 act1 → task546 do. Keep act20's and
-    act35's differing `par1` for the `< 0.2` special case and the rounding scale.
+    `absoluteThresholds` on the **current** reading as task554 act1 rounds it (three decimals,
+    HALF_UP), not on an unrounded `input.lux`. Keep act20's and act35's differing `par1` for the
+    `< 0.2` special case and the rounding scale.
+  - **The act19 stop is its own result, not a zero-α one (Sol).** Tasker's act19 path runs act20
+    (the band from `%par1`), clears the cycle and stops (acts 20–23): no smoothing, no mapping, no
+    brightness or dimming work. `evaluate` must return a result that `PipelineCycleRunner` can tell
+    apart. For it, the runner stores act20's band and skips mapping, animation, throttle updates
+    and accepted-state publication (`PipelineCycleRunner.kt:80`, `:139`, `:148`).
   - **Tests:** a reference oracle for the act18–act35 orchestration in `TaskerReference`, with
-    contract rows for: a return to the previous level after A → B is processed; a repeat reading
-    below the threshold making no smoothing call; α ≥ 0 on every smoothed row; and the stored band
-    centred on the processed reading.
-  - **Record:** a `parity_gaps.md` entry and a row that amends D-039(a)'s "engine is the oracle"
-    premise.
-  - **Order:** land before R6 and R7. It changes both of their contracts: R7's continuation may
-    reduce to "re-evaluate the last accepted reading until act19 stops it", and R6's tests must run
-    against the corrected gates.
+    contract rows for:
+    - a return to the previous level after A → B is processed;
+    - a reading below act19's threshold making no smoothing call **and no mapping, write or
+      accepted-state publish**;
+    - every smoothed row's α matching the oracle, sign included (a negative α from a threshold that
+      moved between cycles is parity; F-E caveat);
+    - the stored band centred on the rounded processed reading.
+  - **Record:** a `parity_gaps.md` entry; the `PARITY_CHECKLIST.md` rows for task544, task546 and
+    task554, which read `ported` today (playbook 2); and a row that amends D-039(a)'s "engine is
+    the oracle" premise.
+  - **Order:** land before R6 and R7. It changes both of their contracts: R6's tests must run
+    against the corrected gates, and R5 does not supply R7's continuation (F-E item 4).
 - [ ] **R6 — F-C, the pending-latest slot.** Q1 is answered. It still needs the rule-review pass
   that amends the `AGENTS.md` invariant and records the D-027 departure in a new row.
   - **The owner's no-ghosts condition, as acceptance tests:**
@@ -278,18 +332,28 @@ protocol).
     - a pending reading is evaluated at most one cycle plus one cooldown after it arrived (the
       response is never later than that);
     - a flicker run (alternating bright and dim faster than the cooldown for 30 s, then steady)
-      runs no more cycles than today's drop policy plus one, and ends on the final light's target.
+      runs no more cycles than today's drop policy plus one, and its last cycle evaluates the final
+      reading. Ending on the final light's *target* needs R7's settling, so R7 asserts that (Sol).
   - **Behaviour:** new readings replace the pending one during initialisation, an active cycle and
     the cooldown. After completion, the newest pending reading is reconsidered against current
     settings and thresholds. During a cooldown, one reconsideration is scheduled for when it
     expires. Pause, override and proximity behaviour are preserved. Pending work is invalidated on
     screen-off, stop and a new sensor session. An in-progress animation is never cancelled.
   - `.conflate()` upstream is insufficient: the rejections happen downstream of the collector.
-  - **Tests:** a final out-of-band reading during an animation, then silence, is evaluated; the
-    same during a cooldown.
+  - **Ordering (Sol):** screen-off, pause, override, context and stop events share the consumer path
+    and queue behind an active cycle (`BrightnessPipelineController.kt:223`). A pending reading is
+    never drained ahead of a control event that is already queued; that event runs first and may
+    invalidate it.
+  - **Tests:**
+    - a final out-of-band reading during an animation, then silence, is evaluated;
+    - the same during a cooldown;
+    - after each of a queued screen-off, pause, override, stop and sensor-session replacement, the
+      pending reading is not evaluated.
 - [ ] **R7 — F-B, the settling path.** Q2 is answered; the Tasker check comes first. Re-derive the
-  continuation on top of R5. If Tasker's act19 already gives a defined endpoint, prefer it over a
-  separate transition policy, and say why in the row. The acceptance criteria below stand either way.
+  continuation on top of R5. act19 gives a defined endpoint only for readings that reach task544,
+  and prof760 keeps an unchanged reading out (F-E item 4). Any continuation is therefore a new
+  policy with its own row, whatever the Tasker check finds. The acceptance criteria below stand
+  either way, and once R7 lands R6's flicker run must also end on the final light's target.
   - **Behaviour:** separate "has a sufficiently different reading arrived?" from "has the accepted
     transition finished?". Continuation bypasses both input gates and keeps pause, override,
     lifecycle and proximity behaviour. It completes when the brightness target for the accepted
