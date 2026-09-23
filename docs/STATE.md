@@ -44,6 +44,13 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
   · [ ] N3 F5, daytime activation — BLOCKED on device evidence, ship no guess · [ ] N4 close-out
   (delete the plan). F3 needs no code and is not a segment.
 
+**Light-tracking stalls + monitoring surfaces (Tideo #130, #132)** — plan
+`docs/plans/LIGHT_STALL_FIX.md` (persisting approved by owner 2026-09-23; Astra-reviewed twice).
+
+- [x] R0 plan · [ ] R1 notification overwrite · [ ] R2 startup race · [ ] R3 diagnostics · [ ] R4
+  health surfaces · [ ] R5 pending-latest slot — BLOCKED on Q1 · [ ] R6 settling path — BLOCKED on
+  Q2 · [ ] R7 close-out (ledger rows, delete the plan).
+
 ## Owner queue
 
 > **Protected section (D-167).** Never delete it, and never silently drop items during compression
@@ -87,6 +94,15 @@ Open questions:
   whether AOSP's own service is a third party in the F5 activation fight. Options: (a) stay silent
   per DB-082, (b) reply and ask, (c) ask for the two outputs only. Recommendation: (b) — N3 is
   blocked without their evidence, and they filed a correct, well-diagnosed report.
+
+- **[2026-09-23] Two parity departures for the light-stall fix — decide each before R5/R6 start.**
+  Q1: when a light reading arrives while Tideo is busy, keep the newest one and look at it
+  afterwards, instead of dropping it as Tasker's re-entry mutex does. This reverses D-027(d) and
+  changes the `AGENTS.md` concurrency invariant. Options: keep dropping · keep one reading · only
+  at startup. Recommendation: keep one. Q2: let an accepted light change finish moving brightness
+  even when the sensor goes silent. Check first whether Tasker stalls the same way. Options: keep
+  parity · finish to the target · only if Tasker settled. Recommendation: finish, after the check.
+  Detail: the plan's §4.
 
 **This train is a minor, `1.11.0`, and vc25 is still its ONE bump (owner, 2026-09-22).** The
 override-attribution train shipped as `1.10.0` / vc24 (2026-08-30). This train opened at `1.10.1` /
@@ -132,6 +148,11 @@ fix and NOT by creating `26.txt`. Re-open only for something genuinely major, an
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-23 — **Light-stall plan (R0).** The #130 fallback notification text is Tideo's own
+  overwrite on every service start, not OEM battery saving. #132 has two code-level mechanisms,
+  neither yet proven responsible: a drop the smoothing never finishes, and a final reading dropped
+  while busy. See Active work.
 
 - 2026-09-22 — **Night Light Kelvin reaches the display service where the key is ignored
   (DC-057).** Owner answered the `ColorDisplayManager` question with the refined (c): the secure
