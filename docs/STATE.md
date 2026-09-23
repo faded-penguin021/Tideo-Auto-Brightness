@@ -48,8 +48,9 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
 `docs/plans/LIGHT_STALL_FIX.md` (persisting approved by owner 2026-09-23; Astra-reviewed twice).
 
 - [x] R0 plan · [ ] R1 notification overwrite · [ ] R2 startup race · [ ] R3 diagnostics · [ ] R4
-  health surfaces · [ ] R5 pending-latest slot — BLOCKED on Q1 · [ ] R6 settling path — BLOCKED on
-  Q2 · [ ] R7 close-out (ledger rows, delete the plan).
+  health surfaces · [ ] R5 restore Tasker's dead-band (F-E) · [ ] R6 pending-latest slot (needs
+  the rule-review pass) · [ ] R7 settling path (Tasker check first) · [ ] R8 close-out (ledger rows,
+  delete the plan).
 
 ## Owner queue
 
@@ -79,30 +80,7 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
    `git ls-remote --tags --refs origin 'refs/tags/v1.11.0'` — a hit means it is done and this item
    can go.
 
-Open questions:
-
-- **[2026-09-21] Should the reporter of AAB issue 15 get a reply, and may we ask them for two
-  outputs?** DB-082's standing rule is that no issue gets a reply unasked, so nothing has been
-  posted. A draft reply is in the Night Light plan: it answers their direct question (their reading
-  of "Device default" was right for the static path, wrong for the circadian one — that divergence
-  was the bug), confirms the two findings they root-caused, corrects their Scale Spread premise,
-  and tells them the feature they originally requested already exists (Circadian scaling OFF +
-  "Follow circadian scaling" ON). Two things only they can supply: the three
-  `cmd overlay lookup config_nightDisplayColorTemperature{Min,Max,Default}` values, which decide
-  whether their 686 K floor is a real resource value or a reading of the 0–100 % intensity slider
-  and so size F4's blast radius; and `settings get secure night_display_auto_mode`, which says
-  whether AOSP's own service is a third party in the F5 activation fight. Options: (a) stay silent
-  per DB-082, (b) reply and ask, (c) ask for the two outputs only. Recommendation: (b) — N3 is
-  blocked without their evidence, and they filed a correct, well-diagnosed report.
-
-- **[2026-09-23] Two parity departures for the light-stall fix — decide each before R5/R6 start.**
-  Q1: when a light reading arrives while Tideo is busy, keep the newest one and look at it
-  afterwards, instead of dropping it as Tasker's re-entry mutex does. This reverses D-027(d) and
-  changes the `AGENTS.md` concurrency invariant. Options: keep dropping · keep one reading · only
-  at startup. Recommendation: keep one. Q2: let an accepted light change finish moving brightness
-  even when the sensor goes silent. Check first whether Tasker stalls the same way. Options: keep
-  parity · finish to the target · only if Tasker settled. Recommendation: finish, after the check.
-  Detail: the plan's §4.
+Open questions: none.
 
 **This train is a minor, `1.11.0`, and vc25 is still its ONE bump (owner, 2026-09-22).** The
 override-attribution train shipped as `1.10.0` / vc24 (2026-08-30). This train opened at `1.10.1` /
@@ -149,6 +127,12 @@ fix and NOT by creating `26.txt`. Re-open only for something genuinely major, an
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-23 — **Owner answers; F-E found.** The AAB issue 15 reporter was answered by the owner
+  personally, so that question is closed and there is no draft to send. Light-stall Q1: keep the
+  newest reading, as long as Tideo never chases ghosts (flicker under trees). Q2: settle, after
+  the Tasker check. Following the owner's lead that luxAlpha goes negative only in Tideo, F-E
+  found the engine lacks task544's act19 dead-band and centres its thresholds one reading late, so
+  a return to the previous light level is ignored. New segment R5 restores parity.
 - 2026-09-23 — **Light-stall plan (R0).** The #130 fallback notification text is Tideo's own
   overwrite on every service start, not OEM battery saving. #132 has two code-level mechanisms,
   neither yet proven responsible: a drop the smoothing never finishes, and a final reading dropped

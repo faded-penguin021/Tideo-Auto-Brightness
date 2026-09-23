@@ -21,8 +21,9 @@ Reported against v1.10.0. Reporter's environment: Pixel 8 Pro / GrapheneOS / And
   installed on a device (the owner offered one, 2026-09-21; nothing was installed).
 - [ ] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.**
 - [ ] **N3 — F5: daytime activation.** BLOCKED on device evidence; do not ship a guess.
-- [ ] **N4 — close-out.** Delete this file once N2 and N3 are settled and the reply question
-  below is answered.
+- [ ] **N4 — close-out.** Delete this file once N2 and N3 are settled. The reply question is
+  closed: the owner answered the reporter personally (2026-09-23), and the draft below was not
+  used.
 
 F3 needs no code at all (see below) and is not a segment.
 
@@ -232,10 +233,12 @@ OnePlus should follow the ramp with Shizuku running, and device checks there bec
   but is a **rule change** requiring the DA-005 rule-review protocol (`.orch/codex.sh rules`) —
   budget for it rather than discovering it at the end.
 
-## The reply to the reporter — drafted, NOT sent
+## The reply to the reporter — drafted, superseded
 
-Standing rule: **no issue gets a reply unasked** (owner, DB-082). An Owner-queue item asks whether
-to post this. Nothing has been posted.
+Standing rule: **no issue gets a reply unasked** (owner, DB-082). The owner replied to the reporter
+personally (2026-09-23), so this draft was never posted. Its content is kept only as analysis. What
+the owner's reply asked for is not recorded here, so do not assume the two outputs below are on
+their way.
 
 What the reply owes them:
 
