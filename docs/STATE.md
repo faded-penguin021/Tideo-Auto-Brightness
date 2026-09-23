@@ -45,14 +45,14 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
   (delete the plan). F3 needs no code and is not a segment.
 
 **Light-tracking stalls + monitoring surfaces (Tideo #130, #132)** — plan
-`docs/plans/LIGHT_STALL_FIX.md` (persisting approved by owner 2026-09-23; Astra-reviewed twice).
+`docs/plans/LIGHT_STALL_FIX.md` (persisting approved by owner 2026-09-23; Astra-reviewed three times).
 
 - [x] R0 plan · [ ] R1 notification overwrite · [ ] R2 startup race · [ ] R3 diagnostics · [ ] R4
   health surfaces · [ ] R5 restore Tasker's dead-band (F-E) · [ ] RF re-admit the last rejected
   low-accuracy reading (F-F; shares R6's rule review and slot) · [ ] R6 pending-latest slot (needs
   the rule-review pass) · [ ] R7 settling path (Tasker check first) · [ ] R8 close-out (ledger rows,
-  delete the plan). R6 and R7 wait on the #132 reporter's "Trust low-accuracy sensor" answer (plan
-  §5 gate, F-F). RF waits on that answer or on a OnePlus wake shown to be F-F rather than H2.
+  delete the plan). Attribution rests on R3's records (plan §5 gate). RF waits on an episode
+  shown to be F-F; R6 and R7 are weighed on their own failure cases.
 
 ## Owner queue
 
@@ -129,6 +129,9 @@ fix and NOT by creating `26.txt`. Re-open only for something genuinely major, an
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-23 — **Light-stall plan, third Astra pass.** R5 keeps Tasker's first-run branch, so the
+  first reading after a start or wake is never rejected by act19. R6's no-ghosts tests are
+  structural, not a cycle count. R7 gained a supersession contract.
 - 2026-09-23 — **Light-stall plan, owner's OnePlus 13 observations folded in.** Every settings
   save sends a start command, so saving any setting resets the notification to "Monitoring" (F-A
   has more start-command sources than the two it listed). A wake in the dark sometimes ends on

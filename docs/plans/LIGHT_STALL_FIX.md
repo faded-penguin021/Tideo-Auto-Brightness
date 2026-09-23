@@ -11,6 +11,8 @@
 > lead. A gpt-5.6-sol review (2026-09-23) is folded in the same way: F-E item 4, R2, R5, R6 and R7
 > were corrected, and its withdrawn claims joined §3. The owner's OnePlus 13 observations
 > (2026-09-23, §1) extended F-A's start-command sources and added the intermittent wake case, H2.
+> A third Astra pass (2026-09-23) added R5's first-run branch, R6's structural no-ghosts tests,
+> R7's supersession contract, and a §5 gate that bases attribution on R3's records.
 
 ## 1. Reports and scope
 
@@ -272,6 +274,10 @@ before each log starts.
 - **"The OnePlus 13 reports accuracy ≤ 1 at 0 lx, so F-F is confirmed there."** Inferred from
   observations 1–2 on the assumption that a first event always arrives. Observations 4–5 admitted
   0 lx readings with the setting off, and H2 explains observation 1 equally well.
+- **"If the setting stops the freezes, F-F is #132's cause."** Supporting evidence only, since the
+  stalls are intermittent. Attribution uses R3's records (§5 gate).
+- **"No more cycles than today's policy plus one" as the no-ghosts test.** A correct slot can
+  exceed that over a long burst (R6).
 - **"α ≥ 0 on every smoothed row" as a parity test.** Tasker's task535 subtracts the previous
   cycle's stored threshold, so faithful parity can yield a small negative α (F-E caveat).
 
@@ -316,18 +322,28 @@ comment budgets were exactly full at `64be441` (2538/2538 and 330/330), so a run
 offset any comment it adds. Raising a budget is a rule change (`comment-budget.sh`, rule-review
 protocol).
 
-**Gate before R6 — the #132 accuracy answer (F-F).** R1, R2, R3, R5 and RF stand whatever the
-reporter says: they fix confirmed defects or restore parity. **RF is conditional**: it goes ahead
-if the reporter says yes, or if a OnePlus wake that ends on "Monitoring" is shown to be F-F rather
-than H2 (H2's "Last sample" check, or R3's first-event line). R3 must count accuracy rejections as
-their own reason either way.
+**Gate before R6 — attribution and the accuracy answer (F-F).** R1, R2, R3 and R5 stand whatever
+the reporter says: they fix confirmed defects or restore parity. R3 must count accuracy rejections
+as their own reason, and must record the effective trust setting with each rejection.
 
-- **If the setting stops the freezes:** F-F is #132's cause, and RF is #132's fix. Re-scope R6 and
-  R7 before starting them: they would fix real mechanisms that #132 no longer demonstrates, and
-  their cost (the D-027 departure, a new settling policy) needs a fresh case. R4 stays.
-- **If it does not:** F-F is ruled out for #132, and R6 and R7 proceed as written. RF then waits
-  on the OnePlus check alone.
-- **No answer:** R6 and R7 wait for R3's diagnostics from the reporter instead.
+**Attribution rests on R3's records, not on the reporter's answer (Astra).** The stalls are
+intermittent, so an answer is supporting evidence only:
+- "Trust on, and the freezes stopped" supports F-F. It does not show that every stall had that
+  cause.
+- "Trust on, and freezes continued" excludes accuracy rejection for *those* episodes, assuming the
+  setting took effect. It does not rule out F-F in earlier ones.
+
+An episode is attributed to F-F when R3 shows its final reading rejected for accuracy with trust
+off.
+
+Two decisions follow, and they are separate:
+- **RF** goes ahead once any episode is attributed to F-F: on #132, or on a OnePlus wake that ends
+  on "Monitoring" and is shown to be F-F rather than H2 (H2's "Last sample" check, or R3's
+  first-event line). Until then it waits.
+- **R6 and R7** are decided on their own reproducible failure cases (F-C, F-B) against their
+  behavioural cost (the D-027 departure, a new settling policy). They are not decided by #132's
+  attribution. An F-F attribution for #132 is a reason to re-check that case before starting them,
+  not to drop them. Without R3 records from the reporter, they wait on those records.
 
 - [x] **R0 — this plan.**
 - [ ] **R1 — F-A, the notification overwrite.** No fork.
@@ -394,13 +410,28 @@ their own reason either way.
     `absoluteThresholds` on the **current** reading as task554 act1 rounds it (three decimals,
     HALF_UP), not on an unrounded `input.lux`. Keep act20's and act35's differing `par1` for the
     `< 0.2` special case and the rounding scale.
+  - **The first reading bypasses act19 (Astra).** Tasker's acts 10–17 run before act18: if
+    `%SmoothedLux` is unset (and `%AutoBrightRunning ≠ 1`), they set `SmoothedLux = par1`,
+    `LuxAlpha = 1`, `LastAAB = now`, seed the thresholds, map the reading and stop
+    (`pipeline_spec.md` §3 step 3). Today the engine reaches that case only through
+    `prev == null` in `shouldUpdate` (`BrightnessEngine.kt:58`), with `prevSmoothedLux` defaulting
+    to `input.lux` (`:52`). Adding act19 without an explicit first-run branch would compute
+    `relative_change = 0` and reject the first reading after every start and wake, **indefinitely**
+    on an on-change sensor in steady light. So `evaluate` needs a first-run result: the reading
+    initialises smoothing, gets its target and seeds the band, and does not pass act18/act19.
+    `setInitialBrightness` calls the engine with an empty previous state
+    (`PipelineCycleRunner.kt:362`), so it takes the same branch.
   - **The act19 stop is its own result, not a zero-α one (Sol).** Tasker's act19 path runs act20
     (the band from `%par1`), clears the cycle and stops (acts 20–23): no smoothing, no mapping, no
     brightness or dimming work. `evaluate` must return a result that `PipelineCycleRunner` can tell
     apart. For it, the runner stores act20's band and skips mapping, animation, throttle updates
     and accepted-state publication (`PipelineCycleRunner.kt:80`, `:139`, `:148`).
-  - **Tests:** a reference oracle for the act18–act35 orchestration in `TaskerReference`, with
-    contract rows for:
+  - **Tests:** a reference oracle for the act10–act35 orchestration in `TaskerReference`, starting
+    at act10 so that the first-run branch is covered, with contract rows for:
+    - **first-run regressions (Astra):** a cold start, then one reading and silence; a screen
+      off/on, then one reading and silence. Each runs once at non-zero lux and once at 0 lx, and
+      each must produce and write the reading's target. `setInitialBrightness` with an empty
+      previous state must match the first-run row;
     - a return to the previous level after A → B is processed;
     - a reading below act19's threshold making no smoothing call **and no mapping, write or
       accepted-state publish**;
@@ -414,13 +445,23 @@ their own reason either way.
     against the corrected gates, and R5 does not supply R7's continuation (F-E item 4).
 - [ ] **R6 — F-C, the pending-latest slot.** Q1 is answered. It still needs the rule-review pass
   that amends the `AGENTS.md` invariant and records the D-027 departure in a new row.
-  - **The owner's no-ghosts condition, as acceptance tests:**
+  - **The owner's no-ghosts condition, as acceptance tests.** These are structural properties, not
+    a cycle count (Astra). A slot legitimately uses its kept reading when the cooldown expires,
+    where today's code waits for another callback, so over a long burst it can run more cycles
+    than today's policy without any backlog or stale replay. The tests:
     - there is exactly one slot, and a newer reading replaces it; nothing queues;
-    - a pending reading is evaluated at most one cycle plus one cooldown after it arrived (the
-      response is never later than that);
-    - a flicker run (alternating bright and dim faster than the cooldown for 30 s, then steady)
-      runs no more cycles than today's drop policy plus one, and its last cycle evaluates the final
-      reading. Ending on the final light's *target* needs R7's settling, so R7 asserts that (Sol).
+    - the current cooldown is respected: no cycle starts inside it;
+    - when a cycle starts, it takes the newest eligible reading;
+    - a reading that was superseded while pending is never processed afterwards;
+    - once input stops, the final eligible reading is reconsidered with no further callback;
+    - **latency, qualified:** a reading that stays newest and eligible, with no control event
+      delaying or invalidating it, is evaluated at most one cycle plus one cooldown after it
+      arrived. No unconditional deadline is possible, because queued control events run first
+      (Ordering, below).
+
+    The flicker run (bright and dim alternating faster than the cooldown for 30 s, then steady)
+    asserts these properties throughout, and that its last cycle evaluates the final reading.
+    Ending on the final light's *target* needs R7's settling, so R7 asserts that (Sol).
   - **Behaviour:** new readings replace the pending one during initialisation, an active cycle and
     the cooldown. After completion, the newest pending reading is reconsidered against current
     settings and thresholds. During a cooldown, one reconsideration is scheduled for when it
@@ -445,9 +486,29 @@ their own reason either way.
     transition finished?". Continuation bypasses both input gates and keeps pause, override,
     lifecycle and proximity behaviour. It completes when the brightness target for the accepted
     stable lux is reached. Repeated calls to the adaptive-α formula are not a completion policy.
-  - **Tests:** a single drop followed by silence finishes the brightness transition, for a zero and
-    a non-zero destination. The same with proximity near. No timer is left re-evaluating an
-    unchanged result. "Smoothed reaches raw within N cooldowns" is **not** a valid expectation.
+  - **Supersession contract (Astra), for the under-trees case:**
+    - a newly accepted reading supersedes whatever remains of the continuation toward the old
+      target. An animation already running may finish under the chosen policy, but all later
+      settling uses the new target, and the old continuation never resumes;
+    - **duration bound:** settling toward one target finishes within a stated bound, which R7 must
+      name and justify before coding;
+    - **terminal state:** on completion, the engine state the next evaluation reads (smoothed lux,
+      stored band, last raw) is consistent with the target reached. A display target reached while
+      smoothing is left behind could make the next cycle move backwards;
+    - **completion is judged on the perceived target, not hardware brightness alone:** under super
+      dimming or the PWM floor (`applyPwmFloor`, D-050), the hardware value does not identify the
+      perceived target (D-109).
+  - **Tests:**
+    - a single drop followed by silence finishes the brightness transition, for a zero and a
+      non-zero destination, and the same with proximity near;
+    - **superseded destination:** darkness starts a transition, bright light arrives before it
+      finishes, then the sensor goes silent. The screen ends on the bright target, and the dark
+      continuation never resumes;
+    - after completion, one more identical evaluation moves nothing (terminal-state consistency);
+    - completion with super dimming engaged and with the PWM floor active;
+    - no timer is left re-evaluating an unchanged result.
+
+    "Smoothed reaches raw within N cooldowns" is **not** a valid expectation.
 - [ ] **R8 — close-out.** Write ledger rows for what shipped (RF's policy included), answering Q1 and Q2 in rows (never
   citing this path), then delete this file.
 
