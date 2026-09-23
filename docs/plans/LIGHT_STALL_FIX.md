@@ -539,3 +539,44 @@ Two decisions follow, and they are separate:
   set beforehand so the onset is captured.
 - Missing recent ALS events in `dumpsys` is **not** enough on its own to name a firmware fault;
   R3's callback-arrival counters are what separate H1 from F-C.
+
+## 7. Device session workflow (owner-approved 2026-09-23)
+
+The owner's OnePlus 13 is connected over adb to the owner's laptop, with Tideo's intent control
+enabled. The agent drives it within the scope below.
+
+- **Where.** Run the session on the laptop: the Claude Desktop app, or `claude remote-control` in
+  the repo folder. A cloud container cannot reach the laptop's adb. Pull `claude/device-e2e-plan`
+  first.
+- **Scope. It does not relax `DEVICE_E2E_PLAN.md` §3,** which still binds the automated suite. This
+  is supervised, hand-driven work for this plan only:
+  - **read-only, by default:** `dumpsys` (including `sensorservice` and `jobscheduler`), `logcat`,
+    screenshots;
+  - **the only commands that change device state:**
+    - Tideo's own intents: `com.tideo.autobrightness.control.REAPPLY`, `SERVICE_ON` and
+      `SERVICE_OFF`;
+    - screen off/on (`input keyevent 26`);
+    - installing the debug build;
+  - **never:** `pm clear`, uninstall, `settings delete|reset`, profile loading or changes, or
+    anything on the E2E §3 denylist. Anything outside this list is asked first.
+- **Two installs, one owner of brightness.** The debug build installs as
+  `com.tideo.autobrightness.debug`, alongside the release app. Turn off the release app's service
+  (`SERVICE_OFF` to `-p com.tideo.autobrightness`) before the debug service runs, and turn it back
+  on at the end.
+- **Order.**
+  1. **Baseline on the release build.**
+     - Reproduce F-A on demand:
+       `adb shell am broadcast -a com.tideo.autobrightness.control.REAPPLY -p com.tideo.autobrightness`.
+       While the model is non-null, the notification falls back to "Monitoring". The receiver
+       ignores every action while intent control is off.
+     - Check `dumpsys jobscheduler` for the Tideo WorkManager job's schedule, to confirm observation
+       6's worker attribution.
+  2. **Implement R1, then R2, then R3**, each ending on a green `scripts/ladder.sh`, a commit and
+     a push (§5).
+  3. **Install the debug build and repeat step 1** against `-p com.tideo.autobrightness.debug`.
+     The notification must keep `Lux … → brightness …` (R1's device check).
+  4. **With R3 installed, repeat the dark-wake test** (H2's check). R3 shows each reading's arrival
+     and accuracy directly, so F-F and H2 can be told apart, and a result decides RF (§5 gate).
+- **Record.** Put each device result in the commit body, and put its effect on a finding in this
+  plan. Device results are observations, scoped to when they were seen (AGENTS.md session
+  protocol, step 6).

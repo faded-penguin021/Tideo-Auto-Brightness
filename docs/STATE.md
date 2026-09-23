@@ -133,6 +133,7 @@ Newest first; ledger rows are the durable detail.
   first reading after a start or wake is never rejected by act19. R6's no-ghosts tests are
   structural, not a cycle count. R7 gained a supersession contract. Later, an unattended
   "Monitoring" fallback in steady dark light fits only the 15-minute MaintenanceWorker (F-A).
+  The adb device-session workflow is plan §7.
 - 2026-09-23 — **Light-stall plan, owner's OnePlus 13 observations folded in.** Every settings
   save sends a start command, so saving any setting resets the notification to "Monitoring" (F-A
   has more start-command sources than the two it listed). A wake in the dark sometimes ends on
