@@ -822,3 +822,24 @@
   fast, which keeps the DC-056 anchor for the next run to restore. Separately, the service-off Apply
   passed `probe = false`, so a user who only ever pressed Apply would never earn the fallback; it
   now probes like the coordinator's writes, `probe = false` being reserved for teardown.
+
+- DC-059: **A pause at `12 / 12 / 15` while the PWM floor holds 15 is a real foreign write that the
+  rules judged correctly (owner report, 2026-09-23, OnePlus 13, 1.11.0).** The card read
+  `Target 3`, `Requested → acknowledged: 15 → 15 ACKNOWLEDGED`, `PAUSED (OBSERVER)`,
+  `Observed / settled / expected: 12 / 12 / 15`, `Mode at commit: Manual`, override seen about 3 s
+  after the last cycle's update, repeated on unlock and again after each Resume. Everything Tideo controls is accounted for: 15 over a
+  target of 3 is `applyPwmFloor` (PWM-sensitive, threshold 15), so `reduce_bright_colors` is
+  engaged; our 15 was stored as asked; 12 is three domain steps off, outside the DC-005 deadband,
+  in MANUAL, so `handleOverride` paused as designed and the defect is attribution, not a rule. What
+  wrote 12 is not identifiable from the app (DC-007).
+
+- DC-060: **The most likely writer behind DC-059 is the OS reacting to Tideo's OWN Extra Dim
+  engage.** The lead is the timing pattern: both triggers are exactly Extra Dim's off→on edge —
+  `hibernate()` and the pause both `disengage()`,
+  and the first cycle after wake or `resume()`'s `setInitialBrightness` re-engages it — and no
+  suppression window covers that engage, whereas DC-009 already found the mode flip to be a
+  brightness event on OEM builds. **A hypothesis, not a reading:** the owner's OS unlock restore
+  predicts the unlock half as well and not the Resume half, and that half is recalled, not
+  captured. No fix is taken on it. A longer settle window is in the rejected set, and at 3 s it
+  would not cover the gap anyway. The discriminator is the Owner-queue check: toggle Extra Dim
+  from the system tile while Tideo is paused and read `screen_brightness` before and after.
