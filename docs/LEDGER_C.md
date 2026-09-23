@@ -856,3 +856,9 @@
   transient that the pause was taken on; if it had resumed, the 241 is Tideo's own write and says
   nothing about the 12, and which of the two it was is still open. A longer fixed or blanket
   settle window is in the rejected set, so any fix here is the owner's ruling, not an agent's.
+
+- DC-062: **The owner had pressed Resume before the reads, so DC-061's `241` is Tideo's own write
+  and says nothing about the 12 (owner, 2026-09-23).** Extra Dim stays ruled out, since the reads
+  still spanned the tile toggle. Whether the 12 lasted or was a dip is still open, and so is the
+  root cause. The next false pause settles it: read `screen_brightness` from the shell before
+  pressing Resume, where about 193 means the 12 stuck and 241 means it was a dip.

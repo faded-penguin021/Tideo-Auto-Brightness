@@ -80,15 +80,13 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
    `git ls-remote --tags --refs origin 'refs/tags/v1.11.0'` — a hit means it is done and this item
    can go.
 
-3. **[2026-09-23] Was Tideo still paused when you read `241`?** Extra Dim is ruled out by your
-   reads. The card's "settled 12" was a second read only 3 ms after the first, so it cannot show
-   that the 12 lasted. If Tideo was still paused (Live Debug → "Manual override: Paused"), nothing
-   of Tideo's put 15 back. The 12 was then a brief dip that reverted by itself, and the pause was
-   taken on that dip. If you had pressed Resume first, the 241 is Tideo's own write and the
-   question stays open. To settle it on the next false pause, don't resume, and run
-   `adb shell settings get system screen_brightness`. About 193 means the 12 stuck, and 241 means it
-   was a dip. Fixing a dip means re-reading later before pausing, which is a settle-window change
-   and yours to rule on. DC-059…DC-061.
+3. **[2026-09-23] On the next false "manual override" pause, read brightness before pressing
+   Resume.** Run `adb shell settings get system screen_brightness` while Live Debug still reads
+   "Manual override: Paused". About 193 means the 12 stuck, so something outside Tideo really
+   changed brightness. 241 means it was a brief dip that reverted by itself, and Tideo paused on it
+   because its "settled" value is a re-read only 3 ms later. Fixing a dip means re-reading later
+   before pausing, which is a settle-window change and yours to rule on. Extra Dim is already ruled
+   out. The earlier `241` read came after Resume, so it could not decide this. DC-059…DC-062.
 
 Open questions: none.
 
