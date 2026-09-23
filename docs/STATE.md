@@ -80,17 +80,15 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
    `git ls-remote --tags --refs origin 'refs/tags/v1.11.0'` — a hit means it is done and this item
    can go.
 
-3. **[2026-09-23] Find out whether turning on Extra Dim makes your phone rewrite brightness.**
-   This is the check behind the false "manual override" pauses on unlock. The leading suspect is
-   the OS reacting to Tideo's own Extra Dim, but that is not proven. Tideo is paused after a false
-   pause, so Extra Dim is off. Then (1) run `adb shell settings get system screen_brightness` and
-   note the value, (2) turn Extra Dim on from the system Quick Settings tile, not by adb (DB-071),
-   (3) wait about 5 s and run the same command again, then (4) turn the tile off. The shell uses
-   the 0–4095 scale, so 15 reads as about 241 and 12 as about 193 (DC-026). A value that moves by
-   itself between steps 1 and 3 confirms the Extra Dim hypothesis, and Tideo then has to suppress
-   its own Extra Dim engage like a brightness write (the DC-009 shape). An unchanged value rules it
-   out, and the next suspect is the OS restoring brightness after unlock. Either result goes into
-   a new ledger row. DC-059, DC-060.
+3. **[2026-09-23] Was Tideo still paused when you read `241`?** Extra Dim is ruled out by your
+   reads. The card's "settled 12" was a second read only 3 ms after the first, so it cannot show
+   that the 12 lasted. If Tideo was still paused (Live Debug → "Manual override: Paused"), nothing
+   of Tideo's put 15 back. The 12 was then a brief dip that reverted by itself, and the pause was
+   taken on that dip. If you had pressed Resume first, the 241 is Tideo's own write and the
+   question stays open. To settle it on the next false pause, don't resume, and run
+   `adb shell settings get system screen_brightness`. About 193 means the 12 stuck, and 241 means it
+   was a dip. Fixing a dip means re-reading later before pausing, which is a settle-window change
+   and yours to rule on. DC-059…DC-061.
 
 Open questions: none.
 
@@ -140,9 +138,9 @@ fix and NOT by creating `26.txt`. Re-open only for something genuinely major, an
 Newest first; ledger rows are the durable detail.
 
 - 2026-09-23 — **A false manual-override pause on unlock was diagnosed but not fixed (DC-059,
-  DC-060).** The write came from outside Tideo, and the override rules judged it correctly. Extra
-  Dim's engage is the lead, and a device check that separates it from the OS's unlock restore is
-  in the Owner queue.
+  DC-060, DC-061).** Tideo's own Extra Dim was the first suspect, and the owner's reads refuted it.
+  The "settled" value Tideo paused on is a 3 ms re-read, so a brief dip looks like a real change.
+  Whether that is what happened waits on the Owner-queue question.
 - 2026-09-23 — **Light-stall plan rescoped by the owner.** This train is not the fix for #132: it
   ships F-A, diagnostics and defects reproduced by a test. The new input and settling policies
   wait for a diagnostic trace, and Q1/Q2 are on record but inactive.

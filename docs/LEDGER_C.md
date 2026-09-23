@@ -832,6 +832,7 @@
   engaged; our 15 was stored as asked; 12 is three domain steps off, outside the DC-005 deadband,
   in MANUAL, so `handleOverride` paused as designed and the defect is attribution, not a rule. What
   wrote 12 is not identifiable from the app (DC-007).
+  → "Settled" here is a 3 ms re-read and cannot show that the 12 lasted — see DC-061.
 
 - DC-060: **The most likely writer behind DC-059 is the OS reacting to Tideo's OWN Extra Dim
   engage.** The lead is the timing pattern: both triggers are exactly Extra Dim's off→on edge —
@@ -843,3 +844,15 @@
   captured. No fix is taken on it. A longer settle window is in the rejected set, and at 3 s it
   would not cover the gap anyway. The discriminator is the Owner-queue check: toggle Extra Dim
   from the system tile while Tideo is paused and read `screen_brightness` before and after.
+  → Refuted by the owner's check: Extra Dim is ruled out — see DC-061.
+
+- DC-061: **Extra Dim is ruled out, and DC-059's "settled 12" was read 3 ms after the change, so
+  it cannot show that the 12 lasted (owner, 2026-09-23).** The owner ran the DC-060 check and
+  `screen_brightness` read `241` at every step, which is domain 15 at S = 4095 (DC-026): Tideo's
+  own write, with no 12 (about 193) anywhere. `handleOverride` settles for `cycleTimeMs` (DC-005)
+  and the card read `Cycle time (ms): 3`, so "settled" is a second read 3 ms after the first, not
+  a settling observation, and a dip the OS reverts looks exactly like a lasting change. If Tideo
+  was still paused during those reads, nothing of Tideo's could have put 15 back, so the 12 was a
+  transient that the pause was taken on; if it had resumed, the 241 is Tideo's own write and says
+  nothing about the 12, and which of the two it was is still open. A longer fixed or blanket
+  settle window is in the rejected set, so any fix here is the owner's ruling, not an agent's.
