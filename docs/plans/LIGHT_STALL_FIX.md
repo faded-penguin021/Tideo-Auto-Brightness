@@ -21,7 +21,7 @@
 | Tideo #132 (LordSithek) | Pixel 9 Pro (caiman), crDroid, Android 16, 1.10.0, ELEVATED via root; battery optimisation off, locked in memory | Brightness occasionally stops following light (dark↔bright) until the service is toggled off/on. Two Live Debug captures with 48 s and 82 s logcats. |
 | Tideo #130 (secondary symptom) | OPPO Find X9 Ultra, ColorOS, 1.10.0 | Notification "repeatedly falls back to *Monitoring ambient light*". Toggling the tile restores it; tile and notification disagree. |
 | Owner | OnePlus 13, OxygenOS | Saw the same notification text at night. Has not seen Tideo go stale on this phone. |
-| Owner, 2026-09-23 | same phone, 0 lx, "Trust low-accuracy sensor" off | (1) After a screen off/on, the notification reads "Monitoring ambient light". (2) With the setting on, a screen off/on gives `0 lx → 0`. (3) Turning it off, with no screen cycle, **instantly** restores "Monitoring"; turning it on again, still with no screen cycle, does not clear it. (4) Later, several screen cycles with the setting **off** gave `0 lx → 0`. (5) A wake after at least 2 min with the screen off, setting off, showed `0 lx → 0` at once. |
+| Owner, 2026-09-23 | same phone, 0 lx, "Trust low-accuracy sensor" off | (1) After a screen off/on, the notification reads "Monitoring ambient light". (2) With the setting on, a screen off/on gives `0 lx → 0`. (3) Turning it off, with no screen cycle, **instantly** restores "Monitoring"; turning it on again, still with no screen cycle, does not clear it. (4) Later, several screen cycles with the setting **off** gave `0 lx → 0`. (5) A wake after at least 2 min with the screen off, setting off, showed `0 lx → 0` at once. (6) Screen left on in the dark with no interaction: after a while the notification fell back to "Monitoring". Live Debug right after showed smoothed and raw 0.0, band 0.0–0.1, target 0, hardware 15 (requested → acknowledged 15 → 15), active rule "Phone in bed", last update (last completed cycle) 7 min ago, last sample "just now". |
 
 **Reading of the 2026-09-23 observations.** (3) is F-A, triggered by the settings save; the trust
 setting itself plays no part, and it is the only deterministic one. (1) is **intermittent**: (4) and
@@ -71,6 +71,13 @@ and `platform/.../sensor/`, so they describe the reporter's build.
     that at 18:23:16, shows smoothed 30.1 lx and target 19.
   - The 09-22 log only brings the task to front (`result code=2`, no post), and the notification
     keeps `Lux 1 → brightness 5`.
+- **Seen unattended on the owner's phone (2026-09-23, observation 6): the worker path.** The
+  pipeline state was non-null (smoothed 0.0, target 0), so the live model reads `Lux 0 →
+  brightness 0`, and the screen was on, so `hibernate()` had not nulled it. Only a start command
+  posts "Monitoring" over that model. Every start-command source above needs a user action except
+  boot and `MaintenanceWorker` (`MaintenanceWorker.kt:23`, every 15 min), so the worker is the only
+  source that fits. Optional confirmation: the time of the fallback matches the worker's schedule
+  (`adb shell dumpsys jobscheduler`, the Tideo WorkManager job).
 - **Reproduced on the owner's phone (2026-09-23, observation 3).** Saving the trust setting sends
   `ACTION_REAPPLY`, so `startForeground` posts "Monitoring". `reapplyProfile` → `setInitialBrightness`
   recomputes the same 0 → 0 model, so the `distinctUntilChanged` updater never re-posts it. Saving
@@ -239,7 +246,20 @@ stays where the framework restored it. **Separating check, no new build needed:*
 on "Monitoring", with the screen off for at least 2 min beforehand, open Live Debug at once. If it
 reads seconds, a reading arrived and was rejected (F-F). If it reads 2 min or more, none arrived
 (H2). Opening the app reposts "Monitoring" (F-A) but does not touch "Last sample". The owner's one
-run (2026-09-23) did not reproduce the failure, so it separated nothing. A fix for H2 is not
+run (2026-09-23) did not reproduce the failure, so it separated nothing. **H2 is weaker on this
+phone:** in observation 6 the sensor kept delivering at a steady ~0 lx (last sample "just now",
+last completed cycle 7 min earlier). A sensor that repeats like that would recover within seconds
+from a missing first event. So a wake that *stays* on "Monitoring" there points to F-F: repeated
+rejections for accuracy, since after a wake no other gate applies. That rests on one screenshot,
+and the delivery rate has not been measured.
+
+**Observation 6, other readings.**
+- The samples arriving at 0 lx were rejected, either by the stored 0.0–0.1 band (F-B's zero trap:
+  0 is neither below 0.0 nor above 0.1) or for accuracy. R3 would name which. The screen was
+  already at target, so this is harmless here.
+- Hardware 15 against target 0 is the PWM floor or dimming threshold at work (`applyPwmFloor`,
+  D-050), with the perceived target reported (D-109). It is a live instance of R7's rule that
+  completion is judged on the perceived target, not the hardware value. A fix for H2 is not
 planned: it waits for a separated reproduction, and would change what a wake does with no reading.
 
 ### H1 — The sensor path goes quiet while still enabled. Open
