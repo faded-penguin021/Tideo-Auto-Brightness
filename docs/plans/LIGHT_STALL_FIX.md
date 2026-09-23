@@ -9,7 +9,8 @@
 > Analysis by Opus. Two gpt-6-astra review passes (2026-09-23) are folded in, with Astra's
 > corrections applied in place and §3 listing the claims they withdrew. F-E comes from an owner
 > lead. A gpt-5.6-sol review (2026-09-23) is folded in the same way: F-E item 4, R2, R5, R6 and R7
-> were corrected, and its withdrawn claims joined §3.
+> were corrected, and its withdrawn claims joined §3. The owner's OnePlus 13 observations
+> (2026-09-23, §1) extended F-A's start-command sources and confirmed F-F on that phone.
 
 ## 1. Reports and scope
 
@@ -17,7 +18,14 @@
 |---|---|---|
 | Tideo #132 (LordSithek) | Pixel 9 Pro (caiman), crDroid, Android 16, 1.10.0, ELEVATED via root; battery optimisation off, locked in memory | Brightness occasionally stops following light (dark↔bright) until the service is toggled off/on. Two Live Debug captures with 48 s and 82 s logcats. |
 | Tideo #130 (secondary symptom) | OPPO Find X9 Ultra, ColorOS, 1.10.0 | Notification "repeatedly falls back to *Monitoring ambient light*". Toggling the tile restores it; tile and notification disagree. |
-| Owner | OnePlus 13, OxygenOS | Saw the same notification text at night. Tideo **never** goes stale on this phone. |
+| Owner | OnePlus 13, OxygenOS | Saw the same notification text at night. Has not seen Tideo go stale on this phone. |
+| Owner, 2026-09-23 | same phone, 0 lx, "Trust low-accuracy sensor" off | (1) After a screen off/on, the notification reads "Monitoring ambient light". (2) With the setting on, a screen off/on gives `0 lx → 0`. (3) Turning it off, with no screen cycle, **instantly** restores "Monitoring"; turning it on again, still with no screen cycle, does not clear it. |
+
+**Reading of the 2026-09-23 observations.** They show two separate mechanisms. (1) and (2) are
+F-F: this sensor reports accuracy ≤ 1 at 0 lx. (3) is F-A, triggered by the settings save; the
+trust setting itself plays no part. The observations do not say whether the brightness itself
+moved, so "has not seen it go stale" still stands, but it is weaker than it looked: after a wake in
+the dark, the code writes nothing (F-F), and that is hard to notice in the dark.
 
 **Not every device is affected.** No mechanism in §2 needs a faulty device, but each one's
 exposure depends on the sensor's event cadence. A sensor that emits frequent small changes (jitter)
@@ -40,11 +48,18 @@ and `platform/.../sensor/`, so they describe the reporter's build.
   re-post that same model after `startForeground` has replaced the visible notification. **In steady
   light the visible notification stays wrong indefinitely**, and even a fresh sample fixes it only if
   it changes a model field.
-- Start commands reach a service that is already running from two places:
+- Start commands reach a service that is already running from many places, since every
+  `AutoBrightnessRuntime.sendServiceAction` is a `startForegroundService`:
   - `MainActivity.onCreate` → `AutoBrightnessRuntime.bootstrap()` → `startMonitoring()`;
-  - `MaintenanceWorker`, every 15 min.
+  - `MaintenanceWorker`, every 15 min;
+  - **every settings save**, through `AutoBrightnessRuntime.reapply()` → `ACTION_REAPPLY`:
+    `DraftSettingsViewModel.kt:155`, `SettingsViewModel.kt:83,116`, `ProfileApplier.kt:35`,
+    `CircadianExtrasViewModel.kt:101`, `LiveDebugViewModel.kt:81`;
+  - the widget (`WidgetActionReceiver.kt:17`) and `ControlReceiver` (`:93`);
+  - `ACTION_RESUME` and `ACTION_RESUME_CONTEXT` from the UI.
 
-  The worker's comment, "startForegroundService is a no-op if already running"
+  (`AppModule.kt:130` calls `controller.reapply()` directly, sends no start command, and so is
+  not a source.) The worker's comment, "startForegroundService is a no-op if already running"
   (`MaintenanceWorker.kt:22`), is false: `onStartCommand` runs on every call.
 - **Checked against both #132 logs.**
   - The 09-23 log *creates* the activity at 18:23:06.104 (`result code=0`, `Displayed +143ms`), and
@@ -52,8 +67,14 @@ and `platform/.../sensor/`, so they describe the reporter's build.
     that at 18:23:16, shows smoothed 30.1 lx and target 19.
   - The 09-22 log only brings the task to front (`result code=2`, no post), and the notification
     keeps `Lux 1 → brightness 5`.
+- **Reproduced on the owner's phone (2026-09-23, observation 3).** Saving the trust setting sends
+  `ACTION_REAPPLY`, so `startForeground` posts "Monitoring". `reapplyProfile` → `setInitialBrightness`
+  recomputes the same 0 → 0 model, so the `distinctUntilChanged` updater never re-posts it. Saving
+  again repeats the same thing. No sensor or trust logic is involved. **Separating check (optional):**
+  in steady light with the setting on, save an unrelated setting. If "Monitoring" appears, that
+  confirms the cause.
 - **Explains:** #130's fallback text and its tile/notification disagreement (the tile reads live
-  state), and the owner's night sighting. **Does not** show that brightness adjustment stopped.
+  state), and the owner's night sighting (or F-F; see there). **Does not** show that brightness adjustment stopped.
 - **Supersedes** the OEM battery-optimisation explanation posted on #130.
 
 ### F-B — A drop is not fully absorbed, and nothing continues it. Confidence: high as a mechanism; attribution provisional
@@ -168,18 +189,39 @@ which in the smoothing path was last written by the *previous* cycle's task546 (
 act25), so a threshold that fell between cycles can still give a small negative α. That is rare,
 consistent with the owner never observing it.
 
-### F-F — A low-accuracy reading is rejected, and recovered accuracy never re-admits it. Confidence: medium as a mechanism; attribution open
+### F-F — A low-accuracy reading is rejected, and nothing re-admits it. Confidence: high as a mechanism (seen on the owner's OnePlus 13); attribution for #132 open
 
 - prof760's first stage drops any reading with `accuracy ≤ 1` unless "Trust low-accuracy sensor"
   is on (`ProfileGates.kt:20`, `BrightnessPipelineController.kt:207-208`).
+- **Seen on the owner's OnePlus 13 (2026-09-23, observations 1–2).** Screen-off `hibernate()`
+  nulls `smoothedLux`, `lastRawLux`, the thresholds and `lastAcceptedMs`
+  (`BrightnessPipelineController.kt:265-279`). On wake, `reinit()` caches settings *before*
+  `startSensor()` (`:251-253`), and `setInitialBrightness` returns early with no lux
+  (`PipelineCycleRunner.kt:359`), so **no brightness is written**. The re-registration's first
+  event then meets unseeded thresholds, a cleared cooldown and a free mutex, so the accuracy gate
+  is the only one that can reject it. With the trust setting off it is rejected, and with it on the
+  same wake gives `0 lx → 0`. **This sensor therefore reports accuracy ≤ 1 at 0 lx**, at least on
+  its first event after registration. Whether it also does so in the light, and whether
+  `onAccuracyChanged` ever fires on it, are unknown.
+- **Consequence on this phone:** with the setting off (the default, as in Tasker), a wake in the
+  dark leaves brightness where the framework restored it until a reading with accuracy > 1
+  arrives. After R1, "Monitoring ambient light" means exactly this, and it is true.
+- **A second path that never re-admits (observation 3).** Turning the setting on saves settings →
+  `ACTION_REAPPLY` → `setInitialBrightness`, which reads only `smoothedLux ?: lastRawLux`, both null
+  after a wake. The rejected reading was never kept, and an on-change sensor in steady light sends
+  no other. **Whether Tasker re-evaluates prof760 when `%AAB_TrustUnreliable` changes is unchecked**:
+  check it with `docs/rebuild/XML_RECIPES.md` alongside Q2, and do not assume parity either way.
 - `LightSensorSource`'s `onAccuracyChanged` is a no-op (`LightSensorSource.kt:39`). On an on-change
   sensor, accuracy can recover without the value changing, so no new event arrives and the rejected
   reading is never evaluated. A toggle re-registers the sensor and gets a fresh initial event,
   which matches #132's "toggle fixes it".
 - It fits the Pixel's AOC reporting "Device appears to be covered" at each re-activation in both
   logs, **if** the sensor marks those readings low-accuracy. Neither log records accuracy.
-- **Asked on #132 (owner, 2026-09-23): does enabling the setting stop the freezes?** This answer
-  decides the shape of the fix (§5, gate before R6).
+- **Asked on #132 (owner, 2026-09-23): does enabling the setting stop the freezes?** Since the
+  OnePlus observations, this answer decides only whether F-F is #132's cause (§5, gate before R6).
+  The mechanism is established, so its fix no longer waits on the reporter.
+- **R2 cannot explain the wake case.** `reinit()` loads settings before registering the sensor, so
+  F-C's startup race applies only to the first service start.
 
 ### H1 — The sensor path goes quiet while still enabled. Open
 
@@ -254,15 +296,14 @@ comment budgets were exactly full at `64be441` (2538/2538 and 330/330), so a run
 offset any comment it adds. Raising a budget is a rule change (`comment-budget.sh`, rule-review
 protocol).
 
-**Gate before R6 — the #132 accuracy answer (F-F).** R1, R2, R3 and R5 stand whatever the reporter
-says: they fix confirmed defects or restore parity. R3 must count accuracy rejections as their
-own reason either way.
+**Gate before R6 — the #132 accuracy answer (F-F).** R1, R2, R3, R5 and RF stand whatever the
+reporter says: they fix confirmed defects or restore parity. RF is no longer conditional, because
+the owner's OnePlus showed the F-F mechanism (2026-09-23). The reporter's answer now decides only
+whether F-F is #132's cause. R3 must count accuracy rejections as their own reason either way.
 
-- **If the setting stops the freezes:** F-F is #132's cause. The fix is a small one: re-admit the
-  last rejected reading when `onAccuracyChanged` reports accuracy > 1. That is a new policy with its
-  own row and test. Re-scope R6 and R7 before starting them: they would fix real mechanisms that
-  #132 no longer demonstrates, and their cost (the D-027 departure, a new settling policy) needs a
-  fresh case. R4 stays.
+- **If the setting stops the freezes:** F-F is #132's cause, and RF is #132's fix. Re-scope R6 and
+  R7 before starting them: they would fix real mechanisms that #132 no longer demonstrates, and
+  their cost (the D-027 departure, a new settling policy) needs a fresh case. R4 stays.
 - **If it does not:** F-F is ruled out for #132, and R6 and R7 proceed as written.
 - **No answer:** R6 and R7 wait for R3's diagnostics from the reporter instead.
 
@@ -275,7 +316,10 @@ own reason either way.
   - **Tests:** a repeated start with an unchanged model and no later sensor event leaves the posted
     text at `Lux … → brightness …` and keeps the active-context subtext (`:528`); the paused
     variant keeps its title and actions; a first start (not running) still posts the monitoring
-    text.
+    text. **Drive the repeat through `ACTION_REAPPLY`** (the owner's reproduction: a settings save
+    whose reapply recomputes the same model), as well as through a plain start. After a wake with
+    no accepted reading, "Monitoring" is still posted; that text is true there (F-F).
+  - **Device check (owner):** in steady light, saving any setting leaves `Lux … → brightness …`.
 - [ ] **R2 — F-C's startup race only.** No fork: it reorders startup and queues nothing. Register
   the sensor only after `cachedSettings` has loaded. Holding an early reading until settings load
   would be deferred work, which belongs to R6 and its D-027 rule review, so R2 does not do it (Sol).
@@ -287,12 +331,32 @@ own reason either way.
   - collector receipt, plus admitted, deferred and rejected counts with the last rejection reason
     (accuracy, dead band, mutex, cooldown, settings not loaded), and the last `onAccuracyChanged`
     value and time (F-F);
-  - the current cycle stage and start time, and the last completed cycle.
+  - the current cycle stage and start time, and the last completed cycle;
+  - the value and accuracy of the first event after each registration (wake or start), so the
+    OnePlus case (F-F) shows up in one screenshot.
 
   Labels must be string resources: the hardcoded-string ceiling in `HardcodedStringCheckTest` may
   only fall. **R5 and R6 each revise this taxonomy (Sol):** R5 adds a distinct act19 stop, and R6
   turns busy and cooldown drops into deferred or replaced work. Each of those segments states which
   counter a reading now lands in, so R4's banner never reads an ambiguous signal.
+- [ ] **RF — F-F, re-admit the last rejected reading.** Not a parity restore: a new policy with its
+  own row. Keeping a rejected reading for later is deferred work, so it shares R6's rule-review
+  pass (D-027) and **R6's single slot**: whichever lands first defines the slot, and the other
+  extends it. Land it after R5, so its tests run against the corrected gates.
+  - **Change:** keep the last reading the accuracy gate rejected (value and accuracy). Re-offer it
+    once, through the normal prof760 gates, when `onAccuracyChanged` reports accuracy > 1 (so
+    `LightSensorSource` stops treating that callback as a no-op), and when a settings save turns
+    "Trust low-accuracy sensor" on. A newer event replaces it. Screen-off, stop and a new sensor
+    session invalidate it. The trust-toggle trigger waits for the Tasker check in F-F. If Tasker
+    does not re-evaluate there, the trigger is still proposed, and the owner decides.
+  - **Tests:**
+    - a wake whose first event is accuracy 1 at 0 lx, followed by silence, writes nothing with the
+      setting off, and is evaluated when accuracy later recovers;
+    - the same case is evaluated when the setting is turned on;
+    - after a screen-off, the kept reading is not re-offered;
+    - a newer reading replaces the kept one.
+  - **Device check (owner):** repeat observations 1–3. Turning the setting on with no screen cycle
+    should give `0 lx → 0`.
 - [ ] **R4 — F-D, the health surfaces.** No parity source; the owner approves the wording.
   - Drive the banner from R3's signals, not a heartbeat.
   - Decide whether to clear runtime state by service-instance ownership and lifecycle instead of
@@ -361,7 +425,7 @@ own reason either way.
   - **Tests:** a single drop followed by silence finishes the brightness transition, for a zero and
     a non-zero destination. The same with proximity near. No timer is left re-evaluating an
     unchanged result. "Smoothed reaches raw within N cooldowns" is **not** a valid expectation.
-- [ ] **R8 — close-out.** Write ledger rows for what shipped, answering Q1 and Q2 in rows (never
+- [ ] **R8 — close-out.** Write ledger rows for what shipped (RF's policy included), answering Q1 and Q2 in rows (never
   citing this path), then delete this file.
 
 ## 6. Evidence still wanted from #132 (ask only if the owner chooses to)

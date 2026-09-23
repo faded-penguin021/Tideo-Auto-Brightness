@@ -48,10 +48,11 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
 `docs/plans/LIGHT_STALL_FIX.md` (persisting approved by owner 2026-09-23; Astra-reviewed twice).
 
 - [x] R0 plan · [ ] R1 notification overwrite · [ ] R2 startup race · [ ] R3 diagnostics · [ ] R4
-  health surfaces · [ ] R5 restore Tasker's dead-band (F-E) · [ ] R6 pending-latest slot (needs
+  health surfaces · [ ] R5 restore Tasker's dead-band (F-E) · [ ] RF re-admit the last rejected
+  low-accuracy reading (F-F; shares R6's rule review and slot) · [ ] R6 pending-latest slot (needs
   the rule-review pass) · [ ] R7 settling path (Tasker check first) · [ ] R8 close-out (ledger rows,
   delete the plan). R6 and R7 wait on the #132 reporter's "Trust low-accuracy sensor" answer (plan
-  §5 gate, F-F).
+  §5 gate, F-F); RF does not.
 
 ## Owner queue
 
@@ -128,6 +129,12 @@ fix and NOT by creating `26.txt`. Re-open only for something genuinely major, an
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-23 — **Light-stall plan, owner's OnePlus 13 observations folded in.** Every settings
+  save sends a start command, so saving any setting resets the notification to "Monitoring" (F-A
+  has more start-command sources than the two it listed). At 0 lx the OnePlus reports low accuracy,
+  so after a wake in the dark nothing is written until a better reading arrives, and turning
+  "Trust low-accuracy sensor" on does not re-check the rejected one. F-F is confirmed as a
+  mechanism, and its fix is new segment RF, which no longer waits on the #132 reporter.
 - 2026-09-23 — **Light-stall plan, Sol review folded in.** Restoring Tasker's dead-band (R5) does
   not by itself continue an unfinished drop: Tasker's profile gate rejects an unchanged reading
   first, so the settling path (R7) is a new policy. R5 now needs a distinct no-write act19 stop
