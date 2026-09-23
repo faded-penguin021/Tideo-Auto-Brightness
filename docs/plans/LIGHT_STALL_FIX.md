@@ -10,7 +10,7 @@
 > corrections applied in place and §3 listing the claims they withdrew. F-E comes from an owner
 > lead. A gpt-5.6-sol review (2026-09-23) is folded in the same way: F-E item 4, R2, R5, R6 and R7
 > were corrected, and its withdrawn claims joined §3. The owner's OnePlus 13 observations
-> (2026-09-23, §1) extended F-A's start-command sources and confirmed F-F on that phone.
+> (2026-09-23, §1) extended F-A's start-command sources and added the intermittent wake case, H2.
 
 ## 1. Reports and scope
 
@@ -19,13 +19,15 @@
 | Tideo #132 (LordSithek) | Pixel 9 Pro (caiman), crDroid, Android 16, 1.10.0, ELEVATED via root; battery optimisation off, locked in memory | Brightness occasionally stops following light (dark↔bright) until the service is toggled off/on. Two Live Debug captures with 48 s and 82 s logcats. |
 | Tideo #130 (secondary symptom) | OPPO Find X9 Ultra, ColorOS, 1.10.0 | Notification "repeatedly falls back to *Monitoring ambient light*". Toggling the tile restores it; tile and notification disagree. |
 | Owner | OnePlus 13, OxygenOS | Saw the same notification text at night. Has not seen Tideo go stale on this phone. |
-| Owner, 2026-09-23 | same phone, 0 lx, "Trust low-accuracy sensor" off | (1) After a screen off/on, the notification reads "Monitoring ambient light". (2) With the setting on, a screen off/on gives `0 lx → 0`. (3) Turning it off, with no screen cycle, **instantly** restores "Monitoring"; turning it on again, still with no screen cycle, does not clear it. |
+| Owner, 2026-09-23 | same phone, 0 lx, "Trust low-accuracy sensor" off | (1) After a screen off/on, the notification reads "Monitoring ambient light". (2) With the setting on, a screen off/on gives `0 lx → 0`. (3) Turning it off, with no screen cycle, **instantly** restores "Monitoring"; turning it on again, still with no screen cycle, does not clear it. (4) Later, several screen cycles with the setting **off** gave `0 lx → 0`. (5) A wake after at least 2 min with the screen off, setting off, showed `0 lx → 0` at once. |
 
-**Reading of the 2026-09-23 observations.** They show two separate mechanisms. (1) and (2) are
-F-F: this sensor reports accuracy ≤ 1 at 0 lx. (3) is F-A, triggered by the settings save; the
-trust setting itself plays no part. The observations do not say whether the brightness itself
-moved, so "has not seen it go stale" still stands, but it is weaker than it looked: after a wake in
-the dark, the code writes nothing (F-F), and that is hard to notice in the dark.
+**Reading of the 2026-09-23 observations.** (3) is F-A, triggered by the settings save; the trust
+setting itself plays no part, and it is the only deterministic one. (1) is **intermittent**: (4) and
+(5) show this sensor can deliver a first event at 0 lx with accuracy > 1, which the gate admits with
+the setting off. So (1)–(2) do **not** establish F-F. A wake that ends on "Monitoring" is either F-F
+(the first event had accuracy ≤ 1) or H2 (no first event arrived), and nothing observed so far
+separates the two. The observations do not say whether the brightness itself moved. In either case
+the code writes nothing after such a wake, and that is hard to notice in the dark.
 
 **Not every device is affected.** No mechanism in §2 needs a faulty device, but each one's
 exposure depends on the sensor's event cadence. A sensor that emits frequent small changes (jitter)
@@ -74,7 +76,7 @@ and `platform/.../sensor/`, so they describe the reporter's build.
   in steady light with the setting on, save an unrelated setting. If "Monitoring" appears, that
   confirms the cause.
 - **Explains:** #130's fallback text and its tile/notification disagreement (the tile reads live
-  state), and the owner's night sighting (or F-F; see there). **Does not** show that brightness adjustment stopped.
+  state), and the owner's night sighting (or the intermittent wake case, F-F or H2). **Does not** show that brightness adjustment stopped.
 - **Supersedes** the OEM battery-optimisation explanation posted on #130.
 
 ### F-B — A drop is not fully absorbed, and nothing continues it. Confidence: high as a mechanism; attribution provisional
@@ -189,27 +191,28 @@ which in the smoothing path was last written by the *previous* cycle's task546 (
 act25), so a threshold that fell between cycles can still give a small negative α. That is rare,
 consistent with the owner never observing it.
 
-### F-F — A low-accuracy reading is rejected, and nothing re-admits it. Confidence: high as a mechanism (seen on the owner's OnePlus 13); attribution for #132 open
+### F-F — A low-accuracy reading is rejected, and nothing re-admits it. Confidence: medium as a mechanism; not established on any device
 
 - prof760's first stage drops any reading with `accuracy ≤ 1` unless "Trust low-accuracy sensor"
   is on (`ProfileGates.kt:20`, `BrightnessPipelineController.kt:207-208`).
-- **Seen on the owner's OnePlus 13 (2026-09-23, observations 1–2).** Screen-off `hibernate()`
-  nulls `smoothedLux`, `lastRawLux`, the thresholds and `lastAcceptedMs`
-  (`BrightnessPipelineController.kt:265-279`). On wake, `reinit()` caches settings *before*
-  `startSensor()` (`:251-253`), and `setInitialBrightness` returns early with no lux
-  (`PipelineCycleRunner.kt:359`), so **no brightness is written**. The re-registration's first
-  event then meets unseeded thresholds, a cleared cooldown and a free mutex, so the accuracy gate
-  is the only one that can reject it. With the trust setting off it is rejected, and with it on the
-  same wake gives `0 lx → 0`. **This sensor therefore reports accuracy ≤ 1 at 0 lx**, at least on
-  its first event after registration. Whether it also does so in the light, and whether
-  `onAccuracyChanged` ever fires on it, are unknown.
-- **Consequence on this phone:** with the setting off (the default, as in Tasker), a wake in the
-  dark leaves brightness where the framework restored it until a reading with accuracy > 1
-  arrives. After R1, "Monitoring ambient light" means exactly this, and it is true.
-- **A second path that never re-admits (observation 3).** Turning the setting on saves settings →
-  `ACTION_REAPPLY` → `setInitialBrightness`, which reads only `smoothedLux ?: lastRawLux`, both null
-  after a wake. The rejected reading was never kept, and an on-change sensor in steady light sends
-  no other. **Whether Tasker re-evaluates prof760 when `%AAB_TrustUnreliable` changes is unchecked**:
+- **The wake path leaves no second chance.** Screen-off `hibernate()` nulls `smoothedLux`,
+  `lastRawLux`, the thresholds and `lastAcceptedMs` (`BrightnessPipelineController.kt:265-279`). On
+  wake, `reinit()` caches settings *before* `startSensor()` (`:251-253`), and
+  `setInitialBrightness` returns early with no lux (`PipelineCycleRunner.kt:359`), so **no
+  brightness is written**. The re-registration's first event then meets unseeded thresholds, a
+  cleared cooldown and a free mutex, so the accuracy gate is the only one that can reject it. If
+  it is rejected, or never arrives (H2), nothing runs until the light changes.
+- **Not shown on the owner's OnePlus 13.** A wake there sometimes ends on "Monitoring" with the
+  setting off (§1, observation 1), and at other times gives `0 lx → 0` with it off (observations 4
+  and 5). This sensor therefore *can* report accuracy > 1 at 0 lx. Whether the failing wakes were
+  a low-accuracy first event (F-F) or no event at all (H2) is open. Observation 2 does not separate
+  them either, since the setting may have been on during a wake that would have succeeded anyway.
+  Whether `onAccuracyChanged` ever fires on this sensor is unknown.
+- **Code fact, independent of any device: turning the setting on never re-admits.** Turning it on
+  saves settings → `ACTION_REAPPLY` → `setInitialBrightness`, which reads only
+  `smoothedLux ?: lastRawLux`, both null after a wake. A rejected reading is never kept, and an
+  on-change sensor in steady light sends no other. Observation 3's lasting "Monitoring" is F-A
+  either way. **Whether Tasker re-evaluates prof760 when `%AAB_TrustUnreliable` changes is unchecked**:
   check it with `docs/rebuild/XML_RECIPES.md` alongside Q2, and do not assume parity either way.
 - `LightSensorSource`'s `onAccuracyChanged` is a no-op (`LightSensorSource.kt:39`). On an on-change
   sensor, accuracy can recover without the value changing, so no new event arrives and the rejected
@@ -217,11 +220,25 @@ consistent with the owner never observing it.
   which matches #132's "toggle fixes it".
 - It fits the Pixel's AOC reporting "Device appears to be covered" at each re-activation in both
   logs, **if** the sensor marks those readings low-accuracy. Neither log records accuracy.
-- **Asked on #132 (owner, 2026-09-23): does enabling the setting stop the freezes?** Since the
-  OnePlus observations, this answer decides only whether F-F is #132's cause (§5, gate before R6).
-  The mechanism is established, so its fix no longer waits on the reporter.
+- **Asked on #132 (owner, 2026-09-23): does enabling the setting stop the freezes?** That answer,
+  or a OnePlus reproduction separated from H2 (below), decides whether RF goes ahead (§5, gate
+  before R6).
 - **R2 cannot explain the wake case.** `reinit()` loads settings before registering the sensor, so
   F-C's startup race applies only to the first service start.
+
+### H2 — The first event after a wake is sometimes not delivered. Open
+
+The other reading of the owner's intermittent wake "Monitoring" (§1). If the ALS sends no initial
+event on re-registration, an on-change sensor in steady light sends nothing, whatever the trust
+setting. The wake path writes nothing without an accepted reading (F-F's first bullet), so brightness
+stays where the framework restored it. **Separating check, no new build needed:** Live Debug's
+"Last sample" is stamped for *every* delivered reading, before any gate
+(`BrightnessPipelineController.kt:204`), and shows seconds under a minute. After a wake that ends
+on "Monitoring", with the screen off for at least 2 min beforehand, open Live Debug at once. If it
+reads seconds, a reading arrived and was rejected (F-F). If it reads 2 min or more, none arrived
+(H2). Opening the app reposts "Monitoring" (F-A) but does not touch "Last sample". The owner's one
+run (2026-09-23) did not reproduce the failure, so it separated nothing. A fix for H2 is not
+planned: it waits for a separated reproduction, and would change what a wake does with no reading.
 
 ### H1 — The sensor path goes quiet while still enabled. Open
 
@@ -252,6 +269,9 @@ before each log starts.
   it, though (F-E item 4).
 - **"Under act19, an unchanged repeat reading keeps smoothing until act19 stops it."** prof760
   rejects it first (F-E item 4). A continuation that re-enters task544 is a new policy, not parity.
+- **"The OnePlus 13 reports accuracy ≤ 1 at 0 lx, so F-F is confirmed there."** Inferred from
+  observations 1–2 on the assumption that a first event always arrives. Observations 4–5 admitted
+  0 lx readings with the setting off, and H2 explains observation 1 equally well.
 - **"α ≥ 0 on every smoothed row" as a parity test.** Tasker's task535 subtracts the previous
   cycle's stored threshold, so faithful parity can yield a small negative α (F-E caveat).
 
@@ -297,14 +317,16 @@ offset any comment it adds. Raising a budget is a rule change (`comment-budget.s
 protocol).
 
 **Gate before R6 — the #132 accuracy answer (F-F).** R1, R2, R3, R5 and RF stand whatever the
-reporter says: they fix confirmed defects or restore parity. RF is no longer conditional, because
-the owner's OnePlus showed the F-F mechanism (2026-09-23). The reporter's answer now decides only
-whether F-F is #132's cause. R3 must count accuracy rejections as their own reason either way.
+reporter says: they fix confirmed defects or restore parity. **RF is conditional**: it goes ahead
+if the reporter says yes, or if a OnePlus wake that ends on "Monitoring" is shown to be F-F rather
+than H2 (H2's "Last sample" check, or R3's first-event line). R3 must count accuracy rejections as
+their own reason either way.
 
 - **If the setting stops the freezes:** F-F is #132's cause, and RF is #132's fix. Re-scope R6 and
   R7 before starting them: they would fix real mechanisms that #132 no longer demonstrates, and
   their cost (the D-027 departure, a new settling policy) needs a fresh case. R4 stays.
-- **If it does not:** F-F is ruled out for #132, and R6 and R7 proceed as written.
+- **If it does not:** F-F is ruled out for #132, and R6 and R7 proceed as written. RF then waits
+  on the OnePlus check alone.
 - **No answer:** R6 and R7 wait for R3's diagnostics from the reporter instead.
 
 - [x] **R0 — this plan.**
@@ -318,7 +340,7 @@ whether F-F is #132's cause. R3 must count accuracy rejections as their own reas
     variant keeps its title and actions; a first start (not running) still posts the monitoring
     text. **Drive the repeat through `ACTION_REAPPLY`** (the owner's reproduction: a settings save
     whose reapply recomputes the same model), as well as through a plain start. After a wake with
-    no accepted reading, "Monitoring" is still posted; that text is true there (F-F).
+    no accepted reading, "Monitoring" is still posted; that text is true there (F-F or H2).
   - **Device check (owner):** in steady light, saving any setting leaves `Lux … → brightness …`.
 - [ ] **R2 — F-C's startup race only.** No fork: it reorders startup and queues nothing. Register
   the sensor only after `cachedSettings` has loaded. Holding an early reading until settings load
@@ -332,15 +354,16 @@ whether F-F is #132's cause. R3 must count accuracy rejections as their own reas
     (accuracy, dead band, mutex, cooldown, settings not loaded), and the last `onAccuracyChanged`
     value and time (F-F);
   - the current cycle stage and start time, and the last completed cycle;
-  - the value and accuracy of the first event after each registration (wake or start), so the
-    OnePlus case (F-F) shows up in one screenshot.
+  - whether a first event arrived after each registration (wake or start), with its value and
+    accuracy, so one screenshot separates F-F from H2 on the OnePlus.
 
   Labels must be string resources: the hardcoded-string ceiling in `HardcodedStringCheckTest` may
   only fall. **R5 and R6 each revise this taxonomy (Sol):** R5 adds a distinct act19 stop, and R6
   turns busy and cooldown drops into deferred or replaced work. Each of those segments states which
   counter a reading now lands in, so R4's banner never reads an ambiguous signal.
-- [ ] **RF — F-F, re-admit the last rejected reading.** Not a parity restore: a new policy with its
-  own row. Keeping a rejected reading for later is deferred work, so it shares R6's rule-review
+- [ ] **RF — F-F, re-admit the last rejected reading.** Conditional (see the gate above). Not a
+  parity restore: a new policy with its own row. It does nothing for H2, where there is no reading
+  to keep. Keeping a rejected reading for later is deferred work, so it shares R6's rule-review
   pass (D-027) and **R6's single slot**: whichever lands first defines the slot, and the other
   extends it. Land it after R5, so its tests run against the corrected gates.
   - **Change:** keep the last reading the accuracy gate rejected (value and accuracy). Re-offer it
@@ -355,8 +378,8 @@ whether F-F is #132's cause. R3 must count accuracy rejections as their own reas
     - the same case is evaluated when the setting is turned on;
     - after a screen-off, the kept reading is not re-offered;
     - a newer reading replaces the kept one.
-  - **Device check (owner):** repeat observations 1–3. Turning the setting on with no screen cycle
-    should give `0 lx → 0`.
+  - **Device check (owner):** after a wake that ends on "Monitoring" and is shown to be F-F,
+    turning the setting on with no screen cycle should give `0 lx → 0`.
 - [ ] **R4 — F-D, the health surfaces.** No parity source; the owner approves the wording.
   - Drive the banner from R3's signals, not a heartbeat.
   - Decide whether to clear runtime state by service-instance ownership and lifecycle instead of

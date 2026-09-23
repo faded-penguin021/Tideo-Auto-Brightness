@@ -52,7 +52,7 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
   low-accuracy reading (F-F; shares R6's rule review and slot) · [ ] R6 pending-latest slot (needs
   the rule-review pass) · [ ] R7 settling path (Tasker check first) · [ ] R8 close-out (ledger rows,
   delete the plan). R6 and R7 wait on the #132 reporter's "Trust low-accuracy sensor" answer (plan
-  §5 gate, F-F); RF does not.
+  §5 gate, F-F). RF waits on that answer or on a OnePlus wake shown to be F-F rather than H2.
 
 ## Owner queue
 
@@ -131,10 +131,10 @@ Newest first; ledger rows are the durable detail.
 
 - 2026-09-23 — **Light-stall plan, owner's OnePlus 13 observations folded in.** Every settings
   save sends a start command, so saving any setting resets the notification to "Monitoring" (F-A
-  has more start-command sources than the two it listed). At 0 lx the OnePlus reports low accuracy,
-  so after a wake in the dark nothing is written until a better reading arrives, and turning
-  "Trust low-accuracy sensor" on does not re-check the rejected one. F-F is confirmed as a
-  mechanism, and its fix is new segment RF, which no longer waits on the #132 reporter.
+  has more start-command sources than the two it listed). A wake in the dark sometimes ends on
+  "Monitoring" with nothing written, but later wakes with trust off gave `0 lx → 0`, so this is
+  either a low-accuracy first reading (F-F) or no first reading at all (new H2). Live Debug's "Last
+  sample" separates the two. New segment RF (re-admit a rejected reading) is conditional.
 - 2026-09-23 — **Light-stall plan, Sol review folded in.** Restoring Tasker's dead-band (R5) does
   not by itself continue an unfinished drop: Tasker's profile gate rejects an unchanged reading
   first, so the settling path (R7) is a new policy. R5 now needs a distinct no-write act19 stop
