@@ -48,11 +48,9 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
 `docs/plans/LIGHT_STALL_FIX.md` (persisting approved by owner 2026-09-23; Astra-reviewed three times).
 
 - [x] R0 plan · [ ] R1 notification overwrite · [ ] R2 startup race · [ ] R3 diagnostics · [ ] R4
-  health surfaces · [ ] R5 restore Tasker's dead-band (F-E) · [ ] RF re-admit the last rejected
-  low-accuracy reading (F-F; shares R6's rule review and slot) · [ ] R6 pending-latest slot (needs
-  the rule-review pass) · [ ] R7 settling path (Tasker check first) · [ ] R8 close-out (ledger rows,
-  delete the plan). Attribution rests on R3's records (plan §5 gate). RF waits on an episode
-  shown to be F-F; R6 and R7 are weighed on their own failure cases.
+  `onTaskRemoved` watchdog · [ ] R5 Tasker's dead-band (F-E) · [ ] R8 close-out (ledger rows,
+  open findings included; delete the plan). R2, R4 and R5 each start from a test that fails today.
+  RF, R6 and R7 are deferred until an R3 trace names their path (plan §5 Scope).
 
 ## Owner queue
 
@@ -129,6 +127,9 @@ fix and NOT by creating `26.txt`. Re-open only for something genuinely major, an
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-23 — **Light-stall plan rescoped by the owner.** This train is not the fix for #132: it
+  ships F-A, diagnostics and defects reproduced by a test. The new input and settling policies
+  wait for a diagnostic trace, and Q1/Q2 are on record but inactive.
 - 2026-09-23 — **Light-stall plan, third Astra pass.** R5 keeps Tasker's first-run branch, so the
   first reading after a start or wake is never rejected by act19. R6's no-ghosts tests are
   structural, not a cycle count. R7 gained a supersession contract. Later, an unattended
