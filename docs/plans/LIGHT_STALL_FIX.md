@@ -454,7 +454,11 @@ record is what would expose an OEM framework that differs (F-F).
   not post Monitoring expected:<[Lux 100 → brightness 120]> but was:<[Monitoring ambient
   light]>`; the paused case read "active"). A lock was added beyond the plan: without it, a start
   command could leave an older model visible over a newer one that the updater had just posted.
-  The device check below is still open (STATE Owner queue).
+  **Device check passed 2026-09-24** (OnePlus 13, debug build of `a50e935`, partly cloudy
+  daylight). Each REAPPLY was read 0.5 s later from the same device shell, and the text stayed
+  `Lux … → brightness …` with the lux unchanged, so no new reading re-posted it. The
+  notification's `when` moved, which shows that REAPPLY re-posted it. The release build 1.10.0
+  had switched to "Monitoring" on the same REAPPLY earlier that day.
   - **Change:** when the pipeline is already running, build the `startForeground` notification
     from current controller state and active context, through the same model mapping the live
     updater uses. Preserve the paused state and its actions. Correct the `MaintenanceWorker`

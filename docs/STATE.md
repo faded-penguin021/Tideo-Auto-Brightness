@@ -75,13 +75,6 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
    Live Debug's "Smoothing α" drops to a tenth.
 
-5. **[2026-09-24] Check the notification fix on the phone next time you test a build.** In steady
-   light, save any setting, or send
-   `adb shell am broadcast -a com.tideo.autobrightness.control.REAPPLY -p com.tideo.autobrightness.debug`
-   with intent control on. It worked if the notification keeps `Lux … → brightness …` instead of
-   switching to "Monitoring ambient light". After a wake with no new reading, "Monitoring" is
-   still expected (DC-065).
-
 Open questions: none.
 
 **This train is `1.11.0` on vc25, its ONE bump (owner, 2026-09-22).** `1.10.1` never shipped, so
@@ -128,7 +121,11 @@ Newest first; ledger rows are the durable detail.
 
 - 2026-09-24 — **Light stalls R1 (DC-065):** a start command reaching a running service, such as
   every settings save or the 15-minute worker, now posts the live `Lux … → brightness …`
-  notification (paused title and Resume kept) instead of "Monitoring ambient light".
+  notification (paused title and Resume kept) instead of "Monitoring ambient light". **Device
+  check passed** the same day on the OnePlus 13 (debug build of `a50e935`): three REAPPLYs in
+  steady light kept `Lux 3532 → brightness 137`, and one more rebuilt the notification (`when`
+  moved) with `Lux 3563 → brightness 138` unchanged, where the release build had switched to
+  "Monitoring"; the owner-queue item is closed.
 
 - 2026-09-24 — **F-G closed as a parity restore (DC-064):** proximity near damps only the
   reported α, as in Tasker; smoothing, mapping and animation stay undamped. The oracle was already
