@@ -589,7 +589,14 @@ record is what would expose an OEM framework that differs (F-F).
     the oracle" premise.
   - **R6 builds on R5's gates.** R5 changes R6's contract, and it does not supply R7's
     continuation (F-E item 4).
-- [ ] **R6 — F-C, the pending-latest slot.** Group 2, **in the train since 2026-09-24 (owner)** on
+- [x] **R6 — F-C, the pending-latest slot.** **Done 2026-09-24 (DC-069).** Both entry tests failed
+  on the old code (`expected:<5000.0> but was:<10.0>`, mid-animation and mid-cooldown). Beyond the
+  plan: a held reading is gated on accuracy only and gets the dead band when reconsidered, since a
+  band checked at arrival is stale mid-cycle and let a return into it leave an older excursion
+  pending (a ghost; mutation-checked); a fence keeps a tick from taking a reading that arrived
+  after a control event queued behind it; and Sol's early review added the session check against
+  a replaced registration's late callback, the count at stop and a clock-rollback timer fix. The
+  admission logic moved into `LightAdmission` to keep the orchestrator under its size cap. Group 2, **in the train since 2026-09-24 (owner)** on
   F-C's capture 2 sequence. Q1's answer (b) is active (§4). Lands after R5.
   - **Rule review first.** It amends the concurrency invariant in `AGENTS.md` ("events that arrive
     during a cycle are dropped rather than queued") and records the D-027(d) departure in a new

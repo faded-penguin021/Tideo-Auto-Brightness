@@ -74,8 +74,8 @@ data class PipelineState(
 
 /** Events serialized through the single pipeline consumer (one runs to completion, D-027). */
 sealed interface PipelineEvent {
-    /** A light-sensor reading that already passed the prof760 gate, accuracy included (DC-045). */
-    data class SensorTick(val lux: Double, val claim: Int = 0) : PipelineEvent
+    /** Run a cycle on the newest pending reading that passed the prof760 gate (DC-045, DC-069). */
+    data class SensorTick(val claim: Int, val session: Int, val fence: Long) : PipelineEvent
 
     /** Display OFF → hibernate (prof753 / task585). */
     data object ScreenOff : PipelineEvent

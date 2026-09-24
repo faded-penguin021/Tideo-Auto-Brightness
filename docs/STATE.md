@@ -18,8 +18,8 @@ here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), set
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
 This branch carries the #126/#127 override-attribution work (DC-002…DC-028), the harness units,
-the runtime rot audit (DC-042…DC-046), the Night Light work (DC-053…DC-058), light-stall R5
-(DC-063), the proximity-damp parity restore (DC-064) and the notification fix R1 (DC-065). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+the runtime rot audit (DC-042…DC-046), the Night Light work (DC-053…DC-058), the proximity-damp
+parity restore (DC-064) and light-stall R1–R6 (DC-063, DC-065…DC-069). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -33,9 +33,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
 - **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
   · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [x] R3 diagnostics (DC-066)
-  · [x] R2 startup race (DC-067) · [x] R4 watchdog (DC-068) · [ ] R6, with its D-027 rule
-  review, **next** · [ ] R8 close-out; R6 starts from a test that fails today, R7 is deferred and RF dropped
-  (plan §5).
+  · [x] R2 startup race (DC-067) · [x] R4 watchdog (DC-068) · [x] R6 pending slot (DC-069)
+  · [ ] R8 close-out, **next**; R7 is deferred and RF dropped (plan §5).
 
 ## Owner queue
 
@@ -75,6 +74,14 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
    `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
    Live Debug's "Smoothing α" drops to a tenth.
+
+5. **[2026-09-24] Check the held-reading change (R6) on the phone next time you test a build.**
+   Tideo now keeps the newest light reading that arrives mid-change and applies it once the
+   animation and cooldown finish, where it used to drop it. Pass the phone slowly in and out of
+   shade a few times, then stop in one place: brightness should settle for that final light
+   without any further change, and Live Debug's Light Sensor counts should show "deferred" and
+   "replaced" rising. Settles it: `DEVICE_TEST_SCRIPT.md` has no step for this yet, so your
+   observation is the check (DC-069).
 
 Open questions: none.
 
@@ -119,6 +126,14 @@ something major, and say so.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-24 — **Light stalls R6 (DC-069), with its rule review:** a light reading that arrives
+  during a cycle or its cooldown now waits in one pending slot, replaced by any newer one, and is
+  applied once the cycle and cooldown end, so the last reading of a change is no longer lost; the
+  concurrency invariant in `AGENTS.md` changed with it. Both entry tests failed on the old code
+  (`expected:<5000.0> but was:<10.0>`). The Light Sensor card adds deferred and replaced counts;
+  the brightness line in `25.txt` now names the fix. JVM tests only, and no device check yet
+  (owner-queue item 5).
 
 - 2026-09-24 — **Owner queue item 5 done (DC-066):** the owner ran the dark-wake test on a build
   with the Light Sensor card (OnePlus 13, screen off 3 min). The wake was healthy: WAKE

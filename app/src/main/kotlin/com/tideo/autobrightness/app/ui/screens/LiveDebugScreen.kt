@@ -332,7 +332,7 @@ private fun LightSensorCard(d: SensorDiagnostics, callbacks: SensorCallbacks) {
         Metric(stringResource(R.string.debug_sensor_first_event), reading(callbacks.first), "debug_sensor_first_event")
         Metric(
             stringResource(R.string.debug_sensor_counts),
-            "${d.received} / ${d.admitted} / ${d.rejected}",
+            "${d.received} / ${d.admitted} / ${d.rejected} / ${d.deferred} / ${d.replaced}",
             "debug_sensor_counts",
         )
         Metric(

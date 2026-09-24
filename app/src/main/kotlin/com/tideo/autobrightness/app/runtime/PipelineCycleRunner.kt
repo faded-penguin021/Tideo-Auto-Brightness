@@ -63,7 +63,7 @@ internal class PipelineCycleRunner(
         setInitialBrightness(settingsProvider().also { ctx.cacheSettings(it) })
     }
 
-    /** task554 → task544 → task535 → task661: ingest a reading and animate to the new brightness. */
+    /** task554 → task544 → task535 → task661: ingest a reading and animate; the caller gates the cooldown. */
     suspend fun runCycle(rawLux: Double, claim: Int = 0) {
         val settings = settingsProvider().also { ctx.cacheSettings(it) }
         val now = clock()
@@ -71,8 +71,6 @@ internal class PipelineCycleRunner(
         val rejection = when {
             !settings.serviceEnabled -> SampleRejection.SERVICE_DISABLED
             s.paused -> SampleRejection.PAUSED
-            // task544 act2-9: throttle gate (G2R-F78).
-            s.lastAcceptedMs?.let { now - it < throttle.throttleMs } == true -> SampleRejection.COOLDOWN
             else -> null
         }
         if (rejection != null) return ctx.update { it.copy(sensor = it.sensor.cycleRejected(rejection, now, settings.trustUnreliableSensor, claim)) }

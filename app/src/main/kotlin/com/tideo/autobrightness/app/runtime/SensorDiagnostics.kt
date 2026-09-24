@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 
 enum class SampleRejection {
-    SETTINGS_NOT_LOADED, SERVICE_DISABLED, ACCURACY, DEAD_BAND, MUTEX, QUEUE_CLOSED, PAUSED, COOLDOWN,
+    SETTINGS_NOT_LOADED, SERVICE_DISABLED, ACCURACY, DEAD_BAND, MUTEX, QUEUE_CLOSED, PAUSED, SCREEN_OFF,
 }
 
 enum class RegistrationCause { START, WAKE }
@@ -77,6 +77,8 @@ data class SensorDiagnostics(
     val received: Int = 0,
     val admitted: Int = 0,
     val rejected: Int = 0,
+    val deferred: Int = 0,
+    val replaced: Int = 0,
     val lastRejection: SampleRejectionRecord? = null,
     val cycle: CycleProgress? = null,
     val lastCycle: CompletedCycle? = null,
@@ -88,15 +90,26 @@ data class SensorDiagnostics(
 
     fun claimed(claim: Int, atMs: Long) = copy(cycle = CycleProgress(CycleStage.CLAIMED, atMs, claim))
 
-    fun received(rejection: SampleRejection?, claim: Int, atMs: Long, trustUnreliable: Boolean?) =
-        copy(received = received + 1).run {
-            if (rejection != null) rejected(rejection, atMs, trustUnreliable) else claimed(claim, atMs)
+    fun received(rejection: SampleRejection?, claim: Int, atMs: Long, trustUnreliable: Boolean?, replacing: Boolean) =
+        copy(received = received + 1).replacing(replacing).run {
+            when {
+                rejection != null -> rejected(rejection, atMs, trustUnreliable)
+                claim != 0 -> claimed(claim, atMs)
+                else -> copy(deferred = deferred + 1)
+            }
         }
+
+    fun replacing(replaced: Boolean) = if (replaced) copy(replaced = this.replaced + 1) else this
 
     private fun owns(claim: Int) = cycle?.claim == claim
 
     fun cycleRejected(reason: SampleRejection, atMs: Long, trustUnreliable: Boolean?, claim: Int) =
         if (!owns(claim)) this else rejected(reason, atMs, trustUnreliable).copy(cycle = null)
+
+    fun cycleDeferred(claim: Int, replaced: Boolean) =
+        if (!owns(claim)) this else copy(cycle = null, deferred = deferred + 1).replacing(replaced)
+
+    fun abandoned(claim: Int) = if (!owns(claim)) this else copy(cycle = null)
 
     fun admitted(claim: Int) =
         if (!owns(claim)) this else copy(admitted = admitted + 1).stage(CycleStage.EVALUATE, claim)

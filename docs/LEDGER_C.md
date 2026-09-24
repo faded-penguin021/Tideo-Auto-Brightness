@@ -917,6 +917,7 @@
   generation, and only the claim that owns the cycle record may count, advance or settle it, so
   neither a stalled collector, a replaced listener's late callback nor a tick queued across a wake
   or restart can fake the evidence (Sol and glue review).
+  Corrected by DC-069.
 
 - DC-067 [cited]: **The light sensor registers only after the pipeline's settings have loaded,
   so the first reading after a service start is evaluated (2026-09-24, Tideo #132, F-C's startup
@@ -946,3 +947,25 @@
   train defers: `tearDownDisabled`'s reset on `Dispatchers.Default` can be overwritten by the
   collector's last publish until the grace reset (`publish` always sets `serviceRunning`), and a
   fresh instance shows stopped until its first publish.
+
+- DC-069 [cited]: **A light reading that arrives while a cycle or its cooldown holds the prof760
+  mutex now waits in one pending slot instead of being dropped, so the last reading of a change is
+  evaluated with no further callback (2026-09-24, Tideo #132, F-C; owner, Q1 (b)).**
+  This departs from Tasker, amending D-027(d) and D-039(c) through the rule review, and
+  `AGENTS.md` states the invariant: a newer held reading replaces the older one, gated on accuracy
+  only with the dead band applied when it is reconsidered (so a return into the band cancels a held
+  excursion), the consumer reconsiders it after every event and one timer at the cooldown's end,
+  a tick takes it only if it arrived before any control event queued behind that tick, and
+  screen-off, pause, override, stop and a new sensor session discard it. The owner's no-ghosts
+  condition is tested structurally: one slot, no cycle inside the cooldown, the newest reading
+  taken, nothing superseded run, and over a 30 s flicker the final reading evaluated within one
+  cycle plus one cooldown (the fence and the unbanded hold are mutation-checked). The Light Sensor
+  card adds deferred (each hold) and replaced, MUTEX and COOLDOWN stop being rejections, and
+  SCREEN_OFF or SERVICE_DISABLED counts a held reading lost to sleep or stop, so every reading
+  still ends admitted, rejected or replaced. Sol's review added the session check that stops a
+  replaced registration's late callback displacing the live reading, the count for a reading held
+  at stop, and a zero-throttle timer spin fix (a wall clock behind the cooldown anchor counts as no
+  cooldown), the rule review (Astra) moved the dead-band check from the drain, which ran mid-cycle
+  against the old band, to the cycle's start, and a tick queued behind a ScreenOff no longer runs
+  after hibernate (DC-067's first race). Ending on the final light's target needs the deferred settling path, which no test
+  asserts.

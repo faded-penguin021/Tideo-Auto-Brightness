@@ -509,7 +509,7 @@
     <string name="debug_sensor_trust_unknown">trust not loaded</string>
     <string name="debug_sensor_first_event">First event after registration</string>
     <string name="debug_sensor_none_yet">None yet</string>
-    <string name="debug_sensor_counts">Received / admitted / rejected</string>
+    <string name="debug_sensor_counts">Received / admitted / rejected / deferred / replaced</string>
     <string name="debug_sensor_last_rejection">Last rejection</string>
     <string name="debug_sensor_cycle">Cycle in progress</string>
     <string name="debug_sensor_cycle_value">%1$s · started %2$s</string>

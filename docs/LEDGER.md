@@ -225,6 +225,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   type-coercion concerns as a distinct risk (expressions are already captured verbatim per S1,
   and (b)'s 661-vs-663 cross-validation is the actual safeguard). (Affects S4, S8, S9a, S9b,
   S10, S11, S12.)
+  Corrected by DC-069.
 
 - D-028 [cited]: S4 PARITY GAPS CHARACTERIZED (full detail in `parity_gaps.md`). The Tasker reference
   oracle + 8 golden CSVs are committed and immutable. The current `BrightnessEngine` diverges from

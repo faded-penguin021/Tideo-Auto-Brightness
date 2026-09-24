@@ -15,12 +15,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Runtime auto-brightness pipeline orchestrator (BINDING, D-027): serialized through a single
- * consumer coroutine. Sensor ticks arriving during a cycle are DROPPED (re-entry mutex [inCycle]).
+ * consumer coroutine. Light readings are admitted, or held in one slot, by [LightAdmission] (DC-069).
  * State is written ONLY from the consumer coroutine via [PipelineRuntimeContext].
  * Pipeline sources: prof760 main loop, prof755 override detection, and lifecycle events.
  */
@@ -59,10 +57,6 @@ class BrightnessPipelineController(
     // between the two beyond "latest deadline wins", which is what the window wants anyway.
     @Volatile private var suppressOverrideUntilMs = 0L
 
-    // %AAB_MainLoop re-entry mutex: true while a sensor cycle is claimed or running.
-    private val inCycle = AtomicBoolean(false)
-    private val claims = AtomicInteger(0)
-
     private val debugEmitter = PipelineDebugEmitter(debugSink)
     private val panicHandler = PanicHandler(brightness, dimming)
     private val cycleRunner = PipelineCycleRunner(
@@ -80,6 +74,7 @@ class BrightnessPipelineController(
     )
 
     private val controlGate = ControlEventGate() // DA-043 backlog bound
+    private val admission = LightAdmission(this, { cachedSettings }, throttle, controlGate, clock, scope)
 
     private val overrideMonitor = OverrideMonitor(brightnessObserver) {
         val s = _state.value
@@ -120,7 +115,7 @@ class BrightnessPipelineController(
         consumerJob = scope.launch {
             cachedSettings = settingsProvider().also { throttle.seed(it.throttleDefaultMs) }
             startSensor(RegistrationCause.START, coroutineContext.job)
-            controlGate.consumeEach { handle(it) }
+            controlGate.consumeEach { handle(it); admission.drain() }
         }
         startOverrideDetection()
     }
@@ -130,10 +125,11 @@ class BrightnessPipelineController(
         _state.update { it.copy(serviceOn = false) }
         // DC-067: consumer first, so a registration still pending on it sees it cancelled.
         consumerJob?.cancel(); consumerJob = null
+        admission.invalidate(SampleRejection.SERVICE_DISABLED)
         stopSensor()
         overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
-        inCycle.set(false)
+        admission.release()
         // DA-038: independently clear pre-death Extra Dim residue and return brightness-mode ownership.
         runCatching { dimming.disengage() }
         runCatching { brightness.restoreMode() }
@@ -161,7 +157,8 @@ class BrightnessPipelineController(
     fun reapply() { postControl(PipelineEvent.ContextChanged) }
 
     // DA-043 bound; OverrideDetected carries a value, so it is capped but never folded.
-    private fun postControl(event: PipelineEvent) = controlGate.admit(event, event !is PipelineEvent.OverrideDetected)
+    private fun postControl(event: PipelineEvent) =
+        admission.fenced { controlGate.admit(event, event !is PipelineEvent.OverrideDetected) }
     internal val controlBacklog: ControlEventGate get() = controlGate // DA-043 counters (test seam)
 
     /** prof769/task528 panic: restore brightness, drop dimming, stop everything (D-139). */
@@ -171,7 +168,7 @@ class BrightnessPipelineController(
         overrideJob?.cancel(); overrideJob = null
         consumer?.join(); consumerJob = null
         proximityTracker.stop()
-        inCycle.set(false)
+        admission.release()
         panicHandler.execute() // task528 act6-8: restore 255 + drop dimming
         _state.value = PipelineState(serviceOn = false)
     }
@@ -190,65 +187,25 @@ class BrightnessPipelineController(
     private fun startSensor(cause: RegistrationCause, owner: Job) {
         if (sensorJob?.isActive == true || !owner.isActive) return
         val generation = callbackLog.registered(cause, clock())
+        val current = admission.newSession()
         _state.update { it.copy(sensor = it.sensor.registered()) }
         sensorJob = scope.launch {
             lightSensor.samples(
                 onRegistered = { callbackLog.listenerRegistered(generation, it) },
                 onCallback = { callbackLog.callback(generation, it, clock()) },
-            ).collect { sample -> onSensorSample(sample.lux.toDouble(), sample.accuracy) }
+            ).collect { sample -> admission.onSample(sample.lux.toDouble(), sample.accuracy, current) }
         }
         proximityTracker.start()
     }
 
     @Synchronized
-    private fun stopSensor() { sensorJob?.cancel(); sensorJob = null; callbackLog.unregistered() }
-
-    /** prof760 gate on collector: passing samples claim [inCycle] mutex, others are dropped. */
-    private fun onSensorSample(lux: Double, accuracy: Int) {
-        val now = clock()
-        val settings = cachedSettings
-        val s = _state.value
-        // Throttle Reinitialization watchdog (task566/prof754, G2R-F78).
-        if (settings != null && s.threshAbsLow != null) {
-            val significant = lux < (s.threshAbsLow ?: 0.0) || lux > (s.threshAbsHigh ?: 0.0)
-            throttle.onSample(now, significant, throttle.ceiling(settings.animSteps, settings.maxWaitMs))
-        }
-        val rejection = when {
-            settings == null -> SampleRejection.SETTINGS_NOT_LOADED
-            !settings.serviceEnabled -> SampleRejection.SERVICE_DISABLED
-            else -> ProfileGates.monitorAmbientLightRejection(
-                trustUnreliable = settings.trustUnreliableSensor,
-                accuracy = accuracy,
-                lux = lux,
-                threshAbsLow = s.threshAbsLow ?: 0.0,
-                threshAbsHigh = s.threshAbsHigh ?: 0.0,
-                mainLoopOn = inCycle.get(),
-                thresholdsSeeded = s.threshAbsLow != null,
-            ) ?: SampleRejection.MUTEX.takeUnless { inCycle.compareAndSet(false, true) }
-        }
-        val trust = settings?.trustUnreliableSensor
-        val claim = if (rejection == null) claims.incrementAndGet() else 0
-        // Record every delivered sample + current throttle (Live Debug visibility, G2R-F5).
-        _state.update {
-            it.copy(lastSampleMs = now, throttleMs = throttle.throttleMs, sensor = it.sensor.received(rejection, claim, now, trust))
-        }
-        if (rejection != null) return
-        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux, claim))) {
-            inCycle.set(false)
-            _state.update { it.copy(sensor = it.sensor.cycleRejected(SampleRejection.QUEUE_CLOSED, now, trust, claim)) }
-        }
+    private fun stopSensor() {
+        sensorJob?.cancel(); sensorJob = null; admission.newSession(); callbackLog.unregistered()
     }
 
     private suspend fun handle(event: PipelineEvent) {
         when (event) {
-            is PipelineEvent.SensorTick -> {
-                try {
-                    cycleRunner.runCycle(event.lux, event.claim)
-                } finally {
-                    inCycle.set(false)
-                    _state.update { it.copy(sensor = it.sensor.completed(CycleResult.ABORTED, clock(), event.claim)) }
-                }
-            }
+            is PipelineEvent.SensorTick -> admission.run(event) { lux, claim -> cycleRunner.runCycle(lux, claim) }
             PipelineEvent.ScreenOff -> hibernate()
             PipelineEvent.ScreenOn -> reinit()
             PipelineEvent.Pause -> pauseInternal()
@@ -277,10 +234,11 @@ class BrightnessPipelineController(
 
     /** prof753/task585 hibernate: stop sensing and Allow Override, clear runtime state (DC-042). */
     private fun hibernate() {
+        admission.invalidate(SampleRejection.SCREEN_OFF)
         stopSensor()
         overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
-        inCycle.set(false)
+        admission.release()
         dimming.disengage() // task585: drop super dimming when the display goes off
         _state.update {
             it.copy(

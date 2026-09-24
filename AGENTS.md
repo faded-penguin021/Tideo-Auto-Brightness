@@ -221,8 +221,12 @@ The complete catalogue is in `docs/LEDGER*.md`; search it as needed. These are t
 often violated during maintenance:
 
 - The concurrency model is binding. There is one pipeline coroutine, and each event runs to
-  completion, including its animation. Events that arrive during a cycle are dropped rather than
-  queued, matching Tasker's `%AAB_MainLoop` re-entry mutex.
+  completion, including its animation. Light readings are never queued: while a cycle or its
+  cooldown holds Tasker's `%AAB_MainLoop` re-entry mutex, the newest reading that passes the
+  accuracy gate waits in a single pending slot, replacing any older one, and is reconsidered
+  against the gates then current, dead band included, once the cycle and cooldown end. A pending
+  reading never runs ahead of a control event queued before it arrived, and screen-off, pause and
+  stop discard it. Tasker drops such a reading; this departure is DC-069, amending D-027(d).
 - Profile gates are hardcoded Kotlin booleans with provenance and a truth-table test. There is no
   generic `ConditionList` evaluator. For `ConditionList`, And binds more tightly than Or, then And2
   and Or2 join from left to right. XML children are alphabetical, so sort them numerically before

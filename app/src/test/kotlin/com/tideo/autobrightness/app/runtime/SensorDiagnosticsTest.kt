@@ -38,7 +38,7 @@ class SensorDiagnosticsTest {
 
         assertEquals(current, current.admitted(claim = 8))
         assertEquals(current, current.stage(CycleStage.ANIMATE, claim = 8))
-        assertEquals(current, current.cycleRejected(SampleRejection.COOLDOWN, 120L, true, claim = 8))
+        assertEquals(current, current.cycleRejected(SampleRejection.PAUSED, 120L, true, claim = 8))
         assertNull(SensorDiagnostics().admitted(claim = 8).cycle, "no claim-less record is ever created")
         assertEquals(0, SensorDiagnostics().admitted(claim = 8).admitted)
     }
