@@ -18,8 +18,8 @@ here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), set
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
 This branch carries the #126/#127 override-attribution work (DC-002…DC-028), the harness units,
-the runtime rot audit (DC-042…DC-046), the Night Light work (DC-053…DC-058) and light-stall R5
-(DC-063). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+the runtime rot audit (DC-042…DC-046), the Night Light work (DC-053…DC-058), light-stall R5
+(DC-063) and the proximity-damp parity restore (DC-064). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -32,7 +32,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
 - **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
-  · [ ] R1 notification overwrite, **next, in a fresh session (owner, 2026-09-24)** · [ ] R3
+  · [x] F-G (DC-064) · [ ] R1 notification overwrite, **next, in a fresh session (owner, 2026-09-24)** · [ ] R3
   · [ ] R2 · [ ] R4 · [ ] R6, with its D-027 rule review · [ ] R8 close-out; R2, R4 and R6 start
   from a test that fails today, R7 is deferred and RF dropped (plan §5).
 
@@ -68,11 +68,12 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    3 ms later, and fixing that is a settle-window change for you to rule on. Extra Dim is ruled
    out (DC-059…DC-062).
 
-4. **[2026-09-24] Decide F-G, the proximity damp, in a fresh-context session (owner).** Tasker's
-   ×0.1 changes only the global `%LuxAlpha` and smooths and maps with the undamped α (task544 acts
-   27–33), while Tideo damps inside the smoothing, so near the sensor each smoothed step moves a
-   tenth as far. Settles it: a parity-restore segment, or a Decided non-item keeping Tideo's damp;
-   the detail is `docs/rebuild/parity_gaps.md` gap-08.
+4. **[2026-09-24] Check the proximity change on the phone next time you test a build.** Tideo no
+   longer slows brightness while the top of the phone is covered, which is what Tasker does: its
+   ×0.1 only ever changed the displayed α (DC-064). If you would rather keep the old slowing as a
+   deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
+   `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
+   Live Debug's "Smoothing α" drops to a tenth.
 
 Open questions: none.
 
@@ -118,6 +119,10 @@ something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-24 — **F-G closed as a parity restore (DC-064):** proximity near damps only the
+  reported α, as in Tasker; smoothing, mapping and animation stay undamped. The oracle was already
+  right; `LightCycleParityTest` now replays it near, and the test that pinned the old damp is
+  replaced.
 - 2026-09-24 — **Light stalls: plan re-scoped (R6 in, R7 deferred, RF dropped, as AOSP reports
   light as high accuracy) and R5 landed (DC-063):** a return to the previous light level is no
   longer ignored; the oracle `TaskerReference.lightCycle` is an addition, and no existing oracle or

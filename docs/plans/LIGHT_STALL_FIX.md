@@ -236,7 +236,8 @@ from the damped α. That is the mechanism F-B's reason 4 describes, and it is Ti
 AGENTS.md sentence "multiplies `LuxAlpha` by 0.1; it never pauses" holds for Tasker's global, and
 the contract test `proximityNear_dampsLuxAlphaByTenth` pins Tideo's divergent behaviour.
 **Deferred by the owner (2026-09-24) to a fresh-context session** and routed to the STATE Owner
-queue; R5 shipped without it (parity_gaps gap-08 lists it as open).
+queue; R5 shipped without it. **Resolved 2026-09-24 as a parity restore (DC-064):** the engine
+smooths, maps and animates undamped and damps only the reported α; that pinning test is replaced.
 
 ### F-F — A low-accuracy reading is rejected, and nothing re-admits it. Ruled out on AOSP frameworks (2026-09-24); RF dropped
 

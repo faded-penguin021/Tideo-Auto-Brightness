@@ -26,7 +26,7 @@ data class CompressedScaleResult(val calculatedBrightness: Double, val effective
 
 class BrightnessEngine {
     companion object {
-        // Tasker task544 act28/29 / prof759 / task545: smoothing-alpha damp factor when proximity reads "near" (phone at ear/covered).
+        // Tasker task544 act28/29 / prof759 / task545: %LuxAlpha readout factor while proximity reads "near".
         const val PROXIMITY_ALPHA_DAMP = 0.1
     }
 
@@ -82,8 +82,6 @@ class BrightnessEngine {
                     thresholdDynamicPercent = prev.threshDynamicPercent,
                     deltaFactor = input.thresholds.deltaFactor,
                     zone1End = input.thresholds.zone1End,
-                    // Tasker task544 act28/29: ×0.1 damp while proximity near (prof759/task545).
-                    luxAlphaDamp = if (input.proximityNear) PROXIMITY_ALPHA_DAMP else 1.0,
                 )
                 smoothedLux = smoothed.first
                 luxAlpha = smoothed.second
@@ -120,13 +118,16 @@ class BrightnessEngine {
         )
 
         val dimmingAlpha = dimmingAlpha(targetBrightness, input.curve.minBrightness)
+        // Tasker task544 act28–31: the ×0.1 sets only the %LuxAlpha global; act27 and act33 use %lux_results2 (gap-08).
+        val reportedLuxAlpha =
+            if (outcome == EvaluationOutcome.SMOOTHED && input.proximityNear) luxAlpha * PROXIMITY_ALPHA_DAMP else luxAlpha
 
         return BrightnessPolicyOutput(
             targetBrightness = targetBrightness,
             transitionDurationMs = throttle,
             animationSteps = steps,
             animationWaitMs = wait,
-            luxAlpha = luxAlpha,
+            luxAlpha = reportedLuxAlpha,
             dimmingAlpha = dimmingAlpha,
             smoothedLux = smoothedLux,
             dynamicThreshold = dynamicThreshold,
@@ -146,14 +147,11 @@ class BrightnessEngine {
         thresholdDynamicPercent: Double,
         deltaFactor: Double,
         zone1End: Double,
-        // Tasker task544 act28/29: LuxAlpha ×0.1 while proximity is "near" (prof759/task545). Default
-        // 1.0 = no damp, so the golden vectors (which never pass this) are byte-identical.
-        luxAlphaDamp: Double = 1.0,
     ): Pair<Double, Double> {
         val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
         val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
-        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)). task544 damps ×luxAlphaDamp before EMA.
-        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta)) * luxAlphaDamp
+        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)).
+        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta))
         val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
         // Tasker task535: BigDecimal(raw).setScale(2|0, HALF_UP) — exact-binary constructor.
         val rounded = if (smoothed < zone1End) bigScale(smoothed, 2) else bigScale(smoothed, 0)

@@ -20,7 +20,7 @@ ROUND_HALF_UP)`, string-formatted returns (`a + "," + b`), int truncation. See p
 | State (paused, screen on) | prof756 | task567 | repost paused notif |
 | Time periodic | prof757 | task584 | repost running notif |
 | Time windows (dawn/dusk) | prof758 | task90 | dynamic scale recompute |
-| Proximity | prof759 (pri 4) | task545 | set %AAB_Proximity near/far → LuxAlpha damp ×0.1 (no pause) |
+| Proximity | prof759 (pri 4) | task545 | set %AAB_Proximity near/far → the `%LuxAlpha` readout ×0.1; no effect on brightness, no pause |
 | Throttle drift | prof754 | task566 | throttle reinit |
 | Panic event | prof769 (pri 15) | task528 | emergency reset |
 
@@ -55,9 +55,13 @@ Order is by `actN` (Tasker execution order), NOT document order. Key sequence:
 5. **Dead-band** (act19–24): if `relative_change < dynamic_threshold` → Perform **Set Thresholds**,
    clear `%AAB_CycleStart`, `MainLoop=0`, **Stop** (change too small).
 6. **Smoothing** (act25–27): Perform **task535 Lux Smoothing** `par1=par1, par2=SmoothedLux` →
-   `%lux_results = "smoothed,alpha,delta"`; split → `%new_smoothed_lux`, `%SmoothedLux`, `%LuxAlpha`.
-7. **Proximity damp** (act28–29): if `%AAB_Proximity = near` → `LuxAlpha = lux_results2 * 0.1`.
-8. → Perform **task661 Map Lux to Brightness**.
+   `%lux_results = "smoothed,alpha,delta"`; split; act27 sets `%new_smoothed_lux` and `%SmoothedLux`
+   from `%lux_results1`, which the **undamped** α produced.
+7. **Proximity damp** (act28–32): if `%AAB_Proximity = near` → `LuxAlpha = lux_results2 * 0.1`,
+   else `LuxAlpha = lux_results2`. Only the `%LuxAlpha` global changes, and only readouts read it.
+8. → Perform **task661 Map Lux to Brightness** (act33) with `par1=%new_smoothed_lux`,
+   `par2=%lux_results2`: the undamped α sizes the animation (task661 act2 → act24). So proximity
+   changes no brightness (parity_gaps gap-08).
 
 ### 1c. task535 Lux Smoothing (`java/task535_1`)
 Exponential smoothing with hysteresis:
@@ -172,7 +176,8 @@ These guarantee C0 continuity across the 3 zones. Identical expressions appear i
 | `%AAB_MainLoop` | On/0 main-loop gate & re-entry guard | 554 set On; 544 set 0 on drop; 585 clear |
 | `%AutoBrightRunning` | 1 while pipeline is writing | 661 act0 =1; 661 act46 =0; 585 clear |
 | `%SmoothedLux` (`%smoothed_lux`) | EMA-smoothed lux | 544 (init=par1, then lux_results1); 585 clear |
-| `%LuxAlpha` (`%lux_alpha`) | last smoothing alpha → animation pacing | 544 / 535 return; prox-damped ×0.1 |
+| `%LuxAlpha` | last smoothing alpha, read only by readouts | 544 act12 =1, act29 ×0.1 near / act31 undamped |
+| `%lux_alpha` | task661's alpha → animation pacing | 661 act2 = `par2` (544 passes the undamped `%lux_results2`) |
 | `%LastAAB` | TIMEMS of last accepted tick (throttle) | 544 act13; 585 clear |
 | `%AAB_LastRawLux` | last raw lux (round3) | 554 java |
 | `%AAB_LastSensorAccuracy` | last `%as_accuracy` | 554 java |
@@ -189,7 +194,7 @@ These guarantee C0 continuity across the 3 zones. Identical expressions appear i
 | `%AAB_Sun*` / `%AAB_calc_*` / `%AAB_Polar*` / `%AAB_*Duration` | solar times & polar state | task90 (S2/S6) |
 | `%AAB_MorningStart/End`, `%AAB_EveningStart/End` | dawn/dusk ramp windows | task90; prof758 gate |
 | `%AAB_Initializing` | true during initial-brightness write | task618; gates prof755 |
-| `%AAB_Proximity` | near/far | prof759 / task545 "Detect Proximity"; damps LuxAlpha ×0.1 in 544 |
+| `%AAB_Proximity` | near/far | prof759 / task545 "Detect Proximity"; damps only the `%LuxAlpha` readout ×0.1 in 544 |
 | `%AAB_Privilege` / `%AAB_SecondaryPrivilege` | detected tier | task378/643 (S2/S7) |
 | `%AAB_ActiveContext` / `%AAB_ContextCache` / `%AAB_NextContextTime` | context-engine state | task43/623 (S2/S10) |
 | `%AutoBrightRunning`, `%as_values1`, `%as_accuracy`, `%TRUN` | Tasker built-ins / sensor array | system |
@@ -210,9 +215,9 @@ on lightSensorEvent(lux, accuracy):                      # prof760 (gated: accur
     if SmoothedLux unset: SmoothedLux=lux; LuxAlpha=1; mapLux(); stop # first run
     relative_change, dynamic_threshold = sigmoidThreshold(lux,SmoothedLux,settings)
     if relative_change < dynamic_threshold: setThresholds(); MainLoop=0; stop  # dead-band
-    (SmoothedLux, LuxAlpha, delta) = luxSmoothing(lux, SmoothedLux)            # task535 (round3, BigDecimal)
-    if Proximity==near: LuxAlpha *= 0.1
-    mapLuxToBrightness(SmoothedLux, LuxAlpha)            # task661
+    (SmoothedLux, alpha, delta) = luxSmoothing(lux, SmoothedLux)               # task535 (round3, BigDecimal)
+    LuxAlpha = Proximity==near ? alpha*0.1 : alpha                             # readout only
+    mapLuxToBrightness(SmoothedLux, alpha)               # task661, undamped
   mapLuxToBrightness(lux, alpha):
     AutoBrightRunning = 1
     mapped = zone1: Form1A*sqrt(lux) | zone2: Form2A+Form2B*(...) | zone3: MaxBright-(Form3A/lux)*MaxBright

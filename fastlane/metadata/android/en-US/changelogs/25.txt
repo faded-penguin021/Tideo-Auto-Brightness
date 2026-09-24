@@ -4,4 +4,4 @@ Fixes circadian Night Light anchoring to a fixed 2850 K instead of your own temp
 
 Fixes settings backup and restore, broken since 1.8.2.
 
-Fixes brightness ignoring a return to the previous light level until the light changed again.
+Fixes brightness ignoring a return to the previous light level, and reacting slowly while the proximity sensor is covered.

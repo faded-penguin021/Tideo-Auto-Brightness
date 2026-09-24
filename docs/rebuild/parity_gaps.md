@@ -127,16 +127,21 @@ decides which of them runs and with what arguments, and it diverged:
   used in mathematical expressions are replaced with 0". So the seed is `%AAB_ThreshDynamic = 0`
   and both limits equal the reading. The engine now does the same, and an identical repeat reading
   is refused, as in Tasker.
+- **The proximity damp (acts 27–33; closed 2026-09-24, DC-064).** Tasker's ×0.1 changes only the
+  global `%LuxAlpha` (act29, else act31 undamped). act27 has already stored `%SmoothedLux` from the
+  undamped α, and act33 hands Map Lux `%lux_results2`, also undamped, which task661 act2 → act24
+  sizes the animation from. `%AAB_Proximity` has no other reader but the Debug scene, so in Tasker
+  proximity changes no brightness. The S14 port (D-087) damped inside the EMA and sized the
+  animation from the damped α: while near, 100 → 30 lx smoothed to 95 instead of 50, the return to
+  100 was then act19-stopped, and 800 lx smoothed to 161. The engine now smooths, maps and animates
+  undamped and reports `luxAlpha × 0.1` on a smoothed cycle while near; `LightCycleParityTest` replays
+  the oracle with proximity near.
 
 **Still open, related, not part of gap-08:**
 - **task618's wake path.** Set Initial Brightness polls the light sensor itself (act8, code373),
   maps `Math.round(raw)` and stores `SmoothedLux = round2(raw)`, and never seeds a band.
   `setInitialBrightness` maps the unrounded smoothed or raw lux from state, and a wake after
   hibernate has neither. Not checked against the first-run row, because it is not that path.
-- **The proximity damp (acts 28–33).** Tasker's ×0.1 changes only the global `%LuxAlpha`. act27
-  has already stored `%SmoothedLux` from the undamped α, and act33 maps with `%lux_results2`, also
-  undamped. The engine damps inside the EMA and sizes the animation from the damped α. This awaits
-  an owner decision.
 - **The throttle watchdog's idle anchor.** task566 measures idle time from `%LastAAB`, which only a
   first run or a smoothed cycle sets. `ThrottleController.onSample` re-anchors on every sample
   outside the stored band. That already included samples dropped while busy or in the cooldown,

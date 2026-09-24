@@ -22,14 +22,15 @@ class LightCycleParityTest {
     private val cfg = ThresholdConfig()
     private val tol = 1e-9
 
-    private fun input(lux: Double, previous: PreviousState?) = BrightnessPolicyInput(
+    private fun input(lux: Double, previous: PreviousState?, near: Boolean = false) = BrightnessPolicyInput(
         lux = lux,
         time = TimeContext(secondsOfDay = 12 * 3600.0),
         thresholds = cfg,
         previous = previous,
+        proximityNear = near,
     )
 
-    private fun oracle(lux: Double, state: TaskerReference.LightCycleState) = TaskerReference.lightCycle(
+    private fun oracle(lux: Double, state: TaskerReference.LightCycleState, near: Boolean) = TaskerReference.lightCycle(
         par1 = lux,
         state = state,
         threshDim = cfg.threshDim,
@@ -39,7 +40,7 @@ class LightCycleParityTest {
         threshDark = cfg.threshDark,
         zone1End = cfg.zone1End,
         deltaFactor = cfg.deltaFactor,
-        proximityNear = false,
+        proximityNear = near,
     )
 
     private fun EvaluationOutcome.toOracle() = when (this) {
@@ -53,7 +54,7 @@ class LightCycleParityTest {
         threshDynamicPercent = out.threshDynamicPercent,
     )
 
-    private fun replay(readings: List<Double>): List<Pair<Double, BrightnessPolicyOutput>> {
+    private fun replay(readings: List<Double>, near: Boolean = false): List<Pair<Double, BrightnessPolicyOutput>> {
         val evaluated = mutableListOf<Pair<Double, BrightnessPolicyOutput>>()
         var previous: PreviousState? = null
         var band: Pair<Double, Double>? = null
@@ -63,8 +64,8 @@ class LightCycleParityTest {
             // prof760: strict < / > against the stored band; unseeded on the first reading.
             val stored = band
             if (stored != null && !(lux < stored.first || lux > stored.second)) continue
-            val out = engine.evaluate(input(lux, previous))
-            val ref = oracle(lux, state)
+            val out = engine.evaluate(input(lux, previous, near))
+            val ref = oracle(lux, state, near)
             val where = "reading $lux after ${evaluated.map { it.first }}"
             if (out.outcome.toOracle() != ref.outcome) mismatches += "$where: outcome ${out.outcome} vs ${ref.outcome}"
             if (kotlin.math.abs(out.smoothedLux - ref.smoothedLux) > tol) {
@@ -145,5 +146,21 @@ class LightCycleParityTest {
             (0..60).map { 200.0 + 40.0 * kotlin.math.sin(it / 3.0) },
         )
         for (seq in sequences) assertNotNull(replay(seq))
+    }
+
+    @Test
+    fun proximityNear_smoothsAsFarAndDampsOnlyTheReportedAlpha() {
+        // act27 stores %SmoothedLux from the undamped α; act29's ×0.1 reaches only the %LuxAlpha global (gap-08).
+        val readings = listOf(100.0, 30.0, 100.0, 20.0, 800.0, 3.0)
+        val far = replay(readings)
+        val near = replay(readings, near = true)
+        assertEquals(far.map { it.first }, near.map { it.first })
+        for ((f, n) in far.map { it.second }.zip(near.map { it.second })) {
+            assertEquals(f.smoothedLux, n.smoothedLux, tol)
+            assertEquals(f.targetBrightness, n.targetBrightness)
+            assertEquals(f.animationSteps, n.animationSteps)
+            assertEquals(f.animationWaitMs, n.animationWaitMs)
+            assertEquals(f.transitionDurationMs, n.transitionDurationMs)
+        }
     }
 }

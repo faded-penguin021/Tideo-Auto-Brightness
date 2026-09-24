@@ -216,8 +216,10 @@ optional.
 ## 4. Proximity damp (prof759/task545)
 
 13. With the service running in changing light, cover the **top** of the phone (proximity "near", e.g.
-    hold it to your ear). **Expected:** brightness reactivity is **damped** (changes ~10× slower) but the
-    loop does **not** pause; uncovering restores normal reactivity. (Live Debug LuxAlpha drops while near.)
+    hold it to your ear). **Expected (DC-064, Tasker parity):** brightness follows the light exactly as
+    it does uncovered — same speed, no damping — and the loop does **not** pause. Only the Live Debug
+    "Smoothing α (LuxAlpha)" readout drops to a tenth while near. Builds before DC-064 slowed reactivity
+    ~10× here instead.
 
 ## 5. Panic reset (prof769/task528)
 

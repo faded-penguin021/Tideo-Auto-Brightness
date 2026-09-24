@@ -876,3 +876,19 @@
   "both gates use the SAME stored band" no longer describes the code, which has one band, Tasker's.
   The detail, and two related divergences left open (task618's wake path, the proximity damp), are
   in `docs/rebuild/parity_gaps.md` gap-08.
+  The proximity damp is closed by DC-064.
+
+- DC-064: **The proximity damp is Tasker's again: it changes only the reported `luxAlpha`, never
+  brightness, and D-087's in-EMA port is withdrawn (2026-09-24).** task544 act29 multiplies only
+  the global `%LuxAlpha`; act27 has already stored `%SmoothedLux` from the undamped α, and act33
+  hands task661 the undamped `%lux_results2`, which its act2 → act24 size the animation from; the
+  only other reader of `%AAB_Proximity` is the Debug scene, so in Tasker proximity is a readout.
+  D-087 had read "damps LuxAlpha ×0.1" as a damp on smoothing, although the owner asked there for
+  parity, so while near a return to the previous level could be act19-stopped (100 → 30 → 100 lx
+  smoothed to 95, stopped, then 800 lx to 161). `evaluate` now smooths, maps and animates undamped
+  and reports `luxAlpha × 0.1` on a smoothed cycle while near, which the oracle already modelled;
+  `LightCycleParityTest` replays it near and `proximityNear_dampsOnlyTheReportedLuxAlpha` replaces
+  the pinning test. F-G was queued as an owner decision, the owner asked this session to work it,
+  and the parity rule set the direction; keeping the old damp would now be a `parity_gaps.md`
+  deviation entry, and the panic gesture's proximity veto (D-116) is untouched. On-device
+  behaviour is unverified (`DEVICE_TEST_SCRIPT.md` §4 now expects no slowing).

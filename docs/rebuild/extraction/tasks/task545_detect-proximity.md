@@ -11,7 +11,8 @@ Owner-verified S3.5 (D-022).
 | act3 | 547 Variable Set | `%AAB_Proximity = far` |
 | act4 | 38 End If | — |
 
-Consumed in task544 act28–29: `if %AAB_Proximity = near → LuxAlpha = lux_results2 × 0.1`
-(reaction damping while the phone is at the ear / in a pocket). It does **NOT** pause the
-pipeline. Port target: S9 proximity sensor listener → pipeline state flag feeding the
-engine's alpha damping.
+Consumed in task544 act28–29: `if %AAB_Proximity = near → LuxAlpha = lux_results2 × 0.1`.
+It does **NOT** pause the pipeline, and it does not damp reactivity either: act27 has already
+stored `%SmoothedLux` from the undamped α, and act33 hands Map Lux the undamped `%lux_results2`,
+so only the readouts that display `%LuxAlpha` change (corrected 2026-09-24, DC-064; the S14 port
+had damped the EMA). The only other reader is the Debug scene.

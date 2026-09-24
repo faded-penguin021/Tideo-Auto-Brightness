@@ -1602,6 +1602,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   stopped on hibernate/teardown) → `PipelineState.proximityNear` (atomic update from the collector, same
   documented exception as `lastSampleMs`) → `buildInput`. Never pauses (task545). Tests: domain
   `proximityNear_dampsLuxAlphaByTenth`, controller `proximityNear_propagatesToPipelineState`.
+  Corrected by DC-064.
 
 - D-088: **(S14 — task524 power-draw calibration PORTED).** Was "measurement deferred" (old D-044); the
   owner flagged it a real tour de force and wanted parity. Ported verbatim from the extracted Java:
