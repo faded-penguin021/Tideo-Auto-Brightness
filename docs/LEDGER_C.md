@@ -932,3 +932,17 @@
   null branch's name. Sol found three pre-existing races this does not fix: a tick queued behind a
   ScreenOff still runs after hibernate (R6's invalidation contract), concurrent `start()`/`stop()`
   are unserialised, and a cancelled listener is not joined before a WAKE re-registers.
+- DC-068 [cited]: **Live runtime state is cleared by service-instance ownership, not by publish
+  recency, so a running service in steady light no longer shows as stopped (2026-09-24, Tideo
+  #130/#132, F-D's watchdog).** `onTaskRemoved` used to arm the S12.9d watchdog, which reset
+  `LiveRuntimeState` 5 s later unless something had published since, and steady light publishes
+  nothing, so the dashboard, tile and widget could show a live service as stopped. Now
+  `ensureRunning` claims the state for its instance, `onDestroy` releases it and arms the 5 s grace
+  with the release's generation, and the grace resets only if no instance owns the state and no
+  newer claim has happened since; `onTaskRemoved` arms nothing, since the instance is still alive.
+  The generation came from Sol, since without it a predecessor's timer cut a successor's grace
+  short (mutation-checked), and a destroyed instance's own late publish no longer cancels its
+  reset either. Left as found, both pre-existing (Sol) and outside the STALE banner redesign this
+  train defers: `tearDownDisabled`'s reset on `Dispatchers.Default` can be overwritten by the
+  collector's last publish until the grace reset (`publish` always sets `serviceRunning`), and a
+  fresh instance shows stopped until its first publish.

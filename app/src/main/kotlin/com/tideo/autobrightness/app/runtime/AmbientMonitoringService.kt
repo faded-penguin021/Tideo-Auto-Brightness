@@ -257,6 +257,7 @@ class AmbientMonitoringService : Service() {
         // DA-030: runtimeStarted latches; runtimeStartCount must NOT (tests distinguish activations).
         runtimeStarted = true
         runtimeStartCount++
+        LiveRuntimeState.claim(this)
         // Refresh tier cache at resume points so out-of-band grants are reflected (G1-F5).
         privilegeManager.refresh()
         controller.start()
@@ -568,14 +569,6 @@ class AmbientMonitoringService : Service() {
         )
     }
 
-    /**
-     * S12.9d: arm staleness watchdog to prevent UI flicker on FGS recreation.
-     */
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        armStalenessWatchdog()
-        super.onTaskRemoved(rootIntent)
-    }
-
     override fun onDestroy() {
         // D-157 (U5): single authoritative OFF event emitted before scope.cancel() (covers all stop paths).
         if (externalControlEnabled) broadcastStateChanged(enabled = false, running = false, paused = false, profile = null)
@@ -593,22 +586,17 @@ class AmbientMonitoringService : Service() {
             displayToggles.stop()
         }
         // S12.9d: watchdog instead of immediate reset (survives FGS recreation within grace window).
-        armStalenessWatchdog()
+        armStalenessWatchdog(LiveRuntimeState.release(this))
         scope.cancel()
         super.onDestroy()
     }
 
     /**
-     * Reset LiveRuntimeState after WATCHDOG_GRACE_MS unless a newer publish arrived.
+     * Reset LiveRuntimeState after WATCHDOG_GRACE_MS unless a newer instance claimed it.
      */
-    private fun armStalenessWatchdog() {
-        val armedAt = System.currentTimeMillis()
+    private fun armStalenessWatchdog(generation: Long) {
         mainHandler.postDelayed({
-            val lastPublish = LiveRuntimeState.pipeline.value.lastPublishMs
-            if (lastPublish == null || lastPublish < armedAt) {
-                LiveRuntimeState.reset()
-                DashboardWidgetProvider.refresh(applicationContext)
-            }
+            if (LiveRuntimeState.resetIfUnowned(generation)) DashboardWidgetProvider.refresh(applicationContext)
         }, WATCHDOG_GRACE_MS)
     }
 

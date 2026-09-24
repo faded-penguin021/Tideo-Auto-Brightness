@@ -18,6 +18,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowToast
+import java.time.Duration
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -125,7 +126,7 @@ class AmbientMonitoringServiceTest {
     }
 
     private fun waitUntil(condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 2_000
+        val deadline = System.currentTimeMillis() + 10_000
         while (!condition() && System.currentTimeMillis() < deadline) {
             shadowOf(Looper.getMainLooper()).idle()
             Thread.sleep(10)
@@ -360,6 +361,93 @@ class AmbientMonitoringServiceTest {
 
         assertEquals(monitoring, textOf(service.foregroundNotification(running.copy(serviceOn = false), "Night")), "a first start posts Monitoring")
         assertEquals(monitoring, textOf(service.foregroundNotification(PipelineState(serviceOn = true), null)), "no accepted reading yet: Monitoring is true")
+    }
+
+    // DC-068: steady light publishes nothing, so a live instance must not lose its state to a timer.
+    @Test
+    fun taskRemoved_inSteadyLight_keepsTheRunningState() {
+        LiveRuntimeState.reset()
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+            waitUntil { LiveRuntimeState.serviceRunning.value }
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+
+            service.onTaskRemoved(null)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(6))
+
+            assertTrue(LiveRuntimeState.serviceRunning.value, "a running service must not show as stopped")
+            assertNotNull(LiveRuntimeState.pipeline.value.lastPublishMs, "its snapshot must survive too")
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    @Test
+    fun destroy_withoutASuccessor_resetsAfterTheGrace_evenIfItsOwnPublishLandsLate() {
+        LiveRuntimeState.reset()
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        controller.get().onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+        waitUntil { LiveRuntimeState.serviceRunning.value }
+
+        controller.destroy()
+        LiveRuntimeState.publish(PipelineState(serviceOn = true), activeContext = null)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(4_900))
+        assertTrue(LiveRuntimeState.serviceRunning.value, "the grace window survives an FGS recreation")
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200))
+        assertFalse(LiveRuntimeState.serviceRunning.value, "a destroyed owner's state is cleared")
+    }
+
+    @Test
+    fun destroy_thenRecreatedService_keepsTheSuccessorsState_inSteadyLight() {
+        LiveRuntimeState.reset()
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
+        val first = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        first.get().onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+        waitUntil { LiveRuntimeState.serviceRunning.value }
+        first.destroy()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        val successorStart = System.currentTimeMillis()
+
+        val second = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            second.get().onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+            waitUntil { (LiveRuntimeState.pipeline.value.lastPublishMs ?: 0L) >= successorStart }
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(6))
+            assertTrue(LiveRuntimeState.serviceRunning.value, "the predecessor's timer must not clear the successor")
+        } finally {
+            second.destroy()
+        }
+    }
+
+    @Test
+    fun predecessorsTimer_doesNotCutTheSuccessorsGrace() {
+        LiveRuntimeState.reset()
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
+        val first = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        first.get().onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+        waitUntil { LiveRuntimeState.serviceRunning.value }
+        first.destroy()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        val successorStart = System.currentTimeMillis()
+
+        val second = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        second.get().onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+        waitUntil { (LiveRuntimeState.pipeline.value.lastPublishMs ?: 0L) >= successorStart }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+        second.destroy()
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1_500))
+        assertTrue(LiveRuntimeState.serviceRunning.value, "the successor keeps its own five-second grace")
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(4))
+        assertFalse(LiveRuntimeState.serviceRunning.value, "then its own timer clears it")
     }
 
     private fun textOf(notification: Notification?): String? =

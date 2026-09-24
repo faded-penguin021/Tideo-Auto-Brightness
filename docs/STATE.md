@@ -33,8 +33,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
 - **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
   · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [x] R3 diagnostics (DC-066)
-  · [x] R2 startup race (DC-067) · [ ] R4, **next** · [ ] R6, with its D-027 rule review
-  · [ ] R8 close-out; R4 and R6 start from a test that fails today, R7 is deferred and RF dropped
+  · [x] R2 startup race (DC-067) · [x] R4 watchdog (DC-068) · [ ] R6, with its D-027 rule
+  review, **next** · [ ] R8 close-out; R6 starts from a test that fails today, R7 is deferred and RF dropped
   (plan §5).
 
 ## Owner queue
@@ -75,14 +75,6 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
    `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
    Live Debug's "Smoothing α" drops to a tenth.
-
-5. **[2026-09-24] On a build with the new Live Debug "Light Sensor" card, repeat the dark-wake
-   test.** Leave the screen off for at least 2 minutes in a dark room, wake it and open Live Debug
-   at once. "Registered: WAKE … listener registered" with "First event after registration: None
-   yet" means no reading arrived (H2). A first event plus a MUTEX or COOLDOWN last rejection points
-   at a dropped reading (F-C). A cycle stuck in one stage for minutes means the cycle never
-   finished. Settles it: a screenshot of that card after such a wake, attached to the next commit
-   or #132 (DC-066).
 
 Open questions: none.
 
@@ -127,6 +119,19 @@ something major, and say so.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-24 — **Owner queue item 5 done (DC-066):** the owner ran the dark-wake test on a build
+  with the Light Sensor card (OnePlus 13, screen off 3 min). The wake was healthy: WAKE
+  registration, first event 0.0 lx within 2 s, about 4 events a second, and no MUTEX or COOLDOWN
+  drop. One clean run of an intermittent failure, so H2 stays open; the detail is under the plan's
+  H2.
+
+- 2026-09-24 — **Light stalls R4 (DC-068):** a running service in steady light no longer shows as
+  stopped 5 s after its task is swiped away; live state is now cleared by service-instance
+  ownership, and a predecessor's timer cannot cut a successor's grace. The entry test was red on
+  the old code. On the OnePlus 13, R4's and R2's device checks passed, but R4's cannot
+  discriminate: a sensor reporting about 4 times a second never stops publishing. No changelog
+  line: `25.txt` is at its cap and the defect was never seen in the field.
 
 - 2026-09-24 — **Light stalls R2 (DC-067):** the light sensor registers only once settings have
   loaded, so the reading it sends on registration after a service start is evaluated instead of

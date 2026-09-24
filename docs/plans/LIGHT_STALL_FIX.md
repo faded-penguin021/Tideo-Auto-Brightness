@@ -313,6 +313,13 @@ like that recovers within seconds from a missing first event. So on this phone H
 "Monitoring" that clears by itself, and "Monitoring" that *stays* points to F-A. That rests on one
 screenshot, and the delivery rate has not been measured.
 
+**The R3 dark-wake run (2026-09-24, debug build, dark room, screen off 3 min) was healthy.** The
+light listener re-registered in the wake key's second (`dumpsys sensorservice`: `result=OK`,
+200 ms sampling). The card showed its first event, 0.0 lx at accuracy 3, within 2 s, and 76
+events in 20 s. The one admitted reading gave UNCHANGED, and the other 75 were DEAD_BAND. The
+screen was already at the dark target. That is one clean run of an intermittent failure, so H2
+stays open. It does measure the delivery rate asked for above: about 4 events a second.
+
 **Tasker does not wait for the first event (2026-09-24).** task618 Set Initial Brightness, which
 runs on wake (prof761), reads the light sensor itself (act8, code373 with sensor type 5 and a
 `%AAB_DefaultThrottle` timeout) and retries up to seven times while accuracy is under 2 and trust is
@@ -516,7 +523,15 @@ record is what would expose an OEM framework that differs (F-F).
   only fall. **Later segments revise this taxonomy (Sol):** R5 adds a distinct act19 stop, and R6
   turns busy and cooldown drops into deferred or replaced work. Each such segment
   states which counter a reading now lands in, so no reader of these signals sees an ambiguous one.
-- [ ] **R4 — F-D, the `onTaskRemoved` watchdog only.** Group 2. Clear runtime state by
+- [x] **R4 — F-D, the `onTaskRemoved` watchdog only.** **Done 2026-09-24 (DC-068).** The entry
+  test failed on the old code as predicted (`a running service must not show as stopped`), as did
+  a late own-publish case. Beyond the plan: Sol found that ownership alone let a predecessor's
+  timer cut a successor's grace, so the release carries a generation (mutation-checked).
+  **Device check passed 2026-09-24** (OnePlus 13, debug build of this tree): after the task was
+  swiped away, the same service instance kept the Dashboard at Active and the notification live
+  28 s later. It cannot discriminate, because the sensor reports about 4 times a second and so
+  publishing never paused. The same build's R2 check: START registration, first event
+  59.1 lx, 9 of 341 admitted, the last rejection DEAD_BAND. Group 2. Clear runtime state by
   service-instance ownership and lifecycle, not by publish recency, so that steady light no longer
   shows a running service as stopped.
   - **Entry test (fails today):** a running service in steady light, 5 s or more after
