@@ -78,6 +78,7 @@ data class DynamicScalingConfig(
 
 data class PreviousState(
     val smoothedLux: Double,
-    val lastRawLux: Double,
+    // %AAB_ThreshDynamic as task546 (or task544 act14) last stored it; task535 subtracts it.
+    val threshDynamicPercent: Double,
     val cycleTimeMs: Double? = null,
 )

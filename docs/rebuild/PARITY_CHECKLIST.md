@@ -102,11 +102,11 @@ filled by S1/S2 during extraction.
 | task524 L14246 · _CalibratePowerDraw | ✓ S1 | ✓ S14 (`PowerDrawCalibration`) | domain `PowerDrawCalibration` + platform `PowerMeter` + app `PowerDrawCalibrator` (latch-breaker sweep) + `PowerDrawStore` + Tools calibrate UI (drives the Activity window) → `PowerDrawChart` (S14) | ported |
 | task535 L15204 · Lux Smoothing | ✓ S1 | ✓ S4 | BrightnessEngine.smoothLux (S5) | ported |
 | task543 L15878 · Calculate Animation | ✓ S1 | ✓ S4 | BrightnessEngine.calculateAnimation (S5) | ported |
-| task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | BrightnessEngine.dynamicThreshold (S5) | ported |
-| task546 L16481 · Set Thresholds | ✓ S1 | ✓ S4 | BrightnessEngine.absoluteThresholds (S5) | ported |
+| task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | BrightnessEngine.dynamicThreshold (S5); act10–act35 orchestration in `evaluate` (act14 zero seed, act19 stop) — DC-063, parity_gaps gap-08 | ported; orchestration fixed 2026-09-24, acts 28–33 proximity damp still divergent (gap-08) |
+| task546 L16481 · Set Thresholds | ✓ S1 | ✓ S4 | BrightnessEngine.absoluteThresholds + thresholdPercent (S5); band centred on the current reading since DC-063 | ported (centre fixed 2026-09-24, gap-08) |
 | task548 L16630 · DR Compressed Scale | ✓ S1 | ✓ S4 | BrightnessEngine.compressedDynamicScale (S5) | ported |
 | task549 L17138 · _GenerateCircadianGraph | ✓ S1 | | ui/graph/ExperimentChart.kt `CircadianScaleChart` (S13d — `DynamicScaleEngine.scaleDynamic` over the day) | ported (chart render S13d) |
-| task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | BrightnessEngine.kt ingest (S5) | ported |
+| task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | BrightnessEngine.evaluate `lastRawLux` (BigDecimal 3-dp HALF_UP, DC-063) | ported (fixed 2026-09-24, gap-08) |
 | task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | ui/graph/DimmingChart.kt (S13d — `SoftwareDimming.dimProgress`/dim-shell) | ported (chart render S13d) |
 | task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | ui/graph/ReactivityChart.kt `AlphaResponseChart` (S13d) | ported (chart render S13d) |
 | task563 L19677 · _AskPermissionsV7 | ✓ S1 | | app/ui/onboarding/OnboardingScreen.kt — notifications → WRITE_SETTINGS → Location → ELEVATED → usage; S12.7d adds restricted-settings hint (F33) + Location step (F41) + Menu landing (F57) | ported (onboarding gates) |

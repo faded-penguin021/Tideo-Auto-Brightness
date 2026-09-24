@@ -224,6 +224,20 @@ which in the smoothing path was last written by the *previous* cycle's task546 (
 act25), so a threshold that fell between cycles can still give a small negative α. That is rare,
 consistent with the owner never observing it.
 
+### F-G — The proximity damp slows smoothing, which Tasker's does not. Confidence: high (code read against Tasker source, 2026-09-24)
+
+Found while transcribing act10–act35 for R5. In task544, act27 stores `%SmoothedLux` from
+task535's own result, computed with the **undamped** α. act29 then sets only the global `%LuxAlpha`
+to `%lux_results2 * 0.1`, and act33 hands Map Lux `par2 = %lux_results2`, the undamped α again (XML
+L16196–L16275). The damped value therefore feeds nothing but the readouts that display
+`%LuxAlpha`. Tideo applies the ×0.1 **inside** the EMA (`BrightnessEngine.kt:67`, `:130-131`), so
+while proximity reads near every smoothed step moves a tenth as far, and the animation is sized
+from the damped α. That is the mechanism F-B's reason 4 describes, and it is Tideo's own. The
+AGENTS.md sentence "multiplies `LuxAlpha` by 0.1; it never pauses" holds for Tasker's global, and
+the contract test `proximityNear_dampsLuxAlphaByTenth` pins Tideo's divergent behaviour. **Not
+yet scheduled:** it is a parity restore in R5's act range, and whether it joins R5 is the owner's
+call.
+
 ### F-F — A low-accuracy reading is rejected, and nothing re-admits it. Ruled out on AOSP frameworks (2026-09-24); RF dropped
 
 - prof760's first stage drops any reading with `accuracy ≤ 1` unless "Trust low-accuracy sensor"
@@ -297,6 +311,14 @@ steady ~0 lx (last sample "just now", last completed cycle 7 min earlier). A sen
 like that recovers within seconds from a missing first event. So on this phone H2 predicts
 "Monitoring" that clears by itself, and "Monitoring" that *stays* points to F-A. That rests on one
 screenshot, and the delivery rate has not been measured.
+
+**Tasker does not wait for the first event (2026-09-24).** task618 Set Initial Brightness, which
+runs on wake (prof761), reads the light sensor itself (act8, code373 with sensor type 5 and a
+`%AAB_DefaultThrottle` timeout) and retries up to seven times while accuracy is under 2 and trust is
+off (act9–12). It then sets `%SmoothedLux` and `%AAB_LastRawLux` from that reading and maps it.
+Tideo's `setInitialBrightness` has no reading of its own after a wake (F-F's wake-path bullet), so
+H2 is a Tideo-only exposure. Recorded here as evidence for a future H2 fix, which is still not
+planned.
 
 **Observation 6, other readings.**
 - The samples arriving at 0 lx were refused by the stored 0.0–0.1 band (F-B's zero trap: 0 is
@@ -469,7 +491,13 @@ record is what would expose an OEM framework that differs (F-F).
     `onTaskRemoved`, keeps its state.
   - The dashboard banner redesign (driving STALE from R3's signals, with wording the owner
     approves) is **not** in this train. It waits until R3's signals have been seen in the field.
-- [ ] **R5 — F-E, restore Tasker's dead-band.** Group 2. This restores parity, so it needs no fork
+- [x] **R5 — F-E, restore Tasker's dead-band.** **Done 2026-09-24 (DC-063, parity_gaps gap-08).**
+  The entry test failed on the old code as predicted (`the 100.0 lx reading must be evaluated
+  expected:<100.0> but was:<30.0>`). Two points below were corrected in the doing: act14's first
+  run seeds **0 % and a zero-width band** (Tasker maths reads the unset `%dynamic_threshold` as 0),
+  not a band from the reading's own threshold; and `setInitialBrightness` is task618, not act10,
+  so it is **not** checked against the first-run row (gap-08 records task618's differences). The
+  acts 28–33 proximity mismatch found here is F-G. Group 2. This restores parity, so it needs no fork
   (playbook 2/4). It does change behaviour users know, so it gets a changelog line. Only R6 lands
   after it, and the owner decides whether it ships in 1.11.0 or a later release. **Started
   2026-09-24, ahead of R1 and R3 (owner):** it is the same work under every answer to the R6/R7

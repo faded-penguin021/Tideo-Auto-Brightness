@@ -42,6 +42,7 @@ data class PipelineState(
     val lastSampleMs: Long? = null,
     val threshAbsLow: Double? = null,
     val threshAbsHigh: Double? = null,
+    val threshDynamicPercent: Double? = null,
     // G2R-F6/F7: surfaced for Reactivity diagnostic card.
     val threshDynamic: Double? = null,
     val cycleTimeMs: Double? = null,

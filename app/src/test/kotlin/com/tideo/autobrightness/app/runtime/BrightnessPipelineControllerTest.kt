@@ -194,6 +194,52 @@ class BrightnessPipelineControllerTest {
     }
 
     @Test
+    fun returnToThePreviousLevel_isEvaluated_taskerBandOnCurrentReading() = runTest {
+        val sensor = FakeSensor()
+        var nowMs = 1_000L
+        val pastAnyCooldownMs = 60_000L
+        val (controller, scope) = newController(sensor, FakeBrightness(), clock = { nowMs })
+        controller.start()
+
+        for (lux in listOf(100.0, 30.0, 100.0)) {
+            sensor.flow.emit(sample(lux))
+            advanceUntilIdle()
+            assertEquals(lux, controller.state.value.lastRawLux, "the $lux lx reading must be evaluated")
+            nowMs += pastAnyCooldownMs
+        }
+        scope.cancel()
+    }
+
+    @Test
+    fun belowTheDynamicThreshold_storesTheBandAndWritesNothing_taskerAct19() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        var nowMs = 1_000L
+        val pastAnyCooldownMs = 60_000L
+        val (controller, scope) = newController(sensor, brightness, clock = { nowMs })
+        controller.start()
+        for (lux in listOf(100.0, 30.0)) {
+            sensor.flow.emit(sample(lux))
+            advanceUntilIdle()
+            nowMs += pastAnyCooldownMs
+        }
+        val before = controller.state.value
+        val writesBefore = brightness.writes.size
+
+        sensor.flow.emit(sample(45.0))
+        advanceUntilIdle()
+
+        val after = controller.state.value
+        assertEquals(45.0, after.lastRawLux)
+        assertTrue(45.0 in after.threshAbsLow!!..after.threshAbsHigh!!, "act20's band is centred on the reading")
+        assertEquals(before.smoothedLux, after.smoothedLux)
+        assertEquals(before.lastAcceptedMs, after.lastAcceptedMs, "the cooldown anchor does not move")
+        assertEquals(before.targetBrightness, after.targetBrightness)
+        assertEquals(writesBefore, brightness.writes.size)
+        scope.cancel()
+    }
+
+    @Test
     fun midCycleSensorEvent_isDropped() = runTest {
         val sensor = FakeSensor()
         val brightness = FakeBrightness()

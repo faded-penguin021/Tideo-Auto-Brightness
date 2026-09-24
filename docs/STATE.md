@@ -48,7 +48,7 @@ Sol- and Astra-reviewed). No device mutation before S4's recovery contract is So
 `docs/plans/LIGHT_STALL_FIX.md` (persisting approved by owner 2026-09-23; Astra-reviewed three times).
 
 - [x] R0 plan · [ ] R1 notification overwrite · [ ] R2 startup race · [ ] R3 diagnostics · [ ] R4
-  `onTaskRemoved` watchdog · [ ] R5 Tasker's dead-band (F-E) · [ ] R8 close-out (ledger rows,
+  `onTaskRemoved` watchdog · [x] R5 Tasker's dead-band (F-E, DC-063) · [ ] R8 close-out (ledger rows,
   open findings included; delete the plan) · [ ] R6 pending-latest slot, in since 2026-09-24,
   after R5, with its D-027 rule review. R2, R4, R5 and R6 each start from a test that fails today.
   R7 stays deferred until an R3 trace names its path; RF is dropped, since AOSP reports light as
@@ -137,11 +137,11 @@ fix and NOT by creating `26.txt`. Re-open only for something genuinely major, an
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-09-24 — **Light-stall plan re-scoped again: R6 in, R7 deferred, RF dropped (owner).** Four
-  findings were re-checked against the code at `24a02f0`. F-C (a reading dropped while busy or in
-  cooldown) fits #132's 11.5 → 31.8 → 0 lx capture, so R6 joins the train. AOSP's sensor JNI
-  reports every light reading as high accuracy, and `onAccuracyChanged` only arrives with an
-  event, so the trust gate cannot refuse a light reading and F-F's mechanism is ruled out.
+- 2026-09-24 — **Tasker's dead-band restored (R5, DC-063):** a return to the previous light level
+  is no longer ignored. Adds the oracle `TaskerReference.lightCycle`; no existing oracle or vector
+  changed.
+- 2026-09-24 — **Light-stall plan re-scoped (owner): R6 in, R7 deferred, RF dropped** — AOSP
+  reports light as high accuracy, ruling out F-F.
 - 2026-09-23 — **A false manual-override pause on unlock was diagnosed but not fixed (DC-059,
   DC-060, DC-061).** Tideo's own Extra Dim was the first suspect, and the owner's reads refuted it.
   The "settled" value Tideo paused on is a 3 ms re-read, so a brief dip looks like a real change.

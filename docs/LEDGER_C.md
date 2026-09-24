@@ -862,3 +862,17 @@
   still spanned the tile toggle. Whether the 12 lasted or was a dip is still open, and so is the
   root cause. The next false pause settles it: read `screen_brightness` from the shell before
   pressing Resume, where about 193 means the 12 stuck and 241 means it was a dip.
+
+- DC-063: **Tasker's dead-band is restored in `BrightnessEngine.evaluate`, and D-039(a)'s premise
+  that the engine is the oracle is withdrawn.** The golden vectors test task535, task544's Java
+  and task546 separately, so nothing checked the orchestration between them, and it diverged from
+  task554 act1 → task544 act10–act35: no act19 stop, a band centred on the previous reading
+  (100 → 30 → 100 lx left the screen on 30 lx's brightness), task535 fed this cycle's threshold
+  instead of the stored `%AAB_ThreshDynamic`, act35's `par1` taken as the reading, and a first-run
+  seed unlike act14's. Each now matches a transcribed oracle, `TaskerReference.lightCycle`, through
+  `LightCycleParityTest`, and an act19 stop stores act20's band while writing, mapping and
+  publishing nothing. act14 reads `%dynamic_threshold` before act18 sets it and Tasker maths reads
+  an unset variable as 0, so a first run seeds 0 % and a zero-width band at the reading. D-039(a)'s
+  "both gates use the SAME stored band" no longer describes the code, which has one band, Tasker's.
+  The detail, and two related divergences left open (task618's wake path, the proximity damp), are
+  in `docs/rebuild/parity_gaps.md` gap-08.

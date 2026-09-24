@@ -13,7 +13,7 @@ class BrightnessEngineContractTest {
             BrightnessPolicyInput(
                 lux = 0.8,
                 time = TimeContext(secondsOfDay = 2 * 3600.0),
-                previous = PreviousState(smoothedLux = 1.0, lastRawLux = 1.0),
+                previous = null, // first run: a completed cycle, not an act19 stop
             ),
         )
 
@@ -27,7 +27,7 @@ class BrightnessEngineContractTest {
             BrightnessPolicyInput(
                 lux = 15_000.0,
                 time = TimeContext(secondsOfDay = 13 * 3600.0),
-                previous = PreviousState(smoothedLux = 8_000.0, lastRawLux = 8_000.0),
+                previous = PreviousState(smoothedLux = 8_000.0, threshDynamicPercent = 17.0),
             ),
         )
 
@@ -42,7 +42,7 @@ class BrightnessEngineContractTest {
             BrightnessPolicyInput(
                 lux = 800.0,
                 time = TimeContext(secondsOfDay = 12 * 3600.0),
-                previous = PreviousState(smoothedLux = 20.0, lastRawLux = 20.0),
+                previous = PreviousState(smoothedLux = 20.0, threshDynamicPercent = 27.0),
             ),
         )
         assertEquals(1.0, spikeOutput.luxAlpha, 1e-9)
@@ -53,10 +53,11 @@ class BrightnessEngineContractTest {
             BrightnessPolicyInput(
                 lux = 126.0,
                 time = TimeContext(secondsOfDay = 12 * 3600.0),
-                previous = PreviousState(smoothedLux = 100.0, lastRawLux = 100.0),
+                previous = PreviousState(smoothedLux = 100.0, threshDynamicPercent = 25.0),
             ),
         )
-        assertTrue(smoothOutput.luxAlpha < 1.0)
+        assertEquals(EvaluationOutcome.SMOOTHED, smoothOutput.outcome)
+        assertTrue(smoothOutput.luxAlpha > 0.0 && smoothOutput.luxAlpha < 1.0)
         assertTrue(smoothOutput.smoothedLux < 126.0)
     }
 
@@ -67,7 +68,7 @@ class BrightnessEngineContractTest {
         val base = BrightnessPolicyInput(
             lux = 126.0,
             time = TimeContext(secondsOfDay = 12 * 3600.0),
-            previous = PreviousState(smoothedLux = 100.0, lastRawLux = 100.0),
+            previous = PreviousState(smoothedLux = 100.0, threshDynamicPercent = 25.0),
         )
         val far = engine.evaluate(base)
         val near = engine.evaluate(base.copy(proximityNear = true))
@@ -88,7 +89,7 @@ class BrightnessEngineContractTest {
                 lux = 100.0,
                 time = TimeContext(secondsOfDay = 12 * 3600.0),
                 overrides = BrightnessOverrides(manualBrightness = 42),
-                previous = PreviousState(smoothedLux = 100.0, lastRawLux = 100.0),
+                previous = PreviousState(smoothedLux = 100.0, threshDynamicPercent = 25.0),
             ),
         )
 
@@ -111,7 +112,7 @@ class BrightnessEngineContractTest {
                 lux = 200.0,
                 time = time,
                 dynamicScaling = DynamicScalingConfig(enabled = true, spreadPercent = 15.0),
-                previous = PreviousState(smoothedLux = 200.0, lastRawLux = 200.0),
+                previous = null, // first run: an equal reading would stop at act19
             ),
         )
 
@@ -120,7 +121,7 @@ class BrightnessEngineContractTest {
                 lux = 200.0,
                 time = time.copy(secondsOfDay = 2 * 3600.0),
                 dynamicScaling = DynamicScalingConfig(enabled = true, spreadPercent = 15.0),
-                previous = PreviousState(smoothedLux = 200.0, lastRawLux = 200.0),
+                previous = null,
             ),
         )
 

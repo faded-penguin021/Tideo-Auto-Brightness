@@ -451,6 +451,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   .shouldCommitPause immediately rather than waiting %AAB_CycleTime, because the single-cycle model
   already guarantees no animation is mid-flight when an OverrideDetected event is dequeued. (Affects
   S9b, S10, S12, S14.)
+  Corrected by DC-063.
 
 - D-040 [cited]: S9b RUNTIME FEATURES + RIP-OUT decisions (sanctioned by the S9b brief; flagged for S12/S14).
   (a) **Super dimming = ELEVATED secure path only.** SuperDimmingCoordinator wires the privileged

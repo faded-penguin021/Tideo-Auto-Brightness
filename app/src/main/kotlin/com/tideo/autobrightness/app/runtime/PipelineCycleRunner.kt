@@ -8,6 +8,7 @@ import com.tideo.autobrightness.app.settings.toThresholdConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessContext
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
+import com.tideo.autobrightness.domain.brightness.EvaluationOutcome
 import com.tideo.autobrightness.domain.brightness.OverrideRules
 import com.tideo.autobrightness.domain.brightness.PreviousState
 import com.tideo.autobrightness.domain.brightness.SoftwareDimming
@@ -78,6 +79,19 @@ internal class PipelineCycleRunner(
         ctx.update { it.copy(autoRunning = true) }
         try {
             val output = engine.evaluate(buildInput(rawLux, settings, s))
+            // Tasker task544 act20–23: keep the band, write nothing, leave the cooldown anchor alone.
+            if (output.outcome == EvaluationOutcome.DEAD_BAND_STOP) {
+                ctx.update {
+                    it.copy(
+                        lastRawLux = output.lastRawLux,
+                        threshAbsLow = output.thresholdLow,
+                        threshAbsHigh = output.thresholdHigh,
+                        threshDynamicPercent = output.threshDynamicPercent,
+                        threshDynamic = output.dynamicThreshold,
+                    )
+                }
+                return
+            }
             val from = brightness.read()
             // task661 act22-26 / task698 step 3: hardware floor in PWM-sensitive mode (D-050); readout tracks perceived (D-109).
             val target = applyPwmFloor(output.targetBrightness, settings)
@@ -138,7 +152,6 @@ internal class PipelineCycleRunner(
 
             // task646→650/645: F65 uses un-floored target, not PWM-floored hardware (task661/698 floor ⟂ task650).
             dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
-            // F58: dimming live readout.
             val (dimCurrent, dimDS) = dimmingReadout(output.targetBrightness, settings, output.scaleDynamic)
 
             // DC-001: cycle time is state (cycleTimeMs, Live Debug), not a Graph Metrics Flash —
@@ -154,10 +167,11 @@ internal class PipelineCycleRunner(
             ctx.update {
                 it.copy(
                     smoothedLux = output.smoothedLux,
-                    lastRawLux = round3(rawLux),
+                    lastRawLux = output.lastRawLux,
                     lastAcceptedMs = now,
                     threshAbsLow = output.thresholdLow,
                     threshAbsHigh = output.thresholdHigh,
+                    threshDynamicPercent = output.threshDynamicPercent,
                     threshDynamic = output.dynamicThreshold,
                     cycleTimeMs = cycleTotal,
                     scaleDynamic = output.scaleDynamic,
@@ -221,8 +235,8 @@ internal class PipelineCycleRunner(
     private fun buildInput(rawLux: Double, settings: AabSettings, s: PipelineState): BrightnessPolicyInput {
         // UTC seconds-of-day (F73).
         val secondsOfDay = ((clock() / 1000L) % 86_400L).toDouble()
-        val previous = if (s.smoothedLux != null && s.lastRawLux != null) {
-            PreviousState(smoothedLux = s.smoothedLux, lastRawLux = s.lastRawLux, cycleTimeMs = s.cycleTimeMs)
+        val previous = if (s.smoothedLux != null && s.threshDynamicPercent != null) {
+            PreviousState(s.smoothedLux, s.threshDynamicPercent, s.cycleTimeMs)
         } else {
             null
         }

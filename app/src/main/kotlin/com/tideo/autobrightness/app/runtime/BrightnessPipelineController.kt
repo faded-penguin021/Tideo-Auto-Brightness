@@ -270,6 +270,8 @@ class BrightnessPipelineController(
                 lastAcceptedMs = null,
                 threshAbsLow = null,
                 threshAbsHigh = null,
+                threshDynamicPercent = null,
+                threshDynamic = null,
                 cycleTimeMs = null,
                 // DC-008: UNKNOWN, not stale, across a sleep (lastBrightnessWrite survives — it is
                 // the continuous diagnostic).

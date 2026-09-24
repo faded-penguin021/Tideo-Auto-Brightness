@@ -3,3 +3,5 @@ Night Light temperature and circadian scaling now take effect on devices whose d
 Fixes circadian Night Light anchoring to a fixed 2850 K instead of your own temperature, and "device default" drifting warmer on each off/on cycle.
 
 Fixes settings backup and restore, broken since 1.8.2.
+
+Fixes brightness ignoring a return to the previous light level until the light changed again.
