@@ -10,6 +10,7 @@ import com.tideo.autobrightness.app.runtime.AabToastAccessibilityService
 import com.tideo.autobrightness.app.runtime.AutoBrightnessRuntime
 import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.PipelineState
+import com.tideo.autobrightness.app.runtime.SensorCallbacks
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 
 data class LiveDebugUiState(
     val pipeline: PipelineState = PipelineState(),
+    val sensorCallbacks: SensorCallbacks = SensorCallbacks(),
     val serviceRunning: Boolean = false,
     val activeContext: String? = null,
     val minBrightness: Int = 0,
@@ -54,14 +56,15 @@ class LiveDebugViewModel(application: Application) : AndroidViewModel(applicatio
     private val globalToasts = MutableStateFlow(isGlobalToastServiceEnabled())
 
     val state: StateFlow<LiveDebugUiState> = combine(
-        LiveRuntimeState.pipeline,
+        combine(LiveRuntimeState.pipeline, LiveRuntimeState.sensorCallbacks.state, ::Pair),
         LiveRuntimeState.activeContext,
         LiveRuntimeState.serviceRunning,
         settingsFlow,
         globalToasts,
-    ) { pipeline, context, running, settings, global ->
+    ) { (pipeline, callbacks), context, running, settings, global ->
         LiveDebugUiState(
             pipeline = pipeline,
+            sensorCallbacks = callbacks,
             serviceRunning = running,
             activeContext = context,
             minBrightness = settings.minBrightness,

@@ -478,7 +478,22 @@ record is what would expose an OEM framework that differs (F-F).
     provider resolves; the emitted reading must be evaluated.
   - **Tests:** registration happens after settings resolve, and the first event after
     registration is evaluated.
-- [ ] **R3 — Diagnostics (Astra), shipped before R4 and R5** so a reporter can separate lost delivery,
+- [x] **R3 — Diagnostics. Done 2026-09-24 (DC-066).** Live Debug has a "Light Sensor" card. The
+  callback record is written on the listener thread and is generation-scoped. Registration shows its
+  cause and whether `registerListener` succeeded. It shows received, admitted and rejected, with
+  the last rejection's reason and the trust setting in effect, then the cycle stage since its claim
+  and the last cycle's result, with R5's act19 stop as `DEAD_BAND_STOP`. **Taxonomy as shipped:**
+  admitted means it reached `engine.evaluate`. Rejection reasons are SETTINGS_NOT_LOADED,
+  SERVICE_DISABLED, ACCURACY, DEAD_BAND and MUTEX at the collector, QUEUE_CLOSED, and PAUSED and
+  COOLDOWN at the cycle. There is no "deferred" count until R6 creates one. R6 must move MUTEX and
+  COOLDOWN into it and add "replaced". A Sol review added the generation and claim guards and the
+  trust record. The glue review scoped every counter move to the owning claim, so a tick queued
+  across a wake or a restart moves nothing, and cleared the registration on hibernate and stop.
+  **Daylight device check passed 2026-09-24** (OnePlus 13, debug build): START registration and its
+  first event (331 lx, accuracy 3), 321 callbacks against 321 received, and counters that sum. The
+  sensor-to-callback lag was 172–230 ms, a baseline for H1. The dark-wake test (§7 step 4) was
+  deferred by the owner because it was daytime.
+- **R3 as specified** (Astra), shipped before R4 and R5 so a reporter can separate lost delivery,
   a dropped final reading and an unfinished cycle from one screenshot. In Live Debug show:
   - the actual sensor callback: value, accuracy, sensor timestamp and arrival time;
   - collector receipt, plus admitted, deferred and rejected counts with the last rejection reason

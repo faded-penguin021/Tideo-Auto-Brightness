@@ -69,12 +69,13 @@ data class PipelineState(
     val overrideHistory: List<Pair<Double, Double>> = emptyList(),
     // S12.9d: drives Dashboard staleness gate (FRESH/AGING/STALE).
     val lastPublishMs: Long? = null,
+    val sensor: SensorDiagnostics = SensorDiagnostics(),
 )
 
 /** Events serialized through the single pipeline consumer (one runs to completion, D-027). */
 sealed interface PipelineEvent {
     /** A light-sensor reading that already passed the prof760 gate, accuracy included (DC-045). */
-    data class SensorTick(val lux: Double) : PipelineEvent
+    data class SensorTick(val lux: Double, val claim: Int = 0) : PipelineEvent
 
     /** Display OFF → hibernate (prof753 / task585). */
     data object ScreenOff : PipelineEvent

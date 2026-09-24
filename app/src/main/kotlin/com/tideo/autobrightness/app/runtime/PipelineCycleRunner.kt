@@ -64,19 +64,21 @@ internal class PipelineCycleRunner(
     }
 
     /** task554 → task544 → task535 → task661: ingest a reading and animate to the new brightness. */
-    suspend fun runCycle(rawLux: Double) {
+    suspend fun runCycle(rawLux: Double, claim: Int = 0) {
         val settings = settingsProvider().also { ctx.cacheSettings(it) }
-        if (!settings.serviceEnabled || ctx.stateValue.paused) return
-
         val now = clock()
         val s = ctx.stateValue
-        // task544 act2-9: throttle gate (G2R-F78).
-        s.lastAcceptedMs?.let { last ->
-            if (now - last < throttle.throttleMs) return
+        val rejection = when {
+            !settings.serviceEnabled -> SampleRejection.SERVICE_DISABLED
+            s.paused -> SampleRejection.PAUSED
+            // task544 act2-9: throttle gate (G2R-F78).
+            s.lastAcceptedMs?.let { now - it < throttle.throttleMs } == true -> SampleRejection.COOLDOWN
+            else -> null
         }
+        if (rejection != null) return ctx.update { it.copy(sensor = it.sensor.cycleRejected(rejection, now, settings.trustUnreliableSensor, claim)) }
 
         val cycleStart = now
-        ctx.update { it.copy(autoRunning = true) }
+        ctx.update { it.copy(autoRunning = true, sensor = it.sensor.admitted(claim)) }
         try {
             val output = engine.evaluate(buildInput(rawLux, settings, s))
             // Tasker task544 act20–23: keep the band, write nothing, leave the cooldown anchor alone.
@@ -88,6 +90,7 @@ internal class PipelineCycleRunner(
                         threshAbsHigh = output.thresholdHigh,
                         threshDynamicPercent = output.threshDynamicPercent,
                         threshDynamic = output.dynamicThreshold,
+                        sensor = it.sensor.completed(CycleResult.DEAD_BAND_STOP, clock(), claim),
                     )
                 }
                 return
@@ -112,7 +115,7 @@ internal class PipelineCycleRunner(
             if (brightnessChanged) {
                 brightness.forceManualMode()
                 // G3-F5: publish target early so dashboard animates during sweep (D-109: perceived, not floored).
-                ctx.update { it.copy(targetBrightness = perceived) }
+                ctx.update { it.copy(targetBrightness = perceived, sensor = it.sensor.stage(CycleStage.ANIMATE, claim)) }
                 if (settings.debugLevel == DebugCategory.SKIP_ANIMATIONS.level) {
                     writeResult = brightness.write(target)
                     applied = baselineAfter(writeResult, applied)
@@ -142,6 +145,7 @@ internal class PipelineCycleRunner(
                             it.copy(
                                 lastAppliedBrightness = baseline,
                                 lastBrightnessWrite = write ?: it.lastBrightnessWrite,
+                                sensor = it.sensor.completed(CycleResult.OVERRIDDEN, clock(), claim),
                             )
                         }
                         ctx.postOverrideDetected(outcome.triggerObserved, OverrideSource.ANIMATION_BAND)
@@ -188,6 +192,7 @@ internal class PipelineCycleRunner(
                     animationWaitMs = output.animationWaitMs,
                     throttleMs = throttle.throttleMs,
                     lastUpdateMs = clock(),
+                    sensor = it.sensor.completed(if (brightnessChanged) CycleResult.APPLIED else CycleResult.UNCHANGED, clock(), claim),
                 )
             }
         } finally {
@@ -263,7 +268,7 @@ internal class PipelineCycleRunner(
             animation = settings.toAnimationConfig(),
             dynamicScaling = settings.toDynamicScalingConfig(),
             previous = previous,
-            // prof759/task545: damp the smoothing alpha ×0.1 while the proximity sensor reads near.
+            // prof759/task545: near damps only the reported LuxAlpha ×0.1, never smoothing.
             proximityNear = s.proximityNear,
         )
     }

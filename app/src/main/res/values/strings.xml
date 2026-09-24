@@ -494,6 +494,29 @@
     <string name="debug_mode_not_manual">Not manual</string>
     <string name="debug_reclaim_ok">Recovered</string>
     <string name="debug_reclaim_failed">Failed</string>
+    <!-- Live Debug: Light Sensor card (DC-066). Enum names (WAKE, DEAD_BAND…) are shown untranslated. -->
+    <string name="debug_sensor_title">Light Sensor</string>
+    <string name="debug_sensor_last_callback">Last callback</string>
+    <string name="debug_sensor_reading_value">%1$s lx · accuracy %2$d · #%3$d · %4$s</string>
+    <string name="debug_sensor_callback_lag">Sensor event → callback (ms)</string>
+    <string name="debug_sensor_timestamp">Sensor timestamp (ms since boot)</string>
+    <string name="debug_sensor_registration">Registered</string>
+    <string name="debug_sensor_listener_ok">listener registered</string>
+    <string name="debug_sensor_listener_failed">listener NOT registered</string>
+    <string name="debug_sensor_listener_pending">listener pending</string>
+    <string name="debug_sensor_trust_on">trust low accuracy on</string>
+    <string name="debug_sensor_trust_off">trust low accuracy off</string>
+    <string name="debug_sensor_trust_unknown">trust not loaded</string>
+    <string name="debug_sensor_first_event">First event after registration</string>
+    <string name="debug_sensor_none_yet">None yet</string>
+    <string name="debug_sensor_counts">Received / admitted / rejected</string>
+    <string name="debug_sensor_last_rejection">Last rejection</string>
+    <string name="debug_sensor_cycle">Cycle in progress</string>
+    <string name="debug_sensor_cycle_value">%1$s · started %2$s</string>
+    <string name="debug_sensor_idle">Idle</string>
+    <string name="debug_sensor_last_cycle">Last completed cycle</string>
+    <string name="debug_sensor_last_cycle_value">%1$s · %2$d ms · %3$s</string>
+    <string name="debug_sensor_pair_value" translatable="false">%1$s · %2$s</string>
     <!-- Placeholder for a value the pipeline has not produced yet — punctuation, not translatable. -->
     <string name="debug_write_absent" translatable="false">—</string>
     <string-array name="debug_labels">

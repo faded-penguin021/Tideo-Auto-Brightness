@@ -8,12 +8,15 @@ import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSample
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -31,7 +34,8 @@ class BrightnessPipelineControllerTest {
 
     private class FakeSensor : LightSensorSource {
         val flow = MutableSharedFlow<LightSample>(extraBufferCapacity = 16)
-        override fun samples(): Flow<LightSample> = flow
+        override fun samples(onRegistered: (Boolean) -> Unit, onCallback: (LightSample) -> Unit): Flow<LightSample> =
+            flow.onStart { onRegistered(true) }.onEach(onCallback)
     }
 
     private class FakeObserver : BrightnessObserver {
@@ -87,7 +91,7 @@ class BrightnessPipelineControllerTest {
         override fun near(): Flow<Boolean> = flow
     }
 
-    private fun sample(lux: Double, accuracy: Int = 3) = LightSample(lux.toFloat(), accuracy, 0L)
+    private fun sample(lux: Double, accuracy: Int = 3, seq: Int = 0) = LightSample(lux.toFloat(), accuracy, 0L, seq)
 
     // Test settings: trustUnreliable, detectOverrides, no scaling.
     private val settings = AabSettings(
@@ -122,16 +126,19 @@ class BrightnessPipelineControllerTest {
         observer: BrightnessObserver = FakeObserver(),
         clock: () -> Long,
         animationRunner: AnimationRunner = AnimationRunner(brightness),
+        settingsProvider: suspend () -> AabSettings = { settings },
+        callbackLog: SensorCallbackLog = SensorCallbackLog(),
     ): Pair<BrightnessPipelineController, CoroutineScope> {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val controller = BrightnessPipelineController(
             lightSensor = sensor,
             brightness = brightness,
             brightnessObserver = observer,
-            settingsProvider = { settings },
+            settingsProvider = settingsProvider,
             scope = scope,
             clock = clock,
             animationRunner = animationRunner,
+            callbackLog = callbackLog,
         )
         return controller to scope
     }
@@ -1062,6 +1069,158 @@ class BrightnessPipelineControllerTest {
                 lastResult = unlandedWrite(to, WriteStatus.REFUSED),
             )
         }
+    }
+
+    @Test
+    fun everyDeliveredReading_landsInOneCounter_withItsReason_DC066() = runTest {
+        val sensor = FakeSensor()
+        var nowMs = 1_000L
+        val (controller, scope) = newController(sensor, FakeBrightness(), clock = { nowMs })
+        controller.start()
+
+        sensor.flow.emit(sample(10.0))
+        advanceUntilIdle()
+        sensor.flow.emit(sample(5_000.0))
+        advanceUntilIdle()
+        var d = controller.state.value.sensor
+        assertEquals(Triple(2, 1, 1), Triple(d.received, d.admitted, d.rejected))
+        assertEquals(SampleRejection.COOLDOWN, d.lastRejection?.reason)
+        assertEquals(1_000L, d.lastRejection?.atMs)
+        assertNull(d.cycle, "a cooldown drop leaves no cycle behind")
+        assertEquals(CycleResult.APPLIED, d.lastCycle?.result)
+
+        nowMs += 60_000L
+        sensor.flow.emit(sample(5_000.0))
+        advanceUntilIdle()
+        sensor.flow.emit(sample(5_000.0))
+        advanceUntilIdle()
+        d = controller.state.value.sensor
+        assertEquals(Triple(4, 2, 2), Triple(d.received, d.admitted, d.rejected))
+        assertEquals(SampleRejection.DEAD_BAND, d.lastRejection?.reason)
+        scope.cancel()
+    }
+
+    @Test
+    fun midCycleDrop_isMUTEX_andKeepsTheRunningCycle_DC066() = runTest {
+        val sensor = FakeSensor()
+        val (controller, scope) = newController(sensor, FakeBrightness(), clock = { 1_000L })
+        controller.start()
+
+        sensor.flow.emit(sample(10.0))
+        sensor.flow.emit(sample(5_000.0))
+        val during = controller.state.value.sensor
+        assertEquals(SampleRejection.MUTEX, during.lastRejection?.reason)
+        assertEquals(CycleStage.ANIMATE, during.cycle?.stage, "the drop must not erase the cycle in flight")
+        assertEquals(1_000L, during.cycle?.startMs)
+
+        advanceUntilIdle()
+        val after = controller.state.value.sensor
+        assertNull(after.cycle)
+        assertEquals(CompletedCycle(CycleResult.APPLIED, 1_000L, 1_000L), after.lastCycle)
+        assertEquals(Triple(2, 1, 1), Triple(after.received, after.admitted, after.rejected))
+        scope.cancel()
+    }
+
+    @Test
+    fun lowAccuracy_isRejectedAsACCURACY_whenTrustIsOff_DC066() = runTest {
+        val sensor = FakeSensor()
+        val untrusting = settings.copy(trustUnreliableSensor = false)
+        val (controller, scope) =
+            newController(sensor, FakeBrightness(), clock = { 1_000L }, settingsProvider = { untrusting })
+        controller.start()
+
+        sensor.flow.emit(sample(10.0, accuracy = 1))
+        advanceUntilIdle()
+        assertEquals(
+            SampleRejectionRecord(SampleRejection.ACCURACY, 1_000L, trustUnreliable = false),
+            controller.state.value.sensor.lastRejection,
+            "the trust setting in effect is part of the record (plan §5 attribution)",
+        )
+        assertEquals(0, controller.state.value.sensor.admitted)
+        scope.cancel()
+    }
+
+    @Test
+    fun pausedAndDisabled_andUnloadedSettings_eachNameTheirReason_DC066() = runTest {
+        val sensor = FakeSensor()
+        val gate = CompletableDeferred<AabSettings>()
+        var current = settings
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L }, settingsProvider = { gate.await(); current },
+        )
+        controller.start()
+
+        sensor.flow.emit(sample(10.0))
+        assertEquals(SampleRejection.SETTINGS_NOT_LOADED, controller.state.value.sensor.lastRejection?.reason)
+        assertNull(controller.state.value.sensor.lastRejection?.trustUnreliable)
+
+        gate.complete(settings)
+        advanceUntilIdle()
+        controller.pause()
+        advanceUntilIdle()
+        sensor.flow.emit(sample(10.0))
+        advanceUntilIdle()
+        assertEquals(SampleRejection.PAUSED, controller.state.value.sensor.lastRejection?.reason)
+
+        controller.resume()
+        advanceUntilIdle()
+        current = settings.copy(serviceEnabled = false)
+        sensor.flow.emit(sample(10.0))
+        advanceUntilIdle()
+        assertEquals(SampleRejection.SERVICE_DISABLED, controller.state.value.sensor.lastRejection?.reason)
+        assertEquals(3, controller.state.value.sensor.rejected)
+        scope.cancel()
+    }
+
+    @Test
+    fun act19Stop_isTheLastCyclesResult_DC066() = runTest {
+        val sensor = FakeSensor()
+        var nowMs = 1_000L
+        val (controller, scope) = newController(sensor, FakeBrightness(), clock = { nowMs })
+        controller.start()
+        for (lux in listOf(100.0, 30.0, 45.0)) {
+            sensor.flow.emit(sample(lux))
+            advanceUntilIdle()
+            nowMs += 60_000L
+        }
+        val d = controller.state.value.sensor
+        assertEquals(CycleResult.DEAD_BAND_STOP, d.lastCycle?.result)
+        assertEquals(3, d.admitted)
+        scope.cancel()
+    }
+
+    @Test
+    fun eachRegistration_recordsItsCause_andItsFirstCallback_DC066() = runTest {
+        val sensor = FakeSensor()
+        val log = SensorCallbackLog()
+        var nowMs = 1_000L
+        val (controller, scope) = newController(sensor, FakeBrightness(), clock = { nowMs }, callbackLog = log)
+        controller.start()
+        assertEquals(RegistrationCause.START, log.state.value.cause)
+        assertEquals(true, log.state.value.listenerRegistered)
+        assertNull(log.state.value.first)
+
+        sensor.flow.emit(sample(10.0, seq = 1))
+        sensor.flow.emit(sample(20.0, seq = 2))
+        advanceUntilIdle()
+        assertEquals(10.0, log.state.value.first?.lux)
+        assertEquals(20.0, log.state.value.last?.lux)
+
+        controller.onScreenOff()
+        advanceUntilIdle()
+        nowMs = 9_000L
+        controller.onScreenOn()
+        advanceUntilIdle()
+        assertEquals(RegistrationCause.WAKE, log.state.value.cause)
+        assertEquals(9_000L, log.state.value.registeredAtMs)
+        assertNull(log.state.value.first, "no event has arrived since the wake")
+        assertEquals(20.0, log.state.value.last?.lux, "the last callback survives, stamped before the wake")
+        assertEquals(0, controller.state.value.sensor.received, "counters are per registration")
+
+        sensor.flow.emit(sample(0.0, accuracy = 3, seq = 1))
+        advanceUntilIdle()
+        assertEquals(SensorCallback(0.0, 3, 1, 0L, 0L, 9_000L), log.state.value.first)
+        scope.cancel()
     }
 
     /** Always aborts with [trigger] as the read that tripped the band detector. */

@@ -44,6 +44,9 @@ object LiveRuntimeState {
         _activeProfile.value = name
     }
 
+    // DC-066: written by the sensor listener, not the pipeline; reset() spares it, registration clears it.
+    val sensorCallbacks = SensorCallbackLog()
+
     private val _serviceRunning = MutableStateFlow(false)
     val serviceRunning: StateFlow<Boolean> = _serviceRunning.asStateFlow()
 

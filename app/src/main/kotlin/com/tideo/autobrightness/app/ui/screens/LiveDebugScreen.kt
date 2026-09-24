@@ -40,6 +40,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.app.runtime.PipelineState
+import com.tideo.autobrightness.app.runtime.SensorCallback
+import com.tideo.autobrightness.app.runtime.SensorCallbacks
+import com.tideo.autobrightness.app.runtime.SensorDiagnostics
 import com.tideo.autobrightness.app.state.LiveDebugUiState
 import com.tideo.autobrightness.app.state.LiveDebugViewModel
 import com.tideo.autobrightness.app.ui.components.AabTopBar
@@ -142,6 +145,8 @@ fun LiveDebugContent(
                 Metric("Last update", lastSampleLabel(p.lastUpdateMs), "debug_last_update")
                 Metric("Last sample", lastSampleLabel(p.lastSampleMs), "debug_last_sample")
             }
+
+            LightSensorCard(p.sensor, state.sensorCallbacks)
 
             DebugLevelSelector(state.debugLevel, onSelectDebug)
 
@@ -284,6 +289,85 @@ private fun BrightnessWriteCard(p: PipelineState) {
             }
             Metric(stringResource(R.string.debug_override_age), lastSampleLabel(d.timestampMs), "debug_override_age")
         }
+    }
+}
+
+@Composable
+private fun LightSensorCard(d: SensorDiagnostics, callbacks: SensorCallbacks) {
+    val dash = stringResource(R.string.debug_write_absent)
+    @Composable
+    fun reading(c: SensorCallback?): String = c?.let {
+        stringResource(R.string.debug_sensor_reading_value, fmt(it.lux), it.accuracy, it.seq, lastSampleLabel(it.atMs))
+    } ?: stringResource(R.string.debug_sensor_none_yet)
+    @Composable
+    fun pair(first: String, ms: Long) = stringResource(R.string.debug_sensor_pair_value, first, lastSampleLabel(ms))
+
+    DiagnosticCard(stringResource(R.string.debug_sensor_title), "debug_sensor_card") {
+        val last = callbacks.last
+        Metric(stringResource(R.string.debug_sensor_last_callback), reading(last), "debug_sensor_last_callback")
+        Metric(
+            stringResource(R.string.debug_sensor_callback_lag),
+            last?.takeIf { it.callbackElapsedNanos > 0L }
+                ?.let { ((it.callbackElapsedNanos - it.sensorTimestampNanos) / 1_000_000L).toString() } ?: dash,
+            "debug_sensor_callback_lag",
+        )
+        Metric(
+            stringResource(R.string.debug_sensor_timestamp),
+            last?.let { (it.sensorTimestampNanos / 1_000_000L).toString() } ?: dash,
+            "debug_sensor_timestamp",
+        )
+        val listener = stringResource(
+            when (callbacks.listenerRegistered) {
+                true -> R.string.debug_sensor_listener_ok
+                false -> R.string.debug_sensor_listener_failed
+                null -> R.string.debug_sensor_listener_pending
+            },
+        )
+        Metric(
+            stringResource(R.string.debug_sensor_registration),
+            callbacks.cause?.let { cause -> callbacks.registeredAtMs?.let { "${pair(cause.name, it)} · $listener" } }
+                ?: dash,
+            "debug_sensor_registration",
+        )
+        Metric(stringResource(R.string.debug_sensor_first_event), reading(callbacks.first), "debug_sensor_first_event")
+        Metric(
+            stringResource(R.string.debug_sensor_counts),
+            "${d.received} / ${d.admitted} / ${d.rejected}",
+            "debug_sensor_counts",
+        )
+        Metric(
+            stringResource(R.string.debug_sensor_last_rejection),
+            d.lastRejection?.let {
+                val trust = stringResource(
+                    when (it.trustUnreliable) {
+                        true -> R.string.debug_sensor_trust_on
+                        false -> R.string.debug_sensor_trust_off
+                        null -> R.string.debug_sensor_trust_unknown
+                    },
+                )
+                "${pair(it.reason.name, it.atMs)} · $trust"
+            } ?: dash,
+            "debug_sensor_last_rejection",
+        )
+        Metric(
+            stringResource(R.string.debug_sensor_cycle),
+            d.cycle?.let {
+                stringResource(R.string.debug_sensor_cycle_value, it.stage.name, lastSampleLabel(it.startMs))
+            } ?: stringResource(R.string.debug_sensor_idle),
+            "debug_sensor_cycle",
+        )
+        Metric(
+            stringResource(R.string.debug_sensor_last_cycle),
+            d.lastCycle?.let {
+                stringResource(
+                    R.string.debug_sensor_last_cycle_value,
+                    it.result.name,
+                    (it.endMs - it.startMs).toInt(),
+                    lastSampleLabel(it.endMs),
+                )
+            } ?: dash,
+            "debug_sensor_last_cycle",
+        )
     }
 }
 

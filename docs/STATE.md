@@ -32,8 +32,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
 - **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
-  · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [ ] R3 diagnostics, **next**
-  · [ ] R2 · [ ] R4 · [ ] R6, with its D-027 rule review · [ ] R8 close-out; R2, R4 and R6 start
+  · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [x] R3 diagnostics (DC-066)
+  · [ ] R2, **next** · [ ] R4 · [ ] R6, with its D-027 rule review · [ ] R8 close-out; R2, R4 and R6 start
   from a test that fails today, R7 is deferred and RF dropped (plan §5).
 
 ## Owner queue
@@ -74,6 +74,14 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
    `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
    Live Debug's "Smoothing α" drops to a tenth.
+
+5. **[2026-09-24] On a build with the new Live Debug "Light Sensor" card, repeat the dark-wake
+   test.** Leave the screen off for at least 2 minutes in a dark room, wake it and open Live Debug
+   at once. "Registered: WAKE … listener registered" with "First event after registration: None
+   yet" means no reading arrived (H2). A first event plus a MUTEX or COOLDOWN last rejection points
+   at a dropped reading (F-C). A cycle stuck in one stage for minutes means the cycle never
+   finished. Settles it: a screenshot of that card after such a wake, attached to the next commit
+   or #132 (DC-066).
 
 Open questions: none.
 
@@ -118,6 +126,14 @@ something major, and say so.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-24 — **Light stalls R3 (DC-066):** Live Debug's new "Light Sensor" card shows the last
+  raw callback, each registration and its first event, received/admitted/rejected with the last
+  reason and trust setting, and the cycle stage and last result. Pipeline behaviour is unchanged.
+  **Device check, daylight only,** at 14:58 on the OnePlus 13, on a debug build of this tree: the
+  card rendered, callbacks matched received (#321 / 321), admitted plus rejected summed to received,
+  accuracy read 3 with trust off, and the sensor-to-callback lag was 172–230 ms. MUTEX and COOLDOWN
+  were not caught as the last reason. The dark-wake test stays owner-queue item 5.
 
 - 2026-09-24 — **Light stalls R1 (DC-065):** a start command reaching a running service, such as
   every settings save or the 15-minute worker, now posts the live `Lux … → brightness …`

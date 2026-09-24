@@ -907,3 +907,13 @@
   the fault by saving a setting on the OnePlus 13 (2026-09-23), and `AmbientMonitoringServiceTest`
   reproduces it through `ACTION_REAPPLY` and a plain start. This fixes the text only and does not
   show that brightness tracking ever stopped.
+
+- DC-066 [cited]: **Live Debug's Light Sensor card traces every light reading, so one screenshot
+  separates no delivery (H1, H2), a dropped reading (F-C) and an unfinished cycle (2026-09-24,
+  Tideo #132).** Each reading lands in exactly one counter: `admitted` (it reached
+  `engine.evaluate`) or `rejected`, with the first failing reason and the trust setting then in
+  effect. There is no "deferred" count until R6's slot, which must re-home MUTEX and COOLDOWN
+  drops. The callback record is written on the listener thread and scoped to a registration
+  generation, and only the claim that owns the cycle record may count, advance or settle it, so
+  neither a stalled collector, a replaced listener's late callback nor a tick queued across a wake
+  or restart can fake the evidence (Sol and glue review).

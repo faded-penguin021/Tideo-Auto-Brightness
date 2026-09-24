@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Runtime auto-brightness pipeline orchestrator (BINDING, D-027): serialized through a single
@@ -39,6 +40,7 @@ class BrightnessPipelineController(
     // prof759/task545 proximity damp. Optional: null (controller unit tests / no proximity sensor) →
     // never near → no damp, so existing behaviour and golden parity are unchanged.
     private val proximitySource: ProximitySensorSource? = null,
+    private val callbackLog: SensorCallbackLog = SensorCallbackLog(),
 ) : ControllerHook, PipelineRuntimeContext {
 
     private val engine = BrightnessEngine()
@@ -59,6 +61,7 @@ class BrightnessPipelineController(
 
     // %AAB_MainLoop re-entry mutex: true while a sensor cycle is claimed or running.
     private val inCycle = AtomicBoolean(false)
+    private val claims = AtomicInteger(0)
 
     private val debugEmitter = PipelineDebugEmitter(debugSink)
     private val panicHandler = PanicHandler(brightness, dimming)
@@ -119,13 +122,14 @@ class BrightnessPipelineController(
             controlGate.consumeEach { handle(it) }
         }
         startOverrideDetection()
-        startSensor()
+        startSensor(RegistrationCause.START)
     }
 
     /** Stop the pipeline entirely (service teardown). */
     fun stop() {
         _state.update { it.copy(serviceOn = false) }
         sensorJob?.cancel(); sensorJob = null
+        callbackLog.unregistered()
         overrideJob?.cancel(); overrideJob = null
         consumerJob?.cancel(); consumerJob = null
         proximityTracker.stop()
@@ -163,6 +167,7 @@ class BrightnessPipelineController(
     /** prof769/task528 panic: restore brightness, drop dimming, stop everything (D-139). */
     suspend fun emergencyStop() {
         sensorJob?.cancel(); sensorJob = null
+        callbackLog.unregistered()
         overrideJob?.cancel(); overrideJob = null
         consumerJob?.cancelAndJoin(); consumerJob = null
         proximityTracker.stop()
@@ -182,10 +187,15 @@ class BrightnessPipelineController(
     }
 
     @Synchronized
-    private fun startSensor() {
+    private fun startSensor(cause: RegistrationCause) {
         if (sensorJob?.isActive == true) return
+        val generation = callbackLog.registered(cause, clock())
+        _state.update { it.copy(sensor = it.sensor.registered()) }
         sensorJob = scope.launch {
-            lightSensor.samples().collect { sample -> onSensorSample(sample.lux.toDouble(), sample.accuracy) }
+            lightSensor.samples(
+                onRegistered = { callbackLog.listenerRegistered(generation, it) },
+                onCallback = { callbackLog.callback(generation, it, clock()) },
+            ).collect { sample -> onSensorSample(sample.lux.toDouble(), sample.accuracy) }
         }
         proximityTracker.start()
     }
@@ -200,23 +210,29 @@ class BrightnessPipelineController(
             val significant = lux < (s.threshAbsLow ?: 0.0) || lux > (s.threshAbsHigh ?: 0.0)
             throttle.onSample(now, significant, throttle.ceiling(settings.animSteps, settings.maxWaitMs))
         }
+        val rejection = when {
+            settings == null -> SampleRejection.SETTINGS_NOT_LOADED
+            !settings.serviceEnabled -> SampleRejection.SERVICE_DISABLED
+            else -> ProfileGates.monitorAmbientLightRejection(
+                trustUnreliable = settings.trustUnreliableSensor,
+                accuracy = accuracy,
+                lux = lux,
+                threshAbsLow = s.threshAbsLow ?: 0.0,
+                threshAbsHigh = s.threshAbsHigh ?: 0.0,
+                mainLoopOn = inCycle.get(),
+                thresholdsSeeded = s.threshAbsLow != null,
+            ) ?: SampleRejection.MUTEX.takeUnless { inCycle.compareAndSet(false, true) }
+        }
+        val trust = settings?.trustUnreliableSensor
+        val claim = if (rejection == null) claims.incrementAndGet() else 0
         // Record every delivered sample + current throttle (Live Debug visibility, G2R-F5).
-        _state.update { it.copy(lastSampleMs = now, throttleMs = throttle.throttleMs) }
-        if (settings == null || !settings.serviceEnabled) return
-        val passes = ProfileGates.monitorAmbientLightGate(
-            trustUnreliable = settings.trustUnreliableSensor,
-            accuracy = accuracy,
-            lux = lux,
-            threshAbsLow = s.threshAbsLow ?: 0.0,
-            threshAbsHigh = s.threshAbsHigh ?: 0.0,
-            mainLoopOn = inCycle.get(),
-            thresholdsSeeded = s.threshAbsLow != null,
-        )
-        if (!passes) return
-        // Re-entry mutex: claim the cycle slot, or drop. Cleared when the cycle completes.
-        if (!inCycle.compareAndSet(false, true)) return
-        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux))) {
+        _state.update {
+            it.copy(lastSampleMs = now, throttleMs = throttle.throttleMs, sensor = it.sensor.received(rejection, claim, now, trust))
+        }
+        if (rejection != null) return
+        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux, claim))) {
             inCycle.set(false)
+            _state.update { it.copy(sensor = it.sensor.cycleRejected(SampleRejection.QUEUE_CLOSED, now, trust, claim)) }
         }
     }
 
@@ -224,9 +240,10 @@ class BrightnessPipelineController(
         when (event) {
             is PipelineEvent.SensorTick -> {
                 try {
-                    cycleRunner.runCycle(event.lux)
+                    cycleRunner.runCycle(event.lux, event.claim)
                 } finally {
                     inCycle.set(false)
+                    _state.update { it.copy(sensor = it.sensor.completed(CycleResult.ABORTED, clock(), event.claim)) }
                 }
             }
             PipelineEvent.ScreenOff -> hibernate()
@@ -250,7 +267,7 @@ class BrightnessPipelineController(
     private suspend fun reinit() {
         val settings = settingsProvider().also { cachedSettings = it }
         _state.update { it.copy(hibernated = false) }
-        startSensor()
+        startSensor(RegistrationCause.WAKE)
         startOverrideDetection()
         if (!_state.value.paused) cycleRunner.setInitialBrightness(settings)
     }
@@ -258,6 +275,7 @@ class BrightnessPipelineController(
     /** prof753/task585 hibernate: stop sensing and Allow Override, clear runtime state (DC-042). */
     private fun hibernate() {
         sensorJob?.cancel(); sensorJob = null
+        callbackLog.unregistered()
         overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
         inCycle.set(false)

@@ -7,6 +7,7 @@ import com.tideo.autobrightness.app.runtime.AppProfileCatalog
 import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
 import com.tideo.autobrightness.app.runtime.ContextEngine
 import com.tideo.autobrightness.app.runtime.ControllerHookHolder
+import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.DisplayTogglesCoordinator
 import com.tideo.autobrightness.app.runtime.NightLightTemperatureRoute
@@ -124,6 +125,7 @@ class AppModule(context: Context) {
             overrideSink = { lux, brightness -> overridePointStore.record(lux, brightness) },
             // prof759/task545: proximity damps smoothing alpha ×0.1.
             proximitySource = AndroidProximitySensorSource(appContext),
+            callbackLog = LiveRuntimeState.sensorCallbacks,
         )
         controllerHook.hook = controller
         // D-110: recompute when circadian location resolves late.
