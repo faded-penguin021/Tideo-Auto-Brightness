@@ -16,6 +16,9 @@
 > **Rescoped by the owner (2026-09-23, §5 Scope).** This train ships the notification fix,
 > diagnostics and defects that a test reproduces. The new input and settling policies (RF, R6, R7)
 > are deferred until a diagnostic trace names the failing path.
+> **Re-scoped again by the owner (2026-09-24, §5 Scope)** after four findings were re-verified
+> against `24a02f0`: **R6 joins the train**, R7 stays deferred, and **RF is dropped**, because
+> AOSP reports every light reading as high accuracy, which rules out F-F's mechanism (F-F).
 
 ## 1. Reports and scope
 
@@ -26,13 +29,18 @@
 | Owner | OnePlus 13, OxygenOS | Saw the same notification text at night. Has not seen Tideo go stale on this phone. |
 | Owner, 2026-09-23 | same phone, 0 lx, "Trust low-accuracy sensor" off | (1) After a screen off/on, the notification reads "Monitoring ambient light". (2) With the setting on, a screen off/on gives `0 lx → 0`. (3) Turning it off, with no screen cycle, **instantly** restores "Monitoring"; turning it on again, still with no screen cycle, does not clear it. (4) Later, several screen cycles with the setting **off** gave `0 lx → 0`. (5) A wake after at least 2 min with the screen off, setting off, showed `0 lx → 0` at once. (6) Screen left on in the dark with no interaction: after a while the notification fell back to "Monitoring". Live Debug right after showed smoothed and raw 0.0, band 0.0–0.1, target 0, hardware 15 (requested → acknowledged 15 → 15), active rule "Phone in bed", last update (last completed cycle) 7 min ago, last sample "just now". |
 
-**Reading of the 2026-09-23 observations.** (3) is F-A, triggered by the settings save; the trust
-setting itself plays no part, and it is the only deterministic one. (1) is **intermittent**: (4) and
-(5) show this sensor can deliver a first event at 0 lx with accuracy > 1, which the gate admits with
-the setting off. So (1)–(2) do **not** establish F-F. A wake that ends on "Monitoring" is either F-F
-(the first event had accuracy ≤ 1) or H2 (no first event arrived), and nothing observed so far
-separates the two. The observations do not say whether the brightness itself moved. In either case
-the code writes nothing after such a wake, and that is hard to notice in the dark.
+**Reading of the 2026-09-23 observations (revised 2026-09-24).** The trust setting cannot change
+what passes on an AOSP framework (F-F), so it plays no part in any of them.
+- (3) is F-A, triggered by the settings save. It is the only deterministic one.
+- (2), (4) and (5) are ordinary successful wakes. (2) tells us nothing about trust.
+- (6) is F-A through the worker (F-A below). The 0 lx samples arriving while the notification was
+  wrong were refused by F-B's zero trap, since accuracy cannot refuse them.
+- (1) is **intermittent**. After a wake nothing gates the first event except accuracy, which
+  always passes, so a wake that ends on "Monitoring" is H2 (no first event arrived) or a start
+  command landing after the wake's cycle (F-A). Nothing observed so far separates the two.
+
+The observations do not say whether the brightness itself moved. After an H2 wake the code writes
+nothing, which is hard to notice in the dark.
 
 **Not every device is affected.** No mechanism in §2 needs a faulty device, but each one's
 exposure depends on the sensor's event cadence. A sensor that emits frequent small changes (jitter)
@@ -42,7 +50,9 @@ no event rates have been measured on either phone.**
 
 **Code version.** All paths and lines are at `64be441`. The cited runtime files are byte-identical to
 **v1.10.0** (`411e26a`), checked with `git diff --stat` over `app/.../runtime/`, `MainActivity.kt`
-and `platform/.../sensor/`, so they describe the reporter's build.
+and `platform/.../sensor/`, so they describe the reporter's build. On 2026-09-24 the four findings'
+line references were re-checked at `24a02f0`: `git diff --stat 64be441 24a02f0` over the three
+modules' `src/main` is empty.
 
 ## 2. Findings
 
@@ -108,7 +118,9 @@ and `platform/.../sensor/`, so they describe the reporter's build.
 
    Re-feeding the same reading therefore does nothing. After a drop to 10 lx the recomputed band is
    7–13 and the retry is inside it. **This inner gate is Tideo's divergence, not Tasker's; see F-E.** **Zero has its own trap:** after a 0 lx cycle the stored band is
-   0–0.1 (`absoluteThresholds`, `:147`), and later 0 readings fail the outer gate.
+   0–0.1 (`absoluteThresholds`, `:147`), and later 0 readings fail the outer gate, which needs
+   `lux < 0.0` or `lux > 0.1` (`ProfileGates.kt:21`). Smoothed lux, left partway down by
+   reason 1, then stays where it is for as long as the room stays dark. Re-checked 2026-09-24.
 3. **The formula doesn't converge to raw either.** α crosses zero where
    `|raw − S|/(S + 1) = dynamicThreshold`. For raw 0 and a threshold of 0.3 that is S ≈ 0.43 lx.
    Rounding can halt progress earlier, and below that point the unclamped α (D-010(a)) goes
@@ -129,9 +141,11 @@ candidate for capture 1 only.
 
 ### F-C — The newest reading is discarded while busy, with no reconsideration. Confidence: high as a mechanism; attribution unproven
 
-- `onSensorSample` drops a reading while `inCycle` is set (`BrightnessPipelineController.kt:217`).
-  `runCycle` drops one inside the cooldown (`PipelineCycleRunner.kt:72-74`). Neither keeps it or
-  schedules another look.
+- `onSensorSample` (`BrightnessPipelineController.kt:194`) drops a reading while a cycle is
+  running, in two places: prof760's `mainLoopOn` operand (`:212`, evaluated in
+  `ProfileGates.kt:22`) and the `inCycle` compare-and-set (`:217`). `runCycle` drops one inside
+  the cooldown (`PipelineCycleRunner.kt:73-74`). None of them keeps the reading or schedules
+  another look. Re-checked 2026-09-24.
 - If the **final** reading of a change lands in the ≈1.3 s window (cycle 544–557 ms + cooldown
   460–776 ms in the #132 captures) and the light then holds steady, that reading is never
   evaluated.
@@ -141,6 +155,12 @@ candidate for capture 1 only.
 - **Candidate for 09-23 capture 2.** The last *processed* raw reading was 31.8 lx, and the first
   reading after re-activation was 0 lx. F-B alone cannot produce that. **A hand over the sensor at
   the toggle, or a sensor path that went quiet (H1), explain it equally well.**
+- **The capture 2 sequence (owner, 2026-09-24).** The capture's readings run 11.5 → 31.8 → 0 lx. If
+  the 0 lx reading arrived while the 31.8 lx cycle was animating or cooling down, F-C drops it, and
+  an on-change sensor in a steady dark room sends nothing further, so the screen holds 31.8 lx's
+  brightness indefinitely. That fits the capture without assuming a sensor fault. It is still a
+  fit, not a trace: only R3 records the drop reason. This is the evidence that moved R6 into the
+  train (§5).
 
 ### F-D — The health surfaces cannot tell "steady" from "stuck". Confidence: high
 
@@ -175,7 +195,8 @@ Tideo's `BrightnessEngine.evaluate` has neither piece:
    smoothed value *away* from the reading, a ghost of its own.
 2. **The band is one reading late.** `absoluteThresholds(input.lux, prev?.lastRawLux …)` (`:56`)
    centres both the inner band and the stored outer band (`PipelineCycleRunner.kt:159-160`) on the
-   *previous* reading. **Seen in the field:** 09-23 capture 2 shows 8–15 lx, which is the previous
+   *previous* reading (re-checked 2026-09-24: `BrightnessEngine.kt:149-150`, fed by
+   `prev?.lastRawLux` at `:56`). **Seen in the field:** 09-23 capture 2 shows 8–15 lx, which is the previous
    raw ≈ 11.5 ± 30% rounded to whole lux, while the reading just processed was 31.8. Tasker's band
    there would have been ≈ 22–41.
 3. **Consequence — a return to the previous level is ignored.** After A → B is processed, the
@@ -203,10 +224,31 @@ which in the smoothing path was last written by the *previous* cycle's task546 (
 act25), so a threshold that fell between cycles can still give a small negative α. That is rare,
 consistent with the owner never observing it.
 
-### F-F — A low-accuracy reading is rejected, and nothing re-admits it. Confidence: medium as a mechanism; not established on any device
+### F-F — A low-accuracy reading is rejected, and nothing re-admits it. Ruled out on AOSP frameworks (2026-09-24); RF dropped
 
 - prof760's first stage drops any reading with `accuracy ≤ 1` unless "Trust low-accuracy sensor"
   is on (`ProfileGates.kt:20`, `BrightnessPipelineController.kt:207-208`).
+- **On AOSP that gate can never fire for light.** `LightSensorSource` passes `event.accuracy`
+  (`LightSensorSource.kt:36`). The framework's JNI receiver fills that value from the HAL's status
+  only for orientation, magnetic field, accelerometer, gyroscope, gravity and linear acceleration
+  (`vector.status`) and heart rate. **Every other type, `TYPE_LIGHT` included, gets
+  `SENSOR_STATUS_ACCURACY_HIGH` (3)** (`frameworks/base/core/jni/android_hardware_SensorManager.cpp`,
+  the `default:` arm of the status switch). The same arm is present at `android-12.0.0_r1` (minSdk 31)
+  and `android-16.0.0_r1`. So on an AOSP-derived framework, including crDroid (#132), the
+  trust setting cannot change which readings pass.
+- **`onAccuracyChanged` cannot re-admit either.** `SystemSensorManager.dispatchSensorEvent` calls it
+  only while delivering an event, when that event's accuracy differs from the last one
+  (`core/java/android/hardware/SystemSensorManager.java`, "call onAccuracyChanged() only if the
+  value changes"). "Accuracy recovers without a new event" cannot happen, and ignoring the callback
+  (`LightSensorSource.kt:39`) loses nothing that `event.accuracy` does not already carry.
+- **What remains open:** an OEM framework that rewrote that switch. Nothing shows one, and
+  OxygenOS admitted 0 lx with the setting off (observations 4, 5). R3 records every callback's
+  accuracy, so a divergent OEM would show there. Only then would this finding reopen, as a new
+  analysis rather than as RF.
+
+The analysis below is superseded by the bullets above. It is kept for R8's row, because it records
+how the wake path behaves.
+
 - **The wake path leaves no second chance.** Screen-off `hibernate()` nulls `smoothedLux`,
   `lastRawLux`, the thresholds and `lastAcceptedMs` (`BrightnessPipelineController.kt:265-279`). On
   wake, `reinit()` caches settings *before* `startSensor()` (`:251-253`), and
@@ -226,39 +268,40 @@ consistent with the owner never observing it.
   on-change sensor in steady light sends no other. Observation 3's lasting "Monitoring" is F-A
   either way. **Whether Tasker re-evaluates prof760 when `%AAB_TrustUnreliable` changes is unchecked**:
   check it with `docs/rebuild/XML_RECIPES.md` alongside Q2, and do not assume parity either way.
-- `LightSensorSource`'s `onAccuracyChanged` is a no-op (`LightSensorSource.kt:39`). On an on-change
-  sensor, accuracy can recover without the value changing, so no new event arrives and the rejected
-  reading is never evaluated. A toggle re-registers the sensor and gets a fresh initial event,
-  which matches #132's "toggle fixes it".
-- It fits the Pixel's AOC reporting "Device appears to be covered" at each re-activation in both
-  logs, **if** the sensor marks those readings low-accuracy. Neither log records accuracy.
-- **Asked on #132 (owner, 2026-09-23): does enabling the setting stop the freezes?** The answer
-  is a clue, not a verdict. Only R3's record of an episode reopens RF (§5, Scope).
+- ~~On an on-change sensor, accuracy can recover without the value changing~~ — withdrawn
+  2026-09-24 (§3): the callback fires only with an event.
+- The Pixel's AOC "Device appears to be covered" at each re-activation cannot reach the gate as
+  low accuracy, because the framework reports light as high accuracy (above).
+- **Asked on #132 (owner, 2026-09-23): does enabling the setting stop the freezes?** On an AOSP
+  framework the answer cannot depend on the setting, so any difference the reporter sees is
+  coincidence or a different cause.
 - **R2 cannot explain the wake case.** `reinit()` loads settings before registering the sensor, so
   F-C's startup race applies only to the first service start.
 
 ### H2 — The first event after a wake is sometimes not delivered. Open
 
-The other reading of the owner's intermittent wake "Monitoring" (§1). If the ALS sends no initial
-event on re-registration, an on-change sensor in steady light sends nothing, whatever the trust
-setting. The wake path writes nothing without an accepted reading (F-F's first bullet), so brightness
-stays where the framework restored it. **Separating check, no new build needed:** Live Debug's
-"Last sample" is stamped for *every* delivered reading, before any gate
+With F-F ruled out (2026-09-24), this is the leading reading of the owner's intermittent wake
+"Monitoring" (§1, observation 1). The other is a start command landing after the wake's cycle
+(F-A). If the ALS sends no initial event on re-registration, an on-change sensor in steady light
+sends nothing. The wake path writes nothing without an accepted reading (F-F's wake-path bullet),
+so brightness stays where the framework restored it. **Separating check, no new build needed:**
+Live Debug's "Last sample" is stamped for *every* delivered reading, before any gate
 (`BrightnessPipelineController.kt:204`), and shows seconds under a minute. After a wake that ends
 on "Monitoring", with the screen off for at least 2 min beforehand, open Live Debug at once. If it
-reads seconds, a reading arrived and was rejected (F-F). If it reads 2 min or more, none arrived
-(H2). Opening the app reposts "Monitoring" (F-A) but does not touch "Last sample". The owner's one
-run (2026-09-23) did not reproduce the failure, so it separated nothing. **H2 is weaker on this
-phone:** in observation 6 the sensor kept delivering at a steady ~0 lx (last sample "just now",
-last completed cycle 7 min earlier). A sensor that repeats like that would recover within seconds
-from a missing first event. So a wake that *stays* on "Monitoring" there points to F-F: repeated
-rejections for accuracy, since after a wake no other gate applies. That rests on one screenshot,
-and the delivery rate has not been measured.
+reads 2 min or more, no reading arrived (H2). If it reads seconds, a reading arrived. After a wake
+no gate can refuse that reading (unseeded band, cleared cooldown, free mutex, accuracy always
+high), so a start command then overwrote the notification (F-A). Opening the app reposts
+"Monitoring" (F-A) but does not touch "Last sample". The owner's one run (2026-09-23) did not
+reproduce the failure, so it separated nothing. In observation 6 the sensor kept delivering at a
+steady ~0 lx (last sample "just now", last completed cycle 7 min earlier). A sensor that repeats
+like that recovers within seconds from a missing first event. So on this phone H2 predicts
+"Monitoring" that clears by itself, and "Monitoring" that *stays* points to F-A. That rests on one
+screenshot, and the delivery rate has not been measured.
 
 **Observation 6, other readings.**
-- The samples arriving at 0 lx were rejected, either by the stored 0.0–0.1 band (F-B's zero trap:
-  0 is neither below 0.0 nor above 0.1) or for accuracy. R3 would name which. The screen was
-  already at target, so this is harmless here.
+- The samples arriving at 0 lx were refused by the stored 0.0–0.1 band (F-B's zero trap: 0 is
+  neither below 0.0 nor above 0.1). Accuracy cannot refuse them (F-F). The screen was already at
+  target, so this is harmless here.
 - Hardware 15 against target 0 is the PWM floor or dimming threshold at work (`applyPwmFloor`,
   D-050), with the perceived target reported (D-109). It is a live instance of R7's rule that
   completion is judged on the perceived target, not the hardware value. A fix for H2 is not
@@ -305,12 +348,17 @@ before each log starts.
   exceed that over a long burst (R6).
 - **"α ≥ 0 on every smoothed row" as a parity test.** Tasker's task535 subtracts the previous
   cycle's stored threshold, so faithful parity can yield a small negative α (F-E caveat).
+- **"A light reading can arrive with accuracy ≤ 1", and the claims resting on it** (withdrawn
+  2026-09-24, F-F): that observation 2 reflects the trust setting; that observation 6's 0 lx
+  samples may have been refused for accuracy; that a wake which *stays* on "Monitoring" points to
+  F-F; and that accuracy can recover without a new event. AOSP reports light as
+  `SENSOR_STATUS_ACCURACY_HIGH` and calls `onAccuracyChanged` only with an event.
 
-## 4. Owner decisions — both answered 2026-09-23, both inactive since the rescope
+## 4. Owner decisions — both answered 2026-09-23; Q1 active again since 2026-09-24
 
-> **Inactive (owner, 2026-09-23).** R6 and R7, which these answers shaped, are deferred (§5,
-> Scope). The answers stay on record for a reopening. Nothing binding changed, because the D-027
-> rule review never started.
+> **Q1 is active again (owner, 2026-09-24)** because R6 is back in the train (§5, Scope). Its
+> D-027 rule review has not started, so nothing binding has changed yet. **Q2 stays inactive**:
+> R7 is still deferred, and its answer stays on record for a reopening.
 
 - **Q1 → (b), with a condition.** Keep the newest reading, **as long as Tideo does not chase
   ghosts**, e.g. driving under trees in the sun, where it would respond to bright/dim/bright/dim
@@ -359,26 +407,23 @@ three groups:
    happening unattended) and R3 (the evidence #132 needs). Nothing so far shows that brightness
    tracking stopped on the owner's phone.
 2. **Code defects: in the train only if a deterministic test reproduces the failure first.** R2
-   (startup race), R4 (the `onTaskRemoved` watchdog) and R5 (the misplaced dead-band). Each
+   (startup race), R4 (the `onTaskRemoved` watchdog), R5 (the misplaced dead-band) and, **since
+   2026-09-24 (owner), R6** (keeping the newest dropped reading; F-C's capture 2 sequence). Each
    segment's first commit step is a test that fails on the current code, and the fix must turn it
-   green.
-3. **New behaviour: deferred.** RF (re-admitting accuracy-rejected readings), R6 (keeping dropped
-   readings) and R7 (finishing partly smoothed transitions). Each addresses a plausible mechanism,
-   but none is shown to be necessary for #132. Each adds timing, cancellation and state
-   responsibilities. Tests can show that such a change meets a chosen contract, not that the
-   contract is the right answer to the reporter's problem, and neither an adb session nor the E2E
-   suite closes that gap. **Reopen one only when a diagnostic trace (R3, from #132 or the owner's
-   phone) names the failing path it addresses.** Its contracts below are kept for that day.
-
-**The low-accuracy answer is a clue, not a verdict (Astra).** The stalls are intermittent, so a
-reporter's answer is supporting evidence only:
-- "Trust on, and the freezes stopped" supports F-F. It does not show that every stall had that
-  cause.
-- "Trust on, and freezes continued" excludes accuracy rejection for *those* episodes, assuming the
-  setting took effect. It does not rule out F-F in earlier ones.
+   green. R6 is also new behaviour, so it additionally needs the D-027 rule review and lands after
+   R5 so its tests run against the corrected gates.
+3. **New behaviour: deferred.** R7 (finishing partly smoothed transitions). It addresses a
+   plausible mechanism, but it is not shown to be necessary for #132, and it adds timing,
+   cancellation and state responsibilities. **RF is dropped, not deferred (owner, 2026-09-24):**
+   its mechanism cannot occur on an AOSP framework (F-F). Tests can show that R7 meets a chosen
+   contract, not that the contract is the right answer to the reporter's problem, and neither an
+   adb session nor the E2E suite closes that gap. **Reopen it only when a diagnostic trace (R3,
+   from #132 or the owner's phone) names the failing path it addresses.** Its contract below is
+   kept for that day.
 
 An episode is attributed to a path only by R3's record of that episode: the rejection reason and
-the trust setting in effect. R3 must record both.
+the trust setting in effect. R3 must record both, even though on AOSP accuracy always passes: the
+record is what would expose an OEM framework that differs (F-F).
 
 - [x] **R0 — this plan.**
 - [ ] **R1 — F-A, the notification overwrite.** No fork.
@@ -405,15 +450,17 @@ the trust setting in effect. R3 must record both.
   a dropped final reading and an unfinished cycle from one screenshot. In Live Debug show:
   - the actual sensor callback: value, accuracy, sensor timestamp and arrival time;
   - collector receipt, plus admitted, deferred and rejected counts with the last rejection reason
-    (accuracy, dead band, mutex, cooldown, settings not loaded), and the last `onAccuracyChanged`
-    value and time (F-F);
+    (accuracy, dead band, mutex, cooldown, settings not loaded). Accuracy stays a reason even
+    though AOSP always passes it, so an OEM framework that differs would show (F-F). The
+    `onAccuracyChanged` value adds nothing, because the framework calls it only with an event
+    whose accuracy is already recorded, so it is dropped (2026-09-24);
   - the current cycle stage and start time, and the last completed cycle;
   - whether a first event arrived after each registration (wake or start), with its value and
-    accuracy, so one screenshot separates F-F from H2 on the OnePlus.
+    accuracy, so one screenshot separates H2 from F-A on the OnePlus.
 
   Labels must be string resources: the hardcoded-string ceiling in `HardcodedStringCheckTest` may
-  only fall. **Later segments revise this taxonomy (Sol):** R5 adds a distinct act19 stop, and a
-  reopened R6 would turn busy and cooldown drops into deferred or replaced work. Each such segment
+  only fall. **Later segments revise this taxonomy (Sol):** R5 adds a distinct act19 stop, and R6
+  turns busy and cooldown drops into deferred or replaced work. Each such segment
   states which counter a reading now lands in, so no reader of these signals sees an ambiguous one.
 - [ ] **R4 — F-D, the `onTaskRemoved` watchdog only.** Group 2. Clear runtime state by
   service-instance ownership and lifecycle, not by publish recency, so that steady light no longer
@@ -423,8 +470,10 @@ the trust setting in effect. R3 must record both.
   - The dashboard banner redesign (driving STALE from R3's signals, with wording the owner
     approves) is **not** in this train. It waits until R3's signals have been seen in the field.
 - [ ] **R5 — F-E, restore Tasker's dead-band.** Group 2. This restores parity, so it needs no fork
-  (playbook 2/4). It does change behaviour users know, so it gets a changelog line. It lands last
-  in the train, and the owner decides whether it ships in 1.11.0 or a later release.
+  (playbook 2/4). It does change behaviour users know, so it gets a changelog line. Only R6 lands
+  after it, and the owner decides whether it ships in 1.11.0 or a later release. **Started
+  2026-09-24, ahead of R1 and R3 (owner):** it is the same work under every answer to the R6/R7
+  question.
   - **Entry test (fails today):** A → B is processed, then a return to A is rejected by the stored
     band.
   - **Change:** in `BrightnessEngine.evaluate`, add task544 act19 (`relative_change` against
@@ -463,47 +512,15 @@ the trust setting in effect. R3 must record both.
   - **Record:** a `parity_gaps.md` entry; the `PARITY_CHECKLIST.md` rows for task544, task546 and
     task554, which read `ported` today (playbook 2); and a row that amends D-039(a)'s "engine is
     the oracle" premise.
-  - **If a deferred item reopens:** it builds on R5's gates. R5 changes R6's contract, and it does
-    not supply R7's continuation (F-E item 4).
-- [ ] **R8 — close-out.** Deleting this plan must not lose the deferred analysis. Write ledger
-  rows, none citing this path, for:
-  - what shipped;
-  - **open findings, one row each:** F-B, F-C beyond the startup race, F-F, H1 and H2. Each row
-    carries its mechanism, its evidence, and the contract from the Deferred subsection, so that a
-    reopening starts from the analysis rather than from nothing;
-  - Q1 and Q2, recorded as answered but inactive: the D-027 rule review never started, so nothing
-    binding changed.
-
-  Then delete this file.
-
-### Deferred — not in this train (group 3)
-
-Not checklist items. Reopen one only as the Scope block above says; its contract then becomes a
-segment, re-reviewed against the evidence that reopened it.
-
-- **RF — F-F, re-admit the last rejected reading.** Reopens on an episode that R3 records as
-  rejected for accuracy with trust off. Not a parity restore: a new policy with its own row. It does nothing for H2, where there is no reading
-  to keep. Keeping a rejected reading for later is deferred work, so it shares R6's rule-review
-  pass (D-027) and **R6's single slot**: whichever lands first defines the slot, and the other
-  extends it. Land it after R5, so its tests run against the corrected gates.
-  - **Change:** keep the last reading the accuracy gate rejected (value and accuracy). Re-offer it
-    once, through the normal prof760 gates, when `onAccuracyChanged` reports accuracy > 1 (so
-    `LightSensorSource` stops treating that callback as a no-op), and when a settings save turns
-    "Trust low-accuracy sensor" on. A newer event replaces it. Screen-off, stop and a new sensor
-    session invalidate it. The trust-toggle trigger waits for the Tasker check in F-F. If Tasker
-    does not re-evaluate there, the trigger is still proposed, and the owner decides.
-  - **Tests:**
-    - a wake whose first event is accuracy 1 at 0 lx, followed by silence, writes nothing with the
-      setting off, and is evaluated when accuracy later recovers;
-    - the same case is evaluated when the setting is turned on;
-    - after a screen-off, the kept reading is not re-offered;
-    - a newer reading replaces the kept one.
-  - **Device check (owner):** after a wake that ends on "Monitoring" and is shown to be F-F,
-    turning the setting on with no screen cycle should give `0 lx → 0`.
-- **R6 — F-C, the pending-latest slot.** Reopens on a trace showing a final reading dropped while
-  busy or in cooldown. Q1's answer stands but is inactive (§4). If reopened, it needs the
-  rule-review pass that amends the `AGENTS.md` invariant and records the D-027 departure in a new
-  row.
+  - **R6 builds on R5's gates.** R5 changes R6's contract, and it does not supply R7's
+    continuation (F-E item 4).
+- [ ] **R6 — F-C, the pending-latest slot.** Group 2, **in the train since 2026-09-24 (owner)** on
+  F-C's capture 2 sequence. Q1's answer (b) is active (§4). Lands after R5.
+  - **Rule review first.** It amends the concurrency invariant in `AGENTS.md` ("events that arrive
+    during a cycle are dropped rather than queued") and records the D-027(d) departure in a new
+    row, both through the rule-review protocol, in the same commit as the code.
+  - **Entry test (fails today):** a final out-of-band reading during an animation, then silence,
+    is evaluated.
   - **The owner's no-ghosts condition, as acceptance tests.** These are structural properties, not
     a cycle count (Astra). A slot legitimately uses its kept reading when the cooldown expires,
     where today's code waits for another callback, so over a long burst it can run more cycles
@@ -520,7 +537,8 @@ segment, re-reviewed against the evidence that reopened it.
 
     The flicker run (bright and dim alternating faster than the cooldown for 30 s, then steady)
     asserts these properties throughout, and that its last cycle evaluates the final reading.
-    Ending on the final light's *target* needs R7's settling, so R7 asserts that (Sol).
+    Ending on the final light's *target* needs R7's settling, which stays deferred, so R6 does not
+    assert it (Sol).
   - **Behaviour:** new readings replace the pending one during initialisation, an active cycle and
     the cooldown. After completion, the newest pending reading is reconsidered against current
     settings and thresholds. During a cooldown, one reconsideration is scheduled for when it
@@ -532,10 +550,32 @@ segment, re-reviewed against the evidence that reopened it.
     never drained ahead of a control event that is already queued; that event runs first and may
     invalidate it.
   - **Tests:**
-    - a final out-of-band reading during an animation, then silence, is evaluated;
+    - the entry test above;
     - the same during a cooldown;
     - after each of a queued screen-off, pause, override, stop and sensor-session replacement, the
       pending reading is not evaluated.
+  - **R3's taxonomy:** a busy or cooldown drop becomes "deferred" when it fills the slot and
+    "replaced" when a newer reading supersedes it; R6 states this in its commit.
+- [ ] **R8 — close-out.** Deleting this plan must not lose the deferred analysis. Write ledger
+  rows, none citing this path, for:
+  - what shipped;
+  - **open findings, one row each:** F-B, H1 and H2, and F-C too if R6 has not shipped. Each row
+    carries its mechanism, its evidence, and the contract from the Deferred subsection, so that a
+    reopening starts from the analysis rather than from nothing;
+  - **F-F, as ruled out:** the AOSP source facts in its section, why RF was dropped (owner,
+    2026-09-24), and the one condition that would reopen it (an OEM framework that R3 shows
+    reporting light accuracy ≤ 1);
+  - Q1 as executed by R6, through its own rule-review row. Q2 as answered but inactive, since R7
+    never started, so nothing binding changed.
+
+  Then delete this file.
+
+### Deferred — not in this train (group 3)
+
+Not a checklist item. Reopen it only as the Scope block above says; its contract then becomes a
+segment, re-reviewed against the evidence that reopened it. RF, formerly listed here, was dropped
+on 2026-09-24 (F-F). R8's F-F row keeps what it was and why it went.
+
 - **R7 — F-B, the settling path.** Reopens on a trace showing a completed cycle that left the screen
   short of its target, with no later reading admitted. Q2's answer stands but is inactive (§4), and
   the Tasker check comes first. Re-derive the
@@ -610,7 +650,8 @@ enabled. The agent drives it within the scope below.
        ignores every action while intent control is off.
      - Check `dumpsys jobscheduler` for the Tideo WorkManager job's schedule, to confirm observation
        6's worker attribution.
-  2. **Implement R1, then R2, then R3**, each ending on a green `scripts/ladder.sh`, a commit and
+  2. **Implement R5, then R1, then R3, then R2** (owner, 2026-09-24: R5 went first as the work that
+     does not depend on the R6/R7 answer). R4 and R6 follow. Each ends on a green `scripts/ladder.sh`, a commit and
      a push (§5).
   3. **Install the debug build and repeat step 1** against `-p com.tideo.autobrightness.debug`.
      The notification must keep `Lux … → brightness …` (R1's device check).
