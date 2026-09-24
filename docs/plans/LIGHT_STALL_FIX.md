@@ -234,9 +234,9 @@ L16196–L16275). The damped value therefore feeds nothing but the readouts that
 while proximity reads near every smoothed step moves a tenth as far, and the animation is sized
 from the damped α. That is the mechanism F-B's reason 4 describes, and it is Tideo's own. The
 AGENTS.md sentence "multiplies `LuxAlpha` by 0.1; it never pauses" holds for Tasker's global, and
-the contract test `proximityNear_dampsLuxAlphaByTenth` pins Tideo's divergent behaviour. **Not
-yet scheduled:** it is a parity restore in R5's act range, and whether it joins R5 is the owner's
-call.
+the contract test `proximityNear_dampsLuxAlphaByTenth` pins Tideo's divergent behaviour.
+**Deferred by the owner (2026-09-24) to a fresh-context session** and routed to the STATE Owner
+queue; R5 shipped without it (parity_gaps gap-08 lists it as open).
 
 ### F-F — A low-accuracy reading is rejected, and nothing re-admits it. Ruled out on AOSP frameworks (2026-09-24); RF dropped
 
