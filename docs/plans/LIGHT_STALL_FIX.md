@@ -470,7 +470,14 @@ record is what would expose an OEM framework that differs (F-F).
     whose reapply recomputes the same model), as well as through a plain start. After a wake with
     no accepted reading, "Monitoring" is still posted; that text is true there (F-F or H2).
   - **Device check (owner):** in steady light, saving any setting leaves `Lux … → brightness …`.
-- [ ] **R2 — F-C's startup race only.** Group 2. No fork: it reorders startup and queues nothing.
+- [x] **R2 — F-C's startup race only.** **Done 2026-09-24 (DC-067).** The entry test failed on
+  the old code as predicted (`expected null, but was: SampleRejectionRecord(reason=SETTINGS_NOT_LOADED
+  …)`). Beyond the plan: registration now runs on the consumer, so `startSensor` refuses a cancelled
+  owner and `stop()`/`emergencyStop()` cancel the consumer first. A mutation check showed that
+  without this the stop-race test fails. Sol's three pre-existing races are recorded in DC-067; the
+  queued-tick one is R6's (below). No device check was planned. If one is run, it looks like
+  this: turn the service on in steady light, and brightness follows the first reading without
+  the light changing first. Group 2. No fork: it reorders startup and queues nothing.
   Register the sensor only after `cachedSettings` has loaded. Holding an early reading until
   settings load would be deferred work, which belongs to the deferred R6 and its D-027 rule
   review, so R2 does not do it (Sol).
@@ -606,7 +613,11 @@ record is what would expose an OEM framework that differs (F-F).
     - the entry test above;
     - the same during a cooldown;
     - after each of a queued screen-off, pause, override, stop and sensor-session replacement, the
-      pending reading is not evaluated.
+      pending reading is not evaluated;
+    - **a tick already queued behind a ScreenOff** (admitted while the consumer handled another
+      event, or emitted on START registration after a ScreenOff that arrived during the settings
+      load) does not run a cycle after hibernate. Today it does, since `runCycle` has no
+      hibernation gate (Sol, R2; DC-067).
   - **R3's taxonomy:** a busy or cooldown drop becomes "deferred" when it fills the slot and
     "replaced" when a newer reading supersedes it; R6 states this in its commit.
 - [ ] **R8 — close-out.** Deleting this plan must not lose the deferred analysis. Write ledger

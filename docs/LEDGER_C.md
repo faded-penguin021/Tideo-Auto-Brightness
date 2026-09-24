@@ -917,3 +917,18 @@
   generation, and only the claim that owns the cycle record may count, advance or settle it, so
   neither a stalled collector, a replaced listener's late callback nor a tick queued across a wake
   or restart can fake the evidence (Sol and glue review).
+
+- DC-067 [cited]: **The light sensor registers only after the pipeline's settings have loaded,
+  so the first reading after a service start is evaluated (2026-09-24, Tideo #132, F-C's startup
+  race).** `start()` used to register before the consumer had read settings, and an on-change
+  sensor's registration event then landed on `cachedSettings == null` and was rejected; in steady
+  light nothing followed it. The consumer now registers right after the read, as `reinit()` already
+  did for WAKE, and holds no early reading (that would be R6's deferred work). Registration moved
+  onto the `Dispatchers.Default` consumer, so `startSensor` takes its owning job and refuses one
+  already cancelled, under the same lock as a new `stopSensor`, and `stop()`/`emergencyStop()`
+  cancel the consumer before the sensor: a `stop()` landing between the read and the registration
+  leaves nothing registered (mutation-checked: without the owner check the test fails). With no
+  listener before settings load, `SETTINGS_NOT_LOADED` is now unreachable and stays only as the
+  null branch's name. Sol found three pre-existing races this does not fix: a tick queued behind a
+  ScreenOff still runs after hibernate (R6's invalidation contract), concurrent `start()`/`stop()`
+  are unserialised, and a cancelled listener is not joined before a WAKE re-registers.

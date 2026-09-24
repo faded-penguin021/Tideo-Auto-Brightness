@@ -8,11 +8,12 @@ import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -37,8 +38,7 @@ class BrightnessPipelineController(
     // F73: real solar ramp windows for the dynamic-scale engine. Default `{ null }` keeps the old
     // fixed-window behaviour (and existing tests) intact; AppModule supplies the live provider.
     private val circadianWindowsProvider: (transitionFactor: Double) -> CircadianWindows? = { null },
-    // prof759/task545 proximity damp. Optional: null (controller unit tests / no proximity sensor) →
-    // never near → no damp, so existing behaviour and golden parity are unchanged.
+    // prof759/task545 proximity. Optional: null (unit tests / no proximity sensor) is never near.
     private val proximitySource: ProximitySensorSource? = null,
     private val callbackLog: SensorCallbackLog = SensorCallbackLog(),
 ) : ControllerHook, PipelineRuntimeContext {
@@ -113,25 +113,25 @@ class BrightnessPipelineController(
         postControl(PipelineEvent.OverrideDetected(observed, source))
     }
 
-    /** Start the pipeline and consumer/sensor/observer flows. */
+    /** Start the pipeline; the light sensor registers only once settings have loaded (DC-067). */
     fun start() {
         if (consumerJob != null) return
         _state.update { it.copy(serviceOn = true) }
         consumerJob = scope.launch {
             cachedSettings = settingsProvider().also { throttle.seed(it.throttleDefaultMs) }
+            startSensor(RegistrationCause.START, coroutineContext.job)
             controlGate.consumeEach { handle(it) }
         }
         startOverrideDetection()
-        startSensor(RegistrationCause.START)
     }
 
     /** Stop the pipeline entirely (service teardown). */
     fun stop() {
         _state.update { it.copy(serviceOn = false) }
-        sensorJob?.cancel(); sensorJob = null
-        callbackLog.unregistered()
-        overrideJob?.cancel(); overrideJob = null
+        // DC-067: consumer first, so a registration still pending on it sees it cancelled.
         consumerJob?.cancel(); consumerJob = null
+        stopSensor()
+        overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
         inCycle.set(false)
         // DA-038: independently clear pre-death Extra Dim residue and return brightness-mode ownership.
@@ -166,10 +166,10 @@ class BrightnessPipelineController(
 
     /** prof769/task528 panic: restore brightness, drop dimming, stop everything (D-139). */
     suspend fun emergencyStop() {
-        sensorJob?.cancel(); sensorJob = null
-        callbackLog.unregistered()
+        val consumer = consumerJob?.also { it.cancel() }
+        stopSensor()
         overrideJob?.cancel(); overrideJob = null
-        consumerJob?.cancelAndJoin(); consumerJob = null
+        consumer?.join(); consumerJob = null
         proximityTracker.stop()
         inCycle.set(false)
         panicHandler.execute() // task528 act6-8: restore 255 + drop dimming
@@ -187,8 +187,8 @@ class BrightnessPipelineController(
     }
 
     @Synchronized
-    private fun startSensor(cause: RegistrationCause) {
-        if (sensorJob?.isActive == true) return
+    private fun startSensor(cause: RegistrationCause, owner: Job) {
+        if (sensorJob?.isActive == true || !owner.isActive) return
         val generation = callbackLog.registered(cause, clock())
         _state.update { it.copy(sensor = it.sensor.registered()) }
         sensorJob = scope.launch {
@@ -199,6 +199,9 @@ class BrightnessPipelineController(
         }
         proximityTracker.start()
     }
+
+    @Synchronized
+    private fun stopSensor() { sensorJob?.cancel(); sensorJob = null; callbackLog.unregistered() }
 
     /** prof760 gate on collector: passing samples claim [inCycle] mutex, others are dropped. */
     private fun onSensorSample(lux: Double, accuracy: Int) {
@@ -267,15 +270,14 @@ class BrightnessPipelineController(
     private suspend fun reinit() {
         val settings = settingsProvider().also { cachedSettings = it }
         _state.update { it.copy(hibernated = false) }
-        startSensor(RegistrationCause.WAKE)
+        startSensor(RegistrationCause.WAKE, currentCoroutineContext().job)
         startOverrideDetection()
         if (!_state.value.paused) cycleRunner.setInitialBrightness(settings)
     }
 
     /** prof753/task585 hibernate: stop sensing and Allow Override, clear runtime state (DC-042). */
     private fun hibernate() {
-        sensorJob?.cancel(); sensorJob = null
-        callbackLog.unregistered()
+        stopSensor()
         overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
         inCycle.set(false)

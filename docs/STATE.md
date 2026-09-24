@@ -33,8 +33,9 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
 - **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
   · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [x] R3 diagnostics (DC-066)
-  · [ ] R2, **next** · [ ] R4 · [ ] R6, with its D-027 rule review · [ ] R8 close-out; R2, R4 and R6 start
-  from a test that fails today, R7 is deferred and RF dropped (plan §5).
+  · [x] R2 startup race (DC-067) · [ ] R4, **next** · [ ] R6, with its D-027 rule review
+  · [ ] R8 close-out; R4 and R6 start from a test that fails today, R7 is deferred and RF dropped
+  (plan §5).
 
 ## Owner queue
 
@@ -126,6 +127,13 @@ something major, and say so.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-24 — **Light stalls R2 (DC-067):** the light sensor registers only once settings have
+  loaded, so the reading it sends on registration after a service start is evaluated instead of
+  dropped as SETTINGS_NOT_LOADED; a `stop()` that lands mid-start leaves no listener. JVM tests
+  only; no device check was run. Also fixed: R1's repeated-start service test, which failed CI at
+  `e0cd4c1` because it waited for a brightness that any reapply recomputes; it now waits for the
+  curve's own target.
 
 - 2026-09-24 — **Light stalls R3 (DC-066):** Live Debug's new "Light Sensor" card shows the last
   raw callback, each registration and its first event, received/admitted/rejected with the last

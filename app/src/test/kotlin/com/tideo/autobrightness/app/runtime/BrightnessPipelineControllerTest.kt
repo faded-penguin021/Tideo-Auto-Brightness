@@ -15,6 +15,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -1141,20 +1142,13 @@ class BrightnessPipelineControllerTest {
     }
 
     @Test
-    fun pausedAndDisabled_andUnloadedSettings_eachNameTheirReason_DC066() = runTest {
+    fun pausedAndDisabled_eachNameTheirReason_DC066() = runTest {
         val sensor = FakeSensor()
-        val gate = CompletableDeferred<AabSettings>()
         var current = settings
         val (controller, scope) = newController(
-            sensor, FakeBrightness(), clock = { 1_000L }, settingsProvider = { gate.await(); current },
+            sensor, FakeBrightness(), clock = { 1_000L }, settingsProvider = { current },
         )
         controller.start()
-
-        sensor.flow.emit(sample(10.0))
-        assertEquals(SampleRejection.SETTINGS_NOT_LOADED, controller.state.value.sensor.lastRejection?.reason)
-        assertNull(controller.state.value.sensor.lastRejection?.trustUnreliable)
-
-        gate.complete(settings)
         advanceUntilIdle()
         controller.pause()
         advanceUntilIdle()
@@ -1168,7 +1162,7 @@ class BrightnessPipelineControllerTest {
         sensor.flow.emit(sample(10.0))
         advanceUntilIdle()
         assertEquals(SampleRejection.SERVICE_DISABLED, controller.state.value.sensor.lastRejection?.reason)
-        assertEquals(3, controller.state.value.sensor.rejected)
+        assertEquals(2, controller.state.value.sensor.rejected)
         scope.cancel()
     }
 
@@ -1220,6 +1214,75 @@ class BrightnessPipelineControllerTest {
         sensor.flow.emit(sample(0.0, accuracy = 3, seq = 1))
         advanceUntilIdle()
         assertEquals(SensorCallback(0.0, 3, 1, 0L, 0L, 9_000L), log.state.value.first)
+        scope.cancel()
+    }
+
+    private class EmitOnRegisterSensor(private val initial: LightSample) : LightSensorSource {
+        var registrations = 0
+        override fun samples(onRegistered: (Boolean) -> Unit, onCallback: (LightSample) -> Unit): Flow<LightSample> =
+            flow {
+                registrations++
+                onRegistered(true)
+                emit(initial)
+                awaitCancellation()
+            }.onEach(onCallback)
+    }
+
+    @Test
+    fun theReadingEmittedOnRegistration_isEvaluated_whenSettingsLoadLate_DC067() = runTest {
+        val sensor = EmitOnRegisterSensor(sample(100.0, seq = 1))
+        val brightness = FakeBrightness()
+        val gate = CompletableDeferred<AabSettings>()
+        val (controller, scope) =
+            newController(sensor, brightness, clock = { 1_000L }, settingsProvider = { gate.await() })
+        controller.start()
+        gate.complete(settings)
+        advanceUntilIdle()
+
+        val d = controller.state.value.sensor
+        assertNull(d.lastRejection, "the start's first reading must not be dropped as SETTINGS_NOT_LOADED")
+        assertEquals(1, d.admitted)
+        assertEquals(100.0, controller.state.value.lastRawLux)
+        assertTrue(brightness.writes.isNotEmpty(), "the first reading must reach the screen")
+        scope.cancel()
+    }
+
+    @Test
+    fun theSensorRegisters_onlyAfterSettingsResolve_DC067() = runTest {
+        val sensor = EmitOnRegisterSensor(sample(100.0, seq = 1))
+        val log = SensorCallbackLog()
+        val gate = CompletableDeferred<AabSettings>()
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L }, settingsProvider = { gate.await() }, callbackLog = log,
+        )
+        controller.start()
+        assertEquals(0, sensor.registrations)
+        assertNull(log.state.value.cause)
+        assertEquals(0, controller.state.value.sensor.received)
+
+        gate.complete(settings)
+        advanceUntilIdle()
+        assertEquals(1, sensor.registrations)
+        assertEquals(RegistrationCause.START, log.state.value.cause)
+        assertEquals(1, controller.state.value.sensor.received)
+        scope.cancel()
+    }
+
+    @Test
+    fun aStopLandingBetweenSettingsLoadAndRegistration_registersNothing_DC067() = runTest {
+        val sensor = EmitOnRegisterSensor(sample(100.0, seq = 1))
+        val log = SensorCallbackLog()
+        lateinit var controller: BrightnessPipelineController
+        val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
+        controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = FakeBrightness(), brightnessObserver = FakeObserver(),
+            settingsProvider = { controller.stop(); settings }, scope = scope, clock = { 1_000L }, callbackLog = log,
+        )
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals(0, sensor.registrations, "a stopped service must not be left holding the light sensor")
+        assertNull(log.state.value.cause)
         scope.cancel()
     }
 
