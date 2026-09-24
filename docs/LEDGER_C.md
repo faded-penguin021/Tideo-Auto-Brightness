@@ -892,3 +892,18 @@
   and the parity rule set the direction; keeping the old damp would now be a `parity_gaps.md`
   deviation entry, and the panic gesture's proximity veto (D-116) is untouched. On-device
   behaviour is unverified (`DEVICE_TEST_SCRIPT.md` §4 now expects no slowing).
+
+- DC-065 [cited]: **A start command reaching a running pipeline posts the live notification, not
+  an empty one (2026-09-24, Tideo #130).** Every `startForegroundService` runs `onStartCommand`
+  (settings saves via `ACTION_REAPPLY`, `MaintenanceWorker` every 15 min, app launch, widget,
+  `ControlReceiver`, Resume), which posted "Monitoring ambient light" from an empty model, and the
+  distinct-until-changed updater never re-posted an unchanged model, so in steady light the text
+  stayed wrong; the worker's "no-op if already running" comment was that false premise. It now
+  maps `controller.state` and the active context through the updater's own mapping, keeping the
+  paused title and Resume, and posts the empty model only while the pipeline is not running;
+  "Monitoring" after a wake with no accepted reading is still true. A lock serialises that post
+  with the updater's and the start command reads state inside it, so any stale updater post that
+  lands after it is followed by the updater's emission of the newer model. The owner reproduced
+  the fault by saving a setting on the OnePlus 13 (2026-09-23), and `AmbientMonitoringServiceTest`
+  reproduces it through `ACTION_REAPPLY` and a plain start. This fixes the text only and does not
+  show that brightness tracking ever stopped.

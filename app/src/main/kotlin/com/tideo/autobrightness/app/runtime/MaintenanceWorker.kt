@@ -19,7 +19,7 @@ class MaintenanceWorker(
         val settings = settingsStore.readRawSettings()
         if (!settings.serviceEnabled) return Result.success()
 
-        // Re-ensure the foreground service is up; startForegroundService is a no-op if already running.
+        // Re-ensure the service is up; a running one still gets onStartCommand, never a no-op (DC-065).
         AutoBrightnessRuntime.startMonitoring(applicationContext, "maintenance_reinit")
         healthStore.markApplied(System.currentTimeMillis())
         return Result.success()

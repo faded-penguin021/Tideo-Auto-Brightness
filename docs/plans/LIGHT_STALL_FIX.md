@@ -449,7 +449,12 @@ the trust setting in effect. R3 must record both, even though on AOSP accuracy a
 record is what would expose an OEM framework that differs (F-F).
 
 - [x] **R0 — this plan.**
-- [ ] **R1 — F-A, the notification overwrite.** No fork.
+- [x] **R1 — F-A, the notification overwrite.** **Done 2026-09-24 (DC-065).** The three new
+  `AmbientMonitoringServiceTest` cases failed on the old code as predicted (`a settings save must
+  not post Monitoring expected:<[Lux 100 → brightness 120]> but was:<[Monitoring ambient
+  light]>`; the paused case read "active"). A lock was added beyond the plan: without it, a start
+  command could leave an older model visible over a newer one that the updater had just posted.
+  The device check below is still open (STATE Owner queue).
   - **Change:** when the pipeline is already running, build the `startForeground` notification
     from current controller state and active context, through the same model mapping the live
     updater uses. Preserve the paused state and its actions. Correct the `MaintenanceWorker`

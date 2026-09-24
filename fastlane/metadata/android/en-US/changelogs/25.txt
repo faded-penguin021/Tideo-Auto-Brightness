@@ -1,7 +1,9 @@
-Night Light temperature and circadian scaling now take effect on devices whose display ignores the setting, such as OnePlus/OxygenOS, when Shizuku or root is available.
+Night Light temperature and circadian scaling now work where the display ignores the setting (e.g. OxygenOS), with Shizuku or root.
 
-Fixes circadian Night Light anchoring to a fixed 2850 K instead of your own temperature, and "device default" drifting warmer on each off/on cycle.
+Fixes circadian Night Light anchoring to 2850 K instead of your temperature, and "device default" drifting warmer each off/on cycle.
 
-Fixes settings backup and restore, broken since 1.8.2.
+Fixes backup and restore, broken since 1.8.2.
 
-Fixes brightness ignoring a return to the previous light level, and reacting slowly while the proximity sensor is covered.
+Fixes brightness ignoring a return to the previous light level and slowing while the proximity sensor is covered.
+
+Fixes the notification reverting to "Monitoring ambient light".

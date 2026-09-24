@@ -50,13 +50,16 @@ import kotlinx.coroutines.launch
 class AmbientMonitoringService : Service() {
     // Legitimately-owned scope for the service lifetime, cancelled in onDestroy().
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private lateinit var controller: BrightnessPipelineController
+    internal lateinit var controller: BrightnessPipelineController
+        private set
     private lateinit var contextEngine: ContextEngine
     private lateinit var displayToggles: DisplayTogglesCoordinator
     private lateinit var panicSensor: com.tideo.autobrightness.platform.sensor.PanicSensorSource
     // Tier cache, refreshed at resume points to avoid per-cycle permission checks (G1-F5).
     private lateinit var privilegeManager: com.tideo.autobrightness.platform.privilege.PrivilegeManager
     private var notificationJob: Job? = null
+    // DC-065: a start command posts the live model; the lock orders it against the updater's posts.
+    private val notificationLock = Any()
     private var panicJob: Job? = null
     // DB-009: watches %AAB_PanicPlugged so a toggle change re-evaluates the sensor gate at once.
     private var panicGateJob: Job? = null
@@ -137,12 +140,14 @@ class AmbientMonitoringService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            buildNotification(NotificationModel()),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-        )
+        synchronized(notificationLock) {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                foregroundNotification(controller.state.value, contextEngine.activeContext.value),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+        }
 
         // A real command supersedes a pending OS restart; explicit starters pre-persist serviceEnabled.
         if (intent != null) {
@@ -269,29 +274,23 @@ class AmbientMonitoringService : Service() {
                 contextEngine.onPipelineTick()
                 // Republish for Dashboard/Menu; separate override lock from active context rule (F46).
                 LiveRuntimeState.publish(state, ctx, manualOverride)
-                NotificationModel(
-                    state.smoothedLux,
-                    state.targetBrightness,
-                    state.paused,
-                    state.serviceOn,
-                    ctx,
-                    state.pausedByOverride,
-                )
+                notificationModel(state, ctx)
             }
                 .distinctUntilChanged()
                 .collect { model ->
                     if (!model.serviceOn) return@collect
                     // F75: override alert reuses NOTIFICATION_ID; pops once then settles back.
                     val rising = model.pausedByOverride && !alertedOverride
-                    if (rising) {
-                        notifyManualOverride()
-                    } else {
-                        getSystemService(NotificationManager::class.java)
-                            .notify(NOTIFICATION_ID, buildNotification(model))
+                    synchronized(notificationLock) {
+                        if (rising) {
+                            notifyManualOverride()
+                        } else {
+                            getSystemService(NotificationManager::class.java)
+                                .notify(NOTIFICATION_ID, buildNotification(model))
+                        }
                     }
                     // G2R-F63: QS tile live refresh; renders state changes without panel close+reopen.
                     requestTileRefresh()
-                    // Home-screen widget live refresh: event-driven (no polling).
                     DashboardWidgetProvider.refresh(applicationContext)
                     alertedOverride = model.pausedByOverride
                 }
@@ -508,6 +507,18 @@ class AmbientMonitoringService : Service() {
         val serviceOn: Boolean = true,
         val activeContext: String? = null,
         val pausedByOverride: Boolean = false,
+    )
+
+    internal fun foregroundNotification(state: PipelineState, activeContext: String?): Notification =
+        buildNotification(if (state.serviceOn) notificationModel(state, activeContext) else NotificationModel())
+
+    private fun notificationModel(state: PipelineState, activeContext: String?) = NotificationModel(
+        state.smoothedLux,
+        state.targetBrightness,
+        state.paused,
+        state.serviceOn,
+        activeContext,
+        state.pausedByOverride,
     )
 
     private fun buildNotification(model: NotificationModel): Notification {

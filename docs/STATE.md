@@ -19,7 +19,7 @@ here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), set
 
 This branch carries the #126/#127 override-attribution work (DC-002…DC-028), the harness units,
 the runtime rot audit (DC-042…DC-046), the Night Light work (DC-053…DC-058), light-stall R5
-(DC-063) and the proximity-damp parity restore (DC-064). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+(DC-063), the proximity-damp parity restore (DC-064) and the notification fix R1 (DC-065). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -32,7 +32,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
 - **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
-  · [x] F-G (DC-064) · [ ] R1 notification overwrite, **next, in a fresh session (owner, 2026-09-24)** · [ ] R3
+  · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [ ] R3 diagnostics, **next**
   · [ ] R2 · [ ] R4 · [ ] R6, with its D-027 rule review · [ ] R8 close-out; R2, R4 and R6 start
   from a test that fails today, R7 is deferred and RF dropped (plan §5).
 
@@ -74,6 +74,13 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
    `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
    Live Debug's "Smoothing α" drops to a tenth.
+
+5. **[2026-09-24] Check the notification fix on the phone next time you test a build.** In steady
+   light, save any setting, or send
+   `adb shell am broadcast -a com.tideo.autobrightness.control.REAPPLY -p com.tideo.autobrightness.debug`
+   with intent control on. It worked if the notification keeps `Lux … → brightness …` instead of
+   switching to "Monitoring ambient light". After a wake with no new reading, "Monitoring" is
+   still expected (DC-065).
 
 Open questions: none.
 
@@ -118,6 +125,10 @@ something major, and say so.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-24 — **Light stalls R1 (DC-065):** a start command reaching a running service, such as
+  every settings save or the 15-minute worker, now posts the live `Lux … → brightness …`
+  notification (paused title and Resume kept) instead of "Monitoring ambient light".
 
 - 2026-09-24 — **F-G closed as a parity restore (DC-064):** proximity near damps only the
   reported α, as in Tasker; smoothing, mapping and animation stay undamped. The oracle was already

@@ -1,12 +1,14 @@
 package com.tideo.autobrightness.app.runtime
 
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.test.core.app.ApplicationProvider
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
@@ -300,6 +302,68 @@ class AmbientMonitoringServiceTest {
             controller.destroy()
         }
     }
+
+    @Test
+    fun repeatedStart_whileRunning_keepsTheLiveModelPosted() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+            service.controller.update { it.copy(smoothedLux = 100.0, targetBrightness = 120) }
+            val live = service.getString(R.string.notif_text_lux_brightness, 100, 120)
+            waitUntil { postedText(service) == live }
+
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_REAPPLY), 0, 2)
+            assertEquals(live, textOf(shadowOf(service).lastForegroundNotification), "a settings save must not post Monitoring")
+            assertEquals(live, postedText(service))
+
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 3)
+            assertEquals(live, textOf(shadowOf(service).lastForegroundNotification), "a plain start must not post Monitoring")
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    @Test
+    fun repeatedStart_whilePaused_keepsThePausedTitleAndResume() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+            service.controller.update { it.copy(smoothedLux = 100.0, targetBrightness = 120, paused = true) }
+
+            service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_REAPPLY), 0, 2)
+            val posted = shadowOf(service).lastForegroundNotification
+            assertEquals(service.getString(R.string.notif_title_paused), posted.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString())
+            assertTrue(posted.actions.orEmpty().any { it.title.toString() == "Resume" }, "the paused notification keeps Resume")
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    @Test
+    fun foregroundNotification_mapsTheLiveModelOnlyWhileRunning() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+        val monitoring = service.getString(R.string.notif_text_monitoring)
+        val running = PipelineState(serviceOn = true, smoothedLux = 42.7, targetBrightness = 30)
+
+        val live = service.foregroundNotification(running, "Night")
+        assertEquals(service.getString(R.string.notif_text_lux_brightness, 42, 30), textOf(live))
+        assertEquals(service.getString(R.string.notif_subtext_context, "Night"), live.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString())
+
+        assertEquals(monitoring, textOf(service.foregroundNotification(running.copy(serviceOn = false), "Night")), "a first start posts Monitoring")
+        assertEquals(monitoring, textOf(service.foregroundNotification(PipelineState(serviceOn = true), null)), "no accepted reading yet: Monitoring is true")
+    }
+
+    private fun textOf(notification: Notification?): String? =
+        notification?.extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+
+    private fun postedText(service: AmbientMonitoringService): String? =
+        textOf(shadowOf(service.getSystemService(NotificationManager::class.java)).getNotification(1001))
 
     // ---- D-157 (U5): outbound event.STATE_CHANGED contract + teardown ordering ----
 
