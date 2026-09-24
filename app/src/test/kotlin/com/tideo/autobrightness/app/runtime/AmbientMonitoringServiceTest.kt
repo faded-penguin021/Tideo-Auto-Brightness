@@ -311,9 +311,12 @@ class AmbientMonitoringServiceTest {
         try {
             val service = controller.get()
             service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
-            service.controller.update { it.copy(smoothedLux = 100.0, targetBrightness = 120) }
-            val live = service.getString(R.string.notif_text_lux_brightness, 100, 120)
-            waitUntil { postedText(service) == live }
+            service.controller.update { it.copy(smoothedLux = 100.0) }
+            service.controller.reapply()
+            fun live() = service.controller.state.value.targetBrightness
+                ?.let { service.getString(R.string.notif_text_lux_brightness, 100, it) }
+            waitUntil { live() != null && postedText(service) == live() }
+            val live = live()
 
             service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_REAPPLY), 0, 2)
             assertEquals(live, textOf(shadowOf(service).lastForegroundNotification), "a settings save must not post Monitoring")
