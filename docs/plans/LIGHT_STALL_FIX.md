@@ -663,7 +663,12 @@ segment, re-reviewed against the evidence that reopened it. RF, formerly listed 
 on 2026-09-24 (F-F). R8's F-F row keeps what it was and why it went.
 
 - **R7 — F-B, the settling path.** Reopens on a trace showing a completed cycle that left the screen
-  short of its target, with no later reading admitted. Q2's answer stands but is inactive (§4), and
+  short of its target, with no later reading admitted. **That trace exists since 2026-09-24**
+  (R6's device check, OnePlus 13, debug build of `938058a`, dark room): after a flashlight flicker
+  ending dark, the last cycle took smoothed lux only to 42.0 (a second run: 100.0) with raw 0.0,
+  α 0.743, target 32/255, and the band 0.0–0.0 then rejected every 0 lx reading as DEAD_BAND, so
+  the screen stayed at 42 lx's brightness in the dark. Whether to reopen is the owner's (STATE
+  open question). Q2's answer stands but is inactive (§4), and
   the Tasker check comes first. Re-derive the
   continuation on top of R5. act19 gives a defined endpoint only for readings that reach task544,
   and prof760 keeps an unchanged reading out (F-E item 4). Any continuation is therefore a new

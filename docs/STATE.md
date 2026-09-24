@@ -34,7 +34,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 - **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
   · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [x] R3 diagnostics (DC-066)
   · [x] R2 startup race (DC-067) · [x] R4 watchdog (DC-068) · [x] R6 pending slot (DC-069)
-  · [ ] R8 close-out, **next**; R7 is deferred and RF dropped (plan §5).
+  · [ ] R8 close-out, **next unless R7 reopens** (open question below); RF dropped (plan §5).
 
 ## Owner queue
 
@@ -75,15 +75,17 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
    Live Debug's "Smoothing α" drops to a tenth.
 
-5. **[2026-09-24] Check the held-reading change (R6) on the phone next time you test a build.**
-   Tideo now keeps the newest light reading that arrives mid-change and applies it once the
-   animation and cooldown finish, where it used to drop it. Pass the phone slowly in and out of
-   shade a few times, then stop in one place: brightness should settle for that final light
-   without any further change, and Live Debug's Light Sensor counts should show "deferred" and
-   "replaced" rising. Settles it: `DEVICE_TEST_SCRIPT.md` has no step for this yet, so your
-   observation is the check (DC-069).
+Open questions:
 
-Open questions: none.
+- **[2026-09-24] Reopen R7, the settling path, before the R8 close-out?** On the OnePlus 13 in
+  a dark room, after a flashlight flicker ending dark, one cycle smoothed only from the flicker's
+  level to 42 lx (and to 100 lx in a second run), so the screen stayed at the brightness for
+  42 lx (32/255) in the dark; every later 0 lx reading is inside the 0.0–0.0 band, so nothing
+  moves it again. That is R7's reopen condition in the plan: a completed cycle short of its
+  target with no later reading admitted. Options: (a) reopen R7 now, with its Tasker check
+  first (the plan's Q2), and hold R8 until it lands; (b) close the train with R8 and keep R7
+  for a later release; (c) accept the behaviour. **Recommendation: (a)** — it is the stall
+  #132 describes, it now reproduces on demand in about 15 s, and R6 cannot fix it alone.
 
 **This train is `1.11.0` on vc25, its ONE bump (owner, 2026-09-22).** `1.10.1` never shipped, so
 DC-057's new capability made the same vc25 a minor. Land further user-facing fixes by editing
@@ -132,8 +134,12 @@ Newest first; ledger rows are the durable detail.
   applied once the cycle and cooldown end, so the last reading of a change is no longer lost; the
   concurrency invariant in `AGENTS.md` changed with it. Both entry tests failed on the old code
   (`expected:<5000.0> but was:<10.0>`). The Light Sensor card adds deferred and replaced counts;
-  the brightness line in `25.txt` now names the fix. JVM tests only, and no device check yet
-  (owner-queue item 5).
+  the brightness line in `25.txt` now names the fix. **Device check passed** the same day on the
+  OnePlus 13 (debug build of `938058a`, dark room, a flashlight flickered at the sensor for
+  10 s): ending dark, ending on the steady light and ending dark again, the last reading was
+  evaluated with no further callback, brightness then held flat, and the counters balanced
+  (e.g. 839 = 86 admitted + 568 rejected + 185 replaced). The same runs reproduced F-B twice:
+  see the open question on R7.
 
 - 2026-09-24 — **Owner queue item 5 done (DC-066):** the owner ran the dark-wake test on a build
   with the Light Sensor card (OnePlus 13, screen off 3 min). The wake was healthy: WAKE
