@@ -205,7 +205,7 @@ class BrightnessPipelineController(
 
     private suspend fun handle(event: PipelineEvent) {
         when (event) {
-            is PipelineEvent.SensorTick -> admission.run(event) { lux, claim -> cycleRunner.runCycle(lux, claim) }
+            is PipelineEvent.SensorTick -> admission.run(event) { lux, claim, continuation -> cycleRunner.runCycle(lux, claim, continuation) }
             PipelineEvent.ScreenOff -> hibernate()
             PipelineEvent.ScreenOn -> reinit()
             PipelineEvent.Pause -> pauseInternal()
@@ -255,6 +255,7 @@ class BrightnessPipelineController(
                 // the continuous diagnostic).
                 lastAppliedBrightness = null,
                 proximityNear = false,
+                settlingSteps = 0,
             )
         }
     }

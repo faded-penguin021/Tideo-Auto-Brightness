@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicReference
 /** DC-069: the one light reading a busy cycle or its cooldown kept back; a newer reading replaces it. */
 internal class PendingReadings(private val scope: CoroutineScope, private val onCooldownEnd: () -> Unit) {
 
-    data class Reading(val lux: Double, val accuracy: Int, val session: Int, val fence: Long)
+    data class Reading(val lux: Double, val accuracy: Int, val session: Int, val fence: Long, val continuation: Boolean = false)
 
     enum class Offer { HELD, REPLACED, STALE }
 
@@ -36,9 +36,14 @@ internal class PendingReadings(private val scope: CoroutineScope, private val on
 
     @Synchronized fun offer(reading: Reading): Offer = when {
         reading.session != session -> Offer.STALE
-        slot.getAndSet(reading) != null -> Offer.REPLACED
+        slot.getAndSet(reading)?.continuation == false -> Offer.REPLACED
         else -> Offer.HELD
     }
+
+    @Synchronized fun offerContinuation(lux: Double, from: Int): Boolean =
+        from == session && slot.compareAndSet(null, Reading(lux, accuracy = 0, session = session, fence = fence, continuation = true))
+
+    @Synchronized fun discard(reading: Reading): Boolean = (slot.get() === reading).also { if (it) clear() }
 
     @Synchronized fun restore(reading: Reading): Boolean = reading.session != session || slot.compareAndSet(null, reading)
 
@@ -49,7 +54,7 @@ internal class PendingReadings(private val scope: CoroutineScope, private val on
     }
 
     @Synchronized fun armCooldown(delayMs: Long) {
-        if (coolingDown) return
+        if (coolingDown || slot.get() == null) return
         expiry = scope.launch {
             delay(delayMs.coerceAtLeast(1L))
             synchronized(this@PendingReadings) { if (expiry === coroutineContext.job) expiry = null }
@@ -59,7 +64,7 @@ internal class PendingReadings(private val scope: CoroutineScope, private val on
 
     @Synchronized fun clear(): Boolean {
         expiry?.cancel(); expiry = null
-        return slot.getAndSet(null) != null
+        return slot.getAndSet(null)?.continuation == false
     }
 
     @Synchronized fun newSession(): Int { clear(); return ++session }

@@ -19,7 +19,7 @@ here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), set
 
 This branch carries the #126/#127 override-attribution work (DC-002…DC-028), the harness units,
 the runtime rot audit (DC-042…DC-046), the Night Light work (DC-053…DC-058), the proximity-damp
-parity restore (DC-064) and light-stall R1–R6 (DC-063, DC-065…DC-069). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+parity restore (DC-064) and light-stall R1–R7 (DC-063, DC-065…DC-070). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -34,7 +34,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 - **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
   · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [x] R3 diagnostics (DC-066)
   · [x] R2 startup race (DC-067) · [x] R4 watchdog (DC-068) · [x] R6 pending slot (DC-069)
-  · [ ] R8 close-out, **next unless R7 reopens** (open question below); RF dropped (plan §5).
+  · [x] R7 settling path (DC-070) · [ ] R8 close-out, **next**; RF dropped (plan §5).
 
 ## Owner queue
 
@@ -75,17 +75,15 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
    Live Debug's "Smoothing α" drops to a tenth.
 
-Open questions:
+5. **[2026-09-25] Check the settling fix on the phone next time you test a build.** Repeat the
+   R6 flicker run in a dark room: flicker a flashlight at the sensor for about 10 s, end dark, and
+   sample `adb shell settings get system screen_brightness` every ~250 ms for 20 s. It worked if
+   brightness keeps falling for a few seconds after the flicker stops and ends at the dark level,
+   not at the 42 lx level (32/255) the last run held, and Live Debug's Light Sensor card shows a
+   last cycle of `SETTLED` or `APPLIED` with a non-zero "settling" count when the sensor went
+   quiet (DC-070).
 
-- **[2026-09-24] Reopen R7, the settling path, before the R8 close-out?** On the OnePlus 13 in
-  a dark room, after a flashlight flicker ending dark, one cycle smoothed only from the flicker's
-  level to 42 lx (and to 100 lx in a second run), so the screen stayed at the brightness for
-  42 lx (32/255) in the dark; every later 0 lx reading is inside the 0.0–0.0 band, so nothing
-  moves it again. That is R7's reopen condition in the plan: a completed cycle short of its
-  target with no later reading admitted. Options: (a) reopen R7 now, with its Tasker check
-  first (the plan's Q2), and hold R8 until it lands; (b) close the train with R8 and keep R7
-  for a later release; (c) accept the behaviour. **Recommendation: (a)** — it is the stall
-  #132 describes, it now reproduces on demand in about 15 s, and R6 cannot fix it alone.
+Open questions: none.
 
 **This train is `1.11.0` on vc25, its ONE bump (owner, 2026-09-22).** `1.10.1` never shipped, so
 DC-057's new capability made the same vc25 a minor. Land further user-facing fixes by editing
@@ -129,62 +127,22 @@ something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-09-24 — **Light stalls R6 (DC-069), with its rule review:** a light reading that arrives
-  during a cycle or its cooldown now waits in one pending slot, replaced by any newer one, and is
-  applied once the cycle and cooldown end, so the last reading of a change is no longer lost; the
-  concurrency invariant in `AGENTS.md` changed with it. Both entry tests failed on the old code
-  (`expected:<5000.0> but was:<10.0>`). The Light Sensor card adds deferred and replaced counts;
-  the brightness line in `25.txt` now names the fix. **Device check passed** the same day on the
-  OnePlus 13 (debug build of `938058a`, dark room, a flashlight flickered at the sensor for
-  10 s): ending dark, ending on the steady light and ending dark again, the last reading was
-  evaluated with no further callback, brightness then held flat, and the counters balanced
-  (e.g. 839 = 86 admitted + 568 rejected + 185 replaced). The same runs reproduced F-B twice:
-  see the open question on R7.
+- 2026-09-25 — **Light stalls R7 (DC-070, DC-071), with its rule review:** the owner reopened R7 on R6's
+  dark-room trace and revised its endpoint to "smoothed lux inside the stored band", not the
+  exact target. The Tasker check found AAB stalls the same way on prof760 (only task618's
+  snaps on wake, saves, resume and profile switches clear it). Repeating the reading cannot
+  finish a drop, since α reaches 0 above the band, so a stalled or 20th settling step lands on the
+  band's edge; a sensor gone silent is continued from the latest admitted reading through R6's
+  slot. The `AGENTS.md` invariant and the `25.txt` brightness line changed with it. Device check
+  is owner-queue item 5.
 
-- 2026-09-24 — **Owner queue item 5 done (DC-066):** the owner ran the dark-wake test on a build
-  with the Light Sensor card (OnePlus 13, screen off 3 min). The wake was healthy: WAKE
-  registration, first event 0.0 lx within 2 s, about 4 events a second, and no MUTEX or COOLDOWN
-  drop. One clean run of an intermittent failure, so H2 stays open; the detail is under the plan's
-  H2.
-
-- 2026-09-24 — **Light stalls R4 (DC-068):** a running service in steady light no longer shows as
-  stopped 5 s after its task is swiped away; live state is now cleared by service-instance
-  ownership, and a predecessor's timer cannot cut a successor's grace. The entry test was red on
-  the old code. On the OnePlus 13, R4's and R2's device checks passed, but R4's cannot
-  discriminate: a sensor reporting about 4 times a second never stops publishing. No changelog
-  line: `25.txt` is at its cap and the defect was never seen in the field.
-
-- 2026-09-24 — **Light stalls R2 (DC-067):** the light sensor registers only once settings have
-  loaded, so the reading it sends on registration after a service start is evaluated instead of
-  dropped as SETTINGS_NOT_LOADED; a `stop()` that lands mid-start leaves no listener. JVM tests
-  only; no device check was run. Also fixed: R1's repeated-start service test, which failed CI at
-  `e0cd4c1` because it waited for a brightness that any reapply recomputes; it now waits for the
-  curve's own target.
-
-- 2026-09-24 — **Light stalls R3 (DC-066):** Live Debug's new "Light Sensor" card shows the last
-  raw callback, each registration and its first event, received/admitted/rejected with the last
-  reason and trust setting, and the cycle stage and last result. Pipeline behaviour is unchanged.
-  **Device check, daylight only,** at 14:58 on the OnePlus 13, on a debug build of this tree: the
-  card rendered, callbacks matched received (#321 / 321), admitted plus rejected summed to received,
-  accuracy read 3 with trust off, and the sensor-to-callback lag was 172–230 ms. MUTEX and COOLDOWN
-  were not caught as the last reason. The dark-wake test stays owner-queue item 5.
-
-- 2026-09-24 — **Light stalls R1 (DC-065):** a start command reaching a running service, such as
-  every settings save or the 15-minute worker, now posts the live `Lux … → brightness …`
-  notification (paused title and Resume kept) instead of "Monitoring ambient light". **Device
-  check passed** the same day on the OnePlus 13 (debug build of `a50e935`): three REAPPLYs in
-  steady light kept `Lux 3532 → brightness 137`, and one more rebuilt the notification (`when`
-  moved) with `Lux 3563 → brightness 138` unchanged, where the release build had switched to
-  "Monitoring"; the owner-queue item is closed.
-
-- 2026-09-24 — **F-G closed as a parity restore (DC-064):** proximity near damps only the
-  reported α, as in Tasker; smoothing, mapping and animation stay undamped. The oracle was already
-  right; `LightCycleParityTest` now replays it near, and the test that pinned the old damp is
-  replaced.
-- 2026-09-24 — **Light stalls: plan re-scoped (R6 in, R7 deferred, RF dropped, as AOSP reports
-  light as high accuracy) and R5 landed (DC-063):** a return to the previous light level is no
-  longer ignored; the oracle `TaskerReference.lightCycle` is an addition, and no existing oracle or
-  vector changed.
+- 2026-09-24 — **Light stalls R1–R6 and F-G (DC-063…DC-069):** R5 restored Tasker's dead band
+  (act19, band on the current reading); F-G made proximity damp only the reported α; R1 stopped
+  start commands posting "Monitoring"; R3 added Live Debug's Light Sensor card; R2 registers the
+  sensor after settings load; R4 clears live state by service ownership; R6 holds the newest busy
+  reading in one slot (rule review, `AGENTS.md` invariant). Device checks on the OnePlus 13 passed
+  for R1, R3 (daylight and dark wake: H2 stays open), R2, R4 (non-discriminating) and R6; R6's
+  flicker run reproduced F-B twice, which reopened R7. Detail: the rows and the plan.
 - 2026-09-23 — **Light-stall plan (R0), reviewed and rescoped;** a false override pause on unlock
   diagnosed, not fixed (DC-059…DC-062).
 - 2026-09-18..22 — **Night Light: snowball closed, anchor on the device's own Kelvin (DC-055,

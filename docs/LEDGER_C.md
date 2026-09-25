@@ -969,3 +969,34 @@
   against the old band, to the cycle's start, and a tick queued behind a ScreenOff no longer runs
   after hibernate (DC-067's first race). Ending on the final light's target needs the deferred settling path, which no test
   asserts.
+  Settling path added by DC-070.
+
+- DC-070 [cited]: **A light transition the adaptive α leaves short now settles into the dead band
+  around the reading, with or without further callbacks (2026-09-25, Tideo #132, F-B; owner, Q2
+  with its endpoint revised from the exact target to smoothed lux inside the stored band).**
+  Repeating the reading cannot get there: task535's α reaches 0 at `S* = (R + p)/(1 − p)`, above a
+  drop's band by about `d(1 + Rd)/(1 − d)` (below a rise's when `Rd < 1`), so at the default
+  `DeltaFactor` 204 of 352 grid transitions stranded, 42 → 0 lx at 0.43; a settling step (an
+  unchanged reading while smoothed lux is outside the band) that ends outside without moving
+  strictly closer, or the 20th, lands on the nearest edge of that step's band stretched to hold the
+  reading (`settlingPlacement`, `settledRange`, outcome `SETTLED`), and every progressing step stays
+  Tasker's. The runtime bypasses prof760's dead band while unsettled, and after each event with
+  R6's slot empty offers the latest reading its sensor session admitted as a marked continuation
+  that a real reading replaces, which pause, override, screen-off and stop clear, and which counts
+  only as "settling" on the Light Sensor card; between cycles `drain` refuses a held reading the
+  current band refuses rather than arming a cooldown, so no timer outlives completion. Completion
+  is judged on smoothed lux, so the PWM floor and super dimming settle on the perceived target
+  (D-050, D-109), and 20 steps (each at most a cycle plus a cooldown) bound it where the stall rule
+  alone took up to 287 at `DeltaFactor` 0.1. Sol's design review added the stretched range (0.15 lx
+  gets task546's `0`–`0.1`), the drain refusal and the session scope; each protection is
+  mutation-checked, and the `AGENTS.md` invariant records the departure.
+- DC-071: **Tasker has no settling path: AAB stalls on prof760 exactly as Tideo did before DC-070
+  (2026-09-25, XML check for Q2).** task546 centres both calls on `%AAB_LastRawLux`, act20 and act35
+  passing the reading and the new smoothed lux as `par1`, which pick only the `< 0.2` case and the
+  rounding; prof760 refuses an in-band repeat before task554 runs, and task90's call of task544
+  with `par1 = %SmoothedLux` (prof758, L41222) cannot move smoothed lux. The only other writer is
+  task618, which snaps smoothed lux to a fresh sensor read on wake, the QS toggle, the three Save
+  buttons, Resume, the dimming toggle, a profile load and a context profile switch, where Tideo's
+  non-wake equivalents re-map the stored value instead (parity_gaps gap-08's open task618 item).
+  Why AAB seemed unaffected is unverified: those snaps, `MinBright` 10 hiding a residual under
+  4 lx, or sensor jitter escaping a zero-width band at 0 lx.

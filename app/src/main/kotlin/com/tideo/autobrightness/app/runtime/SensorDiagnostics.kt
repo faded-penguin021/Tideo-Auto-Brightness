@@ -15,7 +15,17 @@ enum class RegistrationCause { START, WAKE }
 
 enum class CycleStage { CLAIMED, EVALUATE, ANIMATE }
 
-enum class CycleResult { APPLIED, UNCHANGED, DEAD_BAND_STOP, OVERRIDDEN, ABORTED }
+enum class CycleResult {
+    APPLIED, UNCHANGED, SETTLED, DEAD_BAND_STOP, OVERRIDDEN, ABORTED;
+
+    companion object {
+        fun of(settled: Boolean, brightnessChanged: Boolean) = when {
+            settled -> SETTLED
+            brightnessChanged -> APPLIED
+            else -> UNCHANGED
+        }
+    }
+}
 
 data class SensorCallback(
     val lux: Double,
@@ -79,6 +89,7 @@ data class SensorDiagnostics(
     val rejected: Int = 0,
     val deferred: Int = 0,
     val replaced: Int = 0,
+    val settling: Int = 0,
     val lastRejection: SampleRejectionRecord? = null,
     val cycle: CycleProgress? = null,
     val lastCycle: CompletedCycle? = null,
@@ -103,16 +114,22 @@ data class SensorDiagnostics(
 
     private fun owns(claim: Int) = cycle?.claim == claim
 
-    fun cycleRejected(reason: SampleRejection, atMs: Long, trustUnreliable: Boolean?, claim: Int) =
-        if (!owns(claim)) this else rejected(reason, atMs, trustUnreliable).copy(cycle = null)
+    fun cycleRejected(reason: SampleRejection, atMs: Long, trustUnreliable: Boolean?, claim: Int, counted: Boolean = true) = when {
+        !owns(claim) -> this
+        counted -> rejected(reason, atMs, trustUnreliable).copy(cycle = null)
+        else -> copy(cycle = null)
+    }
 
     fun cycleDeferred(claim: Int, replaced: Boolean) =
         if (!owns(claim)) this else copy(cycle = null, deferred = deferred + 1).replacing(replaced)
 
     fun abandoned(claim: Int) = if (!owns(claim)) this else copy(cycle = null)
 
-    fun admitted(claim: Int) =
-        if (!owns(claim)) this else copy(admitted = admitted + 1).stage(CycleStage.EVALUATE, claim)
+    fun admitted(claim: Int, continuation: Boolean = false) = when {
+        !owns(claim) -> this
+        continuation -> copy(settling = settling + 1).stage(CycleStage.EVALUATE, claim)
+        else -> copy(admitted = admitted + 1).stage(CycleStage.EVALUATE, claim)
+    }
 
     fun stage(stage: CycleStage, claim: Int) = if (!owns(claim)) this else copy(cycle = cycle?.copy(stage = stage))
 

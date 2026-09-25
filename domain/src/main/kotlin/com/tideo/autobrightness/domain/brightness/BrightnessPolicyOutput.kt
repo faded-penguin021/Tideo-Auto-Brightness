@@ -1,7 +1,7 @@
 package com.tideo.autobrightness.domain.brightness
 
-/** Which task544 path a reading took: act10–17, act19–23, or act25–35. */
-enum class EvaluationOutcome { FIRST_RUN, DEAD_BAND_STOP, SMOOTHED }
+/** Which task544 path a reading took: act10–17, act19–23, act25–35, or a settling placement (no Tasker path). */
+enum class EvaluationOutcome { FIRST_RUN, DEAD_BAND_STOP, SMOOTHED, SETTLED }
 
 data class BrightnessPolicyOutput(
     val targetBrightness: Int,

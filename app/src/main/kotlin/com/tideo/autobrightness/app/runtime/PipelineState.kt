@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.runtime
 
+import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 
 /** Which detector saw the change (DC-007) — the two paths are otherwise indistinguishable. */
@@ -70,7 +71,21 @@ data class PipelineState(
     // S12.9d: drives Dashboard staleness gate (FRESH/AGING/STALE).
     val lastPublishMs: Long? = null,
     val sensor: SensorDiagnostics = SensorDiagnostics(),
-)
+    val settlingSteps: Int = 0,
+) {
+    /** DC-070: smoothed lux lies outside the stored band, so an unchanged reading stays eligible. */
+    val unsettled: Boolean
+        get() {
+            val band = (threshAbsLow ?: return false) to (threshAbsHigh ?: return false)
+            return (smoothedLux ?: return false) !in BrightnessEngine.settledRange(band, lastRawLux ?: return false)
+        }
+
+    fun unchanged(lux: Double): Boolean {
+        val low = threshAbsLow ?: return false
+        val high = threshAbsHigh ?: return false
+        return lux in low..high || lastRawLux?.let { kotlin.math.abs(lux - it) <= 0.0005 } == true
+    }
+}
 
 /** Events serialized through the single pipeline consumer (one runs to completion, D-027). */
 sealed interface PipelineEvent {

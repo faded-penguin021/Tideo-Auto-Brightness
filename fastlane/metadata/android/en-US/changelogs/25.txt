@@ -4,5 +4,5 @@ Fixes:
 - circadian Night Light anchoring to 2850 K, not your temperature
 - "device default" Night Light drifting warmer each off/on cycle
 - backup and restore, broken since 1.8.2
-- brightness missing the first reading, the last of a fast change or a return to an earlier level and slowing with proximity covered
+- brightness stalling after a drop, missing a first or last reading or a return to an old level, and slowing with proximity covered
 - the notification reverting to "Monitoring ambient light"

@@ -227,6 +227,14 @@ often violated during maintenance:
   against the gates then current, dead band included, once the cycle and cooldown end. A pending
   reading never runs ahead of a control event queued before it arrived, and screen-off, pause and
   stop discard it. Tasker drops such a reading; this departure is DC-069, amending D-027(d).
+  While smoothed lux lies outside the stored band (stretched to hold the reading it is centred
+  on), the dead band does not refuse an unchanged reading, and after an event that leaves the slot
+  empty while the pipeline runs awake and unpaused, the latest reading that sensor session
+  admitted is put back in it as a marked continuation, so settling finishes on a sensor gone
+  silent. A real reading replaces the
+  continuation, it is never counted as a callback, and nothing refills it once smoothed lux is
+  inside the band. A settling step that stalls, or the twentieth, places smoothed lux on the
+  nearest edge. Tasker has no settling path; this departure is DC-070 (DC-071).
 - Profile gates are hardcoded Kotlin booleans with provenance and a truth-table test. There is no
   generic `ConditionList` evaluator. For `ConditionList`, And binds more tightly than Or, then And2
   and Or2 join from left to right. XML children are alphabetical, so sort them numerically before

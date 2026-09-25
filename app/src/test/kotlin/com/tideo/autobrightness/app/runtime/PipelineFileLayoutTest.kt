@@ -39,9 +39,9 @@ class PipelineFileLayoutTest {
 
     @Test
     fun extractedFilesDoNotReBloat() {
-        // Ceilings sized just above the current footprint so a meaningful re-bloat trips the guard (DC-066: +2 wiring).
+        // Ceilings sized just above the current footprint so a meaningful re-bloat trips the guard (DC-066 +2, DC-070 +3 wiring).
         mapOf(
-            "PipelineCycleRunner.kt" to 422,
+            "PipelineCycleRunner.kt" to 425,
             "PipelineDebugEmitter.kt" to 90,
             "PanicHandler.kt" to 70,
         ).forEach { (name, cap) ->

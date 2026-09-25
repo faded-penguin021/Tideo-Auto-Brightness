@@ -64,7 +64,7 @@ internal class PipelineCycleRunner(
     }
 
     /** task554 → task544 → task535 → task661: ingest a reading and animate; the caller gates the cooldown. */
-    suspend fun runCycle(rawLux: Double, claim: Int = 0) {
+    suspend fun runCycle(rawLux: Double, claim: Int = 0, continuation: Boolean = false) {
         val settings = settingsProvider().also { ctx.cacheSettings(it) }
         val now = clock()
         val s = ctx.stateValue
@@ -73,12 +73,13 @@ internal class PipelineCycleRunner(
             s.paused -> SampleRejection.PAUSED
             else -> null
         }
-        if (rejection != null) return ctx.update { it.copy(sensor = it.sensor.cycleRejected(rejection, now, settings.trustUnreliableSensor, claim)) }
+        if (rejection != null) return ctx.update { it.copy(sensor = it.sensor.cycleRejected(rejection, now, settings.trustUnreliableSensor, claim, !continuation)) }
 
         val cycleStart = now
-        ctx.update { it.copy(autoRunning = true, sensor = it.sensor.admitted(claim)) }
+        val settlingStep = if (s.unsettled && (continuation || s.unchanged(rawLux))) s.settlingSteps + 1 else 0
+        ctx.update { it.copy(autoRunning = true, sensor = it.sensor.admitted(claim, continuation)) }
         try {
-            val output = engine.evaluate(buildInput(rawLux, settings, s))
+            val output = engine.evaluate(buildInput(rawLux, settings, s).copy(settlingStep = settlingStep))
             // Tasker task544 act20–23: keep the band, write nothing, leave the cooldown anchor alone.
             if (output.outcome == EvaluationOutcome.DEAD_BAND_STOP) {
                 ctx.update {
@@ -88,6 +89,7 @@ internal class PipelineCycleRunner(
                         threshAbsHigh = output.thresholdHigh,
                         threshDynamicPercent = output.threshDynamicPercent,
                         threshDynamic = output.dynamicThreshold,
+                        settlingSteps = settlingStep,
                         sensor = it.sensor.completed(CycleResult.DEAD_BAND_STOP, clock(), claim),
                     )
                 }
@@ -190,7 +192,8 @@ internal class PipelineCycleRunner(
                     animationWaitMs = output.animationWaitMs,
                     throttleMs = throttle.throttleMs,
                     lastUpdateMs = clock(),
-                    sensor = it.sensor.completed(if (brightnessChanged) CycleResult.APPLIED else CycleResult.UNCHANGED, clock(), claim),
+                    settlingSteps = if (output.outcome == EvaluationOutcome.SETTLED) 0 else settlingStep,
+                    sensor = it.sensor.completed(CycleResult.of(output.outcome == EvaluationOutcome.SETTLED, brightnessChanged), clock(), claim),
                 )
             }
         } finally {

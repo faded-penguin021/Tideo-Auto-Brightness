@@ -63,6 +63,9 @@ class PendingReadingsTest {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val p = PendingReadings(scope) { fired++ }
         p.armCooldown(500L)
+        assertFalse(p.coolingDown, "DC-070: nothing held, so no timer")
+        p.offer(p.reading(10.0, 3, p.session))
+        p.armCooldown(500L)
         p.armCooldown(500L)
         assertTrue(p.coolingDown)
         testScheduler.advanceUntilIdle()

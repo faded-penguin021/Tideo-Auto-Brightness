@@ -19,6 +19,9 @@
 > **Re-scoped again by the owner (2026-09-24, §5 Scope)** after four findings were re-verified
 > against `24a02f0`: **R6 joins the train**, R7 stays deferred, and **RF is dropped**, because
 > AOSP reports every light reading as high accuracy, which rules out F-F's mechanism (F-F).
+> **R7 reopened by the owner (2026-09-25)** on R6's device trace, with a revised completion
+> contract: settling ends when smoothed lux is inside the stored dead band, not on the exact
+> target. The Tasker check, the α analysis and the resolved contract are in §5 → R7.
 
 ## 1. Reports and scope
 
@@ -388,7 +391,9 @@ before each log starts.
 
 > **Q1 is active again (owner, 2026-09-24)** because R6 is back in the train (§5, Scope). Its
 > D-027 rule review has not started, so nothing binding has changed yet. **Q2 stays inactive**:
-> R7 is still deferred, and its answer stays on record for a reopening.
+> R7 is still deferred, and its answer stays on record for a reopening. **Q2 is active again
+> (owner, 2026-09-25)** with its endpoint revised: "settle to the target" became "settle into the
+> dead band around the accepted reading" (§5 → R7).
 
 - **Q1 → (b), with a condition.** Keep the newest reading, **as long as Tideo does not chase
   ghosts**, e.g. driving under trees in the sun, where it would respond to bright/dim/bright/dim
@@ -442,7 +447,8 @@ three groups:
    segment's first commit step is a test that fails on the current code, and the fix must turn it
    green. R6 is also new behaviour, so it additionally needs the D-027 rule review and lands after
    R5 so its tests run against the corrected gates.
-3. **New behaviour: deferred.** R7 (finishing partly smoothed transitions). It addresses a
+3. **New behaviour: R7 reopened (owner, 2026-09-25)** on R6's device trace (R7 below). Until then
+   deferred: R7 (finishing partly smoothed transitions). It addresses a
    plausible mechanism, but it is not shown to be necessary for #132, and it adds timing,
    cancellation and state responsibilities. **RF is dropped, not deferred (owner, 2026-09-24):**
    its mechanism cannot occur on an AOSP framework (F-F). Tests can show that R7 meets a chosen
@@ -619,8 +625,8 @@ record is what would expose an OEM framework that differs (F-F).
 
     The flicker run (bright and dim alternating faster than the cooldown for 30 s, then steady)
     asserts these properties throughout, and that its last cycle evaluates the final reading.
-    Ending on the final light's *target* needs R7's settling, which stays deferred, so R6 does not
-    assert it (Sol).
+    Ending on the final light's *target* needs R7's settling, so R6 does not assert it (Sol); R7
+    adds that the run ends settled, smoothed lux inside the final reading's band.
   - **Behaviour:** new readings replace the pending one during initialisation, an active cycle and
     the cooldown. After completion, the newest pending reading is reconsidered against current
     settings and thresholds. During a cooldown, one reconsideration is scheduled for when it
@@ -642,65 +648,122 @@ record is what would expose an OEM framework that differs (F-F).
       hibernation gate (Sol, R2; DC-067).
   - **R3's taxonomy:** a busy or cooldown drop becomes "deferred" when it fills the slot and
     "replaced" when a newer reading supersedes it; R6 states this in its commit.
+- [x] **R7 — F-B, the settling path. Reopened by the owner 2026-09-25; done the same day
+  (DC-070).** Sol's design review (before code) corrected three points folded in below: the
+  settled range must hold the reading where task546's `< 0.2` case or 0-dp rounding leave it out,
+  a held in-band reading must not arm a cooldown after completion, and a continuation belongs to
+  the sensor session that admitted its reading. Reopened on R6's device trace
+  (OnePlus 13, debug build of `938058a`, dark room): after a flashlight flicker ending dark, the
+  last cycle took smoothed lux only to 42.0 (a second run: 100.0) with raw 0.0, α 0.743, target
+  32/255, and the band 0.0–0.0 then rejected every 0 lx reading as DEAD_BAND, so the screen stayed
+  at 42 lx's brightness in the dark. It is new behaviour with no parity source, so it gets its own
+  row and the rule review (it amends the `AGENTS.md` concurrency invariant that DC-069 wrote).
+  - **Tasker check (Q2), verified from the XML (2026-09-25).**
+    - **Where the band is centred.** task546 centres both calls on `%AAB_LastRawLux`, which task554
+      act1 set to the reading. `par1` only picks the `< 0.2` special case (`0`–`0.1`, percent 1)
+      and the 2-vs-0-decimal scale. act20 (the act19 stop) passes `%par1`, the reading; act35
+      passes `%new_smoothed_lux`. Post-R5 Tideo does the same (`BrightnessEngine.evaluate`).
+    - **prof760 (code 2088, light) rejects every reading inside the stored band**, repeats
+      included, before task554 runs. After 42 → 0 the band is `0`–`0` (act35's `par1` is 42), so a
+      0 lx repeat is neither `< 0` nor `> 0`. AAB stalls exactly as Tideo does on this path.
+    - **task90** (prof758, every 2 min inside a dawn or dusk ramp, or when sun data is stale,
+      with scaling on and the screen on) runs task544 with `par1 = %SmoothedLux` (act82, XML
+      L41222). It can stop earlier (act1's running-task guard, the throttle); otherwise
+      `relative_change` is 0, so act19 stops and act20 re-runs Set Thresholds with `par1` =
+      smoothed lux, and with a zero threshold task535 runs on `raw = S`. Either way it cannot move
+      smoothed lux, so it does not continue a transition. Tideo has no port of this call.
+    - **task618 is the only other path that moves `%SmoothedLux`, and it snaps.** Its act8 reads
+      the sensor, act15 sets `SmoothedLux = round2(reading)`, act35 sets `%AAB_LastRawLux`, and
+      it maps the reading. Callers: prof761 wake, the QS toggle (task551), the three Save buttons
+      (task564, task577, task582), Resume After Override (task569), the dimming toggle (task589),
+      `_ProfileManager` (task637), and task43 when a context switches the profile. Tideo matches it
+      only on wake (hibernate nulls the state and the first reading is a first run). A Tideo save,
+      resume or context switch re-maps the stored smoothed lux instead (gap-08's open task618
+      item), so there it re-applies the stall where AAB would have cleared it.
+    - **Why AAB appeared unaffected: hypotheses, none verified.** (a) Frequent task618 snaps from
+      wakes and saves. (b) Defaults hide the residual: with `MinBright` 10 and `Form1A` 5,
+      anything under 4 lx maps to 10, so a stall left at a few lux is invisible; the owner's
+      profile reaches 0. (c) A sensor that jitters escapes a zero-width band, since any reading
+      other than exactly 0 passes `0`–`0`. (d) No trace was ever taken of AAB.
+  - **The completion contract (owner, 2026-09-25).** After the complete mutex cycle and cooldown,
+    a light reading that is unchanged — inside the stored band, or equal to `%AAB_LastRawLux` —
+    stays eligible while smoothed lux is **outside** the stored band `[ThreshAbsLow,
+    ThreshAbsHigh]` (inclusive, as prof760's strict `<`/`>` make it). Once smoothed lux is inside,
+    it stops. Exact equality with the reading, or with its exact target, is not required. The band
+    is the one R5 stores, centred on the latest admitted reading; the act20 `par1` stays the reading.
+  - **Admitting repeats is not enough: α strands smoothed lux outside the band.** task535's α is
+    `1 − exp(−k·(Δ − p))`, `Δ = round3(|raw − S|/(S + 1))`, and `p` is the stored percent/100, so α
+    reaches 0 where `Δ = p`, at `S* = (R + p)/(1 − p)` for a drop. With `p ≈ d`, the band's top
+    `R(1 + d)` lies below `S*` by `d(1 + Rd)/(1 − d)`, so a drop that has not landed inside the
+    band in one step **approaches it from above and never enters**, and rounding (2 dp under
+    Zone1End, 0 dp above) stops it a step or two before `S*`. A rise stalls below the band when
+    `Rd < 1`. (`p` is the previous cycle's rounded percent and `d` is recomputed, so this is the
+    frozen-parameter picture; a large `DeltaFactor` can land a single step inside, Sol.) act19 sits on the same boundary (`Δ < d`) and stops the step
+    first when it does. Measured with defaults (`k` 1.8) by repeating each transition's reading:
+    42 → 0 stops at 0.43 lx (band `0`–`0`), 1000 → 100 at 135 (band 75–125), 5000 → 50 at 68
+    (38–62), 3 → 0.5 at 1.15 (0.35–0.65); over a 16 × 22 grid of start and end lux, 204 of 352
+    transitions strand. Zero is the drop case with `R = 0`: `S* = p/(1 − p)`, 0.43 lx at `p` 0.3.
+  - **The smallest added rule: place smoothed lux on the band edge when a settling step stalls.**
+    A settling step (the cycle starts outside the band and its reading is unchanged) runs the
+    normal engine. If the result is outside the band and the step did not bring smoothed lux
+    strictly closer to the reading (an act19 stop, α ≤ 0, or rounding), smoothed lux is instead
+    set to the nearest edge of the band that step computed, stretched to hold the reading
+    (`settledRange`: 0.15 lx gives task546's `0`–`0.1`, all-zero thresholds at 10.6 lx give
+    `11`–`11`), with the α that lands there
+    (`(S − edge)/(S − R)`, in `(0, 1]`) sizing the animation. Every step that makes progress
+    stays Tasker's formula; the placement moves smoothed lux the least distance that meets the
+    tolerance and never past the reading. At 0 lx the edge is 0 after a smoothing stall (act35's
+    `0`–`0`) and 0.1 after an act19 stop (act20's `0`–`0.1`). The step's band and percent are
+    kept, so the placed value is inside the stored range by construction.
+  - **Duration bound: 20 settling steps per admitted reading**, the 20th placing if still outside,
+    each at most one cycle plus one cooldown (R6's latency). A step at a small α animates a few
+    frames, and its cooldown is that animation. The stall rule alone always ends (smoothed lux
+    moves on a 0.01 or 1 lx grid and strictly toward the reading), but its length depends on
+    `DeltaFactor`: the worst on the grid is 20 steps at the default 1.8 and 287 at 0.1. 20 keeps
+    the default's longest run and caps the rest.
+  - **Behaviour.**
+    - Eligibility: the collector's and the tick's dead-band gate is bypassed while the stored
+      state is unsettled; accuracy, service, pause, the mutex and the cooldown are unchanged.
+      Settling ends the moment smoothed lux is inside the stored band, which is also the only
+      condition that stops refilling.
+    - **Silent sensor:** after any event, while unsettled with the slot empty and the pipeline
+      running, awake and unpaused, the latest reading this sensor session admitted
+      (`%AAB_LastRawLux`) is put in R6's slot as a marked continuation and follows R6's path: its
+      fence, the cooldown timer, the claim and the tick. A real reading replaces it; screen-off,
+      pause, override, stop and a new sensor session clear it; a tick finding it no longer
+      eligible drops it. Between cycles, a held reading the current band refuses is refused at
+      once instead of arming a cooldown. So no timer runs once settled or invalidated. Resume
+      after a pause finishes the settling (AAB's task618 would have snapped instead).
+    - Supersession: a new out-of-band reading is a normal cycle, resets the step count and
+      recentres the band, so settling from then on is toward the new reading only.
+    - Completion is judged on smoothed lux, never on hardware brightness: under the PWM floor and
+      super dimming the cycle writes and dims exactly as a smoothed cycle does (D-050, D-109).
+    - R3's taxonomy: a callback admitted through the bypass counts as admitted, as before. A
+      continuation is not a callback, so it never counts as received, deferred, replaced or
+      rejected; it has its own "settling" count, and the last cycle result shows SETTLED for a
+      placement.
+  - **Tests.** Engine: a drop to 0 and to a non-zero reading, repeated, ends inside the band with a
+    placement, and each progressing step matches the oracle's α; an act19 stop while outside
+    places; the 20th step places; a non-settling input is unchanged (R5's parity rows still pass).
+    Runtime: repeated callbacks and one reading then silence, each to 0 and to non-zero, end
+    settled with the brightness of the final smoothed lux and no timer armed; proximity near;
+    supersession (a bright reading mid-settle, then silence, ends on the bright band and the dark
+    continuation never runs); a queued screen-off, pause, override, stop or session change drops
+    the continuation; the PWM floor and super dimming settle on smoothed lux while the hardware
+    holds the floor; after completion, a repeat of the reading is rejected as DEAD_BAND and
+    nothing is scheduled. "Smoothed reaches raw" is **not** a valid expectation.
 - [ ] **R8 — close-out.** Deleting this plan must not lose the deferred analysis. Write ledger
   rows, none citing this path, for:
   - what shipped;
-  - **open findings, one row each:** F-B, H1 and H2, and F-C too if R6 has not shipped. Each row
-    carries its mechanism, its evidence, and the contract from the Deferred subsection, so that a
-    reopening starts from the analysis rather than from nothing;
+  - **open findings, one row each:** H1 and H2, and F-B too if R7 has not shipped. Each row
+    carries its mechanism and its evidence, so that a reopening starts from the analysis rather
+    than from nothing;
   - **F-F, as ruled out:** the AOSP source facts in its section, why RF was dropped (owner,
     2026-09-24), and the one condition that would reopen it (an OEM framework that R3 shows
     reporting light accuracy ≤ 1);
-  - Q1 as executed by R6, through its own rule-review row. Q2 as answered but inactive, since R7
-    never started, so nothing binding changed.
+  - Q1 as executed by R6 and Q2 as executed by R7, each through its own rule-review row.
 
   Then delete this file.
-
-### Deferred — not in this train (group 3)
-
-Not a checklist item. Reopen it only as the Scope block above says; its contract then becomes a
-segment, re-reviewed against the evidence that reopened it. RF, formerly listed here, was dropped
-on 2026-09-24 (F-F). R8's F-F row keeps what it was and why it went.
-
-- **R7 — F-B, the settling path.** Reopens on a trace showing a completed cycle that left the screen
-  short of its target, with no later reading admitted. **That trace exists since 2026-09-24**
-  (R6's device check, OnePlus 13, debug build of `938058a`, dark room): after a flashlight flicker
-  ending dark, the last cycle took smoothed lux only to 42.0 (a second run: 100.0) with raw 0.0,
-  α 0.743, target 32/255, and the band 0.0–0.0 then rejected every 0 lx reading as DEAD_BAND, so
-  the screen stayed at 42 lx's brightness in the dark. Whether to reopen is the owner's (STATE
-  open question). Q2's answer stands but is inactive (§4), and
-  the Tasker check comes first. Re-derive the
-  continuation on top of R5. act19 gives a defined endpoint only for readings that reach task544,
-  and prof760 keeps an unchanged reading out (F-E item 4). Any continuation is therefore a new
-  policy with its own row, whatever the Tasker check finds. The acceptance criteria below stand
-  either way, and once R7 lands R6's flicker run must also end on the final light's target.
-  - **Behaviour:** separate "has a sufficiently different reading arrived?" from "has the accepted
-    transition finished?". Continuation bypasses both input gates and keeps pause, override,
-    lifecycle and proximity behaviour. It completes when the brightness target for the accepted
-    stable lux is reached. Repeated calls to the adaptive-α formula are not a completion policy.
-  - **Supersession contract (Astra), for the under-trees case:**
-    - a newly accepted reading supersedes whatever remains of the continuation toward the old
-      target. An animation already running may finish under the chosen policy, but all later
-      settling uses the new target, and the old continuation never resumes;
-    - **duration bound:** settling toward one target finishes within a stated bound, which R7 must
-      name and justify before coding;
-    - **terminal state:** on completion, the engine state the next evaluation reads (smoothed lux,
-      stored band, last raw) is consistent with the target reached. A display target reached while
-      smoothing is left behind could make the next cycle move backwards;
-    - **completion is judged on the perceived target, not hardware brightness alone:** under super
-      dimming or the PWM floor (`applyPwmFloor`, D-050), the hardware value does not identify the
-      perceived target (D-109).
-  - **Tests:**
-    - a single drop followed by silence finishes the brightness transition, for a zero and a
-      non-zero destination, and the same with proximity near;
-    - **superseded destination:** darkness starts a transition, bright light arrives before it
-      finishes, then the sensor goes silent. The screen ends on the bright target, and the dark
-      continuation never resumes;
-    - after completion, one more identical evaluation moves nothing (terminal-state consistency);
-    - completion with super dimming engaged and with the PWM floor active;
-    - no timer is left re-evaluating an unchanged result.
-
-    "Smoothed reaches raw within N cooldowns" is **not** a valid expectation.
 
 ## 6. Evidence still wanted from #132 (ask only if the owner chooses to)
 

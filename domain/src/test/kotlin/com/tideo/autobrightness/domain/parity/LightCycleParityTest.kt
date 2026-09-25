@@ -47,6 +47,7 @@ class LightCycleParityTest {
         EvaluationOutcome.FIRST_RUN -> LightCycleOutcome.FIRST_RUN
         EvaluationOutcome.DEAD_BAND_STOP -> LightCycleOutcome.DEAD_BAND_STOP
         EvaluationOutcome.SMOOTHED -> LightCycleOutcome.SMOOTHED
+        EvaluationOutcome.SETTLED -> fail("a replay without settling steps never places (DC-070)")
     }
 
     private fun carried(out: BrightnessPolicyOutput) = PreviousState(
