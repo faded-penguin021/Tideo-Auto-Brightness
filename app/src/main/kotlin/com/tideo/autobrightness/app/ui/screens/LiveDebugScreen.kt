@@ -52,6 +52,8 @@ import com.tideo.autobrightness.app.ui.components.SwitchSettingRow
 import com.tideo.autobrightness.app.ui.components.fmt
 import com.tideo.autobrightness.app.ui.components.fmtAlpha
 import com.tideo.autobrightness.app.ui.components.fmtInt
+import com.tideo.autobrightness.app.ui.components.fmtLux
+import com.tideo.autobrightness.app.ui.components.fmtPercent
 import com.tideo.autobrightness.app.ui.components.goldValue
 
 // %AAB_Debug 10 categories (D-023): verbatim labels from debug_labels string-array (D-131 i18n).
@@ -114,10 +116,10 @@ fun LiveDebugContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             DiagnosticCard("Core Metrics", "debug_core_metrics") {
-                Metric("Smoothed lux", fmt(p.smoothedLux), "debug_smoothed_lux")
-                Metric("Raw lux", fmt(p.lastRawLux), "debug_raw_lux")
-                Metric("Dynamic threshold", fmt(p.threshDynamic), "debug_dynamic_threshold")
-                Metric("Dead zone (lx)", "${fmt(p.threshAbsLow)} – ${fmt(p.threshAbsHigh)}", "debug_dead_zone")
+                Metric("Smoothed lux", fmtLux(p.smoothedLux), "debug_smoothed_lux")
+                Metric("Raw lux", fmtLux(p.lastRawLux), "debug_raw_lux")
+                Metric("Dynamic threshold", fmtPercent(p.threshDynamic), "debug_dynamic_threshold")
+                Metric("Dead zone (lx)", "${fmtLux(p.threshAbsLow)} – ${fmtLux(p.threshAbsHigh)}", "debug_dead_zone")
                 Metric("Current brightness", fmtInt(p.lastAppliedBrightness), "debug_current_bright")
                 Metric("Target brightness", fmtInt(p.targetBrightness), "debug_target_bright")
             }
