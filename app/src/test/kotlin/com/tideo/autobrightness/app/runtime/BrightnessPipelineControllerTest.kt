@@ -1,6 +1,10 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
+import com.tideo.autobrightness.domain.brightness.BrightnessEngine
+import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
+import com.tideo.autobrightness.domain.brightness.TimeContext
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.WriteStatus
@@ -8,16 +12,23 @@ import com.tideo.autobrightness.platform.observe.BrightnessObserver
 import com.tideo.autobrightness.platform.sensor.LightSample
 import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -31,7 +42,8 @@ class BrightnessPipelineControllerTest {
 
     private class FakeSensor : LightSensorSource {
         val flow = MutableSharedFlow<LightSample>(extraBufferCapacity = 16)
-        override fun samples(): Flow<LightSample> = flow
+        override fun samples(onRegistered: (Boolean) -> Unit, onCallback: (LightSample) -> Unit): Flow<LightSample> =
+            flow.onStart { onRegistered(true) }.onEach(onCallback)
     }
 
     private class FakeObserver : BrightnessObserver {
@@ -87,7 +99,7 @@ class BrightnessPipelineControllerTest {
         override fun near(): Flow<Boolean> = flow
     }
 
-    private fun sample(lux: Double, accuracy: Int = 3) = LightSample(lux.toFloat(), accuracy, 0L)
+    private fun sample(lux: Double, accuracy: Int = 3, seq: Int = 0) = LightSample(lux.toFloat(), accuracy, 0L, seq)
 
     // Test settings: trustUnreliable, detectOverrides, no scaling.
     private val settings = AabSettings(
@@ -122,16 +134,23 @@ class BrightnessPipelineControllerTest {
         observer: BrightnessObserver = FakeObserver(),
         clock: () -> Long,
         animationRunner: AnimationRunner = AnimationRunner(brightness),
+        settingsProvider: suspend () -> AabSettings = { settings },
+        callbackLog: SensorCallbackLog = SensorCallbackLog(),
+        debugSink: DebugSink = NoOpDebugSink,
+        dimming: DimmingCoordinator = NoOpDimmingCoordinator,
     ): Pair<BrightnessPipelineController, CoroutineScope> {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val controller = BrightnessPipelineController(
             lightSensor = sensor,
             brightness = brightness,
             brightnessObserver = observer,
-            settingsProvider = { settings },
+            settingsProvider = settingsProvider,
             scope = scope,
             clock = clock,
             animationRunner = animationRunner,
+            callbackLog = callbackLog,
+            debugSink = debugSink,
+            dimming = dimming,
         )
         return controller to scope
     }
@@ -165,50 +184,48 @@ class BrightnessPipelineControllerTest {
     }
 
     @Test
-    fun firstRun_throttleDrop_acceptAfterWindow() = runTest {
+    fun returnToThePreviousLevel_isEvaluated_taskerBandOnCurrentReading() = runTest {
         val sensor = FakeSensor()
-        val brightness = FakeBrightness()
-        var nowMs = 1000L
-        val (controller, scope) = newController(sensor, brightness, clock = { nowMs })
+        var nowMs = 1_000L
+        val pastAnyCooldownMs = 60_000L
+        val (controller, scope) = newController(sensor, FakeBrightness(), clock = { nowMs + testScheduler.currentTime })
         controller.start()
 
-        sensor.flow.emit(sample(lux = 10.0))
-        advanceUntilIdle()
-        assertTrue(brightness.writes.isNotEmpty(), "first run should write a brightness")
-        assertEquals(10.0, controller.state.value.lastRawLux)
-        assertEquals(1000L, controller.state.value.lastAcceptedMs)
-
-        // Throttle drops outside-band reading.
-        sensor.flow.emit(sample(lux = 5000.0))
-        advanceUntilIdle()
-        assertEquals(10.0, controller.state.value.lastRawLux, "throttled tick must not update state")
-        assertEquals(1000L, controller.state.value.lastAcceptedMs)
-
-        // Past throttle window: accepted.
-        nowMs += 2000L
-        sensor.flow.emit(sample(lux = 5000.0))
-        advanceUntilIdle()
-        assertEquals(5000.0, controller.state.value.lastRawLux)
-        assertEquals(3000L, controller.state.value.lastAcceptedMs)
+        for (lux in listOf(100.0, 30.0, 100.0)) {
+            sensor.flow.emit(sample(lux))
+            advanceUntilIdle()
+            assertEquals(lux, controller.state.value.lastRawLux, "the $lux lx reading must be evaluated")
+            nowMs += pastAnyCooldownMs
+        }
         scope.cancel()
     }
 
     @Test
-    fun midCycleSensorEvent_isDropped() = runTest {
+    fun belowTheDynamicThreshold_storesTheBandAndWritesNothing_taskerAct19() = runTest {
         val sensor = FakeSensor()
         val brightness = FakeBrightness()
-        val (controller, scope) = newController(sensor, brightness, clock = { 1000L })
+        var nowMs = 1_000L
+        val pastAnyCooldownMs = 60_000L
+        val (controller, scope) = newController(sensor, brightness, clock = { nowMs + testScheduler.currentTime })
         controller.start()
+        for (lux in listOf(100.0, 30.0)) {
+            sensor.flow.emit(sample(lux))
+            advanceUntilIdle()
+            nowMs += pastAnyCooldownMs
+        }
+        val before = controller.state.value
+        val writesBefore = brightness.writes.size
 
-        sensor.flow.emit(sample(lux = 10.0))
-        assertTrue(brightness.writes.isNotEmpty(), "cycle should have begun writing")
-        assertNull(controller.state.value.lastRawLux, "cycle 1 not yet committed")
-
-        // Mid-cycle reading dropped by %AAB_MainLoop mutex.
-        sensor.flow.emit(sample(lux = 5000.0))
-
+        sensor.flow.emit(sample(45.0))
         advanceUntilIdle()
-        assertEquals(10.0, controller.state.value.lastRawLux)
+
+        val after = controller.state.value
+        assertEquals(45.0, after.lastRawLux)
+        assertTrue(45.0 in after.threshAbsLow!!..after.threshAbsHigh!!, "act20's band is centred on the reading")
+        assertEquals(before.smoothedLux, after.smoothedLux)
+        assertEquals(before.lastAcceptedMs, after.lastAcceptedMs, "the cooldown anchor does not move")
+        assertEquals(before.targetBrightness, after.targetBrightness)
+        assertEquals(writesBefore, brightness.writes.size)
         scope.cancel()
     }
 
@@ -613,11 +630,7 @@ class BrightnessPipelineControllerTest {
         scope.cancel()
     }
 
-    // DB-082, issue #123. Screen-off hibernate nulls smoothedLux AND lastRawLux, so on wake
-    // setInitialBrightness returns at its first line — and armInitialSettle sits BELOW that return,
-    // so the one transition where the framework re-asserts SCREEN_BRIGHTNESS is the one transition
-    // that arms no suppression at all. The stale self-write marker is from before the sleep, so the
-    // framework's wake write reads as external and pauses the pipeline the user never touched.
+    // DB-082 (issue #123): a wake has no lux to re-apply, and must still arm the settle window.
     @Test
     fun frameworkWriteOnWake_isNotAnOverride_DB082() = runTest {
         val brightness = FakeBrightness()
@@ -1018,6 +1031,505 @@ class BrightnessPipelineControllerTest {
         }
     }
 
+    @Test
+    fun everyDeliveredReading_landsInOneCounter_withItsReason_DC066() = runTest {
+        val sensor = FakeSensor()
+        val instant = settings.copy(debugLevel = DebugCategory.SKIP_ANIMATIONS.level)
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime }, settingsProvider = { instant },
+        )
+        controller.start()
+
+        sensor.flow.emit(sample(10.0))
+        sensor.flow.emit(sample(5_000.0))
+        sensor.flow.emit(sample(6_000.0))
+        var d = controller.state.value.sensor
+        assertEquals(listOf(3, 1, 0, 2, 1), listOf(d.received, d.admitted, d.rejected, d.deferred, d.replaced))
+        assertNull(d.lastRejection, "a cooldown holds a reading back rather than rejecting it (DC-069)")
+        assertNull(d.cycle, "a deferred reading leaves no cycle behind")
+        assertEquals(CycleResult.APPLIED, d.lastCycle?.result)
+
+        advanceUntilIdle()
+        sensor.flow.emit(sample(6_000.0))
+        d = controller.state.value.sensor
+        assertEquals(listOf(4, 2, 1, 2, 1), listOf(d.received, d.admitted, d.rejected, d.deferred, d.replaced))
+        assertEquals(SampleRejection.DEAD_BAND, d.lastRejection?.reason)
+        scope.cancel()
+    }
+
+    @Test
+    fun midCycleReading_isDeferred_andKeepsTheRunningCycle_DC069() = runTest {
+        val sensor = FakeSensor()
+        val (controller, scope) =
+            newController(sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime })
+        controller.start()
+
+        sensor.flow.emit(sample(10.0))
+        sensor.flow.emit(sample(5_000.0))
+        val during = controller.state.value.sensor
+        assertNull(during.lastRejection, "a mid-cycle reading is held, not rejected as MUTEX")
+        assertEquals(1, during.deferred)
+        assertEquals(CycleStage.ANIMATE, during.cycle?.stage, "the deferral must not erase the cycle in flight")
+        assertEquals(1_000L, during.cycle?.startMs)
+
+        advanceUntilIdle()
+        val after = controller.state.value.sensor
+        assertNull(after.cycle)
+        assertEquals(CycleResult.APPLIED, after.lastCycle?.result)
+        assertEquals(listOf(2, 2, 0), listOf(after.received, after.admitted, after.rejected))
+        scope.cancel()
+    }
+
+    @Test
+    fun lowAccuracy_isRejectedAsACCURACY_whenTrustIsOff_DC066() = runTest {
+        val sensor = FakeSensor()
+        val untrusting = settings.copy(trustUnreliableSensor = false)
+        val (controller, scope) =
+            newController(sensor, FakeBrightness(), clock = { 1_000L }, settingsProvider = { untrusting })
+        controller.start()
+
+        sensor.flow.emit(sample(10.0, accuracy = 1))
+        advanceUntilIdle()
+        assertEquals(
+            SampleRejectionRecord(SampleRejection.ACCURACY, 1_000L, trustUnreliable = false),
+            controller.state.value.sensor.lastRejection,
+            "the trust setting in effect is part of the record (plan §5 attribution)",
+        )
+        assertEquals(0, controller.state.value.sensor.admitted)
+        scope.cancel()
+    }
+
+    @Test
+    fun pausedAndDisabled_eachNameTheirReason_DC066() = runTest {
+        val sensor = FakeSensor()
+        var current = settings
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L }, settingsProvider = { current },
+        )
+        controller.start()
+        advanceUntilIdle()
+        controller.pause()
+        advanceUntilIdle()
+        sensor.flow.emit(sample(10.0))
+        advanceUntilIdle()
+        assertEquals(SampleRejection.PAUSED, controller.state.value.sensor.lastRejection?.reason)
+
+        controller.resume()
+        advanceUntilIdle()
+        current = settings.copy(serviceEnabled = false)
+        sensor.flow.emit(sample(10.0))
+        advanceUntilIdle()
+        assertEquals(SampleRejection.SERVICE_DISABLED, controller.state.value.sensor.lastRejection?.reason)
+        assertEquals(2, controller.state.value.sensor.rejected)
+        scope.cancel()
+    }
+
+    @Test
+    fun act19Stop_isTheLastCyclesResult_DC066() = runTest {
+        val sensor = FakeSensor()
+        var nowMs = 1_000L
+        val (controller, scope) = newController(sensor, FakeBrightness(), clock = { nowMs + testScheduler.currentTime })
+        controller.start()
+        for (lux in listOf(100.0, 30.0, 45.0)) {
+            sensor.flow.emit(sample(lux))
+            advanceUntilIdle()
+            nowMs += 60_000L
+        }
+        val d = controller.state.value.sensor
+        assertEquals(CycleResult.DEAD_BAND_STOP, d.lastCycle?.result)
+        assertEquals(3, d.admitted)
+        scope.cancel()
+    }
+
+    @Test
+    fun eachRegistration_recordsItsCause_andItsFirstCallback_DC066() = runTest {
+        val sensor = FakeSensor()
+        val log = SensorCallbackLog()
+        var offsetMs = 1_000L
+        val (controller, scope) =
+            newController(sensor, FakeBrightness(), clock = { offsetMs + testScheduler.currentTime }, callbackLog = log)
+        controller.start()
+        assertEquals(RegistrationCause.START, log.state.value.cause)
+        assertEquals(true, log.state.value.listenerRegistered)
+        assertNull(log.state.value.first)
+
+        sensor.flow.emit(sample(10.0, seq = 1))
+        sensor.flow.emit(sample(20.0, seq = 2))
+        advanceUntilIdle()
+        assertEquals(10.0, log.state.value.first?.lux)
+        assertEquals(20.0, log.state.value.last?.lux)
+
+        controller.onScreenOff()
+        advanceUntilIdle()
+        offsetMs = 9_000L - testScheduler.currentTime
+        controller.onScreenOn()
+        advanceUntilIdle()
+        assertEquals(RegistrationCause.WAKE, log.state.value.cause)
+        assertEquals(9_000L, log.state.value.registeredAtMs)
+        assertNull(log.state.value.first, "no event has arrived since the wake")
+        assertEquals(20.0, log.state.value.last?.lux, "the last callback survives, stamped before the wake")
+        assertEquals(0, controller.state.value.sensor.received, "counters are per registration")
+
+        sensor.flow.emit(sample(0.0, accuracy = 3, seq = 1))
+        advanceUntilIdle()
+        assertEquals(SensorCallback(0.0, 3, 1, 0L, 0L, 9_000L), log.state.value.first)
+        scope.cancel()
+    }
+
+    private class EmitOnRegisterSensor(private val initial: LightSample) : LightSensorSource {
+        var registrations = 0
+        override fun samples(onRegistered: (Boolean) -> Unit, onCallback: (LightSample) -> Unit): Flow<LightSample> =
+            flow {
+                registrations++
+                onRegistered(true)
+                emit(initial)
+                awaitCancellation()
+            }.onEach(onCallback)
+    }
+
+    @Test
+    fun theReadingEmittedOnRegistration_isEvaluated_whenSettingsLoadLate_DC067() = runTest {
+        val sensor = EmitOnRegisterSensor(sample(100.0, seq = 1))
+        val brightness = FakeBrightness()
+        val gate = CompletableDeferred<AabSettings>()
+        val (controller, scope) =
+            newController(sensor, brightness, clock = { 1_000L }, settingsProvider = { gate.await() })
+        controller.start()
+        gate.complete(settings)
+        advanceUntilIdle()
+
+        val d = controller.state.value.sensor
+        assertNull(d.lastRejection, "the start's first reading must not be dropped as SETTINGS_NOT_LOADED")
+        assertEquals(1, d.admitted)
+        assertEquals(100.0, controller.state.value.lastRawLux)
+        assertTrue(brightness.writes.isNotEmpty(), "the first reading must reach the screen")
+        scope.cancel()
+    }
+
+    @Test
+    fun theSensorRegisters_onlyAfterSettingsResolve_DC067() = runTest {
+        val sensor = EmitOnRegisterSensor(sample(100.0, seq = 1))
+        val log = SensorCallbackLog()
+        val gate = CompletableDeferred<AabSettings>()
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L }, settingsProvider = { gate.await() }, callbackLog = log,
+        )
+        controller.start()
+        assertEquals(0, sensor.registrations)
+        assertNull(log.state.value.cause)
+        assertEquals(0, controller.state.value.sensor.received)
+
+        gate.complete(settings)
+        advanceUntilIdle()
+        assertEquals(1, sensor.registrations)
+        assertEquals(RegistrationCause.START, log.state.value.cause)
+        assertEquals(1, controller.state.value.sensor.received)
+        scope.cancel()
+    }
+
+    @Test
+    fun aStopLandingBetweenSettingsLoadAndRegistration_registersNothing_DC067() = runTest {
+        val sensor = EmitOnRegisterSensor(sample(100.0, seq = 1))
+        val log = SensorCallbackLog()
+        lateinit var controller: BrightnessPipelineController
+        val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
+        controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = FakeBrightness(), brightnessObserver = FakeObserver(),
+            settingsProvider = { controller.stop(); settings }, scope = scope, clock = { 1_000L }, callbackLog = log,
+        )
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals(0, sensor.registrations, "a stopped service must not be left holding the light sensor")
+        assertNull(log.state.value.cause)
+        scope.cancel()
+    }
+
+    @Test
+    fun aFinalReadingDuringTheAnimation_isEvaluatedWithNoFurtherCallback_DC069() = runTest {
+        val sensor = FakeSensor()
+        val (controller, scope) =
+            newController(sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime })
+        controller.start()
+        sensor.flow.emit(sample(10.0))
+        assertEquals(CycleStage.ANIMATE, controller.state.value.sensor.cycle?.stage)
+
+        sensor.flow.emit(sample(5_000.0))
+        advanceUntilIdle()
+
+        assertEquals(5_000.0, controller.state.value.lastRawLux, "the final reading must be evaluated")
+        scope.cancel()
+    }
+
+    @Test
+    fun aFinalReadingDuringTheCooldown_isEvaluatedWhenItExpires_DC069() = runTest {
+        val sensor = FakeSensor()
+        val instant = settings.copy(debugLevel = DebugCategory.SKIP_ANIMATIONS.level)
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime }, settingsProvider = { instant },
+        )
+        controller.start()
+        sensor.flow.emit(sample(10.0))
+        val cooldownMs = controller.state.value.throttleMs!!
+        assertTrue(cooldownMs > 0, "the first cycle must leave a cooldown")
+
+        sensor.flow.emit(sample(5_000.0))
+        assertEquals(10.0, controller.state.value.lastRawLux, "no cycle starts inside the cooldown")
+        advanceUntilIdle()
+
+        val s = controller.state.value
+        assertEquals(5_000.0, s.lastRawLux, "the final reading must be evaluated once the cooldown ends")
+        assertEquals(1_000L + cooldownMs, s.lastAcceptedMs)
+        scope.cancel()
+    }
+
+    private class EvalTrace(private val now: () -> Long) : DebugSink {
+        data class Eval(val lux: Double, val atMs: Long)
+        val evals = mutableListOf<Eval>()
+        var onEval: (Eval) -> Unit = {}
+        val luxes: List<Double> get() = evals.map { it.lux }
+        override fun emit(category: DebugCategory, activeLevel: Int, message: () -> String) {
+            if (category != DebugCategory.LIGHT_EVAL) return
+            val lux = message().substringAfter("lux ").substringBefore("→").toDouble()
+            Eval(lux, now()).also { evals += it; onEval(it) }
+        }
+    }
+
+    @Test
+    fun oneSlot_aNewerReadingReplacesIt_andNothingQueues_DC069() = runTest {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime }, debugSink = trace,
+        )
+        controller.start()
+        sensor.flow.emit(sample(10.0))
+        for (lux in listOf(1_000.0, 2_000.0, 3_000.0)) sensor.flow.emit(sample(lux))
+        advanceUntilIdle()
+
+        assertEquals(listOf(10.0, 3_000.0), trace.luxes, "only the newest held reading runs, and once")
+        val d = controller.state.value.sensor
+        assertEquals(listOf(4, 2, 0, 3, 2), listOf(d.received, d.admitted, d.rejected, d.deferred, d.replaced))
+        scope.cancel()
+    }
+
+    @Test
+    fun flickerFasterThanTheCooldown_chasesNoGhosts_andEvaluatesTheFinalReading_DC069() = runTest {
+        val sensor = FakeSensor()
+        val clock = { 1_000L + testScheduler.currentTime }
+        val trace = EvalTrace(clock)
+        val (controller, scope) = newController(sensor, FakeBrightness(), clock = clock, debugSink = trace)
+        var newest = Double.NaN
+        val violations = mutableListOf<String>()
+        trace.onEval = { e ->
+            val s = controller.state.value
+            if (kotlin.math.abs(e.lux - newest) > 1e-3) violations += "${e.lux} ran while $newest was newest"
+            val since = s.lastAcceptedMs?.let { e.atMs - it }
+            if (since != null && since < s.throttleMs!!) violations += "${e.lux} ran ${since}ms into a ${s.throttleMs}ms cooldown"
+        }
+        controller.start()
+
+        repeat(300) { i ->
+            newest = if (i % 2 == 0) 2_000.0 + i else 5.0 + i / 1_000.0
+            sensor.flow.emit(sample(newest))
+            advanceTimeBy(100L)
+        }
+        newest = 400.0
+        val steadyAt = clock()
+        sensor.flow.emit(sample(newest))
+        advanceUntilIdle()
+
+        assertEquals(emptyList(), violations)
+        val reached = trace.luxes.indexOf(400.0)
+        val flicker = trace.luxes.take(reached + 1)
+        assertEquals(flicker.distinct(), flicker, "no reading is evaluated twice")
+        assertTrue(trace.luxes.drop(reached).all { it == 400.0 }, "DC-070: only the final reading is settled toward")
+        assertTrue(trace.evals.size < 150, "cycles are paced by the cooldown, not by the readings: ${trace.evals.size}")
+        val s = controller.state.value
+        assertEquals(s.sensor.admitted + s.sensor.settling, trace.evals.size, "no admitted cycle hid in an act19 stop")
+        assertFalse(s.unsettled, "DC-070: the run ends settled into the final reading's band")
+        val boundMs = 2 * (settings.animSteps.toLong() * settings.maxWaitMs + 10L)
+        assertTrue(trace.evals[reached].atMs - steadyAt <= boundMs, "within one cycle plus one cooldown")
+        scope.cancel()
+    }
+
+    @Test
+    fun aReturnIntoTheBand_supersedesAHeldExcursion_soNoGhostRuns_DC069() = runTest {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val instant = settings.copy(debugLevel = DebugCategory.SKIP_ANIMATIONS.level)
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime },
+            settingsProvider = { instant }, debugSink = trace,
+        )
+        controller.start()
+        sensor.flow.emit(sample(100.0))
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(1_000.0))
+        sensor.flow.emit(sample(10.0))
+        sensor.flow.emit(sample(1_001.0))
+        advanceUntilIdle()
+
+        assertEquals(listOf(100.0, 1_000.0), trace.luxes, "the light came back before the cooldown ended")
+        val d = controller.state.value.sensor
+        assertEquals(1, d.replaced)
+        assertEquals(SampleRejection.DEAD_BAND, d.lastRejection?.reason, "1 001 lx is judged against the new band")
+        scope.cancel()
+    }
+
+    @Test
+    fun aReturnDuringTheAnimation_isJudgedAgainstTheNewBand_notTheOld_DC069() = runTest {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime }, debugSink = trace,
+        )
+        controller.start()
+        for (lux in listOf(10.0, 100.0)) {
+            sensor.flow.emit(sample(lux))
+            advanceUntilIdle()
+            advanceTimeBy(60_000L)
+        }
+        sensor.flow.emit(sample(1_000.0))
+        assertEquals(CycleStage.ANIMATE, controller.state.value.sensor.cycle?.stage)
+        sensor.flow.emit(sample(100.0))
+        advanceUntilIdle()
+
+        assertEquals(listOf(10.0, 100.0, 1_000.0, 100.0), trace.luxes.take(4), "100 lx is outside 1 000 lx's band")
+        assertTrue(trace.luxes.drop(4).all { it == 100.0 }, "DC-070: then settles toward 100 lx only")
+        scope.cancel()
+    }
+
+    private class HoldingAnimationRunner(
+        private val brightness: ScreenBrightnessController,
+        private val holdMs: Long = 1_000L,
+    ) : AnimationRunner(brightness) {
+        override suspend fun animate(from: Int, to: Int, steps: Int, waitMs: Long, detectOverrides: Boolean): AnimationOutcome {
+            kotlinx.coroutines.delay(holdMs)
+            val landed = brightness.write(to)
+            return AnimationOutcome.Completed(lastAcknowledged = landed, lastResult = landed)
+        }
+    }
+
+    private suspend fun TestScope.heldReadingAfter(
+        resumeAfterwards: Boolean = false,
+        control: (BrightnessPipelineController, FakeBrightness) -> Unit,
+    ): Pair<List<Double>, PipelineState> {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope) = newController(
+            sensor, brightness, clock = { 1_000L + testScheduler.currentTime },
+            animationRunner = HoldingAnimationRunner(brightness), debugSink = trace,
+        )
+        controller.start()
+        sensor.flow.emit(sample(10.0))
+        sensor.flow.emit(sample(5_000.0))
+        assertEquals(1, controller.state.value.sensor.deferred)
+        control(controller, brightness)
+        advanceUntilIdle()
+        val state = controller.state.value
+        if (resumeAfterwards) {
+            controller.resume()
+            advanceUntilIdle()
+        }
+        scope.cancel()
+        return trace.luxes to state
+    }
+
+    @Test
+    fun aHeldReading_isDiscardedByAQueuedScreenOff_DC069() = runTest {
+        val (luxes, s) = heldReadingAfter { c, _ -> c.onScreenOff() }
+        assertEquals(listOf(10.0), luxes)
+        assertEquals(SampleRejection.SCREEN_OFF, s.sensor.lastRejection?.reason)
+    }
+
+    @Test
+    fun aHeldReading_isDiscardedByAQueuedPause_DC069() = runTest {
+        val (luxes, s) = heldReadingAfter(resumeAfterwards = true) { c, _ -> c.pause() }
+        assertEquals(listOf(10.0), luxes)
+        assertEquals(SampleRejection.PAUSED, s.sensor.lastRejection?.reason)
+    }
+
+    @Test
+    fun aHeldReading_isDiscardedByAQueuedOverride_DC069() = runTest {
+        val (luxes, s) = heldReadingAfter(resumeAfterwards = true) { c, brightness ->
+            c.postOverrideDetected(200, OverrideSource.OBSERVER)
+            backgroundScope.launch { kotlinx.coroutines.delay(1_500L); brightness.current = 200 }
+        }
+        assertTrue(s.pausedByOverride, "the queued override must commit")
+        assertEquals(listOf(10.0), luxes)
+    }
+
+    @Test
+    fun aHeldReading_isDiscardedByStop_DC069() = runTest {
+        val (luxes, s) = heldReadingAfter { c, _ -> c.stop() }
+        assertEquals(listOf(10.0), luxes)
+        assertEquals(SampleRejection.SERVICE_DISABLED, s.sensor.lastRejection?.reason, "counted, not stranded")
+    }
+
+    @Test
+    fun aHeldReading_isDiscardedAcrossASleepAndWake_DC069() = runTest {
+        val (luxes, s) = heldReadingAfter { c, _ -> c.onScreenOff(); c.onScreenOn() }
+        assertEquals(listOf(10.0), luxes)
+        assertNull(s.lastRawLux, "nothing from before the sleep may run after the wake")
+    }
+
+    private suspend fun TestScope.busyConsumer(
+        sensor: FakeSensor,
+        trace: EvalTrace,
+    ): Triple<BrightnessPipelineController, CoroutineScope, CompletableDeferred<Unit>> {
+        val hold = CompletableDeferred<Unit>()
+        var holding = false
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime },
+            settingsProvider = { if (holding) hold.await(); settings }, debugSink = trace,
+        )
+        controller.start()
+        sensor.flow.emit(sample(10.0))
+        advanceUntilIdle()
+        advanceTimeBy(60_000L)
+        holding = true
+        controller.postOverrideDetected(0, OverrideSource.OBSERVER)
+        runCurrent()
+        return Triple(controller, scope, hold)
+    }
+
+    @Test
+    fun aTickQueuedBehindAScreenOff_runsNoCycleAfterHibernate_DC069() = runTest {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope, hold) = busyConsumer(sensor, trace)
+        controller.onScreenOff()
+        sensor.flow.emit(sample(5_000.0))
+        hold.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(10.0), trace.luxes)
+        assertTrue(controller.state.value.hibernated)
+        assertNull(controller.state.value.lastRawLux)
+        scope.cancel()
+    }
+
+    @Test
+    fun aReadingThatArrivesBehindAQueuedPause_neverRunsAheadOfIt_DC069() = runTest {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope, hold) = busyConsumer(sensor, trace)
+        sensor.flow.emit(sample(5_000.0))
+        controller.pause()
+        sensor.flow.emit(sample(9_000.0))
+        hold.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(10.0), trace.luxes, "5 000 lx was superseded, and 9 000 lx must wait for the pause")
+        val s = controller.state.value
+        assertTrue(s.paused)
+        assertEquals(SampleRejection.PAUSED, s.sensor.lastRejection?.reason)
+        assertEquals(1, s.sensor.replaced)
+        scope.cancel()
+    }
+
     /** Always aborts with [trigger] as the read that tripped the band detector. */
     private class OverridingAnimationRunner(
         private val brightness: ScreenBrightnessController,
@@ -1033,5 +1545,295 @@ class BrightnessPipelineControllerTest {
             val ack = brightness.write(to)
             return AnimationOutcome.Overridden(ack, triggerObserved = trigger)
         }
+    }
+
+    private val dark = settings.copy(minBrightness = 0)
+
+    private fun targetFor(lux: Double, s: AabSettings) = BrightnessEngine().evaluate(
+        BrightnessPolicyInput(lux = lux, time = TimeContext(secondsOfDay = 0.0), curve = s.toBrightnessCurveConfig()),
+    ).targetBrightness
+
+    /** The agreed tolerance: smoothed lux inside the band stored for the reading, and the screen at its target. */
+    private fun assertSettled(s: PipelineState, reading: Double, cfg: AabSettings = dark) {
+        assertFalse(s.unsettled, "smoothed ${s.smoothedLux} outside ${s.threshAbsLow}–${s.threshAbsHigh}")
+        assertEquals(reading, s.lastRawLux!!, 1e-3)
+        assertEquals(targetFor(s.smoothedLux!!, cfg), s.targetBrightness, "the target is the settled smoothed lux's")
+        assertEquals(0, s.settlingSteps)
+        val d = s.sensor
+        assertEquals(d.received, d.admitted + d.rejected + d.replaced, "every callback ends admitted, rejected or replaced")
+    }
+
+    private suspend fun TestScope.dropThenSilence(
+        from: Double,
+        to: Double,
+        cfg: AabSettings = dark,
+        brightness: FakeBrightness = FakeBrightness(),
+        dimming: DimmingCoordinator = NoOpDimmingCoordinator,
+    ): Triple<BrightnessPipelineController, CoroutineScope, EvalTrace> {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope) = newController(
+            sensor, brightness, clock = { 1_000L + testScheduler.currentTime },
+            settingsProvider = { cfg }, debugSink = trace, dimming = dimming,
+        )
+        controller.start()
+        sensor.flow.emit(sample(from))
+        advanceUntilIdle()
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(to))
+        advanceUntilIdle()
+        return Triple(controller, scope, trace)
+    }
+
+    @Test
+    fun unchanged_meansTheStoredBandOrTheReadingItself_notTheStretchedRange_DC070() {
+        val s = PipelineState(threshAbsLow = 0.0, threshAbsHigh = 0.1, lastRawLux = 0.15)
+        assertTrue(s.unchanged(0.05))
+        assertTrue(s.unchanged(0.15))
+        assertFalse(s.unchanged(0.12), "a new reading between the band and the old one is not a repeat")
+    }
+
+    @Test
+    fun oneReadingThenSilence_settlesIntoTheBand_atZero_DC070() = runTest {
+        val (controller, scope, trace) = dropThenSilence(160.0, 0.0)
+        val s = controller.state.value
+        assertSettled(s, 0.0)
+        assertEquals(0, s.targetBrightness)
+        assertEquals(CycleResult.SETTLED, s.sensor.lastCycle?.result)
+        assertTrue(s.sensor.settling > 0, "the continuation ran without a callback")
+        assertEquals(listOf(2, 2, 0), listOf(s.sensor.received, s.sensor.admitted, s.sensor.rejected))
+        assertTrue(trace.luxes.drop(1).all { it == 0.0 }, "only the final reading is settled toward: ${trace.luxes}")
+        assertTrue(trace.evals.size - 2 <= BrightnessEngine.MAX_SETTLING_STEPS, "bounded: ${trace.evals.size}")
+        val cycles = trace.evals.size
+        advanceTimeBy(600_000L)
+        assertEquals(cycles, trace.evals.size, "no timer re-evaluates a settled result")
+        scope.cancel()
+    }
+
+    @Test
+    fun oneReadingThenSilence_settlesIntoTheBand_aboveZero_DC070() = runTest {
+        val (controller, scope, _) = dropThenSilence(1_000.0, 100.0)
+        val s = controller.state.value
+        assertSettled(s, 100.0)
+        assertTrue(s.smoothedLux!! > 100.0, "the band's edge, not the reading: ${s.smoothedLux}")
+        scope.cancel()
+    }
+
+    @Test
+    fun repeatedCallbacks_settleIntoTheBand_DC070() = runTest {
+        for ((from, to) in listOf(160.0 to 0.0, 1_000.0 to 100.0)) {
+            val sensor = FakeSensor()
+            val trace = EvalTrace { testScheduler.currentTime }
+            val (controller, scope) = newController(
+                sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime },
+                settingsProvider = { dark }, debugSink = trace,
+            )
+            controller.start()
+            sensor.flow.emit(sample(from))
+            advanceUntilIdle()
+            advanceTimeBy(60_000L)
+            repeat(80) {
+                sensor.flow.emit(sample(to))
+                advanceTimeBy(250L)
+            }
+            advanceUntilIdle()
+            val s = controller.state.value
+            assertSettled(s, to)
+            assertTrue(s.sensor.admitted > 2, "unchanged callbacks were admitted while unsettled")
+            assertEquals(SampleRejection.DEAD_BAND, s.sensor.lastRejection?.reason, "and refused once settled")
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun aBrighterReadingMidSettle_supersedesTheDarkContinuation_DC070() = runTest {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime },
+            settingsProvider = { dark }, debugSink = trace,
+        )
+        controller.start()
+        sensor.flow.emit(sample(160.0))
+        advanceUntilIdle()
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(0.0))
+        runCurrent()
+        assertEquals(CycleStage.ANIMATE, controller.state.value.sensor.cycle?.stage, "the dark transition is under way")
+        sensor.flow.emit(sample(5_000.0))
+        advanceUntilIdle()
+
+        val s = controller.state.value
+        assertSettled(s, 5_000.0)
+        val bright = trace.luxes.indexOf(5_000.0)
+        assertTrue(bright > 0 && trace.luxes.drop(bright).all { it == 5_000.0 }, "the dark continuation never resumes: ${trace.luxes}")
+        scope.cancel()
+    }
+
+    @Test
+    fun aSettledRepeat_isRefusedAndSchedulesNothing_DC070() = runTest {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime },
+            settingsProvider = { dark }, debugSink = trace,
+        )
+        controller.start()
+        sensor.flow.emit(sample(160.0))
+        advanceUntilIdle()
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(0.0))
+        advanceUntilIdle()
+        val cycles = trace.evals.size
+        val before = controller.state.value
+        sensor.flow.emit(sample(0.0))
+        advanceUntilIdle()
+
+        val s = controller.state.value
+        assertEquals(cycles, trace.evals.size)
+        assertEquals(SampleRejection.DEAD_BAND, s.sensor.lastRejection?.reason)
+        assertEquals(before.smoothedLux, s.smoothedLux)
+        assertEquals(before.targetBrightness, s.targetBrightness)
+        scope.cancel()
+    }
+
+    @Test
+    fun aRepeatHeldThroughTheFinalCycle_isRefusedAtOnce_armingNoTimer_DC070() = runTest {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val (controller, scope) = newController(
+            sensor, brightness, clock = { 1_000L + testScheduler.currentTime }, settingsProvider = { dark },
+        )
+        controller.start()
+        sensor.flow.emit(sample(160.0))
+        advanceUntilIdle()
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(0.0))
+        var lastClaim = -1
+        repeat(5_000) {
+            val cycle = controller.state.value.sensor.cycle
+            if (cycle?.stage == CycleStage.ANIMATE && cycle.claim != lastClaim) {
+                lastClaim = cycle.claim
+                sensor.flow.emit(sample(0.0))
+            }
+            advanceTimeBy(5L)
+        }
+        val s = controller.state.value
+        assertSettled(s, 0.0)
+        assertEquals(CycleResult.SETTLED, s.sensor.lastCycle?.result)
+        assertEquals(SampleRejection.DEAD_BAND, s.sensor.lastRejection?.reason)
+        assertEquals(s.sensor.lastCycle?.endMs, s.sensor.lastRejection?.atMs, "refused as the cycle ended, not after a cooldown")
+        scope.cancel()
+    }
+
+    private suspend fun TestScope.settlingInterruptedBy(
+        control: (BrightnessPipelineController, FakeBrightness) -> Unit,
+    ): Pair<List<Double>, BrightnessPipelineController> {
+        val sensor = FakeSensor()
+        val brightness = FakeBrightness()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope) = newController(
+            sensor, brightness, clock = { 1_000L + testScheduler.currentTime },
+            animationRunner = HoldingAnimationRunner(brightness), settingsProvider = { dark }, debugSink = trace,
+        )
+        controller.start()
+        sensor.flow.emit(sample(160.0))
+        advanceUntilIdle()
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(0.0))
+        runCurrent()
+        assertEquals(CycleStage.ANIMATE, controller.state.value.sensor.cycle?.stage)
+        val evaluated = trace.evals.size
+        control(controller, brightness)
+        advanceTimeBy(600_000L)
+        val luxes = trace.luxes.drop(evaluated)
+        scope.cancel()
+        return luxes to controller
+    }
+
+    @Test
+    fun aQueuedPause_stopsTheContinuation_andResumeFinishesIt_DC070() = runTest {
+        val (after, controller) = settlingInterruptedBy { c, _ -> c.pause() }
+        assertEquals(emptyList(), after, "nothing settles while paused")
+        assertTrue(controller.state.value.paused)
+    }
+
+    @Test
+    fun aQueuedOverride_stopsTheContinuation_DC070() = runTest {
+        val (after, controller) = settlingInterruptedBy { c, brightness ->
+            c.postOverrideDetected(200, OverrideSource.OBSERVER)
+            backgroundScope.launch { kotlinx.coroutines.delay(1_500L); brightness.current = 200 }
+        }
+        assertTrue(controller.state.value.pausedByOverride)
+        assertTrue(after.size <= 1, "at most the cycle already claimed runs: $after")
+    }
+
+    @Test
+    fun aQueuedScreenOffOrStop_stopsTheContinuation_DC070() = runTest {
+        for (control in listOf<(BrightnessPipelineController) -> Unit>({ it.onScreenOff() }, { it.stop() })) {
+            val (after, controller) = settlingInterruptedBy { c, _ -> control(c) }
+            assertTrue(after.size <= 1, "at most the cycle already claimed runs: $after")
+            assertFalse(controller.state.value.unsettled && controller.state.value.serviceOn)
+        }
+    }
+
+    @Test
+    fun resumeAfterAPause_finishesTheSettling_DC070() = runTest {
+        val sensor = FakeSensor()
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime }, settingsProvider = { dark },
+        )
+        controller.start()
+        sensor.flow.emit(sample(160.0))
+        advanceUntilIdle()
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(0.0))
+        runCurrent()
+        controller.pause()
+        advanceUntilIdle()
+        assertTrue(controller.state.value.unsettled)
+        controller.resume()
+        advanceUntilIdle()
+        assertSettled(controller.state.value, 0.0)
+        scope.cancel()
+    }
+
+    @Test
+    fun aNewSensorSession_doesNotContinueTheOldOne_DC070() = runTest {
+        val sensor = FakeSensor()
+        val trace = EvalTrace { testScheduler.currentTime }
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = { 1_000L + testScheduler.currentTime },
+            settingsProvider = { dark }, debugSink = trace,
+        )
+        controller.start()
+        sensor.flow.emit(sample(160.0))
+        advanceUntilIdle()
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(0.0))
+        while (!controller.state.value.unsettled) advanceTimeBy(5L)
+        controller.stop()
+        advanceUntilIdle()
+        val evaluated = trace.evals.size
+        controller.start()
+        advanceUntilIdle()
+        controller.reapply()
+        advanceTimeBy(600_000L)
+        assertEquals(evaluated, trace.evals.size, "a restart waits for its own first reading")
+        scope.cancel()
+    }
+
+    @Test
+    fun underThePwmFloorAndSuperDimming_settlingIsJudgedOnSmoothedLux_DC070() = runTest {
+        val pwm = dark.copy(pwmSensitive = true, dimmingThreshold = 15)
+        val brightness = FakeBrightness()
+        val dimming = FakeDimming()
+        val (controller, scope, _) = dropThenSilence(160.0, 0.0, pwm, brightness, dimming)
+        val s = controller.state.value
+        assertSettled(s, 0.0, pwm)
+        assertEquals(0, s.targetBrightness, "perceived target (D-109)")
+        assertEquals(15, brightness.current, "the hardware holds the PWM floor (D-050)")
+        assertEquals(0, dimming.applied.last(), "super dimming got the settled perceived target")
+        scope.cancel()
     }
 }

@@ -9,10 +9,12 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "bash -c 'if [ \"$CLAUDE_CODE_REMOTE\" = true ]; then export AAB_REMOTE=1; fi; exec \"$CLAUDE_PROJECT_DIR/scripts/session-start.sh\"'"
           },
           {
             "type": "command",
+            "shell": "bash",
             "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/session-facts.sh\""
           }
         ]
@@ -24,10 +26,12 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR/scripts/command-guard.sh\""
           },
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR/scripts/guards/python-edit.sh\" --hook"
           }
         ]
@@ -37,6 +41,7 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR/scripts/command-guard.sh\" --pre-task"
           }
         ]
@@ -48,6 +53,7 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR/scripts/guards/comment-budget.sh\" --hook"
           }
         ]

@@ -44,6 +44,9 @@ object LiveRuntimeState {
         _activeProfile.value = name
     }
 
+    // DC-066: written by the sensor listener, not the pipeline; reset() spares it, registration clears it.
+    val sensorCallbacks = SensorCallbackLog()
+
     private val _serviceRunning = MutableStateFlow(false)
     val serviceRunning: StateFlow<Boolean> = _serviceRunning.asStateFlow()
 
@@ -73,7 +76,29 @@ object LiveRuntimeState {
         }
     }.distinctUntilChanged()
 
-    fun reset() {
+    // DC-068: the live service instance whose state this is; lifecycle, not publish recency, clears it.
+    private var owner: Any? = null
+    private var ownerGeneration = 0L
+
+    @Synchronized fun claim(instance: Any) {
+        owner = instance
+        ownerGeneration++
+    }
+
+    /** Returns the generation a later [resetIfUnowned] must still match, so a newer claim voids it. */
+    @Synchronized fun release(instance: Any): Long {
+        if (owner === instance) owner = null
+        return ownerGeneration
+    }
+
+    @Synchronized fun resetIfUnowned(generation: Long): Boolean {
+        if (owner != null || generation != ownerGeneration) return false
+        reset()
+        return true
+    }
+
+    @Synchronized fun reset() {
+        owner = null
         _pipeline.value = PipelineState()
         _activeContext.value = null
         _manualOverride.value = false

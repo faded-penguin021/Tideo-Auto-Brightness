@@ -680,3 +680,323 @@
   green CI could have supplied that half. Nothing mechanical pointed at it — no crash, no failing
   test, no red rung — so what found it was an audit reading eight files for rot, and check 10e now
   holds the reproduction.
+
+- DC-050: **AMH 14.1.0's only hand step — the Claude adapter's `"shell": "bash"` hook pin — is owed,
+  not applied (2026-09-10).** The release adds the field to every shipped hook so that a host
+  without Git Bash cannot route a hook to the Git for Windows file association, where the script
+  runs detached under a windowed launcher with a terminal's tty on stdin and the caller reads rc=0
+  and zero bytes — a broken hook that is silent where every other one is loud. It is not applied
+  here because `.claude/settings.json` is an owner-owned adapter file and this session's auto-mode
+  permission classifier refused every edit to it, by the Bash and the Edit tool alike. Nothing
+  detects that absence: the upstream changelog says no ladder rung checks the pin, and on this
+  Linux container it is inert anyway, so the branch is green with the step undone and only Owner
+  queue item 2 carries it. Two bounds on copying it later, both from the 14.1.0 entry: a misspelled
+  KEY is stripped with the hook entry left standing, while an invalid VALUE fails the enum and
+  drops the entry outright, so the string must be exactly `"bash"`. That the field is understood at
+  all was read from the changelog — it names the shipped schema at 2.1.100 and this host runs
+  2.1.267 — and not observed here, which is the same evidence tier the release itself claims for
+  the loud-failure case nobody has run.
+  Superseded by DC-051.
+
+- DC-051: **The 14.1.0 hook shell pin is applied; the owner ran the edit the agent was refused
+  (2026-09-10).** All six `"type": "command"` entries in `.claude/settings.json` now carry
+  `"shell": "bash"` — the upstream template pins three, and this adapter's session-facts,
+  python-edit and comment-budget hooks are the other three, each a `.sh` path that would take the
+  same Windows route. Verified by parse and count, not by eye: `json.load` succeeds and six entries
+  are pinned out of six, which is the check that distinguishes a good value from a bad one, since an
+  invalid VALUE drops the whole hook entry while an unknown KEY is merely stripped. What made this
+  a two-party job is worth keeping: `.claude/settings.json` is the file that defines the agent's own
+  rails, so this session's auto-mode classifier refused every edit to it by every tool — correctly,
+  and the remedy was a shell command the owner ran, not a wider permission. The pin remains
+  unobserved where it matters: this host runs bash already, so what is verified is the config's
+  shape, never the Windows behaviour it exists for. Supersedes DC-050.
+
+- DC-052: **A namespace-relative class name in the manifest is validated by nothing, so it
+  fails first on a device (2026-09-18).** `android:backupAgent` read `.backup.SettingsBackupAgent`
+  while the class sits at `.app.backup.SettingsBackupAgent`; AGP expands such a name against the
+  `namespace`, never checks that it resolves, and lint does not either, so the branch stayed green
+  from `d17387e` (1.8.2/vc20) through v1.9.2 — four releases. The framework loads the declared agent
+  by name for backup as well as restore, so the likely blast radius is the whole backup path for
+  those builds, not just `onRestoreFinished()` and its sanitizer; that half of it is unconfirmed
+  because no device check has run. Every other relative name in that manifest resolves, checked by
+  hand. The fix came from a fork (`rolling-beans`, cherry-picked); no test guards it, the owner
+  having declined one, so the same typo can return silently.
+
+- DC-053: **OxygenOS does not *ignore* `night_display_color_temperature` — it does not OBSERVE
+  it; temperature is accepted only through `ColorDisplayManager` (re-tested 2026-09-19, owner's
+  OnePlus 13 / Android 16).** An external write lands and is acknowledged (`SettingsShellCmd:
+  putForUser(… key=night_display_color_temperature, value=3000)`, and `settings get` returns
+  3000), emits no `ColorDisplay*` log line at all, and leaves `dumpsys color_display` reporting
+  its own diverged `Color temp: 3730` — the service, not the key, drives the panel. The Settings
+  UI is stock AOSP (`NightDisplaySettings` + `NightDisplayIntensityPreferenceController`), so
+  only the observer wiring differs: a Tasker write applies while that screen is foregrounded and
+  does nothing otherwise, and write-then-bounce-activation fails because activation re-applies
+  service state rather than the key. This rules out every Tideo-side explanation — a circadian
+  ticker overwrite, a substituted default anchor, a suppressed `capabilityWrite` — since adb and
+  Tasker bypass Tideo entirely and still produce nothing. D-048's disposition is unchanged
+  (documented, not branched): `ColorDisplayManager` is `@SystemApi`, absent from the API 35
+  `android.jar`, and `cmd color_display` exposes no temperature setter, so no supported path
+  exists for a normal app or for shell. Reading the key still returns the true value until
+  something writes it externally, so a read-side "resolve device default from the device" fix
+  stays correct on this hardware; corrects the mechanism stated in D-155's closing note.
+  Corrected by DC-054.
+
+- DC-054: **Shell holds `CONTROL_DISPLAY_COLOR_TRANSFORMS` (`granted=true`), so a Shizuku-proxied
+  reflection call to `ColorDisplayManager.setNightDisplayColorTemperature()` is a LIVE route on
+  OxygenOS — DC-053's "no supported path exists for a normal app or for shell" overstates the
+  closure (2026-09-19, owner's OnePlus 13).** That clause was inferred from `cmd color_display`
+  exposing no temperature setter, which proves only that no shell COMMAND exists and never that
+  shell lacks the permission; `pm dump com.android.shell` settles it, and since Shizuku runs at
+  shell UID the `@SystemApi` absence from the API 35 `android.jar` is a compile-time obstacle that
+  reflection passes. The manager is the very path DC-053 showed the Settings UI uses and the panel
+  honours, so this would genuinely fix the variance rather than mask its symptom. Unproven
+  end-to-end: a permission grant is not a successful call, and this is a modified service whose
+  observer wiring already departs from AOSP, so an `app_process` reflection spike at shell UID
+  would settle it without touching Tideo. Nothing is implemented and D-048's disposition still
+  stands — what changed is its PREMISE, since "documented, not branched" rested on nothing being
+  possible, while the costs are unchanged: a vendor-conditional branch, a hidden signature that can
+  shift between releases with no compile-time warning, tier-dependent behaviour (root passes checks
+  shell may not), and a call outside `SecureDisplayController`'s documented-settings discipline.
+  Corrects DC-053.
+
+- DC-055 [cited]: **"Device default" is a policy, not a value, and the read-back was converting one
+  into the other (2026-09-21; AAB issue 15).** `withDeviceSnapshot` guarded the temperature
+  read-back only while `nightLightCircadianEnabled`, so the instant circadian went off the guard
+  opened and the next read-back copied `snapshot.temperatureK` — whatever Kelvin the D-154 ramp had
+  last written — into a `nightLightTemperature` the user had deliberately left null; re-enabling
+  circadian then took that sample as the night anchor, and each off/on cycle ratcheted it toward
+  the 4082 K day endpoint. A null setpoint now never adopts a device number, which is the honest
+  reading of the null contract the rest of the app already keeps — D-151's "no temperature opinion,
+  leave the device's persistent preference alone", `DisplayTogglesViewModel` writing nothing for
+  null, `SettingsDisplay` rendering it "device default" — so a Kelvin changed in Android Settings
+  deliberately no longer reaches the draft while the profile delegates. The reporter root-caused
+  this themselves; it is milder than it reads, since `readBackDraft` reaches only the DRAFT and the
+  capture persists only once the user presses Apply.
+
+- DC-056 [cited]: **The circadian night anchor is the DEVICE's Kelvin, and owning the key is now
+  explicit state that outlives the process (2026-09-21; AAB issue 15).** `AppModule` resolved a
+  null `nightLightTemperature` to the constant `NIGHT_LIGHT_DEFAULT_K` (2850), so a user sitting
+  at 1500 K got a 2850 K night while `readNightLightTemperature()` went uncalled — null meant
+  "leave the device alone" everywhere except the one path that most needed to know what the device
+  held. The anchor is read once per ownership period and kept in its own `display_prefs` store, not
+  an `AabSettings` field, because it is a device fact while `AabSettings` is the per-profile record
+  that is exported, Tasker-serialised and context-merged; per-tick reads were never an option,
+  since after the first write the device returns the ramp's own sample and the anchor would walk.
+  `anchorK != null` IS that ownership, so release puts the displaced value back before surrendering
+  it — unconditionally, `deviceTempK` being an assumption at seed rather than a record of a write;
+  only once the write succeeds, with the static write suppressed while the key is still ours and an
+  unwritable key never mistaken for a restored one, since an anchor that could not be restored is
+  the one thing that must not be dropped; bracketing the enable flag on the side that cannot show
+  the stale sample; and, acquiring, persisted before the claim, so a cancellation between the two
+  loses the claim rather than the record. This revises two clauses whose premise moved: D-154's
+  null hand-off left the last ramp sample on the device, and D-155 wrote no temperature on panic —
+  both right while Tideo had no record of what it displaced, both now restoring it (owner decided
+  the panic half, 2026-09-21). Unverified by
+  construction: awaiting the store inside `stop()`'s `runBlocking` adds storage latency to
+  `onDestroy`, and no test pins that or a cancellation landing inside the clear.
+
+- DC-057 [cited]: **Night Light Kelvin also goes through the `color_display` binder, but only on a
+  build observed to ignore `night_display_color_temperature` (owner, 2026-09-22, the refined option
+  (c) of the 2026-09-19 question; revises D-048's "documented, not branched").** Every write still
+  lands in the secure setting first; `NightLightTemperatureRoute` adds the service write only after
+  a passive probe — settle 750 ms after a Kelvin the app was writing anyway, check the key still
+  holds it, read `getNightDisplayColorTemperature()` — mismatches on two distinct Kelvins, a verdict
+  persisted with a probe version and `Build.FINGERPRINT`, while HONOURED stays in memory, drops back
+  to probing on any mismatch and is re-checked every 30 min (DC-053's open Settings screen makes the
+  key observed while it is open). The gate is behaviour, not brand; the call is reflection inside
+  the privileged process only — the Shizuku user service bound per operation, or root `app_process`
+  running `ColorDisplayCli`, one failed `su` disabling root for the process — chosen by gpt-6-astra
+  over a sentinel probe, a ramp-long binding and dropping root. On a NOT_HONOURED build an
+  unreachable service FAILS the write and makes the device Kelvin unreadable, so `deviceTempK`
+  advances only on a landed write, the DC-056 anchor is neither read from the stale key nor dropped
+  unrestored, teardown never probes and bounds root at 3 s, and the screen says Shizuku is needed
+  instead of showing an inert slider. Owner-confirmed on the OnePlus 13 (2026-09-22): Tideo now
+  moves the panel's Night Light temperature, and `app_process` `get` at shell UID returns the
+  service's Kelvin; a false NOT_HONOURED costs only a redundant, harmless service write.
+
+- DC-058: **Shizuku cannot answer inside a main-thread `runBlocking`, and the service-off Apply
+  must probe too (2026-09-22, gpt-6-astra PR-time check of DC-057).** Shizuku 13.1.5 posts
+  `bindUserService`'s connection callback to the main looper, so DC-057's teardown restore —
+  `stop()`'s `runBlocking` inside `onDestroy` — would sit out the 4 s bind timeout and then fail;
+  a teardown write on the main thread now skips Shizuku and goes straight to root (3 s), else fails
+  fast, which keeps the DC-056 anchor for the next run to restore. Separately, the service-off Apply
+  passed `probe = false`, so a user who only ever pressed Apply would never earn the fallback; it
+  now probes like the coordinator's writes, `probe = false` being reserved for teardown.
+
+- DC-059: **A pause at `12 / 12 / 15` while the PWM floor holds 15 is a real foreign write that the
+  rules judged correctly (owner report, 2026-09-23, OnePlus 13, 1.11.0).** The card read
+  `Target 3`, `Requested → acknowledged: 15 → 15 ACKNOWLEDGED`, `PAUSED (OBSERVER)`,
+  `Observed / settled / expected: 12 / 12 / 15`, `Mode at commit: Manual`, override seen about 3 s
+  after the last cycle's update, repeated on unlock and again after each Resume. Everything Tideo controls is accounted for: 15 over a
+  target of 3 is `applyPwmFloor` (PWM-sensitive, threshold 15), so `reduce_bright_colors` is
+  engaged; our 15 was stored as asked; 12 is three domain steps off, outside the DC-005 deadband,
+  in MANUAL, so `handleOverride` paused as designed and the defect is attribution, not a rule. What
+  wrote 12 is not identifiable from the app (DC-007).
+  → "Settled" here is a 3 ms re-read and cannot show that the 12 lasted — see DC-061.
+
+- DC-060: **The most likely writer behind DC-059 is the OS reacting to Tideo's OWN Extra Dim
+  engage.** The lead is the timing pattern: both triggers are exactly Extra Dim's off→on edge —
+  `hibernate()` and the pause both `disengage()`,
+  and the first cycle after wake or `resume()`'s `setInitialBrightness` re-engages it — and no
+  suppression window covers that engage, whereas DC-009 already found the mode flip to be a
+  brightness event on OEM builds. **A hypothesis, not a reading:** the owner's OS unlock restore
+  predicts the unlock half as well and not the Resume half, and that half is recalled, not
+  captured. No fix is taken on it. A longer settle window is in the rejected set, and at 3 s it
+  would not cover the gap anyway. The discriminator is the Owner-queue check: toggle Extra Dim
+  from the system tile while Tideo is paused and read `screen_brightness` before and after.
+  → Refuted by the owner's check: Extra Dim is ruled out — see DC-061.
+
+- DC-061: **Extra Dim is ruled out, and DC-059's "settled 12" was read 3 ms after the change, so
+  it cannot show that the 12 lasted (owner, 2026-09-23).** The owner ran the DC-060 check and
+  `screen_brightness` read `241` at every step, which is domain 15 at S = 4095 (DC-026): Tideo's
+  own write, with no 12 (about 193) anywhere. `handleOverride` settles for `cycleTimeMs` (DC-005)
+  and the card read `Cycle time (ms): 3`, so "settled" is a second read 3 ms after the first, not
+  a settling observation, and a dip the OS reverts looks exactly like a lasting change. If Tideo
+  was still paused during those reads, nothing of Tideo's could have put 15 back, so the 12 was a
+  transient that the pause was taken on; if it had resumed, the 241 is Tideo's own write and says
+  nothing about the 12, and which of the two it was is still open. A longer fixed or blanket
+  settle window is in the rejected set, so any fix here is the owner's ruling, not an agent's.
+
+- DC-062: **The owner had pressed Resume before the reads, so DC-061's `241` is Tideo's own write
+  and says nothing about the 12 (owner, 2026-09-23).** Extra Dim stays ruled out, since the reads
+  still spanned the tile toggle. Whether the 12 lasted or was a dip is still open, and so is the
+  root cause. The next false pause settles it: read `screen_brightness` from the shell before
+  pressing Resume, where about 193 means the 12 stuck and 241 means it was a dip.
+
+- DC-063: **Tasker's dead-band is restored in `BrightnessEngine.evaluate`, and D-039(a)'s premise
+  that the engine is the oracle is withdrawn.** The golden vectors test task535, task544's Java
+  and task546 separately, so nothing checked the orchestration between them, and it diverged from
+  task554 act1 → task544 act10–act35: no act19 stop, a band centred on the previous reading
+  (100 → 30 → 100 lx left the screen on 30 lx's brightness), task535 fed this cycle's threshold
+  instead of the stored `%AAB_ThreshDynamic`, act35's `par1` taken as the reading, and a first-run
+  seed unlike act14's. Each now matches a transcribed oracle, `TaskerReference.lightCycle`, through
+  `LightCycleParityTest`, and an act19 stop stores act20's band while writing, mapping and
+  publishing nothing. act14 reads `%dynamic_threshold` before act18 sets it and Tasker maths reads
+  an unset variable as 0, so a first run seeds 0 % and a zero-width band at the reading. D-039(a)'s
+  "both gates use the SAME stored band" no longer describes the code, which has one band, Tasker's.
+  The detail, and two related divergences left open (task618's wake path, the proximity damp), are
+  in `docs/rebuild/parity_gaps.md` gap-08.
+  The proximity damp is closed by DC-064.
+
+- DC-064: **The proximity damp is Tasker's again: it changes only the reported `luxAlpha`, never
+  brightness, and D-087's in-EMA port is withdrawn (2026-09-24).** task544 act29 multiplies only
+  the global `%LuxAlpha`; act27 has already stored `%SmoothedLux` from the undamped α, and act33
+  hands task661 the undamped `%lux_results2`, which its act2 → act24 size the animation from; the
+  only other reader of `%AAB_Proximity` is the Debug scene, so in Tasker proximity is a readout.
+  D-087 had read "damps LuxAlpha ×0.1" as a damp on smoothing, although the owner asked there for
+  parity, so while near a return to the previous level could be act19-stopped (100 → 30 → 100 lx
+  smoothed to 95, stopped, then 800 lx to 161). `evaluate` now smooths, maps and animates undamped
+  and reports `luxAlpha × 0.1` on a smoothed cycle while near, which the oracle already modelled;
+  `LightCycleParityTest` replays it near and `proximityNear_dampsOnlyTheReportedLuxAlpha` replaces
+  the pinning test. F-G was queued as an owner decision, the owner asked this session to work it,
+  and the parity rule set the direction; keeping the old damp would now be a `parity_gaps.md`
+  deviation entry, and the panic gesture's proximity veto (D-116) is untouched. On-device
+  behaviour is unverified (`DEVICE_TEST_SCRIPT.md` §4 now expects no slowing).
+
+- DC-065 [cited]: **A start command reaching a running pipeline posts the live notification, not
+  an empty one (2026-09-24, Tideo #130).** Every `startForegroundService` runs `onStartCommand`
+  (settings saves via `ACTION_REAPPLY`, `MaintenanceWorker` every 15 min, app launch, widget,
+  `ControlReceiver`, Resume), which posted "Monitoring ambient light" from an empty model, and the
+  distinct-until-changed updater never re-posted an unchanged model, so in steady light the text
+  stayed wrong; the worker's "no-op if already running" comment was that false premise. It now
+  maps `controller.state` and the active context through the updater's own mapping, keeping the
+  paused title and Resume, and posts the empty model only while the pipeline is not running;
+  "Monitoring" after a wake with no accepted reading is still true. A lock serialises that post
+  with the updater's and the start command reads state inside it, so any stale updater post that
+  lands after it is followed by the updater's emission of the newer model. The owner reproduced
+  the fault by saving a setting on the OnePlus 13 (2026-09-23), and `AmbientMonitoringServiceTest`
+  reproduces it through `ACTION_REAPPLY` and a plain start. This fixes the text only and does not
+  show that brightness tracking ever stopped.
+
+- DC-066 [cited]: **Live Debug's Light Sensor card traces every light reading, so one screenshot
+  separates no delivery (H1, H2), a dropped reading (F-C) and an unfinished cycle (2026-09-24,
+  Tideo #132).** Each reading lands in exactly one counter: `admitted` (it reached
+  `engine.evaluate`) or `rejected`, with the first failing reason and the trust setting then in
+  effect. There is no "deferred" count until R6's slot, which must re-home MUTEX and COOLDOWN
+  drops. The callback record is written on the listener thread and scoped to a registration
+  generation, and only the claim that owns the cycle record may count, advance or settle it, so
+  neither a stalled collector, a replaced listener's late callback nor a tick queued across a wake
+  or restart can fake the evidence (Sol and glue review).
+  Corrected by DC-069.
+
+- DC-067 [cited]: **The light sensor registers only after the pipeline's settings have loaded,
+  so the first reading after a service start is evaluated (2026-09-24, Tideo #132, F-C's startup
+  race).** `start()` used to register before the consumer had read settings, and an on-change
+  sensor's registration event then landed on `cachedSettings == null` and was rejected; in steady
+  light nothing followed it. The consumer now registers right after the read, as `reinit()` already
+  did for WAKE, and holds no early reading (that would be R6's deferred work). Registration moved
+  onto the `Dispatchers.Default` consumer, so `startSensor` takes its owning job and refuses one
+  already cancelled, under the same lock as a new `stopSensor`, and `stop()`/`emergencyStop()`
+  cancel the consumer before the sensor: a `stop()` landing between the read and the registration
+  leaves nothing registered (mutation-checked: without the owner check the test fails). With no
+  listener before settings load, `SETTINGS_NOT_LOADED` is now unreachable and stays only as the
+  null branch's name. Sol found three pre-existing races this does not fix: a tick queued behind a
+  ScreenOff still runs after hibernate (R6's invalidation contract), concurrent `start()`/`stop()`
+  are unserialised, and a cancelled listener is not joined before a WAKE re-registers.
+- DC-068 [cited]: **Live runtime state is cleared by service-instance ownership, not by publish
+  recency, so a running service in steady light no longer shows as stopped (2026-09-24, Tideo
+  #130/#132, F-D's watchdog).** `onTaskRemoved` used to arm the S12.9d watchdog, which reset
+  `LiveRuntimeState` 5 s later unless something had published since, and steady light publishes
+  nothing, so the dashboard, tile and widget could show a live service as stopped. Now
+  `ensureRunning` claims the state for its instance, `onDestroy` releases it and arms the 5 s grace
+  with the release's generation, and the grace resets only if no instance owns the state and no
+  newer claim has happened since; `onTaskRemoved` arms nothing, since the instance is still alive.
+  The generation came from Sol, since without it a predecessor's timer cut a successor's grace
+  short (mutation-checked), and a destroyed instance's own late publish no longer cancels its
+  reset either. Left as found, both pre-existing (Sol) and outside the STALE banner redesign this
+  train defers: `tearDownDisabled`'s reset on `Dispatchers.Default` can be overwritten by the
+  collector's last publish until the grace reset (`publish` always sets `serviceRunning`), and a
+  fresh instance shows stopped until its first publish.
+
+- DC-069 [cited]: **A light reading that arrives while a cycle or its cooldown holds the prof760
+  mutex now waits in one pending slot instead of being dropped, so the last reading of a change is
+  evaluated with no further callback (2026-09-24, Tideo #132, F-C; owner, Q1 (b)).**
+  This departs from Tasker, amending D-027(d) and D-039(c) through the rule review, and
+  `AGENTS.md` states the invariant: a newer held reading replaces the older one, gated on accuracy
+  only with the dead band applied when it is reconsidered (so a return into the band cancels a held
+  excursion), the consumer reconsiders it after every event and one timer at the cooldown's end,
+  a tick takes it only if it arrived before any control event queued behind that tick, and
+  screen-off, pause, override, stop and a new sensor session discard it. The owner's no-ghosts
+  condition is tested structurally: one slot, no cycle inside the cooldown, the newest reading
+  taken, nothing superseded run, and over a 30 s flicker the final reading evaluated within one
+  cycle plus one cooldown (the fence and the unbanded hold are mutation-checked). The Light Sensor
+  card adds deferred (each hold) and replaced, MUTEX and COOLDOWN stop being rejections, and
+  SCREEN_OFF or SERVICE_DISABLED counts a held reading lost to sleep or stop, so every reading
+  still ends admitted, rejected or replaced. Sol's review added the session check that stops a
+  replaced registration's late callback displacing the live reading, the count for a reading held
+  at stop, and a zero-throttle timer spin fix (a wall clock behind the cooldown anchor counts as no
+  cooldown), the rule review (Astra) moved the dead-band check from the drain, which ran mid-cycle
+  against the old band, to the cycle's start, and a tick queued behind a ScreenOff no longer runs
+  after hibernate (DC-067's first race). Ending on the final light's target needs the deferred settling path, which no test
+  asserts.
+  Settling path added by DC-070.
+
+- DC-070 [cited]: **A light transition the adaptive α leaves short now settles into the dead band
+  around the reading, with or without further callbacks (2026-09-25, Tideo #132, F-B; owner, Q2
+  with its endpoint revised from the exact target to smoothed lux inside the stored band).**
+  Repeating the reading cannot get there: task535's α reaches 0 at `S* = (R + p)/(1 − p)`, above a
+  drop's band by about `d(1 + Rd)/(1 − d)` (below a rise's when `Rd < 1`), so at the default
+  `DeltaFactor` 204 of 352 grid transitions stranded, 42 → 0 lx at 0.43; a settling step (an
+  unchanged reading while smoothed lux is outside the band) that ends outside without moving
+  strictly closer, or the 20th, lands on the nearest edge of that step's band stretched to hold the
+  reading (`settlingPlacement`, `settledRange`, outcome `SETTLED`), and every progressing step stays
+  Tasker's. The runtime bypasses prof760's dead band while unsettled, and after each event with
+  R6's slot empty offers the latest reading its sensor session admitted as a marked continuation
+  that a real reading replaces, which pause, override, screen-off and stop clear, and which counts
+  only as "settling" on the Light Sensor card; between cycles `drain` refuses a held reading the
+  current band refuses rather than arming a cooldown, so no timer outlives completion. Completion
+  is judged on smoothed lux, so the PWM floor and super dimming settle on the perceived target
+  (D-050, D-109), and 20 steps (each at most a cycle plus a cooldown) bound it where the stall rule
+  alone took up to 287 at `DeltaFactor` 0.1. Sol's design review added the stretched range (0.15 lx
+  gets task546's `0`–`0.1`), the drain refusal and the session scope; each protection is
+  mutation-checked, and the `AGENTS.md` invariant records the departure.
+- DC-071: **Tasker has no settling path: AAB stalls on prof760 exactly as Tideo did before DC-070
+  (2026-09-25, XML check for Q2).** task546 centres both calls on `%AAB_LastRawLux`, act20 and act35
+  passing the reading and the new smoothed lux as `par1`, which pick only the `< 0.2` case and the
+  rounding; prof760 refuses an in-band repeat before task554 runs, and task90's call of task544
+  with `par1 = %SmoothedLux` (prof758, L41222) cannot move smoothed lux. The only other writer is
+  task618, which snaps smoothed lux to a fresh sensor read on wake, the QS toggle, the three Save
+  buttons, Resume, the dimming toggle, a profile load and a context profile switch, where Tideo's
+  non-wake equivalents re-map the stored value instead (parity_gaps gap-08's open task618 item).
+  Why AAB seemed unaffected is unverified: those snaps, `MinBright` 10 hiding a residual under
+  4 lx, or sensor jitter escaping a zero-width band at 0 lx.

@@ -20,7 +20,7 @@ name: F-Droid compatibility
 # build.yml still gates every PR.
 #
 # Node 24 runtime policy (see build.yml): every action pinned here is a major declaring
-# `runs.using: node24` — checkout@v7, setup-java@v5, setup-android@v4, cache@v6,
+# `runs.using: node24` — checkout@v7, setup-java@v6, setup-android@v4, cache@v6,
 # upload-artifact@v7, download-artifact@v8. In particular, download-artifact v6 still declares (DA-035)
 # `runs.using: node20`; v7 and later use Node 24. Do NOT downgrade any of them.
 on:
@@ -72,7 +72,7 @@ jobs:
         uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
 
       - name: Set up JDK 21
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
         with:
           distribution: temurin
           java-version: '21'

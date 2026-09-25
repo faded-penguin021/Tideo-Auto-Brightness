@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.runtime
 
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.Test
@@ -131,5 +132,27 @@ class ProfileGatesTest {
         assertFalse(ProfileGates.allowOverrideGate(true, false, true, false, true))     // already paused
         assertFalse(ProfileGates.allowOverrideGate(true, false, false, true, true))     // initializing
         assertFalse(ProfileGates.allowOverrideGate(true, false, false, false, false))   // detect off
+    }
+
+    private fun rejection(
+        accuracy: Int = 3,
+        lux: Double = 5.0,
+        mainLoopOn: Boolean = false,
+    ) = ProfileGates.monitorAmbientLightRejection(false, accuracy, lux, 10.0, 100.0, mainLoopOn, true)
+
+    @Test fun rejection_namesTheFirstFailingOperand_inConditionOrder() {
+        assertEquals(null, rejection())
+        assertEquals(SampleRejection.ACCURACY, rejection(accuracy = 1, lux = 50.0, mainLoopOn = true))
+        assertEquals(SampleRejection.DEAD_BAND, rejection(lux = 50.0, mainLoopOn = true))
+        assertEquals(SampleRejection.MUTEX, rejection(mainLoopOn = true))
+    }
+
+    @Test fun rejection_isNullExactlyWhenTheGatePasses() {
+        for (trust in listOf(true, false)) for (acc in 0..3) for (lux in listOf(5.0, 50.0, 200.0))
+            for (loop in listOf(true, false)) for (seeded in listOf(true, false)) {
+                val passes = ProfileGates.monitorAmbientLightGate(trust, acc, lux, 10.0, 100.0, loop, seeded)
+                val reason = ProfileGates.monitorAmbientLightRejection(trust, acc, lux, 10.0, 100.0, loop, seeded)
+                assertEquals(passes, reason == null, "trust=$trust acc=$acc lux=$lux loop=$loop seeded=$seeded")
+            }
     }
 }

@@ -12,6 +12,8 @@ data class BrightnessPolicyInput(
     val previous: PreviousState? = null,
     // Tasker prof759/task545: proximity sensor "near"; damps smoothing alpha ×0.1 (never pauses)
     val proximityNear: Boolean = false,
+    // DC-070: 1-based step of a settling cycle (an unchanged reading while smoothed lux is outside the band); 0 otherwise.
+    val settlingStep: Int = 0,
 )
 
 data class TimeContext(
@@ -78,6 +80,7 @@ data class DynamicScalingConfig(
 
 data class PreviousState(
     val smoothedLux: Double,
-    val lastRawLux: Double,
+    // %AAB_ThreshDynamic as task546 (or task544 act14) last stored it; task535 subtracts it.
+    val threshDynamicPercent: Double,
     val cycleTimeMs: Double? = null,
 )

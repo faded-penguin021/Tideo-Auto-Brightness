@@ -21,20 +21,22 @@ import kotlinx.coroutines.sync.withLock
  * ELEVATED-gated [SecureDisplayController], idempotent and only-on-change (D-151 replaces D-150).
  *
  * Seed to baseline values without writing; service stop re-applies baseline; process death skips
- * reapply. D-154 circadian: ticker owns temperature when enabled; deviceTempK tracks actual
- * writes (ramp or static). D-139 class concurrency: own collector; all applies serialize under
- * [applyMutex]; stop cancels collector then applies baseline.
+ * reapply. D-154 circadian: ticker owns temperature when enabled; DC-056 makes that ownership
+ * explicit, process-outliving and handed back. deviceTempK tracks actual writes. D-139 class
+ * concurrency: own collector; applies serialize under [applyMutex]; stop then applies baseline.
  */
 class DisplayTogglesCoordinator(
     private val effectiveFlow: Flow<AabSettings?>,
     private val baselineFlow: Flow<AabSettings>,
     private val display: SecureDisplayController,
     private val tierProvider: () -> Tier,
-    // D-154: the current circadian-ramp Kelvin for the given settings (night anchor + steepness +
-    // transition factor come from them), or null when no ramp is computable. Pure and
-    // non-blocking; called under [applyMutex].
-    private val circadianTemperature: (AabSettings) -> Int? = { null },
+    // D-154: ramp Kelvin for these settings and the resolved night anchor, or null when not
+    // computable. Pure and non-blocking; called under [applyMutex].
+    private val circadianTemperature: (AabSettings, Int) -> Int? = { _, _ -> null },
+    private val readAnchor: suspend () -> Int? = { null },
+    private val writeAnchor: suspend (Int?) -> Unit = {},
     private val tickIntervalMs: Long = 60_000L,
+    private val temperatureRoute: NightLightTemperatureRoute = NightLightTemperatureRoute(display),
 ) {
     private val applyMutex = Mutex()
 
@@ -43,6 +45,9 @@ class DisplayTogglesCoordinator(
 
     // Last WRITTEN Kelvin (D-154); diff compares against this not lastApplied.temperatureK. Guarded by [applyMutex].
     private var deviceTempK: Int? = null
+
+    // DC-056: displaced device Kelvin; non-null IS ramp ownership of the key. Guarded by [applyMutex].
+    private var anchorK: Int? = null
 
     // Latest effective settings. Guarded by [applyMutex].
     private var latestEffective: AabSettings? = null
@@ -61,6 +66,7 @@ class DisplayTogglesCoordinator(
             applyMutex.withLock {
                 val seedSettings = baselineFlow.first()
                 resting = seedSettings
+                anchorK = readAnchor()
                 if (lastApplied == null) {
                     val seed = DisplayToggleState.of(seedSettings)
                     lastApplied = seed
@@ -91,15 +97,16 @@ class DisplayTogglesCoordinator(
         job?.cancel(); job = null
         runBlocking {
             applyMutex.withLock {
-                resting?.let { applyLocked(DisplayToggleState.of(it), it) }
+                resting?.let { applyLocked(DisplayToggleState.of(it), it, probe = false) }
+                releaseAnchorLocked(resting)
             }
         }
     }
 
     /**
      * task528 panic (D-155): reset ALL toggles to defaults (not baseline; may carry impairing values).
-     * Writes unconditional; clears D-151 post-death residuals. Temperature not written. Tears down
-     * coordinator so baseline cannot resurrect.
+     * Writes unconditional; clears D-151 post-death residuals. Tears down coordinator so baseline
+     * cannot resurrect. DC-056 revises its temperature clause: a displaced value is put back.
      */
     suspend fun panicReset() {
         scope = null
@@ -110,6 +117,7 @@ class DisplayTogglesCoordinator(
             latestEffective = null
             if (tierProvider() < Tier.ELEVATED) return // nothing we could write (or clear)
             display.setNightLight(false)
+            releaseAnchorLocked(settings = null)
             display.setDaltonizer(DaltonizerMode.OFF)
             display.setInversion(false)
             display.setAlwaysOnDisplay(false)
@@ -118,31 +126,59 @@ class DisplayTogglesCoordinator(
         }
     }
 
+    private suspend fun acquireAnchorLocked(): Int? {
+        anchorK?.let { return it }
+        val kelvin = temperatureRoute.readDeviceKelvin().getOrElse { return null }
+            ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K
+        writeAnchor(kelvin)
+        anchorK = kelvin
+        return kelvin
+    }
+
+    private suspend fun releaseAnchorLocked(settings: AabSettings?): Boolean {
+        val anchor = anchorK ?: return true
+        if (tierProvider() < Tier.ELEVATED || !display.nightLightAvailable) return false
+        val target = settings?.nightLightTemperature ?: anchor
+        if (temperatureRoute.write(target, probe = false).isFailure) return false
+        deviceTempK = target
+        writeAnchor(null)
+        anchorK = null
+        return true
+    }
+
     /** Diff-write [desired] against [lastApplied]. Caller holds [applyMutex]. */
-    private fun applyLocked(desired: DisplayToggleState, settings: AabSettings) {
+    private suspend fun applyLocked(desired: DisplayToggleState, settings: AabSettings, probe: Boolean = true) {
         val last = lastApplied
         lastApplied = desired
-        if (last == null || desired == last) return
+        if (last == null || desired == last) {
+            if (!desired.circadianTemp) releaseAnchorLocked(settings)
+            return
+        }
         // No-op below ELEVATED but keep tracking. Static temperature opinion must track (incl. null);
         // circadian mode does NOT (ramp was never written; first post-grant tick is the feature working).
         if (tierProvider() < Tier.ELEVATED) {
             if (!desired.circadianTemp) deviceTempK = desired.temperatureK
             return
         }
-        if (desired.nightLight != last.nightLight) display.setNightLight(desired.nightLight)
-        // D-154: circadian writes current ramp on swap; static writes non-null anchor.
-        // Both diff against deviceTempK to avoid stale ramp sticking.
+        val switching = desired.nightLight != last.nightLight
+        if (switching && !desired.nightLight) display.setNightLight(false)
+        val released = desired.circadianTemp || releaseAnchorLocked(settings)
+        if (switching && desired.nightLight) display.setNightLight(true)
+        // D-154: both paths diff against deviceTempK, which advances only on a write that landed.
         if (desired.circadianTemp) {
-            circadianTemperature(settings)?.let { kelvin ->
-                if (kelvin != deviceTempK) display.setNightLightTemperature(kelvin)
+            val kelvin = acquireAnchorLocked()?.let { anchor ->
+                circadianTemperature(settings, settings.nightLightTemperature ?: anchor)
+            }
+            if (kelvin != null && (kelvin == deviceTempK || temperatureRoute.write(kelvin, probe).isSuccess)) {
                 deviceTempK = kelvin
             }
-        } else {
+        } else if (released) {
             val temperature = desired.temperatureK
-            if (temperature != null && temperature != deviceTempK) {
-                display.setNightLightTemperature(temperature)
+            if (temperature == null || temperature == deviceTempK ||
+                temperatureRoute.write(temperature, probe).isSuccess
+            ) {
+                deviceTempK = temperature
             }
-            deviceTempK = temperature
         }
         if (desired.daltonizer != last.daltonizer) display.setDaltonizer(desired.daltonizer)
         if (desired.inversion != last.inversion) display.setInversion(desired.inversion)
@@ -160,15 +196,13 @@ class DisplayTogglesCoordinator(
     }
 
     /** D-154: one circadian temperature tick. Caller holds [applyMutex]. */
-    private fun tickLocked() {
+    private suspend fun tickLocked() {
         val settings = latestEffective ?: return
         if (!settings.nightLightCircadianEnabled) return
         if (tierProvider() < Tier.ELEVATED) return
-        val kelvin = circadianTemperature(settings) ?: return
-        if (kelvin != deviceTempK) {
-            display.setNightLightTemperature(kelvin)
-            deviceTempK = kelvin
-        }
+        val anchor = acquireAnchorLocked() ?: return // the tick acquires too: a grant can arrive after the swap
+        val kelvin = circadianTemperature(settings, settings.nightLightTemperature ?: anchor) ?: return
+        if (kelvin != deviceTempK && temperatureRoute.write(kelvin).isSuccess) deviceTempK = kelvin
     }
 
     private data class DisplayToggleState(

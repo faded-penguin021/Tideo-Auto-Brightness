@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * DA-043: admission bound on control events entering pipeline. Consecutive-duplicate coalescing
  * (pausing twice = paused; keeps alternating sequences) + hard cap at maxPending (drop newest
- * if flooded). PANIC/DISABLE bypass here; sensor ticks use D-027 drop-not-queue mutex.
+ * if flooded). PANIC/DISABLE bypass here; sensor ticks use the D-027 mutex and one slot (DC-069).
  */
 internal class ControlEventGate(private val maxPending: Int = MAX_PENDING_CONTROL) {
 
@@ -39,7 +39,7 @@ internal class ControlEventGate(private val maxPending: Int = MAX_PENDING_CONTRO
         return true
     }
 
-    /** Sensor ticks bypass the bound: they carry their own drop-not-queue mutex (D-027). */
+    /** Sensor ticks bypass the bound: at most one is claimed at a time (D-027, DC-069). */
     fun offerSensorTick(event: PipelineEvent): Boolean = events.trySend(event).isSuccess
 
     /** Release coalescing slot as event leaves queue, not after handling. */

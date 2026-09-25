@@ -225,6 +225,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   type-coercion concerns as a distinct risk (expressions are already captured verbatim per S1,
   and (b)'s 661-vs-663 cross-validation is the actual safeguard). (Affects S4, S8, S9a, S9b,
   S10, S11, S12.)
+  Corrected by DC-069.
 
 - D-028 [cited]: S4 PARITY GAPS CHARACTERIZED (full detail in `parity_gaps.md`). The Tasker reference
   oracle + 8 golden CSVs are committed and immutable. The current `BrightnessEngine` diverges from
@@ -451,6 +452,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   .shouldCommitPause immediately rather than waiting %AAB_CycleTime, because the single-cycle model
   already guarantees no animation is mid-flight when an OverrideDetected event is dequeued. (Affects
   S9b, S10, S12, S14.)
+  Corrected by DC-063.
 
 - D-040 [cited]: S9b RUNTIME FEATURES + RIP-OUT decisions (sanctioned by the S9b brief; flagged for S12/S14).
   (a) **Super dimming = ELEVATED secure path only.** SuperDimmingCoordinator wires the privileged
@@ -1601,6 +1603,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   stopped on hibernate/teardown) → `PipelineState.proximityNear` (atomic update from the collector, same
   documented exception as `lastSampleMs`) → `buildInput`. Never pauses (task545). Tests: domain
   `proximityNear_dampsLuxAlphaByTenth`, controller `proximityNear_propagatesToPipelineState`.
+  Corrected by DC-064.
 
 - D-088: **(S14 — task524 power-draw calibration PORTED).** Was "measurement deferred" (old D-044); the
   owner flagged it a real tour de force and wanted parity. Ported verbatim from the extracted Java:
@@ -2807,6 +2810,7 @@ the permanent registry — never compress or remove them.
   first differing swap — the seed still adopts without writing. `applyNow` (service off) stays
   static-only: tracking is a runtime feature (stated in the help text). Folds into the
   unreleased 1.7.0/vc17 (`17.txt` +1 line); DEVICE_TEST_SCRIPT §11 step 38.
+  Corrected by DC-056.
 
 - D-155 [cited]: **Panic (Reset) also returns the privileged display toggles to their DEFAULTS (owner
   on-device finding on the 1.7.0 branch build: panic persisted the privileged keys).** The
@@ -2825,6 +2829,9 @@ the permanent registry — never compress or remove them.
   (D-048 policy, no code): **OxygenOS ignores `night_display_color_temperature`** (the tint is
   fixed regardless of the Kelvin value), so the temperature slider and the D-154 circadian
   tracking are visually inert on OnePlus devices; noted in DEVICE_TEST_SCRIPT §11 + README.
+  Corrected by DC-053.
+  Corrected by DC-056 on the temperature clause.
+  Corrected by DC-057 on the OxygenOS variance: now branched, behind observed behaviour.
 
 - D-156 [cited]: **A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
   (A0; plan `plans/a11y-diagnostics.md`, owner-approved 2026-07-06; opens 1.8.0/vc18).**

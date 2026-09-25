@@ -26,8 +26,14 @@ data class CompressedScaleResult(val calculatedBrightness: Double, val effective
 
 class BrightnessEngine {
     companion object {
-        // Tasker task544 act28/29 / prof759 / task545: smoothing-alpha damp factor when proximity reads "near" (phone at ear/covered).
+        // Tasker task544 act28/29 / prof759 / task545: %LuxAlpha readout factor while proximity reads "near".
         const val PROXIMITY_ALPHA_DAMP = 0.1
+
+        const val MAX_SETTLING_STEPS = 20
+
+        /** DC-070: the band, stretched to hold the reading where task546's `< 0.2` case or 0-dp rounding leave it out. */
+        fun settledRange(band: Pair<Double, Double>, reading: Double): ClosedFloatingPointRange<Double> =
+            minOf(band.first, band.second, reading)..maxOf(band.first, band.second, reading)
     }
 
     fun evaluate(input: BrightnessPolicyInput): BrightnessPolicyOutput {
@@ -49,25 +55,53 @@ class BrightnessEngine {
         }
 
         val prev = input.previous
-        val prevSmoothedLux = prev?.smoothedLux ?: input.lux
-
-        val dynamicThreshold = dynamicThreshold(input.lux, prevSmoothedLux, input.thresholds)
-        // Tasker task546: par1 = current lux (gate + scale selector), lastRawLux = previous raw.
-        val absThresholds = absoluteThresholds(input.lux, prev?.lastRawLux ?: input.lux, dynamicThreshold)
-
-        val shouldUpdate = prev == null || input.lux <= absThresholds.first || input.lux >= absThresholds.second
-        val (smoothedLux, luxAlpha) = if (shouldUpdate) {
-            smoothLux(
-                rawLux = input.lux,
-                previousSmoothedLux = prevSmoothedLux,
-                thresholdDynamicPercent = dynamicThreshold * 100.0,
-                deltaFactor = input.thresholds.deltaFactor,
-                zone1End = input.thresholds.zone1End,
-                // Tasker task544 act28/29: ×0.1 damp while proximity near (prof759/task545).
-                luxAlphaDamp = if (input.proximityNear) PROXIMITY_ALPHA_DAMP else 1.0,
-            )
+        // Tasker task554 act1: %AAB_LastRawLux, the centre of every band this reading stores.
+        val lastRawLux = bigScale(input.lux, 3)
+        val outcome: EvaluationOutcome
+        val smoothedLux: Double
+        val luxAlpha: Double
+        val dynamicThreshold: Double
+        val threshDynamicPercent: Double
+        val absThresholds: Pair<Double, Double>
+        if (prev == null) {
+            // Tasker task544 act10–16 first run; act14 seeds a 0 % band at the reading (parity_gaps gap-08).
+            outcome = EvaluationOutcome.FIRST_RUN
+            smoothedLux = input.lux
+            luxAlpha = 1.0
+            dynamicThreshold = 0.0
+            threshDynamicPercent = 0.0
+            absThresholds = input.lux to input.lux
         } else {
-            prevSmoothedLux to 0.0
+            dynamicThreshold = dynamicThreshold(input.lux, prev.smoothedLux, input.thresholds)
+            val relativeChange = round3(abs(input.lux - prev.smoothedLux) / (prev.smoothedLux + 1.0))
+            // Tasker task544 act19–23 stop below the threshold; act35 passes the new smoothed lux as par1.
+            val stop = relativeChange < dynamicThreshold
+            val smoothed = if (stop) {
+                prev.smoothedLux to 0.0
+            } else {
+                smoothLux(
+                    rawLux = input.lux,
+                    previousSmoothedLux = prev.smoothedLux,
+                    thresholdDynamicPercent = prev.threshDynamicPercent,
+                    deltaFactor = input.thresholds.deltaFactor,
+                    zone1End = input.thresholds.zone1End,
+                )
+            }
+            val par1 = if (stop) input.lux else smoothed.first
+            threshDynamicPercent = thresholdPercent(par1, dynamicThreshold)
+            absThresholds = absoluteThresholds(par1, lastRawLux, dynamicThreshold)
+            val placed = if (input.settlingStep > 0) {
+                settlingPlacement(prev.smoothedLux, smoothed.first, lastRawLux, absThresholds, input.settlingStep)
+            } else {
+                null
+            }
+            outcome = when {
+                placed != null -> EvaluationOutcome.SETTLED
+                stop -> EvaluationOutcome.DEAD_BAND_STOP
+                else -> EvaluationOutcome.SMOOTHED
+            }
+            smoothedLux = placed?.first ?: smoothed.first
+            luxAlpha = placed?.second ?: smoothed.second
         }
 
         val mappedBrightness = mapLuxToBrightness(smoothedLux, input.curve)
@@ -97,13 +131,16 @@ class BrightnessEngine {
         )
 
         val dimmingAlpha = dimmingAlpha(targetBrightness, input.curve.minBrightness)
+        // Tasker task544 act28–31: the ×0.1 sets only the %LuxAlpha global; act27 and act33 use %lux_results2 (gap-08).
+        val smoothing = outcome == EvaluationOutcome.SMOOTHED || outcome == EvaluationOutcome.SETTLED
+        val reportedLuxAlpha = if (smoothing && input.proximityNear) luxAlpha * PROXIMITY_ALPHA_DAMP else luxAlpha
 
         return BrightnessPolicyOutput(
             targetBrightness = targetBrightness,
             transitionDurationMs = throttle,
             animationSteps = steps,
             animationWaitMs = wait,
-            luxAlpha = luxAlpha,
+            luxAlpha = reportedLuxAlpha,
             dimmingAlpha = dimmingAlpha,
             smoothedLux = smoothedLux,
             dynamicThreshold = dynamicThreshold,
@@ -111,7 +148,27 @@ class BrightnessEngine {
             thresholdHigh = absThresholds.second,
             scaleDynamic = scaleDynamic,
             scaleDynamicCompress = scaleResult.effectiveScale,
+            outcome = outcome,
+            threshDynamicPercent = threshDynamicPercent,
+            lastRawLux = lastRawLux,
         )
+    }
+
+    // DC-070: a settling step that stalls outside the range, or the last one allowed, lands on its nearest edge.
+    private fun settlingPlacement(
+        from: Double,
+        stepped: Double,
+        reading: Double,
+        band: Pair<Double, Double>,
+        step: Int,
+    ): Pair<Double, Double>? {
+        val range = settledRange(band, reading)
+        if (stepped in range) return null
+        val progressed = abs(stepped - reading) < abs(from - reading)
+        if (progressed && step < MAX_SETTLING_STEPS) return null
+        val edge = (if (progressed) stepped else from).coerceIn(range)
+        val alpha = (from - edge) / (from - reading)
+        return edge to alpha
     }
 
     fun smoothLux(
@@ -120,14 +177,11 @@ class BrightnessEngine {
         thresholdDynamicPercent: Double,
         deltaFactor: Double,
         zone1End: Double,
-        // Tasker task544 act28/29: LuxAlpha ×0.1 while proximity is "near" (prof759/task545). Default
-        // 1.0 = no damp, so the golden vectors (which never pass this) are byte-identical.
-        luxAlphaDamp: Double = 1.0,
     ): Pair<Double, Double> {
         val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
         val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
-        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)). task544 damps ×luxAlphaDamp before EMA.
-        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta)) * luxAlphaDamp
+        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)).
+        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta))
         val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
         // Tasker task535: BigDecimal(raw).setScale(2|0, HALF_UP) — exact-binary constructor.
         val rounded = if (smoothed < zone1End) bigScale(smoothed, 2) else bigScale(smoothed, 0)
@@ -141,6 +195,9 @@ class BrightnessEngine {
         val threshLow = round3(cfg.threshDark - ((cfg.threshDark - cfg.threshDim) / cfg.zone1End) * smoothedLux)
         return if (smoothedLux < cfg.zone1End) threshLow else threshSig
     }
+
+    fun thresholdPercent(currentLux: Double, dynamicThreshold: Double): Double =
+        if (currentLux < 0.2) 1.0 else bigScale(dynamicThreshold * 100.0, if (currentLux < 10) 2 else 0)
 
     fun absoluteThresholds(currentLux: Double, lastRawLux: Double, dynamicThreshold: Double): Pair<Double, Double> {
         // Tasker task546: par1 < 0.2 → ("1","0","0.1") special-case.

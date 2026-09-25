@@ -28,6 +28,10 @@ class ShizukuUserService(private val context: Context) : IShizukuUserService.Stu
         return readForceDark()
     }
 
+    override fun readNightDisplayTemperature(): Int = ColorDisplayBinder.readKelvin() ?: -1
+
+    override fun setNightDisplayTemperature(kelvin: Int): Int = ColorDisplayBinder.setKelvin(kelvin) ?: -1
+
     private fun run(argv: Array<String>, stdoutLimit: Int): String? = try {
         val process = Runtime.getRuntime().exec(argv)
         process.outputStream.close()

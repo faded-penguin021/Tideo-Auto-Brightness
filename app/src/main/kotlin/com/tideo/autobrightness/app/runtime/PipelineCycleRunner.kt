@@ -8,6 +8,7 @@ import com.tideo.autobrightness.app.settings.toThresholdConfig
 import com.tideo.autobrightness.domain.brightness.BrightnessContext
 import com.tideo.autobrightness.domain.brightness.BrightnessEngine
 import com.tideo.autobrightness.domain.brightness.BrightnessPolicyInput
+import com.tideo.autobrightness.domain.brightness.EvaluationOutcome
 import com.tideo.autobrightness.domain.brightness.OverrideRules
 import com.tideo.autobrightness.domain.brightness.PreviousState
 import com.tideo.autobrightness.domain.brightness.SoftwareDimming
@@ -62,22 +63,38 @@ internal class PipelineCycleRunner(
         setInitialBrightness(settingsProvider().also { ctx.cacheSettings(it) })
     }
 
-    /** task554 → task544 → task535 → task661: ingest a reading and animate to the new brightness. */
-    suspend fun runCycle(rawLux: Double) {
+    /** task554 → task544 → task535 → task661: ingest a reading and animate; the caller gates the cooldown. */
+    suspend fun runCycle(rawLux: Double, claim: Int = 0, continuation: Boolean = false) {
         val settings = settingsProvider().also { ctx.cacheSettings(it) }
-        if (!settings.serviceEnabled || ctx.stateValue.paused) return
-
         val now = clock()
         val s = ctx.stateValue
-        // task544 act2-9: throttle gate (G2R-F78).
-        s.lastAcceptedMs?.let { last ->
-            if (now - last < throttle.throttleMs) return
+        val rejection = when {
+            !settings.serviceEnabled -> SampleRejection.SERVICE_DISABLED
+            s.paused -> SampleRejection.PAUSED
+            else -> null
         }
+        if (rejection != null) return ctx.update { it.copy(sensor = it.sensor.cycleRejected(rejection, now, settings.trustUnreliableSensor, claim, !continuation)) }
 
         val cycleStart = now
-        ctx.update { it.copy(autoRunning = true) }
+        val settlingStep = if (s.unsettled && (continuation || s.unchanged(rawLux))) s.settlingSteps + 1 else 0
+        ctx.update { it.copy(autoRunning = true, sensor = it.sensor.admitted(claim, continuation)) }
         try {
-            val output = engine.evaluate(buildInput(rawLux, settings, s))
+            val output = engine.evaluate(buildInput(rawLux, settings, s).copy(settlingStep = settlingStep))
+            // Tasker task544 act20–23: keep the band, write nothing, leave the cooldown anchor alone.
+            if (output.outcome == EvaluationOutcome.DEAD_BAND_STOP) {
+                ctx.update {
+                    it.copy(
+                        lastRawLux = output.lastRawLux,
+                        threshAbsLow = output.thresholdLow,
+                        threshAbsHigh = output.thresholdHigh,
+                        threshDynamicPercent = output.threshDynamicPercent,
+                        threshDynamic = output.dynamicThreshold,
+                        settlingSteps = settlingStep,
+                        sensor = it.sensor.completed(CycleResult.DEAD_BAND_STOP, clock(), claim),
+                    )
+                }
+                return
+            }
             val from = brightness.read()
             // task661 act22-26 / task698 step 3: hardware floor in PWM-sensitive mode (D-050); readout tracks perceived (D-109).
             val target = applyPwmFloor(output.targetBrightness, settings)
@@ -98,7 +115,7 @@ internal class PipelineCycleRunner(
             if (brightnessChanged) {
                 brightness.forceManualMode()
                 // G3-F5: publish target early so dashboard animates during sweep (D-109: perceived, not floored).
-                ctx.update { it.copy(targetBrightness = perceived) }
+                ctx.update { it.copy(targetBrightness = perceived, sensor = it.sensor.stage(CycleStage.ANIMATE, claim)) }
                 if (settings.debugLevel == DebugCategory.SKIP_ANIMATIONS.level) {
                     writeResult = brightness.write(target)
                     applied = baselineAfter(writeResult, applied)
@@ -128,6 +145,7 @@ internal class PipelineCycleRunner(
                             it.copy(
                                 lastAppliedBrightness = baseline,
                                 lastBrightnessWrite = write ?: it.lastBrightnessWrite,
+                                sensor = it.sensor.completed(CycleResult.OVERRIDDEN, clock(), claim),
                             )
                         }
                         ctx.postOverrideDetected(outcome.triggerObserved, OverrideSource.ANIMATION_BAND)
@@ -138,7 +156,6 @@ internal class PipelineCycleRunner(
 
             // task646→650/645: F65 uses un-floored target, not PWM-floored hardware (task661/698 floor ⟂ task650).
             dimming.apply(output.targetBrightness, settings, output.scaleDynamic)
-            // F58: dimming live readout.
             val (dimCurrent, dimDS) = dimmingReadout(output.targetBrightness, settings, output.scaleDynamic)
 
             // DC-001: cycle time is state (cycleTimeMs, Live Debug), not a Graph Metrics Flash —
@@ -154,10 +171,11 @@ internal class PipelineCycleRunner(
             ctx.update {
                 it.copy(
                     smoothedLux = output.smoothedLux,
-                    lastRawLux = round3(rawLux),
+                    lastRawLux = output.lastRawLux,
                     lastAcceptedMs = now,
                     threshAbsLow = output.thresholdLow,
                     threshAbsHigh = output.thresholdHigh,
+                    threshDynamicPercent = output.threshDynamicPercent,
                     threshDynamic = output.dynamicThreshold,
                     cycleTimeMs = cycleTotal,
                     scaleDynamic = output.scaleDynamic,
@@ -174,6 +192,8 @@ internal class PipelineCycleRunner(
                     animationWaitMs = output.animationWaitMs,
                     throttleMs = throttle.throttleMs,
                     lastUpdateMs = clock(),
+                    settlingSteps = if (output.outcome == EvaluationOutcome.SETTLED) 0 else settlingStep,
+                    sensor = it.sensor.completed(CycleResult.of(output.outcome == EvaluationOutcome.SETTLED, brightnessChanged), clock(), claim),
                 )
             }
         } finally {
@@ -221,8 +241,8 @@ internal class PipelineCycleRunner(
     private fun buildInput(rawLux: Double, settings: AabSettings, s: PipelineState): BrightnessPolicyInput {
         // UTC seconds-of-day (F73).
         val secondsOfDay = ((clock() / 1000L) % 86_400L).toDouble()
-        val previous = if (s.smoothedLux != null && s.lastRawLux != null) {
-            PreviousState(smoothedLux = s.smoothedLux, lastRawLux = s.lastRawLux, cycleTimeMs = s.cycleTimeMs)
+        val previous = if (s.smoothedLux != null && s.threshDynamicPercent != null) {
+            PreviousState(s.smoothedLux, s.threshDynamicPercent, s.cycleTimeMs)
         } else {
             null
         }
@@ -249,7 +269,7 @@ internal class PipelineCycleRunner(
             animation = settings.toAnimationConfig(),
             dynamicScaling = settings.toDynamicScalingConfig(),
             previous = previous,
-            // prof759/task545: damp the smoothing alpha ×0.1 while the proximity sensor reads near.
+            // prof759/task545: near damps only the reported LuxAlpha ×0.1, never smoothing.
             proximityNear = s.proximityNear,
         )
     }

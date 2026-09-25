@@ -62,6 +62,31 @@ class DeviceDisplaySnapshotTest {
     }
 
     @Test
+    fun `device default survives a read-back once the ramp has let go`() {
+        val merged = AabSettings(nightLightTemperature = null, nightLightCircadianEnabled = false)
+            .withDeviceSnapshot(snapshot(temperatureK = 4000))
+
+        assertNull(merged.nightLightTemperature, "a null setpoint must never adopt a device value")
+    }
+
+    @Test
+    fun `disabling circadian does not freeze the last ramp sample into the profile`() {
+        val profile = AabSettings(nightLightEnabled = false, nightLightCircadianEnabled = true)
+        val off = profile.copy(nightLightCircadianEnabled = false)
+
+        val merged = assertNotNull(
+            readBackDraft(off, off, null, snapshot(nightLight = true, temperatureK = 4000)),
+            "the ramp wrote 4000 K and the enable flag changed, so a draft must still be produced",
+        )
+
+        assertTrue(merged.nightLightEnabled)
+        assertNull(
+            merged.nightLightTemperature,
+            "the anchor snowballs on every off/on cycle if the ramp sample lands in the profile",
+        )
+    }
+
+    @Test
     fun `an unset device temperature clears the draft to device default`() {
         val merged = AabSettings(nightLightTemperature = 3000)
             .withDeviceSnapshot(snapshot(temperatureK = null))

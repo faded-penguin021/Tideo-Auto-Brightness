@@ -185,6 +185,14 @@ fun PrivilegedDisplayContent(
                                 modifier = Modifier.testTag("pd_schedule_caveat"),
                             )
                         }
+                        if (state.nightLightNeedsShizuku) {
+                            Text(
+                                stringResource(R.string.pd_night_light_needs_shizuku),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.testTag("pd_night_light_needs_shizuku"),
+                            )
+                        }
                         NightLightTemperatureSlider(
                             kelvin = draft.nightLightTemperature,
                             onCommit = { k -> onEditDraft { it.copy(nightLightTemperature = k) } },

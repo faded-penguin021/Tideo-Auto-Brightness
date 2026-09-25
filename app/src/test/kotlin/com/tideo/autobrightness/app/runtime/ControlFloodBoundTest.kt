@@ -23,7 +23,8 @@ import kotlin.test.assertTrue
 class ControlFloodBoundTest {
 
     private class SilentSensor : LightSensorSource {
-        override fun samples(): Flow<LightSample> = MutableSharedFlow()
+        override fun samples(onRegistered: (Boolean) -> Unit, onCallback: (LightSample) -> Unit): Flow<LightSample> =
+            MutableSharedFlow()
     }
 
     private class SilentObserver : BrightnessObserver {

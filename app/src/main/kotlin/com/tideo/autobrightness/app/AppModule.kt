@@ -1,13 +1,16 @@
 package com.tideo.autobrightness.app
 
 import android.content.Context
+import android.os.Build
 import com.tideo.autobrightness.app.runtime.AndroidContextSignalSource
 import com.tideo.autobrightness.app.runtime.AppProfileCatalog
 import com.tideo.autobrightness.app.runtime.BrightnessPipelineController
 import com.tideo.autobrightness.app.runtime.ContextEngine
 import com.tideo.autobrightness.app.runtime.ControllerHookHolder
+import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.DisplayTogglesCoordinator
+import com.tideo.autobrightness.app.runtime.NightLightTemperatureRoute
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
@@ -16,10 +19,13 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.settings.DataStoreContextBaselineStore
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
+import com.tideo.autobrightness.app.settings.NightLightAnchorStore
+import com.tideo.autobrightness.app.settings.NightLightVerdictStore
 import com.tideo.autobrightness.app.settings.OverridePointStore
 import com.tideo.autobrightness.app.settings.UserProfileStore
 import com.tideo.autobrightness.app.storage.contextBaselineDataStore
 import com.tideo.autobrightness.app.storage.contextRulesDataStore
+import com.tideo.autobrightness.app.storage.displayPrefsDataStore
 import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
@@ -32,6 +38,7 @@ import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessContr
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
 import com.tideo.autobrightness.platform.context.GeoIpLocationClient
+import com.tideo.autobrightness.platform.display.AndroidNightDisplayServiceBridge
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.observe.AndroidBrightnessObserver
@@ -55,6 +62,16 @@ class AppModule(context: Context) {
     // Recorded override points (G2R-F13/F14).
     val overridePointStore: OverridePointStore = OverridePointStore(appContext.overridePointsDataStore)
     val userProfileStore: UserProfileStore = UserProfileStore(appContext.userProfilesDataStore)
+    val nightLightAnchorStore: NightLightAnchorStore = NightLightAnchorStore(appContext.displayPrefsDataStore)
+    val nightLightVerdictStore: NightLightVerdictStore =
+        NightLightVerdictStore(appContext.displayPrefsDataStore, Build.FINGERPRINT)
+
+    fun nightLightTemperatureRoute(display: SecureDisplayController) = NightLightTemperatureRoute(
+        display = display,
+        bridge = AndroidNightDisplayServiceBridge(appContext),
+        isNotHonoured = nightLightVerdictStore::isNotHonoured,
+        markNotHonoured = nightLightVerdictStore::markNotHonoured,
+    )
 
     fun createRuntime(scope: CoroutineScope): RuntimeGraph {
         val brightness = AndroidScreenBrightnessController(appContext)
@@ -108,6 +125,7 @@ class AppModule(context: Context) {
             overrideSink = { lux, brightness -> overridePointStore.record(lux, brightness) },
             // prof759/task545: proximity damps smoothing alpha ×0.1.
             proximitySource = AndroidProximitySensorSource(appContext),
+            callbackLog = LiveRuntimeState.sensorCallbacks,
         )
         controllerHook.hook = controller
         // D-110: recompute when circadian location resolves late.
@@ -122,13 +140,14 @@ class AppModule(context: Context) {
         )
 
         // D-151: display-toggle profile fields applied on profile change.
+        val secureDisplay = AndroidSecureDisplayController(appContext, privilegeManager)
         val displayToggles = DisplayTogglesCoordinator(
             effectiveFlow = contextEngine.effectiveFlow,
             baselineFlow = appContext.settingsDataStore.data,
-            display = AndroidSecureDisplayController(appContext, privilegeManager),
+            display = secureDisplay,
             tierProvider = { privilegeManager.currentTier() },
             // D-154: circadian-ramp Kelvin with real solar windows or TimeContext defaults (F73).
-            circadianTemperature = { s ->
+            circadianTemperature = { s, nightKelvin ->
                 val nowSecOfDay = ((System.currentTimeMillis() / 1000L) % 86_400L).toDouble()
                 val w = circadianWindows.current(s.scaleTransitionFactor.toDouble())
                 val defaults = TimeContext(secondsOfDay = nowSecOfDay)
@@ -147,11 +166,15 @@ class AppModule(context: Context) {
                 ).modifier
                 NightLightTemperatureRamp.temperature(
                     modifier = modifier,
-                    nightKelvin = s.nightLightTemperature
-                        ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K,
+                    nightKelvin = nightKelvin,
                     dayKelvin = SecureDisplayController.NIGHT_LIGHT_MAX_K,
                 )
             },
+            readAnchor = nightLightAnchorStore::read,
+            writeAnchor = { kelvin ->
+                if (kelvin != null) nightLightAnchorStore.write(kelvin) else nightLightAnchorStore.clear()
+            },
+            temperatureRoute = nightLightTemperatureRoute(secureDisplay),
         )
 
         return RuntimeGraph(controller, contextEngine, panicSensor, privilegeManager, displayToggles)

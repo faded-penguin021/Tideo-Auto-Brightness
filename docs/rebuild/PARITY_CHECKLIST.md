@@ -17,7 +17,7 @@ filled by S1/S2 during extraction.
 | prof756 Repost Paused Notification → task567 | L111 | runtime/AmbientMonitoringService paused notification (S9a) | ported |
 | prof757 Repost Foreground Notification → task584 | L156 | runtime/AmbientMonitoringService live notification (S9a) | ported |
 | prof758 Dynamic Scale Engine → task90 | L195 | gate transcribed: ProfileGates.dynamicScaleGate + truth-table test (S9a); **S12.8d**: task90 scheduling fully wired — `CircadianWindowProvider` feeds real solar windows + DST-aware tz at the target instant (F73), fixed Date/Loc override (F39), daily location acquisition incl. ip-api fallback (F83) | ported |
-| prof759 Proximity Detection → task545 | L300 | platform/sensor/ProximitySensorSource (TYPE_PROXIMITY near/far) → BrightnessPipelineController proximity flag → BrightnessEngine LuxAlpha ×0.1 damp (task544 act28/29 / `PROXIMITY_ALPHA_DAMP`, S14); never pauses | ported |
+| prof759 Proximity Detection → task545 | L300 | platform/sensor/ProximitySensorSource (TYPE_PROXIMITY near/far) → BrightnessPipelineController proximity flag → BrightnessEngine reported LuxAlpha ×0.1 (task544 act28/29 / `PROXIMITY_ALPHA_DAMP`, S14); smoothing, mapping and animation stay undamped (DC-064); never pauses | ported; readout-only since 2026-09-24 (DC-064) |
 | prof760 Monitor Ambient Light → task554 (incl. ConditionList gate) | L318 | ProfileGates.monitorAmbientLightGate + truth-table test + BrightnessPipelineController (S9a) | ported |
 | prof761 Initialize (Display On) → task618 | L386 | runtime/BrightnessPipelineController.reinit/setInitialBrightness (S9a) | ported |
 | prof762 Context: App Changed → task43 | L398 | runtime/ContextEngine (S10 — foreground-app poll → APP_CHANGED veto → ContextOverrideResolver); AndroidContextSignalSource | ported (engine; rule UI S12) |
@@ -102,11 +102,11 @@ filled by S1/S2 during extraction.
 | task524 L14246 · _CalibratePowerDraw | ✓ S1 | ✓ S14 (`PowerDrawCalibration`) | domain `PowerDrawCalibration` + platform `PowerMeter` + app `PowerDrawCalibrator` (latch-breaker sweep) + `PowerDrawStore` + Tools calibrate UI (drives the Activity window) → `PowerDrawChart` (S14) | ported |
 | task535 L15204 · Lux Smoothing | ✓ S1 | ✓ S4 | BrightnessEngine.smoothLux (S5) | ported |
 | task543 L15878 · Calculate Animation | ✓ S1 | ✓ S4 | BrightnessEngine.calculateAnimation (S5) | ported |
-| task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | BrightnessEngine.dynamicThreshold (S5) | ported |
-| task546 L16481 · Set Thresholds | ✓ S1 | ✓ S4 | BrightnessEngine.absoluteThresholds (S5) | ported |
+| task544 L16062 · Evaluate Light Change | ✓ S1 | ✓ S4 | BrightnessEngine.dynamicThreshold (S5); act10–act35 orchestration in `evaluate` (act14 zero seed, act19 stop, acts 28–33 readout-only damp) — DC-063, DC-064, parity_gaps gap-08 | ported; orchestration fixed 2026-09-24, proximity damp 2026-09-24 (DC-064) |
+| task546 L16481 · Set Thresholds | ✓ S1 | ✓ S4 | BrightnessEngine.absoluteThresholds + thresholdPercent (S5); band centred on the current reading since DC-063 | ported (centre fixed 2026-09-24, gap-08) |
 | task548 L16630 · DR Compressed Scale | ✓ S1 | ✓ S4 | BrightnessEngine.compressedDynamicScale (S5) | ported |
 | task549 L17138 · _GenerateCircadianGraph | ✓ S1 | | ui/graph/ExperimentChart.kt `CircadianScaleChart` (S13d — `DynamicScaleEngine.scaleDynamic` over the day) | ported (chart render S13d) |
-| task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | BrightnessEngine.kt ingest (S5) | ported |
+| task554 L18132 · Process Sensor Event | ✓ S1 | ✓ S4 | BrightnessEngine.evaluate `lastRawLux` (BigDecimal 3-dp HALF_UP, DC-063) | ported (fixed 2026-09-24, gap-08) |
 | task556 L18359 · _GenerateDimmingCurveGraph | ✓ S1 | | ui/graph/DimmingChart.kt (S13d — `SoftwareDimming.dimProgress`/dim-shell) | ported (chart render S13d) |
 | task557 L18959 · _GenerateAlphaGraph | ✓ S1 | | ui/graph/ReactivityChart.kt `AlphaResponseChart` (S13d) | ported (chart render S13d) |
 | task563 L19677 · _AskPermissionsV7 | ✓ S1 | | app/ui/onboarding/OnboardingScreen.kt — notifications → WRITE_SETTINGS → Location → ELEVATED → usage; S12.7d adds restricted-settings hint (F33) + Location step (F41) + Menu landing (F57) | ported (onboarding gates) |

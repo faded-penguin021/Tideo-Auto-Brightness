@@ -127,6 +127,71 @@ object TaskerReference {
         )
     }
 
+    // ---- task554 act1 → task544 act10–act35 (XML L15972–L16286); state null = unset global ----
+    data class LightCycleState(
+        val smoothedLux: Double?,
+        val threshDynamicPercent: Double?,
+    )
+
+    enum class LightCycleOutcome { FIRST_RUN, DEAD_BAND_STOP, SMOOTHED }
+
+    data class LightCycleResult(
+        val outcome: LightCycleOutcome,
+        val lastRawLux: String,
+        val smoothedLux: Double,
+        val luxAlpha: Double?,
+        val relativeChange: Double?,
+        val dynamicThreshold: Double?,
+        // act14 (first run), act20 (stop) or act35 (smoothed).
+        val thresholds: AbsoluteThresholds,
+    ) {
+        val state: LightCycleState
+            get() = LightCycleState(smoothedLux, thresholds.threshDynamic.toDouble())
+    }
+
+    fun lightCycle(
+        par1: Double,
+        state: LightCycleState,
+        threshDim: Double,
+        threshBright: Double,
+        threshSteepness: Double,
+        threshMidpoint: Double,
+        threshDark: Double,
+        zone1End: Double,
+        deltaFactor: Double,
+        proximityNear: Boolean,
+    ): LightCycleResult {
+        // task554 act1: %AAB_LastRawLux = BigDecimal(raw).setScale(3, HALF_UP), before task544 runs.
+        val lastRawLux = processSensorEventLastRawLux(par1)
+        // act10–16 first run; act14 (L16026) maths reads the unset %dynamic_threshold as 0 (gap-08).
+        val smoothed = state.smoothedLux ?: return LightCycleResult(
+            LightCycleOutcome.FIRST_RUN, lastRawLux, par1, 1.0, null, null,
+            AbsoluteThresholds("0", par1.toString(), par1.toString()),
+        )
+        val change = evaluateLightChange(
+            par1, smoothed, threshDim, threshBright, threshSteepness, threshMidpoint, threshDark, zone1End,
+        )
+        // act19–23: change too small → Set Thresholds(par1 = %par1), Stop. No smoothing, no mapping.
+        if (change.relativeChange < change.dynamicThreshold) {
+            return LightCycleResult(
+                LightCycleOutcome.DEAD_BAND_STOP, lastRawLux, smoothed, null,
+                change.relativeChange, change.dynamicThreshold,
+                setThresholds(par1, change.dynamicThreshold, lastRawLux.toDouble()),
+            )
+        }
+        // act25–27: task535 subtracts %AAB_ThreshDynamic as act14 or the last task546 call stored it.
+        val smoothing = luxSmoothing(
+            par1, smoothed, requireNotNull(state.threshDynamicPercent), deltaFactor, zone1End,
+        )
+        val luxAlpha = if (proximityNear) smoothing.luxAlpha * 0.1 else smoothing.luxAlpha
+        // act35: Set Thresholds(par1 = %new_smoothed_lux); the band centre is still %AAB_LastRawLux.
+        return LightCycleResult(
+            LightCycleOutcome.SMOOTHED, lastRawLux, smoothing.smoothedLux, luxAlpha,
+            change.relativeChange, change.dynamicThreshold,
+            setThresholds(smoothing.smoothedLux, change.dynamicThreshold, lastRawLux.toDouble()),
+        )
+    }
+
     // ---- task659 "_UpdateBrightnessFormulae" (code-547 maths; D-002/D-027) ----------------
     // XML L33337/L33347 (DoMaths). HIGHEST-RISK transcription in the program.
     //

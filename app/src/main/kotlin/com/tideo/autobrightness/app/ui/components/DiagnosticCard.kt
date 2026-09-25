@@ -25,6 +25,8 @@ import com.tideo.autobrightness.app.runtime.PipelineState
 import com.tideo.autobrightness.app.ui.theme.AabGold
 import com.tideo.autobrightness.app.ui.theme.AabMono
 import com.tideo.autobrightness.app.ui.theme.AabTeal
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.Calendar
 
 /** S12.6b, G2R-F7/F8: diagnostic card with live %AAB_* readouts and AAB gold accents. */
@@ -71,9 +73,18 @@ internal fun fmt(value: Double?, digits: Int = 1): String =
 
 internal fun fmtInt(value: Int?): String = value?.toString() ?: "—"
 
-/** G2R-F56: format 0..1 fraction as whole percentage (Tasker parity %aab_thresh*pc). */
-internal fun fmtPercent(value: Double?): String =
-    value?.let { "${Math.round(it * 100.0)}%" } ?: "—"
+private fun fmtStored(value: Double, movePoint: Int, maxDigits: Int): String {
+    if (!value.isFinite()) return value.toString()
+    val stored = BigDecimal.valueOf(value).movePointRight(movePoint)
+        .setScale(maxDigits, RoundingMode.HALF_UP).stripTrailingZeros()
+    return String.format("%.${stored.scale().coerceAtLeast(0)}f", stored)
+}
+
+/** Lux as stored (task535: 2 dp below Zone1End, 0 dp above), capped at task554's 3 dp for raw floats. */
+internal fun fmtLux(value: Double?): String = value?.let { fmtStored(it, 0, 3) } ?: "—"
+
+/** G2R-F56: a round3 0..1 fraction as a percentage at its full precision (%AAB_ThreshDynamic is a percent). */
+internal fun fmtPercent(value: Double?): String = value?.let { "${fmtStored(it, 2, 1)}%" } ?: "—"
 
 /** G2R-F86: display clamps alpha to ≥0 (engine unclamped for task535 parity, D-010(a)). */
 internal fun fmtAlpha(value: Double?): String = fmt(value?.coerceAtLeast(0.0), 3)
@@ -93,14 +104,14 @@ fun ReactivityDiagnosticCardContent(state: PipelineState) {
             append("Current threshold ")
             goldValue(fmtPercent(state.threshDynamic))
             append(" at ")
-            goldValue(fmt(state.smoothedLux))
+            goldValue(fmtLux(state.smoothedLux))
             append(" lx")
         }
         DiagnosticLine("diag_reactivity_deadzone") {
             append("Sensor dead zone ")
-            goldValue(fmt(state.threshAbsLow))
+            goldValue(fmtLux(state.threshAbsLow))
             append(" – ")
-            goldValue(fmt(state.threshAbsHigh))
+            goldValue(fmtLux(state.threshAbsHigh))
             append(" lx")
         }
     }
@@ -159,7 +170,7 @@ fun CurveBrightnessDiagnosticCardContent(state: PipelineState, minBrightness: In
     DiagnosticCard("Live brightness", "curve_diagnostic_card") {
         DiagnosticLine("diag_curve_smoothed_lux") {
             append("Current smoothed lux ")
-            goldValue(fmt(state.smoothedLux))
+            goldValue(fmtLux(state.smoothedLux))
         }
         DiagnosticLine("diag_curve_current_bright") {
             append("Current brightness (")

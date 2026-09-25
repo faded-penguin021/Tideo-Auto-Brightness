@@ -13,7 +13,7 @@ class BrightnessEngineContractTest {
             BrightnessPolicyInput(
                 lux = 0.8,
                 time = TimeContext(secondsOfDay = 2 * 3600.0),
-                previous = PreviousState(smoothedLux = 1.0, lastRawLux = 1.0),
+                previous = null, // first run: a completed cycle, not an act19 stop
             ),
         )
 
@@ -27,7 +27,7 @@ class BrightnessEngineContractTest {
             BrightnessPolicyInput(
                 lux = 15_000.0,
                 time = TimeContext(secondsOfDay = 13 * 3600.0),
-                previous = PreviousState(smoothedLux = 8_000.0, lastRawLux = 8_000.0),
+                previous = PreviousState(smoothedLux = 8_000.0, threshDynamicPercent = 17.0),
             ),
         )
 
@@ -42,7 +42,7 @@ class BrightnessEngineContractTest {
             BrightnessPolicyInput(
                 lux = 800.0,
                 time = TimeContext(secondsOfDay = 12 * 3600.0),
-                previous = PreviousState(smoothedLux = 20.0, lastRawLux = 20.0),
+                previous = PreviousState(smoothedLux = 20.0, threshDynamicPercent = 27.0),
             ),
         )
         assertEquals(1.0, spikeOutput.luxAlpha, 1e-9)
@@ -53,32 +53,32 @@ class BrightnessEngineContractTest {
             BrightnessPolicyInput(
                 lux = 126.0,
                 time = TimeContext(secondsOfDay = 12 * 3600.0),
-                previous = PreviousState(smoothedLux = 100.0, lastRawLux = 100.0),
+                previous = PreviousState(smoothedLux = 100.0, threshDynamicPercent = 25.0),
             ),
         )
-        assertTrue(smoothOutput.luxAlpha < 1.0)
+        assertEquals(EvaluationOutcome.SMOOTHED, smoothOutput.outcome)
+        assertTrue(smoothOutput.luxAlpha > 0.0 && smoothOutput.luxAlpha < 1.0)
         assertTrue(smoothOutput.smoothedLux < 126.0)
     }
 
     @Test
-    fun proximityNear_dampsLuxAlphaByTenth() {
-        // prof759/task545 (task544 act28/29): while the proximity sensor reads "near", LuxAlpha is
-        // damped ×0.1 so a hand/ear over the light sensor doesn't jerk the brightness. It never pauses.
+    fun proximityNear_dampsOnlyTheReportedLuxAlpha() {
+        // Tasker task544 act27–33: the ×0.1 sets only %LuxAlpha; smoothing and Map Lux use %lux_results2 (gap-08).
         val base = BrightnessPolicyInput(
             lux = 126.0,
             time = TimeContext(secondsOfDay = 12 * 3600.0),
-            previous = PreviousState(smoothedLux = 100.0, lastRawLux = 100.0),
+            previous = PreviousState(smoothedLux = 100.0, threshDynamicPercent = 25.0),
         )
         val far = engine.evaluate(base)
         val near = engine.evaluate(base.copy(proximityNear = true))
 
         assertTrue(far.luxAlpha > 0.0, "the un-damped alpha should be positive for this step")
         assertEquals(far.luxAlpha * 0.1, near.luxAlpha, 1e-9)
-        // Lower alpha tracks the previous smoothed value more closely (less reactive), but still moves.
-        assertTrue(
-            kotlin.math.abs(near.smoothedLux - 100.0) <= kotlin.math.abs(far.smoothedLux - 100.0),
-            "near damps reactivity (smoothed stays closer to the previous value)",
-        )
+        assertEquals(far.smoothedLux, near.smoothedLux, 1e-9)
+        assertEquals(far.targetBrightness, near.targetBrightness)
+        assertEquals(far.animationSteps, near.animationSteps)
+        assertEquals(far.animationWaitMs, near.animationWaitMs)
+        assertEquals(far.transitionDurationMs, near.transitionDurationMs)
     }
 
     @Test
@@ -88,7 +88,7 @@ class BrightnessEngineContractTest {
                 lux = 100.0,
                 time = TimeContext(secondsOfDay = 12 * 3600.0),
                 overrides = BrightnessOverrides(manualBrightness = 42),
-                previous = PreviousState(smoothedLux = 100.0, lastRawLux = 100.0),
+                previous = PreviousState(smoothedLux = 100.0, threshDynamicPercent = 25.0),
             ),
         )
 
@@ -111,7 +111,7 @@ class BrightnessEngineContractTest {
                 lux = 200.0,
                 time = time,
                 dynamicScaling = DynamicScalingConfig(enabled = true, spreadPercent = 15.0),
-                previous = PreviousState(smoothedLux = 200.0, lastRawLux = 200.0),
+                previous = null, // first run: an equal reading would stop at act19
             ),
         )
 
@@ -120,7 +120,7 @@ class BrightnessEngineContractTest {
                 lux = 200.0,
                 time = time.copy(secondsOfDay = 2 * 3600.0),
                 dynamicScaling = DynamicScalingConfig(enabled = true, spreadPercent = 15.0),
-                previous = PreviousState(smoothedLux = 200.0, lastRawLux = 200.0),
+                previous = null,
             ),
         )
 

@@ -18,4 +18,9 @@ interface IShizukuUserService {
     String readForceDark() = 3;
 
     String setForceDark(boolean enabled) = 4;
+
+    // DC-057: Night Light Kelvin via the color_display binder; -1 on any failure.
+    int readNightDisplayTemperature() = 5;
+
+    int setNightDisplayTemperature(int kelvin) = 6;
 }

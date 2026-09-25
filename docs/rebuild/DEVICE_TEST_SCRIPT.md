@@ -216,8 +216,10 @@ optional.
 ## 4. Proximity damp (prof759/task545)
 
 13. With the service running in changing light, cover the **top** of the phone (proximity "near", e.g.
-    hold it to your ear). **Expected:** brightness reactivity is **damped** (changes ~10× slower) but the
-    loop does **not** pause; uncovering restores normal reactivity. (Live Debug LuxAlpha drops while near.)
+    hold it to your ear). **Expected (DC-064, Tasker parity):** brightness follows the light exactly as
+    it does uncovered — same speed, no damping — and the loop does **not** pause. Only the Live Debug
+    "Smoothing α (LuxAlpha)" readout drops to a tenth while near. Builds before DC-064 slowed reactivity
+    ~10× here instead.
 
 ## 5. Panic reset (prof769/task528)
 
@@ -384,9 +386,26 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
       Settings → Display → Night Light shows ON with matching intensity. "Use device temperature"
       (unset) leaves the system's own preference untouched. ⚠️ **Known variance (2026-07-05,
       owner's OnePlus):** OxygenOS ignores `night_display_color_temperature` — the tint is the
-      same regardless of the Kelvin value (the switch itself works). The slider and step 38's
-      circadian tracking are then visually inert on that device (D-048: documented, not branched;
-      the write still lands in the settings table — verify over adb if desired).
+      same regardless of the Kelvin value (the switch itself works). Precisely: the service does
+      not observe the key, so the write lands in the settings table and the service's state
+      diverges (DC-053). Since DC-057, with **Shizuku running**, Tideo detects this after two
+      Kelvin changes and then also sets the service directly, so the slider and step 38 should
+      work there; without Shizuku the screen shows a red "Start Shizuku" note instead. Run the
+      spike below once per OS build before trusting it.
+
+      **DC-057 spike (Night Light ON, system Settings closed, debug build installed):**
+      ```sh
+      APK=$(adb shell pm path com.tideo.autobrightness.debug | head -1 | cut -d: -f2 | tr -d '\r')
+      CLI="CLASSPATH=$APK app_process /system/bin com.tideo.autobrightness.platform.privilege.ColorDisplayCli"
+      adb shell "$CLI get"
+      adb shell settings put secure night_display_color_temperature 3000
+      adb shell "$CLI get"
+      adb shell "$CLI set 2700"
+      ```
+      **Expected:** the first `get` prints a Kelvin (exit 0 — shell can reach the service); the
+      second does **not** print 3000 on OxygenOS (the getter tells an ignored key apart — if it
+      prints 3000 the automatic detection cannot work there); `set 2700` prints 2700 **and the
+      panel visibly warms**. Any "exit 1" or no visible change: the fallback is dead on this build.
     - **Color correction:** Grayscale, then Protanomaly/Deuteranomaly/Tritanomaly. **Expected:** the
       filter matches; Settings → Accessibility → Color correction shows the same mode.
     - **Color inversion** on/off. **Expected:** inverts; the Accessibility toggle agrees.
@@ -639,6 +658,17 @@ authorized**) first, then a root shell; the switch itself always persists.
 55. **Opt-out leaves the prop alone.** Switch OFF (opt-out), set the prop by hand
     (`adb shell setprop debug.hwui.force_dark true`), restart the service. **Expected:** the prop
     stays `true` — Tideo never writes it while the opt-in is off.
+
+## 16. Settling after a light change (DC-070)
+
+56. **A transition finishes after the light stops changing.** In a dark room, service running and
+    Live Debug on the Light Sensor card, sample `adb shell settings get system screen_brightness`
+    first for a dark baseline, then every ~250 ms while flickering a flashlight at the sensor for
+    ~10 s, ending dark, and for 20 s after. **Expected:** brightness keeps falling for a few seconds
+    after the flicker stops and holds the dark baseline, not a mid-level; the card's last cycle
+    reads `SETTLED` or `APPLIED`, and later 0 lx readings are refused as `DEAD_BAND`. The
+    "settling" count moves only on a sensor that goes silent; one that keeps reporting settles on
+    its own readings (DD-006).
 
 ---
 

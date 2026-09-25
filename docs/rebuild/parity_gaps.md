@@ -104,6 +104,50 @@ Two systemic causes account for all gaps, both already foreseen (risk register #
   (e.g. a small lux step), or assert `alpha == 1.0` for this spike; then remove the `@Ignore`.
   Logged here so S5 does not "fix" the engine to satisfy a wrong test.
 
+## gap-08 — dead-band orchestration (task554 act1 → task544 act10–act35) — `LightCycleParityTest`
+
+Closed 2026-09-24 (DC-063). The golden vectors test task535, task544's Java and task546 one at a
+time, and every helper matched. What went untested was the orchestration in `evaluate` that
+decides which of them runs and with what arguments, and it diverged:
+
+- **No act19.** The engine gated on an absolute band around the previous reading instead of
+  `relative_change < dynamic_threshold` against smoothed lux, so it smoothed where Tasker stops,
+  with α often negative.
+- **The band was one reading late.** task546 centres both of its calls (act20, act35) on
+  `%AAB_LastRawLux`, which task554 act1 has just set to the **current** reading,
+  `BigDecimal(raw).setScale(3, HALF_UP)`. The engine centred on the previous one, so a return to
+  the previous level was refused by prof760 (100 → 30 → 100 lx left the screen at 30 lx's
+  brightness).
+- **task535 subtracted this cycle's threshold.** Tasker's task535 reads the stored
+  `%AAB_ThreshDynamic`, the rounded percent that act14, act20 or act35 last wrote.
+- **act35's `par1` is the new smoothed lux**, not the reading. It alone picks task546's `< 0.2`
+  special case and its 2-vs-0-decimal scale.
+- **The first-run seed (act14, XML L16026).** act14 evaluates `(%dynamic_threshold)*100` with
+  maths on, before act18 has set that task-local. Tasker's user guide: "uninitialized variables
+  used in mathematical expressions are replaced with 0". So the seed is `%AAB_ThreshDynamic = 0`
+  and both limits equal the reading. The engine now does the same, and an identical repeat reading
+  is refused, as in Tasker.
+- **The proximity damp (acts 27–33; closed 2026-09-24, DC-064).** Tasker's ×0.1 changes only the
+  global `%LuxAlpha` (act29, else act31 undamped). act27 has already stored `%SmoothedLux` from the
+  undamped α, and act33 hands Map Lux `%lux_results2`, also undamped, which task661 act2 → act24
+  sizes the animation from. `%AAB_Proximity` has no other reader but the Debug scene, so in Tasker
+  proximity changes no brightness. The S14 port (D-087) damped inside the EMA and sized the
+  animation from the damped α: while near, 100 → 30 lx smoothed to 95 instead of 50, the return to
+  100 was then act19-stopped, and 800 lx smoothed to 161. The engine now smooths, maps and animates
+  undamped and reports `luxAlpha × 0.1` on a smoothed cycle while near; `LightCycleParityTest` replays
+  the oracle with proximity near.
+
+**Still open, related, not part of gap-08:**
+- **task618's wake path.** Set Initial Brightness polls the light sensor itself (act8, code373),
+  maps `Math.round(raw)` and stores `SmoothedLux = round2(raw)`, and never seeds a band.
+  `setInitialBrightness` maps the unrounded smoothed or raw lux from state, and a wake after
+  hibernate has neither. Not checked against the first-run row, because it is not that path.
+- **The throttle watchdog's idle anchor.** task566 measures idle time from `%LastAAB`, which only a
+  first run or a smoothed cycle sets. `ThrottleController.onSample` re-anchors on every sample
+  outside the stored band. That already included samples dropped while busy or in the cooldown,
+  and since gap-08 it also includes act19 stops, so restoring the throttle ceiling can come up to
+  10 s late. It predates gap-08 and is left as it was.
+
 ---
 
 ## Cross-validation: task661 (runtime) vs task663 (plot copy) — PASS (no gap)

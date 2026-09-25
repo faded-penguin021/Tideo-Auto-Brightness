@@ -22,10 +22,10 @@ cd "$ROOT" || exit 1
 fails=0
 
 # Fact (drift incident d66de4c): the constitution's "Shizuku is a genuine optional runtime
-# dependency in exactly two places", restated in README.md and
+# dependency in exactly three places" (two until DC-057), restated in README.md and
 # docs/rebuild/architecture/privilege_tiers.md — the three sites d66de4c left disagreeing.
 # Consumer files referencing ShizukuShell, excluding its own definition.
-shizuku_expected=2
+shizuku_expected=3
 shizuku_sites=$(grep -rl 'ShizukuShell' platform/src/main app/src/main 2>/dev/null |
 	grep -cv '/ShizukuShell\.kt$')
 if [ "${shizuku_sites:-0}" != "$shizuku_expected" ]; then

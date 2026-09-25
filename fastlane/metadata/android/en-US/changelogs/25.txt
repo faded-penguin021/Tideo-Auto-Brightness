@@ -1,0 +1,8 @@
+Night Light temperature and circadian scaling work where the display ignores the setting (e.g. OxygenOS), with Shizuku or root.
+
+Fixes:
+- circadian Night Light anchoring to 2850 K, not your temperature
+- "device default" Night Light drifting warmer each off/on cycle
+- backup and restore, broken since 1.8.2
+- brightness stalling after a drop, missing a first or last reading or a return to an old level, and slowing with proximity covered
+- the notification reverting to "Monitoring ambient light"

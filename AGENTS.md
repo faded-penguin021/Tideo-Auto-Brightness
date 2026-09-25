@@ -5,12 +5,17 @@ Tideo Auto Brightness is a native Kotlin/Compose Android app. It recreates the T
 now in maintenance.
 
 Maintenance uses the [Agentic Maintenance Harness](https://github.com/faded-penguin021/AMH).
-This constitution records **AMH 14.0.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
+This constitution records **AMH 14.1.0**. The authoritative version is `AMH_VERSION` in `amh.conf`,
 and the version here must change with it; `scripts/guards/doc-facts.sh` fails on a mismatch.
 
-Both halves of that upgrade have now landed: `4e22273` copied the shipped scripts, and the
+Both halves of the 9.1.0 -> 14.0.0 upgrade landed: `4e22273` copied the shipped scripts, and the
 hand-applied seed prose for 9.2.0 and MAJORs 10.0.0…14.0.0 followed, so `AMH_PROSE_VERSION` and
-`AMH_VERSION` in `amh.conf` are equal again and `doc-facts.sh` is silent on the pair. Should they
+`AMH_VERSION` in `amh.conf` are equal again and `doc-facts.sh` is silent on the pair. The 14.1.0
+step on top of that changed no seed prose, so it reopens no gap and the keys advanced together, and
+its one hand-applied note — the Claude adapter's hook shell pin — is applied (DC-050, DC-051).
+Nothing mechanical reports on that pin either way: the version keys are equal, so `doc-facts.sh` is
+satisfied whether or not the adapter carries it, which is why the record is prose here rather than a
+rung. Should they
 ever diverge, that key names the version whose rules this tree's prose actually follows, and the
 guard requires a disclosure sentence here for as long as the gap stands.
 The disclosure it requires is a literal sentence — **"the binding prose is AMH
@@ -96,7 +101,7 @@ session much later.
 - `docs/STATE.md` is capacity-bounded working memory. Its preamble defines the length rule.
 - `docs/LEDGER*.md` is permanent, append-only memory. Never compress, delete, or renumber a row.
   Search the ledger instead of reading a whole volume, and append new entries to the live volume,
-  `docs/LEDGER_C.md`.
+  `docs/LEDGER_D.md`.
 - `docs/history/` is frozen archival material. Consult it, but do not edit it.
 
 Before saying that something does not exist or never happened, establish what evidence could have
@@ -138,8 +143,11 @@ The app has two privilege tiers:
   root. It adds super dimming and the Privileged Display toggles. After the grant, secure writes go
   directly through `Settings.Secure` or `Settings.Global`; they do not use a binder.
 
-Shizuku is also an optional runtime dependency in exactly two places: the Wi-Fi SSID strategy that
-does not require Location, and the force-dark toggle. It is not only a grant mechanism. The count
+Shizuku is also an optional runtime dependency in exactly three places: the Wi-Fi SSID strategy that
+does not require Location, the force-dark toggle, and the Night Light temperature fallback for a
+build whose display service does not observe the Kelvin key (DC-057) — the one secure-settings
+write that can also go through a binder, and only after that build has been observed ignoring the
+key. It is not only a grant mechanism. The count
 is anchored in `scripts/guards/doc-facts.sh`; if it changes, update both the claim and the constant.
 
 ## Conventions
@@ -213,8 +221,20 @@ The complete catalogue is in `docs/LEDGER*.md`; search it as needed. These are t
 often violated during maintenance:
 
 - The concurrency model is binding. There is one pipeline coroutine, and each event runs to
-  completion, including its animation. Events that arrive during a cycle are dropped rather than
-  queued, matching Tasker's `%AAB_MainLoop` re-entry mutex.
+  completion, including its animation. Light readings are never queued: while a cycle or its
+  cooldown holds Tasker's `%AAB_MainLoop` re-entry mutex, the newest reading that passes the
+  accuracy gate waits in a single pending slot, replacing any older one, and is reconsidered
+  against the gates then current, dead band included, once the cycle and cooldown end. A pending
+  reading never runs ahead of a control event queued before it arrived, and screen-off, pause and
+  stop discard it. Tasker drops such a reading; this departure is DC-069, amending D-027(d).
+  While smoothed lux lies outside the stored band (stretched to hold the reading it is centred
+  on), the dead band does not refuse an unchanged reading, and after an event that leaves the slot
+  empty while the pipeline runs awake and unpaused, the latest reading that sensor session
+  admitted is put back in it as a marked continuation, so settling finishes on a sensor gone
+  silent. A real reading replaces the
+  continuation, it is never counted as a callback, and nothing refills it once smoothed lux is
+  inside the band. A settling step that stalls, or the twentieth, places smoothed lux on the
+  nearest edge. Tasker has no settling path; this departure is DC-070 (DC-071).
 - Profile gates are hardcoded Kotlin booleans with provenance and a truth-table test. There is no
   generic `ConditionList` evaluator. For `ConditionList`, And binds more tightly than Or, then And2
   and Or2 join from left to right. XML children are alphabetical, so sort them numerically before

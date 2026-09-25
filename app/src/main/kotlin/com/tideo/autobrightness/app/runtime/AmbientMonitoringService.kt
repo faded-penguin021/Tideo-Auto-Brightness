@@ -50,13 +50,16 @@ import kotlinx.coroutines.launch
 class AmbientMonitoringService : Service() {
     // Legitimately-owned scope for the service lifetime, cancelled in onDestroy().
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private lateinit var controller: BrightnessPipelineController
+    internal lateinit var controller: BrightnessPipelineController
+        private set
     private lateinit var contextEngine: ContextEngine
     private lateinit var displayToggles: DisplayTogglesCoordinator
     private lateinit var panicSensor: com.tideo.autobrightness.platform.sensor.PanicSensorSource
     // Tier cache, refreshed at resume points to avoid per-cycle permission checks (G1-F5).
     private lateinit var privilegeManager: com.tideo.autobrightness.platform.privilege.PrivilegeManager
     private var notificationJob: Job? = null
+    // DC-065: a start command posts the live model; the lock orders it against the updater's posts.
+    private val notificationLock = Any()
     private var panicJob: Job? = null
     // DB-009: watches %AAB_PanicPlugged so a toggle change re-evaluates the sensor gate at once.
     private var panicGateJob: Job? = null
@@ -137,12 +140,14 @@ class AmbientMonitoringService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            buildNotification(NotificationModel()),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-        )
+        synchronized(notificationLock) {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                foregroundNotification(controller.state.value, contextEngine.activeContext.value),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+        }
 
         // A real command supersedes a pending OS restart; explicit starters pre-persist serviceEnabled.
         if (intent != null) {
@@ -252,6 +257,7 @@ class AmbientMonitoringService : Service() {
         // DA-030: runtimeStarted latches; runtimeStartCount must NOT (tests distinguish activations).
         runtimeStarted = true
         runtimeStartCount++
+        LiveRuntimeState.claim(this)
         // Refresh tier cache at resume points so out-of-band grants are reflected (G1-F5).
         privilegeManager.refresh()
         controller.start()
@@ -269,29 +275,23 @@ class AmbientMonitoringService : Service() {
                 contextEngine.onPipelineTick()
                 // Republish for Dashboard/Menu; separate override lock from active context rule (F46).
                 LiveRuntimeState.publish(state, ctx, manualOverride)
-                NotificationModel(
-                    state.smoothedLux,
-                    state.targetBrightness,
-                    state.paused,
-                    state.serviceOn,
-                    ctx,
-                    state.pausedByOverride,
-                )
+                notificationModel(state, ctx)
             }
                 .distinctUntilChanged()
                 .collect { model ->
                     if (!model.serviceOn) return@collect
                     // F75: override alert reuses NOTIFICATION_ID; pops once then settles back.
                     val rising = model.pausedByOverride && !alertedOverride
-                    if (rising) {
-                        notifyManualOverride()
-                    } else {
-                        getSystemService(NotificationManager::class.java)
-                            .notify(NOTIFICATION_ID, buildNotification(model))
+                    synchronized(notificationLock) {
+                        if (rising) {
+                            notifyManualOverride()
+                        } else {
+                            getSystemService(NotificationManager::class.java)
+                                .notify(NOTIFICATION_ID, buildNotification(model))
+                        }
                     }
                     // G2R-F63: QS tile live refresh; renders state changes without panel close+reopen.
                     requestTileRefresh()
-                    // Home-screen widget live refresh: event-driven (no polling).
                     DashboardWidgetProvider.refresh(applicationContext)
                     alertedOverride = model.pausedByOverride
                 }
@@ -510,6 +510,18 @@ class AmbientMonitoringService : Service() {
         val pausedByOverride: Boolean = false,
     )
 
+    internal fun foregroundNotification(state: PipelineState, activeContext: String?): Notification =
+        buildNotification(if (state.serviceOn) notificationModel(state, activeContext) else NotificationModel())
+
+    private fun notificationModel(state: PipelineState, activeContext: String?) = NotificationModel(
+        state.smoothedLux,
+        state.targetBrightness,
+        state.paused,
+        state.serviceOn,
+        activeContext,
+        state.pausedByOverride,
+    )
+
     private fun buildNotification(model: NotificationModel): Notification {
         // G1-F1: surface permission issue instead of looking silently broken.
         val canWrite = android.provider.Settings.System.canWrite(this)
@@ -557,14 +569,6 @@ class AmbientMonitoringService : Service() {
         )
     }
 
-    /**
-     * S12.9d: arm staleness watchdog to prevent UI flicker on FGS recreation.
-     */
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        armStalenessWatchdog()
-        super.onTaskRemoved(rootIntent)
-    }
-
     override fun onDestroy() {
         // D-157 (U5): single authoritative OFF event emitted before scope.cancel() (covers all stop paths).
         if (externalControlEnabled) broadcastStateChanged(enabled = false, running = false, paused = false, profile = null)
@@ -582,22 +586,17 @@ class AmbientMonitoringService : Service() {
             displayToggles.stop()
         }
         // S12.9d: watchdog instead of immediate reset (survives FGS recreation within grace window).
-        armStalenessWatchdog()
+        armStalenessWatchdog(LiveRuntimeState.release(this))
         scope.cancel()
         super.onDestroy()
     }
 
     /**
-     * Reset LiveRuntimeState after WATCHDOG_GRACE_MS unless a newer publish arrived.
+     * Reset LiveRuntimeState after WATCHDOG_GRACE_MS unless a newer instance claimed it.
      */
-    private fun armStalenessWatchdog() {
-        val armedAt = System.currentTimeMillis()
+    private fun armStalenessWatchdog(generation: Long) {
         mainHandler.postDelayed({
-            val lastPublish = LiveRuntimeState.pipeline.value.lastPublishMs
-            if (lastPublish == null || lastPublish < armedAt) {
-                LiveRuntimeState.reset()
-                DashboardWidgetProvider.refresh(applicationContext)
-            }
+            if (LiveRuntimeState.resetIfUnowned(generation)) DashboardWidgetProvider.refresh(applicationContext)
         }, WATCHDOG_GRACE_MS)
     }
 

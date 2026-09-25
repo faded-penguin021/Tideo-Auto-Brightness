@@ -8,17 +8,17 @@ import com.tideo.autobrightness.platform.sensor.LightSensorSource
 import com.tideo.autobrightness.platform.sensor.ProximitySensorSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Runtime auto-brightness pipeline orchestrator (BINDING, D-027): serialized through a single
- * consumer coroutine. Sensor ticks arriving during a cycle are DROPPED (re-entry mutex [inCycle]).
+ * consumer coroutine. Light readings are admitted, or held in one slot, by [LightAdmission] (DC-069).
  * State is written ONLY from the consumer coroutine via [PipelineRuntimeContext].
  * Pipeline sources: prof760 main loop, prof755 override detection, and lifecycle events.
  */
@@ -36,9 +36,9 @@ class BrightnessPipelineController(
     // F73: real solar ramp windows for the dynamic-scale engine. Default `{ null }` keeps the old
     // fixed-window behaviour (and existing tests) intact; AppModule supplies the live provider.
     private val circadianWindowsProvider: (transitionFactor: Double) -> CircadianWindows? = { null },
-    // prof759/task545 proximity damp. Optional: null (controller unit tests / no proximity sensor) →
-    // never near → no damp, so existing behaviour and golden parity are unchanged.
+    // prof759/task545 proximity. Optional: null (unit tests / no proximity sensor) is never near.
     private val proximitySource: ProximitySensorSource? = null,
+    private val callbackLog: SensorCallbackLog = SensorCallbackLog(),
 ) : ControllerHook, PipelineRuntimeContext {
 
     private val engine = BrightnessEngine()
@@ -57,9 +57,6 @@ class BrightnessPipelineController(
     // between the two beyond "latest deadline wins", which is what the window wants anyway.
     @Volatile private var suppressOverrideUntilMs = 0L
 
-    // %AAB_MainLoop re-entry mutex: true while a sensor cycle is claimed or running.
-    private val inCycle = AtomicBoolean(false)
-
     private val debugEmitter = PipelineDebugEmitter(debugSink)
     private val panicHandler = PanicHandler(brightness, dimming)
     private val cycleRunner = PipelineCycleRunner(
@@ -77,6 +74,7 @@ class BrightnessPipelineController(
     )
 
     private val controlGate = ControlEventGate() // DA-043 backlog bound
+    private val admission = LightAdmission(this, { cachedSettings }, throttle, controlGate, clock, scope)
 
     private val overrideMonitor = OverrideMonitor(brightnessObserver) {
         val s = _state.value
@@ -110,26 +108,28 @@ class BrightnessPipelineController(
         postControl(PipelineEvent.OverrideDetected(observed, source))
     }
 
-    /** Start the pipeline and consumer/sensor/observer flows. */
+    /** Start the pipeline; the light sensor registers only once settings have loaded (DC-067). */
     fun start() {
         if (consumerJob != null) return
         _state.update { it.copy(serviceOn = true) }
         consumerJob = scope.launch {
             cachedSettings = settingsProvider().also { throttle.seed(it.throttleDefaultMs) }
-            controlGate.consumeEach { handle(it) }
+            startSensor(RegistrationCause.START, coroutineContext.job)
+            controlGate.consumeEach { handle(it); admission.drain() }
         }
         startOverrideDetection()
-        startSensor()
     }
 
     /** Stop the pipeline entirely (service teardown). */
     fun stop() {
         _state.update { it.copy(serviceOn = false) }
-        sensorJob?.cancel(); sensorJob = null
-        overrideJob?.cancel(); overrideJob = null
+        // DC-067: consumer first, so a registration still pending on it sees it cancelled.
         consumerJob?.cancel(); consumerJob = null
+        admission.invalidate(SampleRejection.SERVICE_DISABLED)
+        stopSensor()
+        overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
-        inCycle.set(false)
+        admission.release()
         // DA-038: independently clear pre-death Extra Dim residue and return brightness-mode ownership.
         runCatching { dimming.disengage() }
         runCatching { brightness.restoreMode() }
@@ -157,16 +157,18 @@ class BrightnessPipelineController(
     fun reapply() { postControl(PipelineEvent.ContextChanged) }
 
     // DA-043 bound; OverrideDetected carries a value, so it is capped but never folded.
-    private fun postControl(event: PipelineEvent) = controlGate.admit(event, event !is PipelineEvent.OverrideDetected)
+    private fun postControl(event: PipelineEvent) =
+        admission.fenced { controlGate.admit(event, event !is PipelineEvent.OverrideDetected) }
     internal val controlBacklog: ControlEventGate get() = controlGate // DA-043 counters (test seam)
 
     /** prof769/task528 panic: restore brightness, drop dimming, stop everything (D-139). */
     suspend fun emergencyStop() {
-        sensorJob?.cancel(); sensorJob = null
+        val consumer = consumerJob?.also { it.cancel() }
+        stopSensor()
         overrideJob?.cancel(); overrideJob = null
-        consumerJob?.cancelAndJoin(); consumerJob = null
+        consumer?.join(); consumerJob = null
         proximityTracker.stop()
-        inCycle.set(false)
+        admission.release()
         panicHandler.execute() // task528 act6-8: restore 255 + drop dimming
         _state.value = PipelineState(serviceOn = false)
     }
@@ -182,53 +184,28 @@ class BrightnessPipelineController(
     }
 
     @Synchronized
-    private fun startSensor() {
-        if (sensorJob?.isActive == true) return
+    private fun startSensor(cause: RegistrationCause, owner: Job) {
+        if (sensorJob?.isActive == true || !owner.isActive) return
+        val generation = callbackLog.registered(cause, clock())
+        val current = admission.newSession()
+        _state.update { it.copy(sensor = it.sensor.registered()) }
         sensorJob = scope.launch {
-            lightSensor.samples().collect { sample -> onSensorSample(sample.lux.toDouble(), sample.accuracy) }
+            lightSensor.samples(
+                onRegistered = { callbackLog.listenerRegistered(generation, it) },
+                onCallback = { callbackLog.callback(generation, it, clock()) },
+            ).collect { sample -> admission.onSample(sample.lux.toDouble(), sample.accuracy, current) }
         }
         proximityTracker.start()
     }
 
-    /** prof760 gate on collector: passing samples claim [inCycle] mutex, others are dropped. */
-    private fun onSensorSample(lux: Double, accuracy: Int) {
-        val now = clock()
-        val settings = cachedSettings
-        val s = _state.value
-        // Throttle Reinitialization watchdog (task566/prof754, G2R-F78).
-        if (settings != null && s.threshAbsLow != null) {
-            val significant = lux < (s.threshAbsLow ?: 0.0) || lux > (s.threshAbsHigh ?: 0.0)
-            throttle.onSample(now, significant, throttle.ceiling(settings.animSteps, settings.maxWaitMs))
-        }
-        // Record every delivered sample + current throttle (Live Debug visibility, G2R-F5).
-        _state.update { it.copy(lastSampleMs = now, throttleMs = throttle.throttleMs) }
-        if (settings == null || !settings.serviceEnabled) return
-        val passes = ProfileGates.monitorAmbientLightGate(
-            trustUnreliable = settings.trustUnreliableSensor,
-            accuracy = accuracy,
-            lux = lux,
-            threshAbsLow = s.threshAbsLow ?: 0.0,
-            threshAbsHigh = s.threshAbsHigh ?: 0.0,
-            mainLoopOn = inCycle.get(),
-            thresholdsSeeded = s.threshAbsLow != null,
-        )
-        if (!passes) return
-        // Re-entry mutex: claim the cycle slot, or drop. Cleared when the cycle completes.
-        if (!inCycle.compareAndSet(false, true)) return
-        if (!controlGate.offerSensorTick(PipelineEvent.SensorTick(lux))) {
-            inCycle.set(false)
-        }
+    @Synchronized
+    private fun stopSensor() {
+        sensorJob?.cancel(); sensorJob = null; admission.newSession(); callbackLog.unregistered()
     }
 
     private suspend fun handle(event: PipelineEvent) {
         when (event) {
-            is PipelineEvent.SensorTick -> {
-                try {
-                    cycleRunner.runCycle(event.lux)
-                } finally {
-                    inCycle.set(false)
-                }
-            }
+            is PipelineEvent.SensorTick -> admission.run(event) { lux, claim, continuation -> cycleRunner.runCycle(lux, claim, continuation) }
             PipelineEvent.ScreenOff -> hibernate()
             PipelineEvent.ScreenOn -> reinit()
             PipelineEvent.Pause -> pauseInternal()
@@ -250,17 +227,18 @@ class BrightnessPipelineController(
     private suspend fun reinit() {
         val settings = settingsProvider().also { cachedSettings = it }
         _state.update { it.copy(hibernated = false) }
-        startSensor()
+        startSensor(RegistrationCause.WAKE, currentCoroutineContext().job)
         startOverrideDetection()
         if (!_state.value.paused) cycleRunner.setInitialBrightness(settings)
     }
 
     /** prof753/task585 hibernate: stop sensing and Allow Override, clear runtime state (DC-042). */
     private fun hibernate() {
-        sensorJob?.cancel(); sensorJob = null
+        admission.invalidate(SampleRejection.SCREEN_OFF)
+        stopSensor()
         overrideJob?.cancel(); overrideJob = null
         proximityTracker.stop()
-        inCycle.set(false)
+        admission.release()
         dimming.disengage() // task585: drop super dimming when the display goes off
         _state.update {
             it.copy(
@@ -270,11 +248,14 @@ class BrightnessPipelineController(
                 lastAcceptedMs = null,
                 threshAbsLow = null,
                 threshAbsHigh = null,
+                threshDynamicPercent = null,
+                threshDynamic = null,
                 cycleTimeMs = null,
                 // DC-008: UNKNOWN, not stale, across a sleep (lastBrightnessWrite survives — it is
                 // the continuous diagnostic).
                 lastAppliedBrightness = null,
                 proximityNear = false,
+                settlingSteps = 0,
             )
         }
     }

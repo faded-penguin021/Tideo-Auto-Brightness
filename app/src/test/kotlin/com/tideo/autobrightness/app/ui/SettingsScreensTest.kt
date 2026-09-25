@@ -166,8 +166,8 @@ class SettingsScreensTest {
     fun liveDebug_debugSelector_showsCurrentLabel_andRendersSeededMetrics() {
         // S12.6b: global debug-category selector (G2R-F9); renders seeded pipeline state (G2R-F6).
         val seeded = PipelineState(
-            smoothedLux = 123.4, lastRawLux = 130.0, threshDynamic = 45.0,
-            threshAbsLow = 10.0, threshAbsHigh = 800.0, scaleDynamic = 1.25,
+            smoothedLux = 123.4, lastRawLux = 130.0, threshDynamic = 0.313,
+            threshAbsLow = 0.35, threshAbsHigh = 800.0, scaleDynamic = 1.25,
             scaleDynamicCompress = 0.9, lastAppliedBrightness = 88, targetBrightness = 90,
         )
         compose.setContent {
@@ -181,6 +181,8 @@ class SettingsScreensTest {
         compose.onNodeWithText("Debug: Light Eval Thresholds").performScrollTo().assertExists()
         compose.onNodeWithTag("debug_smoothed_lux").performScrollTo().assertExists()
         compose.onNodeWithText("123.4", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("31.3%", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("0.35 – 800", substring = true).performScrollTo().assertExists()
     }
 
     // DC-007: the write card must render WITHOUT an override having fired (owner device check 3).

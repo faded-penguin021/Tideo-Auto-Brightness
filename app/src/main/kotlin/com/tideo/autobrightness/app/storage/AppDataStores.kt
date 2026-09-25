@@ -27,6 +27,8 @@ val Context.experimentPrefsDataStore by preferencesDataStore(name = "experiment_
 // D-157: opt-in gate for external intent-control surface; own store (not AabSettings field).
 val Context.controlPrefsDataStore by preferencesDataStore(name = "control_prefs")
 
+val Context.displayPrefsDataStore by preferencesDataStore(name = "display_prefs")
+
 // Power-draw dataset (S14); persisted across restarts, overwritten on recalibration.
 val Context.powerDrawDataStore by preferencesDataStore(name = "power_draw")
 

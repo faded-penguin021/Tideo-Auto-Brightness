@@ -16,11 +16,28 @@ object ProfileGates {
         threshAbsHigh: Double,
         mainLoopOn: Boolean,
         thresholdsSeeded: Boolean,
-    ): Boolean {
+    ): Boolean = monitorAmbientLightRejection(
+        trustUnreliable, accuracy, lux, threshAbsLow, threshAbsHigh, mainLoopOn, thresholdsSeeded,
+    ) == null
+
+    fun monitorAmbientLightRejection(
+        trustUnreliable: Boolean,
+        accuracy: Int,
+        lux: Double,
+        threshAbsLow: Double,
+        threshAbsHigh: Double,
+        mainLoopOn: Boolean,
+        thresholdsSeeded: Boolean,
+    ): SampleRejection? {
         val accuracyTrust = trustUnreliable || (!trustUnreliable && accuracy > 1)
         val deadBand = !thresholdsSeeded || lux < threshAbsLow || lux > threshAbsHigh
         val mutex = !mainLoopOn
-        return accuracyTrust && deadBand && mutex
+        return when {
+            !accuracyTrust -> SampleRejection.ACCURACY
+            !deadBand -> SampleRejection.DEAD_BAND
+            !mutex -> SampleRejection.MUTEX
+            else -> null
+        }
     }
 
     /** prof758 gate: (inMorning OR inEvening OR sunDataStale) AND scalingUse. D-021.
