@@ -13,13 +13,14 @@ adds super dimming and Privileged Display.
 ## Current state
 
 Harness AMH 14.1.0 with its one hand step applied (DC-029…DC-036, DC-051); upstream manifest
-scripts are immutable; the live ledger is `LEDGER_C.md`. **Release standing is NOT recorded
+scripts are immutable; the live ledger is `LEDGER_D.md`. **Release standing is NOT recorded
 here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
 This branch carries the #126/#127 override-attribution work (DC-002…DC-028), the harness units,
 the runtime rot audit (DC-042…DC-046), the Night Light work (DC-053…DC-058), the proximity-damp
-parity restore (DC-064) and light-stall R1–R7 (DC-063, DC-065…DC-070). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+parity restore (DC-064) and the closed light-stall train (DC-063, DC-065…DC-071, DD-001…DD-007),
+whose open findings H1 and H2 live in DD-003 and DD-002. Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -31,10 +32,6 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
-- **Light stalls (Tideo #130, #132)** — `docs/plans/LIGHT_STALL_FIX.md`: [x] R0 · [x] R5 (DC-063)
-  · [x] F-G (DC-064) · [x] R1 notification overwrite (DC-065) · [x] R3 diagnostics (DC-066)
-  · [x] R2 startup race (DC-067) · [x] R4 watchdog (DC-068) · [x] R6 pending slot (DC-069)
-  · [x] R7 settling path (DC-070) · [ ] R8 close-out, **next**; RF dropped (plan §5).
 
 ## Owner queue
 
@@ -74,14 +71,6 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
    `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
    Live Debug's "Smoothing α" drops to a tenth.
-
-5. **[2026-09-25] Check the settling fix on the phone next time you test a build.** Repeat the
-   R6 flicker run in a dark room: flicker a flashlight at the sensor for about 10 s, end dark, and
-   sample `adb shell settings get system screen_brightness` every ~250 ms for 20 s. It worked if
-   brightness keeps falling for a few seconds after the flicker stops and ends at the dark level,
-   not at the 42 lx level (32/255) the last run held, and Live Debug's Light Sensor card shows a
-   last cycle of `SETTLED` or `APPLIED` with a non-zero "settling" count when the sensor went
-   quiet (DC-070).
 
 Open questions: none.
 
@@ -127,24 +116,14 @@ something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-09-25 — **Light stalls R7 (DC-070, DC-071), with its rule review:** the owner reopened R7 on R6's
-  dark-room trace and revised its endpoint to "smoothed lux inside the stored band", not the
-  exact target. The Tasker check found AAB stalls the same way on prof760 (only task618's
-  snaps on wake, saves, resume and profile switches clear it). Repeating the reading cannot
-  finish a drop, since α reaches 0 above the band, so a stalled or 20th settling step lands on the
-  band's edge; a sensor gone silent is continued from the latest admitted reading through R6's
-  slot. The `AGENTS.md` invariant and the `25.txt` brightness line changed with it. Device check
-  is owner-queue item 5.
-
-- 2026-09-24 — **Light stalls R1–R6 and F-G (DC-063…DC-069):** R5 restored Tasker's dead band
-  (act19, band on the current reading); F-G made proximity damp only the reported α; R1 stopped
-  start commands posting "Monitoring"; R3 added Live Debug's Light Sensor card; R2 registers the
-  sensor after settings load; R4 clears live state by service ownership; R6 holds the newest busy
-  reading in one slot (rule review, `AGENTS.md` invariant). Device checks on the OnePlus 13 passed
-  for R1, R3 (daylight and dark wake: H2 stays open), R2, R4 (non-discriminating) and R6; R6's
-  flicker run reproduced F-B twice, which reopened R7. Detail: the rows and the plan.
-- 2026-09-23 — **Light-stall plan (R0), reviewed and rescoped;** a false override pause on unlock
-  diagnosed, not fixed (DC-059…DC-062).
+- 2026-09-25 — **Light-stall train closed (R8):** its plan is deleted and its record is DC-063…DC-071
+  and DD-001…DD-007, with H1 and H2 open. The ledger rolled over to `LEDGER_D.md` (DC-071 ended
+  past the cap), and `AGENTS.md` names the new live volume. R7's settling passed on the OnePlus 13
+  (DD-006) and became `DEVICE_TEST_SCRIPT.md` step 56. Live Debug and the diagnostic cards show lux
+  at its stored precision and the dynamic threshold as a percentage (owner request).
+- 2026-09-23..25 — **Light stalls R0–R7 and F-G (DC-059…DC-071):** notification, diagnostics,
+  startup race, watchdog, Tasker's dead band, proximity damp, pending slot, settling; a false
+  override pause on unlock diagnosed, not fixed.
 - 2026-09-18..22 — **Night Light: snowball closed, anchor on the device's own Kelvin (DC-055,
   DC-056), Kelvin via `color_display` where the key is ignored, making vc25 `1.11.0` (DC-057,
   DC-058); backup-agent fix (DC-052).**

@@ -659,6 +659,17 @@ authorized**) first, then a root shell; the switch itself always persists.
     (`adb shell setprop debug.hwui.force_dark true`), restart the service. **Expected:** the prop
     stays `true` — Tideo never writes it while the opt-in is off.
 
+## 16. Settling after a light change (DC-070)
+
+56. **A transition finishes after the light stops changing.** In a dark room, service running and
+    Live Debug on the Light Sensor card, sample `adb shell settings get system screen_brightness`
+    first for a dark baseline, then every ~250 ms while flickering a flashlight at the sensor for
+    ~10 s, ending dark, and for 20 s after. **Expected:** brightness keeps falling for a few seconds
+    after the flicker stops and holds the dark baseline, not a mid-level; the card's last cycle
+    reads `SETTLED` or `APPLIED`, and later 0 lx readings are refused as `DEAD_BAND`. The
+    "settling" count moves only on a sensor that goes silent; one that keeps reporting settles on
+    its own readings (DD-006).
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures
