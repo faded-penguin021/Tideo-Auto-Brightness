@@ -88,7 +88,9 @@ something major, and say so.
   screen's existing "device default" button. Do not propose a one-shot reset.
 - **Both backup-fix questions are closed (owner, 2026-09-18; DC-052)** — the pre-fix blast radius
   will not be measured, needing `bmgr` work the owner declines, and no regression test guards
-  `android:backupAgent`, one having been dropped as YAGNI; propose neither.
+  `android:backupAgent`, one having been dropped as YAGNI; propose neither. The owner later ran
+  one package-scoped restore check (2026-09-27): it found and fixed the missing
+  `fullBackupOnly` and verified the restore path end to end (DD-008).
 - **The `stop()`/`emergencyStop()` join asymmetry stays** (owner, 2026-09-07; DC-047).
 - **Issues #123, #126 and #127 get no reply, and no issue gets one unasked** (owner, 2026-08-24,
   re-confirmed 2026-09-07; DB-082) — a standing rule, and nothing was posted.
@@ -103,7 +105,8 @@ something major, and say so.
   dependency verification, wider session-branch CI, the D-162/DA-021 triage sets (DB-038), the
   superseded Privileged Display schedule and a persisted seed without real reports (D-150–152), a
   grayscale quick action, refresh-rate/OEM keys, manual Extra Dim, panic re-firing after teardown,
-  §11.39a C1/C2 as wontfix, the destructive `bmgr restore` re-verification (DB-013), and migrating
+  §11.39a C1/C2 as wontfix, a scripted `bmgr restore` step (DB-013; the owner ran it once by
+  hand, DD-008), and migrating
   the test-only `ContextsContent` wrapper; the rest is in `docs/plans/REVIEW_TRIAGE_1.9.0.md`.
 - **Never synthesise unsupported display values on a device** (DB-071) — use a real settings UI;
   DB-077 is exempt, mask 7 having been written by Tideo v1.9.0.
@@ -116,6 +119,9 @@ something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-27 — **Backup actually saves data now (DD-008):** `android:fullBackupOnly="true"` moves
+  the helper-less agent off the empty key/value path; the backup and a Tideo-only restore,
+  including the sanitizer, were verified on the OnePlus 13.
 - 2026-09-25 — **Light-stall train closed (R8):** its plan is deleted and its record is DC-063…DC-071
   and DD-001…DD-007, with H1 and H2 open. The ledger rolled over to `LEDGER_D.md` (DC-071 ended
   past the cap), and `AGENTS.md` names the new live volume. R7's settling passed on the OnePlus 13

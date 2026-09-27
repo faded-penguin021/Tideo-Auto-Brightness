@@ -142,3 +142,17 @@
   missed or dropped reading is therefore replaced within about 250 ms, which hides the dropped
   reading, the unfinished transition and H2 alike; a sensor that falls silent in steady light, as
   #132's Pixel may, would expose them (DD-003).
+
+- DD-008: **Backup saved nothing until `fullBackupOnly` (2026-09-27, OnePlus 13).** Without it a
+  `backupAgent` app is key/value-only, and `SettingsBackupAgent` has no helpers, so no build since
+  1.8.2 backed up settings or profiles (DC-052). With it, `backupnow` streamed exactly the two
+  allowlisted files, and a Tideo-only restore brought them back with the sanitizer's fields
+  written, closing DB-013's residual.
+
+- DD-009: **A failed package-scoped restore still wipes that app's data and permissions
+  (2026-09-27).** A backup signed with another debug key was rejected after Android had cleared
+  Tideo; a successful restore did not wipe. Snapshot with `run-as` before any restore (DB-013).
+
+- DD-010: **`bmgr` preconditions (2026-09-27).** A freshly installed app is `stopped=true` and
+  refuses full backup until launched once; the Google transport restores a debug build signed
+  with the same key, so no `bmgr transport` switch is needed.
