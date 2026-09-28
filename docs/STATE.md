@@ -114,7 +114,8 @@ creating `27.txt`; re-open only for something major, and say so.
 Newest first; ledger rows are the durable detail.
 
 - 2026-09-28 — **#133: curve inputs persist unclamped wherever Apply accepts them (DD-012); owner
-  confirmed a Form1A-40 curve, loaded as a profile, works on 1.12.0-debug vc26.**
+  confirmed on 1.12.0-debug vc26 that a Form1A-40 curve and #133's exact curve (Form1A 28.7353),
+  loaded as profiles, survive, the latter after a force-stop.**
 - 2026-09-28 — **1.12.0/vc26 opened from `main` (v1.11.0 tagged, Owner-queue item closed); #134:
   the override notification can Discard the adjustment it just recorded (DD-011); owner passed
   `DEVICE_TEST_SCRIPT.md` step 57 on 1.12.0-debug vc26.**
