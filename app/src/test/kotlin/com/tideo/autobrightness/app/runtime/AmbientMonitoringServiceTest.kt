@@ -213,6 +213,22 @@ class AmbientMonitoringServiceTest {
         }
     }
 
+    @Test
+    fun overridePause_offersDiscardResumeDisable_andOnlyWhileAPointIsDiscardable() {
+        val service = Robolectric.buildService(AmbientMonitoringService::class.java).create().get()
+        fun actionsOf(state: PipelineState) =
+            service.foregroundNotification(state, null).actions.orEmpty().map { it.title.toString() }
+
+        val overridden = PipelineState(serviceOn = true, paused = true, pausedByOverride = true, discardableOverride = 12.0 to 90.0)
+        assertEquals(listOf("Discard", "Resume", "Disable"), actionsOf(overridden))
+        assertEquals(listOf("Resume", "Reset", "Disable"), actionsOf(PipelineState(serviceOn = true, paused = true)))
+        assertEquals(listOf("Reset", "Disable"), actionsOf(PipelineState(serviceOn = true)))
+
+        service.notifyManualOverride()
+        val alert = shadowOf(service.getSystemService(NotificationManager::class.java)).allNotifications.last()
+        assertEquals(listOf("Discard", "Resume", "Disable"), alert.actions.orEmpty().map { it.title.toString() })
+    }
+
     // D-140: PAUSE/REAPPLY on fresh instance (created by startForegroundService) must stop, not zombie.
     @Test
     fun pause_whenPipelineNotRunning_stopsSelfInsteadOfZombieing() {

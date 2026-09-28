@@ -17,10 +17,11 @@ scripts are immutable; the live ledger is `LEDGER_D.md`. **Release standing is N
 here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-This branch carries the #126/#127 override-attribution work (DC-002…DC-028), the harness units,
-the runtime rot audit (DC-042…DC-046), the Night Light work (DC-053…DC-058), the proximity-damp
-parity restore (DC-064) and the closed light-stall train (DC-063, DC-065…DC-071, DD-001…DD-007),
-whose open findings H1 and H2 live in DD-003 and DD-002. Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+This branch starts the 1.12.0 train from `main` after the 1.11.0 squash (#131), which carried the
+#126/#127 override-attribution work (DC-002…DC-028), the runtime rot audit (DC-042…DC-046), the
+Night Light work (DC-053…DC-058), the proximity-damp parity restore (DC-064) and the closed
+light-stall train (DC-063, DC-065…DC-071, DD-001…DD-007), whose open findings H1 and H2 live in
+DD-003 and DD-002. It adds #134's notification Discard (DD-011). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -52,20 +53,14 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    it: `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt
    has not grown, not that it is gone.
 
-2. **[2026-09-18, retargeted 2026-09-22] Tag v1.11.0 when you are ready; tagging is yours.**
-   First RUNBOOK §6 wants a green `fdroid-compat.yml` on the release commit, and the first release
-   after the AGP 8.13.2 bump owes a one-shot DA-026 check (v1.10.1 was never tagged and is
-   superseded). Settles it: `git ls-remote --tags --refs origin 'refs/tags/v1.11.0'` — a hit
-   means done.
-
-3. **[2026-09-23] On the next false "manual override" pause, read brightness before pressing
+2. **[2026-09-23] On the next false "manual override" pause, read brightness before pressing
    Resume:** `adb shell settings get system screen_brightness` while Live Debug still shows the
    pause. About 193 means the 12 stuck, so something outside Tideo changed brightness; 241 means a
    dip that reverted by itself, which Tideo paused on because its "settled" value is a re-read
    3 ms later, and fixing that is a settle-window change for you to rule on. Extra Dim is ruled
    out (DC-059…DC-062).
 
-4. **[2026-09-24] Check the proximity change on the phone next time you test a build.** Tideo no
+3. **[2026-09-24] Check the proximity change on the phone next time you test a build.** Tideo no
    longer slows brightness while the top of the phone is covered, which is what Tasker does: its
    ×0.1 only ever changed the displayed α (DC-064). If you would rather keep the old slowing as a
    deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
@@ -74,10 +69,9 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 Open questions: none.
 
-**This train is `1.11.0` on vc25, its ONE bump (owner, 2026-09-22).** `1.10.1` never shipped, so
-DC-057's new capability made the same vc25 a minor. Land further user-facing fixes by editing
-`changelogs/25.txt` (500-character cap), never by bumping or by creating `26.txt`; re-open only for
-something major, and say so.
+**This train is `1.12.0` on vc26, its ONE bump (owner, 2026-09-28),** for #134 and then #133. Land
+further user-facing fixes by editing `changelogs/26.txt` (500-character cap), never by bumping or by
+creating `27.txt`; re-open only for something major, and say so.
 
 ## Decided non-items
 
@@ -118,6 +112,10 @@ something major, and say so.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-09-28 — **1.12.0/vc26 opened from `main` (v1.11.0 tagged, Owner-queue item closed); #134:
+  the override notification can Discard the adjustment it just recorded (DD-011); owner passed
+  `DEVICE_TEST_SCRIPT.md` step 57 on 1.12.0-debug vc26.**
 
 - 2026-09-27 — **Backup actually saves data now (DD-008):** `android:fullBackupOnly="true"` moves
   the helper-less agent off the empty key/value path; the backup and a Tideo-only restore,

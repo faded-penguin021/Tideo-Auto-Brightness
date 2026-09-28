@@ -1,0 +1,1 @@
+The manual-override notification has a Discard button: if you moved the brightness slider by accident, tap it to forget that adjustment and resume, without touching your other curve points. While it is offered, Discard takes the place of Reset.

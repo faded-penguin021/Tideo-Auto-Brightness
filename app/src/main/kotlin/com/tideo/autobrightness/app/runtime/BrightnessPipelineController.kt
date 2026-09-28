@@ -149,6 +149,7 @@ class BrightnessPipelineController(
     }
     fun pause() { postControl(PipelineEvent.Pause) }
     fun resume() { postControl(PipelineEvent.Resume) }
+    fun discardOverride() { postControl(PipelineEvent.DiscardOverride) }
 
     /** A context override swapped the active profile: re-apply the initial brightness (task43 act21). */
     override fun onContextChanged() { postControl(PipelineEvent.ContextChanged) }
@@ -210,6 +211,7 @@ class BrightnessPipelineController(
             PipelineEvent.ScreenOn -> reinit()
             PipelineEvent.Pause -> pauseInternal()
             PipelineEvent.Resume -> cycleRunner.resume()
+            PipelineEvent.DiscardOverride -> cycleRunner.discardOverride()
             is PipelineEvent.OverrideDetected ->
                 cycleRunner.handleOverride(event.observedBrightness, event.source)
             PipelineEvent.ContextChanged -> cycleRunner.reapplyProfile()
@@ -220,7 +222,7 @@ class BrightnessPipelineController(
         brightness.clearSelfWriteMarker()
         dimming.disengage()
         // A user-initiated Pause is NOT an override (pausedByOverride stays false → no alert, G2R-F35).
-        _state.update { it.copy(paused = true, pausedByOverride = false) }
+        _state.update { it.copy(paused = true, pausedByOverride = false, discardableOverride = null) }
     }
 
     /** prof761/task618 wake reinit: clear smoothing state, start sensing, set initial brightness. */
@@ -262,11 +264,13 @@ class BrightnessPipelineController(
 }
 
 /** Sink for manual-override training points (task561 %AAB_Overrides, G2R-F13). */
-fun interface OverridePointSink {
+interface OverridePointSink {
     suspend fun record(lux: Double, brightness: Double)
+    suspend fun discard(lux: Double, brightness: Double)
 }
 
 /** No-op sink for controller unit tests / when no persistence is wired. */
 object NoOpOverridePointSink : OverridePointSink {
     override suspend fun record(lux: Double, brightness: Double) = Unit
+    override suspend fun discard(lux: Double, brightness: Double) = Unit
 }

@@ -59,8 +59,16 @@ internal class PipelineCycleRunner(
     /** task569 Resume After Override: re-establish the initial brightness and clear the pause latch. */
     suspend fun resume() {
         // DC-008: the diagnostic describes the override being resumed FROM, so it dies with the pause.
-        ctx.update { it.copy(paused = false, pausedByOverride = false, overrideDiagnostic = null) }
+        ctx.update { it.copy(paused = false, pausedByOverride = false, overrideDiagnostic = null, discardableOverride = null) }
         setInitialBrightness(settingsProvider().also { ctx.cacheSettings(it) })
+    }
+
+    suspend fun discardOverride() {
+        ctx.stateValue.discardableOverride?.let { point ->
+            overrideSink.discard(point.first, point.second)
+            ctx.update { it.copy(overrideHistory = it.overrideHistory - point) }
+        }
+        resume()
     }
 
     /** task554 → task544 → task535 → task661: ingest a reading and animate; the caller gates the cooldown. */
@@ -335,6 +343,7 @@ internal class PipelineCycleRunner(
                 pausedByOverride = true,
                 overrideHistory = history,
                 overrideDiagnostic = diagnostic,
+                discardableOverride = history.firstOrNull(),
             )
         }
         history.firstOrNull()?.let { (lux, bright) -> overrideSink.record(lux, bright) }

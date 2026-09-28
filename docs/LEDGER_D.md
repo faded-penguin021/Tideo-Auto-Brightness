@@ -156,3 +156,10 @@
 - DD-010: **`bmgr` preconditions (2026-09-27).** A freshly installed app is `stopped=true` and
   refuses full backup until launched once; the Google transport restores a debug build signed
   with the same key, so no `bmgr transport` switch is needed.
+
+- DD-011 [cited]: **An override pause can be discarded from its notification (#134, 2026-09-28).**
+  Discard forgets the point that pause recorded, then resumes, unlike AAB's `_DiscardLastOverride`,
+  which pops the newest; with none remembered it only resumes. It matches by value, so if that point
+  was already tapped off the graph an identical older one goes instead, removing only a duplicate;
+  per-point ids were rejected as unjustified (owner). Android shows three actions at most,
+  so Discard · Resume · Disable replace Reset while a point is discardable.

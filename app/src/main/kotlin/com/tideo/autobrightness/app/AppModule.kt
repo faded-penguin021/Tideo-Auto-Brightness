@@ -11,6 +11,7 @@ import com.tideo.autobrightness.app.runtime.LiveRuntimeState
 import com.tideo.autobrightness.app.runtime.DebugSink
 import com.tideo.autobrightness.app.runtime.DisplayTogglesCoordinator
 import com.tideo.autobrightness.app.runtime.NightLightTemperatureRoute
+import com.tideo.autobrightness.app.runtime.OverridePointSink
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
@@ -34,6 +35,7 @@ import com.tideo.autobrightness.domain.brightness.TimeContext
 import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
 import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
 import com.tideo.autobrightness.domain.circadian.NightLightTemperatureRamp
+import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.AndroidSecureDimmingController
 import com.tideo.autobrightness.platform.context.AndroidLocationReader
@@ -122,7 +124,11 @@ class AppModule(context: Context) {
             ),
             debugSink = debugSink,
             // G2R-F13: persist captured override points.
-            overrideSink = { lux, brightness -> overridePointStore.record(lux, brightness) },
+            overrideSink = object : OverridePointSink {
+                override suspend fun record(lux: Double, brightness: Double) = overridePointStore.record(lux, brightness)
+                override suspend fun discard(lux: Double, brightness: Double) =
+                    overridePointStore.delete(OverridePoint(lux = lux, brightness = brightness))
+            },
             // prof759/task545: proximity damps smoothing alpha ×0.1.
             proximitySource = AndroidProximitySensorSource(appContext),
             callbackLog = LiveRuntimeState.sensorCallbacks,
