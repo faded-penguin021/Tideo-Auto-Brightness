@@ -12,11 +12,11 @@ Typed profile schema lives in `AabSettings` and stores migrated Tasker settings 
 | `%AAB_MaxBright` | `maxBrightness` | Int | `255` | `1..255`, `>= minBrightness` |
 | `%AAB_Offset` | `offset` | Int | `0` | `-255..255` |
 | `%AAB_Scale` | `scale` | Int | `1` | `1..10` |
-| `%AAB_Zone1End` | `zone1End` | Int | `35` | `1..20000` |
-| `%AAB_Zone2End` | `zone2End` | Int | `10000` | `1..100000`, `>= zone1End` |
-| `%AAB_Form1A` | `form1A` | Int | `5` | `1..20` |
-| `%AAB_Form2B` | `form2B` | Float | `8.8` | `0.1..30.0` |
-| `%AAB_Form2C` | `form2C` | Int | `18` | `1..50` |
+| `%AAB_Zone1End` | `zone1End` | Int | `35` | `>= 1` (DD-012) |
+| `%AAB_Zone2End` | `zone2End` | Int | `10000` | `>= zone1End` (DD-012) |
+| `%AAB_Form1A` | `form1A` | Double | `5` | finite, `>= 0` (DD-012) |
+| `%AAB_Form2B` | `form2B` | Float | `8.8` | finite (DD-012) |
+| `%AAB_Form2C` | `form2C` | Int | `18` | `<= zone1End` (DD-012) |
 | `%AAB_DimmingEnabled` | `dimmingEnabled` | Boolean | `false` | must be true/false |
 | `%AAB_DimmingStrength` | `dimmingStrength` | Int | `25` | `0..100` |
 | `%AAB_DimmingExponent` | `dimmingExponent` | Float | `2.5` | `0.5..5.0` |

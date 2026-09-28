@@ -127,4 +127,17 @@ class BrightnessEngineContractTest {
         assertTrue(dayOutput.scaleDynamic > nightOutput.scaleDynamic)
         assertTrue(dayOutput.targetBrightness >= nightOutput.targetBrightness)
     }
+
+    @Test
+    fun hugeCurveOutput_saturatesAtMaxInsteadOfWrapping() {
+        val output = engine.evaluate(
+            BrightnessPolicyInput(
+                lux = 20.0,
+                time = TimeContext(secondsOfDay = 12 * 3600.0),
+                previous = null,
+                curve = BrightnessCurveConfig(form1A = 1e10),
+            ),
+        )
+        assertEquals(255, output.targetBrightness)
+    }
 }

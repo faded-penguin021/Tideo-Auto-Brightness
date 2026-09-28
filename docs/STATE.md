@@ -21,7 +21,7 @@ This branch starts the 1.12.0 train from `main` after the 1.11.0 squash (#131), 
 #126/#127 override-attribution work (DC-002…DC-028), the runtime rot audit (DC-042…DC-046), the
 Night Light work (DC-053…DC-058), the proximity-damp parity restore (DC-064) and the closed
 light-stall train (DC-063, DC-065…DC-071, DD-001…DD-007), whose open findings H1 and H2 live in
-DD-003 and DD-002. It adds #134's notification Discard (DD-011). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+DD-003 and DD-002. It adds #134's notification Discard (DD-011) and #133's unclamped curve inputs (DD-012). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -113,6 +113,7 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-09-28 — **#133: curve inputs persist unclamped wherever Apply accepts them (DD-012).**
 - 2026-09-28 — **1.12.0/vc26 opened from `main` (v1.11.0 tagged, Owner-queue item closed); #134:
   the override notification can Discard the adjustment it just recorded (DD-011); owner passed
   `DEVICE_TEST_SCRIPT.md` step 57 on 1.12.0-debug vc26.**

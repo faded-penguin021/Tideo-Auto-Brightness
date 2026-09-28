@@ -120,9 +120,9 @@ class BrightnessEngine {
                 effectiveScale = scaleDynamic,
             )
         }
-        // Tasker task661 act16-21: clamp [MinBright, MaxBright] AFTER scaling; Math.round (ties toward +∞).
-        val targetBrightness = Math.round(scaleResult.calculatedBrightness).toInt()
-            .coerceIn(input.curve.minBrightness, input.curve.maxBrightness)
+        // Tasker task661 act16-21: clamp [MinBright, MaxBright] AFTER scaling; Math.round (ties toward +∞); Long first, DD-012.
+        val targetBrightness = Math.round(scaleResult.calculatedBrightness)
+            .coerceIn(input.curve.minBrightness.toLong(), input.curve.maxBrightness.toLong()).toInt()
 
         val (steps, wait, throttle) = calculateAnimation(
             alpha = luxAlpha,
