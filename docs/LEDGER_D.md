@@ -170,3 +170,9 @@
   `validate()` now repairs only non-finite values, Form1A<0, Form2C>Zone1End, Zone1End<1 and
   Zone2End<Zone1End; Form3A≥0 stays Apply's job (D-169). The engine clamps before narrowing to
   Int, and the graph's fixed 100k-lux axis stays, as in Tasker (owner).
+
+- DD-013: **PWM mode without WRITE_SECURE_SETTINGS pins the hardware at the threshold, uncompensated
+  (2026-09-28).** A fresh debug install restored a PWM-on profile (threshold 150) but no adb grant, so
+  the screen sat at 2409/4095 while the notification showed the perceived 28: the D-050 floor ignores
+  the tier, and the unprivileged overlay that compensates in Tasker is deferred (D-040). The restore
+  worked as intended (DD-008); owner: leave as is, grant the permission after a restore.
