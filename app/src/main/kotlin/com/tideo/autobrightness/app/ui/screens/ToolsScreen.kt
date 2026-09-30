@@ -52,6 +52,7 @@ import com.tideo.autobrightness.app.navigation.AppRoute
 import com.tideo.autobrightness.app.runtime.PowerDrawCalibrator
 import com.tideo.autobrightness.app.runtime.PowerDrawProgress
 import com.tideo.autobrightness.app.settings.toBrightnessCurveConfig
+import com.tideo.autobrightness.app.settings.validate
 import com.tideo.autobrightness.app.state.ControlPrefsViewModel
 import com.tideo.autobrightness.app.state.CurveSuggestionPreview
 import com.tideo.autobrightness.app.state.PowerDrawViewModel
@@ -134,14 +135,14 @@ fun ToolsScreen(
         onApplyWizard = { result ->
             val cfg = CurveSuggestionEngine.applyToLiveCurve(result, settings.toBrightnessCurveConfig())
             vm.update { s ->
-                // G2R-F70: form1A (Double) lands exactly; Int fields round.
+                // G2R-F70: form1A (Double) lands exactly; Int fields round. DD-012: memory = disk.
                 s.copy(
                     form1A = cfg.form1A,
                     zone1End = Math.round(cfg.zone1End).toInt(),
                     form2B = cfg.form2B.toFloat(),
                     form2C = Math.round(cfg.form2C).toInt(),
                     zone2End = Math.round(cfg.zone2End).toInt(),
-                )
+                ).validate()
             }
         },
         powerSamples = powerSamples,

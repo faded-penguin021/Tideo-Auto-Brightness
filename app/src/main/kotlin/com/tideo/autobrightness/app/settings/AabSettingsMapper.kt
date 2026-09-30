@@ -62,14 +62,16 @@ fun AabSettings.toDynamicScalingConfig(): DynamicScalingConfig = DynamicScalingC
 )
 
 fun AabSettings.validate(): AabSettings {
-    // D-146: NaN → default; ±Infinity auto-clamped by coerceIn.
+    // D-146: NaN → default; ±Infinity auto-clamped by coerceIn, or → default where DD-012 left no bound.
     fun Float.nanTo(default: Float): Float = if (isNaN()) default else this
     fun Double.nanTo(default: Double): Double = if (isNaN()) default else this
+    fun Float.finiteOr(default: Float): Float = if (isFinite()) this else default
+    fun Double.finiteOr(default: Double): Double = if (isFinite()) this else default
     val d = AabSettings()
 
     // G3-F3: floor is 0 (OEM minimum, dimmest not screen-off), not 1.
     val clampedMinBrightness = minBrightness.coerceIn(0, 255)
-    val clampedZone1End = zone1End.coerceIn(1, 20_000)
+    val clampedZone1End = zone1End.coerceAtLeast(1)
     val clampedMinWait = minWaitMs.coerceIn(1, 5_000)
     return copy(
         minBrightness = clampedMinBrightness,
@@ -77,10 +79,10 @@ fun AabSettings.validate(): AabSettings {
         offset = offset.coerceIn(-255, 255),
         scale = scale.nanTo(d.scale).coerceIn(0.1f, 10.0f),
         zone1End = clampedZone1End,
-        zone2End = zone2End.coerceIn(clampedZone1End, 100_000),
-        form1A = form1A.nanTo(d.form1A).coerceIn(1.0, 20.0),
-        form2B = form2B.nanTo(d.form2B).coerceIn(0.1f, 30f),
-        form2C = form2C.coerceIn(1, 50),
+        zone2End = zone2End.coerceAtLeast(clampedZone1End),
+        form1A = form1A.finiteOr(d.form1A).coerceAtLeast(0.0),
+        form2B = form2B.finiteOr(d.form2B),
+        form2C = form2C.coerceAtMost(clampedZone1End),
         // DB-008 (issue #110): clamp SETPOINT to 65 (runtime always clamped; UI/persistence must agree).
         dimmingStrength = dimmingStrength.coerceIn(0, MAX_DIMMING_STRENGTH_SETPOINT),
         dimmingExponent = dimmingExponent.nanTo(d.dimmingExponent).coerceIn(0.5f, 5f),

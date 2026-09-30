@@ -670,6 +670,14 @@ authorized**) first, then a root shell; the switch itself always persists.
     "settling" count moves only on a sensor that goes silent; one that keeps reporting settles on
     its own readings (DD-006).
 
+## 17. Discarding an override (DD-011)
+
+57. **Discard forgets only that adjustment.** Move the brightness slider with the service running.
+    **Expected:** the heads-up reads Discard · Resume · Disable, and Curve & Brightness already
+    shows the new blue dot. Tapping Discard resumes auto brightness, returns the notification to
+    its normal actions (Reset back), and removes that dot, leaving the others. Repeat with Resume:
+    it resumes and the dot stays.
+
 ---
 
 **On completion:** flip the affected `PARITY_CHECKLIST.md` rows to `device-verified`; record any failures

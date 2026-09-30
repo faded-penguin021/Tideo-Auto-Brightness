@@ -68,6 +68,7 @@ data class PipelineState(
     // DC-007: event-scoped, written where an override is detected OR dismissed.
     val overrideDiagnostic: OverrideDiagnostic? = null,
     val overrideHistory: List<Pair<Double, Double>> = emptyList(),
+    val discardableOverride: Pair<Double, Double>? = null,
     // S12.9d: drives Dashboard staleness gate (FRESH/AGING/STALE).
     val lastPublishMs: Long? = null,
     val sensor: SensorDiagnostics = SensorDiagnostics(),
@@ -103,6 +104,8 @@ sealed interface PipelineEvent {
 
     /** User tapped Resume (task569). */
     data object Resume : PipelineEvent
+
+    data object DiscardOverride : PipelineEvent
 
     /** An external brightness write was detected as a manual override (prof755 / task567). */
     data class OverrideDetected(val observedBrightness: Int, val source: OverrideSource) : PipelineEvent

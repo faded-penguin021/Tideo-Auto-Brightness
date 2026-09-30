@@ -156,3 +156,23 @@
 - DD-010: **`bmgr` preconditions (2026-09-27).** A freshly installed app is `stopped=true` and
   refuses full backup until launched once; the Google transport restores a debug build signed
   with the same key, so no `bmgr transport` switch is needed.
+
+- DD-011 [cited]: **An override pause can be discarded from its notification (#134, 2026-09-28).**
+  Discard forgets the point that pause recorded, then resumes, unlike AAB's `_DiscardLastOverride`,
+  which pops the newest; with none remembered it only resumes. It matches by value, so if that point
+  was already tapped off the graph an identical older one goes instead, removing only a duplicate;
+  per-point ids were rejected as unjustified (owner). Android shows three actions at most,
+  so Discard · Resume · Disable replace Reset while a point is discardable.
+
+- DD-012 [cited]: **Curve inputs persist unclamped where Apply accepts them (#133, 2026-09-28).**
+  The rebuild-invented ranges (Form1A 1..20, Form2B 0.1..30, Form2C 1..50, zone ends ≤20k/100k)
+  cut valid wizard and hand-made curves on the next cold read or profile load; Tasker bounds none.
+  `validate()` now repairs only non-finite values, Form1A<0, Form2C>Zone1End, Zone1End<1 and
+  Zone2End<Zone1End; Form3A≥0 stays Apply's job (D-169). The engine clamps before narrowing to
+  Int, and the graph's fixed 100k-lux axis stays, as in Tasker (owner).
+
+- DD-013: **PWM mode without WRITE_SECURE_SETTINGS pins the hardware at the threshold, uncompensated
+  (2026-09-28).** A fresh debug install restored a PWM-on profile (threshold 150) but no adb grant, so
+  the screen sat at 2409/4095 while the notification showed the perceived 28: the D-050 floor ignores
+  the tier, and the unprivileged overlay that compensates in Tasker is deferred (D-040). The restore
+  worked as intended (DD-008); owner: leave as is, grant the permission after a restore.

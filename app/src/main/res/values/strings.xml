@@ -26,7 +26,7 @@
     <string name="notif_text_monitoring">Monitoring ambient light</string>
     <string name="notif_subtext_context">Context: %1$s</string>
     <string name="notif_override_title">Manual override detected</string>
-    <string name="notif_override_text">Auto Brightness paused — tap Resume to continue</string>
+    <string name="notif_override_text">Auto Brightness paused — Resume keeps this adjustment as a curve point, Discard forgets it</string>
     <string name="flash_manual_override">Manual override — auto brightness paused</string>
     <!-- DB-035: why an external control command did nothing (debug level 8 only) -->
     <string name="flash_control_gate_off">Control command ignored — external control is off (Tools → Automation control)</string>

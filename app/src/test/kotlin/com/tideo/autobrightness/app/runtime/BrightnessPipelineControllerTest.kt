@@ -138,6 +138,7 @@ class BrightnessPipelineControllerTest {
         callbackLog: SensorCallbackLog = SensorCallbackLog(),
         debugSink: DebugSink = NoOpDebugSink,
         dimming: DimmingCoordinator = NoOpDimmingCoordinator,
+        overrideSink: OverridePointSink = NoOpOverridePointSink,
     ): Pair<BrightnessPipelineController, CoroutineScope> {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val controller = BrightnessPipelineController(
@@ -151,6 +152,7 @@ class BrightnessPipelineControllerTest {
             callbackLog = callbackLog,
             debugSink = debugSink,
             dimming = dimming,
+            overrideSink = overrideSink,
         )
         return controller to scope
     }
@@ -491,6 +493,77 @@ class BrightnessPipelineControllerTest {
         advanceUntilIdle()
         assertTrue(controller.state.value.paused)
         assertTrue(!controller.state.value.pausedByOverride, "a user Pause is not an override")
+        scope.cancel()
+    }
+
+    private class RecordingSink : OverridePointSink {
+        val points = mutableListOf<Pair<Double, Double>>()
+        val discarded = mutableListOf<Pair<Double, Double>>()
+        override suspend fun record(lux: Double, brightness: Double) { points.add(0, lux to brightness) }
+        override suspend fun discard(lux: Double, brightness: Double) {
+            discarded += lux to brightness
+            points.remove(lux to brightness)
+        }
+    }
+
+    @Test
+    fun discardOverride_forgetsOnlyThePointThisPauseRecorded_andResumes() = runTest {
+        val observer = FakeObserver()
+        val brightness = FakeBrightness()
+        val sink = RecordingSink()
+        var nowMs = 1_000L
+        val (controller, scope) = newController(
+            brightness = brightness, observer = observer, clock = { nowMs }, overrideSink = sink,
+        )
+        controller.start()
+        brightness.current = 90
+        observer.flow.emit(90)
+        advanceUntilIdle()
+        controller.resume()
+        advanceUntilIdle()
+        val kept = sink.points.single()
+        val pastResumesSettleWindowMs = 10_000L
+        nowMs += pastResumesSettleWindowMs
+
+        brightness.current = 200
+        observer.flow.emit(200)
+        advanceUntilIdle()
+        val recorded = controller.state.value.discardableOverride
+        assertEquals(sink.points.first(), recorded, "the pause remembers the point it just recorded")
+
+        controller.discardOverride()
+        advanceUntilIdle()
+
+        val s = controller.state.value
+        assertEquals(listOf(recorded!!), sink.discarded)
+        assertEquals(listOf(kept), sink.points, "the earlier point survives")
+        assertEquals(listOf(kept), s.overrideHistory)
+        assertFalse(s.paused, "Discard resumes")
+        assertFalse(s.pausedByOverride)
+        assertNull(s.discardableOverride)
+        scope.cancel()
+    }
+
+    @Test
+    fun discardOverride_withNothingRecorded_onlyResumes() = runTest {
+        val observer = FakeObserver()
+        val sink = RecordingSink()
+        val (controller, scope) = newController(observer = observer, clock = { 1000L }, overrideSink = sink)
+        controller.start()
+        observer.flow.emit(200)
+        advanceUntilIdle()
+        controller.resume()
+        advanceUntilIdle()
+        assertNull(controller.state.value.discardableOverride, "Resume keeps the point and ends the offer")
+
+        controller.pause()
+        advanceUntilIdle()
+        controller.discardOverride()
+        advanceUntilIdle()
+
+        assertTrue(sink.discarded.isEmpty(), "a user Pause recorded nothing, so nothing is discarded")
+        assertEquals(1, sink.points.size)
+        assertFalse(controller.state.value.paused)
         scope.cancel()
     }
 

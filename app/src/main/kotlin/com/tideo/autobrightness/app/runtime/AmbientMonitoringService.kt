@@ -168,6 +168,10 @@ class AmbientMonitoringService : Service() {
                 ensureRunning()
                 controller.resume()
             }
+            ACTION_DISCARD_OVERRIDE -> {
+                ensureRunning()
+                controller.discardOverride()
+            }
             ACTION_REAPPLY -> {
                 // D-140: REAPPLY on not-running instance must not birth the pipeline.
                 if (!controller.state.value.serviceOn) return stopNotRunning(startId)
@@ -480,9 +484,7 @@ class AmbientMonitoringService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVibrate(longArrayOf(0, 200, 100, 200))
-            .addAction(0, getString(R.string.action_resume), actionIntent(ACTION_RESUME))
-            .addAction(0, getString(R.string.action_reset), actionIntent(ACTION_PANIC))
-            .addAction(0, getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
+            .addOverrideActions()
             .build()
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, alert)
         // G2R-F91: route through shared AabFlash surface (overlay → pill → Toast fallback).
@@ -508,6 +510,7 @@ class AmbientMonitoringService : Service() {
         val serviceOn: Boolean = true,
         val activeContext: String? = null,
         val pausedByOverride: Boolean = false,
+        val canDiscard: Boolean = false,
     )
 
     internal fun foregroundNotification(state: PipelineState, activeContext: String?): Notification =
@@ -520,6 +523,7 @@ class AmbientMonitoringService : Service() {
         state.serviceOn,
         activeContext,
         state.pausedByOverride,
+        state.paused && state.discardableOverride != null,
     )
 
     private fun buildNotification(model: NotificationModel): Notification {
@@ -547,7 +551,8 @@ class AmbientMonitoringService : Service() {
             .setOnlyAlertOnce(true)
         contextLine?.let { builder.setSubText(it) }
 
-        // F76: NO Pause action (confused users); Resume/Reset/Disable only.
+        // F76: NO Pause action (confused users). DD-011: Discard displaces Reset (three actions max).
+        if (model.canDiscard) return builder.addOverrideActions().build()
         if (model.paused) {
             builder.addAction(0, getString(R.string.action_resume), actionIntent(ACTION_RESUME))
         }
@@ -555,6 +560,11 @@ class AmbientMonitoringService : Service() {
         builder.addAction(0, getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
         return builder.build()
     }
+
+    private fun NotificationCompat.Builder.addOverrideActions() = this
+        .addAction(0, getString(R.string.action_discard), actionIntent(ACTION_DISCARD_OVERRIDE))
+        .addAction(0, getString(R.string.action_resume), actionIntent(ACTION_RESUME))
+        .addAction(0, getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
 
     private fun actionIntent(action: String): PendingIntent {
         // CWE-927: explicit Intent; component + package on separate statements for CodeQL.
@@ -606,6 +616,7 @@ class AmbientMonitoringService : Service() {
         const val ACTION_START = "com.tideo.autobrightness.runtime.action.START"
         const val ACTION_PAUSE = "com.tideo.autobrightness.runtime.action.PAUSE"
         const val ACTION_RESUME = "com.tideo.autobrightness.runtime.action.RESUME"
+        const val ACTION_DISCARD_OVERRIDE = "com.tideo.autobrightness.runtime.action.DISCARD_OVERRIDE"
         const val ACTION_DISABLE = "com.tideo.autobrightness.runtime.action.DISABLE"
         const val ACTION_PANIC = "com.tideo.autobrightness.runtime.action.PANIC"
         const val ACTION_REAPPLY = "com.tideo.autobrightness.runtime.action.REAPPLY"
