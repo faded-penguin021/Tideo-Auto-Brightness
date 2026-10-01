@@ -28,8 +28,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 ## Active work
 
-- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0
-  done, S1–S9 open; no device mutation before S4's recovery contract is Sol-reviewed.
+- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S1
+  done, S2–S9 open; no device mutation before S4's recovery contract is Sol-reviewed.
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
@@ -113,6 +113,9 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-01 — **E2E S1: `e2e/` scaffolding (pinned uv + lock, every device-script step classified
+  in `scenarios.toml`, manifest and identifier-scan unit tests) and the framework decision
+  (DD-015); RUNBOOK now requires script and manifest to change together.**
 - 2026-10-01 — **The PWM software-exponent help now matches `finalDimLevel` (higher dims more),
   departing from task702's flash; the owner ports it back to AAB (DD-014).**
 - 2026-09-28 — **#133: curve inputs persist unclamped wherever Apply accepts them (DD-012); owner

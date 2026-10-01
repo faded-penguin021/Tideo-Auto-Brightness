@@ -37,3 +37,10 @@ google-services.json
 # directory where that misreading is expensive. If a real need appears, force-add it explicitly.
 .env.*
 secrets.properties
+
+# Real-device E2E suite (local state, evidence, venv)
+e2e/.state/
+e2e/evidence/
+e2e/.venv/
+e2e/**/__pycache__/
+e2e/.pytest_cache/

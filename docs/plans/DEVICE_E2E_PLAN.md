@@ -70,6 +70,11 @@ inventory):
 - Allowed: WRITE_SECURE_SETTINGS grant/revoke on the debug package; PANIC and force-stop of the
   debug package; Tideo prefs through the UI with restore.
 - No reboot.
+- **2026-10-01:** `bmgr restore <token> <package>` is allowed, token and package both required.
+  Without a package, `bmgr restore` restores, and largely wipes, every app on the phone, so the
+  boundary must reject every other `bmgr` shape. A failed package-scoped restore still wipes that
+  package (DD-009), so snapshot with `run-as` first. No scenario uses it unless the owner asks:
+  STATE still declines a scripted `bmgr restore` step.
 - No Windows username, email, device serial or other personal identifier in any file under `e2e/`.
 
 ## 1. Decision: mobile-use over Artemis (a ledger row in segment S1)
@@ -178,7 +183,8 @@ bounded, attributable effect, so an already-true state can never pass it:
      - `pm clear`, any uninstall, install outside the guard;
      - `rm`, `settings delete|reset`;
      - `wipe`, `recovery`, `bootloader`, `fastboot`, `reboot`;
-     - `setprop`, `cmd overlay`, `appops reset`, `bmgr`, `content delete|update|insert`, mutating
+     - `setprop`, `cmd overlay`, `appops reset`, `bmgr` (except the one owner-allowed form under
+       Owner decisions), `content delete|update|insert`, mutating
        `run-as`;
      - force-stop of any other package.
 2. **UI boundary** (independent of the command boundary). An allowed tap can still trigger

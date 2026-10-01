@@ -41,6 +41,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | Threat model — assets, attackers, invariants | `SECURITY_AUDIT_MODEL.md` |
 | The standing on-device acceptance pass (permanent, cited by §number) | `DEVICE_TEST_SCRIPT.md` |
 | What the *unreleased* train changed, for the owner to check (ephemeral) | `DEVICE_TEST_SCRIPT_<version>.md` |
+| The executable twin of that pass: one row per step, auto / partial / manual | `e2e/scenarios.toml` |
 | Which control enforces an invariant, and what proves it | `SECURITY_REVIEW.md` |
 | Numbered deviations — solved mistakes + ongoing (⭐, append in the live file, D-153 rollover; `[cited]` = code-anchored, D-174) | `docs/LEDGER.md` (later `_A.md`/DA-…, `_B.md`/DB-…) |
 
@@ -122,6 +123,13 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
   Changelog lines + ledger rows — that precondition is the rule, so a tree carrying no plan file means
   every plan landed, not that one went missing. Code comments cite `D-NN`, never the plan file (it
   dies; the ledger doesn't).
+- **Device steps change in two places.** `DEVICE_TEST_SCRIPT.md` is the human-readable spec and
+  `e2e/scenarios.toml` its machine/agent-executable twin. Any change that adds, removes or rewrites
+  a numbered step updates both in the same commit, whatever playbook it falls under: the step in
+  the script, and its row (status, effects, reason, and the test once one exists) in the manifest.
+  A plan that will add device steps names both files in the segment that adds them. **Layer:** the
+  `e2e` manifest test fails on a step without a row, but only when `e2e/run.sh tests/unit` runs;
+  neither `scripts/ladder.sh` nor CI runs it, so at the ladder this is prose-only.
 - **Record:** note the deviation-from-Tasker explicitly in `STATE.md`.
 
 ### 6. Cutting a release / version bump
@@ -221,8 +229,9 @@ so check it explicitly.
   `DEVICE_TEST_SCRIPT_<version>.md` — what *this* unreleased train changed, so the owner isn't
   re-running the whole app to check one fix. It is **ephemeral**: when the version ships, fold
   anything with standing value into the numbered sections of `DEVICE_TEST_SCRIPT.md` (append or
-  extend an existing step — sections are cited by number, so never renumber) and **delete** the
-  round file. Git history is its archive; `docs/history/` is not (that is the frozen migration
+  extend an existing step — sections are cited by number, so never renumber), add or update the
+  matching `e2e/scenarios.toml` rows (playbook 5, "Device steps change in two places"), and
+  **delete** the round file. Git history is its archive; `docs/history/` is not (that is the frozen migration
   record and takes no maintenance-era files). Two round scripts alive at once means the previous
   one should already have been retired.
 - **Record:** a `STATE.md` Changelog line; if the version drifted or you changed the release

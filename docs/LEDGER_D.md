@@ -184,3 +184,12 @@
   dims more at every target below the threshold, and because the bias is floored at 10 the darkest
   level depends on it too (threshold 15: about 51 % at 0.8, 93 % at 3.0). `help_pwm_exponent` now
   says so, deliberately without the ~94 % cap (owner); no maths changed.
+
+- DD-015: **The real-device E2E suite drives the phone with uiautomator2 + adbutils directly, behind
+  a deny-by-default command and UI boundary and a conflict-aware recovery journal (2026-10-01,
+  owner-approved 2026-09-13).** Artemis was rejected because it rewrites
+  `enabled_accessibility_services`, which holds Tideo's own service; mobile-use stays only as an
+  offline triage tool over sanitised evidence, since live it uninstalls packages and swaps IMEs.
+  `e2e/scenarios.toml` classifies every `DEVICE_TEST_SCRIPT.md` step and must change with it;
+  profile-changing steps stay manual, because the settings, baseline and profile-name tuple cannot
+  be restored.
