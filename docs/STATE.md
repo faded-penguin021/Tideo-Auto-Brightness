@@ -113,6 +113,8 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-01 — **The PWM software-exponent help now matches `finalDimLevel` (higher dims more),
+  departing from task702's flash; the owner ports it back to AAB (DD-014).**
 - 2026-09-28 — **#133: curve inputs persist unclamped wherever Apply accepts them (DD-012); owner
   confirmed on 1.12.0-debug vc26 that a Form1A-40 curve and #133's exact curve (Form1A 28.7353),
   loaded as profiles, survive, the latter after a force-stop.**

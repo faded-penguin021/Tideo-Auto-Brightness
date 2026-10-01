@@ -176,3 +176,11 @@
   the screen sat at 2409/4095 while the notification showed the perceived 28: the D-050 floor ignores
   the tier, and the unprivileged overlay that compensates in Tasker is deferred (D-040). The restore
   worked as intended (DD-008); owner: leave as is, grant the permission after a restore.
+
+- DD-014 [cited]: **The PWM software-exponent help is corrected away from task702's flash (2026-10-01,
+  owner; the owner ports the new text back to AAB, as in D-168).** Tasker's text said higher values
+  keep the screen brighter for longer and change only the transition, not how much it dims.
+  `finalDimLevel` does the opposite: its level is 99·(1 − r^exp) with r < 1, so a higher exponent
+  dims more at every target below the threshold, and because the bias is floored at 10 the darkest
+  level depends on it too (threshold 15: about 51 % at 0.8, 93 % at 3.0). `help_pwm_exponent` now
+  says so, deliberately without the ~94 % cap (owner); no maths changed.
