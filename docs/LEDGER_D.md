@@ -193,3 +193,9 @@
   `e2e/scenarios.toml` classifies every `DEVICE_TEST_SCRIPT.md` step and must change with it;
   profile-changing steps stay manual, because the settings, baseline and profile-name tuple cannot
   be restored.
+
+- DD-016: **The E2E boundary gates adb where adbutils opens services, not at the harness's own
+  calls (2026-10-01).** That is the one chokepoint library internals share; it also shells out to
+  an `adb` binary (`adb_output`, server auto-start), now refused, and a device is bound by serial
+  because a transport id cannot be tied to one. It confines libraries and honest harness code, not
+  code written to evade it: a source tripwire covers that, and occlusion is left to S6's smoke run.
