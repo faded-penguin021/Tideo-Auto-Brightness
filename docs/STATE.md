@@ -29,7 +29,7 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 ## Active work
 
 - **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S2
-  done, S3–S9 open; no device mutation before S4's recovery contract is Sol-reviewed.
+  done, S4–S9 open; no device mutation before S4's blocking Sol review of S2–S4.
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
@@ -113,6 +113,9 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-01 — **E2E S3: effect inventory, write-ahead recovery journal and recovery procedure
+  (`e2e/tideo_e2e/effects.py`, `journal.py`, `recovery.py`), killed at every call and journal
+  write in unit tests; no device contacted (DD-017).**
 - 2026-10-01 — **E2E S2: the command and UI boundary (`e2e/tideo_e2e/device.py`, `ui.py`) with
   evasion tests and a dependency drift alarm; no device contacted (DD-016).**
 - 2026-10-01 — **E2E S1: `e2e/` scaffolding (pinned uv + lock, every device-script step classified

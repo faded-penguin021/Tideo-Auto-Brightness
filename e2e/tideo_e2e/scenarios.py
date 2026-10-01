@@ -14,7 +14,7 @@ MANIFEST = E2E_ROOT / "scenarios.toml"
 
 STATUSES = frozenset({"auto", "partial", "manual"})
 
-# Coarse effect kinds; S3's effect inventory maps each to concrete keys and recovery.
+# Coarse effect kinds; effects.INVENTORY maps each to concrete keys, flags and a run stage.
 EFFECTS = frozenset({
     "read_only",            # reads only
     "ui_nav",               # navigates Tideo's UI, changes nothing

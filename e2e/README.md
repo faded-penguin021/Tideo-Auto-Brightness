@@ -5,9 +5,9 @@ host's adb server. The Markdown script stays the human spec; `scenarios.toml` ho
 script step, classified `auto`, `partial` or `manual` with a reason. Decision and safety model:
 DD-015.
 
-**Status: boundary built, no device contact yet.** The recovery journal and the scenarios arrive
-in later segments. No device mutation is authorised until the recovery contract is implemented,
-interruption-tested and reviewed.
+**Status: boundary and recovery built, no device contact yet.** The scenarios, the device-side
+recovery port and `run.sh --recover` arrive with S4. No device mutation is authorised until the
+recovery contract has passed its blocking review.
 
 ## Safety boundary
 
@@ -26,6 +26,20 @@ interruption-tested and reviewed.
   that writes to a raw adb socket, calls the saved originals or spawns a process would pass
   around them; `test_boundary_tripwire.py` fails if harness code outside the boundary modules
   does any of that.
+- **Effects** (`tideo_e2e/effects.py`). Each effect kind a scenario declares maps to the settings
+  keys, grant, prefs and runtime state it may change, directly or through Tideo, plus a run
+  stage (settings → service/wake → grant → revoke/force-stop → PANIC) and the preflight SKIP
+  rules.
+- **Journal** (`tideo_e2e/journal.py`), in the private store `${XDG_STATE_HOME:-~/.local/state}/
+  tideo-e2e/` (0700), never under `e2e/`. Bound to a salted serial digest, user and package
+  identity; one run or recovery at a time (flock). Each entry is fsync'd before the mutation it
+  covers, holding the original and every value the run caused. A journal on disk blocks the next
+  run.
+- **Recovery** (`tideo_e2e/recovery.py`), one procedure for teardown and `--recover`: quiesce the
+  service, restore grant and prefs, restore settings, verify twice a settle window apart, then
+  restore the runtime state. A key holding a value the run did not cause is a **conflict**: never
+  written, kept in the journal and reported until it is back at its original or the owner
+  resolves it. Unit tests kill it at every call and every journal write and rerun it.
 - **Drift alarm** (`tideo_e2e/drift.py`). A pin bump that changes any device-facing line of
   adbutils or uiautomator2 fails `test_dependency_drift.py` until the new lines are checked.
 

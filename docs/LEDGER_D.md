@@ -199,3 +199,10 @@
   an `adb` binary (`adb_output`, server auto-start), now refused, and a device is bound by serial
   because a transport id cannot be tied to one. It confines libraries and honest harness code, not
   code written to evade it: a source tripwire covers that, and occlusion is left to S6's smoke run.
+
+- DD-017: **E2E recovery attributes values, not keys: it restores a key only from a value the run
+  caused, and keeps the service off while any conflict stands (2026-10-01).** A running service
+  would write over a conflicted key. Android has no conditional write, so the residual windows
+  (read→restore, action→observe, the stop's own teardown) are named in `recovery.py`. The exception
+  is brightness and the Extra Dim level under a run that touched the service: the pipeline moves
+  them faster than any observation, so any value they hold counts as the run's.
