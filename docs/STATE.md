@@ -113,6 +113,9 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-01 — **#138's grouped github-actions bump (wrapper-validation 6.4.0, setup-java 6.0.1,
+  setup-android 4.0.4, codeql-action 4.38.2) cherry-picked onto this train after full CI went
+  green on the PR; every pin resolved to its tag by hand; #138 closed as included.**
 - 2026-10-01 — **E2E S3: effect inventory, write-ahead recovery journal and recovery procedure
   (`e2e/tideo_e2e/effects.py`, `journal.py`, `recovery.py`), killed at every call and journal
   write in unit tests; no device contacted (DD-017).**
