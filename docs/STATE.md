@@ -29,8 +29,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 ## Active work
 
 - **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S4
-  code done (scenarios and install guard, DD-020); owed before any device mutation: the one full
-  ladder (owner), then the blocking Sol review of S2–S4; S5–S9 open. Owed when the partial rows
+  code done (scenarios and install guard, DD-020), full ladder green; owed before any device
+  mutation: the blocking Sol review of S2–S4; S5–S9 open. Owed when the partial rows
   get tests, from Sol on S4a: a dialog-root flag for SaveProfileDialog before s14_50, and the
   native flash overlay has no resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
@@ -116,6 +116,9 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-02 — **The full ladder S4a deferred, run on `b761165`: green, Gradle set included —
+  `:app` 766 tests (incl. `TestTagsAsResourceIdTest`), `:domain` 134, `:platform` 146 + 146, 0
+  failures, `:app:assembleDebug` rebuilt; x86_64 Temurin 21 under QEMU on the aarch64 container.**
 - 2026-10-02 — **E2E S4c+S4d: 21 device scenarios behind an effect-gated `Run`, every Privileged
   Display preference journaled, Discard allowlisted for the suite's own curve points (owner), and
   the guarded `run.sh --install`; Sol's unit review found 11 issues, all fixed; no device
