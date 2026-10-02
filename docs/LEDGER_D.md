@@ -206,3 +206,9 @@
   (read→restore, action→observe, the stop's own teardown) are named in `recovery.py`. The exception
   is brightness and the Extra Dim level under a run that touched the service: the pipeline moves
   them faster than any observation, so any value they hold counts as the run's.
+
+- DD-018 [cited]: **The app root exports Compose test tags as uiautomator resource-ids
+  (2026-10-02), the E2E suite's one production hook.** `TideoRootSurface` sets
+  `testTagsAsResourceId` once for the whole nav graph; a Robolectric test pins it. A `Dialog` is
+  its own window and inherits nothing, so one gets the flag only when a scenario needs a tag inside
+  it.

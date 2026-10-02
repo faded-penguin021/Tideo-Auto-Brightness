@@ -8,8 +8,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.navigation.compose.rememberNavController
 import com.tideo.autobrightness.app.navigation.AppNavGraph
 import com.tideo.autobrightness.app.runtime.DebugCategory
@@ -24,9 +27,8 @@ import kotlinx.coroutines.flow.map
 @Composable
 fun AutoBrightnessApp() {
     TideoTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            // F88: host the in-app tap-to-dismiss flash surface above the nav graph so confirmations
-            // ("Applied") and foreground debug flashes can be tapped away (a plain Toast cannot).
+        TideoRootSurface {
+            // F88: confirmation and debug flashes above the nav graph, tap-dismissable unlike a Toast.
             AabFlashHost {
                 val navController = rememberNavController()
                 CompositionLocalProvider(LocalGraphMetricsSink provides rememberGraphMetricsSink()) {
@@ -35,6 +37,17 @@ fun AutoBrightnessApp() {
             }
         }
     }
+}
+
+// DD-018: test tags surface as uiautomator resource-ids for the device E2E suite.
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+internal fun TideoRootSurface(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxSize().semantics { testTagsAsResourceId = true },
+        color = MaterialTheme.colorScheme.background,
+        content = content,
+    )
 }
 
 /**

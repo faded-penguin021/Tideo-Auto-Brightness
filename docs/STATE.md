@@ -28,8 +28,9 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 ## Active work
 
-- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S2
-  done, S4–S9 open; no device mutation before S4's blocking Sol review of S2–S4.
+- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S3
+  done; S4 runs as S4a hook [x], S4b device port and install guard [ ], S4c scenarios [ ], then
+  one full ladder and the blocking Sol review of S2–S4 before any device mutation; S5–S9 open.
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
@@ -113,6 +114,9 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-02 — **E2E S4a: the app root exports Compose test tags as resource-ids
+  (`TideoRootSurface`, Robolectric-pinned); the Gradle set is deferred to one run after S4c
+  (owner) (DD-018).**
 - 2026-10-01 — **#138's grouped github-actions bump (wrapper-validation 6.4.0, setup-java 6.0.1,
   setup-android 4.0.4, codeql-action 4.38.2) cherry-picked onto this train after full CI went
   green on the PR; every pin resolved to its tag by hand; #138 closed as included.**
