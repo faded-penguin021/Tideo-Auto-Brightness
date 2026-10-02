@@ -5,9 +5,9 @@ host's adb server. The Markdown script stays the human spec; `scenarios.toml` ho
 script step, classified `auto`, `partial` or `manual` with a reason. Decision and safety model:
 DD-015.
 
-**Status: boundary, recovery and its device port built, no device contact yet.** The scenarios
-arrive with S4c and `--preflight` with S5. No device mutation is authorised until the recovery
-contract has passed its blocking review.
+**Status: boundary, recovery, scenarios and install guard built, no device contact yet.**
+`--preflight` arrives with S5. No device mutation is authorised until the full ladder and the
+blocking review of S2–S4 have passed.
 
 ## Safety boundary
 
@@ -36,7 +36,7 @@ contract has passed its blocking review.
   covers, holding the original and every value the run caused. A journal on disk blocks the next
   run.
 - **Recovery** (`tideo_e2e/recovery.py`), one procedure for teardown and `--recover`: quiesce the
-  service, restore grant and prefs, restore settings, verify twice a settle window apart, then
+  service, restore the grant, restore settings, then prefs, verify twice a settle window apart, then
   restore the runtime state. A key holding a value the run did not cause is a **conflict**: never
   written, kept in the journal and reported until it is back at its original or the owner
   resolves it. Unit tests kill it at every call and every journal write and rerun it.
@@ -46,6 +46,19 @@ contract has passed its blocking review.
   `serviceEnabled`; a broadcast would need external control on. Paused is the Resume action on
   Tideo's ongoing notification. Only Android user 0 is supported. A preference is restorable only
   through a registered UI routine, so a scenario must not journal one that has none.
+- **Scenarios** (`tests/test_s*.py`, runtime `tideo_e2e/harness.py`, fixture
+  `tests/conftest.py`). A test is marked with its row id and gets a `Run`, which refuses an
+  action whose effect kind the row does not declare, a setting outside the footprint, and a
+  control whose preferences are not journaled. Every Privileged Display preference the screen
+  reads back is journaled before the first tap, and the screen must open clean. The fixture
+  applies the SKIP rules, journals the footprint, and recovers after the test, pass or fail;
+  `test_harness.py` also checks each scenario's calls against its row statically. An injected
+  override's curve point is removed with the notification's Discard (owner, 2026-10-02), and the
+  run fails if the points differ afterwards; at the 50-point cap §2 SKIPs.
+- **Install guard** (`tideo_e2e/install.py`). Empty journal; debug package; the one signer's
+  SHA-256 equal to the installed `base.apk`'s (apksigner); versionCode not lower; the owner types
+  `INSTALL`. Then one streamed `cmd package install -r` of the inspected bytes, never -d, -g, -t
+  or an uninstall. Needs `JAVA_HOME` and the Android SDK (`ANDROID_HOME` or `local.properties`).
 - **Drift alarm** (`tideo_e2e/drift.py`). A pin bump that changes any device-facing line of
   adbutils or uiautomator2 fails `test_dependency_drift.py` until the new lines are checked.
 
@@ -62,9 +75,15 @@ resolved in `uv.lock`.
 
 ```
 e2e/run.sh tests/unit          # device-free: manifest, identifiers, boundary, drift
-e2e/run.sh -k s02_10b          # one scenario (once scenarios exist)
-TIDEO_E2E_SERIAL=<serial> e2e/run.sh --recover   # restore what an interrupted run left
+TIDEO_E2E_SERIAL=<serial> e2e/run.sh -k s02_10b      # one scenario
+TIDEO_E2E_SERIAL=<serial> e2e/run.sh -m smoke        # S6's smoke set
+TIDEO_E2E_SERIAL=<serial> e2e/run.sh --recover       # restore what an interrupted run left
+TIDEO_E2E_SERIAL=<serial> e2e/run.sh --install <apk> # guarded install of a debug build
 ```
+
+Without `TIDEO_E2E_SERIAL` every scenario SKIPs. `TIDEO_E2E_CONFIRM=contexts,automation` records
+the owner's confirmations for the SKIP rules. Wake scenarios (§2 10a, 10e) need the phone to
+wake unlocked; otherwise they stop, and `--recover` runs once it is unlocked.
 
 `--recover` exits 0 at once on an empty journal. Otherwise it checks the device's identity over
 a read-only session before anything else, then runs the recovery procedure. Exit 1 means

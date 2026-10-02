@@ -16,23 +16,139 @@ from . import device, state
 from .device import DEBUG_PKG, LAUNCH_FRESH_FLAGS, MAIN_ACTIVITY, WRITE_SECURE_SETTINGS
 from .journal import GRANT, PREF, SETTING, Identity
 from .recovery import RecoveryError
-from .ui import Target, Ui, UiAllowlist, UiDenied
+from .ui import SHADE_PKG, Target, Ui, UiAllowlist, UiDenied
 
 UI_POLLS = 10
 UI_POLL_S = 0.5
 
-# What the port itself may touch: open the Dashboard from the Menu, read and tap the switch.
-PORT_TARGETS = (
-    Target("menu_dashboard", DEBUG_PKG, "click", resource_id="menu_dashboard"),
-    Target("service_switch", DEBUG_PKG, "click", resource_id="service_switch"),
-    Target("service_switch_state", DEBUG_PKG, "read", resource_id="service_switch"),
-)
-PORT_UI = UiAllowlist(*PORT_TARGETS)
+SHADE_LABEL = "Tideo AB (Debug)"
+
+
+def _t(name: str, action: str, rid: str | None = None, **kw) -> Target:
+    return Target(name, DEBUG_PKG, action, resource_id=rid or name, **kw)
+
+
+def _shade(name: str, text: str) -> Target:
+    return Target(name, SHADE_PKG, "click", text=text, anchor=SHADE_LABEL)
+
+
+DALTONIZER_MODES = ("OFF", "GRAYSCALE", "PROTANOMALY", "DEUTERANOMALY", "TRITANOMALY")
+# The Privileged Display preferences its screen reads back from the device and Apply persists
+# with the whole draft (DeviceDisplaySnapshot.withDeviceSnapshot), each with the switch that sets
+# it; the Kelvin has no automatable control and the colour mode is a row of chips.
+PD_SWITCHES = {
+    "aab_settings/nightLightEnabled": "switch_nightLight",
+    "aab_settings/inversionEnabled": "switch_inversion",
+    "aab_settings/alwaysOnDisplayEnabled": "switch_alwaysOn",
+    "aab_settings/stayAwakeChargingEnabled": "switch_stayAwake",
+    "aab_settings/hdrForceSdrEnabled": "switch_hdrForceSdr",
+}
+PD_PREFS = (*PD_SWITCHES, "aab_settings/nightLightTemperature", "aab_settings/daltonizerMode")
+AUTOMATION = "control_prefs/external_control_enabled"
+STRENGTH = "aab_settings/dimmingStrength"
+
+# Every Tideo control the suite may act on, with the effect kinds a tap on it can have; a scenario
+# may tap a target only when its row declares one of them (harness.Run.tap). Reads change nothing.
+# `apply_settings` is the shared draft Apply bar: Super Dimming's writes prefs, Privileged
+# Display's writes display keys too, and prefs_ui's footprint covers both. A shade action also
+# needs notification_action: Reset is PANIC, and Discard deletes a curve point.
+TARGETS: dict[str, tuple[Target, frozenset[str]]] = {
+    t.name: (t, frozenset(effects)) for t, effects in (
+        *((_t(f"menu_{route}", "click"), ("ui_nav",)) for route in (
+            "dashboard", "live_debug", "privileged_display", "super_dimming", "tools")),
+        (_t("service_switch", "click"), ("service_toggle",)),
+        (_t("automation_toggle", "click"), ("prefs_ui",)),
+        (_t("field_dimmingStrength", "edit"), ("prefs_ui",)),
+        (_t("apply_settings", "click"), ("prefs_ui", "privileged_apply")),
+        *((_t(switch, "click"), ("privileged_apply",)) for switch in PD_SWITCHES.values()),
+        *((_t(f"daltonizer_{m.lower()}", "click"), ("privileged_apply",))
+          for m in DALTONIZER_MODES),
+        (_t("pd_stay_awake_custom_preserved_overwrite", "click"), ("privileged_apply",)),
+        (_shade("shade_resume", "Resume"), ("notification_action",)),
+        (_shade("shade_discard", "Discard"), ("override_record",)),
+        (_shade("shade_reset", "Reset"), ("panic",)),
+        *((_t(f"{switch}_state", "read", switch), ()) for switch in PD_SWITCHES.values()),
+        *((_t(name, "read", rid), ()) for name, rid in (
+            ("service_switch_state", "service_switch"),
+            ("automation_toggle_state", "automation_toggle"),
+            ("apply_settings_shown", "apply_settings"),
+            ("menu_privileged_display_shown", "menu_privileged_display"),
+            ("menu_dashboard_shown", "menu_dashboard"),
+            ("field_dimmingStrength_text", "field_dimmingStrength"),
+            ("tier_badge", None), ("override_card", None), ("aab_flash", None),
+            ("pd_stay_awake_custom_preserved", None), ("pd_daltonizer_custom_preserved", None),
+            ("debug_override", None), ("debug_service", None), ("debug_current_bright", None),
+            ("debug_override_disposition", None), ("debug_override_values", None),
+            ("debug_override_age", None),
+        )),
+    )
+}
+# The preferences a control may change: each must be journaled before it is touched.
+TARGET_PREFS: dict[str, frozenset[str]] = {
+    "automation_toggle": frozenset({AUTOMATION}),
+    "field_dimmingStrength": frozenset({STRENGTH}),
+    "apply_settings": frozenset({STRENGTH, *PD_PREFS}),
+    "pd_stay_awake_custom_preserved_overwrite": frozenset(PD_PREFS),
+    **{switch: frozenset(PD_PREFS) for switch in PD_SWITCHES.values()},
+    **{f"daltonizer_{m.lower()}": frozenset(PD_PREFS) for m in DALTONIZER_MODES},
+}
+SUITE_UI = UiAllowlist(*(t for t, _ in TARGETS.values()))
+# What recovery may touch: the service switch, and every control a pref restorer uses.
+PORT_UI = UiAllowlist(*(TARGETS[n][0] for n in (
+    "menu_dashboard", "menu_dashboard_shown", "menu_privileged_display", "menu_super_dimming",
+    "menu_tools", "service_switch", "service_switch_state", "automation_toggle",
+    "automation_toggle_state", "field_dimmingStrength", "apply_settings", "apply_settings_shown",
+    *PD_SWITCHES.values(), *(f"{s}_state" for s in PD_SWITCHES.values()),
+    *(f"daltonizer_{m.lower()}" for m in DALTONIZER_MODES))))
 
 # Restoring a Tideo preference is a UI routine per key. A key without one cannot be restored,
-# so a scenario must not journal it (S4c registers the ones its scenarios change).
+# so a scenario must not journal it (harness.Run.expect_pref refuses). Recovery restores prefs
+# after device settings, so the Privileged Display screen then reads the original device state
+# back into its draft, and one Apply stores it whole.
 PrefRestorer = Callable[["DevicePort", str], None]
-PREF_RESTORERS: dict[str, PrefRestorer] = {}
+
+
+def _set_switch(port: DevicePort, switch: str, value: str) -> None:
+    if _retry(lambda: port.ui.checked(f"{switch}_state"), UI_POLLS, port.sleep) != (
+            value == "true"):
+        port.ui.click(switch)
+
+
+def _apply_if_shown(port: DevicePort) -> None:
+    if port.ui.exists("apply_settings_shown"):
+        port.ui.click("apply_settings")
+
+
+def _restore_automation(port: DevicePort, value: str) -> None:
+    port.open_screen("tools")
+    _set_switch(port, "automation_toggle", value)
+
+
+def _restore_strength(port: DevicePort, value: str) -> None:
+    port.open_screen("super_dimming")
+    _retry(lambda: port.ui.set_text("field_dimmingStrength", value), UI_POLLS, port.sleep)
+    _apply_if_shown(port)
+
+
+def _restore_privileged(key: str) -> PrefRestorer:
+    def restore(port: DevicePort, value: str) -> None:
+        port.open_screen("privileged_display")
+        if key in PD_SWITCHES:
+            _set_switch(port, PD_SWITCHES[key], value)
+        elif key == "aab_settings/daltonizerMode":
+            mode = value.strip('"')
+            if mode not in DALTONIZER_MODES:
+                raise RecoveryError(f"no chip for colour mode {value}")
+            _retry(lambda: port.ui.click(f"daltonizer_{mode.lower()}"), UI_POLLS, port.sleep)
+        _apply_if_shown(port)  # the Kelvin: the read-back draft carries the device's own
+    return restore
+
+
+PREF_RESTORERS: dict[str, PrefRestorer] = {
+    AUTOMATION: _restore_automation,
+    STRENGTH: _restore_strength,
+    **{key: _restore_privileged(key) for key in PD_PREFS},
+}
 
 
 def _retry(action: Callable[[], object], polls: int, wait: Callable[[float], None]):
@@ -77,12 +193,18 @@ class DevicePort:
         return state.paused_in_dump(device.run(self.s, "dumpsys", "notification").output,
                                     DEBUG_PKG)
 
-    def open_dashboard(self) -> None:
-        """Fresh activity → Menu → Dashboard. With Tier NONE it opens on Onboarding instead, and
-        the Menu target never appears: the retry ends in the boundary's refusal."""
+    def open_screen(self, route: str) -> None:
+        """Fresh activity → Menu → `route` ("menu" stays there). With Tier NONE it opens on
+        Onboarding instead, and the Menu never appears: the retry ends in a refusal."""
         device.run(self.s, "am", "start", "-f", LAUNCH_FRESH_FLAGS, "-n",
                    f"{DEBUG_PKG}/{MAIN_ACTIVITY}")
-        _retry(lambda: self.ui.click("menu_dashboard"), UI_POLLS, self._sleep)
+        if route == "menu":
+            _retry(lambda: self.ui.read("menu_dashboard_shown"), UI_POLLS, self._sleep)
+        else:
+            _retry(lambda: self.ui.click(f"menu_{route}"), UI_POLLS, self._sleep)
+
+    def open_dashboard(self) -> None:
+        self.open_screen("dashboard")
 
     def _enabled(self) -> bool:
         return state.read_pref(self.s, "aab_settings/serviceEnabled") == "true"

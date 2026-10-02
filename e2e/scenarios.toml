@@ -28,15 +28,15 @@ id = "s00_tier"
 extra = true
 status = "auto"
 effects = ["ui_nav"]
-pending = true
+test = "tests/test_s00_smoke.py::test_s00_tier_badge_matches_the_grant"
 note = "tier badge readout against the grant state"
 
 # §1 Core loop
 [[scenario]]
 id = "s01_4"
 status = "auto"
-effects = ["service_toggle"]
-pending = true
+effects = ["service_toggle", "ui_nav"]
+test = "tests/test_s00_smoke.py::test_s01_4_master_switch_starts_the_service"
 
 [[scenario]]
 id = "s01_5"
@@ -60,15 +60,16 @@ reason = "steady light is physical; the Live Debug throttle readout is automatab
 [[scenario]]
 id = "s02_8"
 status = "auto"
-effects = ["service_toggle", "settings_write", "override_record", "ui_nav"]
-pending = true
-note = "pause oracle: manual_override channel AND override_card, both verified absent first"
+effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav"]
+test = "tests/test_s02_override.py::test_s02_8_brightness_change_pauses"
+note = "pause oracle: Resume on the ongoing notification, manual_override channel and override_card; the pause is discarded so no curve point stays"
 
 [[scenario]]
 id = "s02_9"
 status = "auto"
-effects = ["service_toggle", "notification_action", "ui_nav"]
-pending = true
+effects = ["service_toggle", "prefs_ui", "broadcast", "automation_events", "notification_action", "ui_nav"]
+test = "tests/test_s02_override.py::test_s02_9_resume_from_the_notification"
+note = "paused by PAUSE, not an override, whose Resume would keep its curve point"
 
 [[scenario]]
 id = "s02_10"
@@ -79,22 +80,22 @@ reason = "swinging light during an animation is physical; absence of a pause is 
 [[scenario]]
 id = "s02_10a"
 status = "auto"
-effects = ["service_toggle", "settings_write", "screen_wake", "override_record", "ui_nav"]
-pending = true
+effects = ["service_toggle", "settings_write", "screen_wake", "override_record", "notification_action", "ui_nav"]
+test = "tests/test_s02_override.py::test_s02_10a_no_false_pause_on_wake"
 note = "quiet/control pair in one test (DB-083); DC-012 unpaused gate before each half"
 
 [[scenario]]
 id = "s02_10b"
 status = "auto"
-effects = ["service_toggle", "settings_write", "override_record", "ui_nav"]
-pending = true
+effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav"]
+test = "tests/test_s02_override.py::test_s02_10b_deadband_boundary"
 note = "stored scale S from the device profile, never calibrated via PANIC"
 
 [[scenario]]
 id = "s02_10c"
 status = "auto"
-effects = ["service_toggle", "settings_write", "ui_nav"]
-pending = true
+effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav"]
+test = "tests/test_s02_override.py::test_s02_10c_mode_conflict_dismisses"
 
 [[scenario]]
 id = "s02_10d"
@@ -104,8 +105,9 @@ reason = "diagnostic readout, not pass/fail, already answered on the owner's pho
 [[scenario]]
 id = "s02_10e"
 status = "auto"
-effects = ["service_toggle", "settings_write", "screen_wake", "ui_nav"]
-pending = true
+effects = ["service_toggle", "settings_write", "screen_wake", "override_record", "notification_action", "ui_nav"]
+test = "tests/test_s02_override.py::test_s02_10e_no_pause_from_a_write_while_off"
+note = "control: step 8's pause once awake, since the pre-fix build is not installed"
 
 # §3 Screen off/on
 [[scenario]]
@@ -135,9 +137,9 @@ reason = "invert+shake gesture and vibration are physical"
 [[scenario]]
 id = "s05_14a"
 status = "auto"
-effects = ["panic", "broadcast", "notification_action", "automation_events", "prefs_ui"]
-pending = true
-note = "late PANIC stage; distinct non-S pre-value, transition to S after"
+effects = ["panic", "broadcast", "notification_action", "automation_events", "prefs_ui", "service_toggle", "ui_nav"]
+test = "tests/test_s05_panic.py::test_s05_14a_every_panic_entry_point_resets"
+note = "late PANIC stage; distinct non-S pre-value, transition to S after; the S.O.S. vibration is not observed"
 
 [[scenario]]
 id = "s05_15"
@@ -162,7 +164,7 @@ reason = "accelerometer release is observable in dumpsys; the gesture half is ph
 id = "s06_16"
 status = "auto"
 effects = ["grant", "ui_nav"]
-pending = true
+test = "tests/test_s06_elevated.py::test_s06_16_grant_raises_the_tier_on_resume"
 
 [[scenario]]
 id = "s06_17"
@@ -186,13 +188,13 @@ reason = "needs daylight hours and a dark room"
 id = "s06_19a"
 status = "auto"
 effects = ["prefs_ui", "ui_nav"]
-pending = true
+test = "tests/test_s06_elevated.py::test_s06_19a_strength_is_clamped_where_stored"
 
 [[scenario]]
 id = "s06_19b"
 status = "auto"
 effects = ["grant", "service_toggle", "ui_nav"]
-pending = true
+test = "tests/test_s06_elevated.py::test_s06_19b_grant_while_running_needs_no_restart"
 note = "never loosened; a failure is classified from evidence (Dashboard never calls refreshTier)"
 
 [[scenario]]
@@ -290,8 +292,8 @@ reason = "the device reacting is automatable; visible agreement with system Sett
 [[scenario]]
 id = "s11_32a"
 status = "auto"
-effects = ["privileged_apply", "settings_write", "ui_nav"]
-pending = true
+effects = ["privileged_apply", "settings_write", "service_toggle", "ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_32a_stay_awake_writes_the_whole_mask"
 
 [[scenario]]
 id = "s11_32b"
@@ -301,9 +303,9 @@ reason = "needs an absent settings row, which only settings delete can restore"
 [[scenario]]
 id = "s11_32c"
 status = "auto"
-effects = ["read_only"]
-pending = true
-note = "read only; values -1, 0, 11, 12, 13 or unset SKIP"
+effects = ["ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_32c_unrecognised_colour_mode_is_read_only"
+note = "reads only; values -1, 0, 11, 12, 13 or unset SKIP; otherwise checks the notice, never writes"
 
 [[scenario]]
 id = "s11_32d"
@@ -319,7 +321,7 @@ reason = "context-carried profile: unrestorable tuple"
 id = "s11_34"
 status = "auto"
 effects = ["privileged_apply", "service_toggle", "ui_nav"]
-pending = true
+test = "tests/test_s11_privileged.py::test_s11_34_apply_with_the_service_off_hits_the_device"
 
 [[scenario]]
 id = "s11_35"
@@ -330,7 +332,7 @@ reason = "needs context swaps and the system QS"
 id = "s11_36"
 status = "auto"
 effects = ["revoke", "grant", "ui_nav"]
-pending = true
+test = "tests/test_s11_privileged.py::test_s11_36_privileged_row_follows_the_grant"
 note = "revoke kills the process; the scenario expects the death and relaunches"
 
 [[scenario]]
@@ -346,9 +348,9 @@ reason = "circadian Night Light tracking needs hours"
 [[scenario]]
 id = "s11_39"
 status = "auto"
-effects = ["panic", "privileged_apply", "settings_write", "ui_nav"]
-pending = true
-note = "late PANIC stage"
+effects = ["panic", "privileged_apply", "notification_action", "service_toggle", "ui_nav"]
+test = "tests/test_s11_privileged.py::test_s11_39_panic_resets_the_privileged_keys"
+note = "late PANIC stage; stay-awake and inversion stand in for grayscale and Night Light"
 
 [[scenario]]
 id = "s11_39a"
@@ -359,7 +361,7 @@ reason = "needs a stored profile that differs from the device"
 id = "s11_39b"
 status = "auto"
 effects = ["privileged_apply", "service_toggle", "ui_nav"]
-pending = true
+test = "tests/test_s11_privileged.py::test_s11_39b_apply_does_not_undo_itself"
 
 [[scenario]]
 id = "s11_39c"
@@ -388,15 +390,15 @@ reason = "uiautomator bounds are not Compose touch bounds"
 [[scenario]]
 id = "s13_42"
 status = "auto"
-effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events"]
-pending = true
+effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events", "ui_nav"]
+test = "tests/test_s13_automation.py::test_s13_42_commands_ignored_until_opted_in"
 note = "quiet/control pair in one test"
 
 [[scenario]]
 id = "s13_43"
 status = "auto"
-effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events", "panic"]
-pending = true
+effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events", "panic", "ui_nav"]
+test = "tests/test_s13_automation.py::test_s13_43_core_verbs_route"
 note = "one oracle per verb; REAPPLY partial (no attributable fresh write); PANIC in the late stage"
 
 [[scenario]]
@@ -413,8 +415,8 @@ reason = "flash text is transient; the LOAD_PROFILE cases are excluded"
 [[scenario]]
 id = "s13_45"
 status = "auto"
-effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events"]
-pending = true
+effects = ["prefs_ui", "broadcast", "service_toggle", "automation_events", "ui_nav"]
+test = "tests/test_s13_automation.py::test_s13_45_service_on_while_stopped"
 
 [[scenario]]
 id = "s13_46"
@@ -483,5 +485,6 @@ reason = "flashlight flicker is physical; the brightness sampling is automatable
 # §17 Discard (added after the plan)
 [[scenario]]
 id = "s17_57"
-status = "manual"
-reason = "the Discard action is outside the notification-shade allowlist (Resume/Reset); promoting it is an owner call"
+status = "partial"
+effects = ["service_toggle", "settings_write", "override_record", "notification_action", "ui_nav"]
+reason = "Discard is allowlisted (owner, 2026-10-02) and every §2 control pause uses it; the Resume half keeps its curve point, which the suite cannot remove"

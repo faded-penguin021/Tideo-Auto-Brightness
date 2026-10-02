@@ -8,8 +8,9 @@ that a rerun converges from:
    did not cause is marked a conflict first; then service off, FGS gone, a settle window, and
    what Tideo's own teardown left on watched keys is attributed to the run (the accepted DC-047
    late write lands here);
-2. restore the grant and Tideo prefs, with the service still off;
-3. restore settings, conflict-aware;
+2. restore the grant, with the service still off;
+3. restore settings, conflict-aware, then Tideo prefs: a Privileged Display restore reads the
+   device back into its draft, so the device must hold its originals first;
 4. verify stability — every restored key reads `original` twice, a settle window apart;
 5. restore the original runtime state and check it took — unless conflicts remain, since a
    running service would write over them; the service then stays off until they are resolved.
@@ -108,7 +109,7 @@ def recover(journal: Journal, port: Port) -> Report:
     if journal.pending() or journal.runtime is not None:
         if journal.runtime is not None:
             _quiesce(journal, port)
-        for kind in (GRANT, PREF, SETTING):
+        for kind in (GRANT, SETTING, PREF):
             _restore(journal, port, kind, report)
         _verify(journal, port)
     for e in journal.conflicts():

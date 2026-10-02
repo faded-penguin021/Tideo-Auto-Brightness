@@ -175,6 +175,7 @@ def _templates() -> tuple[Template, ...]:
     out = [
         Template("getprop", Grade.READ, ("getprop", one_of("prop", *GETPROPS))),
         Template("dumpsys_package", Grade.READ, ("dumpsys", "package", pkg)),
+        Template("pm_path", Grade.READ, ("pm", "path", DEBUG_PKG)),
         Template("dumpsys_services", Grade.READ, ("dumpsys", "activity", "services", pkg)),
         Template("dumpsys_notification", Grade.READ, ("dumpsys", "notification")),
         Template("dumpsys_power", Grade.READ, ("dumpsys", "power")),
@@ -310,6 +311,7 @@ class Session:
     device: adbutils.AdbDevice | None = None
     log: list[tuple[str, str]] = field(default_factory=list)
     clock: Callable[[], float] = time.monotonic
+    install_size: int | None = None  # one streamed install of exactly this size; see install()
 
     def record(self, verdict: str, request: str) -> None:
         self.log.append((verdict, request.replace(self.serial, "<serial>")))
@@ -368,6 +370,11 @@ def _admit_service(s: Session, req: str) -> Grade:
         return Grade.READ
     if req == f"tcp:{U2_PORT}":
         return Grade.HARNESS
+    if m := _INSTALL.fullmatch(req):
+        if s.install_size is None or int(m.group(1)) != s.install_size:
+            raise PreconditionFailed("an install is admitted only from install() after the guard")
+        s.install_size = None
+        return Grade.MUTATE
     if req == "sync:":
         grade, _sync_ok.pending = getattr(_sync_ok, "pending", None), None
         if grade is None:
@@ -393,9 +400,18 @@ _SYNC_REQUESTS = {
 }
 
 
+# The install guard reads the installed debug APK to compare certificates (`pm path` output).
+INSTALLED_APK = re.compile(r"/data/app/(~~[A-Za-z0-9_=-]+/)?" + re.escape(DEBUG_PKG)
+                           + r"-[A-Za-z0-9_=-]+/base\.apk")
+# Streamed install (`adb install --streaming`): replace only, never -d, -g or -t.
+_INSTALL = re.compile(r"exec:cmd package install -r -S ([1-9]\d{0,9})")
+
+
 def _admit_sync(path: str, cmd: str) -> Grade:
     if (cmd, path) in _SYNC_REQUESTS:
         return _SYNC_REQUESTS[(cmd, path)]
+    if cmd == "RECV" and INSTALLED_APK.fullmatch(path):
+        return Grade.READ
     raise Unlisted(f"sync {cmd} {path!r} not allowlisted")
 
 
@@ -481,6 +497,23 @@ def session(serial: str, grades: frozenset[Grade] = frozenset({Grade.READ}),
     finally:
         with _lock:
             _active = None
+
+
+def install(s: Session, apk: bytes) -> str:
+    """Stream one APK to `cmd package install -r`. Only install.py calls this, after its guard
+    and the owner's approval; the request is admitted once, for exactly this size."""
+    if s is not _active or s.device is None or Grade.MUTATE not in s.grades:
+        raise BoundaryViolation("an install needs the open MUTATE session")
+    with _lock:
+        s.install_size = len(apk)
+    try:
+        with s.device.open_transport() as c:
+            c.send_command(f"exec:cmd package install -r -S {len(apk)}")
+            c.check_okay()
+            c.conn.sendall(apk)
+            return c.read_until_close()
+    finally:
+        s.install_size = None
 
 
 def run(s: Session, *argv: str, raw: bool = False):

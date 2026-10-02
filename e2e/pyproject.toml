@@ -17,5 +17,6 @@ testpaths = ["tests"]
 markers = [
   "device: needs the phone through the host adb server",
   "smoke: the S6 smoke set",
+  "scenario(id): a device scenario, by its scenarios.toml row id",
 ]
 addopts = "-ra --strict-markers"

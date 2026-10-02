@@ -35,7 +35,7 @@ def test_panic_footprint_covers_its_indirect_writes():
     assert fp.settings == EVERY_TIDEO_KEY and fp.runtime and fp.private
 
 
-@pytest.mark.parametrize("kind", ["revoke", "force_stop", "broadcast", "notification_action"])
+@pytest.mark.parametrize("kind", ["revoke", "force_stop", "broadcast", "notification_action", "grant"])
 def test_anything_that_may_restart_the_service_carries_its_footprint(kind):
     fp = footprint([kind])
     assert fp.starts_service and fp.settings == EVERY_TIDEO_KEY and fp.runtime

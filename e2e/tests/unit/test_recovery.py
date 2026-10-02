@@ -330,3 +330,14 @@ def test_empty_recovery_is_a_no_op(tmp_path):
     port = CountingPort(dev)
     assert recover_once(tmp_path, port).clean
     assert port.calls == 0
+
+
+def test_prefs_are_restored_after_settings(tmp_path):
+    # A Privileged Display restore reads the device back into its draft (S4 review).
+    dev = FakeDevice()
+    crashed_run(tmp_path, dev)
+    dev.writes.clear()
+    recover_once(tmp_path, dev)
+    kinds = [kind for kind, _key, _value in dev.writes if kind in (SETTING, PREF)]
+    assert PREF in kinds and SETTING in kinds
+    assert kinds.index(PREF) > max(i for i, k in enumerate(kinds) if k == SETTING)

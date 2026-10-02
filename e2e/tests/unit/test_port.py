@@ -148,7 +148,7 @@ def test_a_failed_write_raises(server, session, tmp_path):
 
 def test_unrestorable_writes_refuse_before_sending(server, session, tmp_path):
     port = _port(session, tmp_path)
-    for kind, key, value in [(PREF, "control_prefs/external_control_enabled", "true"),
+    for kind, key, value in [(PREF, "aab_settings/contextOverride", "true"),
                              (GRANT, WRITE_SECURE_SETTINGS, "maybe"),
                              (GRANT, "android.permission.CAMERA", "granted")]:
         with pytest.raises(RecoveryError, match="no way to restore"):

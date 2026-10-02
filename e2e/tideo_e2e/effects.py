@@ -74,12 +74,15 @@ _SERVICE = Footprint(settings=EVERY_TIDEO_KEY, runtime=True, private=True, start
 INVENTORY: dict[str, Footprint] = {
     "read_only": Footprint(),
     "ui_nav": Footprint(),
-    # With the service running, a preference change reaches the pipeline and display toggles.
-    "prefs_ui": Footprint(settings=EVERY_TIDEO_KEY, prefs=True, private=True,
+    # With the service running, a preference change reaches the pipeline and display toggles,
+    # so recovery must quiesce it before restoring (runtime) and restart it after.
+    "prefs_ui": Footprint(settings=EVERY_TIDEO_KEY, prefs=True, private=True, runtime=True,
                           stage=SETTINGS_ONLY),
     # The harness's own brightness injection (DC-012 override path).
     "settings_write": Footprint(settings=BRIGHTNESS, stage=SETTINGS_ONLY),
-    "privileged_apply": Footprint(settings=DISPLAY_TOGGLES, stage=SETTINGS_ONLY),
+    # Apply also stores the toggles in Tideo's settings, which a UI restorer puts back.
+    "privileged_apply": Footprint(settings=DISPLAY_TOGGLES, prefs=True, private=True,
+                                  runtime=True, stage=SETTINGS_ONLY),
     "service_toggle": _SERVICE,
     # Screen on clears contextOverride and re-evaluates contexts, which write whole profiles.
     "screen_wake": Footprint(settings=EVERY_TIDEO_KEY, private=True, reevaluates_contexts=True,
@@ -88,7 +91,9 @@ INVENTORY: dict[str, Footprint] = {
     "notification_action": _SERVICE,
     "broadcast": _SERVICE,
     "automation_events": Footprint(automation_events=True, stage=SERVICE),
-    "grant": Footprint(grant=True, stage=GRANT),
+    # Restoring an original revoked grant kills the process, so recovery must quiesce and
+    # restart the service around it, as for a revoke.
+    "grant": _SERVICE | Footprint(grant=True, stage=GRANT),
     "revoke": _SERVICE | Footprint(grant=True, stage=KILL),
     "force_stop": _SERVICE | Footprint(stage=KILL),
     # Persists serviceEnabled=false, writes every display toggle to its default, zeroes Extra Dim.

@@ -12,7 +12,7 @@ import sys
 import adbutils
 import uiautomator2
 
-from . import device, state
+from . import device, harness, state
 from .device import Grade
 from .journal import Journal, JournalError, private_store
 from .recovery import RecoveryError, recover
@@ -45,6 +45,14 @@ def run_recover() -> int:
             with device.session(target, ALL_GRADES, adb_client()) as s:
                 ui = Ui(s, uiautomator2.connect(s.device), PORT_UI)
                 report = recover(journal, DevicePort(s, ui, store))
+                before = harness.saved_points(store)
+                if before is not None:
+                    if state.override_points(s) == before:
+                        harness.save_points(store, None)
+                    else:
+                        report.notes.append(
+                            "the curve points differ from before the interrupted run: a point "
+                            "it recorded may remain; check Curve & Brightness by hand")
     except (JournalError, RecoveryError, state.StateError, device.BoundaryViolation) as e:
         print(f"recover: stopped, the journal keeps what is left: {e}", file=sys.stderr)
         return 1
@@ -57,10 +65,30 @@ def run_recover() -> int:
     return 0 if report.clean else 1
 
 
+def run_install(apk: str) -> int:
+    from pathlib import Path
+
+    from .apktools import ToolError
+    from .install import InstallRefused, run_install as guarded
+
+    target = os.environ.get("TIDEO_E2E_SERIAL", "")
+    if not target:
+        print("install: set TIDEO_E2E_SERIAL to the phone's adb serial", file=sys.stderr)
+        return 2
+    try:
+        return guarded(Path(apk), target, private_store(), adb_client())
+    except (InstallRefused, ToolError, JournalError, state.StateError,
+            device.BoundaryViolation) as e:
+        print(f"install: stopped: {e}", file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str]) -> int:
     if argv == ["recover"]:
         return run_recover()
-    print("usage: python -m tideo_e2e.cli recover", file=sys.stderr)
+    if len(argv) == 2 and argv[0] == "install":
+        return run_install(argv[1])
+    print("usage: python -m tideo_e2e.cli recover | install <apk>", file=sys.stderr)
     return 2
 
 

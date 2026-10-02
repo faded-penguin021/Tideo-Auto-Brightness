@@ -198,3 +198,22 @@ def test_json_settings_keeps_scalars_as_json_text():
         "serviceEnabled": "true", "contextOverride": "false", "profile": '"Home"'}
     with pytest.raises(state.StateError):
         state.json_settings("[]")
+
+
+# ── S4: Live Debug lines ───────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("text,bound", [("just now", 0), ("5s ago", 5), ("2m ago", 179),
+                                        ("1h ago", 7199), ("never", None)])
+def test_age_is_an_upper_bound(text, bound):
+    assert state.age_seconds(text) == bound
+
+
+def test_live_debug_parsers():
+    assert state.metric_value("Manual override: No") == "No"
+    assert state.override_values("69 / 69 / 68") == (69, 69, 68)
+    assert state.override_values("60 / 60 / —") == (60, 60, None)
+    assert state.disposition("DISMISSED_DRIFT (OBSERVER)") == "DISMISSED_DRIFT"
+    for bad in ("69 / 69", "x / 1 / 2"):
+        with pytest.raises(state.StateError):
+            state.override_values(bad)

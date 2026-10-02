@@ -23,6 +23,7 @@ PANIC = "com.tideo.autobrightness.control.PANIC"
 ALLOWED = {
     "getprop": "getprop ro.build.version.sdk",
     "dumpsys_package": f"dumpsys package {DEBUG_PKG}",
+    "pm_path": f"pm path {DEBUG_PKG}",
     "dumpsys_services": f"dumpsys activity services {RELEASE_PKG}",
     "dumpsys_notification": "dumpsys notification",
     "dumpsys_power": "dumpsys power",
@@ -371,3 +372,50 @@ def test_run_refuses_a_stale_session_and_an_ungranted_grade(client):
     with device.session(SERIAL, client=client) as s:
         with pytest.raises(GradeNotAllowed):
             device.run(s, "settings", "put", "system", "screen_brightness", "10")
+
+
+# ── S4: the install guard's two openings ───────────────────────────────────────────────────
+
+INSTALLED = f"/data/app/~~AbC_12-=/{DEBUG_PKG}-XyZ_9==/base.apk"
+
+
+def test_only_the_installed_debug_apk_can_be_read():
+    assert device._admit_sync(INSTALLED, "RECV") is Grade.READ
+    for path, cmd in ((INSTALLED, "SEND"), (INSTALLED.replace(DEBUG_PKG, RELEASE_PKG), "RECV"),
+                      (f"/data/app/~~a/../{DEBUG_PKG}-b/base.apk", "RECV"),
+                      (f"/data/app/~~a/{DEBUG_PKG}-b/split_config.arm64_v8a.apk", "RECV"),
+                      (f"/data/data/{DEBUG_PKG}/files/base.apk", "RECV")):
+        with pytest.raises(BoundaryViolation):
+            device._admit_sync(path, cmd)
+
+
+def test_install_is_admitted_once_for_its_exact_size():
+    s, req = _session(), "exec:cmd package install -r -S 1234"
+    with pytest.raises(PreconditionFailed):
+        device._admit_service(s, req)
+    s.install_size = 1234
+    with pytest.raises(PreconditionFailed):
+        device._admit_service(s, "exec:cmd package install -r -S 1235")
+    assert device._admit_service(s, req) is Grade.MUTATE
+    with pytest.raises(PreconditionFailed):
+        device._admit_service(s, req)
+
+
+@pytest.mark.parametrize("req", [
+    "exec:cmd package install -r -d -S 9", "exec:cmd package install -r -g -S 9",
+    "exec:cmd package install -r -t -S 9", "exec:cmd package install -S 9",
+    "exec:cmd package install -r -S 9 --user 10", "exec:cmd package uninstall " + DEBUG_PKG,
+    "exec:pm install -r -S 9", "shell:cmd package install -r -S 9", "abb_exec:package\0install",
+])
+def test_other_install_shapes_refused(req):
+    s = _session()
+    s.install_size = 9
+    with pytest.raises(BoundaryViolation):
+        device._admit_service(s, req)
+
+
+def test_install_needs_the_open_mutate_session(client):
+    with device.session(SERIAL, client=client) as s:
+        with pytest.raises(BoundaryViolation):
+            device.install(s, b"apk")
+        assert s.install_size is None

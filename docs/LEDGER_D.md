@@ -218,3 +218,10 @@
   (2026-10-02).** PAUSE never posts on `manual_override`, and the Dashboard renders the switch
   off until settings load, so either shortcut flips or misreads the service. Identity is checked
   over a read-only session before uiautomator2 connects; only Android user 0 is bound.
+
+- DD-020: **E2E scenarios act only through a `Run` that refuses an undeclared effect, and every
+  Privileged Display preference is journaled before the screen is touched (2026-10-02).** Apply
+  stores the whole draft, including fields read back from the device, so recovery restores prefs
+  after settings and the screen must open clean. An injected override's curve point is removed
+  with the notification's Discard (owner, 2026-10-02); the install guard streams the bytes it
+  inspected, after the owner's typed approval.

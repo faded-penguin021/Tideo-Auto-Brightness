@@ -31,9 +31,22 @@ PREF_DEFAULTS = {
     "aab_settings/serviceEnabled": "true",
     "aab_settings/contextOverride": "false",
     "aab_settings/panicRequiresPlugged": "false",
+    "aab_settings/detectOverrides": "false",
+    "aab_settings/dimmingStrength": "25",
+    "aab_settings/inversionEnabled": "false",
+    "aab_settings/stayAwakeChargingEnabled": "false",
+    "aab_settings/daltonizerMode": '"OFF"',
+    "aab_settings/nightLightEnabled": "false",
+    "aab_settings/nightLightTemperature": "null",
+    "aab_settings/alwaysOnDisplayEnabled": "false",
+    "aab_settings/hdrForceSdrEnabled": "false",
     "control_prefs/external_control_enabled": "false",
     "control_prefs/force_dark_enabled": "false",
 }
+OVERRIDE_POINTS_STORE = "files/datastore/aab_override_points.json"
+OVERRIDE_POINTS_CAP = 50  # OverridePoints.MAX_POINTS (task561): one more evicts the oldest
+CONTEXT_RULES_STORE = "files/datastore/aab_context_rules.json"
+BASELINE_STORE = "files/datastore/aab_context_baseline.json"
 
 
 class StateError(RuntimeError):
@@ -123,6 +136,42 @@ def paused_in_dump(dump: str, package: str) -> bool:
             raise StateError("notification actions are present but their titles are unreadable")
         return "Resume" in titles
     return False
+
+
+# Live Debug lines render as "<label>: <value>" (LiveDebugScreen.Metric).
+
+
+def metric_value(line: str) -> str:
+    label, sep, value = line.partition(": ")
+    if not sep:
+        raise StateError(f"not a Live Debug metric line: {line!r}")
+    return value
+
+
+def age_seconds(value: str) -> int | None:
+    """"Override seen" as an upper bound in seconds (lastSampleLabel); None for "never"."""
+    if value == "never":
+        return None
+    if value == "just now":
+        return 0
+    m = re.fullmatch(r"(\d+)([smh]) ago", value)
+    if not m:
+        raise StateError(f"unexpected age {value!r}")
+    # "2m ago" is anything from 120 s to 179 s.
+    return (int(m.group(1)) + 1) * {"s": 1, "m": 60, "h": 3600}[m.group(2)] - 1
+
+
+def override_values(value: str) -> tuple[int, int, int | None]:
+    """"Observed / settled / expected", domain 0–255; expected may be the dash."""
+    parts = value.split(" / ")
+    if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
+        raise StateError(f"unexpected override values {value!r}")
+    return int(parts[0]), int(parts[1]), int(parts[2]) if parts[2].isdigit() else None
+
+
+def disposition(value: str) -> str:
+    """"DISMISSED_DRIFT (OBSERVER)" → "DISMISSED_DRIFT"."""
+    return value.split(" (", 1)[0]
 
 
 def current_user(out: str) -> int:
@@ -248,16 +297,53 @@ def private_file(s: device.Session, path: str) -> bytes | None:
     return r.output
 
 
+def read_prefs(s: device.Session, keys) -> dict[str, str]:
+    """Several `<store>/<key>` preferences from PREF_DEFAULTS, reading each store once."""
+    out, cache = {}, {}
+    for key in keys:
+        if key not in PREF_DEFAULTS:
+            raise StateError(f"unknown preference {key!r}")
+        store, _, name = key.partition("/")
+        if store not in cache:
+            blob = private_file(s, PREF_STORES[store])
+            cache[store] = {} if blob is None else (
+                json_settings(blob.decode("utf-8")) if store == "aab_settings"
+                else preferences(blob))
+        out[key] = cache[store].get(name, PREF_DEFAULTS[key])
+    return out
+
+
 def read_pref(s: device.Session, key: str) -> str:
     """`<store>/<key>` from PREF_DEFAULTS, e.g. `control_prefs/external_control_enabled`."""
-    if key not in PREF_DEFAULTS:
-        raise StateError(f"unknown preference {key!r}")
-    store, _, name = key.partition("/")
-    blob = private_file(s, PREF_STORES[store])
-    if blob is None:
-        return PREF_DEFAULTS[key]
-    values = json_settings(blob.decode("utf-8")) if store == "aab_settings" else preferences(blob)
-    return values.get(name, PREF_DEFAULTS[key])
+    return read_prefs(s, [key])[key]
+
+
+def _json_store(s: device.Session, path: str) -> dict:
+    blob = private_file(s, path)
+    doc = json.loads(blob.decode("utf-8")) if blob else {}
+    if not isinstance(doc, dict):
+        raise StateError(f"{path} is not a JSON object")
+    return doc
+
+
+def context_state(s: device.Session) -> bool:
+    """Plan §3.6: any context rule, a contextOverride latch or a baseline snapshot. Each makes a
+    service start or a screen wake load whole profiles, which the suite cannot restore."""
+    return (bool(_json_store(s, CONTEXT_RULES_STORE).get("rules"))
+            or read_pref(s, "aab_settings/contextOverride") == "true"
+            or _json_store(s, BASELINE_STORE).get("snapshot") is not None)
+
+
+def override_points(s: device.Session) -> list[str]:
+    """The recorded curve points as a sorted multiset; DD-011's Discard may remove an identical
+    older point instead of the newest, which changes the order but not this."""
+    points = _json_store(s, OVERRIDE_POINTS_STORE).get("points", [])
+    return sorted(json.dumps(p, sort_keys=True) for p in points)
+
+
+def model(s: device.Session) -> str:
+    """ro.product.model, which names the device profile under e2e/devices/."""
+    return _out(s, "getprop", "ro.product.model").strip()
 
 
 def identity(s: device.Session, store: Path) -> Identity:

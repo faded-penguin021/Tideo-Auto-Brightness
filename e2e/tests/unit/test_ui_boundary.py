@@ -239,3 +239,45 @@ def test_foreground_is_checked_before_the_dump():
     d.xml = "not xml"  # a dump would raise ParseError, not UiDenied
     with pytest.raises(UiDenied):
         handle.click("switch")
+
+
+# ── S4: text, scroll-into-view, back from the shade, Discard ──────────────────────────────
+
+
+def test_set_text_scroll_and_back_are_single_use_and_exact():
+    ui._pending.text = ("field_dimmingStrength", "65")
+    ui._pending.scroll = "apply_settings"
+    ui._pending.back = True
+    try:
+        with pytest.raises(UiDenied):
+            ui._admit_rpc("setText", [{"resourceId": "field_dimmingStrength"}, "66"])
+        ui._admit_rpc("setText", [{"resourceId": "field_dimmingStrength"}, "65"])
+        with pytest.raises(UiDenied):
+            ui._admit_rpc("setText", [{"resourceId": "field_dimmingStrength"}, "65"])
+        with pytest.raises(UiDenied):
+            ui._admit_rpc("scrollTo", [{"scrollable": True}, {"resourceId": "restore_x"}, True])
+        ui._admit_rpc("scrollTo", [{"scrollable": True}, {"resourceId": "apply_settings"}, True])
+        with pytest.raises(UiDenied):
+            ui._admit_rpc("pressKey", ["home"])
+        ui._admit_rpc("pressKey", ["back"])
+        with pytest.raises(UiDenied):
+            ui._admit_rpc("pressKey", ["back"])
+    finally:
+        ui._pending.text = ui._pending.scroll = ui._pending.back = None
+
+
+def test_edit_targets_need_a_resource_id():
+    with pytest.raises(UiDenied):
+        Target("x", DEBUG_PKG, "edit", text="65")
+
+
+def test_discard_is_a_shade_action_on_tideo_only():
+    Target("d", SHADE_PKG, "click", text="Discard", anchor="Tideo AB (Debug)")
+    with pytest.raises(UiDenied):
+        Target("d", SHADE_PKG, "click", text="Disable", anchor="Tideo AB (Debug)")
+
+
+def test_back_is_refused_while_tideo_is_in_front():
+    handle, d = _ui(DEBUG_PKG, SHADE_RESUME)
+    with pytest.raises(UiDenied):
+        handle.close_shade()

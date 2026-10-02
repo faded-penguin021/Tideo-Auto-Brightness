@@ -28,11 +28,11 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 ## Active work
 
-- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S3
-  done; S4 runs as S4a hook [x], S4b device port and `--recover` [x], S4c scenarios [ ], S4d
-  install guard [ ]; the one full ladder follows S4c (owner), then the blocking Sol review of
-  S2–S4 before any device mutation; S5–S9 open. Owed in S4c, from Sol on S4a: a dialog-root flag
-  for SaveProfileDialog before s14_50, and the native flash overlay has no resource-id (s13_44a).
+- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S4
+  code done (scenarios and install guard, DD-020); owed before any device mutation: the one full
+  ladder (owner), then the blocking Sol review of S2–S4; S5–S9 open. Owed when the partial rows
+  get tests, from Sol on S4a: a dialog-root flag for SaveProfileDialog before s14_50, and the
+  native flash overlay has no resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
@@ -116,6 +116,10 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-02 — **E2E S4c+S4d: 21 device scenarios behind an effect-gated `Run`, every Privileged
+  Display preference journaled, Discard allowlisted for the suite's own curve points (owner), and
+  the guarded `run.sh --install`; Sol's unit review found 11 issues, all fixed; no device
+  contacted (DD-020).**
 - 2026-10-02 — **E2E S4b: the device-side recovery port (`state.py`, `tideo.py`) and
   `run.sh --recover`; Sol's review of S4a+S4b found the paused signal, user binding, identity
   order, pref defaults and switch race wrong, all fixed; no device contacted (DD-019).**

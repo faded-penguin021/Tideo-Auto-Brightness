@@ -3,12 +3,13 @@
 An allowed tap can still trigger destructive app behaviour, so the harness never touches the UI
 except by naming a `Target` in its scenario's `UiAllowlist`. Each action dumps the hierarchy,
 resolves the target to exactly one node of the declared package, checks the foreground, checks
-the node against a global denylist, and only then taps the centre of that node. Test code never
-supplies coordinates.
+the node against a global denylist, and only then taps the centre of that node or sets its text.
+Test code never supplies coordinates. A target off screen is first scrolled into view by
+selector (Compose leaves nodes outside the viewport out of the dump).
 
 Importing this module also gates uiautomator2 at its one HTTP chokepoint (`core._http_request`):
-read-only RPCs pass, `click` passes only for the exact point `Ui` just authorised,
-`openNotification` only while `Ui` opens the shade, and every other RPC is refused. Its
+read-only RPCs pass; `click`, `setText`, `scrollTo`, `openNotification` and `pressKey` "back"
+pass only for the one call `Ui` has just authorised; every other RPC is refused. Its
 package/IME-mutating conveniences are replaced so they raise before reaching the gate.
 """
 
@@ -29,8 +30,9 @@ from .device import BoundaryViolation, PACKAGES
 SHADE_PKG = "com.android.systemui"
 # AOSP's row id (status_bar_notification_row.xml); S6's smoke run confirms it on the owner's OEM.
 NOTIFICATION_ROW_ID = f"{SHADE_PKG}:id/expandableNotificationRow"
-# The named actions on Tideo's own notifications (plan §3.2).
-SHADE_ACTIONS = frozenset({"Resume", "Reset"})
+# The named actions on Tideo's own notifications (plan §3.2). Discard forgets the curve point an
+# override pause recorded (DD-011), so a scenario that causes one leaves the owner's data as found.
+SHADE_ACTIONS = frozenset({"Resume", "Reset", "Discard"})
 # The app-name header of Tideo's notification row: appLabel for release and debug.
 TIDEO_LABELS = frozenset({"Tideo Auto Brightness", "Tideo AB (Debug)"})
 
@@ -61,7 +63,7 @@ class Target:
 
     name: str
     package: str
-    action: Literal["read", "click"]
+    action: Literal["read", "click", "edit"]
     resource_id: str | None = None
     text: str | None = None
     description: str | None = None
@@ -70,8 +72,10 @@ class Target:
     def __post_init__(self):
         if not (self.resource_id or self.text or self.description):
             raise UiDenied(f"{self.name}: no locator")
-        if self.action not in ("read", "click"):
+        if self.action not in ("read", "click", "edit"):
             raise UiDenied(f"{self.name}: unknown action {self.action!r}")
+        if self.action == "edit" and not self.resource_id:
+            raise UiDenied(f"{self.name}: an edit target is located by resource-id alone")
         if self.package == SHADE_PKG:
             if (self.action != "click" or self.text not in SHADE_ACTIONS
                     or self.anchor not in TIDEO_LABELS):
@@ -140,17 +144,25 @@ def _matches(e: ElementTree.Element, t: Target) -> bool:
             and (t.description is None or e.get("content-desc") == t.description))
 
 
-def resolve(xml: str, t: Target) -> Node:
-    """The one node `t` names in this hierarchy, or raise."""
-    root = ElementTree.fromstring(xml)
+def _candidates(root: ElementTree.Element, t: Target) -> list[ElementTree.Element]:
     if t.package == SHADE_PKG:
         rows = [r for r in root.iter("node") if r.get("resource-id") == NOTIFICATION_ROW_ID
                 and any(n.get("text") == t.anchor for n in r.iter("node"))]
         if len(rows) != 1:
             raise UiDenied(f"{t.name}: {len(rows)} notification rows carry {t.anchor!r}")
-        candidates = [e for e in rows[0].iter("node") if _matches(e, t)]
-    else:
-        candidates = [e for e in root.iter("node") if _matches(e, t)]
+        return [e for e in rows[0].iter("node") if _matches(e, t)]
+    return [e for e in root.iter("node") if _matches(e, t)]
+
+
+def count(xml: str, t: Target) -> int:
+    """How many nodes `t` matches in this hierarchy (the shade row must still be unique)."""
+    return len(_candidates(ElementTree.fromstring(xml), t))
+
+
+def resolve(xml: str, t: Target) -> Node:
+    """The one node `t` names in this hierarchy, or raise."""
+    root = ElementTree.fromstring(xml)
+    candidates = _candidates(root, t)
     if len(candidates) != 1:
         raise UiDenied(f"{t.name}: {len(candidates)} nodes match, need exactly one")
     # The tap may land on an enclosing clickable or a child, so the whole chain must be clean.
@@ -169,18 +181,41 @@ def resolve(xml: str, t: Target) -> Node:
 
 READ_RPCS = frozenset({"dumpWindowHierarchy", "deviceInfo", "objInfo", "count", "getText",
                        "waitForExists", "waitUntilGone"})
-_pending = threading.local()  # .click: (x, y) authorised once; .shade: bool
+# One authorisation each, consumed by the call it admits: .click (x, y); .text (resource-id,
+# text); .scroll resource-id; .shade and .back bool.
+_pending = threading.local()
+
+
+def _take(name: str):
+    value = getattr(_pending, name, None)
+    setattr(_pending, name, None)
+    return value
+
+
+def _selector_id(sel) -> str | None:
+    return sel.get("resourceId") if isinstance(sel, dict) else None
 
 
 def _admit_rpc(method: str, params) -> None:
     if method in READ_RPCS:
         return
+    params = list(params or ())
     if method == "click" and getattr(_pending, "click", None) is not None:
-        if tuple(params or ()) == _pending.click:
-            _pending.click = None
+        if tuple(params) == _pending.click:
+            _take("click")
             return
-    if method == "openNotification" and getattr(_pending, "shade", False):
-        _pending.shade = False
+    if method == "setText" and getattr(_pending, "text", None) is not None and len(params) == 2:
+        if (_selector_id(params[0]), params[1]) == _pending.text:
+            _take("text")
+            return
+    if method == "scrollTo" and getattr(_pending, "scroll", None) is not None \
+            and len(params) == 3 and params[2] is True and isinstance(params[0], dict) \
+            and params[0].get("scrollable") is True and _selector_id(params[1]) == _pending.scroll:
+        _take("scroll")
+        return
+    if method == "openNotification" and _take("shade"):
+        return
+    if method == "pressKey" and params == ["back"] and _take("back"):
         return
     raise UiDenied(f"uiautomator2 RPC {method!r} not authorised")
 
@@ -224,17 +259,52 @@ class Ui:
     def __init__(self, s: device.Session, d: uiautomator2.Device, allowlist: UiAllowlist):
         self._s, self._d, self._allow = s, d, allowlist
 
+    def _foreground(self, t: Target) -> None:
+        if t.package != SHADE_PKG:
+            current = self._s.device.app_current().package
+            if current != t.package:
+                raise UiDenied(f"{t.name}: foreground is {current!r}, not {t.package!r}")
+
+    def _scroll_to(self, t: Target) -> None:
+        """Scroll the screen's scrollable until `t` is in view, by selector; never a swipe by
+        coordinates. Nothing to scroll, or no such node, leaves the screen as it was."""
+        if t.package == SHADE_PKG or not t.resource_id:
+            return
+        _pending.scroll = t.resource_id
+        try:
+            self._d(scrollable=True).scroll.vert.to(resourceId=t.resource_id)
+        except uiautomator2.exceptions.RPCError:
+            pass
+        finally:
+            _pending.scroll = None
+
+    def _dump(self, t: Target) -> str:
+        # Foreground first, then a fresh dump, then the action: the shortest window for the
+        # screen to change. Overlays and occlusion are not modelled; S6's smoke run checks them.
+        self._foreground(t)
+        xml = self._d.dump_hierarchy()
+        if count(xml, t) == 0 and t.package != SHADE_PKG and t.resource_id:
+            self._scroll_to(t)
+            self._foreground(t)
+            xml = self._d.dump_hierarchy()
+        return xml
+
     def _locate(self, name: str, action: str) -> tuple[Target, Node]:
         t = self._allow[name]
         if t.action != action:
             raise UiDenied(f"{name} is declared for {t.action}, not {action}")
-        # Foreground first, then a fresh dump, then the tap: the shortest window for the screen
-        # to change. Overlays and occlusion are not modelled; S6's smoke run is their check.
-        if t.package != SHADE_PKG:
-            current = self._s.device.app_current().package
-            if current != t.package:
-                raise UiDenied(f"{name}: foreground is {current!r}, not {t.package!r}")
-        return t, resolve(self._d.dump_hierarchy(), t)
+        return t, resolve(self._dump(t), t)
+
+    def exists(self, name: str) -> bool:
+        """Whether the read target is on screen (scrolled to if needed): one node, or none."""
+        t = self._allow[name]
+        if t.action != "read":
+            raise UiDenied(f"{name} is declared for {t.action}, not read")
+        xml = self._dump(t)
+        if count(xml, t) == 0:
+            return False
+        resolve(xml, t)  # exactly one, and clean
+        return True
 
     def read(self, name: str) -> str:
         return self._locate(name, "read")[1].text
@@ -250,6 +320,15 @@ class Ui:
         finally:
             _pending.click = None
 
+    def set_text(self, name: str, text: str) -> None:
+        """Replace an edit target's text through accessibility (ACTION_SET_TEXT): no IME."""
+        t, _ = self._locate(name, "edit")
+        _pending.text = (t.resource_id, text)
+        try:
+            self._d(resourceId=t.resource_id).set_text(text)
+        finally:
+            _pending.text = None
+
     def open_shade(self) -> None:
         if not self._allow.has_shade():
             raise UiDenied("this scenario declares no notification-shade target")
@@ -258,3 +337,16 @@ class Ui:
             self._d.open_notification()
         finally:
             _pending.shade = False
+
+    def close_shade(self) -> None:
+        """Back, which collapses the shade; only with SystemUI in front, never an app screen."""
+        if not self._allow.has_shade():
+            raise UiDenied("this scenario declares no notification-shade target")
+        current = self._s.device.app_current().package
+        if current != SHADE_PKG:
+            raise UiDenied(f"back with {current!r} in front would navigate it, not the shade")
+        _pending.back = True
+        try:
+            self._d.press("back")
+        finally:
+            _pending.back = False

@@ -1,0 +1,3 @@
+# The owner's OnePlus 13 (ro.product.model). stored_max is S, measured by hand: the system slider at
+# its top, then `settings get system screen_brightness` (DEVICE_TEST_SCRIPT §2 10b; DC-025).
+stored_max = 4095
