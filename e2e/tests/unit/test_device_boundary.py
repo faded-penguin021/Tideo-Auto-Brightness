@@ -8,7 +8,7 @@ import pytest
 from tideo_e2e import device
 from tideo_e2e.device import (
     DEBUG_PKG, RELEASE_PKG, U2_JAR, BoundaryViolation, Denied, Grade, GradeNotAllowed,
-    PreconditionFailed, TEMPLATES, admit_shell, deny_reason, release_fgs_in_dump,
+    PreconditionFailed, TEMPLATES, admit_shell, deny_reason, fgs_in_dump,
 )
 
 from .fake_adb import FakeAdbServer
@@ -41,6 +41,9 @@ ALLOWED = {
     "force_stop_debug": f"am force-stop {DEBUG_PKG}",
     "force_stop_release": f"am force-stop {RELEASE_PKG}",
     "launch": f"am start -n {RELEASE_PKG}/com.tideo.autobrightness.app.MainActivity",
+    "launch_fresh":
+        f"am start -f 0x10008000 -n {DEBUG_PKG}/com.tideo.autobrightness.app.MainActivity",
+    "current_user": "am get-current-user",
     "bmgr_restore": f"bmgr restore 3fa2 {DEBUG_PKG}",
     "settings_get_screen_brightness": "settings get system screen_brightness",
     "settings_put_screen_brightness": "settings put system screen_brightness 4095",
@@ -210,12 +213,12 @@ FGS_DUMP = """ACTIVITY MANAGER SERVICES (dumpsys activity services)
 
 
 def test_release_fgs_parse():
-    assert release_fgs_in_dump(FGS_DUMP)
-    assert not release_fgs_in_dump(FGS_DUMP.replace("isForeground=true", "isForeground=false"))
-    assert not release_fgs_in_dump(FGS_DUMP.replace("autobrightness/", "autobrightness.debug/"))
+    assert fgs_in_dump(FGS_DUMP, RELEASE_PKG)
+    assert not fgs_in_dump(FGS_DUMP.replace("isForeground=true", "isForeground=false"), RELEASE_PKG)
+    assert not fgs_in_dump(FGS_DUMP.replace("autobrightness/", "autobrightness.debug/"), RELEASE_PKG)
     other = FGS_DUMP.replace("isForeground=true", "isForeground=false") + (
         "  * ServiceRecord{77 u0 com.other/.Svc}\n    isForeground=true\n")
-    assert not release_fgs_in_dump(other)
+    assert not fgs_in_dump(other, RELEASE_PKG)
 
 
 # ── end to end: real adbutils / uiautomator2 against a loopback server ─────────────────────

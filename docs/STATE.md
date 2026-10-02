@@ -29,8 +29,10 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 ## Active work
 
 - **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S3
-  done; S4 runs as S4a hook [x], S4b device port and install guard [ ], S4c scenarios [ ], then
-  one full ladder and the blocking Sol review of S2–S4 before any device mutation; S5–S9 open.
+  done; S4 runs as S4a hook [x], S4b device port and `--recover` [x], S4c scenarios [ ], S4d
+  install guard [ ]; the one full ladder follows S4c (owner), then the blocking Sol review of
+  S2–S4 before any device mutation; S5–S9 open. Owed in S4c, from Sol on S4a: a dialog-root flag
+  for SaveProfileDialog before s14_50, and the native flash overlay has no resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
@@ -114,6 +116,9 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-02 — **E2E S4b: the device-side recovery port (`state.py`, `tideo.py`) and
+  `run.sh --recover`; Sol's review of S4a+S4b found the paused signal, user binding, identity
+  order, pref defaults and switch race wrong, all fixed; no device contacted (DD-019).**
 - 2026-10-02 — **E2E S4a: the app root exports Compose test tags as resource-ids
   (`TideoRootSurface`, Robolectric-pinned); the Gradle set is deferred to one run after S4c
   (owner) (DD-018).**

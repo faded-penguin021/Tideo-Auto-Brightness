@@ -115,6 +115,7 @@ class Node:
     text: str
     description: str
     bounds: tuple[int, int, int, int]
+    checked: bool = False
 
     def centre(self) -> tuple[int, int]:
         l, t, r, b = self.bounds
@@ -129,7 +130,7 @@ def _node(e: ElementTree.Element) -> Node:
     if r <= l or b <= t:
         raise UiDenied(f"node with empty bounds: {e.attrib}")
     return Node(e.get("resource-id", ""), e.get("text", ""), e.get("content-desc", ""),
-                (l, t, r, b))
+                (l, t, r, b), e.get("checked") == "true")
 
 
 def _matches(e: ElementTree.Element, t: Target) -> bool:
@@ -237,6 +238,9 @@ class Ui:
 
     def read(self, name: str) -> str:
         return self._locate(name, "read")[1].text
+
+    def checked(self, name: str) -> bool:
+        return self._locate(name, "read")[1].checked
 
     def click(self, name: str) -> None:
         _, node = self._locate(name, "click")

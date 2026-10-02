@@ -5,9 +5,9 @@ host's adb server. The Markdown script stays the human spec; `scenarios.toml` ho
 script step, classified `auto`, `partial` or `manual` with a reason. Decision and safety model:
 DD-015.
 
-**Status: boundary and recovery built, no device contact yet.** The scenarios, the device-side
-recovery port and `run.sh --recover` arrive with S4. No device mutation is authorised until the
-recovery contract has passed its blocking review.
+**Status: boundary, recovery and its device port built, no device contact yet.** The scenarios
+arrive with S4c and `--preflight` with S5. No device mutation is authorised until the recovery
+contract has passed its blocking review.
 
 ## Safety boundary
 
@@ -40,6 +40,12 @@ recovery contract has passed its blocking review.
   restore the runtime state. A key holding a value the run did not cause is a **conflict**: never
   written, kept in the journal and reported until it is back at its original or the owner
   resolves it. Unit tests kill it at every call and every journal write and rerun it.
+- **Device port** (`tideo_e2e/state.py`, `tideo_e2e/tideo.py`). What recovery runs on: read-only
+  parsers for settings, `dumpsys` and Tideo's private stores, and the verbs. The service is
+  switched through the Dashboard's `service_switch`, and only once it shows the stored
+  `serviceEnabled`; a broadcast would need external control on. Paused is the Resume action on
+  Tideo's ongoing notification. Only Android user 0 is supported. A preference is restorable only
+  through a registered UI routine, so a scenario must not journal one that has none.
 - **Drift alarm** (`tideo_e2e/drift.py`). A pin bump that changes any device-facing line of
   adbutils or uiautomator2 fails `test_dependency_drift.py` until the new lines are checked.
 
@@ -57,7 +63,13 @@ resolved in `uv.lock`.
 ```
 e2e/run.sh tests/unit          # device-free: manifest, identifiers, boundary, drift
 e2e/run.sh -k s02_10b          # one scenario (once scenarios exist)
+TIDEO_E2E_SERIAL=<serial> e2e/run.sh --recover   # restore what an interrupted run left
 ```
+
+`--recover` exits 0 at once on an empty journal. Otherwise it checks the device's identity over
+a read-only session before anything else, then runs the recovery procedure. Exit 1 means
+conflicts or a stop, and the journal keeps what is left. The adb server defaults to
+`host.docker.internal:5037` (`ADB_SERVER_HOST`, `ADB_SERVER_PORT`).
 
 ## Rules for this directory
 

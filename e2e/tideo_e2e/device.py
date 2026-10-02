@@ -50,6 +50,7 @@ CONTROL_ACTIONS = frozenset(
     for verb in ("SERVICE_ON", "SERVICE_OFF", "SERVICE_TOGGLE", "PAUSE", "RESUME", "REAPPLY", "PANIC")
 )
 BROADCAST_SPACING_S = 1.5
+LAUNCH_FRESH_FLAGS = "0x10008000"
 
 U2_JAR = "/data/local/tmp/u2.jar"
 U2_PORT = 9008  # uiautomator2.core.DEFAULT_SERVER_PORT; the drift alarm pins it
@@ -181,6 +182,7 @@ def _templates() -> tuple[Template, ...]:
         Template("dumpsys_windows", Grade.READ, ("dumpsys", "window", "windows")),
         Template("dumpsys_activities", Grade.READ, ("dumpsys", "activity", "activities")),
         Template("dumpsys_top", Grade.READ, ("dumpsys", "activity", "top")),
+        Template("current_user", Grade.READ, ("am", "get-current-user")),
         Template("private_cat", Grade.READ,
                  ("run-as", DEBUG_PKG, "cat", pattern("file", _PRIVATE_FILE))),
         Template("private_archive", Grade.READ,
@@ -204,6 +206,10 @@ def _templates() -> tuple[Template, ...]:
                  precondition="release_fgs_running"),
         Template("launch", Grade.MUTATE, ("am", "start", "-n", one_of(
             "component", *(f"{p}/{MAIN_ACTIVITY}" for p in PACKAGES)))),
+        # NEW_TASK | CLEAR_TASK: a fresh activity on the start destination, so every UI route
+        # begins from a known screen. Like any launch, it starts the service if serviceEnabled.
+        Template("launch_fresh", Grade.MUTATE,
+                 ("am", "start", "-f", LAUNCH_FRESH_FLAGS, "-n", f"{DEBUG_PKG}/{MAIN_ACTIVITY}")),
         # Owner decision 2026-10-01: token AND package, never the package-less form.
         Template("bmgr_restore", Grade.MUTATE,
                  ("bmgr", "restore", pattern("token", r"[0-9a-f]{1,16}"), pkg)),
@@ -323,13 +329,14 @@ class Session:
         if self.device is None:
             return False
         out = self.device.shell(["dumpsys", "activity", "services", RELEASE_PKG])
-        return release_fgs_in_dump(out)
+        return fgs_in_dump(out, RELEASE_PKG)
 
 
-def release_fgs_in_dump(dump: str) -> bool:
-    """Whether a `dumpsys activity services` dump shows the release service in the foreground."""
+def fgs_in_dump(dump: str, package: str) -> bool:
+    """Whether a `dumpsys activity services` dump shows `package`'s monitoring service in the
+    foreground."""
     record = re.compile(
-        r"\* ServiceRecord\{[^}]*\s" + re.escape(RELEASE_PKG) + r"/("
+        r"\* ServiceRecord\{[^}]*\s" + re.escape(package) + r"/("
         + re.escape(MONITORING_SERVICE) + r"|\.app\.runtime\.AmbientMonitoringService)\}"
     )
     blocks = re.split(r"(?m)^\s*(?=\* ServiceRecord\{)", dump)
@@ -476,12 +483,12 @@ def session(serial: str, grades: frozenset[Grade] = frozenset({Grade.READ}),
             _active = None
 
 
-def run(s: Session, *argv: str) -> adbutils.ShellReturn:
+def run(s: Session, *argv: str, raw: bool = False):
     """Run one templated command. Checked here to fail before a connection opens, and again
-    at the service guard, which is the binding check."""
+    at the service guard, which is the binding check. `raw` returns bytes output."""
     if s is not _active or s.device is None:
         raise BoundaryViolation("not the open session, or it has no device")
     if (grade := admit_shell(shlex.join(argv)).grade) not in s.grades:
         raise GradeNotAllowed(f"{grade.value} command in a session allowing "
                               f"{sorted(g.value for g in s.grades)}")
-    return s.device.shell2(list(argv))
+    return s.device.shell2(list(argv), encoding=None if raw else "utf-8")

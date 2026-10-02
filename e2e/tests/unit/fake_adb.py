@@ -11,9 +11,14 @@ import struct
 import threading
 
 
+V1_SUFFIX = "; echo X4EXIT:$?"
+
+
 class FakeAdbServer:
     def __init__(self):
         self.received: list[str] = []
+        # shell command (without the v1 trailer) → (output, exit code); default b"ok\n", 0
+        self.responses: dict[str, tuple[bytes, int]] = {}
         self._sock = socket.socket()
         self._sock.bind(("127.0.0.1", 0))
         self._sock.listen()
@@ -66,7 +71,9 @@ class FakeAdbServer:
                         return
                     conn.sendall(b"OKAY")
                     if req.startswith("shell:"):
-                        conn.sendall(b"ok\nX4EXIT:0" if "X4EXIT" in req else b"ok\n")
+                        cmd = req[len("shell:"):].removesuffix(V1_SUFFIX)
+                        out, code = self.responses.get(cmd, (b"ok\n", 0))
+                        conn.sendall(out + f"X4EXIT:{code}".encode() if "X4EXIT" in req else out)
                     return
             except (EOFError, OSError):
                 return

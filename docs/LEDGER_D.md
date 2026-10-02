@@ -212,3 +212,9 @@
   `testTagsAsResourceId` once for the whole nav graph; a Robolectric test pins it. A `Dialog` is
   its own window and inherits nothing, so one gets the flag only when a scenario needs a tag inside
   it.
+
+- DD-019: **The E2E recovery port reads paused as the Resume action on Tideo's ongoing
+  notification, and taps `service_switch` only once it shows the stored `serviceEnabled`
+  (2026-10-02).** PAUSE never posts on `manual_override`, and the Dashboard renders the switch
+  off until settings load, so either shortcut flips or misreads the service. Identity is checked
+  over a read-only session before uiautomator2 connects; only Android user 0 is bound.
