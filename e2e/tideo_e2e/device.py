@@ -211,9 +211,6 @@ def _templates() -> tuple[Template, ...]:
         # begins from a known screen. Like any launch, it starts the service if serviceEnabled.
         Template("launch_fresh", Grade.MUTATE,
                  ("am", "start", "-f", LAUNCH_FRESH_FLAGS, "-n", f"{DEBUG_PKG}/{MAIN_ACTIVITY}")),
-        # Owner decision 2026-10-01: token AND package, never the package-less form.
-        Template("bmgr_restore", Grade.MUTATE,
-                 ("bmgr", "restore", pattern("token", r"[0-9a-f]{1,16}"), pkg)),
     ]
     for ns, keys in SETTINGS.items():
         for key, value in keys.items():
@@ -233,6 +230,9 @@ _DENY_WORDS = frozenset({
     "rm", "rmdir", "unlink", "dd", "mkfs", "reboot", "shutdown", "setprop", "wipe", "fastboot",
     "recovery", "bootloader", "uninstall", "install", "install-create", "install-write",
     "install-commit", "install-existing", "remount", "su",
+    # Even the owner-allowed `bmgr restore <token> <package>`: no scenario needs it, and a failed
+    # restore can wipe the package's data (S2–S4 review).
+    "bmgr",
 })
 # (first, later): denied when `later` follows `first` anywhere in the command.
 _DENY_PAIRS = (
@@ -244,9 +244,6 @@ _DENY_PAIRS = (
     ("ime", "set"), ("ime", "enable"), ("ime", "disable"),
 )
 _RUN_AS_READERS = {"cat", "tar"}
-_BMGR_ALLOWED = re.compile(
-    r"bmgr restore [0-9a-f]{1,16} (" + "|".join(re.escape(p) for p in sorted(PACKAGES)) + r")"
-)
 
 
 def _tokens(cmd: str) -> list[str]:
@@ -264,8 +261,6 @@ def deny_reason(cmd: str) -> str | None:
     for first, later in _DENY_PAIRS:
         if first in tokens and later in tokens[tokens.index(first) + 1:]:
             return f"denied {first} … {later}"
-    if "bmgr" in tokens and not _BMGR_ALLOWED.fullmatch(cmd):
-        return "bmgr other than `bmgr restore <token> <package>`"
     for i, t in enumerate(tokens):
         if t == "force-stop" and (i + 1 >= len(tokens) or tokens[i + 1] not in PACKAGES):
             return "force-stop of a package other than Tideo's"

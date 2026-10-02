@@ -136,6 +136,26 @@ class DraftSettingsViewModelTest {
     }
 
     @Test
+    fun apply_isRefusedBeforeTheSeed_soDefaultsNeverReplaceTheProfile() {
+        setBaseline(AabSettings(minBrightness = 42, dimmingStrength = 30))
+        val main = StandardTestDispatcher()
+        Dispatchers.setMain(main)
+        try {
+            val vm = DraftSettingsViewModel(app)
+            assertEquals(0, vm.epoch.value, "the seed must still be pending; nothing else pins that")
+            assertFalse(vm.dirty.value, "no Apply bar over pre-seed defaults")
+            vm.edit { it.copy(dimmingStrength = 65) }
+            vm.apply()
+            awaitVmOn(main, vm) { it.epoch.value >= 1 }
+            assertEquals(42, awaitCommitted { true }.minBrightness, "the profile must survive")
+            assertEquals(30, committed().dimmingStrength, "the pre-seed edit is not committed")
+            assertFalse(vm.dirty.value, "the seed replaced the pre-seed edit")
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun readBack_tracksRepeatedDeviceChanges() {
         setBaseline(AabSettings(nightLightEnabled = false))
         val vm = seededVm()

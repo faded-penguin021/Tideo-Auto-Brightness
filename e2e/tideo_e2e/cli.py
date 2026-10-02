@@ -12,7 +12,7 @@ import sys
 import adbutils
 import uiautomator2
 
-from . import device, harness, state
+from . import device, state
 from .device import Grade
 from .journal import Journal, JournalError, private_store
 from .recovery import RecoveryError, recover
@@ -45,14 +45,6 @@ def run_recover() -> int:
             with device.session(target, ALL_GRADES, adb_client()) as s:
                 ui = Ui(s, uiautomator2.connect(s.device), PORT_UI)
                 report = recover(journal, DevicePort(s, ui, store))
-                before = harness.saved_points(store)
-                if before is not None:
-                    if state.override_points(s) == before:
-                        harness.save_points(store, None)
-                    else:
-                        report.notes.append(
-                            "the curve points differ from before the interrupted run: a point "
-                            "it recorded may remain; check Curve & Brightness by hand")
     except (JournalError, RecoveryError, state.StateError, device.BoundaryViolation) as e:
         print(f"recover: stopped, the journal keeps what is left: {e}", file=sys.stderr)
         return 1

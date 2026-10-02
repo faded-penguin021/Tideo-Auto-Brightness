@@ -225,3 +225,12 @@
   after settings and the screen must open clean. An injected override's curve point is removed
   with the notification's Discard (owner, 2026-10-02); the install guard streams the bytes it
   inspected, after the owner's typed approval.
+
+- DD-021 [cited]: **Sol's blocking review of E2E S2–S4 found six BLOCKERs and six HIGHs, all
+  fixed before any device contact (2026-10-02).** Under a service that was running, recovery
+  leaves the brightness mode to Tideo's restart and verifies the owner's saved mode, since writing
+  manual back first made Tideo save manual as theirs; curve points are journaled, and an
+  attributable value is only the last observed or the one about to be written. A Draft Apply
+  before the DataStore seed committed defaults over the profile, for anyone tapping fast, so the
+  app now refuses it. Accepted: a window appearing between the hierarchy dump and the tap, and
+  `bmgr` denied outright although the owner allowed one form.

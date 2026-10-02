@@ -8,13 +8,11 @@ declare; a setting the footprint does not journal; and a preference no UI routin
 
 from __future__ import annotations
 
-import json
 import math
 import re
 import time
 import tomllib
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable
 
 import pytest
@@ -81,25 +79,6 @@ def far_domain(*avoid: int, distance: int = 60) -> int:
         if all(abs(n - a) >= distance for a in avoid):
             return n
     raise ValueError(f"no domain value {distance} away from {avoid}")
-
-
-POINTS_FILE = "override_points.json"
-
-
-def save_points(store: Path, points: list[str] | None) -> None:
-    """The curve points a scenario found, kept in the private store until it ends cleanly, so
-    `--recover` after a kill can say whether one it recorded is still there."""
-    path = store / POINTS_FILE
-    if points is None:
-        path.unlink(missing_ok=True)
-        return
-    path.write_text(json.dumps(points), encoding="utf-8")
-    path.chmod(0o600)
-
-
-def saved_points(store: Path) -> list[str] | None:
-    path = store / POINTS_FILE
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
 # ── the run ─────────────────────────────────────────────────────────────────────────────────
@@ -338,6 +317,10 @@ class Run:
 
     def paused(self) -> bool:
         return self.port.paused()
+
+    def owner_mode(self) -> str | None:
+        """The brightness mode Tideo gives back on stop (recovery.Runtime.owner_mode)."""
+        return self.port.owner_mode()
 
     def channels(self) -> frozenset[str]:
         return state.channels(self.s)

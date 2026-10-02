@@ -29,8 +29,8 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 ## Active work
 
 - **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S4
-  code done (scenarios and install guard, DD-020), full ladder green; owed before any device
-  mutation: the blocking Sol review of S2–S4; S5–S9 open. Owed when the partial rows
+  done and the blocking Sol review of S2–S4 fixed (DD-021); next is S5, read-only preflight, which
+  needs the owner to start the host adb server; S5–S9 open. Owed when the partial rows
   get tests, from Sol on S4a: a dialog-root flag for SaveProfileDialog before s14_50, and the
   native flash overlay has no resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
@@ -115,6 +115,11 @@ creating `27.txt`; re-open only for something major, and say so.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-02 — **E2E S2–S4 blocking review: Sol found 6 BLOCKERs and 6 HIGHs, then 4 more in
+  the fixes, all fixed — owner brightness mode, curve points and owner-mode conflicts kept in the
+  journal, SKIP rules for recovery's restart, per-scenario UI allowlist, `bmgr` denied; the app
+  refuses a Draft Apply before its DataStore seed; no device contacted (DD-021).**
 
 - 2026-10-02 — **The full ladder S4a deferred, run on `b761165`: green, Gradle set included —
   `:app` 766 tests (incl. `TestTagsAsResourceIdTest`), `:domain` 134, `:platform` 146 + 146, 0

@@ -11,7 +11,8 @@ import pytest
 from tideo_e2e import harness, state
 from tideo_e2e.harness import Run, UndeclaredEffect, far_domain, to_domain, to_raw
 from tideo_e2e.scenarios import E2E_ROOT, Scenario, load
-from tideo_e2e.tideo import TARGETS
+from tideo_e2e.tideo import TARGETS, scenario_ui
+from tideo_e2e.ui import UiDenied
 
 
 # DEVICE_TEST_SCRIPT §2 10b's own record at S = 4095 (DC-027).
@@ -134,6 +135,27 @@ SCENARIOS = list(_scenario_tests())
 def test_every_auto_row_has_its_scenario_and_back():
     marked = {sid: node for sid, node, _f, _l in SCENARIOS}
     assert {r.id: r.test for r in ROWS.values() if r.test} == marked
+
+
+# Run's handles: a scenario reaching through one would skip every gate above (S2–S4 review).
+RUN_INTERNALS = {"ui", "port", "s", "journal", "fp", "row", "profile"}
+
+
+def test_scenarios_use_only_runs_gated_methods():
+    paths = [E2E_ROOT / "tests" / "steps.py", *sorted((E2E_ROOT / "tests").glob("test_s*.py"))]
+    hits = [f"{p.name}:{n.lineno}: run.{n.attr}" for p in paths
+            for n in ast.walk(ast.parse(p.read_text(encoding="utf-8")))
+            if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
+            and n.value.id == "run" and (n.attr in RUN_INTERNALS or n.attr.startswith("_"))]
+    assert hits == []
+
+
+def test_a_scenarios_ui_allowlist_holds_only_its_effects_controls():
+    allow = scenario_ui(("ui_nav",))
+    allow["menu_dashboard"], allow["apply_settings_shown"]  # noqa: B018 - reads and navigation
+    for name in ("automation_toggle", "service_switch", "apply_settings", "shade_reset"):
+        with pytest.raises(UiDenied):
+            allow[name]  # noqa: B018
 
 
 @pytest.mark.parametrize("sid,node,fn,local", SCENARIOS, ids=[s[0] for s in SCENARIOS])

@@ -19,7 +19,7 @@ from tideo_e2e.effects import DeviceFacts, footprint, skip_reason
 from tideo_e2e.journal import Journal, private_store
 from tideo_e2e.recovery import journal_effects, recover
 from tideo_e2e.scenarios import load
-from tideo_e2e.tideo import SUITE_UI, DevicePort
+from tideo_e2e.tideo import PORT_UI, DevicePort, scenario_ui
 from tideo_e2e.ui import Ui
 
 ROWS = {r.id: r for r in load()}
@@ -82,12 +82,13 @@ def run(request):
         pytest.skip(f"{len(points)} curve points stored; an override would evict the oldest")
     with Journal.for_run(store, identity) as journal, \
             device.session(target, cli.ALL_GRADES, cli.adb_client()) as s:
-        ui = Ui(s, uiautomator2.connect(s.device), SUITE_UI)
-        port = DevicePort(s, ui, store)
+        u2 = uiautomator2.connect(s.device)
+        ui = Ui(s, u2, scenario_ui(row.effects))
+        port = DevicePort(s, Ui(s, u2, PORT_UI), store)
         journal_effects(journal, port, row.effects)
         r = harness.Run(row, s, ui, journal, port, harness.profile_for(model))
         if points is not None:
-            harness.save_points(store, points)  # for --recover after a kill
+            journal.set_points(points)  # recovery checks them, after a kill too
             r.points_before = points
         try:
             if "privileged_apply" in row.effects:
@@ -105,8 +106,3 @@ def run(request):
             if not report.clean:
                 pytest.fail("recovery left conflicts; run e2e/run.sh --recover after resolving:\n  "
                             + "\n  ".join(report.conflicts))
-            if points is not None:
-                if state.override_points(s) != points:
-                    pytest.fail("the override curve points differ from before the run; an "
-                                "override was recorded and not discarded (DD-011)")
-                harness.save_points(store, None)

@@ -33,8 +33,10 @@ NOTIFICATION_ROW_ID = f"{SHADE_PKG}:id/expandableNotificationRow"
 # The named actions on Tideo's own notifications (plan §3.2). Discard forgets the curve point an
 # override pause recorded (DD-011), so a scenario that causes one leaves the owner's data as found.
 SHADE_ACTIONS = frozenset({"Resume", "Reset", "Discard"})
-# The app-name header of Tideo's notification row: appLabel for release and debug.
+# The app-name header of Tideo's notification row: appLabel for release and debug. Only the
+# header node counts, never the same text in another app's title or body (S2–S4 review).
 TIDEO_LABELS = frozenset({"Tideo Auto Brightness", "Tideo AB (Debug)"})
+APP_NAME_ID = "android:id/app_name_text"
 
 # Never acted on, whatever a scenario declares, nor any node nested in or around one: profile
 # delete/overwrite/load/apply/save/restore-factory, import/export, context-rule editing,
@@ -147,7 +149,8 @@ def _matches(e: ElementTree.Element, t: Target) -> bool:
 def _candidates(root: ElementTree.Element, t: Target) -> list[ElementTree.Element]:
     if t.package == SHADE_PKG:
         rows = [r for r in root.iter("node") if r.get("resource-id") == NOTIFICATION_ROW_ID
-                and any(n.get("text") == t.anchor for n in r.iter("node"))]
+                and any(n.get("resource-id") == APP_NAME_ID and n.get("text") == t.anchor
+                        for n in r.iter("node"))]
         if len(rows) != 1:
             raise UiDenied(f"{t.name}: {len(rows)} notification rows carry {t.anchor!r}")
         return [e for e in rows[0].iter("node") if _matches(e, t)]
@@ -174,15 +177,26 @@ def resolve(xml: str, t: Target) -> Node:
     for e in chain + list(candidates[0].iter("node")):
         if denied_node(e.get("resource-id", ""), e.get("text", ""), e.get("content-desc", "")):
             raise UiDenied(f"{t.name}: resolved node is, contains or sits in a denied control")
-    return _node(candidates[0])
+    node = _node(candidates[0])
+    # A tap lands on whatever window is on top at that point: refuse when another package's
+    # node (an overlay, the keyboard, a dialog) covers it. The shade is on top by construction.
+    if t.package != SHADE_PKG:
+        x, y = node.centre()
+        for e in root.iter("node"):
+            m = _BOUNDS.fullmatch(e.get("bounds", ""))
+            if e.get("package") != t.package and m:
+                l, top, r, b = map(int, m.groups())
+                if l <= x < r and top <= y < b:
+                    raise UiDenied(f"{t.name}: {e.get('package')!r} covers its tap point")
+    return node
 
 
 # ── the uiautomator2 RPC gate ───────────────────────────────────────────────────────────────
 
 READ_RPCS = frozenset({"dumpWindowHierarchy", "deviceInfo", "objInfo", "count", "getText",
                        "waitForExists", "waitUntilGone"})
-# One authorisation each, consumed by the call it admits: .click (x, y); .text (resource-id,
-# text); .scroll resource-id; .shade and .back bool.
+# One authorisation each, consumed by the call it admits: .click (x, y); .text ((resource-id,
+# package), text); .scroll (resource-id, package); .shade and .back bool.
 _pending = threading.local()
 
 
@@ -192,8 +206,9 @@ def _take(name: str):
     return value
 
 
-def _selector_id(sel) -> str | None:
-    return sel.get("resourceId") if isinstance(sel, dict) else None
+def _selector_id(sel) -> tuple[str | None, str | None] | None:
+    """A selector's (resourceId, packageName); every selector the gate admits names both."""
+    return (sel.get("resourceId"), sel.get("packageName")) if isinstance(sel, dict) else None
 
 
 def _admit_rpc(method: str, params) -> None:
@@ -210,7 +225,9 @@ def _admit_rpc(method: str, params) -> None:
             return
     if method == "scrollTo" and getattr(_pending, "scroll", None) is not None \
             and len(params) == 3 and params[2] is True and isinstance(params[0], dict) \
-            and params[0].get("scrollable") is True and _selector_id(params[1]) == _pending.scroll:
+            and params[0].get("scrollable") is True \
+            and params[0].get("packageName") == _pending.scroll[1] \
+            and _selector_id(params[1]) == _pending.scroll:
         _take("scroll")
         return
     if method == "openNotification" and _take("shade"):
@@ -270,9 +287,10 @@ class Ui:
         coordinates. Nothing to scroll, or no such node, leaves the screen as it was."""
         if t.package == SHADE_PKG or not t.resource_id:
             return
-        _pending.scroll = t.resource_id
+        _pending.scroll = (t.resource_id, t.package)
         try:
-            self._d(scrollable=True).scroll.vert.to(resourceId=t.resource_id)
+            self._d(scrollable=True, packageName=t.package).scroll.vert.to(
+                resourceId=t.resource_id, packageName=t.package)
         except uiautomator2.exceptions.RPCError:
             pass
         finally:
@@ -280,7 +298,8 @@ class Ui:
 
     def _dump(self, t: Target) -> str:
         # Foreground first, then a fresh dump, then the action: the shortest window for the
-        # screen to change. Overlays and occlusion are not modelled; S6's smoke run checks them.
+        # screen to change. resolve() refuses a covered tap point in that dump; a window that
+        # appears between the dump and the tap is the accepted residue (DD-021).
         self._foreground(t)
         xml = self._d.dump_hierarchy()
         if count(xml, t) == 0 and t.package != SHADE_PKG and t.resource_id:
@@ -323,9 +342,9 @@ class Ui:
     def set_text(self, name: str, text: str) -> None:
         """Replace an edit target's text through accessibility (ACTION_SET_TEXT): no IME."""
         t, _ = self._locate(name, "edit")
-        _pending.text = (t.resource_id, text)
+        _pending.text = ((t.resource_id, t.package), text)
         try:
-            self._d(resourceId=t.resource_id).set_text(text)
+            self._d(resourceId=t.resource_id, packageName=t.package).set_text(text)
         finally:
             _pending.text = None
 

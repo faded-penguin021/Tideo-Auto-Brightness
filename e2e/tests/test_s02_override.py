@@ -90,6 +90,9 @@ def test_s02_10b_deadband_boundary(run):
 
 @pytest.mark.scenario("s02_10c")
 def test_s02_10c_mode_conflict_dismisses(run):
+    # Tideo reclaims manual by saving the automatic mode this writes as the owner's own.
+    if run.owner_mode() != "1":
+        pytest.skip("the owner's brightness mode is not automatic; reclaiming would replace it")
     ready_for_override(run)
     d = settled_domain(run)
     n = far_domain(d)  # far outside the deadband, or the quiet half proves nothing (DC-013)

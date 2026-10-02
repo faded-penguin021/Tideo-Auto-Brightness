@@ -132,13 +132,16 @@ def skip_reason(effects, facts: DeviceFacts) -> str | None:
     # Any write to an absent row creates it, and only `settings delete` could undo that.
     if absent := sorted(fp.settings & facts.absent_rows):
         return f"may create absent rows {absent}; restoring them needs settings delete"
-    if (fp.starts_service or fp.reevaluates_contexts) and facts.context_state \
+    # Recovery stops and restarts a service the run found running, so any runtime footprint
+    # may start it (S2–S4 review), whatever the scenario itself does.
+    starts = fp.starts_service or fp.runtime
+    if (starts or fp.reevaluates_contexts) and facts.context_state \
             and "contexts" not in facts.confirmed:
         return "context rules, contextOverride or a baseline are set; owner has not confirmed"
     # With automation on, every runtime transition is announced.
     touches_automation = fp.automation_events or (fp.runtime and facts.automation_on)
     if touches_automation and "automation" not in facts.confirmed:
         return "STATE_CHANGED broadcasts; owner has not confirmed no receiver acts on them"
-    if fp.starts_service and facts.force_dark_opt_in:
+    if starts and facts.force_dark_opt_in:
         return "force-dark opt-in is on; a service start would set debug.hwui.force_dark"
     return None

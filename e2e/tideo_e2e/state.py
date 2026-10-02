@@ -174,6 +174,20 @@ def disposition(value: str) -> str:
     return value.split(" (", 1)[0]
 
 
+def saved_mode_value(xml: str) -> str | None:
+    """ScreenBrightnessController's saved_brightness_mode from its SharedPreferences XML."""
+    m = re.search(r'<int name="saved_brightness_mode" value="(-?\d+)"\s*/>', xml)
+    return m.group(1) if m else None
+
+
+def awake_in_dump(dump: str) -> bool:
+    """Whether `dumpsys power` reports the device awake (screen on)."""
+    m = re.search(r"mWakefulness=(\w+)", dump)
+    if not m:
+        raise StateError("dumpsys power carries no mWakefulness")
+    return m.group(1) == "Awake"
+
+
 def current_user(out: str) -> int:
     value = out.strip()
     if not value.isdigit():
@@ -339,6 +353,15 @@ def override_points(s: device.Session) -> list[str]:
     older point instead of the newest, which changes the order but not this."""
     points = _json_store(s, OVERRIDE_POINTS_STORE).get("points", [])
     return sorted(json.dumps(p, sort_keys=True) for p in points)
+
+
+def saved_mode(s: device.Session) -> str | None:
+    blob = private_file(s, SAVED_MODE_STORE)
+    return None if blob is None else saved_mode_value(blob.decode("utf-8"))
+
+
+def awake(s: device.Session) -> bool:
+    return awake_in_dump(_out(s, "dumpsys", "power"))
 
 
 def model(s: device.Session) -> str:

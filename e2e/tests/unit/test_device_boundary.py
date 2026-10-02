@@ -45,7 +45,6 @@ ALLOWED = {
     "launch_fresh":
         f"am start -f 0x10008000 -n {DEBUG_PKG}/com.tideo.autobrightness.app.MainActivity",
     "current_user": "am get-current-user",
-    "bmgr_restore": f"bmgr restore 3fa2 {DEBUG_PKG}",
     "settings_get_screen_brightness": "settings get system screen_brightness",
     "settings_put_screen_brightness": "settings put system screen_brightness 4095",
     "settings_get_enabled_accessibility_services":
@@ -95,8 +94,8 @@ EVASIONS = [
     "setprop debug.hwui.force_dark true", "cmd overlay enable x", "appops reset",
     "content delete --uri content://settings/system", "pm uninstall x",
     "cmd package uninstall x", "pm install -r /data/local/tmp/x.apk", "ime set x",
-    # bmgr: only `restore <token> <package>`
-    "bmgr restore", "bmgr restore 3fa2", "bmgr wipe x", "bmgr restore 3fa2 com.android.chrome",
+    # bmgr: every form, the owner-allowed restore included
+    f"bmgr restore 3fa2 {DEBUG_PKG}", "bmgr restore", "bmgr restore 3fa2", "bmgr wipe x", "bmgr restore 3fa2 com.android.chrome",
     f"bmgr restore 3fa2 {DEBUG_PKG} com.other", "bmgr backupnow --all",
     # run-as: reads only, debug package only, no traversal
     f"run-as {DEBUG_PKG} rm -rf files", f"run-as {DEBUG_PKG} sh -c id",

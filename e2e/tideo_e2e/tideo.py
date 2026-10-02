@@ -14,7 +14,7 @@ from typing import Callable
 
 from . import device, state
 from .device import DEBUG_PKG, LAUNCH_FRESH_FLAGS, MAIN_ACTIVITY, WRITE_SECURE_SETTINGS
-from .journal import GRANT, PREF, SETTING, Identity
+from .journal import GRANT, OWNER_MODE, PREF, SETTING, Identity
 from .recovery import RecoveryError
 from .ui import SHADE_PKG, Target, Ui, UiAllowlist, UiDenied
 
@@ -92,7 +92,11 @@ TARGET_PREFS: dict[str, frozenset[str]] = {
     **{switch: frozenset(PD_PREFS) for switch in PD_SWITCHES.values()},
     **{f"daltonizer_{m.lower()}": frozenset(PD_PREFS) for m in DALTONIZER_MODES},
 }
-SUITE_UI = UiAllowlist(*(t for t, _ in TARGETS.values()))
+def scenario_ui(effects) -> UiAllowlist:
+    """One scenario's UI allowlist: every read, and each control one of its effects covers."""
+    return UiAllowlist(*(t for t, kinds in TARGETS.values() if not kinds or kinds & set(effects)))
+
+
 # What recovery may touch: the service switch, and every control a pref restorer uses.
 PORT_UI = UiAllowlist(*(TARGETS[n][0] for n in (
     "menu_dashboard", "menu_dashboard_shown", "menu_privileged_display", "menu_super_dimming",
@@ -186,8 +190,24 @@ class DevicePort:
 
     # ── runtime ──
 
+    def wake(self) -> None:
+        if not state.awake(self.s):
+            device.run(self.s, "input", "keyevent", "KEYCODE_WAKEUP")
+
     def service_running(self) -> bool:
         return state.service_running(self.s)
+
+    def service_enabled(self) -> bool:
+        return self._enabled()
+
+    def override_points(self) -> list[str]:
+        return state.override_points(self.s)
+
+    def owner_mode(self) -> str | None:
+        """The mode Tideo writes back when it stops: its saved mode, else the setting."""
+        saved = state.saved_mode(self.s)
+        return saved if saved is not None else state.read_setting(
+            self.s, "system", "screen_brightness_mode")
 
     def paused(self) -> bool:
         return state.paused_in_dump(device.run(self.s, "dumpsys", "notification").output,
@@ -251,6 +271,8 @@ class DevicePort:
             return state.grant_state(state.package_dump(self.s), DEBUG_PKG)
         if kind == PREF:
             return state.read_pref(self.s, key)
+        if kind == OWNER_MODE:
+            return self.owner_mode()
         raise RecoveryError(f"no reader for {kind}:{key}")
 
     def write(self, kind: str, key: str, value: str) -> None:

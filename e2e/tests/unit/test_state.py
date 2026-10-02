@@ -217,3 +217,18 @@ def test_live_debug_parsers():
     for bad in ("69 / 69", "x / 1 / 2"):
         with pytest.raises(state.StateError):
             state.override_values(bad)
+
+
+def test_saved_mode_reads_the_controllers_shared_prefs():
+    xml = ("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n"
+           '    <int name="saved_brightness_mode" value="1" />\n</map>\n')
+    assert state.saved_mode_value(xml) == "1"
+    assert state.saved_mode_value("<map />") is None
+
+
+def test_awake_is_the_power_managers_wakefulness():
+    assert state.awake_in_dump("  mWakefulness=Awake\n  mWakefulnessChanging=false\n")
+    assert not state.awake_in_dump("  mWakefulness=Asleep\n")
+    assert not state.awake_in_dump("  mWakefulness=Dozing\n")
+    with pytest.raises(state.StateError):
+        state.awake_in_dump("nothing here")

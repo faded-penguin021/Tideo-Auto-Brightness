@@ -8,7 +8,7 @@ import pytest
 
 from tideo_e2e import journal as journal_mod
 from tideo_e2e.journal import (
-    GRANT, SETTING, Identity, IdentityMismatch, Journal, JournalError, JournalLocked,
+    GRANT, PREF, SETTING, Identity, IdentityMismatch, Journal, JournalError, JournalLocked,
     PendingJournal, UnrestorableOriginal, serial_digest,
 )
 
@@ -46,18 +46,28 @@ def test_entry_is_on_disk_before_expect_returns(tmp_path):
     with Journal.for_run(tmp_path, ID) as j:
         j.expect(SETTING, "system/screen_brightness", "120", "4095")
         [row] = on_disk(tmp_path)["entries"]
-        assert row["original"] == "120" and row["attributable"] == ["4095"]
+        assert row["original"] == "120" and row["expected"] == "4095"
 
 
-def test_watch_keeps_the_first_original_and_values_accumulate(tmp_path):
+def test_watch_keeps_the_first_original_and_attributes_only_the_latest(tmp_path):
+    key = "aab_settings/dimmingStrength"
     with Journal.for_run(tmp_path, ID) as j:
-        j.watch(SETTING, "system/screen_brightness", "120")
-        j.watch(SETTING, "system/screen_brightness", "999")
-        j.observe(SETTING, "system/screen_brightness", "300")
-        j.expect(SETTING, "system/screen_brightness", "300", "4095")
-        j.observe(SETTING, "system/screen_brightness", "120")  # back at the original
+        j.watch(PREF, key, "25")
+        j.watch(PREF, key, "999")
+        j.observe(PREF, key, "30")
+        j.expect(PREF, key, "30", "65")  # write-ahead: either may be on the device after a kill
+        row = on_disk(tmp_path)["entries"][0]
+        assert (row["attributable"], row["expected"]) == (["30"], "65")
+        j.observe(PREF, key, "65")
+        j.expect(PREF, key, "65", "64")
+        j.observe(PREF, key, "64")
+        j.expect(PREF, key, "64", "65")
+        j.observe(PREF, key, "65")
+        # 64 was the run's once; if it reappears now, the owner chose it (S2–S4 review).
         [row] = on_disk(tmp_path)["entries"]
-        assert row["original"] == "120" and row["attributable"] == ["300", "4095"]
+        assert row["original"] == "25" and row["attributable"] == ["65"]
+        j.observe(PREF, key, "25")  # back at the original
+        assert on_disk(tmp_path)["entries"][0]["attributable"] == []
 
 
 def test_absent_original_is_refused(tmp_path):
@@ -144,3 +154,16 @@ def test_serial_digest_is_salted_stable_and_never_the_serial(tmp_path):
     assert a != serial_digest(tmp_path / "b", "emu01")
     assert "emu01" not in a
     assert stat.S_IMODE(os.stat(tmp_path / "a" / "salt").st_mode) == 0o600
+
+
+def test_an_expected_value_survives_observations_until_it_lands(tmp_path):
+    # Apply commits asynchronously: observations before it lands still read the old value.
+    key = "aab_settings/dimmingStrength"
+    with Journal.for_run(tmp_path, ID) as j:
+        j.expect(PREF, key, "30", "65")
+        j.observe(PREF, key, "30")  # the edit, before Apply
+        [row] = on_disk(tmp_path)["entries"]
+        assert row["expected"] == "65" and row["attributable"] == []
+        j.observe(PREF, key, "65")  # Apply landed
+        [row] = on_disk(tmp_path)["entries"]
+        assert row["expected"] is None and row["attributable"] == ["65"]

@@ -34,6 +34,9 @@ class FakeDevice:
         for ns, key in recovery.footprint(["panic"]).settings:
             self.state.setdefault((SETTING, f"{ns}/{key}"), "0")
         self.running = True
+        self.enabled = True  # serviceEnabled; the process may be dead while it stays true
+        self.awake = True
+        self.points = ['{"b": 120, "l": 5}']
         self.is_paused = False
         self.saved_mode = "1"
         self.writes: list[tuple[str, str, str]] = []
@@ -43,10 +46,25 @@ class FakeDevice:
     def identity(self):
         return self.ident
 
+    def wake(self):
+        self.awake = True
+
     def service_running(self):
         return self.running
 
+    def service_enabled(self):
+        return self.enabled
+
+    def override_points(self):
+        return list(self.points)
+
+    def owner_mode(self):
+        return self.saved_mode if self.saved_mode is not None else self.state[(SETTING, MODE)]
+
     def service_off(self):
+        if not self.awake:
+            raise AssertionError("the Dashboard switch needs the screen on")
+        self.enabled = False
         if self.running:
             self.running = False
             self.is_paused = False
@@ -57,6 +75,7 @@ class FakeDevice:
                 self.state[(SETTING, BRIGHT)], self.late_write = self.late_write, None
 
     def service_on(self):
+        self.enabled = True
         if not self.running:
             self.running = True
             self.saved_mode = self.state[(SETTING, MODE)]
@@ -70,6 +89,8 @@ class FakeDevice:
         self.is_paused = True
 
     def read(self, kind, key):
+        if kind == journal_mod.OWNER_MODE:
+            return self.owner_mode()
         return self.state.get((kind, key))
 
     def write(self, kind, key, value):
@@ -98,7 +119,7 @@ class CountingPort:
 
 
 def originals(dev):
-    return dict(dev.state), dev.running, dev.is_paused
+    return dict(dev.state), dev.running, dev.enabled, dev.is_paused, dev.saved_mode
 
 
 def crashed_run(store, dev):
@@ -197,8 +218,8 @@ def test_interruption_inside_the_run_converges(tmp_path, kill_after):
         j.expect(SETTING, BRIGHT, dev.read(SETTING, BRIGHT), "4095")
         if kill_after == "write":
             dev.write(SETTING, BRIGHT, "4095")
-    dev.running = False  # the run had stopped the service; nothing drives brightness
-    before = ({**before[0]}, False, False)
+    dev.running = dev.enabled = False  # the run had stopped the service
+    before = ({**before[0]}, False, False, False, before[4])
     assert recover_once(tmp_path, dev).clean
     assert_converged(tmp_path, dev, before)
 
@@ -276,7 +297,8 @@ def test_service_that_does_not_start_keeps_the_runtime_entry(tmp_path):
     with pytest.raises(recovery.RecoveryError, match="did not start"):
         recover_once(tmp_path, dev)
     with Journal.for_recovery(tmp_path) as j:
-        assert j.runtime is not None and not j.entries
+        # The mode stays until the restart Tideo restores it with has been checked.
+        assert j.runtime is not None and list(j.entries) == [f"{SETTING}:{MODE}"]
 
 
 def test_conflict_clears_itself_when_the_owner_restores_the_original(tmp_path):
@@ -341,3 +363,105 @@ def test_prefs_are_restored_after_settings(tmp_path):
     kinds = [kind for kind, _key, _value in dev.writes if kind in (SETTING, PREF)]
     assert PREF in kinds and SETTING in kinds
     assert kinds.index(PREF) > max(i for i, k in enumerate(kinds) if k == SETTING)
+
+
+# ── findings from the S2–S4 blocking review ────────────────────────────────────────────────
+
+
+def test_owners_saved_mode_survives_recovery(tmp_path):
+    # Tideo running, the owner on adaptive brightness (saved "1"); manual written back before
+    # the restart would make Tideo save manual as the owner's mode.
+    dev = FakeDevice()
+    crashed_run(tmp_path, dev)
+    assert recover_once(tmp_path, dev).clean
+    dev.service_off()  # the owner's next stop
+    assert dev.state[(SETTING, MODE)] == "1"
+
+
+def test_a_changed_owner_mode_is_reported(tmp_path):
+    dev = FakeDevice()
+    crashed_run(tmp_path, dev)
+    real_on = dev.service_on
+
+    def start_losing_it():
+        real_on()
+        dev.saved_mode = "0"
+    dev.service_on = start_losing_it
+    report = recover_once(tmp_path, dev)
+    assert any("brightness mode" in c for c in report.conflicts)
+    with pytest.raises(journal_mod.PendingJournal):  # kept, not just reported
+        Journal.for_run(tmp_path, ID)
+    assert not recover_once(tmp_path, dev).clean
+    dev.saved_mode = "1"  # the owner puts it back
+    assert recover_once(tmp_path, dev).clean
+    assert not (tmp_path / "journal.json").exists()
+
+
+def test_enabled_service_with_a_dead_process_is_switched_off(tmp_path):
+    dev = FakeDevice()
+    dev.running = dev.enabled = False
+    with Journal.for_run(tmp_path, ID) as j:
+        journal_effects(j, dev, ["service_toggle"])
+        dev.service_on()
+        dev.running = False  # the process died; serviceEnabled stays true
+    assert recover_once(tmp_path, dev).clean
+    assert not dev.enabled and not dev.running  # the next launch will not start it
+
+
+def test_brightness_is_not_driven_when_the_service_never_ran(tmp_path):
+    dev = FakeDevice()
+    dev.running = dev.enabled = False
+    with Journal.for_run(tmp_path, ID) as j:
+        journal_effects(j, dev, ["prefs_ui"])
+        assert not j.runtime.driven
+    dev.state[(SETTING, BRIGHT)] = "999"  # the owner, after the run died
+    report = recover_once(tmp_path, dev)
+    assert any(BRIGHT in c for c in report.conflicts)
+    assert dev.state[(SETTING, BRIGHT)] == "999"
+
+
+def test_a_run_left_asleep_is_woken_before_the_ui_steps(tmp_path):
+    dev = FakeDevice()
+    before = originals(dev)
+    crashed_run(tmp_path, dev)
+    dev.awake = False  # killed right after KEYCODE_SLEEP
+    assert recover_once(tmp_path, dev).clean
+    assert_converged(tmp_path, dev, before)
+
+
+def test_a_recorded_curve_point_keeps_the_journal_and_blocks_the_next_run(tmp_path):
+    dev = FakeDevice()
+    found = list(dev.points)
+    with Journal.for_run(tmp_path, ID) as j:
+        journal_effects(j, dev, ["override_record"])
+        j.set_points(found)
+        dev.points.append('{"b": 200, "l": 40}')  # an override, killed before its Discard
+    report = recover_once(tmp_path, dev)
+    assert any("curve points" in c for c in report.conflicts)
+    with pytest.raises(journal_mod.PendingJournal):
+        Journal.for_run(tmp_path, ID)
+    dev.points = found  # the owner deletes it by hand
+    assert recover_once(tmp_path, dev).clean
+    assert not (tmp_path / "journal.json").exists()
+
+
+def test_points_check_survives_an_interruption(tmp_path):
+    dev = FakeDevice()
+    with Journal.for_run(tmp_path, ID) as j:
+        journal_effects(j, dev, ["override_record"])
+        j.set_points(list(dev.points))
+    with pytest.raises(Interrupted):
+        recover_once(tmp_path, _kill_on(dev, "override_points"))
+    assert recover_once(tmp_path, dev).clean
+    assert not (tmp_path / "journal.json").exists()
+
+
+def _kill_on(dev, name):
+    class Port(CountingPort):
+        def __getattr__(self, attr):
+            if attr == name:
+                def killed(*_a):
+                    raise Interrupted(name)
+                return killed
+            return super().__getattr__(attr)
+    return Port(dev)

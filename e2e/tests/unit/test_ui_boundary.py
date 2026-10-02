@@ -9,11 +9,12 @@ from uiautomator2 import core
 from tideo_e2e import ui
 from tideo_e2e.device import DEBUG_PKG
 from tideo_e2e.ui import (
-    DISABLED_U2_METHODS, NOTIFICATION_ROW_ID, SHADE_PKG, Target, Ui, UiAllowlist, UiDenied,
+    APP_NAME_ID, DISABLED_U2_METHODS, NOTIFICATION_ROW_ID, SHADE_PKG, Target, Ui, UiAllowlist, UiDenied,
     resolve,
 )
 
 ROW = f'package="{SHADE_PKG}" resource-id="{NOTIFICATION_ROW_ID}"'
+HEADER = f'package="{SHADE_PKG}" resource-id="{APP_NAME_ID}"'
 HIERARCHY = f"""<hierarchy rotation="0">
   <node package="{DEBUG_PKG}" resource-id="service_switch" text="" content-desc=""
         bounds="[0,100][200,200]"/>
@@ -26,11 +27,11 @@ HIERARCHY = f"""<hierarchy rotation="0">
   <node package="{DEBUG_PKG}" resource-id="twin" text="" bounds="[0,620][10,630]"/>
   <node package="com.other" resource-id="service_switch" bounds="[0,700][10,710]"/>
   <node {ROW} bounds="[0,800][1000,900]">
-    <node package="{SHADE_PKG}" text="Other app" bounds="[0,800][100,820]"/>
+    <node {HEADER} text="Other app" bounds="[0,800][100,820]"/>
     <node package="{SHADE_PKG}" text="Resume" bounds="[0,850][100,890]"/>
   </node>
   <node {ROW} bounds="[0,900][1000,1000]">
-    <node package="{SHADE_PKG}" text="Tideo AB (Debug)" bounds="[0,900][100,920]"/>
+    <node {HEADER} text="Tideo AB (Debug)" bounds="[0,900][100,920]"/>
     <node package="{SHADE_PKG}" text="Resume" bounds="[200,950][300,990]"/>
   </node>
 </hierarchy>"""
@@ -245,18 +246,25 @@ def test_foreground_is_checked_before_the_dump():
 
 
 def test_set_text_scroll_and_back_are_single_use_and_exact():
-    ui._pending.text = ("field_dimmingStrength", "65")
-    ui._pending.scroll = "apply_settings"
+    field = {"resourceId": "field_dimmingStrength", "packageName": DEBUG_PKG}
+    apply = {"resourceId": "apply_settings", "packageName": DEBUG_PKG}
+    ours = {"scrollable": True, "packageName": DEBUG_PKG}
+    ui._pending.text = (("field_dimmingStrength", DEBUG_PKG), "65")
+    ui._pending.scroll = ("apply_settings", DEBUG_PKG)
     ui._pending.back = True
     try:
         with pytest.raises(UiDenied):
-            ui._admit_rpc("setText", [{"resourceId": "field_dimmingStrength"}, "66"])
-        ui._admit_rpc("setText", [{"resourceId": "field_dimmingStrength"}, "65"])
-        with pytest.raises(UiDenied):
+            ui._admit_rpc("setText", [field, "66"])
+        with pytest.raises(UiDenied):  # any package's node with that id
             ui._admit_rpc("setText", [{"resourceId": "field_dimmingStrength"}, "65"])
+        ui._admit_rpc("setText", [field, "65"])
         with pytest.raises(UiDenied):
-            ui._admit_rpc("scrollTo", [{"scrollable": True}, {"resourceId": "restore_x"}, True])
-        ui._admit_rpc("scrollTo", [{"scrollable": True}, {"resourceId": "apply_settings"}, True])
+            ui._admit_rpc("setText", [field, "65"])
+        with pytest.raises(UiDenied):
+            ui._admit_rpc("scrollTo", [ours, {**apply, "resourceId": "restore_x"}, True])
+        with pytest.raises(UiDenied):  # another package's scrollable
+            ui._admit_rpc("scrollTo", [{"scrollable": True}, apply, True])
+        ui._admit_rpc("scrollTo", [ours, apply, True])
         with pytest.raises(UiDenied):
             ui._admit_rpc("pressKey", ["home"])
         ui._admit_rpc("pressKey", ["back"])
@@ -281,3 +289,31 @@ def test_back_is_refused_while_tideo_is_in_front():
     handle, d = _ui(DEBUG_PKG, SHADE_RESUME)
     with pytest.raises(UiDenied):
         handle.close_shade()
+
+
+# ── findings from the S2–S4 blocking review: notification ownership, covered tap points ─────
+
+
+def test_tideo_label_outside_the_header_does_not_anchor():
+    # Another app's notification carrying Tideo's label in its body, with a Reset action.
+    xml = (f'<hierarchy><node {ROW} bounds="[0,0][1000,100]">'
+           f'<node {HEADER} text="Other App" bounds="[0,0][100,20]"/>'
+           f'<node package="{SHADE_PKG}" text="Tideo AB (Debug)" bounds="[0,30][100,50]"/>'
+           f'<node package="{SHADE_PKG}" text="Reset" bounds="[0,60][100,90]"/>'
+           f'</node></hierarchy>')
+    with pytest.raises(UiDenied):
+        resolve(xml, Target("r", SHADE_PKG, "click", text="Reset", anchor="Tideo AB (Debug)"))
+
+
+def test_a_covered_tap_point_is_refused():
+    xml = HIERARCHY.replace(
+        "</hierarchy>",
+        '<node package="com.google.android.inputmethod.latin" bounds="[0,120][1000,400]"/>'
+        "</hierarchy>")
+    with pytest.raises(UiDenied):
+        resolve(xml, SWITCH)
+    handle, d = _ui(DEBUG_PKG, SWITCH)
+    d.xml = xml
+    with pytest.raises(UiDenied):
+        handle.click("switch")
+    assert d.clicks == []

@@ -6,8 +6,8 @@ script step, classified `auto`, `partial` or `manual` with a reason. Decision an
 DD-015.
 
 **Status: boundary, recovery, scenarios and install guard built, no device contact yet.**
-`--preflight` arrives with S5. No device mutation is authorised until the full ladder and the
-blocking review of S2–S4 have passed.
+`--preflight` arrives with S5. The blocking review of S2–S4 found 12 issues, all fixed (DD-021);
+S5's read-only preflight is next.
 
 ## Safety boundary
 
@@ -17,10 +17,12 @@ blocking review of S2–S4 have passed.
   (no shell operators reach the device) and match an exact typed template. Templates are graded
   READ, HARNESS (uiautomator2's u2.jar push and server) and MUTATE; a session admits READ only
   unless opened otherwise. With no session open, nothing is sent.
-- **UI** (`tideo_e2e/ui.py`). Scenario code acts only by naming a `Target` in its `UiAllowlist`.
-  Each action resolves exactly one node of the declared package, checks the foreground and a
-  global denylist (profile delete/overwrite/load/restore-factory, import/export, rule editors,
-  calibration), then taps that node. uiautomator2's RPCs are gated too: reads pass, a click only
+- **UI** (`tideo_e2e/ui.py`). Scenario code acts only by naming a `Target` in its `UiAllowlist`,
+  which holds the reads plus the controls its row's effects cover. Each action resolves exactly
+  one node of the declared package, checks the foreground, a global denylist (profile
+  delete/overwrite/load/restore-factory, import/export, rule editors, calibration) and that no
+  other package's node covers the tap point, then taps that node. A shade action needs Tideo's
+  label in the row's app-name header. uiautomator2's RPCs are gated too: reads pass, a click only
   at the point just authorised. Its install/IME/shell conveniences raise.
 - **Not a sandbox.** The gates confine library internals and harness code using public APIs. Code
   that writes to a raw adb socket, calls the saved originals or spawns a process would pass
@@ -33,13 +35,16 @@ blocking review of S2–S4 have passed.
 - **Journal** (`tideo_e2e/journal.py`), in the private store `${XDG_STATE_HOME:-~/.local/state}/
   tideo-e2e/` (0700), never under `e2e/`. Bound to a salted serial digest, user and package
   identity; one run or recovery at a time (flock). Each entry is fsync'd before the mutation it
-  covers, holding the original and every value the run caused. A journal on disk blocks the next
-  run.
-- **Recovery** (`tideo_e2e/recovery.py`), one procedure for teardown and `--recover`: quiesce the
-  service, restore the grant, restore settings, then prefs, verify twice a settle window apart, then
-  restore the runtime state. A key holding a value the run did not cause is a **conflict**: never
-  written, kept in the journal and reported until it is back at its original or the owner
-  resolves it. Unit tests kill it at every call and every journal write and rerun it.
+  covers, holding the original and the values the run may have left: the last one observed and
+  the one about to be written. It also holds the curve points an override scenario found. A
+  journal on disk blocks the next run and any install.
+- **Recovery** (`tideo_e2e/recovery.py`), one procedure for teardown and `--recover`: wake the
+  screen, quiesce the service (serviceEnabled too), restore the grant, restore settings, then
+  prefs, verify twice a settle window apart, restore the runtime state, then check the curve
+  points. Under a service that was running, the brightness mode is left to Tideo's restart and
+  the owner's saved mode is checked instead. A key holding a value the run did not cause is a
+  **conflict**: never written, kept in the journal and reported until it is back at its original
+  or the owner resolves it. Unit tests kill it at every call and every journal write and rerun it.
 - **Device port** (`tideo_e2e/state.py`, `tideo_e2e/tideo.py`). What recovery runs on: read-only
   parsers for settings, `dumpsys` and Tideo's private stores, and the verbs. The service is
   switched through the Dashboard's `service_switch`, and only once it shows the stored
@@ -53,8 +58,9 @@ blocking review of S2–S4 have passed.
   reads back is journaled before the first tap, and the screen must open clean. The fixture
   applies the SKIP rules, journals the footprint, and recovers after the test, pass or fail;
   `test_harness.py` also checks each scenario's calls against its row statically. An injected
-  override's curve point is removed with the notification's Discard (owner, 2026-10-02), and the
-  run fails if the points differ afterwards; at the 50-point cap §2 SKIPs.
+  override's curve point is removed with the notification's Discard (owner, 2026-10-02); points
+  that differ afterwards are a recovery conflict, and at the 50-point cap §2 SKIPs. A scenario
+  reaching past `Run` to its UI, port or journal fails `test_harness.py`.
 - **Install guard** (`tideo_e2e/install.py`). Empty journal; debug package; the one signer's
   SHA-256 equal to the installed `base.apk`'s (apksigner); versionCode not lower; the owner types
   `INSTALL`. Then one streamed `cmd package install -r` of the inspected bytes, never -d, -g, -t

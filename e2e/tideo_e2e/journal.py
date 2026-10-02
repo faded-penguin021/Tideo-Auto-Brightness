@@ -1,11 +1,11 @@
 """The recovery journal: identity-bound, single-run locked, write-ahead and conflict-aware.
 
 Every mutation the run makes, directly or through Tideo, has an entry holding the value it found
-(`original`) and every value the run is known to have caused (`attributable`). Each entry is
+(`original`) and the values the run may have left there: the last one observed (`attributable`)
+and the one it is about to write until an observation sees it land (`expected`). Each entry is
 fsync'd BEFORE the mutation it covers, so an interruption at any point leaves the device in
-`original` or in an attributable value. Recovery restores a key only from an attributable value;
-anything else is a conflict — someone else changed it — and is kept for the owner, never
-overwritten.
+`original` or in a value the run caused. Recovery restores a key only from such a value; anything
+else is a conflict — someone else changed it — and is kept for the owner, never overwritten.
 
 The journal lives in the private store, outside the repo. A journal that exists blocks every run
 until `--recover` empties it or the owner resolves its conflicts.
@@ -25,7 +25,9 @@ from pathlib import Path
 VERSION = 1
 
 SETTING, GRANT, PREF = "setting", "grant", "pref"
-KINDS = (SETTING, GRANT, PREF)
+# The mode Tideo gives back on stop (Runtime.owner_mode): only ever a conflict, never written.
+OWNER_MODE = "owner_mode"
+KINDS = (SETTING, GRANT, PREF, OWNER_MODE)
 PENDING, CONFLICT = "pending", "conflict"
 
 
@@ -78,7 +80,7 @@ def serial_digest(store: Path, serial: str) -> str:
             pass
         finally:
             tmp.unlink()
-        _fsync_dir(store)
+        fsync_dir(store)
     salt = salt_file.read_bytes()
     if len(salt) != SALT_BYTES:
         raise JournalError(f"{salt_file} is damaged; the owner must inspect it")
@@ -88,7 +90,7 @@ def serial_digest(store: Path, serial: str) -> str:
 SALT_BYTES = 32
 
 
-def _fsync_dir(path: Path) -> None:
+def fsync_dir(path: Path) -> None:
     dfd = os.open(path, os.O_RDONLY)
     try:
         os.fsync(dfd)
@@ -113,6 +115,9 @@ class Entry:
     attributable: list[str]
     state: str = PENDING
     seen: str | None = None  # the unattributable value that made it a conflict
+    # The value the harness is about to write, until an observation sees it land: an Apply
+    # commits asynchronously, after observations that still read the old value.
+    expected: str | None = None
 
     @property
     def id(self) -> str:
@@ -123,6 +128,11 @@ class Entry:
 class Runtime:
     service_on: bool
     paused: bool
+    # The brightness mode the owner gets back when Tideo stops: its saved_brightness_mode while
+    # it runs, else the setting. Private to Tideo, so verified after recovery, never written.
+    owner_mode: str | None = None
+    # Whether the pipeline could write brightness during the run: on at the start, or startable.
+    driven: bool = False
 
 
 class Journal:
@@ -135,6 +145,9 @@ class Journal:
         self.identity: Identity | None = None
         self.entries: dict[str, Entry] = {}
         self.runtime: Runtime | None = None
+        # The curve points the run found, while an override it records may still be stored.
+        # Only Tideo's Discard removes one, and only while the service that recorded it runs.
+        self.points: list[str] | None = None
 
     # ── opening ──
 
@@ -213,30 +226,47 @@ class Journal:
     def expect(self, kind: str, key: str, original: str | None, value: str) -> None:
         """Journal a value the harness is about to write itself."""
         entry = self.watch(kind, key, original)
-        self._attribute(entry, value)
+        expected = None if value == entry.original else value
+        if entry.expected != expected:
+            entry.expected = expected
+            self._persist()
 
     def observe(self, kind: str, key: str, value: str | None) -> None:
         """After an action the run performed, attribute the value it left on a watched key.
 
         The window between the action and this read is the run's: a change by someone else in
-        that window would be attributed to the run. Keep the action short."""
+        that window would be attributed to the run. Keep the action short. The device holds
+        `value` now, so it replaces whatever the run left there before: a value the run wrote
+        earlier and then moved off is the owner's again if it reappears."""
         self._check()
         entry = self.entries[f"{kind}:{key}"]
         if value is None:
             raise UnrestorableOriginal(f"{entry.id} became absent; only a delete could be undone")
-        self._attribute(entry, value)
+        now = [] if value == entry.original else [value]
+        expected = None if value == entry.expected else entry.expected
+        if (entry.attributable, entry.expected) != (now, expected):
+            entry.attributable, entry.expected = now, expected
+            self._persist()
 
-    def set_runtime(self, service_on: bool, paused: bool) -> None:
+    def set_runtime(self, service_on: bool, paused: bool, owner_mode: str | None = None,
+                    driven: bool = False) -> None:
         """Record the runtime state once, before the first action that may change it."""
         self._check()
         if self.runtime is None:
-            self.runtime = Runtime(service_on, paused)
+            self.runtime = Runtime(service_on, paused, owner_mode, driven)
             self._persist()
 
-    def _attribute(self, entry: Entry, value: str) -> None:
-        if value != entry.original and value not in entry.attributable:
-            entry.attributable.append(value)
+    def set_points(self, points: list[str]) -> None:
+        """Before the first action that may record an override: the points found."""
+        self._check()
+        if self.points is None:
+            self.points = list(points)
             self._persist()
+
+    def clear_points(self) -> None:
+        self._check()
+        self.points = None
+        self._persist()
 
     # ── recovery bookkeeping ──
 
@@ -272,7 +302,7 @@ class Journal:
 
     @property
     def empty(self) -> bool:
-        return not self.entries and self.runtime is None
+        return not self.entries and self.runtime is None and self.points is None
 
     # ── storage: atomic replace, fsync'd file and directory ──
 
@@ -298,6 +328,7 @@ class Journal:
             "identity": asdict(self.identity) if self.identity else None,
             "entries": [asdict(e) for e in self.entries.values()],
             "runtime": asdict(self.runtime) if self.runtime else None,
+            "points": self.points,
         }
         tmp = self.path.with_suffix(".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -306,7 +337,7 @@ class Journal:
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, self.path)
-        _fsync_dir(self.store)
+        fsync_dir(self.store)
 
     def close_clean(self) -> None:
         """Delete the journal file; only an empty journal may go."""
@@ -315,7 +346,7 @@ class Journal:
             raise JournalError("journal still holds entries")
         if self.path.exists():
             self.path.unlink()
-            _fsync_dir(self.store)
+            fsync_dir(self.store)
 
     def _load(self) -> None:
         doc = json.loads(self.path.read_text(encoding="utf-8"))
@@ -327,3 +358,4 @@ class Journal:
         self.identity = Identity(**doc["identity"])
         self.entries = {e.id: e for e in (Entry(**row) for row in doc["entries"])}
         self.runtime = Runtime(**doc["runtime"]) if doc["runtime"] else None
+        self.points = doc.get("points")

@@ -71,6 +71,10 @@ def test_order_is_settings_then_service_then_kill_then_panic():
     (["service_toggle"], DeviceFacts(automation_on=True, confirmed=frozenset({"automation"})),
      None),
     (["service_toggle"], DeviceFacts(force_dark_opt_in=True), "force-dark"),
+    # Recovery restarts a service it found running (S2–S4 review).
+    (["prefs_ui"], DeviceFacts(context_state=True), "context"),
+    (["prefs_ui"], DeviceFacts(force_dark_opt_in=True), "force-dark"),
+    (["privileged_apply"], DeviceFacts(context_state=True), "context"),
     (["ui_nav"], DeviceFacts(context_state=True, automation_on=True, force_dark_opt_in=True),
      None),
 ])
