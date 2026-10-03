@@ -150,8 +150,8 @@ class LightCycleParityTest {
     }
 
     @Test
-    fun proximityNear_smoothsAsFarAndDampsOnlyTheReportedAlpha() {
-        // act27 stores %SmoothedLux from the undamped α; act29's ×0.1 reaches only the %LuxAlpha global (gap-08).
+    fun proximityNear_smoothsAsFarAndAnimatesFromTheDampedAlpha() {
+        // act27 stores %SmoothedLux from the undamped α; V2's act29 ×0.1 reaches %LuxAlpha and act33's par2 (DD-022).
         val readings = listOf(100.0, 30.0, 100.0, 20.0, 800.0, 3.0)
         val far = replay(readings)
         val near = replay(readings, near = true)
@@ -159,9 +159,13 @@ class LightCycleParityTest {
         for ((f, n) in far.map { it.second }.zip(near.map { it.second })) {
             assertEquals(f.smoothedLux, n.smoothedLux, tol)
             assertEquals(f.targetBrightness, n.targetBrightness)
-            assertEquals(f.animationSteps, n.animationSteps)
-            assertEquals(f.animationWaitMs, n.animationWaitMs)
-            assertEquals(f.transitionDurationMs, n.transitionDurationMs)
+            val (steps, wait, _) = engine.calculateAnimation(n.luxAlpha, input(0.0, null).animation, null)
+            assertEquals(steps, n.animationSteps)
+            assertEquals(wait, n.animationWaitMs)
         }
+        val smoothed = far.indices.filter { far[it].second.outcome == EvaluationOutcome.SMOOTHED }
+        assertTrue(smoothed.isNotEmpty())
+        assertTrue(smoothed.all { near[it].second.animationSteps <= far[it].second.animationSteps })
+        assertTrue(smoothed.any { near[it].second.animationSteps < far[it].second.animationSteps })
     }
 }

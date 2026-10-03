@@ -11,8 +11,10 @@ Owner-verified S3.5 (D-022).
 | act3 | 547 Variable Set | `%AAB_Proximity = far` |
 | act4 | 38 End If | — |
 
-Consumed in task544 act28–29: `if %AAB_Proximity = near → LuxAlpha = lux_results2 × 0.1`.
-It does **NOT** pause the pipeline, and it does not damp reactivity either: act27 has already
-stored `%SmoothedLux` from the undamped α, and act33 hands Map Lux the undamped `%lux_results2`,
-so only the readouts that display `%LuxAlpha` change (corrected 2026-09-24, DC-064; the S14 port
-had damped the EMA). The only other reader is the Debug scene.
+Consumed in task544: in the owner's V2 (2026-10-03, DD-022), `if %AAB_Proximity ~ near →
+%lux_results2 = round3(%lux_results2 × 0.1)`, copied into `%LuxAlpha` and passed as Map Lux's par2,
+so task661 sizes the animation from the damped α. It does **NOT** pause the pipeline and does not
+damp smoothing: `%SmoothedLux` is already stored from the undamped α, so the target brightness is
+unchanged and only the animation (fewer steps, shorter throttle) and the `%LuxAlpha` readouts move.
+The XML transcribed here predates V2: there act29 damped only `%LuxAlpha` (DC-064). The only other
+reader is the Debug scene.

@@ -183,7 +183,7 @@ object TaskerReference {
         val smoothing = luxSmoothing(
             par1, smoothed, requireNotNull(state.threshDynamicPercent), deltaFactor, zone1End,
         )
-        val luxAlpha = if (proximityNear) smoothing.luxAlpha * 0.1 else smoothing.luxAlpha
+        val luxAlpha = if (proximityNear) round3(smoothing.luxAlpha * 0.1) else smoothing.luxAlpha
         // act35: Set Thresholds(par1 = %new_smoothed_lux); the band centre is still %AAB_LastRawLux.
         return LightCycleResult(
             LightCycleOutcome.SMOOTHED, lastRawLux, smoothing.smoothedLux, luxAlpha,

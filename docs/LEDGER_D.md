@@ -234,3 +234,15 @@
   before the DataStore seed committed defaults over the profile, for anyone tapping fast, so the
   app now refuses it. Accepted: a window appearing between the hierarchy dump and the tap, and
   `bmgr` denied outright although the owner allowed one form.
+
+- DD-022 [cited]: **While near, the proximity ×0.1 now also sizes the brightness animation,
+  because the owner changed Tasker's task544 to do so (2026-10-03).** The owner's V2 sets
+  `%lux_results2 = round3(%lux_results2 × 0.1)` while `%AAB_Proximity ~ near` (pasted A30), copies
+  it into `%LuxAlpha` and passes it as A35's par2, so task661 sizes the animation from it; A26–A28
+  have already stored `%SmoothedLux` from the undamped α, so smoothing, the band and the target are
+  unchanged. `evaluate` now feeds the damped, 3-dp-rounded α to `calculateAnimation` on a smoothed
+  or settled cycle, and the oracle and `LightCycleParityTest` model the new A30. task543 gives a
+  smaller α fewer steps and the throttle is the animation's length, so at the defaults α 0.3 goes
+  from 7 × 53 ms (throttle 381 ms) to 2 × 64 ms (138 ms): covered, the same target arrives in a
+  coarser jump and the next cycle may run sooner — no slowing, and not D-087's in-EMA damp, which
+  stays withdrawn by DC-064. On-device behaviour is unverified.

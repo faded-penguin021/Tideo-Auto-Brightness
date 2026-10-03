@@ -171,12 +171,13 @@ class SettlingPlacementTest {
     }
 
     @Test
-    fun proximityNear_settlesTheSameAndDampsOnlyTheReportedAlpha() {
+    fun proximityNear_settlesTheSameAndAnimatesFromTheDampedAlpha() {
         val far = settle(160.0, 0.0)
         val near = settle(160.0, 0.0, near = true)
         assertEquals(far.map { it.smoothedLux }, near.map { it.smoothedLux })
         assertEquals(far.map { it.targetBrightness }, near.map { it.targetBrightness })
-        assertEquals(far.last().luxAlpha * BrightnessEngine.PROXIMITY_ALPHA_DAMP, near.last().luxAlpha, tol)
-        assertEquals(far.last().animationSteps, near.last().animationSteps)
+        val damped = Math.round(far.last().luxAlpha * BrightnessEngine.PROXIMITY_ALPHA_DAMP * 1000.0) / 1000.0
+        assertEquals(damped, near.last().luxAlpha, tol)
+        assertEquals(engine.calculateAnimation(damped, AnimationConfig(), null).first, near.last().animationSteps)
     }
 }

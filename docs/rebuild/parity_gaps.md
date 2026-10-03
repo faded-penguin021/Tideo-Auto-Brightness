@@ -136,6 +136,10 @@ decides which of them runs and with what arguments, and it diverged:
   100 was then act19-stopped, and 800 lx smoothed to 161. The engine now smooths, maps and animates
   undamped and reports `luxAlpha × 0.1` on a smoothed cycle while near; `LightCycleParityTest` replays
   the oracle with proximity near.
+  **Superseded 2026-10-03 (DD-022):** the owner's Tasker V2 damps `%lux_results2` itself
+  (`round3(× 0.1)`, its pasted A30) and passes it as Map Lux's par2, so the animation is sized from the
+  damped α while smoothing stays undamped. The engine and oracle follow, so this stays parity and
+  is no deviation; while near, the same target arrives in fewer steps under a shorter throttle.
 
 **Still open, related, not part of gap-08:**
 - **task618's wake path.** Set Initial Brightness polls the light sensor itself (act8, code373),

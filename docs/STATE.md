@@ -63,14 +63,23 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    3 ms later, and fixing that is a settle-window change for you to rule on. Extra Dim is ruled
    out (DC-059…DC-062).
 
-3. **[2026-09-24] Check the proximity change on the phone next time you test a build.** Tideo no
-   longer slows brightness while the top of the phone is covered, which is what Tasker does: its
-   ×0.1 only ever changed the displayed α (DC-064). If you would rather keep the old slowing as a
-   deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
-   `DEVICE_TEST_SCRIPT.md` step 13 — brightness tracks as fast covered as uncovered, and only
-   Live Debug's "Smoothing α" drops to a tenth.
+3. **[2026-10-03] Check the proximity damp on the phone next time you test a build.** Tideo now
+   follows your Tasker V2: while the top of the phone is covered, the ×0.1 α also sizes the
+   brightness animation, and smoothing stays undamped (DD-022). Settles it: run
+   `DEVICE_TEST_SCRIPT.md` step 13. Brightness should reach the same level as uncovered, and while
+   covered Live Debug's "Smoothing α" should drop to a tenth and "Last animation" should show fewer
+   steps.
 
-Open questions: none.
+Open questions:
+
+- **[2026-10-03] Is a faster, coarser transition what you want from the proximity damp?** In
+  task543 a smaller α means *fewer* animation steps, and the throttle is the animation's length.
+  So V2's ×0.1 does not slow anything: at α 0.3, 7 steps × 53 ms (381 ms throttle) become 2 × 64 ms
+  (138 ms). Covered, brightness jumps to the same target sooner and the next cycle can run sooner.
+  Options: (a) keep it — Tideo and Tasker agree today; (b) if you meant slower, change Tasker
+  first (e.g. damp the α passed to Lux Smoothing, which is D-087's old behaviour) and Tideo follows
+  again. Recommendation: (a) until a device run says it feels wrong, since the change is only
+  visible while the sensor is covered. Settles it: your answer; step 13 shows the step count.
 
 **This train is `1.12.0` on vc26, its ONE bump (owner, 2026-09-28),** for #134 and then #133. Land
 further user-facing fixes by editing `changelogs/26.txt` (500-character cap), never by bumping or by
@@ -115,6 +124,10 @@ creating `27.txt`; re-open only for something major, and say so.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-03 — **Proximity damp follows the owner's Tasker V2: the ×0.1 α (3 dp) now sizes the
+  animation as well as the readout, smoothing still undamped; the oracle changed with it, the
+  source having changed (DD-022, superseding DC-064's readout-only damp).**
 
 - 2026-10-02 — **E2E S2–S4 blocking review: Sol found 6 BLOCKERs and 6 HIGHs, then 4 more in
   the fixes, all fixed — owner brightness mode, curve points and owner-mode conflicts kept in the

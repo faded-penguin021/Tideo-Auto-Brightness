@@ -26,7 +26,7 @@ data class CompressedScaleResult(val calculatedBrightness: Double, val effective
 
 class BrightnessEngine {
     companion object {
-        // Tasker task544 act28/29 / prof759 / task545: %LuxAlpha readout factor while proximity reads "near".
+        // Tasker task544 act28/29 / prof759 / task545: %lux_results2 factor while proximity reads "near" (DD-022).
         const val PROXIMITY_ALPHA_DAMP = 0.1
 
         const val MAX_SETTLING_STEPS = 20
@@ -124,23 +124,24 @@ class BrightnessEngine {
         val targetBrightness = Math.round(scaleResult.calculatedBrightness)
             .coerceIn(input.curve.minBrightness.toLong(), input.curve.maxBrightness.toLong()).toInt()
 
+        // Tasker task544 act28–33: act27 stores %SmoothedLux undamped; the ×0.1 (3 dp) reaches %LuxAlpha and act33's par2 (DD-022).
+        val smoothing = outcome == EvaluationOutcome.SMOOTHED || outcome == EvaluationOutcome.SETTLED
+        val cycleLuxAlpha = if (smoothing && input.proximityNear) round3(luxAlpha * PROXIMITY_ALPHA_DAMP) else luxAlpha
+
         val (steps, wait, throttle) = calculateAnimation(
-            alpha = luxAlpha,
+            alpha = cycleLuxAlpha,
             animation = input.animation,
             cycleTimeMs = prev?.cycleTimeMs,
         )
 
         val dimmingAlpha = dimmingAlpha(targetBrightness, input.curve.minBrightness)
-        // Tasker task544 act28–31: the ×0.1 sets only the %LuxAlpha global; act27 and act33 use %lux_results2 (gap-08).
-        val smoothing = outcome == EvaluationOutcome.SMOOTHED || outcome == EvaluationOutcome.SETTLED
-        val reportedLuxAlpha = if (smoothing && input.proximityNear) luxAlpha * PROXIMITY_ALPHA_DAMP else luxAlpha
 
         return BrightnessPolicyOutput(
             targetBrightness = targetBrightness,
             transitionDurationMs = throttle,
             animationSteps = steps,
             animationWaitMs = wait,
-            luxAlpha = reportedLuxAlpha,
+            luxAlpha = cycleLuxAlpha,
             dimmingAlpha = dimmingAlpha,
             smoothedLux = smoothedLux,
             dynamicThreshold = dynamicThreshold,

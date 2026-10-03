@@ -892,6 +892,7 @@
   and the parity rule set the direction; keeping the old damp would now be a `parity_gaps.md`
   deviation entry, and the panic gesture's proximity veto (D-116) is untouched. On-device
   behaviour is unverified (`DEVICE_TEST_SCRIPT.md` §4 now expects no slowing).
+  Corrected by DD-022.
 
 - DC-065 [cited]: **A start command reaching a running pipeline posts the live notification, not
   an empty one (2026-09-24, Tideo #130).** Every `startForegroundService` runs `onStartCommand`
