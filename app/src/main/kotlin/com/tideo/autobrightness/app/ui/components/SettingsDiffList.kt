@@ -13,8 +13,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.changedCount
 import com.tideo.autobrightness.app.settings.displayRows
@@ -32,8 +35,8 @@ fun SettingsDiffList(
     val changed = settings.changedCount(reference)
     Column(modifier.fillMaxWidth().testTag("settings_diff_list")) {
         Text(
-            if (changed == 0) "All settings at factory defaults"
-            else "$changed setting${if (changed == 1) "" else "s"} changed from default (shown in gold)",
+            if (changed == 0) stringResource(R.string.settings_diff_defaults)
+            else pluralStringResource(R.plurals.settings_diff_changed, changed, changed),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 4.dp).testTag("settings_diff_summary"),
@@ -48,7 +51,7 @@ fun SettingsDiffList(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        row.label,
+                        stringResource(row.labelRes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (row.changed) AabGold else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = if (row.changed) FontWeight.SemiBold else FontWeight.Normal,

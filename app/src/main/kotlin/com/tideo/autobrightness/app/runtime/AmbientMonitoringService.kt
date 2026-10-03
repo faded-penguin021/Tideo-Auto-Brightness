@@ -16,6 +16,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.service.quicksettings.TileService
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.core.app.ServiceCompat
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.AppModule
@@ -455,7 +456,7 @@ class AmbientMonitoringService : Service() {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                getString(R.string.notif_channel_ambient),
+                languageContext.getString(R.string.notif_channel_ambient),
                 NotificationManager.IMPORTANCE_LOW,
             ),
         )
@@ -463,7 +464,7 @@ class AmbientMonitoringService : Service() {
         manager.createNotificationChannel(
             NotificationChannel(
                 OVERRIDE_CHANNEL_ID,
-                getString(R.string.notif_channel_override),
+                languageContext.getString(R.string.notif_channel_override),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 enableVibration(true)
@@ -477,8 +478,8 @@ class AmbientMonitoringService : Service() {
      */
     internal fun notifyManualOverride() {
         val alert = NotificationCompat.Builder(this, OVERRIDE_CHANNEL_ID)
-            .setContentTitle(getString(R.string.notif_override_title))
-            .setContentText(getString(R.string.notif_override_text))
+            .setContentTitle(languageContext.getString(R.string.notif_override_title))
+            .setContentText(languageContext.getString(R.string.notif_override_text))
             .setSmallIcon(R.drawable.ic_stat_brightness)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -489,7 +490,7 @@ class AmbientMonitoringService : Service() {
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, alert)
         // G2R-F91: route through shared AabFlash surface (overlay → pill → Toast fallback).
         mainHandler.post {
-            AabFlash.show(this, getString(R.string.flash_manual_override))
+            AabFlash.show(this, languageContext.getString(R.string.flash_manual_override))
         }
     }
 
@@ -526,22 +527,25 @@ class AmbientMonitoringService : Service() {
         state.paused && state.discardableOverride != null,
     )
 
+    private val languageContext: Context
+        get() = ContextCompat.getContextForLanguage(this)
+
     private fun buildNotification(model: NotificationModel): Notification {
         // G1-F1: surface permission issue instead of looking silently broken.
         val canWrite = android.provider.Settings.System.canWrite(this)
         val title = when {
-            !canWrite -> getString(R.string.notif_title_permission_needed)
-            model.paused -> getString(R.string.notif_title_paused)
-            else -> getString(R.string.notif_title_active)
+            !canWrite -> languageContext.getString(R.string.notif_title_permission_needed)
+            model.paused -> languageContext.getString(R.string.notif_title_paused)
+            else -> languageContext.getString(R.string.notif_title_active)
         }
         val text = when {
-            !canWrite -> getString(R.string.notif_text_grant_write)
-            model.paused -> getString(R.string.notif_text_paused)
+            !canWrite -> languageContext.getString(R.string.notif_text_grant_write)
+            model.paused -> languageContext.getString(R.string.notif_text_paused)
             model.smoothedLux != null && model.targetBrightness != null ->
-                getString(R.string.notif_text_lux_brightness, model.smoothedLux.toInt(), model.targetBrightness)
-            else -> getString(R.string.notif_text_monitoring)
+                languageContext.getString(R.string.notif_text_lux_brightness, model.smoothedLux.toInt(), model.targetBrightness)
+            else -> languageContext.getString(R.string.notif_text_monitoring)
         }
-        val contextLine = model.activeContext?.let { getString(R.string.notif_subtext_context, it) }
+        val contextLine = model.activeContext?.let { languageContext.getString(R.string.notif_subtext_context, it) }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
@@ -554,17 +558,17 @@ class AmbientMonitoringService : Service() {
         // F76: NO Pause action (confused users). DD-011: Discard displaces Reset (three actions max).
         if (model.canDiscard) return builder.addOverrideActions().build()
         if (model.paused) {
-            builder.addAction(0, getString(R.string.action_resume), actionIntent(ACTION_RESUME))
+            builder.addAction(0, languageContext.getString(R.string.action_resume), actionIntent(ACTION_RESUME))
         }
-        builder.addAction(0, getString(R.string.action_reset), actionIntent(ACTION_PANIC))
-        builder.addAction(0, getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
+        builder.addAction(0, languageContext.getString(R.string.action_reset), actionIntent(ACTION_PANIC))
+        builder.addAction(0, languageContext.getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
         return builder.build()
     }
 
     private fun NotificationCompat.Builder.addOverrideActions() = this
-        .addAction(0, getString(R.string.action_discard), actionIntent(ACTION_DISCARD_OVERRIDE))
-        .addAction(0, getString(R.string.action_resume), actionIntent(ACTION_RESUME))
-        .addAction(0, getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
+        .addAction(0, languageContext.getString(R.string.action_discard), actionIntent(ACTION_DISCARD_OVERRIDE))
+        .addAction(0, languageContext.getString(R.string.action_resume), actionIntent(ACTION_RESUME))
+        .addAction(0, languageContext.getString(R.string.action_disable), actionIntent(ACTION_DISABLE))
 
     private fun actionIntent(action: String): PendingIntent {
         // CWE-927: explicit Intent; component + package on separate statements for CodeQL.

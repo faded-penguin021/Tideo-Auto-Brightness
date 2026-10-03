@@ -1,0 +1,723 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tideo 自动亮度</string>
+    <string name="app_wordmark_primary">Tideo</string>
+    <string name="app_wordmark_secondary">自动亮度</string>
+    <string name="app_tagline">随环境光按确定规则调节亮度</string>
+    <string name="global_toasts_a11y_description">在系统范围内显示自动亮度的调试提示（悬浮于其他应用上方）。这项可选服务仅显示提示浮层，绝不读取屏幕内容。仅当你希望在使用其他应用时也能看到诊断提示，才需要启用它。</string>
+
+    <!-- Foreground-service notification (AmbientMonitoringService) -->
+    <string name="notif_channel_ambient">环境光监测</string>
+    <string name="notif_channel_override">手动调节</string>
+    <string name="notif_title_permission_needed">自动亮度 — 需要授权</string>
+    <string name="notif_title_paused">自动亮度已暂停</string>
+    <string name="notif_title_active">自动亮度运行中</string>
+    <string name="notif_text_grant_write">请授予“修改系统设置”权限，以便控制亮度</string>
+    <string name="notif_text_paused">当前为手动调节 — 点击“恢复”以继续</string>
+    <string name="notif_text_lux_brightness">照度 %1$d lux → 亮度 %2$d</string>
+    <string name="notif_text_monitoring">正在监测环境光</string>
+    <string name="notif_subtext_context">情境：%1$s</string>
+    <string name="notif_override_title">检测到手动调节</string>
+    <string name="notif_override_text">自动亮度已暂停 — “恢复”会将本次调节保留为曲线数据点，“丢弃”则会删除此记录</string>
+    <string name="flash_manual_override">手动调节 — 自动亮度已暂停</string>
+    <string name="flash_control_gate_off">已忽略控制命令 — 外部控制未开启（工具 → 自动化控制）</string>
+    <string name="flash_control_name_missing">已忽略 LOAD_PROFILE — 缺少 “name” 附加参数</string>
+    <string name="flash_control_profile_unknown">已忽略 LOAD_PROFILE — 没有名为 “%1$s” 的配置方案</string>
+    <string name="flash_control_resume_ignored">已忽略 RESUME — 服务已关闭</string>
+
+    <!-- Shared action / button labels -->
+    <string name="action_resume">恢复</string>
+    <string name="action_reset">重置</string>
+    <string name="action_disable">停用</string>
+
+    <!-- Screen titles -->
+    <string name="menu_title">菜单</string>
+    <string name="menu_section_settings">设置</string>
+    <string name="menu_section_info">信息与帮助</string>
+    <string name="menu_recheck_permissions">重新检查权限</string>
+    <string name="menu_subtitle_override">当前为手动调节 — 打开以恢复自动控制</string>
+    <string name="menu_subtitle_context">当前情境：%1$s</string>
+    <string name="menu_subtitle_default">保存和加载配置方案 · 自动情境规则</string>
+    <string name="title_dashboard">概览</string>
+    <string name="title_live_debug">实时调试信息</string>
+    <string name="title_reactivity">响应灵敏度</string>
+    <string name="title_curve_brightness">曲线与亮度</string>
+    <string name="title_misc">其他设置</string>
+    <string name="title_super_dimming">超级调暗</string>
+    <string name="title_circadian">昼夜节律</string>
+    <string name="title_contexts">情境</string>
+    <string name="title_profiles_import_export">配置方案与导入/导出</string>
+    <string name="title_profiles_contexts">配置方案与情境</string>
+    <string name="seg_profiles">配置方案</string>
+    <string name="seg_rules">规则</string>
+    <string name="profiles_action_load">加载</string>
+    <string name="profiles_action_save">保存</string>
+    <string name="profiles_action_contexts">情境</string>
+    <string name="profiles_load_title">加载与管理</string>
+    <string name="profiles_contexts_title">情境规则</string>
+    <string name="profiles_close">关闭</string>
+    <string name="profiles_no_saved">尚未保存任何配置方案。</string>
+    <string name="profiles_load_failed_title">无法加载</string>
+    <string name="profiles_import_file">导入设置文件…</string>
+    <string name="profiles_link_legacy">关联旧版配置文件夹…</string>
+    <string name="profiles_relink_legacy">重新关联旧版文件夹…</string>
+    <string name="profiles_load_legacy_entry">加载 %1$s</string>
+    <string name="profiles_restore_factory">恢复出厂配置方案</string>
+    <string name="profiles_reset_defaults">将设置重置为默认值</string>
+    <string name="profiles_export">导出当前设置…</string>
+    <string name="profiles_view_current">查看当前设置…</string>
+    <string name="profiles_active_tag">使用中</string>
+    <string name="ssid_help_title">读取 Wi-Fi 名称</string>
+    <string name="ssid_help_lead_permission">应用需要获取已连接的网络名称（SSID），才能匹配 Wi-Fi 规则。在 Android 上，常规读取方式既需要位置权限，也需要开启定位服务。</string>
+    <string name="ssid_help_lead_services">应用需要获取已连接的网络名称（SSID），才能匹配 Wi-Fi 规则。在 Android 上，常规读取方式需要开启定位服务。</string>
+    <string name="ssid_help_options">如果应用能直接读取网络名称，就无需满足定位要求：\n\n•  Shizuku 或 root — 应用运行 “cmd wifi status”（root 同样适用）。\n•  或者，通过 ADB 授予 DUMP 权限，应用便可读取 “dumpsys wifi”：</string>
+    <string name="ssid_help_copy_dump">复制 ADB 命令</string>
+    <string name="ssid_help_copied">已复制 ADB 命令</string>
+    <string name="ssid_help_dump_security">DUMP 是一项范围较广的系统诊断权限，需要你通过 ADB 手动授予。Tideo 仅将其用于只读的“dumpsys wifi”命令，且绝不存储命令输出。你可以随时通过 ADB 撤销此权限；卸载应用也会撤销它。</string>
+    <string name="ssid_help_regex_caveat">如果你的 SSID 中包含 “SSID”，就会出问题。抱歉啦，不过这就没办法了。</string>
+    <string name="rule_priority_over_max">超出 1–100 的范围 — 将保存为 100。</string>
+    <string name="confirm_delete">删除</string>
+    <string name="confirm_overwrite">覆盖</string>
+    <string name="confirm_cancel">取消</string>
+    <string name="confirm_delete_rule_title">删除规则？</string>
+    <string name="confirm_delete_rule_msg">删除“%1$s”？此操作无法撤销。</string>
+    <string name="confirm_delete_profile_title">删除配置方案？</string>
+    <string name="confirm_delete_profile_msg">删除配置方案“%1$s”？此操作无法撤销。</string>
+    <string name="confirm_overwrite_profile_title">覆盖配置方案？</string>
+    <string name="confirm_overwrite_profile_msg">用当前设置替换“%1$s”？已保存的配置方案将被覆盖。</string>
+    <string name="profile_more_actions">更多操作</string>
+    <string name="legacy_import_header">从 Tasker AAB 导入</string>
+    <string name="manage_profiles_header">管理配置方案与导出</string>
+    <string name="title_global_flash">全局提示（系统范围）</string>
+    <string name="title_panic_sensitivity">紧急重置灵敏度</string>
+    <string name="panic_sensitivity_value">级别：%1$d / 10</string>
+    <string name="panic_sensitivity_passthrough">级别：0（无需摇动）</string>
+    <string name="panic_sensitivity_help">设置触发界面紧急重置所需的摇动力度和时长（亮屏时，将手机倒置后摇动）。0 = 直接触发（无需摇动）；10 = 长时间用力摇动。</string>
+    <string name="panic_plugged_label">仅在连接充电器时启用</string>
+    <string name="panic_plugged_help">紧急重置手势仅在连接充电器时生效。如果希望在电池供电时也能使用此手势，请保持此选项关闭。</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_stale_banner">实时数据可能已过期，监测服务可能已停止响应。</string>
+    <string name="dashboard_circadian_stale">昼夜节律正在使用 %1$d 天前缓存的太阳位置，请暂时开启定位以刷新数据。</string>
+    <string name="dashboard_circadian_no_location">由于没有位置信息，昼夜节律正在使用默认的日出日落时间。请暂时开启定位，以获取准确时间。</string>
+
+    <!-- Circadian -->
+    <string name="circadian_stale_banner">正在显示 %1$d 天前缓存的太阳事件。请暂时开启定位，或启用下方的 IP 定位备用方式，以刷新日出日落时间。</string>
+    <string name="circadian_no_location_banner">尚未获取位置，昼夜节律暂时使用默认的日出日落时间。请暂时开启定位，或启用下方的 IP 定位备用方式，以获取准确时间。</string>
+    <string name="dashboard_tier_none">无写入权限 — 点击以设置</string>
+    <string name="dashboard_tier_basic">基础权限（修改系统设置）</string>
+    <string name="dashboard_tier_elevated">高级权限（可使用超级调暗）</string>
+    <string name="dashboard_status_off">已关闭</string>
+    <string name="dashboard_status_starting">正在启动…</string>
+    <string name="dashboard_status_paused_override">已暂停 — 手动调节</string>
+    <string name="dashboard_status_paused">已暂停</string>
+    <string name="dashboard_status_active">运行中 — 正在监测环境光</string>
+    <string name="dashboard_pill_off">已关闭</string>
+    <string name="dashboard_pill_starting">正在启动…</string>
+    <string name="dashboard_pill_override">手动调节</string>
+    <string name="dashboard_pill_paused">已暂停</string>
+    <string name="dashboard_pill_active">运行中</string>
+    <string name="dashboard_active_profile">配置方案</string>
+    <string name="dashboard_context_none">当前无生效情境</string>
+    <string name="dashboard_auto_brightness">自动亮度</string>
+    <string name="dashboard_manual_override">手动调节</string>
+    <string name="dashboard_override_explain">因你手动更改了亮度，自动控制已暂停，点击“恢复”即可恢复自动控制。</string>
+    <string name="dashboard_resume_button">恢复自动亮度</string>
+    <string name="dashboard_ambient_light">环境光</string>
+    <string name="dashboard_last_sample">上次传感器采样：%1$s</string>
+    <string name="dashboard_brightness">亮度</string>
+    <string name="dashboard_applied_brightness">已应用亮度</string>
+    <string name="dashboard_circadian">昼夜节律</string>
+    <string name="dashboard_super_dimming">超级调暗</string>
+    <string name="dashboard_lux_raw">原始值 %1$s lux · %2$s</string>
+    <string name="dashboard_active_context">生效情境</string>
+    <string name="dashboard_service_health">服务运行状况</string>
+    <string name="dashboard_degraded">功能受限：%1$s</string>
+    <string name="dashboard_quick_actions">快捷操作</string>
+    <string name="dashboard_reset_auto">恢复自动亮度值</string>
+    <string name="dashboard_reset_auto_hint">立即将屏幕恢复到自动计算的亮度，并清除手动调节</string>
+    <string name="dashboard_add_tile">添加快捷设置磁贴</string>
+    <string name="dashboard_add_widget">添加桌面小组件</string>
+    <string name="dashboard_tile_add_success">已添加快捷设置磁贴</string>
+    <string name="dashboard_tile_added">快捷设置磁贴已存在</string>
+    <string name="dashboard_tile_request_failed">无法在此设备上打开磁贴选择器</string>
+
+    <!-- Home-screen widget -->
+    <string name="widget_title">Tideo 自动亮度</string>
+    <string name="widget_description">实时显示亮度、照度、配置方案和情境，支持快捷开关服务及重置。</string>
+    <string name="widget_status_off">已关闭</string>
+    <string name="widget_status_active">运行中</string>
+    <string name="widget_status_paused">已暂停</string>
+    <string name="widget_status_starting">正在启动…</string>
+    <string name="widget_caption_brightness">亮度</string>
+    <string name="widget_caption_lux">照度</string>
+    <string name="widget_caption_profile">配置方案</string>
+    <string name="widget_caption_context">情境</string>
+    <string name="widget_dash">—</string>
+    <string name="widget_turn_on">开启</string>
+    <string name="widget_turn_off">关闭</string>
+    <string name="widget_reset">重置</string>
+
+    <!-- About screen -->
+    <string name="title_about">关于</string>
+    <string name="title_user_guide">使用指南</string>
+    <string name="about_app_name">Tideo 自动亮度</string>
+    <string name="about_heading">关于与许可证</string>
+    <string name="about_version">版本 %1$s</string>
+    <string name="about_intro">本项目是一款原生 Android 应用，可完整替代系统自带的自动亮度功能，让亮度调节更智能、响应更及时，并能按你的喜好定制。</string>
+    <string name="about_author">由 /u/v_uurtjevragen 开发，他用 Tasker 制作了最初的版本，并编写了这款原生 Android 重制版。</string>
+    <string name="about_ack_header">致谢</string>
+    <string name="about_ack_tasker">感谢 Tasker 的开发者 João Dias — 最初的 Advanced Auto Brightness 正是基于这款自动化应用构建的。</string>
+    <string name="about_license_header">MIT 许可证</string>
+    <string name="about_license_body">版权所有 (c) 2026 /u/v_uurtjevragen\n\n特此免费授予任何获得本软件及相关文档文件（以下简称“软件”）副本的人不受限制地处理本软件的权利，包括但不限于使用、复制、修改、合并、发布、分发、再许可和/或出售本软件副本的权利，以及允许获得本软件的人享有上述权利，但须遵守以下条件：\n\n上述版权声明和本许可声明应包含在本软件的所有副本或实质性部分中。\n\n本软件按“原样”提供，不附带任何明示或默示的担保，包括但不限于适销性、特定用途适用性和不侵权的担保。在任何情况下，作者或版权持有人均不对因本软件、使用本软件或与本软件有关的其他行为而产生、引起或相关的任何索赔、损害或其他责任负责，无论其依据是合同、侵权行为还是其他法律理论。</string>
+
+    <!-- User Guide: keep [TIP], [WARN] and Markdown markers for the renderer. -->
+    <string name="guide_banner">Tideo 自动亮度 — 使用指南</string>
+    <string name="guide_welcome_title">欢迎使用</string>
+    <string name="guide_welcome_body">本项目可完整替代手机自带的自动亮度功能，让亮度调节更平滑、更智能，并支持全面自定义，让屏幕按你设定的方式适应光线变化。</string>
+    <string name="guide_s1_title">1. 开始使用：初始设置</string>
+    <string name="guide_s1_body">• **授予权限：**首次启动时，Tideo 会引导你授予通知和修改系统设置权限（应用正常运行所必需）。\n• **开启服务：**打开“概览”页面的总开关。常驻通知表示 Tideo 正在运行，此时 Android 自带的自动亮度会被关闭。\n• **设置上下限：**前往“菜单 → 其他设置”，调整最低和最高亮度，限制屏幕能达到的最暗和最亮的程度。\n[TIP] 对于 OLED 屏幕，建议将最低亮度设为较小的值（如 5 或 10），而不是 0，以免出现暗部细节丢失。</string>
+    <string name="guide_s2_title">2. 熟悉界面</string>
+    <string name="guide_s2_body">所有设置均可从菜单进入：**曲线与亮度**用于调整核心曲线；**响应灵敏度**用于调节传感器的响应；**其他设置**包含全局限制和动画；**昼夜节律**根据一天中的时刻缩放亮度；**超级调暗**处理超低亮度和 PWM 频闪；**配置方案与情境**用于管理配置和自动切换。\n[TIP] 点击任意设置名称旁的 ⓘ 图标，即可查看详细说明。</string>
+    <string name="guide_s3_title">3. 调整亮度曲线</string>
+    <string name="guide_s3_body">曲线采用三段式公式：\n• **区域 1（黑暗到昏暗）：**区域 1 缩放系数是弱光下的主要调节参数；区域 1 终点是“黑暗”与“昏暗”的分界。\n• **区域 2（昏暗到中等光照）：**区域 2 的缩放系数和偏移量决定常见室内光照下的曲线形状，可通过图表查看过渡效果。\n• **区域 3（明亮）：**自动处理，平滑接近最高亮度。\n• **自动曲线拟合：**开启手动调节检测后，Tideo 会保存你的手动调节数据点。在至少 9 种光照条件下收集数据后，运行曲线向导，并可在应用曲线参数前查看图表。</string>
+    <string name="guide_s4_title">4. 消除亮度波动（响应灵敏度）</string>
+    <string name="guide_s4_body">智能死区会过滤传感器噪声带来的波动，让屏幕仅在光线明显变化时作出响应。\n• **阈值：**黑暗、昏暗和明亮阈值控制死区大小（数值越高，亮度越稳定）。\n• **曲线：**中点和斜率控制灵敏度从昏暗到明亮时的平滑过渡。</string>
+    <string name="guide_s5_title">5. 管理配置方案</string>
+    <string name="guide_s5_body">为当前配置命名并保存为方案，即可在不同亮度策略间切换。\n• **概览对比：**当前设置会与出厂默认值比较，调整过的数值以金色显示。\n• **内置预设：**Default（默认）、Battery Saver（省电）、Video Streaming（视频播放）、Outdoors（户外）和 Night Reading（夜间阅读）均可自由编辑，也都可以删除，包括 Default。如需找回，点击“恢复出厂配置方案”即可重新添加这些预设。</string>
+    <string name="guide_s6_title">6. 自动切换配置方案（情境）</string>
+    <string name="guide_s6_body">规则将触发条件与配置方案关联，条件满足时会自动加载对应方案。\n• **触发条件：**应用、时间与星期（支持 SUNRISE/SUNSET，即日出/日落）、电池、位置（地理围栏）和 Wi-Fi。\n• **冲突处理：**优先级（1–100）较高的规则优先；优先级相同时，触发条件更多（更具体）的规则优先。\n• **暂停：**手动加载配置方案会暂停情境引擎；可在“配置方案”页面恢复，或熄屏后重新亮屏。\n[TIP] 位置规则会消耗电量，能用 Wi-Fi 规则时，尽量不用地理围栏。</string>
+    <string name="guide_s7_title">7. 高级功能</string>
+    <string name="guide_s7_body">• **动态缩放（昼夜节律）：**根据当前时刻与日出日落的关系，调整整条曲线。\n• **超级调暗与 PWM 敏感模式：**通过高级权限或屏幕滤镜浮层，让屏幕暗于 Android 的最低亮度；PWM 敏感模式会将硬件亮度固定在无频闪的下限，再用软件浮层进一步调暗。\n[WARN] 请将 PWM 阈值设为能消除频闪的**最低**值。设得过高会让像素在被浮层遮暗的同时仍保持高功耗，加速屏幕老化或烧屏。\n• **手动调节：**拖动亮度滑块会暂停 Tideo 并显示通知；点击“恢复”即可继续。\n• **紧急重置：**将设备倒置并上下摇动，即可重置、停止自动控制并强制设为最高亮度。无论通过手势、通知中的“重置”按钮，还是外部 PANIC 命令触发，都会以 S.O.S. 振动确认。\n• **快捷设置磁贴：**暂停/恢复，或开关服务。\n• **强制深色（工具，需要 Shizuku/root）：**强制以深色方式渲染没有自带深色主题的应用。此功能设计为全局手动开关：Android 只在应用启动时读取该设置，因此技术上无法按应用或情境规则切换（切换总会晚一步）；更改后需彻底关闭并重新打开应用。</string>
+    <string name="guide_s8_title">8. 应用前先看图表</string>
+    <string name="guide_s8_body">• **亮度图：**绿色线为你的曲线，蓝点为手动调节数据点，金色线为参考曲线。\n• **响应灵敏度图：**展示稳定性曲线，以及触发更新所需的光照变化。\n• **其他图表：**昼夜节律和超级调暗图表展示功能随时间和亮度的变化。\n• **功耗校准（工具）：**一项实验性工具，逐级调整亮度并测量电流，以生成功耗曲线。</string>
+    <string name="guide_s9_title">9. 保存设置</string>
+    <string name="guide_s9_body">• **应用：**让更改立即生效，但不写入存储；加载配置方案或重启应用后，更改会丢失。\n• **保存（“配置方案”页面）：**将当前设置写入选定的配置方案，这是永久保留更改的唯一方式。\n• **重置：**将当前选项卡恢复为默认设置。\n[TIP] 编辑多个选项卡后，请保存到当前使用的配置方案；如果使用情境引擎，请覆盖相应方案，否则规则触发时会替换你的更改。</string>
+    <string name="guide_outro">享受全新的智能自动亮度体验吧！</string>
+    <string name="guide_done">知道了</string>
+
+    <!-- Power-draw calibration -->
+    <string name="power_desc">测量屏幕在各亮度级别下的功耗：屏幕会显示全白画面并逐级调整亮度，同时 Tideo 会采样电池电流。建议开启飞行模式并拔掉充电器，以获得最佳结果。</string>
+    <string name="power_calibrate">校准功耗</string>
+    <string name="power_recalibrate">重新校准功耗</string>
+    <string name="power_calibrating">正在校准…</string>
+    <string name="power_prep_title">校准准备</string>
+    <string name="power_prep_message">为确保结果准确：\n\n1. 开启飞行模式（重要）\n2. 关闭后台应用\n3. 测试期间不要触碰屏幕\n4. 拔掉充电器\n\n屏幕将变为白色并逐级调整亮度，持续约 1–2 分钟。</string>
+    <string name="power_start">开始</string>
+    <string name="power_cancel">取消</string>
+    <string name="power_result_success">校准完成（%1$d 个数据点）</string>
+    <string name="power_result_no_sensor">此设备没有可用的电池电流传感器</string>
+    <string name="power_result_charging">请拔掉充电器后重试</string>
+    <string name="power_result_cancelled">已取消校准</string>
+
+    <!-- Chart axis / series / marker labels -->
+    <string name="chart_reference">参考</string>
+    <string name="chart_curve">曲线</string>
+    <string name="chart_now">当前</string>
+    <string name="chart_lux">照度（lux）</string>
+    <string name="chart_brightness">亮度</string>
+    <string name="chart_threshold_pct">阈值 %</string>
+    <string name="chart_alpha">平滑系数 α</string>
+    <string name="chart_rel_lux_pct">照度相对变化 %</string>
+    <string name="chart_time_utc">时刻（UTC）</string>
+    <string name="chart_scale_x">缩放倍数 ×</string>
+    <string name="chart_dim_x">调暗倍数 ×</string>
+    <string name="chart_dim_pct">调暗程度 %</string>
+    <string name="chart_dim_shell">调暗 shell 值</string>
+    <string name="chart_night">夜间</string>
+    <string name="chart_day">日间</string>
+    <string name="chart_power_w">功率（W）</string>
+    <string name="chart_current_ma">电流（mA）</string>
+    <string name="chart_power_empty">暂无功耗数据，请先运行校准进行测量</string>
+    <string name="a11y_graph_brightness_curve">亮度曲线图：将环境光映射为 %1$d 到 %2$d 范围内的屏幕亮度。</string>
+    <string name="a11y_graph_dimming">超级调暗图：亮度降至 %1$d 以下时，调暗强度逐渐增加，最终达到百分之 %2$d。</string>
+    <string name="a11y_graph_reactivity">响应灵敏度图：展示各光照水平下，触发亮度更新所需的光照变化百分比。</string>
+    <string name="a11y_graph_alpha">平滑响应图：展示亮度对光照相对变化的响应强度。</string>
+    <string name="a11y_graph_circadian_dimming">昼夜节律调暗图：展示夜间调暗倍数在一天中的变化，夜里达到峰值。</string>
+    <string name="a11y_graph_circadian_scale">昼夜节律缩放图：展示日间亮度提升倍数在一天中的变化，中午前后达到峰值。</string>
+    <string name="a11y_graph_taper">渐变图：展示日间和夜间缩放如何在亮度两端逐渐减弱，直至不再改变亮度。</string>
+    <string name="a11y_graph_power">功耗图：展示各亮度级别下实测的屏幕功率和电流。</string>
+    <string name="a11y_chart_prev">上一张图表</string>
+    <string name="a11y_chart_next">下一张图表</string>
+    <string name="a11y_chart_go_to">转到第 %1$d 张图表</string>
+    <string-array name="circadian_event_labels">
+        <item>黎明</item>
+        <item>日出</item>
+        <item>正午</item>
+        <item>日落</item>
+        <item>黄昏</item>
+    </string-array>
+
+    <!-- Shared actions / fields / a11y -->
+    <string name="a11y_back">返回</string>
+    <string name="a11y_help_for">帮助：%1$s</string>
+    <string name="a11y_service_toggle">自动亮度服务</string>
+    <string name="a11y_wizard_tau">曲线拟合惯性</string>
+    <string name="a11y_night_light_temp">夜间模式色温</string>
+    <string name="a11y_panic_sensitivity">紧急重置手势灵敏度</string>
+    <string name="action_ok">确定</string>
+    <string name="action_apply">应用</string>
+    <string name="action_applied">已应用</string>
+    <string name="action_edit">编辑</string>
+    <string name="action_discard">丢弃</string>
+    <string name="action_dismiss">关闭</string>
+    <string name="action_keep_editing">继续编辑</string>
+    <string name="action_use_current_location">使用当前位置</string>
+    <string name="field_name">名称</string>
+    <string name="field_latitude">纬度</string>
+    <string name="field_longitude">经度</string>
+    <string name="chart_overrides_label">"  手动调节"</string>
+
+    <string name="settings_fix_error">请先修正高亮显示的曲线错误，再应用设置。</string>
+    <string name="graph_affects">影响%1$s图</string>
+    <string name="livedebug_flash_desc">通过可选的无障碍浮层，在其他应用上方显示调试和情境提示。它仅显示提示消息，绝不读取屏幕内容。</string>
+
+    <!-- Discard-changes confirmation -->
+    <string name="discard_changes_title">丢弃更改？</string>
+    <string name="discard_changes_msg">此页面有未保存的更改。要丢弃更改并离开吗？</string>
+
+    <!-- Toasts / flashes -->
+    <string name="toast_settings_applied">已应用设置</string>
+    <string name="toast_reset_defaults">已重置为默认值</string>
+    <string name="toast_max_bright_raised">最高亮度设置过低，无法满足当前曲线要求，已提高至 %1$d（区域 2 终点的值）。</string>
+    <string name="toast_dimming_strength_clamped">强度设定值已降至 %1$d，超过此值可能导致屏幕全黑。</string>
+    <string name="toast_diagnostics_copied">已将诊断信息复制到剪贴板</string>
+    <string name="toast_suggestion_applied">已应用建议</string>
+    <string name="toast_full_report_copied">已将完整报告复制到剪贴板</string>
+    <string name="toast_crash_log_copied">已将崩溃日志复制到剪贴板</string>
+    <string name="toast_fixed_datelocation">已设置固定日期/位置</string>
+    <string name="toast_using_live_data">正在使用实时数据</string>
+    <string name="toast_acquiring_location">正在获取位置，可能需要等待最多 %1$d 秒…</string>
+    <string name="toast_location_services_off">定位已关闭，请开启设备定位，或使用下方的 IP 定位备用方式</string>
+    <string name="toast_acquire_location_failed">无法获取位置，请授予位置权限，或启用下方的 IP 定位备用方式后重试</string>
+    <string name="toast_folder_linked">已关联文件夹</string>
+    <string name="toast_context_resumed">已恢复情境自动切换</string>
+    <string name="toast_overwrote">已覆盖：%1$s</string>
+    <string name="toast_deleted">已删除：%1$s</string>
+    <string name="toast_saved_profile">已保存配置方案：%1$s</string>
+    <string name="toast_factory_restored">已恢复出厂配置方案</string>
+    <string name="toast_applied_profile">已应用配置方案：%1$s</string>
+    <string name="toast_rule_saved">已保存规则</string>
+    <string name="toast_rule_deleted">已删除规则</string>
+    <string name="toast_wifi_connected">Wi-Fi：%1$s</string>
+    <string name="toast_not_on_wifi">未连接 Wi-Fi</string>
+    <string name="toast_ssid_unknown">无法读取当前 Wi-Fi 名称</string>
+    <string name="toast_location_fix">位置：%1$.4f, %2$.4f</string>
+    <string name="toast_location_needs_permission">请授予位置权限，以便使用当前位置</string>
+    <string name="toast_location_unavailable">尚未获取到位置，请稍后重试</string>
+    <string name="toast_grant_usage_hint">请授予使用情况访问权限，以便应用规则检测前台应用</string>
+
+    <!-- Onboarding / permissions -->
+    <string name="onboarding_title">设置与权限</string>
+    <string name="onboarding_step1_title">1. 通知</string>
+    <string name="onboarding_step1_body">允许通知，以便持续显示亮度控制和运行状态。</string>
+    <string name="onboarding_step1_action">允许通知</string>
+    <string name="onboarding_step2_title">2. 修改系统设置（必需）</string>
+    <string name="onboarding_step2_body">授予亮度控制权限。虽然没有此权限不影响服务运行，但无法更改亮度。</string>
+    <string name="onboarding_step2_action">打开设置</string>
+    <string name="onboarding_step3_title">3. 位置（可选）</string>
+    <string name="onboarding_step3_body">仅用于基于位置的情境规则，以及作为读取 Wi-Fi 名称的备用方式。若使用 Shizuku 或 ADB，则无需位置权限也能使用 Wi-Fi 规则。</string>
+    <string name="onboarding_step3_action">授予位置权限</string>
+    <string name="onboarding_usage_title_needed">5. 使用情况访问权限（应用规则必需）</string>
+    <string name="onboarding_usage_title_optional">5. 使用情况访问权限（可选）</string>
+    <string name="onboarding_usage_body_needed">你的某条情境规则针对特定应用。请授予使用情况访问权限，以便服务检测前台应用。</string>
+    <string name="onboarding_usage_body_optional">仅在你日后添加按应用切换配置方案的情境规则时才需要。可以先跳过，以后再从“配置方案与情境”页面授予。</string>
+    <string name="onboarding_usage_action">打开使用情况访问权限</string>
+    <string name="onboarding_done">完成</string>
+    <string name="onboarding_skip">暂时跳过</string>
+    <string name="onboarding_restricted_body">从 Play 商店以外安装应用时，Android 可能会限制下方的“修改系统设置”开关（以及应用规则所需的“使用情况访问权限”），使其置灰或显示“受限制的设置”。你仍可尝试点击，此时通常会出现解除限制的提示。如果没有，请打开“应用信息 → ⋮ 菜单 → 允许受限制的设置”，然后返回此处。</string>
+    <string name="onboarding_elevated_body">允许 Tideo 更改安全显示设置，用于超级调暗及受支持的配置方案显示开关（夜间模式、颜色校正/反转、息屏显示、充电时保持唤醒，以及实验性的 HDR 禁用功能）。选择任意一种方式来一次性授予 WRITE_SECURE_SETTINGS 权限，以后可通过 ADB 或卸载应用撤销。</string>
+    <string name="onboarding_shizuku_prompt">已安装 Shizuku，但尚未运行，请先启动 Shizuku 应用，再返回此处。</string>
+    <string name="onboarding_restricted_title">请注意：受限制的设置</string>
+    <string name="onboarding_open_app_info">打开应用信息</string>
+    <string name="onboarding_granted">已授权 ✓</string>
+    <string name="onboarding_elevated_title">4. 高级权限（可选）</string>
+    <string name="onboarding_adb_label">ADB（通过电脑执行）：</string>
+    <string name="onboarding_copy_command">复制命令</string>
+    <string name="onboarding_use_shizuku">使用 Shizuku</string>
+    <string name="onboarding_try_root">尝试 root</string>
+
+    <!-- Tools (curve wizard) -->
+    <string name="title_tools">工具</string>
+    <string name="tools_power_header">功耗校准</string>
+    <string name="tools_wizard_desc">根据已记录的手动调节数据拟合亮度曲线（需要至少 9 个数据点）。</string>
+    <string name="tools_inertia">惯性（τ）：%1$s — 越低越贴近数据点，越高越接近当前曲线</string>
+    <string name="tools_not_enough_points">记录的手动调节数据点不足（需要至少 %1$d 个真实数据点，目前有 %2$d 个）。</string>
+    <string name="tools_fit_failed">无法根据已记录的数据点拟合曲线。</string>
+    <string name="tools_wizard_title">曲线建议向导</string>
+    <string name="tools_recorded_points">已记录数据点：%1$d</string>
+    <string name="tools_run_wizard">运行向导</string>
+    <string name="tools_apply_suggestion">应用建议</string>
+    <string name="tools_preview_graph">预览图表</string>
+    <string name="tools_copy_full_report">复制完整报告</string>
+    <string name="tools_diagnostics_header">诊断</string>
+    <string name="tools_diagnostics_desc">如果 Tideo 曾发生崩溃，最近一次崩溃的日志会保存在此设备上。反馈问题时可以复制并附上日志，该日志不会被自动上传。</string>
+    <string name="tools_copy_crash_log">复制最新崩溃日志</string>
+    <string name="tools_no_crash_log">暂无崩溃日志</string>
+    <string name="tools_automation_header">自动化控制</string>
+    <string name="tools_automation_desc">允许 Tasker 或 MacroDroid 等自动化应用通过发送广播来开关、暂停、恢复、重新应用或重置 Tideo，或加载配置方案，默认关闭。开放的操作与磁贴、小组件及通知已有的操作相同，且不会向应用外发送任何信息。</string>
+    <string name="tools_automation_toggle_label">允许外部控制</string>
+    <string name="help_tools_automation">关闭时，Tideo 会忽略所有自动化广播。仅当你使用 Tasker/MacroDroid 控制服务时才需要开启。此功能没有密码保护，开启后设备上的任何应用都能发送这些操作。</string>
+    <string name="tools_force_dark_header">强制深色（Shizuku/root）</string>
+    <string name="tools_force_dark_desc">强制以深色方式渲染没有自带深色主题的应用（开发者选项 debug.hwui.force_dark），通过 Shizuku 或 root shell 写入。手机重启后，此设置会重置。</string>
+    <string name="tools_force_dark_toggle_label">强制深色渲染</string>
+    <string name="help_tools_force_dark">仅在应用启动时生效：已经运行的应用会保持当前渲染方式，直到彻底关闭并重新打开。同样出于这个原因，无法按应用设置规则。</string>
+    <string name="tools_force_dark_state_on">此设备当前已启用</string>
+    <string name="tools_force_dark_state_off">此设备当前未启用</string>
+    <string name="tools_force_dark_unreachable">Shizuku 和 root 均不可用。你的选择会先保存，待其中一种方式可用后，在下次服务启动时应用。</string>
+    <string name="toast_force_dark_applied">已应用，请彻底关闭并重新打开应用以查看效果</string>
+    <string name="toast_force_dark_pending">已保存，待 Shizuku 或 root 可用后应用</string>
+    <string name="toast_force_dark_unreachable_off">已保存，但没有可用的特权 shell，属性将保持原样直到重启</string>
+    <string name="toast_force_dark_failed">无法写入属性</string>
+    <string name="tools_automation_show_actions">查看操作</string>
+    <string name="tools_automation_actions_title">自动化操作</string>
+    <string name="tools_automation_actions_body">发送以下广播操作（均以 com.tideo.autobrightness.control 为前缀）：\n\n• SERVICE_ON / SERVICE_OFF / SERVICE_TOGGLE — 启动、停止或切换服务开关\n• PAUSE / RESUME — 暂停或恢复自动控制\n• REAPPLY — 立即重新计算亮度\n• PANIC — 重置（与通知中的“重置”相同）\n• LOAD_PROFILE — 加载已保存的配置方案；通过名为 “name” 的字符串附加参数传入方案名称\n• CONTEXTS_RESUME — 清除手动加载的配置方案，将控制权交还给情境规则\n\n示例（adb）：\nadb shell am broadcast -a com.tideo.autobrightness.control.LOAD_PROFILE --es name \"Night\" -n com.tideo.autobrightness/.app.control.ControlReceiver\n\n调试版的 -n 组件参数使用 com.tideo.autobrightness.debug 包名。\n\n为确保 Tideo 尚未运行时 SERVICE_ON 也能可靠生效，请将其排除在电池优化之外，否则 Android 可能会阻止服务在后台启动。</string>
+
+    <!-- Curve & Brightness -->
+    <string name="curve_zones_header">曲线分区</string>
+    <string name="curve_form1a">区域 1 缩放系数（form1A）</string>
+    <string name="curve_zone1_end">区域 1 终点（lux）</string>
+    <string name="curve_form2b">区域 2 缩放系数（form2B）</string>
+    <string name="curve_form2c">区域 2 偏移量（form2C）</string>
+    <string name="curve_zone2_end">区域 2 终点（lux）</string>
+    <string name="curve_derived_header">推导值（保证连续性）</string>
+    <string name="curve_form2a">区域 2 对齐系数（form2A）</string>
+    <string name="curve_form3a">区域 3 对齐系数（form3A）</string>
+    <string name="curve_delete_point_title">删除手动调节数据点？</string>
+    <string name="curve_delete_point_msg">照度 %1$.1f lux → 亮度 %2$d</string>
+
+    <!-- Reactivity -->
+    <string name="react_graph_curve">响应灵敏度曲线</string>
+    <string name="react_graph_alpha">平滑系数 α</string>
+    <string name="react_thresholds_header">响应阈值</string>
+    <string name="react_smoothing_header">传感器数据平滑</string>
+    <string name="react_override_header">手动调节与传感器信任</string>
+    <string name="react_dark">黑暗阈值</string>
+    <string name="react_dim">昏暗阈值</string>
+    <string name="react_bright">明亮阈值</string>
+    <string name="react_curve_slope">曲线斜率</string>
+    <string name="react_curve_mid">曲线中点（对数照度）</string>
+    <string name="react_smoothing_delta">平滑系数 Δ</string>
+    <string name="react_use_override">启用手动调节检测</string>
+    <string name="react_trust_sensor">信任低精度传感器</string>
+
+    <!-- Misc -->
+    <string name="misc_language_header">语言</string>
+    <string name="misc_language_label">应用语言</string>
+    <string name="language_current">简体中文</string>
+    <string name="misc_language_note">欢迎贡献人工翻译，详见 CONTRIBUTING.md。</string>
+    <string name="misc_brightness_range">亮度范围</string>
+    <string name="misc_animation">动画</string>
+    <string name="misc_notifications">通知</string>
+    <string name="misc_min_brightness">最低亮度</string>
+    <string name="misc_max_brightness">最高亮度</string>
+    <string name="misc_offset">偏移量</string>
+    <string name="misc_scale_auto">缩放系数（自动 — 动态）</string>
+    <string name="misc_scale">缩放系数</string>
+    <string name="misc_anim_steps">动画步数</string>
+    <string name="misc_min_wait">最短等待时间（ms）</string>
+    <string name="misc_max_wait">最长等待时间（ms）</string>
+    <string name="misc_use_notifications">启用通知</string>
+    <string name="misc_throttle_derived">节流间隔（推导值）</string>
+    <string name="misc_err_waits">最短等待时间不能超过最长等待时间。</string>
+    <string name="unit_ms">ms</string>
+
+    <!-- Super Dimming -->
+    <string name="superdimming_setup_elevated">设置高级权限</string>
+    <string name="sd_graph_dimming">调暗曲线</string>
+    <string name="sd_graph_circadian">昼夜节律调暗</string>
+    <string name="sd_header_super">超级调暗</string>
+    <string name="sd_header_pwm">PWM（频闪）处理</string>
+    <string name="sd_header_circadian_spread">昼夜调暗变化幅度</string>
+    <string name="sd_needs_elevated">使用超级调暗需要高级权限（WRITE_SECURE_SETTINGS）。</string>
+    <string name="sd_use_super">启用超级调暗</string>
+    <string name="sd_strength">强度设定值</string>
+    <string name="sd_exponent">超级调暗指数</string>
+    <string name="sd_threshold">超级调暗阈值</string>
+    <string name="sd_pwm_threshold">PWM 阈值</string>
+    <string name="sd_use_pwm">启用软件调暗（对 PWM 敏感）</string>
+    <string name="sd_pwm_exponent">软件调暗指数（PWM）</string>
+    <string name="sd_spread">变化幅度（昼夜节律）</string>
+    <string name="sd_err_threshold">调暗阈值低于最低亮度。</string>
+
+    <!-- Live Debug -->
+    <string name="relative_time_never">暂无记录</string>
+    <string name="relative_time_just_now">刚刚</string>
+    <string name="relative_time_seconds_ago">%1$d 秒前</string>
+    <string name="relative_time_minutes_ago">%1$d 分钟前</string>
+    <string name="relative_time_hours_ago">%1$d 小时前</string>
+    <string name="diag_reactivity_title">实时响应灵敏度</string>
+    <string name="diag_reactivity_threshold">当前阈值：%1$s（照度 %2$s lx）</string>
+    <string name="diag_reactivity_deadzone">传感器死区：%1$s – %2$s lx</string>
+    <string name="diag_circadian_title">实时昼夜节律缩放</string>
+    <string name="diag_circadian_uncompressed">缩放系数（压缩前）：%1$s，时间 %2$s</string>
+    <string name="diag_circadian_true">实际缩放系数：%1$s（亮度 %2$s，范围 %3$s–%4$s）</string>
+    <string name="diag_curve_title">实时亮度</string>
+    <string name="diag_curve_smoothed_lux">当前平滑照度：%1$s</string>
+    <string name="diag_curve_current_bright">当前亮度：%3$s（范围 %1$s–%2$s）</string>
+    <string name="diag_misc_title">实时运行参数</string>
+    <string name="diag_misc_throttle">当前节流间隔：%1$s ms</string>
+    <string name="diag_misc_alpha">当前平滑系数 α：%1$s</string>
+    <string name="diag_dimming_title">实时超级调暗</string>
+    <string name="diag_dimming_rel">调暗强度（相对值）：%1$s</string>
+    <string name="diag_dimming_abs">调暗程度（绝对值）：%1$s（亮度 %2$s）</string>
+    <string name="debug_core_metrics_title">核心指标</string>
+    <string name="debug_smoothed_lux">平滑照度</string>
+    <string name="debug_raw_lux">原始照度</string>
+    <string name="debug_dynamic_threshold">动态阈值</string>
+    <string name="debug_dead_zone">死区（lx）</string>
+    <string name="debug_current_bright">当前亮度</string>
+    <string name="debug_target_bright">目标亮度</string>
+    <string name="debug_scale_title">昼夜节律与缩放</string>
+    <string name="debug_scale_dynamic">缩放系数（压缩前）</string>
+    <string name="debug_scale_compress">实际缩放系数（压缩后）</string>
+    <string name="debug_system_status_title">系统状态</string>
+    <string name="debug_service">服务</string>
+    <string name="debug_service_running">运行中</string>
+    <string name="debug_service_stopped">已停止</string>
+    <string name="debug_override">手动调节</string>
+    <string name="debug_override_no">否</string>
+    <string name="debug_active_rule">生效规则</string>
+    <string name="debug_active_rule_none">无</string>
+    <string name="debug_performance_title">性能与耗时</string>
+    <string name="debug_lux_alpha">平滑系数 α（LuxAlpha）</string>
+    <string name="debug_cycle_time">单次处理耗时（ms）</string>
+    <string name="debug_throttle">响应冷却时间（ms）</string>
+    <string name="debug_last_animation">上次动画</string>
+    <string name="debug_last_update">上次更新</string>
+    <string name="debug_last_sample">上次采样</string>
+    <string name="livedebug_flash_status">状态</string>
+    <string name="livedebug_flash_enabled">已启用</string>
+    <string name="livedebug_flash_off">关闭（仅在应用前台显示）</string>
+    <string name="livedebug_flash_open_settings">打开无障碍设置</string>
+    <string name="livedebug_flash_enable_settings">在无障碍设置中启用</string>
+    <string name="livedebug_current">调试：%1$s</string>
+    <string name="debug_write_title">亮度写入</string>
+    <string name="debug_write_roundtrip">请求值 → 确认值</string>
+    <string name="debug_write_status">写入状态</string>
+    <string name="debug_write_requested_value">请求写入的 Settings 值</string>
+    <string name="debug_write_settings_api_max">Settings API 最大值</string>
+    <string name="debug_override_disposition">上次手动调节</string>
+    <string name="debug_override_values">观测值 / 稳定值 / 预期值</string>
+    <string name="debug_override_write">手动调节时的写入</string>
+    <string name="debug_override_mode">提交时的模式</string>
+    <string name="debug_override_reclaim">模式恢复</string>
+    <string name="debug_override_age">检测到手动调节的时间</string>
+    <string name="debug_mode_manual">手动</string>
+    <string name="debug_mode_not_manual">非手动</string>
+    <string name="debug_reclaim_ok">已恢复</string>
+    <string name="debug_reclaim_failed">失败</string>
+    <string name="debug_sensor_title">光线传感器</string>
+    <string name="debug_sensor_last_callback">上次回调</string>
+    <string name="debug_sensor_reading_value">%1$s lx · 精度 %2$d · #%3$d · %4$s</string>
+    <string name="debug_sensor_callback_lag">传感器事件 → 回调（ms）</string>
+    <string name="debug_sensor_timestamp">传感器时间戳（开机后毫秒数）</string>
+    <string name="debug_sensor_registration">注册状态</string>
+    <string name="debug_sensor_listener_ok">监听器已注册</string>
+    <string name="debug_sensor_listener_failed">监听器未注册</string>
+    <string name="debug_sensor_listener_pending">监听器等待注册</string>
+    <string name="debug_sensor_trust_on">已开启信任低精度读数</string>
+    <string name="debug_sensor_trust_off">已关闭信任低精度读数</string>
+    <string name="debug_sensor_trust_unknown">信任设置尚未加载</string>
+    <string name="debug_sensor_first_event">注册后的首个事件</string>
+    <string name="debug_sensor_none_yet">暂无</string>
+    <string name="debug_sensor_counts">已接收 / 已接纳 / 已拒绝 / 已延后 / 已替换 / 收敛步数</string>
+    <string name="debug_sensor_last_rejection">上次拒绝</string>
+    <string name="debug_sensor_cycle">当前处理周期</string>
+    <string name="debug_sensor_cycle_value">%1$s · 开始于 %2$s</string>
+    <string name="debug_sensor_idle">空闲</string>
+    <string name="debug_sensor_last_cycle">上次完成的处理周期</string>
+    <string name="debug_sensor_last_cycle_value">%1$s · %2$d ms · %3$s</string>
+    <string-array name="debug_labels">
+        <item>关闭</item>
+        <item>跳过动画</item>
+        <item>动画详情</item>
+        <item>光照评估阈值</item>
+        <item>动态缩放计算</item>
+        <item>超级调暗信息</item>
+        <item>浮层预览</item>
+        <item>图表指标</item>
+        <item>情境自动切换</item>
+        <item>情境定位</item>
+    </string-array>
+
+    <!-- Circadian -->
+    <string name="circadian_date">日期：%1$s</string>
+    <string name="circadian_date_live">日期：%1$s（当前）</string>
+    <string name="circadian_set_fixed">设为固定值</string>
+    <string name="circadian_use_live_data">使用实时数据</string>
+    <string name="circadian_use_live_date">当前日期</string>
+    <string name="graph_circadian">昼夜节律</string>
+    <string name="graph_taper">渐变</string>
+    <string name="circadian_scaling_header">昼夜节律缩放</string>
+    <string name="circadian_taper_header">压缩渐变</string>
+    <string name="circadian_date_location_header">日期与位置</string>
+    <string name="circadian_enable_scaling">启用动态缩放</string>
+    <string name="circadian_scale_spread">缩放变化幅度</string>
+    <string name="circadian_scale_steepness">缩放陡峭度</string>
+    <string name="circadian_transition_factor">过渡因子</string>
+    <string name="circadian_taper_midpoint">渐变中点</string>
+    <string name="circadian_taper_steepness">渐变陡峭度</string>
+    <string name="circadian_ip_fallback_label">使用 IP 定位作为备用方式</string>
+    <string name="circadian_err_transition">过渡因子 &gt; 0.5 时，可能产生不合理的曲线。</string>
+    <string name="circadian_err_taper_midpoint">渐变中点不能超过最高亮度。</string>
+    <string name="circadian_status_live">实时数据：今天 + 当前位置</string>
+    <string name="circadian_status_fixed_date">固定日期：%1$s（实时位置）</string>
+    <string name="circadian_status_fixed_location">固定位置：%1$s, %2$s（实时日期）</string>
+    <string name="circadian_status_fixed_full">固定值：%1$s @ %2$s, %3$s</string>
+    <string name="circadian_live_word">实时</string>
+
+    <!-- Contexts (rule list + editor) -->
+    <string name="contexts_intro">根据前台应用、Wi-Fi、一天中的时刻或充电状态，自动切换到不同的配置方案。</string>
+    <string name="contexts_usage_warning">应用规则需要使用情况访问权限才能检测前台应用。没有此权限，这类规则不会触发。</string>
+    <string name="contexts_no_rules">暂无规则。</string>
+    <string name="contexts_unnamed">（未命名）</string>
+    <string name="contexts_rule_header">规则</string>
+    <string name="contexts_triggers_header">触发条件</string>
+    <string name="contexts_triggers_intro">仅开启此规则需要匹配的条件。所有已开启的触发条件均满足时，规则才会加载对应的配置方案。</string>
+    <string name="contexts_trigger_wifi">Wi-Fi</string>
+    <string name="contexts_trigger_time">时间与星期</string>
+    <string name="contexts_trigger_location">位置</string>
+    <string name="contexts_trigger_battery">电池</string>
+    <string name="contexts_trigger_apps">前台应用</string>
+    <string name="contexts_usage_required">检测前台应用需要使用情况访问权限。</string>
+    <string name="contexts_time_from">从</string>
+    <string name="contexts_time_to">到</string>
+    <string name="contexts_add_rule">添加规则</string>
+    <string name="contexts_grant_usage">授予使用情况访问权限</string>
+    <string name="contexts_loads">加载</string>
+    <string name="contexts_priority_suffix">· 优先级 %1$d</string>
+    <string name="contexts_switch_profile">切换到配置方案：</string>
+    <string name="contexts_priority_label">优先级（1–100，数值越高越优先）</string>
+    <string name="contexts_wifi_ssids">Wi-Fi SSID（用英文逗号分隔）</string>
+    <string name="contexts_use_current_wifi">使用当前 Wi-Fi</string>
+    <string name="contexts_time_window">时间范围：</string>
+    <string name="contexts_clear_time">清除时间</string>
+    <string name="contexts_days">星期（不选表示每天）：</string>
+    <string name="contexts_radius">半径（米）</string>
+    <string name="contexts_only_charging">仅在充电时</string>
+    <string name="contexts_battery_pct">电量百分比：</string>
+    <string name="contexts_from_pct" formatted="false">最低 %</string>
+    <string name="contexts_to_pct" formatted="false">最高 %</string>
+    <string name="contexts_save_rule">保存规则</string>
+    <string name="contexts_picker_value">%1$s：%2$s</string>
+
+    <!-- Field help -->
+    <string name="help_thresh_dark">完全黑暗环境下的响应灵敏度。数值越高，在很暗的房间里亮度就越稳定，越不容易跳变。</string>
+    <string name="help_thresh_dim">大多数情况下的基础响应灵敏度。数值越低，系统对光线小幅减弱的响应就越灵敏。</string>
+    <string name="help_thresh_bright">明亮户外环境下的基础响应灵敏度。较高的数值可避免细小阴影（例如手的遮挡）导致恼人的亮度骤降。</string>
+    <string name="help_curve_slope">控制从昏暗到明亮环境时，响应灵敏度变化的快慢。数值越高，过渡越突然。</string>
+    <string name="help_curve_mid">系统对变化最敏感的照度值，以对数表示。可以将其理解为响应灵敏度曲线的中心点。</string>
+    <string name="help_trust_unreliable">仅当你的设备上自动亮度似乎没有反应时，才需要开启此选项。开启后可能导致亮度不稳定或闪烁。</string>
+    <string name="help_detect_overrides">如果手动调节检测经常误判，请关闭此选项。</string>
+    <string name="help_delta_factor">控制传感器读数的平滑程度。数值越高，对细微光线变化的响应越快，但可能增加抖动。数值越低，亮度越稳定，但响应可能较慢。</string>
+    <string name="help_min_bright">设置屏幕可使用的最低亮度。建议 OLED 屏幕设置 &gt; 0 的值，以避免暗部细节丢失。</string>
+    <string name="help_max_bright">设置屏幕可使用的最高亮度。可通过限制最高亮度来节省电量。</string>
+    <string name="help_offset">直接提高或降低亮度。此数值会在所有光照水平下加到最终亮度上（或从中减去）。</string>
+    <string name="help_scale">整条亮度曲线的全局倍数，用于调整整体对比度。&gt;1 将曲线向更亮的方向拉伸，&lt;1 则向更暗的方向压缩。</string>
+    <string name="help_anim_steps">亮度变化动画的步数。步数越多，过渡越平滑，但也会稍慢一些。</string>
+    <string name="help_max_wait">动画每步之间的最长间隔（毫秒）。控制细微亮度变化的缓慢程度。</string>
+    <string name="help_min_wait">动画每步之间的最短间隔（毫秒）。控制大幅亮度变化的速度。</string>
+    <string name="help_notify_use">通过通知保持服务运行，并显示“已暂停”通知。</string>
+    <string name="help_form_1a">控制昏暗环境中亮度上升的速度。建议值：1 到 5</string>
+    <string name="help_zone_1_end">设置“昏暗光线”与“室内光线”的照度分界，通常对应从暗室进入有灯光房间的情况。</string>
+    <string name="help_form_2b">数值越高，中等光照下的亮度提升越明显。建议值：3 到 10</string>
+    <string name="help_form_2c">中段曲线中细微却影响显著的“偏移量”。数值越低，从黑暗到昏暗的过渡就越舒缓、平滑。建议值：-300 到区域 1 终点。</string>
+    <string name="help_zone_2_end">设置“室内光线”与“明亮户外光线”的照度分界，影响走到室外时的亮度过渡。</string>
+    <string name="help_dimming_strength">控制超级调暗的最大强度。显示的数值表示不受昼夜节律影响时的效果。</string>
+    <string name="help_dim_spread">控制缩放系数在一天中的变化幅度。仅在启用昼夜节律缩放时生效！</string>
+    <string name="help_dimming_exponent">控制超级调暗介入的平缓程度，以及亮度接近最低值时的表现。&lt;1：过渡生硬，不建议使用。1：线性过渡。&gt;1：过渡较柔和。</string>
+    <string name="help_dimming_threshold">屏幕亮度低于此值时，超级调暗开始生效。</string>
+    <string name="help_pwm_threshold">硬件屏幕亮度的下限。低于此值时，使用软件调暗。</string>
+    <string name="help_dimming_enabled">开启或关闭超级调暗。开启后，亮度降至超级调暗阈值以下时，会通过 Android 的“额外调暗”层，让屏幕暗于硬件最低亮度。需要高级权限（安全设置权限）。</string>
+    <string name="help_pwm_exponent">类似伽马的指数，用于控制调暗曲线的形状。数值越高，屏幕保持较亮的范围越大，接近阈值时变暗越陡；数值越低，变暗越快。调整的是亮度过渡方式，而不是调暗幅度！</string>
+    <string name="help_pwm_sensitive">开启或关闭软件调暗功能。开启后，硬件最高亮度会固定在 PWM 阈值。</string>
+    <string name="help_circadian_scaling">根据太阳位置，在一天中调整整条曲线。</string>
+    <string name="help_scale_spread" formatted="false">缩放系数在一天中的变化幅度（%，1–100）。</string>
+    <string name="help_scale_steepness">日夜过渡的陡峭程度。</string>
+    <string name="help_scale_transition">黎明/黄昏过渡的持续时间。</string>
+    <string name="help_taper_midpoint">压缩中心对应的亮度值。</string>
+    <string name="help_taper_steepness">动态范围压缩的斜率。</string>
+    <string name="help_circadian_ip_fallback">默认关闭。仅当 GPS 和网络均无法定位，且未设置固定位置时，才会通过 HTTPS 将你的公网 IP 发送给 ipwho.is 以查询大致坐标。自动查询每天最多一次，坐标保存在此设备上。在设备定位失败后，每次点击“使用当前位置”也可发起一次查询。</string>
+
+    <!-- Profiles import/export status -->
+    <string name="toast_exported">已导出。</string>
+    <string name="toast_export_failed">导出失败：%1$s</string>
+    <string name="toast_imported">已导入。</string>
+    <string name="toast_import_failed">导入失败：%1$s</string>
+    <string name="toast_load_failed">加载失败</string>
+    <string name="toast_loaded_entry">已加载 %1$s</string>
+    <string name="toast_load_failed_detail">加载失败：%1$s</string>
+    <string name="profiles_unreadable">无法读取此配置方案。它既不是 Tideo 导出文件，也不是 Tasker AAB 配置文件。</string>
+    <string name="profiles_too_large">此配置方案文件过大，无法导入。</string>
+    <string name="profiles_read_failed">无法安全读取此配置方案。请尝试重新选择。</string>
+
+    <!-- Profiles (body + dialogs) -->
+    <string name="profiles_save_as">将当前设置另存为…</string>
+    <string name="profiles_resume_context">恢复情境自动切换</string>
+    <string name="profiles_save_title">保存配置方案</string>
+    <string name="profiles_name_label">方案名称</string>
+    <string name="profiles_saving_these">将保存以下设置：</string>
+    <string name="profiles_load_confirm_title">加载“%1$s”？</string>
+    <string name="profiles_current_settings_title">当前设置</string>
+    <string name="profiles_saved_header">已保存的配置方案</string>
+    <string name="profiles_legacy_hint">只需授予一次 Download/AAB/configs 文件夹的访问权限，即可加载 Tasker 应用保存的配置方案。</string>
+    <string name="profiles_context_paused">手动加载配置方案后，情境自动切换已暂停。</string>
+    <string name="profiles_builtin_suffix">（内置）</string>
+    <string name="profiles_factory_defaults">出厂默认值</string>
+    <string name="settings_diff_defaults">所有设置均为出厂默认值</string>
+    <string name="settings_throttle">节流间隔（ms）</string>
+    <string name="settings_night_light_temperature">夜间模式色温</string>
+    <plurals name="settings_diff_changed">
+        <item quantity="other">%1$d 项设置与默认值不同（已用金色标出）</item>
+    </plurals>
+    <string name="profiles_changed_count">%1$d 项与默认值不同</string>
+    <string name="profiles_load_replace_warn">这些设置将替换当前配置。</string>
+
+    <!-- Privileged Display Control -->
+    <string name="title_privileged_display">高级显示设置</string>
+    <string name="menu_section_privileged">高级权限</string>
+    <string name="pd_write_error">无法写入上次更改，WRITE_SECURE_SETTINGS 权限可能已被撤销，请重新授予高级权限后重试。</string>
+    <string name="pd_grant_title">需要高级权限</string>
+    <string name="pd_grant_body">这些显示开关会写入系统安全设置，因此需要一次性授予 WRITE_SECURE_SETTINGS 权限（与超级调暗所需的权限相同）。请选择下方任意一种方式。</string>
+    <string name="pd_grant_requesting">正在请求 Shizuku 授权…</string>
+    <string name="pd_grant_shizuku_ok">已通过 Shizuku 授权 ✓</string>
+    <string name="pd_grant_shizuku_unavailable">Shizuku 未运行。</string>
+    <string name="pd_grant_shizuku_denied">Shizuku 权限被拒绝。</string>
+    <string name="pd_grant_shizuku_failed">Shizuku 授权失败：%1$s</string>
+    <string name="pd_grant_root_ok">已通过 root 授权。</string>
+    <string name="pd_grant_root_failed">root 授权失败或不可用。</string>
+    <string name="pd_adb_copied">已复制 ADB 命令</string>
+    <string name="pd_section_night_light">夜间模式</string>
+    <string name="pd_night_light_switch">夜间模式</string>
+    <string name="pd_night_light_temp_label">色温：%1$d K</string>
+    <string name="pd_night_light_temp_default">色温：设备默认值</string>
+    <string name="pd_night_light_temp_hint">数值越低，色调越暖（滤镜越强）。标准 Android 范围为 2596–4082 K。</string>
+    <string name="pd_night_light_circadian">跟随昼夜节律缩放</string>
+    <string name="pd_night_light_circadian_help">服务运行时，色温会跟随你的昼夜节律曲线：夜间最暖，日间逐渐减弱至最弱滤镜（4082 K）。上方滑块用于设置夜间色温（未设置时使用设备默认值 2850 K）。开启后，手动更改色温会被覆盖。使用与昼夜节律缩放（“昼夜节律”页面）相同的太阳时刻表和陡峭度。</string>
+    <string name="pd_night_light_schedule_caveat">系统设置中已设定夜间模式的定时计划，系统可能会自行将此开关切回原来的状态。</string>
+    <string name="pd_night_light_needs_shizuku">此设备只有通过显示服务才能应用色温设置，否则会忽略该设置。请启动 Shizuku（或授予 root 权限），使色温及昼夜节律渐变生效。</string>
+    <string name="pd_section_color">颜色</string>
+    <string name="pd_daltonizer_label">颜色校正</string>
+    <string name="pd_daltonizer_off">关闭</string>
+    <string name="pd_daltonizer_grayscale">灰度</string>
+    <string name="pd_daltonizer_protan">红色弱（红绿）</string>
+    <string name="pd_daltonizer_deutan">绿色弱（红绿）</string>
+    <string name="pd_daltonizer_tritan">蓝色弱（蓝黄）</string>
+    <string name="pd_daltonizer_custom_preserved">Android 正在使用本应用无法识别的校正模式。Tideo 会保持原样，应用其他更改不会影响它。</string>
+    <string name="pd_use_tideo_setting">改用 Tideo 的设置</string>
+    <string name="pd_inversion">颜色反转</string>
+    <string name="pd_section_screen">屏幕</string>
+    <string name="pd_always_on">息屏显示</string>
+    <string name="pd_stay_awake">充电时保持唤醒</string>
+    <string name="pd_stay_awake_help">连接充电器（交流电源、USB、无线或底座）时，保持屏幕常亮。</string>
+    <string name="pd_stay_awake_custom_preserved">Android 当前选用的充电器类型组合并非由本应用写入，因此并非连接上述每一种充电器时都会保持亮屏。Tideo 会保持原样，应用其他更改不会影响它。</string>
+    <string name="pd_section_experimental">实验性功能</string>
+    <string name="pd_hdr_force_sdr">禁用 HDR（实验性）</string>
+    <string name="pd_hdr_help">直接修改 Android 存储的全局 HDR 格式偏好，不使用 HDR 转换的 Force-SDR 服务 API。应用或清除此更改可能需要重启；更改 HDR 或显示模式时，屏幕可能短暂黑屏。</string>
+    <string name="pd_hdr_custom_preserved">Android 存有自定义的 HDR 格式偏好，无法用此开关表示。Tideo 会保留它；如需更改，请前往系统设置。</string>
+    <string name="pd_info_title">关于这些设置</string>
+    <string name="pd_info_body">仅有某个 Settings 键，并不能证明设备支持对应的显示功能。只有 Android 报告具备相应框架能力时，才会显示夜间模式和息屏显示。其余控件会直接写入系统存储的偏好设置；不同厂商的设备表现可能不同，实验性的 HDR 更改也可能需要重启。更改会一直保留，直到再次修改。</string>
+    <string name="pd_profile_intro">这些设置会与亮度配置方案一同保存，并随配置方案和情境规则一起应用。</string>
+    <string name="pd_profile_temp_clear">使用设备色温</string>
+</resources>

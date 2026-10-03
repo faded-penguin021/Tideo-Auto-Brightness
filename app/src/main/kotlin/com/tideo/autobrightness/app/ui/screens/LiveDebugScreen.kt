@@ -55,6 +55,7 @@ import com.tideo.autobrightness.app.ui.components.fmtInt
 import com.tideo.autobrightness.app.ui.components.fmtLux
 import com.tideo.autobrightness.app.ui.components.fmtPercent
 import com.tideo.autobrightness.app.ui.components.goldValue
+import com.tideo.autobrightness.app.ui.components.relativeAgeLabel
 
 // %AAB_Debug 10 categories (D-023): verbatim labels from debug_labels string-array (D-131 i18n).
 
@@ -115,37 +116,45 @@ fun LiveDebugContent(
                 .testTag("live_debug_screen"),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            DiagnosticCard("Core Metrics", "debug_core_metrics") {
-                Metric("Smoothed lux", fmtLux(p.smoothedLux), "debug_smoothed_lux")
-                Metric("Raw lux", fmtLux(p.lastRawLux), "debug_raw_lux")
-                Metric("Dynamic threshold", fmtPercent(p.threshDynamic), "debug_dynamic_threshold")
-                Metric("Dead zone (lx)", "${fmtLux(p.threshAbsLow)} – ${fmtLux(p.threshAbsHigh)}", "debug_dead_zone")
-                Metric("Current brightness", fmtInt(p.lastAppliedBrightness), "debug_current_bright")
-                Metric("Target brightness", fmtInt(p.targetBrightness), "debug_target_bright")
+            DiagnosticCard(stringResource(R.string.debug_core_metrics_title), "debug_core_metrics") {
+                Metric(stringResource(R.string.debug_smoothed_lux), fmtLux(p.smoothedLux), "debug_smoothed_lux")
+                Metric(stringResource(R.string.debug_raw_lux), fmtLux(p.lastRawLux), "debug_raw_lux")
+                Metric(stringResource(R.string.debug_dynamic_threshold), fmtPercent(p.threshDynamic), "debug_dynamic_threshold")
+                Metric(stringResource(R.string.debug_dead_zone), "${fmtLux(p.threshAbsLow)} – ${fmtLux(p.threshAbsHigh)}", "debug_dead_zone")
+                Metric(stringResource(R.string.debug_current_bright), fmtInt(p.lastAppliedBrightness), "debug_current_bright")
+                Metric(stringResource(R.string.debug_target_bright), fmtInt(p.targetBrightness), "debug_target_bright")
             }
 
-            DiagnosticCard("Circadian & Scale", "debug_scale") {
-                Metric("Uncompressed scale", fmt(p.scaleDynamic, 3), "debug_scale_dynamic")
-                Metric("True (compressed) scale", fmt(p.scaleDynamicCompress, 3), "debug_scale_compress")
+            DiagnosticCard(stringResource(R.string.debug_scale_title), "debug_scale") {
+                Metric(stringResource(R.string.debug_scale_dynamic), fmt(p.scaleDynamic, 3), "debug_scale_dynamic")
+                Metric(stringResource(R.string.debug_scale_compress), fmt(p.scaleDynamicCompress, 3), "debug_scale_compress")
             }
 
-            DiagnosticCard("System Status", "debug_system_status") {
-                Metric("Service", if (state.serviceRunning) "Running" else "Stopped", "debug_service")
-                Metric("Manual override", if (p.paused) "Paused" else "No", "debug_override")
-                Metric("Active rule", state.activeContext ?: "None", "debug_active_rule")
+            DiagnosticCard(stringResource(R.string.debug_system_status_title), "debug_system_status") {
+                Metric(
+                    stringResource(R.string.debug_service),
+                    stringResource(if (state.serviceRunning) R.string.debug_service_running else R.string.debug_service_stopped),
+                    "debug_service",
+                )
+                Metric(
+                    stringResource(R.string.debug_override),
+                    stringResource(if (p.paused) R.string.dashboard_status_paused else R.string.debug_override_no),
+                    "debug_override",
+                )
+                Metric(stringResource(R.string.debug_active_rule), state.activeContext ?: stringResource(R.string.debug_active_rule_none), "debug_active_rule")
             }
 
             // DC-007: requested vs acknowledged vs settingsApiMax, readable without an override firing.
             BrightnessWriteCard(p)
 
             // Performance & Timings — full Tasker parity (G2R-F29).
-            DiagnosticCard("Performance & Timings", "debug_performance") {
-                Metric("Smoothing α (LuxAlpha)", fmtAlpha(p.luxAlpha), "debug_lux_alpha")
-                Metric("Cycle time (ms)", fmt(p.cycleTimeMs, 0), "debug_cycle_time")
-                Metric("Reactivity cooldown (ms)", p.throttleMs?.toString() ?: "—", "debug_throttle")
-                Metric("Last animation", animationLabel(p.animationSteps, p.animationWaitMs), "debug_last_animation")
-                Metric("Last update", lastSampleLabel(p.lastUpdateMs), "debug_last_update")
-                Metric("Last sample", lastSampleLabel(p.lastSampleMs), "debug_last_sample")
+            DiagnosticCard(stringResource(R.string.debug_performance_title), "debug_performance") {
+                Metric(stringResource(R.string.debug_lux_alpha), fmtAlpha(p.luxAlpha), "debug_lux_alpha")
+                Metric(stringResource(R.string.debug_cycle_time), fmt(p.cycleTimeMs, 0), "debug_cycle_time")
+                Metric(stringResource(R.string.debug_throttle), p.throttleMs?.toString() ?: "—", "debug_throttle")
+                Metric(stringResource(R.string.debug_last_animation), animationLabel(p.animationSteps, p.animationWaitMs), "debug_last_animation")
+                Metric(stringResource(R.string.debug_last_update), relativeAgeLabel(p.lastUpdateMs), "debug_last_update")
+                Metric(stringResource(R.string.debug_last_sample), relativeAgeLabel(p.lastSampleMs), "debug_last_sample")
             }
 
             LightSensorCard(p.sensor, state.sensorCallbacks)
@@ -223,9 +232,11 @@ private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
         title = stringResource(R.string.title_global_flash),
         testTag = "global_flash_card",
     ) {
+        val statusLabel = stringResource(R.string.livedebug_flash_status)
+        val statusValue = stringResource(if (enabled) R.string.livedebug_flash_enabled else R.string.livedebug_flash_off)
         DiagnosticLine("global_flash_status") {
-            append("Status: ")
-            goldValue(if (enabled) "Enabled" else "Off (foreground only)")
+            append("$statusLabel: ")
+            goldValue(statusValue)
         }
         Text(
             stringResource(R.string.livedebug_flash_desc),
@@ -235,7 +246,7 @@ private fun GlobalFlashCard(enabled: Boolean, onEnable: () -> Unit) {
             onClick = onEnable,
             modifier = Modifier.fillMaxWidth().testTag("global_flash_enable"),
         ) {
-            Text(if (enabled) "Open Accessibility settings" else "Enable in Accessibility settings")
+            Text(stringResource(if (enabled) R.string.livedebug_flash_open_settings else R.string.livedebug_flash_enable_settings))
         }
     }
 }
@@ -289,7 +300,7 @@ private fun BrightnessWriteCard(p: PipelineState) {
                     "debug_override_reclaim",
                 )
             }
-            Metric(stringResource(R.string.debug_override_age), lastSampleLabel(d.timestampMs), "debug_override_age")
+            Metric(stringResource(R.string.debug_override_age), relativeAgeLabel(d.timestampMs), "debug_override_age")
         }
     }
 }
@@ -299,10 +310,10 @@ private fun LightSensorCard(d: SensorDiagnostics, callbacks: SensorCallbacks) {
     val dash = stringResource(R.string.debug_write_absent)
     @Composable
     fun reading(c: SensorCallback?): String = c?.let {
-        stringResource(R.string.debug_sensor_reading_value, fmt(it.lux), it.accuracy, it.seq, lastSampleLabel(it.atMs))
+        stringResource(R.string.debug_sensor_reading_value, fmt(it.lux), it.accuracy, it.seq, relativeAgeLabel(it.atMs))
     } ?: stringResource(R.string.debug_sensor_none_yet)
     @Composable
-    fun pair(first: String, ms: Long) = stringResource(R.string.debug_sensor_pair_value, first, lastSampleLabel(ms))
+    fun pair(first: String, ms: Long) = stringResource(R.string.debug_sensor_pair_value, first, relativeAgeLabel(ms))
 
     DiagnosticCard(stringResource(R.string.debug_sensor_title), "debug_sensor_card") {
         val last = callbacks.last
@@ -354,7 +365,7 @@ private fun LightSensorCard(d: SensorDiagnostics, callbacks: SensorCallbacks) {
         Metric(
             stringResource(R.string.debug_sensor_cycle),
             d.cycle?.let {
-                stringResource(R.string.debug_sensor_cycle_value, it.stage.name, lastSampleLabel(it.startMs))
+                stringResource(R.string.debug_sensor_cycle_value, it.stage.name, relativeAgeLabel(it.startMs))
             } ?: stringResource(R.string.debug_sensor_idle),
             "debug_sensor_cycle",
         )
@@ -365,7 +376,7 @@ private fun LightSensorCard(d: SensorDiagnostics, callbacks: SensorCallbacks) {
                     R.string.debug_sensor_last_cycle_value,
                     it.result.name,
                     (it.endMs - it.startMs).toInt(),
-                    lastSampleLabel(it.endMs),
+                    relativeAgeLabel(it.endMs),
                 )
             } ?: dash,
             "debug_sensor_last_cycle",
@@ -383,17 +394,6 @@ private fun Metric(label: String, value: String, testTag: String) {
 
 private fun animationLabel(steps: Int?, waitMs: Long?): String =
     if (steps != null && waitMs != null) "${steps}×${waitMs}ms" else "—"
-
-private fun lastSampleLabel(ms: Long?, now: Long = System.currentTimeMillis()): String {
-    if (ms == null) return "never"
-    val secs = ((now - ms) / 1000L).coerceAtLeast(0L)
-    return when {
-        secs < 1L -> "just now"
-        secs < 60L -> "${secs}s ago"
-        secs < 3600L -> "${secs / 60L}m ago"
-        else -> "${secs / 3600L}h ago"
-    }
-}
 
 /**
  * %AAB_Debug 10-category selector (D-023): global control on Live Debug scene (G2R-F9).

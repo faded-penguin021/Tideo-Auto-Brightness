@@ -93,6 +93,9 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
 ### 4. Bug fix
 - **Read first:** the reference doc for the affected area (above) + any related
   `docs/LEDGER.md` row.
+- **Language picker:** `CONTRIBUTING.md` describes translation resources; the picker lives in
+  `ui/onboarding/OnboardingScreen.kt`, and `res/xml/locales_config.xml` lists supported locales.
+  `MainActivity` uses AppCompat's app-language API with automatic locale storage on Android 12/12L.
 - **Steps:** reproduce → add/adjust a failing test first → fix so it conforms to the golden
   vectors (never edit a golden vector to pass; changing one needs proof the extraction was
   wrong + a `STATE.md` entry) → run the ladder → **glue-review protocol** (below) if the fix

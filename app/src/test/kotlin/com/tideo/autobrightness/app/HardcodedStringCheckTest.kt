@@ -23,7 +23,7 @@ class HardcodedStringCheckTest {
     companion object {
         private const val CEILING = 0
 
-        private const val WRAPPER_CEILING = 29
+        private const val WRAPPER_CEILING = 1
     }
 
     private fun countLiterals(pattern: Regex, wrapped: Boolean): Map<String, Int> {

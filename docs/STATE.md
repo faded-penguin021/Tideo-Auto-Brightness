@@ -48,19 +48,14 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **Backlog, not for this train — extract the 29 hardcoded diagnostic-card labels (DC-040).**
-   `WRAPPER_CEILING` in `HardcodedStringCheckTest` freezes them at 29 and may only fall. Settles
-   it: `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt
-   has not grown, not that it is gone.
-
-2. **[2026-09-23] On the next false "manual override" pause, read brightness before pressing
+1. **[2026-09-23] On the next false "manual override" pause, read brightness before pressing
    Resume:** `adb shell settings get system screen_brightness` while Live Debug still shows the
    pause. About 193 means the 12 stuck, so something outside Tideo changed brightness; 241 means a
    dip that reverted by itself, which Tideo paused on because its "settled" value is a re-read
    3 ms later, and fixing that is a settle-window change for you to rule on. Extra Dim is ruled
    out (DC-059…DC-062).
 
-3. **[2026-09-24] Check the proximity change on the phone next time you test a build.** Tideo no
+2. **[2026-09-24] Check the proximity change on the phone next time you test a build.** Tideo no
    longer slows brightness while the top of the phone is covered, which is what Tasker does: its
    ×0.1 only ever changed the displayed α (DC-064). If you would rather keep the old slowing as a
    deliberate difference from Tasker, say so; it is one engine change back. Settles it: run
@@ -113,6 +108,17 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-03 — Profile settings-list labels now follow the app language.
+- 2026-10-03 — Localized live diagnostics, overlay status, relative ages and the settings
+  summary, completing the diagnostic-label backlog (DC-040). Improved Chinese translation.
+- 2026-10-03 — Language changes now update the interface in place and refresh widgets.
+  Grant feedback updates to the current app language.
+- 2026-10-03 — Improved Simplified Chinese translation for clarity and consistency.
+- 2026-10-03 — Localized Shizuku and root grant feedback in Setup and Privileged Display
+  to follow the app language.
+- 2026-10-03 — Added Simplified Chinese translation and app-language selection, with
+  persistent language preferences. Notifications and widgets follow the app language;
+  updated translation contribution guidance.
 - 2026-09-28 — **#133: curve inputs persist unclamped wherever Apply accepts them (DD-012); owner
   confirmed on 1.12.0-debug vc26 that a Form1A-40 curve and #133's exact curve (Form1A 28.7353),
   loaded as profiles, survive, the latter after a force-stop.**

@@ -1,5 +1,6 @@
 package com.tideo.autobrightness.app.settings
 
+import com.tideo.autobrightness.R
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -42,11 +43,11 @@ class SettingsDisplayTest {
     }
 
     @Test
-    fun crypticKeys_useFriendlyLabels() {
+    fun crypticKeys_useLabelResources() {
         // G2R-F84: friendly labels instead of raw "form1A"/"form2C" names.
         val rows = AabSettings().displayRows().associateBy { it.taskerVariable }
-        assertEquals("Zone 1 scaling", rows.getValue("%AAB_Form1A").label)
-        assertEquals("Zone 2 offset", rows.getValue("%AAB_Form2C").label)
-        assertEquals("Min brightness", rows.getValue("%AAB_MinBright").label)
+        assertEquals(R.string.curve_form1a, rows.getValue("%AAB_Form1A").labelRes)
+        assertEquals(R.string.curve_form2c, rows.getValue("%AAB_Form2C").labelRes)
+        assertEquals(R.string.misc_min_brightness, rows.getValue("%AAB_MinBright").labelRes)
     }
 }

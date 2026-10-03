@@ -333,8 +333,13 @@ private fun GrantChannelsCard(
                 Text(stringResource(R.string.onboarding_try_root))
             }
         }
-        state.grantMessage?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        state.grantMessageRes?.let { messageRes ->
+            val message = if (messageRes == R.string.pd_grant_shizuku_failed) {
+                stringResource(messageRes, state.grantFailureReason.orEmpty())
+            } else {
+                stringResource(messageRes)
+            }
+            Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
         }
     }
 }

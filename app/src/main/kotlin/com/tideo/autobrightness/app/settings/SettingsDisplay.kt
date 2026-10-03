@@ -1,8 +1,11 @@
 package com.tideo.autobrightness.app.settings
 
+import androidx.annotation.StringRes
+import com.tideo.autobrightness.R
+
 /** One row of the full settings list (profiles.md elements0): compares vs factory defaults, gold highlight (S12.7h, G2R-F38). */
 data class SettingDisplayRow(
-    val label: String,
+    @StringRes val labelRes: Int,
     val taskerVariable: String,
     val value: String,
     val changed: Boolean,
@@ -17,7 +20,7 @@ fun AabSettings.displayRows(reference: AabSettings = AabSettings()): List<Settin
             val mine = valueFor(rule.key)
             val theirs = reference.valueFor(rule.key)
             SettingDisplayRow(
-                label = friendlyLabel(rule.key, rule.taskerVariable),
+                labelRes = SETTING_LABELS.getValue(rule.key),
                 taskerVariable = rule.taskerVariable,
                 value = mine,
                 changed = mine != theirs,
@@ -41,52 +44,49 @@ private val EXCLUDED_KEYS = setOf(
     "thresholdMidpoint",
 )
 
-/** User-friendly labels for diff list (G2R-F84); unmapped keys fall back to [humanize] (no reflection). */
-private val FRIENDLY_LABELS: Map<String, String> = mapOf(
-    "minBrightness" to "Min brightness",
-    "maxBrightness" to "Max brightness",
-    "offset" to "Brightness offset",
-    "scale" to "Brightness scale",
-    "zone1End" to "Zone 1 end (lux)",
-    "zone2End" to "Zone 2 end (lux)",
-    "form1A" to "Zone 1 scaling",
-    "form2B" to "Zone 2 scaling",
-    "form2C" to "Zone 2 offset",
-    "dimmingEnabled" to "Super dimming",
-    "dimmingStrength" to "Dimming strength",
-    "dimmingExponent" to "Dimming curve",
-    "dimmingThreshold" to "Dimming threshold",
-    "dimSpread" to "Dimming spread",
-    "pwmSensitive" to "PWM-sensitive mode",
-    "pwmExponent" to "PWM curve",
-    "throttleDefaultMs" to "Throttle (ms)",
-    "minWaitMs" to "Min step wait (ms)",
-    "maxWaitMs" to "Max step wait (ms)",
-    "animSteps" to "Animation steps",
-    "deltaFactor" to "Smoothing Δ",
-    "thresholdBright" to "Bright threshold",
-    "thresholdDark" to "Dark threshold",
-    "thresholdDim" to "Dim threshold",
-    "thresholdSteepness" to "Curve slope",
-    "scalingEnabled" to "Circadian scaling",
-    "scaleSpread" to "Scale spread",
-    "scaleSteepness" to "Scale steepness",
-    "scaleTaperMidpoint" to "Taper midpoint",
-    "scaleTaperSteepness" to "Taper steepness",
-    "scaleTransitionFactor" to "Scale transition",
-    "trustUnreliableSensor" to "Trust low-accuracy sensor",
-    "nightLightEnabled" to "Night Light",
-    "nightLightTemperature" to "Night Light temperature",
-    "nightLightCircadianEnabled" to "Night Light circadian tracking",
-    "daltonizerMode" to "Color correction",
-    "inversionEnabled" to "Color inversion",
-    "alwaysOnDisplayEnabled" to "Always-on display",
-    "stayAwakeChargingEnabled" to "Stay awake while charging",
-    "hdrForceSdrEnabled" to "Disable HDR (experimental)",
+/** Label resources for the diff list (G2R-F84), shared with the settings screens. */
+private val SETTING_LABELS: Map<String, Int> = mapOf(
+    "minBrightness" to R.string.misc_min_brightness,
+    "maxBrightness" to R.string.misc_max_brightness,
+    "offset" to R.string.misc_offset,
+    "scale" to R.string.misc_scale,
+    "zone1End" to R.string.curve_zone1_end,
+    "zone2End" to R.string.curve_zone2_end,
+    "form1A" to R.string.curve_form1a,
+    "form2B" to R.string.curve_form2b,
+    "form2C" to R.string.curve_form2c,
+    "dimmingEnabled" to R.string.sd_header_super,
+    "dimmingStrength" to R.string.sd_strength,
+    "dimmingExponent" to R.string.sd_exponent,
+    "dimmingThreshold" to R.string.sd_threshold,
+    "dimSpread" to R.string.sd_spread,
+    "pwmSensitive" to R.string.sd_use_pwm,
+    "pwmExponent" to R.string.sd_pwm_exponent,
+    "throttleDefaultMs" to R.string.settings_throttle,
+    "minWaitMs" to R.string.misc_min_wait,
+    "maxWaitMs" to R.string.misc_max_wait,
+    "animSteps" to R.string.misc_anim_steps,
+    "deltaFactor" to R.string.react_smoothing_delta,
+    "thresholdBright" to R.string.react_bright,
+    "thresholdDark" to R.string.react_dark,
+    "thresholdDim" to R.string.react_dim,
+    "thresholdSteepness" to R.string.react_curve_slope,
+    "scalingEnabled" to R.string.circadian_scaling_header,
+    "scaleSpread" to R.string.circadian_scale_spread,
+    "scaleSteepness" to R.string.circadian_scale_steepness,
+    "scaleTaperMidpoint" to R.string.circadian_taper_midpoint,
+    "scaleTaperSteepness" to R.string.circadian_taper_steepness,
+    "scaleTransitionFactor" to R.string.circadian_transition_factor,
+    "trustUnreliableSensor" to R.string.react_trust_sensor,
+    "nightLightEnabled" to R.string.pd_night_light_switch,
+    "nightLightTemperature" to R.string.settings_night_light_temperature,
+    "nightLightCircadianEnabled" to R.string.pd_night_light_circadian,
+    "daltonizerMode" to R.string.pd_daltonizer_label,
+    "inversionEnabled" to R.string.pd_inversion,
+    "alwaysOnDisplayEnabled" to R.string.pd_always_on,
+    "stayAwakeChargingEnabled" to R.string.pd_stay_awake,
+    "hdrForceSdrEnabled" to R.string.pd_hdr_force_sdr,
 )
-
-internal fun friendlyLabel(key: String, taskerVariable: String): String =
-    FRIENDLY_LABELS[key] ?: humanize(taskerVariable)
 
 /** Formatted value for contract key. Explicit `when` (no reflection, keep aligned). */
 internal fun AabSettings.valueFor(key: String): String = when (key) {
@@ -143,15 +143,4 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "hdrForceSdrEnabled" -> hdrForceSdrEnabled.toString()
     // Fail fast on schema drift (S12.9c #2). SettingsDisplayContractDriftTest guards.
     else -> throw IllegalArgumentException("Unknown AabSettings key: '$key' (not in valueFor's when)")
-}
-
-/** "%AAB_MinBright" → "Min Bright": drop prefix, space camelCase (readable, faithful). */
-private fun humanize(taskerVariable: String): String {
-    val bare = taskerVariable.removePrefix("%AAB_")
-    val sb = StringBuilder()
-    bare.forEachIndexed { i, c ->
-        if (i > 0 && c.isUpperCase() && (bare[i - 1].isLowerCase() || bare[i - 1].isDigit())) sb.append(' ')
-        sb.append(c)
-    }
-    return sb.toString()
 }
