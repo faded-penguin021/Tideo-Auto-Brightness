@@ -72,14 +72,16 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 
 Open questions:
 
-- **[2026-10-03] Is a faster, coarser transition what you want from the proximity damp?** In
-  task543 a smaller α means *fewer* animation steps, and the throttle is the animation's length.
-  So V2's ×0.1 does not slow anything: at α 0.3, 7 steps × 53 ms (381 ms throttle) become 2 × 64 ms
-  (138 ms). Covered, brightness jumps to the same target sooner and the next cycle can run sooner.
-  Options: (a) keep it — Tideo and Tasker agree today; (b) if you meant slower, change Tasker
-  first (e.g. damp the α passed to Lux Smoothing, which is D-087's old behaviour) and Tideo follows
-  again. Recommendation: (a) until a device run says it feels wrong, since the change is only
-  visible while the sensor is covered. Settles it: your answer; step 13 shows the step count.
+- **[2026-10-03] Covered, V2's damp makes brightness changes quicker and jumpier, not slower —
+  is that what you want?** Lux Smoothing returns α (`%lux_results2`) after it has already used it
+  to compute the new smoothed lux, so the ×0.1 cannot change *where* brightness goes. Its only
+  effect is on Calculate Animation (task543), where a small α means few steps: at the default 20
+  steps / 25–65 ms, α 0.3 animates in 7 steps × 53 ms (≈ 370 ms) and α 0.03 in 2 steps × 64 ms
+  (≈ 130 ms). The next cycle may also start sooner, because the throttle is that animation length.
+  Options: (a) keep it — Tideo and Tasker agree today; (b) if you meant "react slower while
+  covered", Tasker has to damp the α *inside* Lux Smoothing, before it blends the new smoothed lux
+  (the pre-DC-064 Tideo behaviour), and Tideo then follows. Recommendation: (a) unless step 13
+  feels wrong. Settles it: your answer.
 
 **This train is `1.12.0` on vc26, its ONE bump (owner, 2026-09-28),** for #134 and then #133. Land
 further user-facing fixes by editing `changelogs/26.txt` (500-character cap), never by bumping or by
