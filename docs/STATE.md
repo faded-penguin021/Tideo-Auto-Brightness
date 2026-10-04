@@ -12,19 +12,17 @@ adds super dimming and Privileged Display.
 
 ## Current state
 
-Harness AMH 14.1.0 with its one hand step applied (DC-029…DC-036, DC-051); upstream manifest
-scripts are immutable; the live ledger is `LEDGER_D.md`. **Release standing is NOT recorded
-here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), settled by hand with
+Harness AMH 14.1.0 with its one hand step applied (DC-029…DC-036, DC-051); the live ledger is
+`LEDGER_D.md`. **Release standing is NOT recorded here:** the session banner computes it
+(`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-The tree declares 1.14.0 / vc28 and includes Simplified Chinese and app-language selection
-(#141), #134's notification Discard (DD-011) and #133's unclamped curve inputs (DD-012). This
-train adds the proximity damp in smoothing (DD-022, DD-024) and #139's plugged-in fix with the
-global panic toggle (DD-025). The light-stall findings H1 and H2 remain recorded in DD-003 and
-DD-002. Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
-built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
-`DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
-investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
+The tree declares 1.14.0 / vc28 (the train paragraph under the Owner queue). The light-stall
+findings H1 and H2 remain recorded in DD-003 and DD-002. Device rounds on 1.10.0-debug vc24 are
+closed, with the 0–4095 conversion path frozen as built, and a later build owes its own run
+(DC-011…DC-013, DC-025…DC-028, DB-083; `DEVICE_TEST_SCRIPT.md` §2); no round script is alive
+(RUNBOOK §6, DB-010), the force-stop investigation stays closed (DB-051…DB-060), and
+Scorecard.dev is a run-once local input.
 
 ## Active work
 
@@ -71,30 +69,26 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    (then `dumpsys battery reset`), and a rule loading a profile saved with "Only when plugged in" on
    leaves Live Debug's switch off (DD-025).
 
-4. **[2026-10-04] Get two Chinese strings translated; until then they show in English.** Both
-   English strings changed meaning on this train, so their outdated Chinese was removed (DD-026):
-   `help_pwm_exponent` (the PWM exponent help, DD-014) and `contexts_only_plugged_in` (the
-   "Only while plugged in" rule label, DD-025). Ask a fluent speaker, such as #141's translator,
-   per `CONTRIBUTING.md`. Settles it: `grep -c -e 'name="help_pwm_exponent"' -e
-   'name="contexts_only_plugged_in"' app/src/main/res/values-b+zh+Hans/strings.xml` prints 2.
+4. **[2026-10-04] Get two Chinese strings translated; they show in English until then.**
+   `help_pwm_exponent` (DD-014) and `contexts_only_plugged_in` (DD-025) changed meaning, so their
+   old Chinese was removed (DD-026). Ask a fluent speaker, such as #141's translator. Settles it:
+   `grep -c -e 'name="help_pwm_exponent"' -e 'name="contexts_only_plugged_in"'
+   app/src/main/res/values-b+zh+Hans/strings.xml` prints 2.
 
-5. **[2026-10-04] After this train reaches `main`, check the translation badge works.** The new
-   `Translation badges` workflow runs for the first time there, and nothing could test it before.
-   Worked if the Actions tab shows a green "Translation badges" run and the README's 简体中文
-   badge shows a percentage instead of an error. If the run failed on its push, allow Actions to
-   create the `badges` branch (Settings → Actions → Workflow permissions: read and write, or the
-   ruleset that blocks it), then run it from the Actions tab. Settles it:
+5. **[2026-10-04] Once this train is on `main`, check the translation badge.** The `Translation
+   badges` workflow first runs there. Worked if its Actions run is green and the README's 简体中文
+   badge shows a percentage. If its push was refused, let Actions create the `badges` branch
+   (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
 Open questions:
 
 - None.
 
-**This train is `1.14.0` on vc28, its ONE bump** — the owner chose a minor bump on 2026-10-04,
-and it moved off 1.13.0 / vc27 when `main` took that for #141's Simplified Chinese. It was opened
-by #139 and is shared with the #136 and solar-offset plans. Land further user-facing fixes by
-editing `changelogs/28.txt` (500-character cap), never by bumping or by creating `29.txt`; re-open
-only for something major, and say so.
+**This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
+1.13.0 / vc27 when `main` shipped #141). It carries #139 and is shared with the #136 and
+solar-offset plans. Land further user-facing fixes in `changelogs/28.txt` (500-character cap),
+never by bumping or creating `29.txt`; re-open only for something major, and say so.
 
 ## Decided non-items
 
@@ -136,75 +130,11 @@ only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-04 — **Translation badges come from CI now (owner): the `Translation badges` workflow
-  publishes coverage JSON to the `badges` branch on pushes to `main`, and the README reads it;
-  `TranslationCoverageBadgeTest` is gone (DD-028, superseding DD-027).**
-- 2026-10-04 — **README Translations section shows a coverage badge per language (简体中文 99%),
-  kept accurate by `TranslationCoverageBadgeTest` (owner request; DD-027).**
-- 2026-10-04 — **Untranslated strings fall back to English (owner): lint's `MissingTranslation`
-  is a warning, and the two Chinese strings whose English changed meaning were removed rather
-  than left stale (DD-026).**
-- 2026-10-04 — **`main` merged in after #141 shipped as v1.13.0 / vc27, so this train moves to
-  1.14.0 / vc28 with its notes in `changelogs/28.txt`; `26.txt` and `27.txt` are main's, as
-  published. The merge brings Simplified Chinese, app-language selection and the User Guide theme
-  fix.**
-- 2026-10-04 — **#139: context rules read "plugged in" from `EXTRA_PLUGGED`, ported from the
-  owner's AAB task43 (AdvancedAutoBrightness#21), so a charge limit no longer flaps them; the rule
-  label is now "Only while plugged in"; the panic "Only when plugged in" toggle survives profile
-  loads, rule reverts, Reset, import and Apply, as DB-009 ruled. Opens 1.13.0 / vc27 (owner)
-  (DD-025).**
-- 2026-10-04 — **Proximity damp moved into smoothing, per the owner's task535 A3b. That answers
-  the open question with (b): while covered, smoothed lux moves a tenth as far. Uncovering now
-  re-evaluates the last raw reading (task545 A5); the oracle changed with the source (DD-024,
-  superseding DD-022).**
-- 2026-10-04 — **Translation policy relaxed (owner, #140): human and AI-assisted translations
-  that a fluent speaker reviewed string by string are accepted, unreviewed machine translation is
-  not; `CONTRIBUTING.md` and the README say so (DD-023).**
-- 2026-10-04 — User Guide HTML and its WebView background follow the app theme, including changes
-  while the page is open; dark-mode accents and tinted callouts retain the original palette, with
-  corresponding readable gold/green/coral colors in light mode. Robolectric covers both palettes,
-  light-mode contrast and both switch directions; actual device rendering remains unverified.
-- 2026-10-03..04 — Added Simplified Chinese and persistent app-language selection (1.13.0 / vc27),
-  including System default; UI, grant feedback, diagnostics (DC-040), profile lists, notifications
-  and widgets follow the language. Review fixes use one language lookup per notification,
-  profile labels matching all 40 original English entries, with independent Chinese labels where
-  screen wording differs, and refreshed channel names with Android 12/12L storage-race
-  coverage; changelog 26 is unchanged. Translation/picker guidance is documented;
-  compiled launch resources retain AppCompat, with device appearance unverified.
-- 2026-10-03 — **Proximity damp follows the owner's Tasker V2: the ×0.1 α (3 dp) now sizes the
-  animation as well as the readout, smoothing still undamped; the oracle changed with it, the
-  source having changed (DD-022, superseding DC-064's readout-only damp).**
-
-- 2026-10-01..02 — **E2E S1–S4 and the blocking Sol review of S2–S4: `e2e/` scaffolding, the
-  command/UI boundary, effect journal and recovery, 21 device scenarios behind an effect-gated
-  `Run`, root test tags as resource-ids; all review findings fixed; the deferred full ladder ran
-  green on `b761165`; no device contacted (DD-015…DD-021).**
-- 2026-10-01 — **#138's grouped github-actions bump (wrapper-validation 6.4.0, setup-java 6.0.1,
-  setup-android 4.0.4, codeql-action 4.38.2) cherry-picked onto this train after full CI went
-  green on the PR; every pin resolved to its tag by hand; #138 closed as included.**
-- 2026-10-01 — **The PWM software-exponent help now matches `finalDimLevel` (higher dims more),
-  departing from task702's flash; the owner ports it back to AAB (DD-014).**
-- 2026-09-28 — **#133: curve inputs persist unclamped wherever Apply accepts them (DD-012); owner
-  confirmed on 1.12.0-debug vc26 that a Form1A-40 curve and #133's exact curve (Form1A 28.7353),
-  loaded as profiles, survive, the latter after a force-stop.**
-- 2026-09-28 — **1.12.0/vc26 opened from `main` (v1.11.0 tagged, Owner-queue item closed); #134:
-  the override notification can Discard the adjustment it just recorded (DD-011); owner passed
-  `DEVICE_TEST_SCRIPT.md` step 57 on 1.12.0-debug vc26.**
-
-- 2026-09-27 — **Backup actually saves data now (DD-008):** `android:fullBackupOnly="true"` moves
-  the helper-less agent off the empty key/value path; the backup and a Tideo-only restore,
-  including the sanitizer, were verified on the OnePlus 13.
-- 2026-09-25 — **Light-stall train closed (R8):** its plan is deleted and its record is DC-063…DC-071
-  and DD-001…DD-007, with H1 and H2 open. The ledger rolled over to `LEDGER_D.md` (DC-071 ended
-  past the cap), and `AGENTS.md` names the new live volume. R7's settling passed on the OnePlus 13
-  (DD-006) and became `DEVICE_TEST_SCRIPT.md` step 56. Live Debug and the diagnostic cards show lux
-  at its stored precision and the dynamic threshold as a percentage (owner request).
-- 2026-09-23..25 — **Light stalls R0–R7 and F-G (DC-059…DC-071):** notification, diagnostics,
-  startup race, watchdog, Tasker's dead band, proximity damp, pending slot, settling; a false
-  override pause on unlock diagnosed, not fixed.
-- 2026-09-18..22 — **Night Light: snowball closed, anchor on the device's own Kelvin (DC-055,
-  DC-056), Kelvin via `color_display` where the key is ignored, making vc25 `1.11.0` (DC-057,
-  DC-058); backup-agent fix (DC-052).**
-- 2026-09-02..13 — **AMH 9.1.0 → 14.1.0 (DC-029…DC-036, DC-050, DC-051), the runtime rot audit
-  (DC-037…DC-049), E2E suite planned.**
-- 2026-06-23..08-31 — **v1.0.0 → v1.9.2, then the #126/#127 train (D-096…DC-028).**
+- 2026-10-04 — **`main` merged in after #141 shipped as v1.13.0 / vc27 (Simplified Chinese, the
+  language picker, the User Guide theme; device appearance unverified), so this train moved to
+  1.14.0 / vc28 with `changelogs/28.txt`.**
+- 2026-10-01..04 — **This train so far: E2E S1–S4 (DD-015…DD-021), the PWM help (DD-014), the
+  proximity damp (DD-022, DD-024), #139 (DD-025), translation policy, English fallback and CI
+  coverage badges (DD-023, DD-026…DD-028), #138's actions bump.**
+- 2026-06-23..09-28 — **v1.0.0 → v1.12.0 (D-096…DD-012); #133 and #134 owner-passed on
+  1.12.0-debug vc26.**
