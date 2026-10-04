@@ -596,7 +596,6 @@
     <string name="contexts_clear_time">清除时间</string>
     <string name="contexts_days">星期（不选表示每天）：</string>
     <string name="contexts_radius">半径（米）</string>
-    <string name="contexts_only_plugged_in">仅在充电时</string>
     <string name="contexts_battery_pct">电量百分比：</string>
     <string name="contexts_from_pct" formatted="false">最低 %</string>
     <string name="contexts_to_pct" formatted="false">最高 %</string>
@@ -631,7 +630,6 @@
     <string name="help_dimming_threshold">屏幕亮度低于此值时，超级调暗开始生效。</string>
     <string name="help_pwm_threshold">硬件屏幕亮度的下限。低于此值时，使用软件调暗。</string>
     <string name="help_dimming_enabled">开启或关闭超级调暗。开启后，亮度降至超级调暗阈值以下时，会通过 Android 的“额外调暗”层，让屏幕暗于硬件最低亮度。需要高级权限（安全设置权限）。</string>
-    <string name="help_pwm_exponent">类似伽马的指数，用于控制调暗曲线的形状。数值越高，屏幕保持较亮的范围越大，接近阈值时变暗越陡；数值越低，变暗越快。调整的是亮度过渡方式，而不是调暗幅度！</string>
     <string name="help_pwm_sensitive">开启或关闭软件调暗功能。开启后，硬件最高亮度会固定在 PWM 阈值。</string>
     <string name="help_circadian_scaling">根据太阳位置，在一天中调整整条曲线。</string>
     <string name="help_scale_spread" formatted="false">缩放系数在一天中的变化幅度（%，1–100）。</string>

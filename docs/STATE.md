@@ -71,14 +71,12 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    (then `dumpsys battery reset`), and a rule loading a profile saved with "Only when plugged in" on
    leaves Live Debug's switch off (DD-025).
 
-4. **[2026-10-04] Get two Chinese strings retranslated.** Both English strings changed on this
-   train, and lint cannot see that the Chinese text is out of date:
-   - `help_pwm_exponent` (DD-014) still translates the old "not how much" text;
-   - `contexts_only_plugged_in` (DD-025, renamed from `contexts_only_charging`) still says "仅在充电时",
-     "only while charging", which is exactly what #139 made it stop meaning.
-
-   Ask a fluent speaker, such as #141's translator, per `CONTRIBUTING.md`. Settles it:
-   `grep -c -e '而不是调暗幅度' -e '仅在充电时' app/src/main/res/values-b+zh+Hans/strings.xml` prints 0.
+4. **[2026-10-04] Get two Chinese strings translated; until then they show in English.** Both
+   English strings changed meaning on this train, so their outdated Chinese was removed (DD-026):
+   `help_pwm_exponent` (the PWM exponent help, DD-014) and `contexts_only_plugged_in` (the
+   "Only while plugged in" rule label, DD-025). Ask a fluent speaker, such as #141's translator,
+   per `CONTRIBUTING.md`. Settles it: `grep -c -e 'name="help_pwm_exponent"' -e
+   'name="contexts_only_plugged_in"' app/src/main/res/values-b+zh+Hans/strings.xml` prints 2.
 
 Open questions:
 
@@ -130,6 +128,9 @@ only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-04 — **Untranslated strings fall back to English (owner): lint's `MissingTranslation`
+  is a warning, and the two Chinese strings whose English changed meaning were removed rather
+  than left stale (DD-026).**
 - 2026-10-04 — **`main` merged in after #141 shipped as v1.13.0 / vc27, so this train moves to
   1.14.0 / vc28 with its notes in `changelogs/28.txt`; `26.txt` and `27.txt` are main's, as
   published. The merge brings Simplified Chinese, app-language selection and the User Guide theme

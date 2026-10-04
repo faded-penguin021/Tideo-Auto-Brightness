@@ -289,3 +289,12 @@
   The unit opened 1.13.0 / vc27, shared with the #136 and solar-offset plans; on-device behaviour
   is unverified (`DEVICE_TEST_SCRIPT.md` steps 15a and 23), and `AndroidPowerMeter.isCharging`
   (task524's calibration abort) still reads the charge status, left for its own decision.
+
+- DD-026 [cited]: **An untranslated string falls back to English instead of blocking the build
+  (owner, 2026-10-04).** With `values-b+zh+Hans/` present, lint's `MissingTranslation` error
+  meant every new or rewritten English string waited on a fluent translator, which the policy of
+  DD-023 cannot hurry, so `app/lint.xml` lowers it to a warning and Android shows the English
+  default. A string whose English meaning changes loses its translations in the same change,
+  because a stale one is worse than English. `help_pwm_exponent` (DD-014) and
+  `contexts_only_plugged_in` (DD-025) were the first, and show in English in the Chinese UI until
+  retranslated.

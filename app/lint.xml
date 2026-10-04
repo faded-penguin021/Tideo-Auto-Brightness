@@ -11,4 +11,6 @@
     -->
     <issue id="GradleDependency" severity="ignore" />
     <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <!-- DD-026: an untranslated string falls back to English; lint lists it as a warning. -->
+    <issue id="MissingTranslation" severity="warning" />
 </lint>

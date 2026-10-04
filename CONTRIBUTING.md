@@ -66,6 +66,11 @@ app-layer contribution, so it's welcome here via PR.
 6. Open a PR with the new `values-<lang>/strings.xml`, noting the language and whether it is a human
    or an AI-assisted translation (if AI-assisted, which tool made the draft).
 
+A string without a translation shows in English, so a partial translation still works; lint lists
+the missing ones as warnings, not errors. When a change rewrites an English string's meaning,
+delete that string from every `values-<lang>/` file in the same change, so the app shows the new
+English rather than an outdated translation until a translator catches up.
+
 The in-app **Language** selector (Setup screen) lists English and Simplified Chinese. When adding
 another translated locale, also add it to the picker in `OnboardingScreen.kt` and to
 `app/src/main/res/xml/locales_config.xml`.
