@@ -25,7 +25,7 @@ class AndroidContextSignalSource(
 ) : ContextSignalSource {
 
     override fun batteryFlow(): Flow<BatterySignal> =
-        battery.batteryState().map { BatterySignal(percent = it.levelPercent, plugged = it.isCharging) }
+        battery.batteryState().map { BatterySignal(percent = it.levelPercent, plugged = it.isPlugged) }
 
     override fun wifiFlow(): Flow<String?> = wifi.ssidFlow()
 

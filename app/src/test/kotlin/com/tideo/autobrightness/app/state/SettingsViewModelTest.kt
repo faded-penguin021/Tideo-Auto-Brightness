@@ -156,4 +156,32 @@ class SettingsViewModelTest {
         val result = awaitCommitted { it.minBrightness != 42 }
         assertEquals(7, result.debugLevel, "a per-screen reset must not reset the global debug category")
     }
+
+    @Test
+    fun resetDefaults_keepsTheGlobalPanicPluggedToggle_DD025() {
+        runBlocking {
+            app.settingsDataStore.updateData {
+                AabSettings(serviceEnabled = false, panicRequiresPlugged = true, minBrightness = 42)
+            }
+        }
+        idle()
+
+        SettingsViewModel(app).resetDefaults()
+
+        val result = awaitCommitted { it.minBrightness != 42 }
+        assertEquals(true, result.panicRequiresPlugged, "Reset keeps the global panic toggle (DB-009)")
+    }
+
+    @Test
+    fun replaceAll_keepsTheGlobalPanicPluggedToggle_DD025() {
+        runBlocking {
+            app.settingsDataStore.updateData { AabSettings(serviceEnabled = false, panicRequiresPlugged = false) }
+        }
+        idle()
+
+        SettingsViewModel(app).replaceAll(AabSettings(panicRequiresPlugged = true, zone1End = 50))
+
+        val result = awaitCommitted { it.zone1End == 50 }
+        assertEquals(false, result.panicRequiresPlugged, "an import keeps the global panic toggle (DB-009)")
+    }
 }

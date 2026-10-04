@@ -28,6 +28,7 @@ class ProfileApplier(
                 detectOverrides = current.detectOverrides,
                 debugLevel = current.debugLevel,
                 panicSensitivity = current.panicSensitivity,
+                panicRequiresPlugged = current.panicRequiresPlugged,
                 contextOverride = true, // latch the manual context lock (G2R-F30)
             )
         }

@@ -9,9 +9,9 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
-// Tasker: prof763 Context: Battery Changed → task43 evaluates %BATT/%CHARGING for context rules.
+// Tasker: prof763 Context: Battery Changed → task43 evaluates %BATT and EXTRA_PLUGGED for context rules (DD-025).
 data class BatteryState(
-    val isCharging: Boolean,
+    val isPlugged: Boolean,
     val levelPercent: Int,
     val temperatureTenths: Int,
 )
@@ -35,13 +35,11 @@ class AndroidBatteryStateReader(private val context: Context) : BatteryStateRead
     }
 
     private fun Intent.toBatteryState(): BatteryState {
-        val status = getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL
+        val isPlugged = getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) > 0
         val level = getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = getIntExtra(BatteryManager.EXTRA_SCALE, 100)
         val pct = if (scale > 0) (level * 100 / scale) else 0
         val temp = getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)
-        return BatteryState(isCharging, pct, temp)
+        return BatteryState(isPlugged, pct, temp)
     }
 }

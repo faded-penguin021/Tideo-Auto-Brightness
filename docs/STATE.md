@@ -21,7 +21,9 @@ This branch starts the 1.12.0 train from `main` after the 1.11.0 squash (#131), 
 #126/#127 override-attribution work (DC-002…DC-028), the runtime rot audit (DC-042…DC-046), the
 Night Light work (DC-053…DC-058), the proximity-damp parity restore (DC-064) and the closed
 light-stall train (DC-063, DC-065…DC-071, DD-001…DD-007), whose open findings H1 and H2 live in
-DD-003 and DD-002. It adds #134's notification Discard (DD-011) and #133's unclamped curve inputs (DD-012). Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+DD-003 and DD-002. It adds #134's notification Discard (DD-011) and #133's unclamped curve inputs (DD-012),
+then the proximity damp in smoothing (DD-022, DD-024) and #139's plugged-in fix with the global
+panic toggle (DD-025), which opened 1.13.0 / vc27 in this tree. Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -70,13 +72,20 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    toward a light change, with Live Debug's "Smoothing α" at a tenth. After you uncover the sensor it
    should catch up within a cycle or two, with no change in light.
 
+4. **[2026-10-04] Check #139 and the global panic toggle on a 1.13.0 build.** Run
+   `DEVICE_TEST_SCRIPT.md` step 23's charge-limit bullet and step 15a's global-toggle bullet. Worked
+   if an "Only while plugged in" rule stays active through `adb shell dumpsys battery set status 4`
+   (then `dumpsys battery reset`), and a rule loading a profile saved with "Only when plugged in" on
+   leaves Live Debug's switch off (DD-025).
+
 Open questions:
 
 - None.
 
-**This train is `1.12.0` on vc26, its ONE bump (owner, 2026-09-28),** for #134 and then #133. Land
-further user-facing fixes by editing `changelogs/26.txt` (500-character cap), never by bumping or by
-creating `27.txt`; re-open only for something major, and say so.
+**This train is `1.13.0` on vc27, its ONE bump (owner, 2026-10-04),** opened by #139 and shared
+with the #136 and solar-offset plans. Land further user-facing fixes by editing `changelogs/27.txt`
+(500-character cap), never by bumping or by creating `28.txt`; re-open only for something major, and
+say so.
 
 ## Decided non-items
 
@@ -118,6 +127,11 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-04 — **#139: context rules read "plugged in" from `EXTRA_PLUGGED`, ported from the
+  owner's AAB task43 (AdvancedAutoBrightness#21), so a charge limit no longer flaps them; the rule
+  label is now "Only while plugged in"; the panic "Only when plugged in" toggle survives profile
+  loads, rule reverts, Reset, import and Apply, as DB-009 ruled. Opens 1.13.0 / vc27 (owner)
+  (DD-025).**
 - 2026-10-04 — **Proximity damp moved into smoothing, per the owner's task535 A3b. That answers
   the open question with (b): while covered, smoothed lux moves a tenth as far. Uncovering now
   re-evaluates the last raw reading (task545 A5); the oracle changed with the source (DD-024,
@@ -129,35 +143,13 @@ Newest first; ledger rows are the durable detail.
   animation as well as the readout, smoothing still undamped; the oracle changed with it, the
   source having changed (DD-022, superseding DC-064's readout-only damp).**
 
-- 2026-10-02 — **E2E S2–S4 blocking review: Sol found 6 BLOCKERs and 6 HIGHs, then 4 more in
-  the fixes, all fixed — owner brightness mode, curve points and owner-mode conflicts kept in the
-  journal, SKIP rules for recovery's restart, per-scenario UI allowlist, `bmgr` denied; the app
-  refuses a Draft Apply before its DataStore seed; no device contacted (DD-021).**
-
-- 2026-10-02 — **The full ladder S4a deferred, run on `b761165`: green, Gradle set included —
-  `:app` 766 tests (incl. `TestTagsAsResourceIdTest`), `:domain` 134, `:platform` 146 + 146, 0
-  failures, `:app:assembleDebug` rebuilt; x86_64 Temurin 21 under QEMU on the aarch64 container.**
-- 2026-10-02 — **E2E S4c+S4d: 21 device scenarios behind an effect-gated `Run`, every Privileged
-  Display preference journaled, Discard allowlisted for the suite's own curve points (owner), and
-  the guarded `run.sh --install`; Sol's unit review found 11 issues, all fixed; no device
-  contacted (DD-020).**
-- 2026-10-02 — **E2E S4b: the device-side recovery port (`state.py`, `tideo.py`) and
-  `run.sh --recover`; Sol's review of S4a+S4b found the paused signal, user binding, identity
-  order, pref defaults and switch race wrong, all fixed; no device contacted (DD-019).**
-- 2026-10-02 — **E2E S4a: the app root exports Compose test tags as resource-ids
-  (`TideoRootSurface`, Robolectric-pinned); the Gradle set is deferred to one run after S4c
-  (owner) (DD-018).**
+- 2026-10-01..02 — **E2E S1–S4 and the blocking Sol review of S2–S4: `e2e/` scaffolding, the
+  command/UI boundary, effect journal and recovery, 21 device scenarios behind an effect-gated
+  `Run`, root test tags as resource-ids; all review findings fixed; the deferred full ladder ran
+  green on `b761165`; no device contacted (DD-015…DD-021).**
 - 2026-10-01 — **#138's grouped github-actions bump (wrapper-validation 6.4.0, setup-java 6.0.1,
   setup-android 4.0.4, codeql-action 4.38.2) cherry-picked onto this train after full CI went
   green on the PR; every pin resolved to its tag by hand; #138 closed as included.**
-- 2026-10-01 — **E2E S3: effect inventory, write-ahead recovery journal and recovery procedure
-  (`e2e/tideo_e2e/effects.py`, `journal.py`, `recovery.py`), killed at every call and journal
-  write in unit tests; no device contacted (DD-017).**
-- 2026-10-01 — **E2E S2: the command and UI boundary (`e2e/tideo_e2e/device.py`, `ui.py`) with
-  evasion tests and a dependency drift alarm; no device contacted (DD-016).**
-- 2026-10-01 — **E2E S1: `e2e/` scaffolding (pinned uv + lock, every device-script step classified
-  in `scenarios.toml`, manifest and identifier-scan unit tests) and the framework decision
-  (DD-015); RUNBOOK now requires script and manifest to change together.**
 - 2026-10-01 — **The PWM software-exponent help now matches `finalDimLevel` (higher dims more),
   departing from task702's flash; the owner ports it back to AAB (DD-014).**
 - 2026-09-28 — **#133: curve inputs persist unclamped wherever Apply accepts them (DD-012); owner

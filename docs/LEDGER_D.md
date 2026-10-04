@@ -270,3 +270,22 @@
   Debug. One departure remains: DC-070's settling still runs while near, in damped steps, landing
   smoothed lux on the band edge by its twentieth step, where Tasker would leave it lagging until a
   reading leaves the band or the sensor is uncovered. On-device behaviour is unverified.
+- DD-025 [cited]: **Context rules read "plugged in" from `EXTRA_PLUGGED`, not the charge status,
+  ported from the owner's AAB task43 (#139); and the panic "Only when plugged in" toggle is now
+  global everywhere, as DB-009 ruled (2026-10-04).** At a charge limit Android reports
+  `NOT_CHARGING` (sometimes `DISCHARGING`) while the charger stays connected, so task43 A12's
+  `isPlugged` (`EXTRA_STATUS` ∈ {`CHARGING`, `FULL`}), which Tideo ported faithfully, flapped
+  "Only while charging" rules at the limit, matched on-battery rules wrongly, and D-132's cooldown
+  bypass re-evaluated on every flip. The owner's AAB V3.4 task43 (AdvancedAutoBrightness#21) now
+  reads `getIntExtra(EXTRA_PLUGGED, 0) > 0` and renames the editor label "Only While Plugged In";
+  `AndroidBatteryStateReader` ports it as `BatteryState.isPlugged` (a missing extra is unplugged;
+  AC, USB, wireless and dock count, as in the panic source), and the label and rule summary follow,
+  so this is a port, not a deviation. Separately, six sites that keep `panicSensitivity` across a
+  settings swap omitted `panicRequiresPlugged` — `mergeProfile` (rule load and revert),
+  `ProfileApplier.applyProfile`, `SettingsViewModel.resetDefaults` and `replaceAll`, and
+  `DraftSettingsViewModel`'s store refresh and Apply — so a rule loading a profile saved with the
+  toggle on disabled the gesture on battery, the case DB-009 ruled out, and a Live Debug change
+  under an active rule was lost on revert; all six now take the same side as `panicSensitivity`.
+  The unit opened 1.13.0 / vc27, shared with the #136 and solar-offset plans; on-device behaviour
+  is unverified (`DEVICE_TEST_SCRIPT.md` steps 15a and 23), and `AndroidPowerMeter.isCharging`
+  (task524's calibration abort) still reads the charge status, left for its own decision.

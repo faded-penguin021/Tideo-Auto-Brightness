@@ -78,6 +78,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
                     panicSensitivity = current.panicSensitivity,
+                    panicRequiresPlugged = current.panicRequiresPlugged,
                 )
             }
             if (updated.serviceEnabled) AutoBrightnessRuntime.reapply(app)
@@ -100,6 +101,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     detectOverrides = current.detectOverrides,
                     debugLevel = current.debugLevel,
                     panicSensitivity = current.panicSensitivity,
+                    panicRequiresPlugged = current.panicRequiresPlugged,
                     contextOverride = true,
                     // No per-capability preview on import: keep secure fields unchanged (visible preview on profile apply).
                     dimmingEnabled = current.dimmingEnabled,

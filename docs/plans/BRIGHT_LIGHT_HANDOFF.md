@@ -157,7 +157,8 @@ Each unit: ladder green → STATE line → commit → push.
 
 0. **Open the train.**
    - Confirm the tag with `git ls-remote --tags --refs origin 'refs/tags/v*'`.
-   - Bump to 1.13.0 / vc27 and add `changelogs/27.txt`.
+   - The bump to 1.13.0 / vc27 and `changelogs/27.txt` already landed with the plugged-in fix
+     (DD-025); add this plan's sentence to `27.txt` within the cap instead.
    - Add a checklist for this plan under STATE `## Active work` and fix the stale Owner-queue
      "train is 1.12.0" paragraph.
    - **Read-only adb facts:** model and SDK, `screen_brightness_mode`/`screen_brightness`, the

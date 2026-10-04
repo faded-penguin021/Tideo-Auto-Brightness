@@ -220,7 +220,7 @@ internal fun ContextTriggers.summary(): String {
         wifi?.takeIf { it.isNotEmpty() }?.let { add("Wi-Fi ${it.joinToString()}") }
         timeRange?.takeIf { it.size == 2 }?.let { add("${it[0]}–${it[1]}") }
         days?.takeIf { it.isNotEmpty() }?.let { add(it.sorted().joinToString("") { d -> DAY_LABELS.getOrElse(d - 1) { "?" } }) }
-        battery?.let { add(if (it.onPower == true) "charging" else if (it.onPower == false) "on battery" else "battery ${it.min}-${it.max}%") }
+        battery?.let { add(if (it.onPower == true) "plugged in" else if (it.onPower == false) "on battery" else "battery ${it.min}-${it.max}%") }
         // DB-061: name the circle; "near location" read identically for every rule.
         location?.let { add("near ${formatCoord(it.lat)}, ${formatCoord(it.lon)} (${it.radius.toInt()} m)") }
     }

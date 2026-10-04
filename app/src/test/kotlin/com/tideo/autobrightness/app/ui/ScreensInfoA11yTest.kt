@@ -137,7 +137,7 @@ class ScreensInfoA11yTest {
         // D-156: the battery section's "only while charging" Switch label is a sibling Text — the fix
         // gives the switch node its own contentDescription so TalkBack reads more than "switch".
         renderEditorAllSectionsOpen()
-        compose.onNodeWithTag("rule_charging").assertContentDescriptionEquals("Only while charging")
+        compose.onNodeWithTag("rule_charging").assertContentDescriptionEquals("Only while plugged in")
     }
 
     @Test

@@ -115,9 +115,9 @@ class ContextEngine(
 
     /**
      * Non-suspend snapshot of the last resolved effective settings, or null before the first context
-     * evaluation. Used by the panic source to read the GLOBAL `%AAB_PanicSensitivity` per arming from a
-     * sensor callback (no coroutine, must not block) — the value is identical in baseline and effective
-     * because mergeProfile preserves it (D-116).
+     * evaluation. Used by the panic source to read the GLOBAL `%AAB_PanicSensitivity` and
+     * `%AAB_PanicPlugged` from a sensor callback (no coroutine, must not block) — both are identical in
+     * baseline and effective because mergeProfile preserves them (D-116, DD-025).
      */
     val effectiveSnapshot: AabSettings? get() = _effective.value
 
@@ -641,7 +641,7 @@ interface ProfileCatalog {
  * preserved from the baseline.
  *
  * `%AAB_DetectOverrides` is a GLOBAL preference, not a task626 snapshot key, so a swap must never
- * silently disable manual-override detection (G2-F8) — likewise panicSensitivity (D-116). A blanket
+ * silently disable manual-override detection (G2-F8) — likewise both panic prefs (D-116, DD-025). A blanket
  * `copy(global = baseline.global)` is therefore wrong: GlobalPrefs also holds
  * `quickSettingsEnabled`/`notificationsEnabled`, which ARE per-profile (S12.9c #1).
  */
@@ -651,6 +651,7 @@ internal fun mergeProfile(baseline: AabSettings, profile: AabSettings): AabSetti
     detectOverrides = baseline.detectOverrides,
     debugLevel = baseline.debugLevel,
     panicSensitivity = baseline.panicSensitivity,
+    panicRequiresPlugged = baseline.panicRequiresPlugged,
     setupTitle = baseline.setupTitle,
     schemaVersion = baseline.schemaVersion,
 )

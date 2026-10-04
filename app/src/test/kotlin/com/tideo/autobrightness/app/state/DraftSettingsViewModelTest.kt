@@ -229,6 +229,32 @@ class DraftSettingsViewModelTest {
     }
 
     @Test
+    fun liveDebugPanicPluggedChange_reachesTheDraft_withoutDirtying_DD025() {
+        setBaseline(AabSettings(panicRequiresPlugged = false))
+        val vm = seededVm()
+
+        setBaseline(committed().copy(panicRequiresPlugged = true)) // Live Debug, a GLOBAL field
+        awaitVm(vm) { it.draft.value.panicRequiresPlugged && !it.dirty.value }
+
+        assertTrue(vm.draft.value.panicRequiresPlugged, "the open draft follows the store")
+        assertFalse(vm.dirty.value, "a global field moved elsewhere is not a user edit")
+    }
+
+    @Test
+    fun apply_doesNotWriteAStalePanicPluggedValueBack_DD025() {
+        setBaseline(AabSettings(maxBrightness = 200, panicRequiresPlugged = false))
+        val vm = seededVm()
+        vm.edit { it.copy(maxBrightness = 222) }
+        idle()
+        runBlocking { app.settingsDataStore.updateData { it.copy(panicRequiresPlugged = true) } }
+
+        vm.apply()
+
+        val result = awaitCommitted { it.maxBrightness == 222 }
+        assertTrue(result.panicRequiresPlugged, "Apply keeps the store's global panic toggle")
+    }
+
+    @Test
     fun apply_raisesMaxBrightToFitCurve_D169() {
         // D-169: raise MaxBright to curve minimum (253) instead of blocking save.
         val steep = AabSettings(

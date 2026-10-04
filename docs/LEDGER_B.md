@@ -226,6 +226,7 @@
   while it stays on a Qi pad is not a scenario worth narrowing the check for. Do not restrict this to
   USB without new evidence. `[cited]`: `AndroidPanicSensorSource`, `AabSettings.panicRequiresPlugged`,
   `LiveDebugViewModel.setPanicRequiresPlugged`, `AmbientMonitoringService.startPanicGateWatcher`.
+  Corrected by DD-025.
 - DB-010: **Per-round device scripts were accreting into a graveyard; they now have a lifecycle.**
   Every round that needed owner verification added its own `*_TEST*.md` and none were ever removed —
   `RESUME_CONTEXT_TEST.md` (DA-018, executed and shipped in 1.8.1), plus this train's

@@ -1,0 +1,4 @@
+Fixes:
+- "Only while plugged in" rules (formerly "Only while charging") no longer switch on and off at a battery charge limit
+- a context rule loading a profile no longer changes the panic gesture's "Only when plugged in" setting
+- with the proximity sensor covered, brightness follows light changes more slowly, as in Tasker, and catches up when uncovered

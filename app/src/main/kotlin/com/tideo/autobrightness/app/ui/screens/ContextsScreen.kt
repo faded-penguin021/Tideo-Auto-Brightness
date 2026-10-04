@@ -443,14 +443,14 @@ internal fun RuleEditor(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     // D-156: name the switch; sibling Text doesn't announce to TalkBack.
-                    val onlyChargingLabel = stringResource(R.string.contexts_only_charging)
+                    val onlyPluggedInLabel = stringResource(R.string.contexts_only_plugged_in)
                     Switch(
                         checked = charging,
                         onCheckedChange = { charging = it },
                         modifier = Modifier.testTag("rule_charging")
-                            .semantics { contentDescription = onlyChargingLabel },
+                            .semantics { contentDescription = onlyPluggedInLabel },
                     )
-                    Text(onlyChargingLabel, style = MaterialTheme.typography.bodyMedium)
+                    Text(onlyPluggedInLabel, style = MaterialTheme.typography.bodyMedium)
                 }
                 Text(stringResource(R.string.contexts_battery_pct), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

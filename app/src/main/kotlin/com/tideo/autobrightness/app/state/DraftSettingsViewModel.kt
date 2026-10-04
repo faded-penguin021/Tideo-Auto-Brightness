@@ -65,9 +65,10 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                             contextOverride = c.contextOverride,
                             schemaVersion = c.schemaVersion,
                             setupTitle = c.setupTitle,
-                            // GLOBAL fields: debugLevel (Live Debug scene, G2R-F9), panicSensitivity (D-116).
+                            // GLOBAL fields: debugLevel (Live Debug scene, G2R-F9), panic prefs (D-116, DD-025).
                             debugLevel = c.debugLevel,
                             panicSensitivity = c.panicSensitivity,
+                            panicRequiresPlugged = c.panicRequiresPlugged,
                         )
                     }
                 }
@@ -151,6 +152,7 @@ class DraftSettingsViewModel(application: Application) : AndroidViewModel(applic
                     contextOverride = current.contextOverride,
                     debugLevel = current.debugLevel,
                     panicSensitivity = current.panicSensitivity,
+                    panicRequiresPlugged = current.panicRequiresPlugged,
                 )
             }
             if (committedNow.serviceEnabled) AutoBrightnessRuntime.reapply(app)

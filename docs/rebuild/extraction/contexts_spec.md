@@ -184,6 +184,10 @@ Then reads solar (`%AAB_Sunrise/Sunset`, UTC seconds → shifted to local), de-s
 battery %, plugged status (live `BATTERY_CHANGED` receiver), day-of-week, and current SSID
 (`%bypass_ssid` first, else WifiManager).
 
+> **Owner's task43 (AAB V3.4, AdvancedAutoBrightness#21, DD-025), not in this XML:** plugged status
+> is `batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) > 0`, replacing V3.3's
+> `EXTRA_STATUS` ∈ {`CHARGING`, `FULL`}, which dropped out at a charge limit (#139).
+
 **PASS 2 — veto gates** (skip eval if nothing relevant changed). Always-eval on midnight
 rollover (`curDay != lastDay`) or `_ContextResume`. Otherwise per-caller:
 - App Changed: eval only if rule active OR non-default profile OR `cache.contains(","+app+",")`,

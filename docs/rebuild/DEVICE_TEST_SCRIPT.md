@@ -245,6 +245,10 @@ optional.
     re-enabling the service while unplugged. The second shape is the one that broke (DB-011) — the
     gesture started before the settings snapshot resolved and an unresolved snapshot read as "no
     restriction".
+    - **The toggle is global, not per-profile (DD-025).** Turn it **off** and save profile P; turn it
+      **on** and save profile Q; turn it **off** again and add a rule that loads Q. While the rule is
+      active, **Expected:** Live Debug's switch still reads **off** and the gesture fires on battery.
+      Flip the switch while the rule is active. **Expected:** the new value survives the rule dropping.
 15b. **The accelerometer is released while the screen is off** and re-registered on screen-on
     (DB-009 — it was held at ~50 Hz for the life of the service, including screen-off, where the
     gesture cannot fire). With the toggle off: lock, wait ~10 s, unlock and **immediately** gesture.
@@ -304,7 +308,14 @@ optional.
 
 22. Add a **per-app** rule (grant usage access when prompted) targeting a saved profile; switch to that
     app. **Expected:** the profile loads (a teal context flash); the Dashboard shows the active context.
-23. Add a **charging** rule; plug/unplug. **Expected:** the rule applies on the charging change.
+23. Add an **Only while plugged in** rule; plug/unplug. **Expected:** the rule applies on the plug change.
+    - **Charge limit (#139, DD-025).** With the charger in and the rule active, run
+      `adb shell dumpsys battery set status 4` (not charging), then `adb shell dumpsys battery reset`.
+      **Expected:** the rule stays active and Live Debug shows no context change. On a phone with a real
+      charge limit, at the limit, `adb shell dumpsys battery` shows `status: 4` (or 3) with `AC powered`
+      or `USB powered` `true`, and the rule stays active. If both read `false` at the limit, that
+      device's limit reports the charger as disconnected and no fix here can help: record it, don't
+      work around it.
     - **Prompt switch on plug-in (D-132).** With a higher-priority charging rule and a lower-priority
       battery rule both matching (e.g. "Charging" P81 on-power vs "Low battery" P80 ≤30%), at low battery
       plug the charger in (screen can be off). **Expected:** it switches to the charging rule **immediately**,

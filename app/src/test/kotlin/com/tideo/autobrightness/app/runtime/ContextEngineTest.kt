@@ -910,6 +910,72 @@ class ContextEngineTest {
     }
 
     @Test
+    fun mergeProfile_preservesPanicRequiresPlugged_bothWays_DD025() {
+        val on = mergeProfile(AabSettings(panicRequiresPlugged = true), AabSettings(panicRequiresPlugged = false))
+        assertEquals(true, on.panicRequiresPlugged, "on in the baseline survives a profile saved off")
+        val off = mergeProfile(AabSettings(panicRequiresPlugged = false), AabSettings(panicRequiresPlugged = true))
+        assertEquals(false, off.panicRequiresPlugged, "off in the baseline survives a profile saved on")
+    }
+
+    private val pluggedRule = ContextRule(
+        id = "plug", name = "Plugged", profile = "Q", priority = 10,
+        triggers = ContextTriggers(battery = BatteryTrigger(onPower = true)),
+    )
+
+    private fun TestScope.panicEngine(live: FakeSettingsStore, src: FakeSignalSource): Pair<ContextEngine, CoroutineScope> {
+        val profileQ = AabSettings(panicRequiresPlugged = true, minBrightness = 99)
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { listOf(pluggedRule) },
+            settingsProvider = live.provider,
+            settingsWriter = live.writer,
+            baselineStore = FakeBaselineStore(),
+            profileCatalog = object : ProfileCatalog {
+                override suspend fun profile(name: String): AabSettings? = if (name == "Q") profileQ else null
+                override suspend fun names(): Set<String> = setOf("Q")
+            },
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { 0L },
+        )
+        return engine to scope
+    }
+
+    @Test
+    fun ruleLoadingAProfileSavedWithPanicPluggedOn_keepsTheGlobalOff_DD025() = runTest {
+        val live = FakeSettingsStore(baseline.copy(panicRequiresPlugged = false))
+        val (engine, scope) = panicEngine(live, FakeSignalSource(plugged = true))
+        engine.start(scope)
+        advanceUntilIdle()
+
+        assertEquals("Plugged", engine.activeContext.value)
+        assertEquals(99, engine.effectiveSettings().minBrightness, "the profile's curve applies")
+        assertEquals(false, engine.effectiveSettings().panicRequiresPlugged, "the global toggle stays off")
+        scope.cancel()
+    }
+
+    @Test
+    fun panicPluggedChangedWhileARuleIsActive_survivesTheRevert_DD025() = runTest {
+        val live = FakeSettingsStore(baseline.copy(panicRequiresPlugged = false))
+        val src = FakeSignalSource(plugged = true)
+        val (engine, scope) = panicEngine(live, src)
+        engine.start(scope)
+        advanceUntilIdle()
+        assertEquals("Plugged", engine.activeContext.value)
+
+        live.value = live.value.copy(panicRequiresPlugged = true) // Live Debug, while the rule runs
+
+        src.plugged = false
+        src.battery.emit(BatterySignal(50, plugged = false))
+        advanceUntilIdle()
+
+        assertNull(engine.activeContext.value, "unplugging drops the rule")
+        assertEquals(baseline.minBrightness, engine.effectiveSettings().minBrightness, "the baseline is restored")
+        assertEquals(true, engine.effectiveSettings().panicRequiresPlugged, "the Live Debug change survives")
+        scope.cancel()
+    }
+
+    @Test
     fun mergeProfile_preservesDebugLevel_G2RF9() {
         // G2R-F9: debugLevel is global, not task626 snapshot key.
         val base = AabSettings(debugLevel = 4, minBrightness = 7)

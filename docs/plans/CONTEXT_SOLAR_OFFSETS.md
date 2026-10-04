@@ -55,6 +55,7 @@ Tasker semantics override coding taste (AGENTS.md). The domain change follows RU
   so the glue-review protocol does not apply. If either does need to change, run the protocol.
 - **Train: 1.13.0 / vc27, shared with the #136 plan** (owner, 2026-10-01). v1.12.0 is tagged. Whichever
   unit from the two plans lands first does the bump and opens `changelogs/27.txt` (500-character cap).
+  The plugged-in fix (DD-025) has since done both: add a sentence to `27.txt` instead.
 
 ## U1 — Evaluator parity (`:domain`)
 

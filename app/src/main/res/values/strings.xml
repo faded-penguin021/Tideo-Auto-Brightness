@@ -586,7 +586,7 @@
     <string name="contexts_clear_time">Clear time</string>
     <string name="contexts_days">Days (none = every day):</string>
     <string name="contexts_radius">Radius (metres)</string>
-    <string name="contexts_only_charging">Only while charging</string>
+    <string name="contexts_only_plugged_in">Only while plugged in</string>
     <string name="contexts_battery_pct">Battery percentage:</string>
     <string name="contexts_from_pct" formatted="false">From %</string>
     <string name="contexts_to_pct" formatted="false">To %</string>

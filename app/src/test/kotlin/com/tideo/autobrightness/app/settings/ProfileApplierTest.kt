@@ -42,6 +42,15 @@ class ProfileApplierTest {
     }
 
     @Test
+    fun applyProfile_keepsTheGlobalPanicPluggedToggle_DD025() = runBlocking {
+        seed(AabSettings(serviceEnabled = false, panicRequiresPlugged = true))
+
+        applier.applyProfile("Battery Saver") // a built-in, saved with the toggle off
+
+        assertTrue(committed().panicRequiresPlugged, "the panic plugged toggle is global (DB-009)")
+    }
+
+    @Test
     fun applyProfile_unknownName_isNoOp() = runBlocking {
         val before = AabSettings(serviceEnabled = false, minBrightness = 42, contextOverride = false)
         seed(before)
