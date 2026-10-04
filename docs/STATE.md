@@ -78,6 +78,14 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    per `CONTRIBUTING.md`. Settles it: `grep -c -e 'name="help_pwm_exponent"' -e
    'name="contexts_only_plugged_in"' app/src/main/res/values-b+zh+Hans/strings.xml` prints 2.
 
+5. **[2026-10-04] After this train reaches `main`, check the translation badge works.** The new
+   `Translation badges` workflow runs for the first time there, and nothing could test it before.
+   Worked if the Actions tab shows a green "Translation badges" run and the README's 简体中文
+   badge shows a percentage instead of an error. If the run failed on its push, allow Actions to
+   create the `badges` branch (Settings → Actions → Workflow permissions: read and write, or the
+   ruleset that blocks it), then run it from the Actions tab. Settles it:
+   `git ls-remote --heads origin badges` prints one line (DD-028).
+
 Open questions:
 
 - None.
@@ -128,6 +136,9 @@ only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-04 — **Translation badges come from CI now (owner): the `Translation badges` workflow
+  publishes coverage JSON to the `badges` branch on pushes to `main`, and the README reads it;
+  `TranslationCoverageBadgeTest` is gone (DD-028, superseding DD-027).**
 - 2026-10-04 — **README Translations section shows a coverage badge per language (简体中文 99%),
   kept accurate by `TranslationCoverageBadgeTest` (owner request; DD-027).**
 - 2026-10-04 — **Untranslated strings fall back to English (owner): lint's `MissingTranslation`

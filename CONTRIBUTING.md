@@ -63,18 +63,20 @@ app-layer contribution, so it's welcome here via PR.
 4. Keep strings roughly the same length where you can — some sit on buttons / single lines.
 5. Build to validate: `./gradlew :app:assembleDebug` and `./gradlew :app:lintDebug` (lint flags
    missing or mis-formatted translations).
-6. Add a coverage badge for your language to the README's **Translations** section. Run
-   `./gradlew :app:testDebugUnitTest --tests '*TranslationCoverageBadge*'`; it fails with the exact
-   line to paste.
+6. Add a coverage badge for your language to the README's **Translations** section: copy the
+   简体中文 line, then change the language tag (in the alt text and in the `.json` file name) and
+   the `label=` (your language's name, URL-encoded). The number fills in by itself once your
+   translation is on `main`.
 7. Open a PR with the new `values-<lang>/strings.xml`, noting the language and whether it is a human
    or an AI-assisted translation (if AI-assisted, which tool made the draft).
 
 A string without a translation shows in English, so a partial translation still works; lint lists
 the missing ones as warnings, not errors. When a change rewrites an English string's meaning,
 delete that string from every `values-<lang>/` file in the same change, so the app shows the new
-English rather than an outdated translation until a translator catches up. Adding or removing
-strings can move a language's coverage past a whole percent; the same test then tells you the new
-badge numbers.
+English rather than an outdated translation until a translator catches up. The README badges
+follow by themselves: the `Translation badges` workflow recomputes coverage on every push to
+`main` that changes a `strings.xml`, and its job summary lists the strings each language is
+missing.
 
 The in-app **Language** selector (Setup screen) lists English and Simplified Chinese. When adding
 another translated locale, also add it to the picker in `OnboardingScreen.kt` and to

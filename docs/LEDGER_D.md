@@ -299,7 +299,7 @@
   `contexts_only_plugged_in` (DD-025) were the first, and show in English in the Chinese UI until
   retranslated.
 
-- DD-027 [cited]: **The README shows a coverage badge per translated language, checked by a unit
+- DD-027: **The README shows a coverage badge per translated language, checked by a unit
   test rather than published by CI (owner request, 2026-10-04).** `TranslationCoverageBadgeTest`
   counts each `values-*/strings.xml` key that a translatable default string also has, rounds the
   share down to a whole percent, and fails unless the README's shields.io badge for that language
@@ -307,3 +307,13 @@
   CI would need a write-permission workflow and a badge branch, so the cost accepted instead is a
   one-number README edit whenever coverage crosses a whole percent. Simplified Chinese started at
   99% (662 of 664), the two strings DD-026 removed being the gap.
+  Superseded by DD-028.
+
+- DD-028 [cited]: **Translation coverage badges are published by CI, replacing DD-027's unit test
+  (owner, 2026-10-04).** The test failed a change whenever coverage crossed a whole percent, which
+  contradicts DD-026's rule that a missing translation must not block anyone. The `Translation
+  badges` workflow runs `.github/scripts/translation_coverage.py` on pushes to `main` that touch a
+  `strings.xml`, writes one shields.io endpoint JSON per language tag to the orphan `badges`
+  branch with a job-scoped write token (the `clean-dist.yml` pattern), and lists missing keys in
+  the job summary. A broken run shows as a stale or failing badge rather than a red PR, and the
+  workflow's first run on `main` is its only real test.
