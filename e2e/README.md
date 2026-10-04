@@ -5,9 +5,8 @@ host's adb server. The Markdown script stays the human spec; `scenarios.toml` ho
 script step, classified `auto`, `partial` or `manual` with a reason. Decision and safety model:
 DD-015.
 
-**Status: boundary, recovery, scenarios and install guard built, no device contact yet.**
-`--preflight` arrives with S5. The blocking review of S2–S4 found 12 issues, all fixed (DD-021);
-S5's read-only preflight is next.
+**Status: boundary, recovery, scenarios, install guard and read-only preflight built (S5,
+DD-029).** The first device contact was read-only; S6's guarded install and smoke run are next.
 
 ## Safety boundary
 
@@ -64,7 +63,8 @@ S5's read-only preflight is next.
 - **Install guard** (`tideo_e2e/install.py`). Empty journal; debug package; the one signer's
   SHA-256 equal to the installed `base.apk`'s (apksigner); versionCode not lower; the owner types
   `INSTALL`. Then one streamed `cmd package install -r` of the inspected bytes, never -d, -g, -t
-  or an uninstall. Needs `JAVA_HOME` and the Android SDK (`ANDROID_HOME` or `local.properties`).
+  or an uninstall. Only when `dumpsys package` says it cannot find the debug package is an
+  install a first one: the APK's single signer is then the one every later install must match. Needs `JAVA_HOME` and the Android SDK (`ANDROID_HOME` or `local.properties`).
 - **Drift alarm** (`tideo_e2e/drift.py`). A pin bump that changes any device-facing line of
   adbutils or uiautomator2 fails `test_dependency_drift.py` until the new lines are checked.
 
@@ -81,6 +81,7 @@ resolved in `uv.lock`.
 
 ```
 e2e/run.sh tests/unit          # device-free: manifest, identifiers, boundary, drift
+TIDEO_E2E_SERIAL=<serial> e2e/run.sh --preflight     # strictly read-only; run first
 TIDEO_E2E_SERIAL=<serial> e2e/run.sh -k s02_10b      # one scenario
 TIDEO_E2E_SERIAL=<serial> e2e/run.sh -m smoke        # S6's smoke set
 TIDEO_E2E_SERIAL=<serial> e2e/run.sh --recover       # restore what an interrupted run left
@@ -94,7 +95,16 @@ wake unlocked; otherwise they stop, and `--recover` runs once it is unlocked.
 `--recover` exits 0 at once on an empty journal. Otherwise it checks the device's identity over
 a read-only session before anything else, then runs the recovery procedure. Exit 1 means
 conflicts or a stop, and the journal keeps what is left. The adb server defaults to
-`host.docker.internal:5037` (`ADB_SERVER_HOST`, `ADB_SERVER_PORT`).
+`host.docker.internal:5037` (`ADB_SERVER_HOST`, `ADB_SERVER_PORT`). A phone in wireless
+`adb tcpip` mode can instead be reached from a server inside the container: `adb connect
+<phone>:5555`, then `ADB_SERVER_HOST=127.0.0.1`. The serial is then `<phone>:5555`, which stays
+in the environment, never in a file.
+
+`--preflight` refuses on a pending journal, a missing device profile or debug build, a
+brightness above the profile's S, or a language list through which Tideo might render Chinese
+(the suite reads English text). It prints the snapshot summary and which scenarios the SKIP
+rules would skip, and writes the full snapshot and an archive of Tideo's data dir (read with
+`run-as … tar`) to the private store only. Exit 0 means a run may start.
 
 ## Rules for this directory
 

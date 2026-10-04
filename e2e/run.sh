@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Entry point: --recover, --install <apk>, or pytest passthrough. --preflight arrives with S5.
+# Entry point: --preflight (read-only), --recover, --install <apk>, or pytest passthrough.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,8 +18,7 @@ esac
 cd "$here"
 case "${1:-}" in
   --preflight)
-    echo "run.sh: --preflight is not implemented yet" >&2
-    exit 2
+    exec "$uv" run --frozen python -m tideo_e2e.cli preflight
     ;;
   --recover)
     exec "$uv" run --frozen python -m tideo_e2e.cli recover

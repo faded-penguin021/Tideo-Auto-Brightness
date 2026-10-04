@@ -317,3 +317,9 @@
   branch with a job-scoped write token (the `clean-dist.yml` pattern), and lists missing keys in
   the job summary. A broken run shows as a stale or failing badge rather than a red PR, and the
   workflow's first run on `main` is its only real test.
+- DD-029: **E2E S5: `run.sh --preflight` is the suite's first device contact, and it is read-only
+  (2026-10-04).** On the owner's phone it ran 126 adb requests, all READ templates. It refuses
+  unless Tideo's language list is certainly English: the app's own locales walk into the system's,
+  and a Chinese entry anywhere after a non-English first one is refused (Sol). The install guard
+  gained a first install, reached only on `dumpsys package`'s own "Unable to find package" line.
+  The owner approved it, and its signer now binds every later install.

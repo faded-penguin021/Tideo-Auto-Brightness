@@ -42,6 +42,23 @@ def test_guard_refuses(new, code, have):
     assert problems(new, code, have)
 
 
+def test_a_first_install_is_judged_on_the_new_apk_alone():
+    assert problems(_new(), None, None) == []
+    assert problems(_new(signers=(A, B)), None, None)
+    assert problems(_new(signers=()), None, None)
+    assert problems(_new(package="com.tideo.autobrightness"), None, None)
+
+
+def test_a_first_install_needs_the_package_absent_for_every_user():
+    from .test_state import PACKAGE_DUMP
+    assert install.installed_anywhere(PACKAGE_DUMP)
+    assert not install.installed_anywhere(f"Unable to find package: {DEBUG_PKG}\n")
+    for unreadable in ("", "Packages:\n  Package [com.other] (1a2b):\n",
+                       f"Packages:\n  Package [{DEBUG_PKG}] (?):\n"):
+        with pytest.raises(InstallRefused):
+            install.installed_anywhere(unreadable)
+
+
 @pytest.mark.parametrize("out", [
     "", f"package:/data/app/~~x/{DEBUG_PKG}-y/base.apk\n"
         f"package:/data/app/~~x/{DEBUG_PKG}-y/split_config.en.apk\n",

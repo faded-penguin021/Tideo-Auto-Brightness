@@ -75,12 +75,30 @@ def run_install(apk: str) -> int:
         return 1
 
 
+def run_preflight() -> int:
+    from . import preflight
+
+    target = os.environ.get("TIDEO_E2E_SERIAL", "")
+    if not target:
+        print("preflight: set TIDEO_E2E_SERIAL to the phone's adb serial", file=sys.stderr)
+        return 2
+    confirmed = frozenset(c.strip() for c in os.environ.get("TIDEO_E2E_CONFIRM", "").split(",")
+                          if c.strip())
+    try:
+        return preflight.run(target, private_store(), adb_client(), confirmed)
+    except (JournalError, state.StateError, device.BoundaryViolation) as e:
+        print(f"preflight: stopped: {e}", file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str]) -> int:
     if argv == ["recover"]:
         return run_recover()
+    if argv == ["preflight"]:
+        return run_preflight()
     if len(argv) == 2 and argv[0] == "install":
         return run_install(argv[1])
-    print("usage: python -m tideo_e2e.cli recover | install <apk>", file=sys.stderr)
+    print("usage: python -m tideo_e2e.cli preflight | recover | install <apk>", file=sys.stderr)
     return 2
 
 

@@ -45,6 +45,7 @@ ALLOWED = {
     "launch_fresh":
         f"am start -f 0x10008000 -n {DEBUG_PKG}/com.tideo.autobrightness.app.MainActivity",
     "current_user": "am get-current-user",
+    "app_locales": f"cmd locale get-app-locales {DEBUG_PKG} --user 0",
     "settings_get_screen_brightness": "settings get system screen_brightness",
     "settings_put_screen_brightness": "settings put system screen_brightness 4095",
     "settings_get_enabled_accessibility_services":

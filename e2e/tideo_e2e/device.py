@@ -121,6 +121,8 @@ SETTINGS: dict[str, dict[str, P | None]] = {
     "system": {
         "screen_brightness": int_in("brightness", 0, BRIGHTNESS_MAX),
         "screen_brightness_mode": _BIT,
+        # The full system language list, which resource resolution walks (S5's language check).
+        "system_locales": None,
     },
     "secure": {
         "night_display_activated": _BIT,
@@ -146,7 +148,7 @@ SETTINGS: dict[str, dict[str, P | None]] = {
 
 GETPROPS = frozenset({
     "ro.build.version.sdk", "ro.build.version.release", "ro.product.manufacturer",
-    "ro.product.model", "ro.serialno", "debug.hwui.force_dark",
+    "ro.product.model", "ro.serialno", "debug.hwui.force_dark", "persist.sys.locale",
 })
 
 # Private files run-as may read; relative to the app data dir, no traversal.
@@ -184,6 +186,9 @@ def _templates() -> tuple[Template, ...]:
         Template("dumpsys_activities", Grade.READ, ("dumpsys", "activity", "activities")),
         Template("dumpsys_top", Grade.READ, ("dumpsys", "activity", "top")),
         Template("current_user", Grade.READ, ("am", "get-current-user")),
+        # The per-app language (#141's picker stores it in the platform's LocaleManager).
+        Template("app_locales", Grade.READ,
+                 ("cmd", "locale", "get-app-locales", pkg, "--user", "0")),
         Template("private_cat", Grade.READ,
                  ("run-as", DEBUG_PKG, "cat", pattern("file", _PRIVATE_FILE))),
         Template("private_archive", Grade.READ,

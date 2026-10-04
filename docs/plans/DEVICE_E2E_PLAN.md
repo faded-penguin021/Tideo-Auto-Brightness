@@ -23,7 +23,8 @@ under this plan until segment S4's recovery contract is implemented, interruptio
 Sol-reviewed.**
 
 **Environment (measured 2026-09-13)**
-- Claude runs in the arm64 dev container: Python 3.12, no pip, uv or adb.
+- Claude runs in the arm64 dev container: Python 3.12, no pip, uv or adb. (By 2026-10-04 it had
+  uv and an adb binary; S5 reached the phone through that, see S5.)
 - Builds run on the amd64 builder container over SSH (`assembleDebug` has taken ~39 min).
 - The host is Windows 11 ARM64 with Docker Desktop. Its compose files are outside the repo.
 - The phone is attached to Windows. `host.docker.internal` resolves; port 5037 was refused when
@@ -388,7 +389,8 @@ in STATE `## Active work`.
     journal and recovery code, the effect inventory, the install guard and every mutating test.
     Safety findings get fixed first.
 - **S5 — device, read-only**
-  - The owner starts the host adb server.
+  - An adb server the container can reach. Measured 2026-10-04: the container's own server,
+    connected to the phone over wireless `adb tcpip` 5555, works; the host server is not needed.
   - `run.sh --preflight`, strictly read-only: connectivity; identity; package, variant and cert;
     release FGS; settings, runtime and private-state snapshot; SKIP-rule evaluation; private-store
     archive.
