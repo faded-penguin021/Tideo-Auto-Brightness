@@ -298,3 +298,12 @@
   because a stale one is worse than English. `help_pwm_exponent` (DD-014) and
   `contexts_only_plugged_in` (DD-025) were the first, and show in English in the Chinese UI until
   retranslated.
+
+- DD-027 [cited]: **The README shows a coverage badge per translated language, checked by a unit
+  test rather than published by CI (owner request, 2026-10-04).** `TranslationCoverageBadgeTest`
+  counts each `values-*/strings.xml` key that a translatable default string also has, rounds the
+  share down to a whole percent, and fails unless the README's shields.io badge for that language
+  tag shows that percent and its colour, printing the line to paste. Publishing the numbers from
+  CI would need a write-permission workflow and a badge branch, so the cost accepted instead is a
+  one-number README edit whenever coverage crosses a whole percent. Simplified Chinese started at
+  99% (662 of 664), the two strings DD-026 removed being the gap.

@@ -229,6 +229,10 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the **Bug report** issue template.
 ### Translations 
 Many thanks to [Tsuk1ko](https://github.com/Tsuk1ko) for translating the app into Simplified Chinese!
 
+[![简体中文 (zh-Hans): 99% translated](https://img.shields.io/badge/%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-99%25%20translated-green)](CONTRIBUTING.md#translations-are-welcome-here)
+
+Strings that are not translated yet show in English.
+
 ## License
 
 [MIT](LICENSE) © 2026 /u/v_uurtjevragen. 

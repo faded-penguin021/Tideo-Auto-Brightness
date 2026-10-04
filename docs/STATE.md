@@ -128,6 +128,8 @@ only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-04 — **README Translations section shows a coverage badge per language (简体中文 99%),
+  kept accurate by `TranslationCoverageBadgeTest` (owner request; DD-027).**
 - 2026-10-04 — **Untranslated strings fall back to English (owner): lint's `MissingTranslation`
   is a warning, and the two Chinese strings whose English changed meaning were removed rather
   than left stale (DD-026).**
