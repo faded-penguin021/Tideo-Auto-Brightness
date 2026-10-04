@@ -17,13 +17,11 @@ scripts are immutable; the live ledger is `LEDGER_D.md`. **Release standing is N
 here:** the session banner computes it (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-This branch starts the 1.12.0 train from `main` after the 1.11.0 squash (#131), which carried the
-#126/#127 override-attribution work (DC-002…DC-028), the runtime rot audit (DC-042…DC-046), the
-Night Light work (DC-053…DC-058), the proximity-damp parity restore (DC-064) and the closed
-light-stall train (DC-063, DC-065…DC-071, DD-001…DD-007), whose open findings H1 and H2 live in
-DD-003 and DD-002. It adds #134's notification Discard (DD-011) and #133's unclamped curve inputs (DD-012),
-then the proximity damp in smoothing (DD-022, DD-024) and #139's plugged-in fix with the global
-panic toggle (DD-025), which opened 1.13.0 / vc27 in this tree. Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
+The tree declares 1.14.0 / vc28 and includes Simplified Chinese and app-language selection
+(#141), #134's notification Discard (DD-011) and #133's unclamped curve inputs (DD-012). This
+train adds the proximity damp in smoothing (DD-022, DD-024) and #139's plugged-in fix with the
+global panic toggle (DD-025). The light-stall findings H1 and H2 remain recorded in DD-003 and
+DD-002. Device rounds on 1.10.0-debug vc24 are closed, with the 0–4095 conversion path frozen as
 built, and a later build owes its own run (DC-011…DC-013, DC-025…DC-028, DB-083;
 `DEVICE_TEST_SCRIPT.md` §2); no round script is alive (RUNBOOK §6, DB-010), the force-stop
 investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -53,39 +51,44 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **Backlog, not for this train — extract the 29 hardcoded diagnostic-card labels (DC-040).**
-   `WRAPPER_CEILING` in `HardcodedStringCheckTest` freezes them at 29 and may only fall. Settles
-   it: `./gradlew :app:testDebugUnitTest --tests '*HardcodedStringCheck*'` — green means the debt
-   has not grown, not that it is gone.
-
-2. **[2026-09-23] On the next false "manual override" pause, read brightness before pressing
+1. **[2026-09-23] On the next false "manual override" pause, read brightness before pressing
    Resume:** `adb shell settings get system screen_brightness` while Live Debug still shows the
    pause. About 193 means the 12 stuck, so something outside Tideo changed brightness; 241 means a
    dip that reverted by itself, which Tideo paused on because its "settled" value is a re-read
    3 ms later, and fixing that is a settle-window change for you to rule on. Extra Dim is ruled
    out (DC-059…DC-062).
 
-3. **[2026-10-04] Check the proximity damp on the phone next time you test a build.** Tideo now
+2. **[2026-10-04] Check the proximity damp on the phone next time you test a build.** Tideo now
    follows your new Lux Smoothing and Detect Proximity: while the top of the phone is covered, the
    ×0.1 damps smoothing itself, and uncovering re-evaluates the last reading (DD-024). Settles it:
    run `DEVICE_TEST_SCRIPT.md` step 13. While covered, brightness should creep only part of the way
    toward a light change, with Live Debug's "Smoothing α" at a tenth. After you uncover the sensor it
    should catch up within a cycle or two, with no change in light.
 
-4. **[2026-10-04] Check #139 and the global panic toggle on a 1.13.0 build.** Run
+3. **[2026-10-04] Check #139 and the global panic toggle on a 1.14.0 build.** Run
    `DEVICE_TEST_SCRIPT.md` step 23's charge-limit bullet and step 15a's global-toggle bullet. Worked
    if an "Only while plugged in" rule stays active through `adb shell dumpsys battery set status 4`
    (then `dumpsys battery reset`), and a rule loading a profile saved with "Only when plugged in" on
    leaves Live Debug's switch off (DD-025).
 
+4. **[2026-10-04] Get two Chinese strings retranslated.** Both English strings changed on this
+   train, and lint cannot see that the Chinese text is out of date:
+   - `help_pwm_exponent` (DD-014) still translates the old "not how much" text;
+   - `contexts_only_plugged_in` (DD-025, renamed from `contexts_only_charging`) still says "仅在充电时",
+     "only while charging", which is exactly what #139 made it stop meaning.
+
+   Ask a fluent speaker, such as #141's translator, per `CONTRIBUTING.md`. Settles it:
+   `grep -c -e '而不是调暗幅度' -e '仅在充电时' app/src/main/res/values-b+zh+Hans/strings.xml` prints 0.
+
 Open questions:
 
 - None.
 
-**This train is `1.13.0` on vc27, its ONE bump (owner, 2026-10-04),** opened by #139 and shared
-with the #136 and solar-offset plans. Land further user-facing fixes by editing `changelogs/27.txt`
-(500-character cap), never by bumping or by creating `28.txt`; re-open only for something major, and
-say so.
+**This train is `1.14.0` on vc28, its ONE bump** — the owner chose a minor bump on 2026-10-04,
+and it moved off 1.13.0 / vc27 when `main` took that for #141's Simplified Chinese. It was opened
+by #139 and is shared with the #136 and solar-offset plans. Land further user-facing fixes by
+editing `changelogs/28.txt` (500-character cap), never by bumping or by creating `29.txt`; re-open
+only for something major, and say so.
 
 ## Decided non-items
 
@@ -127,6 +130,10 @@ say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-04 — **`main` merged in after #141 shipped as v1.13.0 / vc27, so this train moves to
+  1.14.0 / vc28 with its notes in `changelogs/28.txt`; `26.txt` and `27.txt` are main's, as
+  published. The merge brings Simplified Chinese, app-language selection and the User Guide theme
+  fix.**
 - 2026-10-04 — **#139: context rules read "plugged in" from `EXTRA_PLUGGED`, ported from the
   owner's AAB task43 (AdvancedAutoBrightness#21), so a charge limit no longer flaps them; the rule
   label is now "Only while plugged in"; the panic "Only when plugged in" toggle survives profile
@@ -139,6 +146,17 @@ Newest first; ledger rows are the durable detail.
 - 2026-10-04 — **Translation policy relaxed (owner, #140): human and AI-assisted translations
   that a fluent speaker reviewed string by string are accepted, unreviewed machine translation is
   not; `CONTRIBUTING.md` and the README say so (DD-023).**
+- 2026-10-04 — User Guide HTML and its WebView background follow the app theme, including changes
+  while the page is open; dark-mode accents and tinted callouts retain the original palette, with
+  corresponding readable gold/green/coral colors in light mode. Robolectric covers both palettes,
+  light-mode contrast and both switch directions; actual device rendering remains unverified.
+- 2026-10-03..04 — Added Simplified Chinese and persistent app-language selection (1.13.0 / vc27),
+  including System default; UI, grant feedback, diagnostics (DC-040), profile lists, notifications
+  and widgets follow the language. Review fixes use one language lookup per notification,
+  profile labels matching all 40 original English entries, with independent Chinese labels where
+  screen wording differs, and refreshed channel names with Android 12/12L storage-race
+  coverage; changelog 26 is unchanged. Translation/picker guidance is documented;
+  compiled launch resources retain AppCompat, with device appearance unverified.
 - 2026-10-03 — **Proximity damp follows the owner's Tasker V2: the ×0.1 α (3 dp) now sizes the
   animation as well as the readout, smoothing still undamped; the oracle changed with it, the
   source having changed (DD-022, superseding DC-064's readout-only damp).**

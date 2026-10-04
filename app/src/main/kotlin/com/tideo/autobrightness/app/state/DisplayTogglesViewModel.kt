@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.state
 
 import android.app.Application
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tideo.autobrightness.R
@@ -39,7 +40,8 @@ data class PrivilegedDisplayUiState(
     val stayAwakePreferenceCustom: Boolean = false,
     val adbCommand: String = "",
     val shizukuAvailability: ShizukuAvailability = ShizukuAvailability.NOT_INSTALLED,
-    val grantMessage: String? = null,
+    @StringRes val grantMessageRes: Int? = null,
+    val grantFailureReason: String? = null,
     val writeFailed: Boolean = false,
     val nightLightNeedsShizuku: Boolean = false,
 )
@@ -270,11 +272,12 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     }
 
     fun requestShizukuGrant() {
-        _state.update { it.copy(grantMessage = getApplication<Application>().getString(R.string.pd_grant_requesting)) }
+        _state.update { it.copy(grantMessageRes = R.string.pd_grant_requesting, grantFailureReason = null) }
         privilegeManager.requestShizukuGrant { result ->
             _state.update {
                 it.copy(
-                    grantMessage = result.toMessage(getApplication()),
+                    grantMessageRes = result.toMessageRes(),
+                    grantFailureReason = (result as? ShizukuGrantGateway.Result.Failed)?.reason,
                     shizukuAvailability = privilegeManager.shizukuAvailability(),
                 )
             }
@@ -287,19 +290,19 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             val granted = privilegeManager.tryGrantViaRoot()
             _state.update {
                 it.copy(
-                    grantMessage = getApplication<Application>().getString(
-                        if (granted) R.string.pd_grant_root_ok else R.string.pd_grant_root_failed,
-                    ),
+                    grantMessageRes = if (granted) R.string.pd_grant_root_ok else R.string.pd_grant_root_failed,
+                    grantFailureReason = null,
                 )
             }
             if (granted) refresh()
         }
     }
 
-    private fun ShizukuGrantGateway.Result.toMessage(app: Application): String = when (this) {
-        ShizukuGrantGateway.Result.Success -> app.getString(R.string.pd_grant_shizuku_ok)
-        ShizukuGrantGateway.Result.Unavailable -> app.getString(R.string.pd_grant_shizuku_unavailable)
-        ShizukuGrantGateway.Result.PermissionDenied -> app.getString(R.string.pd_grant_shizuku_denied)
-        is ShizukuGrantGateway.Result.Failed -> app.getString(R.string.pd_grant_shizuku_failed, reason)
+    @StringRes
+    private fun ShizukuGrantGateway.Result.toMessageRes(): Int = when (this) {
+        ShizukuGrantGateway.Result.Success -> R.string.pd_grant_shizuku_ok
+        ShizukuGrantGateway.Result.Unavailable -> R.string.pd_grant_shizuku_unavailable
+        ShizukuGrantGateway.Result.PermissionDenied -> R.string.pd_grant_shizuku_denied
+        is ShizukuGrantGateway.Result.Failed -> R.string.pd_grant_shizuku_failed
     }
 }

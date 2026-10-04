@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import androidx.core.content.ContextCompat
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.MainActivity
 import com.tideo.autobrightness.app.runtime.AppProcessScope
@@ -75,15 +76,22 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         }
 
         private fun renderViews(context: Context, model: WidgetModel): RemoteViews {
+            val languageContext = ContextCompat.getContextForLanguage(context)
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
-            views.setTextViewText(R.id.widget_status, context.getString(statusLabelRes(model)))
+            views.setTextViewText(R.id.widget_title, languageContext.getString(R.string.widget_title))
+            views.setTextViewText(R.id.widget_caption_brightness, languageContext.getString(R.string.widget_caption_brightness))
+            views.setTextViewText(R.id.widget_caption_lux, languageContext.getString(R.string.widget_caption_lux))
+            views.setTextViewText(R.id.widget_caption_profile, languageContext.getString(R.string.widget_caption_profile))
+            views.setTextViewText(R.id.widget_caption_context, languageContext.getString(R.string.widget_caption_context))
+            views.setTextViewText(R.id.widget_reset, languageContext.getString(R.string.widget_reset))
+            views.setTextViewText(R.id.widget_status, languageContext.getString(statusLabelRes(model)))
             views.setTextViewText(R.id.widget_brightness, model.brightness?.toString() ?: DASH)
             views.setTextViewText(R.id.widget_lux, model.lux?.let { "%.0f".format(it) } ?: DASH)
             views.setTextViewText(R.id.widget_profile, model.profile ?: DASH)
             views.setTextViewText(R.id.widget_context, model.context ?: DASH)
             views.setTextViewText(
                 R.id.widget_toggle,
-                context.getString(if (model.enabled) R.string.widget_turn_off else R.string.widget_turn_on),
+                languageContext.getString(if (model.enabled) R.string.widget_turn_off else R.string.widget_turn_on),
             )
 
             // Body → open the app; buttons → broadcast to the non-exported action receiver (D-147).

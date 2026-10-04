@@ -9,6 +9,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.os.LocaleListCompat
 import com.tideo.autobrightness.R
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -69,7 +72,8 @@ data class OnboardingUiState(
     val locationGranted: Boolean = false,
     // Sideloaded installs may hit Android's "Restricted setting" block (G2R-F33).
     val sideloaded: Boolean = false,
-    val elevatedMessage: String? = null,
+    @StringRes val elevatedMessageRes: Int? = null,
+    val elevatedFailureReason: String? = null,
     val adbCommand: String = "",
 )
 
@@ -166,15 +170,21 @@ fun OnboardingScreen(navController: NavHostController) {
         },
         onCopyAdb = { clipboard.setText(AnnotatedString(ui.adbCommand)) },
         onRequestShizuku = {
-            ui = ui.copy(elevatedMessage = "Requesting Shizuku grant…")
+            ui = ui.copy(elevatedMessageRes = R.string.pd_grant_requesting, elevatedFailureReason = null)
             privilegeManager.requestShizukuGrant { result ->
-                ui = ui.copy(elevatedMessage = result.toMessage())
+                ui = ui.copy(
+                    elevatedMessageRes = result.toMessageRes(),
+                    elevatedFailureReason = (result as? ShizukuGrantGateway.Result.Failed)?.reason,
+                )
                 reprobe() // Reads refreshed tier on success
             }
         },
         onTryRoot = {
             val ok = privilegeManager.tryGrantViaRoot()
-            ui = ui.copy(elevatedMessage = if (ok) "Granted via root." else "Root grant failed or unavailable.")
+            ui = ui.copy(
+                elevatedMessageRes = if (ok) R.string.pd_grant_root_ok else R.string.pd_grant_root_failed,
+                elevatedFailureReason = null,
+            )
             reprobe()
         },
         onRequestUsageAccess = { usageLauncher.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
@@ -206,7 +216,7 @@ fun OnboardingContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // D-131: app language picker (English only); see OnboardingLanguageCard.
+            // D-131: app language picker.
             OnboardingLanguageCard()
             // G2R-F33: show restricted settings hint if needed (sideloaded app).
             if (state.sideloaded) {
@@ -260,11 +270,17 @@ fun OnboardingContent(
     }
 }
 
-/** App-language picker (D-131), not yet functional (English only). Wired when translated resources land. */
 @Composable
 private fun OnboardingLanguageCard() {
     var expanded by remember { mutableStateOf(false) }
     val english = stringResource(R.string.language_english)
+    val simplifiedChinese = stringResource(R.string.language_simplified_chinese)
+    val systemDefault = stringResource(R.string.language_system_default)
+    val currentLanguage = if (AppCompatDelegate.getApplicationLocales().isEmpty) {
+        systemDefault
+    } else {
+        stringResource(R.string.language_current)
+    }
     Card(modifier = Modifier.testTag("language_card")) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.misc_language_header), style = MaterialTheme.typography.titleMedium)
@@ -273,11 +289,19 @@ private fun OnboardingLanguageCard() {
                     onClick = { expanded = true },
                     modifier = Modifier.fillMaxWidth().testTag("language_selector"),
                 ) {
-                    Text(stringResource(R.string.misc_language_label) + ": " + english)
+                    Text(stringResource(R.string.misc_language_label) + ": " + currentLanguage)
                     Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                 }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DropdownMenuItem(text = { Text(english) }, onClick = { expanded = false })
+                    listOf("" to systemDefault, "en" to english, "zh-Hans" to simplifiedChinese).forEach { (tag, label) ->
+                        DropdownMenuItem(text = { Text(label) }, onClick = {
+                            expanded = false
+                            AppCompatDelegate.setApplicationLocales(
+                                if (tag.isEmpty()) LocaleListCompat.getEmptyLocaleList()
+                                else LocaleListCompat.forLanguageTags(tag),
+                            )
+                        })
+                    }
                 }
             }
             Text(
@@ -369,18 +393,24 @@ private fun ElevatedStepCard(
                     }
                 }
             }
-            state.elevatedMessage?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            state.elevatedMessageRes?.let { messageRes ->
+                val message = if (messageRes == R.string.pd_grant_shizuku_failed) {
+                    stringResource(messageRes, state.elevatedFailureReason.orEmpty())
+                } else {
+                    stringResource(messageRes)
+                }
+                Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             }
         }
     }
 }
 
-private fun ShizukuGrantGateway.Result.toMessage(): String = when (this) {
-    ShizukuGrantGateway.Result.Success -> "Granted via Shizuku ✓"
-    ShizukuGrantGateway.Result.Unavailable -> "Shizuku is not running."
-    ShizukuGrantGateway.Result.PermissionDenied -> "Shizuku permission denied."
-    is ShizukuGrantGateway.Result.Failed -> "Shizuku grant failed: $reason"
+@StringRes
+private fun ShizukuGrantGateway.Result.toMessageRes(): Int = when (this) {
+    ShizukuGrantGateway.Result.Success -> R.string.pd_grant_shizuku_ok
+    ShizukuGrantGateway.Result.Unavailable -> R.string.pd_grant_shizuku_unavailable
+    ShizukuGrantGateway.Result.PermissionDenied -> R.string.pd_grant_shizuku_denied
+    is ShizukuGrantGateway.Result.Failed -> R.string.pd_grant_shizuku_failed
 }
 
 private fun notificationsGranted(context: Context): Boolean {

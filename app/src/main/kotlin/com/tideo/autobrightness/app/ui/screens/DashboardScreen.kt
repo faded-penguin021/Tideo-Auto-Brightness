@@ -44,6 +44,7 @@ import com.tideo.autobrightness.app.state.ServiceHealthUiState
 import com.tideo.autobrightness.app.ui.components.AabCard
 import com.tideo.autobrightness.app.ui.components.AabTopBar
 import com.tideo.autobrightness.app.ui.components.BrightnessInstrument
+import com.tideo.autobrightness.app.ui.components.relativeAgeLabel
 import com.tideo.autobrightness.app.ui.theme.AabDataCaption
 import com.tideo.autobrightness.app.ui.theme.AabDataDisplay
 import com.tideo.autobrightness.app.runtime.CircadianLocationStatus
@@ -306,7 +307,7 @@ private fun ReadoutStrip(state: DashboardUiState) {
             )
         }
         Text(
-            stringResource(R.string.dashboard_lux_raw, state.rawLux.fmt(), state.lastSampleMs.toRelativeAge()),
+            stringResource(R.string.dashboard_lux_raw, state.rawLux.fmt(), relativeAgeLabel(state.lastSampleMs)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("last_sample_age"),
@@ -361,15 +362,3 @@ private fun HealthCard(health: ServiceHealthUiState) {
 }
 
 private fun Double?.fmt(): String = this?.let { "%.0f".format(it) } ?: "—"
-
-/** Relative "Xs ago" age for a millis timestamp; "never" when the sensor has not fired yet. */
-private fun Long?.toRelativeAge(now: Long = System.currentTimeMillis()): String {
-    if (this == null) return "never"
-    val secs = ((now - this) / 1000L).coerceAtLeast(0L)
-    return when {
-        secs < 1L -> "just now"
-        secs < 60L -> "${secs}s ago"
-        secs < 3600L -> "${secs / 60L}m ago"
-        else -> "${secs / 3600L}h ago"
-    }
-}

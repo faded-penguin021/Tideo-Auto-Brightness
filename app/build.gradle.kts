@@ -18,8 +18,8 @@ android {
         // the change — RUNBOOK §6 "Cutting a release". `release-preflight.yml` (D-124) enforces this on PRs.
         // Per-version history is NOT kept here — see the docs/STATE.md Changelog, docs/LEDGER.md, and
         // fastlane/.../changelogs/<versionCode>.txt.
-        versionCode = 27
-        versionName = "1.13.0"
+        versionCode = 28
+        versionName = "1.14.0"
         manifestPlaceholders["appLabel"] = "Tideo Auto Brightness"
     }
 
@@ -113,6 +113,7 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

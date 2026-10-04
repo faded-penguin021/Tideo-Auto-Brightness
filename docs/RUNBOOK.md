@@ -31,6 +31,7 @@ vectors are ground truth**; where any doc disagrees with the code, trust the cod
 | A specific task's actions / curve math | `extraction/tasks/task<id>_*.md` |
 | Default values & variable classification | `extraction/defaults_audit.md` |
 | Ancillary features (tile, notification, debug, import/export) | `extraction/features_spec.md` |
+| App languages and translations | `CONTRIBUTING.md`; picker: `app/src/main/kotlin/com/tideo/autobrightness/app/ui/onboarding/OnboardingScreen.kt`; supported locales: `app/src/main/res/xml/locales_config.xml`. `MainActivity` uses AppCompat's app-language API with automatic locale storage on Android 12/12L. |
 | Anonymous scene-handler tasks | `extraction/tasks/anonymous_handlers.md` |
 | Scene → M3 screen mapping | `screen_map.md`, `extraction/scenes/*` |
 | How to safely re-read the source XML | `XML_RECIPES.md` |

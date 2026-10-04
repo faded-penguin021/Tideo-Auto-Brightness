@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowToast
 import java.time.Duration
@@ -27,6 +28,40 @@ import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 class AmbientMonitoringServiceTest {
+
+    @Test
+    fun configurationChange_renamesBothChannelsWithoutChangingTheirSettings() {
+        RuntimeEnvironment.setQualifiers("en")
+        val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
+        try {
+            val service = controller.get()
+            val manager = service.getSystemService(NotificationManager::class.java)
+            assertEquals("Ambient monitoring", manager.getNotificationChannel("ambient_monitoring").name.toString())
+            assertEquals("Manual override", manager.getNotificationChannel("manual_override").name.toString())
+            val originalAlert = manager.getNotificationChannel("manual_override")
+
+            RuntimeEnvironment.setQualifiers("zh-rCN")
+            service.onConfigurationChanged(service.resources.configuration)
+
+            val ambient = manager.getNotificationChannel("ambient_monitoring")
+            val alert = manager.getNotificationChannel("manual_override")
+            assertEquals("环境光监测", ambient.name.toString())
+            assertEquals("手动调节", alert.name.toString())
+            assertEquals(NotificationManager.IMPORTANCE_LOW, ambient.importance)
+            assertEquals(originalAlert.importance, alert.importance)
+            assertEquals(originalAlert.shouldVibrate(), alert.shouldVibrate())
+            assertTrue(originalAlert.vibrationPattern.contentEquals(alert.vibrationPattern))
+
+            RuntimeEnvironment.setQualifiers("en")
+            service.onConfigurationChanged(service.resources.configuration)
+            assertEquals("Ambient monitoring", manager.getNotificationChannel("ambient_monitoring").name.toString())
+            assertEquals("Manual override", manager.getNotificationChannel("manual_override").name.toString())
+            assertEquals(0, service.runtimeStartCount)
+        } finally {
+            controller.destroy()
+            RuntimeEnvironment.setQualifiers("en")
+        }
+    }
 
     @Test
     fun disabledStickyRestart_stopsWithoutStartingRuntimeOrWriters() {

@@ -439,8 +439,11 @@
     <!-- Misc -->
     <string name="misc_language_header">Language</string>
     <string name="misc_language_label">App language</string>
-    <string name="language_english">English</string>
-    <string name="misc_language_note">Only English is available right now. Human translations are welcome — see CONTRIBUTING.md.</string>
+    <string name="language_current">English</string>
+    <string name="language_system_default">System default</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_simplified_chinese" translatable="false">简体中文</string>
+    <string name="misc_language_note">Human translations are welcome — see CONTRIBUTING.md.</string>
     <string name="misc_brightness_range">Brightness range</string>
     <string name="misc_animation">Animation</string>
     <string name="misc_notifications">Notifications</string>
@@ -476,6 +479,56 @@
     <string name="sd_err_threshold">Dimming threshold is below minimum brightness.</string>
 
     <!-- Live Debug -->
+    <string name="relative_time_never">never</string>
+    <string name="relative_time_just_now">just now</string>
+    <string name="relative_time_seconds_ago">%1$ds ago</string>
+    <string name="relative_time_minutes_ago">%1$dm ago</string>
+    <string name="relative_time_hours_ago">%1$dh ago</string>
+    <string name="diag_reactivity_title">Live reactivity</string>
+    <string name="diag_reactivity_threshold">Current threshold %1$s at %2$s lx</string>
+    <string name="diag_reactivity_deadzone">Sensor dead zone %1$s – %2$s lx</string>
+    <string name="diag_circadian_title">Live circadian scale</string>
+    <string name="diag_circadian_uncompressed">Uncompressed scale %1$s at %2$s</string>
+    <string name="diag_circadian_true">True scale %1$s at %2$s brightness (%3$s–%4$s)</string>
+    <string name="diag_curve_title">Live brightness</string>
+    <string name="diag_curve_smoothed_lux">Current smoothed lux %1$s</string>
+    <string name="diag_curve_current_bright">Current brightness (%1$s–%2$s) %3$s</string>
+    <string name="diag_misc_title">Live timing</string>
+    <string name="diag_misc_throttle">Current throttle %1$s ms</string>
+    <string name="diag_misc_alpha">Current smoothing α %1$s</string>
+    <string name="diag_dimming_title">Live super dimming</string>
+    <string name="diag_dimming_rel">Dimming strength (rel) %1$s</string>
+    <string name="diag_dimming_abs">Dimming level (abs) %1$s at %2$s brightness</string>
+    <string name="debug_core_metrics_title">Core Metrics</string>
+    <string name="debug_smoothed_lux">Smoothed lux</string>
+    <string name="debug_raw_lux">Raw lux</string>
+    <string name="debug_dynamic_threshold">Dynamic threshold</string>
+    <string name="debug_dead_zone">Dead zone (lx)</string>
+    <string name="debug_current_bright">Current brightness</string>
+    <string name="debug_target_bright">Target brightness</string>
+    <string name="debug_scale_title">Circadian &amp; Scale</string>
+    <string name="debug_scale_dynamic">Uncompressed scale</string>
+    <string name="debug_scale_compress">True (compressed) scale</string>
+    <string name="debug_system_status_title">System Status</string>
+    <string name="debug_service">Service</string>
+    <string name="debug_service_running">Running</string>
+    <string name="debug_service_stopped">Stopped</string>
+    <string name="debug_override">Manual override</string>
+    <string name="debug_override_no">No</string>
+    <string name="debug_active_rule">Active rule</string>
+    <string name="debug_active_rule_none">None</string>
+    <string name="debug_performance_title">Performance &amp; Timings</string>
+    <string name="debug_lux_alpha">Smoothing α (LuxAlpha)</string>
+    <string name="debug_cycle_time">Cycle time (ms)</string>
+    <string name="debug_throttle">Reactivity cooldown (ms)</string>
+    <string name="debug_last_animation">Last animation</string>
+    <string name="debug_last_update">Last update</string>
+    <string name="debug_last_sample">Last sample</string>
+    <string name="livedebug_flash_status">Status</string>
+    <string name="livedebug_flash_enabled">Enabled</string>
+    <string name="livedebug_flash_off">Off (foreground only)</string>
+    <string name="livedebug_flash_open_settings">Open Accessibility settings</string>
+    <string name="livedebug_flash_enable_settings">Enable in Accessibility settings</string>
     <string name="livedebug_current">Debug: %1$s</string>
 
     <!-- Live Debug: Brightness Writes card (DC-007). "Requested → acknowledged" is domain 0–255. -->
@@ -658,6 +711,28 @@
     <string name="profiles_context_paused">Context automation is paused after a manual profile load.</string>
     <string name="profiles_builtin_suffix">"  (built-in)"</string>
     <string name="profiles_factory_defaults">Factory defaults</string>
+    <string name="settings_diff_defaults">All settings at factory defaults</string>
+    <string name="settings_throttle">Throttle (ms)</string>
+    <string name="settings_offset">Brightness offset</string>
+    <string name="settings_scale">Brightness scale</string>
+    <string name="settings_dimming_exponent">Dimming curve</string>
+    <string name="settings_dimming_strength">Dimming strength</string>
+    <string name="settings_night_light_circadian">Night Light circadian tracking</string>
+    <string name="settings_pwm_exponent">PWM curve</string>
+    <string name="settings_night_light_temperature">Night Light temperature</string>
+    <string name="settings_form1a">Zone 1 scaling</string>
+    <string name="settings_form2b">Zone 2 scaling</string>
+    <string name="settings_form2c">Zone 2 offset</string>
+    <string name="settings_dimming_threshold">Dimming threshold</string>
+    <string name="settings_dim_spread">Dimming spread</string>
+    <string name="settings_pwm_sensitive">PWM-sensitive mode</string>
+    <string name="settings_min_wait">Min step wait (ms)</string>
+    <string name="settings_max_wait">Max step wait (ms)</string>
+    <string name="settings_scale_transition">Scale transition</string>
+    <plurals name="settings_diff_changed">
+        <item quantity="one">%1$d setting changed from default (shown in gold)</item>
+        <item quantity="other">%1$d settings changed from default (shown in gold)</item>
+    </plurals>
     <string name="profiles_changed_count">%1$d changed from default</string>
     <string name="profiles_load_replace_warn">These settings will replace your current configuration.</string>
 

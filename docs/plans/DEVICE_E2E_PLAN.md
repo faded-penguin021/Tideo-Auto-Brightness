@@ -392,6 +392,10 @@ in STATE `## Active work`.
   - `run.sh --preflight`, strictly read-only: connectivity; identity; package, variant and cert;
     release FGS; settings, runtime and private-state snapshot; SKIP-rule evaluation; private-store
     archive.
+  - App language: since 1.13.0 Tideo can run in Simplified Chinese, and the suite matches English
+    text (the Resume/Reset/Discard actions, Live Debug values and ages, the tier badge). Preflight
+    must refuse unless Tideo resolves to English. The risk is silent: `state.paused_in_dump` reads a
+    Chinese notification as unpaused instead of failing.
   - The owner answers the confirmations (contexts, automation receivers).
 - **S6 — device, install + smoke**
   - Owner-approved guarded install.

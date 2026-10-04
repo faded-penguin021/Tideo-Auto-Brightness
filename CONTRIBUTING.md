@@ -28,7 +28,7 @@ When you open one, keep it scoped to the app layer and include device model + An
 ## Translations are welcome here
 
 The app is fully localizable — every user-facing string lives in
-`app/src/main/res/values/strings.xml`. Right now English is the only language. A translation is an
+`app/src/main/res/values/strings.xml`. English and Simplified Chinese are available. A translation is an
 app-layer contribution, so it's welcome here via PR.
 
 > **Human and AI-assisted translations are welcome; unreviewed machine translation is not.** A
@@ -66,8 +66,9 @@ app-layer contribution, so it's welcome here via PR.
 6. Open a PR with the new `values-<lang>/strings.xml`, noting the language and whether it is a human
    or an AI-assisted translation (if AI-assisted, which tool made the draft).
 
-The in-app **Language** selector (Misc screen) lists only English today; once a translated locale is
-merged it gets added there.
+The in-app **Language** selector (Setup screen) lists English and Simplified Chinese. When adding
+another translated locale, also add it to the picker in `OnboardingScreen.kt` and to
+`app/src/main/res/xml/locales_config.xml`.
 
 ## Where features and brightness-logic changes go
 

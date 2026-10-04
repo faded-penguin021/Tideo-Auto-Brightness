@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -26,6 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -277,6 +280,38 @@ class UiShellTest {
         AppRoute.entries.filter { it != AppRoute.Menu }.forEach { route ->
             compose.runOnUiThread { nav.navigate(route.route) }
             compose.onNodeWithText(route.label).assertExists()
+        }
+    }
+
+    @Test
+    @Config(sdk = [31, 32])
+    fun languagePicker_systemDefaultClearsExplicitLanguageOnAndroid12() {
+        val previousLocales = AppCompatDelegate.getApplicationLocales()
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
+        try {
+            compose.setContent {
+                MaterialTheme {
+                    OnboardingContent(
+                        state = OnboardingUiState(),
+                        onRequestNotifications = {},
+                        onRequestWriteSettings = {},
+                        onRequestLocation = {},
+                        onOpenAppInfo = {},
+                        onCopyAdb = {},
+                        onRequestShizuku = {},
+                        onTryRoot = {},
+                        onRequestUsageAccess = {},
+                        onDone = {},
+                    )
+                }
+            }
+            compose.onNodeWithTag("language_selector").performScrollTo().performClick()
+            compose.onNodeWithText("System default").performClick()
+            compose.runOnIdle {
+                assertTrue(AppCompatDelegate.getApplicationLocales().isEmpty)
+            }
+        } finally {
+            AppCompatDelegate.setApplicationLocales(previousLocales)
         }
     }
 
