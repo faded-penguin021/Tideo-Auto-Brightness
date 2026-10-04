@@ -26,7 +26,7 @@ pipeline's four bare globals (all RUNTIME, no defaults; already specced in `pipe
 | `%SmoothedLux` | 15 | EMA-smoothed lux (task544/535; cleared by task585) |
 | `%AutoBrightRunning` | 13 | 1 while the pipeline is writing brightness (echo suppression) |
 | `%LastAAB` | 10 | TIMEMS of last accepted tick (throttle gate) |
-| `%LuxAlpha` | 9 | last smoothing alpha, prox-damped ×0.1 (round3) while near, the same α task661 animates from (owner's V2, DD-022) |
+| `%LuxAlpha` | 9 | last smoothing alpha, prox-damped ×0.1 (round3) inside task535 while near, the same α that blended smoothed lux and that task661 animates from (DD-024) |
 
 (Scan: `grep -oE '%[A-Za-z][A-Za-z0-9_]*' | grep [A-Z]`, minus `%AAB_*` and ALL-CAPS Tasker
 built-ins; the two remaining one-off hits are HTML/Java false positives. Future audits must

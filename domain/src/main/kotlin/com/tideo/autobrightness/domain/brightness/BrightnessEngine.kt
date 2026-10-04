@@ -26,7 +26,7 @@ data class CompressedScaleResult(val calculatedBrightness: Double, val effective
 
 class BrightnessEngine {
     companion object {
-        // Tasker task544 act28/29 / prof759 / task545: %lux_results2 factor while proximity reads "near" (DD-022).
+        // Tasker task535 A3b (was task544 act28/29) / prof759 / task545: lux_alpha factor while %AAB_Proximity is "near" (DD-024).
         const val PROXIMITY_ALPHA_DAMP = 0.1
 
         const val MAX_SETTLING_STEPS = 20
@@ -85,6 +85,7 @@ class BrightnessEngine {
                     thresholdDynamicPercent = prev.threshDynamicPercent,
                     deltaFactor = input.thresholds.deltaFactor,
                     zone1End = input.thresholds.zone1End,
+                    proximityNear = input.proximityNear,
                 )
             }
             val par1 = if (stop) input.lux else smoothed.first
@@ -124,12 +125,8 @@ class BrightnessEngine {
         val targetBrightness = Math.round(scaleResult.calculatedBrightness)
             .coerceIn(input.curve.minBrightness.toLong(), input.curve.maxBrightness.toLong()).toInt()
 
-        // Tasker task544 act28–33: act27 stores %SmoothedLux undamped; the ×0.1 (3 dp) reaches %LuxAlpha and act33's par2 (DD-022).
-        val smoothing = outcome == EvaluationOutcome.SMOOTHED || outcome == EvaluationOutcome.SETTLED
-        val cycleLuxAlpha = if (smoothing && input.proximityNear) round3(luxAlpha * PROXIMITY_ALPHA_DAMP) else luxAlpha
-
         val (steps, wait, throttle) = calculateAnimation(
-            alpha = cycleLuxAlpha,
+            alpha = luxAlpha,
             animation = input.animation,
             cycleTimeMs = prev?.cycleTimeMs,
         )
@@ -141,7 +138,7 @@ class BrightnessEngine {
             transitionDurationMs = throttle,
             animationSteps = steps,
             animationWaitMs = wait,
-            luxAlpha = cycleLuxAlpha,
+            luxAlpha = luxAlpha,
             dimmingAlpha = dimmingAlpha,
             smoothedLux = smoothedLux,
             dynamicThreshold = dynamicThreshold,
@@ -178,11 +175,13 @@ class BrightnessEngine {
         thresholdDynamicPercent: Double,
         deltaFactor: Double,
         zone1End: Double,
+        proximityNear: Boolean = false,
     ): Pair<Double, Double> {
         val luxDelta = round3(abs((rawLux - previousSmoothedLux) / (previousSmoothedLux + 1.0)))
         val effectiveDelta = round3(luxDelta - (thresholdDynamicPercent / 100.0))
-        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)).
-        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta))
+        // Tasker task535: lux_alpha NOT clamped to [0,1] (D-010(a)); A3b damps it before the blend while near (DD-024).
+        val undamped = round3(1.0 - exp(-deltaFactor * effectiveDelta))
+        val luxAlpha = if (proximityNear) round3(undamped * PROXIMITY_ALPHA_DAMP) else undamped
         val smoothed = rawLux * luxAlpha + previousSmoothedLux * (1.0 - luxAlpha)
         // Tasker task535: BigDecimal(raw).setScale(2|0, HALF_UP) — exact-binary constructor.
         val rounded = if (smoothed < zone1End) bigScale(smoothed, 2) else bigScale(smoothed, 0)

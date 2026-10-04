@@ -63,25 +63,16 @@ investigation stays closed (DB-051…DB-060), and Scorecard.dev is a run-once lo
    3 ms later, and fixing that is a settle-window change for you to rule on. Extra Dim is ruled
    out (DC-059…DC-062).
 
-3. **[2026-10-03] Check the proximity damp on the phone next time you test a build.** Tideo now
-   follows your Tasker V2: while the top of the phone is covered, the ×0.1 α also sizes the
-   brightness animation, and smoothing stays undamped (DD-022). Settles it: run
-   `DEVICE_TEST_SCRIPT.md` step 13. Brightness should reach the same level as uncovered, and while
-   covered Live Debug's "Smoothing α" should drop to a tenth and "Last animation" should show fewer
-   steps.
+3. **[2026-10-04] Check the proximity damp on the phone next time you test a build.** Tideo now
+   follows your new Lux Smoothing and Detect Proximity: while the top of the phone is covered, the
+   ×0.1 damps smoothing itself, and uncovering re-evaluates the last reading (DD-024). Settles it:
+   run `DEVICE_TEST_SCRIPT.md` step 13. While covered, brightness should creep only part of the way
+   toward a light change, with Live Debug's "Smoothing α" at a tenth. After you uncover the sensor it
+   should catch up within a cycle or two, with no change in light.
 
 Open questions:
 
-- **[2026-10-03] Covered, V2's damp makes brightness changes quicker and jumpier, not slower —
-  is that what you want?** Lux Smoothing returns α (`%lux_results2`) after it has already used it
-  to compute the new smoothed lux, so the ×0.1 cannot change *where* brightness goes. Its only
-  effect is on Calculate Animation (task543), where a small α means few steps: at the default 20
-  steps / 25–65 ms, α 0.3 animates in 7 steps × 53 ms (≈ 370 ms) and α 0.03 in 2 steps × 64 ms
-  (≈ 130 ms). The next cycle may also start sooner, because the throttle is that animation length.
-  Options: (a) keep it — Tideo and Tasker agree today; (b) if you meant "react slower while
-  covered", Tasker has to damp the α *inside* Lux Smoothing, before it blends the new smoothed lux
-  (the pre-DC-064 Tideo behaviour), and Tideo then follows. Recommendation: (a) unless step 13
-  feels wrong. Settles it: your answer.
+- None.
 
 **This train is `1.12.0` on vc26, its ONE bump (owner, 2026-09-28),** for #134 and then #133. Land
 further user-facing fixes by editing `changelogs/26.txt` (500-character cap), never by bumping or by
@@ -127,6 +118,10 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-04 — **Proximity damp moved into smoothing, per the owner's task535 A3b. That answers
+  the open question with (b): while covered, smoothed lux moves a tenth as far. Uncovering now
+  re-evaluates the last raw reading (task545 A5); the oracle changed with the source (DD-024,
+  superseding DD-022).**
 - 2026-10-04 — **Translation policy relaxed (owner, #140): human and AI-assisted translations
   that a fluent speaker reviewed string by string are accepted, unreviewed machine translation is
   not; `CONTRIBUTING.md` and the README say so (DD-023).**

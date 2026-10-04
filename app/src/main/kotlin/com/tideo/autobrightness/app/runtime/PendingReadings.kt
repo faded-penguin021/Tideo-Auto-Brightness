@@ -10,7 +10,14 @@ import java.util.concurrent.atomic.AtomicReference
 /** DC-069: the one light reading a busy cycle or its cooldown kept back; a newer reading replaces it. */
 internal class PendingReadings(private val scope: CoroutineScope, private val onCooldownEnd: () -> Unit) {
 
-    data class Reading(val lux: Double, val accuracy: Int, val session: Int, val fence: Long, val continuation: Boolean = false)
+    data class Reading(
+        val lux: Double,
+        val accuracy: Int,
+        val session: Int,
+        val fence: Long,
+        val continuation: Boolean = false,
+        val recheck: Boolean = false,
+    )
 
     enum class Offer { HELD, REPLACED, STALE }
 
@@ -40,8 +47,8 @@ internal class PendingReadings(private val scope: CoroutineScope, private val on
         else -> Offer.HELD
     }
 
-    @Synchronized fun offerContinuation(lux: Double, from: Int): Boolean =
-        from == session && slot.compareAndSet(null, Reading(lux, accuracy = 0, session = session, fence = fence, continuation = true))
+    @Synchronized fun offerContinuation(lux: Double, from: Int, recheck: Boolean = false): Boolean =
+        from == session && slot.compareAndSet(null, Reading(lux, 0, session, fence, continuation = true, recheck = recheck))
 
     @Synchronized fun discard(reading: Reading): Boolean = (slot.get() === reading).also { if (it) clear() }
 

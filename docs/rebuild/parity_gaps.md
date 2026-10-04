@@ -140,6 +140,10 @@ decides which of them runs and with what arguments, and it diverged:
   (`round3(× 0.1)`, its pasted A30) and passes it as Map Lux's par2, so the animation is sized from the
   damped α while smoothing stays undamped. The engine and oracle follow, so this stays parity and
   is no deviation; while near, the same target arrives in fewer steps under a shorter throttle.
+  **Superseded 2026-10-04 (DD-024):** the owner moved the damp into task535 (A3b, before the
+  blend), so while near smoothing itself moves a tenth as far, and task545's exit re-runs task544 on
+  `%AAB_LastRawLux`. The engine, the oracle and the pipeline follow. The one remaining departure is
+  DC-070's settling, which keeps running while near (DD-024).
 
 **Still open, related, not part of gap-08:**
 - **task618's wake path.** Set Initial Brightness polls the light sensor itself (act8, code373),

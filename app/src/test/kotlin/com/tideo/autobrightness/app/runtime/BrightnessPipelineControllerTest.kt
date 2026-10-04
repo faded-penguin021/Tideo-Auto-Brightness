@@ -186,6 +186,48 @@ class BrightnessPipelineControllerTest {
     }
 
     @Test
+    fun proximityExit_reEvaluatesTheLastRawReading() = runTest {
+        val sensor = FakeSensor()
+        val proximity = FakeProximity()
+        var nowMs = 1_000L
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor,
+            brightness = FakeBrightness(),
+            brightnessObserver = FakeObserver(),
+            settingsProvider = { settings },
+            scope = scope,
+            clock = { nowMs + testScheduler.currentTime },
+            proximitySource = proximity,
+        )
+        controller.start()
+        sensor.flow.emit(sample(100.0))
+        advanceUntilIdle()
+        nowMs += 60_000L
+        proximity.flow.emit(false)
+        advanceUntilIdle()
+        val settling = controller.state.value.sensor.settling
+        assertEquals(0, settling, "far without a prior near is no exit")
+
+        proximity.flow.emit(true)
+        sensor.flow.emit(sample(400.0))
+        advanceUntilIdle()
+        nowMs += 60_000L
+        val before = controller.state.value
+        assertEquals(400.0, before.lastRawLux)
+
+        proximity.flow.emit(false)
+        advanceUntilIdle()
+        val after = controller.state.value
+        assertFalse(after.proximityNear)
+        assertEquals(before.sensor.admitted, after.sensor.admitted, "the re-evaluation is not a sensor callback")
+        assertTrue(after.sensor.settling > before.sensor.settling, "exit should run task544 on the last raw reading")
+        assertNotNull(after.sensor.lastCycle)
+        assertTrue(after.sensor.lastCycle!!.endMs > before.sensor.lastCycle!!.endMs)
+        scope.cancel()
+    }
+
+    @Test
     fun returnToThePreviousLevel_isEvaluated_taskerBandOnCurrentReading() = runTest {
         val sensor = FakeSensor()
         var nowMs = 1_000L

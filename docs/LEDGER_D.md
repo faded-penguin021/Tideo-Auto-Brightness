@@ -235,7 +235,7 @@
   app now refuses it. Accepted: a window appearing between the hierarchy dump and the tap, and
   `bmgr` denied outright although the owner allowed one form.
 
-- DD-022 [cited]: **While near, the proximity ×0.1 now also sizes the brightness animation,
+- DD-022: **While near, the proximity ×0.1 now also sizes the brightness animation,
   because the owner changed Tasker's task544 to do so (2026-10-03).** The owner's V2 sets
   `%lux_results2 = round3(%lux_results2 × 0.1)` while `%AAB_Proximity ~ near` (pasted A30), copies
   it into `%LuxAlpha` and passes it as A35's par2, so task661 sizes the animation from it; A26–A28
@@ -246,6 +246,7 @@
   from 7 × 53 ms (throttle 381 ms) to 2 × 64 ms (138 ms): covered, the same target arrives in a
   coarser jump and the next cycle may run sooner — no slowing, and not D-087's in-EMA damp, which
   stays withdrawn by DC-064. On-device behaviour is unverified.
+  Superseded by DD-024.
 
 - DD-023: **Translations may be AI-assisted when a fluent speaker reviews every string; unreviewed
   machine translation stays out (owner, #140, 2026-10-04).** D-131's human-only rule turned away a
@@ -254,3 +255,18 @@
   translations are accepted, the PR saying which and naming the drafting tool, while tool output
   submitted without that review is not. The in-app `misc_language_note` still says only that human
   translations are welcome, which stays true, and is left alone because #141 rewrites that line.
+
+- DD-024 [cited]: **While near, the proximity ×0.1 damps smoothing itself, and uncovering re-runs
+  Evaluate, because the owner moved the damp into task535 and extended task545 (2026-10-04).**
+  Answering DD-022's open question with its option (b), the owner's task535 adds A3b,
+  `lux_alpha = round3(lux_alpha × 0.1)` while `%AAB_Proximity` equals `near`, before A4's blend,
+  and task544's near branch is gone, so smoothed lux, the band, the target, the animation and the
+  readout all follow the damped α (D-087's in-EMA damp, withdrawn by DC-064, now as Tasker's);
+  `smoothLux` and the oracle damp there, and `evaluate` no longer damps afterwards. task545's exit
+  branch now performs task544 on `%AAB_LastRawLux`, which Tideo queues on a near→far change as a
+  recheck in DC-069's pending slot: it skips prof760's band and accuracy gate as Tasker's direct
+  call does, keeps the service, pause, screen and task544 dead-band gates, is deferred by the
+  cooldown where A6 would drop it, yields to any real reading, and counts as settling in Live
+  Debug. One departure remains: DC-070's settling still runs while near, in damped steps, landing
+  smoothed lux on the band edge by its twentieth step, where Tasker would leave it lagging until a
+  reading leaves the band or the sensor is uncovered. On-device behaviour is unverified.

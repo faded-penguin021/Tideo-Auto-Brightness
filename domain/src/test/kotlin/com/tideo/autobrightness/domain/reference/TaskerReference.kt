@@ -64,14 +64,16 @@ object TaskerReference {
         threshDynamicPercent: Double,
         deltaFactor: Double,
         zone1End: Double,
+        proximityNear: Boolean = false,
     ): SmoothingResult {
         // A1: lux_delta = round3(|(par1 - par2) / (par2 + 1)|)
         val luxDeltaRaw = abs((par1 - par2) / (par2 + 1.0))
         val luxDelta = round3(luxDeltaRaw)
         // A2: effective_delta = round3(lux_delta - ThreshDynamic/100)
         val effectiveDelta = round3(luxDelta - (threshDynamicPercent / 100.0))
-        // A3: lux_alpha = round3(1 - exp(-DeltaFactor * effective_delta))  [UNCLAMPED]
-        val luxAlpha = round3(1.0 - exp(-deltaFactor * effectiveDelta))
+        // A3: lux_alpha = round3(1 - exp(-DeltaFactor * effective_delta))  [UNCLAMPED]; A3b ×0.1 while "near"
+        val undamped = round3(1.0 - exp(-deltaFactor * effectiveDelta))
+        val luxAlpha = if (proximityNear) round3(undamped * 0.1) else undamped
         // A4: new_smoothed_lux (unrounded)
         val newSmoothedRaw = (par1 * luxAlpha) + (par2 * (1.0 - luxAlpha))
         // BigDecimal HALF_UP: 2-dp below Zone1End, else 0-dp (whole number, no ".0")
@@ -179,14 +181,13 @@ object TaskerReference {
                 setThresholds(par1, change.dynamicThreshold, lastRawLux.toDouble()),
             )
         }
-        // act25–27: task535 subtracts %AAB_ThreshDynamic as act14 or the last task546 call stored it.
+        // act25–27: task535 subtracts %AAB_ThreshDynamic as act14 or the last task546 call stored it; A3b damps α while near.
         val smoothing = luxSmoothing(
-            par1, smoothed, requireNotNull(state.threshDynamicPercent), deltaFactor, zone1End,
+            par1, smoothed, requireNotNull(state.threshDynamicPercent), deltaFactor, zone1End, proximityNear,
         )
-        val luxAlpha = if (proximityNear) round3(smoothing.luxAlpha * 0.1) else smoothing.luxAlpha
         // act35: Set Thresholds(par1 = %new_smoothed_lux); the band centre is still %AAB_LastRawLux.
         return LightCycleResult(
-            LightCycleOutcome.SMOOTHED, lastRawLux, smoothing.smoothedLux, luxAlpha,
+            LightCycleOutcome.SMOOTHED, lastRawLux, smoothing.smoothedLux, smoothing.luxAlpha,
             change.relativeChange, change.dynamicThreshold,
             setThresholds(smoothing.smoothedLux, change.dynamicThreshold, lastRawLux.toDouble()),
         )

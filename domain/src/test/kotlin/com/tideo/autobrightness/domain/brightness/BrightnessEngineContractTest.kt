@@ -62,8 +62,8 @@ class BrightnessEngineContractTest {
     }
 
     @Test
-    fun proximityNear_smoothsUndampedAndAnimatesFromTheDampedAlpha() {
-        // Tasker task544 act27–33: smoothing is undamped; the ×0.1 reaches %LuxAlpha and Map Lux's par2 (DD-022).
+    fun proximityNear_dampsSmoothingAndTheAnimationAlike() {
+        // Tasker task535 A3b: α ×0.1 before the blend; %LuxAlpha and Map Lux's par2 carry the damped α (DD-024).
         val base = BrightnessPolicyInput(
             lux = 400.0,
             time = TimeContext(secondsOfDay = 12 * 3600.0),
@@ -76,10 +76,10 @@ class BrightnessEngineContractTest {
 
         assertTrue(far.luxAlpha > 0.0, "the un-damped alpha should be positive for this step")
         assertEquals(damped, near.luxAlpha, 1e-9)
-        assertEquals(far.smoothedLux, near.smoothedLux, 1e-9)
-        assertEquals(far.targetBrightness, near.targetBrightness)
+        assertEquals(400.0 * damped + 100.0 * (1.0 - damped), near.smoothedLux, 0.5)
+        assertTrue(near.smoothedLux < far.smoothedLux, "near ${near.smoothedLux} vs far ${far.smoothedLux}")
+        assertTrue(near.targetBrightness <= far.targetBrightness)
         assertTrue(near.animationSteps < far.animationSteps, "near ${near.animationSteps} vs far ${far.animationSteps}")
-        assertTrue(near.animationWaitMs > far.animationWaitMs, "near ${near.animationWaitMs} vs far ${far.animationWaitMs}")
         assertEquals(steps, near.animationSteps)
         assertEquals(wait, near.animationWaitMs)
         assertEquals(throttle, near.transitionDurationMs)

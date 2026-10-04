@@ -216,11 +216,13 @@ optional.
 ## 4. Proximity damp (prof759/task545)
 
 13. With the service running in changing light, cover the **top** of the phone (proximity "near", e.g.
-    hold it to your ear). **Expected (DD-022, Tasker V2 parity):** brightness reaches the same level it
-    would uncovered — smoothing is not damped — and the loop does **not** pause. While near, Live Debug's
-    "Smoothing α (LuxAlpha)" drops to a tenth and "Last animation" shows fewer steps (often 1–2), so
-    each change lands as a quicker, coarser jump. Builds before DC-064 slowed reactivity ~10× here;
-    DC-064 builds up to DD-022 changed only the α readout.
+    hold it to your ear). **Expected (DD-024, the owner's task535/task545 parity):** the loop does
+    **not** pause, but while near each light change moves brightness only about a tenth of the way per
+    cycle: Live Debug's "Smoothing α (LuxAlpha)" drops to a tenth, "Last animation" shows few steps,
+    and the "settling" count climbs as Tideo creeps toward the reading. Uncover the sensor:
+    brightness catches up within a cycle or two without any change in light, because uncovering
+    re-evaluates the last reading. History: DC-064 builds up to DD-022 changed only the α readout;
+    DD-022 builds sped the animation up and left smoothing undamped.
 
 ## 5. Panic reset (prof769/task528)
 

@@ -12,6 +12,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -92,9 +93,10 @@ class BrightnessPipelineController(
     private var sensorJob: Job? = null
     private var overrideJob: Job? = null
 
-    // prof759/task545 proximity damp. Orchestrator only; lifecycle lives in ProximityTracker.
+    // prof759/task545 proximity damp; A5's exit re-runs task544 on %AAB_LastRawLux (DD-024). Lifecycle: ProximityTracker.
     private val proximityTracker = ProximityTracker(proximitySource, scope) { near ->
-        _state.update { it.copy(proximityNear = near) }
+        val wasNear = _state.getAndUpdate { it.copy(proximityNear = near) }.proximityNear
+        if (wasNear && !near) admission.proximityExit()
     }
 
     // --- PipelineRuntimeContext: the single-writer accessors the cycle runner reaches state through ---

@@ -110,21 +110,26 @@ internal class LightAdmission(
         return continuationRejection(settings(), s) == null && pending.offerContinuation(lux, admittedSession)
     }
 
+    fun proximityExit() {
+        val lux = ctx.stateValue.lastRawLux ?: return
+        if (pending.offerContinuation(lux, admittedSession, recheck = true)) drain()
+    }
+
     private fun discardIfSettled(s: PipelineState): Boolean {
         val held = pending.current ?: return false
         val settings = settings()
-        val rejection = if (held.continuation) continuationRejection(settings, s) else gateRejection(held, settings, s, false)
+        val rejection = if (held.continuation) continuationRejection(settings, s, held.recheck) else gateRejection(held, settings, s, false)
         if (rejection != SampleRejection.DEAD_BAND || !pending.discard(held)) return false
         if (!held.continuation) ctx.update { it.copy(sensor = it.sensor.rejected(rejection, clock(), settings?.trustUnreliableSensor)) }
         return true
     }
 
-    private fun continuationRejection(settings: AabSettings?, s: PipelineState) = when {
+    private fun continuationRejection(settings: AabSettings?, s: PipelineState, recheck: Boolean = false) = when {
         settings == null -> SampleRejection.SETTINGS_NOT_LOADED
         !settings.serviceEnabled || !s.serviceOn -> SampleRejection.SERVICE_DISABLED
         s.paused -> SampleRejection.PAUSED
         s.hibernated -> SampleRejection.SCREEN_OFF
-        !s.unsettled -> SampleRejection.DEAD_BAND
+        !s.unsettled && !recheck -> SampleRejection.DEAD_BAND
         else -> null
     }
 
@@ -145,7 +150,7 @@ internal class LightAdmission(
             val settings = settings()
             val continuation = reading?.continuation == true
             val rejection = reading?.let {
-                if (continuation) continuationRejection(settings, s) else gateRejection(it, settings, s, mainLoopOn = false)
+                if (continuation) continuationRejection(settings, s, it.recheck) else gateRejection(it, settings, s, mainLoopOn = false)
             }
             when {
                 reading == null -> ctx.update { it.copy(sensor = it.sensor.abandoned(tick.claim)) }

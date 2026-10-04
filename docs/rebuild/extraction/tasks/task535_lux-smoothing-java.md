@@ -14,3 +14,8 @@
 **Variables written:** `%output`
 
 **Variables read:** (none)
+
+> **Owner's task535 (2026-10-04, DD-024), not in this XML:** the Java reads `"%AAB_Proximity"` too,
+> and between A3 (`lux_alpha`) and A4 (the blend) adds A3b: `if (AAB_Proximity.equals("near"))
+> lux_alpha = Math.round(lux_alpha * 0.1 * 1000.0) / 1000.0;`. The new smoothed lux and the
+> returned α both come from the damped value.
