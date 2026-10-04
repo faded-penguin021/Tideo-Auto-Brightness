@@ -28,8 +28,9 @@ Scorecard.dev is a run-once local input.
 
 - **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S4
   done and the blocking Sol review of S2–S4 fixed (DD-021); S5's read-only preflight is built and
-  passed on 1.14.0-debug vc28 (DD-029), leaving only the owner's automation confirmation (Owner
-  queue 6); next is S6, smoke; S6–S9 open. Owed when the partial rows
+  passed on 1.14.0-debug vc28 (DD-029); no Tasker/MacroDroid profile on the owner's phone acts on
+  `STATE_CHANGED` (owner, 2026-10-04), so device runs set `TIDEO_E2E_CONFIRM=automation`; next is
+  S6, smoke; S6–S9 open. Owed when the partial rows
   get tests, from Sol on S4a: a dialog-root flag for SaveProfileDialog before s14_50, and the
   native flash overlay has no resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
@@ -82,11 +83,6 @@ Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
-6. **[2026-10-04] Tell me whether any Tasker or MacroDroid profile on the phone reacts to Tideo's
-   `STATE_CHANGED` broadcasts.** If none does, five E2E scenarios (§2 9, §5 14a, §13 42/43/45)
-   can run; until then preflight skips them. Settles it: with your "none" recorded,
-   `TIDEO_E2E_CONFIRM=automation e2e/run.sh --preflight` lists no `STATE_CHANGED` SKIP (DD-029).
-
 Open questions:
 
 - None.
@@ -137,7 +133,8 @@ never by bumping or creating `29.txt`; re-open only for something major, and say
 Newest first; ledger rows are the durable detail.
 
 - 2026-10-04 — **E2E S5: read-only preflight built and passed on the phone; 1.14.0-debug vc28 is
-  its first guarded install (DD-029).**
+  its first guarded install (DD-029). Owner: no automation receiver, so all 21 scenarios clear
+  the SKIP rules.**
 
 - 2026-10-04 — **`main` merged in after #141 shipped as v1.13.0 / vc27 (Simplified Chinese, the
   language picker, the User Guide theme; device appearance unverified), so this train moved to
