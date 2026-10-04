@@ -127,6 +127,9 @@ creating `27.txt`; re-open only for something major, and say so.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-04 — **Translation policy relaxed (owner, #140): human and AI-assisted translations
+  that a fluent speaker reviewed string by string are accepted, unreviewed machine translation is
+  not; `CONTRIBUTING.md` and the README say so (DD-023).**
 - 2026-10-03 — **Proximity damp follows the owner's Tasker V2: the ×0.1 α (3 dp) now sizes the
   animation as well as the readout, smoothing still undamped; the oracle changed with it, the
   source having changed (DD-022, superseding DC-064's readout-only damp).**

@@ -2349,6 +2349,7 @@ the permanent registry — never compress or remove them.
   folded into the same **1.6.0 / versionCode 14** release as D-130. **(Note:** the Language selector was
   subsequently moved from Misc to the top of the Onboarding screen per owner preference — same inert,
   English-only scaffold, different home.)
+  Corrected by DD-023.
 
 - D-132 [cited]: **a plug/unplug transition bypasses the PASS-1 battery cooldown (deviation from Tasker).** Owner
   report (2026-06-30): with a "Charging" rule (priority 81, on-power + time window) and a "Low Battery" rule

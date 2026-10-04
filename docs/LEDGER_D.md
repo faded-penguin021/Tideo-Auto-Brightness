@@ -246,3 +246,11 @@
   from 7 × 53 ms (throttle 381 ms) to 2 × 64 ms (138 ms): covered, the same target arrives in a
   coarser jump and the next cycle may run sooner — no slowing, and not D-087's in-EMA damp, which
   stays withdrawn by DC-064. On-device behaviour is unverified.
+
+- DD-023: **Translations may be AI-assisted when a fluent speaker reviews every string; unreviewed
+  machine translation stays out (owner, #140, 2026-10-04).** D-131's human-only rule turned away a
+  translator who drafts with an AI model, then checks every string against the English original and
+  in the running app. `CONTRIBUTING.md` and the README now name three kinds: human and AI-assisted
+  translations are accepted, the PR saying which and naming the drafting tool, while tool output
+  submitted without that review is not. The in-app `misc_language_note` still says only that human
+  translations are welcome, which stays true, and is left alone because #141 rewrites that line.
