@@ -115,10 +115,25 @@ class FakeU2:
         self.shade_opened += 1
 
 
+class FakeAdb:
+    """`dumpsys window displays` focus, and the shade collapse command, which takes focus back."""
+
+    def __init__(self, focus):
+        self.focus, self.commands = focus, []
+
+    def shell(self, argv):
+        if argv == ["dumpsys", "window", "displays"]:
+            title = "NotificationShade" if self.focus == SHADE_PKG else f"{self.focus}/.Main"
+            return f"  mCurrentFocus=Window{{4f2a u0 {title}}}\n"
+        assert argv == ["cmd", "statusbar", "collapse"], argv
+        self.commands.append(argv)
+        self.focus = DEBUG_PKG
+        return ""
+
+
 def _ui(foreground=DEBUG_PKG, *targets):
-    app = SimpleNamespace(app_current=lambda: SimpleNamespace(package=foreground))
     d = FakeU2()
-    return Ui(SimpleNamespace(device=app), d, UiAllowlist(*targets)), d
+    return Ui(SimpleNamespace(device=FakeAdb(foreground)), d, UiAllowlist(*targets)), d
 
 
 def test_click_and_read():
@@ -162,10 +177,15 @@ def test_shade_only_with_a_declared_shade_target():
     handle, d = _ui(DEBUG_PKG, SWITCH)
     with pytest.raises(UiDenied):
         handle.open_shade()
-    handle, d = _ui("com.android.launcher", SHADE_RESUME)
+    handle, d = _ui(SHADE_PKG, SHADE_RESUME)
     handle.open_shade()
     handle.click("resume")
     assert d.shade_opened == 1 and d.clicks == [(250, 970)]
+    # adbutils' app_current() named the app under an open shade (DD-033): focus decides.
+    handle, d = _ui(DEBUG_PKG, SHADE_RESUME)
+    with pytest.raises(UiDenied):
+        handle.click("resume")
+    assert d.clicks == []
 
 
 # ── the RPC gate and disabled conveniences ─────────────────────────────────────────────────
@@ -265,7 +285,7 @@ def test_set_text_scroll_and_back_are_single_use_and_exact():
     apply = {"resourceId": "apply_settings", "packageName": DEBUG_PKG}
     ours = {"scrollable": True, "packageName": DEBUG_PKG}
     ui._pending.text = (("field_dimmingStrength", DEBUG_PKG), "65")
-    ui._pending.scroll = ("apply_settings", DEBUG_PKG)
+    ui._pending.scroll = ("scrollForward", DEBUG_PKG)
     ui._pending.back = True
     try:
         with pytest.raises(UiDenied):
@@ -275,18 +295,151 @@ def test_set_text_scroll_and_back_are_single_use_and_exact():
         ui._admit_rpc("setText", [field, "65"])
         with pytest.raises(UiDenied):
             ui._admit_rpc("setText", [field, "65"])
-        with pytest.raises(UiDenied):
-            ui._admit_rpc("scrollTo", [ours, {**apply, "resourceId": "restore_x"}, True])
+        with pytest.raises(UiDenied):  # the other direction
+            ui._admit_rpc("scrollBackward", [ours, True, 55])
+        with pytest.raises(UiDenied):  # scrollIntoView is no longer admitted
+            ui._admit_rpc("scrollTo", [ours, apply, True])
         with pytest.raises(UiDenied):  # another package's scrollable
-            ui._admit_rpc("scrollTo", [{"scrollable": True}, apply, True])
-        ui._admit_rpc("scrollTo", [ours, apply, True])
+            ui._admit_rpc("scrollForward", [{"scrollable": True}, True, 55])
+        ui._admit_rpc("scrollForward", [ours, True, 55])
+        with pytest.raises(UiDenied):
+            ui._admit_rpc("scrollForward", [ours, True, 55])
         with pytest.raises(UiDenied):
             ui._admit_rpc("pressKey", ["home"])
-        ui._admit_rpc("pressKey", ["back"])
-        with pytest.raises(UiDenied):
+        with pytest.raises(UiDenied):  # the shade closes by command now (DD-033)
             ui._admit_rpc("pressKey", ["back"])
     finally:
         ui._pending.text = ui._pending.scroll = ui._pending.back = None
+
+
+class ScrollingU2(FakeU2):
+    """`pages` dumps in scroll order: a forward swipe moves one page on, until the last."""
+
+    def __init__(self, pages, start=0):
+        super().__init__(pages[start])
+        self.pages, self.at, self.swipes = pages, start, []
+
+    def __call__(self, **selector):
+        fake = self
+
+        class _Vert:
+            def _go(self, method, step):
+                ui._admit_rpc(method, [selector, True, 55])
+                fake.swipes.append(method)
+                fake.at = max(0, min(len(fake.pages) - 1, fake.at + step))
+                fake.xml = fake.pages[fake.at]
+
+            def forward(self):
+                self._go("scrollForward", 1)
+
+            def backward(self):
+                self._go("scrollBackward", -1)
+
+        return SimpleNamespace(scroll=SimpleNamespace(vert=_Vert()))
+
+
+def _scrolling_ui(pages, start=0):
+    app = FakeAdb(DEBUG_PKG)
+    d = ScrollingU2(pages, start)
+    return Ui(SimpleNamespace(device=app), d, UiAllowlist(SWITCH)), d
+
+
+def test_an_off_screen_target_is_swiped_into_view_in_either_direction():
+    blank = '<hierarchy rotation="0"><node package="{}" scrollable="true" text="p{}"/></hierarchy>'
+    pages = [blank.format(DEBUG_PKG, i) for i in range(4)]
+    # Three swipes forward reach it (scrollIntoView stopped after one on Compose, DD-033).
+    handle, d = _scrolling_ui(pages[:3] + [HIERARCHY])
+    handle.click("switch")
+    assert d.swipes == ["scrollForward"] * 3 and d.clicks == [(100, 150)]
+    # Above the viewport: forward to the end (an unchanged dump), then back up to it.
+    handle, d = _scrolling_ui([HIERARCHY] + pages[:2], start=1)
+    handle.click("switch")
+    assert d.swipes == ["scrollForward"] * 2 + ["scrollBackward"] * 2
+
+
+def test_an_absent_target_stops_at_both_ends():
+    blank = (f'<hierarchy rotation="0"><node package="{DEBUG_PKG}" scrollable="true" '
+             f'text="x"/></hierarchy>')
+    handle, d = _scrolling_ui([blank])
+    with pytest.raises(UiDenied):
+        handle.click("switch")
+    assert d.swipes == ["scrollForward", "scrollBackward"]
+
+
+def test_no_swipe_without_the_packages_own_scrollable_in_the_dump():
+    # Hidden behind another window, uiautomator2 waited out its selector timeout per swipe.
+    for node in (f'<node package="{DEBUG_PKG}" text="x"/>',
+                 f'<node package="{SHADE_PKG}" scrollable="true" text="x"/>'):
+        handle, d = _scrolling_ui([f'<hierarchy rotation="0">{node}</hierarchy>'] * 2)
+        with pytest.raises(UiDenied):
+            handle.click("switch")
+        assert d.swipes == []
+
+
+PAUSED = "Auto Brightness paused"
+
+
+def _row(title, top, extra="", button=(900, 1000)):
+    """An OxygenOS notification row: collapsed it has a title and an expand button only."""
+    return (f'<node {ROW} bounds="[0,{top}][1000,{top + 100}]">'
+            f'<node package="{SHADE_PKG}" resource-id="android:id/title" text="{title}" '
+            f'bounds="[0,{top}][500,{top + 40}]"/>'
+            f'<node package="{SHADE_PKG}" resource-id="android:id/expand_button" '
+            f'bounds="[{button[0]},{top}][{button[1]},{top + 40}]"/>{extra}</node>')
+
+
+def _shade(*rows, front=SHADE_PKG):
+    app = FakeAdb(front)
+    d = FakeU2('<hierarchy rotation="0">' + "".join(rows) + "</hierarchy>")
+    return Ui(SimpleNamespace(device=app), d, UiAllowlist(SHADE_RESUME)), d
+
+
+def _posters(table):
+    return lambda title: frozenset(table.get(title, ()))
+
+
+def test_tideos_own_collapsed_row_is_expanded_once():
+    handle, d = _shade(_row("Someone else's title", 0), _row(PAUSED, 900))
+    assert handle.expand_own_row(_posters({PAUSED: [DEBUG_PKG]})) is True
+    assert d.clicks == [(950, 920)]  # its expand button, nothing else
+
+
+@pytest.mark.parametrize("rows, posters", [
+    # Another app's row with Tideo's title (Sol): the title alone proves nothing.
+    ([_row(PAUSED, 900)], {PAUSED: ["com.other"]}),
+    ([_row(PAUSED, 900)], {PAUSED: [DEBUG_PKG, "com.other"]}),
+    # Already expanded: a header or an action of its own; a tap would collapse it.
+    ([_row(PAUSED, 900, f'<node {HEADER} text="Tideo AB (Debug)" bounds="[0,950][9,960]"/>')],
+     {PAUSED: [DEBUG_PKG]}),
+    ([_row(PAUSED, 900, f'<node package="{SHADE_PKG}" resource-id="android:id/action0" '
+                        f'text="Resume" bounds="[0,950][90,990]"/>')], {PAUSED: [DEBUG_PKG]}),
+    # A group's parent does not inherit its child row's title.
+    ([f'<node {ROW} bounds="[0,0][1000,400]"><node package="{SHADE_PKG}" '
+      f'resource-id="android:id/expand_button" bounds="[900,0][1000,40]"/>'
+      + _row(PAUSED, 200, f'<node {HEADER} text="x" bounds="[0,250][9,260]"/>') + "</node>"],
+     {PAUSED: [DEBUG_PKG]}),
+    # An expand button outside its row's bounds.
+    ([_row(PAUSED, 900, button=(1100, 1200))], {PAUSED: [DEBUG_PKG]}),
+])
+def test_no_other_row_is_expanded(rows, posters):
+    handle, d = _shade(*rows)
+    assert handle.expand_own_row(_posters(posters)) is False
+    assert d.clicks == []
+
+
+def test_expansion_needs_the_shade_in_front_and_a_clean_row():
+    handle, d = _shade(_row(PAUSED, 900), front=DEBUG_PKG)
+    with pytest.raises(UiDenied):
+        handle.expand_own_row(_posters({PAUSED: [DEBUG_PKG]}))
+    handle, d = _shade(_row(PAUSED, 0), _row(PAUSED, 900))  # two qualify: neither is tapped
+    with pytest.raises(UiDenied):
+        handle.expand_own_row(_posters({PAUSED: [DEBUG_PKG]}))
+    denied = (f'<node package="{SHADE_PKG}" resource-id="restore_factory" text="" '
+              f'bounds="[0,0][1000,2000]">' + _row(PAUSED, 900) + "</node>")
+    handle, d = _shade(denied)
+    with pytest.raises(UiDenied):
+        handle.expand_own_row(_posters({PAUSED: [DEBUG_PKG]}))
+    assert d.clicks == []
 
 
 def test_edit_targets_need_a_resource_id():
@@ -300,10 +453,38 @@ def test_discard_is_a_shade_action_on_tideo_only():
         Target("d", SHADE_PKG, "click", text="Disable", anchor="Tideo AB (Debug)")
 
 
-def test_back_is_refused_while_tideo_is_in_front():
+def test_enabled_reads_a_greyed_out_control():
+    # Apply is always on screen and only enabled with something to apply (DraftApplyBar).
+    bar = Target("bar", DEBUG_PKG, "read", resource_id="apply_settings")
+    xml = ('<hierarchy><node package="{}" resource-id="apply_settings" enabled="{}" '
+           'bounds="[0,0][10,10]"/></hierarchy>')
+    assert resolve(xml.format(DEBUG_PKG, "false"), bar).enabled is False
+    assert resolve(xml.format(DEBUG_PKG, "true"), bar).enabled is True
+
+
+def test_the_shade_closes_by_command_and_only_when_open():
     handle, d = _ui(DEBUG_PKG, SHADE_RESUME)
-    with pytest.raises(UiDenied):
-        handle.close_shade()
+    handle.close_shade()  # already closed: nothing is sent
+    assert handle._s.device.commands == []
+    handle, d = _ui(SHADE_PKG, SHADE_RESUME)
+    handle.close_shade()
+    assert handle._s.device.commands == [["cmd", "statusbar", "collapse"]]
+    assert handle.focus() == DEBUG_PKG
+
+
+@pytest.mark.parametrize("dump, focus", [
+    ("  mCurrentFocus=Window{1a u0 NotificationShade}\n", SHADE_PKG),
+    (f"  mCurrentFocus=Window{{1a u0 {DEBUG_PKG}/com.x.MainActivity}}\n", DEBUG_PKG),
+    (f"  mCurrentFocus=Window{{1a u0 {DEBUG_PKG}}}\n", DEBUG_PKG),     # a dialog's window
+    ("  mCurrentFocus=null\n", None),
+    ("  mCurrentFocus=Window{1a u0 StatusBar}\n", None),              # unknown title
+    ("  mCurrentFocus=Window{1a u0 NotificationShade}\n"
+     f"  mCurrentFocus=Window{{2b u0 {DEBUG_PKG}/.Main}}\n", None),   # displays disagree
+    (f"  mCurrentFocus=null\n  mCurrentFocus=Window{{2b u0 {DEBUG_PKG}/.Main}}\n", None),
+    (f"  mCurrentFocus=Window{{1a u0 {SHADE_PKG}/.VolumeDialog}}\n", None),  # not the shade
+])
+def test_focus_reads_the_shade_an_app_or_unknown(dump, focus):
+    assert ui.focus_in_dump(dump) == focus
 
 
 # ── findings from the S2–S4 blocking review: notification ownership, covered tap points ─────

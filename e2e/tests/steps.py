@@ -10,6 +10,8 @@ from tideo_e2e.harness import Run
 from tideo_e2e.state import OVERRIDE_CHANNEL
 from tideo_e2e.ui import UiDenied
 
+DETECT = "aab_settings/detectOverrides"
+
 EXTERNAL_CONTROL = "control_prefs/external_control_enabled"
 # The Dashboard tier badge (strings.xml dashboard_tier_*).
 BASIC = "Basic access (Modify system settings)"
@@ -30,9 +32,17 @@ def unpaused(run: Run) -> None:
 
 
 def ready_for_override(run: Run) -> None:
-    """Service running, Override Detection on, one cycle completed, not paused."""
-    if run.pref("aab_settings/detectOverrides") != "true":
-        pytest.skip("Override Detection is off (Reactivity screen); the suite does not change it")
+    """Service running, Override Detection on, one cycle completed, not paused. The debug
+    build's Override Detection is turned on, journaled and restored (owner, 2026-10-05)."""
+    if run.paused():
+        pytest.skip("already paused; resume it by hand first (DC-012)")
+    if run.pref(DETECT) != "true":
+        run.expect_pref(DETECT, "true")
+        run.open("reactivity")
+        if not run.checked("switch_detectOverrides_state"):
+            run.tap("switch_detectOverrides")
+        run.tap("apply_settings")
+        run.wait_for(lambda: run.pref(DETECT) == "true", 5, "Override Detection stored on")
     if run.paused():
         pytest.skip("already paused; resume it by hand first (DC-012)")
     if not run.running():

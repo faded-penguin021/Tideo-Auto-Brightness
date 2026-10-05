@@ -8,7 +8,7 @@ STRENGTH = "aab_settings/dimmingStrength"
 
 
 def _flash(run) -> str:
-    return run.read("aab_flash") if run.shown("aab_flash") else ""
+    return run.read_if_shown("aab_flash") or ""  # one dump: the flash lasts 2.5 s
 
 
 def _require_revoked(run):
@@ -36,12 +36,13 @@ def test_s06_19a_strength_is_clamped_where_stored(run):
         run.open("super_dimming")
         run.expect_pref(STRENGTH, stored)
         run.set_text("field_dimmingStrength", typed)
-        run.tap("apply_settings")
+        run.tap("apply_settings", observe=False)
         if announced:
             run.wait_for(lambda: "reduced to 65" in _flash(run), 3, "the clamp message")
         else:
-            assert run.stays(lambda: not run.shown("aab_flash"), 3), \
-                f"a message although nothing was clamped: {_flash(run)!r}"
+            # Apply always flashes "Applied" (DraftApplyBar); only the clamp message may not show.
+            assert run.stays(lambda: "reduced to" not in _flash(run), 3), \
+                f"a clamp message although nothing was clamped: {_flash(run)!r}"
         run.wait_for(lambda: run.pref(STRENGTH) == stored, 5, f"strength stored as {stored}")
         assert run.read("field_dimmingStrength_text") == stored
         run.open("super_dimming")  # leave and return

@@ -36,6 +36,12 @@ object AabFlash {
         this.foregroundPresenter = presenter
     }
 
+    fun unregisterForeground(presenter: Presenter) {
+        if (foregroundPresenter !== presenter) return
+        presenter.hide()
+        foregroundPresenter = null
+    }
+
     /** True when a global presenter (the Accessibility overlay) is active. */
     fun isGlobal(): Boolean = presenter != null
 

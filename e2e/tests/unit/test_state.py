@@ -209,6 +209,24 @@ def test_age_is_an_upper_bound(text, bound):
     assert state.age_seconds(text) == bound
 
 
+def test_posters_of_a_title_come_from_each_records_own_title():
+    def record(pkg, title):
+        return (f"    NotificationRecord(0x0abc: pkg={pkg} user=UserHandle{{0}} id=1 tag=null\n"
+                f"      extras={{\n                android.title={title}\n      }}\n")
+    dump = ("Current Notification Manager state:\n  Notification List:\n"
+            + record(DEBUG_PKG, "String (Auto Brightness paused)")
+            + record("com.other", "String (Auto Brightness paused.)")
+            + record("com.third", "String [length=22]")
+            + "  Snoozed notifications:\n                android.title=String (late)\n")
+    assert state.posters_in_dump(dump, "Auto Brightness paused") == {DEBUG_PKG}
+    assert state.posters_in_dump(dump, "late") == frozenset()  # past the last record's own
+    # A last record with no title of its own does not borrow one from a later section.
+    untitled = (f"    NotificationRecord(0x0abc: pkg={DEBUG_PKG} user=UserHandle{{0}} id=1\n"
+                "  Snoozed notifications:\n"
+                "                android.title=String (Auto Brightness paused)\n")
+    assert state.posters_in_dump(untitled, "Auto Brightness paused") == frozenset()
+
+
 def test_live_debug_parsers():
     assert state.metric_value("Manual override: No") == "No"
     assert state.override_values("69 / 69 / 68") == (69, 69, 68)

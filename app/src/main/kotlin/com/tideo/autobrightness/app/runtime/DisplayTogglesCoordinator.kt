@@ -4,6 +4,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.Tier
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -67,8 +68,9 @@ class DisplayTogglesCoordinator(
                 val seedSettings = baselineFlow.first()
                 resting = seedSettings
                 anchorK = readAnchor()
+                val afterPanic = panicked.getAndSet(false)
                 if (lastApplied == null) {
-                    val seed = DisplayToggleState.of(seedSettings)
+                    val seed = DisplayToggleState.of(if (afterPanic) AabSettings() else seedSettings)
                     lastApplied = seed
                     deviceTempK = seed.temperatureK
                 }
@@ -123,6 +125,7 @@ class DisplayTogglesCoordinator(
             display.setAlwaysOnDisplay(false)
             display.setStayAwakePlugged(false)
             if (display.hdrForceSdrAvailable) display.setHdrForceSdr(false)
+            panicked.set(true)
         }
     }
 
@@ -229,5 +232,9 @@ class DisplayTogglesCoordinator(
                 hdrForceSdr = settings.hdrForceSdrEnabled,
             )
         }
+    }
+
+    internal companion object {
+        val panicked = AtomicBoolean(false) // DD-034: outlives the per-start instance (D-155)
     }
 }

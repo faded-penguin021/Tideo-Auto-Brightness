@@ -42,7 +42,7 @@ fun AabFlashHost(content: @Composable () -> Unit) {
         }
         AabFlash.registerForeground(presenter)
         onDispose {
-            AabFlash.registerForeground(null)
+            AabFlash.unregisterForeground(presenter)
             message = null
         }
     }

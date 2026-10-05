@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -650,6 +651,33 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         assertEquals(listOf("nightLight=true", "temp=2700", "daltonizer=GRAYSCALE"), h.display.writes)
     }
+
+    @Test
+    fun aNewServiceAfterPanic_reassertsTheBaseline_DD034() = runTest(UnconfinedTestDispatcher()) {
+        val profile = nightProfile.copy(inversionEnabled = true, stayAwakeChargingEnabled = true)
+        val before = Harness(baseline = profile)
+        before.coordinator.start(backgroundScope)
+        before.effectiveFlow.value = profile
+        runCurrent()
+        before.coordinator.panicReset()
+        val after = Harness(baseline = profile)
+        after.coordinator.start(backgroundScope)
+        after.effectiveFlow.value = profile
+        runCurrent()
+        assertTrue(
+            after.display.writes.containsAll(
+                listOf("nightLight=true", "daltonizer=GRAYSCALE", "inversion=true", "stayAwake=true"),
+            ),
+            "${after.display.writes}",
+        )
+        val later = Harness(baseline = profile)
+        later.coordinator.start(backgroundScope)
+        later.effectiveFlow.value = profile
+        runCurrent()
+        assertTrue(later.display.writes.isEmpty(), "${later.display.writes}")
+    }
+
+    @After fun clearPanicMark() = DisplayTogglesCoordinator.panicked.set(false)
 
     @Test
     fun panicReset_belowElevated_writesNothing_D155() = runTest(UnconfinedTestDispatcher()) {

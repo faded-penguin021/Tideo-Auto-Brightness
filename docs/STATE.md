@@ -30,7 +30,11 @@ Scorecard.dev is a run-once local input.
   done and the blocking Sol review of S2–S4 fixed (DD-021); S5's read-only preflight is built and
   passed on 1.14.0-debug vc28 (DD-029); no Tasker/MacroDroid profile on the owner's phone acts on
   `STATE_CHANGED` (owner, 2026-10-04), so device runs set `TIDEO_E2E_CONFIRM=automation`; S6's
-  smoke set passed there (DD-032); next is S7, suites by effect order; S7–S9 open. Owed when the
+  smoke set passed there (DD-032); S7 is under way (DD-033, DD-034): 15 of 21 auto scenarios
+  pass (13) or skip correctly (2) on the phone; s06_19a and s11_39 await a build carrying DD-034's
+  two app fixes, s06_19b is a Tideo defect awaiting the owner (Open questions), s02_10b is
+  unclassified (Live Debug's brightness never matched the stored value in 15 s), and s02_10a/10e
+  need the phone to wake unlocked. S8–S9 open. Owed when the
   partial rows get tests, from Sol on S4a: a dialog-root flag for SaveProfileDialog before s14_50, and the
   native flash overlay has no resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
@@ -97,9 +101,27 @@ Scorecard.dev is a run-once local input.
    self-healing emergency Default (`performLoad`) still writes `thresh_midpoint` 3.0 in the
    extracted source, so make it 4.0 if yours does too (DD-030, DD-031).
 
+7. **[2026-10-05] Install the next 1.14.0 debug build, then let the E2E suite rerun two
+   scenarios.** It carries two fixes the phone run found (DD-034): flashes stay Tideo's teal pill
+   after the app is relaunched, and re-enabling the service after a panic brings your profile's
+   inversion/grayscale/stay-awake back. Install with `TIDEO_E2E_SERIAL=<phone>:5555
+   ADB_SERVER_HOST=127.0.0.1 e2e/run.sh --install <apk>` (you type `INSTALL`). Worked if
+   `e2e/run.sh -k 's06_19a or s11_39'` passes; it needs WRITE_SECURE_SETTINGS granted, so `adb
+   shell pm grant com.tideo.autobrightness.debug android.permission.WRITE_SECURE_SETTINGS` first
+   and revoke it after if you want it off.
+
 Open questions:
 
-- None.
+- **[2026-10-05] Should an open Dashboard notice a grant by itself?** DEVICE_TEST_SCRIPT 19b
+  promises the badge reaches ELEVATED within ~10 s of an adb grant with no restart, but no screen
+  calls `refreshTier()`, so it changes only when the app is reopened; e2e s06_19b fails on that.
+  Options: (a) poll the tier every few seconds while the Dashboard is visible; (b) refresh on
+  resume and change the script to "after returning to the app". Recommendation: (b), since a grant
+  is a once-per-install event and polling costs a Binder call every few seconds forever.
+- **[2026-10-05] Do you want the wake scenarios (s02_10a, s02_10e) automated?** They sleep and
+  wake the screen and need it to come back unlocked. Options: (a) set the phone to lock a few
+  minutes after screen-off while testing; (b) keep them manual. Recommendation: (a) for test
+  sessions only. s02_10a's own check (no false pause on wake) passed before the lock stopped it.
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). It carries #139 and is shared with the #136 and
@@ -145,6 +167,10 @@ never by bumping or creating `29.txt`; re-open only for something major, and say
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-05 — **E2E S7 checkpoint: the effect-ordered suites ran on the phone; the harness now
+  reads focus, the notification shade and greyed Apply the way OxygenOS 16 shows them (DD-033),
+  and two Tideo defects it found are fixed in the app, unverified on device (DD-034).**
 
 - 2026-10-05 — **E2E S6: smoke passes on the owner's phone on 1.14.0-debug vc28, after fixing the
   harness's OxygenOS service-record and chip-label parsing (DD-032).**

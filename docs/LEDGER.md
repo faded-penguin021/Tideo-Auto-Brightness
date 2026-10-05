@@ -2836,6 +2836,7 @@ the permanent registry — never compress or remove them.
   Corrected by DC-053.
   Corrected by DC-056 on the temperature clause.
   Corrected by DC-057 on the OxygenOS variance: now branched, behind observed behaviour.
+  Corrected by DD-034 on the restart clause: each service start built a new coordinator.
 
 - D-156 [cited]: **A11y (TalkBack) backlog adopted — semantics conventions + the `SemanticsAudit` gate
   (A0; plan `plans/a11y-diagnostics.md`, owner-approved 2026-07-06; opens 1.8.0/vc18).**

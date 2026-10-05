@@ -46,6 +46,7 @@ PD_SWITCHES = {
 PD_PREFS = (*PD_SWITCHES, "aab_settings/nightLightTemperature", "aab_settings/daltonizerMode")
 AUTOMATION = "control_prefs/external_control_enabled"
 STRENGTH = "aab_settings/dimmingStrength"
+DETECT = "aab_settings/detectOverrides"  # Reactivity's Override Detection (owner, 2026-10-05)
 
 # Every Tideo control the suite may act on, with the effect kinds a tap on it can have; a scenario
 # may tap a target only when its row declares one of them (harness.Run.tap). Reads change nothing.
@@ -55,9 +56,11 @@ STRENGTH = "aab_settings/dimmingStrength"
 TARGETS: dict[str, tuple[Target, frozenset[str]]] = {
     t.name: (t, frozenset(effects)) for t, effects in (
         *((_t(f"menu_{route}", "click"), ("ui_nav",)) for route in (
-            "dashboard", "live_debug", "privileged_display", "super_dimming", "tools")),
+            "dashboard", "live_debug", "privileged_display", "reactivity", "super_dimming",
+            "tools")),
         (_t("service_switch", "click"), ("service_toggle",)),
         (_t("automation_toggle", "click"), ("prefs_ui",)),
+        (_t("switch_detectOverrides", "click"), ("prefs_ui",)),
         (_t("field_dimmingStrength", "edit"), ("prefs_ui",)),
         (_t("apply_settings", "click"), ("prefs_ui", "privileged_apply")),
         *((_t(switch, "click"), ("privileged_apply",)) for switch in PD_SWITCHES.values()),
@@ -71,6 +74,7 @@ TARGETS: dict[str, tuple[Target, frozenset[str]]] = {
         *((_t(name, "read", rid), ()) for name, rid in (
             ("service_switch_state", "service_switch"),
             ("automation_toggle_state", "automation_toggle"),
+            ("switch_detectOverrides_state", "switch_detectOverrides"),
             ("apply_settings_shown", "apply_settings"),
             ("menu_privileged_display_shown", "menu_privileged_display"),
             ("menu_dashboard_shown", "menu_dashboard"),
@@ -86,8 +90,9 @@ TARGETS: dict[str, tuple[Target, frozenset[str]]] = {
 # The preferences a control may change: each must be journaled before it is touched.
 TARGET_PREFS: dict[str, frozenset[str]] = {
     "automation_toggle": frozenset({AUTOMATION}),
+    "switch_detectOverrides": frozenset({DETECT}),
     "field_dimmingStrength": frozenset({STRENGTH}),
-    "apply_settings": frozenset({STRENGTH, *PD_PREFS}),
+    "apply_settings": frozenset({STRENGTH, DETECT, *PD_PREFS}),
     "pd_stay_awake_custom_preserved_overwrite": frozenset(PD_PREFS),
     **{switch: frozenset(PD_PREFS) for switch in PD_SWITCHES.values()},
     **{f"daltonizer_{m.lower()}": frozenset(PD_PREFS) for m in DALTONIZER_MODES},
@@ -100,8 +105,9 @@ def scenario_ui(effects) -> UiAllowlist:
 # What recovery may touch: the service switch, and every control a pref restorer uses.
 PORT_UI = UiAllowlist(*(TARGETS[n][0] for n in (
     "menu_dashboard", "menu_dashboard_shown", "menu_privileged_display", "menu_super_dimming",
-    "menu_tools", "service_switch", "service_switch_state", "automation_toggle",
-    "automation_toggle_state", "field_dimmingStrength", "apply_settings", "apply_settings_shown",
+    "menu_tools", "menu_reactivity", "service_switch", "service_switch_state", "automation_toggle",
+    "automation_toggle_state", "switch_detectOverrides", "switch_detectOverrides_state",
+    "field_dimmingStrength", "apply_settings", "apply_settings_shown",
     *PD_SWITCHES.values(), *(f"{s}_state" for s in PD_SWITCHES.values()),
     *(f"daltonizer_{m.lower()}" for m in DALTONIZER_MODES))))
 
@@ -119,13 +125,20 @@ def _set_switch(port: DevicePort, switch: str, value: str) -> None:
 
 
 def _apply_if_shown(port: DevicePort) -> None:
-    if port.ui.exists("apply_settings_shown"):
+    # The bar is always shown; Apply is enabled only with something to apply.
+    if _retry(lambda: port.ui.enabled("apply_settings_shown"), UI_POLLS, port.sleep):
         port.ui.click("apply_settings")
 
 
 def _restore_automation(port: DevicePort, value: str) -> None:
     port.open_screen("tools")
     _set_switch(port, "automation_toggle", value)
+
+
+def _restore_detect(port: DevicePort, value: str) -> None:
+    port.open_screen("reactivity")
+    _set_switch(port, "switch_detectOverrides", value)
+    _apply_if_shown(port)
 
 
 def _restore_strength(port: DevicePort, value: str) -> None:
@@ -150,6 +163,7 @@ def _restore_privileged(key: str) -> PrefRestorer:
 
 PREF_RESTORERS: dict[str, PrefRestorer] = {
     AUTOMATION: _restore_automation,
+    DETECT: _restore_detect,
     STRENGTH: _restore_strength,
     **{key: _restore_privileged(key) for key in PD_PREFS},
 }
@@ -213,15 +227,17 @@ class DevicePort:
         return state.paused_in_dump(device.run(self.s, "dumpsys", "notification").output,
                                     DEBUG_PKG)
 
-    def open_screen(self, route: str) -> None:
-        """Fresh activity → Menu → `route` ("menu" stays there). With Tier NONE it opens on
-        Onboarding instead, and the Menu never appears: the retry ends in a refusal."""
+    def open_screen(self, route: str, ui: Ui | None = None) -> None:
+        """Fresh activity → Menu → `route` ("menu" stays there), through `ui` (a scenario's
+        allowlist) or the port's own. With Tier NONE it opens on Onboarding instead, and the
+        Menu never appears: the retry ends in a refusal."""
+        ui = ui or self.ui
         device.run(self.s, "am", "start", "-f", LAUNCH_FRESH_FLAGS, "-n",
                    f"{DEBUG_PKG}/{MAIN_ACTIVITY}")
         if route == "menu":
-            _retry(lambda: self.ui.read("menu_dashboard_shown"), UI_POLLS, self._sleep)
+            _retry(lambda: ui.read("menu_dashboard_shown"), UI_POLLS, self._sleep)
         else:
-            _retry(lambda: self.ui.click(f"menu_{route}"), UI_POLLS, self._sleep)
+            _retry(lambda: ui.click(f"menu_{route}"), UI_POLLS, self._sleep)
 
     def open_dashboard(self) -> None:
         self.open_screen("dashboard")

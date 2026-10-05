@@ -24,14 +24,15 @@ from .journal import PREF, SETTING, Journal
 from .recovery import observe_effects
 from .scenarios import E2E_ROOT, Scenario
 from .tideo import (
-    PD_PREFS, PREF_RESTORERS, STRENGTH, TARGET_PREFS, TARGETS, DevicePort, UI_POLL_S, UI_POLLS,
-    _retry,
+    DETECT, PD_PREFS, PREF_RESTORERS, STRENGTH, TARGET_PREFS, TARGETS, DevicePort, UI_POLL_S,
+    UI_POLLS, _retry,
 )
 from .ui import Ui
 
 DEVICES = E2E_ROOT / "devices"
 # What the draft Apply bar stores, per screen.
-APPLY_PREFS = {"super_dimming": frozenset({STRENGTH}), "privileged_display": frozenset(PD_PREFS)}
+APPLY_PREFS = {"super_dimming": frozenset({STRENGTH}), "privileged_display": frozenset(PD_PREFS),
+               "reactivity": frozenset({DETECT})}
 POLL_S = 0.5
 
 
@@ -131,7 +132,7 @@ class Run:
         for key, value in state.read_prefs(self.s, PD_PREFS).items():
             self.journal.watch(PREF, key, value)
         self.open("privileged_display")
-        if self.shown("apply_settings_shown"):
+        if self.dirty():
             pytest.skip("Privileged Display opens with the device differing from the profile; "
                         "Apply or Discard there by hand first")
 
@@ -176,16 +177,19 @@ class Run:
                 and self.pref("aab_settings/serviceEnabled") == "true":
             raise UndeclaredEffect(f"{self.row.id}: launching would start the service")
         self._screen = route
-        self.port.open_screen(route)
+        self.port.open_screen(route, self.ui)
         self._observe()
 
-    def tap(self, name: str) -> None:
+    def tap(self, name: str, observe: bool = True) -> None:
+        """`observe=False` when the next read must follow at once (19a's 2.5 s flash); the
+        next action's own observation then attributes what the tap wrote."""
         _target, effects = TARGETS[name]
         if effects:
             self._need(effects, f"tapping {name}")
         self._need_prefs(name)
         _retry(lambda: self.ui.click(name), UI_POLLS, self._sleep)
-        self._observe()
+        if observe:
+            self._observe()
 
     def set_text(self, name: str, text: str) -> None:
         self._need(TARGETS[name][1], f"editing {name}")
@@ -201,6 +205,14 @@ class Run:
 
     def shown(self, name: str) -> bool:
         return self.ui.exists(name)
+
+    def read_if_shown(self, name: str) -> str | None:
+        return self.ui.read_if_shown(name)
+
+    def dirty(self) -> bool:
+        """Whether Apply is enabled: the bar is always shown, and Apply is enabled when the
+        draft is dirty and free of validation errors (SettingsControls.DraftApplyBar)."""
+        return _retry(lambda: self.ui.enabled("apply_settings_shown"), UI_POLLS, self._sleep)
 
     def metric(self, tag: str) -> str:
         """A Live Debug line's value; the screen must be open."""
@@ -222,6 +234,10 @@ class Run:
                                        f"run recorded; found {len(before)} → {len(now)}")
         self.ui.open_shade()
         try:
+            # Only the wait for shade focus is retried: the expand tap is sent once (DD-033).
+            _retry(self.ui.require_shade, UI_POLLS, self._sleep)
+            if self.ui.expand_own_row(lambda title: state.title_posters(self.s, title)):
+                self._sleep(UI_POLL_S)
             _retry(lambda: self.ui.click(name), UI_POLLS, self._sleep)
         finally:
             self._sleep(UI_POLL_S)
@@ -314,7 +330,6 @@ class Run:
 
     def running(self) -> bool:
         return self.port.service_running()
-
     def paused(self) -> bool:
         return self.port.paused()
 

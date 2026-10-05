@@ -120,6 +120,23 @@ def notification_channels(dump: str, package: str) -> frozenset[str]:
 
 
 _RECORD = re.compile(r"(?m)^\s*(?=NotificationRecord\()")
+_POSTER = re.compile(r"NotificationRecord\(0x[0-9a-f]+: pkg=(\S+) ")
+_TITLE = re.compile(r"(?m)^\s*android\.title=(.*)$")
+
+
+def posters_in_dump(dump: str, title: str) -> frozenset[str]:
+    """The packages that posted a notification titled exactly `title`, from an unredacted
+    `dumpsys notification`; nothing else of the dump is kept. A record ends at the next
+    section heading (indented two spaces or less), so the last never borrows a later title,
+    and only its first title counts."""
+    out = set()
+    for block in _RECORD.split(dump):
+        head, _, rest = block.partition("\n")
+        block = head + "\n" + re.split(r"(?m)^ {0,2}\S", rest, maxsplit=1)[0]
+        if (m := _POSTER.match(block)) and (t := _TITLE.search(block)) \
+                and t.group(1) == f"String ({title})":
+            out.add(m.group(1))
+    return frozenset(out)
 _ACTION = re.compile(r'(?m)^\s*\[\d+\] "(.*)" -> ')
 
 
@@ -296,9 +313,20 @@ def package_dump(s: device.Session, package: str = DEBUG_PKG) -> str:
 def service_running(s: device.Session, package: str = DEBUG_PKG) -> bool:
     return device.fgs_in_dump(_out(s, "dumpsys", "activity", "services", package), package)
 
-
 def channels(s: device.Session, package: str = DEBUG_PKG) -> frozenset[str]:
     return notification_channels(_out(s, "dumpsys", "notification"), package)
+
+
+def title_posters(s: device.Session, title: str) -> frozenset[str]:
+    # Every app's notification text: an error carrying output (adbutils' AdbError can) is
+    # replaced, never chained, so none reaches a log or a failure report.
+    try:
+        dump = _out(s, "dumpsys", "notification", "--noredact")
+    except Exception:
+        dump = None
+    if dump is None:
+        raise StateError("the unredacted notification read failed; its output is withheld")
+    return posters_in_dump(dump, title)
 
 
 def private_file(s: device.Session, path: str) -> bytes | None:

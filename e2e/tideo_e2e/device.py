@@ -180,9 +180,15 @@ def _templates() -> tuple[Template, ...]:
         Template("pm_path", Grade.READ, ("pm", "path", DEBUG_PKG)),
         Template("dumpsys_services", Grade.READ, ("dumpsys", "activity", "services", pkg)),
         Template("dumpsys_notification", Grade.READ, ("dumpsys", "notification")),
+        # Titles, for who posted a collapsed shade row (DD-033). Every app's text: parsed in
+        # memory to the posting packages, never kept (the audit log holds requests only).
+        Template("dumpsys_notification_titles", Grade.READ,
+                 ("dumpsys", "notification", "--noredact")),
         Template("dumpsys_power", Grade.READ, ("dumpsys", "power")),
-        # adbutils.app_current(), which ui.py uses for the foreground check.
+        # adbutils.app_current(), with the next two.
         Template("dumpsys_windows", Grade.READ, ("dumpsys", "window", "windows")),
+        # ui.py's focus check: Android 16 prints mCurrentFocus here, not under windows (DD-033).
+        Template("dumpsys_displays", Grade.READ, ("dumpsys", "window", "displays")),
         Template("dumpsys_activities", Grade.READ, ("dumpsys", "activity", "activities")),
         Template("dumpsys_top", Grade.READ, ("dumpsys", "activity", "top")),
         Template("current_user", Grade.READ, ("am", "get-current-user")),
@@ -204,6 +210,8 @@ def _templates() -> tuple[Template, ...]:
                  ("am", "broadcast", "-a", one_of("action", *CONTROL_ACTIONS),
                   "-n", f"{DEBUG_PKG}/{CONTROL_RECEIVER}"),
                  precondition="broadcast_spacing"),
+        # Closes the notification shade without a Back that could reach an app (DD-033).
+        Template("shade_collapse", Grade.MUTATE, ("cmd", "statusbar", "collapse")),
         Template("keyevent", Grade.MUTATE,
                  ("input", "keyevent", one_of("key", "KEYCODE_SLEEP", "KEYCODE_WAKEUP"))),
         Template("force_stop_debug", Grade.MUTATE, ("am", "force-stop", DEBUG_PKG)),

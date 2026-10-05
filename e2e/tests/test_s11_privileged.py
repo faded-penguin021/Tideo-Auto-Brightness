@@ -27,6 +27,9 @@ def _apply(run) -> None:
 @pytest.mark.scenario("s11_32a")
 def test_s11_32a_stay_awake_writes_the_whole_mask(run):
     require_elevated(run)
+    # From a stored ON, flipping the switch after mask 0 lands on the profile again: no Apply.
+    if run.pref(STAY) == "true":
+        pytest.skip("needs the profile's stay-awake OFF (Privileged Display); it is ON")
     if run.running():
         run.service(False)  # the direct-write path
     run.put(*STAY_KEY, 0)
@@ -38,21 +41,21 @@ def test_s11_32a_stay_awake_writes_the_whole_mask(run):
     assert not _flip(run, "switch_stayAwake", STAY)
     _apply(run)
     run.wait_for(lambda: run.setting(*STAY_KEY) == "0", 5, "mask 0")
-    # A mask Tideo did not write: shown as on, with the notice (DB-077).
+    # A mask Tideo did not write: the switch keeps the profile's OFF, and the notice says the
+    # device holds another (DB-077; owner, 2026-10-05, over the script's "reads ON").
     run.put(*STAY_KEY, 7)
     run.open("privileged_display")
-    assert run.checked("switch_stayAwake_state")
-    assert run.shown("pd_stay_awake_custom_preserved")
-    # An unrelated Apply must not broaden it; the draft carries the device's ON too.
-    run.expect_pref(STAY, "true")
+    run.wait_for(lambda: run.shown("pd_stay_awake_custom_preserved"), 5, "the notice at mask 7")
+    assert not run.checked("switch_stayAwake_state")
+    # An unrelated Apply must not broaden it.
     inverted = _flip(run, "switch_inversion", INVERSION)
     _apply(run)
     run.wait_for(lambda: run.setting(*INVERSION_KEY) == ("1" if inverted else "0"), 5,
                  "the unrelated field applied")
     assert run.setting(*STAY_KEY) == "7", "an unrelated Apply broadened the charger set"
     # "Use Tideo's setting instead" writes at once, without an Apply (DB-078).
-    run.tap("pd_stay_awake_custom_preserved_overwrite")
-    run.wait_for(lambda: run.setting(*STAY_KEY) == "15", 5, "mask 15 from the notice")
+    run.tap("pd_stay_awake_custom_preserved_overwrite")  # writes the profile's OFF
+    run.wait_for(lambda: run.setting(*STAY_KEY) == "0", 5, "mask 0 from the notice")
     assert not run.shown("pd_stay_awake_custom_preserved")
 
 
@@ -87,8 +90,7 @@ def test_s11_36_privileged_row_follows_the_grant(run):
     require_elevated(run)
     run.open("menu")
     assert run.shown("menu_privileged_display_shown")
-    run.revoke()  # kills the process
-    run.wait_for(lambda: not run.running(), 10, "the process to die with the grant")
+    run.revoke()  # Android 16 (OxygenOS) keeps the process alive (DD-033)
     run.open("menu")
     run.wait_for(lambda: not run.shown("menu_privileged_display_shown"), 10,
                  "the Privileged row to disappear")
@@ -109,7 +111,7 @@ def test_s11_39_panic_resets_the_privileged_keys(run):
         run.expect_pref(pref, "true")
         if not run.checked(f"{switch}_state"):
             run.tap(switch)
-    if run.shown("apply_settings_shown"):  # the switches may show the device, not the profile
+    if run.dirty():  # the switches may show the device, not the profile
         _apply(run)
     run.wait_for(lambda: run.pref(INVERSION) == run.pref(STAY) == "true", 5, "both stored on")
     run.wait_for(lambda: run.setting(*INVERSION_KEY) == "1"
@@ -134,5 +136,5 @@ def test_s11_39b_apply_does_not_undo_itself(run):
         inverted = _flip(run, "switch_inversion", INVERSION)
         _apply(run)
         assert run.stays(lambda: run.checked("switch_inversion_state") == inverted
-                         and not run.shown("apply_settings_shown"), 4), \
+                         and not run.dirty(), 4), \
             f"the toggle rolled back with the service {'on' if on else 'off'} (DB-047/DB-048)"

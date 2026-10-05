@@ -6,7 +6,8 @@ script step, classified `auto`, `partial` or `manual` with a reason. Decision an
 DD-015.
 
 **Status: boundary, recovery, scenarios, install guard and read-only preflight built (S5,
-DD-029); the smoke set passes on a device (S6, DD-032).** The effect-ordered suites are next.
+DD-029); the smoke set passes on a device (S6, DD-032); the effect-ordered suites have run
+there (S7, DD-033), with their open items in `docs/STATE.md`.**
 
 ## Safety boundary
 
@@ -18,11 +19,16 @@ DD-029); the smoke set passes on a device (S6, DD-032).** The effect-ordered sui
   unless opened otherwise. With no session open, nothing is sent.
 - **UI** (`tideo_e2e/ui.py`). Scenario code acts only by naming a `Target` in its `UiAllowlist`,
   which holds the reads plus the controls its row's effects cover. Each action resolves exactly
-  one node of the declared package, checks the foreground, a global denylist (profile
+  one node of the declared package, checks that this package holds input focus (read from
+  `dumpsys window displays`; unknown focus refuses), a global denylist (profile
   delete/overwrite/load/restore-factory, import/export, rule editors, calibration) and that no
-  other package's node covers the tap point, then taps that node. A shade action needs Tideo's
-  label in the row's app-name header. uiautomator2's RPCs are gated too: reads pass, a click only
-  at the point just authorised. Its install/IME/shell conveniences raise.
+  other package's node covers the tap point, then taps that node. A shade action needs the
+  `NotificationShade` window focused and Tideo's label in the row's app-name header; a collapsed
+  row is expanded once per opening, and only when the unredacted notification dump shows the
+  debug package alone posted its title. The shade closes by `cmd statusbar collapse`, never Back.
+  A target off screen is swiped into view only through the package's own scrollable in the dump.
+  uiautomator2's RPCs are gated too: reads pass, a click or one swipe only as just authorised.
+  Its install/IME/shell conveniences raise (DD-033).
 - **Not a sandbox.** The gates confine library internals and harness code using public APIs. Code
   that writes to a raw adb socket, calls the saved originals or spawns a process would pass
   around them; `test_boundary_tripwire.py` fails if harness code outside the boundary modules

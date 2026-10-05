@@ -360,3 +360,22 @@
   node's one text-bearing descendant and refuses two. The owner installed the build out of band,
   same signer. s01_4 failed once in 8 runs with its message not kept; S7 classifies it if it
   recurs.
+
+- DD-033: **E2E S7 on OxygenOS / Android 16: what the phone told the harness (2026-10-05).**
+  Focus is `dumpsys window displays`' `mCurrentFocus` (absent under `windows`); adbutils'
+  `app_current()` read an open shade as the app under it, so every action now needs its own
+  package, or the `NotificationShade` window, to hold focus, and the shade closes by `cmd
+  statusbar collapse`. A collapsed notification row has no app name and no actions: it is
+  expanded once per opening, only when `--noredact` shows the debug package alone posted its
+  title (Sol, Astra). UiScrollable gave up after one Compose swipe, the draft Apply bar is always
+  shown (Apply is enabled when dirty and free of errors), `pm revoke` does not kill the app, and
+  an unrecognised stay-awake mask keeps the profile's value (owner, over the script's "reads
+  ON"). s01_4 did not recur.
+
+- DD-034 [cited]: **Two Tideo defects the S7 device run found, fixed (2026-10-05).** A
+  NEW_TASK|CLEAR_TASK relaunch disposed the old `AabFlashHost` after the new one registered, and
+  its `registerForeground(null)` sent every later flash to a plain Toast; a host now clears only
+  itself. D-155's "a same-process restart re-asserts the baseline" never held, as
+  `createRuntime` builds a new `DisplayTogglesCoordinator` per service start: a process-level
+  mark, set after panic's last write and consumed by the next start, seeds from the defaults.
+  Both await a device rerun on a build carrying them (s06_19a, s11_39).

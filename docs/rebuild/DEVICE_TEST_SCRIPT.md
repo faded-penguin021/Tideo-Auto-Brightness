@@ -437,11 +437,13 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     toggle ON, Apply → **Expected: `15`** (`AC|USB|WIRELESS|DOCK`), not 7. OFF + Apply → `0`.
     Then set a mask this app does not write (`… put global stay_on_while_plugged_in 7` — what
     Tideo itself wrote up to v1.9.0, so this is the state every upgrading device is in; `1` also
-    works) and reopen the screen. **Expected:** the switch reads ON *and* a notice appears under it
-    saying Android is set to a charger set this app did not write. Now Apply with some *other*
+    works) and reopen the screen. **Expected:** the switch keeps Tideo's stored setting (OFF after
+    the step above) *and* a notice appears under it saying Android is set to a charger set this
+    app did not write (owner, 2026-10-05: not ON). Now Apply with some *other*
     field changed. **Expected:** the mask stays as you set it — an unrelated Apply must not broaden
     a charger set Tideo did not choose. Finally tap **Use Tideo's setting instead** on that notice.
-    **Expected:** the mask becomes `15` and the notice disappears, with no Apply needed. A notice
+    **Expected:** the mask becomes Tideo's setting (`0` while OFF, `15` while ON) and the notice
+    disappears, with no Apply needed. A notice
     that never appears at `7` is the DB-077 regression; a button that needs Apply is DB-078's.
 32b. **HDR: an absent row is a default, a partial row is a preference (DB-045/DB-049).** With both
     rows cleared (`adb shell settings delete global user_disabled_hdr_formats` and
