@@ -7,6 +7,8 @@ import java.io.OutputStream
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 /** Pre-override baseline snapshot (D-170, task626): holds settings before first override for PASS 4 revert (contexts_spec).
  *  [userProfileName] is persisted %AAB_ProfileUser, the last manually-loaded profile (DA-018), separate from snapshot lifecycle. */
@@ -40,13 +42,18 @@ object ContextBaselineSerializer : Serializer<ContextBaseline> {
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true
+        encodeDefaults = true
     }
 
     override val defaultValue: ContextBaseline = ContextBaseline()
 
     override suspend fun readFrom(input: InputStream): ContextBaseline {
         return runCatching {
-            json.decodeFromString(ContextBaseline.serializer(), input.readBytes().decodeToString())
+            val stored = json.parseToJsonElement(input.readBytes().decodeToString()).jsonObject
+            val snapshot = stored["snapshot"] as? JsonObject
+            val upgraded = if (snapshot == null) stored
+            else JsonObject(stored + ("snapshot" to AabSettingsSerializer.upgradeJson(snapshot)))
+            json.decodeFromJsonElement(ContextBaseline.serializer(), upgraded)
         }.getOrDefault(defaultValue)
     }
 

@@ -60,14 +60,16 @@ class ProfileImportExportManager(
         internal const val PROVIDER_TIMEOUT_MS = 20_000L
     }
 
-    private val json = Json { ignoreUnknownKeys = false; prettyPrint = true }
+    private val json = Json { ignoreUnknownKeys = false; prettyPrint = true; encodeDefaults = true }
+
+    private fun encode(settings: AabSettings): ByteArray = json.encodeToString(
+        AabProfilePayload.serializer(),
+        AabProfilePayload(settings = settings.validate()),
+    ).encodeToByteArray()
 
     suspend fun exportToAppPrivate(profileName: String, settings: AabSettings): String {
         val fileName = sanitizeFileName(profileName)
-        val payload = json.encodeToString(
-            AabProfilePayload.serializer(),
-            AabProfilePayload(settings = settings.validate()),
-        ).encodeToByteArray()
+        val payload = encode(settings)
         withContext(Dispatchers.IO) {
             context.openFileOutput(fileName, Context.MODE_PRIVATE).use { output -> output.write(payload) }
         }
@@ -78,10 +80,7 @@ class ProfileImportExportManager(
      * DA-044: encode first, then dispatch IO to avoid blocking the UI thread with untrusted providers.
      */
     suspend fun exportToDocument(uri: Uri, settings: AabSettings, resolver: ContentResolver = context.contentResolver) {
-        val payload = json.encodeToString(
-            AabProfilePayload.serializer(),
-            AabProfilePayload(settings = settings.validate()),
-        ).encodeToByteArray()
+        val payload = encode(settings)
         withContext(Dispatchers.IO) {
             withTimeout(PROVIDER_TIMEOUT_MS) {
                 resolver.openOutputStream(uri)?.use { output -> output.write(payload) }
@@ -197,7 +196,12 @@ class ProfileImportExportManager(
             return ProfileLoadResult.TotalFailure(it.message ?: "JSON structure rejected", "Legacy parse not attempted")
         }
         val jsonAttempt = runCatching {
-            val payload = json.decodeFromString(AabProfilePayload.serializer(), content)
+            val root = json.parseToJsonElement(content)
+            val settings = (root as? JsonObject)?.get("settings") as? JsonObject
+            val upgraded = if (root is JsonObject && settings != null) {
+                JsonObject(root + ("settings" to AabSettingsSerializer.upgradeJson(settings)))
+            } else root
+            val payload = json.decodeFromJsonElement(AabProfilePayload.serializer(), upgraded)
             require(payload.schemaVersion in 1..CURRENT_SCHEMA_VERSION) { "Unsupported profile schema" }
             require(payload.settings.schemaVersion in 1..CURRENT_SCHEMA_VERSION) { "Unsupported settings schema" }
             AabSettingsSerializer.migrate(payload.settings).validate()

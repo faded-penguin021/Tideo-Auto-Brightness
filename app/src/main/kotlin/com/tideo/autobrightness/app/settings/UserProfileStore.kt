@@ -21,9 +21,11 @@ data class SavedProfile(
 data class SavedProfiles(
     val profiles: List<SavedProfile> = emptyList(),
     val seeded: Boolean = false,
+    val factoryRevision: Int = 0,
 ) {
     companion object {
         const val SCHEMA_VERSION = 1
+        const val FACTORY_REVISION = 1
     }
 }
 
@@ -51,14 +53,28 @@ object SavedProfilesSerializer : Serializer<SavedProfiles> {
             require(raw.size() <= MAX_ENCODED_PROFILES_BYTES) { "Saved profiles file is implausibly large" }
             val decoded = json.decodeFromString(SavedProfiles.serializer(), raw.toByteArray().decodeToString())
             require(decoded.profiles.size <= UserProfileStore.MAX_PROFILES)
-            decoded.copy(
-                profiles = decoded.profiles.map {
-                    require(it.name.isNotBlank() && it.name != "." && it.name != ".." &&
-                        it.name.length <= UserProfileStore.MAX_PROFILE_NAME_CHARS)
-                    it.copy(settings = it.settings.validate())
-                }.distinctBy { it.name },
+            upgradeFactory(
+                decoded.copy(
+                    profiles = decoded.profiles.map {
+                        require(it.name.isNotBlank() && it.name != "." && it.name != ".." &&
+                            it.name.length <= UserProfileStore.MAX_PROFILE_NAME_CHARS)
+                        it.copy(settings = it.settings.validate())
+                    }.distinctBy { it.name },
+                ),
             )
         }.getOrDefault(defaultValue)
+
+    // DD-030: revision 1 moved the built-ins' midpoint 3.0 → 4.0; only an untouched built-in follows.
+    internal fun upgradeFactory(saved: SavedProfiles): SavedProfiles {
+        if (saved.factoryRevision >= SavedProfiles.FACTORY_REVISION) return saved
+        val profiles = saved.profiles.map { profile ->
+            val factory = DefaultProfiles.all[profile.name]
+            if (factory != null && profile.builtIn &&
+                profile.settings.copy(schemaVersion = 0) == factory.copy(thresholdMidpoint = 3.0, schemaVersion = 0)
+            ) profile.copy(settings = factory) else profile
+        }
+        return saved.copy(profiles = profiles, factoryRevision = SavedProfiles.FACTORY_REVISION)
+    }
 
     override suspend fun writeTo(t: SavedProfiles, output: OutputStream) {
         output.write(json.encodeToString(SavedProfiles.serializer(), t).encodeToByteArray())
@@ -119,12 +135,13 @@ class UserProfileStore(private val dataStore: DataStore<SavedProfiles>) {
             val factory = factoryProfiles()
             val factoryNames = factory.map { it.name }.toSet()
             val userOnly = current.profiles.filterNot { it.name in factoryNames }
-            SavedProfiles(profiles = factory + userOnly, seeded = true)
+            SavedProfiles(profiles = factory + userOnly, seeded = true, factoryRevision = SavedProfiles.FACTORY_REVISION)
         }
     }
 
     private fun seedIfNeeded(current: SavedProfiles): SavedProfiles =
-        if (current.seeded) current else SavedProfiles(profiles = factoryProfiles(), seeded = true)
+        if (current.seeded) current
+        else SavedProfiles(profiles = factoryProfiles(), seeded = true, factoryRevision = SavedProfiles.FACTORY_REVISION)
 
     private fun factoryProfiles(): List<SavedProfile> =
         DefaultProfiles.all.map { (name, settings) -> SavedProfile(name, settings, builtIn = true) }

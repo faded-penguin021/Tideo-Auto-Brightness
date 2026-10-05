@@ -83,6 +83,20 @@ Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
+6. **[2026-10-05] Check the new defaults on the phone when you next install a 1.14.0 build over your
+   current one, and fix two things in Tasker.** Before installing, note the Misc screen's animation
+   steps, min wait and max wait. Worked if they are unchanged when you had ever changed any of them,
+   and otherwise read 50 / 5 / 30; loading an unedited Default shows a Reactivity midpoint of 4.0
+   and an unedited Outdoors 4.255; and with "Trust unreliable sensor" on, loading an unedited
+   built-in leaves it on. Settles the first part: `adb shell run-as com.tideo.autobrightness.debug
+   cat files/datastore/aab_settings.json` lists `animSteps`, `minWaitMs`, `maxWaitMs` and
+   `throttleDefaultMs` once the app has saved anything. In Tasker: task592's Outdoors declares
+   `JSONObject genOutdoor` twice, so name the reactivity one `reactOutdoor`, and its second
+   `min_wait` line stands where `genOutdoor.put("delta_factor", 4.0);` was, so put that back (Tideo
+   keeps Outdoors at 4.0); and task637's
+   self-healing emergency Default (`performLoad`) still writes `thresh_midpoint` 3.0 in the
+   extracted source, so make it 4.0 if yours does too (DD-030, DD-031).
+
 Open questions:
 
 - None.
@@ -131,6 +145,13 @@ never by bumping or creating `29.txt`; re-open only for something major, and say
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-05 — **First launch now takes the owner's task570 animation defaults (50 / 5 / 30 /
+  1510) and the built-ins task592's midpoints (4.0, Outdoors 4.255), so Default is the
+  first-launch settings; any animation value a user changed is kept, in settings, baseline snapshot
+  and exports, which now store every key with no schema bump, and an untouched built-in follows
+  (DD-030); loading an untouched built-in keeps the user's trust-unreliable and Quick Settings
+  choices (DD-031).**
 
 - 2026-10-04 — **E2E S5: read-only preflight built and passed on the phone; 1.14.0-debug vc28 is
   its first guarded install (DD-029). Owner: no automation receiver, so all 21 scenarios clear

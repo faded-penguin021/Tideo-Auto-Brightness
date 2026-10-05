@@ -38,6 +38,21 @@ class ProfileLoadResultTest {
         assertEquals(7, (result as ProfileLoadResult.Success).settings.minBrightness)
     }
 
+    // DD-030: a v3 export omitted default-valued keys, so its absent animation keys meant v3's values.
+    @Test
+    fun `a v3 export keeps the v3 animation defaults beside a key it set`() {
+        val result = manager.decodePayload("""{ "settings": { "animSteps": 40 } }""")
+        val s = (result as ProfileLoadResult.Success).settings
+        assertEquals(listOf(40L, 25L, 65L, 1310L), listOf(s.animSteps.toLong(), s.minWaitMs.toLong(), s.maxWaitMs.toLong(), s.throttleDefaultMs))
+    }
+
+    @Test
+    fun `an export written now round-trips a partly-default animation group`() = runBlocking {
+        manager.exportToAppPrivate("dd030-round-trip", AabSettings(animSteps = 40))
+        val s = (manager.importFromAppPrivate("dd030-round-trip") as ProfileLoadResult.Success).settings
+        assertEquals(listOf(40L, 5L, 30L, 1510L), listOf(s.animSteps.toLong(), s.minWaitMs.toLong(), s.maxWaitMs.toLong(), s.throttleDefaultMs))
+    }
+
     @Test
     fun `a Tasker nested config is a LegacyFallback`() {
         val taskerConfig = """{ "general": { "z1_end": 50.0 } }"""

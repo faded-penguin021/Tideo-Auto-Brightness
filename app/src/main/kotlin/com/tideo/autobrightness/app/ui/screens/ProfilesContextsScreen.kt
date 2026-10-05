@@ -186,7 +186,7 @@ fun ProfilesContextsScreen(
                     // G2R-F44: register legacy profile by file name for rule targeting
                     val profileName = entry.name.removeSuffix(".json").removeSuffix(".JSON")
                     settingsVm.saveImportedProfile(profileName, imported)
-                    settingsVm.replaceAll(imported)
+                    settingsVm.replaceAll(imported, profileName)
                 }
             }.getOrElse { loadError = it.message; context.getString(R.string.toast_load_failed_detail, it.message ?: "") }
             status?.let(toast)
@@ -259,6 +259,7 @@ fun ProfilesContextsScreen(
     previewProfile?.let { entry ->
         LoadProfileDialog(
             profile = entry,
+            current = settings,
             onDismiss = { previewProfile = null },
             onConfirm = { previewProfile = null; settingsVm.applyProfile(entry.name); toast(R.string.toast_applied_profile, entry.name) },
         )

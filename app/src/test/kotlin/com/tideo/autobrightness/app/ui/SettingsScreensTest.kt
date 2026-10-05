@@ -966,6 +966,7 @@ class SettingsScreensTest {
             MaterialTheme {
                 LoadProfileDialog(
                     profile = SavedProfile("Bright", AabSettings(maxBrightness = 255, scale = 1.5f)),
+                    current = AabSettings(),
                     onDismiss = {},
                     onConfirm = { confirmed = true },
                 )

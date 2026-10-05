@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.LegacyConfigEntry
 import com.tideo.autobrightness.app.settings.SavedProfile
 import com.tideo.autobrightness.app.settings.changedCount
@@ -256,6 +257,7 @@ fun ProfilesBody(
     previewProfile?.let { entry ->
         LoadProfileDialog(
             profile = entry,
+            current = currentSettings,
             onDismiss = { previewProfile = null },
             onConfirm = { previewProfile = null; onApplyProfile(entry.name) },
         )
@@ -514,7 +516,7 @@ internal fun SaveProfileDialog(
  * the live configuration.
  */
 @Composable
-fun LoadProfileDialog(profile: SavedProfile, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+fun LoadProfileDialog(profile: SavedProfile, current: AabSettings, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.profiles_load_confirm_title, profile.name)) },
@@ -524,7 +526,7 @@ fun LoadProfileDialog(profile: SavedProfile, onDismiss: () -> Unit, onConfirm: (
                     stringResource(R.string.profiles_load_replace_warn),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                SettingsDiffList(profile.settings)
+                SettingsDiffList(DefaultProfiles.keepUserChoices(profile.name, profile.settings, current))
             }
         },
         confirmButton = {

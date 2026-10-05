@@ -256,7 +256,11 @@ Java generates **5 default profiles** to disk via `writeProfile`, all from `getB
 - **Default** — baseline (z1_end 35, z2_end 10000, form1a 5, form2a 29.58, form2b 8.8, form2c 18,
   form2d 35, form3a 2513; min/max bright 10/255; scale 1, offset 0; anim_steps 50, min/max_wait 5/30,
   throttle 1510, delta_factor 1.8; thresh dark/dim/bright 0.3/0.25/0.08, steepness 2.1, midpoint 3.0;
-  circadian disabled; superdimming disabled).
+  circadian disabled; superdimming disabled). The owner's `getBaseProfile()` now uses midpoint 4.0, so
+  Default equals the first-launch settings and the built-ins inherit 4.0, Outdoors taking 4.255
+  (2026-10-05, DD-030). It never wrote `detect_overrides`, `trust_unreliable` or `qs_use` (the
+  reactivity and circadian lists above are performSave's), so loading a built-in keeps the user's
+  values (DD-031).
 - **Battery Saver** — max_bright 200, min_bright 1, scale 0.8, anim_steps 1, delta_factor 2.8;
   thresh dark/dim/bright all 0.5; both features off.
 - **Video Streaming** — anim_steps 50, min/max_wait 50/100, min/max_bright 20/255, delta_factor 0.5,

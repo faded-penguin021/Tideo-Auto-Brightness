@@ -323,3 +323,32 @@
   and a Chinese entry anywhere after a non-English first one is refused (Sol). The install guard
   gained a first install, reached only on `dumpsys package`'s own "Unable to find package" line.
   The owner approved it, and its signer now binds every later install.
+- DD-030 [cited]: **First-launch animation defaults are 50 steps, 5–30 ms waits and a 1510 ms
+  throttle, and the built-ins' midpoint is 4.0 (Outdoors 4.255), as the owner's adapted task570
+  and task592 set them (2026-10-05).** The owner's task570 sets `%AAB_AnimSteps` 50,
+  `%AAB_MinWait` 5 and `%AAB_MaxWait` 30, where the extracted XML has 20/25/65, and still derives
+  `%AAB_Throttle` and `%AAB_ThreshMidpoint = log10(%AAB_Zone2End)`, so `AabSettings()` now equals
+  `DefaultProfiles.Default`; the owner's task592 moves `getBaseProfile()` from 3.0 to 4.0 and gives
+  Outdoors log10(18000) = 4.255, and Tideo keeps storing both derived values rather than computing
+  them (owner). The settings, context-baseline and export writers used to omit every key equal to
+  its default, so each now encodes every key and its reader pins an object's absent animation keys
+  to 20/25/65/1310 unless all four are absent, when it takes the new values (owner: a user who
+  changed any of them keeps exactly what they had, and the group never mixes old and new). The
+  schema stays v3 on purpose, key presence being the marker, because a bump made an older build
+  reject the file and reset every setting on a downgrade or an equal-versionCode reinstall (review
+  finding). Saved built-ins are stored whole, so `factoryRevision` 1 gives a built-in still holding
+  its revision-0 values the current ones, once, and keeps any the user edited. Accepted: a v3 user
+  who had set all four back to exactly 20/25/65/1310 cannot be told from one who never touched them
+  and moves too; on-device behaviour is unverified.
+- DD-031 [cited]: **Loading an untouched built-in profile keeps the user's "Trust unreliable
+  sensor" and Quick Settings choices, closing a parity gap open since the port (2026-10-05).**
+  task592's `getBaseProfile()` never wrote `reactivity.detect_overrides`,
+  `reactivity.trust_unreliable` or `circadian.qs_use` ("Booleans removed to respect user choices"
+  is in the extracted source too), and task637's `performLoad` writes only the keys a file holds, so
+  a Tasker load of a built-in keeps those globals; D-073(2) and `features_spec.md`'s schema list
+  read performSave's full key set as task592's, and only `detectOverrides` was kept on every load.
+  `DefaultProfiles.keepUserChoices` treats a profile as task592's when its name is a built-in's and
+  its values equal that built-in's (schema version aside), and the manual load, the context
+  engine's rule load, a Tasker configs-folder load and the load preview all route through it.
+  A built-in the user edited and saved, or a Tasker file whose other values differ, carries its own
+  values, as `performSave` writes every key. On-device behaviour is unverified.

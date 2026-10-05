@@ -51,6 +51,37 @@ class ProfileApplierTest {
     }
 
     @Test
+    fun applyProfile_untouchedBuiltInKeepsTrustAndQuickSettings_DD031() = runBlocking {
+        UserProfileStore(app.userProfilesDataStore).restoreFactory()
+        seed(AabSettings(serviceEnabled = false, trustUnreliableSensor = true, quickSettingsEnabled = true))
+
+        applier.applyProfile("Outdoors")
+
+        val r = committed()
+        assertEquals(4.255, r.thresholdMidpoint, "the profile's own values applied")
+        assertTrue(r.trustUnreliableSensor, "task592 writes no trust_unreliable")
+        assertTrue(r.quickSettingsEnabled, "task592 writes no qs_use")
+    }
+
+    @Test
+    fun applyProfile_editedBuiltInAppliesItsOwnTrustAndQuickSettings_DD031() = runBlocking {
+        val profiles = UserProfileStore(app.userProfilesDataStore)
+        profiles.save("Outdoors", DefaultProfiles.Outdoors.copy(minBrightness = 30))
+        seed(AabSettings(serviceEnabled = false, trustUnreliableSensor = true, quickSettingsEnabled = true))
+
+        try {
+            applier.applyProfile("Outdoors")
+
+            val r = committed()
+            assertEquals(30, r.minBrightness)
+            assertFalse(r.trustUnreliableSensor, "a saved profile carries its own value, as performSave writes it")
+            assertFalse(r.quickSettingsEnabled)
+        } finally {
+            profiles.restoreFactory()
+        }
+    }
+
+    @Test
     fun applyProfile_unknownName_isNoOp() = runBlocking {
         val before = AabSettings(serviceEnabled = false, minBrightness = 42, contextOverride = false)
         seed(before)

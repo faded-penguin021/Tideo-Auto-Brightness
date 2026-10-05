@@ -25,12 +25,12 @@ data class AabSettings(
     val dimSpread: Int = 100,
     val pwmSensitive: Boolean = false,
     val pwmExponent: Float = 0.8f,
-    // Tasker: task570 %AAB_Throttle = AnimSteps*MaxWait+10 = 20*65+10 = 1310 (D-004/D-008)
-    val throttleDefaultMs: Long = 1_310L,
-    val minWaitMs: Int = 25,
-    val maxWaitMs: Int = 65,
-    // Tasker: task570 %AAB_AnimSteps = 20; slider range 0–100 (D-004/D-008/D-017)
-    val animSteps: Int = 20,
+    // Tasker: task570 %AAB_Throttle = AnimSteps*MaxWait+10 = 50*30+10 = 1510 (D-004/D-008, DD-030)
+    val throttleDefaultMs: Long = 1_510L,
+    val minWaitMs: Int = 5,
+    val maxWaitMs: Int = 30,
+    // Tasker: task570 %AAB_AnimSteps = 50 (DD-030); slider range 0–100 (D-004/D-008/D-017)
+    val animSteps: Int = 50,
     val deltaFactor: Float = 1.8f,
     val thresholdBright: Float = 0.08f,
     val thresholdDark: Float = 0.3f,
@@ -127,10 +127,10 @@ object AabSettingsContract {
         AabSettingRule("%AAB_DimSpread", "dimSpread", AabValueType.Int, "100", "range -100..100"),
         AabSettingRule("%AAB_PWMSensitive", "pwmSensitive", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_PWMExp", "pwmExponent", AabValueType.Float, "0.8", "range 0.1..3.0"),
-        AabSettingRule("%AAB_Throttle", "throttleDefaultMs", AabValueType.Long, "1310", "range 100..60000"),
-        AabSettingRule("%AAB_MinWait", "minWaitMs", AabValueType.Int, "25", "range 1..5000"),
-        AabSettingRule("%AAB_MaxWait", "maxWaitMs", AabValueType.Int, "65", "range 1..5000 and >= minWaitMs"),
-        AabSettingRule("%AAB_AnimSteps", "animSteps", AabValueType.Int, "20", "range 0..100"),
+        AabSettingRule("%AAB_Throttle", "throttleDefaultMs", AabValueType.Long, "1510", "range 100..60000"),
+        AabSettingRule("%AAB_MinWait", "minWaitMs", AabValueType.Int, "5", "range 1..5000"),
+        AabSettingRule("%AAB_MaxWait", "maxWaitMs", AabValueType.Int, "30", "range 1..5000 and >= minWaitMs"),
+        AabSettingRule("%AAB_AnimSteps", "animSteps", AabValueType.Int, "50", "range 0..100"),
         AabSettingRule("%AAB_DeltaFactor", "deltaFactor", AabValueType.Float, "1.8", "range 0.1..10.0"),
         AabSettingRule("%AAB_ThreshBright", "thresholdBright", AabValueType.Float, "0.08", "range 0.0..1.0"),
         AabSettingRule("%AAB_ThreshDark", "thresholdDark", AabValueType.Float, "0.3", "range 0.0..1.0"),

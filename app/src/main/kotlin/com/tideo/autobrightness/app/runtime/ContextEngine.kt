@@ -4,6 +4,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ContextBaselineStore
 import com.tideo.autobrightness.app.settings.ContextRule
 import com.tideo.autobrightness.app.settings.ContextSignalTokens
+import com.tideo.autobrightness.app.settings.DefaultProfiles
 import com.tideo.autobrightness.app.settings.toSpec
 import com.tideo.autobrightness.domain.context.ContextOverrideResolver
 import com.tideo.autobrightness.domain.context.ContextResolution
@@ -468,7 +469,7 @@ class ContextEngine(
                 val profile = profileCatalog.profile(target)
                 if (profile != null) {
                     if (baselineStore.snapshot() == null) baselineStore.save(current)
-                    settingsWriter { mergeProfile(it, profile) }
+                    settingsWriter { mergeProfile(it, DefaultProfiles.keepUserChoices(target, profile, it)) }
                 } else {
                     current
                 }

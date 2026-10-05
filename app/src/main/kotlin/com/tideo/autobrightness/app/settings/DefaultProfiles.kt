@@ -5,16 +5,8 @@ package com.tideo.autobrightness.app.settings
  */
 object DefaultProfiles {
 
-    // task592 getBaseProfile(); animation defaults differ from task570 init.
-    // D-151/D-152: display-toggle fields stay at AabSettings defaults (leave device alone).
-    val Default = AabSettings(
-        animSteps = 50,            // task592: anim_steps 50 (task570 default is 20)
-        minWaitMs = 5,             // task592: min_wait 5 (task570 default is 25)
-        maxWaitMs = 30,            // task592: max_wait 30 (task570 default is 65)
-        throttleDefaultMs = 1510L, // task592: throttle = 50*30+10 = 1510
-        thresholdMidpoint = 3.0,   // task592: midpoint 3.0 (task570 default is log10(10000)=4.0)
-        // All other fields use AabSettings() defaults (matching task570 init values)
-    )
+    // task592 getBaseProfile() is task570's init (DD-030); display toggles stay off (D-151/D-152).
+    val Default = AabSettings()
 
     // task592: min/max 1/200, scale 0.8, anim 1, delta 2.8, thresh dark/dim/bright 0.5.
     val BatterySaver = Default.copy(
@@ -42,7 +34,7 @@ object DefaultProfiles {
         dimmingThreshold = 20,
     )
 
-    // task592: min 25, offset 15, scale 1.15, anim 10, wait 10, delta 4, form1a 8, zones 55/18000.
+    // task592: min 25, offset 15, scale 1.15, anim 10, wait 10, delta 4, form1a 8, zones 55/18000, midpoint 4.255.
     val Outdoors = Default.copy(
         minBrightness = 25,
         offset = 15,
@@ -53,6 +45,7 @@ object DefaultProfiles {
         form1A = 8.0,
         zone1End = 55,
         zone2End = 18000,
+        thresholdMidpoint = 4.255,
     )
 
     // task592: min 1, wait 60/120, delta 0.8, pwm_sensitive ON, thresh_dark 0.6.
@@ -75,4 +68,9 @@ object DefaultProfiles {
         "Outdoors" to Outdoors,
         "Night Reading" to NightReading,
     )
+
+    // DD-031: task592 writes no trust_unreliable or qs_use, so loading an untouched built-in keeps the user's.
+    fun keepUserChoices(name: String, profile: AabSettings, current: AabSettings): AabSettings =
+        if (all[name]?.copy(schemaVersion = 0) != profile.copy(schemaVersion = 0)) profile
+        else profile.copy(trustUnreliableSensor = current.trustUnreliableSensor, quickSettingsEnabled = current.quickSettingsEnabled)
 }

@@ -1430,10 +1430,21 @@ class BrightnessPipelineControllerTest {
 
     @Test
     fun flickerFasterThanTheCooldown_chasesNoGhosts_andEvaluatesTheFinalReading_DC069() = runTest {
+        flickerChasesNoGhosts(settings)
+    }
+
+    @Test
+    fun flickerAtTheV3AnimationTiming_chasesNoGhosts_DD030() = runTest {
+        flickerChasesNoGhosts(settings.copy(animSteps = 20, minWaitMs = 25, maxWaitMs = 65, throttleDefaultMs = 1_310L))
+    }
+
+    private suspend fun TestScope.flickerChasesNoGhosts(timing: AabSettings) {
         val sensor = FakeSensor()
         val clock = { 1_000L + testScheduler.currentTime }
         val trace = EvalTrace(clock)
-        val (controller, scope) = newController(sensor, FakeBrightness(), clock = clock, debugSink = trace)
+        val (controller, scope) = newController(
+            sensor, FakeBrightness(), clock = clock, settingsProvider = { timing }, debugSink = trace,
+        )
         var newest = Double.NaN
         val violations = mutableListOf<String>()
         trace.onEval = { e ->
@@ -1441,6 +1452,21 @@ class BrightnessPipelineControllerTest {
             if (kotlin.math.abs(e.lux - newest) > 1e-3) violations += "${e.lux} ran while $newest was newest"
             val since = s.lastAcceptedMs?.let { e.atMs - it }
             if (since != null && since < s.throttleMs!!) violations += "${e.lux} ran ${since}ms into a ${s.throttleMs}ms cooldown"
+        }
+        var stops = 0
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            var seen: CompletedCycle? = null
+            controller.state.collect { st ->
+                val c = st.sensor.lastCycle
+                if (c != null && c !== seen) {
+                    seen = c
+                    if (c.result == CycleResult.DEAD_BAND_STOP) {
+                        stops++
+                        val raw = st.lastRawLux ?: Double.NaN
+                        if (!(kotlin.math.abs(raw - newest) <= 1e-3)) violations += "act19 stopped $raw while $newest was newest"
+                    }
+                }
+            }
         }
         controller.start()
 
@@ -1461,9 +1487,12 @@ class BrightnessPipelineControllerTest {
         assertTrue(trace.luxes.drop(reached).all { it == 400.0 }, "DC-070: only the final reading is settled toward")
         assertTrue(trace.evals.size < 150, "cycles are paced by the cooldown, not by the readings: ${trace.evals.size}")
         val s = controller.state.value
-        assertEquals(s.sensor.admitted + s.sensor.settling, trace.evals.size, "no admitted cycle hid in an act19 stop")
+        assertEquals(
+            s.sensor.admitted + s.sensor.settling, trace.evals.size + stops,
+            "every admitted cycle is evaluated or act19-stopped on the newest reading, so none hides a ghost",
+        )
         assertFalse(s.unsettled, "DC-070: the run ends settled into the final reading's band")
-        val boundMs = 2 * (settings.animSteps.toLong() * settings.maxWaitMs + 10L)
+        val boundMs = 2 * (timing.animSteps.toLong() * timing.maxWaitMs + 10L)
         assertTrue(trace.evals[reached].atMs - steadyAt <= boundMs, "within one cycle plus one cooldown")
         scope.cancel()
     }

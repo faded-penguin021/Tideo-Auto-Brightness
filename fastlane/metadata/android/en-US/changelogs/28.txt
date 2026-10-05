@@ -3,3 +3,4 @@ Fixes:
 - a context rule loading a profile no longer changes the panic gesture's "Only when plugged in" setting
 - with the proximity sensor covered, brightness follows light changes more slowly, as in Tasker, and catches up when uncovered
 - the PWM software exponent's help now says what it does: higher values dim more
+- default animation and built-in profiles now match Tasker

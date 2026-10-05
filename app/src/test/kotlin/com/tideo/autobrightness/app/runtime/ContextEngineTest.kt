@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.Test
@@ -116,6 +117,7 @@ class ContextEngineTest {
         clock: () -> Long = { 0L },
         onChanged: () -> Unit = {},
         baselineStore: FakeBaselineStore = FakeBaselineStore(),
+        profiles: ProfileCatalog = catalog,
     ): EngineHarness {
         val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val settings = FakeSettingsStore(baseline)
@@ -124,7 +126,7 @@ class ContextEngineTest {
             settingsProvider = settings.provider,
             settingsWriter = settings.writer,
             baselineStore = baselineStore,
-            profileCatalog = catalog,
+            profileCatalog = profiles,
             signalSource = signalSource,
             onProfileChanged = onChanged,
             clock = clock,
@@ -751,6 +753,37 @@ class ContextEngineTest {
         assertNull(h.engine.activeContext.value)
         assertEquals(baseline, h.settings.value, "the revert restores the snapshotted baseline")
         assertNull(h.baselineStore.stored, "the snapshot is cleared after the revert")
+        h.scope.cancel()
+    }
+
+    @Test
+    fun contextLoadOfABuiltIn_keepsTrustUnreliableAndQuickSettings_DD031() = runTest {
+        val user = baseline.copy(trustUnreliableSensor = true, quickSettingsEnabled = true)
+        val h = engine(listOf(batterySaverRule), FakeSignalSource(batteryPercent = 10), baseline = user)
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertEquals("Low Battery", h.engine.activeContext.value)
+        assertEquals(DefaultProfiles.BatterySaver.minBrightness, h.settings.value.minBrightness)
+        assertTrue(h.settings.value.trustUnreliableSensor, "task592 writes no trust_unreliable")
+        assertTrue(h.settings.value.quickSettingsEnabled, "task592 writes no qs_use")
+        h.scope.cancel()
+    }
+
+    @Test
+    fun contextLoadOfAnEditedBuiltIn_appliesItsOwnTrustAndQuickSettings_DD031() = runTest {
+        val edited = DefaultProfiles.BatterySaver.copy(minBrightness = 7)
+        val profiles = object : ProfileCatalog {
+            override suspend fun profile(name: String): AabSettings? = if (name == "Battery Saver") edited else null
+            override suspend fun names(): Set<String> = setOf("Battery Saver")
+        }
+        val user = baseline.copy(trustUnreliableSensor = true, quickSettingsEnabled = true)
+        val h = engine(listOf(batterySaverRule), FakeSignalSource(batteryPercent = 10), baseline = user, profiles = profiles)
+        h.engine.start(h.scope)
+        advanceUntilIdle()
+        assertEquals("Low Battery", h.engine.activeContext.value)
+        assertEquals(7, h.settings.value.minBrightness)
+        assertFalse(h.settings.value.trustUnreliableSensor, "a saved profile carries its own value")
+        assertFalse(h.settings.value.quickSettingsEnabled)
         h.scope.cancel()
     }
 

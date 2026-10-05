@@ -6,6 +6,8 @@
 
 > Auto-transcribed verbatim from XML (entity-decoded). Provenance: each row is `actN` at its XML line. Reads/writes inferred from Variable Set targets and `%var` references.
 
+> **The owner's current task570 differs (2026-10-05, DD-030):** acts 26–28 set `%AAB_AnimSteps` 50, `%AAB_MinWait` 5 and `%AAB_MaxWait` 30, so act29's throttle is 1510. The rows below are the extracted XML, which predates that change; the app follows the owner's values.
+
 | act | line | code | detail | condition |
 |---|---|---|---|---|
 | 0 | L20985 | 37 If | **If** | `%AAB_SetupComplete !~ (no match) 1` |
