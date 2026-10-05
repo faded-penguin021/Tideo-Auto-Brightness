@@ -128,6 +128,21 @@ def test_click_and_read():
     assert handle.read("lux") == "12.5"
 
 
+def test_read_takes_a_container_label_from_its_one_text_child():
+    # A Compose AssistChip on device: the tagged node is empty, the label is a child TextView.
+    chip = (f'<hierarchy><node package="{DEBUG_PKG}" resource-id="badge" text="" '
+            f'bounds="[0,0][100,50]">{{}}</node></hierarchy>')
+    one = f'<node package="{DEBUG_PKG}" text="Basic" bounds="[10,10][90,40]"/>'
+    blank = f'<node package="{DEBUG_PKG}" text="" bounds="[0,5][100,45]"/>'
+    two = one + f'<node package="{DEBUG_PKG}" text="Elevated" bounds="[10,10][90,40]"/>'
+    badge = Target("badge", DEBUG_PKG, "read", resource_id="badge")
+    assert resolve(chip.format(one + blank), badge).label() == "Basic"
+    assert resolve(chip.format(blank), badge).label() == ""
+    with pytest.raises(UiDenied):
+        resolve(chip.format(two), badge).label()
+    assert resolve(HIERARCHY, LUX).label() == "12.5"
+
+
 def test_wrong_foreground_refused():
     handle, d = _ui("com.android.launcher", SWITCH)
     with pytest.raises(UiDenied):

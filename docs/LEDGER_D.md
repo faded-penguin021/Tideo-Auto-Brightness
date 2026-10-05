@@ -352,3 +352,11 @@
   engine's rule load, a Tasker configs-folder load and the load preview all route through it.
   A built-in the user edited and saved, or a Tasker file whose other values differ, carries its own
   values, as `performSave` writes every key. On-device behaviour is unverified.
+- DD-032: **E2E S6: the smoke set passes on the owner's phone (OxygenOS, Android 16) on
+  1.14.0-debug vc28, after two harness parser fixes (2026-10-05).** OxygenOS appends
+  ` c:<package>` inside a ServiceRecord's braces, so preflight read the running service as
+  stopped; `fgs_in_dump` now admits exactly that suffix and still reads anything else as not
+  running. A tagged AssistChip dumps empty with its label in a child, so a read falls back to the
+  node's one text-bearing descendant and refuses two. The owner installed the build out of band,
+  same signer. s01_4 failed once in 8 runs with its message not kept; S7 classifies it if it
+  recurs.

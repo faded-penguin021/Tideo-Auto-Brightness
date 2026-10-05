@@ -29,9 +29,9 @@ Scorecard.dev is a run-once local input.
 - **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S4
   done and the blocking Sol review of S2–S4 fixed (DD-021); S5's read-only preflight is built and
   passed on 1.14.0-debug vc28 (DD-029); no Tasker/MacroDroid profile on the owner's phone acts on
-  `STATE_CHANGED` (owner, 2026-10-04), so device runs set `TIDEO_E2E_CONFIRM=automation`; next is
-  S6, smoke; S6–S9 open. Owed when the partial rows
-  get tests, from Sol on S4a: a dialog-root flag for SaveProfileDialog before s14_50, and the
+  `STATE_CHANGED` (owner, 2026-10-04), so device runs set `TIDEO_E2E_CONFIRM=automation`; S6's
+  smoke set passed there (DD-032); next is S7, suites by effect order; S7–S9 open. Owed when the
+  partial rows get tests, from Sol on S4a: a dialog-root flag for SaveProfileDialog before s14_50, and the
   native flash overlay has no resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
@@ -145,6 +145,9 @@ never by bumping or creating `29.txt`; re-open only for something major, and say
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-05 — **E2E S6: smoke passes on the owner's phone on 1.14.0-debug vc28, after fixing the
+  harness's OxygenOS service-record and chip-label parsing (DD-032).**
 
 - 2026-10-05 — **First launch now takes the owner's task570 animation defaults (50 / 5 / 30 /
   1510) and the built-ins task592's midpoints (4.0, Outdoors 4.255), so Default is the

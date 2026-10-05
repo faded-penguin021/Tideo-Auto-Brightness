@@ -222,6 +222,19 @@ def test_release_fgs_parse():
     assert not fgs_in_dump(other, RELEASE_PKG)
 
 
+def test_fgs_parse_accepts_a_client_suffix():
+    # Android 16 (OxygenOS) dumps a ` c:<package>` suffix inside the record's braces.
+    suffixed = FGS_DUMP.replace(
+        "AmbientMonitoringService}\n", f"AmbientMonitoringService c:{RELEASE_PKG}}}\n", 1)
+    assert suffixed != FGS_DUMP
+    assert fgs_in_dump(suffixed, RELEASE_PKG)
+    assert not fgs_in_dump(suffixed.replace("autobrightness/", "autobrightness.debug/"), RELEASE_PKG)
+    debug = suffixed.replace("autobrightness/", "autobrightness.debug/").replace(
+        f"c:{RELEASE_PKG}", f"c:{DEBUG_PKG}")
+    assert fgs_in_dump(debug, DEBUG_PKG)
+    assert not fgs_in_dump(debug, RELEASE_PKG)
+
+
 # ── end to end: real adbutils / uiautomator2 against a loopback server ─────────────────────
 
 

@@ -336,10 +336,10 @@ class Session:
 
 def fgs_in_dump(dump: str, package: str) -> bool:
     """Whether a `dumpsys activity services` dump shows `package`'s monitoring service in the
-    foreground."""
+    foreground. Newer builds append ` c:<client package>` inside the record's braces."""
     record = re.compile(
         r"\* ServiceRecord\{[^}]*\s" + re.escape(package) + r"/("
-        + re.escape(MONITORING_SERVICE) + r"|\.app\.runtime\.AmbientMonitoringService)\}"
+        + re.escape(MONITORING_SERVICE) + r"|\.app\.runtime\.AmbientMonitoringService)( c:[\w.]+)?\}"
     )
     blocks = re.split(r"(?m)^\s*(?=\* ServiceRecord\{)", dump)
     return any(record.match(b) and re.search(r"isForeground=true", b) for b in blocks)

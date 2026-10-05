@@ -122,10 +122,21 @@ class Node:
     description: str
     bounds: tuple[int, int, int, int]
     checked: bool = False
+    inner: tuple[str, ...] = ()  # descendants' non-empty texts, in document order
 
     def centre(self) -> tuple[int, int]:
         l, t, r, b = self.bounds
         return (l + r) // 2, (t + b) // 2
+
+    def label(self) -> str:
+        """Its own text, else its one text-bearing descendant's: a tagged chip, card or row
+        dumps empty with the label in a child. Two or more such descendants are ambiguous."""
+        if self.text or not self.inner:
+            return self.text
+        if len(self.inner) > 1:
+            raise UiDenied(f"{self.resource_id}: no text of its own and {len(self.inner)} in "
+                           "its descendants")
+        return self.inner[0]
 
 
 def _node(e: ElementTree.Element) -> Node:
@@ -135,8 +146,9 @@ def _node(e: ElementTree.Element) -> Node:
     l, t, r, b = map(int, m.groups())
     if r <= l or b <= t:
         raise UiDenied(f"node with empty bounds: {e.attrib}")
+    inner = tuple(d.get("text") for d in e.iter("node") if d is not e and d.get("text"))
     return Node(e.get("resource-id", ""), e.get("text", ""), e.get("content-desc", ""),
-                (l, t, r, b), e.get("checked") == "true")
+                (l, t, r, b), e.get("checked") == "true", inner)
 
 
 def _matches(e: ElementTree.Element, t: Target) -> bool:
@@ -326,7 +338,7 @@ class Ui:
         return True
 
     def read(self, name: str) -> str:
-        return self._locate(name, "read")[1].text
+        return self._locate(name, "read")[1].label()
 
     def checked(self, name: str) -> bool:
         return self._locate(name, "read")[1].checked

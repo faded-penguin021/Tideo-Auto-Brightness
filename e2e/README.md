@@ -6,7 +6,7 @@ script step, classified `auto`, `partial` or `manual` with a reason. Decision an
 DD-015.
 
 **Status: boundary, recovery, scenarios, install guard and read-only preflight built (S5,
-DD-029).** The first device contact was read-only; S6's guarded install and smoke run are next.
+DD-029); the smoke set passes on a device (S6, DD-032).** The effect-ordered suites are next.
 
 ## Safety boundary
 
