@@ -24,8 +24,9 @@ import kotlin.test.assertTrue
 /** DD-038: pinned → live fix → last-known → geo-IP (if enabled) → null. */
 class ContextSolarTimesTest {
 
-    private class FakeLocation(private val last: LocationSnapshot?) : LocationReader {
-        override fun lastKnownLocation(): LocationSnapshot? = last
+    private class FakeLocation(var last: LocationSnapshot?) : LocationReader {
+        var reads = 0
+        override fun lastKnownLocation(): LocationSnapshot? = last.also { reads++ }
         override fun locationUpdates(minTimeMs: Long, minDistanceM: Float): Flow<LocationSnapshot> = emptyFlow()
         override suspend fun currentLocation(): LocationResult = LocationResult.Unavailable
     }
@@ -78,6 +79,30 @@ class ContextSolarTimesTest {
         store.setGeoIpEnabled(true)
         assertEquals(expected, times(store).today(reportMs))
         assertNotEquals(expected, times(store).today(reportMs, liveFix = sydney))
+    }
+
+    @Test
+    fun lastKnown_isReadOncePerReuseWindow() = withStore { store ->
+        val fake = FakeLocation(null)
+        val times = ContextSolarTimes(store, fake)
+        val window = ContextSolarTimes.LAST_KNOWN_REUSE_MS
+
+        repeat(60) { assertNull(times.today(reportMs + it * 1_000L, liveFix = 0.0 to 0.0)) }
+        assertEquals(1, fake.reads)
+
+        times.today(reportMs + 5_000L, liveFix = amsterdam)
+        assertEquals(1, fake.reads)
+
+        fake.last = LocationSnapshot(sydney.first, sydney.second)
+        assertNull(times.today(reportMs + window - 1, liveFix = 0.0 to 0.0))
+        assertEquals(1, fake.reads)
+
+        fake.last = LocationSnapshot(amsterdam.first, amsterdam.second)
+        val expected = times.today(reportMs, liveFix = amsterdam)
+        assertEquals(expected, times.today(reportMs + window, liveFix = 0.0 to 0.0))
+        assertEquals(2, fake.reads)
+        assertEquals(expected, times.today(reportMs + window + 1_000L, liveFix = 0.0 to 0.0))
+        assertEquals(2, fake.reads)
     }
 
     @Test

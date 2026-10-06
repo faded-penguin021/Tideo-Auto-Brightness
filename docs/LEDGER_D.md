@@ -446,3 +446,13 @@
   wrote after a locked phone dozes again (~8-10 s after wake, so Tideo hibernated); the owner now
   unlocks first, and since the quiet half's write stands until the light moves, Tideo's last
   applied value is put back before the control. Passed twice.
+
+- DD-042 [cited]: **TIME rules wake only at `%AAB_NextContextTime`, as prof764 does; the evaluation
+  on every pipeline update is gone (owner, 2026-10-06).** That tick, D-042(e)'s stand-in kept after
+  D-093 built the scheduler, assembled signals about once a second, reading Android's last-known
+  location each time without a pinned or live fix. It also re-ran refused evaluations, so a PASS-1
+  refusal (shared cooldown) of any caller but BATTERY is now retried as that caller once the
+  cooldown has passed, a departure from task43, which drops it (Astra's choice over strict parity).
+  `ContextSolarTimes` reuses the last-known answer for 10 minutes, as the app poll still assembles
+  every 2.5 s. As in Tasker, a day-only rule waits for the next evaluation after midnight. JVM-tested;
+  on-device unverified.

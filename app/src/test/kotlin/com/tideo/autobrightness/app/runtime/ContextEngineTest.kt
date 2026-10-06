@@ -16,8 +16,11 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import java.util.Calendar
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -58,6 +61,7 @@ class ContextEngineTest {
         var wifi: String = "",
         var dayOfWeek: Int = 4,
         var nowSecondsOfDay: Int = 12 * 3600,
+        var timeOfDay: (() -> Int)? = null,
     ) : ContextSignalSource {
         val battery = MutableSharedFlow<BatterySignal>(extraBufferCapacity = 16)
         val wifi_ = MutableSharedFlow<String?>(extraBufferCapacity = 16)
@@ -77,7 +81,7 @@ class ContextEngineTest {
             return ContextSignals(
                 app = this.app, lat = lat, lon = lon,
                 batteryPercent = this.batteryPercent, plugged = this.plugged,
-                wifi = this.wifi, dayOfWeek = dayOfWeek, nowSecondsOfDay = nowSecondsOfDay,
+                wifi = this.wifi, dayOfWeek = dayOfWeek, nowSecondsOfDay = timeOfDay?.invoke() ?: nowSecondsOfDay,
             )
         }
     }
@@ -132,6 +136,59 @@ class ContextEngineTest {
             clock = clock,
         )
         return EngineHarness(engine, scope, settings, baselineStore)
+    }
+
+    @Test
+    fun timeWake_insidePass1Cooldown_retriesInsteadOfSkippingADay() = runTest {
+        val noon = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val rule = ContextRule(
+            id = "lunch", name = "Lunch", profile = "Video Streaming", priority = 10,
+            triggers = ContextTriggers(timeRange = listOf("12:01", "13:00")),
+        )
+        val src = FakeSignalSource(timeOfDay = { 12 * 3600 + (testScheduler.currentTime / 1000).toInt() })
+        val (engine, scope) = engine(listOf(rule), src, clock = { noon + testScheduler.currentTime })
+        engine.start(scope)
+        runCurrent()
+        assertEquals("12.01", engine.nextContextTime.value)
+
+        advanceTimeBy(59_500)
+        engine.resumeContextAutomation()
+        advanceTimeBy(600)
+        runCurrent()
+        assertNull(engine.activeContext.value, "the 12:01:00 wake fell inside RESUME's cooldown")
+
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals("Lunch", engine.activeContext.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun wifiChange_insideSharedCooldown_appliesWhenTheCooldownEnds() = runTest {
+        val rule = ContextRule(
+            id = "home", name = "Home", profile = "Video Streaming", priority = 10,
+            triggers = ContextTriggers(wifi = listOf("HomeNet")),
+        )
+        val src = FakeSignalSource()
+        val (engine, scope) = engine(listOf(rule), src, clock = { testScheduler.currentTime })
+        engine.start(scope)
+        runCurrent()
+        assertNull(engine.activeContext.value)
+
+        advanceTimeBy(3_000)
+        src.wifi = "HomeNet"
+        src.wifi_.emit("HomeNet")
+        advanceTimeBy(4_900)
+        runCurrent()
+        assertNull(engine.activeContext.value, "refused inside WIFI's 8 s cooldown from the t=0 evaluation")
+
+        advanceTimeBy(200)
+        runCurrent()
+        assertEquals("Home", engine.activeContext.value)
+        scope.cancel()
     }
 
     @Test

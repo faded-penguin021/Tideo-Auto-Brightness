@@ -84,6 +84,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-06 — **Time rules wake only at the next context time, as Tasker's prof764 does; the
+  per-pipeline-update evaluation that read Android's last-known location about once a second is
+  gone (DD-042).**
+
 - 2026-10-06 — **E2E S7 device runs done: s11_39 passes now the owner's `SUNSET-30` rule is
   deleted, s02_10e passes, and s02_10a passes once its control waits for the owner's unlock
   (DD-041).**

@@ -549,6 +549,7 @@ Seeded by the S0 audit (details in CLAUDE.md "Facts & corrections ledger"):
   (f) **PASS1 cooldown lastEvalTime is null until the first eval** (not 0) so a freshly-started engine
   always evaluates once regardless of clock value (the 0-init would have blocked the seed eval when
   clock≈0; harmless in prod but a real edge). (Affects S12, S14.)
+  Corrected by DD-042.
 
 - D-043 [cited]: S11 UI-SHELL decisions (sanctioned by the S11 brief; flagged for S12/S13/S14).
   (a) **Shizuku grant exec closed via a bound user service, NOT reflection (D-032 closed).** The
