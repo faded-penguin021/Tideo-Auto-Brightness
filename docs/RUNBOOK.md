@@ -113,7 +113,8 @@ Each: *when · read first · code to touch · parity obligations · acceptance �
   owner-approved execution plan in the directory named by `PLAN_DIR` in `amh.conf` (today
   `docs/plans/`), which also holds retained triage docs such as `REVIEW_TRIAGE_1.9.0.md`. The two are
   not governed alike: an execution plan is deleted at its final segment (below), while a triage doc
-  that `STATE.md` **Decided non-items** or a ledger row still points at is retained until nothing
+  that the Decided non-items (`docs/rebuild/DECIDED_NON_ITEMS.md`, DD-037) or a ledger row still
+  points at is retained until nothing
   points at it. Mirror a segment checklist in `STATE.md` `## Active work`, creating that section if it
   is absent. Segments run **sequentially** (D-133) and each ends SHIPPABLE:
   ladder green → STATE Changelog line → commit → push. A follow-up session bases its branch on
@@ -542,15 +543,15 @@ and it hunts RULE bug classes, each from this repo's history:
   filenames, or env vars (D-176).
 
 Out of scope: routine STATE.md edits (changelog lines, queue items, Current state) —
-working memory, not legislation. Two STATE sections ARE legislation and stay in scope: the
+working memory, not legislation. Two STATE-anchored texts ARE legislation and stay in scope: the
 **length-guard preamble** (guard-lockstep thresholds) and **Decided non-items** (binding
-declines). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
+declines, whose body is `docs/rebuild/DECIDED_NON_ITEMS.md` under STATE's pointer, DD-037). Verdict goes in the commit body ("rule-review pass: clean", or the findings and
 their triage). The ladder's rule-file advisory (DA-006) WARNs when the *uncommitted* diff touches a file
 named in `RULE_FILES` (`amh.conf`) — that tripwire only *surfaces* the obligation, it never certifies the
 pass; the review itself stays prose-enforced (the D-162 no-attestation-gates line holds).
 STATE.md and the ledger files are deliberately outside the tripwire (they change in nearly
 every unit — warn fatigue kills tripwires), so their legislative sections stay wholly
-prose-covered. **One level of meta only:** the reviewer reports, the session triages, the
+prose-covered; so does `docs/rebuild/DECIDED_NON_ITEMS.md`, which is not in `RULE_FILES` either. **One level of meta only:** the reviewer reports, the session triages, the
 owner arbitrates via the Owner queue — nobody reviews the reviewer.
 
 ## Incident: leaked credential (DA-006)

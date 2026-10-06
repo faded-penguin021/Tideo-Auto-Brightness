@@ -395,3 +395,24 @@
   not return to clock time ("Clear time" or a picked time does); an offset overflowing a Long is
   rejected by the editor where AAB saves it and evaluates 0; `HH:MM` with inner whitespace is still
   accepted (each part trimmed) where Tasker aborts. On-device behaviour is unverified.
+
+- DD-036: **The owner's device round on 1.14.0-debug vc28 (built from `55262a5`) passed (2026-10-06).**
+  All nine branch checks passed on the phone: DD-035's exit (a rule ending 07:03 stayed on through
+  07:03:59 and switched off at the 07:04 boundary, screen on and untouched) and the rule editor's
+  offsets, including the no-location and Simplified Chinese options but not the AAB import; #139's
+  charge-limit status 4 and the global panic toggle (DD-025); the first-launch defaults, read as
+  50 / 5 / 30, the 4.0 and 4.255 midpoints, and trust-unreliable kept on a built-in load (DD-030,
+  DD-031); the proximity damp (DD-022, DD-024); both DD-034 fixes, by a
+  method the report does not name; and the PWM help text (DD-014). The owner could not read the
+  Chinese screen, but `values-b+zh+Hans` holds neither `help_pwm_exponent` nor
+  `contexts_only_plugged_in`, so both fall back to English as DD-026 intends. The solar-offsets plan
+  closed, and its webview paste moved verbatim to
+  `_source/java/task637_profilemanager-webview.rev-2026-10-01.hunks.txt`.
+
+- DD-037: **Decided non-items moved verbatim out of `docs/STATE.md` to
+  `docs/rebuild/DECIDED_NON_ITEMS.md` (owner's grant, 2026-10-06).** STATE was over its compression
+  trigger at the previous commit, so the next commit had to land under the post-action ceilings.
+  Even with every completed stage folded, it could not get there while keeping the live E2E
+  narrative verbatim, which the owner asked for. STATE keeps the required `## Decided non-items`
+  header with a pointer to the file. The declines stay legislation under the rule-review protocol,
+  and RUNBOOK's two references now name the file.
