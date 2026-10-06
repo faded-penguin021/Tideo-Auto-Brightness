@@ -440,3 +440,9 @@
   still adds, super dimming starting without a restart, needs a dark room. The owner keeps
   fingerprint unlock, so a `screen_wake` scenario SKIPs unless `unlock` is confirmed, and each
   wake waits 60 s for the keyguard (`isKeyguardShowing`) to clear.
+
+- DD-041: **E2E S7's last three rows pass on the phone (2026-10-06).** With the owner's
+  `SUNSET-30` rule deleted s11_39 passes, and s02_10e passes with `unlock`. s02_10a's control
+  wrote after a locked phone dozes again (~8-10 s after wake, so Tideo hibernated); the owner now
+  unlocks first, and since the quiet half's write stands until the light moves, Tideo's last
+  applied value is put back before the control. Passed twice.

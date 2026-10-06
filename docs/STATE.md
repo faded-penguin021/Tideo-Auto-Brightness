@@ -29,13 +29,11 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   done and the blocking Sol review of S2–S4 fixed (DD-021); S5's read-only preflight is built and
   passed on 1.14.0-debug vc28 (DD-029); no Tasker/MacroDroid profile on the owner's phone acts on
   `STATE_CHANGED` (owner, 2026-10-04), so device runs set `TIDEO_E2E_CONFIRM=automation`; S6's
-  smoke set passed there (DD-032); S7 is under way (DD-033, DD-034, DD-039, DD-040): 17 of 20
-  auto scenarios pass (15) or skip correctly (2) on the phone; the owner passed DD-034's two app
-  fixes on 1.14.0-debug vc28 (DD-036), and e2e's s06_19a passes there, but s11_39 must be rerun
-  between sunrise+30 and sunset−30, when the owner's `SUNSET-30` context rule is not active (runs
-  need `TIDEO_E2E_CONFIRM=contexts,automation` while it exists; the owner gave that on
-  2026-10-06); s02_10a/10e run only with `unlock` added, which a session asks the owner for
-  first, since each wake waits for their fingerprint (DD-040). S8–S9 open. Owed when the partial rows get tests, from Sol on S4a: a
+  smoke set passed there (DD-032); S7's device runs are done (DD-033, DD-034, DD-039…DD-041):
+  all 20 auto scenarios pass (18) or skip correctly (2) on 1.14.0-debug vc28, the owner having
+  deleted the `SUNSET-30` context rule; s02_10a/10e run only with `unlock` added, which a session
+  asks the owner for first, since each wake waits for their fingerprint (DD-040). S8–S9 open.
+  Owed when the partial rows get tests, from Sol on S4a: a
   dialog-root flag for SaveProfileDialog before s14_50, and the native flash overlay has no
   resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
@@ -85,6 +83,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-06 — **E2E S7 device runs done: s11_39 passes now the owner's `SUNSET-30` rule is
+  deleted, s02_10e passes, and s02_10a passes once its control waits for the owner's unlock
+  (DD-041).**
 
 - 2026-10-06 — **Owner queue answered: no false override pause has recurred since 2026-09-23, so
   that item is dropped; the task592/task637 Tasker fixes are done; the owner re-checked the

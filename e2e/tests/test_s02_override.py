@@ -54,16 +54,24 @@ def test_s02_10a_no_false_pause_on_wake(run):
         f"the write landed {run.last_put_at - woke:.2f} s after wake, outside the window"
     assert _quiet(run), "a write just after wake paused (#123)"
     woke_unlocked(run)
-    # Control: the same write 5 s after wake is a user adjustment.
+    # The ignored write stands (Tideo's first cycle after wake already matched d, so it writes
+    # nothing), and the next wake would animate from it over the control. Put Tideo's last
+    # applied value back, read now since the light may have moved off d (Sol): drift, not a pause.
     unpaused(run)
+    run.open("live_debug")
+    run.wait_for(lambda: run.metric("debug_current_bright").isdigit(), 15, "a baseline since wake")
+    run.put_brightness(int(run.metric("debug_current_bright")))
+    assert _quiet(run), "restoring Tideo's own value paused"
+    # Control: the same write 5 s after wake is a user adjustment. Unlocked first: a locked phone
+    # dozes again ~8-10 s after a wake, and a write after that lands while Tideo hibernates.
     d = settled_domain(run)
     run.keyevent("KEYCODE_SLEEP")
     run.sleep(3)
     run.keyevent("KEYCODE_WAKEUP")
-    run.sleep(5)  # timed from the wake, so the unlock waits until after the write
+    woke_unlocked(run)
+    run.sleep(5)  # from the unlock, itself the latest wake
     unpaused(run)
     run.put_brightness(far_domain(d))
-    woke_unlocked(run)
     expect_pause(run, "the control; silence means detection is disabled")
     discard(run)
 
