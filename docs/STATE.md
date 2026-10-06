@@ -37,8 +37,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   dialog-root flag for SaveProfileDialog before s14_50, and the native flash overlay has no
   resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
-  `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
-  · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
+  `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
+  [x] N1 · [ ] N2 device Kelvin range · [ ] N2b 686–7985 K opt-in toggle · [x] N3 (owner: the
+  DD-038 solar fallback) · [ ] N4 close-out.
 
 ## Owner queue
 
@@ -83,6 +84,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-06 — **Night Light plan: #142's owner direction added as N2b (686–7985 K behind an
+  opt-in toggle); N3 closed as the owner's DD-038 solar-fallback diagnosis.**
 
 - 2026-10-06 — **Time rules wake only at the next context time, as Tasker's prof764 does; the
   per-pipeline-update evaluation that read Android's last-known location about once a second is

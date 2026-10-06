@@ -14,14 +14,23 @@ commit against an AAB issue: cross-reference it as
 
 Reported against v1.10.0. Reporter's environment: Pixel 8 Pro / GrapheneOS / Android 17.
 
+A second issue feeds N2 and N2b: **`faded-penguin021/Tideo-Auto-Brightness#142`** ("Full color
+temperature range", 2026-10-06), a Tideo issue this time. Its reporter showed the
+`color_display` binder drives Night Light well outside the AOSP range, and the owner's reply there
+sets the direction recorded under N2b. Per that reply, feature requests belong in AAB, which gets
+the feature first and is then ported here.
+
 ## Segments
 
 - [x] **N1 — F1 + F2, the reported bug.** Shipped as DC-055 (read-back) and DC-056 (anchor).
   JVM-verified only; the settings-row confirmation below is still **owed** and needs a debug build
   installed on a device (the owner offered one, 2026-09-21; nothing was installed).
-- [ ] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.**
-- [ ] **N3 — F5: daytime activation.** BLOCKED on device evidence; do not ship a guess.
-- [ ] **N4 — close-out.** Delete this file once N2 and N3 are settled. The reply question is
+- [ ] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.** The slider
+  follows the device's reported min/max/default (owner, #142, 2026-10-06).
+- [ ] **N2b — extended range behind a toggle (#142).** 686–7985 K, off by default. Starts after N2.
+- [x] **N3 — F5: daytime activation.** Owner, 2026-10-06: most likely the default-solar-times
+  fallback that DD-038 fixed. No N3 code; unverified on the reporter's device.
+- [ ] **N4 — close-out.** Delete this file once N2, N2b and N3 are settled. The reply question is
   closed: the owner answered the reporter personally (2026-09-23), and the draft below was not
   used.
 
@@ -93,13 +102,24 @@ Inject the reader so a unit test can supply a diverging device; that is the gate
 **not locally reproducible** (see below).
 
 Separately: `setNightLightTemperature` clamps to `1_000..10_000` and `SettingsValidator` validates
-the same band. Those are sanity rails, not AOSP bounds, and are fine — but a device floor of 686
-sits below the 1000 rail, so a user there still cannot express their real setting. Decide whether
-the rail should follow the device too; that is a question, not a finding.
+the same band. Those are sanity rails, not AOSP bounds. A device floor of 686 sits below the 1000
+rail. **Settled by the owner (#142, 2026-10-06):** N2 only makes the slider follow the device's
+reported range. Anything wider is N2b's opt-in toggle, and N2b moves these rails to 686..7985,
+one band shared by `SecureDisplayController`, `AabSettingsMapper` and `SettingsValidator`.
 
-### Where 686 comes from — open, and it sizes F4 rather than gating it
+### Where 686 comes from — explained by the matrix maths; the lookup still sizes F4
 
-Three candidate sources, very different blast radii: a GrapheneOS change (most likely — and
+**Owner, #142 (2026-10-06):** 686 K is where AOSP's Night Light matrix runs out of blue. #142
+quotes the per-channel fit (`r = 1`; `g = -9.6235e-9·K² + 1.5305e-4·K + 0.3908`;
+`b = -1.8936e-8·K² + 3.0241e-4·K - 0.1987`). Its roots, rechecked here: blue reaches 0 at
+**686.6 K**, green reaches 0 at −2238 K (so `-2200` is close to pure red), and blue peaks at the
+vertex **7985 K** (≈1.009) and then falls, so the tint turns red again above it (#142's reporter saw
+that at 12000 K). A floor at the blue zero is a principled choice for a blue-light filter, which is
+why the owner now reads 686 as GrapheneOS's deliberate limit. The lookup below is still worth
+asking for, because it shows whether the 686 is a real overlay value. The three candidate sources
+were:
+
+A GrapheneOS change (most likely — and
 GrapheneOS users are exactly this app's Shizuku/root-capable audience, so they are
 over-represented among Tideo users), an AOSP change in Android 17 (now unlikely: AOSP still
 documents 2596/2850/4082, and the owner's Android 16 device returns stock values), or a local
@@ -120,10 +140,67 @@ Add `--verbose` to see which overlay supplied a value. Fallbacks if that ever fa
 build: `aapt2 dump resources` on a pulled `framework-res.apk` (base values only — also enumerate
 `/vendor/overlay`, `/product/overlay`, `/system_ext/overlay`), or `dumpsys color_display`. What does
 **not** work: writing an out-of-range value and reading it back. `Settings.Secure.putInt` stores
-whatever it is given; the clamping lives in the Settings UI and in ColorDisplayService's
-application path, never in the stored value — that measures your own write.
+whatever it is given, so reading it back only measures your own write. Clamping happens
+elsewhere, and #142 shows it is uneven. On the owner's device (2026-10-06) out-of-range writes
+**visibly changed** the panel while `dumpsys color_display` reported a clamped value and
+`settings get` reported the written one. So the dumpsys or service read is not proof of what the
+panel shows.
 
-## N3 — F5: daytime activation (BLOCKED, needs device evidence)
+## N2b — extended range behind a toggle (#142; starts after N2)
+
+**Owner direction (#142 reply, 2026-10-06):** an opt-in toggle, labelled "Go beyond temperature
+limits" or something close (the wording is not final), off by default. When it is on, the setpoint
+slider spans **686–7985 K** instead of the device's reported range. Never go below 686 (blue is
+already zero; going lower only strips green toward red). Never go above 7985 (the blue peak; above
+it the fit reddens again). Both bounds are derived under N2 above. The toggle needs the ELEVATED
+tier, like every Night Light control.
+
+**Port from AAB first.** Per the owner, AAB builds the feature first and Tideo ports it. Before
+starting, look for AAB's implementation. If it exists, its toggle semantics are the parity source
+and "Tasker semantics override coding taste" applies. If it does not exist yet, ask the owner
+whether N2b waits for it.
+
+**The binder code #142 proposes already exists.** The issue's `ColorDisplayBinder` snippet is
+essentially `platform/.../privilege/ColorDisplayBinder.kt` (DC-057). Do not add a second copy.
+What N2b actually has to settle:
+
+- **The write path.** DC-057 uses the binder only on builds whose verdict is NOT_HONOURED. Find out
+  on a device whether an out-of-range Kelvin written to the secure key takes effect on an HONOURED
+  build, or whether only the binder delivers it. If out-of-range values need the binder everywhere,
+  that widens Shizuku's role. AGENTS.md's "exactly three places" sentence and the
+  `doc-facts.sh` anchor then change too, which is a rule change under the rule-review protocol.
+- **The DC-057 probe hazard (found while planning; not yet tested).**
+  `NightLightTemperatureRoute.observe` counts a mismatch when the service's
+  `getNightDisplayColorTemperature()` differs from the written Kelvin. If that getter clamps the
+  way #142's dumpsys did, every out-of-range write is a false mismatch. Two of them latch
+  NOT_HONOURED on a build that honours the key. The same clamped read would also feed
+  `readDeviceKelvin` and the DC-056 anchor. Recommendation: probe only with Kelvins inside the
+  device range, and pin that with a unit test.
+- **The ramp's day endpoint.** The circadian ramp runs from the setpoint to `dayKelvin`, which N2
+  sets to the device max. With the toggle on, a setpoint can sit above the device max, and the ramp
+  would then make daytime warmer than night. Recommendation: use `max(deviceMax, setpoint)` as the
+  day endpoint. Do not extend the day endpoint to 7985, which would also change the ramp for users
+  who keep the toggle off.
+- **Where the toggle lives, and what turning it off does.** Choose between the DC-056
+  `display_prefs` store (a device-scoped preference) and an `AabSettings` field (a per-profile
+  setting that is exported and context-merged). Also decide whether a stored out-of-range setpoint
+  is clamped into the device range when the toggle goes off, or kept and only re-shown. A profile
+  imported with 686 K must still pass the validator, which is why the rails above become 686..7985
+  whatever the toggle says. Ask the owner; this is a question, not a finding.
+- **Collateral.** The new strings need Chinese translations (see Owner-queue item 1's pattern).
+  Device steps go into both `DEVICE_TEST_SCRIPT.md` and `e2e/scenarios.toml` (RUNBOOK playbook 5).
+  `:app`'s comment budget is still the limit noted under "Session setup".
+
+## N3 — F5: daytime activation (owner diagnosis: fixed by DD-038)
+
+**Owner, 2026-10-06:** the daytime activation was most likely the fallback to default solar times,
+fixed in a recent commit. That fix is DD-038 (`716b54b`). Without a pinned location, a live fix or
+Android's last-known location, SUNRISE/SUNSET rule tokens fell back to task43's 06:00/18:00
+placeholder, so a sunset-anchored rule could fire in daylight. They now resolve through
+`ContextSolarTimes`, with the pinned Circadian location first. DD-042 changed how often that
+resolver reads the last-known location. **No N3 code is planned.** It stays unverified on the
+reporter's device. If the report comes back on a build carrying DD-038, the two suspects below are
+where to start; neither has been verified.
 
 Reporter: Night Light activates during the daytime, only with circadian on. Two candidate
 mechanisms, neither verified:
@@ -254,8 +331,8 @@ What the reply owes them:
    "stock AOSP" — AOSP documents 2596–4082 as a per-panel example. F4 is a real defect regardless.
 6. Ask for the three `cmd overlay lookup` outputs and their `night_display_auto_mode`.
 
-## Also worth deciding, not in scope here
+## Where reports land — answered
 
-AAB's last push was 2026-08-24 and the code has moved to Tideo, but AAB still carries the issue
-tracker users are on — which is why a Tideo bug was filed against AAB. If that split is not
-deliberate, decide where reports should land.
+The owner's #142 reply (2026-10-06) settles this for feature requests: they go to AAB, which builds
+the feature first and Tideo ports it. That makes the split deliberate. Bug reports were not
+addressed.
