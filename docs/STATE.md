@@ -41,7 +41,8 @@ Scorecard.dev is a run-once local input.
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
 - **Solar offsets** — `docs/plans/CONTEXT_SOLAR_OFFSETS.md` (owner go-ahead 2026-10-06): [x] U1
-  evaluator parity (DD-035) · [ ] U2 rule editor.
+  evaluator parity (DD-035) · [x] U2 rule editor; owed: the owner's device step (Owner queue 8).
+  The plan stays until then: its Appendix B is the only copy of the webview paste.
 
 ## Owner queue
 
@@ -112,6 +113,12 @@ Scorecard.dev is a run-once local input.
    shell pm grant com.tideo.autobrightness.debug android.permission.WRITE_SECURE_SETTINGS` first
    and revoke it after if you want it off.
 
+8. **[2026-10-06] On that build, check that time rules end on time and that Sunrise/Sunset offsets
+   work.** Run `DEVICE_TEST_SCRIPT.md` step 24c. Worked if a rule ending at 14:02 switches back at
+   14:03 with the phone untouched, and a Sunset rule with an offset switches on at the minute its
+   gold preview shows (DD-035). The editor's four new strings (`contexts_offset_*`) are English only
+   until a fluent speaker translates them, like item 4.
+
 Open questions:
 
 - **[2026-10-05] Should an open Dashboard notice a grant by itself?** DEVICE_TEST_SCRIPT 19b
@@ -169,6 +176,10 @@ never by bumping or creating `29.txt`; re-open only for something major, and say
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-06 — **Solar offsets U2: the rule editor's Sunrise/Sunset take an "Offset (min)" with a
+  gold resolved-time preview, saved as `SUNRISE±N`/`SUNSET±N`; an invalid offset blocks Save
+  inline (DD-035). New device step 24c (`s08_24c`, manual).**
 
 - 2026-10-06 — **Solar offsets U1: the evaluator follows AAB's task43 revision of 2026-10-01 —
   `SUNRISE±N`/`SUNSET±N` endpoints, a rule held for all of its end minute, an exit wake at end +

@@ -351,6 +351,17 @@ optional.
     **comma decimal separator** (e.g. Deutsch). **Expected:** identical — the parse/format pair is
     shared by both screens now. Before the fix, Set silently refused and the rule reopened with the
     toggle off.
+24c. **Time rules exit on time; solar offsets (DD-035).** Use a profile different from your baseline
+    as the rule's target, with no other rule matching.
+    - **Exit at end + 1 min.** Add a time rule from now to **2 min from now** (e.g. 14:00–14:02 at
+      14:00) and leave the phone untouched, screen off. **Expected:** it switches on, stays on through
+      the whole 14:02 minute, and switches back to your baseline at **14:03** (a teal context flash;
+      Live Debug's next context time read 14.03 before then), not at some later light change.
+    - **Sunset offset.** With location available, add a rule whose From is **Sunset** and whose
+      **Offset (min)** puts it about 3 min from now (e.g. sunset 18:30, now 17:57 → `-30`), To a
+      clock time an hour later. **Expected:** the gold preview under the offset shows that time
+      (18:00 here), the rule switches on at exactly that minute, and reopening the rule shows the
+      offset as `-30`. An offset like `5-` refuses to save with "Offset for Start must be…".
 25. Manually load a profile (Profiles). **Expected:** context automation **pauses** (Resume banner);
     screen off→on or Resume re-enables it.
     - **Resume re-evaluates, it does not reset (DA-018).** With a rule currently MATCHING, load a

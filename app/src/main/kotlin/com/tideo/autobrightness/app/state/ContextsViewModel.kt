@@ -78,11 +78,11 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
     suspend fun currentLocation(): LocationResult = location.activeFix()
 
     /**
-     * Today's resolved sunrise / sunset as "HH:MM" for the SUNRISE/SUNSET token labels (G2R-F68),
+     * Today's sunrise / sunset as local seconds-of-day for the token labels and offset preview (G2R-F68),
      * computed for the last-known location. Null when no location is available (tokens still work;
      * they just show without the resolved time). Mirrors AndroidContextSignalSource's solar math.
      */
-    suspend fun solarTimes(): Pair<String, String>? = withContext(Dispatchers.Default) {
+    suspend fun solarTimes(): Pair<Long, Long>? = withContext(Dispatchers.Default) {
         val loc = runCatching { location.lastKnownLocation() }.getOrNull() ?: return@withContext null
         val cal = Calendar.getInstance()
         val offsetHours = cal.timeZone.getOffset(cal.timeInMillis) / 3_600_000.0
@@ -91,11 +91,9 @@ class ContextsViewModel(application: Application) : AndroidViewModel(application
             val solar = SolarCalculator.compute(loc.latitude, loc.longitude, cal.timeInMillis / 1000L, offsetHours)
             val rise = Math.floorMod(solar.riseEpochSec + offsetSecs, 86_400L)
             val set = Math.floorMod(solar.setEpochSec + offsetSecs, 86_400L)
-            formatSeconds(rise) to formatSeconds(set)
+            rise to set
         }.getOrNull()
     }
-
-    private fun formatSeconds(s: Long): String = "%02d:%02d".format(s / 3600, (s % 3600) / 60)
 
     /** task43 reads %APP_FOREGROUND via usage stats — app rules are dead without this grant. */
     fun hasUsageAccess(): Boolean = foregroundApp.hasUsageAccessPermission()

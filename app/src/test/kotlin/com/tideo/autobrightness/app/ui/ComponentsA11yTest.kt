@@ -51,7 +51,7 @@ class ComponentsA11yTest {
                     HeroNavCard(title = "Profiles", subtitle = "Save & load", icon = Icons.Filled.Person, onClick = {})
                     TriggerSection(title = "Time window", enabled = true, onEnabledChange = {}, key = "time") {}
                     TimeField(label = "From", value = "08:00", tag = "from", onSet = {})
-                    TimeTokenRow(which = "from", solarLabel = null, onPick = {})
+                    TimeTokenRow(which = "from", solarTimes = null, onPick = {})
                     DayPicker(selected = setOf(1), onToggle = {})
                     UsageAccessPromptCard(messageRes = R.string.a11y_back, cardTag = "usage", buttonTag = "usage_btn", onRequest = {})
                     AppPickerList(

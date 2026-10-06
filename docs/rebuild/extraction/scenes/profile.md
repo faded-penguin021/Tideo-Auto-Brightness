@@ -27,6 +27,14 @@
 - `performTask('_ContextResume', 10)` — resume context engine
 - Context-rule UI controls: `toggleDay()` (day-of-week M/T/W/T/F/S/S, data-val 1–7),
   `setSolarTime('Start'|'End', 'SUNRISE'|'SUNSET')`, `_GetWifiForContext`, `_GetLocationForContext`.
+- **Solar offsets (owner revision of 2026-10-01, DD-035).** Picking Sunrise or Sunset reveals an
+  "Offset (min)" field (`ctxOffsetStart`/`ctxOffsetEnd`, placeholder "e.g. +30 or -15");
+  `updateSolarDisplay()` shows base + offset, floored to the minute, in yellow in the time input (an
+  invalid or blank offset counts as 0). `getCommittedTime()` saves `SUNRISE+30`, `SUNSET-15`, or the
+  bare token for a blank or zero offset, and refuses anything failing `^[+-]?\d+$` ("Invalid Offset").
+  Editing seeds the field from the token; picking a clock time clears it; switching between Sunrise
+  and Sunset keeps it. Tideo: `RuleEditor` + `SolarOffsetField` (tags `start_offset`/`end_offset`, a
+  gold `*_offset_preview`, inline `offset_error`); deviations in DD-035.
 
 ## Disposition
 

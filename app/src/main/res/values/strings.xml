@@ -637,6 +637,10 @@
     <string name="contexts_use_current_wifi">Use current Wi-Fi</string>
     <string name="contexts_time_window">Time window:</string>
     <string name="contexts_clear_time">Clear time</string>
+    <string name="contexts_offset_label">Offset (min)</string>
+    <string name="contexts_offset_placeholder">e.g. +30 or -15</string>
+    <string name="contexts_offset_invalid_start">Offset for Start must be a signed whole number of minutes (e.g. +30, -15)</string>
+    <string name="contexts_offset_invalid_end">Offset for End must be a signed whole number of minutes (e.g. +30, -15)</string>
     <string name="contexts_days">Days (none = every day):</string>
     <string name="contexts_radius">Radius (metres)</string>
     <string name="contexts_only_plugged_in">Only while plugged in</string>

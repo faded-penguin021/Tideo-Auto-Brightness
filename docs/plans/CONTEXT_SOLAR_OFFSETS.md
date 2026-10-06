@@ -5,7 +5,7 @@
 The owner gave the go-ahead to execute both units on 2026-10-06; only session-branch commits are
 authorised: no PR, tag or release. They land on the train's session branch (`claude/device-e2e`),
 not the `session/…` branch named below, and on the 1.14.0 / vc28 train (`changelogs/28.txt`),
-which superseded the 1.13.0 one named below. Progress: [x] U1 (DD-035) · [ ] U2.
+which superseded the 1.13.0 one named below. Progress: [x] U1 (DD-035) · [x] U2. Both done; the owner runs `DEVICE_TEST_SCRIPT.md` step 24c.
 
 ## Context
 

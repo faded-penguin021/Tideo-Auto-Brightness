@@ -168,8 +168,8 @@ fun ProfilesContextsScreen(
     var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
     LaunchedEffect(Unit) { apps = runCatching { contextsVm.installedApps() }.getOrDefault(emptyList()) }
     // G2R-F68: resolve today's sunrise/sunset for token labels
-    var solarLabel by remember { mutableStateOf<Pair<String, String>?>(null) }
-    LaunchedEffect(Unit) { solarLabel = runCatching { contextsVm.solarTimes() }.getOrNull() }
+    var solarTimes by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    LaunchedEffect(Unit) { solarTimes = runCatching { contextsVm.solarTimes() }.getOrNull() }
 
     // D-111: sticky Load / Save / Contexts action bar (stays put while list scrolls)
     var showLoad by remember { mutableStateOf(false) }
@@ -340,7 +340,7 @@ fun ProfilesContextsScreen(
                 rules = rules,
                 profileNames = profileNames.ifEmpty { listOf("Default") },
                 apps = apps,
-                solarLabel = solarLabel,
+                solarTimes = solarTimes,
                 activeContext = activeContext,
                 onSave = { toast(R.string.toast_rule_saved); contextsVm.save(it) },
                 onDelete = { contextsVm.delete(it); toast(R.string.toast_rule_deleted) },

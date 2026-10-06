@@ -245,6 +245,11 @@ status = "manual"
 reason = "context-rule editors are outside the UI allowlist"
 
 [[scenario]]
+id = "s08_24c"
+status = "manual"
+reason = "context-rule editors are outside the UI allowlist; the waits are wall-clock minutes"
+
+[[scenario]]
 id = "s08_25"
 status = "manual"
 reason = "profile load: the (settings, baseline, profile-name) tuple is not restorable"

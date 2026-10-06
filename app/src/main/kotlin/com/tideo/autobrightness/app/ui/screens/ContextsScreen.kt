@@ -58,6 +58,7 @@ import com.tideo.autobrightness.app.ui.components.EmptyState
 import com.tideo.autobrightness.app.ui.components.SectionHeader
 import com.tideo.autobrightness.app.ui.components.SettingsColumn
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
+import com.tideo.autobrightness.app.ui.components.SolarOffsetField
 import com.tideo.autobrightness.app.ui.components.TimeField
 import com.tideo.autobrightness.app.ui.components.TimeTokenRow
 import com.tideo.autobrightness.app.ui.components.TriggerSection
@@ -67,6 +68,7 @@ import com.tideo.autobrightness.app.ui.components.formatCoord
 import com.tideo.autobrightness.app.ui.components.parseCoord
 import com.tideo.autobrightness.app.ui.components.summary
 import com.tideo.autobrightness.app.ui.theme.Dimens
+import com.tideo.autobrightness.domain.context.SolarTimeTokens
 import java.util.UUID
 
 // Legacy standalone surface for screen tests; live Contexts moved to ProfilesContextsScreen.
@@ -75,7 +77,7 @@ fun ContextsContent(
     rules: List<ContextRule>,
     profileNames: List<String>,
     apps: List<AppEntry>,
-    solarLabel: Pair<String, String>? = null,
+    solarTimes: Pair<Long, Long>? = null,
     onBack: () -> Unit,
     onSave: (ContextRule) -> Unit,
     onDelete: (String) -> Unit,
@@ -90,7 +92,7 @@ fun ContextsContent(
                 rules = rules,
                 profileNames = profileNames,
                 apps = apps,
-                solarLabel = solarLabel,
+                solarTimes = solarTimes,
                 onSave = onSave,
                 onDelete = onDelete,
                 onUseCurrentSsid = onUseCurrentSsid,
@@ -108,7 +110,7 @@ fun ContextRulesSection(
     rules: List<ContextRule>,
     profileNames: List<String>,
     apps: List<AppEntry>,
-    solarLabel: Pair<String, String>? = null,
+    solarTimes: Pair<Long, Long>? = null,
     onSave: (ContextRule) -> Unit,
     onDelete: (String) -> Unit,
     onUseCurrentSsid: ((String) -> Unit) -> Unit = {},
@@ -164,7 +166,7 @@ fun ContextRulesSection(
                     rule = current,
                     profileNames = profileNames,
                     apps = apps,
-                    solarLabel = solarLabel,
+                    solarTimes = solarTimes,
                     onCancel = { editing = null },
                     onSave = { onSave(it); editing = null },
                     onUseCurrentSsid = onUseCurrentSsid,
@@ -235,7 +237,7 @@ internal fun RuleEditor(
     rule: ContextRule,
     profileNames: List<String>,
     apps: List<AppEntry>,
-    solarLabel: Pair<String, String>?,
+    solarTimes: Pair<Long, Long>?,
     onCancel: () -> Unit,
     onSave: (ContextRule) -> Unit,
     onUseCurrentSsid: ((String) -> Unit) -> Unit,
@@ -249,8 +251,13 @@ internal fun RuleEditor(
     var priorityText by remember { mutableStateOf(rule.priority.takeIf { it >= 1 }?.toString() ?: "1") }
     val priorityOverMax = (priorityText.trim().toIntOrNull() ?: 0) > 100
     var wifi by remember { mutableStateOf(rule.triggers.wifi?.joinToString(", ") ?: "") }
-    var startTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(0) ?: "") }
-    var endTime by remember { mutableStateOf(rule.triggers.timeRange?.getOrNull(1) ?: "") }
+    val startToken = rule.triggers.timeRange?.getOrNull(0) ?: ""
+    val endToken = rule.triggers.timeRange?.getOrNull(1) ?: ""
+    var startTime by remember { mutableStateOf(SolarTimeTokens.eventOf(startToken) ?: startToken) }
+    var endTime by remember { mutableStateOf(SolarTimeTokens.eventOf(endToken) ?: endToken) }
+    var startOffset by remember { mutableStateOf(solarOffsetSeed(startToken)) }
+    var endOffset by remember { mutableStateOf(solarOffsetSeed(endToken)) }
+    var offsetError by remember { mutableStateOf<String?>(null) }
     // Day-of-week selection (G2R-F67): Calendar.DAY_OF_WEEK values 1=Sun..7=Sat; empty = all days.
     val selectedDays = remember { mutableStateOf(rule.triggers.days?.toSet() ?: emptySet()) }
     var charging by remember { mutableStateOf(rule.triggers.battery?.onPower == true) }
@@ -275,6 +282,13 @@ internal fun RuleEditor(
     var appsEnabled by remember { mutableStateOf(rule.triggers.apps != null) }
 
     fun saveRule() {
+        val hasTimeRange = timeEnabled && startTime.isNotBlank() && endTime.isNotBlank()
+        val startSaved = committedTimeToken(startTime, startOffset)
+        val endSaved = committedTimeToken(endTime, endOffset)
+        if (hasTimeRange && (startSaved == null || endSaved == null)) {
+            offsetError = if (startSaved == null) "start" else "end"
+            return
+        }
         val minPct = battMin.trim().toIntOrNull()?.coerceIn(0, 100)
         val maxPct = battMax.trim().toIntOrNull()?.coerceIn(0, 100)
         val hasBattery = batteryEnabled && (charging || minPct != null || maxPct != null)
@@ -291,8 +305,8 @@ internal fun RuleEditor(
                 null
             },
             location = locationTriggerOf(locationEnabled, lat, lon, radius),
-            timeRange = if (timeEnabled && startTime.isNotBlank() && endTime.isNotBlank()) {
-                listOf(startTime.trim(), endTime.trim())
+            timeRange = if (hasTimeRange && startSaved != null && endSaved != null) {
+                listOf(startSaved, endSaved)
             } else {
                 null
             },
@@ -394,17 +408,41 @@ internal fun RuleEditor(
                 Text(stringResource(R.string.contexts_time_window), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
-                        TimeField(stringResource(R.string.contexts_time_from), startTime, "start") { startTime = it }
-                        TimeTokenRow("start", solarLabel) { startTime = it }
+                        TimeField(stringResource(R.string.contexts_time_from), startTime, "start") {
+                            startTime = it; startOffset = ""; offsetError = null
+                        }
+                        TimeTokenRow("start", solarTimes) { startTime = it; offsetError = null }
+                        if (SolarTimeTokens.eventOf(startTime) != null) {
+                            SolarOffsetField("start", startTime, startOffset, solarTimes, offsetError == "start") {
+                                startOffset = it; offsetError = null
+                            }
+                        }
                     }
                     Column(Modifier.weight(1f)) {
-                        TimeField(stringResource(R.string.contexts_time_to), endTime, "end") { endTime = it }
-                        TimeTokenRow("end", solarLabel) { endTime = it }
+                        TimeField(stringResource(R.string.contexts_time_to), endTime, "end") {
+                            endTime = it; endOffset = ""; offsetError = null
+                        }
+                        TimeTokenRow("end", solarTimes) { endTime = it; offsetError = null }
+                        if (SolarTimeTokens.eventOf(endTime) != null) {
+                            SolarOffsetField("end", endTime, endOffset, solarTimes, offsetError == "end") {
+                                endOffset = it; offsetError = null
+                            }
+                        }
                     }
+                }
+                offsetError?.let { side ->
+                    Text(
+                        stringResource(
+                            if (side == "start") R.string.contexts_offset_invalid_start else R.string.contexts_offset_invalid_end,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag("offset_error"),
+                    )
                 }
                 if (startTime.isNotBlank() || endTime.isNotBlank()) {
                     TextButton(
-                        onClick = { startTime = ""; endTime = "" },
+                        onClick = { startTime = ""; endTime = ""; startOffset = ""; endOffset = ""; offsetError = null },
                         modifier = Modifier.testTag("clear_time"),
                     ) { Text(stringResource(R.string.contexts_clear_time)) }
                 }
@@ -519,3 +557,11 @@ internal fun locationTriggerOf(
 }
 
 // D-150: TriggerSection components moved to TriggerEditors.kt.
+
+private fun solarOffsetSeed(token: String): String =
+    if (SolarTimeTokens.eventOf(token) != null) SolarTimeTokens.editorOffsetText(token) else ""
+
+private fun committedTimeToken(base: String, offset: String): String? {
+    val event = SolarTimeTokens.eventOf(base) ?: return base.trim()
+    return SolarTimeTokens.commit(event, offset)
+}

@@ -114,7 +114,7 @@ class ScreensInfoA11yTest {
                     rule = rule,
                     profileNames = listOf("Default", "Movies"),
                     apps = listOf(AppEntry("com.example", "Example App")),
-                    solarLabel = "06:42" to "20:15",
+                    solarTimes = 24_120L to 72_900L,
                     onCancel = {}, onSave = {},
                     onUseCurrentSsid = {}, onUseCurrentLocation = {},
                     hasUsageAccess = { false }, onRequestUsageAccess = {},

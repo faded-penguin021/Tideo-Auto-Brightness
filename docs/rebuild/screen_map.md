@@ -22,6 +22,8 @@ rects and `PropertiesElement` scene-chrome are dropped (replaced by the M3 Scaff
 > diagnostics → clipboard (D-025); the Misc debug selector now drives runtime debug **toasts** for the
 > 10 `%AAB_Debug` categories (D-023); confirmations/warnings toast across screens (G2-F12); the QS
 > tile shows the live paused/running state (G2-F17). Behaviour-only — the screen set is unchanged.
+> **2026-10-06:** a Sunrise/Sunset endpoint in the rule editor takes an "Offset (min)" with a gold
+> resolved-time preview, saved as `SUNRISE±N`/`SUNSET±N` (AAB Profile scene revision, DD-035).
 
 > **S12.6a update (IA + naming, G2R-F1/F2/F3/F4):** the **AAB Menu is now a real home screen** (hub +
 > back-target; route `menu`) — the S12.5a nav drawer was promoted into it, and the Profiles/Contexts
