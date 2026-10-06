@@ -4,4 +4,4 @@ Fixes:
 - with the proximity sensor covered, brightness adapts more slowly, as in Tasker
 - the PWM exponent's help now says higher values dim more
 - default animation and built-in profiles now match Tasker
-- time rules end on time, and Sunrise/Sunset can take an offset in minutes
+- time rules end on time; Sunrise/Sunset take offsets and follow the Circadian location

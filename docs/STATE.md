@@ -81,6 +81,11 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `thresh_midpoint` 3.0 in the extracted source, so make it 4.0 if yours does too (DD-030, DD-031).
    Nothing in this repository settles it; tell a session when it is done.
 
+5. **[2026-10-06] Re-check your "sunrise test" rule on the next build.** With the location pinned on
+   the Circadian screen, the rule editor's Sunset button should show about 19:0x (not blank), and
+   the `SUNSET-30` rule should switch on around 18:3x, not at 17:30. Settles it: on the Context
+   rules screen the card's gold "Active" tag first appears at that time (DD-038).
+
 Open questions:
 
 - **[2026-10-05] Should an open Dashboard notice a grant by itself?** DEVICE_TEST_SCRIPT 19b
@@ -109,6 +114,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-06 — **SUNRISE/SUNSET rule times follow the pinned Circadian location; one shared
+  resolver for engine and editor (DD-038).**
 - 2026-10-06 — **The owner's device round on 1.14.0-debug vc28 passed all nine checks; the
   solar-offsets plan closed, its webview paste now a source transcript (DD-036). Compression
   pass: Decided non-items moved verbatim to `docs/rebuild/DECIDED_NON_ITEMS.md` (DD-037).**

@@ -416,3 +416,15 @@
   narrative verbatim, which the owner asked for. STATE keeps the required `## Decided non-items`
   header with a pointer to the file. The declines stay legislation under the rule-review protocol,
   and RUNBOOK's two references now name the file.
+
+- DD-038 [cited]: **SUNRISE/SUNSET rule tokens resolve from the Circadian screen's pinned location
+  (owner report, 2026-10-06).** The owner's `SUNSET-30`–`SUNRISE+30` rule switched on at 17:30 local
+  while the pinned Circadian graph showed sunset at ~19:06, because the engine read only the live fix
+  or Android's last-known location, found neither, and used task43's 18:00 placeholder; the rule
+  editor's labels held a second copy of that math. Both now call `ContextSolarTimes` with the
+  owner's order: pinned → live fix → Android last-known → geo-IP only while that fallback is enabled
+  → 06:00/18:00, matching task43, which reads the circadian task's `%AAB_Sunrise/Sunset`. Geo-IP is
+  the circadian's once-a-day cached lookup (D-103), never fetched during evaluation, and since that
+  cache does not record its source an older cached Android fix is also skipped while geo-IP is off
+  (owner accepted). A pinned date does not move rule times, which use today. JVM-tested
+  (`ContextSolarTimesTest`); on-device behaviour is unverified.
