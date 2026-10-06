@@ -8,7 +8,6 @@ import pytest
 from tideo_e2e import state
 from tideo_e2e.harness import Run
 from tideo_e2e.state import OVERRIDE_CHANNEL
-from tideo_e2e.ui import UiDenied
 
 DETECT = "aab_settings/detectOverrides"
 
@@ -17,6 +16,7 @@ EXTERNAL_CONTROL = "control_prefs/external_control_enabled"
 BASIC = "Basic access (Modify system settings)"
 ELEVATED = "Elevated access (super dimming ready)"
 QUIET_S = 6  # how long "nothing happens" is watched for: several pipeline cycles
+UNLOCK_WAIT_S = 60  # for the owner's fingerprint after each wake
 
 
 def override_paused(run: Run) -> bool:
@@ -103,12 +103,10 @@ def disposition(run: Run, since: float, before: tuple[str, str] | None
 
 
 def woke_unlocked(run: Run) -> None:
-    """After KEYCODE_WAKEUP the UI steps and recovery need Tideo reachable, not a keyguard."""
-    try:
-        run.open("dashboard")
-    except UiDenied as e:
-        pytest.fail(f"the phone came back locked ({e}); wake scenarios need it to wake "
-                    f"unlocked. Unlock it, then run e2e/run.sh --recover")
+    """After KEYCODE_WAKEUP the UI steps and recovery need Tideo reachable, not a keyguard: the
+    owner, at the phone by the `unlock` confirmation, unlocks it by fingerprint."""
+    run.wait_for(lambda: not run.locked(), UNLOCK_WAIT_S, "unlock by the owner after the wake")
+    run.open("dashboard")
 
 
 def automation(run: Run, on: bool) -> None:

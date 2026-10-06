@@ -51,6 +51,7 @@ class Footprint:
     starts_service: bool = False
     reevaluates_contexts: bool = False
     automation_events: bool = False
+    wakes_locked: bool = False   # the phone wakes to a keyguard only the owner can clear
     stage: int = READ
 
     def __or__(self, other: Footprint) -> Footprint:
@@ -62,7 +63,7 @@ class Footprint:
 
 
 _FLAGS = ("grant", "prefs", "runtime", "private", "starts_service", "reevaluates_contexts",
-          "automation_events")
+          "automation_events", "wakes_locked")
 
 # Start stores and stop removes saved_brightness_mode; start applies and teardown reapplies the
 # display baseline; a running pipeline writes brightness and may engage Extra Dim. Anything that
@@ -86,7 +87,7 @@ INVENTORY: dict[str, Footprint] = {
     "service_toggle": _SERVICE,
     # Screen on clears contextOverride and re-evaluates contexts, which write whole profiles.
     "screen_wake": Footprint(settings=EVERY_TIDEO_KEY, private=True, reevaluates_contexts=True,
-                             stage=SERVICE),
+                             wakes_locked=True, stage=SERVICE),
     "override_record": Footprint(private=True, runtime=True, stage=SERVICE),
     "notification_action": _SERVICE,
     "broadcast": _SERVICE,
@@ -123,7 +124,7 @@ class DeviceFacts:
     context_state: bool = False      # enabled context rules, contextOverride or a baseline set
     automation_on: bool = False
     force_dark_opt_in: bool = False
-    confirmed: frozenset[str] = field(default_factory=frozenset)  # "contexts", "automation"
+    confirmed: frozenset[str] = field(default_factory=frozenset)  # contexts, automation, unlock
 
 
 def skip_reason(effects, facts: DeviceFacts) -> str | None:
@@ -142,6 +143,9 @@ def skip_reason(effects, facts: DeviceFacts) -> str | None:
     touches_automation = fp.automation_events or (fp.runtime and facts.automation_on)
     if touches_automation and "automation" not in facts.confirmed:
         return "STATE_CHANGED broadcasts; owner has not confirmed no receiver acts on them"
+    # The owner unlocks by fingerprint after every wake (owner, 2026-10-06).
+    if fp.wakes_locked and "unlock" not in facts.confirmed:
+        return "wakes the screen locked; the owner must be at the phone to unlock it"
     if starts and facts.force_dark_opt_in:
         return "force-dark opt-in is on; a service start would set debug.hwui.force_dark"
     return None

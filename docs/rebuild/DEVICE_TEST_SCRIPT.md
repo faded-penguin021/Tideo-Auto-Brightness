@@ -279,8 +279,10 @@ optional.
     spread 0, dark room. **Fail:** dimming got *weaker*; the clamp was only ever meant to correct the
     display.
 19b. **A grant made while the app is running is picked up without a restart** (DB-012). With the
-    service running and the screen on, grant `WRITE_SECURE_SETTINGS` over adb. **Expected:** the tier
-    badge reaches **ELEVATED** within ~10 s and super dimming starts working, with no app restart.
+    service running, the screen on and the room dark enough to dim, grant `WRITE_SECURE_SETTINGS`
+    over adb. **Expected:** super dimming starts working within ~10 s, with no app restart. An open
+    Dashboard's tier badge does not change; it reads **ELEVATED** once the app is reopened (step
+    16), and that is intended (owner, 2026-10-06).
     **Known residual:** `PrivilegeManager` is per-`AppModule` and `AppModule` is built at ~10 call
     sites, so the tier cache is shared only within one instance; DB-012 self-heals the visible symptom
     rather than making it process-wide.

@@ -60,8 +60,10 @@ def test_s02_10a_no_false_pause_on_wake(run):
     run.keyevent("KEYCODE_SLEEP")
     run.sleep(3)
     run.keyevent("KEYCODE_WAKEUP")
-    run.sleep(5)
+    run.sleep(5)  # timed from the wake, so the unlock waits until after the write
+    unpaused(run)
     run.put_brightness(far_domain(d))
+    woke_unlocked(run)
     expect_pause(run, "the control; silence means detection is disabled")
     discard(run)
 

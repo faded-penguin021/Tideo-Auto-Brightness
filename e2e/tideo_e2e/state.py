@@ -205,6 +205,14 @@ def awake_in_dump(dump: str) -> bool:
     return m.group(1) == "Awake"
 
 
+def keyguard_in_dump(dump: str) -> bool:
+    """Whether `dumpsys window displays` shows the keyguard; refuses none or a disagreement."""
+    values = set(re.findall(r"isKeyguardShowing=(true|false)\b", dump))
+    if len(values) != 1:
+        raise StateError(f"dumpsys window displays: isKeyguardShowing is {sorted(values)}")
+    return values.pop() == "true"
+
+
 def current_user(out: str) -> int:
     value = out.strip()
     if not value.isdigit():
@@ -390,6 +398,10 @@ def saved_mode(s: device.Session) -> str | None:
 
 def awake(s: device.Session) -> bool:
     return awake_in_dump(_out(s, "dumpsys", "power"))
+
+
+def locked(s: device.Session) -> bool:
+    return keyguard_in_dump(_out(s, "dumpsys", "window", "displays"))
 
 
 def model(s: device.Session) -> str:

@@ -192,10 +192,8 @@ test = "tests/test_s06_elevated.py::test_s06_19a_strength_is_clamped_where_store
 
 [[scenario]]
 id = "s06_19b"
-status = "auto"
-effects = ["grant", "service_toggle", "ui_nav"]
-test = "tests/test_s06_elevated.py::test_s06_19b_grant_while_running_needs_no_restart"
-note = "never loosened; a failure is classified from evidence (Dashboard never calls refreshTier)"
+status = "manual"
+reason = "super dimming needs a room dark enough to dim; the badge on reopening is s06_16"
 
 [[scenario]]
 id = "s06_19c"

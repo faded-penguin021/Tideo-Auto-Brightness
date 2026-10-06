@@ -434,3 +434,9 @@
   waited for a pipeline write steady light never makes; it now settles once and passed twice.
   s11_39 still fails, but its restart loaded the owner's sunset-to-sunrise context rule's
   profile (both toggles off), so it says nothing of DD-034 until rerun outside that window.
+
+- DD-040: **Owner answers on two E2E scenarios (2026-10-06).** An open Dashboard need not notice
+  a grant, so s06_19b is manual: the badge on reopening is s06_16, and what DEVICE_TEST_SCRIPT 19b
+  still adds, super dimming starting without a restart, needs a dark room. The owner keeps
+  fingerprint unlock, so a `screen_wake` scenario SKIPs unless `unlock` is confirmed, and each
+  wake waits 60 s for the keyguard (`isKeyguardShowing`) to clear.

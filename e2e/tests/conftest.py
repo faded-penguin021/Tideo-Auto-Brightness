@@ -24,7 +24,7 @@ from tideo_e2e.ui import Ui
 
 ROWS = {r.id: r for r in load()}
 SERIAL_ENV = "TIDEO_E2E_SERIAL"
-# Owner confirmations for this run (plan §3.6), comma-separated: contexts, automation.
+# Owner confirmations for this run (plan §3.6), comma-separated: contexts, automation, unlock.
 CONFIRM_ENV = "TIDEO_E2E_CONFIRM"
 
 

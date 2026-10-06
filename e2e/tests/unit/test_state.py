@@ -250,3 +250,11 @@ def test_awake_is_the_power_managers_wakefulness():
     assert not state.awake_in_dump("  mWakefulness=Dozing\n")
     with pytest.raises(state.StateError):
         state.awake_in_dump("nothing here")
+
+
+def test_keyguard_reads_one_agreed_value():
+    assert state.keyguard_in_dump("    mShowingDream=false\n    isKeyguardShowing=true\n")
+    assert not state.keyguard_in_dump("    isKeyguardShowing=false\n")
+    for dump in ("nothing here", "isKeyguardShowing=true\nisKeyguardShowing=false\n"):
+        with pytest.raises(state.StateError):
+            state.keyguard_in_dump(dump)

@@ -47,15 +47,3 @@ def test_s06_19a_strength_is_clamped_where_stored(run):
         assert run.read("field_dimmingStrength_text") == stored
         run.open("super_dimming")  # leave and return
         assert run.read("field_dimmingStrength_text") == stored
-
-
-@pytest.mark.scenario("s06_19b")
-def test_s06_19b_grant_while_running_needs_no_restart(run):
-    _require_revoked(run)
-    if not run.running():
-        run.service(True)
-    run.open("dashboard")
-    assert run.read("tier_badge") == BASIC
-    run.grant()
-    # No relaunch: the open Dashboard must pick the grant up by itself (DB-012).
-    run.wait_for(lambda: run.read("tier_badge") == ELEVATED, 10, "ELEVATED without a restart")

@@ -305,11 +305,10 @@ bounded, attributable effect, so an already-true state can never pass it:
 **Auto**
 - §0 tier badge readout.
 - §1 4.
-- §2 8/9, 10a, 10b, 10c, 10e, each with the DC-012 unpaused gate before every half.
+- §2 8/9, 10a, 10b, 10c, 10e, each with the DC-012 unpaused gate before every half; 10a and 10e
+  only with the owner's `unlock` confirmation (DD-040).
 - §6 16.
-- §6 19b: never loosened. If it fails, classify it from evidence; Sol noted the Dashboard never calls
-  `refreshTier()`.
-- §6 19a.
+- §6 19a. 19b went manual: an open Dashboard need not notice a grant (owner, DD-040).
 - §11 32a, 32c, 34, 36 (revoke → process death handled), 39b.
 - §13 42, 43 (per-verb oracles above; `REAPPLY` partial; `PANIC` late), 45.
 - Late PANIC stage: §5 14a (broadcast + notification Reset, distinct pre-value, transition to S),

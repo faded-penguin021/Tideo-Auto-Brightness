@@ -342,3 +342,6 @@ class Run:
 
     def granted(self) -> bool:
         return state.grant_state(state.package_dump(self.s), DEBUG_PKG) == "granted"
+
+    def locked(self) -> bool:
+        return state.locked(self.s)

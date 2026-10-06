@@ -64,6 +64,8 @@ def test_order_is_settings_then_service_then_kill_then_panic():
      DeviceFacts(absent_rows=frozenset({("secure", "reduce_bright_colors_level")})), "absent"),
     (["service_toggle"], DeviceFacts(context_state=True), "context"),
     (["screen_wake"], DeviceFacts(context_state=True), "context"),
+    (["screen_wake"], DeviceFacts(), "locked"),
+    (["screen_wake"], DeviceFacts(confirmed=frozenset({"unlock"})), None),
     (["service_toggle"], DeviceFacts(context_state=True, confirmed=frozenset({"contexts"})), None),
     (["automation_events"], DeviceFacts(), "STATE_CHANGED"),
     (["broadcast"], DeviceFacts(automation_on=True), "STATE_CHANGED"),

@@ -95,8 +95,9 @@ TIDEO_E2E_SERIAL=<serial> e2e/run.sh --install <apk> # guarded install of a debu
 ```
 
 Without `TIDEO_E2E_SERIAL` every scenario SKIPs. `TIDEO_E2E_CONFIRM=contexts,automation` records
-the owner's confirmations for the SKIP rules. Wake scenarios (§2 10a, 10e) need the phone to
-wake unlocked; otherwise they stop, and `--recover` runs once it is unlocked.
+the owner's confirmations for the SKIP rules. Wake scenarios (§2 10a, 10e) SKIP unless it also
+lists `unlock`, which says the owner is at the phone: each wake then waits up to 60 s for their
+fingerprint. If none comes they stop, and `--recover` runs once it is unlocked.
 
 `--recover` exits 0 at once on an empty journal. Otherwise it checks the device's identity over
 a read-only session before anything else, then runs the recovery procedure. Exit 1 means
