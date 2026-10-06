@@ -14,30 +14,35 @@ internal object ContextMatching {
     private const val EARTH_RADIUS_M = 6_371_000.0
     internal const val SECONDS_PER_DAY = 86_400L
 
-    internal fun resolveTimeToken(token: String, signals: ContextSignals): Long = when (token) {
-        "SUNRISE" -> signals.sunriseLocalSecs
-        "SUNSET" -> signals.sunsetLocalSecs
-        else -> {
-            val parts = token.split(":")
-            parts[0].trim().toLong() * 3600 + parts[1].trim().toLong() * 60
+    internal fun resolveTimeToken(token: String, signals: ContextSignals): Long {
+        val raw = token.trim { it <= ' ' }
+        val base = when (SolarTimeTokens.eventOf(raw)) {
+            SolarTimeTokens.SUNRISE -> signals.sunriseLocalSecs
+            SolarTimeTokens.SUNSET -> signals.sunsetLocalSecs
+            else -> {
+                val parts = raw.split(":")
+                return parts[0].trim().toLong() * 3600 + parts[1].trim().toLong() * 60
+            }
         }
+        return SolarTimeTokens.resolve(base, SolarTimeTokens.offsetMinutes(raw))
     }
 
-    /** Time-of-day + day-of-week window verdict (task43 L314-354). start > end = overnight range. */
+    /** Time-of-day + day-of-week verdict on the current minute (task43 rev hunks L58-68). start > end = overnight. */
     internal fun timeDayWindowMatches(
         start: Long,
         end: Long,
         activeDays: List<Int>,
         signals: ContextSignals,
     ): Boolean {
+        val nowMinute = signals.nowSecondsOfDay / 60 * 60
         val activeToday = activeDays.isEmpty() || activeDays.contains(signals.dayOfWeek)
         return if (start <= end) {
-            activeToday && signals.nowSecondsOfDay >= start && signals.nowSecondsOfDay <= end
+            activeToday && nowMinute >= start && nowMinute <= end
         } else {
             val prevDay = if (signals.dayOfWeek == 1) 7 else signals.dayOfWeek - 1
             val activeYesterday = activeDays.isEmpty() || activeDays.contains(prevDay)
-            val matchToday = activeToday && signals.nowSecondsOfDay >= start
-            val matchYest = activeYesterday && signals.nowSecondsOfDay <= end
+            val matchToday = activeToday && nowMinute >= start
+            val matchYest = activeYesterday && nowMinute <= end
             matchToday || matchYest
         }
     }

@@ -31,7 +31,7 @@ data class LocationConstraint(
     val radius: Double,
 )
 
-/** Start/end tokens: "HH:MM" | "SUNRISE" | "SUNSET". start > end ⇒ overnight (task43 L314-354). */
+/** Start/end tokens: "HH:MM" | "SUNRISE[±N]" | "SUNSET[±N]", N in minutes ([SolarTimeTokens]). start > end ⇒ overnight. */
 data class TimeRange(
     val start: String,
     val end: String,

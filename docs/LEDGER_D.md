@@ -379,3 +379,19 @@
   `createRuntime` builds a new `DisplayTogglesCoordinator` per service start: a process-level
   mark, set after panic's last write and consumed by the next start, seeds from the defaults.
   Both await a device rerun on a build carrying them (s06_19a, s11_39).
+
+- DD-035 [cited]: **AAB's task43 revision of 2026-10-01 — solar offsets, an inclusive end minute
+  and an exit wake at end + 1 min — ported (2026-10-06).** The owner pasted the revised
+  `_EvaluateContexts` act12, whose changed regions are transcribed (the only copy) in
+  `_source/java/task43_1_evaluatecontexts-v2.rev-2026-10-01.hunks.txt`. A `time_range` endpoint
+  starting with `SUNRISE` or `SUNSET` takes an offset in minutes after the first `+`, else the first
+  `-` (a parse failure is 0), wrapped into the day and floored to the minute, plain tokens included;
+  `SolarTimeTokens` is the grammar's single home, for evaluator and editor, and before it Tideo threw
+  on an imported `SUNRISE+30`. The window is tested on the current minute, so a rule holds for all
+  of its end minute, and the wake list holds `start` and `end + 60 s`, where the old wake at `end`
+  matched again and left the rule on until a later evaluation. Deviations kept: a solar token can be picked with no
+  location fix (no preview; the engine uses 06:00/18:00 as task43 does), where the AAB editor
+  refuses; an invalid offset is an inline error, not a modal; re-tapping the selected token does
+  not return to clock time ("Clear time" or a picked time does); an offset overflowing a Long is
+  rejected by the editor where AAB saves it and evaluates 0; `HH:MM` with inner whitespace is still
+  accepted (each part trimmed) where Tasker aborts. On-device behaviour is unverified.

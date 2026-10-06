@@ -28,7 +28,7 @@ data class ContextTriggers(
     val battery: BatteryTrigger? = null,
     /** GPS/network location radius. */
     val location: LocationTrigger? = null,
-    /** [start, end] as "HH:MM" | "SUNRISE" | "SUNSET"; supports overnight ranges (start > end). */
+    /** [start, end] as "HH:MM" | "SUNRISE[±N]" | "SUNSET[±N]" (N minutes); supports overnight ranges (start > end). */
     @SerialName("time_range") val timeRange: List<String>? = null,
     /** Calendar.DAY_OF_WEEK values 1=Sun..7=Sat; null means all days. */
     val days: List<Int>? = null,

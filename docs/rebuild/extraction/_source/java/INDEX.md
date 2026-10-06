@@ -27,3 +27,4 @@ contains NO Java; its curve math is in code-547 maths expressions, not here.
 | Privilege / permissions | `task378` (privilege-detection), `task563` (ask-permissions), `task643` (learn-write-secure) |
 | Calibration | `task524` (calibrate-power-draw), `task620` (adaptive-brightness-scene-size) |
 | Graph generators (plot-side; cross-validate only) | `task549` (circadian), `task556` (dimming-curve), `task557` (alpha), `task657` (compression), `task663_1/2` (3-zone), `task703` (reactivity), `task705` (circadian-dimming) |
+| Owner revisions (not in the XML) | `task43_1_evaluatecontexts-v2.rev-2026-10-01.hunks.txt` — the owner's 2026-10-01 paste of task43 act12's changed regions (solar offsets, inclusive end minute, exit wake at end + 60 s); the rest equals `task43_1` apart from a cosmetic list. It supersedes `task43_1` L314-357 and is cited by line number (DD-035) |

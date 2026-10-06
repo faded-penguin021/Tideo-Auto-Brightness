@@ -1,0 +1,80 @@
+/* task43 _EvaluateContexts V2, action A12 -- owner revision of 2026-10-01 (solar offsets).
+ * Owner paste, changed regions only; the rest equals task43_1_evaluatecontexts-v2.java.txt apart
+ * from the cosmetic list in A.3. Not in the extracted XML; the paste is the only source.
+ * Code cites this file's line numbers (DD-035). Reference transcript, NOT buildable. */
+
+/* ---- A.1 Input gathering (a new line after nowSecs) ---- */
+
+    cal = Calendar.getInstance();
+    nowSecs = (cal.get(Calendar.HOUR_OF_DAY) * 3600) + (cal.get(Calendar.MINUTE) * 60) + cal.get(Calendar.SECOND);
+    nowMinute = (cal.get(Calendar.HOUR_OF_DAY) * 3600) + (cal.get(Calendar.MINUTE) * 60);
+    curDay = cal.get(Calendar.DAY_OF_WEEK);
+
+/* ---- A.2 The time-range block; replaces transcript L314-357 (`if (hasTime) {` ... `if (hasDays) specificity++;`) ---- */
+
+        if (hasTime) {
+            range = triggers.getJSONArray("time_range");
+
+            /* 1. Parse Start Time (Floored to Minute Boundary) */
+            start = 0L;
+            sRaw = range.getString(0).trim();
+            if (sRaw.startsWith("SUNRISE") || sRaw.startsWith("SUNSET")) {
+                baseSolar = sRaw.startsWith("SUNRISE") ? valSunrise : valSunset;
+                sOffsetMin = 0L;
+                if (sRaw.contains("+")) {
+                    try { sOffsetMin = Long.parseLong(sRaw.substring(sRaw.indexOf("+") + 1).trim()); } catch(Exception ex){}
+                } else if (sRaw.contains("-")) {
+                    try { sOffsetMin = -Long.parseLong(sRaw.substring(sRaw.indexOf("-") + 1).trim()); } catch(Exception ex){}
+                }
+                rawSolar = ((baseSolar + (sOffsetMin * 60L)) % 86400L + 86400L) % 86400L;
+                start = (rawSolar / 60L) * 60L;
+            } else {
+                sT = sRaw.split(":");
+                start = (Long.parseLong(sT[0]) * 3600) + (Long.parseLong(sT[1]) * 60);
+            }
+
+            /* 2. Parse End Time (Floored to Minute Boundary) */
+            end = 0L;
+            eRaw = range.getString(1).trim();
+            if (eRaw.startsWith("SUNRISE") || eRaw.startsWith("SUNSET")) {
+                baseSolar = eRaw.startsWith("SUNRISE") ? valSunrise : valSunset;
+                eOffsetMin = 0L;
+                if (eRaw.contains("+")) {
+                    try { eOffsetMin = Long.parseLong(eRaw.substring(eRaw.indexOf("+") + 1).trim()); } catch(Exception ex){}
+                } else if (eRaw.contains("-")) {
+                    try { eOffsetMin = -Long.parseLong(eRaw.substring(eRaw.indexOf("-") + 1).trim()); } catch(Exception ex){}
+                }
+                rawSolar = ((baseSolar + (eOffsetMin * 60L)) % 86400L + 86400L) % 86400L;
+                end = (rawSolar / 60L) * 60L;
+            } else {
+                eT = eRaw.split(":");
+                end = (Long.parseLong(eT[0]) * 3600) + (Long.parseLong(eT[1]) * 60);
+            }
+
+            /* Schedule wake at entry (start) and immediately after inclusive exit (end + 60s) */
+            wakeTimes.add(new Long(start));
+            wakeTimes.add(new Long((end + 60L) % 86400L));
+
+            activeToday = (activeDays.isEmpty() || activeDays.contains(curDay));
+
+            /* Evaluate matching against the current inclusive minute */
+            if (start <= end) {
+                if (!activeToday || nowMinute < start || nowMinute > end) timeDayMatch = false;
+            } else {
+                prevDay = (curDay == 1) ? 7 : curDay - 1;
+                activeYesterday = (activeDays.isEmpty() || activeDays.contains(prevDay));
+                matchToday = activeToday && (nowMinute >= start);
+                matchYest = activeYesterday && (nowMinute <= end);
+                if (!matchToday && !matchYest) timeDayMatch = false;
+            }
+
+            specificity++;
+            if (hasDays) specificity++;
+
+/* ---- A.3 Cosmetic differences from the transcript, with no behavioural effect ----
+ * - The comments `NEW: SOLAR VARIABLES` and "...to prevent crash" are shortened.
+ * - The `(WifiManager)` cast is dropped, and the Wi-Fi, state and cache explanatory comments are
+ *   removed.
+ * - `String currentLog` becomes `currentLog`, and `if(isDebug)` becomes `if (isDebug)`.
+ * - `((Long)wakeTimes.get(k)).longValue()` becomes `wakeTimes.get(k).longValue()`.
+ * - Some blank-line layout changes. */

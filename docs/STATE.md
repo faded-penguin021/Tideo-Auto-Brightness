@@ -40,6 +40,8 @@ Scorecard.dev is a run-once local input.
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
+- **Solar offsets** — `docs/plans/CONTEXT_SOLAR_OFFSETS.md` (owner go-ahead 2026-10-06): [x] U1
+  evaluator parity (DD-035) · [ ] U2 rule editor.
 
 ## Owner queue
 
@@ -167,6 +169,10 @@ never by bumping or creating `29.txt`; re-open only for something major, and say
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-06 — **Solar offsets U1: the evaluator follows AAB's task43 revision of 2026-10-01 —
+  `SUNRISE±N`/`SUNSET±N` endpoints, a rule held for all of its end minute, an exit wake at end +
+  1 min — and an imported offset token no longer aborts evaluation (DD-035).**
 
 - 2026-10-05 — **E2E S7 checkpoint: the effect-ordered suites ran on the phone; the harness now
   reads focus, the notification shade and greyed Apply the way OxygenOS 16 shows them (DD-033),

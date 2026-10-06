@@ -2,9 +2,10 @@
 
 ## Status
 
-Spec only. No code has changed. The approved action is committing this plan to `docs/plans/`
-(owner, 2026-10-01). Executing either unit needs the owner's separate go-ahead. Even then, only
-session-branch commits are authorised: no PR, tag or release.
+The owner gave the go-ahead to execute both units on 2026-10-06; only session-branch commits are
+authorised: no PR, tag or release. They land on the train's session branch (`claude/device-e2e`),
+not the `session/…` branch named below, and on the 1.14.0 / vc28 train (`changelogs/28.txt`),
+which superseded the 1.13.0 one named below. Progress: [x] U1 (DD-035) · [ ] U2.
 
 ## Context
 

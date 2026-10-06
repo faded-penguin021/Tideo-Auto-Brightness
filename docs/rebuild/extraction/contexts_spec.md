@@ -40,6 +40,8 @@ Notes on triggers verified in XML:
 - **prof764** uses a Tasker **Time context** `<fromvar>/<tovar> = %AAB_NextContextTime`: the
   profile becomes active at the clock time stored in that variable (format `HH.MM`, set by
   task43 §4). This is the self-scheduling wake-up for time-range rules and SUNRISE/SUNSET.
+  Since the 2026-10-01 task43 revision it wakes at each rule's start and at **end + 1 min**, so a
+  rule exits on time (PASS 3 below; DD-035).
 - **prof766** `<rep>2 <repval>3` with all `fh/fm/th/tm=-1` = **repeat every 3 minutes, all day**.
   This is the location heartbeat/watchdog poll. It also has a State 123 latch (con2).
 - **prof767** Event 3050 = Variable Set, watching `%AAB_NetLocation` (`arg2=0`). Fires whenever
@@ -121,11 +123,22 @@ Context object schema (from task43 PASS 3 reader + task623 writer):
     "wifi":       ["HomeNet", "Office"],              // optional, trimmed compare
     "battery":    { "min":0, "max":20, "on_power":true }, // any subset optional
     "location":   { "lat":51.5, "lon":-0.1, "radius":150 },// metres
-    "time_range": ["22:00", "SUNRISE"],              // [start,end]; "HH:MM" | "SUNRISE" | "SUNSET"
+    "time_range": ["22:00", "SUNRISE+30"],           // [start,end]; "HH:MM" | "SUNRISE[±N]" | "SUNSET[±N]"
     "days":       [1,2,3,4,5,6,7]                     // Calendar.DAY_OF_WEEK, 1=Sun..7=Sat
   }
 }
 ```
+
+**Time token grammar** (task43 revision of 2026-10-01; transcript
+`_source/java/task43_1_evaluatecontexts-v2.rev-2026-10-01.hunks.txt`; Kotlin home
+`SolarTimeTokens`). Each endpoint is trimmed first.
+- An endpoint that **starts with** `SUNRISE` (tested first) or `SUNSET` is solar. Its offset in
+  minutes is read after the first `+`, otherwise after the first `-` (negated); a parse failure
+  counts as 0. So `SUNRISE++5` and `SUNRISE--5` are both +5, and `SUNRISEx` is plain sunrise.
+- A solar endpoint resolves to `(base + N·60)` wrapped into 0..86399 and **floored to the
+  minute**; plain `SUNRISE`/`SUNSET` are floored too.
+- Anything else is `HH:MM` (Tideo trims each part, Tasker does not — DD-035).
+- The AAB editor saves `SUNRISE+30`, `SUNSET-15`, or bare `SUNRISE` for a zero or blank offset.
 
 ### 2.4 Daily reset (prof8 → task26 `_ResetContextCacheDaily`)
 - Fires **03:00 daily** (Time con0 `fh=3 fm=0 th=3 tm=0`) while `%AAB_ContextCache` isSet.
@@ -199,9 +212,12 @@ On proceed, write new `%AAB_ContextState`.
 
 **PASS 3 — match + rank.** Load rules (RAM `%AAB_ContextJSONCache` → disk fallback). For each
 rule, `isMatch` AND over every present trigger:
-- **time_range/days**: resolves `SUNRISE`/`SUNSET`/`HH:MM` to seconds-of-day; supports
-  overnight ranges (start>end spills into yesterday with prev-day membership); collects all
-  start/end into `wakeTimes` for scheduling.
+- **time_range/days**: resolves each endpoint to seconds-of-day by the §2.3 token grammar;
+  supports overnight ranges (start>end spills into yesterday with prev-day membership). The
+  window is tested against **`nowMinute`** (seconds dropped), so a rule stays active for all of its
+  end minute. Every rule, matching or not, adds `start` and `(end + 60) % 86400` to `wakeTimes`
+  (before the 2026-10-01 revision: `start` and `end`, which left the rule active until some later
+  evaluation).
 - **apps**: `curApp` ∈ list. **battery**: `min ≤ curBatt ≤ max` and `on_power == isPlugged`.
 - **location**: `Location.distanceBetween ≤ radius`. **wifi**: `curWifi` ∈ list (trimmed).
 - **specificity** = count of trigger dimensions matched (time, +1 if days, apps, battery, loc, wifi).
@@ -224,7 +240,8 @@ first-seen (array order). `priority` defaults to 0 if absent.
 - If override active → **skip the profile switch** entirely (only refresh wake times); log
   "Override Active … Profile switch skipped."
 - Compute `%AAB_NextContextTime` = nearest future `wakeTimes` entry as `HH.MM` (drives prof764),
-  or null if no time rules.
+  or null if no time rules. This step still compares against exact `nowSecs`, so during an end
+  minute the end + 1 min exit wake is still in the future.
 
 **Tasker wrapper, post-Java** (apply): act17 guards — **skip apply if** `target_context_profile`
 unset, OR equals current `%AAB_CurrentActiveProfile`, OR caller is `_ContextResume`. Otherwise
