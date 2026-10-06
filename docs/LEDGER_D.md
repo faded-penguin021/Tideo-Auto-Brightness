@@ -428,3 +428,9 @@
   cache does not record its source an older cached Android fix is also skipped while geo-IP is off
   (owner accepted). A pinned date does not move rule times, which use today. JVM-tested
   (`ContextSolarTimesTest`); on-device behaviour is unverified.
+
+- DD-039: **E2E S7 reruns on a build carrying DD-034 (2026-10-06).** s06_19a passes. s02_10b was
+  a harness defect: a drift dismissal writes nothing, so re-settling before its second step
+  waited for a pipeline write steady light never makes; it now settles once and passed twice.
+  s11_39 still fails, but its restart loaded the owner's sunset-to-sunrise context rule's
+  profile (both toggles off), so it says nothing of DD-034 until rerun outside that window.

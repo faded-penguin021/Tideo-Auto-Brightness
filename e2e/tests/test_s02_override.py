@@ -69,9 +69,11 @@ def test_s02_10a_no_false_pause_on_wake(run):
 @pytest.mark.scenario("s02_10b")
 def test_s02_10b_deadband_boundary(run):
     ready_for_override(run)
+    # A drift dismissal writes nothing back, so step 2 starts from step 1's write while Tideo
+    # still expects d; settling again waits for a pipeline write that steady light never makes.
+    d = settled_domain(run)
     for step, pauses in ((1, False), (2, True)):
         unpaused(run)
-        d = settled_domain(run)
         n = d + step if d + step <= 255 else d - step
         before = last_disposition(run)
         since = run.now()

@@ -29,13 +29,15 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   done and the blocking Sol review of S2–S4 fixed (DD-021); S5's read-only preflight is built and
   passed on 1.14.0-debug vc28 (DD-029); no Tasker/MacroDroid profile on the owner's phone acts on
   `STATE_CHANGED` (owner, 2026-10-04), so device runs set `TIDEO_E2E_CONFIRM=automation`; S6's
-  smoke set passed there (DD-032); S7 is under way (DD-033, DD-034): 15 of 21 auto scenarios
-  pass (13) or skip correctly (2) on the phone; the owner passed DD-034's two app fixes on
-  1.14.0-debug vc28 (DD-036), not saying whether e2e ran s06_19a and s11_39; s06_19b is a Tideo
-  defect awaiting the owner (Open questions), s02_10b is unclassified (Live Debug's brightness
-  never matched the stored value in 15 s), and s02_10a/10e need the phone to wake unlocked. S8–S9
-  open. Owed when the partial rows get tests, from Sol on S4a: a dialog-root flag for
-  SaveProfileDialog before s14_50, and the native flash overlay has no resource-id (s13_44a).
+  smoke set passed there (DD-032); S7 is under way (DD-033, DD-034, DD-039): 17 of 21 auto
+  scenarios pass (15) or skip correctly (2) on the phone; the owner passed DD-034's two app fixes
+  on 1.14.0-debug vc28 (DD-036), and e2e's s06_19a passes there, but s11_39 must be rerun between
+  sunrise+30 and sunset−30, when the owner's `SUNSET-30` context rule is not active (runs need
+  `TIDEO_E2E_CONFIRM=contexts,automation` while it exists; the owner gave that on 2026-10-06);
+  s06_19b is a Tideo defect awaiting the owner (Open questions), and s02_10a/10e need the phone
+  to wake unlocked. S8–S9 open. Owed when the partial rows get tests, from Sol on S4a: a
+  dialog-root flag for SaveProfileDialog before s14_50, and the native flash overlay has no
+  resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` (not a Tideo issue): [x] N1 · [ ] N2 Kelvin bounds
   · [ ] N3 daytime activation, BLOCKED on device evidence · [ ] N4 close-out.
@@ -113,6 +115,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-06 — **E2E S7 reruns on vc28 with DD-034: s06_19a passes; s02_10b's failure was the
+  harness re-settling after a drift dismissal, fixed and passing; s11_39 awaits a run outside the
+  owner's nightly context rule (DD-039).**
 
 - 2026-10-06 — **SUNRISE/SUNSET rule times follow the pinned Circadian location; one shared
   resolver for engine and editor (DD-038).**
