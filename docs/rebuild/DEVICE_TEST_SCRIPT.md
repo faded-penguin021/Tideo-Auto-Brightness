@@ -353,10 +353,12 @@ optional.
     toggle off.
 24c. **Time rules exit on time; solar offsets (DD-035).** Use a profile different from your baseline
     as the rule's target, with no other rule matching.
-    - **Exit at end + 1 min.** Add a time rule from now to **2 min from now** (e.g. 14:00–14:02 at
-      14:00) and leave the phone untouched, screen off. **Expected:** it switches on, stays on through
-      the whole 14:02 minute, and switches back to your baseline at **14:03** (a teal context flash;
-      Live Debug's next context time read 14.03 before then), not at some later light change.
+    - **Exit at end + 1 min.** Keep the **screen on** for the whole check (Stay awake, or a long
+      screen timeout), on the Dashboard, in steady light, and don't touch the phone: turning the screen
+      on runs its own evaluation, which would hide a late exit. Add a time rule from now to **2 min
+      from now** (e.g. 14:00–14:02 at 14:00). **Expected:** it switches on, stays on through the whole
+      14:02 minute, and the active profile flips back to your baseline at **14:03:00** (a teal context
+      flash). The old build left it on until some later evaluation (a light change, or a screen-on).
     - **Sunset offset.** With location available, add a rule whose From is **Sunset** and whose
       **Offset (min)** puts it about 3 min from now (e.g. sunset 18:30, now 17:57 → `-30`), To a
       clock time an hour later. **Expected:** the gold preview under the offset shows that time

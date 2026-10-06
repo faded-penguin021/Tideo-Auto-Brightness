@@ -240,8 +240,8 @@ first-seen (array order). `priority` defaults to 0 if absent.
 - If override active → **skip the profile switch** entirely (only refresh wake times); log
   "Override Active … Profile switch skipped."
 - Compute `%AAB_NextContextTime` = nearest future `wakeTimes` entry as `HH.MM` (drives prof764),
-  or null if no time rules. This step still compares against exact `nowSecs`, so during an end
-  minute the end + 1 min exit wake is still in the future.
+  or null if no time rules. This step still compares against exact `nowSecs`; as every wake time
+  is minute-aligned, that gives the same verdict as `nowMinute` would.
 
 **Tasker wrapper, post-Java** (apply): act17 guards — **skip apply if** `target_context_profile`
 unset, OR equals current `%AAB_CurrentActiveProfile`, OR caller is `_ContextResume`. Otherwise

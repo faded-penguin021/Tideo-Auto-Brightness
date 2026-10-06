@@ -228,7 +228,7 @@ class ContextOverrideResolverTest {
     }
 
     @Test
-    fun nextWakeTime_keepsExactSecondsSoTheEndMinuteStillSchedulesItsExit() {
+    fun nextWakeTime_duringTheEndMinuteSchedulesTheExit() {
         val r = ContextOverrideResolver.resolve(
             listOf(rule("t", timeRange = TimeRange("09:00", "17:00"))),
             noon.copy(nowSecondsOfDay = 17 * 3600 + 45),

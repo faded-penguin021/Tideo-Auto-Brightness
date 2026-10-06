@@ -404,7 +404,7 @@ internal fun RuleEditor(
                 ) { Text(stringResource(R.string.contexts_use_current_wifi)) }
             }
 
-            TriggerSection(stringResource(R.string.contexts_trigger_time), timeEnabled, { timeEnabled = it }, "time") {
+            TriggerSection(stringResource(R.string.contexts_trigger_time), timeEnabled, { timeEnabled = it; offsetError = null }, "time") {
                 Text(stringResource(R.string.contexts_time_window), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
@@ -562,6 +562,6 @@ private fun solarOffsetSeed(token: String): String =
     if (SolarTimeTokens.eventOf(token) != null) SolarTimeTokens.editorOffsetText(token) else ""
 
 private fun committedTimeToken(base: String, offset: String): String? {
-    val event = SolarTimeTokens.eventOf(base) ?: return base.trim()
+    val event = SolarTimeTokens.eventOf(base) ?: return base.trim { it <= ' ' }
     return SolarTimeTokens.commit(event, offset)
 }

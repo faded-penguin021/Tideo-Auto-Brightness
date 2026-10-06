@@ -115,7 +115,7 @@ Scorecard.dev is a run-once local input.
 
 8. **[2026-10-06] On that build, check that time rules end on time and that Sunrise/Sunset offsets
    work.** Run `DEVICE_TEST_SCRIPT.md` step 24c. Worked if a rule ending at 14:02 switches back at
-   14:03 with the phone untouched, and a Sunset rule with an offset switches on at the minute its
+   14:03:00 with the screen kept on and the phone untouched, and a Sunset rule with an offset switches on at the minute its
    gold preview shows (DD-035). The editor's four new strings (`contexts_offset_*`) are English only
    until a fluent speaker translates them, like item 4.
 

@@ -1271,6 +1271,43 @@ class SettingsScreensTest {
     }
 
     @Test
+    fun contextEditor_clearTimeClearsBothOffsets_DD035() {
+        var saved: com.tideo.autobrightness.app.settings.ContextRule? = null
+        renderRuleEditor(rule = solarRule("SUNRISE+30", "SUNSET-15"), onSave = { saved = it })
+        compose.onNodeWithTag("clear_time").performScrollTo().performClick()
+        compose.onNodeWithTag("start_offset").assertDoesNotExist()
+        compose.onNodeWithTag("start_sunrise").performScrollTo().performClick()
+        compose.onNodeWithTag("end_sunset").performScrollTo().performClick()
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        assertEquals(listOf("SUNRISE", "SUNSET"), saved?.triggers?.timeRange)
+    }
+
+    @Test
+    fun contextEditor_invalidEndOffset_namesEnd_andDisabledTimeTriggerStillSaves_DD035() {
+        var saved: com.tideo.autobrightness.app.settings.ContextRule? = null
+        renderRuleEditor(rule = solarRule("22:00", "SUNRISE--5"), onSave = { saved = it })
+        compose.onNodeWithTag("end_offset").performScrollTo().assertTextContains("--5")
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        assertEquals(null, saved)
+        compose.onNodeWithTag("offset_error").performScrollTo()
+            .assertTextContains("Offset for End", substring = true)
+        compose.onNodeWithTag("trigger_toggle_time").performScrollTo().performClick()
+        compose.onNodeWithTag("offset_error").assertDoesNotExist()
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        assertEquals(null, saved?.triggers?.timeRange)
+        assertEquals("Dusk", saved?.name)
+    }
+
+    @Test
+    fun contextEditor_importedSpacedTokenReSavesCanonically_DD035() {
+        var saved: com.tideo.autobrightness.app.settings.ContextRule? = null
+        renderRuleEditor(rule = solarRule(" SUNSET + 30 ", "23:00"), onSave = { saved = it })
+        compose.onNodeWithTag("start_offset").performScrollTo().assertTextContains("+30")
+        compose.onNodeWithTag("save_rule").performScrollTo().performClick()
+        assertEquals(listOf("SUNSET+30", "23:00"), saved?.triggers?.timeRange)
+    }
+
+    @Test
     fun contextEditor_noSolarTimes_hidesPreview_DD035() {
         renderRuleEditor(solarTimes = null)
         compose.onNodeWithTag("start_sunrise").performScrollTo().performClick()
