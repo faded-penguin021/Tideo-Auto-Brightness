@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
 /**
@@ -106,6 +107,7 @@ class ContextEngine(
     private var locationJob: Job? = null
     private var rulesJob: Job? = null
     private var timeJob: Job? = null
+    private val deferred = ConcurrentHashMap<ContextCaller, Job>()
     // The lone surviving @Volatile (S12.9e audit): written from the lifecycle callbacks onScreenOn/Off
     // and read from the listener-start helpers on the engine scope — a single boolean, single-writer
     // per transition, so a plain volatile read is sufficient (no compound invariant to protect).
@@ -212,6 +214,7 @@ class ContextEngine(
         locationJob?.cancel(); locationJob = null
         rulesJob?.cancel(); rulesJob = null
         timeJob?.cancel(); timeJob = null
+        deferred.values.forEach { it.cancel() }; deferred.clear()
         scope = null
     }
 
@@ -271,11 +274,6 @@ class ContextEngine(
     fun onScreenOff() {
         screenOn = false
         appJob?.cancel(); appJob = null
-    }
-
-    /** Called from the pipeline cycle: re-evaluate time-window rules (contexts_spec — prof764). */
-    fun onPipelineTick() {
-        scope?.launch { evaluate(ContextCaller.TIME) }
     }
 
     private suspend fun startAppPollIfNeeded() {
@@ -369,7 +367,10 @@ class ContextEngine(
         val cooldown = caller.cooldownMs
         val now = clock()
         val last = lastEvalTime
-        if (!plugChanged && cooldown > 0 && last != null && now - last < cooldown) return@withLock
+        if (!plugChanged && cooldown > 0 && last != null && now - last < cooldown) {
+            if (caller != ContextCaller.BATTERY) deferPastCooldown(caller)
+            return@withLock
+        }
 
         val signals = signalSource.assemble(snap.app, snap.batteryPercent, snap.plugged, snap.wifi, snap.lat, snap.lon)
         // %AAB_ProfileUser (DA-018): the last manually-loaded profile = the no-match revert target and
@@ -399,6 +400,20 @@ class ContextEngine(
             profileExists = { knownProfiles.contains(it) },
         )
         apply(resolution, current, rules, caller)
+    }
+
+    // DD-041: a PASS-1 refusal is retried as the same caller once the shared cooldown has passed.
+    private fun deferPastCooldown(caller: ContextCaller) {
+        if (deferred[caller]?.isActive == true) return
+        deferred[caller] = scope?.launch {
+            while (true) {
+                val waitMs = evalMutex.withLock { lastEvalTime }?.let { it + caller.cooldownMs - clock() } ?: 0L
+                if (waitMs <= 0) break
+                delay(waitMs)
+            }
+            deferred.remove(caller)
+            evaluate(caller)
+        } ?: return
     }
 
     private fun shouldProceed(

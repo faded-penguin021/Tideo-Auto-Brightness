@@ -86,6 +86,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-06 — **Time rules wake only at the next context time, as Tasker's prof764 does; the
+  per-pipeline-update evaluation that read Android's last-known location about once a second is
+  gone (DD-041).**
+
 - 2026-10-06 — **Owner queue answered: no false override pause has recurred since 2026-09-23, so
   that item is dropped; the task592/task637 Tasker fixes are done; the owner re-checked the
   `SUNSET-30` rule and it is correct (DD-038). Both E2E open questions are closed
