@@ -62,6 +62,12 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
+3. **[2026-10-07] Delete two branches this train already contains.** `claude/device-e2e` and
+   `claude/e2e-s9-closeout` are both ancestors of `claude/night-light-n2` (the second merged in
+   with the owner's DD-044/DD-045 renumbering); the push rail stops an agent deleting a branch.
+   Settles it: `git ls-remote --heads origin claude/device-e2e claude/e2e-s9-closeout` prints
+   nothing.
+
 Open questions:
 
 1. **[2026-10-07] Approve the low-lux jitter rule?** Since v1.11.0 a dark room's brightness
