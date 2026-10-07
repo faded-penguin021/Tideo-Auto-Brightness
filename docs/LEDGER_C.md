@@ -813,6 +813,7 @@
   instead of showing an inert slider. Owner-confirmed on the OnePlus 13 (2026-09-22): Tideo now
   moves the panel's Night Light temperature, and `app_process` `get` at shell UID returns the
   service's Kelvin; a false NOT_HONOURED costs only a redundant, harmless service write.
+  Corrected by DD-051.
 
 - DC-058: **Shizuku cannot answer inside a main-thread `runBlocking`, and the service-off Apply
   must probe too (2026-09-22, gpt-6-astra PR-time check of DC-057).** Shizuku 13.1.5 posts

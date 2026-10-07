@@ -22,14 +22,15 @@ cd "$ROOT" || exit 1
 fails=0
 
 # Fact (drift incident d66de4c): the constitution's "Shizuku is a genuine optional runtime
-# dependency in exactly three places" (two until DC-057), restated in README.md and
+# dependency in exactly three places" (two until DC-057), restated in SHIZUKU_USAGE.md (README.md,
+# the d66de4c drift site, now points there) and
 # docs/rebuild/architecture/privilege_tiers.md — the three sites d66de4c left disagreeing.
 # Consumer files referencing ShizukuShell, excluding its own definition.
 shizuku_expected=3
 shizuku_sites=$(grep -rl 'ShizukuShell' platform/src/main app/src/main 2>/dev/null |
 	grep -cv '/ShizukuShell\.kt$')
 if [ "${shizuku_sites:-0}" != "$shizuku_expected" ]; then
-	printf 'doc-fact drift: %s file(s) reference ShizukuShell but the docs claim exactly %s runtime places — update the claim in the constitution (AGENTS.md) and its restatement in README.md, the d66de4c drift site, AND this guard'"'"'s constant in lockstep (DA-015)\n' \
+	printf 'doc-fact drift: %s file(s) reference ShizukuShell but the docs claim exactly %s runtime places — update the claim in the constitution (AGENTS.md), its restatements in SHIZUKU_USAGE.md (where README.md, the d66de4c drift site, points) and docs/rebuild/architecture/privilege_tiers.md, AND this guard'"'"'s constant in lockstep (DA-015)\n' \
 		"$shizuku_sites" "$shizuku_expected" >&2
 	fails=$((fails + 1))
 fi

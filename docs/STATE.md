@@ -89,6 +89,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-07 — **Night Light N2b step 5a (rule change): AGENTS.md's third Shizuku place now covers
+  the extended range; README points at the new `SHIZUKU_USAGE.md`; DC-057's "only" is corrected
+  (DD-051).**
+
 - 2026-10-07 — **Night Light N2b step 4: the "Go beyond temperature limits" row on the Privileged
   Display screen, shown with Shizuku running or root, kept while on; the slider, its hint and the
   circadian help follow the draft flag at once (DD-050).**

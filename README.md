@@ -124,7 +124,7 @@ adb shell pm grant com.tideo.autobrightness android.permission.WRITE_SECURE_SETT
 After the grant, Tideo writes the secure setting **directly** (no Shizuku binder needed for dimming).
 The grant is detected the next time the screen turns on or when the app is opened.
 
-> **Three runtime uses of Shizuku.** Beyond the one-time grant, Shizuku is used at runtime in exactly three optional places, all through Shizuku's shell (with a root fallback): the **no-Location Wi-Fi SSID** context runs `cmd wifi status` so Wi-Fi-based context rules can read the SSID *without* the Location permission, the **global force-dark** toggle sets the `debug.hwui.force_dark` system property (which isn't reachable through secure settings), and the **Night Light temperature** is also sent to the display service on devices (such as OxygenOS) that ignore the temperature setting — only once Tideo has seen the device ignore it.
+To find out more about the use of Shizuku in this project, please read SHIZUKU_USAGE.md.
 
 ## Troubleshooting
 

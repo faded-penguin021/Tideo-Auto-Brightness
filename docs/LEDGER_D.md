@@ -539,3 +539,13 @@
   Shizuku is not usable, so a Shizuku user never sees a root-manager toast for it, and a successful
   in-app root grant counts as root. JVM-tested (Compose under Robolectric); on-device unverified, and
   the zh-Hans strings are owed with the Owner queue's translation item.
+- DD-051: **DC-057's "only on a build observed to ignore the key" no longer holds: the Night Light
+  Kelvin also goes through the display-service binder while a profile's extended range is on and
+  after an out-of-range write until one lands through it (DD-048), so the constitution's third Shizuku place
+  is reworded under the rule-review protocol and still counts as one (N2b step 5, #142).** The
+  owner's direction kept that place a single file (`NightDisplayServiceBridge`), so `doc-facts.sh`
+  stays at three; README's paragraph became one sentence pointing at `SHIZUKU_USAGE.md`, which now
+  holds the paragraph updated for extended mode, and the guard's failure message names that file
+  and `privilege_tiers.md` as the restatements. Nothing checks that README's pointer resolves or
+  that `SHIZUKU_USAGE.md` agrees with the constitution: like every doc-facts claim, the guard
+  counts code and never parses prose, so both are reviewer-held.
