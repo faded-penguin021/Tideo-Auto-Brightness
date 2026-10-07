@@ -5,6 +5,7 @@ import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
 import com.tideo.autobrightness.domain.brightness.BrightnessCurveConfig
 import com.tideo.autobrightness.domain.brightness.DynamicScalingConfig
 import com.tideo.autobrightness.domain.brightness.ThresholdConfig
+import com.tideo.autobrightness.platform.display.SecureDisplayController
 
 // Domain config mappings for BrightnessPolicyInput.
 
@@ -110,7 +111,7 @@ fun AabSettings.validate(): AabSettings {
         debugLevel = debugLevel.coerceIn(0, 9),
         panicSensitivity = panicSensitivity.coerceIn(0, 10),
         // D-151: display-toggle fields; unknown daltonizer resets to OFF (D-146 spirit).
-        nightLightTemperature = nightLightTemperature?.coerceIn(1_000, 10_000),
+        nightLightTemperature = nightLightTemperature?.coerceIn(SecureDisplayController.NIGHT_LIGHT_RAIL_K),
         daltonizerMode = if (daltonizerMode in DALTONIZER_MODES) daltonizerMode else DALTONIZER_OFF,
     )
 }

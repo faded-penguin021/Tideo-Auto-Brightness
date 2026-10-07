@@ -27,7 +27,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
-  [x] N1 · [x] N2 device Kelvin range (DD-045) · [ ] N2b 686–7308 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
+  [x] N1 · [x] N2 device Kelvin range (DD-045) · [ ] N2b 686–7308 K opt-in toggle, AAB reference and owner answers in the plan, step 1 of 5 done (DD-046) · [x] N3 (owner: the
   DD-038 solar fallback) · [ ] N4 close-out.
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
@@ -85,6 +85,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-07 — **Night Light N2b step 1: every stored setpoint and Kelvin write is railed to
+  686–7308, one band for controller, mapper and validator (DD-046). The plan now holds AAB's
+  reference, distilled, and the owner's answers.**
 
 - 2026-10-07 — **The parallel `claude/e2e-s9-closeout` branch merged into this train; its row kept
   DD-044, so N2's row is renumbered DD-045 (owner).**

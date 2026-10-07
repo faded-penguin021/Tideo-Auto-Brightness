@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.settings
 
 import com.tideo.autobrightness.domain.brightness.BrightnessFormulae
+import com.tideo.autobrightness.platform.display.SecureDisplayController
 import kotlin.math.ceil
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -139,10 +140,11 @@ object SettingsValidator {
         // D-151 (display-toggle profile fields): a set Night Light temperature outside the
         // SecureDisplayController sanity band is clamped on save — surface the clamp like dimSpread.
         val nightLightTemperature = settings.nightLightTemperature
-        if (nightLightTemperature != null && (nightLightTemperature < 1_000 || nightLightTemperature > 10_000)) {
+        val rail = SecureDisplayController.NIGHT_LIGHT_RAIL_K
+        if (nightLightTemperature != null && nightLightTemperature !in rail) {
             errors += FieldError(
                 "nightLightTemperature",
-                "Night Light temperature ($nightLightTemperature K) must be between 1000 and 10000 K.",
+                "Night Light temperature ($nightLightTemperature K) must be between ${rail.first} and ${rail.last} K.",
             )
         }
 

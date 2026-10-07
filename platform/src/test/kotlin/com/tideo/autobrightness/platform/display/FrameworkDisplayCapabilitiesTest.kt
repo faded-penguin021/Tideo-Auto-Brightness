@@ -48,8 +48,9 @@ class FrameworkDisplayCapabilitiesTest {
 
     @Test
     fun `Night Light range stays inside the write rails and the default inside the range`() {
-        assertEquals(NightLightKelvinRange(1000, 4082, 2850), kelvin(min = 686))
-        assertEquals(NightLightKelvinRange(2596, 10_000, 2850), kelvin(max = 12_000))
+        assertEquals(NightLightKelvinRange(686, 4082, 2850), kelvin(min = 686))
+        assertEquals(NightLightKelvinRange(686, 4082, 2850), kelvin(min = 500))
+        assertEquals(NightLightKelvinRange(2596, 7308, 2850), kelvin(max = 12_000))
         assertEquals(NightLightKelvinRange(2596, 4082, 4082), kelvin(default = 6500))
     }
 

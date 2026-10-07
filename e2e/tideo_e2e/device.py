@@ -126,7 +126,7 @@ SETTINGS: dict[str, dict[str, P | None]] = {
     },
     "secure": {
         "night_display_activated": _BIT,
-        "night_display_color_temperature": int_in("kelvin", 1000, 10000),
+        "night_display_color_temperature": int_in("kelvin", 686, 10000),
         "night_display_auto_mode": int_in("auto_mode", 0, 2),
         "accessibility_display_daltonizer": one_of("daltonizer", "-1", "0", "11", "12", "13"),
         "accessibility_display_daltonizer_enabled": _BIT,

@@ -114,10 +114,10 @@ class SecureDisplayControllerTest {
         assertEquals(3400, controller.readNightLightTemperature())
 
         assertTrue(controller.setNightLightTemperature(50).isSuccess)
-        assertEquals(1_000, controller.readNightLightTemperature())
+        assertEquals(686, controller.readNightLightTemperature())
 
         assertTrue(controller.setNightLightTemperature(99_999).isSuccess)
-        assertEquals(10_000, controller.readNightLightTemperature())
+        assertEquals(7_308, controller.readNightLightTemperature())
     }
 
     @Test

@@ -479,3 +479,14 @@
   write rails until N2b moves them, so a 686 floor shows as 1000, and a min ≥ max pair keeps
   AOSP's range. The hint loses its Chinese (DD-026). JVM-tested; on-device unverified.
   Renumbered from DD-044, which the parallel S9 branch had taken first (owner, 2026-10-07).
+  Corrected by DD-046.
+
+- DD-046 [cited]: **Every stored Night Light setpoint and every Kelvin write is railed to 686–7308,
+  AAB's extended range, not 1000–10000 (N2b step 1, #142).** One band is shared by
+  `SecureDisplayController`, `AabSettingsMapper` and `SettingsValidator`; 686 is where the
+  #142 matrix fit's blue multiplier reaches zero, and 7308 the highest Kelvin at which every
+  multiplier stays within 0–1. A device floor of 686 now shows as 686, but a device config above
+  7308 is cut to 7308 (slider top and circadian day endpoint), and a config wholly above it falls
+  back to AOSP's range; a stored or read-back value of 7309–10000 (import, a high-max slider, or a
+  device key set elsewhere) clamps to 7308 on save, and the e2e restore floor drops to 686.
+  JVM-tested; on-device unverified.

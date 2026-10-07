@@ -72,8 +72,10 @@ class AabSettingsClampTest {
 
     @Test
     fun `night light temperature clamps into the sanity band but null stays null D151`() {
-        assertEquals(1_000, AabSettings(nightLightTemperature = 5).validate().nightLightTemperature)
-        assertEquals(10_000, AabSettings(nightLightTemperature = 99_999).validate().nightLightTemperature)
+        assertEquals(686, AabSettings(nightLightTemperature = 5).validate().nightLightTemperature)
+        assertEquals(7_308, AabSettings(nightLightTemperature = 99_999).validate().nightLightTemperature)
+        assertEquals(686, AabSettings(nightLightTemperature = 686).validate().nightLightTemperature)
+        assertEquals(7_308, AabSettings(nightLightTemperature = 7_308).validate().nightLightTemperature)
         assertEquals(2_700, AabSettings(nightLightTemperature = 2_700).validate().nightLightTemperature)
         // null = "no temperature opinion / device default" — validate() must not invent a value.
         assertEquals(null, AabSettings().validate().nightLightTemperature)
