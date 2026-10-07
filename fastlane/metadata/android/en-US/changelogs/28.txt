@@ -1,7 +1,8 @@
 Fixes:
-- "Only while plugged in" rules (formerly "Only while charging") no longer flicker at a charge limit
-- a context rule loading a profile no longer changes the panic gesture's "Only when plugged in" setting
-- with the proximity sensor covered, brightness adapts more slowly, as in Tasker
-- the PWM exponent's help now says higher values dim more
-- default animation and built-in profiles now match Tasker
-- time rules end on time; Sunrise/Sunset take offsets and follow the Circadian location
+- "Only while plugged in" rules (was "Only while charging") no longer flicker at a charge limit
+- a context rule's profile no longer changes panic's plugged-in setting
+- covered proximity sensor: brightness adapts more slowly, as in Tasker
+- PWM exponent help: higher dims more
+- default animation and built-in profiles match Tasker
+- time rules end on time; Sunrise/Sunset take offsets, follow the Circadian location
+- Night Light uses the device's range, or 686–7308 K via Shizuku/root

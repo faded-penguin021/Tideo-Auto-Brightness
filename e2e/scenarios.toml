@@ -349,6 +349,11 @@ status = "manual"
 reason = "circadian Night Light tracking needs hours"
 
 [[scenario]]
+id = "s11_38a"
+status = "manual"
+reason = "needs Shizuku or root for Tideo and a visual panel check; the extended range writes through the display service"
+
+[[scenario]]
 id = "s11_39"
 status = "auto"
 effects = ["panic", "privileged_apply", "notification_action", "service_toggle", "ui_nav"]

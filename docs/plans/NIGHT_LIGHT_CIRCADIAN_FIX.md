@@ -28,10 +28,10 @@ the feature first and is then ported here.
 - [x] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.** The slider
   follows the device's reported min/max/default (owner, #142, 2026-10-06). Shipped as DD-045,
   inside the 1000–10000 rails, which N2b step 1 moved to 686–7308 (DD-046); JVM-verified only.
-- [ ] **N2b — extended range behind a toggle (#142).** 686–7308 K, off by default, per profile,
+- [x] **N2b — extended range behind a toggle (#142).** 686–7308 K, off by default, per profile,
   shown only with Shizuku or root; the ramp starts from 7308 K while it is on. The AAB reference
   arrived and the owner answered every open question (2026-10-07); both are recorded under N2b
-  below, which also holds its step list (steps 1–4 done, DD-046…DD-050).
+  below, which also holds its step list (all five steps done, DD-046…DD-051).
 - [x] **N3 — F5: daytime activation.** Owner, 2026-10-06: most likely the default-solar-times
   fallback that DD-038 fixed. No N3 code; unverified on the reporter's device.
 - [ ] **N4 — close-out.** Delete this file once N2, N2b and N3 are settled. The reply question is
@@ -275,7 +275,7 @@ A15 Return %return
    toggle at once (AAB waits for Apply; Tideo's draft model makes that unnecessary). Compose's
    `Slider` coerces its displayed value to `valueRange`, so the draft must keep a stored
    out-of-range setpoint unless the user moves the thumb. New strings take format arguments.
-5. [ ] **Collateral.** AGENTS.md wording, README → `SHIZUKU_USAGE.md`, `doc-facts.sh` message (rule
+5. [x] **Collateral** (DD-051; device step 38a and `s11_38a`; Chinese via Owner-queue item 1). AGENTS.md wording, README → `SHIZUKU_USAGE.md`, `doc-facts.sh` message (rule
    review); `docs/rebuild/architecture/privilege_tiers.md` restates the Shizuku places too;
    ledger row; `changelogs/28.txt`; Chinese for the new strings via Owner-queue item 1;
    `DEVICE_TEST_SCRIPT.md` and `e2e/scenarios.toml` steps together (RUNBOOK playbook 5);

@@ -27,7 +27,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
-  [x] N1 · [x] N2 device Kelvin range (DD-045) · [ ] N2b 686–7308 K opt-in toggle, AAB reference and owner answers in the plan, steps 1–4 of 5 done (DD-046…DD-050) · [x] N3 (owner: the
+  [x] N1 · [x] N2 device Kelvin range (DD-045) · [x] N2b 686–7308 K opt-in toggle (DD-046…DD-051), device step 38a unrun · [x] N3 (owner: the
   DD-038 solar fallback) · [ ] N4 close-out.
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
@@ -88,6 +88,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-07 — **Night Light N2b done (step 5b): device step 38a and its `s11_38a` row, and
+  `changelogs/28.txt` gains the range line, the other lines tightened to fit 500 characters.**
 
 - 2026-10-07 — **Night Light N2b step 5a (rule change): AGENTS.md's third Shizuku place now covers
   the extended range; README points at the new `SHIZUKU_USAGE.md`; DC-057's "only" is corrected

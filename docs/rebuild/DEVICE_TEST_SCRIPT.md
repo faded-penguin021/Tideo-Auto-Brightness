@@ -552,6 +552,19 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     on (every other display field keeps manual changes). Turn the switch off + Apply. **Expected:**
     the ticker stops and the temperature returns to the profile's static value (the slider; with the
     slider unset it simply stays where the ramp left it); manual changes stick again.
+38a. **Extended Night Light range (DD-047…DD-050).** With neither Shizuku running for Tideo nor
+    root, open Privileged Display. **Expected:** no "Go beyond temperature limits" row. Start
+    Shizuku (or have root), reopen the screen. **Expected:** the row shows under "Follow circadian
+    scaling". Turn it on. **Expected:** at once, before Apply, the slider hint reads "Extended range
+    686–7308 K". Set about 1000 K, Night Light on, Apply. **Expected:** the panel is visibly redder
+    than at the device's own minimum, and `adb shell settings get secure
+    night_display_color_temperature` prints 1000 (`dumpsys color_display` may report a clamped
+    value, as #142 saw — not a failure). Turn the row off and Apply. **Expected:** the panel returns
+    to the device's minimum (2596 on stock) rather than staying at 1000, and the slider label still
+    reads 1000 K (a stored setpoint is kept, clamped only when applied). Turn it back on with
+    **Follow circadian scaling**, service ON, in daylight. **Expected:** the key sits near 7308 and
+    Night Light switching on is barely visible. Stop Shizuku, reopen the screen. **Expected:** the
+    row stays visible with the "needs Shizuku" note, and Apply lands the device's minimum.
 39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
     Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
     **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to
