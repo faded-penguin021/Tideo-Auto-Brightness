@@ -81,6 +81,7 @@ private val SETTING_LABELS: Map<String, Int> = mapOf(
     "nightLightEnabled" to R.string.pd_night_light_switch,
     "nightLightTemperature" to R.string.settings_night_light_temperature,
     "nightLightCircadianEnabled" to R.string.settings_night_light_circadian,
+    "extendedNightLightEnabled" to R.string.settings_night_light_extended,
     "daltonizerMode" to R.string.pd_daltonizer_label,
     "inversionEnabled" to R.string.pd_inversion,
     "alwaysOnDisplayEnabled" to R.string.pd_always_on,
@@ -136,6 +137,7 @@ internal fun AabSettings.valueFor(key: String): String = when (key) {
     "nightLightEnabled" -> nightLightEnabled.toString()
     "nightLightTemperature" -> nightLightTemperature?.toString() ?: "device default"
     "nightLightCircadianEnabled" -> nightLightCircadianEnabled.toString()
+    "extendedNightLightEnabled" -> extendedNightLightEnabled.toString()
     "daltonizerMode" -> daltonizerMode
     "inversionEnabled" -> inversionEnabled.toString()
     "alwaysOnDisplayEnabled" -> alwaysOnDisplayEnabled.toString()

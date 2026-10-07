@@ -490,3 +490,14 @@
   back to AOSP's range; a stored or read-back value of 7309–10000 (import, a high-max slider, or a
   device key set elsewhere) clamps to 7308 on save, and the e2e restore floor drops to 686.
   JVM-tested; on-device unverified.
+- DD-047: **Night Light's extended range is a per-profile field, `extendedNightLightEnabled`,
+  default off (N2b step 2, #142); nothing reads it yet.** It persists and exports with the profile,
+  imports from key=value as `%AAB_ExtendedNightLight`, context-merges from the loaded profile, is
+  kept at its current value by a legacy import like the other display fields, is never taken from a
+  device read-back, and a draft edit of it blocks a re-merge. **Decided under the owner's N2b grant,
+  departing from AAB:** a saved profile or export written before the field reads it as off, where
+  AAB's loader keeps the current mode when the key is absent. Tideo profiles are complete
+  snapshots — every display field added later took its default the same way — and a tri-state
+  "keep current" would reach every consumer of the flag, for profiles that predate a feature nobody
+  could have switched on. The zh-Hans label is owed with the Owner queue's translation item.
+  JVM-tested; on-device unverified.

@@ -109,6 +109,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     nightLightEnabled = current.nightLightEnabled,
                     nightLightTemperature = current.nightLightTemperature,
                     nightLightCircadianEnabled = current.nightLightCircadianEnabled,
+                    extendedNightLightEnabled = current.extendedNightLightEnabled,
                     daltonizerMode = current.daltonizerMode,
                     inversionEnabled = current.inversionEnabled,
                     alwaysOnDisplayEnabled = current.alwaysOnDisplayEnabled,

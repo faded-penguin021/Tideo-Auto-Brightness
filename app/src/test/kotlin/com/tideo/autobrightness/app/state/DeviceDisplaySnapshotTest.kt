@@ -102,6 +102,18 @@ class DeviceDisplaySnapshotTest {
     }
 
     @Test
+    fun `extended flag is never device-sourced, and a draft edit of it blocks a re-merge`() {
+        val committed = AabSettings()
+        val edited = committed.copy(extendedNightLightEnabled = true)
+
+        assertTrue(edited.withDeviceSnapshot(snapshot()).extendedNightLightEnabled)
+        assertNull(
+            readBackDraft(edited, committed, committed, snapshot(nightLight = true)),
+            "toggling only the extended flag is a user edit of a display field",
+        )
+    }
+
+    @Test
     fun `unavailable HDR leaves the stored field untouched`() {
         val on = AabSettings(hdrForceSdrEnabled = true).withDeviceSnapshot(snapshot(hdrForceSdr = null))
         val off = AabSettings(hdrForceSdrEnabled = false).withDeviceSnapshot(snapshot(hdrForceSdr = null))

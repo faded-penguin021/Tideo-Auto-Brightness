@@ -1083,6 +1083,7 @@ class ContextEngineTest {
             nightLightEnabled = true,
             nightLightTemperature = 2_700,
             nightLightCircadianEnabled = true,
+            extendedNightLightEnabled = true,
             daltonizerMode = "GRAYSCALE",
             inversionEnabled = true,
             alwaysOnDisplayEnabled = true,
@@ -1093,6 +1094,7 @@ class ContextEngineTest {
         assertEquals(true, merged.nightLightEnabled, "nightLightEnabled comes from the profile")
         assertEquals(2_700, merged.nightLightTemperature, "nightLightTemperature comes from the profile")
         assertEquals(true, merged.nightLightCircadianEnabled, "nightLightCircadianEnabled comes from the profile (D-154)")
+        assertEquals(true, merged.extendedNightLightEnabled, "extendedNightLightEnabled comes from the profile")
         assertEquals("GRAYSCALE", merged.daltonizerMode, "daltonizerMode comes from the profile")
         assertEquals(true, merged.inversionEnabled, "inversionEnabled comes from the profile")
         assertEquals(true, merged.alwaysOnDisplayEnabled, "alwaysOnDisplayEnabled comes from the profile")

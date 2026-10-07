@@ -722,6 +722,7 @@
     <string name="settings_dimming_exponent">Dimming curve</string>
     <string name="settings_dimming_strength">Dimming strength</string>
     <string name="settings_night_light_circadian">Night Light circadian tracking</string>
+    <string name="settings_night_light_extended">Night Light extended range</string>
     <string name="settings_pwm_exponent">PWM curve</string>
     <string name="settings_night_light_temperature">Night Light temperature</string>
     <string name="settings_form1a">Zone 1 scaling</string>

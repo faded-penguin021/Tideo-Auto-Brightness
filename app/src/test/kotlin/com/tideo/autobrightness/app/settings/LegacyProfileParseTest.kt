@@ -41,4 +41,11 @@ class LegacyProfileParseTest {
         val s = TaskerLegacyProfileSerializer.deserialize("%AAB_MinBright = 42")
         assertEquals(42, s.minBrightness)
     }
+
+    @Test
+    fun `the extended Night Light flag parses from key=value and is off when absent`() {
+        assertEquals(true, TaskerLegacyProfileSerializer.deserialize("%AAB_ExtendedNightLight = On").extendedNightLightEnabled)
+        assertEquals(false, TaskerLegacyProfileSerializer.deserialize("%AAB_ExtendedNightLight = false").extendedNightLightEnabled)
+        assertEquals(false, TaskerLegacyProfileSerializer.deserialize("%AAB_MinBright = 42").extendedNightLightEnabled)
+    }
 }

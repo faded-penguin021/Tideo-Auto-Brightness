@@ -123,9 +123,17 @@ class AabSettingsMigrationTest {
         "trustUnreliableSensor":false,"quickSettingsEnabled":false,"notificationsEnabled":true,"debugLevel":0,
         "panicSensitivity":8,"contextOverride":false,"panicRequiresPlugged":false,
         "setupTitle":"Advanced Auto Brightness Setup","nightLightEnabled":false,"nightLightTemperature":null,
-        "nightLightCircadianEnabled":false,"daltonizerMode":"OFF","inversionEnabled":false,
+        "nightLightCircadianEnabled":false,"extendedNightLightEnabled":false,"daltonizerMode":"OFF","inversionEnabled":false,
         "alwaysOnDisplayEnabled":false,"stayAwakeChargingEnabled":false,"hdrForceSdrEnabled":false}
     """.trimIndent()
+
+    @Test
+    fun `a file written before the extended Night Light flag reads it off, and a set flag round-trips`() = runTest {
+        assertFalse(readV3("""{ "nightLightCircadianEnabled": true }""").extendedNightLightEnabled)
+        val out = java.io.ByteArrayOutputStream()
+        AabSettingsSerializer.writeTo(AabSettings(extendedNightLightEnabled = true), out)
+        assertTrue(AabSettingsSerializer.readFrom(out.toByteArray().inputStream()).extendedNightLightEnabled)
+    }
 
     @Test
     fun `every default is frozen, because a file written before DD-030 omits keys at their default`() {

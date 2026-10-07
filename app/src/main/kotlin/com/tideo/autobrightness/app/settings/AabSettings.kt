@@ -65,6 +65,7 @@ data class AabSettings(
     val nightLightTemperature: Int? = null,
     // D-154: temperature follows circadian modifier; manual changes don't stick while on
     val nightLightCircadianEnabled: Boolean = false,
+    val extendedNightLightEnabled: Boolean = false,
     // D-150: color-correction mode (STRING enum for schema forward-compatibility)
     val daltonizerMode: String = DALTONIZER_OFF,
     val inversionEnabled: Boolean = false,
@@ -155,6 +156,7 @@ object AabSettingsContract {
         AabSettingRule("%AAB_NightLight", "nightLightEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_NightLightTemp", "nightLightTemperature", AabValueType.Int, "device default", "range 686..7308, or unset = device default"),
         AabSettingRule("%AAB_NightLightCircadian", "nightLightCircadianEnabled", AabValueType.Boolean, "false", "must be true|false"),
+        AabSettingRule("%AAB_ExtendedNightLight", "extendedNightLightEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_Daltonizer", "daltonizerMode", AabValueType.String, DALTONIZER_OFF, "one of OFF|GRAYSCALE|PROTANOMALY|DEUTERANOMALY|TRITANOMALY"),
         AabSettingRule("%AAB_Inversion", "inversionEnabled", AabValueType.Boolean, "false", "must be true|false"),
         AabSettingRule("%AAB_AlwaysOnDisplay", "alwaysOnDisplayEnabled", AabValueType.Boolean, "false", "must be true|false"),

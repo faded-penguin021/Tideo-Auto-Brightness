@@ -21,9 +21,9 @@ data class DeviceDisplaySnapshot(
 )
 
 /**
- * DB-034: merge a device read-back into a draft. Three fields are never device-sourced:
- * `nightLightCircadianEnabled` has no Android counterpart; the temperature key is the ticker's
- * while circadian is on; and a null one delegates to the device rather than tracking it (DC-055).
+ * DB-034: merge a device read-back into a draft. Never device-sourced: the circadian and extended
+ * flags have no Android counterpart; the temperature key is the ticker's while circadian is on;
+ * and a null one delegates to the device rather than tracking it (DC-055).
  */
 fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings = copy(
     // DB-042: hidden, unsupported fields must not be erased by read-back.
@@ -43,7 +43,7 @@ fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings
 )
 
 /**
- * DB-040: the eight fields the read-back owns. Comparisons must be scoped to these — the draft also
+ * DB-040: the nine display fields of a draft. Comparisons must be scoped to these — the draft also
  * carries global fields (`serviceEnabled`, `contextOverride`, `debugLevel`, `panicSensitivity`, …)
  * that `DraftSettingsViewModel`'s collector rewrites from DataStore whenever the service, a context
  * rule or the QS tile moves them. Whole-object equality reads those writes as a user edit.
@@ -52,6 +52,7 @@ private fun AabSettings.displayFieldsEqual(other: AabSettings): Boolean =
     nightLightEnabled == other.nightLightEnabled &&
         nightLightTemperature == other.nightLightTemperature &&
         nightLightCircadianEnabled == other.nightLightCircadianEnabled &&
+        extendedNightLightEnabled == other.extendedNightLightEnabled &&
         daltonizerMode == other.daltonizerMode &&
         inversionEnabled == other.inversionEnabled &&
         alwaysOnDisplayEnabled == other.alwaysOnDisplayEnabled &&
