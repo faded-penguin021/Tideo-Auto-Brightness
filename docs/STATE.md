@@ -40,6 +40,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
   [x] N1 · [ ] N2 device Kelvin range · [ ] N2b 686–7308 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
   DD-038 solar fallback) · [ ] N4 close-out.
+- **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
+  2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
+  go-ahead.
 
 ## Owner queue
 
@@ -68,7 +71,14 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
-Open questions: none.
+Open questions:
+
+1. **[2026-10-07] Approve the low-lux jitter rule?** Since v1.11.0 a dark room's brightness
+   flickers 2↔3 as the sensor flickers between 0 and a few tenths of a lux.
+   `docs/plans/LOW_LUX_SETTLING_JITTER.md` → **Proposed fix**: a fresh 0.2–1 lx reading whose
+   first cycle is a dead-band stop holds smoothed lux, with no settling after it; the engine and
+   the #132 stall fix are untouched. Options: yes (build it as specified) or change the rule.
+   Recommended: yes. Settles it: your answer.
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
