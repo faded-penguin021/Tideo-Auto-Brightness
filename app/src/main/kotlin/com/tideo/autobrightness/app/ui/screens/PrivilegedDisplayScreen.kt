@@ -185,7 +185,8 @@ fun PrivilegedDisplayContent(
                                 modifier = Modifier.testTag("pd_schedule_caveat"),
                             )
                         }
-                        if (state.nightLightNeedsShizuku) {
+                        val extended = draft.extendedNightLightEnabled
+                        if (state.nightLightNeedsShizuku || (extended && !state.extendedRouteAvailable)) {
                             Text(
                                 stringResource(R.string.pd_night_light_needs_shizuku),
                                 color = MaterialTheme.colorScheme.error,
@@ -193,9 +194,11 @@ fun PrivilegedDisplayContent(
                                 modifier = Modifier.testTag("pd_night_light_needs_shizuku"),
                             )
                         }
+                        val activeRange = state.nightLightRange.withExtended(extended)
                         NightLightTemperatureSlider(
                             kelvin = draft.nightLightTemperature,
-                            range = state.nightLightRange,
+                            range = activeRange,
+                            extended = extended,
                             onCommit = { k -> onEditDraft { it.copy(nightLightTemperature = k) } },
                         )
                         if (draft.nightLightTemperature != null) {
@@ -208,9 +211,19 @@ fun PrivilegedDisplayContent(
                             stringResource(R.string.pd_night_light_circadian), draft.nightLightCircadianEnabled,
                             { on -> onEditDraft { it.copy(nightLightCircadianEnabled = on) } },
                             help = R.string.pd_night_light_circadian_help,
-                            helpArgs = arrayOf(state.nightLightRange.max, state.nightLightRange.default),
+                            helpArgs = arrayOf(activeRange.max, activeRange.default),
                             testTag = "switch_nightLightCircadian",
                         )
+                        if (state.extendedRouteAvailable || extended) {
+                            val band = state.nightLightRange.withExtended(true)
+                            SwitchSettingRow(
+                                stringResource(R.string.pd_night_light_extended), extended,
+                                { on -> onEditDraft { it.copy(extendedNightLightEnabled = on) } },
+                                help = R.string.pd_night_light_extended_help,
+                                helpArgs = arrayOf(band.min, band.max),
+                                testTag = "switch_nightLightExtended",
+                            )
+                        }
                     }
                 }
 
@@ -348,10 +361,15 @@ private fun GrantChannelsCard(
 
 /**
  * Kelvin slider for `night_display_color_temperature`. Commits on drag END; null = device default.
- * [range] is the device's own framework config (DD-045); ColorDisplayService may still clamp.
+ * [range] is the device's framework config (DD-045), or AAB's band while [extended] (DD-050).
  */
 @Composable
-private fun NightLightTemperatureSlider(kelvin: Int?, range: NightLightKelvinRange, onCommit: (Int) -> Unit) {
+private fun NightLightTemperatureSlider(
+    kelvin: Int?,
+    range: NightLightKelvinRange,
+    extended: Boolean,
+    onCommit: (Int) -> Unit,
+) {
     var drag by remember { mutableStateOf<Float?>(null) }
     val shown = drag?.roundToInt() ?: kelvin
     Column {
@@ -375,7 +393,10 @@ private fun NightLightTemperatureSlider(kelvin: Int?, range: NightLightKelvinRan
                 .semantics { contentDescription = tempLabel },
         )
         Text(
-            stringResource(R.string.pd_night_light_temp_hint, range.min, range.max),
+            stringResource(
+                if (extended) R.string.pd_night_light_temp_hint_extended else R.string.pd_night_light_temp_hint,
+                range.min, range.max,
+            ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

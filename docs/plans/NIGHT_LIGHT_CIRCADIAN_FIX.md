@@ -31,7 +31,7 @@ the feature first and is then ported here.
 - [ ] **N2b — extended range behind a toggle (#142).** 686–7308 K, off by default, per profile,
   shown only with Shizuku or root; the ramp starts from 7308 K while it is on. The AAB reference
   arrived and the owner answered every open question (2026-10-07); both are recorded under N2b
-  below, which also holds its step list (steps 1–3 done, DD-046…DD-049).
+  below, which also holds its step list (steps 1–4 done, DD-046…DD-050).
 - [x] **N3 — F5: daytime activation.** Owner, 2026-10-06: most likely the default-solar-times
   fallback that DD-038 fixed. No N3 code; unverified on the reporter's device.
 - [ ] **N4 — close-out.** Delete this file once N2, N2b and N3 are settled. The reply question is
@@ -271,7 +271,7 @@ A15 Return %return
    `releaseAnchorLocked` sets `deviceTempK` to the requested anchor, so an anchor above 7308 (a
    device that held, say, 8000 before the ramp took over) is tracked as 8000 while the controller
    wrote 7308 — track the clamped value. Glue-review protocol.
-4. [ ] **UI.** Toggle row with the visibility above; the slider's range follows the **draft**
+4. [x] **UI** (DD-050; its one grant-decided fork is when root is probed). Toggle row with the visibility above; the slider's range follows the **draft**
    toggle at once (AAB waits for Apply; Tideo's draft model makes that unnecessary). Compose's
    `Slider` coerces its displayed value to `valueRange`, so the draft must keep a stored
    out-of-range setpoint unless the user moves the thumb. New strings take format arguments.

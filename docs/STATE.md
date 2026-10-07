@@ -27,7 +27,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
-  [x] N1 · [x] N2 device Kelvin range (DD-045) · [ ] N2b 686–7308 K opt-in toggle, AAB reference and owner answers in the plan, steps 1–3 of 5 done (DD-046…DD-049) · [x] N3 (owner: the
+  [x] N1 · [x] N2 device Kelvin range (DD-045) · [ ] N2b 686–7308 K opt-in toggle, AAB reference and owner answers in the plan, steps 1–4 of 5 done (DD-046…DD-050) · [x] N3 (owner: the
   DD-038 solar fallback) · [ ] N4 close-out.
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
@@ -47,15 +47,17 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get eight Chinese strings translated; they show in English until then.**
+1. **[2026-10-04] Get eleven Chinese strings translated; they show in English until then.**
    `help_pwm_exponent` (DD-014), `contexts_only_plugged_in` (DD-025) and
    `pd_night_light_temp_hint` (DD-045) changed meaning, so their old Chinese was removed (DD-026),
-   the rule editor's four `contexts_offset_*` strings are new (DD-035), and so is the settings
-   label `settings_night_light_extended` (DD-047). You will ask in an issue once this train nears
-   release (owner, 2026-10-06). Settles it:
+   the rule editor's four `contexts_offset_*` strings are new (DD-035), and so are the extended
+   Night Light range's four: `settings_night_light_extended` (DD-047),
+   `pd_night_light_temp_hint_extended` and the two `pd_night_light_extended*` (DD-050). You will
+   ask in an issue once this train nears release (owner, 2026-10-06). Settles it:
    `grep -c -e 'name="help_pwm_exponent"' -e 'name="contexts_only_plugged_in"' -e
-   'name="pd_night_light_temp_hint"' -e 'name="contexts_offset_' -e
-   'name="settings_night_light_extended"' app/src/main/res/values-b+zh+Hans/strings.xml` prints 8.
+   'name="pd_night_light_temp_hint' -e 'name="contexts_offset_' -e
+   'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
+   app/src/main/res/values-b+zh+Hans/strings.xml` prints 11.
 
 2. **[2026-10-04] Once this train is on `main`, check the translation badge.** The `Translation
    badges` workflow first runs there. Worked if its Actions run is green and the README's 简体中文
@@ -86,6 +88,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-07 — **Night Light N2b step 4: the "Go beyond temperature limits" row on the Privileged
+  Display screen, shown with Shizuku running or root, kept while on; the slider, its hint and the
+  circadian help follow the draft flag at once (DD-050).**
 
 - 2026-10-07 — **Night Light N2b step 3: Kelvin writes clamp to the active range at write time —
   686–7308 through the display-service bridge while a profile's extended flag is on, else the

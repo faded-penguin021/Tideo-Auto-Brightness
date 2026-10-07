@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -336,5 +337,82 @@ class PrivilegedDisplayScreenTest {
         compose.onNodeWithTag("pd_shizuku_start_prompt").assertExists()
         compose.onNodeWithTag("pd_grant_shizuku").assertDoesNotExist()
         compose.onNodeWithTag("pd_copy_adb").assertExists() // ADB always offered
+    }
+
+    // --- DD-050: the extended range (N2b step 4) ---
+
+    @Test
+    fun extendedToggle_isHidden_withNoRoute_andTheFlagOff_DD050() {
+        setDraftContent()
+        compose.onNodeWithTag("switch_nightLightExtended").assertDoesNotExist()
+    }
+
+    @Test
+    fun extendedToggle_withShizuku_editsTheDraft_DD050() {
+        val draft = setDraftContent(state = elevated.copy(shizukuUsable = true))
+        compose.onNodeWithTag("switch_nightLightExtended").performScrollTo().performClick()
+        assertEquals(true, draft().extendedNightLightEnabled)
+    }
+
+    @Test
+    fun anExtendedDraft_widensTheSliderAndItsTexts_DD050() {
+        val draft = setDraftContent(
+            state = elevated.copy(shizukuUsable = true),
+            initial = AabSettings(extendedNightLightEnabled = true),
+        )
+        compose.onNodeWithText("Lower = warmer (stronger filter). Extended range 686–7308 K.").assertExists()
+        compose.onNodeWithTag("slider_nightLightTemp").performScrollTo()
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(700f) }
+        assertEquals(700, draft().nightLightTemperature, "below the device's 2596, reachable only while extended")
+        compose.onNodeWithTag("help_switch_nightLightCircadian").performScrollTo().performClick()
+        val help = compose.onNodeWithTag("helptext_switch_nightLightCircadian")
+            .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString()
+        assertTrue("(7308 K)" in help, help)
+        compose.onNodeWithTag("pd_night_light_needs_shizuku").assertDoesNotExist()
+    }
+
+    @Test
+    fun extendedToggle_showsWithRootAlone_DD050() {
+        setDraftContent(state = elevated.copy(rootAvailable = true))
+        compose.onNodeWithTag("switch_nightLightExtended").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun extendedOn_withNoRoute_staysVisible_andSaysWhereItLands_DD050() {
+        val draft = setDraftContent(initial = AabSettings(extendedNightLightEnabled = true))
+        compose.onNodeWithTag("pd_night_light_needs_shizuku").performScrollTo().assertExists()
+        compose.onNodeWithTag("switch_nightLightExtended").performScrollTo().performClick()
+        assertEquals(false, draft().extendedNightLightEnabled, "a toggle left on must be switchable off")
+    }
+
+    @Test
+    fun switchingTheFlagOff_keepsAnExtendedSetpoint_untilTheThumbMoves_DD050() {
+        val draft = mutableStateOf(AabSettings(nightLightTemperature = 700, extendedNightLightEnabled = true))
+        compose.setContent {
+            MaterialTheme {
+                PrivilegedDisplayContent(
+                    state = elevated.copy(shizukuUsable = true),
+                    onBack = {},
+                    draft = draft.value,
+                    draftDirty = true,
+                    onEditDraft = { transform -> draft.value = transform(draft.value) },
+                )
+            }
+        }
+        compose.onNodeWithTag("switch_nightLightExtended").performScrollTo().performClick()
+        compose.waitForIdle()
+        assertEquals(false, draft.value.extendedNightLightEnabled)
+        compose.onNodeWithText("Lower = warmer (stronger filter). This device's range is 2596–4082 K.").assertExists()
+        compose.onAllNodesWithText("Temperature: 700 K").onFirst().assertExists()
+        assertEquals(700, draft.value.nightLightTemperature, "the slider's coerced display must not reach the draft")
+        compose.onNodeWithTag("slider_nightLightTemp").performScrollTo()
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(3_000f) }
+        assertEquals(3_000, draft.value.nightLightTemperature)
+    }
+
+    @Test
+    fun shizukuRunningWithoutTideosPermission_isNoRoute_DD050() {
+        setDraftContent(state = elevated.copy(shizukuAvailability = ShizukuAvailability.RUNNING))
+        compose.onNodeWithTag("switch_nightLightExtended").assertDoesNotExist()
     }
 }

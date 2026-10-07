@@ -23,6 +23,8 @@ interface PrivilegeManager {
     /** ADB `pm grant` for DUMP permission (D-130): no-Location SSID path. */
     fun dumpGrantInstruction(): String
     fun tryGrantViaRoot(): Boolean
+    fun rootAvailable(): Boolean = false
+    fun shizukuUsable(): Boolean = false
     /** Three-state Shizuku readiness: RUNNING (one-tap grant), INSTALLED_NOT_RUNNING (start app), NOT_INSTALLED (hide). */
     fun shizukuAvailability(): ShizukuAvailability
     /** Run Shizuku grant flow; report outcome via [onResult], refresh tier on success. */
@@ -75,7 +77,22 @@ class AndroidPrivilegeManager(private val context: Context) : PrivilegeManager {
         false
     }
 
+    override fun rootAvailable(): Boolean = try {
+        val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+        process.outputStream.close()
+        if (!process.waitFor(ROOT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            false
+        } else {
+            process.exitValue() == 0
+        }
+    } catch (_: Exception) {
+        false
+    }
+
     override fun shizukuAvailability(): ShizukuAvailability = ShizukuGrantGateway.availability(context)
+
+    override fun shizukuUsable(): Boolean = ShizukuGrantGateway.isUsable()
 
     // S11 (D-032): Shizuku grant via bound user service.
     override fun requestShizukuGrant(onResult: (ShizukuGrantGateway.Result) -> Unit) {

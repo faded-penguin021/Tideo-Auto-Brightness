@@ -62,6 +62,7 @@ class DisplayTogglesViewModelTest {
         nightLightAvailable: Boolean = true,
         alwaysOnDisplayAvailable: Boolean = true,
         io: CoroutineDispatcher = dispatcher,
+        rootProbe: () -> Boolean = { false },
     ): DisplayTogglesViewModel {
         val privileges = AndroidPrivilegeManager(app)
         val display = AndroidSecureDisplayController(
@@ -77,6 +78,7 @@ class DisplayTogglesViewModelTest {
             io = io,
             temperatureRoute = NightLightTemperatureRoute(display),
             keyNotHonoured = flowOf(false),
+            rootProbe = rootProbe,
         )
     }
 
@@ -368,7 +370,7 @@ class DisplayTogglesViewModelTest {
                 return realDisplay.setNightLight(on)
             }
         }
-        val vm = DisplayTogglesViewModel(app, privileges, display, controlledIo)
+        val vm = DisplayTogglesViewModel(app, privileges, display, controlledIo, rootProbe = { false })
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(false, assertNotNull(vm.deviceSnapshot.value).nightLight)
 
@@ -411,6 +413,21 @@ class DisplayTogglesViewModelTest {
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999))
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_color_temperature", -999))
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "doze_always_on", -999))
+    }
+
+    @Test
+    fun root_isProbedOncePerScreenOpen_onlyAtElevated_DD050() {
+        var probes = 0
+        val below = vm(rootProbe = { probes++; true })
+        assertEquals(0, probes, "below ELEVATED the toggle cannot render, so there is nothing to probe for")
+        assertFalse(below.state.value.rootAvailable)
+
+        grantElevated()
+        val vm = vm(rootProbe = { probes++; true })
+        vm.refresh()
+        assertEquals(1, probes, "a resume refresh must not re-run su")
+        assertTrue(vm.state.value.rootAvailable)
+        assertTrue(vm.state.value.extendedRouteAvailable)
     }
 
     @Test

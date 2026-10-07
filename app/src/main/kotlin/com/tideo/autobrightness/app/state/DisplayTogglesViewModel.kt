@@ -46,7 +46,12 @@ data class PrivilegedDisplayUiState(
     val grantFailureReason: String? = null,
     val writeFailed: Boolean = false,
     val nightLightNeedsShizuku: Boolean = false,
-)
+    val shizukuUsable: Boolean = false,
+    val rootAvailable: Boolean = false,
+) {
+    val extendedRouteAvailable: Boolean
+        get() = shizukuUsable || rootAvailable
+}
 
 /** DB-078: preserved fields whose control stays visible, so an overwrite has something to show. */
 enum class PreservedDisplayField { DALTONIZER, STAY_AWAKE }
@@ -65,6 +70,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
     private val temperatureRoute: NightLightTemperatureRoute =
         AppModule(application).nightLightTemperatureRoute(display),
     keyNotHonoured: Flow<Boolean> = AppModule(application).nightLightVerdictStore.notHonouredFlow,
+    private val rootProbe: () -> Boolean = privilegeManager::rootAvailable,
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(
@@ -108,12 +114,25 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             }
         }
         refresh()
+        // DD-050: root once per screen open, and only where Shizuku cannot already carry the range.
+        if (privilegeManager.currentTier() == Tier.ELEVATED &&
+            !_state.value.shizukuUsable
+        ) {
+            viewModelScope.launch(io) {
+                if (rootProbe()) _state.update { it.copy(rootAvailable = true) }
+            }
+        }
     }
 
     /** Re-probe tier and device facts; clear lingering write-failure banner. */
     fun refresh() {
         privilegeManager.refresh()
-        _state.update { it.copy(shizukuAvailability = privilegeManager.shizukuAvailability()).withShizukuNeed() }
+        _state.update {
+            it.copy(
+                shizukuAvailability = privilegeManager.shizukuAvailability(),
+                shizukuUsable = privilegeManager.shizukuUsable(),
+            ).withShizukuNeed()
+        }
         scheduleDeviceOperation { generation ->
             deviceLock.withLock {
                 val snapshot = readSnapshotLocked()
@@ -299,6 +318,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                 it.copy(
                     grantMessageRes = if (granted) R.string.pd_grant_root_ok else R.string.pd_grant_root_failed,
                     grantFailureReason = null,
+                    rootAvailable = it.rootAvailable || granted,
                 )
             }
             if (granted) refresh()

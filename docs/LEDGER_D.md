@@ -528,3 +528,14 @@
   design), so an extended resting profile lands device-clamped there, and a reboot reloads the
   clamped key, so a static extended setpoint waits for its next apply while a ramp recovers on its
   next tick.
+- DD-050 [cited]: **The Privileged Display screen's Night Light card has a "Go beyond temperature
+  limits" row under "Follow circadian scaling", shown while Shizuku is usable by Tideo (running and
+  permitted, as the bridge needs) or root answers, and kept visible while a draft has it on (N2b
+  step 4, #142).** The slider's range, its hint and the circadian help's day endpoint follow the
+  draft flag at once (686–7308, device default kept); a stored setpoint the slider cannot show keeps
+  its number in the label, reaching the draft only when the thumb moves; and with the flag on and no
+  route, DC-057's "needs Shizuku" note shows, as the owner decided. **Fork decided under the owner's
+  N2b grant:** root is probed with `su -c id` once per screen open, only at ELEVATED and only when
+  Shizuku is not usable, so a Shizuku user never sees a root-manager toast for it, and a successful
+  in-app root grant counts as root. JVM-tested (Compose under Robolectric); on-device unverified, and
+  the zh-Hans strings are owed with the Owner queue's translation item.

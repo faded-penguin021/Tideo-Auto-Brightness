@@ -44,11 +44,7 @@ interface SecureDisplayController {
 
     val nightLightRange: NightLightKelvinRange get() = NightLightKelvinRange.AOSP
 
-    fun nightLightRange(extended: Boolean): NightLightKelvinRange = if (extended) {
-        NightLightKelvinRange(NIGHT_LIGHT_EXTENDED_MIN_K, NIGHT_LIGHT_EXTENDED_MAX_K, nightLightRange.default)
-    } else {
-        nightLightRange
-    }
+    fun nightLightRange(extended: Boolean): NightLightKelvinRange = nightLightRange.withExtended(extended)
 
     companion object {
         /** AOSP's example config (D-149), the device's fallback (DD-045); AAB's extended band is the rail (DD-046). */
@@ -63,6 +59,16 @@ interface SecureDisplayController {
 
 data class NightLightKelvinRange(val min: Int, val max: Int, val default: Int) {
     fun clamp(kelvin: Int): Int = kelvin.coerceIn(min, max)
+
+    fun withExtended(extended: Boolean): NightLightKelvinRange = if (extended) {
+        NightLightKelvinRange(
+            SecureDisplayController.NIGHT_LIGHT_EXTENDED_MIN_K,
+            SecureDisplayController.NIGHT_LIGHT_EXTENDED_MAX_K,
+            default,
+        )
+    } else {
+        this
+    }
 
     companion object {
         val AOSP = NightLightKelvinRange(
