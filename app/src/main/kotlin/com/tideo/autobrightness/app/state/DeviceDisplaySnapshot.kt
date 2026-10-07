@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.state
 
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.DaltonizerMode
+import com.tideo.autobrightness.platform.display.NightLightKelvinRange
 
 /**
  * DB-034: what the seven Privileged Display keys actually read as on the device, so the screen can
@@ -18,18 +19,20 @@ data class DeviceDisplaySnapshot(
     val alwaysOn: Boolean?,
     val stayAwake: Boolean?,
     val hdrForceSdr: Boolean?,
+    val nightLightRange: NightLightKelvinRange? = null,
 )
 
 /**
- * DB-034: merge a device read-back into a draft. Never device-sourced: the circadian and extended
- * flags have no Android counterpart; the temperature key is the ticker's while circadian is on;
- * and a null one delegates to the device rather than tracking it (DC-055).
+ * DB-034: merge a device read-back into a draft. Never device-sourced: the extended and circadian
+ * flags; the temperature while circadian owns the key, while unset (DC-055), or while the device
+ * holds the setpoint's own apply-time clamp (DD-048).
  */
 fun AabSettings.withDeviceSnapshot(snapshot: DeviceDisplaySnapshot): AabSettings = copy(
     // DB-042: hidden, unsupported fields must not be erased by read-back.
     nightLightEnabled = snapshot.nightLight ?: nightLightEnabled,
     nightLightTemperature = if (
-        nightLightTemperature == null || snapshot.nightLight == null || nightLightCircadianEnabled
+        nightLightTemperature == null || snapshot.nightLight == null || nightLightCircadianEnabled ||
+        (snapshot.nightLightRange != null && snapshot.temperatureK == snapshot.nightLightRange.clamp(nightLightTemperature))
     ) {
         nightLightTemperature
     } else {

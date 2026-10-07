@@ -140,6 +140,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             alwaysOn = if (display.alwaysOnDisplayAvailable) display.readAlwaysOnDisplay() else null,
             stayAwake = display.readStayAwakePlugged(),
             hdrForceSdr = if (display.hdrForceSdrAvailable) display.readHdrForceSdr() else null,
+            nightLightRange = display.nightLightRange,
         )
     }
 
@@ -184,8 +185,11 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
                         add(display.setNightLight(settings.nightLightEnabled))
                     }
                     settings.nightLightTemperature?.let {
-                        if (device == null || device.temperatureK != it || keyIgnored) {
-                            add(temperatureRoute.write(it))
+                        val extended = settings.extendedNightLightEnabled
+                        if (device == null || extended || keyIgnored ||
+                            device.temperatureK != display.nightLightRange(extended).clamp(it)
+                        ) {
+                            add(temperatureRoute.writeClamped(it, extended).map { })
                         }
                     }
                     if (writeDaltonizer) add(display.setDaltonizer(daltonizerPick))

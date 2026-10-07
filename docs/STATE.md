@@ -27,7 +27,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
-  [x] N1 · [x] N2 device Kelvin range (DD-045) · [ ] N2b 686–7308 K opt-in toggle, AAB reference and owner answers in the plan, steps 1–2 of 5 done (DD-046, DD-047) · [x] N3 (owner: the
+  [x] N1 · [x] N2 device Kelvin range (DD-045) · [ ] N2b 686–7308 K opt-in toggle, AAB reference and owner answers in the plan, steps 1–3 of 5 done (DD-046…DD-049) · [x] N3 (owner: the
   DD-038 solar fallback) · [ ] N4 close-out.
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
@@ -86,6 +86,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-07 — **Night Light N2b step 3: Kelvin writes clamp to the active range at write time —
+  686–7308 through the display-service bridge while a profile's extended flag is on, else the
+  device range; the ramp's day endpoint is 7308 while it is on, and a stored out-of-range setpoint
+  survives the read-back (DD-048, DD-049).**
 
 - 2026-10-07 — **Night Light N2b step 2: the per-profile `extendedNightLightEnabled` field (off by
   default, `%AAB_ExtendedNightLight`), persisted, exported and context-merged; nothing reads it yet.

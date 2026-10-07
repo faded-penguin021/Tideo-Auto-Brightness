@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.platform.display.NightDisplayServiceBridge
 import com.tideo.autobrightness.platform.display.SecureDisplayController
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.delay
 
 /** DC-057: every Night Light Kelvin write; the service too once the key is confirmed ignored. */
@@ -12,6 +13,7 @@ class NightLightTemperatureRoute(
     private val markNotHonoured: suspend () -> Unit = {},
     private val nowMs: () -> Long = { System.nanoTime() / 1_000_000L },
     private val settleMs: Long = SETTLE_MS,
+    private val bridgeOutOfRange: AtomicBoolean = BRIDGE_OUT_OF_RANGE,
 ) {
     enum class Verdict { UNKNOWN, HONOURED, NOT_HONOURED }
 
@@ -27,6 +29,28 @@ class NightLightTemperatureRoute(
         load()
         if (verdict != Verdict.NOT_HONOURED) return Result.success(display.readNightLightTemperature())
         return bridge?.readKelvin()?.let { Result.success(it) } ?: Result.failure(unreachable())
+    }
+
+    suspend fun writeClamped(kelvin: Int, extended: Boolean, probe: Boolean = true, current: Int? = null): Result<Int> {
+        val device = display.nightLightRange
+        if (extended && bridge != null) {
+            val target = display.nightLightRange(extended = true).clamp(kelvin)
+            if (bridge.setKelvin(target, quick = !probe) != null) {
+                bridgeOutOfRange.set(target != device.clamp(target))
+                return display.setNightLightTemperature(target).map { target }
+            }
+        }
+        val target = device.clamp(kelvin)
+        if (target == current) return Result.success(target)
+        // DD-048: the service keeps a binder Kelvin raw, so a key write clamping to the same edge is a no-op.
+        if (bridge != null && bridgeOutOfRange.get()) {
+            display.setNightLightTemperature(target).onFailure { return Result.failure(it) }
+            if (bridge.setKelvin(target, quick = !probe) != null) {
+                bridgeOutOfRange.set(false)
+                return Result.success(target)
+            }
+        }
+        return write(target, probe && !bridgeOutOfRange.get()).map { target }
     }
 
     suspend fun write(kelvin: Int, probe: Boolean = true): Result<Unit> {
@@ -75,5 +99,8 @@ class NightLightTemperatureRoute(
         const val SETTLE_MS = 750L
         const val RECHECK_MS = 30 * 60_000L
         const val CONFIRMATIONS = 2
+
+        /** Process-wide: the coordinator and the screen each hold a route. */
+        val BRIDGE_OUT_OF_RANGE = AtomicBoolean(false)
     }
 }

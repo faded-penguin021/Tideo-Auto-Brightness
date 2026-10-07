@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.state
 
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.DaltonizerMode
+import com.tideo.autobrightness.platform.display.NightLightKelvinRange
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -111,6 +112,18 @@ class DeviceDisplaySnapshotTest {
             readBackDraft(edited, committed, committed, snapshot(nightLight = true)),
             "toggling only the extended flag is a user edit of a display field",
         )
+    }
+
+    @Test
+    fun `a device holding the setpoint's own clamp keeps the stored out-of-range setpoint`() {
+        val stored = AabSettings(nightLightTemperature = 1_000)
+        fun readBack(deviceK: Int, range: NightLightKelvinRange?) = stored.withDeviceSnapshot(
+            snapshot(temperatureK = deviceK).copy(nightLightRange = range),
+        ).nightLightTemperature
+
+        assertEquals(1_000, readBack(2_596, NightLightKelvinRange.AOSP), "2596 is what applying 1000 wrote")
+        assertEquals(3_000, readBack(3_000, NightLightKelvinRange.AOSP), "anything else is a real device change")
+        assertEquals(2_596, readBack(2_596, null), "no known range: the read-back wins as before")
     }
 
     @Test

@@ -31,7 +31,7 @@ the feature first and is then ported here.
 - [ ] **N2b — extended range behind a toggle (#142).** 686–7308 K, off by default, per profile,
   shown only with Shizuku or root; the ramp starts from 7308 K while it is on. The AAB reference
   arrived and the owner answered every open question (2026-10-07); both are recorded under N2b
-  below, which also holds its step list (steps 1–2 done, DD-046, DD-047).
+  below, which also holds its step list (steps 1–3 done, DD-046…DD-049).
 - [x] **N3 — F5: daytime activation.** Owner, 2026-10-06: most likely the default-solar-times
   fallback that DD-038 fixed. No N3 code; unverified on the reporter's device.
 - [ ] **N4 — close-out.** Delete this file once N2, N2b and N3 are settled. The reply question is
@@ -259,7 +259,9 @@ A15 Return %return
    block); migration/round-trip tests (DD-047). **Fork decided under the grant:** a profile saved
    before the field reads it as off, unlike AAB's keep-current-when-absent, because Tideo profiles
    are complete snapshots and a tri-state flag would reach every consumer (DD-047).
-3. [ ] **Runtime.** The active range is the extended band when the toggle is on and a route
+3. [x] **Runtime** (DD-048; DD-049 holds its four grant-decided forks: writes-only clamping, a railed
+   anchor restore, no route cache, and the read-back keeping a stored setpoint whose clamp the
+   device holds — so step 4 needs no read-back change for it). The active range is the extended band when the toggle is on and a route
    exists, else the device range; clamp only on apply, in `DisplayTogglesCoordinator` and in
    `DisplayTogglesViewModel.applyNow`. `AppModule`'s `dayKelvin` is 7308 while extended. Extended
    writes go straight to the bridge and **skip `NightLightTemperatureRoute.observe()`**: if the

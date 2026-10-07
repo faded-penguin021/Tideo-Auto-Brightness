@@ -72,7 +72,7 @@ class DisplayTogglesCoordinator(
                 if (lastApplied == null) {
                     val seed = DisplayToggleState.of(if (afterPanic) AabSettings() else seedSettings)
                     lastApplied = seed
-                    deviceTempK = seed.temperatureK
+                    deviceTempK = seed.temperatureK?.let { display.nightLightRange(seed.extended).clamp(it) }
                 }
             }
             launch { baselineFlow.collect { resting = it } }
@@ -141,9 +141,14 @@ class DisplayTogglesCoordinator(
     private suspend fun releaseAnchorLocked(settings: AabSettings?): Boolean {
         val anchor = anchorK ?: return true
         if (tierProvider() < Tier.ELEVATED || !display.nightLightAvailable) return false
-        val target = settings?.nightLightTemperature ?: anchor
-        if (temperatureRoute.write(target, probe = false).isFailure) return false
-        deviceTempK = target
+        val setpoint = settings?.nightLightTemperature
+        val restored = if (setpoint != null) {
+            writeKelvinLocked(setpoint, settings, probe = false, skipIfCurrent = false)
+        } else {
+            val railed = anchor.coerceIn(SecureDisplayController.NIGHT_LIGHT_RAIL_K)
+            temperatureRoute.write(railed, probe = false).isSuccess.also { if (it) deviceTempK = railed }
+        }
+        if (!restored) return false
         writeAnchor(null)
         anchorK = null
         return true
@@ -160,7 +165,9 @@ class DisplayTogglesCoordinator(
         // No-op below ELEVATED but keep tracking. Static temperature opinion must track (incl. null);
         // circadian mode does NOT (ramp was never written; first post-grant tick is the feature working).
         if (tierProvider() < Tier.ELEVATED) {
-            if (!desired.circadianTemp) deviceTempK = desired.temperatureK
+            if (!desired.circadianTemp) {
+                deviceTempK = desired.temperatureK?.let { display.nightLightRange(desired.extended).clamp(it) }
+            }
             return
         }
         val switching = desired.nightLight != last.nightLight
@@ -172,16 +179,10 @@ class DisplayTogglesCoordinator(
             val kelvin = acquireAnchorLocked()?.let { anchor ->
                 circadianTemperature(settings, settings.nightLightTemperature ?: anchor)
             }
-            if (kelvin != null && (kelvin == deviceTempK || temperatureRoute.write(kelvin, probe).isSuccess)) {
-                deviceTempK = kelvin
-            }
+            if (kelvin != null) writeKelvinLocked(kelvin, settings, probe)
         } else if (released) {
             val temperature = desired.temperatureK
-            if (temperature == null || temperature == deviceTempK ||
-                temperatureRoute.write(temperature, probe).isSuccess
-            ) {
-                deviceTempK = temperature
-            }
+            if (temperature == null) deviceTempK = null else writeKelvinLocked(temperature, settings, probe)
         }
         if (desired.daltonizer != last.daltonizer) display.setDaltonizer(desired.daltonizer)
         if (desired.inversion != last.inversion) display.setInversion(desired.inversion)
@@ -205,13 +206,29 @@ class DisplayTogglesCoordinator(
         if (tierProvider() < Tier.ELEVATED) return
         val anchor = acquireAnchorLocked() ?: return // the tick acquires too: a grant can arrive after the swap
         val kelvin = circadianTemperature(settings, settings.nightLightTemperature ?: anchor) ?: return
-        if (kelvin != deviceTempK && temperatureRoute.write(kelvin).isSuccess) deviceTempK = kelvin
+        writeKelvinLocked(kelvin, settings)
+    }
+
+    /** DD-048: [kelvin] clamped to [settings]' active range; [deviceTempK] tracks what landed. */
+    private suspend fun writeKelvinLocked(
+        kelvin: Int,
+        settings: AabSettings?,
+        probe: Boolean = true,
+        skipIfCurrent: Boolean = true,
+    ): Boolean {
+        val extended = settings?.extendedNightLightEnabled == true
+        if (skipIfCurrent && display.nightLightRange(extended).clamp(kelvin) == deviceTempK) return true
+        val current = deviceTempK.takeIf { skipIfCurrent }
+        val landed = temperatureRoute.writeClamped(kelvin, extended, probe, current).getOrElse { return false }
+        deviceTempK = landed
+        return true
     }
 
     private data class DisplayToggleState(
         val nightLight: Boolean,
         val temperatureK: Int?,
         val circadianTemp: Boolean,
+        val extended: Boolean,
         val daltonizer: DaltonizerMode,
         val inversion: Boolean,
         val alwaysOn: Boolean,
@@ -223,6 +240,7 @@ class DisplayTogglesCoordinator(
                 nightLight = settings.nightLightEnabled,
                 temperatureK = settings.nightLightTemperature,
                 circadianTemp = settings.nightLightCircadianEnabled,
+                extended = settings.extendedNightLightEnabled,
                 // Fallback for un-validated input.
                 daltonizer = DaltonizerMode.entries.firstOrNull { it.name == settings.daltonizerMode }
                     ?: DaltonizerMode.OFF,

@@ -8,6 +8,7 @@ import com.tideo.autobrightness.app.runtime.NightLightTemperatureRoute
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
+import com.tideo.autobrightness.platform.display.NightLightKelvinRange
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.AndroidPrivilegeManager
@@ -67,6 +68,7 @@ class DisplayTogglesViewModelTest {
             app, privileges,
             nightLightAvailable = nightLightAvailable,
             alwaysOnDisplayAvailable = alwaysOnDisplayAvailable,
+            nightLightRange = NightLightKelvinRange.AOSP,
         )
         return DisplayTogglesViewModel(
             app,
@@ -409,6 +411,19 @@ class DisplayTogglesViewModelTest {
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_activated", -999))
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "night_display_color_temperature", -999))
         assertEquals(-999, Settings.Secure.getInt(app.contentResolver, "doze_always_on", -999))
+    }
+
+    @Test
+    fun directApply_clampsAnOutOfRangeSetpoint_andTheReadBackKeepsIt_DD048() {
+        grantElevated()
+        val vm = vm()
+        val stored = AabSettings(nightLightEnabled = true, nightLightTemperature = 1_000)
+
+        vm.applyNow(stored)
+
+        assertEquals(2_596, Settings.Secure.getInt(app.contentResolver, "night_display_color_temperature", -999))
+        val snapshot = assertNotNull(vm.deviceSnapshot.value)
+        assertEquals(1_000, stored.withDeviceSnapshot(snapshot).nightLightTemperature, "the stored number survives")
     }
 
     @Test

@@ -501,3 +501,30 @@
   "keep current" would reach every consumer of the flag, for profiles that predate a feature nobody
   could have switched on. The zh-Hans label is owed with the Owner queue's translation item.
   JVM-tested; on-device unverified.
+- DD-048 [cited]: **Night Light Kelvin is clamped to the active range at write time: 686–7308 through
+  DC-057's display-service bridge while a profile's extended flag is on, else the device's own range
+  through the key (N2b step 3, #142).** `NightLightTemperatureRoute.writeClamped` is the one entry:
+  extended tries the bridge first and only then mirrors the key, skipping the honour probe so a
+  clamping service getter never latches NOT_HONOURED, and with no route (Shizuku stopped, no root)
+  only the device clamp reaches the key, skipped when the device already holds it; because AOSP's
+  service keeps a binder Kelvin raw and compares clamped values, a key write clamping to the same
+  edge would be a no-op, so after an out-of-range binder write the next non-extended write also goes
+  through the bridge, unprobed (a process-wide flag). The coordinator's seed, below-ELEVATED
+  tracking, static, swap, tick and release writes all clamp alike and `deviceTempK` tracks the
+  Kelvin that landed; the screen's direct Apply uses the same entry, always writing while extended,
+  and the ramp's day endpoint is 7308 while the flag is on. The forks and known limits are DD-049;
+  the AOSP behaviour above is recalled, neither re-read nor measured — JVM-tested, on-device
+  unverified.
+- DD-049: **DD-048's forks, decided under the owner's N2b grant, and its accepted limits.** (a) Only
+  writes are clamped, as AAB's `_NightLightAPI` A3/A4 do; the ramp's night endpoint and DC-056's anchor stay
+  raw, so the ramp shape is unchanged; (b) restoring a displaced anchor for a null setpoint is railed
+  to 686–7308, never device-clamped, because it puts back the device's own value rather than
+  applying a setpoint; (c) the route is not cached: every extended write tries the bridge, so the
+  ticker recovers a returning Shizuku within a minute, while a static setpoint written with no route
+  waits for the next profile change or Apply, as AAB's apply-time write does; (d) a read-back
+  equal to the setpoint's device clamp keeps the stored setpoint (the snapshot carries the device
+  range), done here because this step introduced the clamp the read-back would otherwise copy
+  into the draft. Known and accepted: `stop()`'s main-thread quick write skips Shizuku (DC-057's
+  design), so an extended resting profile lands device-clamped there, and a reboot reloads the
+  clamped key, so a static extended setpoint waits for its next apply while a ramp recovers on its
+  next tick.
