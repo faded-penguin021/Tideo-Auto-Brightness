@@ -57,7 +57,7 @@ import com.tideo.autobrightness.app.ui.components.rememberToaster
 import com.tideo.autobrightness.app.ui.theme.Dimens
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
-import com.tideo.autobrightness.platform.display.SecureDisplayController
+import com.tideo.autobrightness.platform.display.NightLightKelvinRange
 import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlin.math.roundToInt
@@ -195,6 +195,7 @@ fun PrivilegedDisplayContent(
                         }
                         NightLightTemperatureSlider(
                             kelvin = draft.nightLightTemperature,
+                            range = state.nightLightRange,
                             onCommit = { k -> onEditDraft { it.copy(nightLightTemperature = k) } },
                         )
                         if (draft.nightLightTemperature != null) {
@@ -207,6 +208,7 @@ fun PrivilegedDisplayContent(
                             stringResource(R.string.pd_night_light_circadian), draft.nightLightCircadianEnabled,
                             { on -> onEditDraft { it.copy(nightLightCircadianEnabled = on) } },
                             help = R.string.pd_night_light_circadian_help,
+                            helpArgs = arrayOf(state.nightLightRange.max, state.nightLightRange.default),
                             testTag = "switch_nightLightCircadian",
                         )
                     }
@@ -346,10 +348,10 @@ private fun GrantChannelsCard(
 
 /**
  * Kelvin slider for `night_display_color_temperature`. Commits on drag END; null = device default.
- * AOSP bounds 2596–4082, default 2850; OEMs may vary (ColorDisplayService clamps).
+ * [range] is the device's own framework config (DD-044); ColorDisplayService may still clamp.
  */
 @Composable
-private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
+private fun NightLightTemperatureSlider(kelvin: Int?, range: NightLightKelvinRange, onCommit: (Int) -> Unit) {
     var drag by remember { mutableStateOf<Float?>(null) }
     val shown = drag?.roundToInt() ?: kelvin
     Column {
@@ -362,18 +364,18 @@ private fun NightLightTemperatureSlider(kelvin: Int?, onCommit: (Int) -> Unit) {
         // the slider carries its own contentDescription for TalkBack.
         val tempLabel = stringResource(R.string.a11y_night_light_temp)
         Slider(
-            value = drag ?: (kelvin ?: AOSP_NIGHT_LIGHT_DEFAULT_K).toFloat(),
+            value = drag ?: (kelvin ?: range.default).toFloat(),
             onValueChange = { drag = it },
             onValueChangeFinished = {
                 drag?.roundToInt()?.let(onCommit)
                 drag = null
             },
-            valueRange = AOSP_NIGHT_LIGHT_MIN_K.toFloat()..AOSP_NIGHT_LIGHT_MAX_K.toFloat(),
+            valueRange = range.min.toFloat()..range.max.toFloat(),
             modifier = Modifier.fillMaxWidth().testTag("slider_nightLightTemp")
                 .semantics { contentDescription = tempLabel },
         )
         Text(
-            stringResource(R.string.pd_night_light_temp_hint),
+            stringResource(R.string.pd_night_light_temp_hint, range.min, range.max),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -441,8 +443,3 @@ private fun DaltonizerMode.labelRes(): Int = when (this) {
     DaltonizerMode.DEUTERANOMALY -> R.string.pd_daltonizer_deutan
     DaltonizerMode.TRITANOMALY -> R.string.pd_daltonizer_tritan
 }
-
-// AOSP frameworks/base config; shared with D-154 circadian ramp via SecureDisplayController.
-private const val AOSP_NIGHT_LIGHT_MIN_K = SecureDisplayController.NIGHT_LIGHT_MIN_K
-private const val AOSP_NIGHT_LIGHT_MAX_K = SecureDisplayController.NIGHT_LIGHT_MAX_K
-private const val AOSP_NIGHT_LIGHT_DEFAULT_K = SecureDisplayController.NIGHT_LIGHT_DEFAULT_K

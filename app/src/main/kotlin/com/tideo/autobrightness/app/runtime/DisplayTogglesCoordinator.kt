@@ -132,7 +132,7 @@ class DisplayTogglesCoordinator(
     private suspend fun acquireAnchorLocked(): Int? {
         anchorK?.let { return it }
         val kelvin = temperatureRoute.readDeviceKelvin().getOrElse { return null }
-            ?: SecureDisplayController.NIGHT_LIGHT_DEFAULT_K
+            ?: display.nightLightRange.default
         writeAnchor(kelvin)
         anchorK = kelvin
         return kelvin

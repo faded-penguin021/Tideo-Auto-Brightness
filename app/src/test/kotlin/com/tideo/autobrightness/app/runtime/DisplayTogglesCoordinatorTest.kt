@@ -4,6 +4,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.DALTONIZER_MODES
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
+import com.tideo.autobrightness.platform.display.NightLightKelvinRange
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.Tier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,6 +25,7 @@ class DisplayTogglesCoordinatorTest {
     private class FakeSecureDisplay : SecureDisplayController {
         override var nightLightAvailable = true
         override var alwaysOnDisplayAvailable = true
+        override var nightLightRange = NightLightKelvinRange.AOSP
         val writes = mutableListOf<String>()
         // DB-048: what the coordinator ASKED for, recorded before the capability gate. Without it a
         // gated assertion only re-reads this fake's own `if`, and would still pass if the coordinator
@@ -443,6 +445,18 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = deviceDefaultProfile
         runCurrent()
         assertEquals(SecureDisplayController.NIGHT_LIGHT_DEFAULT_K, h.anchorGiven)
+    }
+
+    @Test
+    fun aGenuinelyUnsetKey_fallsBackToThisDevicesConfiguredDefault_DD044() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.nightLightRange = NightLightKelvinRange(1_800, 5_000, 3_000)
+        h.display.deviceTemp = null
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = deviceDefaultProfile
+        runCurrent()
+        assertEquals(3_000, h.anchorGiven)
     }
 
     @Test

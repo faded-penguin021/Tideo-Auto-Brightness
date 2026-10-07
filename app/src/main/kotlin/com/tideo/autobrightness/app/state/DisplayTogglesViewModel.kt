@@ -11,6 +11,7 @@ import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.platform.display.AndroidSecureDisplayController
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
+import com.tideo.autobrightness.platform.display.NightLightKelvinRange
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.PrivilegeManager
 import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
@@ -33,6 +34,7 @@ data class PrivilegedDisplayUiState(
     val tier: Tier = Tier.NONE,
     val nightLightAutoMode: NightLightAutoMode = NightLightAutoMode.MANUAL,
     val nightLightAvailable: Boolean = false,
+    val nightLightRange: NightLightKelvinRange = NightLightKelvinRange.AOSP,
     val alwaysOnDisplayAvailable: Boolean = false,
     val hdrAvailable: Boolean = false,
     val hdrPreferenceCustom: Boolean = false,
@@ -71,6 +73,7 @@ class DisplayTogglesViewModel @JvmOverloads constructor(
             adbCommand = privilegeManager.adbGrantInstruction(),
             shizukuAvailability = privilegeManager.shizukuAvailability(),
             nightLightAvailable = display.nightLightAvailable,
+            nightLightRange = display.nightLightRange,
             alwaysOnDisplayAvailable = display.alwaysOnDisplayAvailable,
         ),
     )

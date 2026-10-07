@@ -191,6 +191,7 @@ fun SwitchSettingRow(
     modifier: Modifier = Modifier,
     helper: String? = null,
     @StringRes help: Int? = null,
+    helpArgs: Array<out Any> = emptyArray(),
     enabled: Boolean = true,
     testTag: String = label,
 ) {
@@ -202,7 +203,8 @@ fun SwitchSettingRow(
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
-            val msg = help?.let { stringResource(it) }?.takeIf { showHelp } ?: helper
+            val helpText = help?.let { if (helpArgs.isEmpty()) stringResource(it) else stringResource(it, *helpArgs) }
+            val msg = helpText?.takeIf { showHelp } ?: helper
             if (msg != null) {
                 Text(
                     msg,

@@ -173,7 +173,7 @@ class AppModule(context: Context) {
                 NightLightTemperatureRamp.temperature(
                     modifier = modifier,
                     nightKelvin = nightKelvin,
-                    dayKelvin = SecureDisplayController.NIGHT_LIGHT_MAX_K,
+                    dayKelvin = secureDisplay.nightLightRange.max,
                 )
             },
             readAnchor = nightLightAnchorStore::read,

@@ -25,8 +25,9 @@ the feature first and is then ported here.
 - [x] **N1 — F1 + F2, the reported bug.** Shipped as DC-055 (read-back) and DC-056 (anchor).
   JVM-verified only; the settings-row confirmation below is still **owed** and needs a debug build
   installed on a device (the owner offered one, 2026-09-21; nothing was installed).
-- [ ] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.** The slider
-  follows the device's reported min/max/default (owner, #142, 2026-10-06).
+- [x] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.** The slider
+  follows the device's reported min/max/default (owner, #142, 2026-10-06). Shipped as DD-044,
+  inside the 1000–10000 rails until N2b; JVM-verified only.
 - [ ] **N2b — extended range behind a toggle (#142).** 686–7308 K, off by default, per profile,
   shown only with Shizuku or root; the ramp starts from 7308 K while it is on. **Waits for the AAB
   reference** (owner, 2026-10-07). Starts after N2.

@@ -38,7 +38,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
-  [x] N1 · [ ] N2 device Kelvin range · [ ] N2b 686–7308 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
+  [x] N1 · [x] N2 device Kelvin range (DD-044) · [ ] N2b 686–7308 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
   DD-038 solar fallback) · [ ] N4 close-out.
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
@@ -58,12 +58,14 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 > fork, options, recommendation (D-167), dated (DA-006); credential leaks and external-content
 > escalations land here too.
 
-1. **[2026-10-04] Get six Chinese strings translated; they show in English until then.**
-   `help_pwm_exponent` (DD-014) and `contexts_only_plugged_in` (DD-025) changed meaning, so their
-   old Chinese was removed (DD-026), and the rule editor's four `contexts_offset_*` strings are new
-   (DD-035). You will ask in an issue once this train nears release (owner, 2026-10-06). Settles it:
+1. **[2026-10-04] Get seven Chinese strings translated; they show in English until then.**
+   `help_pwm_exponent` (DD-014), `contexts_only_plugged_in` (DD-025) and
+   `pd_night_light_temp_hint` (DD-044) changed meaning, so their old Chinese was removed (DD-026),
+   and the rule editor's four `contexts_offset_*` strings are new (DD-035). You will ask in an
+   issue once this train nears release (owner, 2026-10-06). Settles it:
    `grep -c -e 'name="help_pwm_exponent"' -e 'name="contexts_only_plugged_in"' -e
-   'name="contexts_offset_' app/src/main/res/values-b+zh+Hans/strings.xml` prints 6.
+   'name="pd_night_light_temp_hint"' -e 'name="contexts_offset_'
+   app/src/main/res/values-b+zh+Hans/strings.xml` prints 7.
 
 2. **[2026-10-04] Once this train is on `main`, check the translation badge.** The `Translation
    badges` workflow first runs there. Worked if its Actions run is green and the README's 简体中文
@@ -94,6 +96,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-07 — **Night Light N2: the slider range, the circadian day endpoint and the unset-key
+  default come from the device's framework config, AOSP's values only as fallback (DD-044).**
 
 - 2026-10-07 — **E2E S8 dropped by the owner: mobile-use has no device-free mode and its adbutils
   pin cannot be locked beside the suite's, so there is no triage extra (DD-043).**

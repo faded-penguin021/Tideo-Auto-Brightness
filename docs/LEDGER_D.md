@@ -463,3 +463,9 @@
   or cloud device, so an offline triage would use only its LangChain wrappers. Its
   `adbutils==2.9.3` pin also makes a `triage` extra unsatisfiable beside the suite's 2.12.0
   (`uv lock`).
+
+- DD-044 [cited]: **The Night Light slider, ramp day endpoint and unset-key anchor follow the
+  device's `config_nightDisplayColorTemperature{Min,Max,Default}`, not AOSP's 2596/4082/2850
+  (N2, #142).** Each absent value falls back to AOSP's; both bounds stay inside the 1000–10000
+  write rails until N2b moves them, so a 686 floor shows as 1000, and a min ≥ max pair keeps
+  AOSP's range. The hint loses its Chinese (DD-026). JVM-tested; on-device unverified.

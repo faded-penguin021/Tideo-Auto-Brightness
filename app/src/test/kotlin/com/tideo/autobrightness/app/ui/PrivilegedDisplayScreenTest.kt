@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -16,6 +17,7 @@ import com.tideo.autobrightness.app.state.PrivilegedDisplayUiState
 import com.tideo.autobrightness.app.ui.screens.PrivilegedDisplayContent
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
+import com.tideo.autobrightness.platform.display.NightLightKelvinRange
 import com.tideo.autobrightness.platform.privilege.ShizukuAvailability
 import com.tideo.autobrightness.platform.privilege.Tier
 import org.junit.Rule
@@ -229,6 +231,21 @@ class PrivilegedDisplayScreenTest {
         // A set temperature offers the clear back to null (= "device default", never written).
         compose.onNodeWithTag("pd_temp_clear").performScrollTo().performClick()
         assertNull(draft().nightLightTemperature)
+    }
+
+    @Test
+    fun temperatureSlider_andItsTexts_followThisDevicesKelvinConfig_DD044() {
+        val device = elevated.copy(nightLightRange = NightLightKelvinRange(1_800, 5_000, 3_000))
+        val draft = setDraftContent(state = device)
+        compose.onNodeWithText("Lower = warmer (stronger filter). This device's range is 1800–5000 K.")
+            .assertExists()
+        compose.onNodeWithTag("slider_nightLightTemp").performScrollTo()
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(1_900f) }
+        assertEquals(1_900, draft().nightLightTemperature, "below AOSP's 2596, reachable only on this device's range")
+        compose.onNodeWithTag("help_switch_nightLightCircadian").performScrollTo().performClick()
+        val help = compose.onNodeWithTag("helptext_switch_nightLightCircadian")
+            .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString()
+        assertTrue("(5000 K)" in help && "device default 3000 K" in help, help)
     }
 
     @Test

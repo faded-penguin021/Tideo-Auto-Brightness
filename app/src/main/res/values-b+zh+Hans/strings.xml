@@ -706,9 +706,8 @@
     <string name="pd_night_light_switch">夜间模式</string>
     <string name="pd_night_light_temp_label">色温：%1$d K</string>
     <string name="pd_night_light_temp_default">色温：设备默认值</string>
-    <string name="pd_night_light_temp_hint">数值越低，色调越暖（滤镜越强）。标准 Android 范围为 2596–4082 K。</string>
     <string name="pd_night_light_circadian">跟随昼夜节律缩放</string>
-    <string name="pd_night_light_circadian_help">服务运行时，色温会跟随你的昼夜节律曲线：夜间最暖，日间逐渐减弱至最弱滤镜（4082 K）。上方滑块用于设置夜间色温（未设置时使用设备默认值 2850 K）。开启后，手动更改色温会被覆盖。使用与昼夜节律缩放（“昼夜节律”页面）相同的太阳时刻表和陡峭度。</string>
+    <string name="pd_night_light_circadian_help">服务运行时，色温会跟随你的昼夜节律曲线：夜间最暖，日间逐渐减弱至最弱滤镜（%1$d K）。上方滑块用于设置夜间色温（未设置时使用设备默认值 %2$d K）。开启后，手动更改色温会被覆盖。使用与昼夜节律缩放（“昼夜节律”页面）相同的太阳时刻表和陡峭度。</string>
     <string name="pd_night_light_schedule_caveat">系统设置中已设定夜间模式的定时计划，系统可能会自行将此开关切回原来的状态。</string>
     <string name="pd_night_light_needs_shizuku">此设备只有通过显示服务才能应用色温设置，否则会忽略该设置。请启动 Shizuku（或授予 root 权限），使色温及昼夜节律渐变生效。</string>
     <string name="pd_section_color">颜色</string>
