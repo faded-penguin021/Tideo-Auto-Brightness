@@ -25,20 +25,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
-- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S4
-  done and the blocking Sol review of S2–S4 fixed (DD-021); S5's read-only preflight is built and
-  passed on 1.14.0-debug vc28 (DD-029); no Tasker/MacroDroid profile on the owner's phone acts on
-  `STATE_CHANGED` (owner, 2026-10-04), so device runs set `TIDEO_E2E_CONFIRM=automation`; S6's
-  smoke set passed there (DD-032); S7's device runs are done (DD-033, DD-034, DD-039…DD-041):
-  all 20 auto scenarios pass (18) or skip correctly (2) on 1.14.0-debug vc28, the owner having
-  deleted the `SUNSET-30` context rule; s02_10a/10e run only with `unlock` added, which a session
-  asks the owner for first, since each wake waits for their fingerprint (DD-040). S8 is dropped (DD-043); S9 close-out is open.
-  Owed when the partial rows get tests, from Sol on S4a: a
-  dialog-root flag for SaveProfileDialog before s14_50, and the native flash overlay has no
-  resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
-  [x] N1 · [x] N2 device Kelvin range (DD-044) · [ ] N2b 686–7308 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
+  [x] N1 · [x] N2 device Kelvin range (DD-045) · [ ] N2b 686–7308 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
   DD-038 solar fallback) · [ ] N4 close-out.
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
@@ -60,7 +49,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 1. **[2026-10-04] Get seven Chinese strings translated; they show in English until then.**
    `help_pwm_exponent` (DD-014), `contexts_only_plugged_in` (DD-025) and
-   `pd_night_light_temp_hint` (DD-044) changed meaning, so their old Chinese was removed (DD-026),
+   `pd_night_light_temp_hint` (DD-045) changed meaning, so their old Chinese was removed (DD-026),
    and the rule editor's four `contexts_offset_*` strings are new (DD-035). You will ask in an
    issue once this train nears release (owner, 2026-10-06). Settles it:
    `grep -c -e 'name="help_pwm_exponent"' -e 'name="contexts_only_plugged_in"' -e
@@ -97,8 +86,16 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-07 — **The parallel `claude/e2e-s9-closeout` branch merged into this train; its row kept
+  DD-044, so N2's row is renumbered DD-045 (owner).**
+
 - 2026-10-07 — **Night Light N2: the slider range, the circadian day endpoint and the unset-key
-  default come from the device's framework config, AOSP's values only as fallback (DD-044).**
+  default come from the device's framework config, AOSP's values only as fallback (DD-045).**
+
+- 2026-10-07 — **E2E suite complete (S9; plan deleted): 17 of 20 auto rows pass on the phone and 3
+  skip on their preconditions, private state unchanged; how to run it is RUNBOOK playbook 9, what
+  a PASS does not prove is `e2e/README.md` "Known limits", and the script names each section's
+  auto rows (DD-044).**
 
 - 2026-10-07 — **E2E S8 dropped by the owner: mobile-use has no device-free mode and its adbutils
   pin cannot be locked beside the suite's, so there is no triage extra (DD-043).**

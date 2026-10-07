@@ -464,8 +464,18 @@
   `adbutils==2.9.3` pin also makes a `triage` extra unsatisfiable beside the suite's 2.12.0
   (`uv lock`).
 
-- DD-044 [cited]: **The Night Light slider, ramp day endpoint and unset-key anchor follow the
+- DD-044: **The E2E plan is closed (S9, 2026-10-07): on 1.14.0-debug vc28, installed before DD-042,
+  17 of 20 auto rows pass and 3 skip on their own preconditions; the journal ends empty and
+  Tideo's private stores are byte-identical before and after.** The skips: grant already held
+  (s06_16), the owner's brightness mode manual (s02_10c), daltonizer at AOSP 0 (s11_32c). From
+  Sol's final review, a held value the restore template refuses now SKIPs like an absent row; the
+  rest is `e2e/README.md` "Known limits", and comparing private state stays a manual step
+  (RUNBOOK playbook 9).
+  Commit `e9f1b22` cites this ID for the N2 Kelvin-range row, renumbered DD-045 (owner, 2026-10-07).
+
+- DD-045 [cited]: **The Night Light slider, ramp day endpoint and unset-key anchor follow the
   device's `config_nightDisplayColorTemperature{Min,Max,Default}`, not AOSP's 2596/4082/2850
   (N2, #142).** Each absent value falls back to AOSP's; both bounds stay inside the 1000–10000
   write rails until N2b moves them, so a 686 floor shows as 1000, and a min ≥ max pair keeps
   AOSP's range. The hint loses its Chinese (DD-026). JVM-tested; on-device unverified.
+  Renumbered from DD-044, which the parallel S9 branch had taken first (owner, 2026-10-07).

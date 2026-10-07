@@ -348,7 +348,7 @@ private fun GrantChannelsCard(
 
 /**
  * Kelvin slider for `night_display_color_temperature`. Commits on drag END; null = device default.
- * [range] is the device's own framework config (DD-044); ColorDisplayService may still clamp.
+ * [range] is the device's own framework config (DD-045); ColorDisplayService may still clamp.
  */
 @Composable
 private fun NightLightTemperatureSlider(kelvin: Int?, range: NightLightKelvinRange, onCommit: (Int) -> Unit) {

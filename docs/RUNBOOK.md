@@ -348,6 +348,46 @@ Do it in two reviewable commits; on-device verification is owner-only (no emulat
 - **Acceptance:** full CI green on the PR. **Record:** STATE changelog line; a `D-NN` only if the
   process itself changed.
 
+### 9. Running the device E2E suite on the owner's phone
+- **When:** a build needs device evidence beyond JVM tests — a fix on a scenario's path, a train
+  nearing release, or the owner asks. It covers the `auto` rows only; `DEVICE_TEST_SCRIPT.md`'s
+  `E2E auto:` line under each section names them, and every other step stays the owner's.
+- **Read first:** `e2e/README.md` (boundary, journal, run commands), DD-015 (decision and safety
+  model), DD-040 (wake scenarios).
+- **Preconditions, from the owner:** the phone unlocked and reachable over adb (the serial lives in
+  the environment, never in a file); the debug build installed; Tideo resolving to English; and
+  hands off the phone's display settings until the run ends (`e2e/README.md` "Known limits").
+  Confirmations go in `TIDEO_E2E_CONFIRM`: `automation` stands (no Tasker/MacroDroid profile acts
+  on `STATE_CHANGED`, owner 2026-10-04); `contexts` only when the owner confirms it for that run;
+  `unlock` only after asking, since each wake then waits 60 s for their fingerprint (DD-040).
+- **Steps:**
+  1. `e2e/run.sh tests/unit` — device-free.
+  2. `e2e/run.sh --preflight` — read-only; anything but exit 0 stops the run. Its "would run" list
+     is the expected set. Note the installed build's commit: a build older than the tree's last
+     `app/` change is evidence about that build, not the tree.
+  3. A new build goes on only through `e2e/run.sh --install <apk>` or by the owner's own hand.
+  4. `e2e/run.sh tests --ignore=tests/unit --junitxml=<private store>/junit-<date>.xml` — one
+     invocation; collection orders it by effect stage. JUnit XML carries skip reasons that may name
+     the device, so it goes to the private store, never under `e2e/`.
+  5. The wake pair, once the owner is at the phone: add `unlock` and run `-k "s02_10a or s02_10e"`.
+  6. `e2e/run.sh --recover` — exits 0 at once on an empty journal. A pending journal blocks every
+     later run; its conflicts are the owner's to resolve. Recovery never writes a conflicted key
+     itself, but a preference restore can rewrite one through Tideo (`e2e/README.md` "Known
+     limits").
+  7. `e2e/run.sh --preflight` again, and compare its record with step 2's: settings, grant,
+     runtime state and each of Tideo's private stores, field by field. Only churn the run
+     explains may differ; nothing compares them automatically.
+- **Failures:** classify as Tideo defect / harness / framework / timing / OEM / invalid assumption.
+  Fix in scope, rerun the node, then the group. A Tideo defect is playbook 4.
+- **Avoid:** any device mutation outside `run.sh`: the boundary covers only the harness, so a
+  hand-typed `adb shell` write is unjournaled. Never `pm clear`, uninstall, reboot or `bmgr`.
+- **Layer:** the boundary, journal and SKIP rules are code with unit tests; the preconditions,
+  asking before `unlock` and step 7's comparison are prose only.
+- **Acceptance:** every collected scenario passes, or skips with a SKIP rule's reason, and the
+  skips match preflight's list or a scenario's own stated precondition; the journal is empty; step
+  7 finds no unexplained difference. **Record:** a ledger row naming the build (versionName/versionCode and its commit) and
+  the pass/skip/fail counts; a STATE changelog line.
+
 ## Session discipline (BINDING for every maintenance session — D-161)
 
 Structural rules replacing the retired model-tier policy: D-035 moved code segments to Opus after

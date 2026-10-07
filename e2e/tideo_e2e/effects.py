@@ -121,18 +121,22 @@ class DeviceFacts:
     """What preflight observed, plus what the owner confirmed for this run."""
 
     absent_rows: frozenset[Key] = frozenset()
-    context_state: bool = False      # enabled context rules, contextOverride or a baseline set
+    unrestorable_rows: frozenset[Key] = frozenset()  # held values the put template refuses
+    context_state: bool = False     # enabled context rules, contextOverride or a baseline set
     automation_on: bool = False
     force_dark_opt_in: bool = False
     confirmed: frozenset[str] = field(default_factory=frozenset)  # contexts, automation, unlock
 
 
 def skip_reason(effects, facts: DeviceFacts) -> str | None:
-    """The plan §3.6 SKIP rule this scenario trips on this device, or None."""
+    """The SKIP rule this scenario trips on this device, or None."""
     fp = footprint(effects)
     # Any write to an absent row creates it, and only `settings delete` could undo that.
     if absent := sorted(fp.settings & facts.absent_rows):
         return f"may create absent rows {absent}; restoring them needs settings delete"
+    # A journaled original the boundary would refuse to write back leaves a stuck journal.
+    if held := sorted(fp.settings & facts.unrestorable_rows):
+        return f"rows {held} hold values the boundary cannot write back"
     # Recovery stops and restarts a service the run found running, so any runtime footprint
     # may start it (S2–S4 review), whatever the scenario itself does.
     starts = fp.starts_service or fp.runtime

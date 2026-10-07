@@ -7,17 +7,25 @@ from collections import Counter
 import pytest
 
 from tideo_e2e.scenarios import (
-    E2E_ROOT, EFFECTS, STATUSES, ManifestError, load, script_step_ids,
+    E2E_ROOT, EFFECTS, STATUSES, ManifestError, load, script_e2e_pointers, script_step_ids,
 )
 
 ROWS = load()
 STEPS = script_step_ids()
+POINTERS = script_e2e_pointers()
 
 
 def test_script_parses_to_steps():
     # Guards the extractor itself: §0 starts at step 1 and §2 carries the 10a…10e family.
     assert STEPS[:3] == ["s00_1", "s00_2", "s00_3"]
     assert {"s02_10a", "s02_10e", "s11_39d", "s13_44a"} <= set(STEPS)
+
+
+@pytest.mark.parametrize("section", sorted(POINTERS), ids=lambda s: f"s{s:02d}")
+def test_section_pointer_names_its_auto_rows(section):
+    # Each script section carries one `E2E auto:` line naming exactly its auto rows, in order.
+    auto = [r.id for r in ROWS if r.status == "auto" and r.id.startswith(f"s{section:02d}_")]
+    assert POINTERS[section] == [auto]
 
 
 def test_ids_unique():

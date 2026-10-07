@@ -49,6 +49,23 @@ def script_step_ids(path: Path = SCRIPT) -> list[str]:
     return ids
 
 
+_POINTER = re.compile(r"^E2E auto: (.*)$")
+_POINTER_ID = re.compile(r"`(s\d{2}_\w+)`")
+
+
+def script_e2e_pointers(path: Path = SCRIPT) -> dict[int, list[list[str]]]:
+    """Each section's `E2E auto:` lines, as the ids each names, keyed by section number."""
+    out: dict[int, list[list[str]]] = {}
+    section: int | None = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if m := _SECTION.match(line):
+            section = int(m.group(1))
+            out[section] = []
+        elif section is not None and (m := _POINTER.match(line)):
+            out[section].append(_POINTER_ID.findall(m.group(1)))
+    return out
+
+
 @dataclass(frozen=True)
 class Scenario:
     id: str

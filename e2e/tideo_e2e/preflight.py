@@ -1,4 +1,4 @@
-"""`run.sh --preflight`: strictly read-only checks before any device scenario (plan §3.6, S5).
+"""`run.sh --preflight`: strictly read-only checks before any device scenario.
 
 One READ-grade session: connectivity, identity, package and signer, the release build's service,
 the app language, the settings/runtime/private-state snapshot, the SKIP rules per scenario, and
@@ -143,6 +143,9 @@ def check(s: device.Session, store: Path, confirmed: frozenset[str]) -> Report:
 
     facts = DeviceFacts(
         absent_rows=absent, context_state=contexts,
+        unrestorable_rows=frozenset(
+            k for k in EVERY_TIDEO_KEY if (v := settings[f"{k[0]}/{k[1]}"]) is not None
+            and not device.restorable(*k, v)),
         automation_on=prefs["control_prefs/external_control_enabled"] == "true",
         force_dark_opt_in=prefs["control_prefs/force_dark_enabled"] == "true",
         confirmed=confirmed,

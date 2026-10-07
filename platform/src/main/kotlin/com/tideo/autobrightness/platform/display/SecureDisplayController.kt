@@ -45,7 +45,7 @@ interface SecureDisplayController {
     val nightLightRange: NightLightKelvinRange get() = NightLightKelvinRange.AOSP
 
     companion object {
-        /** AOSP's example Night Light config (D-149); only the fallback for the device's own (DD-044). */
+        /** AOSP's example Night Light config (D-149); only the fallback for the device's own (DD-045). */
         const val NIGHT_LIGHT_MIN_K = 2596
         const val NIGHT_LIGHT_MAX_K = 4082
         const val NIGHT_LIGHT_DEFAULT_K = 2850

@@ -34,7 +34,7 @@ SHADE_WINDOW = "NotificationShade"  # its focused-window title (OxygenOS 16, AOS
 SHADE_POLLS, SHADE_POLL_S = 10, 0.3
 # AOSP's row id (status_bar_notification_row.xml); S6's smoke run confirms it on the owner's OEM.
 NOTIFICATION_ROW_ID = f"{SHADE_PKG}:id/expandableNotificationRow"
-# The named actions on Tideo's own notifications (plan §3.2). Discard forgets the curve point an
+# The named actions on Tideo's own notifications. Discard forgets the curve point an
 # override pause recorded (DD-011), so a scenario that causes one leaves the owner's data as found.
 SHADE_ACTIONS = frozenset({"Resume", "Reset", "Discard"})
 # The app-name header of Tideo's notification row: appLabel for release and debug. Only the
