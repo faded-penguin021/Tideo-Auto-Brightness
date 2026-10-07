@@ -27,7 +27,9 @@ the feature first and is then ported here.
   installed on a device (the owner offered one, 2026-09-21; nothing was installed).
 - [ ] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.** The slider
   follows the device's reported min/max/default (owner, #142, 2026-10-06).
-- [ ] **N2b — extended range behind a toggle (#142).** 686–7985 K, off by default. Starts after N2.
+- [ ] **N2b — extended range behind a toggle (#142).** 686–7985 K, off by default, per profile,
+  shown only with Shizuku or root; the ramp starts from 7985 K while it is on. **Waits for the AAB
+  reference** (owner, 2026-10-07). Starts after N2.
 - [x] **N3 — F5: daytime activation.** Owner, 2026-10-06: most likely the default-solar-times
   fallback that DD-038 fixed. No N3 code; unverified on the reporter's device.
 - [ ] **N4 — close-out.** Delete this file once N2, N2b and N3 are settled. The reply question is
@@ -146,47 +148,90 @@ elsewhere, and #142 shows it is uneven. On the owner's device (2026-10-06) out-o
 `settings get` reported the written one. So the dumpsys or service read is not proof of what the
 panel shows.
 
-## N2b — extended range behind a toggle (#142; starts after N2)
+## N2b — extended range behind a toggle (#142; WAITS for the AAB reference)
 
 **Owner direction (#142 reply, 2026-10-06):** an opt-in toggle, labelled "Go beyond temperature
 limits" or something close (the wording is not final), off by default. When it is on, the setpoint
 slider spans **686–7985 K** instead of the device's reported range. Never go below 686 (blue is
 already zero; going lower only strips green toward red). Never go above 7985 (the blue peak; above
-it the fit reddens again). Both bounds are derived under N2 above. The toggle needs the ELEVATED
-tier, like every Night Light control.
+it the fit reddens again). Both bounds are derived under N2 above.
 
-**Port from AAB first.** Per the owner, AAB builds the feature first and Tideo ports it. Before
-starting, look for AAB's implementation. If it exists, its toggle semantics are the parity source
-and "Tasker semantics override coding taste" applies. If it does not exist yet, ask the owner
-whether N2b waits for it.
+### Owner decisions (2026-10-07) — do not re-litigate
 
-**The binder code #142 proposes already exists.** The issue's `ColorDisplayBinder` snippet is
-essentially `platform/.../privilege/ColorDisplayBinder.kt` (DC-057). Do not add a second copy.
-What N2b actually has to settle:
+| Decision | Detail |
+| --- | --- |
+| **N2b waits for the AAB reference** | The AAB work is mostly WebView changes. Its write task, `_NightLightAPI`, already exists (transcribed below). Port AAB's toggle semantics once they land, rather than inventing them. |
+| **With the toggle on, 7985 K is the ramp's day endpoint** | Night Light normally ramps from the device max (4082 on stock AOSP) down to the setpoint. Extended mode ramps from 7985 instead, so activation is gentler and slower. Day is never warmer than night, because every setpoint is ≤ 7985. With the toggle off, the day endpoint stays the device max (N2). |
+| **Extended range needs Shizuku or root** | If neither route is available, the toggle is **not shown**. ELEVATED (a `pm grant`) alone is not enough. |
+| **The toggle is per profile** | It is an `AabSettings` field, so it is exported, serialised for Tasker and context-merged like the setpoint. Its `%AAB_…` name comes from the AAB reference. |
+| **Out-of-range setpoints are preserved** | A stored setpoint outside the active range is kept, never rewritten. It is clamped only when applied. Turning the toggle off, importing a profile, or loading a profile whose value the slider cannot show never changes the stored number. |
+| **This is Shizuku's fourth runtime use** | The N2b commit updates AGENTS.md's "exactly three places" sentence and the `doc-facts.sh` constant. It is a rule change under the DA-005 rule-review protocol (`.orch/codex.sh rules`), so budget for it. |
 
-- **The write path.** DC-057 uses the binder only on builds whose verdict is NOT_HONOURED. Find out
-  on a device whether an out-of-range Kelvin written to the secure key takes effect on an HONOURED
-  build, or whether only the binder delivers it. If out-of-range values need the binder everywhere,
-  that widens Shizuku's role. AGENTS.md's "exactly three places" sentence and the
-  `doc-facts.sh` anchor then change too, which is a rule change under the rule-review protocol.
+Why 7985 makes activation gentle, computed from the #142 fit: at 7985 K, `g ≈ 0.999` and
+`b ≈ 1.009`, so the matrix is almost the identity, and Night Light switching on at the start of the
+ramp is visually close to nothing. At 4082 K the same fit gives `g ≈ 0.86, b ≈ 0.72`, which is the
+visible step the stock ramp starts with. A device check is owed: the fit's blue goes slightly
+**above 1** between 7308 and 8662 K. Whether ColorDisplayService or the panel clips that small
+boost (about 1 %) is unknown, so look at a white screen at 7985 K with Night Light on and off.
+
+### AAB's write task — the parity source for the write path (owner-supplied, 2026-10-07)
+
+`_NightLightAPI` is newer than the V3.3 export in `docs/rebuild/extraction/`, so this transcript
+is the only copy here. Once the AAB export containing it lands, re-cite it by XML coordinates:
+
+```
+A1  Stop                                     If %par12 ~R .*[A-Za-z].* & %par12 Set
+A2  %temp = %par12                           If %par12 Set
+A3  %temp = %AAB_TempMin                     If %temp < %AAB_TempMin
+A4  %temp = %AAB_TempMax                     If %temp > %AAB_TempMax
+A5  If %AAB_SecondaryPrivilege ~ Root
+A6    Run Shell (root): service call color_display 9 i32 %temp   (10 s, continue after error)
+A7    %return = true
+A8  Else If %AAB_SecondaryPrivilege ~ Shizuku
+A9    Run Shell (Shizuku): service call color_display 9 i32 %temp (continue after error)
+A10   %return = true
+A11 Else If %AAB_SecondaryPrivilege ~ ADB WiFi
+A12   ADB Wifi: service call color_display 9 i32 %temp            (10 s)
+A13   %return = true
+A14 End If
+A15 Return %return
+```
+
+What it settles, and what it leaves open:
+
+- **The write is always the binder**: transaction 9, `setNightDisplayColorTemperature`. It runs
+  regardless of any probe verdict, and the secure key is never involved. In Tideo that is DC-057's
+  existing `ColorDisplayBinder` (the issue's snippet is essentially that file; do not add a second
+  copy), taken directly while the toggle is on rather than only on a NOT_HONOURED build.
+- **The clamp happens on write** (A3/A4, to `%AAB_TempMin`/`%AAB_TempMax`). That matches "preserve
+  stored, clamp on apply". Which min/max those variables hold in each mode comes from the AAB
+  reference.
+- **AAB has an ADB WiFi route (A11–A13); Tideo has no equivalent.** The owner's rule is Shizuku or
+  root, so this branch is not ported.
+- **There is no fallback when no route exists**: `%return` stays unset and nothing is written.
+  Tideo hides the toggle in that case. A profile that already has the toggle on, applied while
+  Shizuku is stopped, still needs defined behaviour. Recommendation: apply the setpoint clamped to
+  the device range through the normal key path, and show the "Shizuku needed" state DC-057
+  already has. Confirm this against the AAB reference.
+
+### Still for the implementing session
+
 - **The DC-057 probe hazard (found while planning; not yet tested).**
   `NightLightTemperatureRoute.observe` counts a mismatch when the service's
   `getNightDisplayColorTemperature()` differs from the written Kelvin. If that getter clamps the
-  way #142's dumpsys did, every out-of-range write is a false mismatch. Two of them latch
-  NOT_HONOURED on a build that honours the key. The same clamped read would also feed
-  `readDeviceKelvin` and the DC-056 anchor. Recommendation: probe only with Kelvins inside the
-  device range, and pin that with a unit test.
-- **The ramp's day endpoint.** The circadian ramp runs from the setpoint to `dayKelvin`, which N2
-  sets to the device max. With the toggle on, a setpoint can sit above the device max, and the ramp
-  would then make daytime warmer than night. Recommendation: use `max(deviceMax, setpoint)` as the
-  day endpoint. Do not extend the day endpoint to 7985, which would also change the ramp for users
-  who keep the toggle off.
-- **Where the toggle lives, and what turning it off does.** Choose between the DC-056
-  `display_prefs` store (a device-scoped preference) and an `AabSettings` field (a per-profile
-  setting that is exported and context-merged). Also decide whether a stored out-of-range setpoint
-  is clamped into the device range when the toggle goes off, or kept and only re-shown. A profile
-  imported with 686 K must still pass the validator, which is why the rails above become 686..7985
-  whatever the toggle says. Ask the owner; this is a question, not a finding.
+  way #142's dumpsys did, an out-of-range write is a false mismatch, and two of them latch
+  NOT_HONOURED on a build that honours the key. Extended writes take the binder directly (above),
+  so they must also skip `observe()` and leave the verdict alone. The clamped read also feeds
+  `readDeviceKelvin` and the DC-056 anchor, so pin both cases with unit tests.
+- **The slider must not save a clamped value.** Compose's `Slider` coerces what it displays to its
+  `valueRange`, so a draft must keep the stored out-of-range setpoint unless the user moves the
+  thumb.
+- **Rails.** Move them to 686..7985, one band shared by `SecureDisplayController`,
+  `AabSettingsMapper` and `SettingsValidator` (see N2), so a preserved 686 K passes validation
+  whatever the toggle says.
+- **Visibility is live.** Shizuku can stop or lose its grant while the app runs, so the toggle's
+  visibility must follow the same availability DC-057 already reads. It must not be decided once at
+  launch.
 - **Collateral.** The new strings need Chinese translations (see Owner-queue item 1's pattern).
   Device steps go into both `DEVICE_TEST_SCRIPT.md` and `e2e/scenarios.toml` (RUNBOOK playbook 5).
   `:app`'s comment budget is still the limit noted under "Session setup".
