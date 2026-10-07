@@ -146,6 +146,12 @@ SETTINGS: dict[str, dict[str, P | None]] = {
     },
 }
 
+def restorable(namespace: str, key: str, value: str) -> bool:
+    """Whether the `settings put` template would accept writing this value back."""
+    param = SETTINGS[namespace][key]
+    return param is not None and param.accepts(value)
+
+
 GETPROPS = frozenset({
     "ro.build.version.sdk", "ro.build.version.release", "ro.product.manufacturer",
     "ro.product.model", "ro.serialno", "debug.hwui.force_dark", "persist.sys.locale",

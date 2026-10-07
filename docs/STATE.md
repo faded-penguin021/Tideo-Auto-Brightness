@@ -25,17 +25,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
-- **Real-device E2E suite** — `docs/plans/DEVICE_E2E_PLAN.md` (owner-approved 2026-09-13): S0–S4
-  done and the blocking Sol review of S2–S4 fixed (DD-021); S5's read-only preflight is built and
-  passed on 1.14.0-debug vc28 (DD-029); no Tasker/MacroDroid profile on the owner's phone acts on
-  `STATE_CHANGED` (owner, 2026-10-04), so device runs set `TIDEO_E2E_CONFIRM=automation`; S6's
-  smoke set passed there (DD-032); S7's device runs are done (DD-033, DD-034, DD-039…DD-041):
-  all 20 auto scenarios pass (18) or skip correctly (2) on 1.14.0-debug vc28, the owner having
-  deleted the `SUNSET-30` context rule; s02_10a/10e run only with `unlock` added, which a session
-  asks the owner for first, since each wake waits for their fingerprint (DD-040). S8 is dropped (DD-043); S9 close-out is open.
-  Owed when the partial rows get tests, from Sol on S4a: a
-  dialog-root flag for SaveProfileDialog before s14_50, and the native flash overlay has no
-  resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
   [x] N1 · [ ] N2 device Kelvin range · [ ] N2b 686–7308 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
@@ -84,6 +73,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-07 — **E2E suite complete (S9; plan deleted): 17 of 20 auto rows pass on the phone and 3
+  skip on their preconditions, private state unchanged; how to run it is RUNBOOK playbook 9, what
+  a PASS does not prove is `e2e/README.md` "Known limits", and the script names each section's
+  auto rows (DD-044).**
 
 - 2026-10-07 — **E2E S8 dropped by the owner: mobile-use has no device-free mode and its adbutils
   pin cannot be locked beside the suite's, so there is no triage extra (DD-043).**

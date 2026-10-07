@@ -1,4 +1,4 @@
-"""`run.sh --install <apk>`: the guarded install of a debug build (plan §3.8).
+"""`run.sh --install <apk>`: the guarded install of a debug build.
 
 Refused unless the journal is empty. The new APK must be the debug package, signed by exactly the
 certificate the installed debug package carries (apksigner on the base.apk pulled from the phone),

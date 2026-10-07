@@ -60,6 +60,10 @@ def test_order_is_settings_then_service_then_kill_then_panic():
     (["privileged_apply"],
      DeviceFacts(absent_rows=frozenset({("global", "user_disabled_hdr_formats")})), "absent"),
     (["settings_write"], DeviceFacts(absent_rows=frozenset({("secure", "doze_always_on")})), None),
+    (["panic"], DeviceFacts(unrestorable_rows=frozenset(
+        {("secure", "accessibility_display_daltonizer")})), "cannot write back"),
+    (["settings_write"], DeviceFacts(unrestorable_rows=frozenset(
+        {("secure", "accessibility_display_daltonizer")})), None),
     (["service_toggle"],
      DeviceFacts(absent_rows=frozenset({("secure", "reduce_bright_colors_level")})), "absent"),
     (["service_toggle"], DeviceFacts(context_state=True), "context"),

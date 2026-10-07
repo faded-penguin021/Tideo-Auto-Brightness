@@ -24,7 +24,7 @@ from tideo_e2e.ui import Ui
 
 ROWS = {r.id: r for r in load()}
 SERIAL_ENV = "TIDEO_E2E_SERIAL"
-# Owner confirmations for this run (plan §3.6), comma-separated: contexts, automation, unlock.
+# Owner confirmations for this run, comma-separated: contexts, automation, unlock.
 CONFIRM_ENV = "TIDEO_E2E_CONFIRM"
 
 
@@ -44,10 +44,13 @@ def pytest_collection_modifyitems(config, items):
 
 def _facts(s: device.Session, row) -> DeviceFacts:
     fp = footprint(row.effects)
-    absent = frozenset(k for k in fp.settings if state.read_setting(s, *k) is None)
+    held = {k: state.read_setting(s, *k) for k in fp.settings}
+    absent = frozenset(k for k, v in held.items() if v is None)
     confirmed = frozenset(c.strip() for c in os.environ.get(CONFIRM_ENV, "").split(",") if c)
     return DeviceFacts(
         absent_rows=absent,
+        unrestorable_rows=frozenset(k for k, v in held.items()
+                                    if v is not None and not device.restorable(*k, v)),
         context_state=state.context_state(s),
         automation_on=state.read_pref(s, "control_prefs/external_control_enabled") == "true",
         force_dark_opt_in=state.read_pref(s, "control_prefs/force_dark_enabled") == "true",

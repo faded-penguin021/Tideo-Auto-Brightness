@@ -463,3 +463,11 @@
   or cloud device, so an offline triage would use only its LangChain wrappers. Its
   `adbutils==2.9.3` pin also makes a `triage` extra unsatisfiable beside the suite's 2.12.0
   (`uv lock`).
+
+- DD-044: **The E2E plan is closed (S9, 2026-10-07): on 1.14.0-debug vc28, installed before DD-042,
+  17 of 20 auto rows pass and 3 skip on their own preconditions; the journal ends empty and
+  Tideo's private stores are byte-identical before and after.** The skips: grant already held
+  (s06_16), the owner's brightness mode manual (s02_10c), daltonizer at AOSP 0 (s11_32c). From
+  Sol's final review, a held value the restore template refuses now SKIPs like an absent row; the
+  rest is `e2e/README.md` "Known limits", and comparing private state stays a manual step
+  (RUNBOOK playbook 9).

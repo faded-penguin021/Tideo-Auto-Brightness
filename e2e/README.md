@@ -5,9 +5,8 @@ host's adb server. The Markdown script stays the human spec; `scenarios.toml` ho
 script step, classified `auto`, `partial` or `manual` with a reason. Decision and safety model:
 DD-015.
 
-**Status: boundary, recovery, scenarios, install guard and read-only preflight built (S5,
-DD-029); the smoke set passes on a device (S6, DD-032); the effect-ordered suites have run
-there (S7, DD-033), with their open items in `docs/STATE.md`.**
+**Status: complete (S9, DD-044). Every auto row passes or skips by rule on the owner's phone;
+how to run it is RUNBOOK playbook 9, and what a PASS does not prove is under Known limits.**
 
 ## Safety boundary
 
@@ -112,6 +111,38 @@ brightness above the profile's S, or a language list through which Tideo might r
 (the suite reads English text). It prints the snapshot summary and which scenarios the SKIP
 rules would skip, and writes the full snapshot and an archive of Tideo's data dir (read with
 `run-as … tar`) to the private store only. Exit 0 means a run may start.
+
+## Known limits
+
+Recorded rather than fixed, mostly from the final safety and vacuity review (S9).
+
+- **Hands off display settings during a run.** `Run.open()` attributes whatever a watched key
+  holds after a navigation to the run, so an owner's change made between two harness actions is
+  restored over. Recovery restores a Tideo preference through a whole-draft Apply, which can
+  rewrite a Night Light temperature it marked as a conflict when Circadian tracking holds a
+  different setpoint.
+- **Private state is compared by hand.** Recovery restores only journaled keys and preferences;
+  no automatic post-run comparison of Tideo's private stores is built. Run
+  `--preflight` before and after and compare the two records (RUNBOOK playbook 9).
+- **The private store is wherever `XDG_STATE_HOME` points**, and pytest's own reports are not
+  redacted: keep both outside `e2e/`, and do not pass `--showlocals`.
+- **A skip is not a pass.** The fixture skips every runtime row when `serviceEnabled` and the
+  running service disagree, and `steps.py` skips when enabling Override Detection itself pauses.
+  Compare the skips with preflight's "would run" list.
+- **What a PASS does not prove:**
+  - s00_tier reads one tier, and s06_16 needs a revoked start to see the BASIC→ELEVATED change.
+  - s01_4, s02_8, s13_43's PAUSE/RESUME: lifecycle and presentation, not whether brightness is
+    still being controlled.
+  - s02_9 resumes a broadcast PAUSE, not a recorded override.
+  - s02_10a's quiet half runs while locked and its control after unlock, so a build that is
+    silent while locked rather than through the wake guard passes; s02_10e assumes SLEEP slept.
+  - s05_14a skips before its broadcast PANIC if the restarted pipeline stays at S.
+  - s06_19a's 100→65 clamp passes on a build that ignores the input when 65 is already stored.
+  - s11_32c asserts the notice only, and skips on AOSP daltonizer values.
+  - s11_39 checks its two substitutes, not every toggle PANIC resets.
+  - s11_39b's oracle is the draft plus a disabled Apply, without a read-back.
+- **Owed before two partial rows get tests:** SaveProfileDialog needs the dialog-root
+  `testTagsAsResourceId` flag (s14_50), and the native flash overlay has no resource-id (s13_44a).
 
 ## Rules for this directory
 

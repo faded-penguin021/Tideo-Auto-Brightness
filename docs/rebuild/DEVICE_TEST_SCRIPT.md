@@ -19,6 +19,8 @@ optional.
 
 ## 0. Install & onboarding (task563)
 
+E2E auto: `s00_tier`; the other rows, with reasons, are in `e2e/scenarios.toml`.
+
 1. Install the APK; launch. **Expected:** onboarding starts (tier == NONE) → notifications prompt →
    "Modify system settings" → optional Location → optional Elevated step → optional usage-access.
 2. Grant POST_NOTIFICATIONS and WRITE_SETTINGS. Return to the app. **Expected:** tier badge shows
@@ -27,6 +29,8 @@ optional.
    between Tideo and the OS.
 
 ## 1. Core loop — sensor → brightness (prof760/task554/544/535/661/543/696)
+
+E2E auto: `s01_4`; the other rows, with reasons, are in `e2e/scenarios.toml`.
 
 4. From the Dashboard, flip the **master switch** on. **Expected:** a persistent foreground
    notification appears (live lux/target); the QS-tile/widget (if added) shows Active.
@@ -37,6 +41,9 @@ optional.
    shows the throttle climbing to its ceiling in stable light.
 
 ## 2. Manual override detect / resume (prof755/task567)
+
+E2E auto: `s02_8` `s02_9` `s02_10a` `s02_10b` `s02_10c` `s02_10e`; the other rows, with reasons,
+are in `e2e/scenarios.toml`.
 
 8. With Override Detection on (Reactivity screen), drag the **system** brightness slider mid-run.
    **Expected:** Tideo **pauses**, posts a vibrating high-priority "manual override" notification +
@@ -208,12 +215,16 @@ optional.
 
 ## 3. Screen off/on — hibernate & reinit (prof753/585, prof761/618)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 11. Turn the screen off, wait ~10 s, turn it on. **Expected:** sensing resumes; an initial brightness is
     set for the ambient level; context automation resumes (manual lock cleared on wake).
 12. Reboot the device. **Expected:** the service self-starts (foreground notification returns) if it was
     enabled (specialUse FGS is boot-eligible).
 
 ## 4. Proximity damp (prof759/task545)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
 
 13. With the service running in changing light, cover the **top** of the phone (proximity "near", e.g.
     hold it to your ear). **Expected (DD-024, the owner's task535/task545 parity):** the loop does
@@ -225,6 +236,8 @@ optional.
     DD-022 builds sped the animation up and left smoothing undamped.
 
 ## 5. Panic reset (prof769/task528)
+
+E2E auto: `s05_14a`; the other rows, with reasons, are in `e2e/scenarios.toml`.
 
 14. Hold the phone **upside down** (charging port up) and **shake** vertically. **Expected:** an **S.O.S.
     vibration**, brightness forced to **maximum**, the service stops (full reset).
@@ -257,6 +270,8 @@ optional.
     service still running.
 
 ## 6. Super dimming [ELEVATED] (task646/650/645/700/698)
+
+E2E auto: `s06_16` `s06_19a`; the other rows, with reasons, are in `e2e/scenarios.toml`.
 
 16. Grant elevated access:
     `adb shell pm grant com.tideo.autobrightness android.permission.WRITE_SECURE_SETTINGS`
@@ -294,6 +309,8 @@ optional.
 
 ## 7. Circadian scaling (task90)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 20. On the Circadian screen, enable dynamic scaling; check the chart's **"Now"** line and the live curve.
     **Expected:** the scale multiplier tracks the real local sunrise/sunset (not a fixed UTC window).
 21. Set a **fixed date/location** (Experiment element). **Expected:** the curve + the live scaling shift
@@ -307,6 +324,8 @@ optional.
     coordinate fields must still give the date-only case, so all three combinations are reachable.
 
 ## 8. Contexts (task43 + prof762–768)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
 
 22. Add a **per-app** rule (grant usage access when prompted) targeting a saved profile; switch to that
     app. **Expected:** the profile loads (a teal context flash); the Dashboard shows the active context.
@@ -381,6 +400,8 @@ optional.
 
 ## 9. Charts, wizard, calibration, profiles
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 26. Collect ≥ 9 manual overrides (step 8 repeatedly across lighting), then **Tools → Run wizard**.
     **Expected:** a fitted curve + a verbose diagnostics report; **Apply** updates the curve; the Curve &
     Brightness chart shows the recorded points + suggested line + the live "Now" marker.
@@ -394,6 +415,8 @@ optional.
 
 ## 10. Surfaces & soak
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 30. Add the **QS tile** and the **home-screen widget** (Dashboard quick actions). **Expected:** both
     reflect Off/Active/Paused and toggle the service; the widget repaints on state changes.
 31. **24 h soak:** leave the service running a full day across doze/charging/locations. **Expected:**
@@ -401,6 +424,9 @@ optional.
     acceptable battery drain, **no ANRs/crashes**, brightness stays sensible.
 
 ## 11. Privileged Display toggles [ELEVATED] (D-149–D-152)
+
+E2E auto: `s11_32a` `s11_32c` `s11_34` `s11_36` `s11_39` `s11_39b`; the other rows, with reasons,
+are in `e2e/scenarios.toml`.
 
 The toggles are `AabSettings` **profile fields** applied on profile change by
 `DisplayTogglesCoordinator` (super-dimming model, idempotent only-on-change); with the service OFF,
@@ -579,6 +605,8 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
 
 ## 12. Accessibility — TalkBack & touch targets (D-156)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 The a11y backlog (D-156, units A0–A7) is verified in CI by the `SemanticsAudit`
 gate + the `TouchTargetsA11yTest` floor, but semantics tests only *approximate* TalkBack, and Compose's
 runtime `minimumInteractiveComponentSize()` expansion is **not observable in Robolectric** — so the two
@@ -604,6 +632,8 @@ double-tap to activate.
     instead (they are excluded from the automated floor by design — `TouchTargetsA11yTest`).
 
 ## 13. Automation control — intent surface (D-157)
+
+E2E auto: `s13_42` `s13_43` `s13_45`; the other rows, with reasons, are in `e2e/scenarios.toml`.
 
 Opt-in external control (Tasker / MacroDroid). CI covers the gate + verb routing + the outbound event
 contract (`ControlReceiverTest`, `AmbientMonitoringServiceTest`), but end-to-end delivery from a real
@@ -645,6 +675,8 @@ reference: [`docs/AUTOMATION.md`](../AUTOMATION.md). Use `adb` (no automation ap
 
 ## 14. Edge-to-edge + keyboard insets (D-159)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 `MainActivity` now calls `enableEdgeToEdge()` **app-wide** (plus manifest `adjustResize` and the
 Scaffold-level `imePadding()`), which changed how EVERY screen receives system-bar and keyboard
 insets on API 31–36. CI cannot see insets — this sweep is the only real gate. Test with **gesture
@@ -667,6 +699,8 @@ navigation** first, then repeat the marked items with **3-button navigation** (t
     whole window (adjustResize + inset dispatch, not legacy ADJUST_PAN).
 
 ## 15. Force dark via Shizuku/root (D-172)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
 
 Global `debug.hwui.force_dark` toggle in Tools. Live paths try Shizuku (**running and
 authorized**) first, then a root shell; the switch itself always persists.
@@ -692,6 +726,8 @@ authorized**) first, then a root shell; the switch itself always persists.
 
 ## 16. Settling after a light change (DC-070)
 
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
+
 56. **A transition finishes after the light stops changing.** In a dark room, service running and
     Live Debug on the Light Sensor card, sample `adb shell settings get system screen_brightness`
     first for a dark baseline, then every ~250 ms while flickering a flashlight at the sensor for
@@ -702,6 +738,8 @@ authorized**) first, then a root shell; the switch itself always persists.
     its own readings (DD-006).
 
 ## 17. Discarding an override (DD-011)
+
+E2E auto: none; every row, with its reason, is in `e2e/scenarios.toml`.
 
 57. **Discard forgets only that adjustment.** Move the brightness slider with the service running.
     **Expected:** the heads-up reads Discard · Resume · Disable, and Curve & Brightness already
