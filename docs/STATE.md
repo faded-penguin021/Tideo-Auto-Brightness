@@ -65,6 +65,13 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
+3. **[2026-10-07] Try the extended Night Light range on a debug build of this train.** Run
+   `docs/rebuild/DEVICE_TEST_SCRIPT.md` step 38a with Shizuku running for Tideo (or root). Worked if
+   every **Expected** in it holds; the one that matters most is that turning the range off and
+   applying brings the panel back to the device's minimum instead of leaving it at 1000 K, because
+   that fix rests on how AOSP's display service is recalled to behave, not on a measurement
+   (DD-048, DD-049). Settles it: your report of the step.
+
 Open questions:
 
 1. **[2026-10-07] Approve the low-lux jitter rule?** Since v1.11.0 a dark room's brightness
@@ -73,6 +80,14 @@ Open questions:
    first cycle is a dead-band stop holds smoothed lux, with no settling after it; the engine and
    the #132 stall fix are untouched. Options: yes (build it as specified) or change the rule.
    Recommended: yes. Settles it: your answer.
+
+2. **[2026-10-07] Close the Night Light plan by archiving it or deleting it?** N2, N2b and N3 are
+   settled, so its N4 says delete `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`. But it now holds the
+   only copy of your AAB `_NightLightAPI` and `_DetermineNightLightThresh` transcript, the two
+   unverified N3 suspects and the commands to ask the reporter for, none of which a ledger row
+   repeats. Options: archive it whole to `docs/history/` (RUNBOOK Session discipline 5 allows this
+   for a plan worth keeping; it is then frozen) or delete it as N4 says. Recommended: archive, for
+   the AAB transcript. Settles it: your answer.
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
@@ -88,6 +103,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-07 — **Owner queue: try step 38a on a device; Open question: archive or delete the Night
+  Light plan (its N4).**
 
 - 2026-10-07 — **Night Light N2b done (step 5b): device step 38a and its `s11_38a` row, and
   `changelogs/28.txt` gains the range line, the other lines tightened to fit 500 characters.**
