@@ -99,7 +99,8 @@ So it is used in the smaller mode: an LLM triage of **already-captured, sanitise
 **no device connection at all**. It never decides a result.
 
 **The core suite uses uiautomator2 + adbutils directly.** Sol recommended cutting the agent layer;
-the owner kept it, so it is the last segment.
+the owner kept it as S8, then dropped it on 2026-10-07 (DD-043): mobile-use has no device-free
+mode, and its `adbutils` pin cannot be locked beside the suite's.
 
 ## 2. Architecture
 
@@ -109,7 +110,6 @@ production change is one testability hook.
 ```
 e2e/
   pyproject.toml, uv.lock   # uv project; core: adbutils, uiautomator2, pytest (exact pins)
-                            # optional extra "triage": mobile-use (pinned SHA), no device access
   README.md                 # setup, run one/all, safety + recovery model, manual-only list
   host/windows-adb.md, host/start-adb-server.ps1   # host glue ONLY; placeholders, never literal paths
   tideo_e2e/
@@ -279,7 +279,6 @@ bounded, attributable effect, so an already-true state can never pass it:
      package with text redaction outside known labels.
    - A scan runs **before** anything is persisted there, covering serial-looking tokens, emails,
      account names, host user paths and SSIDs.
-   - The mobile-use triage reads **only** the sanitised evidence, never the private store.
    - A device-free unit test scans all tracked `e2e/` files for identifier shapes.
 8. **Install guard**
    - Artifact identity: `aapt dump badging` shows `com.tideo.autobrightness.debug`; record sha256 and
@@ -352,11 +351,6 @@ All of the above are subject to the §3.6 preflight SKIP rules.
   - First try the default server through Docker Desktop's loopback proxy.
   - Otherwise `adb -a nodaemon server start`, plus a firewall rule allowing TCP 5037 only from the
     Docker/WSL vEthernet subnet.
-- **Triage extra:**
-  - `MOBILE_USE_TELEMETRY_ENABLED=false`.
-  - No `ADB_HOST` and no device.
-  - Input is sanitised evidence only.
-  - The API key is read by the tool itself and never printed.
 - **`.gitignore`:** `e2e/.state/`, `e2e/evidence/`, `e2e/.venv/`.
 
 ## 6. Segments (sequential; each ends shippable)
@@ -407,8 +401,7 @@ in STATE `## Active work`.
   - After each group: journal empty, invariants clean.
   - Failures are classified as Tideo defect / harness / framework / timing / OEM / invalid
     assumption. Fix in scope and rerun the node, then the group.
-- **S8 — triage extra**
-  - Offline mobile-use triage on one sanitised failure bundle.
+- **S8 — dropped (owner, 2026-10-07; DD-043).** It was an offline mobile-use triage.
 - **S9 — close-out**
   - Ladder green; full auto suite; restoration and invariant report; `git diff` identifier review.
   - Final Sol review on safety and on whether each test can fail on a broken build.

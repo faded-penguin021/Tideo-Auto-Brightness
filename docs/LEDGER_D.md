@@ -193,6 +193,7 @@
   `e2e/scenarios.toml` classifies every `DEVICE_TEST_SCRIPT.md` step and must change with it;
   profile-changing steps stay manual, because the settings, baseline and profile-name tuple cannot
   be restored.
+  Corrected by DD-043.
 
 - DD-016: **The E2E boundary gates adb where adbutils opens services, not at the harness's own
   calls (2026-10-01).** That is the one chokepoint library internals share; it also shells out to
@@ -456,3 +457,9 @@
   `ContextSolarTimes` reuses the last-known answer for 10 minutes, as the app poll still assembles
   every 2.5 s. As in Tasker, a day-only rule waits for the next evaluation after midnight. JVM-tested;
   on-device unverified.
+
+- DD-043: **mobile-use is dropped from the E2E suite; there is no triage extra (owner, 2026-10-07).**
+  At both the pinned `12a1dbd` and `62913c9` its agent raises `DeviceNotFoundError` without a local
+  or cloud device, so an offline triage would use only its LangChain wrappers. Its
+  `adbutils==2.9.3` pin also makes a `triage` extra unsatisfiable beside the suite's 2.12.0
+  (`uv lock`).

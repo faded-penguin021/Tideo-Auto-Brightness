@@ -32,7 +32,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   smoke set passed there (DD-032); S7's device runs are done (DD-033, DD-034, DD-039…DD-041):
   all 20 auto scenarios pass (18) or skip correctly (2) on 1.14.0-debug vc28, the owner having
   deleted the `SUNSET-30` context rule; s02_10a/10e run only with `unlock` added, which a session
-  asks the owner for first, since each wake waits for their fingerprint (DD-040). S8–S9 open.
+  asks the owner for first, since each wake waits for their fingerprint (DD-040). S8 is dropped (DD-043); S9 close-out is open.
   Owed when the partial rows get tests, from Sol on S4a: a
   dialog-root flag for SaveProfileDialog before s14_50, and the native flash overlay has no
   resource-id (s13_44a).
@@ -84,6 +84,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-07 — **E2E S8 dropped by the owner: mobile-use has no device-free mode and its adbutils
+  pin cannot be locked beside the suite's, so there is no triage extra (DD-043).**
 
 - 2026-10-06 — **Night Light plan: #142's owner direction added as N2b (686–7308 K behind an
   opt-in toggle); N3 closed as the owner's DD-038 solar-fallback diagnosis. Owner, 2026-10-07:
