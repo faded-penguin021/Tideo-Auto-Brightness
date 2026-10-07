@@ -38,7 +38,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
   resource-id (s13_44a).
 - **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
   `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
-  [x] N1 · [ ] N2 device Kelvin range · [ ] N2b 686–7985 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
+  [x] N1 · [ ] N2 device Kelvin range · [ ] N2b 686–7308 K opt-in toggle, waits for the AAB reference · [x] N3 (owner: the
   DD-038 solar fallback) · [ ] N4 close-out.
 
 ## Owner queue
@@ -85,9 +85,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-06 — **Night Light plan: #142's owner direction added as N2b (686–7985 K behind an
+- 2026-10-06 — **Night Light plan: #142's owner direction added as N2b (686–7308 K behind an
   opt-in toggle); N3 closed as the owner's DD-038 solar-fallback diagnosis. Owner, 2026-10-07:
-  N2b waits for AAB's reference (`_NightLightAPI` transcribed into the plan), ramps from 7985 K,
+  N2b waits for AAB's reference (`_NightLightAPI` transcribed into the plan), ramps from 7308 K
+  (the top at which every RGB multiplier stays in 0–1),
   is per profile, is visible only with Shizuku or root, and keeps out-of-range setpoints.**
 
 - 2026-10-06 — **Time rules wake only at the next context time, as Tasker's prof764 does; the

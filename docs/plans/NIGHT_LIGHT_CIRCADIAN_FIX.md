@@ -27,8 +27,8 @@ the feature first and is then ported here.
   installed on a device (the owner offered one, 2026-09-21; nothing was installed).
 - [ ] **N2 — F4: the AOSP Kelvin bounds are hardcoded and are per-panel config.** The slider
   follows the device's reported min/max/default (owner, #142, 2026-10-06).
-- [ ] **N2b — extended range behind a toggle (#142).** 686–7985 K, off by default, per profile,
-  shown only with Shizuku or root; the ramp starts from 7985 K while it is on. **Waits for the AAB
+- [ ] **N2b — extended range behind a toggle (#142).** 686–7308 K, off by default, per profile,
+  shown only with Shizuku or root; the ramp starts from 7308 K while it is on. **Waits for the AAB
   reference** (owner, 2026-10-07). Starts after N2.
 - [x] **N3 — F5: daytime activation.** Owner, 2026-10-06: most likely the default-solar-times
   fallback that DD-038 fixed. No N3 code; unverified on the reporter's device.
@@ -106,7 +106,7 @@ Inject the reader so a unit test can supply a diverging device; that is the gate
 Separately: `setNightLightTemperature` clamps to `1_000..10_000` and `SettingsValidator` validates
 the same band. Those are sanity rails, not AOSP bounds. A device floor of 686 sits below the 1000
 rail. **Settled by the owner (#142, 2026-10-06):** N2 only makes the slider follow the device's
-reported range. Anything wider is N2b's opt-in toggle, and N2b moves these rails to 686..7985,
+reported range. Anything wider is N2b's opt-in toggle, and N2b moves these rails to 686..7308,
 one band shared by `SecureDisplayController`, `AabSettingsMapper` and `SettingsValidator`.
 
 ### Where 686 comes from — explained by the matrix maths; the lookup still sizes F4
@@ -115,8 +115,9 @@ one band shared by `SecureDisplayController`, `AabSettingsMapper` and `SettingsV
 quotes the per-channel fit (`r = 1`; `g = -9.6235e-9·K² + 1.5305e-4·K + 0.3908`;
 `b = -1.8936e-8·K² + 3.0241e-4·K - 0.1987`). Its roots, rechecked here: blue reaches 0 at
 **686.6 K**, green reaches 0 at −2238 K (so `-2200` is close to pure red), and blue peaks at the
-vertex **7985 K** (≈1.009) and then falls, so the tint turns red again above it (#142's reporter saw
-that at 12000 K). A floor at the blue zero is a principled choice for a blue-light filter, which is
+vertex 7985 K (≈1.009) and then falls, so the tint turns red again above it (#142's reporter saw
+that at 12000 K). Blue first exceeds 1 at **7308.0 K** (green there is 0.995) and stays above 1
+until 8662 K, so 7308 is the highest Kelvin at which every multiplier stays within 0–1. A floor at the blue zero is a principled choice for a blue-light filter, which is
 why the owner now reads 686 as GrapheneOS's deliberate limit. The lookup below is still worth
 asking for, because it shows whether the 686 is a real overlay value. The three candidate sources
 were:
@@ -152,27 +153,27 @@ panel shows.
 
 **Owner direction (#142 reply, 2026-10-06):** an opt-in toggle, labelled "Go beyond temperature
 limits" or something close (the wording is not final), off by default. When it is on, the setpoint
-slider spans **686–7985 K** instead of the device's reported range. Never go below 686 (blue is
-already zero; going lower only strips green toward red). Never go above 7985 (the blue peak; above
-it the fit reddens again). Both bounds are derived under N2 above.
+slider spans **686–7308 K** instead of the device's reported range. Never go below 686 (blue is
+already zero; going lower only strips green toward red). Never go above 7308 (owner, 2026-10-07:
+above it blue exceeds 1, so every RGB multiplier stays in 0–1 only up to 7308). Both bounds are
+derived under N2 above.
 
 ### Owner decisions (2026-10-07) — do not re-litigate
 
 | Decision | Detail |
 | --- | --- |
 | **N2b waits for the AAB reference** | The AAB work is mostly WebView changes. Its write task, `_NightLightAPI`, already exists (transcribed below). Port AAB's toggle semantics once they land, rather than inventing them. |
-| **With the toggle on, 7985 K is the ramp's day endpoint** | Night Light normally ramps from the device max (4082 on stock AOSP) down to the setpoint. Extended mode ramps from 7985 instead, so activation is gentler and slower. Day is never warmer than night, because every setpoint is ≤ 7985. With the toggle off, the day endpoint stays the device max (N2). |
+| **With the toggle on, 7308 K is the ramp's day endpoint** | Night Light normally ramps from the device max (4082 on stock AOSP) down to the setpoint. Extended mode ramps from 7308 instead, so activation is gentler and slower. Day is never warmer than night, because every setpoint is ≤ 7308. With the toggle off, the day endpoint stays the device max (N2). |
 | **Extended range needs Shizuku or root** | If neither route is available, the toggle is **not shown**. ELEVATED (a `pm grant`) alone is not enough. |
 | **The toggle is per profile** | It is an `AabSettings` field, so it is exported, serialised for Tasker and context-merged like the setpoint. Its `%AAB_…` name comes from the AAB reference. |
 | **Out-of-range setpoints are preserved** | A stored setpoint outside the active range is kept, never rewritten. It is clamped only when applied. Turning the toggle off, importing a profile, or loading a profile whose value the slider cannot show never changes the stored number. |
 | **This is Shizuku's fourth runtime use** | The N2b commit updates AGENTS.md's "exactly three places" sentence and the `doc-facts.sh` constant. It is a rule change under the DA-005 rule-review protocol (`.orch/codex.sh rules`), so budget for it. |
 
-Why 7985 makes activation gentle, computed from the #142 fit: at 7985 K, `g ≈ 0.999` and
-`b ≈ 1.009`, so the matrix is almost the identity, and Night Light switching on at the start of the
+Why 7308 makes activation gentle, computed from the #142 fit: at 7308 K, `g ≈ 0.995` and
+`b ≈ 1.000`, so the matrix is almost the identity, and Night Light switching on at the start of the
 ramp is visually close to nothing. At 4082 K the same fit gives `g ≈ 0.86, b ≈ 0.72`, which is the
-visible step the stock ramp starts with. A device check is owed: the fit's blue goes slightly
-**above 1** between 7308 and 8662 K. Whether ColorDisplayService or the panel clips that small
-boost (about 1 %) is unknown, so look at a white screen at 7985 K with Night Light on and off.
+visible step the stock ramp starts with. Stopping at 7308 rather than the 7985 blue peak means no
+multiplier exceeds 1, so whether ColorDisplayService or the panel would clip a boost never arises.
 
 ### AAB's write task — the parity source for the write path (owner-supplied, 2026-10-07)
 
@@ -226,7 +227,7 @@ What it settles, and what it leaves open:
 - **The slider must not save a clamped value.** Compose's `Slider` coerces what it displays to its
   `valueRange`, so a draft must keep the stored out-of-range setpoint unless the user moves the
   thumb.
-- **Rails.** Move them to 686..7985, one band shared by `SecureDisplayController`,
+- **Rails.** Move them to 686..7308, one band shared by `SecureDisplayController`,
   `AabSettingsMapper` and `SettingsValidator` (see N2), so a preserved 686 K passes validation
   whatever the toggle says.
 - **Visibility is live.** Shizuku can stop or lose its grant while the app runs, so the toggle's
