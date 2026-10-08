@@ -587,3 +587,10 @@
   the extended Night Light route (key-only after a bridge write, the null-anchor release, recovery
   suppressed while Shizuku is down); and e2e harness gaps (recovery order, preflight accepting a
   failed backup, install provenance, a teardown read failure skipping recovery, s11's rollback race).
+- DD-058 [cited]: **Release preflight classifies `*/src/debug/*` and `e2e/*` as non-shipping (PR #144
+  preflight, 2026-10-08).** Its fail-closed `classify_path` stopped on the first path in neither
+  class, `app/src/debug/res/drawable/ic_launcher_background.xml` (DD-052); the `e2e/` harness
+  (DD-015) was unclassified as well. Debug-variant sources never reach the release or F-Droid APK,
+  and Gradle reads nothing under `e2e/`, so neither demands a version bump. The ladder never runs
+  this workflow, so a new top-level tree stays green locally until the PR's preflight classifies it
+  (accepted; prose-only).

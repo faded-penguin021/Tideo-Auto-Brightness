@@ -82,6 +82,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-08 — **Release preflight classifies debug-variant sources and the `e2e/` harness as
+  non-shipping; its fail-closed step had stopped on DD-052's debug launcher drawable (DD-058).**
+
 - 2026-10-08 — **PR-time Astra review: a scheduled TIME wake no longer cancels its own profile
   write, and a Sunrise/Sunset rule re-arms from the new day's sun times at midnight (DD-056); the
   badge workflow publishes only from `main`; the rest triaged, fixed or accepted (DD-057).**

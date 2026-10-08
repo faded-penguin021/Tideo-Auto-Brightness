@@ -245,8 +245,9 @@ so check it explicitly.
 - **CI guardrail (`release-preflight.yml`, D-124).** A secret-free PR check enforces this checklist so a
   miss is caught before merge, not after a bad tag. It runs the version/changelog checks **only when the
   PR ships app code**: shipped `src/main`/`src/release` trees, Gradle build graph/toolchain files,
-  wrapper files, or ProGuard/consumer rules. Harness/config/docs/workflow/test/metadata changes do
-  not manufacture a release bump. Any path in neither explicit class fails closed and must be
+  wrapper files, or ProGuard/consumer rules. Harness/config/docs/workflow/test/metadata changes,
+  debug-variant `src/debug` trees and the owner-run `e2e/` device harness do not manufacture a
+  release bump (DD-058). Any path in neither explicit class fails closed and must be
   classified in the same PR. **Prose-only invariant:** if the build begins consuming a file under
   a non-shipping tree, that input is reclassified as shipping in the introducing PR; CI cannot infer
   a future Gradle input graph. When the release gate fires it requires:
