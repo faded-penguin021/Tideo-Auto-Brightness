@@ -22,6 +22,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavHostController
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
+import com.tideo.autobrightness.app.ui.theme.AabTeal
+import com.tideo.autobrightness.app.ui.theme.AabTealAccent
+import com.tideo.autobrightness.app.ui.theme.AabTealLink
 import java.util.Locale
 
 /** AAB User Guide scene (Tasker: sceneAAB User Guide): static HTML manual in WebView (no JS, no network).
@@ -89,11 +92,11 @@ private fun buildGuideHtml(
 ): String {
     val dark = colors.background.luminance() < 0.5f
     val scheme = if (dark) "dark" else "light"
-    val accent = if (dark) "#00a986" else "#007c63"
+    val accent = (if (dark) AabTealAccent else AabTeal).cssColor()
     val emphasis = if (dark) "#ffc107" else "#8a6500"
     val quoteText = if (dark) "#cfeee6" else "#244b40"
     val quoteBackground = if (dark) "#2e3633" else "#e8f3ee"
-    val lead = if (dark) "#00c79e" else "#007c63"
+    val lead = (if (dark) AabTealLink else AabTeal).cssColor()
     val tipBackground = if (dark) "#26302e" else "#e4f4ed"
     val warningBackground = if (dark) "#3a2b2a" else "#fff0ee"
     val warningText = if (dark) "#ff8a80" else "#b3342c"
@@ -120,7 +123,7 @@ private fun buildGuideHtml(
           ul { margin:6px 0 6px 2px; padding-left:18px; }
           li { margin:5px 0; }
           strong, b { color:$emphasis; font-weight:600; }
-          blockquote { border-left:3px solid #007c63; margin:8px 0; padding:8px 14px; color:$quoteText;
+          blockquote { border-left:3px solid ${AabTeal.cssColor()}; margin:8px 0; padding:8px 14px; color:$quoteText;
                        background:$quoteBackground; font-style:italic; border-radius:0 6px 6px 0; }
           .outro { color:$lead; font-weight:600; font-style:normal; }
           .tip { border-left:3px solid $accent; background:$tipBackground; padding:8px 12px; margin:8px 0;

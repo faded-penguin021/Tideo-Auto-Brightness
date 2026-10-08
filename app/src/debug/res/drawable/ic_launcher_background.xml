@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-build launcher background (DD-052): main's teal gradient in dark blue, #1565C0 → #0D47A1
+  (the debug AabTeal and a darker shade), so a debug install is told apart from the release at a glance.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0 L108,0 L108,108 L0,108 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="0"
+                android:endX="54" android:endY="108"
+                android:startColor="#FF1565C0"
+                android:endColor="#FF0D47A1" />
+        </aapt:attr>
+    </path>
+</vector>

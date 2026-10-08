@@ -88,6 +88,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-08 — **Debug builds are dark blue: UI palette, launcher icon and widget; release stays
+  teal (DD-052).**
+
 - 2026-10-08 — **Owner approved the low-lux jitter rule as specified; it goes in the train after
   1.14.0, each step on the owner's go-ahead.**
 

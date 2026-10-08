@@ -1,6 +1,7 @@
 package com.tideo.autobrightness.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import com.tideo.autobrightness.BuildConfig
 
 /**
  * AAB brand palette — teal + gold. All values from Tasker scenes, not invented (S12.5a).
@@ -8,10 +9,10 @@ import androidx.compose.ui.graphics.Color
  * See extraction/scenes/about.md for detailed provenance.
  */
 
-// --- Primary teal family ---
-val AabTeal = Color(0xFF007C63)        // banner / primary / all "on" indicator dots
-val AabTealAccent = Color(0xFF00A986)  // lighter accent heading (about.md)
-val AabTealLink = Color(0xFF00C79E)    // bright link / hyperlink text (about.md)
+// --- Primary teal family (dark blue in debug builds, DD-052) ---
+val AabTeal = if (BuildConfig.DEBUG) Color(0xFF1565C0) else Color(0xFF007C63)        // banner / primary / all "on" indicator dots
+val AabTealAccent = if (BuildConfig.DEBUG) Color(0xFF42A5F5) else Color(0xFF00A986)  // lighter accent heading (about.md)
+val AabTealLink = if (BuildConfig.DEBUG) Color(0xFF64B5F6) else Color(0xFF00C79E)    // bright link / hyperlink text (about.md)
 
 // --- Gold / amber family ---
 val AabGold = Color(0xFFFFC107)        // "strong" accent, warnings, chart current-series

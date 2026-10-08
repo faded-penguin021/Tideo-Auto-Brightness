@@ -549,3 +549,9 @@
   and `privilege_tiers.md` as the restatements. Nothing checks that README's pointer resolves or
   that `SHIZUKU_USAGE.md` agrees with the constitution: like every doc-facts claim, the guard
   counts code and never parses prose, so both are reviewer-held.
+- DD-052 [cited]: **Debug builds are dark blue, not AAB teal (owner, 2026-10-08), so a debug install
+  is told from the release at a glance.** `Color.kt`'s three teal constants switch on
+  `BuildConfig.DEBUG` (#1565C0, #42A5F5, #64B5F6), the hard-coded teal sites read them, and the
+  debug source set overrides the launcher background and widget drawables; release keeps every
+  teal value. Unit tests run on the debug variant, so they check palette wiring, not the release
+  literals; the User Guide's faint green-grey tints stay in debug (Sol review, triaged).

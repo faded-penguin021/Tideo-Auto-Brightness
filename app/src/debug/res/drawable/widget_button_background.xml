@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-build widget button (DD-052): main's pill in the debug AabTeal, dark blue (#1565C0). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FF1565C0" />
+    <corners android:radius="18dp" />
+</shape>

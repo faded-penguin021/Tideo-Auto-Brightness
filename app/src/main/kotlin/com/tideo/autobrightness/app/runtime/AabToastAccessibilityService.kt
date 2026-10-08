@@ -12,6 +12,8 @@ import android.view.Gravity
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.TextView
+import androidx.compose.ui.graphics.toArgb
+import com.tideo.autobrightness.app.ui.theme.AabTeal
 
 /** Opt-in AccessibilityService for system-wide AAB flash messages (G2R-F50, F88: tap-to-dismiss).
  * Uses TYPE_ACCESSIBILITY_OVERLAY (no SYSTEM_ALERT_WINDOW). Purely presentation; degrades to Toast fallback. */
@@ -41,7 +43,7 @@ class AabToastAccessibilityService : AccessibilityService() {
             setPadding(pad, dp(10), pad, dp(10))
             background = GradientDrawable().apply {
                 cornerRadius = dp(12).toFloat()
-                setColor(AAB_TEAL)
+                setColor(AabTeal.toArgb())
             }
             // F88: tap-to-dismiss
             setOnClickListener { removeOverlay() }
@@ -86,6 +88,5 @@ class AabToastAccessibilityService : AccessibilityService() {
 
     private companion object {
         const val OVERLAY_DURATION_MS = 2_500L
-        const val AAB_TEAL = 0xFF007C63.toInt()
     }
 }
