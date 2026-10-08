@@ -2,8 +2,9 @@
 
 ## Status
 
-Spec only. No code has changed. The approved action is committing this plan to `docs/plans/`.
-The owner must approve the rule under **Proposed fix** before anyone implements it.
+Spec only. No code has changed. The owner approved the rule under **Proposed fix** as written
+(2026-10-08). It goes in the train after 1.14.0, and each step needs the owner's go-ahead. The new
+ledger row recording the DC-070 departure lands with the code.
 
 ## Symptom (owner report, 2026-09-27)
 
@@ -58,7 +59,7 @@ The one that matters is `anAct19StopAtZero`. A drop toward 0 lx can end its cree
 (0.4 / 1.4 < 0.299) rather than an α-stall. Without placement, smoothed lux stays parked about
 0.3 lx above the 0–0.1 band. That reopens #132, whose stalls mostly appear at 0 lx.
 
-## Proposed fix (awaiting owner approval)
+## Proposed fix (owner-approved, 2026-10-08)
 
 **Rule:** a *fresh* reading (not a settling continuation, not an unchanged repeat) with
 **0.2 ≤ raw < 1 lx** whose *first* cycle is `DEAD_BAND_STOP` holds smoothed lux. No settling

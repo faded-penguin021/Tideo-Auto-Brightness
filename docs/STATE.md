@@ -28,6 +28,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
   go-ahead.
+- **Low-lux settling jitter** — `docs/plans/LOW_LUX_SETTLING_JITTER.md`, spec only; its
+  **Proposed fix** is approved as written and goes in the train after 1.14.0 (owner, 2026-10-08),
+  each step on the owner's go-ahead.
 
 ## Owner queue
 
@@ -68,14 +71,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    that fix rests on how AOSP's display service is recalled to behave, not on a measurement
    (DD-048, DD-049). Settles it: your report of the step.
 
-Open questions:
-
-1. **[2026-10-07] Approve the low-lux jitter rule?** Since v1.11.0 a dark room's brightness
-   flickers 2↔3 as the sensor flickers between 0 and a few tenths of a lux.
-   `docs/plans/LOW_LUX_SETTLING_JITTER.md` → **Proposed fix**: a fresh 0.2–1 lx reading whose
-   first cycle is a dead-band stop holds smoothed lux, with no settling after it; the engine and
-   the #132 stall fix are untouched. Options: yes (build it as specified) or change the rule.
-   Recommended: yes. Settles it: your answer.
+Open questions: none.
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
@@ -91,6 +87,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-08 — **Owner approved the low-lux jitter rule as specified; it goes in the train after
+  1.14.0, each step on the owner's go-ahead.**
 
 - 2026-10-08 — **Night Light plan closed (N4): archived whole, now frozen, as
   `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md` for its AAB `_NightLightAPI` transcript (owner);
