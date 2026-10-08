@@ -24,7 +24,7 @@ internal fun classifyStaleness(lastPublishMs: Long?, now: Long): Staleness {
     }
 }
 
-/** Process-wide bridge: UI observes live pipeline from AmbientMonitoringService without service binding. Concurrency: single writer (pipeline-collector). */
+/** Process-wide bridge: UI observes live pipeline from AmbientMonitoringService without service binding. Concurrency: one lock; only the owner publishes (DD-055). */
 object LiveRuntimeState {
     private val _pipeline = MutableStateFlow(PipelineState())
     val pipeline: StateFlow<PipelineState> = _pipeline.asStateFlow()
@@ -50,12 +50,14 @@ object LiveRuntimeState {
     private val _serviceRunning = MutableStateFlow(false)
     val serviceRunning: StateFlow<Boolean> = _serviceRunning.asStateFlow()
 
-    fun publish(
+    @Synchronized fun publish(
+        instance: Any,
         state: PipelineState,
         activeContext: String?,
         manualOverride: Boolean = false,
         nowMs: Long = System.currentTimeMillis(),
     ) {
+        if (owner !== instance) return
         _pipeline.value = state.copy(lastPublishMs = nowMs)
         _activeContext.value = activeContext
         _manualOverride.value = manualOverride

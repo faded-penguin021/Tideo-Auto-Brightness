@@ -566,3 +566,9 @@
 - DD-054 [cited]: **The User Guide's quote text, quote background and tip background turn blue in
   debug builds too (owner, 2026-10-08: they still read as teal on the device).** Release keeps its
   green-grey values; `UserGuideThemeTest` expects the variant's tint. Corrects DD-052's "tints stay".
+- DD-055 [cited]: **Only the current owner publishes live runtime state (owner, 2026-10-08: option
+  (a)).** `LiveRuntimeState.publish` takes the publishing service and runs under the claim/release
+  lock; a publish from a released or superseded instance is dropped, so a destroyed service's late
+  publish can no longer re-mark it running after the 5 s reset or overwrite a successor (completes
+  DC-068). A stopped snapshot landing after `release` is dropped too, so the grace shows the last
+  accepted one; no test forces a publish to straddle a reset (Sol review, triaged).

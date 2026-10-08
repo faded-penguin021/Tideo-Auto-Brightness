@@ -65,18 +65,7 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
-Open questions:
-
-1. **[2026-10-08] Fix the late-publish race behind a flaky service test?**
-   `AmbientMonitoringServiceTest`'s `destroy_withoutASuccessor_resetsAfterTheGrace_…` failed once
-   in a full ladder run. gpt-6-astra (read-only) traced it to a real race: a destroyed service's
-   in-flight publish from `Dispatchers.Default` can land after the 5 s watchdog reset, because
-   `LiveRuntimeState.publish` has no owner check, and mark the service running again. On a phone
-   this needs a publish stalled more than 5 s, so it is rare. The tile or Dashboard would show
-   "Active" for a dead service, with nothing to correct it; brightness control never restarts.
-   Options: (a) fix production: a publish from a released owner is ignored, under the claim/release
-   lock, plus deterministic tests; (b) test-only: join the service's work first, which hides the
-   gap; (c) leave it. Recommended: (a), as its own unit in the next train. Settles it: your answer.
+Open questions: none.
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
@@ -92,6 +81,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-08 — **Open question answered (a): only the current owner publishes live runtime state,
+  so a destroyed service's late publish cannot show it running again; behind the once-flaky
+  `destroy_withoutASuccessor_…` test (DD-055).**
 
 - 2026-10-08 — **Owner ran step 38a on 1.14.0-debug vc28 (57561ec): the extended Night Light range
   passes, including the range-off return to the device minimum (DD-053); the step's no-Shizuku

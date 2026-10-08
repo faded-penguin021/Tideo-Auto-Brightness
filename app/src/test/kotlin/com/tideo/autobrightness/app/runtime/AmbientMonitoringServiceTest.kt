@@ -443,15 +443,18 @@ class AmbientMonitoringServiceTest {
         val app = ApplicationProvider.getApplicationContext<Context>()
         runBlocking { app.settingsDataStore.updateData { it.copy(serviceEnabled = true) } }
         val controller = Robolectric.buildService(AmbientMonitoringService::class.java).create()
-        controller.get().onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
+        val service = controller.get()
+        service.onStartCommand(Intent().setAction(AmbientMonitoringService.ACTION_START), 0, 1)
         waitUntil { LiveRuntimeState.serviceRunning.value }
 
         controller.destroy()
-        LiveRuntimeState.publish(PipelineState(serviceOn = true), activeContext = null)
+        LiveRuntimeState.publish(service, PipelineState(serviceOn = true), activeContext = null)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(4_900))
         assertTrue(LiveRuntimeState.serviceRunning.value, "the grace window survives an FGS recreation")
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200))
         assertFalse(LiveRuntimeState.serviceRunning.value, "a destroyed owner's state is cleared")
+        LiveRuntimeState.publish(service, PipelineState(serviceOn = true), activeContext = null)
+        assertFalse(LiveRuntimeState.serviceRunning.value, "a destroyed owner cannot resurrect its state")
     }
 
     @Test
