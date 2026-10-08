@@ -25,10 +25,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 ## Active work
 
-- **Night Light fix** — `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`, for
-  `faded-penguin021/AdvancedAutoBrightness#15` and `faded-penguin021/Tideo-Auto-Brightness#142`:
-  [x] N1 · [x] N2 device Kelvin range (DD-045) · [x] N2b 686–7308 K opt-in toggle (DD-046…DD-051), device step 38a unrun · [x] N3 (owner: the
-  DD-038 solar fallback) · [ ] N4 close-out.
 - **Bright-light hand-off (#136)** — `docs/plans/BRIGHT_LIGHT_HANDOFF.md`, spec only (owner,
   2026-10-01); it goes in the train after 1.14.0 (owner, 2026-10-07), each unit on the owner's
   go-ahead.
@@ -81,14 +77,6 @@ Open questions:
    the #132 stall fix are untouched. Options: yes (build it as specified) or change the rule.
    Recommended: yes. Settles it: your answer.
 
-2. **[2026-10-07] Close the Night Light plan by archiving it or deleting it?** N2, N2b and N3 are
-   settled, so its N4 says delete `docs/plans/NIGHT_LIGHT_CIRCADIAN_FIX.md`. But it now holds the
-   only copy of your AAB `_NightLightAPI` and `_DetermineNightLightThresh` transcript, the two
-   unverified N3 suspects and the commands to ask the reporter for, none of which a ledger row
-   repeats. Options: archive it whole to `docs/history/` (RUNBOOK Session discipline 5 allows this
-   for a plan worth keeping; it is then frozen) or delete it as N4 says. Recommended: archive, for
-   the AAB transcript. Settles it: your answer.
-
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
 (500-character cap), never by bumping or creating `29.txt`; re-open only for something major, and
@@ -103,6 +91,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-08 — **Night Light plan closed (N4): archived whole, now frozen, as
+  `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md` for its AAB `_NightLightAPI` transcript (owner);
+  device step 38a stays on the Owner queue.**
 
 - 2026-10-07 — **Owner queue: try step 38a on a device; Open question: archive or delete the Night
   Light plan (its N4).**
