@@ -187,21 +187,21 @@ class ContextEngine(
                 evaluate(ContextCaller.RESUME)
             }
         }
-        // prof764 self-scheduling Time context (contexts_spec): wake EXACTLY at the next time boundary
-        // and re-evaluate, instead of waiting for the next light sample. TYPE_LIGHT is an on-change
-        // sensor, so in constant light (phone on a desk, screen off) no sample arrives and a 20:00 /
-        // Sunset rule would otherwise fire late — only when the user next disturbs the sensor or wakes
-        // the screen. `collectLatest` re-arms whenever the nearest boundary changes; the inner loop
-        // re-arms a same-time daily recurrence. NB: a coroutine delay() can be deferred during deep Doze,
-        // so onScreenOn()'s TIME eval and the 15-min MaintenanceWorker remain backstops for that case.
+        // prof764 self-scheduling Time context (contexts_spec): wake at the next time boundary rather than
+        // wait for a light sample — TYPE_LIGHT is on-change, so in constant light none arrives and a 20:00 /
+        // Sunset rule would fire late. `collectLatest` re-arms when the boundary changes; Doze can defer
+        // delay(), so onScreenOn()'s TIME eval and the 15-min MaintenanceWorker remain backstops. DD-056: it
+        // also wakes at local midnight; each evaluation is a child of timeJob, which a re-arm cannot cancel.
         timeJob = scope.launch {
+            val evaluations = this
             nextContextTime.collectLatest {
                 while (true) {
                     val token = nextContextTime.value ?: break
-                    val waitMs = millisUntilNextContextWake(token, clock())
+                    val now = clock()
+                    val waitMs = millisUntilNextContextWake(token, now)
                     if (waitMs < 0) break
-                    delay(waitMs)
-                    evaluate(ContextCaller.TIME)
+                    delay(minOf(waitMs, millisUntilNextContextWake("00.00", now)))
+                    evaluations.launch { evaluate(ContextCaller.TIME) }.join()
                 }
             }
         }

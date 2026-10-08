@@ -171,7 +171,7 @@ class AabSettingsMigrationTest {
     }
 
     @Test
-    fun `a file written now holds every key, so it round-trips and a v3 build still reads it`() = runTest {
+    fun `a file written now holds every key, round-trips, and keeps a schema version a v3 build accepts`() = runTest {
         val out = java.io.ByteArrayOutputStream()
         AabSettingsSerializer.writeTo(AabSettings(animSteps = 40), out)
         val written = Json.parseToJsonElement(out.toString()).jsonObject

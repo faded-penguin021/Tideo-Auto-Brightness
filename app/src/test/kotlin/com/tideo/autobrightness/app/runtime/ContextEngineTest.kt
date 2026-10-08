@@ -11,6 +11,7 @@ import com.tideo.autobrightness.domain.context.ContextSignals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import java.util.Calendar
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.Test
@@ -62,6 +64,7 @@ class ContextEngineTest {
         var dayOfWeek: Int = 4,
         var nowSecondsOfDay: Int = 12 * 3600,
         var timeOfDay: (() -> Int)? = null,
+        var sunrise: (() -> Long)? = null,
     ) : ContextSignalSource {
         val battery = MutableSharedFlow<BatterySignal>(extraBufferCapacity = 16)
         val wifi_ = MutableSharedFlow<String?>(extraBufferCapacity = 16)
@@ -82,6 +85,7 @@ class ContextEngineTest {
                 app = this.app, lat = lat, lon = lon,
                 batteryPercent = this.batteryPercent, plugged = this.plugged,
                 wifi = this.wifi, dayOfWeek = dayOfWeek, nowSecondsOfDay = timeOfDay?.invoke() ?: nowSecondsOfDay,
+                sunriseLocalSecs = sunrise?.invoke() ?: 21_600L,
             )
         }
     }
@@ -164,6 +168,78 @@ class ContextEngineTest {
         runCurrent()
         assertEquals("Lunch", engine.activeContext.value)
         scope.cancel()
+    }
+
+    @Test
+    fun timeWake_withASuspendingWriter_finishesTheProfileSwap() = runTest {
+        val noon = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val rule = ContextRule(
+            id = "lunch", name = "Lunch", profile = "Video Streaming", priority = 10,
+            triggers = ContextTriggers(timeRange = listOf("12:01", "13:00")),
+        )
+        val src = FakeSignalSource(timeOfDay = { 12 * 3600 + (testScheduler.currentTime / 1000).toInt() })
+        var stored = baseline
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val engine = ContextEngine(
+            rulesProvider = { listOf(rule) },
+            settingsProvider = { stored },
+            // A real DataStore write suspends; the in-memory fakes never do.
+            settingsWriter = { transform -> delay(1); stored = transform(stored); stored },
+            baselineStore = FakeBaselineStore(),
+            profileCatalog = catalog,
+            signalSource = src,
+            onProfileChanged = {},
+            clock = { noon + testScheduler.currentTime },
+        )
+        try {
+            engine.start(scope)
+            runCurrent()
+            assertEquals("12.01", engine.nextContextTime.value)
+
+            advanceTimeBy(60_500)
+            runCurrent()
+            assertEquals("Lunch", engine.activeContext.value)
+            assertNotEquals(baseline, stored, "the 12:01 wake's profile write was cancelled mid-apply")
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun solarWake_armedBeforeMidnight_reArmsFromTheNewDaysSunrise() = runTest {
+        val evening = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 20); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val untilMidnightMs = 4 * 3_600_000L
+        val rule = ContextRule(
+            id = "dawn", name = "Dawn", profile = "Video Streaming", priority = 10,
+            triggers = ContextTriggers(timeRange = listOf("SUNRISE", "SUNRISE+1")),
+        )
+        val src = FakeSignalSource(
+            timeOfDay = { ((20 * 3600 + testScheduler.currentTime / 1000) % 86_400).toInt() },
+            // 06:44 today, 06:41 tomorrow: the window moves earlier than the wake armed tonight.
+            sunrise = { if (testScheduler.currentTime < untilMidnightMs) 24_240L else 24_060L },
+        )
+        val (engine, scope) = engine(listOf(rule), src, clock = { evening + testScheduler.currentTime })
+        try {
+            engine.start(scope)
+            runCurrent()
+            assertEquals("06.44", engine.nextContextTime.value)
+
+            advanceTimeBy(untilMidnightMs + 1_000)
+            runCurrent()
+            assertEquals("06.41", engine.nextContextTime.value)
+
+            advanceTimeBy((6 * 3600 + 41 * 60 + 29) * 1_000L)
+            runCurrent()
+            assertEquals("Dawn", engine.activeContext.value)
+        } finally {
+            scope.cancel()
+        }
     }
 
     @Test

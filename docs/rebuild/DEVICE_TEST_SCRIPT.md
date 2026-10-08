@@ -546,7 +546,8 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     circadian scaling**, Apply (baseline), service ON, ideally within ~1 h of local sunset/sunrise.
     **Expected:** within a minute the temperature starts moving with the sun —
     `adb shell settings get secure night_display_color_temperature` drifts toward your slider value
-    (warmer) as the evening ramp progresses, and toward 4082 in daylight; in stable indoor light too
+    (warmer) as the evening ramp progresses, and toward the device's maximum (4082 on stock) in
+    daylight; in stable indoor light too
     (the ticker is independent of brightness cycles). Change the temperature by hand in system
     settings. **Expected:** it is re-overridden within ~1 min — documented behavior while tracking is
     on (every other display field keeps manual changes). Turn the switch off + Apply. **Expected:**
@@ -556,14 +557,16 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     root, open Privileged Display. **Expected:** no "Go beyond temperature limits" row. Start
     Shizuku (or have root), reopen the screen. **Expected:** the row shows under "Follow circadian
     scaling". Turn it on. **Expected:** at once, before Apply, the slider hint reads "Extended range
-    686–7308 K". Set about 1000 K, Night Light on, Apply. **Expected:** the panel is visibly redder
+    686–7308 K". Set about 1000 K (below the device's minimum), Night Light on, Apply.
+    **Expected:** the panel is visibly redder
     than at the device's own minimum, and `adb shell settings get secure
     night_display_color_temperature` prints 1000 (`dumpsys color_display` may report a clamped
     value, as #142 saw — not a failure). Turn the row off and Apply. **Expected:** the panel returns
     to the device's minimum (2596 on stock) rather than staying at 1000, and the slider label still
     reads 1000 K (a stored setpoint is kept, clamped only when applied). Turn it back on with
     **Follow circadian scaling**, service ON, in daylight. **Expected:** the key sits near 7308 and
-    Night Light switching on is barely visible. Stop Shizuku, reopen the screen. **Expected:** the
+    Night Light switching on is barely visible. Stop Shizuku (skip this check on a rooted phone,
+    where root still carries the bridge), reopen the screen. **Expected:** the
     row stays visible with the "needs Shizuku" note, and with no Apply (there is nothing to apply)
     the next tick drops the key to the top of the device's range (4082 on stock). Turn **Follow
     circadian scaling** off and Apply. **Expected:** the key lands the device's minimum (2596 on

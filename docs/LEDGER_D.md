@@ -572,3 +572,18 @@
   publish can no longer re-mark it running after the 5 s reset or overwrite a successor (completes
   DC-068). A stopped snapshot landing after `release` is dropped too, so the grace shows the last
   accepted one; no test forces a publish to straddle a reset (Sol review, triaged).
+- DD-056 [cited]: **A scheduled TIME wake runs its evaluation as its own job, and the scheduler also wakes
+  at local midnight (PR-time Astra review, 2026-10-08).** Run inside `collectLatest`, the
+  evaluation was cancelled by its own `apply()` publishing the next boundary, so a suspending
+  settings write left the rule active but its profile unwritten (pre-existing, made the only path
+  by DD-042). A SUNRISE/SUNSET token armed before midnight kept the previous day's sun time; task43
+  reads sun times fresh on each run, so a midnight wake now re-resolves them (owner, 2026-10-08).
+  Glue review: each evaluation is a child of `timeJob`, so `stop()` cancels one that outlived a re-arm.
+- DD-057: **The PR-time Astra review's remaining findings were triaged by user-visible impact
+  (owner, 2026-10-08).** Fixed: the badge workflow publishes only from `main`, `pipeline_spec.md`
+  notes DD-024, steps 38/38a follow the device's range, and a migration test's name claims less.
+  Accepted limits: solar times use the evaluation day's UTC offset, so on a DST-change day they're an
+  hour off; a clock rule inside the spring DST gap waits for the next wake; three AOSP-cache edges in
+  the extended Night Light route (key-only after a bridge write, the null-anchor release, recovery
+  suppressed while Shizuku is down); and e2e harness gaps (recovery order, preflight accepting a
+  failed backup, install provenance, a teardown read failure skipping recovery, s11's rollback race).

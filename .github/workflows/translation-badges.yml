@@ -27,6 +27,8 @@ concurrency:
 
 jobs:
   publish:
+    # A manual run from another branch would publish that branch's coverage over main's.
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write  # needed to push the JSON to the badges branch
     runs-on: ubuntu-latest

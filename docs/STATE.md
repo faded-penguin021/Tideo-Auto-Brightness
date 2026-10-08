@@ -82,6 +82,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-08 — **PR-time Astra review: a scheduled TIME wake no longer cancels its own profile
+  write, and a Sunrise/Sunset rule re-arms from the new day's sun times at midnight (DD-056); the
+  badge workflow publishes only from `main`; the rest triaged, fixed or accepted (DD-057).**
+
 - 2026-10-08 — **Open question answered (a): only the current owner publishes live runtime state,
   so a destroyed service's late publish cannot show it running again; behind the once-flaky
   `destroy_withoutASuccessor_…` test (DD-055).**
