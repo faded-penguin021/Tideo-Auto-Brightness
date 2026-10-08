@@ -555,3 +555,14 @@
   debug source set overrides the launcher background and widget drawables; release keeps every
   teal value. Unit tests run on the debug variant, so they check palette wiring, not the release
   literals; the User Guide's faint green-grey tints stay in debug (Sol review, triaged).
+  Corrected by DD-054.
+- DD-053: **DD-048's range-off return is device-verified: on the owner's OnePlus 13, 1.14.0-debug
+  vc28 at 57561ec (owner, 2026-10-08), step 38a passed.** An extended 1018 K setpoint applied
+  through the bridge reddened the panel; turning the range off and applying moved the key to 2596
+  in about 3 s and the panel back with it; extended circadian in daylight held the key at 7308.
+  With Shizuku stopped, the tick and a static apply clamped the key (4082, then 2596) while the
+  panel kept the service's 4082, as DC-057 says for this key-ignoring build. The step's old "Apply
+  lands the device's minimum" missed both that and the greyed Apply under circadian, so it now says so.
+- DD-054 [cited]: **The User Guide's quote text, quote background and tip background turn blue in
+  debug builds too (owner, 2026-10-08: they still read as teal on the device).** Release keeps its
+  green-grey values; `UserGuideThemeTest` expects the variant's tint. Corrects DD-052's "tints stay".

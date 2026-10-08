@@ -564,7 +564,12 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     reads 1000 K (a stored setpoint is kept, clamped only when applied). Turn it back on with
     **Follow circadian scaling**, service ON, in daylight. **Expected:** the key sits near 7308 and
     Night Light switching on is barely visible. Stop Shizuku, reopen the screen. **Expected:** the
-    row stays visible with the "needs Shizuku" note, and Apply lands the device's minimum.
+    row stays visible with the "needs Shizuku" note, and with no Apply (there is nothing to apply)
+    the next tick drops the key to the top of the device's range (4082 on stock). Turn **Follow
+    circadian scaling** off and Apply. **Expected:** the key lands the device's minimum (2596 on
+    stock) and the slider still reads the stored setpoint. On a build that ignores the key (DC-057;
+    the owner's OnePlus 13) the panel keeps what the display service last held — 4082 in
+    `dumpsys color_display` — until Shizuku returns, as the note says (owner run, 2026-10-08).
 39. **Panic resets the privileged keys (D-155).** With a profile holding grayscale + inversion +
     Night Light engaged (via context rule or Apply), fire the panic gesture (step 14).
     **Expected:** besides the SOS + max brightness + service stop, ALL display toggles return to

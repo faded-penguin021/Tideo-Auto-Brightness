@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavHostController
+import com.tideo.autobrightness.BuildConfig
 import com.tideo.autobrightness.R
 import com.tideo.autobrightness.app.ui.components.SettingsScaffold
 import com.tideo.autobrightness.app.ui.theme.AabTeal
@@ -94,10 +95,11 @@ private fun buildGuideHtml(
     val scheme = if (dark) "dark" else "light"
     val accent = (if (dark) AabTealAccent else AabTeal).cssColor()
     val emphasis = if (dark) "#ffc107" else "#8a6500"
-    val quoteText = if (dark) "#cfeee6" else "#244b40"
-    val quoteBackground = if (dark) "#2e3633" else "#e8f3ee"
+    val blue = BuildConfig.DEBUG // DD-054: the teal tints turn blue in debug builds.
+    val quoteText = if (dark) (if (blue) "#cfe0f6" else "#cfeee6") else (if (blue) "#24384b" else "#244b40")
+    val quoteBackground = if (dark) (if (blue) "#2e3238" else "#2e3633") else (if (blue) "#e8eef6" else "#e8f3ee")
     val lead = (if (dark) AabTealLink else AabTeal).cssColor()
-    val tipBackground = if (dark) "#26302e" else "#e4f4ed"
+    val tipBackground = if (dark) (if (blue) "#262c33" else "#26302e") else (if (blue) "#e4edf7" else "#e4f4ed")
     val warningBackground = if (dark) "#3a2b2a" else "#fff0ee"
     val warningText = if (dark) "#ff8a80" else "#b3342c"
     val divider = if (dark) "#4a4a4a" else colors.outlineVariant.cssColor()

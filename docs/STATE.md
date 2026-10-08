@@ -51,8 +51,9 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    `pd_night_light_temp_hint` (DD-045) changed meaning, so their old Chinese was removed (DD-026),
    the rule editor's four `contexts_offset_*` strings are new (DD-035), and so are the extended
    Night Light range's four: `settings_night_light_extended` (DD-047),
-   `pd_night_light_temp_hint_extended` and the two `pd_night_light_extended*` (DD-050). You will
-   ask in an issue once this train nears release (owner, 2026-10-06). Settles it:
+   `pd_night_light_temp_hint_extended` and the two `pd_night_light_extended*` (DD-050). Asked in
+   #143 (2026-10-08); it does not block the release, since missing keys fall back to English
+   (owner, 2026-10-08). Paste translations replied there into the file. Settles it:
    `grep -c -e 'name="help_pwm_exponent"' -e 'name="contexts_only_plugged_in"' -e
    'name="pd_night_light_temp_hint' -e 'name="contexts_offset_' -e
    'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
@@ -64,14 +65,18 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
-3. **[2026-10-07] Try the extended Night Light range on a debug build of this train.** Run
-   `docs/rebuild/DEVICE_TEST_SCRIPT.md` step 38a with Shizuku running for Tideo (or root). Worked if
-   every **Expected** in it holds; the one that matters most is that turning the range off and
-   applying brings the panel back to the device's minimum instead of leaving it at 1000 K, because
-   that fix rests on how AOSP's display service is recalled to behave, not on a measurement
-   (DD-048, DD-049). Settles it: your report of the step.
+Open questions:
 
-Open questions: none.
+1. **[2026-10-08] Fix the late-publish race behind a flaky service test?**
+   `AmbientMonitoringServiceTest`'s `destroy_withoutASuccessor_resetsAfterTheGrace_…` failed once
+   in a full ladder run. gpt-6-astra (read-only) traced it to a real race: a destroyed service's
+   in-flight publish from `Dispatchers.Default` can land after the 5 s watchdog reset, because
+   `LiveRuntimeState.publish` has no owner check, and mark the service running again. On a phone
+   this needs a publish stalled more than 5 s, so it is rare. The tile or Dashboard would show
+   "Active" for a dead service, with nothing to correct it; brightness control never restarts.
+   Options: (a) fix production: a publish from a released owner is ignored, under the claim/release
+   lock, plus deterministic tests; (b) test-only: join the service's work first, which hides the
+   gap; (c) leave it. Recommended: (a), as its own unit in the next train. Settles it: your answer.
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
@@ -87,6 +92,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-08 — **Owner ran step 38a on 1.14.0-debug vc28 (57561ec): the extended Night Light range
+  passes, including the range-off return to the device minimum (DD-053); the step's no-Shizuku
+  expectation is corrected. The User Guide's quote and tip tints turn blue in debug too (DD-054).**
 
 - 2026-10-08 — **Debug builds are dark blue: UI palette, launcher icon and widget; release stays
   teal (DD-052).**
