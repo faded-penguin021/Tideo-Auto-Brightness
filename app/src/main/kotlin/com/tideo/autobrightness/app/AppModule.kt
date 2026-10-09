@@ -180,6 +180,8 @@ class AppModule(context: Context) {
             writeAnchor = { kelvin ->
                 if (kelvin != null) nightLightAnchorStore.write(kelvin) else nightLightAnchorStore.clear()
             },
+            readPrior = nightLightAnchorStore::readPrior,
+            writePrior = nightLightAnchorStore::writePrior,
             temperatureRoute = nightLightTemperatureRoute(secureDisplay),
         )
 

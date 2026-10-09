@@ -2755,6 +2755,7 @@ the permanent registry — never compress or remove them.
   Display toggles screen (immediate control + grant card, minus its Schedules section). D-150
   stays in this ledger as history. Folds into the unreleased **1.7.0 / versionCode 17**
   (`changelogs/17.txt` rewritten — D-150 was never released, no user-facing deprecation).
+  Corrected by DD-059.
 
 - D-152 [cited]: **D-151 completed — ALL Privileged Display toggles are profile fields; the duplicated
   manual section removed (owner finding: half the toggles existed only as device-immediate

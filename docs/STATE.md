@@ -65,7 +65,18 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
-Open questions: none.
+3. **[2026-10-09] Check that disabling Tideo puts Night Light back as you had it.** Needs a debug
+   build after this commit. Turn Night Light off in Android's own settings, enable Tideo with a
+   profile that has Night Light on with circadian and extended on, wait a minute for the tint, then
+   disable Tideo. Worked if Night Light goes off. Repeat with Night Light on at a value you chose
+   first; that value should come back. Settles it: `adb shell settings get secure
+   night_display_activated` prints 0 after the first run (DD-059).
+
+Open questions:
+- [2026-10-09] The train changelog `changelogs/28.txt` is at 496 of its 500 characters, so
+  DD-059's disable fix has no line of its own. Options: (a) leave it out, (b) fold it into the
+  Night Light line by shortening another. Recommendation: (b), since disabling now behaves
+  differently from v1.13.0.
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
@@ -81,6 +92,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-09 — **Disabling Tideo puts Night Light back as Tideo found it, on/off and Kelvin,
+  through Shizuku when only the display service can show it; the owner's 2596 K tint after an
+  extended day ramp is gone (DD-059, revising D-151 for Night Light).**
 
 - 2026-10-08 — **Release preflight classifies debug-variant sources and the `e2e/` harness as
   non-shipping; its fail-closed step had stopped on DD-052's debug launcher drawable (DD-058).**

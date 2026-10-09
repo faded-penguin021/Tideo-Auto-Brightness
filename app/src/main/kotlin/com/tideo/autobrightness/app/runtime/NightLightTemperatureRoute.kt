@@ -53,6 +53,19 @@ class NightLightTemperatureRoute(
         return write(target, probe && !bridgeOutOfRange.get()).map { target }
     }
 
+    /** DD-059: DC-056's raw hand-back, via the service if the key can't show it; false = service write owed. */
+    suspend fun restore(kelvin: Int, quick: Boolean = true): Result<Boolean> {
+        load()
+        val inRange = kelvin == display.nightLightRange.clamp(kelvin)
+        val keyShowsIt = inRange && !bridgeOutOfRange.get() && verdict != Verdict.NOT_HONOURED
+        if (bridge == null || keyShowsIt) return display.setNightLightTemperature(kelvin).map { true }
+        if (bridge.setKelvin(kelvin, quick) != null) {
+            bridgeOutOfRange.set(!inRange)
+            return display.setNightLightTemperature(kelvin).map { true }
+        }
+        return display.setNightLightTemperature(kelvin).map { false }
+    }
+
     suspend fun write(kelvin: Int, probe: Boolean = true): Result<Unit> {
         val result = display.setNightLightTemperature(kelvin)
         val bridge = bridge ?: return result

@@ -1,11 +1,13 @@
 package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
+import com.tideo.autobrightness.app.settings.NightLightPrior
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.Tier
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -17,14 +19,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Applies display-toggle PROFILE fields (D-151/D-152: Night Light, temperature, daltonizer,
- * inversion, always-on display, stay-awake-charging, experimental HDR disabling) to device via
- * ELEVATED-gated [SecureDisplayController], idempotent and only-on-change (D-151 replaces D-150).
- *
- * Seed to baseline values without writing; service stop re-applies baseline; process death skips
- * reapply. D-154 circadian: ticker owns temperature when enabled; DC-056 makes that ownership
- * explicit, process-outliving and handed back. deviceTempK tracks actual writes. D-139 class
- * concurrency: own collector; applies serialize under [applyMutex]; stop then applies baseline.
+ * Applies display-toggle profile fields (D-151/D-152) through ELEVATED-gated [SecureDisplayController],
+ * only on change: the seed adopts the baseline unwritten, stop returns to it (Night Light as found,
+ * DD-059), D-154's ticker owns a circadian Kelvin (DC-056). Applies serialize under [applyMutex] (D-139).
  */
 class DisplayTogglesCoordinator(
     private val effectiveFlow: Flow<AabSettings?>,
@@ -36,8 +33,11 @@ class DisplayTogglesCoordinator(
     private val circadianTemperature: (AabSettings, Int) -> Int? = { _, _ -> null },
     private val readAnchor: suspend () -> Int? = { null },
     private val writeAnchor: suspend (Int?) -> Unit = {},
+    private val readPrior: suspend () -> NightLightPrior? = { null },
+    private val writePrior: suspend (NightLightPrior?) -> Unit = {},
     private val tickIntervalMs: Long = 60_000L,
     private val temperatureRoute: NightLightTemperatureRoute = NightLightTemperatureRoute(display),
+    private val handOffScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
 ) {
     private val applyMutex = Mutex()
 
@@ -49,6 +49,12 @@ class DisplayTogglesCoordinator(
 
     // DC-056: displaced device Kelvin; non-null IS ramp ownership of the key. Guarded by [applyMutex].
     private var anchorK: Int? = null
+
+    // DD-059: Night Light before Tideo's first write; stop() puts it back. Guarded by [applyMutex].
+    private var prior: NightLightPrior? = null
+
+    // DD-059: an anchor restore only the key took; the service write is owed. Guarded by [applyMutex].
+    private var restoreOwedK: Int? = null
 
     // Latest effective settings. Guarded by [applyMutex].
     private var latestEffective: AabSettings? = null
@@ -68,6 +74,7 @@ class DisplayTogglesCoordinator(
                 val seedSettings = baselineFlow.first()
                 resting = seedSettings
                 anchorK = readAnchor()
+                prior = readPrior()
                 val afterPanic = panicked.getAndSet(false)
                 if (lastApplied == null) {
                     val seed = DisplayToggleState.of(if (afterPanic) AabSettings() else seedSettings)
@@ -92,16 +99,21 @@ class DisplayTogglesCoordinator(
         }
     }
 
-    /** Service stop: return toggles to baseline (only-on-change). D-134/D-150 precedent. */
+    /** Service stop: toggles to baseline (D-151), Night Light as found (DD-059). */
     fun stop() {
         if (scope == null) return
         scope = null
         job?.cancel(); job = null
-        runBlocking {
+        val owed = runBlocking {
             applyMutex.withLock {
-                resting?.let { applyLocked(DisplayToggleState.of(it), it, probe = false) }
-                releaseAnchorLocked(resting)
+                resting?.let { applyLocked(DisplayToggleState.of(it), it, probe = false, nightLight = false) }
+                val held = prior
+                if (held != null) restorePriorLocked(held) else releaseAnchorLocked(settings = null)
+                restoreOwedK.also { restoreOwedK = null }
             }
+        }
+        if (owed != null) handOffScope.launch {
+            if (display.readNightLightTemperature() == owed) temperatureRoute.restore(owed, quick = false)
         }
     }
 
@@ -117,6 +129,8 @@ class DisplayTogglesCoordinator(
             lastApplied = DisplayToggleState.of(AabSettings())
             deviceTempK = null
             latestEffective = null
+            writePrior(null) // D-155's defaults are the reset; no later stop puts the pre-Tideo state back
+            prior = null
             if (tierProvider() < Tier.ELEVATED) return // nothing we could write (or clear)
             display.setNightLight(false)
             releaseAnchorLocked(settings = null)
@@ -127,6 +141,32 @@ class DisplayTogglesCoordinator(
             if (display.hdrForceSdrAvailable) display.setHdrForceSdr(false)
             panicked.set(true)
         }
+    }
+
+    private suspend fun capturePriorLocked() {
+        if (prior != null) return
+        val kelvin = anchorK
+            ?: temperatureRoute.readDeviceKelvin().fold({ it ?: display.nightLightRange.default }, { null })
+        val found = NightLightPrior(display.readNightLight(), kelvin)
+        writePrior(found)
+        prior = found
+    }
+
+    /** DD-059: off, Kelvin, on, so no edge shows a stale Kelvin; the record goes once it landed. */
+    private suspend fun restorePriorLocked(held: NightLightPrior) {
+        if (tierProvider() < Tier.ELEVATED || !display.nightLightAvailable) return
+        val activated = display.readNightLight()
+        if (!held.activated && activated) display.setNightLight(false).onFailure { return }
+        held.kelvin?.let { kelvin ->
+            val railed = kelvin.coerceIn(SecureDisplayController.NIGHT_LIGHT_RAIL_K)
+            val shown = temperatureRoute.restore(railed).getOrElse { return }
+            restoreOwedK = railed.takeUnless { shown }
+        }
+        if (held.activated && !activated) display.setNightLight(true).onFailure { return }
+        writeAnchor(null)
+        anchorK = null
+        writePrior(null)
+        prior = null
     }
 
     private suspend fun acquireAnchorLocked(): Int? {
@@ -146,7 +186,10 @@ class DisplayTogglesCoordinator(
             writeKelvinLocked(setpoint, settings, probe = false, skipIfCurrent = false)
         } else {
             val railed = anchor.coerceIn(SecureDisplayController.NIGHT_LIGHT_RAIL_K)
-            temperatureRoute.write(railed, probe = false).isSuccess.also { if (it) deviceTempK = railed }
+            temperatureRoute.restore(railed).onSuccess { shown ->
+                deviceTempK = railed
+                restoreOwedK = railed.takeUnless { shown }
+            }.isSuccess
         }
         if (!restored) return false
         writeAnchor(null)
@@ -155,11 +198,16 @@ class DisplayTogglesCoordinator(
     }
 
     /** Diff-write [desired] against [lastApplied]. Caller holds [applyMutex]. */
-    private suspend fun applyLocked(desired: DisplayToggleState, settings: AabSettings, probe: Boolean = true) {
+    private suspend fun applyLocked(
+        desired: DisplayToggleState,
+        settings: AabSettings,
+        probe: Boolean = true,
+        nightLight: Boolean = true,
+    ) {
         val last = lastApplied
         lastApplied = desired
         if (last == null || desired == last) {
-            if (!desired.circadianTemp) releaseAnchorLocked(settings)
+            if (nightLight && !desired.circadianTemp) releaseAnchorLocked(settings)
             return
         }
         // No-op below ELEVATED but keep tracking. Static temperature opinion must track (incl. null);
@@ -170,20 +218,7 @@ class DisplayTogglesCoordinator(
             }
             return
         }
-        val switching = desired.nightLight != last.nightLight
-        if (switching && !desired.nightLight) display.setNightLight(false)
-        val released = desired.circadianTemp || releaseAnchorLocked(settings)
-        if (switching && desired.nightLight) display.setNightLight(true)
-        // D-154: both paths diff against deviceTempK, which advances only on a write that landed.
-        if (desired.circadianTemp) {
-            val kelvin = acquireAnchorLocked()?.let { anchor ->
-                circadianTemperature(settings, settings.nightLightTemperature ?: anchor)
-            }
-            if (kelvin != null) writeKelvinLocked(kelvin, settings, probe)
-        } else if (released) {
-            val temperature = desired.temperatureK
-            if (temperature == null) deviceTempK = null else writeKelvinLocked(temperature, settings, probe)
-        }
+        if (nightLight) applyNightLightLocked(desired, last, settings, probe)
         if (desired.daltonizer != last.daltonizer) display.setDaltonizer(desired.daltonizer)
         if (desired.inversion != last.inversion) display.setInversion(desired.inversion)
         if (desired.alwaysOn != last.alwaysOn) display.setAlwaysOnDisplay(desired.alwaysOn)
@@ -196,6 +231,29 @@ class DisplayTogglesCoordinator(
         }
         if (desired.hdrForceSdr != last.hdrForceSdr && display.hdrForceSdrAvailable) {
             display.setHdrForceSdr(desired.hdrForceSdr)
+        }
+    }
+
+    private suspend fun applyNightLightLocked(
+        desired: DisplayToggleState,
+        last: DisplayToggleState,
+        settings: AabSettings,
+        probe: Boolean,
+    ) {
+        val switching = desired.nightLight != last.nightLight
+        if (switching) capturePriorLocked()
+        if (switching && !desired.nightLight) display.setNightLight(false)
+        val released = desired.circadianTemp || releaseAnchorLocked(settings)
+        if (switching && desired.nightLight) display.setNightLight(true)
+        // D-154: both paths diff against deviceTempK, which advances only on a write that landed.
+        if (desired.circadianTemp) {
+            val kelvin = acquireAnchorLocked()?.let { anchor ->
+                circadianTemperature(settings, settings.nightLightTemperature ?: anchor)
+            }
+            if (kelvin != null) writeKelvinLocked(kelvin, settings, probe)
+        } else if (released) {
+            val temperature = desired.temperatureK
+            if (temperature == null) deviceTempK = null else writeKelvinLocked(temperature, settings, probe)
         }
     }
 
@@ -218,6 +276,7 @@ class DisplayTogglesCoordinator(
     ): Boolean {
         val extended = settings?.extendedNightLightEnabled == true
         if (skipIfCurrent && display.nightLightRange(extended).clamp(kelvin) == deviceTempK) return true
+        capturePriorLocked()
         val current = deviceTempK.takeIf { skipIfCurrent }
         val landed = temperatureRoute.writeClamped(kelvin, extended, probe, current).getOrElse { return false }
         deviceTempK = landed

@@ -528,6 +528,7 @@
   design), so an extended resting profile lands device-clamped there, and a reboot reloads the
   clamped key, so a static extended setpoint waits for its next apply while a ramp recovers on its
   next tick.
+  Corrected by DD-059.
 - DD-050 [cited]: **The Privileged Display screen's Night Light card has a "Go beyond temperature
   limits" row under "Follow circadian scaling", shown while Shizuku is usable by Tideo (running and
   permitted, as the bridge needs) or root answers, and kept visible while a draft has it on (N2b
@@ -587,6 +588,7 @@
   the extended Night Light route (key-only after a bridge write, the null-anchor release, recovery
   suppressed while Shizuku is down); and e2e harness gaps (recovery order, preflight accepting a
   failed backup, install provenance, a teardown read failure skipping recovery, s11's rollback race).
+  Corrected by DD-059.
 - DD-058 [cited]: **Release preflight classifies `*/src/debug/*` and `e2e/*` as non-shipping (PR #144
   preflight, 2026-10-08).** Its fail-closed `classify_path` stopped on the first path in neither
   class, `app/src/debug/res/drawable/ic_launcher_background.xml` (DD-052); the `e2e/` harness
@@ -594,3 +596,13 @@
   and Gradle reads nothing under `e2e/`, so neither demands a version bump. The ladder never runs
   this workflow, so a new top-level tree stays green locally until the PR's preflight classifies it
   (accepted; prose-only).
+- DD-059 [cited]: **Service stop puts Night Light back as Tideo found it, on/off and Kelvin, once Tideo
+  has written it; other toggles still rest at the baseline (owner, 2026-10-09, revising D-151 for
+  Night Light).** Owner's device: extended + circadian at noon left the service at a raw 7308, and
+  disabling Tideo showed a 2596 K tint where Night Light had been off. A persisted `NightLightPrior`
+  is taken just before the first write and dropped by panic; anchor and prior restores go through
+  the bridge whenever the key alone cannot show them, and since `stop()` blocks the main thread
+  that Shizuku binds on, the owed service write follows off it unless the key moved on. Sol's review
+  (2026-10-09) fixed four; accepted: sub-second races between stop and a successor or startup's
+  record load, an owed write lost to process death right after stop, Night Light switched back on
+  before an owed service Kelvin lands, and DD-057's flag-reset edge.

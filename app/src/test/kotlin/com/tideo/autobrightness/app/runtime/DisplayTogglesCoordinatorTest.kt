@@ -2,6 +2,7 @@ package com.tideo.autobrightness.app.runtime
 
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.DALTONIZER_MODES
+import com.tideo.autobrightness.app.settings.NightLightPrior
 import com.tideo.autobrightness.platform.display.DaltonizerMode
 import com.tideo.autobrightness.platform.display.NightDisplayServiceBridge
 import com.tideo.autobrightness.platform.display.NightLightAutoMode
@@ -9,8 +10,11 @@ import com.tideo.autobrightness.platform.display.NightLightKelvinRange
 import com.tideo.autobrightness.platform.display.SecureDisplayController
 import com.tideo.autobrightness.platform.privilege.Tier
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -47,8 +51,10 @@ class DisplayTogglesCoordinatorTest {
             return if (available) write(entry) else Result.success(Unit)
         }
 
-        override fun readNightLight() = false
+        var nightLightOn = false
+        override fun readNightLight() = nightLightOn
         override fun setNightLight(on: Boolean) = gated("nightLight=$on", nightLightAvailable)
+            .also { if (nightLightAvailable) nightLightOn = on }
         override fun readNightLightTemperature(): Int? = deviceTemp
         override fun setNightLightTemperature(kelvin: Int): Result<Unit> {
             if (failTemperatureWrites) {
@@ -87,6 +93,7 @@ class DisplayTogglesCoordinatorTest {
         baseline: AabSettings = AabSettings(),
         tickIntervalMs: Long = 60_000L,
         withService: Boolean = false,
+        handOffScope: CoroutineScope? = null,
     ) {
         val display = FakeSecureDisplay()
         var tier = tier
@@ -94,9 +101,11 @@ class DisplayTogglesCoordinatorTest {
         var rampKelvin: Int? = null
         var anchorGiven: Int? = null
         var storedAnchor: Int? = null
+        var storedPrior: NightLightPrior? = null
         val baselineFlow = MutableStateFlow(baseline)
         val effectiveFlow = MutableStateFlow<AabSettings?>(null)
         val service = FakeService()
+        val bridgeOutOfRange = AtomicBoolean(false)
         val coordinator = DisplayTogglesCoordinator(
             effectiveFlow = effectiveFlow,
             baselineFlow = baselineFlow,
@@ -108,20 +117,24 @@ class DisplayTogglesCoordinatorTest {
             },
             readAnchor = { this.storedAnchor },
             writeAnchor = { this.storedAnchor = it },
+            readPrior = { this.storedPrior },
+            writePrior = { this.storedPrior = it },
             tickIntervalMs = tickIntervalMs,
             temperatureRoute = NightLightTemperatureRoute(
-                display, service.takeIf { withService }, bridgeOutOfRange = AtomicBoolean(false),
+                display, service.takeIf { withService }, bridgeOutOfRange = bridgeOutOfRange,
             ),
+            handOffScope = handOffScope ?: CoroutineScope(Dispatchers.Unconfined),
         )
     }
 
     /** DC-057's service as the extended range reaches it; a non-extended write never probes it here. */
     private class FakeService : NightDisplayServiceBridge {
         var reachable = true
+        var quickRefused = false // stop()'s main thread: Shizuku cannot bind there
         val sets = mutableListOf<Int>()
         override suspend fun readKelvin(): Int? = null
         override suspend fun setKelvin(kelvin: Int, quick: Boolean): Int? {
-            if (!reachable) return null
+            if (!reachable || (quick && quickRefused)) return null
             sets += kelvin
             return kelvin
         }
@@ -197,8 +210,8 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         h.display.writes.clear()
         h.coordinator.stop()
-        // D-151: service stop re-applies baseline (no latch)
-        assertEquals(listOf("nightLight=false", "daltonizer=OFF"), h.display.writes)
+        // D-151: baseline (no latch); DD-059: then Night Light as found, an unset key at the default
+        assertEquals(listOf("daltonizer=OFF", "nightLight=false", "temp=2850"), h.display.writes)
     }
 
     @Test
@@ -217,11 +230,11 @@ class DisplayTogglesCoordinatorTest {
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = baseline
         // User edits baseline profile; reevaluate() republishes as effective
-        val edited = baseline.copy(nightLightEnabled = true)
+        val edited = baseline.copy(daltonizerMode = "GRAYSCALE")
         h.baselineFlow.value = edited
         h.effectiveFlow.value = edited
         runCurrent()
-        assertEquals(listOf("nightLight=true"), h.display.writes)
+        assertEquals(listOf("daltonizer=GRAYSCALE"), h.display.writes)
         h.display.writes.clear()
         // Resting state tracks baseline edit; stop() has nothing to undo
         h.coordinator.stop()
@@ -752,7 +765,9 @@ class DisplayTogglesCoordinatorTest {
         h.effectiveFlow.value = baseline
         runCurrent()
         assertEquals(listOf("temp=7308"), h.display.writes, "the anchor goes back railed")
+        assertEquals(listOf(7_308), h.service.sets, "above the device range only the service shows it (DD-059)")
         h.display.writes.clear()
+        h.service.sets.clear()
         h.effectiveFlow.value = AabSettings(nightLightTemperature = 7_308, extendedNightLightEnabled = true)
         runCurrent()
         assertTrue(h.display.writes.none { it.startsWith("temp=") }, "7308 already landed: ${h.display.writes}")
@@ -851,6 +866,108 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         h.coordinator.panicReset()
         assertTrue(h.display.writes.none { it.startsWith("hdr") }, "hdr must be skipped: ${h.display.writes}")
+    }
+
+    @Test
+    fun stop_switchesNightLightBackOff_whenTideoFoundItOff_DD059() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.display.deviceTemp = 1_500
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        assertEquals(NightLightPrior(activated = false, kelvin = 1_500), h.storedPrior)
+        h.display.writes.clear()
+        h.coordinator.stop()
+        assertEquals(listOf("daltonizer=OFF", "nightLight=false", "temp=1500"), h.display.writes)
+        assertEquals(null, h.storedPrior)
+    }
+
+    @Test
+    fun stop_putsTheFoundKelvinBack_notTheBaselinesNightSetpoint_DD059() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(baseline = circadianProfile)
+        h.display.nightLightOn = true
+        h.display.deviceTemp = 3_000
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        advanceTimeBy(61_000); runCurrent()
+        h.display.writes.clear()
+        h.coordinator.stop()
+        assertEquals(listOf("temp=3000"), h.display.writes, "2700 is the night setpoint, not what Tideo found")
+    }
+
+    @Test
+    fun aRecordFromADeadProcess_isPutBackOnTheNextStop_kelvinBeforeOn_DD059() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(baseline = nightProfile)
+        h.storedPrior = NightLightPrior(activated = true, kelvin = 2_200)
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        h.coordinator.stop()
+        assertEquals(listOf("temp=2200", "nightLight=true"), h.display.writes, "Kelvin lands before the filter shows")
+        assertEquals(null, h.storedPrior)
+    }
+
+    @Test
+    fun aQuickWriteTheServiceRefused_isRetriedUnquick_DD059() = runTest(UnconfinedTestDispatcher()) {
+        val extendedCircadian = deviceDefaultProfile.copy(extendedNightLightEnabled = true)
+        val h = Harness(baseline = extendedCircadian, withService = true)
+        h.display.deviceTemp = 4_082
+        h.rampKelvin = 7_308
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = extendedCircadian
+        runCurrent()
+        advanceTimeBy(61_000); runCurrent()
+        assertEquals(listOf(7_308), h.service.sets)
+        h.display.deviceTemp = 4_082 // the fake key does not track writes: what the restore leaves there
+        h.service.quickRefused = true
+        h.coordinator.stop()
+        assertEquals(listOf(7_308, 4_082), h.service.sets, "the hand-off must reach the service")
+        assertTrue(!h.bridgeOutOfRange.get())
+        assertEquals(null, h.storedPrior)
+        assertEquals(null, h.storedAnchor)
+    }
+
+    @Test
+    fun theOwedServiceWrite_isSkipped_whenTheKeyMovedOn_DD059() = runTest(UnconfinedTestDispatcher()) {
+        val extendedCircadian = deviceDefaultProfile.copy(extendedNightLightEnabled = true)
+        val handOff = CoroutineScope(StandardTestDispatcher(testScheduler)) // runs only at runCurrent()
+        val h = Harness(baseline = extendedCircadian, withService = true, handOffScope = handOff)
+        h.display.deviceTemp = 4_082
+        h.rampKelvin = 7_308
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = extendedCircadian
+        runCurrent()
+        advanceTimeBy(61_000); runCurrent()
+        h.service.quickRefused = true
+        h.coordinator.stop()
+        h.display.deviceTemp = 3_100 // a new instance or the user wrote the key before the hand-off ran
+        runCurrent()
+        assertEquals(listOf(7_308), h.service.sets)
+    }
+
+    @Test
+    fun panic_dropsTheRecord_DD059() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        h.coordinator.panicReset()
+        assertEquals(null, h.storedPrior)
+    }
+
+    @Test
+    fun panicBelowElevated_stillDropsTheRecord_DD059() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.storedPrior = NightLightPrior(activated = true, kelvin = 2_200)
+        h.coordinator.start(backgroundScope)
+        runCurrent()
+        h.tier = Tier.BASIC
+        h.coordinator.panicReset()
+        assertEquals(null, h.storedPrior, "a later grant must not let a stop resurrect it")
     }
 
     @Test
