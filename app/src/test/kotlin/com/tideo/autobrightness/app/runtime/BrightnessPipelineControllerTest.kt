@@ -1980,4 +1980,51 @@ class BrightnessPipelineControllerTest {
         assertEquals(0, dimming.applied.last(), "super dimming got the settled perceived target")
         scope.cancel()
     }
+
+    private val noonUtcMs = 12 * 3_600_000L
+
+    @Test
+    fun reapply_publishesTheScaleItApplied_DD062() = runTest {
+        val sensor = FakeSensor()
+        var current = settings
+        val (controller, scope) = newController(
+            sensor, clock = { noonUtcMs + testScheduler.currentTime }, settingsProvider = { current },
+        )
+        controller.start()
+        sensor.flow.emit(sample(100.0))
+        advanceUntilIdle()
+        assertEquals(1.0, controller.state.value.scaleDynamic)
+
+        current = settings.copy(scalingEnabled = true)
+        controller.reapply()
+        advanceUntilIdle()
+        val s = controller.state.value
+        assertEquals(1.15, s.scaleDynamic, "the card showed the last cycle's 1.000 (owner, 2026-10-09)")
+        assertTrue(s.scalingUse)
+        assertTrue(s.scaleDynamicCompress != 1.0, "the compressed scale the reapply wrote with")
+        scope.cancel()
+    }
+
+    @Test
+    fun deadBandStop_publishesTheCurrentScale_DD062() = runTest {
+        val sensor = FakeSensor()
+        var current = settings
+        val (controller, scope) = newController(
+            sensor, clock = { noonUtcMs + testScheduler.currentTime }, settingsProvider = { current },
+        )
+        controller.start()
+        sensor.flow.emit(sample(100.0))
+        advanceUntilIdle()
+        val compress = controller.state.value.scaleDynamicCompress
+
+        current = settings.copy(scalingEnabled = true)
+        advanceTimeBy(60_000L)
+        sensor.flow.emit(sample(100.5))
+        advanceUntilIdle()
+        val s = controller.state.value
+        assertEquals(CycleResult.DEAD_BAND_STOP, s.sensor.lastCycle?.result)
+        assertEquals(1.15, s.scaleDynamic)
+        assertEquals(compress, s.scaleDynamicCompress, "task661 does not run on a dead-band stop")
+        scope.cancel()
+    }
 }

@@ -97,6 +97,7 @@ internal class PipelineCycleRunner(
                         threshAbsHigh = output.thresholdHigh,
                         threshDynamicPercent = output.threshDynamicPercent,
                         threshDynamic = output.dynamicThreshold,
+                        scaleDynamic = output.scaleDynamic,
                         settlingSteps = settlingStep,
                         sensor = it.sensor.completed(CycleResult.DEAD_BAND_STOP, clock(), claim),
                     )
@@ -378,7 +379,7 @@ internal class PipelineCycleRunner(
         ctx.update { it.copy(overrideDiagnostic = diagnostic) }
     }
 
-    /** task618 block#1: Set Initial Brightness. */
+    /** task618 block#1: Set Initial Brightness; act20/act27 recompute both scales, so they are published (DD-062). */
     fun setInitialBrightness(settings: AabSettings) {
         val s = ctx.stateValue
         // DB-082: arm BEFORE the lux guard and before the write. Below the guard it never armed on
@@ -403,7 +404,8 @@ internal class PipelineCycleRunner(
                     lastAppliedBrightness = baselineAfter(result, it.lastAppliedBrightness),
                     lastBrightnessWrite = result,
                     targetBrightness = perceived,      // perceived read-out (D-109)
-                    lastAcceptedMs = clock(),
+                    lastAcceptedMs = clock(), scalingUse = settings.scalingEnabled,
+                    scaleDynamic = output.scaleDynamic, scaleDynamicCompress = output.scaleDynamicCompress,
                 )
             }
         } finally {

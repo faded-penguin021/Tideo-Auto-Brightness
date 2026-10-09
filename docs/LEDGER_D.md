@@ -629,3 +629,18 @@
   `LocationSnapshot.isValid`. Kept apart on purpose: background acquisition never powers GPS while
   the button does (D-122, DB-059), and DD-038's rule-time order is the owner's. JVM-tested;
   on-device behaviour is unverified.
+  Its owner check read a stale readout as well: DD-062.
+- DD-062 [cited]: **The live circadian card showed the last light cycle's scale; a reapply and a
+  dead-band stop now publish theirs (owner's device, 2026-10-09).** DD-061's check read
+  "Uncompressed scale 1,000" all evening in a dark room: `setInitialBrightness`, every reapply's
+  path, wrote brightness with the new scale but published neither `scaleDynamic` nor
+  `scaleDynamicCompress`, so the card kept a cycle's from before scaling was on, and prof760's
+  in-band refusal meant no later cycle replaced it. task618 performs task661 (act20) and task90
+  (act27), so publishing both there is parity and gives override capture (task561) the compressed
+  scale behind the brightness it reverses; a dead-band stop publishes `scaleDynamic` alone, as
+  task661 does not run on one. Found on the way: prof758's 2-minute re-run of task90 inside the
+  dawn/dusk windows is not ported, and in AAB it moves only `%AAB_ScaleDynamic`/`%AAB_DimDynamic`,
+  since act82 hands task544 `%SmoothedLux` as `par1` (L41222) and act19–23 stop it before task661,
+  so AAB's brightness does not follow the ramp under steady light either. PARITY_CHECKLIST's
+  prof758 row is corrected and the port is an Owner-queue question (2026-10-09); JVM-tested, both
+  tests failing without the fix.

@@ -65,21 +65,28 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
-3. **[2026-10-09] Check that enabling Tideo again turns its Night Light back on.** Disabling
-   already puts Night Light back off (you confirmed, 2026-10-09). Needs a debug build after this
-   commit. With a profile that has Night Light on, disable Tideo (Night Light goes off), then
-   enable it. Worked if Night Light comes on by itself, without pressing Apply. Also: disable, wait
-   until a context rule picks a profile with Night Light off, enable; it should stay off. Settles
-   it: `adb shell settings get secure night_display_activated` prints 1 after the first enable
-   (DD-060).
+3. **[2026-10-09] Check again that Circadian uses a new location without restarting Tideo.**
+   Your first try read "Uncompressed scale 1,000" all evening: the card showed the last light
+   cycle's scale, from before circadian was on, and a dark steady room never ran another (DD-062).
+   Needs a debug build after this commit. Clear the app's storage, enable Tideo with the IP
+   fallback off, turn circadian scaling on, then switch the IP fallback on. Worked if, within about
+   a minute and without toggling Tideo, the card's uncompressed scale reads about 0.85 after dusk
+   (about 1.15 at midday; between the two during dawn/dusk) and Night Light tints. Settles the
+   location half: `adb exec-out run-as com.tideo.autobrightness.debug cat
+   files/datastore/experiment_prefs.preferences_pb | grep -ac sun_cached_lat` prints 1 (0 means
+   no location was stored, which is a different bug). The card half only you can see (DD-061,
+   DD-062).
 
-4. **[2026-10-09] Check that Circadian uses a new location without restarting Tideo.** Needs a
-   debug build after this commit, with Tideo running and circadian scaling on. Easiest repro: clear
-   the app's storage, enable Tideo with the IP fallback off, then on the Circadian screen switch
-   the IP fallback on. Worked if, within about a minute and without toggling Tideo, the
-   "uncompressed" circadian scale moves to the value for the time of day (not 1.15 after sunset)
-   and Night Light tints. Then tap "Use current location" (without Set fixed) on another day's
-   first run; it should do the same. No command settles it; you do (DD-061).
+4. **[2026-10-09] Open question: port AAB's 2-minute circadian re-run (prof758)?** You said yes
+   to this on my earlier description, which was wrong. During the dawn/dusk ramps, AAB recomputes
+   the scale every 2 minutes, but its follow-up light check is handed the current smoothed lux, so
+   it always stops in the dead band. **AAB's brightness does not follow the ramp under steady
+   light either**; only the scale number moves (DD-062). Options: (a) port it as AAB does: the
+   Circadian card and Live Debug scale refresh every 2 minutes during the ramps, and brightness
+   still waits for a light change or Apply; (b) a departure from AAB: the same 2-minute tick also
+   re-applies brightness, so the screen follows the ramp in steady light; (c) leave it. Recommend
+   (b): a still room at dusk is where circadian dimming should show, and the 2-minute cadence is
+   AAB's own. Either goes after 1.14.0 unless you say otherwise.
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
@@ -95,6 +102,10 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-09 — **Owner: enabling Tideo again turns a profile's Night Light back on (DD-060 passes
+  on device). DD-061's check read a stale card: a reapply and a dead-band stop now publish the
+  scale they computed (DD-062); AAB's 2-minute prof758 re-run is unported and goes to the owner.**
 
 - 2026-10-09 — **A running service follows the stored circadian location and the IP fallback
   switch, so a fix from "Use current location" applies without a restart (DD-061). Open question
