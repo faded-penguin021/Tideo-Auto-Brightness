@@ -102,9 +102,9 @@ class AppModule(context: Context) {
             overrideFlow = experimentPrefs.dateLocation,
             location = AndroidLocationReader(appContext),
             geoIpFallback = { if (experimentPrefs.geoIpEnabled.first()) geoIpClient.resolve() else null },
-            loadCachedLocation = { experimentPrefs.readCachedSunLocation() },
+            storedLocation = experimentPrefs.cachedSunLocation,
             persistLocation = { lat, lon, day -> experimentPrefs.writeCachedSunLocation(lat, lon, day) },
-            loadGeoIpAttemptDay = { experimentPrefs.readGeoIpAttemptDay() },
+            storedAttemptDay = experimentPrefs.geoIpAttemptDay,
             persistGeoIpAttemptDay = { day -> experimentPrefs.writeGeoIpAttemptDay(day) },
         )
 

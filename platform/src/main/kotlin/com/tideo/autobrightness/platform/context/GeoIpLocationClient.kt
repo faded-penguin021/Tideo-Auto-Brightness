@@ -51,10 +51,7 @@ class GeoIpLocationClient(
             if (latValue.isString || lonValue.isString) return null
             val lat = latValue.doubleOrNull ?: return null
             val lon = lonValue.doubleOrNull ?: return null
-            if (!lat.isFinite() || lat !in -90.0..90.0 || !lon.isFinite() || lon !in -180.0..180.0) return null
-            // Reject null island (0,0).
-            if (lat == 0.0 && lon == 0.0) return null
-            return LocationSnapshot(lat, lon)
+            return LocationSnapshot(lat, lon).takeIf { it.isValid }
         }
 
         /**

@@ -613,3 +613,19 @@
   manual Apply. The seed now takes Night Light as off with an unknown Kelvin, and the first
   context-evaluated profile writes it; a baseline with Night Light off still adopts, so a system
   Night Light the user turned on is not switched off at each start. Sol (2026-10-09): no defects.
+- DD-061 [cited]: **A running service follows the stored circadian location and the IP fallback
+  switch; it read the store once, at start (owner's device, 2026-10-09).** On a fresh install the
+  service spent the day's DA-037 attempt before the owner enabled ipwho.is, and the fix "Use current
+  location" then stored (DB-054) stayed unread, so the pipeline and Night Light ran on
+  `TimeContext`'s 06–08/18–20 UTC placeholder windows (scale 1.15 where ~0.87 was due) until the
+  service restarted.
+  `CircadianWindowProvider` now follows the store (DataStore subscriptions, woken only by writes):
+  it adopts a valid stored fix that differs from the one it holds, an acquisition that finishes
+  after a fix was stored for its day is dropped, and switching the IP fallback on clears the
+  persisted attempt day in the same write, so the freed day survives a restart — a user action,
+  like DA-037's per-tap lookup, not an automatic retry. The store is the one way a location
+  reaches the provider; the two view-models' copies of the status rule and the provider's test-only `status` became one
+  `CircadianLocationStatus.of`, and four copies of the coordinate check became
+  `LocationSnapshot.isValid`. Kept apart on purpose: background acquisition never powers GPS while
+  the button does (D-122, DB-059), and DD-038's rule-time order is the owner's. JVM-tested;
+  on-device behaviour is unverified.

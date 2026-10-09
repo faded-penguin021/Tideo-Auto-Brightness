@@ -73,11 +73,13 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    it: `adb shell settings get secure night_display_activated` prints 1 after the first enable
    (DD-060).
 
-Open questions:
-- [2026-10-09] The train changelog `changelogs/28.txt` is at 496 of its 500 characters, so
-  DD-059's disable fix has no line of its own. Options: (a) leave it out, (b) fold it into the
-  Night Light line by shortening another. Recommendation: (b), since disabling now behaves
-  differently from v1.13.0.
+4. **[2026-10-09] Check that Circadian uses a new location without restarting Tideo.** Needs a
+   debug build after this commit, with Tideo running and circadian scaling on. Easiest repro: clear
+   the app's storage, enable Tideo with the IP fallback off, then on the Circadian screen switch
+   the IP fallback on. Worked if, within about a minute and without toggling Tideo, the
+   "uncompressed" circadian scale moves to the value for the time of day (not 1.15 after sunset)
+   and Night Light tints. Then tap "Use current location" (without Set fixed) on another day's
+   first run; it should do the same. No command settles it; you do (DD-061).
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
@@ -93,6 +95,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-09 — **A running service follows the stored circadian location and the IP fallback
+  switch, so a fix from "Use current location" applies without a restart (DD-061). Open question
+  answered (owner: weigh the whole train): `changelogs/28.txt` regrouped as New/Fixes, with the
+  Night Light disable/enable and circadian lines.**
 
 - 2026-10-09 — **Owner: DD-059's disable fix works on device. Enabling Tideo again turns a
   profile's Night Light back on, where it had stayed off until Apply (DD-060).**

@@ -21,7 +21,17 @@ import kotlin.coroutines.resume
 data class LocationSnapshot(
     val latitude: Double,
     val longitude: Double,
-)
+) {
+    val isValid: Boolean get() = isValid(latitude, longitude)
+
+    companion object {
+        /** DA-037: finite, in range and not null island — the one check every location source passes. */
+        fun isValid(latitude: Double, longitude: Double): Boolean =
+            latitude.isFinite() && latitude in -90.0..90.0 &&
+                longitude.isFinite() && longitude in -180.0..180.0 &&
+                (latitude != 0.0 || longitude != 0.0)
+    }
+}
 
 /** Typed result for one-shot "use current location" read (G2R-F42). Separates missing-permission from no-fix. */
 sealed interface LocationResult {

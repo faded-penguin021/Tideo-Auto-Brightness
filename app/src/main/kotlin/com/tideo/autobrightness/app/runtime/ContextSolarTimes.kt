@@ -3,6 +3,7 @@ package com.tideo.autobrightness.app.runtime
 import com.tideo.autobrightness.app.settings.ExperimentPrefsStore
 import com.tideo.autobrightness.domain.circadian.SolarCalculator
 import com.tideo.autobrightness.platform.context.LocationReader
+import com.tideo.autobrightness.platform.context.LocationSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
@@ -51,14 +52,10 @@ class ContextSolarTimes(
             } catch (_: Exception) {
                 null
             }
-            if (loc != null && isValid(loc.first, loc.second)) return loc
+            if (loc != null && LocationSnapshot.isValid(loc.first, loc.second)) return loc
         }
         return null
     }
-
-    private fun isValid(lat: Double, lon: Double): Boolean =
-        lat.isFinite() && lat in -90.0..90.0 && lon.isFinite() && lon in -180.0..180.0 &&
-            (lat != 0.0 || lon != 0.0)
 
     companion object {
         const val DEFAULT_SUNRISE = 21_600L // 06:00
