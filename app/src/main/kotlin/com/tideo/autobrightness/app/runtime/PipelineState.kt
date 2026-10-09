@@ -112,4 +112,6 @@ sealed interface PipelineEvent {
 
     /** A context override swapped the active profile → re-run Set Initial Brightness (task43 act21). */
     data object ContextChanged : PipelineEvent
+
+    data object ScaleTick : PipelineEvent
 }

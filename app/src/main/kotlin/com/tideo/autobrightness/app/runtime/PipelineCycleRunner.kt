@@ -12,7 +12,6 @@ import com.tideo.autobrightness.domain.brightness.EvaluationOutcome
 import com.tideo.autobrightness.domain.brightness.OverrideRules
 import com.tideo.autobrightness.domain.brightness.PreviousState
 import com.tideo.autobrightness.domain.brightness.SoftwareDimming
-import com.tideo.autobrightness.domain.brightness.TimeContext
 import com.tideo.autobrightness.platform.brightness.BrightnessWriteResult
 import com.tideo.autobrightness.platform.brightness.ScreenBrightnessController
 import com.tideo.autobrightness.platform.brightness.WriteStatus
@@ -248,8 +247,6 @@ internal class PipelineCycleRunner(
     }
 
     private fun buildInput(rawLux: Double, settings: AabSettings, s: PipelineState): BrightnessPolicyInput {
-        // UTC seconds-of-day (F73).
-        val secondsOfDay = ((clock() / 1000L) % 86_400L).toDouble()
         val previous = if (s.smoothedLux != null && s.threshDynamicPercent != null) {
             PreviousState(s.smoothedLux, s.threshDynamicPercent, s.cycleTimeMs)
         } else {
@@ -257,21 +254,9 @@ internal class PipelineCycleRunner(
         }
         // F73: real sunrise/sunset windows, not fixed defaults.
         val windows = circadianWindowsProvider(settings.scaleTransitionFactor.toDouble())
-        val time = if (windows != null) {
-            TimeContext(
-                secondsOfDay = secondsOfDay,
-                morningStart = windows.morningStart,
-                morningEnd = windows.morningEnd,
-                eveningStart = windows.eveningStart,
-                eveningEnd = windows.eveningEnd,
-                sunlightDurationMinutes = windows.sunlightDurationMinutes,
-            )
-        } else {
-            TimeContext(secondsOfDay = secondsOfDay)
-        }
         return BrightnessPolicyInput(
             lux = rawLux,
-            time = time,
+            time = circadianTimeContext(clock(), windows),
             context = BrightnessContext(isPolarDayNight = windows?.isPolar ?: false),
             thresholds = settings.toThresholdConfig(),
             curve = settings.toBrightnessCurveConfig(),

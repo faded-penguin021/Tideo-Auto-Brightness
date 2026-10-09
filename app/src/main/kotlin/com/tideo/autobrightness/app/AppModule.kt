@@ -15,7 +15,9 @@ import com.tideo.autobrightness.app.runtime.OverridePointSink
 import com.tideo.autobrightness.app.runtime.SuperDimmingCoordinator
 import com.tideo.autobrightness.app.runtime.ToastContextLoadSink
 import com.tideo.autobrightness.app.runtime.ToastDebugSink
+import com.tideo.autobrightness.app.runtime.CircadianScaleRefresh
 import com.tideo.autobrightness.app.runtime.CircadianWindowProvider
+import com.tideo.autobrightness.app.runtime.liveDynamicScale
 import com.tideo.autobrightness.app.settings.AabSettings
 import com.tideo.autobrightness.app.settings.ContextRuleStore
 import com.tideo.autobrightness.app.settings.DataStoreContextBaselineStore
@@ -31,9 +33,6 @@ import com.tideo.autobrightness.app.storage.experimentPrefsDataStore
 import com.tideo.autobrightness.app.storage.overridePointsDataStore
 import com.tideo.autobrightness.app.storage.settingsDataStore
 import com.tideo.autobrightness.app.storage.userProfilesDataStore
-import com.tideo.autobrightness.domain.brightness.TimeContext
-import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
-import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
 import com.tideo.autobrightness.domain.circadian.NightLightTemperatureRamp
 import com.tideo.autobrightness.domain.wizard.OverridePoint
 import com.tideo.autobrightness.platform.brightness.AndroidScreenBrightnessController
@@ -132,6 +131,7 @@ class AppModule(context: Context) {
             // prof759/task545: proximity damps smoothing alpha ×0.1.
             proximitySource = AndroidProximitySensorSource(appContext),
             callbackLog = LiveRuntimeState.sensorCallbacks,
+            scaleRefreshPeriodMs = CircadianScaleRefresh.PERIOD_MS,
         )
         controllerHook.hook = controller
         // D-110: recompute when circadian location resolves late.
@@ -154,24 +154,9 @@ class AppModule(context: Context) {
             tierProvider = { privilegeManager.currentTier() },
             // D-154: circadian-ramp Kelvin with real solar windows or TimeContext defaults (F73).
             circadianTemperature = { s, nightKelvin ->
-                val nowSecOfDay = ((System.currentTimeMillis() / 1000L) % 86_400L).toDouble()
                 val w = circadianWindows.current(s.scaleTransitionFactor.toDouble())
-                val defaults = TimeContext(secondsOfDay = nowSecOfDay)
-                val modifier = DynamicScaleEngine.compute(
-                    DynamicScaleInput(
-                        nowSecOfDay = nowSecOfDay,
-                        morningStart = w?.morningStart ?: defaults.morningStart,
-                        morningEnd = w?.morningEnd ?: defaults.morningEnd,
-                        eveningStart = w?.eveningStart ?: defaults.eveningStart,
-                        eveningEnd = w?.eveningEnd ?: defaults.eveningEnd,
-                        sunlightDurationMinutes = w?.sunlightDurationMinutes
-                            ?: defaults.sunlightDurationMinutes,
-                        isPolar = w?.isPolar ?: false,
-                        steepness = s.scaleSteepness.toDouble(),
-                    ),
-                ).modifier
                 NightLightTemperatureRamp.temperature(
-                    modifier = modifier,
+                    modifier = liveDynamicScale(System.currentTimeMillis(), w, s).modifier,
                     nightKelvin = nightKelvin,
                     dayKelvin = secureDisplay.nightLightRange(s.extendedNightLightEnabled).max,
                 )

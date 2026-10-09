@@ -2,6 +2,7 @@ package com.tideo.autobrightness.domain.brightness
 
 import com.tideo.autobrightness.domain.circadian.DynamicScaleEngine
 import com.tideo.autobrightness.domain.circadian.DynamicScaleInput
+import com.tideo.autobrightness.domain.circadian.DynamicScaleResult
 import java.math.BigDecimal
 import java.math.RoundingMode
 import kotlin.math.abs
@@ -250,6 +251,9 @@ class BrightnessEngine {
     }
 
     fun computeDynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): Double =
+        dynamicScale(time, scaling, context).scaleDynamic
+
+    fun dynamicScale(time: TimeContext, scaling: DynamicScalingConfig, context: BrightnessContext): DynamicScaleResult =
         DynamicScaleEngine.compute(
             DynamicScaleInput(
                 nowSecOfDay = time.secondsOfDay,
@@ -262,7 +266,7 @@ class BrightnessEngine {
                 steepness = scaling.steepness,
                 scaleSpreadPercent = scaling.spreadPercent,
             )
-        ).scaleDynamic
+        )
 
     fun calculateAnimation(alpha: Double, animation: AnimationConfig, cycleTimeMs: Double?): Triple<Int, Long, Long> {
         val clamped = alpha.coerceIn(0.0, 1.0)

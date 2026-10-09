@@ -2027,4 +2027,80 @@ class BrightnessPipelineControllerTest {
         assertEquals(compress, s.scaleDynamicCompress, "task661 does not run on a dead-band stop")
         scope.cancel()
     }
+
+    private val placeholderWindows = CircadianWindows(
+        morningStart = 6 * 3600.0, morningEnd = 8 * 3600.0, eveningStart = 18 * 3600.0, eveningEnd = 20 * 3600.0,
+        sunlightDurationMinutes = 720.0, isPolar = false,
+    )
+
+    private fun scaleTickTest(
+        startMs: Long,
+        settingsProvider: suspend () -> AabSettings,
+        brightness: FakeBrightness = FakeBrightness(),
+        body: suspend TestScope.(BrightnessPipelineController, FakeSensor) -> Unit,
+    ) = runTest {
+        val sensor = FakeSensor()
+        val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val controller = BrightnessPipelineController(
+            lightSensor = sensor, brightness = brightness, brightnessObserver = FakeObserver(),
+            settingsProvider = settingsProvider, scope = scope, clock = { startMs + testScheduler.currentTime },
+            circadianWindowsProvider = { placeholderWindows },
+            scaleRefreshPeriodMs = CircadianScaleRefresh.PERIOD_MS,
+        )
+        try {
+            body(controller, sensor)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    private val scaling = settings.copy(scalingEnabled = true)
+    private val at1828Utc = 18 * 3_600_000L + 28 * 60_000L
+    private val firstCycleMs = 60_000L
+
+    @Test
+    fun scaleTick_refreshesTheScaleInsideAnEveningRamp_writesNothing_DD063() {
+        val brightness = FakeBrightness()
+        scaleTickTest(at1828Utc, { scaling }, brightness) { controller, sensor ->
+            controller.start()
+            sensor.flow.emit(sample(100.0))
+            advanceTimeBy(firstCycleMs)
+            val cycleScale = assertNotNull(controller.state.value.scaleDynamic)
+            val writes = brightness.writes.toList()
+
+            advanceTimeBy(CircadianScaleRefresh.PERIOD_MS * 2 - firstCycleMs + 1)
+            val scale = assertNotNull(controller.state.value.scaleDynamic)
+            assertTrue(scale < cycleScale, "the evening ramp moved on from $cycleScale by 18:32 UTC: $scale")
+            val lastTickMs = at1828Utc + CircadianScaleRefresh.PERIOD_MS * 2
+            assertEquals(liveDynamicScale(lastTickMs, placeholderWindows, scaling).scaleDynamic, scale)
+            assertEquals(writes, brightness.writes, "act82's task544 call dead-band-stops: no brightness write")
+        }
+    }
+
+    @Test
+    fun scaleTick_outsideTheRamps_leavesTheScale_DD063() {
+        var current = settings
+        scaleTickTest(12 * 3_600_000L, { current }) { controller, sensor ->
+            controller.start()
+            sensor.flow.emit(sample(100.0))
+            advanceTimeBy(firstCycleMs)
+            assertEquals(1.0, controller.state.value.scaleDynamic)
+            current = scaling
+            advanceTimeBy(CircadianScaleRefresh.PERIOD_MS * 3 + 1)
+            runCurrent()
+            assertEquals(1.0, controller.state.value.scaleDynamic, "prof758's gate holds only inside a ramp")
+        }
+    }
+
+    @Test
+    fun scaleTick_stopsWithTheService_DD063() = scaleTickTest(at1828Utc, { scaling }) { controller, sensor ->
+        controller.start()
+        sensor.flow.emit(sample(100.0))
+        advanceTimeBy(firstCycleMs)
+        val cycleScale = assertNotNull(controller.state.value.scaleDynamic)
+        controller.stop()
+        advanceTimeBy(CircadianScaleRefresh.PERIOD_MS * 2 + 1)
+        runCurrent()
+        assertEquals(cycleScale, controller.state.value.scaleDynamic)
+    }
 }

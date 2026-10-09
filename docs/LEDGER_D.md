@@ -644,3 +644,15 @@
   so AAB's brightness does not follow the ramp under steady light either. PARITY_CHECKLIST's
   prof758 row is corrected and the port is an Owner-queue question (2026-10-09); JVM-tested, both
   tests failing without the fix.
+- DD-063 [cited]: **prof758 is ported as AAB runs it: every 2 min inside a dawn/dusk window, or with no
+  location yet, task90 refreshes the published scale and moves no brightness (owner's option (a),
+  2026-10-09).** A controller ticker posts `PipelineEvent.ScaleTick`, so the refresh runs on the
+  pipeline's one consumer and stops with the service; it is gated by the transcribed
+  `ProfileGates.dynamicScaleGate`, with "sun data stale" read as no windows. act82's task544 call is
+  not ported: AAB hands it `%SmoothedLux`, so it only ever re-runs Set Thresholds on a dead-band
+  stop, and that re-centring would fight DC-070's stretched band. The owner declined option (b),
+  re-applying brightness on the tick, because steady light would see it as jitter. On the owner's
+  review, "solar windows or `TimeContext` placeholders" and the task90 Block #2 call became one
+  `circadianTimeContext`/`liveDynamicScale` pair shared by the pipeline, the tick and Night Light's
+  D-154 Kelvin ramp, where AppModule had kept its own copy. JVM-tested; each of the three new tests
+  fails under its own mutation, except the stop test, which the cancelled consumer also satisfies.

@@ -67,26 +67,15 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
 
 3. **[2026-10-09] Check again that Circadian uses a new location without restarting Tideo.**
    Your first try read "Uncompressed scale 1,000" all evening: the card showed the last light
-   cycle's scale, from before circadian was on, and a dark steady room never ran another (DD-062).
-   Needs a debug build after this commit. Clear the app's storage, enable Tideo with the IP
-   fallback off, turn circadian scaling on, then switch the IP fallback on. Worked if, within about
-   a minute and without toggling Tideo, the card's uncompressed scale reads about 0.85 after dusk
-   (about 1.15 at midday; between the two during dawn/dusk) and Night Light tints. Settles the
-   location half: `adb exec-out run-as com.tideo.autobrightness.debug cat
-   files/datastore/experiment_prefs.preferences_pb | grep -ac sun_cached_lat` prints 1 (0 means
-   no location was stored, which is a different bug). The card half only you can see (DD-061,
-   DD-062).
-
-4. **[2026-10-09] Open question: port AAB's 2-minute circadian re-run (prof758)?** You said yes
-   to this on my earlier description, which was wrong. During the dawn/dusk ramps, AAB recomputes
-   the scale every 2 minutes, but its follow-up light check is handed the current smoothed lux, so
-   it always stops in the dead band. **AAB's brightness does not follow the ramp under steady
-   light either**; only the scale number moves (DD-062). Options: (a) port it as AAB does: the
-   Circadian card and Live Debug scale refresh every 2 minutes during the ramps, and brightness
-   still waits for a light change or Apply; (b) a departure from AAB: the same 2-minute tick also
-   re-applies brightness, so the screen follows the ramp in steady light; (c) leave it. Recommend
-   (b): a still room at dusk is where circadian dimming should show, and the 2-minute cadence is
-   AAB's own. Either goes after 1.14.0 unless you say otherwise.
+   cycle's scale, from before circadian was on (DD-062). Needs a debug build after this commit.
+   Clear the app's storage, enable Tideo with the IP fallback off, turn circadian scaling on, then
+   switch the IP fallback on. Worked if, within about a minute and without toggling Tideo, the
+   card's uncompressed scale reads about 0.85 after dusk (about 1.15 at midday) and Night Light
+   tints; during dusk itself the scale should also step down every 2 minutes in steady light while
+   brightness holds (DD-063). Settles the location half: `adb exec-out run-as
+   com.tideo.autobrightness.debug cat files/datastore/experiment_prefs.preferences_pb | grep -ac
+   sun_cached_lat` prints 1 (0 means no location was stored, which is a different bug). The card
+   half only you can see (DD-061…DD-063).
 
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
@@ -103,127 +92,24 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
-- 2026-10-09 — **Owner: enabling Tideo again turns a profile's Night Light back on (DD-060 passes
-  on device). DD-061's check read a stale card: a reapply and a dead-band stop now publish the
-  scale they computed (DD-062); AAB's 2-minute prof758 re-run is unported and goes to the owner.**
-
-- 2026-10-09 — **A running service follows the stored circadian location and the IP fallback
-  switch, so a fix from "Use current location" applies without a restart (DD-061). Open question
-  answered (owner: weigh the whole train): `changelogs/28.txt` regrouped as New/Fixes, with the
-  Night Light disable/enable and circadian lines.**
-
-- 2026-10-09 — **Owner: DD-059's disable fix works on device. Enabling Tideo again turns a
-  profile's Night Light back on, where it had stayed off until Apply (DD-060).**
-
-- 2026-10-09 — **Disabling Tideo puts Night Light back as Tideo found it, on/off and Kelvin,
-  through Shizuku when only the display service can show it; the owner's 2596 K tint after an
-  extended day ramp is gone (DD-059, revising D-151 for Night Light).**
-
-- 2026-10-08 — **Release preflight classifies debug-variant sources and the `e2e/` harness as
-  non-shipping; its fail-closed step had stopped on DD-052's debug launcher drawable (DD-058).**
-
-- 2026-10-08 — **PR-time Astra review: a scheduled TIME wake no longer cancels its own profile
-  write, and a Sunrise/Sunset rule re-arms from the new day's sun times at midnight (DD-056); the
-  badge workflow publishes only from `main`; the rest triaged, fixed or accepted (DD-057).**
-
-- 2026-10-08 — **Open question answered (a): only the current owner publishes live runtime state,
-  so a destroyed service's late publish cannot show it running again; behind the once-flaky
-  `destroy_withoutASuccessor_…` test (DD-055).**
-
-- 2026-10-08 — **Owner ran step 38a on 1.14.0-debug vc28 (57561ec): the extended Night Light range
-  passes, including the range-off return to the device minimum (DD-053); the step's no-Shizuku
-  expectation is corrected. The User Guide's quote and tip tints turn blue in debug too (DD-054).**
-
-- 2026-10-08 — **Debug builds are dark blue: UI palette, launcher icon and widget; release stays
-  teal (DD-052).**
-
-- 2026-10-08 — **Owner approved the low-lux jitter rule as specified; it goes in the train after
-  1.14.0, each step on the owner's go-ahead.**
-
-- 2026-10-08 — **Night Light plan closed (N4): archived whole, now frozen, as
-  `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md` for its AAB `_NightLightAPI` transcript (owner);
-  device step 38a stays on the Owner queue.**
-
-- 2026-10-07 — **Owner queue: try step 38a on a device; Open question: archive or delete the Night
-  Light plan (its N4).**
-
-- 2026-10-07 — **Night Light N2b done (step 5b): device step 38a and its `s11_38a` row, and
-  `changelogs/28.txt` gains the range line, the other lines tightened to fit 500 characters.**
-
-- 2026-10-07 — **Night Light N2b step 5a (rule change): AGENTS.md's third Shizuku place now covers
-  the extended range; README points at the new `SHIZUKU_USAGE.md`; DC-057's "only" is corrected
-  (DD-051).**
-
-- 2026-10-07 — **Night Light N2b step 4: the "Go beyond temperature limits" row on the Privileged
-  Display screen, shown with Shizuku running or root, kept while on; the slider, its hint and the
-  circadian help follow the draft flag at once (DD-050).**
-
-- 2026-10-07 — **Night Light N2b step 3: Kelvin writes clamp to the active range at write time —
-  686–7308 through the display-service bridge while a profile's extended flag is on, else the
-  device range; the ramp's day endpoint is 7308 while it is on, and a stored out-of-range setpoint
-  survives the read-back (DD-048, DD-049).**
-
-- 2026-10-07 — **Night Light N2b step 2: the per-profile `extendedNightLightEnabled` field (off by
-  default, `%AAB_ExtendedNightLight`), persisted, exported and context-merged; nothing reads it yet.
-  A profile saved before it reads it as off, a grant-decided departure from AAB (DD-047).**
-
-- 2026-10-07 — **Owner queue: `claude/device-e2e` and `claude/e2e-s9-closeout` are deleted on
-  origin (owner; `git ls-remote --heads` printed nothing), so that item is dropped.**
-
-- 2026-10-07 — **Night Light N2b step 1: every stored setpoint and Kelvin write is railed to
-  686–7308, one band for controller, mapper and validator (DD-046). The plan now holds AAB's
-  reference, distilled, and the owner's answers.**
-
-- 2026-10-07 — **The parallel `claude/e2e-s9-closeout` branch merged into this train; its row kept
-  DD-044, so N2's row is renumbered DD-045 (owner).**
-
-- 2026-10-07 — **Night Light N2: the slider range, the circadian day endpoint and the unset-key
-  default come from the device's framework config, AOSP's values only as fallback (DD-045).**
-
-- 2026-10-07 — **E2E suite complete (S9; plan deleted): 17 of 20 auto rows pass on the phone and 3
-  skip on their preconditions, private state unchanged; how to run it is RUNBOOK playbook 9, what
-  a PASS does not prove is `e2e/README.md` "Known limits", and the script names each section's
-  auto rows (DD-044).**
-
-- 2026-10-07 — **E2E S8 dropped by the owner: mobile-use has no device-free mode and its adbutils
-  pin cannot be locked beside the suite's, so there is no triage extra (DD-043).**
-
-- 2026-10-06 — **Night Light plan: #142's owner direction added as N2b (686–7308 K behind an
-  opt-in toggle); N3 closed as the owner's DD-038 solar-fallback diagnosis. Owner, 2026-10-07:
-  N2b waits for AAB's reference (`_NightLightAPI` transcribed into the plan), ramps from 7308 K
-  (the top at which every RGB multiplier stays in 0–1),
-  is per profile, is visible only with Shizuku or root, and keeps out-of-range setpoints.**
-
-- 2026-10-06 — **Time rules wake only at the next context time, as Tasker's prof764 does; the
-  per-pipeline-update evaluation that read Android's last-known location about once a second is
-  gone (DD-042).**
-
-- 2026-10-06 — **E2E S7 device runs done: s11_39 passes now the owner's `SUNSET-30` rule is
-  deleted, s02_10e passes, and s02_10a passes once its control waits for the owner's unlock
-  (DD-041).**
-
-- 2026-10-06 — **Owner queue answered: no false override pause has recurred since 2026-09-23, so
-  that item is dropped; the task592/task637 Tasker fixes are done; the owner re-checked the
-  `SUNSET-30` rule and it is correct (DD-038). Both E2E open questions are closed
-  (DD-040): an open Dashboard need not notice a grant, and wake scenarios stay owner-unlocked.**
-
-- 2026-10-06 — **E2E S7 reruns on vc28 with DD-034: s06_19a passes; s02_10b's failure was the
-  harness re-settling after a drift dismissal, fixed and passing; s11_39 awaits a run outside the
-  owner's nightly context rule (DD-039).**
-
-- 2026-10-06 — **SUNRISE/SUNSET rule times follow the pinned Circadian location; one shared
-  resolver for engine and editor (DD-038).**
-- 2026-10-06 — **The owner's device round on 1.14.0-debug vc28 passed all nine checks; the
-  solar-offsets plan closed, its webview paste now a source transcript (DD-036). Compression
-  pass: Decided non-items moved verbatim to `docs/rebuild/DECIDED_NON_ITEMS.md` (DD-037).**
-- 2026-10-05 — **E2E S7 checkpoint: the effect-ordered suites ran on the phone; the harness now
-  reads focus, the notification shade and greyed Apply the way OxygenOS 16 shows them (DD-033),
-  and two Tideo defects it found are fixed in the app, unverified on device (DD-034).**
-- 2026-10-05 — **E2E S6: smoke passes on the owner's phone on 1.14.0-debug vc28, after fixing the
-  harness's OxygenOS service-record and chip-label parsing (DD-032).**
-- 2026-10-04 — **E2E S5: read-only preflight built and passed on the phone; 1.14.0-debug vc28 is
-  its first guarded install (DD-029). Owner: no automation receiver, so all 21 scenarios clear
-  the SKIP rules.**
+- 2026-10-09 — **Open question answered (a): AAB's 2-minute prof758 re-run refreshes the scale
+  readout during the dawn/dusk ramps and moves no brightness; the owner declined (b) as jitter in
+  steady light. One shared helper now serves the pipeline, that tick and Night Light (DD-063).**
+- 2026-10-09 — **Night Light goes back as found on disable and on again on enable, both
+  owner-confirmed (DD-059, DD-060). A running service follows the stored circadian location and
+  the IP fallback switch (DD-061); a reapply now publishes the scale it applied (DD-062).**
+- 2026-10-08 — **Release preflight treats debug sources and `e2e/` as non-shipping (DD-058); Astra
+  review fixes for TIME wakes and the badge workflow (DD-056, DD-057); only the owning service
+  publishes live state (DD-055); debug builds are dark blue (DD-052, DD-054); step 38a passed on
+  device (DD-053); the low-lux jitter rule approved for after 1.14.0.**
+- 2026-10-06..08 — **Night Light: the device's Kelvin range (N2, DD-045) and the opt-in extended
+  686–7308 K range per profile, Shizuku or root only (N2b, DD-046…DD-051); the plan is archived as
+  `docs/history/NIGHT_LIGHT_CIRCADIAN_FIX.md`.**
+- 2026-10-04..07 — **E2E suite S5–S9 done on the owner's phone, S8 dropped (DD-029,
+  DD-032…DD-034, DD-039…DD-044); RUNBOOK playbook 9 runs it.**
+- 2026-10-06 — **Device round on 1.14.0-debug vc28 passed nine checks (DD-036); Decided non-items
+  moved to `docs/rebuild/DECIDED_NON_ITEMS.md` (DD-037); SUNRISE/SUNSET rules follow the pinned
+  location (DD-038); TIME rules wake only at the next context time (DD-042).**
 - 2026-10-01..06 — **This train (1.14.0 / vc28 after `main` shipped #141 as v1.13.0): E2E S1–S4
   (DD-015…DD-021), the PWM help (DD-014), the proximity damp (DD-022,
   DD-024), #139 (DD-025), translation policy and coverage badges (DD-023, DD-026…DD-028), the
