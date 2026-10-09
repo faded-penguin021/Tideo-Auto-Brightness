@@ -65,12 +65,13 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
    `git ls-remote --heads origin badges` prints one line (DD-028).
 
-3. **[2026-10-09] Check that disabling Tideo puts Night Light back as you had it.** Needs a debug
-   build after this commit. Turn Night Light off in Android's own settings, enable Tideo with a
-   profile that has Night Light on with circadian and extended on, wait a minute for the tint, then
-   disable Tideo. Worked if Night Light goes off. Repeat with Night Light on at a value you chose
-   first; that value should come back. Settles it: `adb shell settings get secure
-   night_display_activated` prints 0 after the first run (DD-059).
+3. **[2026-10-09] Check that enabling Tideo again turns its Night Light back on.** Disabling
+   already puts Night Light back off (you confirmed, 2026-10-09). Needs a debug build after this
+   commit. With a profile that has Night Light on, disable Tideo (Night Light goes off), then
+   enable it. Worked if Night Light comes on by itself, without pressing Apply. Also: disable, wait
+   until a context rule picks a profile with Night Light off, enable; it should stay off. Settles
+   it: `adb shell settings get secure night_display_activated` prints 1 after the first enable
+   (DD-060).
 
 Open questions:
 - [2026-10-09] The train changelog `changelogs/28.txt` is at 496 of its 500 characters, so
@@ -92,6 +93,9 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 ## Changelog
 
 Newest first; ledger rows are the durable detail.
+
+- 2026-10-09 — **Owner: DD-059's disable fix works on device. Enabling Tideo again turns a
+  profile's Night Light back on, where it had stayed off until Apply (DD-060).**
 
 - 2026-10-09 — **Disabling Tideo puts Night Light back as Tideo found it, on/off and Kelvin,
   through Shizuku when only the display service can show it; the owner's 2596 K tint after an

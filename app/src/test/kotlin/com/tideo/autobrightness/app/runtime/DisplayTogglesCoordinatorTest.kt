@@ -521,6 +521,7 @@ class DisplayTogglesCoordinatorTest {
     @Test
     fun stop_handsTheKeyBack_evenWhenTheBaselineStillAsksForARamp_DC056() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness(baseline = deviceDefaultProfile)
+        h.storedPrior = NightLightPrior(activated = false, kelvin = 1_500) // the device shows Tideo's baseline (DD-060)
         h.display.deviceTemp = 1_500
         h.rampKelvin = 3_400
         h.coordinator.start(backgroundScope)
@@ -537,13 +538,14 @@ class DisplayTogglesCoordinatorTest {
     @Test
     fun aSurvivingAnchor_isRestored_evenWhenTheProfileMatchesTheSeededAssumption_DC056() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness(baseline = nightProfile)
-        h.storedAnchor = 1_500
+        h.storedAnchor = 1_500 // a pre-DD-059 build: an anchor and no prior record
         h.display.deviceTemp = 3_400
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = nightProfile
         runCurrent()
-        assertEquals(listOf("temp=2700"), h.display.writes)
+        assertEquals(listOf("temp=2700", "nightLight=true"), h.display.writes, "no record: asserted (DD-060)")
         assertEquals(null, h.storedAnchor)
+        assertEquals(NightLightPrior(activated = false, kelvin = 1_500), h.storedPrior, "the anchor, not the ramp")
     }
 
     @Test
@@ -734,6 +736,7 @@ class DisplayTogglesCoordinatorTest {
     fun switchingTheFlagOn_fromASeededBaseline_writesTheExtendedSetpoint_DD048() = runTest(UnconfinedTestDispatcher()) {
         val seeded = extended700.copy(extendedNightLightEnabled = false) // the device shows 2596 for it
         val h = Harness(baseline = seeded, withService = true)
+        h.storedPrior = NightLightPrior(activated = false, kelvin = null) // Tideo wrote that (DD-060)
         h.coordinator.start(backgroundScope)
         h.effectiveFlow.value = seeded
         runCurrent()
@@ -839,6 +842,7 @@ class DisplayTogglesCoordinatorTest {
             "${after.display.writes}",
         )
         val later = Harness(baseline = profile)
+        later.storedPrior = after.storedPrior // `after`'s writes are still on the device (DD-060)
         later.coordinator.start(backgroundScope)
         later.effectiveFlow.value = profile
         runCurrent()
@@ -881,6 +885,69 @@ class DisplayTogglesCoordinatorTest {
         h.coordinator.stop()
         assertEquals(listOf("daltonizer=OFF", "nightLight=false", "temp=1500"), h.display.writes)
         assertEquals(null, h.storedPrior)
+    }
+
+    @Test
+    fun theNextStart_switchesNightLightBackOn_afterStopHandedItBack_DD060() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(baseline = nightProfile)
+        h.display.deviceTemp = 1_500
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        h.baselineFlow.value = nightProfile // the owner applied it to the baseline
+        h.coordinator.stop()
+        assertEquals(false, h.display.nightLightOn)
+        val next = DisplayTogglesCoordinator(
+            effectiveFlow = h.effectiveFlow,
+            baselineFlow = h.baselineFlow,
+            display = h.display,
+            tierProvider = { Tier.ELEVATED },
+            readPrior = { h.storedPrior },
+            writePrior = { h.storedPrior = it },
+        )
+        h.display.writes.clear()
+        next.start(backgroundScope)
+        runCurrent()
+        assertEquals(listOf("nightLight=true", "temp=2700"), h.display.writes)
+        assertEquals(NightLightPrior(activated = false, kelvin = 1_500), h.storedPrior)
+    }
+
+    @Test
+    fun theNextStart_leavesNightLightOff_whenTheContextNowPicksAProfileWithout_DD060() =
+        runTest(UnconfinedTestDispatcher()) {
+            val h = Harness(baseline = nightProfile)
+            h.coordinator.start(backgroundScope)
+            h.effectiveFlow.value = baseline
+            h.effectiveFlow.value = nightProfile
+            runCurrent()
+            h.baselineFlow.value = nightProfile // the live store still holds the last profile
+            h.coordinator.stop()
+            h.effectiveFlow.value = null // a new service: no evaluation yet
+            val next = DisplayTogglesCoordinator(
+                effectiveFlow = h.effectiveFlow,
+                baselineFlow = h.baselineFlow,
+                display = h.display,
+                tierProvider = { Tier.ELEVATED },
+                readPrior = { h.storedPrior },
+                writePrior = { h.storedPrior = it },
+            )
+            next.start(backgroundScope)
+            h.display.writes.clear()
+            h.effectiveFlow.value = baseline // time passed: the first evaluation picks a profile without it
+            runCurrent()
+            assertTrue(h.display.writes.none { it.startsWith("nightLight") }, "${h.display.writes}")
+            assertEquals(false, h.display.nightLightOn)
+        }
+
+    @Test
+    fun aStartWithTideosRecord_stillAdoptsTheBaseline_DD060() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(baseline = nightProfile)
+        h.storedPrior = NightLightPrior(activated = false, kelvin = 1_500) // the device still holds Tideo's writes
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        assertTrue(h.display.writes.isEmpty(), "a dead process's writes are still on the device: ${h.display.writes}")
     }
 
     @Test

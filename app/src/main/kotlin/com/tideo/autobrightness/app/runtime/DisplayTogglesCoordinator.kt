@@ -20,8 +20,8 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Applies display-toggle profile fields (D-151/D-152) through ELEVATED-gated [SecureDisplayController],
- * only on change: the seed adopts the baseline unwritten, stop returns to it (Night Light as found,
- * DD-059), D-154's ticker owns a circadian Kelvin (DC-056). Applies serialize under [applyMutex] (D-139).
+ * on change: seed adopts the baseline (DD-060), stop returns to it (Night Light as found, DD-059),
+ * D-154's ticker owns a circadian Kelvin (DC-056). Applies serialize under [applyMutex] (D-139).
  */
 class DisplayTogglesCoordinator(
     private val effectiveFlow: Flow<AabSettings?>,
@@ -78,8 +78,10 @@ class DisplayTogglesCoordinator(
                 val afterPanic = panicked.getAndSet(false)
                 if (lastApplied == null) {
                     val seed = DisplayToggleState.of(if (afterPanic) AabSettings() else seedSettings)
-                    lastApplied = seed
-                    deviceTempK = seed.temperatureK?.let { display.nightLightRange(seed.extended).clamp(it) }
+                    val handedBack = prior == null && seed.nightLight
+                    lastApplied = if (handedBack) seed.copy(nightLight = false) else seed
+                    deviceTempK = seed.temperatureK?.takeUnless { handedBack }
+                        ?.let { display.nightLightRange(seed.extended).clamp(it) }
                 }
             }
             launch { baselineFlow.collect { resting = it } }

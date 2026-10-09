@@ -606,3 +606,10 @@
   (2026-10-09) fixed four; accepted: sub-second races between stop and a successor or startup's
   record load, an owed write lost to process death right after stop, Night Light switched back on
   before an owed service Kelvin lands, and DD-057's flag-reset edge.
+  Corrected by DD-060.
+- DD-060 [cited]: **With no `NightLightPrior` stored, a service start asserts a baseline's Night Light
+  instead of adopting it (owner's device, 2026-10-09).** DD-059's stop hands Night Light back, so the
+  next start's baseline seed claimed an "on" the device no longer showed and left it off until a
+  manual Apply. The seed now takes Night Light as off with an unknown Kelvin, and the first
+  context-evaluated profile writes it; a baseline with Night Light off still adopts, so a system
+  Night Light the user turned on is not switched off at each start. Sol (2026-10-09): no defects.
