@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
@@ -21,7 +22,7 @@ import kotlinx.coroutines.sync.withLock
 /**
  * Applies display-toggle profile fields (D-151/D-152) through ELEVATED-gated [SecureDisplayController],
  * on change: seed adopts the baseline (DD-060), stop returns to it (Night Light as found, DD-059),
- * D-154's ticker owns a circadian Kelvin (DC-056). Applies serialize under [applyMutex] (D-139).
+ * D-154's ticker owns a circadian Kelvin (DC-056, DD-064). Applies serialize under [applyMutex] (D-139).
  */
 class DisplayTogglesCoordinator(
     private val effectiveFlow: Flow<AabSettings?>,
@@ -36,10 +37,13 @@ class DisplayTogglesCoordinator(
     private val readPrior: suspend () -> NightLightPrior? = { null },
     private val writePrior: suspend (NightLightPrior?) -> Unit = {},
     private val tickIntervalMs: Long = 60_000L,
+    private val recheckDelayMs: Long = RECHECK_DELAY_MS,
     private val temperatureRoute: NightLightTemperatureRoute = NightLightTemperatureRoute(display),
     private val handOffScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
 ) {
     private val applyMutex = Mutex()
+
+    private val recheck = Channel<Unit>(Channel.CONFLATED)
 
     // Last asserted or seeded state. Guarded by [applyMutex].
     private var lastApplied: DisplayToggleState? = null
@@ -92,6 +96,13 @@ class DisplayTogglesCoordinator(
                     applyMutex.withLock { tickLocked() }
                 }
             }
+            launch {
+                while (true) {
+                    recheck.receive()
+                    delay(recheckDelayMs)
+                    applyMutex.withLock { tickLocked() }
+                }
+            }
             effectiveFlow.filterNotNull().collect { effective ->
                 applyMutex.withLock {
                     latestEffective = effective
@@ -108,6 +119,7 @@ class DisplayTogglesCoordinator(
         job?.cancel(); job = null
         val owed = runBlocking {
             applyMutex.withLock {
+                latestEffective = null
                 resting?.let { applyLocked(DisplayToggleState.of(it), it, probe = false, nightLight = false) }
                 val held = prior
                 if (held != null) restorePriorLocked(held) else releaseAnchorLocked(settings = null)
@@ -253,19 +265,21 @@ class DisplayTogglesCoordinator(
                 circadianTemperature(settings, settings.nightLightTemperature ?: anchor)
             }
             if (kelvin != null) writeKelvinLocked(kelvin, settings, probe)
+            recheck.trySend(Unit)
         } else if (released) {
             val temperature = desired.temperatureK
             if (temperature == null) deviceTempK = null else writeKelvinLocked(temperature, settings, probe)
         }
     }
 
-    /** D-154: one circadian temperature tick. Caller holds [applyMutex]. */
+    /** D-154: one circadian temperature tick, also rewriting a key moved off what landed (DD-064). Caller holds [applyMutex]. */
     private suspend fun tickLocked() {
         val settings = latestEffective ?: return
         if (!settings.nightLightCircadianEnabled) return
         if (tierProvider() < Tier.ELEVATED) return
         val anchor = acquireAnchorLocked() ?: return // the tick acquires too: a grant can arrive after the swap
         val kelvin = circadianTemperature(settings, settings.nightLightTemperature ?: anchor) ?: return
+        if (display.nightLightAvailable && display.readNightLightTemperature() != deviceTempK) deviceTempK = null
         writeKelvinLocked(kelvin, settings)
     }
 
@@ -314,6 +328,7 @@ class DisplayTogglesCoordinator(
     }
 
     internal companion object {
+        const val RECHECK_DELAY_MS = 5_000L
         val panicked = AtomicBoolean(false) // DD-034: outlives the per-start instance (D-155)
     }
 }

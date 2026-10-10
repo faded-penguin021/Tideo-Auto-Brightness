@@ -17,8 +17,9 @@ Harness AMH 14.1.0 with its one hand step applied (DC-029…DC-036, DC-051); the
 (`scripts/session-facts.sh`, DC-030), settled by hand with
 `git ls-remote --tags --refs origin 'refs/tags/v*'`.
 
-The tree declares 1.14.0 / vc28 (the train paragraph under the Owner queue); its device round
-passed on 1.14.0-debug vc28 (DD-036), and a later build owes its own run. The 0–4095 conversion
+The tree declares 1.14.1 / vc29 (the train paragraph under the Owner queue); 1.14.0's device
+round passed on 1.14.0-debug vc28 (DD-036), and step 38a's #145 check passed on 1.14.1-debug vc29
+with a brief warmer tint before the expected one (DD-065). The 0–4095 conversion
 path stays frozen as built (DC-011…DC-013, DC-025…DC-028, DB-083), the light-stall findings H1/H2
 are DD-003/DD-002, no round script is alive (RUNBOOK §6, DB-010), the force-stop investigation
 stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
@@ -59,15 +60,22 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
    app/src/main/res/values-b+zh+Hans/strings.xml` prints 11.
 
-2. **[2026-10-04] Once this train is on `main`, check the translation badge.** The `Translation
-   badges` workflow first runs there. Worked if its Actions run is green and the README's 简体中文
-   badge shows a percentage. If its push was refused, let Actions create the `badges` branch
-   (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
-   `git ls-remote --heads origin badges` prints one line (DD-028).
+2. **[2026-10-10] Fix the intermittent CI hang in `DraftSettingsViewModelTest`; until then, rerun
+   on a hang.** The `Build` run on `main` for #144 (run 38039291255, attempt 1) sat in the ladder
+   step until cancelled; its thread dump shows Robolectric's main thread parked in
+   `setBaseline`'s `runBlocking { settingsDataStore.updateData { … } }`
+   (`DraftSettingsViewModelTest.kt:42`, from `edit_marksDirty_thenDiscardReverts`) with every
+   coroutine worker idle. The same tree passed on the PR, and attempt 2 got past it. The test is
+   old and flaked before (D-071, D-080). `release.yml` and `release-signing.yml` run the same
+   tests, so a hang there costs their 30-minute cap and a rerun, never a bad release; F-Droid
+   builds `assembleRelease` only and never runs tests. Needs a follow-up fix PR off `main`, on
+   your go-ahead. Worked when that PR is merged and a `Build` run on `main` is green; settles it:
+   `git log --oneline origin/main -- app/src/test/kotlin/com/tideo/autobrightness/app/state/DraftSettingsViewModelTest.kt`
+   shows a commit after 2026-10-10.
 
-**This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
-1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
-(500-character cap), never by bumping or creating `29.txt`; re-open only for something major, and
+**This train is `1.14.1` on vc29, its ONE bump** (the owner's patch bump of 2026-10-10 for #145,
+after `main` shipped 1.14.0 / vc28 as #144). Land further user-facing fixes in `changelogs/29.txt`
+(500-character cap), never by bumping or creating `30.txt`; re-open only for something major, and
 say so.
 
 ## Decided non-items
@@ -80,6 +88,11 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-10 — **1.14.1 / vc29 for #145: a circadian Night Light key that the device moved off
+  what Tideo wrote is rewritten by the next tick, and an apply gets an early tick 5 s later
+  (DD-064); owner-verified on device, with a brief warmer tint before the expected one (DD-065).**
+- 2026-10-10 — **Translation badges work on `main` (owner-confirmed; `badges` branch present,
+  DD-028).**
 - 2026-10-10 — **Owner-confirmed on device: Circadian follows a new location without a restart,
   the live card shows the applied scale, and the dusk scale refresh steps (DD-061…DD-063).**
 - 2026-10-09 — **Open question answered (a): AAB's 2-minute prof758 re-run refreshes the scale

@@ -2817,6 +2817,7 @@ the permanent registry — never compress or remove them.
   static-only: tracking is a runtime feature (stated in the help text). Folds into the
   unreleased 1.7.0/vc17 (`17.txt` +1 line); DEVICE_TEST_SCRIPT §11 step 38.
   Corrected by DC-056.
+  Corrected by DD-064.
 
 - D-155 [cited]: **Panic (Reset) also returns the privileged display toggles to their DEFAULTS (owner
   on-device finding on the 1.7.0 branch build: panic persisted the privileged keys).** The

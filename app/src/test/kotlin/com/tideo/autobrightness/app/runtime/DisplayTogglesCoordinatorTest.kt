@@ -62,6 +62,7 @@ class DisplayTogglesCoordinatorTest {
                 return Result.failure(SecurityException("refused"))
             }
             return gated("temp=$kelvin", nightLightAvailable)
+                .also { if (nightLightAvailable) deviceTemp = kelvin }
         }
         override fun readNightLightAutoMode() = NightLightAutoMode.MANUAL
         override fun readDaltonizer() = DaltonizerMode.OFF
@@ -777,6 +778,95 @@ class DisplayTogglesCoordinatorTest {
         assertTrue(h.service.sets.isEmpty())
     }
 
+    private val extendedCircadian = circadianProfile.copy(extendedNightLightEnabled = true)
+
+    @Test
+    fun aRampKeyMovedOffWhatLanded_isRewrittenUnderAnUnchangedSun_DD064() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(withService = true)
+        h.rampKelvin = 7_308
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = extendedCircadian
+        advanceTimeBy(6_000)
+        h.display.deviceTemp = 4_082 // #145: the key back on the device's own maximum
+        h.display.writes.clear()
+        h.service.sets.clear()
+        advanceTimeBy(60_000)
+        assertEquals(listOf("temp=7308"), h.display.writes)
+        assertEquals(listOf(7_308), h.service.sets)
+        h.display.writes.clear()
+        advanceTimeBy(60_000)
+        assertTrue(h.display.writes.isEmpty(), "a held key is not rewritten: ${h.display.writes}")
+    }
+
+    @Test
+    fun aSwitchOnTheOsOverrode_isRewrittenWithinTheRecheck_DD064() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(withService = true)
+        h.rampKelvin = 7_308
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = extendedCircadian
+        runCurrent()
+        assertEquals(listOf("nightLight=true", "temp=7308"), h.display.writes)
+        h.display.deviceTemp = 4_082 // the OS acting on the switch-on after Tideo's write
+        h.display.writes.clear()
+        advanceTimeBy(DisplayTogglesCoordinator.RECHECK_DELAY_MS + 1)
+        assertEquals(listOf("temp=7308"), h.display.writes, "well before the minute's tick")
+    }
+
+    @Test
+    fun anExtendedWriteWithNoRouteAtApply_isRetriedWithinTheRecheck_DD064() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(withService = true)
+        h.service.reachable = false // a Shizuku bind that did not answer in time
+        h.rampKelvin = 7_308
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = extendedCircadian
+        runCurrent()
+        assertEquals(4_082, h.display.deviceTemp)
+        h.service.reachable = true
+        advanceTimeBy(NightLightTemperatureRoute.SETTLE_MS + DisplayTogglesCoordinator.RECHECK_DELAY_MS + 1)
+        assertEquals(listOf(7_308), h.service.sets)
+        assertEquals(7_308, h.display.deviceTemp)
+    }
+
+    @Test
+    fun aPendingRecheck_writesNothing_onceTheProfileWentStatic_orTheServiceStopped_DD064() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.rampKelvin = 3_400
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = circadianProfile
+        advanceTimeBy(1_000)
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        h.display.deviceTemp = 3_000
+        h.display.writes.clear()
+        advanceTimeBy(DisplayTogglesCoordinator.RECHECK_DELAY_MS + 1)
+        assertTrue(h.display.writes.isEmpty(), "a static profile's Kelvin is not the ramp's: ${h.display.writes}")
+
+        h.effectiveFlow.value = circadianProfile
+        runCurrent()
+        h.coordinator.stop()
+        h.display.deviceTemp = 3_000
+        h.display.writes.clear()
+        advanceTimeBy(DisplayTogglesCoordinator.RECHECK_DELAY_MS + 1)
+        assertTrue(h.display.writes.isEmpty(), "nothing writes after stop(): ${h.display.writes}")
+    }
+
+    @Test
+    fun aStaticKelvinChangedByHand_stillSticks_DD064() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness()
+        h.coordinator.start(backgroundScope)
+        h.effectiveFlow.value = baseline
+        h.effectiveFlow.value = nightProfile
+        runCurrent()
+        h.display.deviceTemp = 3_000
+        h.display.writes.clear()
+        advanceTimeBy(3 * 60_000L)
+        assertTrue(h.display.writes.isEmpty(), "only a ramp owns the key: ${h.display.writes}")
+    }
+
     @Test
     fun panicReset_writesAllDefaults_unconditionally_D155() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness()
@@ -988,7 +1078,6 @@ class DisplayTogglesCoordinatorTest {
         runCurrent()
         advanceTimeBy(61_000); runCurrent()
         assertEquals(listOf(7_308), h.service.sets)
-        h.display.deviceTemp = 4_082 // the fake key does not track writes: what the restore leaves there
         h.service.quickRefused = true
         h.coordinator.stop()
         assertEquals(listOf(7_308, 4_082), h.service.sets, "the hand-off must reach the service")
