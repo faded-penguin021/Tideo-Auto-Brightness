@@ -656,3 +656,25 @@
   `circadianTimeContext`/`liveDynamicScale` pair shared by the pipeline, the tick and Night Light's
   D-154 Kelvin ramp, where AppModule had kept its own copy. JVM-tested; each of the three new tests
   fails under its own mutation, except the stop test, which the cancelled consumer also satisfies.
+- DD-064 [cited]: **While a circadian ramp owns the Night Light key, the tick rewrites a key that has
+  moved off the Kelvin that landed, even under an unchanged sun, and every circadian apply gets one
+  early tick 5 s later (#145, owner's OnePlus 13 on 1.14.0, 2026-10-10).** Night Light, Follow
+  circadian scaling and the extended range switched on in one daylight Apply left the key at 4082
+  until a second off/on Apply of the range, because D-154's only-on-change tick compared the ramp
+  with `deviceTempK` (what Tideo last landed), never with the key — which also broke D-154's "manual
+  changes do not stick while tracking" and step 38's "re-overridden within ~1 min". What wrote 4082
+  is not established: either the OS acting on the switch-on after Tideo's write (the retry, with
+  Night Light already on, held) or a Shizuku bind past its 4 s timeout falling back to the device
+  clamp; the early tick covers the first by the read-back and the second by retrying the bridge,
+  since the extended clamp differs from what landed. A held key still writes nothing, a static
+  profile's manual change still sticks (D-151), `stop()` drops the effective profile so a late
+  tick finds nothing to write (glue review), and two cases cost a rewrite a minute (accepted): a
+  device that keeps moving the key back, and a key-ignoring build with the service unreachable,
+  whose key-only write never counts as landed (DC-057). JVM-tested, the test fake now storing a
+  Kelvin write so the key reads back as a device's does; device-verified by DD-065.
+- DD-065: **DD-064 is device-verified: on the owner's OnePlus 13, 1.14.1-debug vc29 (owner,
+  2026-10-10), the #145 check in step 38a passed, with the extended range taking hold on one
+  Apply.** The owner saw the panel very briefly at a lower (warmer) temperature before it
+  settled at the expected one; it is not a full red flash. Its cause is not established, and no
+  fix is made for it; step 38a now expects it, so a later run can tell whether it grows or goes
+  away.

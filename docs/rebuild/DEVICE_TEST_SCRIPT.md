@@ -565,8 +565,12 @@ Apply writes the device directly (`applyNow`). Debug builds need their own grant
     to the device's minimum (2596 on stock) rather than staying at 1000, and the slider label still
     reads 1000 K (a stored setpoint is kept, clamped only when applied). Turn it back on with
     **Follow circadian scaling**, service ON, in daylight. **Expected:** the key sits near 7308 and
-    Night Light switching on is barely visible. Stop Shizuku (skip this check on a rooted phone,
-    where root still carries the bridge), reopen the screen. **Expected:** the
+    Night Light switching on is barely visible. Turn Night Light, **Follow circadian scaling** and
+    the row off and Apply, then turn all three on together and Apply once (#145, DD-064).
+    **Expected:** within about 5 s the key reads 7308, with no second Apply; a very short dip to a
+    warmer tint before the expected one is known (DD-065), so note only if it lasts longer.
+    Stop Shizuku (skip this check on a rooted phone, where root still carries the bridge), reopen
+    the screen. **Expected:** the
     row stays visible with the "needs Shizuku" note, and with no Apply (there is nothing to apply)
     the next tick drops the key to the top of the device's range (4082 on stock). Turn **Follow
     circadian scaling** off and Apply. **Expected:** the key lands the device's minimum (2596 on

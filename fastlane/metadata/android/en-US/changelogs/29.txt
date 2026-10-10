@@ -1,0 +1,3 @@
+Fixes:
+- Night Light with Follow circadian scaling takes hold on the first Apply, extended range included
+- while it follows the sun, a temperature changed elsewhere is put back within a minute
