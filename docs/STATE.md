@@ -59,12 +59,6 @@ stays closed (DB-051…DB-060), and Scorecard.dev is a run-once local input.
    'name="settings_night_light_extended"' -e 'name="pd_night_light_extended'
    app/src/main/res/values-b+zh+Hans/strings.xml` prints 11.
 
-2. **[2026-10-04] Once this train is on `main`, check the translation badge.** The `Translation
-   badges` workflow first runs there. Worked if its Actions run is green and the README's 简体中文
-   badge shows a percentage. If its push was refused, let Actions create the `badges` branch
-   (Settings → Actions → Workflow permissions, or the blocking ruleset) and rerun it. Settles it:
-   `git ls-remote --heads origin badges` prints one line (DD-028).
-
 **This train is `1.14.0` on vc28, its ONE bump** (the owner's minor bump of 2026-10-04, moved off
 1.13.0 / vc27 when `main` shipped #141). Land further user-facing fixes in `changelogs/28.txt`
 (500-character cap), never by bumping or creating `29.txt`; re-open only for something major, and
@@ -80,6 +74,8 @@ proposing work; changing it is legislation under RUNBOOK's rule-review protocol.
 
 Newest first; ledger rows are the durable detail.
 
+- 2026-10-10 — **Translation badges work on `main` (owner-confirmed; `badges` branch present,
+  DD-028).**
 - 2026-10-10 — **Owner-confirmed on device: Circadian follows a new location without a restart,
   the live card shows the applied scale, and the dusk scale refresh steps (DD-061…DD-063).**
 - 2026-10-09 — **Open question answered (a): AAB's 2-minute prof758 re-run refreshes the scale
